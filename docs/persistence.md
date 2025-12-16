@@ -475,6 +475,70 @@ Like glTF/GLB for 3D, we support multiple formats:
 | `.cellsb` | ~120 KB | ~5ms |
 | `.cellsb` + zstd | ~50 KB | ~8ms |
 
+## File Size Analysis
+
+### Per-Cell Overhead
+
+**Our .cells format (text):**
+```
+X nP6kR2mW kR7pN2wQ jH4sW8nF n 42
+```
+- Cell ID: 8 chars
+- Col ID: 8 chars
+- Row ID: 8 chars
+- Structure: ~10 chars (prefixes, spaces, newline)
+- **Fixed overhead: ~34 bytes + value**
+
+**XLSX (uncompressed XML inside zip):**
+```xml
+<c r="A1"><v>42</v></c>
+```
+- Cell ref: 2-5 chars (A1 to XFD1048576)
+- Structure: ~15 chars
+- **Fixed overhead: ~17-20 bytes + value**
+
+XLSX is always zip-compressed; our format has .cellsz and .cellsb options.
+
+### Comparison by Scenario
+
+| Scenario | .cells | .cellsz | .cellsb+zstd | XLSX |
+|----------|--------|---------|--------------|------|
+| 10K numeric cells | ~400 KB | ~80 KB | ~50 KB | ~60 KB |
+| 10K text cells | ~600 KB | ~120 KB | ~80 KB | ~80 KB |
+| 10K formula cells | ~800 KB | ~150 KB | ~90 KB | ~100 KB |
+| Sparse: 100 cells in 1M grid | ~4 KB | ~1 KB | ~1 KB | ~8 KB |
+| 1M cells (numbers) | ~40 MB | ~8 MB | ~5 MB | ~6 MB |
+
+### Where UUIDs Cost Most
+
+Formulas have the highest UUID overhead since each cell reference uses two 8-char IDs:
+
+```
+Excel:  =SUM(B2:D10)
+Ours:   =SUM($fG7nP2wR$qM2kL5pR:$jK4sT8yL$yB9tX3wN)
+```
+
+A formula-heavy sheet can be 2-3x larger in uncompressed text. Compression largely eliminates this difference.
+
+### Why UUIDs Are Worth It
+
+1. **Compression closes the gap** - .cellsz is within 20-30% of XLSX
+2. **Binary beats XLSX** - .cellsb+zstd is often smaller than XLSX
+3. **Sparse data wins** - we only store existing cells
+4. **Git-friendliness** - text overhead enables clean diffs
+5. **CRDT stability** - UUIDs enable conflict-free collaboration
+
+### Recommended Format by Use Case
+
+| Use Case | Format | Rationale |
+|----------|--------|-----------|
+| Git repos, < 10K cells | `.cells` | Human-readable, clean diffs |
+| Git repos, 10K-100K cells | `.cellsz` | Compressed, diffable with git filter |
+| Large files, fast loading | `.cellsb` | Binary, random access |
+| Sharing, archival | `.cellsb` + zstd | Smallest size |
+
+The 8-char base62 IDs (62^8 = 218 trillion combinations) are the minimum viable size for collision resistance in large collaborative documents.
+
 ## Binary Format (`.cellsb`)
 
 ### Structure
