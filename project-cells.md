@@ -41,44 +41,52 @@ A high-performance, collaborative spreadsheet engine with:
 ## Core Components
 
 ### 1. [Data Model](./docs/data-model.md)
+
 - UUID-based cell identification
 - N-dimensional sparse structure
 - Doubly-linked dimension chains with gap encoding
 
 ### 2. [Type System](./docs/type-system.md)
+
 - **Completely optional** - works exactly like Excel by default
 - Column typing as gradual discovery (not enforced like AirTable)
 - Features Excel can't represent (stickiness): relations, select options, validation
 - Always exportable to XLSX (with warnings for feature loss)
 
 ### 3. [Formula Engine](./docs/formula-engine.md)
+
 - Excel formula parser → AST
 - AST → Luau transpiler
 - Sandboxed Luau execution
 - Dependency graph for reactive updates
 
 ### 4. [CRDT & Collaboration](./docs/crdt.md)
+
 - Operation-based CRDT for cell mutations
 - Dimension structure CRDTs (insert/delete/reorder)
 - Conflict resolution strategies
 
 ### 5. [Persistence & File Format](./docs/persistence.md)
+
 - Git-diff-friendly text format
 - Binary format for large files
 - Import/export (xlsx, csv)
 
 ### 6. [Rendering](./docs/rendering.md)
+
 - Virtual viewport with aggressive culling
 - Dirty region tracking
 - Platform-specific backends
 
 ### 7. [Networking & Collaboration](./docs/networking.md)
+
 - WebRTC peer-to-peer connections
 - No relay server for document data
 - Lightweight signaling for connection setup
 - Mesh topology for small groups
 
 ### 8. [Cross-Platform Strategy](./docs/cross-platform.md)
+
 - Core as shared C/C++ library
 - WebAssembly compilation for web
 - Platform-native UI (SwiftUI, WinUI, React)
@@ -116,12 +124,14 @@ cells/
 ## Key Design Decisions
 
 ### Why UUID-based cells instead of (row, col)?
+
 1. **CRDT-friendly**: No coordinate conflicts during concurrent edits
 2. **Stable references**: Moving cells doesn't break formulas
 3. **Sparse by nature**: Only allocated cells consume memory
 4. **Multi-dimensional**: Generalizes beyond 2D trivially
 
 ### Why Luau for formulas?
+
 1. **App Store compliant**: No JIT = accepted on iOS/macOS sandboxed apps
 2. **Faster than Lua 5.4**: Roblox-optimized VM, type-aware optimizations
 3. **Sandboxable**: Built-in sandboxing, proven at Roblox scale
@@ -129,6 +139,7 @@ cells/
 5. **Well-maintained**: Active development, open-source (MIT)
 
 ### Why doubly-linked dimensions with gaps?
+
 1. **O(1) insert/delete**: No array shifting
 2. **Sparse-friendly**: Gap encoding avoids empty nodes
 3. **CRDT-compatible**: Each link is independently addressable
@@ -179,6 +190,7 @@ Cells works exactly like Excel out of the box. Advanced features are **opt-in an
 ### Stickiness Through Features Excel Can't Represent
 
 These features create value that keeps users in Cells:
+
 - **Relations**: Link cells to rows in other sheets (stable UUID references, not fragile A1)
 - **Select/Multi-select**: Dropdown options with colors (stored in column, not data validation hacks)
 - **Column validation**: Required fields, unique constraints, regex patterns
@@ -186,6 +198,7 @@ These features create value that keeps users in Cells:
 - **API-first**: Every sheet is queryable via API
 
 **Critical**: When exporting to XLSX, clearly inform users which features will be lost:
+
 ```
 ⚠ Export to Excel
 
