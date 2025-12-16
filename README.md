@@ -17,17 +17,17 @@ A high-performance, collaborative spreadsheet engine with:
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Grid Renderer (C/C++)                        │
+│                     Grid Renderer (C++17)                        │
 │        Virtual scrolling, viewport culling, dirty regions        │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Core Engine (C/C++)                           │
+│                    Core Engine (C++17)                           │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
 │  │ Data Model  │  │ Formula     │  │ CRDT / Collaboration    │  │
 │  │ (Cells,     │◄─┤ Engine      │  │ Engine                  │  │
-│  │ Dimensions) │  │ (Lua + AST) │  │                         │  │
+│  │ Dimensions) │  │ (Luau+AST)  │  │                         │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -87,38 +87,36 @@ A high-performance, collaborative spreadsheet engine with:
 
 ### 8. [Cross-Platform Strategy](./docs/cross-platform.md)
 
-- Core as shared C/C++ library
+- Core as shared C++17 library
 - WebAssembly compilation for web
 - Platform-native UI (SwiftUI, WinUI, React)
 
-## Directory Structure (Proposed)
+## Directory Structure
 
 ```
 cells/
-├── core/                   # C/C++ core engine
-│   ├── src/
-│   │   ├── model/          # Data structures
-│   │   ├── formula/        # Formula engine
-│   │   ├── crdt/           # Collaboration
-│   │   ├── persistence/    # File I/O
-│   │   └── api/            # C API for bindings
-│   ├── lua/                # Embedded Lua + sandbox
-│   └── tests/
+├── WORKSPACE               # Bazel workspace root
+├── core/                   # C++17 core engine
+│   ├── BUILD
+│   ├── cells/              # Main library
+│   │   ├── BUILD
+│   │   ├── *.h             # Headers
+│   │   ├── *.cc            # Implementation
+│   │   └── *_test.cc       # Tests (colocated)
+│   └── testdata/           # Sample .cells files
 ├── renderer/               # Grid rendering layer
-│   ├── src/
 │   └── shaders/            # If using GPU
 ├── bindings/               # Language bindings
 │   ├── wasm/               # WebAssembly build
 │   ├── swift/              # iOS/macOS
-│   ├── kotlin/             # Android
-│   └── node/               # Node.js (optional)
+│   └── kotlin/             # Android
 ├── apps/                   # Platform apps
 │   ├── web/
 │   ├── macos/
 │   ├── ios/
 │   └── windows/
 ├── docs/                   # Architecture docs
-└── tools/                  # Dev tools, converters
+└── plans/                  # Implementation plans
 ```
 
 ## Key Design Decisions
@@ -145,10 +143,24 @@ cells/
 3. **CRDT-compatible**: Each link is independently addressable
 4. **Flexible iteration**: Forward/backward traversal
 
-## Build & Compilation Strategy
+## Build System
+
+**Bazel** - Fast incremental builds, hermetic, scales well.
+
+```bash
+# Build all
+bazel build //core/...
+
+# Run tests
+bazel test //core/...
+
+# Build for specific platform
+bazel build //core:cells --config=macos
+bazel build //core:cells --config=wasm
+```
 
 ```
-                    C/C++ Core Source
+                    C++17 Core Source
                           │
           ┌───────────────┼───────────────┐
           ▼               ▼               ▼
@@ -169,6 +181,8 @@ cells/
 
 ## Decisions Made
 
+- [x] **Language**: C++17 for core engine (C for heavy independent tasks)
+- [x] **Build system**: Bazel - fast incremental builds, hermetic
 - [x] **Formula runtime**: Luau (not Lua/LuaJIT) - App Store compliant, faster, well-maintained
 - [x] **Cell storage**: Sharded hashmap - O(1) access, parallelizable
 - [x] **Undo/redo**: Branch-based history - aligns with git-friendly philosophy, clean CRDT semantics
