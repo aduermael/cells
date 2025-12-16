@@ -12,7 +12,7 @@ A high-performance, collaborative spreadsheet engine with:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        UI Layer                                  │
-│   (Platform-specific: Native views / WebGL Canvas / Flutter)    │
+│   (Platform-native: SwiftUI / WinUI / React+Canvas)             │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -72,10 +72,16 @@ A high-performance, collaborative spreadsheet engine with:
 - Dirty region tracking
 - Platform-specific backends
 
-### 7. [Cross-Platform Strategy](./docs/cross-platform.md)
+### 7. [Networking & Collaboration](./docs/networking.md)
+- WebRTC peer-to-peer connections
+- No relay server for document data
+- Lightweight signaling for connection setup
+- Mesh topology for small groups
+
+### 8. [Cross-Platform Strategy](./docs/cross-platform.md)
 - Core as shared C/C++ library
 - WebAssembly compilation for web
-- UI layer options and recommendations
+- Platform-native UI (SwiftUI, WinUI, React)
 
 ## Directory Structure (Proposed)
 
@@ -156,7 +162,8 @@ cells/
 - [x] **Cell storage**: Sharded hashmap - O(1) access, parallelizable
 - [x] **Undo/redo**: Branch-based history - aligns with git-friendly philosophy, clean CRDT semantics
 - [x] **Dimensions**: Start with 2D, but model supports N dimensions - naming and structures are dimension-agnostic
-- [x] **UI framework**: Flutter (desktop/mobile) + React+Canvas (web)
+- [x] **UI framework**: Platform-native (SwiftUI for Apple, WinUI for Windows, React+Canvas for web)
+- [x] **Networking**: P2P via WebRTC - no relay servers, CRDT-native sync
 - [x] **Type system**: Optional/gradual typing - dynamic by default, column-level type constraints optional
 
 ## Design Philosophy

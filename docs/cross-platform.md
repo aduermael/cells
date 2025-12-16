@@ -375,175 +375,174 @@ public class CellsWorkbook : IDisposable
 }
 ```
 
-## UI Framework Options
+## UI Framework Strategy
 
-### Option A: Fully Native
+### Decision: Platform-Native UIs
 
-Each platform has its own UI:
+For maximum snappiness and native feel, each platform gets its own native UI:
 
-| Platform | Framework | Pros | Cons |
-|----------|-----------|------|------|
-| Web | React + Canvas | Full web integration | Separate codebase |
-| macOS | SwiftUI/AppKit | Native feel | Apple only |
-| iOS | SwiftUI/UIKit | Native feel | Apple only |
-| Windows | WPF/WinUI | Native feel | Windows only |
-| Android | Jetpack Compose | Native feel | Android only |
+| Platform | Framework | Language | Notes |
+|----------|-----------|----------|-------|
+| **macOS** | SwiftUI | Swift | Native feel, best performance |
+| **iOS** | SwiftUI | Swift | Shared code with macOS |
+| **Web** | React + Canvas | TypeScript | Full web integration |
+| **Windows** | WinUI 3 | C# | Modern Windows native |
+| **Android** | Jetpack Compose | Kotlin | Material 3 native |
 
-**Recommendation if team is large** - best UX per platform
+### Why Not Flutter/Cross-Platform?
 
-### Option B: Cross-Platform UI Framework
+1. **Performance**: Native frameworks are always snappier
+2. **Platform integration**: Better gestures, menus, shortcuts
+3. **AI-assisted development**: Maintaining multiple UIs is now practical
+4. **User expectations**: Spreadsheets need to feel "right" on each platform
+5. **App Store**: Native apps get better treatment
 
-Single UI codebase:
+### Architecture
 
-| Framework | Platforms | Language | Rendering | Notes |
-|-----------|-----------|----------|-----------|-------|
-| **Flutter** | All + Web | Dart | Skia (own) | Good for custom UIs |
-| React Native | Mobile + Web | JS/TS | Native views | Web via react-native-web |
-| Tauri | Desktop + Web | Rust + Web | WebView | Lightweight |
-| Qt | Desktop | C++ | Own | Mature, complex |
-| Electron | Desktop | JS | Chromium | Heavy |
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Platform UI Layer                             │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────┐  │
+│  │ SwiftUI │ │ SwiftUI │ │ React   │ │ WinUI 3 │ │ Compose  │  │
+│  │ (macOS) │ │ (iOS)   │ │ (Web)   │ │ (Win)   │ │ (Android)│  │
+│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └────┬─────┘  │
+│       │           │           │           │           │         │
+│       └───────────┴───────────┴─────┬─────┴───────────┘         │
+│                                     │                           │
+│                        Platform Bindings                        │
+│                        (Swift / JS / C# / Kotlin)               │
+└─────────────────────────────────────┼──────────────────────────┘
+                                      │
+┌─────────────────────────────────────┼──────────────────────────┐
+│                      Core Engine (C/C++)                        │
+│                            C API                                │
+└─────────────────────────────────────────────────────────────────┘
+```
 
-**Recommendation: Flutter**
+### Code Sharing Between Platforms
 
-Reasons:
-1. Compiles to native code (not JS bridge)
-2. Canvas-based rendering suits spreadsheet needs
-3. Single codebase for mobile, desktop, and web
-4. Good FFI support for calling C/C++
+While UIs are separate, significant code is shared:
 
-### Option C: Hybrid (Recommended)
+| Layer | Shared? | Notes |
+|-------|---------|-------|
+| Core engine | 100% | C/C++, all platforms |
+| C API | 100% | Universal interface |
+| Bindings | ~80% | Per-language, not per-platform |
+| UI patterns | ~60% | Similar architecture, different syntax |
+| Business logic | ~50% | Can share via core or thin layer |
 
-- **Core + Grid Renderer**: C/C++ (shared)
-- **Web**: React + Canvas calling WASM core
-- **Desktop/Mobile**: Flutter calling native core via FFI
+## SwiftUI Integration (Apple Platforms)
 
-This gives:
-- Best web experience (not WebView)
-- Native performance on all platforms
-- Shared core logic
+```swift
+// CellsApp/Core/CellsBindings.swift
 
-## Flutter Integration
+import Foundation
 
-```dart
-// lib/cells_bindings.dart
-import 'dart:ffi';
-import 'dart:io';
+// Load the core library
+@_silgen_name("cells_workbook_new")
+func cells_workbook_new() -> OpaquePointer
 
-// Load native library
-final DynamicLibrary cellsLib = Platform.isAndroid
-    ? DynamicLibrary.open('libcells.so')
-    : Platform.isIOS
-        ? DynamicLibrary.process()
-        : Platform.isMacOS
-            ? DynamicLibrary.open('libcells.dylib')
-            : DynamicLibrary.open('cells.dll');
+@_silgen_name("cells_workbook_free")
+func cells_workbook_free(_ handle: OpaquePointer)
 
-// Bindings
-typedef CellsWorkbookNewNative = Pointer Function();
-typedef CellsWorkbookNewDart = Pointer Function();
+@_silgen_name("cells_render")
+func cells_render(_ sheet: OpaquePointer, _ viewport: UnsafePointer<CellsViewport>) -> UnsafeMutablePointer<CellsDrawList>
 
-final cellsWorkbookNew = cellsLib
-    .lookupFunction<CellsWorkbookNewNative, CellsWorkbookNewDart>(
-        'cells_workbook_new');
-
-// Dart wrapper class
+// Swift wrapper
+@Observable
 class Workbook {
-  final Pointer _handle;
+    private var handle: OpaquePointer
 
-  Workbook() : _handle = cellsWorkbookNew();
+    init() {
+        handle = cells_workbook_new()
+    }
 
-  // ... methods
+    deinit {
+        cells_workbook_free(handle)
+    }
+
+    func render(sheet: Int, viewport: CellsViewport) -> [DrawCommand] {
+        var vp = viewport
+        let drawList = cells_render(getSheet(sheet), &vp)
+        defer { cells_drawlist_free(drawList) }
+        return parseDrawList(drawList)
+    }
 }
 ```
 
-```dart
-// lib/grid_widget.dart
-import 'package:flutter/material.dart';
+```swift
+// CellsApp/Views/SpreadsheetView.swift
 
-class SpreadsheetGrid extends StatefulWidget {
-  final Workbook workbook;
-  final int sheetIndex;
+import SwiftUI
 
-  const SpreadsheetGrid({
-    required this.workbook,
-    required this.sheetIndex,
-  });
+struct SpreadsheetView: View {
+    @State private var workbook: Workbook
+    @State private var scrollOffset: CGPoint = .zero
+    @State private var zoom: CGFloat = 1.0
 
-  @override
-  State<SpreadsheetGrid> createState() => _SpreadsheetGridState();
-}
+    var body: some View {
+        GeometryReader { geometry in
+            Canvas { context, size in
+                let viewport = CellsViewport(
+                    scroll_x: Float(scrollOffset.x),
+                    scroll_y: Float(scrollOffset.y),
+                    width: Float(size.width),
+                    height: Float(size.height),
+                    zoom: Float(zoom)
+                )
 
-class _SpreadsheetGridState extends State<SpreadsheetGrid> {
-  double scrollX = 0;
-  double scrollY = 0;
+                let commands = workbook.render(sheet: 0, viewport: viewport)
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onPanUpdate: (details) {
-        setState(() {
-          scrollX -= details.delta.dx;
-          scrollY -= details.delta.dy;
-        });
-      },
-      child: CustomPaint(
-        painter: GridPainter(
-          workbook: widget.workbook,
-          sheetIndex: widget.sheetIndex,
-          scrollX: scrollX,
-          scrollY: scrollY,
-        ),
-        size: Size.infinite,
-      ),
-    );
-  }
-}
-
-class GridPainter extends CustomPainter {
-  final Workbook workbook;
-  final int sheetIndex;
-  final double scrollX, scrollY;
-
-  GridPainter({
-    required this.workbook,
-    required this.sheetIndex,
-    required this.scrollX,
-    required this.scrollY,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Get draw commands from C core
-    final commands = workbook.render(
-      sheetIndex,
-      Viewport(scrollX, scrollY, size.width, size.height),
-    );
-
-    // Execute commands on Flutter canvas
-    for (final cmd in commands) {
-      switch (cmd.type) {
-        case DrawType.rect:
-          canvas.drawRect(
-            Rect.fromLTWH(cmd.x, cmd.y, cmd.w, cmd.h),
-            Paint()..color = Color(cmd.color),
-          );
-          break;
-        case DrawType.text:
-          final textPainter = TextPainter(
-            text: TextSpan(text: cmd.text, style: TextStyle(color: Color(cmd.color))),
-            textDirection: TextDirection.ltr,
-          );
-          textPainter.layout();
-          textPainter.paint(canvas, Offset(cmd.x, cmd.y));
-          break;
-        // ...
-      }
+                for cmd in commands {
+                    switch cmd {
+                    case .rect(let rect, let color):
+                        context.fill(
+                            Path(rect),
+                            with: .color(Color(color))
+                        )
+                    case .text(let text, let point, let style):
+                        context.draw(
+                            Text(text).font(style.font),
+                            at: point
+                        )
+                    case .line(let from, let to, let color):
+                        context.stroke(
+                            Path { p in
+                                p.move(to: from)
+                                p.addLine(to: to)
+                            },
+                            with: .color(Color(color))
+                        )
+                    }
+                }
+            }
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        scrollOffset.x -= value.translation.width
+                        scrollOffset.y -= value.translation.height
+                    }
+            )
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        zoom = value
+                    }
+            )
+        }
     }
-  }
+}
 
-  @override
-  bool shouldRepaint(GridPainter old) =>
-      scrollX != old.scrollX || scrollY != old.scrollY;
+// For high-performance rendering, can drop to Metal
+struct MetalSpreadsheetView: NSViewRepresentable {
+    let workbook: Workbook
+
+    func makeNSView(context: Context) -> MTKView {
+        let view = MTKView()
+        view.device = MTLCreateSystemDefaultDevice()
+        // ... Metal setup for 60fps scrolling
+        return view
+    }
 }
 ```
 
@@ -622,18 +621,23 @@ Build Pipeline:
   4. CI tests all platforms
 ```
 
-## Summary Recommendation
+## Summary
 
 | Component | Technology | Rationale |
 |-----------|------------|-----------|
 | Core engine | C/C++ | Performance, portability |
-| Formulas | Lua 5.4 | WASM compatible, sandboxable |
-| Web UI | React + Canvas | Best web experience |
-| Desktop/Mobile UI | Flutter | Single codebase, native perf |
+| Formulas | Luau | App Store compliant, fast |
+| macOS/iOS UI | SwiftUI | Native feel, maximum snappiness |
+| Web UI | React + Canvas | Full web integration |
+| Windows UI | WinUI 3 | Modern Windows native |
+| Android UI | Jetpack Compose | Material 3 native |
+| Networking | WebRTC P2P | Modern, serverless sync |
 | Build | CMake + platform tools | Industry standard |
 | IPC | C API + FFI | Universal, type-safe |
 
-Start with:
-1. Core engine (C/C++) with comprehensive C API
-2. WASM build + React web app (fastest iteration)
-3. Then Flutter for native apps (reuse core)
+### Development Order
+
+1. **Core engine** (C/C++) with comprehensive C API
+2. **Swift bindings** + SwiftUI app (primary platform)
+3. **WASM build** + React web app
+4. Other platforms as needed
