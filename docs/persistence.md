@@ -22,13 +22,17 @@ Short ID:   Kj7mXp2Q                               (8 chars)
 8 chars of base62 = 62^8 = **218 trillion** combinations. More than enough for any document, and still globally unique enough in practice.
 
 ```c
-// ID generation
+// ID generation (with rejection sampling to avoid modulo bias)
 char* generate_id() {
     static const char base62[] =
         "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     char id[9];
     for (int i = 0; i < 8; i++) {
-        id[i] = base62[random_byte() % 62];
+        uint8_t r;
+        do {
+            r = random_byte();
+        } while (r >= 248);  // 248 = 62*4, reject to avoid bias
+        id[i] = base62[r % 62];
     }
     id[8] = '\0';
     return strdup(id);
@@ -62,7 +66,6 @@ The visual order of columns/rows is stored in an **order list**, separate from t
 ```
 #cells v1
 D <doc-id> "<name>"
-N <node-id>
 
 S <sheet-id> "<name>"
 
@@ -92,7 +95,6 @@ A simple spreadsheet with: A1=2, A2="foo", D4==A1+10
 ```
 #cells v1
 D Qx7mXp2L "Untitled"
-N Wk4nJ9sR
 
 S bF3hL8mN "Sheet1"
 
@@ -116,7 +118,6 @@ X wK3nJ7pM vT5mK9xL yB9tX3wN f "=$kR7pN2wQ$jH4sW8nF+10"
 | ID | Type | Meaning |
 |----|------|---------|
 | `Qx7mXp2L` | Doc | Document ID |
-| `Wk4nJ9sR` | Node | This replica's ID (for CRDT) |
 | `bF3hL8mN` | Sheet | Sheet ID |
 | `kR7pN2wQ` | Column | First column → displays as **A** |
 | `vT5mK9xL` | Column | Second column, gap:2 before it → displays as **D** |
@@ -131,7 +132,6 @@ The formula `=$kR7pN2wQ$jH4sW8nF+10` references column `kR7pN2wQ` (A) and row `j
 ```
 #cells v1
 D Kj7mXp2Q "Budget 2024"
-N pL4nR8wS
 
 S tH2kM6xN "Q1 Expenses"
 
@@ -198,7 +198,6 @@ All IDs are random 8-char base62 strings. The UI computes display names (A, B, C
 |--------|---------|--------|
 | `#cells` | Format version | `#cells v1` |
 | `D` | Document ID & name | `D <id> "<name>"` |
-| `N` | Node ID (this replica for CRDT) | `N <id>` |
 | `S` | Sheet definition | `S <id> "<name>"` |
 | `#cols` | Start columns section | |
 | `C` | Column (doubly-linked) | `C <id> <prev>[:<gap>] <next>[:<gap>] [props...]` |
@@ -233,9 +232,15 @@ C <id> <prev>[:<gap-before>] <next>[:<gap-after>] [key:value...]
 | `R r2 r1 r4:1` | Row 2: prev is r1 (gap 0), next is r4 (gap 1 = row 3 empty) |
 | `C cX ~ cY w:200 name:"Total"` | Column with custom width and name |
 
-#### Node ID (N)
+#### Node ID (Runtime, Not Stored)
 
-The node ID identifies this replica in the CRDT system. Used in HLC timestamps:
+Node IDs identify replicas in the CRDT system but are **not stored in document files**. They are a runtime concern:
+
+- **Stored in engine config** (e.g., `~/.cells/node_id` or app preferences)
+- **Generated once per install** and reused across all documents
+- **Used when creating new operations** (the engine stamps its node ID on edits)
+
+Node IDs appear in **OpLog entries** as historical attribution (who made each change):
 
 ```
 HLC: 1705312200000.0.N3f8hJ2w
@@ -244,6 +249,11 @@ HLC: 1705312200000.0.N3f8hJ2w
 ```
 
 When two users edit the same cell at the exact same millisecond, node ID breaks the tie deterministically.
+
+This separation means:
+- Files contain document data, not instance identity
+- Sharing files doesn't cause node ID conflicts
+- No unnecessary diffs when different users save
 
 #### Cell Types
 
@@ -429,7 +439,7 @@ File sections are ordered for progressive loading:
 
 ```
 #cells v1
-D ... N ...          # 1. Document metadata (instant)
+D ...                # 1. Document metadata (instant)
 S ...                # 2. Sheet structure
 #cols / #rows        # 3. Grid structure (render empty grid)
 #cells               # 4. Cell data (progressive fill)
@@ -675,9 +685,6 @@ Workbook* parse_cells_file(const char* content, size_t len) {
             case 'D':  // Document
                 parse_document(&p, line);
                 break;
-            case 'N':  // Node ID
-                parse_node(&p, line);
-                break;
             case 'S':  // Sheet
                 parse_sheet(&p, line);
                 break;
@@ -849,7 +856,6 @@ void serialize_workbook(Workbook* wb, FILE* out) {
     // Header
     fprintf(out, "#cells v1\n");
     fprintf(out, "D %s \"%s\"\n", wb->id, escape_string(wb->name));
-    fprintf(out, "N %s\n", wb->node_id);
     fprintf(out, "\n");
 
     // Each sheet
