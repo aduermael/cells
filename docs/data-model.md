@@ -8,116 +8,114 @@ The fundamental unit of data. Each cell is identified by a UUID, not coordinates
 ```c
 typedef struct Cell {
     uuid_t id;                    // Unique identifier
-    CellValue value;              // Raw value (number, string, etc.)
-    char* formula;                // Original formula text (if any)
-    CompiledFormula* compiled;    // Lua bytecode (if formula)
-    DimensionLink* dim_links;     // Array of links, one per dimension
-    uint32_t dim_count;           // Number of dimensions this cell participates in
+    uuid_t x;                     // Column axis UUID
+    uuid_t y;                     // Row axis UUID
+
+    // Value (pointer for recycle pool optimization)
+    char* value;                  // Raw value as string (NULL = empty)
+    CellValueType type;           // Interpreted type (or inferred from string)
+    CellError error;              // Error state (CELL_OK = no error)
+
+    // Formula (single pointer to combined struct)
+    Formula* formula;             // Formula text + compiled bytecode (NULL = not a formula)
 
     // Metadata
     CellStyle* style;             // Formatting (optional, can be NULL)
-    uint64_t modified_at;         // Lamport timestamp for CRDT
-    uuid_t modified_by;           // Node ID for CRDT
+    uint64_t modified_at;         // HLC timestamp for CRDT
 } Cell;
 
-typedef union CellValue {
-    double number;
-    char* string;
-    bool boolean;
-    CellError error;
-    // NULL represented by tag
-} CellValue;
-
 typedef enum CellValueType {
-    CELL_NULL,
-    CELL_NUMBER,
-    CELL_STRING,
-    CELL_BOOLEAN,
-    CELL_ERROR
+    CELL_TYPE_AUTO,               // Infer from string content
+    CELL_TYPE_NUMBER,
+    CELL_TYPE_TEXT,
+    CELL_TYPE_BOOLEAN,
+    CELL_TYPE_DATE,
+    CELL_TYPE_NULL
 } CellValueType;
+
+typedef enum CellError {
+    CELL_OK = 0,
+    CELL_ERR_VALUE,               // #VALUE!
+    CELL_ERR_REF,                 // #REF!
+    CELL_ERR_NAME,                // #NAME?
+    CELL_ERR_DIV,                 // #DIV/0!
+    CELL_ERR_NULL,                // #NULL!
+    CELL_ERR_NUM,                 // #NUM!
+    CELL_ERR_CIRCULAR             // Circular reference
+} CellError;
+
+typedef struct Formula {
+    char* text;                   // Original formula text (e.g., "=SUM(A1:A10)")
+    uint8_t* bytecode;            // Compiled Luau bytecode (NULL = not compiled)
+    size_t bytecode_len;          // Bytecode length
+} Formula;
 ```
 
-### DimensionLink
-Links a cell to its position within a dimension (column, row, or higher).
+**Design notes:**
+- Type is optional; if `CELL_TYPE_AUTO`, value is cast dynamically from string
+- x/y are hardcoded for 2D; UUIDs allow future N-D extension without changing Cell struct
+- Formula combines source text and bytecode in one allocation
 
-```c
-typedef struct DimensionLink {
-    uint32_t dimension;           // Which dimension (0=col, 1=row, ...)
-    uuid_t axis_id;               // Which axis node this cell belongs to
-
-    // For ordering within the axis
-    uuid_t prev_cell;             // Previous cell in this axis (or NULL_UUID)
-    uuid_t next_cell;             // Next cell in this axis (or NULL_UUID)
-} DimensionLink;
-```
-
-### Axis (Column/Row/etc.)
-Represents a single column, row, or higher-dimensional axis.
+### Axis (Column or Row)
+Represents a single column (x-axis) or row (y-axis).
 
 ```c
 typedef struct Axis {
     uuid_t id;                    // Unique identifier
-    uint32_t dimension;           // Which dimension this axis belongs to
+    bool is_column;               // true = column (x), false = row (y)
 
-    // Doubly-linked list within the dimension
-    uuid_t prev_axis;             // Previous axis (or NULL_UUID)
-    uuid_t next_axis;             // Next axis (or NULL_UUID)
-    uint32_t gap_to_next;         // Visual gap to next axis (0 = adjacent)
+    // Doubly-linked list within dimension
+    uuid_t prev;                  // Previous axis (or NULL_UUID)
+    uuid_t next;                  // Next axis (or NULL_UUID)
+    uint32_t gap;                 // Number of skipped positions to next (0 = adjacent)
 
-    // Axis properties
-    char* name;                   // Display name ("A", "B", "1", "2", custom)
-    uint32_t size;                // Width (dim 0) or height (dim 1) in pixels
+    // Properties
+    char* name;                   // Custom name only (NULL = compute A,B,C or 1,2,3)
+    uint32_t size;                // Width (column) or height (row) in pixels
     bool hidden;                  // Visibility flag
 
-    // Type constraints (optional, primarily for dimension 0 / columns)
+    // Type constraints (columns only)
     ColumnConstraints* constraints;  // NULL = any type allowed (dynamic)
 
-    // First/last cell in this axis for traversal
-    uuid_t first_cell;
-    uuid_t last_cell;
-
     // CRDT metadata
-    uint64_t created_at;          // Lamport timestamp
-    uuid_t created_by;            // Node ID
+    uint64_t created_at;          // HLC timestamp
 } Axis;
 ```
 
-See [type-system.md](./type-system.md) for `ColumnConstraints` definition and validation logic.
-
-### Dimension
-Container for all axes of a given dimension type.
-
-```c
-typedef struct Dimension {
-    uint32_t index;               // 0, 1, 2, ...
-    char* name;                   // "columns", "rows", or custom
-
-    uuid_t first_axis;            // Head of the linked list
-    uuid_t last_axis;             // Tail of the linked list
-    uint32_t axis_count;          // Number of defined axes
-
-    // Default properties for new axes
-    uint32_t default_size;        // Default width/height
-} Dimension;
-```
+**Design notes:**
+- `name` is only stored if user sets a custom name; "A", "B", "C" or "1", "2", "3" are computed dynamically by walking the linked list
+- If display name caching is needed for performance, it lives outside the Axis struct (e.g., in a rendering layer cache)
+- See [type-system.md](./type-system.md) for `ColumnConstraints` definition
 
 ### Sheet
-A 2D (or N-D) view containing cells.
+A 2D grid containing cells.
 
 ```c
 typedef struct Sheet {
     uuid_t id;
     char* name;
 
-    Dimension* dimensions;        // Array of dimensions
-    uint32_t dim_count;           // Number of dimensions (typically 2)
+    // Column axis (x dimension)
+    uuid_t first_col;             // Head of column linked list
+    uuid_t last_col;              // Tail of column linked list
+    uint32_t col_count;           // Number of defined columns
+    uint32_t default_col_width;   // Default width for new columns
 
-    // Cell storage (hashmap by UUID)
+    // Row axis (y dimension)
+    uuid_t first_row;             // Head of row linked list
+    uuid_t last_row;              // Tail of row linked list
+    uint32_t row_count;           // Number of defined rows
+    uint32_t default_row_height;  // Default height for new rows
+
+    // Cell storage (sharded hashmap by UUID)
     CellMap* cells;
 
+    // Axis storage (hashmap by UUID)
+    AxisMap* columns;             // Column axes
+    AxisMap* rows;                // Row axes
+
     // CRDT metadata
-    uint64_t modified_at;
-    uuid_t modified_by;
+    uint64_t modified_at;         // HLC timestamp
 } Sheet;
 ```
 
@@ -144,9 +142,9 @@ typedef struct Workbook {
 ## Visual Representation
 
 ```
-Dimension 0 (Columns)
+X-Axis (Columns)
     ┌────────────────────────────────────────────────────┐
-    │  Axis A ──(gap:0)──► Axis B ──(gap:2)──► Axis E    │
+    │  Col A ──(gap:0)──► Col B ──(gap:2)──► Col E       │
     │    │                   │                    │      │
     └────┼───────────────────┼────────────────────┼──────┘
          │                   │                    │
@@ -165,10 +163,9 @@ Dimension 0 (Columns)
          │                   │                    │
     ─────┼───────────────────┼────────────────────┼──────
          │                   │                    │
-    Axis 1 ───(gap:1)───► Axis 3
-    (Row 1)               (Row 3)
+    Row 1 ───(gap:1)───► Row 3
 
-    Dimension 1 (Rows)
+    Y-Axis (Rows)
 ```
 
 ## Gap Encoding Example
@@ -176,23 +173,26 @@ Dimension 0 (Columns)
 Columns A, B exist. Columns C, D don't exist. Column E exists.
 
 ```
-Axis A:
-  id: "uuid-col-a"
-  prev_axis: NULL
-  next_axis: "uuid-col-b"
-  gap_to_next: 0          // B is immediately after A
+Column A:
+  id: "aB3kM9xQ"
+  is_column: true
+  prev: NULL
+  next: "fG7nP2wR"
+  gap: 0                  // B is immediately after A
 
-Axis B:
-  id: "uuid-col-b"
-  prev_axis: "uuid-col-a"
-  next_axis: "uuid-col-e"
-  gap_to_next: 2          // 2 undefined columns (C, D) before E
+Column B:
+  id: "fG7nP2wR"
+  is_column: true
+  prev: "aB3kM9xQ"
+  next: "jK4sT8yL"
+  gap: 2                  // 2 undefined columns (C, D) before E
 
-Axis E:
-  id: "uuid-col-e"
-  prev_axis: "uuid-col-b"
-  next_axis: NULL
-  gap_to_next: 0
+Column E:
+  id: "jK4sT8yL"
+  is_column: true
+  prev: "fG7nP2wR"
+  next: NULL
+  gap: 0
 ```
 
 ## Cell Lookup Strategies
@@ -205,11 +205,13 @@ Cell* cell_get(Sheet* sheet, uuid_t id);
 ```
 
 ### By Coordinates (For UI)
-O(n) worst case, but typically O(1) with axis index cache.
+O(1) with compound key lookup (x,y -> cell_id).
 
 ```c
-Cell* cell_at(Sheet* sheet, uuid_t col_id, uuid_t row_id);
-// Or with positional index (requires traversing linked list):
+// Primary: lookup by axis UUIDs
+Cell* cell_at(Sheet* sheet, uuid_t x, uuid_t y);
+
+// Convenience: lookup by position (requires axis traversal first)
 Cell* cell_at_position(Sheet* sheet, uint32_t col_pos, uint32_t row_pos);
 ```
 
@@ -218,8 +220,8 @@ Iterator-based for efficiency.
 
 ```c
 CellIterator* cells_in_range(Sheet* sheet,
-                             uuid_t start_col, uuid_t end_col,
-                             uuid_t start_row, uuid_t end_row);
+                             uuid_t x_start, uuid_t x_end,
+                             uuid_t y_start, uuid_t y_end);
 ```
 
 ## Memory Layout Considerations
@@ -230,7 +232,8 @@ For cache efficiency, consider structure-of-arrays for hot paths:
 // For rendering (hot path)
 typedef struct CellRenderData {
     uuid_t* ids;
-    CellValue* values;
+    char** values;                // String values
+    CellValueType* types;         // Type tags
     CellStyle** styles;
     uint32_t count;
 } CellRenderData;
@@ -239,22 +242,12 @@ typedef struct CellRenderData {
 CellRenderData* extract_viewport(Sheet* sheet, Viewport* vp);
 ```
 
-## Multi-Dimensional Generalization
+## Future: N-Dimensional Extension
 
-For N-dimensional data:
+The UUID-based x/y coordinates allow future extension to N dimensions without changing the Cell struct. This is a long-term consideration, not part of initial implementation.
 
-```c
-// 3D example: Sheet × Row × Column
-Cell* cell = cell_at_nd(workbook, (uuid_t[]){
-    sheet_axis_id,   // Dimension 0: which sheet
-    row_axis_id,     // Dimension 1: which row
-    col_axis_id      // Dimension 2: which column
-}, 3);
-```
-
-This allows:
-- Pivot table views
-- Multi-sheet formulas
+Potential uses:
+- Pivot table views (3D: sheet × row × column)
 - Time-series dimensions
 - Custom hierarchies
 
@@ -317,9 +310,9 @@ Benefits:
 - **Parallel iteration** for recalc, rendering
 - **Memory efficient** for sparse data
 
-## Open Questions for Data Model
+## Open Questions
 
-1. **String interning**: Deduplicate repeated string values?
+1. **String interning**: Deduplicate repeated string values across cells?
 2. **Style sharing**: Many cells share styles - use style IDs with registry?
-3. **Computed values**: Store cached formula results, or always recompute?
-4. **Sparse dimension iteration**: For very sparse sheets, use skip-list overlay?
+3. **Recycle pools**: Implementation strategy for Cell and value pointer allocation?
+4. **Coordinate index**: Secondary index for (x,y) -> cell_id lookups, or compute on demand?
