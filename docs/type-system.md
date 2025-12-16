@@ -2,7 +2,18 @@
 
 ## Overview
 
-Cells uses **optional/gradual typing**: cells are dynamically typed by default (Excel-compatible), but columns can optionally enforce type constraints (AirTable-inspired).
+Cells uses **completely optional typing**: cells are dynamically typed by default (exactly like Excel), and columns can optionally have type constraints as a **gradual discovery** feature.
+
+### Philosophy: Excel-First, Not AirTable
+
+Unlike AirTable (which requires field types upfront), Cells is a spreadsheet first:
+
+- **Default behavior**: No types, no constraints, just like Excel
+- **Opt-in gradually**: Add column types when/if you need them
+- **Never enforced**: You can always type anything anywhere (constraints warn, not block)
+- **Always exportable**: XLSX export always works (with warnings about feature loss)
+
+Column typing is a power feature for users who want it, not a requirement to use the product.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -467,17 +478,73 @@ UI flow:
 3. User reviews invalid cells, fixes or proceeds
 4. If proceeding with invalid cells: they become #TYPE! errors or are cleared
 
+## XLSX Export: Preserving Data, Warning About Features
+
+Users can always export to Excel. The export process:
+
+1. **Data is always preserved** - cell values export cleanly
+2. **Features that can't be represented are flagged** before export
+3. **User confirms** with clear understanding of what's lost
+
+### Feature Loss Matrix
+
+| Cells Feature | XLSX Export | Notes |
+|---------------|-------------|-------|
+| Cell values | ✅ Preserved | Numbers, text, dates, booleans |
+| Formulas | ✅ Preserved | Converted from UUID refs to A1 notation |
+| Column widths | ✅ Preserved | Standard Excel property |
+| Basic formatting | ✅ Preserved | Bold, colors, alignment |
+| **Column types** | ❌ Lost | Excel has no column-level type concept |
+| **Select options** | ⚠️ Partial | Can export as Data Validation dropdown, but loses colors |
+| **Relations** | ❌ Lost | Becomes plain text (display value) |
+| **Validation rules** | ⚠️ Partial | Some map to Excel Data Validation |
+| **Multi-select** | ❌ Lost | Becomes comma-separated text |
+
+### Export Warning UI
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ⚠ Export to Excel                                       │
+│                                                          │
+│  Your data will be exported. These features will be      │
+│  converted or lost:                                      │
+│                                                          │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ • Column "Status" (Select)                          │ │
+│  │   → Dropdown options preserved, colors lost         │ │
+│  │                                                      │ │
+│  │ • Column "Project" (Relation → Projects)            │ │
+│  │   → Will become plain text: "Website Redesign"      │ │
+│  │                                                      │ │
+│  │ • Column "Email" (Text with validation)             │ │
+│  │   → Validation pattern lost                         │ │
+│  └────────────────────────────────────────────────────┘ │
+│                                                          │
+│  The data itself is fully preserved.                     │
+│                                                          │
+│  [ Cancel ]                        [ Export Anyway ]     │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Stickiness Strategy
+
+These warnings serve two purposes:
+1. **Honest UX**: Users always know what they're getting
+2. **Soft lock-in**: Users see the value they'd lose by leaving
+
+The key is that **data is never held hostage** - only metadata/features are lost. This builds trust while creating natural stickiness.
+
 ## Summary
 
 | Layer | When | What |
 |-------|------|------|
 | Cell storage | Always | Raw value with actual type |
-| Column validation | On write | Type checking + constraints |
+| Column validation | On write (optional) | Type checking + constraints if column has type |
 | Formula hints | On compile | Luau type annotations for optimization |
 | Runtime formulas | On execute | Dynamic, Excel-compatible behavior |
 
 This gives us:
-- **Excel compatibility**: Formulas work as expected
-- **AirTable power**: Structured data with validation
-- **Performance**: Luau type hints enable faster bytecode
-- **Safety**: Optional constraints catch errors early
+- **Excel compatibility**: Works exactly like Excel by default
+- **Gradual power**: Structured data features when you want them
+- **No lock-in**: Always export to XLSX (with honest warnings)
+- **Stickiness**: Features Excel can't represent create value

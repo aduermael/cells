@@ -46,10 +46,10 @@ A high-performance, collaborative spreadsheet engine with:
 - Doubly-linked dimension chains with gap encoding
 
 ### 2. [Type System](./docs/type-system.md)
-- Optional/gradual typing (dynamic by default)
-- Column-level type constraints (AirTable-inspired)
-- Relations (foreign keys between sheets)
-- Luau type hints for compile-time optimization
+- **Completely optional** - works exactly like Excel by default
+- Column typing as gradual discovery (not enforced like AirTable)
+- Features Excel can't represent (stickiness): relations, select options, validation
+- Always exportable to XLSX (with warnings for feature loss)
 
 ### 3. [Formula Engine](./docs/formula-engine.md)
 - Excel formula parser → AST
@@ -164,16 +164,43 @@ cells/
 - [x] **Dimensions**: Start with 2D, but model supports N dimensions - naming and structures are dimension-agnostic
 - [x] **UI framework**: Platform-native (SwiftUI for Apple, WinUI for Windows, React+Canvas for web)
 - [x] **Networking**: P2P via WebRTC - no relay servers, CRDT-native sync
-- [x] **Type system**: Optional/gradual typing - dynamic by default, column-level type constraints optional
+- [x] **Type system**: Completely optional - Excel-like by default, column types as gradual discovery for stickiness
 
 ## Design Philosophy
 
-### "Spreadsheet as Database" (AirTable-inspired)
-Beyond traditional spreadsheets, Cells supports using sheets as structured data stores:
-- **Column types**: Enforce types per column (number, text, date, select, relation, etc.)
-- **Validation**: Column-level constraints (required, unique, min/max, regex)
-- **Relations**: Link cells to rows in other sheets (foreign keys)
+### Excel-First, Power Features as Gradual Discovery
+
+Cells works exactly like Excel out of the box. Advanced features are **opt-in and discoverable**, not required:
+
+1. **Start familiar**: Import XLSX, edit like Excel, export back to XLSX
+2. **Discover gradually**: Column typing, validation, relations are there when you need them
+3. **Never locked in**: Always export to XLSX (with clear warnings about feature loss)
+
+### Stickiness Through Features Excel Can't Represent
+
+These features create value that keeps users in Cells:
+- **Relations**: Link cells to rows in other sheets (stable UUID references, not fragile A1)
+- **Select/Multi-select**: Dropdown options with colors (stored in column, not data validation hacks)
+- **Column validation**: Required fields, unique constraints, regex patterns
 - **Views**: Multiple views of same data (grid, kanban, calendar, gallery)
 - **API-first**: Every sheet is queryable via API
 
-This is enabled by the UUID-based model - relations are stable references, not fragile A1 coordinates.
+**Critical**: When exporting to XLSX, clearly inform users which features will be lost:
+```
+⚠ Export to Excel
+
+These features will be lost:
+• Column "Status" - Select options and colors
+• Column "Project" - Relation to Projects sheet (will become plain text)
+• Column "Email" - Validation pattern
+
+The data itself will be preserved. Continue?
+```
+
+### Not AirTable
+
+AirTable enforces structure. We don't:
+- **AirTable**: Must define field types upfront, structured-first
+- **Cells**: Type anywhere, constrain later (or never), spreadsheet-first
+
+Column types in Cells are like training wheels you can add to any column at any time - not a requirement to use the product.
