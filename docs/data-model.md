@@ -69,6 +69,9 @@ typedef struct Axis {
     uint32_t size;                // Width (dim 0) or height (dim 1) in pixels
     bool hidden;                  // Visibility flag
 
+    // Type constraints (optional, primarily for dimension 0 / columns)
+    ColumnConstraints* constraints;  // NULL = any type allowed (dynamic)
+
     // First/last cell in this axis for traversal
     uuid_t first_cell;
     uuid_t last_cell;
@@ -78,6 +81,8 @@ typedef struct Axis {
     uuid_t created_by;            // Node ID
 } Axis;
 ```
+
+See [type-system.md](./type-system.md) for `ColumnConstraints` definition and validation logic.
 
 ### Dimension
 Container for all axes of a given dimension type.

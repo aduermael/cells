@@ -45,28 +45,34 @@ A high-performance, collaborative spreadsheet engine with:
 - N-dimensional sparse structure
 - Doubly-linked dimension chains with gap encoding
 
-### 2. [Formula Engine](./docs/formula-engine.md)
+### 2. [Type System](./docs/type-system.md)
+- Optional/gradual typing (dynamic by default)
+- Column-level type constraints (AirTable-inspired)
+- Relations (foreign keys between sheets)
+- Luau type hints for compile-time optimization
+
+### 3. [Formula Engine](./docs/formula-engine.md)
 - Excel formula parser → AST
-- AST → Lua transpiler
-- Sandboxed Lua execution
+- AST → Luau transpiler
+- Sandboxed Luau execution
 - Dependency graph for reactive updates
 
-### 3. [CRDT & Collaboration](./docs/crdt.md)
+### 4. [CRDT & Collaboration](./docs/crdt.md)
 - Operation-based CRDT for cell mutations
 - Dimension structure CRDTs (insert/delete/reorder)
 - Conflict resolution strategies
 
-### 4. [Persistence & File Format](./docs/persistence.md)
+### 5. [Persistence & File Format](./docs/persistence.md)
 - Git-diff-friendly text format
 - Binary format for large files
 - Import/export (xlsx, csv)
 
-### 5. [Rendering](./docs/rendering.md)
+### 6. [Rendering](./docs/rendering.md)
 - Virtual viewport with aggressive culling
 - Dirty region tracking
 - Platform-specific backends
 
-### 6. [Cross-Platform Strategy](./docs/cross-platform.md)
+### 7. [Cross-Platform Strategy](./docs/cross-platform.md)
 - Core as shared C/C++ library
 - WebAssembly compilation for web
 - UI layer options and recommendations
@@ -151,7 +157,16 @@ cells/
 - [x] **Undo/redo**: Branch-based history - aligns with git-friendly philosophy, clean CRDT semantics
 - [x] **Dimensions**: Start with 2D, but model supports N dimensions - naming and structures are dimension-agnostic
 - [x] **UI framework**: Flutter (desktop/mobile) + React+Canvas (web)
+- [x] **Type system**: Optional/gradual typing - dynamic by default, column-level type constraints optional
 
-## Open Questions
+## Design Philosophy
 
-- [ ] Cell type system - dynamic (like Excel) or optional typing?
+### "Spreadsheet as Database" (AirTable-inspired)
+Beyond traditional spreadsheets, Cells supports using sheets as structured data stores:
+- **Column types**: Enforce types per column (number, text, date, select, relation, etc.)
+- **Validation**: Column-level constraints (required, unique, min/max, regex)
+- **Relations**: Link cells to rows in other sheets (foreign keys)
+- **Views**: Multiple views of same data (grid, kanban, calendar, gallery)
+- **API-first**: Every sheet is queryable via API
+
+This is enabled by the UUID-based model - relations are stable references, not fragile A1 coordinates.
