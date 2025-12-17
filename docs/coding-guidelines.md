@@ -33,6 +33,27 @@ Avoid `std::` when avoidable. Prefer simpler, more explicit alternatives:
 - Use `nullptr` returns for "not found" cases
 - Reserve exceptions for truly exceptional cases (memory exhaustion, etc.)
 
+## Struct Design
+
+Member functions (including constructors) **do not increase struct size**. They're stored once in the code segment, not per-instance.
+
+```cpp
+struct A { int x; char* y; };
+struct B { int x; char* y; B(); void foo(); ~B(); };
+// Both are exactly 16 bytes - functions add no per-instance overhead
+```
+
+**What adds to struct size:**
+- Data members
+- `virtual` functions (add vtable pointer, +8 bytes on 64-bit)
+
+**What does NOT add to struct size:**
+- Constructors, destructors
+- Regular member functions
+- `static` members
+
+**Guideline:** Use constructors and member functions freely for cleaner code. Only avoid `virtual` in memory-critical structs.
+
 ## Performance
 
 - Prefer contiguous memory (arrays, vectors) over linked structures

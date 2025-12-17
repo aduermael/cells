@@ -6,78 +6,53 @@
 namespace cells {
 
 // ============================================================================
-// CellValue (C-style functions)
+// CellValue
 // ============================================================================
 
-CellValue cellValueEmpty() {
-    CellValue v;
-    v.raw = "";
-    v.type = CellValueType::STRING;
-    v.error = CellError::NONE;
-    return v;
-}
+CellValue::CellValue()
+    : raw(), type(CellValueType::STRING), error(CellError::NONE) {}
 
-CellValue cellValueNumber(double number) {
-    CellValue v;
-    v.raw = std::to_string(number);
-    v.type = CellValueType::NUMBER;
-    v.error = CellError::NONE;
-
+CellValue::CellValue(double number)
+    : raw(std::to_string(number)), type(CellValueType::NUMBER), error(CellError::NONE) {
     // Remove trailing zeros for cleaner representation
-    size_t dot = v.raw.find('.');
+    size_t dot = raw.find('.');
     if (dot != std::string::npos) {
-        size_t last = v.raw.find_last_not_of('0');
+        size_t last = raw.find_last_not_of('0');
         if (last != std::string::npos && last > dot) {
-            v.raw = v.raw.substr(0, last + 1);
+            raw = raw.substr(0, last + 1);
         }
         // Remove trailing dot if all decimals were zeros
-        if (v.raw.back() == '.') {
-            v.raw.pop_back();
+        if (raw.back() == '.') {
+            raw.pop_back();
         }
     }
-    return v;
 }
 
-CellValue cellValueString(const std::string& str) {
-    CellValue v;
-    v.raw = str;
-    v.type = CellValueType::STRING;
-    v.error = CellError::NONE;
-    return v;
-}
+CellValue::CellValue(const std::string& str)
+    : raw(str), type(CellValueType::STRING), error(CellError::NONE) {}
 
-CellValue cellValueBoolean(bool boolean) {
-    CellValue v;
-    v.raw = boolean ? "true" : "false";
-    v.type = CellValueType::BOOLEAN;
-    v.error = CellError::NONE;
-    return v;
-}
+CellValue::CellValue(bool boolean)
+    : raw(boolean ? "true" : "false"), type(CellValueType::BOOLEAN), error(CellError::NONE) {}
 
-CellValue cellValueError(CellError err) {
-    CellValue v;
-    v.raw = errorToString(err);
-    v.type = CellValueType::ERROR;
-    v.error = err;
-    return v;
-}
+CellValue::CellValue(CellError err)
+    : raw(errorToString(err)), type(CellValueType::ERROR), error(err) {}
 
-double cellValueAsNumber(const CellValue& v) {
-    if (v.type != CellValueType::NUMBER) {
+double CellValue::asNumber() const {
+    if (type != CellValueType::NUMBER) {
         return 0.0;
     }
-    return std::strtod(v.raw.c_str(), nullptr);
+    return std::strtod(raw.c_str(), nullptr);
 }
 
-bool cellValueAsBoolean(const CellValue& v) {
-    if (v.type != CellValueType::BOOLEAN) {
+bool CellValue::asBoolean() const {
+    if (type != CellValueType::BOOLEAN) {
         return false;
     }
-    return v.raw == "true";
+    return raw == "true";
 }
 
-const std::string& cellValueAsString(const CellValue& v) {
-    return v.raw;
+const std::string& CellValue::asString() const {
+    return raw;
 }
 
 // ============================================================================

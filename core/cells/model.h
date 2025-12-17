@@ -23,19 +23,17 @@ struct CellValue {
     std::string raw;         // Raw string representation
     CellValueType type;      // How to interpret the value
     CellError error;         // Error state (NONE if no error)
+
+    CellValue();
+    explicit CellValue(double number);
+    explicit CellValue(const std::string& str);
+    explicit CellValue(bool boolean);
+    explicit CellValue(CellError error);
+
+    double asNumber() const;
+    bool asBoolean() const;
+    const std::string& asString() const;
 };
-
-// CellValue constructors (C-style)
-CellValue cellValueEmpty();
-CellValue cellValueNumber(double number);
-CellValue cellValueString(const std::string& str);
-CellValue cellValueBoolean(bool boolean);
-CellValue cellValueError(CellError error);
-
-// CellValue accessors (C-style)
-double cellValueAsNumber(const CellValue& v);
-bool cellValueAsBoolean(const CellValue& v);
-const std::string& cellValueAsString(const CellValue& v);
 
 // Formula - contains source text and parsed AST
 // Owned by Cell, cleaned up in Cell destructor
