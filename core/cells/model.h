@@ -23,23 +23,24 @@ struct CellValue {
     std::string raw;         // Raw string representation
     CellValueType type;      // How to interpret the value
     CellError error;         // Error state (NONE if no error)
-
-    CellValue();
-    CellValue(double number);
-    CellValue(const std::string& str, CellValueType type = CellValueType::STRING);
-    CellValue(bool boolean);
-    CellValue(CellError error);
-
-    // Value accessors (parse from raw string)
-    double asNumber() const;
-    bool asBoolean() const;
-    const std::string& asString() const;
 };
+
+// CellValue constructors (C-style)
+CellValue cellValueEmpty();
+CellValue cellValueNumber(double number);
+CellValue cellValueString(const std::string& str);
+CellValue cellValueBoolean(bool boolean);
+CellValue cellValueError(CellError error);
+
+// CellValue accessors (C-style)
+double cellValueAsNumber(const CellValue& v);
+bool cellValueAsBoolean(const CellValue& v);
+const std::string& cellValueAsString(const CellValue& v);
 
 // Formula - contains source text and parsed AST
 // Owned by Cell, cleaned up in Cell destructor
 struct Formula {
-    char* text;              // Formula source (e.g., "=A1+B1"), owned
+    char* text;              // Formula source with UUID refs (e.g., "=$cK7mXp2Q$rFp3nW9x+10"), owned
     struct ASTNode* ast;     // Parsed AST, null if not parsed, owned
     bool dirty;              // Needs recalculation?
 
