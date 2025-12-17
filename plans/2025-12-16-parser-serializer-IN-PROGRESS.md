@@ -1,6 +1,6 @@
 # Parser/Serializer Implementation Plan
 
-**Status:** READY
+**Status:** IN-PROGRESS
 **Created:** 2025-12-16
 **Goal:** Implement the `.cells` text format parser and serializer with sample files and tests.
 
@@ -26,9 +26,9 @@ Implement parsing and serialization for the `.cells` v1 text format as specified
 
 Define the core C++ types needed for the parser.
 
-- [ ] **1a:** Create `core/cells/types.h` with basic types (ID, CellValueType, CellError)
-- [ ] **1b:** Create `core/cells/model.h` with Cell, Axis, Sheet, Workbook structs
-- [ ] **1c:** Create `core/cells/model.cc` with constructors and methods
+- [x] **1a:** Create `core/cells/types.h` with basic types (ID, CellValueType, CellError)
+- [x] **1b:** Create `core/cells/model.h` with Cell, Axis, Sheet, Workbook structs
+- [x] **1c:** Create `core/cells/model.cc` with constructors and methods
 
 **Deliverables:**
 - `types.h` - enums, typedefs, ID type
