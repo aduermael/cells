@@ -1,6 +1,15 @@
-###############################################################################
-# Bazel now uses Bzlmod by default to manage external dependencies.
-# Please consider migrating your external dependencies from WORKSPACE to MODULE.bazel.
-#
-# For more details, please check https://github.com/bazelbuild/bazel/issues/18958
-###############################################################################
+module(
+    name = "cells",
+    version = "0.0.1",
+)
+
+# Google Test
+bazel_dep(name = "googletest", version = "1.14.0")
+
+# Hedron's Compile Commands Extractor
+bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
+git_override(
+    module_name = "hedron_compile_commands",
+    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
+    commit = "1e08f8e0507b6b6b1f4416a9a22cf5c28beaba93",
+)

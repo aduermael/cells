@@ -1,4 +1,4 @@
-.PHONY: build test format lint check clean
+.PHONY: build test format lint check clean compile-db
 
 # Build
 build:
@@ -32,6 +32,10 @@ check:
 fix:
 	./scripts/format.sh
 	./scripts/lint.sh --fix
+
+# Generate compile_commands.json for clang tools
+compile-db:
+	bazel run //:refresh_compile_commands
 
 # Clean build artifacts
 clean:
