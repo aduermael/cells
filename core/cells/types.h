@@ -13,17 +13,18 @@ constexpr size_t kIDLength = 8;
 
 // ID is a fixed 8-character base62 identifier (62^8 = 218 trillion combinations)
 // Examples: "Kj7mXp2Q", "fR3pK7wN"
-// Null ID is represented as all zeros internally, "~" in file format
+// Null ID has data[0] == '\0', serialized as "~" in file format
+// Valid IDs never start with '\0' (base62 chars are 0-9, A-Z, a-z)
 struct ID {
     char data[kIDLength];
 
-    // Default constructor creates null ID (all zeros)
-    constexpr ID() : data{0, 0, 0, 0, 0, 0, 0, 0} {}
+    // Default constructor creates null ID
+    constexpr ID() : data{0} {}
 
     // Construct from string (must be exactly 8 chars, or "~" for null)
     explicit ID(const char* str) {
         if (str == nullptr || str[0] == '~' || str[0] == '\0') {
-            std::memset(data, 0, kIDLength);
+            data[0] = '\0';
         } else {
             std::memcpy(data, str, kIDLength);
         }
@@ -31,12 +32,9 @@ struct ID {
 
     explicit ID(const std::string& str) : ID(str.c_str()) {}
 
-    // Check if this is a null ID
+    // Check if this is a null ID (single byte check)
     bool IsNull() const {
-        for (size_t i = 0; i < kIDLength; ++i) {
-            if (data[i] != 0) return false;
-        }
-        return true;
+        return data[0] == '\0';
     }
 
     // Convert to string (for display/debugging)
