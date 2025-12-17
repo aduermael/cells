@@ -32,8 +32,8 @@ Column typing is a power feature for users who want it, not a requirement to use
 │  └─────────────────────────────────────────────────────────────┘│
 │                              │                                   │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │ Layer 3: Formula Type Hints (Static Analysis / Compile)     ││
-│  │ - Luau type annotations for optimization                    ││
+│  │ Layer 3: Formula Type Hints (Static Analysis)               ││
+│  │ - Type inference from column constraints                    ││
 │  │ - Warnings at formula edit time, not runtime errors         ││
 │  └─────────────────────────────────────────────────────────────┘│
 │                                                                  │
@@ -257,35 +257,17 @@ ValidationResult validate_cell_value(CellValue input,
 }
 ```
 
-## Formula Type Hints (Luau Static Analysis)
+## Formula Type Hints (Static Analysis)
 
-Luau's type system operates at **compile time only**, not runtime. This means:
+Type hints operate at **analysis time only**, not runtime. This means:
 
-1. Type annotations improve **bytecode generation** (faster execution)
-2. Type errors are **warnings during formula editing**, not runtime failures
+1. Type inference helps catch errors during formula editing
+2. Type errors are **warnings**, not runtime failures
 3. At runtime, formulas still handle dynamic values (Excel-compatible)
-
-### Generated Luau with Types
-
-When a formula references typed columns, we generate type hints:
-
-```lua
--- Formula: =A1 * B1 + C1
--- Column A: NUMBER, Column B: NUMBER, Column C: ANY
-
-local function formula(): number?
-    local a: number = cell("uuid-a1") :: number   -- Known to be number
-    local b: number = cell("uuid-b1") :: number   -- Known to be number
-    local c = cell("uuid-c1")                     -- Unknown type
-
-    return a * b + (tonumber(c) or 0)             -- Safe coercion for C
-end
-return formula()
-```
 
 ### Type Inference in Formula Editor
 
-The formula editor can show type information:
+When a formula references typed columns, the editor can show type information:
 
 ```
 =SUM(A1:A10)
@@ -297,26 +279,29 @@ The formula editor can show type information:
      ⚠ Column B is TEXT - SUM may return unexpected results
 ```
 
-### Luau Type Definitions for Excel Functions
+### Function Type Signatures
 
-```lua
--- types.luau (loaded into analysis environment)
+Each Excel function has a known type signature used for static analysis:
 
-type CellValue = number | string | boolean | nil
-type Range = {CellValue}
+```c
+// Type signatures for static analysis
+typedef struct FunctionTypeInfo {
+    const char* name;
+    CellValueType return_type;
+    CellValueType* arg_types;
+    int arg_count;
+    bool variadic;
+} FunctionTypeInfo;
 
-declare excel: {
-    SUM: (Range) -> number,
-    AVERAGE: (Range) -> number,
-    COUNT: (Range) -> number,
-    CONCAT: (...string) -> string,
-    IF: <T>(boolean, T, T) -> T,
-    VLOOKUP: <T>(CellValue, Range, number, boolean?) -> T,
-    -- ... more functions
-}
-
-declare cell: (string) -> CellValue
-declare range: (string, string) -> Range
+// Examples
+static FunctionTypeInfo type_info[] = {
+    {"SUM",     CELL_TYPE_NUMBER, NULL, 0, true},   // variadic, returns number
+    {"AVERAGE", CELL_TYPE_NUMBER, NULL, 0, true},
+    {"COUNT",   CELL_TYPE_NUMBER, NULL, 0, true},
+    {"CONCAT",  CELL_TYPE_TEXT,   NULL, 0, true},   // variadic, returns text
+    {"IF",      CELL_TYPE_AUTO,   NULL, 3, false},  // return type matches args
+    // ...
+};
 ```
 
 ## Relations (Foreign Keys)
@@ -540,7 +525,7 @@ The key is that **data is never held hostage** - only metadata/features are lost
 |-------|------|------|
 | Cell storage | Always | Raw value with actual type |
 | Column validation | On write (optional) | Type checking + constraints if column has type |
-| Formula hints | On compile | Luau type annotations for optimization |
+| Formula hints | On edit | Static analysis for editor warnings |
 | Runtime formulas | On execute | Dynamic, Excel-compatible behavior |
 
 This gives us:

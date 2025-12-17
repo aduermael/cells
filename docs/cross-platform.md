@@ -40,7 +40,7 @@
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘   │
 │                                                                      │
 │  ┌─────────────┐ ┌─────────────┐                                    │
-│  │ Renderer    │ │ Lua Runtime │                                    │
+│  │ Renderer    │ │ AST Interp  │                                    │
 │  └─────────────┘ └─────────────┘                                    │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
@@ -626,7 +626,7 @@ Build Pipeline:
 | Component | Technology | Rationale |
 |-----------|------------|-----------|
 | Core engine | C/C++ | Performance, portability |
-| Formulas | Luau | App Store compliant, fast |
+| Formulas | Native AST interpreter | No dependencies, full control |
 | macOS/iOS UI | SwiftUI | Native feel, maximum snappiness |
 | Web UI | React + Canvas | Full web integration |
 | Windows UI | WinUI 3 | Modern Windows native |

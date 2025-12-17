@@ -36,12 +36,11 @@ struct CellValue {
     const std::string& asString() const;
 };
 
-// Formula - contains source text and optional compiled bytecode
+// Formula - contains source text and parsed AST
 // Owned by Cell, cleaned up in Cell destructor
 struct Formula {
     char* text;              // Formula source (e.g., "=A1+B1"), owned
-    uint8_t* bytecode;       // Compiled Luau bytecode, null if not compiled, owned
-    size_t bytecodeLen;      // Bytecode length in bytes
+    struct ASTNode* ast;     // Parsed AST, null if not parsed, owned
     bool dirty;              // Needs recalculation?
 
     Formula();

@@ -19,6 +19,7 @@ Implement parsing and serialization for the `.cells` v1 text format as specified
 - Styles and cell-styles sections
 - OpLog section
 - XLSX/CSV import/export
+- Formula parsing/execution (separate plan - formulas stored as text only)
 
 ---
 
@@ -36,17 +37,31 @@ Define the core C++ types needed for the parser.
 
 ---
 
-## Phase 2: Parser Implementation
+## Phase 2: ID Generation
+
+Implement base62 ID generation for creating new entities. Needed early for sample file creation.
+
+- [ ] **2a:** Create `core/cells/id.h` and `core/cells/id.cc` with ID generation
+- [ ] **2b:** Implement rejection sampling to avoid modulo bias
+- [ ] **2c:** Add `core/cells/id_test.cc` for ID generation tests (length, charset, uniqueness)
+
+**Deliverables:**
+- `id.h` / `id.cc` - `generate_id()` function
+- `id_test.cc` - tests for ID generation
+
+---
+
+## Phase 3: Parser Implementation
 
 Implement the text format parser.
 
-- [ ] **2a:** Create `core/cells/parser.h` with parser API
-- [ ] **2b:** Create `core/cells/parser.cc` with line-by-line parser
-- [ ] **2c:** Implement section parsing (#cols, #rows, #cells)
-- [ ] **2d:** Implement value type parsing (n, s, f, b, e, d, t)
-- [ ] **2e:** Implement linked-list parsing with gap notation (prev:gap next:gap)
-- [ ] **2f:** Implement axis properties parsing (w:, h:, name:)
-- [ ] **2g:** Add parser error handling with line numbers
+- [ ] **3a:** Create `core/cells/parser.h` with parser API
+- [ ] **3b:** Create `core/cells/parser.cc` with line-by-line parser
+- [ ] **3c:** Implement section parsing (#cols, #rows, #cells)
+- [ ] **3d:** Implement value type parsing (n, s, f, b, e, d, t)
+- [ ] **3e:** Implement linked-list parsing with gap notation (prev:gap next:gap)
+- [ ] **3f:** Implement axis properties parsing (w:, h:, name:)
+- [ ] **3g:** Add parser error handling with line numbers
 
 **Deliverables:**
 - `parser.h` - `parse()` function, `ParseError` struct
@@ -54,16 +69,16 @@ Implement the text format parser.
 
 ---
 
-## Phase 3: Serializer Implementation
+## Phase 4: Serializer Implementation
 
 Implement the text format serializer.
 
-- [ ] **3a:** Create `core/cells/serializer.h` with serializer API
-- [ ] **3b:** Create `core/cells/serializer.cc` with basic structure
-- [ ] **3c:** Implement axis serialization with gap notation
-- [ ] **3d:** Implement cell serialization for all value types
-- [ ] **3e:** Implement string escaping for quoted values
-- [ ] **3f:** Add serialization to file and to string
+- [ ] **4a:** Create `core/cells/serializer.h` with serializer API
+- [ ] **4b:** Create `core/cells/serializer.cc` with basic structure
+- [ ] **4c:** Implement axis serialization with gap notation
+- [ ] **4d:** Implement cell serialization for all value types
+- [ ] **4e:** Implement string escaping for quoted values
+- [ ] **4f:** Add serialization to file and to string
 
 **Deliverables:**
 - `serializer.h` - `serialize()` function
@@ -71,52 +86,38 @@ Implement the text format serializer.
 
 ---
 
-## Phase 4: Sample Files
+## Phase 5: Sample Files
 
 Create test data files covering various scenarios.
 
-- [ ] **4a:** Create `core/testdata/minimal.cells` - simplest valid file (1 cell)
-- [ ] **4b:** Create `core/testdata/simple.cells` - basic file from docs (A1=2, A2="foo", D4=formula)
-- [ ] **4c:** Create `core/testdata/budget.cells` - larger example from docs (budget spreadsheet)
-- [ ] **4d:** Create `core/testdata/all_types.cells` - all cell value types (n, s, f, b, e, d, t)
-- [ ] **4e:** Create `core/testdata/gaps.cells` - sparse grid with various gap encodings
-- [ ] **4f:** Create `core/testdata/unicode.cells` - unicode strings and sheet names
-- [ ] **4g:** Create `core/testdata/empty.cells` - valid file with no cells
+- [ ] **5a:** Create `core/testdata/minimal.cells` - simplest valid file (1 cell)
+- [ ] **5b:** Create `core/testdata/simple.cells` - basic file from docs (A1=2, A2="foo", D4=formula)
+- [ ] **5c:** Create `core/testdata/budget.cells` - larger example from docs (budget spreadsheet)
+- [ ] **5d:** Create `core/testdata/all_types.cells` - all cell value types (n, s, f, b, e, d, t)
+- [ ] **5e:** Create `core/testdata/gaps.cells` - sparse grid with various gap encodings
+- [ ] **5f:** Create `core/testdata/unicode.cells` - unicode strings and sheet names
+- [ ] **5g:** Create `core/testdata/empty.cells` - valid file with no cells
 
 **Deliverables:**
 - 7 sample `.cells` files in `core/testdata/`
 
 ---
 
-## Phase 5: Tests
+## Phase 6: Tests
 
 Implement unit tests for parser and serializer.
 
-- [ ] **5a:** Create `core/cells/parser_test.cc` - parser unit tests (Google Test)
-- [ ] **5b:** Add tests for each sample file (parse succeeds)
-- [ ] **5c:** Add tests for malformed files (parse fails with correct error)
-- [ ] **5d:** Create `core/cells/serializer_test.cc` - serializer unit tests
-- [ ] **5e:** Add roundtrip tests (parse → serialize → parse, compare)
-- [ ] **5f:** Set up Bazel BUILD files with test targets
+- [ ] **6a:** Create `core/cells/parser_test.cc` - parser unit tests (Google Test)
+- [ ] **6b:** Add tests for each sample file (parse succeeds)
+- [ ] **6c:** Add tests for malformed files (parse fails with correct error)
+- [ ] **6d:** Create `core/cells/serializer_test.cc` - serializer unit tests
+- [ ] **6e:** Add roundtrip tests (parse → serialize → parse, compare)
+- [ ] **6f:** Set up Bazel BUILD files with test targets
 
 **Deliverables:**
 - `parser_test.cc` - parser tests
 - `serializer_test.cc` - serializer tests
 - `BUILD` files with `bazel test` targets
-
----
-
-## Phase 6: ID Generation
-
-Implement base62 ID generation for creating new entities.
-
-- [ ] **6a:** Create `core/cells/id.h` and `core/cells/id.cc` with ID generation
-- [ ] **6b:** Implement rejection sampling to avoid modulo bias
-- [ ] **6c:** Add `core/cells/id_test.cc` for ID generation tests (length, charset, uniqueness)
-
-**Deliverables:**
-- `id.h` / `id.cc` - `generate_id()` function
-- `id_test.cc` - tests for ID generation
 
 ---
 

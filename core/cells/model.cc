@@ -60,10 +60,10 @@ const std::string& CellValue::asString() const {
 // ============================================================================
 
 Formula::Formula()
-    : text(nullptr), bytecode(nullptr), bytecodeLen(0), dirty(true) {}
+    : text(nullptr), ast(nullptr), dirty(true) {}
 
 Formula::Formula(const char* src)
-    : bytecode(nullptr), bytecodeLen(0), dirty(true) {
+    : ast(nullptr), dirty(true) {
     if (src) {
         size_t len = std::strlen(src);
         text = new char[len + 1];
@@ -75,28 +75,24 @@ Formula::Formula(const char* src)
 
 Formula::~Formula() {
     delete[] text;
-    delete[] bytecode;
+    // Note: ast cleanup will be handled when ASTNode is implemented
 }
 
 Formula::Formula(Formula&& other)
-    : text(other.text), bytecode(other.bytecode),
-      bytecodeLen(other.bytecodeLen), dirty(other.dirty) {
+    : text(other.text), ast(other.ast), dirty(other.dirty) {
     other.text = nullptr;
-    other.bytecode = nullptr;
-    other.bytecodeLen = 0;
+    other.ast = nullptr;
 }
 
 Formula& Formula::operator=(Formula&& other) {
     if (this != &other) {
         delete[] text;
-        delete[] bytecode;
+        // Note: ast cleanup will be handled when ASTNode is implemented
         text = other.text;
-        bytecode = other.bytecode;
-        bytecodeLen = other.bytecodeLen;
+        ast = other.ast;
         dirty = other.dirty;
         other.text = nullptr;
-        other.bytecode = nullptr;
-        other.bytecodeLen = 0;
+        other.ast = nullptr;
     }
     return *this;
 }

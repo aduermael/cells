@@ -2,36 +2,39 @@
 
 ## Overview
 
-The formula engine transforms Excel-style formulas into executable Luau code, runs them in a sandbox, and manages the dependency graph for reactive updates.
+The formula engine parses Excel-style formulas into an AST and executes them natively in C/C++, managing the dependency graph for reactive updates.
 
 ```
-┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│ Excel        │    │     AST      │    │   Luau       │    │  Sandboxed   │
-│ Formula      │───►│    Parser    │───►│  Codegen     │───►│  Execution   │
-│ "=SUM(A1:B2)"│    │              │    │              │    │              │
-└──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘
-                                                                   │
-                           ┌───────────────────────────────────────┘
-                           ▼
-                    ┌──────────────┐
-                    │ Dependency   │
-                    │ Graph        │
-                    │ (for recalc) │
-                    └──────────────┘
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│ Excel        │    │     AST      │    │   Native     │
+│ Formula      │───►│    Parser    │───►│  Execution   │
+│ "=SUM(A1:B2)"│    │              │    │  (C/C++)     │
+└──────────────┘    └──────────────┘    └──────────────┘
+                                               │
+                          ┌────────────────────┘
+                          ▼
+                   ┌──────────────┐
+                   │ Dependency   │
+                   │ Graph        │
+                   │ (for recalc) │
+                   └──────────────┘
 ```
 
-## Why Luau (not Lua or LuaJIT)
+## Why Native AST Execution
 
-| | Lua 5.4 | LuaJIT | Luau |
-|---|---------|--------|------|
-| **Performance** | Baseline | ~10x faster | ~2-5x faster than Lua 5.4 |
-| **iOS/macOS App Store** | ✅ | ❌ (JIT forbidden) | ✅ |
-| **WASM support** | ✅ | ❌ | ✅ |
-| **Type annotations** | ❌ | ❌ | ✅ (optional) |
-| **Sandboxing** | Manual | Manual | Built-in |
-| **Maintenance** | Slow releases | Stalled | Active (Roblox) |
+Instead of transpiling to a scripting language, we execute the AST directly in C/C++:
 
-Luau: https://github.com/luau-lang/luau
+| Approach | Pros | Cons |
+|----------|------|------|
+| **Native AST** | No dependencies, full control, simpler build | Must implement all functions |
+| Scripting (Lua/etc) | Existing ecosystem | Extra dependency, context switching |
+
+Benefits of native execution:
+- **Simpler architecture**: No codegen step, no runtime embedding
+- **Better performance**: No interpreter overhead, direct function calls
+- **Easier debugging**: Stack traces are native, not VM traces
+- **Smaller binary**: No embedded runtime
+- **Full control**: Custom memory management, precise error handling
 
 ## Phase 1: Lexer
 
@@ -181,195 +184,205 @@ typedef struct Dependencies {
 Dependencies* extract_dependencies(ASTNode* ast);
 ```
 
-## Phase 4: Lua Code Generation
+## Phase 4: Native AST Execution
 
-Transform AST to Lua code:
-
-### Example Transformations
-
-| Excel | Lua |
-|-------|-----|
-| `=A1+B1` | `return cell("uuid-a1") + cell("uuid-b1")` |
-| `=SUM(A1:A10)` | `return excel.SUM(range("uuid-a1","uuid-a10"))` |
-| `=IF(A1>0,A1,-A1)` | `return excel.IF(cell("uuid-a1")>0, cell("uuid-a1"), -cell("uuid-a1"))` |
-| `=A1&" "&B1` | `return tostring(cell("uuid-a1")).." "..tostring(cell("uuid-b1"))` |
-| `="Hello"` | `return "Hello"` |
-
-### Code Generator
+Execute the AST directly in C/C++ via a tree-walking interpreter:
 
 ```c
-typedef struct LuaCodegen {
-    StringBuilder* output;
-    int temp_counter;
-} LuaCodegen;
+typedef struct ExecContext {
+    Sheet* sheet;
+    Cell* cell;               // Current cell being evaluated
+    int recursion_depth;      // For cycle detection
+    int max_recursion;        // Limit (e.g., 1000)
+} ExecContext;
 
-char* generate_lua(ASTNode* ast) {
-    LuaCodegen gen = {0};
-    sb_append(&gen.output, "return ");
-    emit_node(&gen, ast);
-    return sb_to_string(gen.output);
-}
-
-void emit_node(LuaCodegen* gen, ASTNode* node) {
-    switch (node->type) {
-        case AST_NUMBER:
-            sb_appendf(gen->output, "%g", node->number);
-            break;
-
-        case AST_CELL_REF:
-            sb_appendf(gen->output, "cell(\"%s\")", node->resolved_id);
-            break;
-
-        case AST_FUNCTION_CALL:
-            sb_appendf(gen->output, "excel.%s(", node->function_call.name);
-            for (int i = 0; i < node->function_call.arg_count; i++) {
-                if (i > 0) sb_append(gen->output, ",");
-                emit_node(gen, node->function_call.args[i]);
-            }
-            sb_append(gen->output, ")");
-            break;
-        // ...
-    }
-}
-```
-
-## Phase 5: Luau Sandbox
-
-### Sandbox Setup
-
-```c
-#include "luacode.h"  // Luau compiler
-#include "lua.h"
-#include "lualib.h"
-
-lua_State* create_formula_sandbox() {
-    lua_State* L = luaL_newstate();
-
-    // Luau: Use restricted sandbox mode (no dangerous globals by default)
-    luaL_sandboxthread(L);
-
-    // Load only safe libraries
-    luaL_openlibs(L);  // Luau's openlibs is already sandboxed
-
-    // Register our spreadsheet functions
-    register_cell_function(L);      // cell("uuid") -> value
-    register_range_function(L);     // range("start", "end") -> iterator
-    register_excel_namespace(L);    // excel.SUM, excel.IF, etc.
-
-    // Set memory limit (Luau has built-in support)
-    lua_setmemcat(L, 0);  // Memory category for tracking
-    // Custom allocator for hard limits:
-    lua_setallocf(L, limited_allocator, &memory_limit);
-
-    return L;
-}
-
-// Compile Excel formula to Luau bytecode
-CompiledFormula* compile_formula(const char* luau_source) {
-    // Luau compilation options
-    lua_CompileOptions options = {0};
-    options.optimizationLevel = 2;
-    options.debugLevel = 0;  // No debug info in production
-
-    size_t bytecode_size;
-    char* bytecode = luau_compile(luau_source, strlen(luau_source),
-                                   &options, &bytecode_size);
-
-    if (bytecode == NULL) {
-        return NULL;  // Compilation error
-    }
-
-    CompiledFormula* cf = malloc(sizeof(CompiledFormula));
-    cf->bytecode = bytecode;
-    cf->bytecode_size = bytecode_size;
-    return cf;
-}
-```
-
-### Luau Type Annotations (Generated)
-
-Generated Luau code can include type hints for better performance:
-
-```lua
--- Generated from: =SUM(A1:B10) * 2
-local function formula(): number
-    return excel.SUM(range("uuid-a1", "uuid-b10")) * 2
-end
-return formula()
-```
-
-### Execution with Limits
-
-```c
 typedef struct ExecResult {
     bool success;
     CellValue value;
     char* error;
-    int cycles_used;
 } ExecResult;
 
-ExecResult execute_formula(Cell* cell, Sheet* sheet) {
-    lua_State* L = get_sandbox();
+ExecResult execute_ast(ASTNode* node, ExecContext* ctx) {
+    switch (node->type) {
+        case AST_NUMBER:
+            return (ExecResult){
+                .success = true,
+                .value = {.type = CELL_NUMBER, .number = node->number}
+            };
 
-    // Set execution context
-    set_context(L, sheet, cell);
+        case AST_STRING:
+            return (ExecResult){
+                .success = true,
+                .value = {.type = CELL_STRING, .string = strdup(node->string)}
+            };
 
-    // Set instruction limit (prevent infinite loops)
-    lua_sethook(L, instruction_limit_hook, LUA_MASKCOUNT, 10000);
+        case AST_CELL_REF: {
+            Cell* ref_cell = resolve_cell_ref(ctx->sheet, node);
+            if (!ref_cell) {
+                return (ExecResult){.success = false, .error = "#REF!"};
+            }
+            return (ExecResult){.success = true, .value = ref_cell->value};
+        }
 
-    // Load and execute
-    if (luaL_loadstring(L, cell->compiled->lua_code) != 0) {
-        return (ExecResult){.success = false, .error = lua_tostring(L, -1)};
+        case AST_BINARY_OP: {
+            ExecResult left = execute_ast(node->binary_op.left, ctx);
+            if (!left.success) return left;
+
+            ExecResult right = execute_ast(node->binary_op.right, ctx);
+            if (!right.success) return right;
+
+            return eval_binary_op(node->binary_op.op, left.value, right.value);
+        }
+
+        case AST_FUNCTION_CALL:
+            return call_function(node->function_call.name,
+                                 node->function_call.args,
+                                 node->function_call.arg_count, ctx);
+
+        // ... other cases
+    }
+}
+```
+
+### Binary Operator Implementation
+
+```c
+ExecResult eval_binary_op(const char* op, CellValue left, CellValue right) {
+    // Coerce to numbers for arithmetic
+    if (strcmp(op, "+") == 0) {
+        double l = to_number(left);
+        double r = to_number(right);
+        return (ExecResult){
+            .success = true,
+            .value = {.type = CELL_NUMBER, .number = l + r}
+        };
     }
 
-    int status = lua_pcall(L, 0, 1, 0);
-    if (status != 0) {
-        return (ExecResult){.success = false, .error = lua_tostring(L, -1)};
+    if (strcmp(op, "&") == 0) {
+        // String concatenation
+        char* l = to_string(left);
+        char* r = to_string(right);
+        char* result = concat_strings(l, r);
+        return (ExecResult){
+            .success = true,
+            .value = {.type = CELL_STRING, .string = result}
+        };
     }
 
-    // Extract result
-    CellValue value = lua_to_cell_value(L, -1);
-    lua_pop(L, 1);
+    // Comparison operators
+    if (strcmp(op, "=") == 0 || strcmp(op, "<") == 0 /* ... */) {
+        return eval_comparison(op, left, right);
+    }
 
-    return (ExecResult){.success = true, .value = value};
+    return (ExecResult){.success = false, .error = "#VALUE!"};
 }
 ```
 
 ## Excel Function Library
 
-Implement Excel functions in Luau (with optional type annotations for performance):
+Implement Excel functions natively in C/C++:
 
-```lua
--- excel_functions.luau (loaded into sandbox)
-local excel = {}
+```c
+// Function registry
+typedef ExecResult (*ExcelFn)(CellValue* args, int arg_count, ExecContext* ctx);
 
-function excel.SUM(...)
-    local total = 0
-    for _, v in ipairs(flatten({...})) do
-        if type(v) == "number" then
-            total = total + v
-        end
-    end
-    return total
-end
+typedef struct FunctionDef {
+    const char* name;
+    ExcelFn fn;
+    int min_args;
+    int max_args;  // -1 for variadic
+} FunctionDef;
 
-function excel.IF(condition, true_val, false_val)
-    if condition then
-        return true_val
-    else
-        return false_val or false
-    end
-end
+// Function implementations
+ExecResult fn_sum(CellValue* args, int arg_count, ExecContext* ctx) {
+    double total = 0;
+    for (int i = 0; i < arg_count; i++) {
+        if (args[i].type == CELL_ARRAY) {
+            // Iterate array/range
+            for (int j = 0; j < args[i].array->count; j++) {
+                if (args[i].array->values[j].type == CELL_NUMBER) {
+                    total += args[i].array->values[j].number;
+                }
+            }
+        } else if (args[i].type == CELL_NUMBER) {
+            total += args[i].number;
+        }
+        // Skip non-numbers (Excel behavior)
+    }
+    return (ExecResult){
+        .success = true,
+        .value = {.type = CELL_NUMBER, .number = total}
+    };
+}
 
-function excel.VLOOKUP(lookup_value, table_array, col_index, range_lookup)
-    -- Implementation...
-end
+ExecResult fn_if(CellValue* args, int arg_count, ExecContext* ctx) {
+    if (arg_count < 2) {
+        return (ExecResult){.success = false, .error = "#VALUE!"};
+    }
 
-function excel.INDEX(array, row_num, col_num)
-    -- Implementation...
-end
+    bool condition = to_boolean(args[0]);
+    if (condition) {
+        return (ExecResult){.success = true, .value = args[1]};
+    } else if (arg_count >= 3) {
+        return (ExecResult){.success = true, .value = args[2]};
+    } else {
+        return (ExecResult){
+            .success = true,
+            .value = {.type = CELL_BOOLEAN, .boolean = false}
+        };
+    }
+}
 
--- ... hundreds more
+ExecResult fn_vlookup(CellValue* args, int arg_count, ExecContext* ctx) {
+    // lookup_value, table_array, col_index, [range_lookup]
+    // ... implementation
+}
+
+// Function registry
+static FunctionDef functions[] = {
+    {"SUM",     fn_sum,     1, -1},
+    {"AVERAGE", fn_average, 1, -1},
+    {"COUNT",   fn_count,   1, -1},
+    {"IF",      fn_if,      2, 3},
+    {"VLOOKUP", fn_vlookup, 3, 4},
+    {"INDEX",   fn_index,   2, 3},
+    {"MATCH",   fn_match,   2, 3},
+    // ... hundreds more
+    {NULL, NULL, 0, 0}  // Sentinel
+};
+
+ExecResult call_function(const char* name, ASTNode** args, int arg_count,
+                          ExecContext* ctx) {
+    // Find function
+    for (int i = 0; functions[i].name; i++) {
+        if (strcasecmp(functions[i].name, name) == 0) {
+            FunctionDef* fn = &functions[i];
+
+            // Validate arg count
+            if (arg_count < fn->min_args ||
+                (fn->max_args >= 0 && arg_count > fn->max_args)) {
+                return (ExecResult){.success = false, .error = "#VALUE!"};
+            }
+
+            // Evaluate arguments
+            CellValue* evaluated = malloc(arg_count * sizeof(CellValue));
+            for (int j = 0; j < arg_count; j++) {
+                ExecResult r = execute_ast(args[j], ctx);
+                if (!r.success) {
+                    free(evaluated);
+                    return r;
+                }
+                evaluated[j] = r.value;
+            }
+
+            ExecResult result = fn->fn(evaluated, arg_count, ctx);
+            free(evaluated);
+            return result;
+        }
+    }
+
+    return (ExecResult){.success = false, .error = "#NAME?"};
+}
 ```
 
 ### Function Categories to Implement
@@ -416,8 +429,13 @@ void recalculate(Sheet* sheet, uuid_t changed_cell) {
     for (int i = 0; i < array_len(order); i++) {
         Cell* cell = cell_get(sheet, order[i]);
         if (cell->formula) {
-            ExecResult result = execute_formula(cell, sheet);
-            cell->value = result.value;
+            ExecContext ctx = {.sheet = sheet, .cell = cell};
+            ExecResult result = execute_ast(cell->formula->ast, &ctx);
+            if (result.success) {
+                cell->value = result.value;
+            } else {
+                cell->error = parse_error(result.error);
+            }
         }
     }
 }
@@ -439,55 +457,43 @@ bool has_circular_ref(DepGraph* graph, uuid_t cell_id, Dependencies* new_deps) {
 
 ## WASM Considerations
 
-Luau compiles cleanly to WebAssembly:
+Native C/C++ compiles cleanly to WebAssembly via Emscripten:
 
-1. **No JIT dependency**: Luau's interpreter works everywhere
-2. **Memory**: Pre-allocate Luau state pool for reuse
-3. **Async**: Long calculations yield to browser via Luau's interrupt mechanism
+1. **No special runtime**: Same code runs native and WASM
+2. **Memory**: Pre-allocate pools for cells, AST nodes
+3. **Async**: Long calculations can yield via Emscripten's asyncify
 
 ```c
 // WASM-friendly execution with yielding
-static int instruction_count = 0;
+static int iteration_count = 0;
 
-void interrupt_callback(lua_State* L, int gc) {
-    instruction_count++;
-    if (instruction_count > 100000) {
-        // Yield to browser event loop
-        emscripten_sleep(0);  // WASM-specific
-        instruction_count = 0;
+void maybe_yield() {
+    iteration_count++;
+    if (iteration_count > 100000) {
+        #ifdef __EMSCRIPTEN__
+        emscripten_sleep(0);  // Yield to browser event loop
+        #endif
+        iteration_count = 0;
     }
 }
 
-ExecResult execute_formula_wasm(Cell* cell, Sheet* sheet) {
-    lua_State* L = get_sandbox();
-
-    // Set interrupt callback (Luau feature)
-    lua_callbacks(L)->interrupt = interrupt_callback;
-
-    // Load bytecode (already compiled)
-    luau_load(L, "formula", cell->compiled->bytecode,
-              cell->compiled->bytecode_size, 0);
-
-    // Execute
-    int status = lua_pcall(L, 0, 1, 0);
-    // ...
+ExecResult execute_ast_wasm(ASTNode* node, ExecContext* ctx) {
+    maybe_yield();
+    return execute_ast(node, ctx);
 }
 ```
 
-Luau's bytecode is portable - compile once, run on native and WASM.
-
 ## Performance Optimizations
 
-1. **Bytecode caching**: Compile formula to Luau bytecode once, reuse
+1. **AST caching**: Parse formula once, store AST for reuse
 2. **Batch recalc**: Group multiple changes, recalc once
 3. **Parallel recalc**: Independent branches can run in parallel
 4. **Lazy evaluation**: Only calc visible cells first
-5. **Luau optimizations**: Type annotations enable faster codegen
+5. **Inline hot functions**: Mark SUM, IF, etc. for inlining
 
 ## Testing Strategy
 
 1. **Parser tests**: Verify AST structure for various formulas
-2. **Codegen tests**: Check generated Lua is correct
-3. **Execution tests**: Compare results with Excel/Sheets
-4. **Edge cases**: Errors, empty cells, type coercion
-5. **Performance tests**: Large ranges, complex formulas
+2. **Execution tests**: Compare results with Excel/Sheets
+3. **Edge cases**: Errors, empty cells, type coercion
+4. **Performance tests**: Large ranges, complex formulas

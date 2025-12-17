@@ -27,7 +27,7 @@ A high-performance, collaborative spreadsheet engine with:
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
 │  │ Data Model  │  │ Formula     │  │ CRDT / Collaboration    │  │
 │  │ (Cells,     │◄─┤ Engine      │  │ Engine                  │  │
-│  │ Dimensions) │  │ (Luau+AST)  │  │                         │  │
+│  │ Dimensions) │  │ (Native AST)│  │                         │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -56,8 +56,7 @@ A high-performance, collaborative spreadsheet engine with:
 ### 3. [Formula Engine](./docs/formula-engine.md)
 
 - Excel formula parser → AST
-- AST → Luau transpiler
-- Sandboxed Luau execution
+- Native AST interpreter in C/C++
 - Dependency graph for reactive updates
 
 ### 4. [CRDT & Collaboration](./docs/crdt.md)
@@ -128,13 +127,13 @@ cells/
 3. **Sparse by nature**: Only allocated cells consume memory
 4. **Multi-dimensional**: Generalizes beyond 2D trivially
 
-### Why Luau for formulas?
+### Why native AST execution?
 
-1. **App Store compliant**: No JIT = accepted on iOS/macOS sandboxed apps
-2. **Faster than Lua 5.4**: Roblox-optimized VM, type-aware optimizations
-3. **Sandboxable**: Built-in sandboxing, proven at Roblox scale
-4. **Type annotations**: Optional types for better tooling and perf hints
-5. **Well-maintained**: Active development, open-source (MIT)
+1. **Simpler architecture**: No codegen step, no runtime embedding
+2. **Better performance**: No interpreter overhead, direct function calls
+3. **Easier debugging**: Stack traces are native, not VM traces
+4. **Smaller binary**: No embedded runtime (~500KB+ for scripting VMs)
+5. **Full control**: Custom memory management, precise error handling
 
 ### Why doubly-linked dimensions with gaps?
 
@@ -183,7 +182,7 @@ bazel build //core:cells --config=wasm
 
 - [x] **Language**: C++17 for core engine (C for heavy independent tasks)
 - [x] **Build system**: Bazel - fast incremental builds, hermetic
-- [x] **Formula runtime**: Luau (not Lua/LuaJIT) - App Store compliant, faster, well-maintained
+- [x] **Formula runtime**: Native AST interpreter - no dependencies, simpler, full control
 - [x] **Cell storage**: Sharded hashmap - O(1) access, parallelizable
 - [x] **Undo/redo**: Branch-based history - aligns with git-friendly philosophy, clean CRDT semantics
 - [x] **Dimensions**: Start with 2D, but model supports N dimensions - naming and structures are dimension-agnostic

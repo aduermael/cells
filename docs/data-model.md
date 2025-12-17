@@ -17,7 +17,7 @@ typedef struct Cell {
     CellError error;              // Error state (CELL_OK = no error)
 
     // Formula (single pointer to combined struct)
-    Formula* formula;             // Formula text + compiled bytecode (NULL = not a formula)
+    Formula* formula;             // Formula text + parsed AST (NULL = not a formula)
 
     // Metadata
     CellStyle* style;             // Formatting (optional, can be NULL)
@@ -46,15 +46,14 @@ typedef enum CellError {
 
 typedef struct Formula {
     char* text;                   // Original formula text (e.g., "=SUM(A1:A10)")
-    uint8_t* bytecode;            // Compiled Luau bytecode (NULL = not compiled)
-    size_t bytecode_len;          // Bytecode length
+    struct ASTNode* ast;          // Parsed AST (NULL = not parsed)
 } Formula;
 ```
 
 **Design notes:**
 - Type is optional; if `CELL_TYPE_AUTO`, value is cast dynamically from string
 - x/y are hardcoded for 2D; UUIDs allow future N-D extension without changing Cell struct
-- Formula combines source text and bytecode in one allocation
+- Formula combines source text and parsed AST in one allocation
 
 ### Axis (Column or Row)
 Represents a single column (x-axis) or row (y-axis).
