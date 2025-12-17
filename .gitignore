@@ -1,0 +1,16 @@
+# Bazel
+/bazel-*
+MODULE.bazel.lock
+
+# IDE
+.idea/
+*.swp
+*.swo
+.vscode/
+
+# macOS
+.DS_Store
+
+# Build outputs
+*.o
+*.a
