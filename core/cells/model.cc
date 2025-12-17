@@ -1,7 +1,7 @@
 #include "core/cells/model.h"
 
 #include <cstdlib>
-#include <stdexcept>
+#include <cstring>
 
 namespace cells {
 
@@ -56,22 +56,104 @@ const std::string& CellValue::asString() const {
 }
 
 // ============================================================================
+// Formula
+// ============================================================================
+
+Formula::Formula()
+    : text(nullptr), bytecode(nullptr), bytecodeLen(0), dirty(true) {}
+
+Formula::Formula(const char* src)
+    : bytecode(nullptr), bytecodeLen(0), dirty(true) {
+    if (src) {
+        size_t len = std::strlen(src);
+        text = new char[len + 1];
+        std::memcpy(text, src, len + 1);
+    } else {
+        text = nullptr;
+    }
+}
+
+Formula::~Formula() {
+    delete[] text;
+    delete[] bytecode;
+}
+
+Formula::Formula(Formula&& other)
+    : text(other.text), bytecode(other.bytecode),
+      bytecodeLen(other.bytecodeLen), dirty(other.dirty) {
+    other.text = nullptr;
+    other.bytecode = nullptr;
+    other.bytecodeLen = 0;
+}
+
+Formula& Formula::operator=(Formula&& other) {
+    if (this != &other) {
+        delete[] text;
+        delete[] bytecode;
+        text = other.text;
+        bytecode = other.bytecode;
+        bytecodeLen = other.bytecodeLen;
+        dirty = other.dirty;
+        other.text = nullptr;
+        other.bytecode = nullptr;
+        other.bytecodeLen = 0;
+    }
+    return *this;
+}
+
+// ============================================================================
 // Cell
 // ============================================================================
 
-Cell::Cell() : id(), colId(), rowId(), value(), formula() {}
+Cell::Cell() : id(), colId(), rowId(), value(), formula(nullptr) {}
 
-Cell::Cell(const ID& id) : id(id), colId(), rowId(), value(), formula() {}
+Cell::Cell(const ID& id) : id(id), colId(), rowId(), value(), formula(nullptr) {}
 
 Cell::Cell(const ID& id, const ID& col, const ID& row)
-    : id(id), colId(col), rowId(row), value(), formula() {}
+    : id(id), colId(col), rowId(row), value(), formula(nullptr) {}
+
+Cell::~Cell() {
+    delete formula;
+}
+
+Cell::Cell(Cell&& other)
+    : id(other.id), colId(other.colId), rowId(other.rowId),
+      value(std::move(other.value)), formula(other.formula) {
+    other.formula = nullptr;
+}
+
+Cell& Cell::operator=(Cell&& other) {
+    if (this != &other) {
+        delete formula;
+        id = other.id;
+        colId = other.colId;
+        rowId = other.rowId;
+        value = std::move(other.value);
+        formula = other.formula;
+        other.formula = nullptr;
+    }
+    return *this;
+}
 
 bool Cell::isFormula() const {
-    return value.type == CellValueType::FORMULA || !formula.empty();
+    return formula != nullptr;
 }
 
 bool Cell::hasError() const {
     return value.error != CellError::NONE;
+}
+
+void Cell::setFormula(Formula* f) {
+    delete formula;
+    formula = f;
+    if (f) {
+        value.type = CellValueType::FORMULA;
+    }
+}
+
+void Cell::clearFormula() {
+    delete formula;
+    formula = nullptr;
 }
 
 // ============================================================================

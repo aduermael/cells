@@ -36,20 +36,57 @@ struct CellValue {
     const std::string& asString() const;
 };
 
+// Formula - contains source text and optional compiled bytecode
+// Owned by Cell, cleaned up in Cell destructor
+struct Formula {
+    char* text;              // Formula source (e.g., "=A1+B1"), owned
+    uint8_t* bytecode;       // Compiled Luau bytecode, null if not compiled, owned
+    size_t bytecodeLen;      // Bytecode length in bytes
+    bool dirty;              // Needs recalculation?
+
+    Formula();
+    explicit Formula(const char* text);
+    ~Formula();
+
+    // Non-copyable (owns resources)
+    Formula(const Formula&) = delete;
+    Formula& operator=(const Formula&) = delete;
+
+    // Movable
+    Formula(Formula&& other);
+    Formula& operator=(Formula&& other);
+};
+
 // Cell - fundamental unit of data
+// Either a direct value OR a formula with cached result
 struct Cell {
     ID id;                   // Unique identifier (8-char base62)
     ID colId;                // Column axis ID
     ID rowId;                // Row axis ID
-    CellValue value;         // Cell value and type
-    std::string formula;     // Formula text (empty if not a formula)
+    CellValue value;         // Direct value OR cached formula result
+    Formula* formula;        // null = value cell, non-null = formula cell (owned)
 
     Cell();
     explicit Cell(const ID& id);
     Cell(const ID& id, const ID& col, const ID& row);
+    ~Cell();
+
+    // Non-copyable (owns formula)
+    Cell(const Cell&) = delete;
+    Cell& operator=(const Cell&) = delete;
+
+    // Movable
+    Cell(Cell&& other);
+    Cell& operator=(Cell&& other);
 
     bool isFormula() const;
     bool hasError() const;
+
+    // Set cell to a formula (takes ownership)
+    void setFormula(Formula* f);
+
+    // Clear formula, making this a value cell
+    void clearFormula();
 };
 
 // Axis - represents a column or row
