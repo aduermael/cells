@@ -1,5 +1,73 @@
 # Coding Guidelines
 
+## Code Quality Tools
+
+### Formatting (clang-format)
+
+All C++ code must be formatted using clang-format. Configuration is in `.clang-format`.
+
+```bash
+# Format all files
+./scripts/format.sh
+
+# Check formatting (CI mode)
+./scripts/format.sh --check
+
+# Format specific files
+./scripts/format.sh core/cells/model.cc
+```
+
+### Linting (clang-tidy)
+
+Static analysis using clang-tidy. Configuration is in `.clang-tidy`.
+
+```bash
+# Lint all files
+./scripts/lint.sh
+
+# Lint and auto-fix
+./scripts/lint.sh --fix
+
+# Lint specific files
+./scripts/lint.sh core/cells/model.cc
+```
+
+### Combined Check
+
+Run all checks (format + lint + build):
+```bash
+./scripts/check.sh          # Check mode
+./scripts/check.sh --fix    # Fix mode
+```
+
+### Pre-commit Hook (Optional)
+
+Install to run format checks before each commit:
+```bash
+ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
+```
+
+### Requirements
+
+Install the tools:
+```bash
+brew install clang-format llvm
+export PATH="$(brew --prefix llvm)/bin:$PATH"  # Add to .zshrc
+```
+
+### Naming Conventions
+
+| Element | Convention | Example |
+|---------|------------|---------|
+| Structs/Classes | PascalCase | `CellValue`, `Sheet` |
+| Enums | PascalCase | `CellValueType` |
+| Enum constants | UPPER_CASE | `NUMBER`, `STRING` |
+| Functions | camelCase | `getValue`, `addCell` |
+| Variables | camelCase | `cellId`, `rowCount` |
+| Private members | _camelCase | `_cellIndex` |
+| Constants | UPPER_CASE | `ID_LENGTH`, `DEFAULT_ROW_HEIGHT` |
+| Namespaces | snake_case | `cells` |
+
 ## Standard Library Usage
 
 Avoid `std::` when avoidable. Prefer simpler, more explicit alternatives:
@@ -53,6 +121,36 @@ struct B { int x; char* y; B(); void foo(); ~B(); };
 - `static` members
 
 **Guideline:** Use constructors and member functions freely for cleaner code. Only avoid `virtual` in memory-critical structs.
+
+## Struct Layout and Padding
+
+C++ compilers insert padding bytes to satisfy alignment requirements. To minimize wasted space:
+
+**Order members by alignment (largest first):**
+```cpp
+// BAD - 7 bytes padding
+struct Bad {
+    char a;          // 1 byte, offset 0
+                     // 7 bytes padding
+    double b;        // 8 bytes, offset 8
+};                   // Total: 16 bytes (only 9 useful)
+
+// GOOD - no padding
+struct Good {
+    double b;        // 8 bytes, offset 0
+    char a;          // 1 byte, offset 8
+};                   // Total: 16 bytes (9 useful, 7 tail padding unavoidable)
+```
+
+**Alignment requirements (64-bit):**
+| Type | Size | Alignment |
+|------|------|-----------|
+| `char`, `bool` | 1 | 1 |
+| `uint16_t` | 2 | 2 |
+| `uint32_t`, `float` | 4 | 4 |
+| `uint64_t`, `double`, pointers, `std::string` | 8 | 8 |
+
+**Guideline:** Sort struct members by decreasing alignment. Group same-alignment fields together. Put `bool` and `char` fields at the end.
 
 ## Performance
 

@@ -157,13 +157,15 @@ void Cell::clearFormula() {
 // ============================================================================
 
 Axis::Axis()
-    : id(), isColumn(true), prevId(), nextId(),
-      gapBefore(0), gapAfter(0), name(), size(DEFAULT_COLUMN_WIDTH) {}
+    : name(), id(), prevId(), nextId(),
+      gapBefore(0), gapAfter(0), size(DEFAULT_COLUMN_WIDTH),
+      isColumn(true) {}
 
 Axis::Axis(const ID& id, bool isColumn)
-    : id(id), isColumn(isColumn), prevId(), nextId(),
-      gapBefore(0), gapAfter(0), name(),
-      size(isColumn ? DEFAULT_COLUMN_WIDTH : DEFAULT_ROW_HEIGHT) {}
+    : name(), id(id), prevId(), nextId(),
+      gapBefore(0), gapAfter(0),
+      size(isColumn ? DEFAULT_COLUMN_WIDTH : DEFAULT_ROW_HEIGHT),
+      isColumn(isColumn) {}
 
 bool Axis::isHead() const {
     return prevId.isNull();

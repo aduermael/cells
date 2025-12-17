@@ -14,3 +14,6 @@ MODULE.bazel.lock
 # Build outputs
 *.o
 *.a
+
+# Clang tooling
+compile_commands.json

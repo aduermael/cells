@@ -88,19 +88,22 @@ struct Cell {
 };
 
 // Axis - represents a column or row
+// Layout optimized for minimal padding (64 bytes total)
 struct Axis {
+    // 8-byte aligned fields
+    std::string name;        // Custom name (empty = compute from position)
     ID id;                   // Unique identifier (8-char base62)
-    bool isColumn;           // true = column (x), false = row (y)
-
-    // Doubly-linked list structure
     ID prevId;               // Previous axis ID (null = head)
     ID nextId;               // Next axis ID (null = tail)
+
+    // 4-byte aligned fields
     uint32_t gapBefore;      // Empty positions between prev and this
     uint32_t gapAfter;       // Empty positions between this and next
-
-    // Properties
-    std::string name;        // Custom name (empty = compute from position)
     uint32_t size;           // Width (column) or height (row) in pixels
+
+    // 1-byte aligned fields
+    bool isColumn;           // true = column (x), false = row (y)
+                             // 3 bytes padding (struct alignment = 8)
 
     Axis();
     explicit Axis(const ID& id, bool isColumn = true);
