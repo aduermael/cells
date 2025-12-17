@@ -51,7 +51,9 @@ done
 
 # Find files to lint (only .cc files, not headers)
 if [ ${#FILES[@]} -eq 0 ]; then
-    mapfile -t FILES < <(find "$PROJECT_ROOT/core" -type f -name "*.cc" 2>/dev/null)
+    while IFS= read -r -d '' file; do
+        FILES+=("$file")
+    done < <(find "$PROJECT_ROOT/core" -type f -name "*.cc" -print0 2>/dev/null)
 fi
 
 if [ ${#FILES[@]} -eq 0 ]; then

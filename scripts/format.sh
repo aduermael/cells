@@ -39,10 +39,11 @@ for arg in "$@"; do
     esac
 done
 
-# Find files to format
+# Find files to format if none specified
 if [ ${#FILES[@]} -eq 0 ]; then
-    # No files specified, find all C++ files
-    mapfile -t FILES < <(find "$PROJECT_ROOT/core" -type f \( -name "*.cc" -o -name "*.h" -o -name "*.cpp" -o -name "*.hpp" \) 2>/dev/null)
+    while IFS= read -r -d '' file; do
+        FILES+=("$file")
+    done < <(find "$PROJECT_ROOT/core" -type f \( -name "*.cc" -o -name "*.h" -o -name "*.cpp" -o -name "*.hpp" \) -print0 2>/dev/null)
 fi
 
 if [ ${#FILES[@]} -eq 0 ]; then
