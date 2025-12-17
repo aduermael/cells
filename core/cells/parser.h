@@ -1,0 +1,84 @@
+#ifndef CELLS_PARSER_H_
+#define CELLS_PARSER_H_
+
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+
+#include "core/cells/model.h"
+#include "core/cells/types.h"
+
+namespace cells {
+
+// Parser error information
+struct ParseError {
+    int line{0};            // 1-based line number
+    int column{0};          // 1-based column (0 if not applicable)
+    std::string message{};  // Human-readable error message
+
+    ParseError() = default;
+    ParseError(int line, std::string msg) : line(line), message(std::move(msg)) {}
+    ParseError(int line, int col, std::string msg)
+        : line(line), column(col), message(std::move(msg)) {}
+
+    [[nodiscard]] std::string toString() const;
+};
+
+// Result of parsing a .cells file
+struct ParseResult {
+    std::unique_ptr<Workbook> workbook{};  // Non-null on success
+    std::optional<ParseError> error{};     // Present on failure
+
+    [[nodiscard]] bool ok() const { return workbook != nullptr && !error.has_value(); }
+    [[nodiscard]] explicit operator bool() const { return ok(); }
+};
+
+// Main parser class
+class Parser {
+public:
+    Parser();
+
+    // Parse a .cells file from string content
+    // Returns ParseResult with workbook on success, error on failure
+    ParseResult parse(const std::string& content);
+    ParseResult parse(std::string_view content);
+
+private:
+    // Internal state
+    int lineNum_{0};
+    Workbook* workbook_{nullptr};   // Current workbook being built
+    Sheet* currentSheet_{nullptr};  // Current sheet being parsed
+    std::string errorMsg_;          // Error message if parsing failed
+
+    // Reset parser state for new parse
+    void reset();
+
+    // Set error and return false
+    bool setError(const std::string& message);
+    bool setError(int line, const std::string& message);
+
+    // Parse a single line (dispatches to specific parsers)
+    bool parseLine(std::string_view line);
+
+    // Line type parsers
+    bool parseDocument(std::string_view line);  // D <id> "<name>"
+    bool parseSheet(std::string_view line);     // S <id> "<name>"
+    bool parseColumn(std::string_view line);    // C <id> <prev> <next> [props]
+    bool parseRow(std::string_view line);       // R <id> <prev> <next> [props]
+    bool parseCell(std::string_view line);      // X <id> <col> <row> <type> <value>
+
+    // Helper parsers
+    static bool parseLink(std::string_view token, ID& outId, uint32_t& outGap);
+    static bool parseQuotedString(std::string_view input, std::string& out, size_t& consumed);
+    static bool parseAxisProps(std::string_view props, Axis& axis);
+    bool parseCellValue(std::string_view value, char type, CellValue& out);
+};
+
+// Convenience function for one-shot parsing
+ParseResult parse(const std::string& content);
+ParseResult parse(std::string_view content);
+
+}  // namespace cells
+
+#endif  // CELLS_PARSER_H_

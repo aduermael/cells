@@ -1,0 +1,34 @@
+#cells v1
+D uN1cO2dE "日本語テスト"
+
+S sH3eE4tA "表計算"
+
+#cols
+C cA1bC2dE ~ cB3dE4fG
+C cB3dE4fG cA1bC2dE ~
+
+#rows
+R rA1bC2dE ~ rB3dE4fG
+R rB3dE4fG rA1bC2dE rC5fG6hJ
+R rC5fG6hJ rB3dE4fG rD7hJ8kL
+R rD7hJ8kL rC5fG6hJ rE9kL0mN
+R rE9kL0mN rD7hJ8kL rF1mN2pQ
+R rF1mN2pQ rE9kL0mN rG3pQ4rS
+R rG3pQ4rS rF1mN2pQ ~
+
+#cells
+X xU1nI2cO cA1bC2dE rA1bC2dE s "日本語"
+X xU2nI3cO cB3dE4fG rA1bC2dE s "Japanese"
+X xU3nI4cO cA1bC2dE rB3dE4fG s "中文"
+X xU4nI5cO cB3dE4fG rB3dE4fG s "Chinese"
+X xU5nI6cO cA1bC2dE rC5fG6hJ s "한국어"
+X xU6nI7cO cB3dE4fG rC5fG6hJ s "Korean"
+X xU7nI8cO cA1bC2dE rD7hJ8kL s "Ελληνικά"
+X xU8nI9cO cB3dE4fG rD7hJ8kL s "Greek"
+X xU9nI0cO cA1bC2dE rE9kL0mN s "العربية"
+X xV1oJ2pK cB3dE4fG rE9kL0mN s "Arabic"
+X xV2oJ3pK cA1bC2dE rF1mN2pQ s "🎉🚀💻"
+X xV3oJ4pK cB3dE4fG rF1mN2pQ s "Emoji"
+X xV4oJ5pK cA1bC2dE rG3pQ4rS s "Line\nBreak"
+X xV5oJ6pK cB3dE4fG rG3pQ4rS s "Tab\there"
+

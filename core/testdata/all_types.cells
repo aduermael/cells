@@ -1,0 +1,46 @@
+#cells v1
+D tY8pL3mK "All Types Test"
+
+S qR5sW2xN "Types"
+
+#cols
+C cA1bC2dE ~ cB3dE4fG
+C cB3dE4fG cA1bC2dE ~
+
+#rows
+R rA1bC2dE ~ rB3dE4fG
+R rB3dE4fG rA1bC2dE rC5fG6hJ
+R rC5fG6hJ rB3dE4fG rD7hJ8kL
+R rD7hJ8kL rC5fG6hJ rE9kL0mN
+R rE9kL0mN rD7hJ8kL rF1mN2pQ
+R rF1mN2pQ rE9kL0mN rG3pQ4rS
+R rG3pQ4rS rF1mN2pQ rH5rS6tW
+R rH5rS6tW rG3pQ4rS rJ7tW8xY
+R rJ7tW8xY rH5rS6tW rK9xY0zA
+R rK9xY0zA rJ7tW8xY rL1zA2bC
+R rL1zA2bC rK9xY0zA ~
+
+#cells
+X xA1aB2cD cA1bC2dE rA1bC2dE s "Type"
+X xA2aB3cD cB3dE4fG rA1bC2dE s "Value"
+X xA3aB4cD cA1bC2dE rB3dE4fG s "Number (int)"
+X xA4aB5cD cB3dE4fG rB3dE4fG n 42
+X xA5aB6cD cA1bC2dE rC5fG6hJ s "Number (float)"
+X xA6aB7cD cB3dE4fG rC5fG6hJ n 3.14159265358979
+X xA7aB8cD cA1bC2dE rD7hJ8kL s "Number (neg)"
+X xA8aB9cD cB3dE4fG rD7hJ8kL n -100.5
+X xA9aB0cD cA1bC2dE rE9kL0mN s "String"
+X xB1bC2dE cB3dE4fG rE9kL0mN s "Hello, World!"
+X xB2bC3dE cA1bC2dE rF1mN2pQ s "Boolean (true)"
+X xB3bC4dE cB3dE4fG rF1mN2pQ b true
+X xB4bC5dE cA1bC2dE rG3pQ4rS s "Boolean (false)"
+X xB5bC6dE cB3dE4fG rG3pQ4rS b false
+X xB6bC7dE cA1bC2dE rH5rS6tW s "Formula"
+X xB7bC8dE cB3dE4fG rH5rS6tW f "=$cB3dE4fG$rB3dE4fG*2"
+X xB8bC9dE cA1bC2dE rJ7tW8xY s "Error"
+X xB9bC0dE cB3dE4fG rJ7tW8xY e #DIV/0!
+X xC1cD2eF cA1bC2dE rK9xY0zA s "Date"
+X xC2cD3eF cB3dE4fG rK9xY0zA d 2024-01-15
+X xC3cD4eF cA1bC2dE rL1zA2bC s "DateTime"
+X xC4cD5eF cB3dE4fG rL1zA2bC t 2024-01-15T10:30:00Z
+

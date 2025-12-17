@@ -1,0 +1,40 @@
+#cells v1
+D Kj7mXp2Q "Budget 2024"
+
+S tH2kM6xN "Q1 Expenses"
+
+#cols
+C fR3pK7wN ~ gT8mL2sQ w:120 name:"Category"
+C gT8mL2sQ fR3pK7wN hW4nJ9xR w:80 name:"Jan"
+C hW4nJ9xR gT8mL2sQ jK6pM3wT w:80 name:"Feb"
+C jK6pM3wT hW4nJ9xR kN8sR4xW w:80 name:"Mar"
+C kN8sR4xW jK6pM3wT ~ w:100 name:"Total"
+
+#rows
+R mP2wK7nL ~ nQ4xL8pM h:30 name:"Header"
+R nQ4xL8pM mP2wK7nL pR6yM9qN
+R pR6yM9qN nQ4xL8pM qS8zN2rP:6
+R qS8zN2rP pR6yM9qN:6 ~ name:"Total"
+
+#cells
+X aB3cD4eF fR3pK7wN mP2wK7nL s "Category"
+X bC4dE5fG gT8mL2sQ mP2wK7nL s "Jan"
+X cD5eF6gH hW4nJ9xR mP2wK7nL s "Feb"
+X dE6fG7hJ jK6pM3wT mP2wK7nL s "Mar"
+X eF7gH8jK kN8sR4xW mP2wK7nL s "Total"
+X fG8hJ9kL fR3pK7wN nQ4xL8pM s "Rent"
+X gH9jK2lM gT8mL2sQ nQ4xL8pM n 2000
+X hJ2kL3mN hW4nJ9xR nQ4xL8pM n 2000
+X jK3lM4nP jK6pM3wT nQ4xL8pM n 2000
+X kL4mN5pQ kN8sR4xW nQ4xL8pM f "=SUM($gT8mL2sQ$nQ4xL8pM:$jK6pM3wT$nQ4xL8pM)"
+X lM5nP6qR fR3pK7wN pR6yM9qN s "Utilities"
+X mN6pQ7rS gT8mL2sQ pR6yM9qN n 150
+X nP7qR8sT hW4nJ9xR pR6yM9qN n 180
+X pQ8rS9tW jK6pM3wT pR6yM9qN n 165
+X qR9sT2wX kN8sR4xW pR6yM9qN f "=SUM($gT8mL2sQ$pR6yM9qN:$jK6pM3wT$pR6yM9qN)"
+X rS2tW3xY fR3pK7wN qS8zN2rP s "Total"
+X sT3wX4yZ gT8mL2sQ qS8zN2rP f "=SUM($gT8mL2sQ$nQ4xL8pM:$gT8mL2sQ$pR6yM9qN)"
+X tW4xY5zA hW4nJ9xR qS8zN2rP f "=SUM($hW4nJ9xR$nQ4xL8pM:$hW4nJ9xR$pR6yM9qN)"
+X wX5yZ6aB jK6pM3wT qS8zN2rP f "=SUM($jK6pM3wT$nQ4xL8pM:$jK6pM3wT$pR6yM9qN)"
+X xY6zA7bC kN8sR4xW qS8zN2rP f "=SUM($kN8sR4xW$nQ4xL8pM:$kN8sR4xW$pR6yM9qN)"
+

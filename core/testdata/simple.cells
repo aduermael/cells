@@ -1,0 +1,19 @@
+#cells v1
+D Qx7mXp2L "Untitled"
+
+S bF3hL8mN "Sheet1"
+
+#cols
+C kR7pN2wQ ~ vT5mK9xL:2
+C vT5mK9xL kR7pN2wQ:2 ~
+
+#rows
+R jH4sW8nF ~ qM2kL5pR
+R qM2kL5pR jH4sW8nF yB9tX3wN:1
+R yB9tX3wN qM2kL5pR:1 ~
+
+#cells
+X nP6kR2mW kR7pN2wQ jH4sW8nF n 2
+X hT8sL4xQ kR7pN2wQ qM2kL5pR s "foo"
+X wK3nJ7pM vT5mK9xL yB9tX3wN f "=$kR7pN2wQ$jH4sW8nF+10"
+

@@ -49,11 +49,13 @@ for arg in "$@"; do
     esac
 done
 
-# Find files to lint (only .cc files, not headers)
+# Find files to lint (only .cc files, not headers or test files)
+# Test files (_test.cc) are excluded because they depend on external test
+# framework headers (gtest) that aren't available to clang-tidy
 if [ ${#FILES[@]} -eq 0 ]; then
     while IFS= read -r -d '' file; do
         FILES+=("$file")
-    done < <(find "$PROJECT_ROOT/core" -type f -name "*.cc" -print0 2>/dev/null)
+    done < <(find "$PROJECT_ROOT/core" -type f -name "*.cc" ! -name "*_test.cc" -print0 2>/dev/null)
 fi
 
 if [ ${#FILES[@]} -eq 0 ]; then
@@ -85,19 +87,20 @@ for file in "${FILES[@]}"; do
 
     echo -e "${YELLOW}Checking:${NC} $file"
 
-    # Run clang-tidy (include project root for header resolution)
-    # Filter out noisy system header summary and empty lines
-    OUTPUT=$("${TIDY_CMD[@]}" \
+    # Run clang-tidy with output to temp file to capture exit code reliably
+    TMPFILE=$(mktemp)
+    TIDY_EXIT=0
+    "${TIDY_CMD[@]}" \
         --config-file="$PROJECT_ROOT/.clang-tidy" \
         "$file" \
         -- \
         -std=c++17 \
         -I"$PROJECT_ROOT" \
-        2>&1)
-    TIDY_EXIT=$?
+        > "$TMPFILE" 2>&1 || TIDY_EXIT=$?
 
-    # Filter and display output
-    echo "$OUTPUT" | grep -v -E "^$|warnings generated|Suppressed .* warnings|Use -header-filter" || true
+    # Filter and display output (remove noise from system headers)
+    grep -v -E "^$|warnings generated|Suppressed .* warnings|Use -header-filter|^Error while processing|^Found compiler error" "$TMPFILE" || true
+    rm -f "$TMPFILE"
 
     if [ $TIDY_EXIT -ne 0 ]; then
         FAILED=1

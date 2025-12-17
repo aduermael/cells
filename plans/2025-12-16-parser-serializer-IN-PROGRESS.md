@@ -41,9 +41,9 @@ Define the core C++ types needed for the parser.
 
 Implement base62 ID generation for creating new entities. Needed early for sample file creation.
 
-- [ ] **2a:** Create `core/cells/id.h` and `core/cells/id.cc` with ID generation
-- [ ] **2b:** Implement rejection sampling to avoid modulo bias
-- [ ] **2c:** Add `core/cells/id_test.cc` for ID generation tests (length, charset, uniqueness)
+- [x] **2a:** Create `core/cells/id.h` and `core/cells/id.cc` with ID generation
+- [x] **2b:** Implement rejection sampling to avoid modulo bias
+- [x] **2c:** Add `core/cells/id_test.cc` for ID generation tests (length, charset, uniqueness)
 
 **Deliverables:**
 - `id.h` / `id.cc` - `generate_id()` function
@@ -55,13 +55,13 @@ Implement base62 ID generation for creating new entities. Needed early for sampl
 
 Implement the text format parser.
 
-- [ ] **3a:** Create `core/cells/parser.h` with parser API
-- [ ] **3b:** Create `core/cells/parser.cc` with line-by-line parser
-- [ ] **3c:** Implement section parsing (#cols, #rows, #cells)
-- [ ] **3d:** Implement value type parsing (n, s, f, b, e, d, t)
-- [ ] **3e:** Implement linked-list parsing with gap notation (prev:gap next:gap)
-- [ ] **3f:** Implement axis properties parsing (w:, h:, name:)
-- [ ] **3g:** Add parser error handling with line numbers
+- [x] **3a:** Create `core/cells/parser.h` with parser API
+- [x] **3b:** Create `core/cells/parser.cc` with line-by-line parser
+- [x] **3c:** Implement section parsing (#cols, #rows, #cells)
+- [x] **3d:** Implement value type parsing (n, s, f, b, e, d, t)
+- [x] **3e:** Implement linked-list parsing with gap notation (prev:gap next:gap)
+- [x] **3f:** Implement axis properties parsing (w:, h:, name:)
+- [x] **3g:** Add parser error handling with line numbers
 
 **Deliverables:**
 - `parser.h` - `parse()` function, `ParseError` struct
@@ -73,12 +73,12 @@ Implement the text format parser.
 
 Implement the text format serializer.
 
-- [ ] **4a:** Create `core/cells/serializer.h` with serializer API
-- [ ] **4b:** Create `core/cells/serializer.cc` with basic structure
-- [ ] **4c:** Implement axis serialization with gap notation
-- [ ] **4d:** Implement cell serialization for all value types
-- [ ] **4e:** Implement string escaping for quoted values
-- [ ] **4f:** Add serialization to file and to string
+- [x] **4a:** Create `core/cells/serializer.h` with serializer API
+- [x] **4b:** Create `core/cells/serializer.cc` with basic structure
+- [x] **4c:** Implement axis serialization with gap notation
+- [x] **4d:** Implement cell serialization for all value types
+- [x] **4e:** Implement string escaping for quoted values
+- [x] **4f:** Add serialization to file and to string
 
 **Deliverables:**
 - `serializer.h` - `serialize()` function
@@ -90,13 +90,13 @@ Implement the text format serializer.
 
 Create test data files covering various scenarios.
 
-- [ ] **5a:** Create `core/testdata/minimal.cells` - simplest valid file (1 cell)
-- [ ] **5b:** Create `core/testdata/simple.cells` - basic file from docs (A1=2, A2="foo", D4=formula)
-- [ ] **5c:** Create `core/testdata/budget.cells` - larger example from docs (budget spreadsheet)
-- [ ] **5d:** Create `core/testdata/all_types.cells` - all cell value types (n, s, f, b, e, d, t)
-- [ ] **5e:** Create `core/testdata/gaps.cells` - sparse grid with various gap encodings
-- [ ] **5f:** Create `core/testdata/unicode.cells` - unicode strings and sheet names
-- [ ] **5g:** Create `core/testdata/empty.cells` - valid file with no cells
+- [x] **5a:** Create `core/testdata/minimal.cells` - simplest valid file (1 cell)
+- [x] **5b:** Create `core/testdata/simple.cells` - basic file from docs (A1=2, A2="foo", D4=formula)
+- [x] **5c:** Create `core/testdata/budget.cells` - larger example from docs (budget spreadsheet)
+- [x] **5d:** Create `core/testdata/all_types.cells` - all cell value types (n, s, f, b, e, d, t)
+- [x] **5e:** Create `core/testdata/gaps.cells` - sparse grid with various gap encodings
+- [x] **5f:** Create `core/testdata/unicode.cells` - unicode strings and sheet names
+- [x] **5g:** Create `core/testdata/empty.cells` - valid file with no cells
 
 **Deliverables:**
 - 7 sample `.cells` files in `core/testdata/`

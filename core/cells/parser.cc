@@ -1,0 +1,640 @@
+#include "core/cells/parser.h"
+
+#include <cstdlib>
+
+#include <charconv>
+#include <sstream>
+
+namespace cells {
+
+// --- ParseError ---
+
+std::string ParseError::toString() const {
+    std::ostringstream ss;
+    ss << "line " << line;
+    if (column > 0) {
+        ss << ", column " << column;
+    }
+    ss << ": " << message;
+    return ss.str();
+}
+
+// --- Parser ---
+
+Parser::Parser() = default;
+
+void Parser::reset() {
+    lineNum_ = 0;
+    workbook_ = nullptr;
+    currentSheet_ = nullptr;
+    errorMsg_.clear();
+}
+
+bool Parser::setError(const std::string& message) {
+    errorMsg_ = message;
+    return false;
+}
+
+bool Parser::setError(int line, const std::string& message) {
+    lineNum_ = line;
+    errorMsg_ = message;
+    return false;
+}
+
+ParseResult Parser::parse(const std::string& content) {
+    return parse(std::string_view(content));
+}
+
+ParseResult Parser::parse(std::string_view content) {
+    reset();
+
+    auto wb = std::make_unique<Workbook>();
+    workbook_ = wb.get();
+
+    // Parse line by line
+    size_t pos = 0;
+    lineNum_ = 0;
+
+    while (pos < content.size()) {
+        lineNum_++;
+
+        // Find end of line
+        size_t lineEnd = content.find('\n', pos);
+        if (lineEnd == std::string_view::npos) {
+            lineEnd = content.size();
+        }
+
+        // Extract line (without newline)
+        std::string_view line = content.substr(pos, lineEnd - pos);
+
+        // Remove trailing \r if present (Windows line endings)
+        if (!line.empty() && line.back() == '\r') {
+            line = line.substr(0, line.size() - 1);
+        }
+
+        // Parse the line
+        if (!parseLine(line)) {
+            ParseResult result;
+            result.error = ParseError(lineNum_, errorMsg_);
+            return result;
+        }
+
+        pos = lineEnd + 1;
+    }
+
+    ParseResult result;
+    result.workbook = std::move(wb);
+    return result;
+}
+
+bool Parser::parseLine(std::string_view line) {
+    // Skip empty lines
+    if (line.empty()) {
+        return true;
+    }
+
+    // Skip lines that are only whitespace
+    const size_t firstNonSpace = line.find_first_not_of(" \t");
+    if (firstNonSpace == std::string_view::npos) {
+        return true;
+    }
+
+    const char prefix = line[firstNonSpace];
+
+    switch (prefix) {
+        case '#':  // Comment line - skip
+            return true;
+
+        case 'D':  // Document
+            return parseDocument(line.substr(firstNonSpace));
+
+        case 'S':  // Sheet
+            return parseSheet(line.substr(firstNonSpace));
+
+        case 'C':  // Column
+            return parseColumn(line.substr(firstNonSpace));
+
+        case 'R':  // Row
+            return parseRow(line.substr(firstNonSpace));
+
+        case 'X':  // Cell
+            return parseCell(line.substr(firstNonSpace));
+
+        case 'T':    // Style definition (ignored for now)
+        case 'Y':    // Cell-style mapping (ignored for now)
+        case 'O': {  // OpLog entry (ignored for now)
+            // These sections are deferred to a later implementation plan
+            return true;
+        }
+
+        default:
+            // Unknown line type - ignore gracefully
+            return true;
+    }
+}
+
+bool Parser::parseDocument(std::string_view line) {
+    // Format: D <id> "<name>"
+    if (line.size() < 2 || line[0] != 'D' || line[1] != ' ') {
+        return setError("Invalid document line");
+    }
+
+    line = line.substr(2);  // Skip "D "
+
+    // Parse ID (8 characters)
+    const size_t spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos || spacePos < 1) {
+        return setError("Missing document ID");
+    }
+
+    const std::string idStr(line.substr(0, spacePos));
+    workbook_->id = ID(idStr);
+
+    // Parse quoted name
+    line = line.substr(spacePos + 1);
+    std::string name;
+    size_t consumed = 0;
+    if (!parseQuotedString(line, name, consumed)) {
+        return setError("Invalid document name, expected quoted string");
+    }
+
+    workbook_->name = std::move(name);
+    return true;
+}
+
+bool Parser::parseSheet(std::string_view line) {
+    // Format: S <id> "<name>"
+    if (line.size() < 2 || line[0] != 'S' || line[1] != ' ') {
+        return setError("Invalid sheet line");
+    }
+
+    line = line.substr(2);  // Skip "S "
+
+    // Parse ID
+    const size_t spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos || spacePos < 1) {
+        return setError("Missing sheet ID");
+    }
+
+    const std::string idStr(line.substr(0, spacePos));
+    const ID sheetId(idStr);
+
+    // Parse quoted name
+    line = line.substr(spacePos + 1);
+    std::string name;
+    size_t consumed = 0;
+    if (!parseQuotedString(line, name, consumed)) {
+        return setError("Invalid sheet name, expected quoted string");
+    }
+
+    // Create sheet and add to workbook
+    auto sheet = std::make_unique<Sheet>(sheetId, std::move(name));
+    currentSheet_ = sheet.get();
+    workbook_->addSheet(std::move(sheet));
+
+    return true;
+}
+
+bool Parser::parseLink(std::string_view token, ID& outId, uint32_t& outGap) {
+    // Format: "~" or "<id>" or "<id>:<gap>" or "~:<gap>"
+    outGap = 0;
+
+    // Find colon for gap
+    const size_t colonPos = token.find(':');
+    std::string_view idPart;
+    std::string_view gapPart;
+
+    if (colonPos != std::string_view::npos) {
+        idPart = token.substr(0, colonPos);
+        gapPart = token.substr(colonPos + 1);
+    } else {
+        idPart = token;
+    }
+
+    // Parse ID part
+    if (idPart.empty() || idPart == "~") {
+        outId = ID();  // Null ID
+    } else {
+        outId = ID(std::string(idPart));
+    }
+
+    // Parse gap part
+    if (!gapPart.empty()) {
+        int gap = 0;
+        auto result = std::from_chars(gapPart.data(), gapPart.data() + gapPart.size(), gap);
+        if (result.ec != std::errc()) {
+            return false;
+        }
+        outGap = static_cast<uint32_t>(gap);
+    }
+
+    return true;
+}
+
+bool Parser::parseQuotedString(std::string_view input, std::string& out, size_t& consumed) {
+    // Find opening quote
+    if (input.empty() || input[0] != '"') {
+        return false;
+    }
+
+    out.clear();
+    size_t pos = 1;  // Skip opening quote
+
+    while (pos < input.size()) {
+        const char c = input[pos];
+
+        if (c == '"') {
+            // End of string
+            consumed = pos + 1;
+            return true;
+        }
+
+        if (c == '\\' && pos + 1 < input.size()) {
+            // Escape sequence
+            const char next = input[pos + 1];
+            switch (next) {
+                case 'n':
+                    out += '\n';
+                    break;
+                case 't':
+                    out += '\t';
+                    break;
+                case 'r':
+                    out += '\r';
+                    break;
+                case '\\':
+                    out += '\\';
+                    break;
+                case '"':
+                    out += '"';
+                    break;
+                default:
+                    out += next;
+                    break;
+            }
+            pos += 2;
+        } else {
+            out += c;
+            pos++;
+        }
+    }
+
+    // Unterminated string
+    return false;
+}
+
+bool Parser::parseAxisProps(std::string_view props, Axis& axis) {
+    // Format: key:value pairs separated by space
+    // Examples: w:100 name:"Total" h:30
+
+    while (!props.empty()) {
+        // Skip leading whitespace
+        const size_t start = props.find_first_not_of(" \t");
+        if (start == std::string_view::npos) {
+            break;
+        }
+        props = props.substr(start);
+
+        // Find key:value pair
+        const size_t colonPos = props.find(':');
+        if (colonPos == std::string_view::npos) {
+            break;
+        }
+
+        const std::string_view key = props.substr(0, colonPos);
+        props = props.substr(colonPos + 1);
+
+        if (props.empty()) {
+            break;
+        }
+
+        // Parse value
+        if (key == "w" || key == "h") {
+            // Numeric value
+            const size_t endPos = props.find_first_of(" \t");
+            const std::string_view valueStr =
+                (endPos == std::string_view::npos) ? props : props.substr(0, endPos);
+
+            int value = 0;
+            auto result =
+                std::from_chars(valueStr.data(), valueStr.data() + valueStr.size(), value);
+            if (result.ec != std::errc()) {
+                return false;
+            }
+
+            axis.size = static_cast<uint32_t>(value);
+
+            if (endPos == std::string_view::npos) {
+                props = "";
+            } else {
+                props = props.substr(endPos);
+            }
+        } else if (key == "name") {
+            // Quoted string value
+            std::string name;
+            size_t consumed = 0;
+            if (!parseQuotedString(props, name, consumed)) {
+                return false;
+            }
+            axis.name = std::move(name);
+            props = props.substr(consumed);
+        } else {
+            // Unknown property - skip to next space
+            const size_t endPos = props.find_first_of(" \t");
+            if (endPos == std::string_view::npos) {
+                props = "";
+            } else {
+                props = props.substr(endPos);
+            }
+        }
+    }
+
+    return true;
+}
+
+bool Parser::parseColumn(std::string_view line) {
+    // Format: C <id> <prev>[:<gap>] <next>[:<gap>] [props...]
+    if (currentSheet_ == nullptr) {
+        return setError("Column outside of sheet");
+    }
+
+    if (line.size() < 2 || line[0] != 'C' || line[1] != ' ') {
+        return setError("Invalid column line");
+    }
+
+    line = line.substr(2);  // Skip "C "
+
+    // Tokenize: id, prev, next
+    std::string_view tokens[3];
+    size_t tokenCount = 0;
+    size_t propsStart = 0;
+
+    size_t pos = 0;
+    while (tokenCount < 3 && pos < line.size()) {
+        // Skip whitespace
+        const size_t start = line.find_first_not_of(" \t", pos);
+        if (start == std::string_view::npos) {
+            break;
+        }
+
+        // Find end of token
+        size_t end = line.find_first_of(" \t", start);
+        if (end == std::string_view::npos) {
+            end = line.size();
+        }
+
+        tokens[tokenCount++] = line.substr(start, end - start);
+        pos = end;
+        propsStart = end;
+    }
+
+    if (tokenCount < 3) {
+        return setError("Column requires id, prev, and next");
+    }
+
+    // Create axis
+    auto col = std::make_unique<Axis>(ID(std::string(tokens[0])), true);
+
+    // Parse prev link
+    if (!parseLink(tokens[1], col->prevId, col->gapBefore)) {
+        return setError("Invalid prev link in column");
+    }
+
+    // Parse next link
+    if (!parseLink(tokens[2], col->nextId, col->gapAfter)) {
+        return setError("Invalid next link in column");
+    }
+
+    // Parse optional properties
+    if (propsStart < line.size()) {
+        if (!parseAxisProps(line.substr(propsStart), *col)) {
+            return setError("Invalid column properties");
+        }
+    }
+
+    currentSheet_->addColumn(std::move(col));
+    return true;
+}
+
+bool Parser::parseRow(std::string_view line) {
+    // Format: R <id> <prev>[:<gap>] <next>[:<gap>] [props...]
+    if (currentSheet_ == nullptr) {
+        return setError("Row outside of sheet");
+    }
+
+    if (line.size() < 2 || line[0] != 'R' || line[1] != ' ') {
+        return setError("Invalid row line");
+    }
+
+    line = line.substr(2);  // Skip "R "
+
+    // Tokenize: id, prev, next
+    std::string_view tokens[3];
+    size_t tokenCount = 0;
+    size_t propsStart = 0;
+
+    size_t pos = 0;
+    while (tokenCount < 3 && pos < line.size()) {
+        const size_t start = line.find_first_not_of(" \t", pos);
+        if (start == std::string_view::npos) {
+            break;
+        }
+
+        size_t end = line.find_first_of(" \t", start);
+        if (end == std::string_view::npos) {
+            end = line.size();
+        }
+
+        tokens[tokenCount++] = line.substr(start, end - start);
+        pos = end;
+        propsStart = end;
+    }
+
+    if (tokenCount < 3) {
+        return setError("Row requires id, prev, and next");
+    }
+
+    // Create axis
+    auto row = std::make_unique<Axis>(ID(std::string(tokens[0])), false);
+
+    // Parse prev link
+    if (!parseLink(tokens[1], row->prevId, row->gapBefore)) {
+        return setError("Invalid prev link in row");
+    }
+
+    // Parse next link
+    if (!parseLink(tokens[2], row->nextId, row->gapAfter)) {
+        return setError("Invalid next link in row");
+    }
+
+    // Parse optional properties
+    if (propsStart < line.size()) {
+        if (!parseAxisProps(line.substr(propsStart), *row)) {
+            return setError("Invalid row properties");
+        }
+    }
+
+    currentSheet_->addRow(std::move(row));
+    return true;
+}
+
+bool Parser::parseCellValue(std::string_view value, char type, CellValue& out) {
+    switch (type) {
+        case 'n': {
+            // Number: 42, 3.14, -100
+            const double num = std::strtod(std::string(value).c_str(), nullptr);
+            out = CellValue(num);
+            return true;
+        }
+
+        case 's': {
+            // String: "Hello"
+            std::string str;
+            size_t consumed = 0;
+            if (!parseQuotedString(value, str, consumed)) {
+                return false;
+            }
+            out = CellValue(std::move(str));
+            return true;
+        }
+
+        case 'f': {
+            // Formula: "=$cA$r1+10"
+            std::string formula;
+            size_t consumed = 0;
+            if (!parseQuotedString(value, formula, consumed)) {
+                return false;
+            }
+            out.raw = std::move(formula);
+            out.type = CellValueType::FORMULA;
+            out.error = CellError::NONE;
+            return true;
+        }
+
+        case 'b': {
+            // Boolean: true or false
+            if (value == "true") {
+                out = CellValue(true);
+            } else if (value == "false") {
+                out = CellValue(false);
+            } else {
+                return false;
+            }
+            return true;
+        }
+
+        case 'e': {
+            // Error: #DIV/0!, #REF!, etc.
+            out.type = CellValueType::ERROR;
+            out.raw = std::string(value);
+            out.error = stringToError(out.raw);
+            return true;
+        }
+
+        case 'd': {
+            // Date: 2024-01-15 (ISO 8601)
+            out.type = CellValueType::DATE;
+            out.raw = std::string(value);
+            out.error = CellError::NONE;
+            return true;
+        }
+
+        case 't': {
+            // DateTime: 2024-01-15T10:30:00Z (ISO 8601)
+            out.type = CellValueType::DATE_TIME;
+            out.raw = std::string(value);
+            out.error = CellError::NONE;
+            return true;
+        }
+
+        default:
+            return false;
+    }
+}
+
+bool Parser::parseCell(std::string_view line) {
+    // Format: X <id> <col> <row> <type> <value>
+    if (currentSheet_ == nullptr) {
+        return setError("Cell outside of sheet");
+    }
+
+    if (line.size() < 2 || line[0] != 'X' || line[1] != ' ') {
+        return setError("Invalid cell line");
+    }
+
+    line = line.substr(2);  // Skip "X "
+
+    // Tokenize: id, col, row, type
+    std::string_view tokens[4];
+    size_t tokenCount = 0;
+    size_t valueStart = 0;
+
+    size_t pos = 0;
+    while (tokenCount < 4 && pos < line.size()) {
+        const size_t start = line.find_first_not_of(" \t", pos);
+        if (start == std::string_view::npos) {
+            break;
+        }
+
+        size_t end = line.find_first_of(" \t", start);
+        if (end == std::string_view::npos) {
+            end = line.size();
+        }
+
+        tokens[tokenCount++] = line.substr(start, end - start);
+        pos = end;
+        valueStart = end;
+    }
+
+    if (tokenCount < 4) {
+        return setError("Cell requires id, col, row, and type");
+    }
+
+    // Type is single char
+    if (tokens[3].size() != 1) {
+        return setError("Invalid cell type");
+    }
+    const char type = tokens[3][0];
+
+    // Find value start (skip whitespace after type)
+    if (valueStart < line.size()) {
+        const size_t start = line.find_first_not_of(" \t", valueStart);
+        if (start != std::string_view::npos) {
+            valueStart = start;
+        } else {
+            valueStart = line.size();
+        }
+    }
+
+    // Create cell
+    auto cell = std::make_unique<Cell>(ID(std::string(tokens[0])), ID(std::string(tokens[1])),
+                                       ID(std::string(tokens[2])));
+
+    // Parse value
+    const std::string_view valueStr = (valueStart < line.size()) ? line.substr(valueStart) : "";
+    if (!parseCellValue(valueStr, type, cell->value)) {
+        return setError("Invalid cell value");
+    }
+
+    // If it's a formula, set the formula pointer
+    if (type == 'f') {
+        cell->setFormula(new Formula(cell->value.raw.c_str()));
+    }
+
+    currentSheet_->addCell(std::move(cell));
+    return true;
+}
+
+// --- Convenience functions ---
+
+ParseResult parse(const std::string& content) {
+    Parser parser;
+    return parser.parse(content);
+}
+
+ParseResult parse(std::string_view content) {
+    Parser parser;
+    return parser.parse(content);
+}
+
+}  // namespace cells
