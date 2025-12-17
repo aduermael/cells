@@ -32,19 +32,17 @@ Static analysis using clang-tidy. Configuration is in `.clang-tidy`.
 ./scripts/lint.sh core/cells/model.cc
 ```
 
-### Combined Check
+### Makefile Commands
 
-Run all checks (format + lint + build):
 ```bash
-./scripts/check.sh          # Check mode
-./scripts/check.sh --fix    # Fix mode
-```
-
-### Pre-commit Hook (Optional)
-
-Install to run format checks before each commit:
-```bash
-ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
+make format       # Format all C++ code
+make format-check # Check formatting (CI mode)
+make lint         # Run linter
+make lint-fix     # Lint with auto-fix
+make check        # Run all checks (format + lint + build)
+make fix          # Fix all auto-fixable issues
+make build        # Build with Bazel
+make clean        # Clean build artifacts
 ```
 
 ### Requirements
