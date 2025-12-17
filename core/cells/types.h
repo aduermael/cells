@@ -2,21 +2,76 @@
 #define CELLS_TYPES_H_
 
 #include <cstdint>
+#include <cstring>
+#include <functional>
 #include <string>
 
 namespace cells {
 
-// ID is an 8-character base62 string (62^8 = 218 trillion combinations)
+// ID length constant
+constexpr size_t kIDLength = 8;
+
+// ID is a fixed 8-character base62 identifier (62^8 = 218 trillion combinations)
 // Examples: "Kj7mXp2Q", "fR3pK7wN"
-using ID = std::string;
+// Null ID is represented as all zeros internally, "~" in file format
+struct ID {
+    char data[kIDLength];
 
-// Null ID represented as "~" in file format
-constexpr const char* kNullID = "~";
+    // Default constructor creates null ID (all zeros)
+    constexpr ID() : data{0, 0, 0, 0, 0, 0, 0, 0} {}
 
-// Check if an ID is null/empty
-inline bool IsNullID(const ID& id) {
-    return id.empty() || id == kNullID;
-}
+    // Construct from string (must be exactly 8 chars, or "~" for null)
+    explicit ID(const char* str) {
+        if (str == nullptr || str[0] == '~' || str[0] == '\0') {
+            std::memset(data, 0, kIDLength);
+        } else {
+            std::memcpy(data, str, kIDLength);
+        }
+    }
+
+    explicit ID(const std::string& str) : ID(str.c_str()) {}
+
+    // Check if this is a null ID
+    bool IsNull() const {
+        for (size_t i = 0; i < kIDLength; ++i) {
+            if (data[i] != 0) return false;
+        }
+        return true;
+    }
+
+    // Convert to string (for display/debugging)
+    std::string ToString() const {
+        if (IsNull()) return "~";
+        return std::string(data, kIDLength);
+    }
+
+    // Equality comparison
+    bool operator==(const ID& other) const {
+        return std::memcmp(data, other.data, kIDLength) == 0;
+    }
+
+    bool operator!=(const ID& other) const {
+        return !(*this == other);
+    }
+
+    // Ordering (for use in sorted containers)
+    bool operator<(const ID& other) const {
+        return std::memcmp(data, other.data, kIDLength) < 0;
+    }
+};
+
+// Hash function for ID (for use in unordered_map/unordered_set)
+struct IDHash {
+    std::size_t operator()(const ID& id) const {
+        // FNV-1a hash
+        std::size_t hash = 14695981039346656037ULL;
+        for (size_t i = 0; i < kIDLength; ++i) {
+            hash ^= static_cast<unsigned char>(id.data[i]);
+            hash *= 1099511628211ULL;
+        }
+        return hash;
+    }
+};
 
 // Cell value types - stored as single char in file format
 enum class CellValueType {
@@ -108,9 +163,6 @@ inline const char* ErrorToString(CellError error) {
 // Default sizes for axes
 constexpr uint32_t kDefaultColumnWidth = 100;
 constexpr uint32_t kDefaultRowHeight = 24;
-
-// ID length constant
-constexpr size_t kIDLength = 8;
 
 }  // namespace cells
 

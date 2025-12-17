@@ -80,8 +80,8 @@ struct Sheet {
     std::string name;        // Sheet name
 
     // Axis storage (maps ID -> Axis)
-    std::unordered_map<ID, std::unique_ptr<Axis>> columns;
-    std::unordered_map<ID, std::unique_ptr<Axis>> rows;
+    std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> columns;
+    std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> rows;
 
     // Head/tail of linked lists (for traversal)
     ID first_col;
@@ -90,7 +90,7 @@ struct Sheet {
     ID last_row;
 
     // Cell storage (maps ID -> Cell)
-    std::unordered_map<ID, std::unique_ptr<Cell>> cells;
+    std::unordered_map<ID, std::unique_ptr<Cell>, IDHash> cells;
 
     // Secondary index: (col_id, row_id) -> cell_id
     std::unordered_map<std::string, ID> cell_index;
@@ -128,7 +128,7 @@ struct Workbook {
     std::vector<std::unique_ptr<Sheet>> sheets;
 
     // Sheet lookup by ID
-    std::unordered_map<ID, Sheet*> sheet_index;
+    std::unordered_map<ID, Sheet*, IDHash> sheet_index;
 
     Workbook();
     explicit Workbook(const ID& id, const std::string& name = "Untitled");

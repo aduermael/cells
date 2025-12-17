@@ -88,11 +88,11 @@ Axis::Axis(const ID& id, bool is_column)
       size(is_column ? kDefaultColumnWidth : kDefaultRowHeight) {}
 
 bool Axis::IsHead() const {
-    return IsNullID(prev_id);
+    return prev_id.IsNull();
 }
 
 bool Axis::IsTail() const {
-    return IsNullID(next_id);
+    return next_id.IsNull();
 }
 
 // ============================================================================
@@ -178,7 +178,7 @@ void Sheet::AddRow(std::unique_ptr<Axis> row) {
 
 std::string Sheet::MakeCellKey(const ID& col_id, const ID& row_id) {
     // Simple composite key: col_id + ":" + row_id
-    return col_id + ":" + row_id;
+    return col_id.ToString() + ":" + row_id.ToString();
 }
 
 // ============================================================================
