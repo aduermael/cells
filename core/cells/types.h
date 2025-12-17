@@ -17,10 +17,10 @@ constexpr size_t ID_LENGTH = 8;
 // Null ID has data[0] == '\0', serialized as "~" in file format
 // Valid IDs never start with '\0' (base62 chars are 0-9, A-Z, a-z)
 struct ID {
-    char data[ID_LENGTH];
+    char data[ID_LENGTH]{};
 
-    // Default constructor creates null ID
-    constexpr ID() : data{0} {}
+    // Default constructor creates null ID (data already zero-initialized above)
+    constexpr ID() = default;
 
     // Construct from string (must be exactly 8 chars, or "~" for null)
     explicit ID(const char* str) {
@@ -34,13 +34,14 @@ struct ID {
     explicit ID(const std::string& str) : ID(str.c_str()) {}
 
     // Check if this is a null ID (single byte check)
-    bool isNull() const { return data[0] == '\0'; }
+    [[nodiscard]] bool isNull() const { return data[0] == '\0'; }
 
     // Convert to string (for display/debugging)
-    std::string toString() const {
-        if (isNull())
+    [[nodiscard]] std::string toString() const {
+        if (isNull()) {
             return "~";
-        return std::string(data, ID_LENGTH);
+        }
+        return {data, ID_LENGTH};
     }
 
     // Equality comparison
@@ -57,8 +58,8 @@ struct IDHash {
     std::size_t operator()(const ID& id) const {
         // FNV-1a hash
         std::size_t hash = 14695981039346656037ULL;
-        for (size_t i = 0; i < ID_LENGTH; ++i) {
-            hash ^= static_cast<unsigned char>(id.data[i]);
+        for (const char i : id.data) {
+            hash ^= static_cast<unsigned char>(i);
             hash *= 1099511628211ULL;
         }
         return hash;
@@ -66,7 +67,7 @@ struct IDHash {
 };
 
 // Cell value types - stored as single char in file format
-enum class CellValueType {
+enum class CellValueType : std::uint8_t {
     NUMBER,     // 'n' - numeric value (42, 3.14, -100)
     STRING,     // 's' - quoted string ("Hello")
     FORMULA,    // 'f' - formula with ID-based refs ("=$cA$r1+10")
@@ -120,7 +121,7 @@ inline char valueTypeToChar(CellValueType type) {
 }
 
 // Cell error types - stored as strings in file format
-enum class CellError {
+enum class CellError : std::uint8_t {
     NONE,      // No error
     VALUE,     // #VALUE! - wrong type of argument
     REF,       // #REF! - invalid cell reference
@@ -142,20 +143,27 @@ constexpr const char* ERROR_CIRCULAR_STR = "#CIRCULAR!";
 
 // Convert error string to CellError
 inline CellError stringToError(const std::string& s) {
-    if (s == ERROR_VALUE_STR)
+    if (s == ERROR_VALUE_STR) {
         return CellError::VALUE;
-    if (s == ERROR_REF_STR)
+    }
+    if (s == ERROR_REF_STR) {
         return CellError::REF;
-    if (s == ERROR_NAME_STR)
+    }
+    if (s == ERROR_NAME_STR) {
         return CellError::NAME;
-    if (s == ERROR_DIV_STR)
+    }
+    if (s == ERROR_DIV_STR) {
         return CellError::DIV;
-    if (s == ERROR_NULL_STR)
+    }
+    if (s == ERROR_NULL_STR) {
         return CellError::NULL_REF;
-    if (s == ERROR_NUM_STR)
+    }
+    if (s == ERROR_NUM_STR) {
         return CellError::NUM;
-    if (s == ERROR_CIRCULAR_STR)
+    }
+    if (s == ERROR_CIRCULAR_STR) {
         return CellError::CIRCULAR;
+    }
     return CellError::NONE;
 }
 

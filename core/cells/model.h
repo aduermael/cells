@@ -27,13 +27,13 @@ struct CellValue {
 
     CellValue();
     explicit CellValue(double number);
-    explicit CellValue(const std::string& str);
+    explicit CellValue(std::string str);
     explicit CellValue(bool boolean);
     explicit CellValue(CellError error);
 
-    double asNumber() const;
-    bool asBoolean() const;
-    const std::string& asString() const;
+    [[nodiscard]] double asNumber() const;
+    [[nodiscard]] bool asBoolean() const;
+    [[nodiscard]] const std::string& asString() const;
 };
 
 // Formula - contains source text and parsed AST
@@ -52,8 +52,8 @@ struct Formula {
     Formula& operator=(const Formula&) = delete;
 
     // Movable
-    Formula(Formula&& other);
-    Formula& operator=(Formula&& other);
+    Formula(Formula&& other) noexcept;
+    Formula& operator=(Formula&& other) noexcept;
 };
 
 // Cell - fundamental unit of data
@@ -75,11 +75,11 @@ struct Cell {
     Cell& operator=(const Cell&) = delete;
 
     // Movable
-    Cell(Cell&& other);
-    Cell& operator=(Cell&& other);
+    Cell(Cell&& other) noexcept;
+    Cell& operator=(Cell&& other) noexcept;
 
-    bool isFormula() const;
-    bool hasError() const;
+    [[nodiscard]] bool isFormula() const;
+    [[nodiscard]] bool hasError() const;
 
     // Set cell to a formula (takes ownership)
     void setFormula(Formula* f);
@@ -109,8 +109,8 @@ struct Axis {
     Axis();
     explicit Axis(const ID& id, bool isColumn = true);
 
-    bool isHead() const;  // No prev
-    bool isTail() const;  // No next
+    [[nodiscard]] bool isHead() const;  // No prev
+    [[nodiscard]] bool isTail() const;  // No next
 };
 
 // Sheet - 2D grid containing cells
@@ -132,7 +132,7 @@ struct Sheet {
     std::unordered_map<ID, std::unique_ptr<Cell>, IDHash> cells;
 
     Sheet();
-    explicit Sheet(const ID& id, const std::string& name = "Sheet1");
+    explicit Sheet(const ID& id, std::string name = "Sheet1");
 
     // Cell operations
     Cell* getCell(const ID& cellId);
@@ -146,9 +146,9 @@ struct Sheet {
     void addRow(std::unique_ptr<Axis> row);
 
     // Count accessors
-    size_t columnCount() const { return columns.size(); }
-    size_t rowCount() const { return rows.size(); }
-    size_t cellCount() const { return cells.size(); }
+    [[nodiscard]] size_t columnCount() const { return columns.size(); }
+    [[nodiscard]] size_t rowCount() const { return rows.size(); }
+    [[nodiscard]] size_t cellCount() const { return cells.size(); }
 
 private:
     // Secondary index: (colId, rowId) -> cellId
@@ -167,14 +167,14 @@ struct Workbook {
     std::vector<std::unique_ptr<Sheet>> sheets;
 
     Workbook();
-    explicit Workbook(const ID& id, const std::string& name = "Untitled");
+    explicit Workbook(const ID& id, std::string name = "Untitled");
 
     // Sheet operations
     Sheet* getSheet(const ID& sheetId);
     Sheet* getSheetByIndex(size_t index);
     void addSheet(std::unique_ptr<Sheet> sheet);
 
-    size_t sheetCount() const { return sheets.size(); }
+    [[nodiscard]] size_t sheetCount() const { return sheets.size(); }
 
 private:
     // Sheet lookup by ID

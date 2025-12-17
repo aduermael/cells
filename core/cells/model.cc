@@ -3,6 +3,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <utility>
+
 namespace cells {
 
 // ============================================================================
@@ -14,9 +16,9 @@ CellValue::CellValue() : raw(), type(CellValueType::STRING), error(CellError::NO
 CellValue::CellValue(double number)
     : raw(std::to_string(number)), type(CellValueType::NUMBER), error(CellError::NONE) {
     // Remove trailing zeros for cleaner representation
-    size_t dot = raw.find('.');
+    size_t const dot = raw.find('.');
     if (dot != std::string::npos) {
-        size_t last = raw.find_last_not_of('0');
+        size_t const last = raw.find_last_not_of('0');
         if (last != std::string::npos && last > dot) {
             raw = raw.substr(0, last + 1);
         }
@@ -27,8 +29,8 @@ CellValue::CellValue(double number)
     }
 }
 
-CellValue::CellValue(const std::string& str)
-    : raw(str), type(CellValueType::STRING), error(CellError::NONE) {}
+CellValue::CellValue(std::string str)
+    : raw(std::move(str)), type(CellValueType::STRING), error(CellError::NONE) {}
 
 CellValue::CellValue(bool boolean)
     : raw(boolean ? "true" : "false"), type(CellValueType::BOOLEAN), error(CellError::NONE) {}
@@ -60,13 +62,11 @@ const std::string& CellValue::asString() const {
 
 Formula::Formula() : text(nullptr), ast(nullptr), dirty(true) {}
 
-Formula::Formula(const char* src) : ast(nullptr), dirty(true) {
-    if (src) {
-        size_t len = std::strlen(src);
-        text = new char[len + 1];
-        std::memcpy(text, src, len + 1);
-    } else {
-        text = nullptr;
+Formula::Formula(const char* text) : text(nullptr), ast(nullptr), dirty(true) {
+    if (text) {
+        size_t const len = std::strlen(text);
+        this->text = new char[len + 1];
+        std::memcpy(this->text, text, len + 1);
     }
 }
 
@@ -75,12 +75,12 @@ Formula::~Formula() {
     // Note: ast cleanup will be handled when ASTNode is implemented
 }
 
-Formula::Formula(Formula&& other) : text(other.text), ast(other.ast), dirty(other.dirty) {
+Formula::Formula(Formula&& other) noexcept : text(other.text), ast(other.ast), dirty(other.dirty) {
     other.text = nullptr;
     other.ast = nullptr;
 }
 
-Formula& Formula::operator=(Formula&& other) {
+Formula& Formula::operator=(Formula&& other) noexcept {
     if (this != &other) {
         delete[] text;
         // Note: ast cleanup will be handled when ASTNode is implemented
@@ -108,7 +108,7 @@ Cell::~Cell() {
     delete formula;
 }
 
-Cell::Cell(Cell&& other)
+Cell::Cell(Cell&& other) noexcept
     : id(other.id),
       colId(other.colId),
       rowId(other.rowId),
@@ -117,7 +117,7 @@ Cell::Cell(Cell&& other)
     other.formula = nullptr;
 }
 
-Cell& Cell::operator=(Cell&& other) {
+Cell& Cell::operator=(Cell&& other) noexcept {
     if (this != &other) {
         delete formula;
         id = other.id;
@@ -189,7 +189,7 @@ bool Axis::isTail() const {
 
 Sheet::Sheet() : id(), name("Sheet1") {}
 
-Sheet::Sheet(const ID& id, const std::string& name) : id(id), name(name) {}
+Sheet::Sheet(const ID& id, std::string name) : id(id), name(std::move(name)) {}
 
 Cell* Sheet::getCell(const ID& cellId) {
     auto it = cells.find(cellId);
@@ -206,8 +206,9 @@ Cell* Sheet::getCellAt(const ID& colId, const ID& rowId) {
 }
 
 void Sheet::addCell(std::unique_ptr<Cell> cell) {
-    if (!cell)
+    if (!cell) {
         return;
+    }
 
     const ID& cellId = cell->id;
     const ID& colId = cell->colId;
@@ -232,8 +233,9 @@ Axis* Sheet::getRow(const ID& rowId) {
 }
 
 void Sheet::addColumn(std::unique_ptr<Axis> col) {
-    if (!col)
+    if (!col) {
         return;
+    }
 
     col->isColumn = true;
     const ID& colId = col->id;
@@ -250,8 +252,9 @@ void Sheet::addColumn(std::unique_ptr<Axis> col) {
 }
 
 void Sheet::addRow(std::unique_ptr<Axis> row) {
-    if (!row)
+    if (!row) {
         return;
+    }
 
     row->isColumn = false;
     const ID& rowId = row->id;
@@ -278,7 +281,7 @@ std::string Sheet::makeCellKey(const ID& colId, const ID& rowId) {
 
 Workbook::Workbook() : id(), name("Untitled") {}
 
-Workbook::Workbook(const ID& id, const std::string& name) : id(id), name(name) {}
+Workbook::Workbook(const ID& id, std::string name) : id(id), name(std::move(name)) {}
 
 Sheet* Workbook::getSheet(const ID& sheetId) {
     auto it = _sheetIndex.find(sheetId);
@@ -293,8 +296,9 @@ Sheet* Workbook::getSheetByIndex(size_t index) {
 }
 
 void Workbook::addSheet(std::unique_ptr<Sheet> sheet) {
-    if (!sheet)
+    if (!sheet) {
         return;
+    }
 
     const ID& sheetId = sheet->id;
     Sheet* rawPtr = sheet.get();
