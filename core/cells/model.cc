@@ -10,10 +10,10 @@ namespace cells {
 // ============================================================================
 
 CellValue::CellValue()
-    : raw(), type(CellValueType::kString), error(CellError::kNone) {}
+    : raw(), type(CellValueType::STRING), error(CellError::NONE) {}
 
 CellValue::CellValue(double number)
-    : raw(std::to_string(number)), type(CellValueType::kNumber), error(CellError::kNone) {
+    : raw(std::to_string(number)), type(CellValueType::NUMBER), error(CellError::NONE) {
     // Remove trailing zeros for cleaner representation
     size_t dot = raw.find('.');
     if (dot != std::string::npos) {
@@ -29,29 +29,29 @@ CellValue::CellValue(double number)
 }
 
 CellValue::CellValue(const std::string& str, CellValueType type)
-    : raw(str), type(type), error(CellError::kNone) {}
+    : raw(str), type(type), error(CellError::NONE) {}
 
 CellValue::CellValue(bool boolean)
-    : raw(boolean ? "true" : "false"), type(CellValueType::kBoolean), error(CellError::kNone) {}
+    : raw(boolean ? "true" : "false"), type(CellValueType::BOOLEAN), error(CellError::NONE) {}
 
 CellValue::CellValue(CellError err)
-    : raw(ErrorToString(err)), type(CellValueType::kError), error(err) {}
+    : raw(errorToString(err)), type(CellValueType::ERROR), error(err) {}
 
-double CellValue::AsNumber() const {
-    if (type != CellValueType::kNumber) {
+double CellValue::asNumber() const {
+    if (type != CellValueType::NUMBER) {
         return 0.0;
     }
     return std::strtod(raw.c_str(), nullptr);
 }
 
-bool CellValue::AsBoolean() const {
-    if (type != CellValueType::kBoolean) {
+bool CellValue::asBoolean() const {
+    if (type != CellValueType::BOOLEAN) {
         return false;
     }
     return raw == "true";
 }
 
-const std::string& CellValue::AsString() const {
+const std::string& CellValue::asString() const {
     return raw;
 }
 
@@ -59,19 +59,19 @@ const std::string& CellValue::AsString() const {
 // Cell
 // ============================================================================
 
-Cell::Cell() : id(), col_id(), row_id(), value(), formula() {}
+Cell::Cell() : id(), colId(), rowId(), value(), formula() {}
 
-Cell::Cell(const ID& id) : id(id), col_id(), row_id(), value(), formula() {}
+Cell::Cell(const ID& id) : id(id), colId(), rowId(), value(), formula() {}
 
 Cell::Cell(const ID& id, const ID& col, const ID& row)
-    : id(id), col_id(col), row_id(row), value(), formula() {}
+    : id(id), colId(col), rowId(row), value(), formula() {}
 
-bool Cell::IsFormula() const {
-    return value.type == CellValueType::kFormula || !formula.empty();
+bool Cell::isFormula() const {
+    return value.type == CellValueType::FORMULA || !formula.empty();
 }
 
-bool Cell::HasError() const {
-    return value.error != CellError::kNone;
+bool Cell::hasError() const {
+    return value.error != CellError::NONE;
 }
 
 // ============================================================================
@@ -79,20 +79,20 @@ bool Cell::HasError() const {
 // ============================================================================
 
 Axis::Axis()
-    : id(), is_column(true), prev_id(), next_id(),
-      gap_before(0), gap_after(0), name(), size(kDefaultColumnWidth) {}
+    : id(), isColumn(true), prevId(), nextId(),
+      gapBefore(0), gapAfter(0), name(), size(DEFAULT_COLUMN_WIDTH) {}
 
-Axis::Axis(const ID& id, bool is_column)
-    : id(id), is_column(is_column), prev_id(), next_id(),
-      gap_before(0), gap_after(0), name(),
-      size(is_column ? kDefaultColumnWidth : kDefaultRowHeight) {}
+Axis::Axis(const ID& id, bool isColumn)
+    : id(id), isColumn(isColumn), prevId(), nextId(),
+      gapBefore(0), gapAfter(0), name(),
+      size(isColumn ? DEFAULT_COLUMN_WIDTH : DEFAULT_ROW_HEIGHT) {}
 
-bool Axis::IsHead() const {
-    return prev_id.IsNull();
+bool Axis::isHead() const {
+    return prevId.isNull();
 }
 
-bool Axis::IsTail() const {
-    return next_id.IsNull();
+bool Axis::isTail() const {
+    return nextId.isNull();
 }
 
 // ============================================================================
@@ -103,82 +103,82 @@ Sheet::Sheet() : id(), name("Sheet1") {}
 
 Sheet::Sheet(const ID& id, const std::string& name) : id(id), name(name) {}
 
-Cell* Sheet::GetCell(const ID& cell_id) {
-    auto it = cells.find(cell_id);
+Cell* Sheet::getCell(const ID& cellId) {
+    auto it = cells.find(cellId);
     return (it != cells.end()) ? it->second.get() : nullptr;
 }
 
-Cell* Sheet::GetCellAt(const ID& col_id, const ID& row_id) {
-    auto key = MakeCellKey(col_id, row_id);
-    auto it = cell_index.find(key);
-    if (it == cell_index.end()) {
+Cell* Sheet::getCellAt(const ID& colId, const ID& rowId) {
+    auto key = makeCellKey(colId, rowId);
+    auto it = _cellIndex.find(key);
+    if (it == _cellIndex.end()) {
         return nullptr;
     }
-    return GetCell(it->second);
+    return getCell(it->second);
 }
 
-void Sheet::AddCell(std::unique_ptr<Cell> cell) {
+void Sheet::addCell(std::unique_ptr<Cell> cell) {
     if (!cell) return;
 
-    const ID& cell_id = cell->id;
-    const ID& col_id = cell->col_id;
-    const ID& row_id = cell->row_id;
+    const ID& cellId = cell->id;
+    const ID& colId = cell->colId;
+    const ID& rowId = cell->rowId;
 
     // Update secondary index
-    auto key = MakeCellKey(col_id, row_id);
-    cell_index[key] = cell_id;
+    auto key = makeCellKey(colId, rowId);
+    _cellIndex[key] = cellId;
 
     // Store cell
-    cells[cell_id] = std::move(cell);
+    cells[cellId] = std::move(cell);
 }
 
-Axis* Sheet::GetColumn(const ID& col_id) {
-    auto it = columns.find(col_id);
+Axis* Sheet::getColumn(const ID& colId) {
+    auto it = columns.find(colId);
     return (it != columns.end()) ? it->second.get() : nullptr;
 }
 
-Axis* Sheet::GetRow(const ID& row_id) {
-    auto it = rows.find(row_id);
+Axis* Sheet::getRow(const ID& rowId) {
+    auto it = rows.find(rowId);
     return (it != rows.end()) ? it->second.get() : nullptr;
 }
 
-void Sheet::AddColumn(std::unique_ptr<Axis> col) {
+void Sheet::addColumn(std::unique_ptr<Axis> col) {
     if (!col) return;
 
-    col->is_column = true;
-    const ID& col_id = col->id;
+    col->isColumn = true;
+    const ID& colId = col->id;
 
     // Track first/last for linked list
-    if (col->IsHead()) {
-        first_col = col_id;
+    if (col->isHead()) {
+        firstCol = colId;
     }
-    if (col->IsTail()) {
-        last_col = col_id;
+    if (col->isTail()) {
+        lastCol = colId;
     }
 
-    columns[col_id] = std::move(col);
+    columns[colId] = std::move(col);
 }
 
-void Sheet::AddRow(std::unique_ptr<Axis> row) {
+void Sheet::addRow(std::unique_ptr<Axis> row) {
     if (!row) return;
 
-    row->is_column = false;
-    const ID& row_id = row->id;
+    row->isColumn = false;
+    const ID& rowId = row->id;
 
     // Track first/last for linked list
-    if (row->IsHead()) {
-        first_row = row_id;
+    if (row->isHead()) {
+        firstRow = rowId;
     }
-    if (row->IsTail()) {
-        last_row = row_id;
+    if (row->isTail()) {
+        lastRow = rowId;
     }
 
-    rows[row_id] = std::move(row);
+    rows[rowId] = std::move(row);
 }
 
-std::string Sheet::MakeCellKey(const ID& col_id, const ID& row_id) {
-    // Simple composite key: col_id + ":" + row_id
-    return col_id.ToString() + ":" + row_id.ToString();
+std::string Sheet::makeCellKey(const ID& colId, const ID& rowId) {
+    // Simple composite key: colId + ":" + rowId
+    return colId.toString() + ":" + rowId.toString();
 }
 
 // ============================================================================
@@ -189,26 +189,26 @@ Workbook::Workbook() : id(), name("Untitled") {}
 
 Workbook::Workbook(const ID& id, const std::string& name) : id(id), name(name) {}
 
-Sheet* Workbook::GetSheet(const ID& sheet_id) {
-    auto it = sheet_index.find(sheet_id);
-    return (it != sheet_index.end()) ? it->second : nullptr;
+Sheet* Workbook::getSheet(const ID& sheetId) {
+    auto it = _sheetIndex.find(sheetId);
+    return (it != _sheetIndex.end()) ? it->second : nullptr;
 }
 
-Sheet* Workbook::GetSheetByIndex(size_t index) {
+Sheet* Workbook::getSheetByIndex(size_t index) {
     if (index >= sheets.size()) {
         return nullptr;
     }
     return sheets[index].get();
 }
 
-void Workbook::AddSheet(std::unique_ptr<Sheet> sheet) {
+void Workbook::addSheet(std::unique_ptr<Sheet> sheet) {
     if (!sheet) return;
 
-    const ID& sheet_id = sheet->id;
-    Sheet* raw_ptr = sheet.get();
+    const ID& sheetId = sheet->id;
+    Sheet* rawPtr = sheet.get();
 
     sheets.push_back(std::move(sheet));
-    sheet_index[sheet_id] = raw_ptr;
+    _sheetIndex[sheetId] = rawPtr;
 }
 
 }  // namespace cells
