@@ -9,8 +9,7 @@ namespace cells {
 // CellValue
 // ============================================================================
 
-CellValue::CellValue()
-    : raw(), type(CellValueType::STRING), error(CellError::NONE) {}
+CellValue::CellValue() : raw(), type(CellValueType::STRING), error(CellError::NONE) {}
 
 CellValue::CellValue(double number)
     : raw(std::to_string(number)), type(CellValueType::NUMBER), error(CellError::NONE) {
@@ -59,11 +58,9 @@ const std::string& CellValue::asString() const {
 // Formula
 // ============================================================================
 
-Formula::Formula()
-    : text(nullptr), ast(nullptr), dirty(true) {}
+Formula::Formula() : text(nullptr), ast(nullptr), dirty(true) {}
 
-Formula::Formula(const char* src)
-    : ast(nullptr), dirty(true) {
+Formula::Formula(const char* src) : ast(nullptr), dirty(true) {
     if (src) {
         size_t len = std::strlen(src);
         text = new char[len + 1];
@@ -78,8 +75,7 @@ Formula::~Formula() {
     // Note: ast cleanup will be handled when ASTNode is implemented
 }
 
-Formula::Formula(Formula&& other)
-    : text(other.text), ast(other.ast), dirty(other.dirty) {
+Formula::Formula(Formula&& other) : text(other.text), ast(other.ast), dirty(other.dirty) {
     other.text = nullptr;
     other.ast = nullptr;
 }
@@ -113,8 +109,11 @@ Cell::~Cell() {
 }
 
 Cell::Cell(Cell&& other)
-    : id(other.id), colId(other.colId), rowId(other.rowId),
-      value(std::move(other.value)), formula(other.formula) {
+    : id(other.id),
+      colId(other.colId),
+      rowId(other.rowId),
+      value(std::move(other.value)),
+      formula(other.formula) {
     other.formula = nullptr;
 }
 
@@ -157,13 +156,22 @@ void Cell::clearFormula() {
 // ============================================================================
 
 Axis::Axis()
-    : name(), id(), prevId(), nextId(),
-      gapBefore(0), gapAfter(0), size(DEFAULT_COLUMN_WIDTH),
+    : name(),
+      id(),
+      prevId(),
+      nextId(),
+      gapBefore(0),
+      gapAfter(0),
+      size(DEFAULT_COLUMN_WIDTH),
       isColumn(true) {}
 
 Axis::Axis(const ID& id, bool isColumn)
-    : name(), id(id), prevId(), nextId(),
-      gapBefore(0), gapAfter(0),
+    : name(),
+      id(id),
+      prevId(),
+      nextId(),
+      gapBefore(0),
+      gapAfter(0),
       size(isColumn ? DEFAULT_COLUMN_WIDTH : DEFAULT_ROW_HEIGHT),
       isColumn(isColumn) {}
 
@@ -198,7 +206,8 @@ Cell* Sheet::getCellAt(const ID& colId, const ID& rowId) {
 }
 
 void Sheet::addCell(std::unique_ptr<Cell> cell) {
-    if (!cell) return;
+    if (!cell)
+        return;
 
     const ID& cellId = cell->id;
     const ID& colId = cell->colId;
@@ -223,7 +232,8 @@ Axis* Sheet::getRow(const ID& rowId) {
 }
 
 void Sheet::addColumn(std::unique_ptr<Axis> col) {
-    if (!col) return;
+    if (!col)
+        return;
 
     col->isColumn = true;
     const ID& colId = col->id;
@@ -240,7 +250,8 @@ void Sheet::addColumn(std::unique_ptr<Axis> col) {
 }
 
 void Sheet::addRow(std::unique_ptr<Axis> row) {
-    if (!row) return;
+    if (!row)
+        return;
 
     row->isColumn = false;
     const ID& rowId = row->id;
@@ -282,7 +293,8 @@ Sheet* Workbook::getSheetByIndex(size_t index) {
 }
 
 void Workbook::addSheet(std::unique_ptr<Sheet> sheet) {
-    if (!sheet) return;
+    if (!sheet)
+        return;
 
     const ID& sheetId = sheet->id;
     Sheet* rawPtr = sheet.get();

@@ -2,6 +2,7 @@
 #define CELLS_MODEL_H_
 
 #include <cstdint>
+
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -20,9 +21,9 @@ struct Workbook;
 // Cell value - stores the raw value as a string (for simplicity)
 // The type field indicates how to interpret it
 struct CellValue {
-    std::string raw;         // Raw string representation
-    CellValueType type;      // How to interpret the value
-    CellError error;         // Error state (NONE if no error)
+    std::string raw;     // Raw string representation
+    CellValueType type;  // How to interpret the value
+    CellError error;     // Error state (NONE if no error)
 
     CellValue();
     explicit CellValue(double number);
@@ -38,9 +39,9 @@ struct CellValue {
 // Formula - contains source text and parsed AST
 // Owned by Cell, cleaned up in Cell destructor
 struct Formula {
-    char* text;              // Formula source with UUID refs (e.g., "=$cK7mXp2Q$rFp3nW9x+10"), owned
-    struct ASTNode* ast;     // Parsed AST, null if not parsed, owned
-    bool dirty;              // Needs recalculation?
+    char* text;           // Formula source with UUID refs (e.g., "=$cK7mXp2Q$rFp3nW9x+10"), owned
+    struct ASTNode* ast;  // Parsed AST, null if not parsed, owned
+    bool dirty;           // Needs recalculation?
 
     Formula();
     explicit Formula(const char* text);
@@ -58,11 +59,11 @@ struct Formula {
 // Cell - fundamental unit of data
 // Either a direct value OR a formula with cached result
 struct Cell {
-    ID id;                   // Unique identifier (8-char base62)
-    ID colId;                // Column axis ID
-    ID rowId;                // Row axis ID
-    CellValue value;         // Direct value OR cached formula result
-    Formula* formula;        // null = value cell, non-null = formula cell (owned)
+    ID id;             // Unique identifier (8-char base62)
+    ID colId;          // Column axis ID
+    ID rowId;          // Row axis ID
+    CellValue value;   // Direct value OR cached formula result
+    Formula* formula;  // null = value cell, non-null = formula cell (owned)
 
     Cell();
     explicit Cell(const ID& id);
@@ -91,31 +92,31 @@ struct Cell {
 // Layout optimized for minimal padding (64 bytes total)
 struct Axis {
     // 8-byte aligned fields
-    std::string name;        // Custom name (empty = compute from position)
-    ID id;                   // Unique identifier (8-char base62)
-    ID prevId;               // Previous axis ID (null = head)
-    ID nextId;               // Next axis ID (null = tail)
+    std::string name;  // Custom name (empty = compute from position)
+    ID id;             // Unique identifier (8-char base62)
+    ID prevId;         // Previous axis ID (null = head)
+    ID nextId;         // Next axis ID (null = tail)
 
     // 4-byte aligned fields
-    uint32_t gapBefore;      // Empty positions between prev and this
-    uint32_t gapAfter;       // Empty positions between this and next
-    uint32_t size;           // Width (column) or height (row) in pixels
+    uint32_t gapBefore;  // Empty positions between prev and this
+    uint32_t gapAfter;   // Empty positions between this and next
+    uint32_t size;       // Width (column) or height (row) in pixels
 
     // 1-byte aligned fields
-    bool isColumn;           // true = column (x), false = row (y)
-                             // 3 bytes padding (struct alignment = 8)
+    bool isColumn;  // true = column (x), false = row (y)
+                    // 3 bytes padding (struct alignment = 8)
 
     Axis();
     explicit Axis(const ID& id, bool isColumn = true);
 
-    bool isHead() const;     // No prev
-    bool isTail() const;     // No next
+    bool isHead() const;  // No prev
+    bool isTail() const;  // No next
 };
 
 // Sheet - 2D grid containing cells
 struct Sheet {
-    ID id;                   // Unique identifier
-    std::string name;        // Sheet name
+    ID id;             // Unique identifier
+    std::string name;  // Sheet name
 
     // Axis storage (maps ID -> Axis)
     std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> columns;
@@ -159,8 +160,8 @@ private:
 
 // Workbook - top-level container
 struct Workbook {
-    ID id;                   // Document ID
-    std::string name;        // Document name
+    ID id;             // Document ID
+    std::string name;  // Document name
 
     // Sheets (order matters for tab display)
     std::vector<std::unique_ptr<Sheet>> sheets;
