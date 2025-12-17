@@ -86,13 +86,20 @@ for file in "${FILES[@]}"; do
     echo -e "${YELLOW}Checking:${NC} $file"
 
     # Run clang-tidy (include project root for header resolution)
-    if ! "${TIDY_CMD[@]}" \
+    # Filter out noisy system header summary and empty lines
+    OUTPUT=$("${TIDY_CMD[@]}" \
         --config-file="$PROJECT_ROOT/.clang-tidy" \
         "$file" \
         -- \
         -std=c++17 \
         -I"$PROJECT_ROOT" \
-        2>&1 | grep -v "^$"; then
+        2>&1)
+    TIDY_EXIT=$?
+
+    # Filter and display output
+    echo "$OUTPUT" | grep -v -E "^$|warnings generated|Suppressed .* warnings|Use -header-filter" || true
+
+    if [ $TIDY_EXIT -ne 0 ]; then
         FAILED=1
     fi
 done
