@@ -29,8 +29,8 @@ struct CSVWriteError {
 
 // Result of writing a CSV file
 struct CSVWriteResult {
-    std::string output{};                   // CSV content on success
-    std::optional<CSVWriteError> error{};   // Present on failure
+    std::string output{};                  // CSV content on success
+    std::optional<CSVWriteError> error{};  // Present on failure
 
     [[nodiscard]] bool ok() const { return !error.has_value(); }
     [[nodiscard]] explicit operator bool() const { return ok(); }

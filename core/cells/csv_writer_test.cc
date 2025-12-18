@@ -4,15 +4,15 @@
 
 #include "core/cells/csv_reader.h"
 #include "core/cells/id.h"
+
 #include "gtest/gtest.h"
 
 namespace cells {
 namespace {
 
 // Helper to create a simple sheet with data
-std::unique_ptr<Sheet> createSimpleSheet(
-    const std::vector<std::string>& colNames,
-    const std::vector<std::vector<std::string>>& data) {
+std::unique_ptr<Sheet> createSimpleSheet(const std::vector<std::string>& colNames,
+                                         const std::vector<std::vector<std::string>>& data) {
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
 
     // Create columns
@@ -81,9 +81,8 @@ std::unique_ptr<Sheet> createSimpleSheet(
 }
 
 // Helper to create a sheet with numeric data
-std::unique_ptr<Sheet> createNumericSheet(
-    const std::vector<std::string>& colNames,
-    const std::vector<std::vector<double>>& data) {
+std::unique_ptr<Sheet> createNumericSheet(const std::vector<std::string>& colNames,
+                                          const std::vector<std::vector<double>>& data) {
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
 
     // Create columns
@@ -160,9 +159,8 @@ TEST(CSVWriterTest, WriteHeaderOnly) {
 }
 
 TEST(CSVWriterTest, WriteSimpleData) {
-    auto sheet = createSimpleSheet(
-        {"Name", "Age", "City"},
-        {{"Alice", "30", "NYC"}, {"Bob", "25", "LA"}});
+    auto sheet =
+        createSimpleSheet({"Name", "Age", "City"}, {{"Alice", "30", "NYC"}, {"Bob", "25", "LA"}});
 
     CSVWriteResult result = writeCSV(*sheet);
     EXPECT_TRUE(result.ok());
@@ -170,9 +168,7 @@ TEST(CSVWriterTest, WriteSimpleData) {
 }
 
 TEST(CSVWriterTest, WriteNumericData) {
-    auto sheet = createNumericSheet(
-        {"A", "B", "C"},
-        {{1.0, 2.0, 3.0}, {4.5, 5.5, 6.5}});
+    auto sheet = createNumericSheet({"A", "B", "C"}, {{1.0, 2.0, 3.0}, {4.5, 5.5, 6.5}});
 
     CSVWriteResult result = writeCSV(*sheet);
     EXPECT_TRUE(result.ok());
@@ -182,9 +178,7 @@ TEST(CSVWriterTest, WriteNumericData) {
 }
 
 TEST(CSVWriterTest, WriteWithoutHeader) {
-    auto sheet = createSimpleSheet(
-        {"Name", "Age"},
-        {{"Alice", "30"}});
+    auto sheet = createSimpleSheet({"Name", "Age"}, {{"Alice", "30"}});
 
     CSVWriteOptions options;
     options.includeHeader = false;
@@ -197,9 +191,7 @@ TEST(CSVWriterTest, WriteWithoutHeader) {
 // --- Escaping Tests (RFC 4180) ---
 
 TEST(CSVWriterTest, EscapeFieldWithComma) {
-    auto sheet = createSimpleSheet(
-        {"Name", "Description"},
-        {{"Test", "Hello, World"}});
+    auto sheet = createSimpleSheet({"Name", "Description"}, {{"Test", "Hello, World"}});
 
     CSVWriteResult result = writeCSV(*sheet);
     EXPECT_TRUE(result.ok());
@@ -208,9 +200,7 @@ TEST(CSVWriterTest, EscapeFieldWithComma) {
 }
 
 TEST(CSVWriterTest, EscapeFieldWithQuotes) {
-    auto sheet = createSimpleSheet(
-        {"Name", "Quote"},
-        {{"Test", "Say \"Hello\""}});
+    auto sheet = createSimpleSheet({"Name", "Quote"}, {{"Test", "Say \"Hello\""}});
 
     CSVWriteResult result = writeCSV(*sheet);
     EXPECT_TRUE(result.ok());
@@ -219,9 +209,7 @@ TEST(CSVWriterTest, EscapeFieldWithQuotes) {
 }
 
 TEST(CSVWriterTest, EscapeFieldWithNewline) {
-    auto sheet = createSimpleSheet(
-        {"Name", "Multiline"},
-        {{"Test", "Line1\nLine2"}});
+    auto sheet = createSimpleSheet({"Name", "Multiline"}, {{"Test", "Line1\nLine2"}});
 
     CSVWriteResult result = writeCSV(*sheet);
     EXPECT_TRUE(result.ok());
@@ -230,9 +218,7 @@ TEST(CSVWriterTest, EscapeFieldWithNewline) {
 }
 
 TEST(CSVWriterTest, EscapeFieldWithCR) {
-    auto sheet = createSimpleSheet(
-        {"Name", "Text"},
-        {{"Test", "Line1\rLine2"}});
+    auto sheet = createSimpleSheet({"Name", "Text"}, {{"Test", "Line1\rLine2"}});
 
     CSVWriteResult result = writeCSV(*sheet);
     EXPECT_TRUE(result.ok());
@@ -241,9 +227,7 @@ TEST(CSVWriterTest, EscapeFieldWithCR) {
 }
 
 TEST(CSVWriterTest, NoEscapeNormalField) {
-    auto sheet = createSimpleSheet(
-        {"Name", "Value"},
-        {{"Hello", "World"}});
+    auto sheet = createSimpleSheet({"Name", "Value"}, {{"Hello", "World"}});
 
     CSVWriteResult result = writeCSV(*sheet);
     EXPECT_TRUE(result.ok());
@@ -255,9 +239,7 @@ TEST(CSVWriterTest, NoEscapeNormalField) {
 // --- Delimiter Tests ---
 
 TEST(CSVWriterTest, WriteTabDelimited) {
-    auto sheet = createSimpleSheet(
-        {"Name", "Age"},
-        {{"Alice", "30"}});
+    auto sheet = createSimpleSheet({"Name", "Age"}, {{"Alice", "30"}});
 
     CSVWriteOptions options;
     options.delimiter = '\t';
@@ -268,9 +250,7 @@ TEST(CSVWriterTest, WriteTabDelimited) {
 }
 
 TEST(CSVWriterTest, WriteSemicolonDelimited) {
-    auto sheet = createSimpleSheet(
-        {"Name", "Age"},
-        {{"Alice", "30"}});
+    auto sheet = createSimpleSheet({"Name", "Age"}, {{"Alice", "30"}});
 
     CSVWriteOptions options;
     options.delimiter = ';';
@@ -281,9 +261,7 @@ TEST(CSVWriterTest, WriteSemicolonDelimited) {
 }
 
 TEST(CSVWriterTest, EscapeTabInTabDelimited) {
-    auto sheet = createSimpleSheet(
-        {"Name", "Value"},
-        {{"Test", "Has\tTab"}});
+    auto sheet = createSimpleSheet({"Name", "Value"}, {{"Test", "Has\tTab"}});
 
     CSVWriteOptions options;
     options.delimiter = '\t';
@@ -297,9 +275,7 @@ TEST(CSVWriterTest, EscapeTabInTabDelimited) {
 // --- Line Ending Tests ---
 
 TEST(CSVWriterTest, WriteLFLineEndings) {
-    auto sheet = createSimpleSheet(
-        {"A", "B"},
-        {{"1", "2"}});
+    auto sheet = createSimpleSheet({"A", "B"}, {{"1", "2"}});
 
     CSVWriteOptions options;
     options.useCRLF = false;
@@ -310,9 +286,7 @@ TEST(CSVWriterTest, WriteLFLineEndings) {
 }
 
 TEST(CSVWriterTest, WriteCRLFLineEndings) {
-    auto sheet = createSimpleSheet(
-        {"A", "B"},
-        {{"1", "2"}});
+    auto sheet = createSimpleSheet({"A", "B"}, {{"1", "2"}});
 
     CSVWriteOptions options;
     options.useCRLF = true;
@@ -325,9 +299,7 @@ TEST(CSVWriterTest, WriteCRLFLineEndings) {
 // --- Empty Cell Tests ---
 
 TEST(CSVWriterTest, WriteEmptyCells) {
-    auto sheet = createSimpleSheet(
-        {"A", "B", "C"},
-        {{"1", "", "3"}, {"", "2", ""}});
+    auto sheet = createSimpleSheet({"A", "B", "C"}, {{"1", "", "3"}, {"", "2", ""}});
 
     CSVWriteResult result = writeCSV(*sheet);
     EXPECT_TRUE(result.ok());
@@ -561,9 +533,8 @@ TEST(CSVRoundtripTest, LargerDataRoundtrip) {
     // Create a larger CSV
     std::string original = "A,B,C,D,E\r\n";
     for (int i = 0; i < 100; i++) {
-        original += std::to_string(i) + "," + std::to_string(i * 2) + ","
-                    + std::to_string(i * 3) + "," + std::to_string(i * 4) + ","
-                    + std::to_string(i * 5) + "\r\n";
+        original += std::to_string(i) + "," + std::to_string(i * 2) + "," + std::to_string(i * 3) +
+                    "," + std::to_string(i * 4) + "," + std::to_string(i * 5) + "\r\n";
     }
 
     CSVReadResult readResult = readCSV(original);

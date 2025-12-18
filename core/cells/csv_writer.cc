@@ -42,28 +42,26 @@ std::vector<ID> CSVWriter::getOrderedRows(const Sheet& sheet) const {
 
 std::string CSVWriter::formatValue(const CellValue& value) const {
     switch (value.type) {
-        case CellValueType::NUMBER:
-        case CellValueType::DATE:
-        case CellValueType::DATE_TIME:
-            return value.raw;
-
-        case CellValueType::STRING:
-        case CellValueType::FORMULA:
-            // For formulas, output the cached computed value (stored in raw)
-            return value.raw;
-
         case CellValueType::BOOLEAN:
             return value.raw == "1" || value.raw == "true" ? "true" : "false";
 
         case CellValueType::ERROR:
             return errorToString(value.error);
+
+        case CellValueType::NUMBER:
+        case CellValueType::DATE:
+        case CellValueType::DATE_TIME:
+        case CellValueType::STRING:
+        case CellValueType::FORMULA:
+            // For formulas, output the cached computed value (stored in raw)
+            return value.raw;
     }
 
     return value.raw;
 }
 
 bool CSVWriter::needsQuoting(const std::string& field) const {
-    for (char c : field) {
+    for (char const c : field) {
         if (c == options_.delimiter || c == '"' || c == '\r' || c == '\n') {
             return true;
         }
@@ -81,7 +79,7 @@ std::string CSVWriter::escapeField(const std::string& field) const {
     result.reserve(field.size() + 2);  // At minimum, add surrounding quotes
     result.push_back('"');
 
-    for (char c : field) {
+    for (char const c : field) {
         if (c == '"') {
             result.push_back('"');  // Escape quote by doubling it
         }
@@ -101,7 +99,7 @@ CSVWriteResult CSVWriter::write(const Sheet& sheet) {
 
     // Get ordered columns and rows
     std::vector<ID> columns = getOrderedColumns(sheet);
-    std::vector<ID> rows = getOrderedRows(sheet);
+    std::vector<ID> const rows = getOrderedRows(sheet);
 
     if (columns.empty()) {
         // Empty sheet - return empty output
@@ -151,7 +149,7 @@ CSVWriteResult CSVWriter::write(const Sheet& sheet) {
             // Find cell at (column, row)
             const Cell* cell = const_cast<Sheet&>(sheet).getCellAt(columns[c], rowId);
             if (cell != nullptr) {
-                std::string value = formatValue(cell->value);
+                std::string const value = formatValue(cell->value);
                 oss << escapeField(value);
             }
             // Empty cell outputs empty field (nothing before the next delimiter)
