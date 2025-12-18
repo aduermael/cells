@@ -54,6 +54,7 @@ cc_library(
 cc_test(
     name = "parser_test",
     srcs = ["parser_test.cc"],
+    data = ["//core/testdata:sample_cells_files"],
     deps = [
         ":parser",
         "@googletest//:gtest_main",

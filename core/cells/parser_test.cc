@@ -1,5 +1,7 @@
 #include "core/cells/parser.h"
 
+#include <fstream>
+#include <sstream>
 #include <string>
 
 #include "gtest/gtest.h"
@@ -455,6 +457,158 @@ R xY9zA1bC ~ ~
 
     ParseResult result = parse(content);
     EXPECT_TRUE(result.ok());
+}
+
+// --- Sample File Tests ---
+// These tests parse the sample .cells files from core/testdata/
+
+namespace {
+std::string readTestFile(const std::string& filename) {
+    const std::string path = "core/testdata/" + filename;
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        return "";
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+}  // namespace
+
+TEST(SampleFileTest, ParseMinimalCells) {
+    const std::string content = readTestFile("minimal.cells");
+    ASSERT_FALSE(content.empty()) << "Could not read minimal.cells";
+
+    ParseResult result = parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    ASSERT_NE(result.workbook, nullptr);
+    EXPECT_EQ(result.workbook->name, "Minimal");
+    EXPECT_EQ(result.workbook->sheetCount(), 1u);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+    EXPECT_EQ(sheet->name, "Sheet1");
+    EXPECT_EQ(sheet->columnCount(), 1u);
+    EXPECT_EQ(sheet->rowCount(), 1u);
+    EXPECT_EQ(sheet->cellCount(), 1u);
+}
+
+TEST(SampleFileTest, ParseSimpleCells) {
+    const std::string content = readTestFile("simple.cells");
+    ASSERT_FALSE(content.empty()) << "Could not read simple.cells";
+
+    ParseResult result = parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    ASSERT_NE(result.workbook, nullptr);
+    EXPECT_EQ(result.workbook->name, "Untitled");
+    EXPECT_EQ(result.workbook->sheetCount(), 1u);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+    EXPECT_EQ(sheet->columnCount(), 2u);
+    EXPECT_EQ(sheet->rowCount(), 3u);
+    EXPECT_EQ(sheet->cellCount(), 3u);
+}
+
+TEST(SampleFileTest, ParseBudgetCells) {
+    const std::string content = readTestFile("budget.cells");
+    ASSERT_FALSE(content.empty()) << "Could not read budget.cells";
+
+    ParseResult result = parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    ASSERT_NE(result.workbook, nullptr);
+    EXPECT_EQ(result.workbook->name, "Budget 2024");
+    EXPECT_EQ(result.workbook->sheetCount(), 1u);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+    EXPECT_EQ(sheet->name, "Q1 Expenses");
+    EXPECT_EQ(sheet->columnCount(), 5u);
+    EXPECT_EQ(sheet->rowCount(), 4u);
+    EXPECT_EQ(sheet->cellCount(), 20u);
+}
+
+TEST(SampleFileTest, ParseAllTypesCells) {
+    const std::string content = readTestFile("all_types.cells");
+    ASSERT_FALSE(content.empty()) << "Could not read all_types.cells";
+
+    ParseResult result = parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    ASSERT_NE(result.workbook, nullptr);
+    EXPECT_EQ(result.workbook->name, "All Types Test");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+    EXPECT_EQ(sheet->columnCount(), 2u);
+    EXPECT_EQ(sheet->rowCount(), 11u);
+    EXPECT_EQ(sheet->cellCount(), 22u);
+}
+
+TEST(SampleFileTest, ParseGapsCells) {
+    const std::string content = readTestFile("gaps.cells");
+    ASSERT_FALSE(content.empty()) << "Could not read gaps.cells";
+
+    ParseResult result = parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    ASSERT_NE(result.workbook, nullptr);
+    EXPECT_EQ(result.workbook->name, "Gaps Test");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+    EXPECT_EQ(sheet->columnCount(), 3u);
+    EXPECT_EQ(sheet->rowCount(), 4u);
+    EXPECT_EQ(sheet->cellCount(), 11u);
+
+    // Verify gap values on columns
+    Axis* col1 = sheet->getColumn(ID("cA1bC2dE"));
+    ASSERT_NE(col1, nullptr);
+    EXPECT_EQ(col1->gapAfter, 3u);
+
+    Axis* col2 = sheet->getColumn(ID("cE5fG6hJ"));
+    ASSERT_NE(col2, nullptr);
+    EXPECT_EQ(col2->gapBefore, 3u);
+    EXPECT_EQ(col2->gapAfter, 5u);
+}
+
+TEST(SampleFileTest, ParseUnicodeCells) {
+    const std::string content = readTestFile("unicode.cells");
+    ASSERT_FALSE(content.empty()) << "Could not read unicode.cells";
+
+    ParseResult result = parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    ASSERT_NE(result.workbook, nullptr);
+    // Document name is Japanese
+    EXPECT_EQ(result.workbook->name, "日本語テスト");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+    // Sheet name is Japanese
+    EXPECT_EQ(sheet->name, "表計算");
+    EXPECT_EQ(sheet->cellCount(), 14u);
+}
+
+TEST(SampleFileTest, ParseEmptyCells) {
+    const std::string content = readTestFile("empty.cells");
+    ASSERT_FALSE(content.empty()) << "Could not read empty.cells";
+
+    ParseResult result = parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    ASSERT_NE(result.workbook, nullptr);
+    EXPECT_EQ(result.workbook->name, "Empty Workbook");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+    EXPECT_EQ(sheet->name, "Empty Sheet");
+    EXPECT_EQ(sheet->columnCount(), 0u);
+    EXPECT_EQ(sheet->rowCount(), 0u);
+    EXPECT_EQ(sheet->cellCount(), 0u);
 }
 
 }  // namespace
