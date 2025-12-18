@@ -215,16 +215,18 @@ Implement CSV export from our data model.
 
 Wire up the CLI with CSV and .cells support before adding XLSX complexity.
 
-- [ ] **5a:** Implement conversion pipeline (read -> transform -> write)
-- [ ] **5b:** Wire CSV reader/writer into CLI
-- [ ] **5c:** Add progress reporting
-- [ ] **5d:** Add warning accumulation and reporting
-- [ ] **5e:** Implement `-y` (overwrite) and `-q` (quiet) flags
-- [ ] **5f:** Add error handling with helpful messages
-- [ ] **5g:** Create end-to-end tests (csv → cells, cells → csv, roundtrips)
+- [x] **5a:** Implement conversion pipeline (read -> transform -> write)
+- [x] **5b:** Wire CSV reader/writer into CLI
+- [x] **5c:** Add progress reporting
+- [x] **5d:** Add warning accumulation and reporting
+- [x] **5e:** Implement `-y` (overwrite) and `-q` (quiet) flags
+- [x] **5f:** Add error handling with helpful messages
+- [x] **5g:** Create end-to-end tests (csv → cells, cells → csv, roundtrips)
 
 **Deliverables:**
 - Working `cells` CLI binary (CSV + .cells only)
+- `converter.h` / `converter.cc` - conversion pipeline using Workbook as intermediary
+- `converter_test.cc` - 15 end-to-end tests covering all scenarios
 - End-to-end conversion tests
 - Usable tool for basic spreadsheet conversion
 
