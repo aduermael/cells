@@ -38,10 +38,8 @@ When converting between formats, some features may be lost:
 | Formulas | Yes | No (values only) | Yes |
 | Cell styles | Yes | No | Yes |
 | Column widths | Yes | No | Yes |
-| UUID-based refs | Yes | No | No |
-| Gap encoding | Yes | No | No |
-| OpLog/history | Yes | No | No |
 | Cell types | Yes | Limited | Yes |
+| Edit history | Yes | No | No |
 
 When features are lost, the CLI will print warnings:
 
@@ -179,7 +177,26 @@ Implement CSV export from our data model.
 
 ---
 
-## Phase 4: XLSX Reader
+## Phase 4: CSV ↔ CELLS Integration
+
+Wire up the CLI with CSV and .cells support before adding XLSX complexity.
+
+- [ ] **4a:** Implement conversion pipeline (read -> transform -> write)
+- [ ] **4b:** Wire CSV reader/writer into CLI
+- [ ] **4c:** Add progress reporting
+- [ ] **4d:** Add warning accumulation and reporting
+- [ ] **4e:** Implement `-y` (overwrite) and `-q` (quiet) flags
+- [ ] **4f:** Add error handling with helpful messages
+- [ ] **4g:** Create end-to-end tests (csv → cells, cells → csv, roundtrips)
+
+**Deliverables:**
+- Working `cells` CLI binary (CSV + .cells only)
+- End-to-end conversion tests
+- Usable tool for basic spreadsheet conversion
+
+---
+
+## Phase 5: XLSX Reader
 
 Implement Excel import. Use a library for the heavy lifting.
 
@@ -193,15 +210,15 @@ Options for reading XLSX:
 
 **Recommendation:** OpenXLSX (C++17, matches our codebase, header-only is easy to integrate)
 
-- [ ] **4a:** Add OpenXLSX as Bazel dependency (or xlnt)
-- [ ] **4b:** Create `core/cells/xlsx_reader.h` and `xlsx_reader.cc`
-- [ ] **4c:** Implement basic cell reading (numbers, strings)
-- [ ] **4d:** Implement formula reading (as text)
-- [ ] **4e:** Read cell styles (basic: bold, colors)
-- [ ] **4f:** Read column widths and row heights
-- [ ] **4g:** Handle multiple sheets
-- [ ] **4h:** Create test files: `core/testdata/xlsx/simple.xlsx`, etc.
-- [ ] **4i:** Add `xlsx_reader_test.cc`
+- [ ] **5a:** Add OpenXLSX as Bazel dependency (or xlnt)
+- [ ] **5b:** Create `core/cells/xlsx_reader.h` and `xlsx_reader.cc`
+- [ ] **5c:** Implement basic cell reading (numbers, strings)
+- [ ] **5d:** Implement formula reading (as text)
+- [ ] **5e:** Read cell styles (basic: bold, colors)
+- [ ] **5f:** Read column widths and row heights
+- [ ] **5g:** Handle multiple sheets
+- [ ] **5h:** Create test files: `core/testdata/xlsx/simple.xlsx`, etc.
+- [ ] **5i:** Add `xlsx_reader_test.cc`
 
 **Deliverables:**
 - `xlsx_reader.h` / `xlsx_reader.cc` - XLSX to Workbook
@@ -210,19 +227,19 @@ Options for reading XLSX:
 
 ---
 
-## Phase 5: XLSX Writer
+## Phase 6: XLSX Writer
 
 Implement Excel export.
 
-- [ ] **5a:** Create `core/cells/xlsx_writer.h` and `xlsx_writer.cc`
-- [ ] **5b:** Implement basic cell writing (numbers, strings)
-- [ ] **5c:** Implement formula writing (convert UUID refs to A1)
-- [ ] **5d:** Write cell styles (basic)
-- [ ] **5e:** Write column widths and row heights
-- [ ] **5f:** Handle multiple sheets
-- [ ] **5g:** Add warning system for feature loss
-- [ ] **5h:** Add `xlsx_writer_test.cc`
-- [ ] **5i:** Add roundtrip tests (xlsx -> cells -> xlsx)
+- [ ] **6a:** Create `core/cells/xlsx_writer.h` and `xlsx_writer.cc`
+- [ ] **6b:** Implement basic cell writing (numbers, strings)
+- [ ] **6c:** Implement formula writing (convert UUID refs to A1)
+- [ ] **6d:** Write cell styles (basic)
+- [ ] **6e:** Write column widths and row heights
+- [ ] **6f:** Handle multiple sheets
+- [ ] **6g:** Add warning system for feature loss
+- [ ] **6h:** Add `xlsx_writer_test.cc`
+- [ ] **6i:** Add roundtrip tests (xlsx -> cells -> xlsx)
 
 **Deliverables:**
 - `xlsx_writer.h` / `xlsx_writer.cc` - Workbook to XLSX
@@ -230,16 +247,16 @@ Implement Excel export.
 
 ---
 
-## Phase 6: Formula Reference Conversion
+## Phase 7: Formula Reference Conversion
 
 Convert between UUID-based and A1 notation for Excel compatibility.
 
-- [ ] **6a:** Create `core/cells/ref_converter.h` and `ref_converter.cc`
-- [ ] **6b:** Implement UUID-to-A1 conversion (for export)
-- [ ] **6c:** Implement A1-to-UUID conversion (for import)
-- [ ] **6d:** Handle absolute vs relative references ($A$1 vs A1)
-- [ ] **6e:** Handle range references (A1:C3)
-- [ ] **6f:** Add `ref_converter_test.cc`
+- [ ] **7a:** Create `core/cells/ref_converter.h` and `ref_converter.cc`
+- [ ] **7b:** Implement UUID-to-A1 conversion (for export)
+- [ ] **7c:** Implement A1-to-UUID conversion (for import)
+- [ ] **7d:** Handle absolute vs relative references ($A$1 vs A1)
+- [ ] **7e:** Handle range references (A1:C3)
+- [ ] **7f:** Add `ref_converter_test.cc`
 
 **Deliverables:**
 - `ref_converter.h` / `ref_converter.cc` - reference conversion
@@ -247,33 +264,31 @@ Convert between UUID-based and A1 notation for Excel compatibility.
 
 ---
 
-## Phase 7: Integration
+## Phase 8: XLSX Integration
 
-Wire everything together in the CLI.
+Wire XLSX support into the CLI.
 
-- [ ] **7a:** Implement conversion pipeline (read -> transform -> write)
-- [ ] **7b:** Add progress reporting for large files
-- [ ] **7c:** Add warning accumulation and reporting
-- [ ] **7d:** Implement `-y` (overwrite) and `-q` (quiet) flags
-- [ ] **7e:** Add error handling with helpful messages
-- [ ] **7f:** Create end-to-end tests
+- [ ] **8a:** Add XLSX reader/writer to CLI conversion pipeline
+- [ ] **8b:** Integrate formula reference conversion
+- [ ] **8c:** Add XLSX-specific CLI options (--sheet, --all-sheets)
+- [ ] **8d:** Create end-to-end tests (xlsx → cells, cells → xlsx, csv ↔ xlsx)
 
 **Deliverables:**
-- Working `cells` CLI binary
-- End-to-end conversion tests
+- Full `cells` CLI with XLSX support
+- Complete format conversion matrix tested
 
 ---
 
-## Phase 8: Polish
+## Phase 9: Polish
 
 Final touches for release.
 
-- [ ] **8a:** Add man page or `--help` documentation
-- [ ] **8b:** Test on sample real-world files
-- [ ] **8c:** Performance testing with large files (100K+ cells)
-- [ ] **8d:** Memory profiling
-- [ ] **8e:** Update GETTING_STARTED.md with CLI usage
-- [ ] **8f:** Create example scripts in `examples/`
+- [ ] **9a:** Add man page or `--help` documentation
+- [ ] **9b:** Test on sample real-world files
+- [ ] **9c:** Performance testing with large files (100K+ cells)
+- [ ] **9d:** Memory profiling
+- [ ] **9e:** Update GETTING_STARTED.md with CLI usage
+- [ ] **9f:** Create example scripts in `examples/`
 
 **Deliverables:**
 - Complete, tested CLI tool
