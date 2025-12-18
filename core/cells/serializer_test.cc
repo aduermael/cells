@@ -1,10 +1,12 @@
 #include "core/cells/serializer.h"
 
+#include <fstream>
 #include <sstream>
 #include <string>
 
 #include "core/cells/id.h"
 #include "core/cells/model.h"
+#include "core/cells/parser.h"
 #include "gtest/gtest.h"
 
 namespace cells {
@@ -302,6 +304,160 @@ TEST(SerializerTest, ConvenienceSerializeToStreamFunction) {
     const std::string output = ss.str();
     EXPECT_FALSE(output.empty());
     EXPECT_NE(output.find("D aB3cD4eF"), std::string::npos);
+}
+
+// --- Roundtrip Tests ---
+// Parse -> Serialize -> Parse -> Compare
+
+namespace {
+std::string readTestFile(const std::string& filename) {
+    const std::string path = "core/testdata/" + filename;
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        return "";
+    }
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    return buffer.str();
+}
+
+// Compare two workbooks for structural equality
+void compareWorkbooks(const Workbook& wb1, const Workbook& wb2) {
+    EXPECT_EQ(wb1.name, wb2.name);
+    EXPECT_EQ(wb1.sheetCount(), wb2.sheetCount());
+
+    for (size_t i = 0; i < wb1.sheetCount() && i < wb2.sheetCount(); i++) {
+        const Sheet* s1 = wb1.sheets[i].get();
+        const Sheet* s2 = wb2.sheets[i].get();
+
+        EXPECT_EQ(s1->name, s2->name) << "Sheet " << i;
+        EXPECT_EQ(s1->columnCount(), s2->columnCount()) << "Sheet " << i;
+        EXPECT_EQ(s1->rowCount(), s2->rowCount()) << "Sheet " << i;
+        EXPECT_EQ(s1->cellCount(), s2->cellCount()) << "Sheet " << i;
+    }
+}
+}  // namespace
+
+TEST(RoundtripTest, MinimalFile) {
+    const std::string content = readTestFile("minimal.cells");
+    ASSERT_FALSE(content.empty());
+
+    // Parse original
+    ParseResult result1 = parse(content);
+    ASSERT_TRUE(result1.ok());
+
+    // Serialize
+    const std::string serialized = serialize(*result1.workbook);
+    EXPECT_FALSE(serialized.empty());
+
+    // Parse serialized
+    ParseResult result2 = parse(serialized);
+    ASSERT_TRUE(result2.ok()) << (result2.error ? result2.error->toString() : "");
+
+    // Compare
+    compareWorkbooks(*result1.workbook, *result2.workbook);
+}
+
+TEST(RoundtripTest, SimpleFile) {
+    const std::string content = readTestFile("simple.cells");
+    ASSERT_FALSE(content.empty());
+
+    ParseResult result1 = parse(content);
+    ASSERT_TRUE(result1.ok());
+
+    const std::string serialized = serialize(*result1.workbook);
+
+    ParseResult result2 = parse(serialized);
+    ASSERT_TRUE(result2.ok()) << (result2.error ? result2.error->toString() : "");
+
+    compareWorkbooks(*result1.workbook, *result2.workbook);
+}
+
+TEST(RoundtripTest, BudgetFile) {
+    const std::string content = readTestFile("budget.cells");
+    ASSERT_FALSE(content.empty());
+
+    ParseResult result1 = parse(content);
+    ASSERT_TRUE(result1.ok());
+
+    const std::string serialized = serialize(*result1.workbook);
+
+    ParseResult result2 = parse(serialized);
+    ASSERT_TRUE(result2.ok()) << (result2.error ? result2.error->toString() : "");
+
+    compareWorkbooks(*result1.workbook, *result2.workbook);
+}
+
+TEST(RoundtripTest, AllTypesFile) {
+    const std::string content = readTestFile("all_types.cells");
+    ASSERT_FALSE(content.empty());
+
+    ParseResult result1 = parse(content);
+    ASSERT_TRUE(result1.ok());
+
+    const std::string serialized = serialize(*result1.workbook);
+
+    ParseResult result2 = parse(serialized);
+    ASSERT_TRUE(result2.ok()) << (result2.error ? result2.error->toString() : "");
+
+    compareWorkbooks(*result1.workbook, *result2.workbook);
+}
+
+TEST(RoundtripTest, GapsFile) {
+    const std::string content = readTestFile("gaps.cells");
+    ASSERT_FALSE(content.empty());
+
+    ParseResult result1 = parse(content);
+    ASSERT_TRUE(result1.ok());
+
+    const std::string serialized = serialize(*result1.workbook);
+
+    ParseResult result2 = parse(serialized);
+    ASSERT_TRUE(result2.ok()) << (result2.error ? result2.error->toString() : "");
+
+    compareWorkbooks(*result1.workbook, *result2.workbook);
+}
+
+TEST(RoundtripTest, UnicodeFile) {
+    const std::string content = readTestFile("unicode.cells");
+    ASSERT_FALSE(content.empty());
+
+    ParseResult result1 = parse(content);
+    ASSERT_TRUE(result1.ok());
+
+    const std::string serialized = serialize(*result1.workbook);
+
+    ParseResult result2 = parse(serialized);
+    ASSERT_TRUE(result2.ok()) << (result2.error ? result2.error->toString() : "");
+
+    compareWorkbooks(*result1.workbook, *result2.workbook);
+}
+
+TEST(RoundtripTest, EmptyFile) {
+    const std::string content = readTestFile("empty.cells");
+    ASSERT_FALSE(content.empty());
+
+    ParseResult result1 = parse(content);
+    ASSERT_TRUE(result1.ok());
+
+    const std::string serialized = serialize(*result1.workbook);
+
+    ParseResult result2 = parse(serialized);
+    ASSERT_TRUE(result2.ok()) << (result2.error ? result2.error->toString() : "");
+
+    compareWorkbooks(*result1.workbook, *result2.workbook);
+}
+
+TEST(RoundtripTest, InMemoryWorkbook) {
+    // Create a workbook in memory, serialize, parse, compare
+    auto wb = createMinimalWorkbook();
+
+    const std::string serialized = serialize(*wb);
+
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    compareWorkbooks(*wb, *result.workbook);
 }
 
 }  // namespace

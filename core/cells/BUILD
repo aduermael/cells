@@ -64,9 +64,11 @@ cc_test(
 cc_test(
     name = "serializer_test",
     srcs = ["serializer_test.cc"],
+    data = ["//core/testdata:sample_cells_files"],
     deps = [
         ":id",
         ":model",
+        ":parser",
         ":serializer",
         "@googletest//:gtest_main",
     ],
