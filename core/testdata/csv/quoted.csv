@@ -1,0 +1,6 @@
+Name,Description,Value
+"Simple","No special chars",100
+"With, comma","Contains a comma",200
+"With ""quotes""","Contains escaped quotes",300
+"Multi
+line","Has newline inside",400

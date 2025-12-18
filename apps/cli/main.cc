@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 
+#include "core/cells/csv_reader.h"
 #include "core/cells/parser.h"
 
 namespace {
@@ -167,6 +168,11 @@ bool validate_options(Options& opts) {
         return true;
     }
 
+    // Helper to detect .tsv files for auto-setting tab delimiter
+    auto ends_with_tsv = [](const std::string& s) {
+        return s.size() >= 4 && s.substr(s.size() - 4) == ".tsv";
+    };
+
     // Info mode: allow positional arg as input if -i wasn't used
     if (opts.show_info) {
         if (opts.input_file.empty() && !opts.output_file.empty()) {
@@ -180,6 +186,10 @@ bool validate_options(Options& opts) {
         // Auto-detect input format if not specified
         if (opts.input_format == Format::kUnknown) {
             opts.input_format = detect_format(opts.input_file);
+        }
+        // Auto-set tab delimiter for .tsv files
+        if (ends_with_tsv(opts.input_file) && opts.csv.delimiter == ",") {
+            opts.csv.delimiter = "\t";
         }
         return true;
     }
@@ -215,9 +225,6 @@ bool validate_options(Options& opts) {
     }
 
     // Auto-set tab delimiter for .tsv files
-    auto ends_with_tsv = [](const std::string& s) {
-        return s.size() >= 4 && s.substr(s.size() - 4) == ".tsv";
-    };
     if (ends_with_tsv(opts.input_file) || ends_with_tsv(opts.output_file)) {
         if (opts.csv.delimiter == ",") {
             opts.csv.delimiter = "\t";
@@ -261,7 +268,7 @@ size_t calc_grid_dimension(
     return position;
 }
 
-// Show file information for .cells files
+// Show file information
 int show_file_info(const Options& opts) {
     // Read the file
     std::string content = read_file(opts.input_file);
@@ -270,20 +277,35 @@ int show_file_info(const Options& opts) {
         return 1;
     }
 
-    // Only .cells format is supported for info mode currently
-    if (opts.input_format != Format::kCells) {
-        std::cerr << "Error: --info only supports .cells files currently\n";
+    // Parse the file based on format
+    std::unique_ptr<cells::Workbook> workbook;
+
+    if (opts.input_format == Format::kCells) {
+        cells::ParseResult result = cells::parse(content);
+        if (!result.ok()) {
+            std::cerr << "Error: " << result.error->toString() << "\n";
+            return 1;
+        }
+        workbook = std::move(result.workbook);
+    } else if (opts.input_format == Format::kCsv) {
+        // Build CSV options from CLI options
+        cells::CSVReadOptions csv_opts;
+        if (!opts.csv.delimiter.empty()) {
+            csv_opts.delimiter = opts.csv.delimiter[0];
+        }
+        csv_opts.hasHeader = opts.csv.has_header;
+        csv_opts.autoDetectTypes = true;
+
+        cells::CSVReadResult result = cells::readCSV(content, csv_opts);
+        if (!result.ok()) {
+            std::cerr << "Error: " << result.error->toString() << "\n";
+            return 1;
+        }
+        workbook = std::move(result.workbook);
+    } else {
+        std::cerr << "Error: --info only supports .cells and .csv files currently\n";
         return 1;
     }
-
-    // Parse the file
-    cells::ParseResult result = cells::parse(content);
-    if (!result.ok()) {
-        std::cerr << "Error: " << result.error->toString() << "\n";
-        return 1;
-    }
-
-    const auto& workbook = result.workbook;
 
     // Calculate statistics per sheet
     size_t total_values = 0;

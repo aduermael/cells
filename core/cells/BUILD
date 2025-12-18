@@ -82,3 +82,24 @@ cc_binary(
         ":serializer",
     ],
 )
+
+cc_library(
+    name = "csv_reader",
+    srcs = ["csv_reader.cc"],
+    hdrs = ["csv_reader.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":id",
+        ":model",
+    ],
+)
+
+cc_test(
+    name = "csv_reader_test",
+    srcs = ["csv_reader_test.cc"],
+    data = ["//core/testdata:sample_csv_files"],
+    deps = [
+        ":csv_reader",
+        "@googletest//:gtest_main",
+    ],
+)

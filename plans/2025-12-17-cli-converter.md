@@ -177,18 +177,20 @@ Formulas: 23
 
 Implement CSV import into our data model.
 
-- [ ] **3a:** Create `core/cells/csv_reader.h` and `csv_reader.cc`
-- [ ] **3b:** Implement RFC 4180 CSV parsing (quoted fields, escapes)
-- [ ] **3c:** Handle different delimiters (comma, tab, semicolon)
-- [ ] **3d:** Auto-detect numeric vs string values
-- [ ] **3e:** Handle UTF-8 encoding (and BOM detection)
-- [ ] **3f:** Create test files: `core/testdata/csv/simple.csv`, etc.
-- [ ] **3g:** Add `csv_reader_test.cc`
+- [x] **3a:** Create `core/cells/csv_reader.h` and `csv_reader.cc`
+- [x] **3b:** Implement RFC 4180 CSV parsing (quoted fields, escapes)
+- [x] **3c:** Handle different delimiters (comma, tab, semicolon)
+- [x] **3d:** Auto-detect numeric vs string values
+- [x] **3e:** Handle UTF-8 encoding (and BOM detection)
+- [x] **3f:** Create test files: `core/testdata/csv/simple.csv`, etc.
+- [x] **3g:** Add `csv_reader_test.cc`
+- [x] **3h:** Wire up CSV support to CLI `--info` command
 
 **Deliverables:**
 - `csv_reader.h` / `csv_reader.cc` - CSV to Workbook
-- `csv_reader_test.cc` - unit tests
-- Test CSV files in `core/testdata/csv/`
+- `csv_reader_test.cc` - unit tests (32 tests)
+- Test CSV files in `core/testdata/csv/` (8 files)
+- CLI `--info` command works with `.csv` and `.tsv` files
 
 ---
 

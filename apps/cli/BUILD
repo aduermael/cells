@@ -5,6 +5,7 @@ cc_binary(
         "options.h",
     ],
     deps = [
+        "//core/cells:csv_reader",
         "//core/cells:model",
         "//core/cells:parser",
         "//core/cells:serializer",

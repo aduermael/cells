@@ -1,0 +1,4 @@
+Integer,Float,Negative,Scientific,Text
+42,3.14,-100,1.5e10,not-a-number
+0,0.0,-0,-1e-5,123abc
+100,99.99,-50.5,2.5E3,
