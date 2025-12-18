@@ -1,8 +1,13 @@
-.PHONY: build test format lint check clean compile-db
+.PHONY: build test format lint check clean compile-db cli
 
 # Build
 build:
 	bazel build //core/...
+
+# Build CLI and copy to repo root
+cli:
+	bazel build //apps/cli:cells
+	cp -f bazel-bin/apps/cli/cells ./cells
 
 # Test (when tests exist)
 test:
