@@ -1,6 +1,9 @@
 cc_binary(
     name = "cells",
-    srcs = ["main.cc"],
+    srcs = [
+        "main.cc",
+        "options.h",
+    ],
     deps = [
         "//core/cells:model",
         "//core/cells:parser",

@@ -1,6 +1,8 @@
 // Cells CLI - spreadsheet format converter
 // Usage: cells -i <input> <output>
 
+#include "options.h"
+
 #include <cstring>
 #include <iostream>
 #include <string>
@@ -8,24 +10,10 @@
 
 namespace {
 
-constexpr const char* kVersion = "0.0.1";
+using cells::cli::Format;
+using cells::cli::Options;
 
-struct Options {
-    std::string input_file;
-    std::string output_file;
-    std::string input_format;   // -f: force input format
-    std::string output_format;  // -t: force output format
-    std::string delimiter = ",";
-    std::string encoding = "utf-8";
-    std::string sheet_name;
-    bool no_header = false;
-    bool all_sheets = false;
-    bool overwrite = false;  // -y
-    bool quiet = false;      // -q
-    bool verbose = false;    // -v
-    bool show_help = false;
-    bool show_version = false;
-};
+constexpr const char* kVersion = "0.0.1";
 
 void print_usage(const char* program_name) {
     std::cerr << "Usage: " << program_name << " [options] -i <input> <output>\n"
@@ -56,6 +44,13 @@ void print_usage(const char* program_name) {
 
 void print_version() { std::cout << "cells " << kVersion << "\n"; }
 
+Format parse_format(std::string_view format_str) {
+    if (format_str == "cells") return Format::kCells;
+    if (format_str == "csv") return Format::kCsv;
+    if (format_str == "xlsx") return Format::kXlsx;
+    return Format::kUnknown;
+}
+
 // Returns true on success, false on error
 bool parse_args(int argc, char* argv[], Options& opts) {
     for (int i = 1; i < argc; ++i) {
@@ -74,43 +69,51 @@ bool parse_args(int argc, char* argv[], Options& opts) {
             continue;
         }
         if (arg == "-f" && i + 1 < argc) {
-            opts.input_format = argv[++i];
+            opts.input_format = parse_format(argv[++i]);
+            if (opts.input_format == Format::kUnknown) {
+                std::cerr << "Error: Unknown input format: " << argv[i] << "\n";
+                return false;
+            }
             continue;
         }
         if (arg == "-t" && i + 1 < argc) {
-            opts.output_format = argv[++i];
+            opts.output_format = parse_format(argv[++i]);
+            if (opts.output_format == Format::kUnknown) {
+                std::cerr << "Error: Unknown output format: " << argv[i] << "\n";
+                return false;
+            }
             continue;
         }
         if (arg == "--delimiter" && i + 1 < argc) {
-            opts.delimiter = argv[++i];
+            opts.csv.delimiter = argv[++i];
             continue;
         }
         if (arg == "--encoding" && i + 1 < argc) {
-            opts.encoding = argv[++i];
+            opts.csv.encoding = argv[++i];
             continue;
         }
         if (arg == "--sheet" && i + 1 < argc) {
-            opts.sheet_name = argv[++i];
+            opts.xlsx.sheet_name = argv[++i];
             continue;
         }
         if (arg == "--no-header") {
-            opts.no_header = true;
+            opts.csv.has_header = false;
             continue;
         }
         if (arg == "--all-sheets") {
-            opts.all_sheets = true;
+            opts.xlsx.all_sheets = true;
             continue;
         }
         if (arg == "-y") {
-            opts.overwrite = true;
+            opts.output.overwrite = true;
             continue;
         }
         if (arg == "-q") {
-            opts.quiet = true;
+            opts.output.quiet = true;
             continue;
         }
         if (arg == "-v") {
-            opts.verbose = true;
+            opts.output.verbose = true;
             continue;
         }
         // Positional argument (output file)
