@@ -2,9 +2,9 @@
 // Run with: bazel run //core/testdata/xlsx:generate_test_files
 // NOLINTBEGIN(misc-include-cleaner)
 
-#include <OpenXLSX/OpenXLSX.hpp>  // NOLINT(build/include_order)
-
 #include <cstdlib>
+
+#include <OpenXLSX/OpenXLSX.hpp>  // NOLINT(build/include_order)
 #include <filesystem>
 #include <iostream>
 #include <string>

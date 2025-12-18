@@ -64,11 +64,9 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
 
         // Filter sheets if specific sheet requested
         if (!options_.sheetName.empty()) {
-            const auto it =
-                std::find(sheetNames.begin(), sheetNames.end(), options_.sheetName);
+            const auto it = std::find(sheetNames.begin(), sheetNames.end(), options_.sheetName);
             if (it == sheetNames.end()) {
-                result.error =
-                    XLSXReadError("Sheet \"" + options_.sheetName + "\" not found");
+                result.error = XLSXReadError("Sheet \"" + options_.sheetName + "\" not found");
                 return result;
             }
             sheetNames = {options_.sheetName};
