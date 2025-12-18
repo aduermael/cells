@@ -1,6 +1,6 @@
 # Parser/Serializer Implementation Plan
 
-**Status:** IN-PROGRESS
+**Status:** DONE
 **Created:** 2025-12-16
 **Goal:** Implement the `.cells` text format parser and serializer with sample files and tests.
 
@@ -107,12 +107,12 @@ Create test data files covering various scenarios.
 
 Implement unit tests for parser and serializer.
 
-- [ ] **6a:** Create `core/cells/parser_test.cc` - parser unit tests (Google Test)
-- [ ] **6b:** Add tests for each sample file (parse succeeds)
-- [ ] **6c:** Add tests for malformed files (parse fails with correct error)
-- [ ] **6d:** Create `core/cells/serializer_test.cc` - serializer unit tests
-- [ ] **6e:** Add roundtrip tests (parse → serialize → parse, compare)
-- [ ] **6f:** Set up Bazel BUILD files with test targets
+- [x] **6a:** Create `core/cells/parser_test.cc` - parser unit tests (Google Test)
+- [x] **6b:** Add tests for each sample file (parse succeeds)
+- [x] **6c:** Add tests for malformed files (parse fails with correct error)
+- [x] **6d:** Create `core/cells/serializer_test.cc` - serializer unit tests
+- [x] **6e:** Add roundtrip tests (parse → serialize → parse, compare)
+- [x] **6f:** Set up Bazel BUILD files with test targets
 
 **Deliverables:**
 - `parser_test.cc` - parser tests
