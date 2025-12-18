@@ -198,16 +198,16 @@ Implement CSV import into our data model.
 
 Implement CSV export from our data model.
 
-- [ ] **4a:** Create `core/cells/csv_writer.h` and `csv_writer.cc`
-- [ ] **4b:** Implement RFC 4180 CSV output (proper escaping)
-- [ ] **4c:** Handle formula cells (output computed value)
-- [ ] **4d:** Support custom delimiters
-- [ ] **4e:** Add `csv_writer_test.cc`
-- [ ] **4f:** Add roundtrip tests (csv -> cells -> csv)
+- [x] **4a:** Create `core/cells/csv_writer.h` and `csv_writer.cc`
+- [x] **4b:** Implement RFC 4180 CSV output (proper escaping)
+- [x] **4c:** Handle formula cells (output computed value)
+- [x] **4d:** Support custom delimiters
+- [x] **4e:** Add `csv_writer_test.cc`
+- [x] **4f:** Add roundtrip tests (csv -> cells -> csv)
 
 **Deliverables:**
-- `csv_writer.h` / `csv_writer.cc` - Workbook to CSV
-- `csv_writer_test.cc` - unit tests
+- `csv_writer.h` / `csv_writer.cc` - Workbook to CSV (28 tests passing)
+- `csv_writer_test.cc` - unit tests including 7 roundtrip tests
 
 ---
 
