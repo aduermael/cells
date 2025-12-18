@@ -1,6 +1,7 @@
 // Cells CLI - spreadsheet format converter
 // Usage: cells -i <input> <output>
 
+#include "converter.h"
 #include "options.h"
 
 #include <chrono>
@@ -16,6 +17,8 @@
 
 namespace {
 
+using cells::cli::ConversionResult;
+using cells::cli::Converter;
 using cells::cli::detect_format;
 using cells::cli::Format;
 using cells::cli::format_name;
@@ -383,7 +386,7 @@ int main(int argc, char* argv[]) {
     if (opts.show_info) {
         result = show_file_info(opts);
     } else {
-        // TODO: Implement conversion pipeline
+        // Run conversion pipeline
         if (opts.output.verbose) {
             std::cout << "Input:  " << opts.input_file << " ("
                       << format_name(opts.input_format) << ")\n";
@@ -391,8 +394,25 @@ int main(int argc, char* argv[]) {
                       << format_name(opts.output_format) << ")\n";
         }
 
-        std::cout << "Converting: " << opts.input_file << " -> " << opts.output_file
-                  << "\n";
+        Converter converter(opts);
+        ConversionResult conv_result = converter.convert();
+
+        // Print warnings (unless quiet mode)
+        if (!opts.output.quiet) {
+            for (const auto& warning : conv_result.warnings) {
+                std::cerr << "Warning: " << warning.message << "\n";
+            }
+        }
+
+        if (!conv_result.ok()) {
+            std::cerr << "Error: " << conv_result.error << "\n";
+            result = 1;
+        } else {
+            if (!opts.output.quiet) {
+                std::cout << "Converted: " << opts.input_file << " -> " << opts.output_file
+                          << " (" << conv_result.cells_converted << " cells)\n";
+            }
+        }
     }
 
     // Show timing if requested
