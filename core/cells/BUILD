@@ -103,3 +103,13 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "csv_writer",
+    srcs = ["csv_writer.cc"],
+    hdrs = ["csv_writer.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":model",
+    ],
+)
