@@ -80,10 +80,9 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
             // Create our Sheet
             auto sheet = std::make_unique<Sheet>(generate_id(), sheetName);
 
-            // Get dimensions
-            auto lastCell = xlSheet.lastCell();
-            uint32_t rowCount = lastCell.row();
-            uint16_t colCount = lastCell.column();
+            // Get dimensions - use rowCount/columnCount to avoid exceptions on empty sheets
+            uint32_t rowCount = xlSheet.rowCount();
+            uint16_t colCount = xlSheet.columnCount();
 
             if (rowCount == 0 || colCount == 0) {
                 // Empty sheet

@@ -136,3 +136,13 @@ cc_library(
         "@openxlsx",
     ],
 )
+
+cc_test(
+    name = "xlsx_reader_test",
+    srcs = ["xlsx_reader_test.cc"],
+    data = ["//core/testdata/xlsx:sample_xlsx_files"],
+    deps = [
+        ":xlsx_reader",
+        "@googletest//:gtest_main",
+    ],
+)
