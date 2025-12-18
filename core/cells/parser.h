@@ -64,12 +64,11 @@ private:
     // Line type parsers
     bool parseDocument(std::string_view line);  // D <id> "<name>"
     bool parseSheet(std::string_view line);     // S <id> "<name>"
-    bool parseColumn(std::string_view line);    // C <id> <prev> <next> [props]
-    bool parseRow(std::string_view line);       // R <id> <prev> <next> [props]
+    bool parseColumn(std::string_view line);    // C <id> <pos> [props]
+    bool parseRow(std::string_view line);       // R <id> <pos> [props]
     bool parseCell(std::string_view line);      // X <id> <col> <row> <type> <value>
 
     // Helper parsers
-    static bool parseLink(std::string_view token, ID& outId, uint32_t& outGap);
     static bool parseQuotedString(std::string_view input, std::string& out, size_t& consumed);
     static bool parseAxisProps(std::string_view props, Axis& axis);
     bool parseCellValue(std::string_view value, char type, CellValue& out);

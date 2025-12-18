@@ -4,21 +4,21 @@ D tY8pL3mK "All Types Test"
 S qR5sW2xN "Types"
 
 #cols
-C cA1bC2dE ~ cB3dE4fG
-C cB3dE4fG cA1bC2dE ~
+C cA1bC2dE 0
+C cB3dE4fG 1
 
 #rows
-R rA1bC2dE ~ rB3dE4fG
-R rB3dE4fG rA1bC2dE rC5fG6hJ
-R rC5fG6hJ rB3dE4fG rD7hJ8kL
-R rD7hJ8kL rC5fG6hJ rE9kL0mN
-R rE9kL0mN rD7hJ8kL rF1mN2pQ
-R rF1mN2pQ rE9kL0mN rG3pQ4rS
-R rG3pQ4rS rF1mN2pQ rH5rS6tW
-R rH5rS6tW rG3pQ4rS rJ7tW8xY
-R rJ7tW8xY rH5rS6tW rK9xY0zA
-R rK9xY0zA rJ7tW8xY rL1zA2bC
-R rL1zA2bC rK9xY0zA ~
+R rA1bC2dE 0
+R rB3dE4fG 1
+R rC5fG6hJ 2
+R rD7hJ8kL 3
+R rE9kL0mN 4
+R rF1mN2pQ 5
+R rG3pQ4rS 6
+R rH5rS6tW 7
+R rJ7tW8xY 8
+R rK9xY0zA 9
+R rL1zA2bC 10
 
 #cells
 X xA1aB2cD cA1bC2dE rA1bC2dE s "Type"

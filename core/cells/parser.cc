@@ -195,42 +195,6 @@ bool Parser::parseSheet(std::string_view line) {
     return true;
 }
 
-bool Parser::parseLink(std::string_view token, ID& outId, uint32_t& outGap) {
-    // Format: "~" or "<id>" or "<id>:<gap>" or "~:<gap>"
-    outGap = 0;
-
-    // Find colon for gap
-    const size_t colonPos = token.find(':');
-    std::string_view idPart;
-    std::string_view gapPart;
-
-    if (colonPos != std::string_view::npos) {
-        idPart = token.substr(0, colonPos);
-        gapPart = token.substr(colonPos + 1);
-    } else {
-        idPart = token;
-    }
-
-    // Parse ID part
-    if (idPart.empty() || idPart == "~") {
-        outId = ID();  // Null ID
-    } else {
-        outId = ID(std::string(idPart));
-    }
-
-    // Parse gap part
-    if (!gapPart.empty()) {
-        int gap = 0;
-        auto result = std::from_chars(gapPart.data(), gapPart.data() + gapPart.size(), gap);
-        if (result.ec != std::errc()) {
-            return false;
-        }
-        outGap = static_cast<uint32_t>(gap);
-    }
-
-    return true;
-}
-
 bool Parser::parseQuotedString(std::string_view input, std::string& out, size_t& consumed) {
     // Find opening quote
     if (input.empty() || input[0] != '"') {
@@ -353,7 +317,7 @@ bool Parser::parseAxisProps(std::string_view props, Axis& axis) {
 }
 
 bool Parser::parseColumn(std::string_view line) {
-    // Format: C <id> <prev>[:<gap>] <next>[:<gap>] [props...]
+    // Format: C <id> <position> [props...]
     if (currentSheet_ == nullptr) {
         return setError("Column outside of sheet");
     }
@@ -364,13 +328,13 @@ bool Parser::parseColumn(std::string_view line) {
 
     line = line.substr(2);  // Skip "C "
 
-    // Tokenize: id, prev, next
-    std::string_view tokens[3];
+    // Tokenize: id, position
+    std::string_view tokens[2];
     size_t tokenCount = 0;
     size_t propsStart = 0;
 
     size_t pos = 0;
-    while (tokenCount < 3 && pos < line.size()) {
+    while (tokenCount < 2 && pos < line.size()) {
         // Skip whitespace
         const size_t start = line.find_first_not_of(" \t", pos);
         if (start == std::string_view::npos) {
@@ -388,22 +352,20 @@ bool Parser::parseColumn(std::string_view line) {
         propsStart = end;
     }
 
-    if (tokenCount < 3) {
-        return setError("Column requires id, prev, and next");
+    if (tokenCount < 2) {
+        return setError("Column requires id and position");
     }
 
     // Create axis
     auto col = std::make_unique<Axis>(ID(std::string(tokens[0])), true);
 
-    // Parse prev link
-    if (!parseLink(tokens[1], col->prevId, col->gapBefore)) {
-        return setError("Invalid prev link in column");
+    // Parse position
+    int position = 0;
+    auto result = std::from_chars(tokens[1].data(), tokens[1].data() + tokens[1].size(), position);
+    if (result.ec != std::errc()) {
+        return setError("Invalid column position");
     }
-
-    // Parse next link
-    if (!parseLink(tokens[2], col->nextId, col->gapAfter)) {
-        return setError("Invalid next link in column");
-    }
+    col->position = static_cast<uint32_t>(position);
 
     // Parse optional properties
     if (propsStart < line.size()) {
@@ -417,7 +379,7 @@ bool Parser::parseColumn(std::string_view line) {
 }
 
 bool Parser::parseRow(std::string_view line) {
-    // Format: R <id> <prev>[:<gap>] <next>[:<gap>] [props...]
+    // Format: R <id> <position> [props...]
     if (currentSheet_ == nullptr) {
         return setError("Row outside of sheet");
     }
@@ -428,13 +390,13 @@ bool Parser::parseRow(std::string_view line) {
 
     line = line.substr(2);  // Skip "R "
 
-    // Tokenize: id, prev, next
-    std::string_view tokens[3];
+    // Tokenize: id, position
+    std::string_view tokens[2];
     size_t tokenCount = 0;
     size_t propsStart = 0;
 
     size_t pos = 0;
-    while (tokenCount < 3 && pos < line.size()) {
+    while (tokenCount < 2 && pos < line.size()) {
         const size_t start = line.find_first_not_of(" \t", pos);
         if (start == std::string_view::npos) {
             break;
@@ -450,22 +412,20 @@ bool Parser::parseRow(std::string_view line) {
         propsStart = end;
     }
 
-    if (tokenCount < 3) {
-        return setError("Row requires id, prev, and next");
+    if (tokenCount < 2) {
+        return setError("Row requires id and position");
     }
 
     // Create axis
     auto row = std::make_unique<Axis>(ID(std::string(tokens[0])), false);
 
-    // Parse prev link
-    if (!parseLink(tokens[1], row->prevId, row->gapBefore)) {
-        return setError("Invalid prev link in row");
+    // Parse position
+    int position = 0;
+    auto result = std::from_chars(tokens[1].data(), tokens[1].data() + tokens[1].size(), position);
+    if (result.ec != std::errc()) {
+        return setError("Invalid row position");
     }
-
-    // Parse next link
-    if (!parseLink(tokens[2], row->nextId, row->gapAfter)) {
-        return setError("Invalid next link in row");
-    }
+    row->position = static_cast<uint32_t>(position);
 
     // Parse optional properties
     if (propsStart < line.size()) {

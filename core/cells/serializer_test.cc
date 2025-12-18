@@ -124,10 +124,11 @@ TEST(SerializerTest, SerializeBooleanCell) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    col->position = 0;
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row->position = 0;
     auto row2 = std::make_unique<Axis>(ID("rB3dE4fG"), false);
-    row2->prevId = ID("rA1bC2dE");
-    row->nextId = ID("rB3dE4fG");
+    row2->position = 1;
 
     auto cellTrue = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cellTrue->value = CellValue(true);
@@ -216,28 +217,29 @@ TEST(SerializerTest, NoEscapeUnicode) {
     EXPECT_EQ(result, "日本語");
 }
 
-// --- Gap Notation ---
+// --- Position Serialization ---
 
-TEST(SerializerTest, SerializeColumnGaps) {
+TEST(SerializerTest, SerializeColumnPositions) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
 
     auto col1 = std::make_unique<Axis>(ID("cA1bC2dE"), true);
-    col1->nextId = ID("cB3dE4fG");
-    col1->gapAfter = 3;
+    col1->position = 0;
 
     auto col2 = std::make_unique<Axis>(ID("cB3dE4fG"), true);
-    col2->prevId = ID("cA1bC2dE");
-    col2->gapBefore = 3;
+    col2->position = 5;
 
     sheet->addColumn(std::move(col1));
     sheet->addColumn(std::move(col2));
-    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row->position = 0;
+    sheet->addRow(std::move(row));
     wb->addSheet(std::move(sheet));
 
     const std::string output = serialize(*wb);
-    // Should have gap notation like "cB3dE4fG:3"
-    EXPECT_NE(output.find(":3"), std::string::npos);
+    // Should have positions
+    EXPECT_NE(output.find("C cA1bC2dE 0"), std::string::npos);
+    EXPECT_NE(output.find("C cB3dE4fG 5"), std::string::npos);
 }
 
 // --- Axis Properties ---
@@ -404,8 +406,8 @@ TEST(RoundtripTest, AllTypesFile) {
     compareWorkbooks(*result1.workbook, *result2.workbook);
 }
 
-TEST(RoundtripTest, GapsFile) {
-    const std::string content = readTestFile("gaps.cells");
+TEST(RoundtripTest, SparseFile) {
+    const std::string content = readTestFile("sparse.cells");
     ASSERT_FALSE(content.empty());
 
     ParseResult result1 = parse(content);

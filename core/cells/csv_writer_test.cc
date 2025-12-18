@@ -17,54 +17,20 @@ std::unique_ptr<Sheet> createSimpleSheet(const std::vector<std::string>& colName
 
     // Create columns
     std::vector<ID> colIds;
-    ID prevColId;
     for (size_t c = 0; c < colNames.size(); c++) {
         auto col = std::make_unique<Axis>(generate_id(), true);
         col->name = colNames[c];
-        col->prevId = prevColId;
-
-        if (!prevColId.isNull()) {
-            Axis* prevCol = sheet->getColumn(prevColId);
-            if (prevCol) {
-                prevCol->nextId = col->id;
-            }
-        }
-
-        if (c == 0) {
-            sheet->firstCol = col->id;
-        }
-        if (c == colNames.size() - 1) {
-            sheet->lastCol = col->id;
-        }
-
+        col->position = static_cast<uint32_t>(c);
         colIds.push_back(col->id);
-        prevColId = col->id;
         sheet->addColumn(std::move(col));
     }
 
     // Create rows and cells
     std::vector<ID> rowIds;
-    ID prevRowId;
     for (size_t r = 0; r < data.size(); r++) {
         auto row = std::make_unique<Axis>(generate_id(), false);
-        row->prevId = prevRowId;
-
-        if (!prevRowId.isNull()) {
-            Axis* prevRow = sheet->getRow(prevRowId);
-            if (prevRow) {
-                prevRow->nextId = row->id;
-            }
-        }
-
-        if (r == 0) {
-            sheet->firstRow = row->id;
-        }
-        if (r == data.size() - 1) {
-            sheet->lastRow = row->id;
-        }
-
+        row->position = static_cast<uint32_t>(r);
         rowIds.push_back(row->id);
-        prevRowId = row->id;
         sheet->addRow(std::move(row));
 
         // Add cells for this row
@@ -87,48 +53,20 @@ std::unique_ptr<Sheet> createNumericSheet(const std::vector<std::string>& colNam
 
     // Create columns
     std::vector<ID> colIds;
-    ID prevColId;
     for (size_t c = 0; c < colNames.size(); c++) {
         auto col = std::make_unique<Axis>(generate_id(), true);
         col->name = colNames[c];
-        col->prevId = prevColId;
-
-        if (!prevColId.isNull()) {
-            sheet->getColumn(prevColId)->nextId = col->id;
-        }
-
-        if (c == 0) {
-            sheet->firstCol = col->id;
-        }
-        if (c == colNames.size() - 1) {
-            sheet->lastCol = col->id;
-        }
-
+        col->position = static_cast<uint32_t>(c);
         colIds.push_back(col->id);
-        prevColId = col->id;
         sheet->addColumn(std::move(col));
     }
 
     // Create rows and cells
     std::vector<ID> rowIds;
-    ID prevRowId;
     for (size_t r = 0; r < data.size(); r++) {
         auto row = std::make_unique<Axis>(generate_id(), false);
-        row->prevId = prevRowId;
-
-        if (!prevRowId.isNull()) {
-            sheet->getRow(prevRowId)->nextId = row->id;
-        }
-
-        if (r == 0) {
-            sheet->firstRow = row->id;
-        }
-        if (r == data.size() - 1) {
-            sheet->lastRow = row->id;
-        }
-
+        row->position = static_cast<uint32_t>(r);
         rowIds.push_back(row->id);
-        prevRowId = row->id;
         sheet->addRow(std::move(row));
 
         // Add cells for this row
@@ -335,28 +273,15 @@ TEST(CSVWriterTest, WriteBooleanValues) {
     // Create column
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->name = "Active";
+    col->position = 0;
     ID colId = col->id;
-    sheet->firstCol = colId;
-    sheet->lastCol = colId;
     sheet->addColumn(std::move(col));
 
     // Create rows with boolean cells
-    ID prevRowId;
     for (int i = 0; i < 2; i++) {
         auto row = std::make_unique<Axis>(generate_id(), false);
-        row->prevId = prevRowId;
-        if (!prevRowId.isNull()) {
-            sheet->getRow(prevRowId)->nextId = row->id;
-        }
+        row->position = static_cast<uint32_t>(i);
         ID rowId = row->id;
-
-        if (i == 0) {
-            sheet->firstRow = rowId;
-        }
-        if (i == 1) {
-            sheet->lastRow = rowId;
-        }
-        prevRowId = rowId;
         sheet->addRow(std::move(row));
 
         auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
@@ -377,16 +302,14 @@ TEST(CSVWriterTest, WriteErrorValues) {
     // Create column
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->name = "Value";
+    col->position = 0;
     ID colId = col->id;
-    sheet->firstCol = colId;
-    sheet->lastCol = colId;
     sheet->addColumn(std::move(col));
 
     // Create row with error cell
     auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
     ID rowId = row->id;
-    sheet->firstRow = rowId;
-    sheet->lastRow = rowId;
     sheet->addRow(std::move(row));
 
     auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
@@ -405,30 +328,18 @@ TEST(CSVWriterTest, GenerateColumnNamesWhenEmpty) {
 
     // Create columns without names
     std::vector<ID> colIds;
-    ID prevColId;
     for (int c = 0; c < 3; c++) {
         auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = static_cast<uint32_t>(c);
         // Leave name empty
-        col->prevId = prevColId;
-        if (!prevColId.isNull()) {
-            sheet->getColumn(prevColId)->nextId = col->id;
-        }
-        if (c == 0) {
-            sheet->firstCol = col->id;
-        }
-        if (c == 2) {
-            sheet->lastCol = col->id;
-        }
         colIds.push_back(col->id);
-        prevColId = col->id;
         sheet->addColumn(std::move(col));
     }
 
     // Create one row
     auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
     ID rowId = row->id;
-    sheet->firstRow = rowId;
-    sheet->lastRow = rowId;
     sheet->addRow(std::move(row));
 
     // Add cells

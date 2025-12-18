@@ -35,9 +35,10 @@ Entities are sorted by their HLC timestamp, not by visual position:
 - Inserts don't shift other lines
 - Concurrent edits to different cells don't conflict
 
-### 4. Order Stored Separately from Content
+### 4. Position-Based Ordering
 
-Visual order of columns/rows is stored via doubly-linked list, separate from content.
+Visual order of columns/rows is stored via explicit positions (0-indexed integers).
+Each axis knows its own position, making it simple to sort and serialize.
 
 ## Text Format (`.cells`)
 
@@ -50,10 +51,10 @@ D <doc-id> "<name>"
 S <sheet-id> "<name>"
 
 #cols
-C <id> <prev>[:<gap>] <next>[:<gap>] [props...]
+C <id> <position> [props...]
 
 #rows
-R <id> <prev>[:<gap>] <next>[:<gap>] [props...]
+R <id> <position> [props...]
 
 #cells
 X <id> <col-id> <row-id> <type> <value>
@@ -79,13 +80,13 @@ D Qx7mXp2L "Untitled"
 S bF3hL8mN "Sheet1"
 
 #cols
-C kR7pN2wQ ~ vT5mK9xL:2
-C vT5mK9xL kR7pN2wQ:2 ~
+C kR7pN2wQ 0
+C vT5mK9xL 3
 
 #rows
-R jH4sW8nF ~ qM2kL5pR
-R qM2kL5pR jH4sW8nF yB9tX3wN:1
-R yB9tX3wN qM2kL5pR:1 ~
+R jH4sW8nF 0
+R qM2kL5pR 1
+R yB9tX3wN 3
 
 #cells
 X nP6kR2mW kR7pN2wQ jH4sW8nF n 2
@@ -100,17 +101,17 @@ X wK3nJ7pM vT5mK9xL yB9tX3wN f "=$kR7pN2wQ$jH4sW8nF+10"
 | `#cells` | Format version | `#cells v1` |
 | `D` | Document | `D <id> "<name>"` |
 | `S` | Sheet | `S <id> "<name>"` |
-| `C` | Column | `C <id> <prev>[:<gap>] <next>[:<gap>] [props...]` |
-| `R` | Row | `R <id> <prev>[:<gap>] <next>[:<gap>] [props...]` |
+| `C` | Column | `C <id> <position> [props...]` |
+| `R` | Row | `R <id> <position> [props...]` |
 | `X` | Cell | `X <id> <col> <row> <type> <value>` |
 | `T` | Style | `T <id> <properties>` |
 | `Y` | Cell-style | `Y <cell-id> <style-ids>` |
 | `O` | Operation | `O <hlc> <op-type> <args...>` |
 
-### Link Notation
+### Position Notation
 
-- `~` = null (no prev/next)
-- `:<gap>` = number of empty positions between (default 0)
+- Position is a 0-indexed integer
+- Sparse positions are allowed (e.g., columns at 0, 3, 10)
 - Props: `w:<width>`, `h:<height>`, `name:"<name>"`
 
 ### Cell Types
@@ -147,18 +148,16 @@ User changes A1 from 2 to 42:
 
 **Result**: 1 line changed.
 
-### Insert Column Between Existing Columns
+### Insert Column
 
 ```diff
  #cols
--C kR7pN2wQ ~ vT5mK9xL:2
-+C kR7pN2wQ ~ mT3xK8pW
-+C mT3xK8pW kR7pN2wQ vT5mK9xL:1
--C vT5mK9xL kR7pN2wQ:2 ~
-+C vT5mK9xL mT3xK8pW:1 ~
+ C kR7pN2wQ 0
++C mT3xK8pW 1
+ C vT5mK9xL 3
 ```
 
-**Result**: 3 lines changed. Gap split from 2 to 1+1.
+**Result**: 1 line added. Simple!
 
 ### Concurrent Edits (No Conflict)
 
@@ -178,12 +177,12 @@ Clear 1-line conflict. User picks one.
 
 ## Comparison with Other Formats
 
-| Format | Edit Cell | Insert Row | Merge Quality |
-|--------|-----------|------------|---------------|
+| Format | Edit Cell | Insert Column | Merge Quality |
+|--------|-----------|---------------|---------------|
 | CSV | 1 line | All lines shift | Poor |
 | JSON | ~3 lines | ~5 lines | Poor |
 | XLSX | Binary | Binary | Impossible |
-| **.cells** | 1 line | 3 lines | Excellent |
+| **.cells** | 1 line | 1 line | Excellent |
 
 ## File Format Variants
 

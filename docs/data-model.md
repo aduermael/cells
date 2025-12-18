@@ -43,20 +43,19 @@ The fundamental unit of data. Each cell is identified by a UUID, not coordinates
 
 ### Axis (Column or Row)
 
-Represents a single column or row as a doubly-linked list node.
+Represents a single column or row with an explicit visual position.
 
 | Field | Description |
 |-------|-------------|
 | `id` | Unique identifier |
 | `is_column` | true = column (x), false = row (y) |
-| `prev` / `next` | Linked list pointers |
-| `gap` | Skipped positions to next (0 = adjacent) |
+| `position` | Visual position (0-indexed integer) |
 | `name` | Custom name (NULL = compute A,B,C or 1,2,3) |
 | `size` | Width (column) or height (row) in pixels |
 | `hidden` | Visibility flag |
 | `constraints` | Type constraints (columns only) |
 
-**Note**: Display names (A, B, C or 1, 2, 3) are computed by walking the linked list, not stored.
+**Note**: Display names (A, B, C or 1, 2, 3) are computed from position, not stored.
 
 ### Sheet
 
@@ -66,11 +65,9 @@ A 2D grid containing cells.
 |-------|-------------|
 | `id` | Unique identifier |
 | `name` | Sheet name |
-| `first_col` / `last_col` | Column linked list head/tail |
-| `first_row` / `last_row` | Row linked list head/tail |
-| `col_count` / `row_count` | Number of defined axes |
 | `cells` | Cell storage (sharded hashmap) |
-| `columns` / `rows` | Axis storage (hashmap by UUID) |
+| `columns` | Axis storage (hashmap by UUID) |
+| `rows` | Axis storage (hashmap by UUID) |
 
 ### Workbook
 
@@ -90,7 +87,7 @@ Top-level container.
 ```
 X-Axis (Columns)
     ┌────────────────────────────────────────────────────┐
-    │  Col A ──(gap:0)──► Col B ──(gap:2)──► Col E       │
+    │  Col A (pos:0)    Col B (pos:1)    Col E (pos:4)   │
     └────────────────────────────────────────────────────┘
          │                   │                    │
          ▼                   ▼                    ▼
@@ -100,18 +97,20 @@ X-Axis (Columns)
     └────────┘          └────────┘          └────────┘
          │                   │                    │
          ▼                   ▼                    ▼
-    Row 1 ───(gap:1)───► Row 3
+    Row 1 (pos:0)    Row 3 (pos:2)
 
     Y-Axis (Rows)
 ```
 
-## Gap Encoding
+## Sparse Positions
 
 Columns A, B exist. C, D don't exist. E exists.
 
-- Column A: `prev=~, next=B, gap=0` (B is adjacent)
-- Column B: `prev=A, next=E, gap=2` (2 empty columns C,D before E)
-- Column E: `prev=B, next=~, gap=0`
+- Column A: `position=0`
+- Column B: `position=1`
+- Column E: `position=4`
+
+Positions don't need to be contiguous. Empty positions are simply not stored.
 
 ## Cell Lookup Strategies
 
@@ -119,7 +118,7 @@ Columns A, B exist. C, D don't exist. E exists.
 |--------|------------|----------|
 | By UUID | O(1) | Primary lookup |
 | By (col_id, row_id) | O(1) | UI coordinate lookup |
-| By position (col_pos, row_pos) | O(n) | Requires axis traversal |
+| By position (col_pos, row_pos) | O(n) | Requires sorting by position |
 | Range iterator | O(k) | Formula evaluation |
 
 ## Cell Storage
@@ -139,12 +138,12 @@ Sharded hashmap for O(1) access with parallelization:
 3. **Sparse by nature**: Only allocated cells consume memory
 4. **Multi-dimensional**: Generalizes beyond 2D trivially
 
-### Why doubly-linked dimensions with gaps?
+### Why position-based ordering?
 
-1. **O(1) insert/delete**: No array shifting
-2. **Sparse-friendly**: Gap encoding avoids empty nodes
-3. **CRDT-compatible**: Each link is independently addressable
-4. **Flexible iteration**: Forward/backward traversal
+1. **Simple**: Each axis knows its own position
+2. **Git-friendly**: Insert = 1 line added (vs. 3 lines with linked lists)
+3. **CRDT-compatible**: Position conflicts resolved via LWW
+4. **Easy sorting**: Just sort by position field
 
 ## Implementation
 

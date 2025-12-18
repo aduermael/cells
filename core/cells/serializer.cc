@@ -1,5 +1,6 @@
 #include "core/cells/serializer.h"
 
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 #include <vector>
@@ -73,66 +74,42 @@ void Serializer::serializeSheet(const Sheet& sheet, std::ostream& out) const {
 }
 
 void Serializer::serializeColumns(const Sheet& sheet, std::ostream& out) const {
-    // Find head column (one with null prevId) and traverse in order
-    std::vector<const Axis*> ordered;
-    const Axis* head = nullptr;
+    // Collect columns with sort keys (position, id) for deterministic ordering
+    std::vector<std::pair<std::pair<uint32_t, std::string>, const Axis*>> ordered;
+    ordered.reserve(sheet.columns.size());
 
     for (const auto& pair : sheet.columns) {
-        if (pair.second->prevId.isNull()) {
-            head = pair.second.get();
-            break;
-        }
+        const Axis* axis = pair.second.get();
+        ordered.emplace_back(std::make_pair(axis->position, axis->id.toString()), axis);
     }
 
-    // Traverse from head to tail
-    const Axis* current = head;
-    while (current != nullptr) {
-        ordered.push_back(current);
-        if (current->nextId.isNull()) {
-            break;
-        }
-        auto it = sheet.columns.find(current->nextId);
-        if (it == sheet.columns.end()) {
-            break;
-        }
-        current = it->second.get();
-    }
+    // Sort by (position, id) - fully deterministic
+    std::sort(ordered.begin(), ordered.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
 
     // Serialize in order
-    for (const Axis* col : ordered) {
-        serializeAxis(*col, 'C', out);
+    for (const auto& item : ordered) {
+        serializeAxis(*item.second, 'C', out);
     }
 }
 
 void Serializer::serializeRows(const Sheet& sheet, std::ostream& out) const {
-    // Find head row (one with null prevId) and traverse in order
-    std::vector<const Axis*> ordered;
-    const Axis* head = nullptr;
+    // Collect rows with sort keys (position, id) for deterministic ordering
+    std::vector<std::pair<std::pair<uint32_t, std::string>, const Axis*>> ordered;
+    ordered.reserve(sheet.rows.size());
 
     for (const auto& pair : sheet.rows) {
-        if (pair.second->prevId.isNull()) {
-            head = pair.second.get();
-            break;
-        }
+        const Axis* axis = pair.second.get();
+        ordered.emplace_back(std::make_pair(axis->position, axis->id.toString()), axis);
     }
 
-    // Traverse from head to tail
-    const Axis* current = head;
-    while (current != nullptr) {
-        ordered.push_back(current);
-        if (current->nextId.isNull()) {
-            break;
-        }
-        auto it = sheet.rows.find(current->nextId);
-        if (it == sheet.rows.end()) {
-            break;
-        }
-        current = it->second.get();
-    }
+    // Sort by (position, id) - fully deterministic
+    std::sort(ordered.begin(), ordered.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
 
     // Serialize in order
-    for (const Axis* row : ordered) {
-        serializeAxis(*row, 'R', out);
+    for (const auto& item : ordered) {
+        serializeAxis(*item.second, 'R', out);
     }
 }
 
@@ -143,15 +120,8 @@ void Serializer::serializeCells(const Sheet& sheet, std::ostream& out) const {
 }
 
 void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out) const {
-    // Format: C/R <id> <prev>[:<gap>] <next>[:<gap>] [props...]
-    out << prefix << " " << axis.id.toString() << " ";
-
-    // Prev link with gap before
-    serializeLink(axis.prevId, axis.gapBefore, out);
-    out << " ";
-
-    // Next link with gap after
-    serializeLink(axis.nextId, axis.gapAfter, out);
+    // Format: C/R <id> <position> [props...]
+    out << prefix << " " << axis.id.toString() << " " << axis.position;
 
     // Optional properties (only if non-default)
     if (axis.isColumn && axis.size != DEFAULT_COLUMN_WIDTH) {
@@ -165,19 +135,6 @@ void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out)
     }
 
     out << "\n";
-}
-
-void Serializer::serializeLink(const ID& id, uint32_t gap, std::ostream& out) {
-    if (id.isNull()) {
-        out << "~";
-    } else {
-        out << id.toString();
-    }
-
-    // Only include gap if non-zero
-    if (gap > 0) {
-        out << ":" << gap;
-    }
 }
 
 void Serializer::serializeCell(const Cell& cell, std::ostream& out) const {

@@ -247,34 +247,17 @@ CSVReadResult CSVReader::read(std::string_view content) {
     // Create columns
     std::vector<ID> colIds;
     colIds.reserve(numCols);
-    ID prevColId;
 
     for (size_t c = 0; c < numCols; c++) {
         auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = static_cast<uint32_t>(c);
         colIds.push_back(col->id);
-
-        // Set up linked list
-        col->prevId = prevColId;
-        if (!prevColId.isNull()) {
-            Axis* prevCol = sheet->getColumn(prevColId);
-            if (prevCol) {
-                prevCol->nextId = col->id;
-            }
-        }
 
         // Set column name from header if available
         if (options_.hasHeader && !records.empty() && c < records[0].size()) {
             col->name = records[0][c];
         }
 
-        if (c == 0) {
-            sheet->firstCol = col->id;
-        }
-        if (c == numCols - 1) {
-            sheet->lastCol = col->id;
-        }
-
-        prevColId = col->id;
         sheet->addColumn(std::move(col));
     }
 
@@ -292,29 +275,11 @@ CSVReadResult CSVReader::read(std::string_view content) {
     // Create rows
     std::vector<ID> rowIds;
     rowIds.reserve(numRows);
-    ID prevRowId;
 
     for (size_t r = 0; r < numRows; r++) {
         auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = static_cast<uint32_t>(r);
         rowIds.push_back(row->id);
-
-        // Set up linked list
-        row->prevId = prevRowId;
-        if (!prevRowId.isNull()) {
-            Axis* prevRow = sheet->getRow(prevRowId);
-            if (prevRow) {
-                prevRow->nextId = row->id;
-            }
-        }
-
-        if (r == 0) {
-            sheet->firstRow = row->id;
-        }
-        if (r == numRows - 1) {
-            sheet->lastRow = row->id;
-        }
-
-        prevRowId = row->id;
         sheet->addRow(std::move(row));
     }
 

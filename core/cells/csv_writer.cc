@@ -1,5 +1,6 @@
 #include "core/cells/csv_writer.h"
 
+#include <algorithm>
 #include <sstream>
 
 namespace cells {
@@ -9,35 +10,43 @@ CSVWriter::CSVWriter() = default;
 CSVWriter::CSVWriter(const CSVWriteOptions& options) : options_(options) {}
 
 std::vector<ID> CSVWriter::getOrderedColumns(const Sheet& sheet) const {
-    std::vector<ID> columns;
+    // Collect all columns and sort by position
+    std::vector<std::pair<uint32_t, ID>> columns;
+    columns.reserve(sheet.columns.size());
 
-    ID colId = sheet.firstCol;
-    while (!colId.isNull()) {
-        columns.push_back(colId);
-        auto it = sheet.columns.find(colId);
-        if (it == sheet.columns.end()) {
-            break;
-        }
-        colId = it->second->nextId;
+    for (const auto& pair : sheet.columns) {
+        columns.emplace_back(pair.second->position, pair.first);
     }
 
-    return columns;
+    std::sort(columns.begin(), columns.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    std::vector<ID> result;
+    result.reserve(columns.size());
+    for (const auto& col : columns) {
+        result.push_back(col.second);
+    }
+    return result;
 }
 
 std::vector<ID> CSVWriter::getOrderedRows(const Sheet& sheet) const {
-    std::vector<ID> rows;
+    // Collect all rows and sort by position
+    std::vector<std::pair<uint32_t, ID>> rows;
+    rows.reserve(sheet.rows.size());
 
-    ID rowId = sheet.firstRow;
-    while (!rowId.isNull()) {
-        rows.push_back(rowId);
-        auto it = sheet.rows.find(rowId);
-        if (it == sheet.rows.end()) {
-            break;
-        }
-        rowId = it->second->nextId;
+    for (const auto& pair : sheet.rows) {
+        rows.emplace_back(pair.second->position, pair.first);
     }
 
-    return rows;
+    std::sort(rows.begin(), rows.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    std::vector<ID> result;
+    result.reserve(rows.size());
+    for (const auto& row : rows) {
+        result.push_back(row.second);
+    }
+    return result;
 }
 
 std::string CSVWriter::formatValue(const CellValue& value) const {

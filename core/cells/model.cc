@@ -156,33 +156,14 @@ void Cell::clearFormula() {
 // Axis
 // ============================================================================
 
-Axis::Axis()
-    : name(),
-      id(),
-      prevId(),
-      nextId(),
-      gapBefore(0),
-      gapAfter(0),
-      size(DEFAULT_COLUMN_WIDTH),
-      isColumn(true) {}
+Axis::Axis() : name(), id(), position(0), size(DEFAULT_COLUMN_WIDTH), isColumn(true) {}
 
 Axis::Axis(const ID& id, bool isColumn)
     : name(),
       id(id),
-      prevId(),
-      nextId(),
-      gapBefore(0),
-      gapAfter(0),
+      position(0),
       size(isColumn ? DEFAULT_COLUMN_WIDTH : DEFAULT_ROW_HEIGHT),
       isColumn(isColumn) {}
-
-bool Axis::isHead() const {
-    return prevId.isNull();
-}
-
-bool Axis::isTail() const {
-    return nextId.isNull();
-}
 
 // ============================================================================
 // Sheet
@@ -239,17 +220,7 @@ void Sheet::addColumn(std::unique_ptr<Axis> col) {
     }
 
     col->isColumn = true;
-    const ID& colId = col->id;
-
-    // Track first/last for linked list
-    if (col->isHead()) {
-        firstCol = colId;
-    }
-    if (col->isTail()) {
-        lastCol = colId;
-    }
-
-    columns[colId] = std::move(col);
+    columns[col->id] = std::move(col);
 }
 
 void Sheet::addRow(std::unique_ptr<Axis> row) {
@@ -258,17 +229,7 @@ void Sheet::addRow(std::unique_ptr<Axis> row) {
     }
 
     row->isColumn = false;
-    const ID& rowId = row->id;
-
-    // Track first/last for linked list
-    if (row->isHead()) {
-        firstRow = rowId;
-    }
-    if (row->isTail()) {
-        lastRow = rowId;
-    }
-
-    rows[rowId] = std::move(row);
+    rows[row->id] = std::move(row);
 }
 
 std::string Sheet::makeCellKey(const ID& colId, const ID& rowId) {

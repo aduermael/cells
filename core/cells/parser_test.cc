@@ -51,10 +51,10 @@ D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 
 #cols
-C pQ7rS8tW ~ ~
+C pQ7rS8tW 0
 
 #rows
-R xY9zA1bC ~ ~
+R xY9zA1bC 0
 
 #cells
 X dE2fG3hJ pQ7rS8tW xY9zA1bC n 42
@@ -110,9 +110,9 @@ TEST(ParserTest, ParseNumberValue) {
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C pQ7rS8tW ~ ~
+C pQ7rS8tW 0
 #rows
-R xY9zA1bC ~ ~
+R xY9zA1bC 0
 #cells
 X dE2fG3hJ pQ7rS8tW xY9zA1bC n 123.456
 )";
@@ -135,9 +135,9 @@ TEST(ParserTest, ParseStringValue) {
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C pQ7rS8tW ~ ~
+C pQ7rS8tW 0
 #rows
-R xY9zA1bC ~ ~
+R xY9zA1bC 0
 #cells
 X dE2fG3hJ pQ7rS8tW xY9zA1bC s "Hello, World!"
 )";
@@ -160,10 +160,10 @@ TEST(ParserTest, ParseBooleanValue) {
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C pQ7rS8tW ~ ~
+C pQ7rS8tW 0
 #rows
-R xY9zA1bC ~ ~
-R yY9zA1bD xY9zA1bC ~
+R xY9zA1bC 0
+R yY9zA1bD 1
 #cells
 X dE2fG3hJ pQ7rS8tW xY9zA1bC b true
 X dE2fG3hK pQ7rS8tW yY9zA1bD b false
@@ -193,9 +193,9 @@ TEST(ParserTest, ParseFormulaValue) {
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C pQ7rS8tW ~ ~
+C pQ7rS8tW 0
 #rows
-R xY9zA1bC ~ ~
+R xY9zA1bC 0
 #cells
 X dE2fG3hJ pQ7rS8tW xY9zA1bC f "=SUM(A1:B2)"
 )cells";
@@ -219,9 +219,9 @@ TEST(ParserTest, ParseErrorValue) {
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C pQ7rS8tW ~ ~
+C pQ7rS8tW 0
 #rows
-R xY9zA1bC ~ ~
+R xY9zA1bC 0
 #cells
 X dE2fG3hJ pQ7rS8tW xY9zA1bC e #DIV/0!
 )";
@@ -244,9 +244,9 @@ TEST(ParserTest, ParseDateValue) {
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C pQ7rS8tW ~ ~
+C pQ7rS8tW 0
 #rows
-R xY9zA1bC ~ ~
+R xY9zA1bC 0
 #cells
 X dE2fG3hJ pQ7rS8tW xY9zA1bC d 2024-01-15
 )";
@@ -269,9 +269,9 @@ TEST(ParserTest, ParseDateTimeValue) {
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C pQ7rS8tW ~ ~
+C pQ7rS8tW 0
 #rows
-R xY9zA1bC ~ ~
+R xY9zA1bC 0
 #cells
 X dE2fG3hJ pQ7rS8tW xY9zA1bC t 2024-01-15T10:30:00Z
 )";
@@ -289,17 +289,17 @@ X dE2fG3hJ pQ7rS8tW xY9zA1bC t 2024-01-15T10:30:00Z
     }
 }
 
-// Linked list parsing
-TEST(ParserTest, ParseAxisLinks) {
+// Position-based axis parsing
+TEST(ParserTest, ParseAxisPositions) {
     const std::string content = R"(#cells v1
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C cA1bC2dE ~ cB3dE4fG
-C cB3dE4fG cA1bC2dE cC5fG6hJ
-C cC5fG6hJ cB3dE4fG ~
+C cA1bC2dE 0
+C cB3dE4fG 1
+C cC5fG6hJ 2
 #rows
-R rA1bC2dE ~ ~
+R rA1bC2dE 0
 #cells
 )";
 
@@ -313,30 +313,27 @@ R rA1bC2dE ~ ~
 
         Axis* col1 = sheet->getColumn(ID("cA1bC2dE"));
         ASSERT_NE(col1, nullptr);
-        EXPECT_TRUE(col1->prevId.isNull());
-        EXPECT_EQ(col1->nextId.toString(), "cB3dE4fG");
+        EXPECT_EQ(col1->position, 0u);
 
         Axis* col2 = sheet->getColumn(ID("cB3dE4fG"));
         ASSERT_NE(col2, nullptr);
-        EXPECT_EQ(col2->prevId.toString(), "cA1bC2dE");
-        EXPECT_EQ(col2->nextId.toString(), "cC5fG6hJ");
+        EXPECT_EQ(col2->position, 1u);
 
         Axis* col3 = sheet->getColumn(ID("cC5fG6hJ"));
         ASSERT_NE(col3, nullptr);
-        EXPECT_EQ(col3->prevId.toString(), "cB3dE4fG");
-        EXPECT_TRUE(col3->nextId.isNull());
+        EXPECT_EQ(col3->position, 2u);
     }
 }
 
-TEST(ParserTest, ParseAxisGaps) {
+TEST(ParserTest, ParseSparsePositions) {
     const std::string content = R"(#cells v1
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C cA1bC2dE ~ cB3dE4fG:3
-C cB3dE4fG cA1bC2dE:3 ~
+C cA1bC2dE 0
+C cB3dE4fG 5
 #rows
-R rA1bC2dE ~ ~
+R rA1bC2dE 0
 #cells
 )";
 
@@ -349,11 +346,11 @@ R rA1bC2dE ~ ~
 
         Axis* col1 = sheet->getColumn(ID("cA1bC2dE"));
         ASSERT_NE(col1, nullptr);
-        EXPECT_EQ(col1->gapAfter, 3u);
+        EXPECT_EQ(col1->position, 0u);
 
         Axis* col2 = sheet->getColumn(ID("cB3dE4fG"));
         ASSERT_NE(col2, nullptr);
-        EXPECT_EQ(col2->gapBefore, 3u);
+        EXPECT_EQ(col2->position, 5u);
     }
 }
 
@@ -363,9 +360,9 @@ TEST(ParserTest, ParseAxisWidth) {
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C cA1bC2dE ~ ~ w:200
+C cA1bC2dE 0 w:200
 #rows
-R rA1bC2dE ~ ~
+R rA1bC2dE 0
 #cells
 )";
 
@@ -386,9 +383,9 @@ TEST(ParserTest, ParseAxisName) {
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C cA1bC2dE ~ ~ name:"Revenue"
+C cA1bC2dE 0 name:"Revenue"
 #rows
-R rA1bC2dE ~ ~
+R rA1bC2dE 0
 #cells
 )";
 
@@ -409,7 +406,7 @@ TEST(ParserTest, ErrorContainsLineNumber) {
     // Column before any sheet is defined - triggers "Column outside of sheet" error
     const std::string content = R"(#cells v1
 D aB3cD4eF "Test"
-C pQ7rS8tW ~ ~
+C pQ7rS8tW 0
 )";
 
     Parser parser;
@@ -419,7 +416,7 @@ C pQ7rS8tW ~ ~
     EXPECT_GT(result.error->line, 0);
 }
 
-TEST(ParserTest, ErrorMissingColumnTokens) {
+TEST(ParserTest, ErrorMissingColumnPosition) {
     const std::string content = R"(#cells v1
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
@@ -449,7 +446,7 @@ TEST(ParserTest, ErrorInvalidDocumentName) {
 TEST(MalformedFileTest, RowOutsideSheet) {
     const std::string content = R"(#cells v1
 D aB3cD4eF "Test"
-R rA1bC2dE ~ ~
+R rA1bC2dE 0
 )";
 
     Parser parser;
@@ -471,7 +468,7 @@ X xA1bC2dE cA1bC2dE rA1bC2dE n 42
     EXPECT_TRUE(result.error.has_value());
 }
 
-TEST(MalformedFileTest, ColumnMissingPrev) {
+TEST(MalformedFileTest, ColumnMissingPosition) {
     const std::string content = R"(#cells v1
 D aB3cD4eF "Test"
 S sH3eE4tB "Sheet"
@@ -484,12 +481,12 @@ C cA1bC2dE
     EXPECT_TRUE(result.error.has_value());
 }
 
-TEST(MalformedFileTest, ColumnMissingNext) {
+TEST(MalformedFileTest, RowMissingPosition) {
     const std::string content = R"(#cells v1
 D aB3cD4eF "Test"
 S sH3eE4tB "Sheet"
-#cols
-C cA1bC2dE ~
+#rows
+R rA1bC2dE
 )";
 
     ParseResult result = parse(content);
@@ -497,12 +494,12 @@ C cA1bC2dE ~
     EXPECT_TRUE(result.error.has_value());
 }
 
-TEST(MalformedFileTest, RowMissingTokens) {
+TEST(MalformedFileTest, InvalidColumnPosition) {
     const std::string content = R"(#cells v1
 D aB3cD4eF "Test"
 S sH3eE4tB "Sheet"
-#rows
-R rA1bC2dE
+#cols
+C cA1bC2dE abc
 )";
 
     ParseResult result = parse(content);
@@ -516,9 +513,9 @@ TEST(MalformedFileTest, CellMissingValueAccepted) {
 D aB3cD4eF "Test"
 S sH3eE4tB "Sheet"
 #cols
-C cA1bC2dE ~ ~
+C cA1bC2dE 0
 #rows
-R rA1bC2dE ~ ~
+R rA1bC2dE 0
 #cells
 X xA1bC2dE cA1bC2dE rA1bC2dE n
 )";
@@ -539,25 +536,11 @@ TEST(MalformedFileTest, CellMissingType) {
 D aB3cD4eF "Test"
 S sH3eE4tB "Sheet"
 #cols
-C cA1bC2dE ~ ~
+C cA1bC2dE 0
 #rows
-R rA1bC2dE ~ ~
+R rA1bC2dE 0
 #cells
 X xA1bC2dE cA1bC2dE rA1bC2dE
-)";
-
-    ParseResult result = parse(content);
-    EXPECT_FALSE(result.ok());
-    EXPECT_TRUE(result.error.has_value());
-}
-
-TEST(MalformedFileTest, InvalidGapValue) {
-    const std::string content = R"(#cells v1
-D aB3cD4eF "Test"
-S sH3eE4tB "Sheet"
-#cols
-C cA1bC2dE ~ cB3dE4fG:abc
-C cB3dE4fG cA1bC2dE:abc ~
 )";
 
     ParseResult result = parse(content);
@@ -586,9 +569,9 @@ TEST(MalformedFileTest, CellStringUnterminatedQuote) {
 D aB3cD4eF "Test"
 S sH3eE4tB "Sheet"
 #cols
-C cA1bC2dE ~ ~
+C cA1bC2dE 0
 #rows
-R rA1bC2dE ~ ~
+R rA1bC2dE 0
 #cells
 X xA1bC2dE cA1bC2dE rA1bC2dE s "unterminated
 )";
@@ -619,7 +602,7 @@ C cA1bC2dE
     EXPECT_FALSE(result.ok());
     EXPECT_TRUE(result.error.has_value());
     EXPECT_GT(result.error->line, 0);
-    // Error should be on line 5 (the malformed column line)
+    // Error should be on line 5 (the malformed column line - missing position)
     EXPECT_EQ(result.error->line, 5);
 }
 
@@ -629,9 +612,9 @@ TEST(ParserTest, ParseConvenienceFunction) {
 D aB3cD4eF "Test"
 S gH5jK6mN "Sheet1"
 #cols
-C pQ7rS8tW ~ ~
+C pQ7rS8tW 0
 #rows
-R xY9zA1bC ~ ~
+R xY9zA1bC 0
 #cells
 )";
 
@@ -728,15 +711,15 @@ TEST(SampleFileTest, ParseAllTypesCells) {
     EXPECT_EQ(sheet->cellCount(), 22u);
 }
 
-TEST(SampleFileTest, ParseGapsCells) {
-    const std::string content = readTestFile("gaps.cells");
-    ASSERT_FALSE(content.empty()) << "Could not read gaps.cells";
+TEST(SampleFileTest, ParseSparsePositionsCells) {
+    const std::string content = readTestFile("sparse.cells");
+    ASSERT_FALSE(content.empty()) << "Could not read sparse.cells";
 
     ParseResult result = parse(content);
     EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
 
     ASSERT_NE(result.workbook, nullptr);
-    EXPECT_EQ(result.workbook->name, "Gaps Test");
+    EXPECT_EQ(result.workbook->name, "Sparse Positions Test");
 
     Sheet* sheet = result.workbook->getSheetByIndex(0);
     ASSERT_NE(sheet, nullptr);
@@ -744,15 +727,18 @@ TEST(SampleFileTest, ParseGapsCells) {
     EXPECT_EQ(sheet->rowCount(), 4u);
     EXPECT_EQ(sheet->cellCount(), 11u);
 
-    // Verify gap values on columns
+    // Verify sparse positions on columns (A=0, E=4, K=10)
     Axis* col1 = sheet->getColumn(ID("cA1bC2dE"));
     ASSERT_NE(col1, nullptr);
-    EXPECT_EQ(col1->gapAfter, 3u);
+    EXPECT_EQ(col1->position, 0u);
 
     Axis* col2 = sheet->getColumn(ID("cE5fG6hJ"));
     ASSERT_NE(col2, nullptr);
-    EXPECT_EQ(col2->gapBefore, 3u);
-    EXPECT_EQ(col2->gapAfter, 5u);
+    EXPECT_EQ(col2->position, 4u);
+
+    Axis* col3 = sheet->getColumn(ID("cK9mN0pQ"));
+    ASSERT_NE(col3, nullptr);
+    EXPECT_EQ(col3->position, 10u);
 }
 
 TEST(SampleFileTest, ParseUnicodeCells) {

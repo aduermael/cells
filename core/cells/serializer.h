@@ -12,14 +12,10 @@ namespace cells {
 // Serializer for .cells v1 text format
 //
 // Produces output matching the format specification in docs/persistence.md:
-//   #cells v1
 //   D <id> "<name>"
 //   S <id> "<name>"
-//   #cols
-//   C <id> <prev>[:<gap>] <next>[:<gap>] [props...]
-//   #rows
-//   R <id> <prev>[:<gap>] <next>[:<gap>] [props...]
-//   #cells
+//   C <id> <position> [props...]
+//   R <id> <position> [props...]
 //   X <id> <col> <row> <type> <value>
 //
 class Serializer {
@@ -53,10 +49,6 @@ private:
 
     // Serialize a single cell
     void serializeCell(const Cell& cell, std::ostream& out) const;
-
-    // Serialize a link (ID with optional gap)
-    // Format: "~" for null, "<id>" or "<id>:<gap>" for non-null
-    static void serializeLink(const ID& id, uint32_t gap, std::ostream& out);
 
     // Serialize cell value based on type
     void serializeCellValue(const CellValue& value, const Cell& cell, std::ostream& out) const;

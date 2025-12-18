@@ -248,27 +248,21 @@ std::string read_file(const std::string& path) {
     return ss.str();
 }
 
-// Calculate actual grid dimension by walking the axis linked list and summing gaps
+// Calculate actual grid dimension by finding max position
 size_t calc_grid_dimension(
-    const std::unordered_map<cells::ID, std::unique_ptr<cells::Axis>, cells::IDHash>& axes,
-    const cells::ID& first_id) {
-    if (first_id.isNull() || axes.empty()) {
+    const std::unordered_map<cells::ID, std::unique_ptr<cells::Axis>, cells::IDHash>& axes) {
+    if (axes.empty()) {
         return 0;
     }
 
-    size_t position = 0;
-    cells::ID current_id = first_id;
-
-    while (!current_id.isNull()) {
-        auto it = axes.find(current_id);
-        if (it == axes.end()) break;
-
-        const auto& axis = it->second;
-        position += 1 + axis->gapBefore;
-        current_id = axis->nextId;
+    uint32_t max_position = 0;
+    for (const auto& pair : axes) {
+        if (pair.second->position >= max_position) {
+            max_position = pair.second->position + 1;
+        }
     }
 
-    return position;
+    return max_position;
 }
 
 // Show file information
@@ -331,9 +325,9 @@ int show_file_info(const Options& opts) {
         const char* branch = is_last ? "└─ " : "├─ ";
         const char* indent = is_last ? "   " : "│  ";
 
-        // Calculate actual grid dimensions (accounting for gaps)
-        size_t num_rows = calc_grid_dimension(sheet->rows, sheet->firstRow);
-        size_t num_cols = calc_grid_dimension(sheet->columns, sheet->firstCol);
+        // Calculate actual grid dimensions from max position
+        size_t num_rows = calc_grid_dimension(sheet->rows);
+        size_t num_cols = calc_grid_dimension(sheet->columns);
 
         std::cout << branch << sheet->name << "\n";
         std::cout << indent << num_rows << (num_rows == 1 ? " row x " : " rows x ")

@@ -4,13 +4,13 @@ D Qx7mXp2L "Untitled"
 S bF3hL8mN "Sheet1"
 
 #cols
-C kR7pN2wQ ~ vT5mK9xL:2
-C vT5mK9xL kR7pN2wQ:2 ~
+C kR7pN2wQ 0
+C vT5mK9xL 3
 
 #rows
-R jH4sW8nF ~ qM2kL5pR
-R qM2kL5pR jH4sW8nF yB9tX3wN:1
-R yB9tX3wN qM2kL5pR:1 ~
+R jH4sW8nF 0
+R qM2kL5pR 1
+R yB9tX3wN 3
 
 #cells
 X nP6kR2mW kR7pN2wQ jH4sW8nF n 2

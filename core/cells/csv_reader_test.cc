@@ -259,7 +259,14 @@ TEST(CSVReaderTest, SkipUTF8BOM) {
     EXPECT_EQ(sheet->columnCount(), 2u);
 
     // First column should be named "A", not "\xEF\xBB\xBFA"
-    Axis* firstCol = sheet->getColumn(sheet->firstCol);
+    // Find column at position 0
+    Axis* firstCol = nullptr;
+    for (const auto& pair : sheet->columns) {
+        if (pair.second->position == 0) {
+            firstCol = pair.second.get();
+            break;
+        }
+    }
     ASSERT_NE(firstCol, nullptr);
     EXPECT_EQ(firstCol->name, "A");
 }
@@ -275,18 +282,22 @@ TEST(CSVReaderTest, ColumnNamesFromHeader) {
     Sheet* sheet = result.workbook->getSheetByIndex(0);
     EXPECT_EQ(sheet->columnCount(), 3u);
 
-    // Verify column names
-    Axis* col1 = sheet->getColumn(sheet->firstCol);
-    ASSERT_NE(col1, nullptr);
-    EXPECT_EQ(col1->name, "Name");
+    // Find columns by position and verify names
+    std::vector<Axis*> cols(3, nullptr);
+    for (const auto& pair : sheet->columns) {
+        if (pair.second->position < 3) {
+            cols[pair.second->position] = pair.second.get();
+        }
+    }
 
-    Axis* col2 = sheet->getColumn(col1->nextId);
-    ASSERT_NE(col2, nullptr);
-    EXPECT_EQ(col2->name, "Age");
+    ASSERT_NE(cols[0], nullptr);
+    EXPECT_EQ(cols[0]->name, "Name");
 
-    Axis* col3 = sheet->getColumn(col2->nextId);
-    ASSERT_NE(col3, nullptr);
-    EXPECT_EQ(col3->name, "City");
+    ASSERT_NE(cols[1], nullptr);
+    EXPECT_EQ(cols[1]->name, "Age");
+
+    ASSERT_NE(cols[2], nullptr);
+    EXPECT_EQ(cols[2]->name, "City");
 }
 
 // --- Edge Cases ---
@@ -448,7 +459,14 @@ TEST(SampleCSVFileTest, ParseBOMCSV) {
 
     Sheet* sheet = result.workbook->getSheetByIndex(0);
     // First column should be "Name", not with BOM
-    Axis* firstCol = sheet->getColumn(sheet->firstCol);
+    // Find column at position 0
+    Axis* firstCol = nullptr;
+    for (const auto& pair : sheet->columns) {
+        if (pair.second->position == 0) {
+            firstCol = pair.second.get();
+            break;
+        }
+    }
     ASSERT_NE(firstCol, nullptr);
     EXPECT_EQ(firstCol->name, "Name");
 }

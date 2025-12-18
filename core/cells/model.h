@@ -89,28 +89,15 @@ struct Cell {
 };
 
 // Axis - represents a column or row
-// Layout optimized for minimal padding (64 bytes total)
 struct Axis {
-    // 8-byte aligned fields
-    std::string name;  // Custom name (empty = compute from position)
-    ID id;             // Unique identifier (8-char base62)
-    ID prevId;         // Previous axis ID (null = head)
-    ID nextId;         // Next axis ID (null = tail)
-
-    // 4-byte aligned fields
-    uint32_t gapBefore;  // Empty positions between prev and this
-    uint32_t gapAfter;   // Empty positions between this and next
-    uint32_t size;       // Width (column) or height (row) in pixels
-
-    // 1-byte aligned fields
-    bool isColumn;  // true = column (x), false = row (y)
-                    // 3 bytes padding (struct alignment = 8)
+    std::string name;   // Custom name (empty = compute from position)
+    ID id;              // Unique identifier (8-char base62)
+    uint32_t position;  // Visual position (0-indexed)
+    uint32_t size;      // Width (column) or height (row) in pixels
+    bool isColumn;      // true = column (x), false = row (y)
 
     Axis();
     explicit Axis(const ID& id, bool isColumn = true);
-
-    [[nodiscard]] bool isHead() const;  // No prev
-    [[nodiscard]] bool isTail() const;  // No next
 };
 
 // Sheet - 2D grid containing cells
@@ -121,12 +108,6 @@ struct Sheet {
     // Axis storage (maps ID -> Axis)
     std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> columns;
     std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> rows;
-
-    // Head/tail of linked lists (for traversal)
-    ID firstCol;
-    ID lastCol;
-    ID firstRow;
-    ID lastRow;
 
     // Cell storage (maps ID -> Cell)
     std::unordered_map<ID, std::unique_ptr<Cell>, IDHash> cells;

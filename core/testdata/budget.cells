@@ -4,17 +4,17 @@ D Kj7mXp2Q "Budget 2024"
 S tH2kM6xN "Q1 Expenses"
 
 #cols
-C fR3pK7wN ~ gT8mL2sQ w:120 name:"Category"
-C gT8mL2sQ fR3pK7wN hW4nJ9xR w:80 name:"Jan"
-C hW4nJ9xR gT8mL2sQ jK6pM3wT w:80 name:"Feb"
-C jK6pM3wT hW4nJ9xR kN8sR4xW w:80 name:"Mar"
-C kN8sR4xW jK6pM3wT ~ w:100 name:"Total"
+C fR3pK7wN 0 w:120 name:"Category"
+C gT8mL2sQ 1 w:80 name:"Jan"
+C hW4nJ9xR 2 w:80 name:"Feb"
+C jK6pM3wT 3 w:80 name:"Mar"
+C kN8sR4xW 4 w:100 name:"Total"
 
 #rows
-R mP2wK7nL ~ nQ4xL8pM h:30 name:"Header"
-R nQ4xL8pM mP2wK7nL pR6yM9qN
-R pR6yM9qN nQ4xL8pM qS8zN2rP:6
-R qS8zN2rP pR6yM9qN:6 ~ name:"Total"
+R mP2wK7nL 0 h:30 name:"Header"
+R nQ4xL8pM 1
+R pR6yM9qN 2
+R qS8zN2rP 9 name:"Total"
 
 #cells
 X aB3cD4eF fR3pK7wN mP2wK7nL s "Category"
