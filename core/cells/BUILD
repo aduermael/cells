@@ -113,3 +113,14 @@ cc_library(
         ":model",
     ],
 )
+
+cc_test(
+    name = "csv_writer_test",
+    srcs = ["csv_writer_test.cc"],
+    deps = [
+        ":csv_reader",
+        ":csv_writer",
+        ":id",
+        "@googletest//:gtest_main",
+    ],
+)

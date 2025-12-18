@@ -16,14 +16,15 @@ CellValue::CellValue() : raw(), type(CellValueType::STRING), error(CellError::NO
 CellValue::CellValue(double number)
     : raw(std::to_string(number)), type(CellValueType::NUMBER), error(CellError::NONE) {
     // Remove trailing zeros for cleaner representation
+    // e.g., "30.000000" -> "30", "3.140000" -> "3.14"
     size_t const dot = raw.find('.');
     if (dot != std::string::npos) {
         size_t const last = raw.find_last_not_of('0');
-        if (last != std::string::npos && last > dot) {
+        if (last != std::string::npos && last >= dot) {
             raw = raw.substr(0, last + 1);
         }
         // Remove trailing dot if all decimals were zeros
-        if (raw.back() == '.') {
+        if (!raw.empty() && raw.back() == '.') {
             raw.pop_back();
         }
     }
