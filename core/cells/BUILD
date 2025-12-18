@@ -61,6 +61,17 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "serializer_test",
+    srcs = ["serializer_test.cc"],
+    deps = [
+        ":id",
+        ":model",
+        ":serializer",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_binary(
     name = "roundtrip_test",
     srcs = ["roundtrip_test.cc"],
