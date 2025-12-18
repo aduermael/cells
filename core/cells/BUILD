@@ -124,3 +124,15 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "xlsx_reader",
+    srcs = ["xlsx_reader.cc"],
+    hdrs = ["xlsx_reader.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":id",
+        ":model",
+        "@openxlsx",
+    ],
+)
