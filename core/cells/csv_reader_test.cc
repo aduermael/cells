@@ -248,7 +248,9 @@ TEST(CSVReaderTest, ParseCR) {
 
 TEST(CSVReaderTest, SkipUTF8BOM) {
     // UTF-8 BOM followed by simple CSV
-    const std::string csv = "\xEF\xBB\xBF" "A,B\n1,2\n";
+    const std::string csv =
+        "\xEF\xBB\xBF"
+        "A,B\n1,2\n";
     CSVReadResult result = readCSV(csv);
     EXPECT_TRUE(result.ok());
     ASSERT_NE(result.workbook, nullptr);

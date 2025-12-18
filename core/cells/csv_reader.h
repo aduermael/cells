@@ -12,8 +12,8 @@ namespace cells {
 
 // Options for CSV parsing
 struct CSVReadOptions {
-    char delimiter{','};      // Field delimiter (comma, tab, semicolon, etc.)
-    bool hasHeader{true};     // First row is header (used for column names)
+    char delimiter{','};         // Field delimiter (comma, tab, semicolon, etc.)
+    bool hasHeader{true};        // First row is header (used for column names)
     bool autoDetectTypes{true};  // Auto-detect numeric vs string values
 
     CSVReadOptions() = default;
@@ -35,8 +35,8 @@ struct CSVReadError {
 
 // Result of parsing a CSV file
 struct CSVReadResult {
-    std::unique_ptr<Workbook> workbook{};    // Non-null on success
-    std::optional<CSVReadError> error{};     // Present on failure
+    std::unique_ptr<Workbook> workbook{};  // Non-null on success
+    std::optional<CSVReadError> error{};   // Present on failure
 
     [[nodiscard]] bool ok() const { return workbook != nullptr && !error.has_value(); }
     [[nodiscard]] explicit operator bool() const { return ok(); }

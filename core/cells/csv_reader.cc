@@ -1,7 +1,8 @@
 #include "core/cells/csv_reader.h"
 
-#include <algorithm>
 #include <cctype>
+
+#include <algorithm>
 #include <charconv>
 #include <sstream>
 
@@ -73,7 +74,7 @@ bool CSVReader::looksLikeBoolean(const std::string& s) {
     // Case-insensitive check for true/false
     std::string lower;
     lower.reserve(s.size());
-    for (char c : s) {
+    for (char const c : s) {
         lower.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
     }
     return lower == "true" || lower == "false";
@@ -88,7 +89,7 @@ CellValue CSVReader::detectValue(const std::string& raw, bool autoDetect) {
     if (looksLikeBoolean(raw)) {
         std::string lower;
         lower.reserve(raw.size());
-        for (char c : raw) {
+        for (char const c : raw) {
             lower.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
         }
         return CellValue(lower == "true");
@@ -141,7 +142,7 @@ std::optional<std::string> CSVReader::parseField(std::string_view& content) {
     // Unquoted field - read until delimiter, newline, or end
     std::string result;
     while (!content.empty()) {
-        char c = content[0];
+        char const c = content[0];
         if (c == options_.delimiter || c == '\r' || c == '\n') {
             break;
         }
@@ -168,7 +169,7 @@ std::optional<std::vector<std::string>> CSVReader::parseRecord(std::string_view&
             break;  // End of content
         }
 
-        char next = content[0];
+        char const next = content[0];
         if (next == options_.delimiter) {
             content.remove_prefix(1);  // Skip delimiter, continue parsing
         } else if (next == '\r') {
@@ -179,7 +180,7 @@ std::optional<std::vector<std::string>> CSVReader::parseRecord(std::string_view&
             break;  // End of record
         } else if (next == '\n') {
             content.remove_prefix(1);  // Skip LF
-            break;  // End of record
+            break;                     // End of record
         }
     }
 
@@ -278,8 +279,8 @@ CSVReadResult CSVReader::read(std::string_view content) {
     }
 
     // Determine data rows (skip header if present)
-    size_t startRow = options_.hasHeader ? 1 : 0;
-    size_t numRows = records.size() - startRow;
+    size_t const startRow = options_.hasHeader ? 1 : 0;
+    size_t const numRows = records.size() - startRow;
 
     if (numRows == 0) {
         // Only header, no data
