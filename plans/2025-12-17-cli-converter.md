@@ -246,20 +246,20 @@ Options for reading XLSX:
 
 **Recommendation:** OpenXLSX (C++17, matches our codebase, header-only is easy to integrate)
 
-- [ ] **6a:** Add OpenXLSX as Bazel dependency (or xlnt)
-- [ ] **6b:** Create `core/cells/xlsx_reader.h` and `xlsx_reader.cc`
-- [ ] **6c:** Implement basic cell reading (numbers, strings)
-- [ ] **6d:** Implement formula reading (as text)
-- [ ] **6e:** Read cell styles (basic: bold, colors)
-- [ ] **6f:** Read column widths and row heights
-- [ ] **6g:** Handle multiple sheets
-- [ ] **6h:** Create test files: `core/testdata/xlsx/simple.xlsx`, etc.
-- [ ] **6i:** Add `xlsx_reader_test.cc`
+- [x] **6a:** Add OpenXLSX as Bazel dependency (or xlnt)
+- [x] **6b:** Create `core/cells/xlsx_reader.h` and `xlsx_reader.cc`
+- [x] **6c:** Implement basic cell reading (numbers, strings)
+- [x] **6d:** Implement formula reading (as text)
+- [ ] **6e:** Read cell styles (basic: bold, colors) *(deferred - not critical for MVP)*
+- [x] **6f:** Read column widths and row heights
+- [x] **6g:** Handle multiple sheets
+- [x] **6h:** Create test files: `core/testdata/xlsx/simple.xlsx`, etc.
+- [x] **6i:** Add `xlsx_reader_test.cc`
 
 **Deliverables:**
-- `xlsx_reader.h` / `xlsx_reader.cc` - XLSX to Workbook
+- `xlsx_reader.h` / `xlsx_reader.cc` - XLSX to Workbook (20 tests passing)
 - `xlsx_reader_test.cc` - unit tests
-- Test XLSX files in `core/testdata/xlsx/`
+- Test XLSX files in `core/testdata/xlsx/` (6 files: simple, formulas, multi_sheet, types, empty, unicode)
 
 ---
 
