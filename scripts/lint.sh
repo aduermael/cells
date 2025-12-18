@@ -52,10 +52,16 @@ done
 # Find files to lint (only .cc files, not headers or test files)
 # Test files (_test.cc) are excluded because they depend on external test
 # framework headers (gtest) that aren't available to clang-tidy
+# xlsx_reader.cc and testdata/xlsx files are excluded because they depend on
+# OpenXLSX which is a Bazel external dependency not available to clang-tidy
 if [ ${#FILES[@]} -eq 0 ]; then
     while IFS= read -r -d '' file; do
         FILES+=("$file")
-    done < <(find "$PROJECT_ROOT/core" -type f -name "*.cc" ! -name "*_test.cc" -print0 2>/dev/null)
+    done < <(find "$PROJECT_ROOT/core" -type f -name "*.cc" \
+        ! -name "*_test.cc" \
+        ! -name "xlsx_reader.cc" \
+        ! -path "*/testdata/xlsx/*" \
+        -print0 2>/dev/null)
 fi
 
 if [ ${#FILES[@]} -eq 0 ]; then

@@ -52,7 +52,7 @@ struct XLSXReadResult {
 class XLSXReader {
 public:
     XLSXReader();
-    explicit XLSXReader(const XLSXReadOptions& options);
+    explicit XLSXReader(XLSXReadOptions options);
 
     // Read XLSX from file path
     // Returns XLSXReadResult with workbook on success, error on failure

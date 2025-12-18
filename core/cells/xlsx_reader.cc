@@ -1,7 +1,9 @@
 #include "core/cells/xlsx_reader.h"
 
-#include <OpenXLSX/OpenXLSX.hpp>
+#include <OpenXLSX/OpenXLSX.hpp>  // NOLINT(build/include_order)
+#include <algorithm>
 #include <sstream>
+#include <utility>
 
 #include "core/cells/id.h"
 #include "core/cells/types.h"
@@ -34,7 +36,7 @@ std::string XLSXReadError::toString() const {
 
 XLSXReader::XLSXReader() = default;
 
-XLSXReader::XLSXReader(const XLSXReadOptions& options) : options_(options) {}
+XLSXReader::XLSXReader(XLSXReadOptions options) : options_(std::move(options)) {}
 
 void XLSXReader::reset() {
     warnings_.clear();
@@ -62,18 +64,14 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
 
         // Filter sheets if specific sheet requested
         if (!options_.sheetName.empty()) {
-            bool found = false;
-            for (const auto& name : sheetNames) {
-                if (name == options_.sheetName) {
-                    found = true;
-                    sheetNames = {name};
-                    break;
-                }
-            }
-            if (!found) {
-                result.error = XLSXReadError("Sheet \"" + options_.sheetName + "\" not found");
+            const auto it =
+                std::find(sheetNames.begin(), sheetNames.end(), options_.sheetName);
+            if (it == sheetNames.end()) {
+                result.error =
+                    XLSXReadError("Sheet \"" + options_.sheetName + "\" not found");
                 return result;
             }
+            sheetNames = {options_.sheetName};
         }
 
         // Process each worksheet

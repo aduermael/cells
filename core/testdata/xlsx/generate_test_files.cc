@@ -1,9 +1,10 @@
 // Generate test XLSX files for xlsx_reader_test
 // Run with: bazel run //core/testdata/xlsx:generate_test_files
+// NOLINTBEGIN(misc-include-cleaner)
+
+#include <OpenXLSX/OpenXLSX.hpp>  // NOLINT(build/include_order)
 
 #include <cstdlib>
-
-#include <OpenXLSX/OpenXLSX.hpp>
 #include <filesystem>
 #include <iostream>
 #include <string>
@@ -190,3 +191,5 @@ int main(int argc, char* argv[]) {
     std::cout << "All test files created in: " << dir << "\n";
     return 0;
 }
+
+// NOLINTEND(misc-include-cleaner)
