@@ -18,7 +18,12 @@ using cells::cli::Options;
 constexpr const char* kVersion = "0.0.1";
 
 void print_usage(const char* program_name) {
-    std::cerr << "Usage: " << program_name << " [options] -i <input> <output>\n"
+    std::cerr << "cells - spreadsheet format converter\n"
+              << "\n"
+              << "Usage: " << program_name << " [options] -i <input> <output>\n"
+              << "\n"
+              << "Convert between spreadsheet formats (.cells, .csv, .xlsx).\n"
+              << "Format is auto-detected from file extension.\n"
               << "\n"
               << "Input/Output:\n"
               << "  -i <file>           Input file (required)\n"
@@ -41,7 +46,13 @@ void print_usage(const char* program_name) {
               << "\n"
               << "Info:\n"
               << "  --version           Show version\n"
-              << "  --help              Show this help\n";
+              << "  --help              Show this help\n"
+              << "\n"
+              << "Examples:\n"
+              << "  cells -i data.csv output.cells\n"
+              << "  cells -i budget.xlsx report.csv\n"
+              << "  cells -i legacy.csv modern.xlsx\n"
+              << "  cells -i data.tsv --delimiter '\\t' output.cells\n";
 }
 
 void print_version() { std::cout << "cells " << kVersion << "\n"; }
