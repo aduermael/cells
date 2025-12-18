@@ -51,6 +51,15 @@ cc_library(
     ],
 )
 
+cc_test(
+    name = "parser_test",
+    srcs = ["parser_test.cc"],
+    deps = [
+        ":parser",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_binary(
     name = "roundtrip_test",
     srcs = ["roundtrip_test.cc"],
