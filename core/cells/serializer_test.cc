@@ -7,6 +7,7 @@
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/parser.h"
+
 #include "gtest/gtest.h"
 
 namespace cells {
