@@ -10,7 +10,9 @@
 
 namespace {
 
+using cells::cli::detect_format;
 using cells::cli::Format;
+using cells::cli::format_name;
 using cells::cli::Options;
 
 constexpr const char* kVersion = "0.0.1";
@@ -133,7 +135,7 @@ bool parse_args(int argc, char* argv[], Options& opts) {
     return true;
 }
 
-bool validate_options(const Options& opts) {
+bool validate_options(Options& opts) {
     if (opts.show_help || opts.show_version) {
         return true;
     }
@@ -145,6 +147,37 @@ bool validate_options(const Options& opts) {
         std::cerr << "Error: Output file required\n";
         return false;
     }
+
+    // Auto-detect input format if not specified
+    if (opts.input_format == Format::kUnknown) {
+        opts.input_format = detect_format(opts.input_file);
+        if (opts.input_format == Format::kUnknown) {
+            std::cerr << "Error: Cannot detect input format from extension. "
+                      << "Use -f to specify format.\n";
+            return false;
+        }
+    }
+
+    // Auto-detect output format if not specified
+    if (opts.output_format == Format::kUnknown) {
+        opts.output_format = detect_format(opts.output_file);
+        if (opts.output_format == Format::kUnknown) {
+            std::cerr << "Error: Cannot detect output format from extension. "
+                      << "Use -t to specify format.\n";
+            return false;
+        }
+    }
+
+    // Auto-set tab delimiter for .tsv files
+    auto ends_with_tsv = [](const std::string& s) {
+        return s.size() >= 4 && s.substr(s.size() - 4) == ".tsv";
+    };
+    if (ends_with_tsv(opts.input_file) || ends_with_tsv(opts.output_file)) {
+        if (opts.csv.delimiter == ",") {
+            opts.csv.delimiter = "\t";
+        }
+    }
+
     return true;
 }
 
@@ -174,6 +207,13 @@ int main(int argc, char* argv[]) {
     }
 
     // TODO: Implement conversion pipeline
+    if (opts.output.verbose) {
+        std::cout << "Input:  " << opts.input_file << " ("
+                  << format_name(opts.input_format) << ")\n";
+        std::cout << "Output: " << opts.output_file << " ("
+                  << format_name(opts.output_format) << ")\n";
+    }
+
     std::cout << "Converting: " << opts.input_file << " -> " << opts.output_file
               << "\n";
 

@@ -2,6 +2,7 @@
 #define APPS_CLI_OPTIONS_H_
 
 #include <string>
+#include <string_view>
 
 namespace cells::cli {
 
@@ -52,6 +53,36 @@ struct Options {
     bool show_help = false;
     bool show_version = false;
 };
+
+// Detect format from file extension
+// Returns kUnknown if extension is not recognized
+inline Format detect_format(std::string_view filename) {
+    // Find the last dot
+    auto dot_pos = filename.rfind('.');
+    if (dot_pos == std::string_view::npos) {
+        return Format::kUnknown;
+    }
+
+    std::string_view ext = filename.substr(dot_pos);
+
+    if (ext == ".cells") return Format::kCells;
+    if (ext == ".csv") return Format::kCsv;
+    if (ext == ".tsv") return Format::kCsv;  // TSV is CSV with tab delimiter
+    if (ext == ".xlsx") return Format::kXlsx;
+
+    return Format::kUnknown;
+}
+
+// Convert format enum to string for display
+inline const char* format_name(Format fmt) {
+    switch (fmt) {
+        case Format::kCells: return "cells";
+        case Format::kCsv: return "csv";
+        case Format::kXlsx: return "xlsx";
+        case Format::kUnknown: return "unknown";
+    }
+    return "unknown";
+}
 
 }  // namespace cells::cli
 
