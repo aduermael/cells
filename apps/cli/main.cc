@@ -3,10 +3,15 @@
 
 #include "options.h"
 
+#include <chrono>
 #include <cstring>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
+
+#include "core/cells/parser.h"
 
 namespace {
 
@@ -43,8 +48,10 @@ void print_usage(const char* program_name) {
               << "  -y                  Overwrite output without asking\n"
               << "  -q                  Quiet mode (no warnings)\n"
               << "  -v                  Verbose output\n"
+              << "  --time              Show processing time\n"
               << "\n"
               << "Info:\n"
+              << "  -I, --info          Show file information (no conversion)\n"
               << "  --version           Show version\n"
               << "  --help              Show this help\n"
               << "\n"
@@ -52,7 +59,8 @@ void print_usage(const char* program_name) {
               << "  cells -i data.csv output.cells\n"
               << "  cells -i budget.xlsx report.csv\n"
               << "  cells -i legacy.csv modern.xlsx\n"
-              << "  cells -i data.tsv --delimiter '\\t' output.cells\n";
+              << "  cells -i data.tsv --delimiter '\\t' output.cells\n"
+              << "  cells -I data.cells             # Show file info\n";
 }
 
 void print_version() { std::cout << "cells " << kVersion << "\n"; }
@@ -76,6 +84,10 @@ bool parse_args(int argc, char* argv[], Options& opts) {
         if (arg == "--version") {
             opts.show_version = true;
             return true;
+        }
+        if (arg == "--info" || arg == "-I") {
+            opts.show_info = true;
+            continue;
         }
         if (arg == "-i" && i + 1 < argc) {
             opts.input_file = argv[++i];
@@ -129,6 +141,10 @@ bool parse_args(int argc, char* argv[], Options& opts) {
             opts.output.verbose = true;
             continue;
         }
+        if (arg == "--time") {
+            opts.output.show_time = true;
+            continue;
+        }
         // Positional argument (output file)
         if (!arg.empty() && arg[0] != '-') {
             if (opts.output_file.empty()) {
@@ -150,10 +166,29 @@ bool validate_options(Options& opts) {
     if (opts.show_help || opts.show_version) {
         return true;
     }
+
+    // Info mode: allow positional arg as input if -i wasn't used
+    if (opts.show_info) {
+        if (opts.input_file.empty() && !opts.output_file.empty()) {
+            opts.input_file = opts.output_file;
+            opts.output_file.clear();
+        }
+        if (opts.input_file.empty()) {
+            std::cerr << "Error: Input file required (-i <file>)\n";
+            return false;
+        }
+        // Auto-detect input format if not specified
+        if (opts.input_format == Format::kUnknown) {
+            opts.input_format = detect_format(opts.input_file);
+        }
+        return true;
+    }
+
     if (opts.input_file.empty()) {
         std::cerr << "Error: Input file required (-i <file>)\n";
         return false;
     }
+
     if (opts.output_file.empty()) {
         std::cerr << "Error: Output file required\n";
         return false;
@@ -192,6 +227,108 @@ bool validate_options(Options& opts) {
     return true;
 }
 
+// Read file contents into a string
+std::string read_file(const std::string& path) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        return "";
+    }
+    std::ostringstream ss;
+    ss << file.rdbuf();
+    return ss.str();
+}
+
+// Calculate actual grid dimension by walking the axis linked list and summing gaps
+size_t calc_grid_dimension(
+    const std::unordered_map<cells::ID, std::unique_ptr<cells::Axis>, cells::IDHash>& axes,
+    const cells::ID& first_id) {
+    if (first_id.isNull() || axes.empty()) {
+        return 0;
+    }
+
+    size_t position = 0;
+    cells::ID current_id = first_id;
+
+    while (!current_id.isNull()) {
+        auto it = axes.find(current_id);
+        if (it == axes.end()) break;
+
+        const auto& axis = it->second;
+        position += 1 + axis->gapBefore;
+        current_id = axis->nextId;
+    }
+
+    return position;
+}
+
+// Show file information for .cells files
+int show_file_info(const Options& opts) {
+    // Read the file
+    std::string content = read_file(opts.input_file);
+    if (content.empty()) {
+        std::cerr << "Error: Could not read file: " << opts.input_file << "\n";
+        return 1;
+    }
+
+    // Only .cells format is supported for info mode currently
+    if (opts.input_format != Format::kCells) {
+        std::cerr << "Error: --info only supports .cells files currently\n";
+        return 1;
+    }
+
+    // Parse the file
+    cells::ParseResult result = cells::parse(content);
+    if (!result.ok()) {
+        std::cerr << "Error: " << result.error->toString() << "\n";
+        return 1;
+    }
+
+    const auto& workbook = result.workbook;
+
+    // Calculate statistics per sheet
+    size_t total_values = 0;
+    size_t total_formulas = 0;
+    size_t sheet_count = workbook->sheetCount();
+
+    for (size_t i = 0; i < sheet_count; ++i) {
+        const auto& sheet = workbook->sheets[i];
+        bool is_last = (i == sheet_count - 1);
+
+        size_t formula_count = 0;
+        for (const auto& [id, cell] : sheet->cells) {
+            if (cell->isFormula()) {
+                formula_count++;
+            }
+        }
+        size_t value_count = sheet->cellCount() - formula_count;
+
+        // Tree characters (Unicode box-drawing)
+        const char* branch = is_last ? "└─ " : "├─ ";
+        const char* indent = is_last ? "   " : "│  ";
+
+        // Calculate actual grid dimensions (accounting for gaps)
+        size_t num_rows = calc_grid_dimension(sheet->rows, sheet->firstRow);
+        size_t num_cols = calc_grid_dimension(sheet->columns, sheet->firstCol);
+
+        std::cout << branch << sheet->name << "\n";
+        std::cout << indent << num_rows << (num_rows == 1 ? " row x " : " rows x ")
+                  << num_cols << (num_cols == 1 ? " column" : " columns") << "\n";
+        std::cout << indent << value_count
+                  << (value_count == 1 ? " value, " : " values, ") << formula_count
+                  << (formula_count == 1 ? " formula" : " formulas") << "\n";
+
+        total_values += value_count;
+        total_formulas += formula_count;
+    }
+
+    std::cout << sheet_count << (sheet_count == 1 ? " sheet, " : " sheets, ")
+              << total_values << (total_values == 1 ? " value, " : " values, ")
+              << total_formulas << (total_formulas == 1 ? " formula" : " formulas")
+              << "\n";
+
+    return 0;
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
@@ -217,16 +354,42 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    // TODO: Implement conversion pipeline
-    if (opts.output.verbose) {
-        std::cout << "Input:  " << opts.input_file << " ("
-                  << format_name(opts.input_format) << ")\n";
-        std::cout << "Output: " << opts.output_file << " ("
-                  << format_name(opts.output_format) << ")\n";
+    // Start timing after arg parsing
+    auto start_time = std::chrono::steady_clock::now();
+    int result = 0;
+
+    if (opts.show_info) {
+        result = show_file_info(opts);
+    } else {
+        // TODO: Implement conversion pipeline
+        if (opts.output.verbose) {
+            std::cout << "Input:  " << opts.input_file << " ("
+                      << format_name(opts.input_format) << ")\n";
+            std::cout << "Output: " << opts.output_file << " ("
+                      << format_name(opts.output_format) << ")\n";
+        }
+
+        std::cout << "Converting: " << opts.input_file << " -> " << opts.output_file
+                  << "\n";
     }
 
-    std::cout << "Converting: " << opts.input_file << " -> " << opts.output_file
-              << "\n";
+    // Show timing if requested
+    if (opts.output.show_time) {
+        auto end_time = std::chrono::steady_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(
+            end_time - start_time);
+        if (duration.count() >= 1000000) {
+            std::cout << "Time: "
+                      << std::chrono::duration_cast<std::chrono::milliseconds>(duration)
+                                 .count() /
+                             1000.0
+                      << "s\n";
+        } else if (duration.count() >= 1000) {
+            std::cout << "Time: " << duration.count() / 1000.0 << "ms\n";
+        } else {
+            std::cout << "Time: " << duration.count() << "us\n";
+        }
+    }
 
-    return 0;
+    return result;
 }

@@ -32,6 +32,7 @@ struct OutputOptions {
     bool overwrite = false;  // -y: Overwrite without asking
     bool quiet = false;      // -q: Suppress warnings
     bool verbose = false;    // -v: Verbose output
+    bool show_time = false;  // --time: Show processing time
 };
 
 // Complete CLI options
@@ -52,6 +53,7 @@ struct Options {
     // Info flags
     bool show_help = false;
     bool show_version = false;
+    bool show_info = false;  // --info / -I: Show file information
 };
 
 // Detect format from file extension

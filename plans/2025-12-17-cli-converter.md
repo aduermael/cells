@@ -162,10 +162,10 @@ Total cells: 1,712
 Formulas: 23
 ```
 
-- [ ] **2a:** Add `--info` / `-I` flag to options
-- [ ] **2b:** Implement .cells file reading using existing parser
-- [ ] **2c:** Calculate and display file statistics (sheets, rows, columns, cells)
-- [ ] **2d:** Show formula count
+- [x] **2a:** Add `--info` / `-I` flag to options
+- [x] **2b:** Implement .cells file reading using existing parser
+- [x] **2c:** Calculate and display file statistics (sheets, rows, columns, cells)
+- [x] **2d:** Show formula count
 
 **Deliverables:**
 - `cells --info` command working for .cells files
