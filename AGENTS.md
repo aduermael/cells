@@ -41,6 +41,10 @@ When executing a plan, each subtask gets its own commit named by phase and subta
 ### Phase Review Process
 **Stop at the end of each phase** to let the user review the commits before proceeding to the next phase. Do not continue to the next phase until the user gives approval.
 
+### Working Style
+- **One commit per sub-task:** Each lettered subtask (a, b, c...) gets its own commit
+- **Never more than one phase at a time:** Complete a phase, stop, let user review, then proceed
+
 ## Code Style
 
 ### Language
