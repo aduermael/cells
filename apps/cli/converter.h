@@ -5,15 +5,15 @@
 #include <string>
 #include <vector>
 
-#include "options.h"
-
 #include "core/cells/model.h"
+
+#include "options.h"
 
 namespace cells::cli {
 
 // Warning generated during conversion
 struct ConversionWarning {
-    std::string message;
+    std::string message{};
 
     explicit ConversionWarning(std::string msg) : message(std::move(msg)) {}
 };
@@ -21,8 +21,8 @@ struct ConversionWarning {
 // Result of a conversion operation
 struct ConversionResult {
     bool success{false};
-    std::string error;  // Error message if success is false
-    std::vector<ConversionWarning> warnings;
+    std::string error{};  // Error message if success is false
+    std::vector<ConversionWarning> warnings{};
     size_t cells_converted{0};  // Number of cells in the converted file
 
     [[nodiscard]] bool ok() const { return success; }
@@ -58,7 +58,7 @@ private:
                            std::string& error_out);
 
     // Check if output file exists
-    bool outputFileExists() const;
+    [[nodiscard]] bool outputFileExists() const;
 
     // Add a warning
     void addWarning(const std::string& message);

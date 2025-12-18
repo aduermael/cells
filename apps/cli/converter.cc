@@ -55,7 +55,7 @@ ConversionResult Converter::convert() {
 
 std::unique_ptr<Workbook> Converter::readInput(std::string& error_out) {
     // Read file contents
-    std::string content = readFileContents(options_.input_file, error_out);
+    const std::string content = readFileContents(options_.input_file, error_out);
     if (content.empty() && !error_out.empty()) {
         return nullptr;
     }
@@ -63,7 +63,7 @@ std::unique_ptr<Workbook> Converter::readInput(std::string& error_out) {
     switch (options_.input_format) {
         case Format::kCells: {
             ParseResult result = parse(content);
-            if (!result.ok()) {
+            if (!result.ok() && result.error.has_value()) {
                 error_out = result.error->toString();
                 return nullptr;
             }
@@ -79,7 +79,7 @@ std::unique_ptr<Workbook> Converter::readInput(std::string& error_out) {
             csv_opts.autoDetectTypes = true;
 
             CSVReadResult result = readCSV(content, csv_opts);
-            if (!result.ok()) {
+            if (!result.ok() && result.error.has_value()) {
                 error_out = result.error->toString();
                 return nullptr;
             }
@@ -104,7 +104,7 @@ bool Converter::writeOutput(const Workbook& workbook, std::string& error_out) {
 
     switch (options_.output_format) {
         case Format::kCells: {
-            Serializer serializer;
+            const Serializer serializer;
             content = serializer.serialize(workbook);
             break;
         }
@@ -117,7 +117,7 @@ bool Converter::writeOutput(const Workbook& workbook, std::string& error_out) {
             csv_opts.includeHeader = options_.csv.has_header;
 
             CSVWriteResult result = writeCSV(workbook, csv_opts);
-            if (!result.ok()) {
+            if (!result.ok() && result.error.has_value()) {
                 error_out = result.error->toString();
                 return false;
             }
@@ -200,7 +200,8 @@ void Converter::checkFeatureLoss(const Workbook& workbook) {
                     break;
                 }
             }
-            if (has_formulas) break;
+            if (has_formulas)
+                break;
         }
         if (has_formulas) {
             addWarning("Formulas will be exported as computed values only.");
