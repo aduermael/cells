@@ -1,6 +1,6 @@
 # CLI Converter Implementation Plan
 
-**Status:** TODO
+**Status:** IN-PROGRESS
 **Created:** 2025-12-17
 **Goal:** Build a command-line tool for converting between spreadsheet formats (.cells, .csv, .xlsx).
 
@@ -128,11 +128,11 @@ cells -i input.xlsx output.cells -q -y
 
 Set up the command-line parsing infrastructure.
 
-- [ ] **1a:** Create `apps/cli/BUILD` with Bazel target
-- [ ] **1b:** Create `apps/cli/main.cc` with argument parsing
-- [ ] **1c:** Add option structs (InputOptions, OutputOptions, CSVOptions, etc.)
-- [ ] **1d:** Implement format detection from file extension
-- [ ] **1e:** Add `--help` and `--version` output
+- [x] **1a:** Create `apps/cli/BUILD` with Bazel target
+- [x] **1b:** Create `apps/cli/main.cc` with argument parsing
+- [x] **1c:** Add option structs (InputOptions, OutputOptions, CSVOptions, etc.)
+- [x] **1d:** Implement format detection from file extension
+- [x] **1e:** Add `--help` and `--version` output
 
 **Deliverables:**
 - `apps/cli/main.cc` - entry point with arg parsing
