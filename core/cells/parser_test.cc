@@ -443,6 +443,186 @@ TEST(ParserTest, ErrorInvalidDocumentName) {
     EXPECT_TRUE(result.error.has_value());
 }
 
+// --- Malformed File Tests ---
+// Comprehensive tests for various parser error conditions
+
+TEST(MalformedFileTest, RowOutsideSheet) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+R rA1bC2dE ~ ~
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+    EXPECT_NE(result.error->message.find("outside"), std::string::npos);
+}
+
+TEST(MalformedFileTest, CellOutsideSheet) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+X xA1bC2dE cA1bC2dE rA1bC2dE n 42
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+}
+
+TEST(MalformedFileTest, ColumnMissingPrev) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+#cols
+C cA1bC2dE
+)";
+
+    ParseResult result = parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+}
+
+TEST(MalformedFileTest, ColumnMissingNext) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+#cols
+C cA1bC2dE ~
+)";
+
+    ParseResult result = parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+}
+
+TEST(MalformedFileTest, RowMissingTokens) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+#rows
+R rA1bC2dE
+)";
+
+    ParseResult result = parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+}
+
+TEST(MalformedFileTest, CellMissingValueAccepted) {
+    // Parser is permissive - a number without value defaults to 0
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+#cols
+C cA1bC2dE ~ ~
+#rows
+R rA1bC2dE ~ ~
+#cells
+X xA1bC2dE cA1bC2dE rA1bC2dE n
+)";
+
+    ParseResult result = parse(content);
+    // Parser accepts this - number defaults to 0
+    EXPECT_TRUE(result.ok());
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        Cell* cell = sheet->getCell(ID("xA1bC2dE"));
+        ASSERT_NE(cell, nullptr);
+        EXPECT_EQ(cell->value.type, CellValueType::NUMBER);
+    }
+}
+
+TEST(MalformedFileTest, CellMissingType) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+#cols
+C cA1bC2dE ~ ~
+#rows
+R rA1bC2dE ~ ~
+#cells
+X xA1bC2dE cA1bC2dE rA1bC2dE
+)";
+
+    ParseResult result = parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+}
+
+TEST(MalformedFileTest, InvalidGapValue) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+#cols
+C cA1bC2dE ~ cB3dE4fG:abc
+C cB3dE4fG cA1bC2dE:abc ~
+)";
+
+    ParseResult result = parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+}
+
+TEST(MalformedFileTest, SheetMissingName) {
+    const std::string content = "S sH3eE4tB\n";
+
+    ParseResult result = parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+}
+
+TEST(MalformedFileTest, SheetUnterminatedQuote) {
+    const std::string content = "S sH3eE4tB \"Unterminated\n";
+
+    ParseResult result = parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+}
+
+TEST(MalformedFileTest, CellStringUnterminatedQuote) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+#cols
+C cA1bC2dE ~ ~
+#rows
+R rA1bC2dE ~ ~
+#cells
+X xA1bC2dE cA1bC2dE rA1bC2dE s "unterminated
+)";
+
+    ParseResult result = parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+}
+
+TEST(MalformedFileTest, DocumentMissingId) {
+    const std::string content = "D \"Test\"\n";
+
+    ParseResult result = parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+}
+
+TEST(MalformedFileTest, ErrorMessageHasLineNumber) {
+    // Verify that error messages include line numbers for debugging
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+
+S sH3eE4tB "Sheet"
+C cA1bC2dE
+)";
+
+    ParseResult result = parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+    EXPECT_GT(result.error->line, 0);
+    // Error should be on line 5 (the malformed column line)
+    EXPECT_EQ(result.error->line, 5);
+}
+
 // Convenience function
 TEST(ParserTest, ParseConvenienceFunction) {
     const std::string content = R"(#cells v1
