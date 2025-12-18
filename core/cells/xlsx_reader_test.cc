@@ -258,7 +258,8 @@ TEST(XLSXReaderTest, ReadUnicodeText) {
                     break;
                 }
             }
-            if (foundUnicode) break;
+            if (foundUnicode)
+                break;
         }
     }
     EXPECT_TRUE(foundUnicode) << "Expected to find unicode text in cells";

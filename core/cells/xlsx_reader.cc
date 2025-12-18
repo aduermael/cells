@@ -1,7 +1,6 @@
 #include "core/cells/xlsx_reader.h"
 
 #include <OpenXLSX/OpenXLSX.hpp>
-
 #include <sstream>
 
 #include "core/cells/id.h"
@@ -37,9 +36,13 @@ XLSXReader::XLSXReader() = default;
 
 XLSXReader::XLSXReader(const XLSXReadOptions& options) : options_(options) {}
 
-void XLSXReader::reset() { warnings_.clear(); }
+void XLSXReader::reset() {
+    warnings_.clear();
+}
 
-void XLSXReader::addWarning(const std::string& msg) { warnings_.push_back(msg); }
+void XLSXReader::addWarning(const std::string& msg) {
+    warnings_.push_back(msg);
+}
 
 XLSXReadResult XLSXReader::readFile(const std::string& path) {
     reset();

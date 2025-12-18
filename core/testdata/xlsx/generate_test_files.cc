@@ -1,9 +1,9 @@
 // Generate test XLSX files for xlsx_reader_test
 // Run with: bazel run //core/testdata/xlsx:generate_test_files
 
-#include <OpenXLSX/OpenXLSX.hpp>
-
 #include <cstdlib>
+
+#include <OpenXLSX/OpenXLSX.hpp>
 #include <filesystem>
 #include <iostream>
 #include <string>

@@ -12,10 +12,10 @@ namespace cells {
 
 // Options for XLSX parsing
 struct XLSXReadOptions {
-    bool readFormulas{true};      // Read formulas (vs computed values only)
-    bool readStyles{true};        // Read cell styles (bold, colors, etc.)
-    bool readDimensions{true};    // Read column widths and row heights
-    std::string sheetName{};      // Specific sheet to read (empty = all sheets)
+    bool readFormulas{true};    // Read formulas (vs computed values only)
+    bool readStyles{true};      // Read cell styles (bold, colors, etc.)
+    bool readDimensions{true};  // Read column widths and row heights
+    std::string sheetName{};    // Specific sheet to read (empty = all sheets)
 
     XLSXReadOptions() = default;
 };
