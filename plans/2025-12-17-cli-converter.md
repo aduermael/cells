@@ -141,17 +141,49 @@ Set up the command-line parsing infrastructure.
 
 ---
 
-## Phase 2: CSV Reader
+## Phase 2: File Info Command
+
+Add an info mode to inspect .cells files before implementing conversion.
+
+```bash
+cells --info data.cells
+# or
+cells -I data.cells
+```
+
+Example output:
+```
+File: data.cells
+Format: cells v1
+Sheets: 2
+  - Sheet1: 150 rows × 12 columns (1,423 cells)
+  - Sheet2: 45 rows × 8 columns (289 cells)
+Total cells: 1,712
+Formulas: 23
+```
+
+- [ ] **2a:** Add `--info` / `-I` flag to options
+- [ ] **2b:** Implement .cells file reading using existing parser
+- [ ] **2c:** Calculate and display file statistics (sheets, rows, columns, cells)
+- [ ] **2d:** Show formula count
+
+**Deliverables:**
+- `cells --info` command working for .cells files
+- Validates parser integration before conversion work
+
+---
+
+## Phase 3: CSV Reader
 
 Implement CSV import into our data model.
 
-- [ ] **2a:** Create `core/cells/csv_reader.h` and `csv_reader.cc`
-- [ ] **2b:** Implement RFC 4180 CSV parsing (quoted fields, escapes)
-- [ ] **2c:** Handle different delimiters (comma, tab, semicolon)
-- [ ] **2d:** Auto-detect numeric vs string values
-- [ ] **2e:** Handle UTF-8 encoding (and BOM detection)
-- [ ] **2f:** Create test files: `core/testdata/csv/simple.csv`, etc.
-- [ ] **2g:** Add `csv_reader_test.cc`
+- [ ] **3a:** Create `core/cells/csv_reader.h` and `csv_reader.cc`
+- [ ] **3b:** Implement RFC 4180 CSV parsing (quoted fields, escapes)
+- [ ] **3c:** Handle different delimiters (comma, tab, semicolon)
+- [ ] **3d:** Auto-detect numeric vs string values
+- [ ] **3e:** Handle UTF-8 encoding (and BOM detection)
+- [ ] **3f:** Create test files: `core/testdata/csv/simple.csv`, etc.
+- [ ] **3g:** Add `csv_reader_test.cc`
 
 **Deliverables:**
 - `csv_reader.h` / `csv_reader.cc` - CSV to Workbook
@@ -160,16 +192,16 @@ Implement CSV import into our data model.
 
 ---
 
-## Phase 3: CSV Writer
+## Phase 4: CSV Writer
 
 Implement CSV export from our data model.
 
-- [ ] **3a:** Create `core/cells/csv_writer.h` and `csv_writer.cc`
-- [ ] **3b:** Implement RFC 4180 CSV output (proper escaping)
-- [ ] **3c:** Handle formula cells (output computed value)
-- [ ] **3d:** Support custom delimiters
-- [ ] **3e:** Add `csv_writer_test.cc`
-- [ ] **3f:** Add roundtrip tests (csv -> cells -> csv)
+- [ ] **4a:** Create `core/cells/csv_writer.h` and `csv_writer.cc`
+- [ ] **4b:** Implement RFC 4180 CSV output (proper escaping)
+- [ ] **4c:** Handle formula cells (output computed value)
+- [ ] **4d:** Support custom delimiters
+- [ ] **4e:** Add `csv_writer_test.cc`
+- [ ] **4f:** Add roundtrip tests (csv -> cells -> csv)
 
 **Deliverables:**
 - `csv_writer.h` / `csv_writer.cc` - Workbook to CSV
@@ -177,17 +209,17 @@ Implement CSV export from our data model.
 
 ---
 
-## Phase 4: CSV ↔ CELLS Integration
+## Phase 5: CSV ↔ CELLS Integration
 
 Wire up the CLI with CSV and .cells support before adding XLSX complexity.
 
-- [ ] **4a:** Implement conversion pipeline (read -> transform -> write)
-- [ ] **4b:** Wire CSV reader/writer into CLI
-- [ ] **4c:** Add progress reporting
-- [ ] **4d:** Add warning accumulation and reporting
-- [ ] **4e:** Implement `-y` (overwrite) and `-q` (quiet) flags
-- [ ] **4f:** Add error handling with helpful messages
-- [ ] **4g:** Create end-to-end tests (csv → cells, cells → csv, roundtrips)
+- [ ] **5a:** Implement conversion pipeline (read -> transform -> write)
+- [ ] **5b:** Wire CSV reader/writer into CLI
+- [ ] **5c:** Add progress reporting
+- [ ] **5d:** Add warning accumulation and reporting
+- [ ] **5e:** Implement `-y` (overwrite) and `-q` (quiet) flags
+- [ ] **5f:** Add error handling with helpful messages
+- [ ] **5g:** Create end-to-end tests (csv → cells, cells → csv, roundtrips)
 
 **Deliverables:**
 - Working `cells` CLI binary (CSV + .cells only)
@@ -196,7 +228,7 @@ Wire up the CLI with CSV and .cells support before adding XLSX complexity.
 
 ---
 
-## Phase 5: XLSX Reader
+## Phase 6: XLSX Reader
 
 Implement Excel import. Use a library for the heavy lifting.
 
@@ -210,15 +242,15 @@ Options for reading XLSX:
 
 **Recommendation:** OpenXLSX (C++17, matches our codebase, header-only is easy to integrate)
 
-- [ ] **5a:** Add OpenXLSX as Bazel dependency (or xlnt)
-- [ ] **5b:** Create `core/cells/xlsx_reader.h` and `xlsx_reader.cc`
-- [ ] **5c:** Implement basic cell reading (numbers, strings)
-- [ ] **5d:** Implement formula reading (as text)
-- [ ] **5e:** Read cell styles (basic: bold, colors)
-- [ ] **5f:** Read column widths and row heights
-- [ ] **5g:** Handle multiple sheets
-- [ ] **5h:** Create test files: `core/testdata/xlsx/simple.xlsx`, etc.
-- [ ] **5i:** Add `xlsx_reader_test.cc`
+- [ ] **6a:** Add OpenXLSX as Bazel dependency (or xlnt)
+- [ ] **6b:** Create `core/cells/xlsx_reader.h` and `xlsx_reader.cc`
+- [ ] **6c:** Implement basic cell reading (numbers, strings)
+- [ ] **6d:** Implement formula reading (as text)
+- [ ] **6e:** Read cell styles (basic: bold, colors)
+- [ ] **6f:** Read column widths and row heights
+- [ ] **6g:** Handle multiple sheets
+- [ ] **6h:** Create test files: `core/testdata/xlsx/simple.xlsx`, etc.
+- [ ] **6i:** Add `xlsx_reader_test.cc`
 
 **Deliverables:**
 - `xlsx_reader.h` / `xlsx_reader.cc` - XLSX to Workbook
@@ -227,19 +259,19 @@ Options for reading XLSX:
 
 ---
 
-## Phase 6: XLSX Writer
+## Phase 7: XLSX Writer
 
 Implement Excel export.
 
-- [ ] **6a:** Create `core/cells/xlsx_writer.h` and `xlsx_writer.cc`
-- [ ] **6b:** Implement basic cell writing (numbers, strings)
-- [ ] **6c:** Implement formula writing (convert UUID refs to A1)
-- [ ] **6d:** Write cell styles (basic)
-- [ ] **6e:** Write column widths and row heights
-- [ ] **6f:** Handle multiple sheets
-- [ ] **6g:** Add warning system for feature loss
-- [ ] **6h:** Add `xlsx_writer_test.cc`
-- [ ] **6i:** Add roundtrip tests (xlsx -> cells -> xlsx)
+- [ ] **7a:** Create `core/cells/xlsx_writer.h` and `xlsx_writer.cc`
+- [ ] **7b:** Implement basic cell writing (numbers, strings)
+- [ ] **7c:** Implement formula writing (convert UUID refs to A1)
+- [ ] **7d:** Write cell styles (basic)
+- [ ] **7e:** Write column widths and row heights
+- [ ] **7f:** Handle multiple sheets
+- [ ] **7g:** Add warning system for feature loss
+- [ ] **7h:** Add `xlsx_writer_test.cc`
+- [ ] **7i:** Add roundtrip tests (xlsx -> cells -> xlsx)
 
 **Deliverables:**
 - `xlsx_writer.h` / `xlsx_writer.cc` - Workbook to XLSX
@@ -247,16 +279,16 @@ Implement Excel export.
 
 ---
 
-## Phase 7: Formula Reference Conversion
+## Phase 8: Formula Reference Conversion
 
 Convert between UUID-based and A1 notation for Excel compatibility.
 
-- [ ] **7a:** Create `core/cells/ref_converter.h` and `ref_converter.cc`
-- [ ] **7b:** Implement UUID-to-A1 conversion (for export)
-- [ ] **7c:** Implement A1-to-UUID conversion (for import)
-- [ ] **7d:** Handle absolute vs relative references ($A$1 vs A1)
-- [ ] **7e:** Handle range references (A1:C3)
-- [ ] **7f:** Add `ref_converter_test.cc`
+- [ ] **8a:** Create `core/cells/ref_converter.h` and `ref_converter.cc`
+- [ ] **8b:** Implement UUID-to-A1 conversion (for export)
+- [ ] **8c:** Implement A1-to-UUID conversion (for import)
+- [ ] **8d:** Handle absolute vs relative references ($A$1 vs A1)
+- [ ] **8e:** Handle range references (A1:C3)
+- [ ] **8f:** Add `ref_converter_test.cc`
 
 **Deliverables:**
 - `ref_converter.h` / `ref_converter.cc` - reference conversion
@@ -264,14 +296,14 @@ Convert between UUID-based and A1 notation for Excel compatibility.
 
 ---
 
-## Phase 8: XLSX Integration
+## Phase 9: XLSX Integration
 
 Wire XLSX support into the CLI.
 
-- [ ] **8a:** Add XLSX reader/writer to CLI conversion pipeline
-- [ ] **8b:** Integrate formula reference conversion
-- [ ] **8c:** Add XLSX-specific CLI options (--sheet, --all-sheets)
-- [ ] **8d:** Create end-to-end tests (xlsx → cells, cells → xlsx, csv ↔ xlsx)
+- [ ] **9a:** Add XLSX reader/writer to CLI conversion pipeline
+- [ ] **9b:** Integrate formula reference conversion
+- [ ] **9c:** Add XLSX-specific CLI options (--sheet, --all-sheets)
+- [ ] **9d:** Create end-to-end tests (xlsx → cells, cells → xlsx, csv ↔ xlsx)
 
 **Deliverables:**
 - Full `cells` CLI with XLSX support
@@ -279,16 +311,16 @@ Wire XLSX support into the CLI.
 
 ---
 
-## Phase 9: Polish
+## Phase 10: Polish
 
 Final touches for release.
 
-- [ ] **9a:** Add man page or `--help` documentation
-- [ ] **9b:** Test on sample real-world files
-- [ ] **9c:** Performance testing with large files (100K+ cells)
-- [ ] **9d:** Memory profiling
-- [ ] **9e:** Update GETTING_STARTED.md with CLI usage
-- [ ] **9f:** Create example scripts in `examples/`
+- [ ] **10a:** Add man page or `--help` documentation
+- [ ] **10b:** Test on sample real-world files
+- [ ] **10c:** Performance testing with large files (100K+ cells)
+- [ ] **10d:** Memory profiling
+- [ ] **10e:** Update GETTING_STARTED.md with CLI usage
+- [ ] **10f:** Create example scripts in `examples/`
 
 **Deliverables:**
 - Complete, tested CLI tool
