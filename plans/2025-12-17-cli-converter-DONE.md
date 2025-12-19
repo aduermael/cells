@@ -1,6 +1,6 @@
 # CLI Converter Implementation Plan
 
-**Status:** IN-PROGRESS
+**Status:** DONE
 **Created:** 2025-12-17
 **Goal:** Build a command-line tool for converting between spreadsheet formats (.cells, .csv, .xlsx).
 
@@ -449,6 +449,10 @@ http_archive(
 ---
 
 ## Phase 11: Replace OpenXLSX with Excelize
+
+> **Note:** This phase is superseded by the native XLSX implementation plan
+> (`2025-12-19-xlsx-native-IN-PROGRESS.md`). The Excelize/Go dependency has been
+> removed in favor of a pure C++ implementation using miniz + pugixml.
 
 **Motivation:** OpenXLSX doesn't support shared or array formulas, which are very common in real Excel files. Excelize (Go) has better Excel parity and is actively maintained.
 
