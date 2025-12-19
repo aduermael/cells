@@ -192,6 +192,12 @@ std::string colIndexToLetter(size_t index) {
     return result;
 }
 
+// Helper to get cell position in grid
+struct CellPosition {
+    size_t colIdx;
+    size_t rowIdx;
+};
+
 // Generate worksheet XML
 std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
                               const cells::RefConverter& refConverter, bool writeFormulas) {
@@ -226,6 +232,8 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
 
     // Build cell lookup: (colIdx, rowIdx) -> Cell*
     std::unordered_map<uint64_t, const cells::Cell*> cellGrid;
+    // Also track cell positions
+    std::unordered_map<const cells::Cell*, CellPosition> cellPositions;
     for (const auto& pair : sheet.cells) {
         const cells::Cell* cell = pair.second.get();
         auto colIt = colIdToIndex.find(cell->colId.toString());
@@ -233,6 +241,33 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
         if (colIt != colIdToIndex.end() && rowIt != rowIdToIndex.end()) {
             const uint64_t key = (static_cast<uint64_t>(rowIt->second) << 32) | colIt->second;
             cellGrid[key] = cell;
+            cellPositions[cell] = {colIt->second, rowIt->second};
+        }
+    }
+
+    // Build shared formula index map: master cell -> si (shared index)
+    std::unordered_map<const cells::Cell*, int> masterToSi;
+    // Also map subscriber cells to their master's si
+    std::unordered_map<const cells::Cell*, int> subscriberToSi;
+    int nextSi = 0;
+
+    if (writeFormulas) {
+        for (const auto& pair : sheet.cells) {
+            const cells::Cell* cell = pair.second.get();
+            // Check if this cell is a shared formula master
+            if (cell->isSharedFormulaMaster()) {
+                masterToSi[cell] = nextSi++;
+            }
+        }
+        // Map subscribers to their master's si
+        for (const auto& pair : sheet.cells) {
+            const cells::Cell* cell = pair.second.get();
+            if (cell->isSharedFormula() && cell->sharedFormulaRef != nullptr) {
+                auto masterIt = masterToSi.find(cell->sharedFormulaRef);
+                if (masterIt != masterToSi.end()) {
+                    subscriberToSi[cell] = masterIt->second;
+                }
+            }
         }
     }
 
@@ -282,22 +317,44 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
             // Handle formula cells
             if (writeFormulas && formula != nullptr && formula->text != nullptr &&
                 std::strlen(formula->text) > 1) {
-                // Formula cell - write as number type with formula
                 xml << ">\n";
-                // Skip the leading '=' in formula text
-                const char* formulaText = formula->text;
-                if (formulaText[0] == '=') {
-                    formulaText++;
+
+                // Check if this is a shared formula
+                auto masterIt = masterToSi.find(cell);
+                auto subscriberIt = subscriberToSi.find(cell);
+
+                if (masterIt != masterToSi.end()) {
+                    // This is a shared formula master - calculate the range
+                    // For now, just use the master cell as the ref (Excel accepts this)
+                    const int si = masterIt->second;
+
+                    // Skip the leading '=' in formula text
+                    const char* formulaText = formula->text;
+                    if (formulaText[0] == '=') {
+                        formulaText++;
+                    }
+                    const std::string a1Formula = refConverter.formulaToA1(formulaText);
+
+                    xml << "        <f t=\"shared\" ref=\"" << cellRef << "\" si=\"" << si << "\">"
+                        << escapeXml(a1Formula) << "</f>\n";
+                } else if (subscriberIt != subscriberToSi.end()) {
+                    // This is a shared formula subscriber
+                    const int si = subscriberIt->second;
+                    xml << "        <f t=\"shared\" si=\"" << si << "\"/>\n";
+                } else {
+                    // Regular formula (not shared)
+                    const char* formulaText = formula->text;
+                    if (formulaText[0] == '=') {
+                        formulaText++;
+                    }
+                    const std::string a1Formula = refConverter.formulaToA1(formulaText);
+                    xml << "        <f>" << escapeXml(a1Formula) << "</f>\n";
                 }
-                // Convert UUID refs to A1 notation
-                const std::string a1Formula = refConverter.formulaToA1(formulaText);
-                xml << "        <f>" << escapeXml(a1Formula) << "</f>\n";
 
                 // Write cached value if available
                 if (value.type == cells::CellValueType::NUMBER) {
                     xml << "        <v>" << value.raw << "</v>\n";
                 } else if (value.type == cells::CellValueType::STRING && !value.raw.empty()) {
-                    // For formula results that are strings, write inline
                     xml << "        <v>" << escapeXml(value.raw) << "</v>\n";
                 }
                 xml << "      </c>\n";
