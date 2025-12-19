@@ -1,7 +1,8 @@
 #include "core/cells/ref_converter.h"
 
-#include <algorithm>
 #include <cctype>
+
+#include <algorithm>
 
 namespace cells {
 
@@ -38,12 +39,12 @@ void RefConverter::setContext(const Sheet& sheet) {
     indexToRowId_.reserve(rows.size());
 
     for (size_t i = 0; i < columns.size(); ++i) {
-        std::string idStr = columns[i].second.toString();
+        const std::string idStr = columns[i].second.toString();
         colIdToIndex_[idStr] = i;
         indexToColId_.push_back(idStr);
     }
     for (size_t i = 0; i < rows.size(); ++i) {
-        std::string idStr = rows[i].second.toString();
+        const std::string idStr = rows[i].second.toString();
         rowIdToIndex_[idStr] = i;
         indexToRowId_.push_back(idStr);
     }
@@ -59,12 +60,12 @@ void RefConverter::setContext(const std::vector<ID>& columnIds, const std::vecto
     indexToRowId_.reserve(rowIds.size());
 
     for (size_t i = 0; i < columnIds.size(); ++i) {
-        std::string idStr = columnIds[i].toString();
+        const std::string idStr = columnIds[i].toString();
         colIdToIndex_[idStr] = i;
         indexToColId_.push_back(idStr);
     }
     for (size_t i = 0; i < rowIds.size(); ++i) {
-        std::string idStr = rowIds[i].toString();
+        const std::string idStr = rowIds[i].toString();
         rowIdToIndex_[idStr] = i;
         indexToRowId_.push_back(idStr);
     }
@@ -98,7 +99,7 @@ int RefConverter::columnLetterToIndex(const std::string& letter) {
     }
 
     int result = 0;
-    for (char c : letter) {
+    for (const char c : letter) {
         if (c >= 'A' && c <= 'Z') {
             result = result * 26 + (c - 'A' + 1);
         } else if (c >= 'a' && c <= 'z') {
@@ -151,7 +152,7 @@ CellRef RefConverter::parseA1Ref(const std::string& ref) {
 
     // Parse row number
     std::string rowDigits;
-    while (pos < ref.size() && std::isdigit(ref[pos])) {
+    while (pos < ref.size() && (std::isdigit(ref[pos]) != 0)) {
         rowDigits += ref[pos];
         ++pos;
     }
@@ -161,12 +162,12 @@ CellRef RefConverter::parseA1Ref(const std::string& ref) {
     }
 
     // Convert to indices
-    int colIdx = columnLetterToIndex(colLetters);
+    const int colIdx = columnLetterToIndex(colLetters);
     if (colIdx < 0) {
         return result;
     }
 
-    int rowNum = std::stoi(rowDigits);
+    const int rowNum = std::stoi(rowDigits);
     if (rowNum < 1) {
         return result;  // Excel rows are 1-based
     }
@@ -182,7 +183,7 @@ RangeRef RefConverter::parseRangeRef(const std::string& ref) {
     RangeRef result;
 
     // Find the colon separator
-    size_t colonPos = ref.find(':');
+    const size_t colonPos = ref.find(':');
     if (colonPos == std::string::npos) {
         // Not a range, treat as single cell
         result.start = parseA1Ref(ref);
@@ -257,14 +258,14 @@ bool RefConverter::isUuidRefStart(const std::string& formula, size_t pos) {
     // Check that the 8 characters after first $ and second $ are valid ID characters
     // (alphanumeric for base62)
     for (size_t i = 1; i <= 8; ++i) {
-        char c = formula[pos + i];
-        if (!std::isalnum(c)) {
+        const char c = formula[pos + i];
+        if (std::isalnum(c) == 0) {
             return false;
         }
     }
     for (size_t i = 10; i <= 17; ++i) {
-        char c = formula[pos + i];
-        if (!std::isalnum(c)) {
+        const char c = formula[pos + i];
+        if (std::isalnum(c) == 0) {
             return false;
         }
     }
@@ -292,15 +293,12 @@ bool RefConverter::isA1RefStart(const std::string& formula, size_t pos) {
     }
 
     // A1 ref can start with $ or a column letter
-    char c = formula[pos];
-    if (c == '$' || isColumnChar(c)) {
-        return true;
-    }
-    return false;
+    const char c = formula[pos];
+    return c == '$' || isColumnChar(c);
 }
 
 size_t RefConverter::extractA1Ref(const std::string& formula, size_t pos, CellRef& ref) {
-    size_t start = pos;
+    const size_t start = pos;
 
     // Reset ref
     ref = CellRef();
@@ -334,7 +332,7 @@ size_t RefConverter::extractA1Ref(const std::string& formula, size_t pos, CellRe
 
     // Parse row number
     std::string rowDigits;
-    while (pos < formula.size() && std::isdigit(formula[pos])) {
+    while (pos < formula.size() && (std::isdigit(formula[pos]) != 0)) {
         rowDigits += formula[pos];
         ++pos;
     }
@@ -344,12 +342,12 @@ size_t RefConverter::extractA1Ref(const std::string& formula, size_t pos, CellRe
     }
 
     // Convert to indices
-    int colIdx = columnLetterToIndex(colLetters);
+    const int colIdx = columnLetterToIndex(colLetters);
     if (colIdx < 0) {
         return 0;
     }
 
-    int rowNum = std::stoi(rowDigits);
+    const int rowNum = std::stoi(rowDigits);
     if (rowNum < 1) {
         return 0;
     }
@@ -371,8 +369,8 @@ std::string RefConverter::uuidRefToA1(const std::string& ref) const {
         return "";
     }
 
-    std::string colId = ref.substr(1, 8);
-    std::string rowId = ref.substr(10, 8);
+    const std::string colId = ref.substr(1, 8);
+    const std::string rowId = ref.substr(10, 8);
 
     // Look up indices
     auto colIt = colIdToIndex_.find(colId);
@@ -394,7 +392,7 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
     while (i < formula.size()) {
         std::string colId;
         std::string rowId;
-        size_t len = extractUuidRef(formula, i, colId, rowId);
+        const size_t len = extractUuidRef(formula, i, colId, rowId);
 
         if (len > 0) {
             // Found a UUID ref, convert it
@@ -425,7 +423,7 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
 // ============================================================================
 
 std::string RefConverter::a1RefToUuid(const std::string& ref) const {
-    CellRef parsed = parseA1Ref(ref);
+    const CellRef parsed = parseA1Ref(ref);
     if (!parsed.valid) {
         return "";
     }
@@ -462,26 +460,28 @@ std::string RefConverter::formulaToUuid(const std::string& formula) const {
         // Check for A1 reference
         // But first, make sure we're not in the middle of a word (e.g., "SUM" shouldn't match "M")
         // An A1 ref should not be preceded by an alphanumeric character
-        bool canStartRef = (i == 0) || !std::isalnum(formula[i - 1]);
+        const bool canStartRef = (i == 0) || (std::isalnum(formula[i - 1]) == 0);
 
         if (canStartRef && isA1RefStart(formula, i)) {
             CellRef ref;
-            size_t len = extractA1Ref(formula, i, ref);
+            const size_t len = extractA1Ref(formula, i, ref);
 
             if (len > 0 && ref.valid) {
                 // Check if we're parsing a range (next char is ':')
                 if (i + len < formula.size() && formula[i + len] == ':') {
                     // Range reference - convert both parts
-                    std::string startRef = formatUuidRef(ref);
+                    const std::string startRef = formatUuidRef(ref);
 
                     // Parse the end of the range
                     CellRef endRef;
-                    size_t endLen = extractA1Ref(formula, i + len + 1, endRef);
+                    const size_t endLen = extractA1Ref(formula, i + len + 1, endRef);
 
                     if (endLen > 0 && endRef.valid) {
-                        std::string endRefStr = formatUuidRef(endRef);
+                        const std::string endRefStr = formatUuidRef(endRef);
                         if (!startRef.empty() && !endRefStr.empty()) {
-                            result += startRef + ":" + endRefStr;
+                            result += startRef;
+                            result += ':';
+                            result += endRefStr;
                             i += len + 1 + endLen;
                             continue;
                         }
@@ -489,7 +489,7 @@ std::string RefConverter::formulaToUuid(const std::string& formula) const {
                 }
 
                 // Single cell reference
-                std::string uuidRef = formatUuidRef(ref);
+                const std::string uuidRef = formatUuidRef(ref);
                 if (!uuidRef.empty()) {
                     result += uuidRef;
                     i += len;

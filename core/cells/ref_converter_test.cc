@@ -74,7 +74,8 @@ TEST(RefConverterTest, ColumnLetterRoundtrip) {
     for (size_t i = 0; i < 1000; ++i) {
         std::string letter = RefConverter::columnIndexToLetter(i);
         int index = RefConverter::columnLetterToIndex(letter);
-        EXPECT_EQ(static_cast<size_t>(index), i) << "Failed for index " << i << " (letter: " << letter << ")";
+        EXPECT_EQ(static_cast<size_t>(index), i)
+            << "Failed for index " << i << " (letter: " << letter << ")";
     }
 }
 
@@ -268,17 +269,15 @@ TEST(RefConverterTest, UuidRefToA1WithContext) {
     for (const auto& pair : sheet->columns) {
         columns.emplace_back(pair.second->position, pair.first);
     }
-    std::sort(columns.begin(), columns.end(), [](const auto& a, const auto& b) {
-        return a.first < b.first;
-    });
+    std::sort(columns.begin(), columns.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
 
     std::vector<std::pair<uint32_t, ID>> rows;
     for (const auto& pair : sheet->rows) {
         rows.emplace_back(pair.second->position, pair.first);
     }
-    std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
-        return a.first < b.first;
-    });
+    std::sort(rows.begin(), rows.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
 
     // Create a UUID ref for A1
     std::string uuidRef = "$" + columns[0].second.toString() + "$" + rows[0].second.toString();
@@ -307,17 +306,15 @@ TEST(RefConverterTest, FormulaToA1Simple) {
     for (const auto& pair : sheet->columns) {
         columns.emplace_back(pair.second->position, pair.first);
     }
-    std::sort(columns.begin(), columns.end(), [](const auto& a, const auto& b) {
-        return a.first < b.first;
-    });
+    std::sort(columns.begin(), columns.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
 
     std::vector<std::pair<uint32_t, ID>> rows;
     for (const auto& pair : sheet->rows) {
         rows.emplace_back(pair.second->position, pair.first);
     }
-    std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
-        return a.first < b.first;
-    });
+    std::sort(rows.begin(), rows.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
 
     // Create a formula: =A1+B2
     std::string col0 = columns[0].second.toString();
@@ -340,17 +337,15 @@ TEST(RefConverterTest, FormulaToA1WithFunctions) {
     for (const auto& pair : sheet->columns) {
         columns.emplace_back(pair.second->position, pair.first);
     }
-    std::sort(columns.begin(), columns.end(), [](const auto& a, const auto& b) {
-        return a.first < b.first;
-    });
+    std::sort(columns.begin(), columns.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
 
     std::vector<std::pair<uint32_t, ID>> rows;
     for (const auto& pair : sheet->rows) {
         rows.emplace_back(pair.second->position, pair.first);
     }
-    std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) {
-        return a.first < b.first;
-    });
+    std::sort(rows.begin(), rows.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
 
     // Create a formula: =SUM(A1,B2)
     std::string col0 = columns[0].second.toString();
@@ -396,8 +391,8 @@ TEST(RefConverterTest, A1RefToUuidOutOfRange) {
     converter.setContext(*sheet);
 
     // Our test sheet only has 5 columns (A-E) and 10 rows (1-10)
-    EXPECT_EQ(converter.a1RefToUuid("Z1"), "");   // Column out of range
-    EXPECT_EQ(converter.a1RefToUuid("A100"), ""); // Row out of range
+    EXPECT_EQ(converter.a1RefToUuid("Z1"), "");    // Column out of range
+    EXPECT_EQ(converter.a1RefToUuid("A100"), "");  // Row out of range
 }
 
 TEST(RefConverterTest, FormulaToUuidSimple) {
@@ -519,12 +514,7 @@ TEST(RefConverterTest, RoundtripSimpleFormula) {
     converter.setContext(*sheet);
 
     std::vector<std::string> formulas = {
-        "A1",
-        "B2+C3",
-        "SUM(A1:D10)",
-        "IF(A1>0,B1,C1)",
-        "A1*B1/C1",
-        "(A1+B1)*C1",
+        "A1", "B2+C3", "SUM(A1:D10)", "IF(A1>0,B1,C1)", "A1*B1/C1", "(A1+B1)*C1",
     };
 
     for (const auto& formula : formulas) {

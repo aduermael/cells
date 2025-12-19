@@ -13,7 +13,7 @@
 namespace cells {
 
 // Reference types
-enum class ReferenceType {
+enum class ReferenceType : std::uint8_t {
     RELATIVE,  // A1 - both column and row are relative
     ABSOLUTE,  // $A$1 - both column and row are absolute
     COL_ABS,   // $A1 - column absolute, row relative
@@ -22,10 +22,10 @@ enum class ReferenceType {
 
 // Parsed cell reference
 struct CellRef {
-    std::string colId;       // UUID or empty if not resolved
-    std::string rowId;       // UUID or empty if not resolved
-    size_t colIndex{0};      // 0-based column index
-    size_t rowIndex{0};      // 0-based row index
+    std::string colId;   // UUID or empty if not resolved
+    std::string rowId;   // UUID or empty if not resolved
+    size_t colIndex{0};  // 0-based column index
+    size_t rowIndex{0};  // 0-based row index
     ReferenceType type{ReferenceType::RELATIVE};
     bool valid{false};
 
