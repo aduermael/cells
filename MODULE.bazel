@@ -4,10 +4,10 @@ module(
 )
 
 # Platforms for OS-specific configurations
-bazel_dep(name = "platforms", version = "0.0.10")
+bazel_dep(name = "platforms", version = "0.0.11")
 
 # Google Test
-bazel_dep(name = "googletest", version = "1.14.0")
+bazel_dep(name = "googletest", version = "1.14.0.bcr.1")
 
 # Native XLSX parsing - XML parser
 bazel_dep(name = "pugixml", version = "1.14")
