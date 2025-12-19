@@ -380,4 +380,125 @@ func XLSXErrorFree(errStr *C.char) {
 	}
 }
 
+// ExcelizeWriteXLSX writes an XLSX file from the provided C structs.
+// A new file is created, populated, saved, and closed immediately.
+//
+//export ExcelizeWriteXLSX
+func ExcelizeWriteXLSX(path *C.char, data *C.XLSXData, errorOut **C.char) C.int {
+	if data == nil {
+		*errorOut = C.CString("data is nil")
+		return -1
+	}
+
+	goPath := C.GoString(path)
+	f := excelize.NewFile()
+	defer f.Close()
+
+	sheetCount := int(data.sheet_count)
+	if sheetCount == 0 {
+		*errorOut = C.CString("no sheets in data")
+		return -1
+	}
+
+	sheets := unsafe.Slice(data.sheets, sheetCount)
+
+	// Create sheets and populate them
+	for i := 0; i < sheetCount; i++ {
+		sheet := &sheets[i]
+		sheetName := C.GoString(sheet.name)
+
+		// First sheet already exists as "Sheet1", rename it
+		// Additional sheets need to be created
+		if i == 0 {
+			f.SetSheetName("Sheet1", sheetName)
+		} else {
+			_, err := f.NewSheet(sheetName)
+			if err != nil {
+				*errorOut = C.CString("failed to create sheet " + sheetName + ": " + err.Error())
+				return -1
+			}
+		}
+
+		// Write cells
+		if sheet.cell_count > 0 && sheet.cells != nil {
+			cells := unsafe.Slice(sheet.cells, int(sheet.cell_count))
+			for j := 0; j < int(sheet.cell_count); j++ {
+				cell := &cells[j]
+				row := int(cell.row) + 1  // Convert to 1-indexed
+				col := int(cell.col) + 1  // Convert to 1-indexed
+				cellRef, _ := excelize.CoordinatesToCellName(col, row)
+
+				// Check if this is a formula cell
+				if cell.formula != nil {
+					formula := C.GoString(cell.formula)
+					if err := f.SetCellFormula(sheetName, cellRef, formula); err != nil {
+						// Log error but continue - formula might be invalid
+						continue
+					}
+				} else if cell.value != nil {
+					value := C.GoString(cell.value)
+					// Set value based on type
+					switch cell.cell_type {
+					case C.XLSX_CELL_TYPE_NUMBER:
+						// Try to parse as number
+						if floatVal, err := strconv.ParseFloat(value, 64); err == nil {
+							f.SetCellValue(sheetName, cellRef, floatVal)
+						} else if intVal, err := strconv.ParseInt(value, 10, 64); err == nil {
+							f.SetCellValue(sheetName, cellRef, intVal)
+						} else {
+							f.SetCellValue(sheetName, cellRef, value)
+						}
+					case C.XLSX_CELL_TYPE_BOOL:
+						boolVal := strings.ToUpper(value) == "TRUE" || value == "1"
+						f.SetCellValue(sheetName, cellRef, boolVal)
+					case C.XLSX_CELL_TYPE_ERROR:
+						// Write error as string
+						f.SetCellValue(sheetName, cellRef, value)
+					case C.XLSX_CELL_TYPE_DATE:
+						// Try to parse as date, fallback to string
+						f.SetCellValue(sheetName, cellRef, value)
+					default:
+						// String or empty - write as is
+						f.SetCellValue(sheetName, cellRef, value)
+					}
+				}
+			}
+		}
+
+		// Set column widths
+		if sheet.col_dim_count > 0 && sheet.col_dims != nil {
+			colDims := unsafe.Slice(sheet.col_dims, int(sheet.col_dim_count))
+			for j := 0; j < int(sheet.col_dim_count); j++ {
+				dim := &colDims[j]
+				colName, _ := excelize.ColumnNumberToName(int(dim.col) + 1)
+				f.SetColWidth(sheetName, colName, colName, float64(dim.width))
+				if dim.hidden != 0 {
+					f.SetColVisible(sheetName, colName, false)
+				}
+			}
+		}
+
+		// Set row heights
+		if sheet.row_dim_count > 0 && sheet.row_dims != nil {
+			rowDims := unsafe.Slice(sheet.row_dims, int(sheet.row_dim_count))
+			for j := 0; j < int(sheet.row_dim_count); j++ {
+				dim := &rowDims[j]
+				rowNum := int(dim.row) + 1 // Convert to 1-indexed
+				f.SetRowHeight(sheetName, rowNum, float64(dim.height))
+				if dim.hidden != 0 {
+					f.SetRowVisible(sheetName, rowNum, false)
+				}
+			}
+		}
+	}
+
+	// Save the file
+	if err := f.SaveAs(goPath); err != nil {
+		*errorOut = C.CString("failed to save file: " + err.Error())
+		return -1
+	}
+
+	return 0
+}
+
 func main() {}
