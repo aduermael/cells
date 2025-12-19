@@ -177,18 +177,18 @@ f <cell_id>	=FORMULA	array:A1:A5
 
 ---
 
-## Phase 4: Implement XLSX Write (Native)
+## Phase 4: Implement XLSX Write (Native) - COMPLETE
 
-- [ ] 4a: Set up ZIP archive creation with miniz
-- [ ] 4b: Implement Content_Types.xml and root relationships (_rels/.rels)
-- [ ] 4c: Implement workbook.xml and sheet relationships
-- [ ] 4d: Implement worksheet XML generation (sheetData)
-- [ ] 4e: Implement shared strings table (xl/sharedStrings.xml)
-- [ ] 4f: Implement minimal styles.xml
-- [ ] 4g: Implement formula conversion (UUID→A1 with locking markers)
-- [ ] 4h: Implement shared formula export
-- [ ] 4i: Implement array formula export
-- [ ] 4j: Add comprehensive XLSX write tests
+- [x] 4a: Set up ZIP archive creation with miniz
+- [x] 4b: Implement Content_Types.xml and root relationships (_rels/.rels)
+- [x] 4c: Implement workbook.xml and sheet relationships
+- [x] 4d: Implement worksheet XML generation (sheetData)
+- [x] 4e: Implement shared strings table (xl/sharedStrings.xml)
+- [x] 4f: Implement minimal styles.xml
+- [x] 4g: Implement formula conversion (UUID→A1 with locking markers)
+- [x] 4h: Implement shared formula export
+- [ ] 4i: Implement array formula export (POSTPONED with Phase 3)
+- [x] 4j: Add comprehensive XLSX write tests
 
 ### Design Notes
 
