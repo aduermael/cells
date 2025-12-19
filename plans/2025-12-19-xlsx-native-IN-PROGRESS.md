@@ -146,7 +146,9 @@ struct SharedFormulaGroup {
 
 ---
 
-## Phase 3: Support Array Formulas (Reader)
+## Phase 3: Support Array Formulas (Reader) - POSTPONED
+
+> **Status**: Postponed - array formulas are not urgent.
 
 - [ ] 3a: Add isArrayFormula and arrayRange fields to Formula struct
 - [ ] 3b: Implement XLSX reader array formula parsing
