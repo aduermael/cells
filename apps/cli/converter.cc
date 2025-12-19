@@ -2,6 +2,7 @@
 
 #include "converter.h"
 
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
@@ -13,12 +14,19 @@
 #include "core/cells/xlsx_reader.h"
 #include "core/cells/xlsx_writer.h"
 
+namespace fs = std::filesystem;
+
 namespace cells::cli {
 
 Converter::Converter(const Options& options) : options_(options) {}
 
 ConversionResult Converter::convert() {
     ConversionResult result;
+
+    // Handle --all-sheets mode (export each sheet to separate file)
+    if (options_.xlsx.all_sheets && options_.output_format == Format::kCsv) {
+        return convertAllSheets();
+    }
 
     // Check if output file exists and we're not allowed to overwrite
     if (!options_.output.overwrite && outputFileExists()) {
@@ -47,6 +55,134 @@ ConversionResult Converter::convert() {
     // Calculate total cells
     size_t total_cells = 0;
     for (const auto& sheet : workbook->sheets) {
+        total_cells += sheet->cellCount();
+    }
+
+    result.success = true;
+    result.warnings = std::move(warnings_);
+    result.cells_converted = total_cells;
+    return result;
+}
+
+ConversionResult Converter::convertAllSheets() {
+    ConversionResult result;
+
+    // Read input file
+    std::string error;
+    auto workbook = readInput(error);
+    if (!workbook) {
+        result.error = error;
+        return result;
+    }
+
+    // Check for formula warnings
+    bool has_formulas = false;
+    for (const auto& sheet : workbook->sheets) {
+        for (const auto& [id, cell] : sheet->cells) {
+            if (cell->isFormula()) {
+                has_formulas = true;
+                break;
+            }
+        }
+        if (has_formulas)
+            break;
+    }
+    if (has_formulas) {
+        addWarning("Formulas will be exported as computed values only.");
+    }
+
+    // Determine output directory
+    fs::path output_path(options_.output_file);
+    fs::path output_dir;
+
+    // Check if output is a directory or ends with separator
+    if (fs::is_directory(output_path) || options_.output_file.back() == '/' ||
+        options_.output_file.back() == '\\') {
+        output_dir = output_path;
+    } else {
+        // Use parent directory
+        output_dir = output_path.parent_path();
+        if (output_dir.empty()) {
+            output_dir = ".";
+        }
+    }
+
+    // Create output directory if it doesn't exist
+    std::error_code ec;
+    if (!fs::exists(output_dir)) {
+        fs::create_directories(output_dir, ec);
+        if (ec) {
+            result.error = "Could not create directory: " + output_dir.string() + " (" + ec.message() + ")";
+            return result;
+        }
+    }
+
+    // CSV write options
+    CSVWriteOptions csv_opts;
+    if (!options_.csv.delimiter.empty()) {
+        csv_opts.delimiter = options_.csv.delimiter[0];
+    }
+    csv_opts.includeHeader = options_.csv.has_header;
+
+    // Export each sheet to a separate file
+    size_t total_cells = 0;
+    for (const auto& sheet : workbook->sheets) {
+        // Create a temporary single-sheet workbook for CSV export
+        Workbook temp_workbook(workbook->id, workbook->name);
+
+        // We need to duplicate the sheet for the temp workbook
+        // CSV writer only writes the first sheet anyway
+        auto temp_sheet = std::make_unique<Sheet>(sheet->id, sheet->name);
+
+        // Copy columns
+        for (const auto& [col_id, col] : sheet->columns) {
+            auto new_col = std::make_unique<Axis>(col->id, true);
+            new_col->position = col->position;
+            new_col->size = col->size;
+            new_col->name = col->name;
+            temp_sheet->addColumn(std::move(new_col));
+        }
+
+        // Copy rows
+        for (const auto& [row_id, row] : sheet->rows) {
+            auto new_row = std::make_unique<Axis>(row->id, false);
+            new_row->position = row->position;
+            new_row->size = row->size;
+            temp_sheet->addRow(std::move(new_row));
+        }
+
+        // Copy cells (shallow copy of value is fine)
+        for (const auto& [cell_id, cell] : sheet->cells) {
+            auto new_cell = std::make_unique<Cell>(cell->id, cell->colId, cell->rowId);
+            new_cell->value = cell->value;
+            // Don't copy formula (CSV exports computed values only)
+            temp_sheet->addCell(std::move(new_cell));
+        }
+
+        temp_workbook.sheets.push_back(std::move(temp_sheet));
+
+        // Generate output filename
+        fs::path sheet_file = output_dir / (sheet->name + ".csv");
+
+        // Check if file exists
+        if (!options_.output.overwrite && fs::exists(sheet_file)) {
+            result.error =
+                "Output file already exists: " + sheet_file.string() + " (use -y to overwrite)";
+            return result;
+        }
+
+        // Write CSV
+        CSVWriteResult csv_result = writeCSV(temp_workbook, csv_opts);
+        if (!csv_result.ok() && csv_result.error.has_value()) {
+            result.error = "Error writing " + sheet_file.string() + ": " + csv_result.error->toString();
+            return result;
+        }
+
+        if (!writeFileContents(sheet_file.string(), csv_result.output, error)) {
+            result.error = error;
+            return result;
+        }
+
         total_cells += sheet->cellCount();
     }
 
