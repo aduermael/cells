@@ -1,11 +1,13 @@
 #include "core/cells/xlsx_writer.h"
 
-#include <algorithm>
 #include <cstring>
+
+#include <algorithm>
 #include <sstream>
 #include <unordered_map>
 
 #include "core/cells/ref_converter.h"
+
 #include "miniz.h"
 
 namespace {
@@ -65,14 +67,19 @@ std::string generateContentTypes(size_t sheetCount) {
            "ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>\n";
     xml << "  <Default Extension=\"xml\" ContentType=\"application/xml\"/>\n";
     xml << "  <Override PartName=\"/xl/workbook.xml\" "
-           "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>\n";
+           "ContentType=\"application/"
+           "vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>\n";
     xml << "  <Override PartName=\"/xl/styles.xml\" "
-           "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>\n";
+           "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/"
+           ">\n";
     xml << "  <Override PartName=\"/xl/sharedStrings.xml\" "
-           "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml\"/>\n";
+           "ContentType=\"application/"
+           "vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml\"/>\n";
     for (size_t i = 0; i < sheetCount; ++i) {
-        xml << "  <Override PartName=\"/xl/worksheets/sheet" << (i + 1) << ".xml\" "
-               "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>\n";
+        xml << "  <Override PartName=\"/xl/worksheets/sheet" << (i + 1)
+            << ".xml\" "
+               "ContentType=\"application/"
+               "vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>\n";
     }
     xml << "</Types>";
     return xml.str();
@@ -82,8 +89,11 @@ std::string generateContentTypes(size_t sheetCount) {
 std::string generateRootRels() {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
-    xml << "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n";
-    xml << "  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>\n";
+    xml << "<Relationships "
+           "xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n";
+    xml << "  <Relationship Id=\"rId1\" "
+           "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+           "officeDocument\" Target=\"xl/workbook.xml\"/>\n";
     xml << "</Relationships>";
     return xml.str();
 }
@@ -108,11 +118,14 @@ std::string generateWorkbook(const std::vector<std::string>& sheetNames) {
 std::string generateWorkbookRels(size_t sheetCount) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
-    xml << "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n";
+    xml << "<Relationships "
+           "xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n";
     // Sheet relationships
     for (size_t i = 0; i < sheetCount; ++i) {
         xml << "  <Relationship Id=\"rId" << (i + 1)
-            << "\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" "
+            << "\" "
+               "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+               "worksheet\" "
                "Target=\"worksheets/sheet"
             << (i + 1) << ".xml\"/>\n";
     }
@@ -122,7 +135,9 @@ std::string generateWorkbookRels(size_t sheetCount) {
            "Target=\"styles.xml\"/>\n";
     // Shared strings relationship
     xml << "  <Relationship Id=\"rId" << (sheetCount + 2)
-        << "\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" "
+        << "\" "
+           "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+           "sharedStrings\" "
            "Target=\"sharedStrings.xml\"/>\n";
     xml << "</Relationships>";
     return xml.str();
@@ -207,6 +222,7 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
 
     // Get ordered columns and rows
     std::vector<std::pair<uint32_t, cells::ID>> columns;
+    columns.reserve(sheet.columns.size());
     for (const auto& pair : sheet.columns) {
         columns.emplace_back(pair.second->position, pair.first);
     }
@@ -214,6 +230,7 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
               [](const auto& a, const auto& b) { return a.first < b.first; });
 
     std::vector<std::pair<uint32_t, cells::ID>> rows;
+    rows.reserve(sheet.rows.size());
     for (const auto& pair : sheet.rows) {
         rows.emplace_back(pair.second->position, pair.first);
     }
@@ -380,8 +397,8 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
 
                     case cells::CellValueType::BOOLEAN:
                         xml << " t=\"b\">\n";
-                        xml << "        <v>" << (value.raw == "true" || value.raw == "1" ? "1" : "0")
-                            << "</v>\n";
+                        xml << "        <v>"
+                            << (value.raw == "true" || value.raw == "1" ? "1" : "0") << "</v>\n";
                         xml << "      </c>\n";
                         break;
 
