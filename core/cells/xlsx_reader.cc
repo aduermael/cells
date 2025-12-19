@@ -1,15 +1,17 @@
 #include "core/cells/xlsx_reader.h"
 
-#include <algorithm>
 #include <cstdlib>
 #include <cstring>
+
+#include <algorithm>
 #include <sstream>
 #include <string>
 #include <utility>
 
-#include "bindings/go/excelize_types.h"
 #include "core/cells/id.h"
 #include "core/cells/types.h"
+
+#include "bindings/go/excelize_types.h"
 
 namespace cells {
 
@@ -166,7 +168,8 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
             if (options_.readDimensions && xlSheet.col_dims != nullptr) {
                 for (int d = 0; d < xlSheet.col_dim_count; ++d) {
                     if (xlSheet.col_dims[d].col == c) {
-                        // Convert Excel width units to pixels (approximately 7 pixels per character)
+                        // Convert Excel width units to pixels (approximately 7 pixels per
+                        // character)
                         col->size = static_cast<uint32_t>(xlSheet.col_dims[d].width * 7.0);
                         break;
                     }
@@ -202,18 +205,16 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
             const XLSXCell& xlCell = xlSheet.cells[cellIdx];
 
             // Validate indices
-            if (xlCell.row < 0 || xlCell.row >= xlSheet.row_count ||
-                xlCell.col < 0 || xlCell.col >= xlSheet.col_count) {
-                addWarning("Cell at invalid position (" + std::to_string(xlCell.row) +
-                           ", " + std::to_string(xlCell.col) + "), skipping");
+            if (xlCell.row < 0 || xlCell.row >= xlSheet.row_count || xlCell.col < 0 ||
+                xlCell.col >= xlSheet.col_count) {
+                addWarning("Cell at invalid position (" + std::to_string(xlCell.row) + ", " +
+                           std::to_string(xlCell.col) + "), skipping");
                 continue;
             }
 
             // Create cell
-            auto cell = std::make_unique<Cell>(
-                generate_id(),
-                columnIds[xlCell.col],
-                rowIds[xlCell.row]);
+            auto cell =
+                std::make_unique<Cell>(generate_id(), columnIds[xlCell.col], rowIds[xlCell.row]);
 
             // Parse cell value
             cell->value = parseCellValue(xlCell);

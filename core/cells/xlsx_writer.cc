@@ -9,9 +9,10 @@
 #include <unordered_map>
 #include <utility>
 
-#include "bindings/go/excelize_types.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/types.h"
+
+#include "bindings/go/excelize_types.h"
 
 namespace cells {
 
@@ -133,8 +134,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
     }
 
     xlData->sheet_count = static_cast<int>(workbook.sheets.size());
-    xlData->sheets = static_cast<XLSXSheet*>(
-        malloc(sizeof(XLSXSheet) * workbook.sheets.size()));
+    xlData->sheets = static_cast<XLSXSheet*>(malloc(sizeof(XLSXSheet) * workbook.sheets.size()));
     if (xlData->sheets == nullptr) {
         free(xlData);
         result.error = XLSXWriteError("Failed to allocate memory for sheets");
@@ -199,8 +199,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
             }
             if (!colDims.empty()) {
                 xlSheet->col_dim_count = static_cast<int>(colDims.size());
-                xlSheet->col_dims = static_cast<XLSXColDim*>(
-                    malloc(sizeof(XLSXColDim) * colDims.size()));
+                xlSheet->col_dims =
+                    static_cast<XLSXColDim*>(malloc(sizeof(XLSXColDim) * colDims.size()));
                 memcpy(xlSheet->col_dims, colDims.data(), sizeof(XLSXColDim) * colDims.size());
             }
         }
@@ -224,8 +224,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
             }
             if (!rowDims.empty()) {
                 xlSheet->row_dim_count = static_cast<int>(rowDims.size());
-                xlSheet->row_dims = static_cast<XLSXRowDim*>(
-                    malloc(sizeof(XLSXRowDim) * rowDims.size()));
+                xlSheet->row_dims =
+                    static_cast<XLSXRowDim*>(malloc(sizeof(XLSXRowDim) * rowDims.size()));
                 memcpy(xlSheet->row_dims, rowDims.data(), sizeof(XLSXRowDim) * rowDims.size());
             }
         }
@@ -300,8 +300,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
                         // Try to parse as number first
                         char* end = nullptr;
                         double num = std::strtod(cell.value.raw.c_str(), &end);
-                        if (end != cell.value.raw.c_str() && *end == '\0' &&
-                            !std::isnan(num) && !std::isinf(num)) {
+                        if (end != cell.value.raw.c_str() && *end == '\0' && !std::isnan(num) &&
+                            !std::isinf(num)) {
                             valueStr = std::to_string(num);
                             xlCell.cell_type = XLSX_CELL_TYPE_NUMBER;
                         } else {
@@ -339,8 +339,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         // Copy cells to sheet
         xlSheet->cell_count = static_cast<int>(cells.size());
         if (!cells.empty()) {
-            xlSheet->cells = static_cast<XLSXCell*>(
-                malloc(sizeof(XLSXCell) * cells.size()));
+            xlSheet->cells = static_cast<XLSXCell*>(malloc(sizeof(XLSXCell) * cells.size()));
             memcpy(xlSheet->cells, cells.data(), sizeof(XLSXCell) * cells.size());
         }
     }
@@ -353,8 +352,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
     XLSXDataFree(xlData);
 
     if (writeResult != 0) {
-        result.error = XLSXWriteError(
-            std::string("Failed to write XLSX file: ") + (error ? error : "unknown error"));
+        result.error = XLSXWriteError(std::string("Failed to write XLSX file: ") +
+                                      (error ? error : "unknown error"));
         if (error != nullptr) {
             XLSXErrorFree(error);
         }
