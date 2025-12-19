@@ -1,13 +1,15 @@
 #include "core/cells/xlsx_writer.h"
 
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 
-#include <OpenXLSX/OpenXLSX.hpp>  // NOLINT(build/include_order)
 #include <algorithm>
 #include <sstream>
 #include <unordered_map>
 #include <utility>
 
+#include "bindings/go/excelize_types.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/types.h"
 
@@ -102,6 +104,18 @@ std::string XLSXWriter::convertFormula(const std::string& formula, const Sheet& 
     return converter.formulaToA1(formula);
 }
 
+// Helper to duplicate a C string (returns nullptr if input is nullptr/empty)
+static char* dupString(const std::string& str) {
+    if (str.empty()) {
+        return nullptr;
+    }
+    char* result = static_cast<char*>(malloc(str.size() + 1));
+    if (result != nullptr) {
+        memcpy(result, str.c_str(), str.size() + 1);
+    }
+    return result;
+}
+
 XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::string& path) {
     reset();
     XLSXWriteResult result;
@@ -111,172 +125,244 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         return result;
     }
 
-    try {
-        // Create new XLSX document
-        OpenXLSX::XLDocument doc;
-        doc.create(path, OpenXLSX::XLForceOverwrite);
+    // Allocate XLSXData structure
+    XLSXData* xlData = static_cast<XLSXData*>(malloc(sizeof(XLSXData)));
+    if (xlData == nullptr) {
+        result.error = XLSXWriteError("Failed to allocate memory");
+        return result;
+    }
 
-        auto xlWorkbook = doc.workbook();
+    xlData->sheet_count = static_cast<int>(workbook.sheets.size());
+    xlData->sheets = static_cast<XLSXSheet*>(
+        malloc(sizeof(XLSXSheet) * workbook.sheets.size()));
+    if (xlData->sheets == nullptr) {
+        free(xlData);
+        result.error = XLSXWriteError("Failed to allocate memory for sheets");
+        return result;
+    }
 
-        // OpenXLSX creates a default "Sheet1" - we'll rename or delete it
-        for (size_t sheetIdx = 0; sheetIdx < workbook.sheets.size(); ++sheetIdx) {
-            const auto& sheet = workbook.sheets[sheetIdx];
-            std::string xlSheetName;
+    // Initialize all sheets to zero
+    memset(xlData->sheets, 0, sizeof(XLSXSheet) * workbook.sheets.size());
 
-            if (sheetIdx == 0) {
-                // Rename the default sheet
-                xlWorkbook.worksheet("Sheet1").setName(sheet->name);
-                xlSheetName = sheet->name;
-            } else {
-                // Add new sheet
-                xlWorkbook.addWorksheet(sheet->name);
-                xlSheetName = sheet->name;
-            }
+    // Process each sheet
+    for (size_t sheetIdx = 0; sheetIdx < workbook.sheets.size(); ++sheetIdx) {
+        const auto& sheet = workbook.sheets[sheetIdx];
+        XLSXSheet* xlSheet = &xlData->sheets[sheetIdx];
 
-            auto xlSheet = xlWorkbook.worksheet(xlSheetName);
+        xlSheet->name = dupString(sheet->name);
 
-            // Get ordered columns and rows
-            std::vector<ID> columnIds = getOrderedColumns(*sheet);
-            std::vector<ID> rowIds = getOrderedRows(*sheet);
+        // Get ordered columns and rows
+        std::vector<ID> columnIds = getOrderedColumns(*sheet);
+        std::vector<ID> rowIds = getOrderedRows(*sheet);
 
-            if (columnIds.empty() || rowIds.empty()) {
-                // Empty sheet - skip cell writing
-                continue;
-            }
+        xlSheet->col_count = static_cast<int>(columnIds.size());
+        xlSheet->row_count = static_cast<int>(rowIds.size());
 
-            // Write column widths if enabled
-            if (options_.writeDimensions) {
-                for (size_t c = 0; c < columnIds.size(); ++c) {
-                    auto it = sheet->columns.find(columnIds[c]);
-                    if (it != sheet->columns.end()) {
-                        // Convert pixels to Excel width units (approximately 7 pixels per
-                        // character)
-                        float width = static_cast<float>(it->second->size) / 7.0f;
-                        if (width > 0) {
-                            xlSheet.column(static_cast<uint16_t>(c + 1)).setWidth(width);
-                        }
+        if (columnIds.empty() || rowIds.empty()) {
+            xlSheet->cell_count = 0;
+            xlSheet->cells = nullptr;
+            xlSheet->col_dims = nullptr;
+            xlSheet->col_dim_count = 0;
+            xlSheet->row_dims = nullptr;
+            xlSheet->row_dim_count = 0;
+            continue;
+        }
+
+        // Build column ID to index map
+        std::unordered_map<ID, size_t> colIdToIndex;
+        for (size_t c = 0; c < columnIds.size(); ++c) {
+            colIdToIndex[columnIds[c]] = c;
+        }
+
+        // Build row ID to index map
+        std::unordered_map<ID, size_t> rowIdToIndex;
+        for (size_t r = 0; r < rowIds.size(); ++r) {
+            rowIdToIndex[rowIds[r]] = r;
+        }
+
+        // Write column dimensions if enabled
+        if (options_.writeDimensions) {
+            std::vector<XLSXColDim> colDims;
+            for (size_t c = 0; c < columnIds.size(); ++c) {
+                auto it = sheet->columns.find(columnIds[c]);
+                if (it != sheet->columns.end() && it->second->size > 0) {
+                    // Convert pixels to Excel width units (approximately 7 pixels per character)
+                    double width = static_cast<double>(it->second->size) / 7.0;
+                    if (width > 0 && width != 64.0 / 7.0) {  // Skip default width
+                        XLSXColDim dim;
+                        dim.col = static_cast<int>(c);
+                        dim.width = width;
+                        dim.hidden = 0;
+                        colDims.push_back(dim);
                     }
                 }
             }
-
-            // Write row heights if enabled
-            if (options_.writeDimensions) {
-                for (size_t r = 0; r < rowIds.size(); ++r) {
-                    auto it = sheet->rows.find(rowIds[r]);
-                    if (it != sheet->rows.end()) {
-                        // Convert pixels to points (1 point = 1.333 pixels at 96 DPI)
-                        double height = static_cast<double>(it->second->size) / 1.333;
-                        if (height > 0) {
-                            xlSheet.row(static_cast<uint32_t>(r + 1)).setHeight(height);
-                        }
-                    }
-                }
-            }
-
-            // Write cells
-            for (const auto& cellPair : sheet->cells) {
-                const Cell& cell = *cellPair.second;
-
-                // Find column and row indices
-                auto colIt = std::find(columnIds.begin(), columnIds.end(), cell.colId);
-                auto rowIt = std::find(rowIds.begin(), rowIds.end(), cell.rowId);
-
-                if (colIt == columnIds.end() || rowIt == rowIds.end()) {
-                    addWarning("Cell " + cell.id.toString() +
-                               " references unknown column or row, skipping");
-                    continue;
-                }
-
-                size_t colIndex = static_cast<size_t>(colIt - columnIds.begin());
-                size_t rowIndex = static_cast<size_t>(rowIt - rowIds.begin());
-
-                // Excel uses 1-based indexing
-                auto xlCell = xlSheet.cell(static_cast<uint32_t>(rowIndex + 1),
-                                           static_cast<uint16_t>(colIndex + 1));
-
-                // Write cell value based on type
-                switch (cell.value.type) {
-                    case CellValueType::NUMBER:
-                    case CellValueType::DATE:
-                    case CellValueType::DATE_TIME: {
-                        double num = cell.value.asNumber();
-                        if (std::isnan(num) || std::isinf(num)) {
-                            xlCell.value() = cell.value.raw;  // Write as string
-                        } else {
-                            xlCell.value() = num;
-                        }
-                        break;
-                    }
-
-                    case CellValueType::STRING:
-                        xlCell.value() = cell.value.raw;
-                        break;
-
-                    case CellValueType::BOOLEAN:
-                        xlCell.value() = cell.value.asBoolean();
-                        break;
-
-                    case CellValueType::ERROR:
-                        // Write error as string (Excel will interpret it)
-                        xlCell.value() = errorToString(cell.value.error);
-                        break;
-
-                    case CellValueType::FORMULA:
-                        // Formula cells - write computed value, formula handled below
-                        if (!cell.value.raw.empty()) {
-                            // Try to parse as number first
-                            try {
-                                double num = std::stod(cell.value.raw);
-                                if (!std::isnan(num) && !std::isinf(num)) {
-                                    xlCell.value() = num;
-                                } else {
-                                    xlCell.value() = cell.value.raw;
-                                }
-                            } catch (...) {
-                                xlCell.value() = cell.value.raw;
-                            }
-                        }
-                        break;
-                }
-
-                // Write formula if present and enabled
-                if (options_.writeFormulas && cell.formula != nullptr &&
-                    cell.formula->text != nullptr) {
-                    std::string formulaText = cell.formula->text;
-                    // Remove leading '=' if present (OpenXLSX adds it)
-                    if (!formulaText.empty() && formulaText[0] == '=') {
-                        formulaText = formulaText.substr(1);
-                    }
-
-                    // Convert UUID references to A1 notation
-                    std::string convertedFormula =
-                        convertFormula(formulaText, *sheet, columnIds, rowIds);
-
-                    if (!convertedFormula.empty()) {
-                        try {
-                            xlCell.formula() = convertedFormula;
-                        } catch (const std::exception& e) {
-                            addWarning("Could not write formula for cell at row " +
-                                       std::to_string(rowIndex + 1) + ", column " +
-                                       std::to_string(colIndex + 1) + ": " + e.what());
-                        }
-                    }
-                }
-
-                result.cellsWritten++;
+            if (!colDims.empty()) {
+                xlSheet->col_dim_count = static_cast<int>(colDims.size());
+                xlSheet->col_dims = static_cast<XLSXColDim*>(
+                    malloc(sizeof(XLSXColDim) * colDims.size()));
+                memcpy(xlSheet->col_dims, colDims.data(), sizeof(XLSXColDim) * colDims.size());
             }
         }
 
-        doc.save();
-        doc.close();
+        // Write row dimensions if enabled
+        if (options_.writeDimensions) {
+            std::vector<XLSXRowDim> rowDims;
+            for (size_t r = 0; r < rowIds.size(); ++r) {
+                auto it = sheet->rows.find(rowIds[r]);
+                if (it != sheet->rows.end() && it->second->size > 0) {
+                    // Convert pixels to points (1 point = 1.333 pixels at 96 DPI)
+                    double height = static_cast<double>(it->second->size) / 1.333;
+                    if (height > 0 && height != 15.0) {  // Skip default height
+                        XLSXRowDim dim;
+                        dim.row = static_cast<int>(r);
+                        dim.height = height;
+                        dim.hidden = 0;
+                        rowDims.push_back(dim);
+                    }
+                }
+            }
+            if (!rowDims.empty()) {
+                xlSheet->row_dim_count = static_cast<int>(rowDims.size());
+                xlSheet->row_dims = static_cast<XLSXRowDim*>(
+                    malloc(sizeof(XLSXRowDim) * rowDims.size()));
+                memcpy(xlSheet->row_dims, rowDims.data(), sizeof(XLSXRowDim) * rowDims.size());
+            }
+        }
 
-        result.warnings = std::move(warnings_);
-        return result;
+        // Write cells
+        std::vector<XLSXCell> cells;
+        cells.reserve(sheet->cells.size());
 
-    } catch (const std::exception& e) {
-        result.error = XLSXWriteError(std::string("Failed to write XLSX file: ") + e.what());
+        for (const auto& cellPair : sheet->cells) {
+            const Cell& cell = *cellPair.second;
+
+            // Find column and row indices
+            auto colIt = colIdToIndex.find(cell.colId);
+            auto rowIt = rowIdToIndex.find(cell.rowId);
+
+            if (colIt == colIdToIndex.end() || rowIt == rowIdToIndex.end()) {
+                addWarning("Cell " + cell.id.toString() +
+                           " references unknown column or row, skipping");
+                continue;
+            }
+
+            XLSXCell xlCell;
+            memset(&xlCell, 0, sizeof(xlCell));
+            xlCell.row = static_cast<int>(rowIt->second);
+            xlCell.col = static_cast<int>(colIt->second);
+
+            // Determine cell type and value
+            std::string valueStr;
+            switch (cell.value.type) {
+                case CellValueType::NUMBER:
+                case CellValueType::DATE:
+                case CellValueType::DATE_TIME: {
+                    double num = cell.value.asNumber();
+                    if (std::isnan(num) || std::isinf(num)) {
+                        valueStr = cell.value.raw;
+                        xlCell.cell_type = XLSX_CELL_TYPE_STRING;
+                    } else {
+                        valueStr = std::to_string(num);
+                        // Remove trailing zeros after decimal point
+                        size_t dot = valueStr.find('.');
+                        if (dot != std::string::npos) {
+                            size_t last = valueStr.find_last_not_of('0');
+                            if (last > dot) {
+                                valueStr = valueStr.substr(0, last + 1);
+                            } else {
+                                valueStr = valueStr.substr(0, dot);
+                            }
+                        }
+                        xlCell.cell_type = XLSX_CELL_TYPE_NUMBER;
+                    }
+                    break;
+                }
+
+                case CellValueType::STRING:
+                    valueStr = cell.value.raw;
+                    xlCell.cell_type = XLSX_CELL_TYPE_STRING;
+                    break;
+
+                case CellValueType::BOOLEAN:
+                    valueStr = cell.value.asBoolean() ? "TRUE" : "FALSE";
+                    xlCell.cell_type = XLSX_CELL_TYPE_BOOL;
+                    break;
+
+                case CellValueType::ERROR:
+                    valueStr = errorToString(cell.value.error);
+                    xlCell.cell_type = XLSX_CELL_TYPE_ERROR;
+                    break;
+
+                case CellValueType::FORMULA:
+                    // Formula cells - write computed value
+                    if (!cell.value.raw.empty()) {
+                        // Try to parse as number first
+                        char* end = nullptr;
+                        double num = std::strtod(cell.value.raw.c_str(), &end);
+                        if (end != cell.value.raw.c_str() && *end == '\0' &&
+                            !std::isnan(num) && !std::isinf(num)) {
+                            valueStr = std::to_string(num);
+                            xlCell.cell_type = XLSX_CELL_TYPE_NUMBER;
+                        } else {
+                            valueStr = cell.value.raw;
+                            xlCell.cell_type = XLSX_CELL_TYPE_STRING;
+                        }
+                    }
+                    break;
+            }
+
+            xlCell.value = dupString(valueStr);
+
+            // Write formula if present and enabled
+            if (options_.writeFormulas && cell.formula != nullptr &&
+                cell.formula->text != nullptr) {
+                std::string formulaText = cell.formula->text;
+                // Remove leading '=' if present
+                if (!formulaText.empty() && formulaText[0] == '=') {
+                    formulaText = formulaText.substr(1);
+                }
+
+                // Convert UUID references to A1 notation
+                std::string convertedFormula =
+                    convertFormula(formulaText, *sheet, columnIds, rowIds);
+
+                if (!convertedFormula.empty()) {
+                    xlCell.formula = dupString(convertedFormula);
+                }
+            }
+
+            cells.push_back(xlCell);
+            result.cellsWritten++;
+        }
+
+        // Copy cells to sheet
+        xlSheet->cell_count = static_cast<int>(cells.size());
+        if (!cells.empty()) {
+            xlSheet->cells = static_cast<XLSXCell*>(
+                malloc(sizeof(XLSXCell) * cells.size()));
+            memcpy(xlSheet->cells, cells.data(), sizeof(XLSXCell) * cells.size());
+        }
+    }
+
+    // Write XLSX file using excelize
+    char* error = nullptr;
+    int writeResult = ExcelizeWriteXLSX(path.c_str(), xlData, &error);
+
+    // Free the XLSXData structure
+    XLSXDataFree(xlData);
+
+    if (writeResult != 0) {
+        result.error = XLSXWriteError(
+            std::string("Failed to write XLSX file: ") + (error ? error : "unknown error"));
+        if (error != nullptr) {
+            XLSXErrorFree(error);
+        }
         return result;
     }
+
+    result.warnings = std::move(warnings_);
+    return result;
 }
 
 // ============================================================================

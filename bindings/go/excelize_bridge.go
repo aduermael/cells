@@ -219,15 +219,12 @@ type rowDimData struct {
 func determineCellType(f *excelize.File, sheet, cellRef, value string) int {
 	cellType, err := f.GetCellType(sheet, cellRef)
 	if err != nil {
-		return 0 // XLSX_CELL_TYPE_EMPTY
+		// Fallback: try to infer type from value
+		return inferTypeFromValue(value)
 	}
 
 	switch cellType {
-	case excelize.CellTypeUnset, excelize.CellTypeInlineString, excelize.CellTypeSharedString:
-		return 1 // XLSX_CELL_TYPE_STRING
 	case excelize.CellTypeNumber:
-		// Check if it's a date by looking at the cell style/format
-		// For now, return number - date detection is complex
 		return 2 // XLSX_CELL_TYPE_NUMBER
 	case excelize.CellTypeBool:
 		return 3 // XLSX_CELL_TYPE_BOOL
@@ -237,19 +234,37 @@ func determineCellType(f *excelize.File, sheet, cellRef, value string) int {
 		return 5 // XLSX_CELL_TYPE_DATE
 	case excelize.CellTypeFormula:
 		// Formula cells - determine type from value
-		if _, err := strconv.ParseFloat(value, 64); err == nil {
-			return 2 // XLSX_CELL_TYPE_NUMBER
-		}
-		if strings.ToUpper(value) == "TRUE" || strings.ToUpper(value) == "FALSE" {
-			return 3 // XLSX_CELL_TYPE_BOOL
-		}
-		if strings.HasPrefix(value, "#") {
-			return 4 // XLSX_CELL_TYPE_ERROR
-		}
+		return inferTypeFromValue(value)
+	case excelize.CellTypeUnset:
+		// CellTypeUnset is returned for cells without explicit type attribute
+		// Try to infer type from value
+		return inferTypeFromValue(value)
+	case excelize.CellTypeInlineString, excelize.CellTypeSharedString:
 		return 1 // XLSX_CELL_TYPE_STRING
 	default:
-		return 1 // XLSX_CELL_TYPE_STRING
+		return inferTypeFromValue(value)
 	}
+}
+
+// inferTypeFromValue attempts to determine cell type from the string value
+func inferTypeFromValue(value string) int {
+	// Check for boolean
+	upper := strings.ToUpper(value)
+	if upper == "TRUE" || upper == "FALSE" {
+		return 3 // XLSX_CELL_TYPE_BOOL
+	}
+
+	// Check for error
+	if strings.HasPrefix(value, "#") {
+		return 4 // XLSX_CELL_TYPE_ERROR
+	}
+
+	// Try to parse as number
+	if _, err := strconv.ParseFloat(value, 64); err == nil {
+		return 2 // XLSX_CELL_TYPE_NUMBER
+	}
+
+	return 1 // XLSX_CELL_TYPE_STRING
 }
 
 // getColumnDimensions gets column width info

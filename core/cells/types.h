@@ -66,6 +66,24 @@ struct IDHash {
     }
 };
 
+}  // namespace cells
+
+// std::hash specialization for ID (allows use in std::unordered_map/set without custom hasher)
+template <>
+struct std::hash<cells::ID> {
+    std::size_t operator()(const cells::ID& id) const {
+        // FNV-1a hash
+        std::size_t hash = 14695981039346656037ULL;
+        for (const char i : id.data) {
+            hash ^= static_cast<unsigned char>(i);
+            hash *= 1099511628211ULL;
+        }
+        return hash;
+    }
+};
+
+namespace cells {
+
 // Cell value types - stored as single char in file format
 enum class CellValueType : std::uint8_t {
     NUMBER,     // 'n' - numeric value (42, 3.14, -100)

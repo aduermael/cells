@@ -3,6 +3,9 @@ module(
     version = "0.0.1",
 )
 
+# Platforms for OS-specific configurations
+bazel_dep(name = "platforms", version = "0.0.10")
+
 # Google Test
 bazel_dep(name = "googletest", version = "1.14.0")
 

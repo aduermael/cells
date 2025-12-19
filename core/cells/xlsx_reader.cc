@@ -1,10 +1,13 @@
 #include "core/cells/xlsx_reader.h"
 
-#include <OpenXLSX/OpenXLSX.hpp>  // NOLINT(build/include_order)
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 #include <sstream>
+#include <string>
 #include <utility>
 
+#include "bindings/go/excelize_types.h"
 #include "core/cells/id.h"
 #include "core/cells/types.h"
 
@@ -46,219 +49,206 @@ void XLSXReader::addWarning(const std::string& msg) {
     warnings_.push_back(msg);
 }
 
+// Helper to map cell type enum to CellValue
+static CellValue parseCellValue(const XLSXCell& xlCell) {
+    const char* value = xlCell.value;
+    if (value == nullptr || value[0] == '\0') {
+        return CellValue("");
+    }
+
+    switch (xlCell.cell_type) {
+        case XLSX_CELL_TYPE_NUMBER: {
+            // Try to parse as double
+            char* end = nullptr;
+            double num = std::strtod(value, &end);
+            if (end != value && *end == '\0') {
+                return CellValue(num);
+            }
+            return CellValue(std::string(value));
+        }
+
+        case XLSX_CELL_TYPE_BOOL: {
+            std::string val(value);
+            bool boolVal = (val == "TRUE" || val == "true" || val == "1");
+            return CellValue(boolVal);
+        }
+
+        case XLSX_CELL_TYPE_ERROR: {
+            std::string errStr(value);
+            CellError err = CellError::NONE;
+            if (errStr == "#DIV/0!") {
+                err = CellError::DIV;
+            } else if (errStr == "#VALUE!") {
+                err = CellError::VALUE;
+            } else if (errStr == "#REF!") {
+                err = CellError::REF;
+            } else if (errStr == "#NAME?") {
+                err = CellError::NAME;
+            } else if (errStr == "#NUM!") {
+                err = CellError::NUM;
+            } else if (errStr == "#N/A" || errStr == "#NULL!") {
+                err = CellError::NULL_REF;
+            } else {
+                err = CellError::VALUE;  // Default
+            }
+            return CellValue(err);
+        }
+
+        case XLSX_CELL_TYPE_DATE:
+            // Store dates as numbers (Excel serial date format)
+            {
+                char* end = nullptr;
+                double num = std::strtod(value, &end);
+                if (end != value && *end == '\0') {
+                    return CellValue(num);
+                }
+            }
+            return CellValue(std::string(value));
+
+        case XLSX_CELL_TYPE_STRING:
+        case XLSX_CELL_TYPE_EMPTY:
+        default:
+            return CellValue(std::string(value));
+    }
+}
+
 XLSXReadResult XLSXReader::readFile(const std::string& path) {
     reset();
     XLSXReadResult result;
 
-    try {
-        // Open the XLSX document
-        OpenXLSX::XLDocument doc;
-        doc.open(path);
+    // Parse XLSX using excelize (Go)
+    char* error = nullptr;
+    XLSXData* xlData = ExcelizeParseXLSX(path.c_str(), &error);
 
-        // Create workbook with generated ID
-        auto workbook = std::make_unique<Workbook>(generate_id(), "Imported");
+    if (error != nullptr) {
+        result.error = XLSXReadError(std::string("Failed to read XLSX file: ") + error);
+        XLSXErrorFree(error);
+        return result;
+    }
 
-        // Get the workbook object
-        auto xlWorkbook = doc.workbook();
-        auto sheetNames = xlWorkbook.worksheetNames();
+    if (xlData == nullptr) {
+        result.error = XLSXReadError("Failed to read XLSX file: unknown error");
+        return result;
+    }
+
+    // Create workbook with generated ID
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Imported");
+
+    // Process each sheet
+    for (int sheetIdx = 0; sheetIdx < xlData->sheet_count; ++sheetIdx) {
+        const XLSXSheet& xlSheet = xlData->sheets[sheetIdx];
+        std::string sheetName(xlSheet.name);
 
         // Filter sheets if specific sheet requested
-        if (!options_.sheetName.empty()) {
-            const auto it = std::find(sheetNames.begin(), sheetNames.end(), options_.sheetName);
-            if (it == sheetNames.end()) {
-                result.error = XLSXReadError("Sheet \"" + options_.sheetName + "\" not found");
-                return result;
-            }
-            sheetNames = {options_.sheetName};
+        if (!options_.sheetName.empty() && sheetName != options_.sheetName) {
+            continue;
         }
 
-        // Process each worksheet
-        for (const auto& sheetName : sheetNames) {
-            auto xlSheet = xlWorkbook.worksheet(sheetName);
+        // Create our Sheet
+        auto sheet = std::make_unique<Sheet>(generate_id(), sheetName);
 
-            // Create our Sheet
-            auto sheet = std::make_unique<Sheet>(generate_id(), sheetName);
+        // Skip empty sheets
+        if (xlSheet.row_count == 0 || xlSheet.col_count == 0) {
+            workbook->addSheet(std::move(sheet));
+            continue;
+        }
 
-            // Get dimensions - use rowCount/columnCount to avoid exceptions on empty sheets
-            uint32_t rowCount = xlSheet.rowCount();
-            uint16_t colCount = xlSheet.columnCount();
+        // Create columns and rows
+        std::vector<ID> columnIds;
+        std::vector<ID> rowIds;
 
-            if (rowCount == 0 || colCount == 0) {
-                // Empty sheet
-                workbook->addSheet(std::move(sheet));
+        for (int c = 0; c < xlSheet.col_count; ++c) {
+            auto col = std::make_unique<Axis>(generate_id(), true);
+            col->position = static_cast<uint32_t>(c);
+            col->size = 64;  // Default width
+
+            // Apply column dimensions if available
+            if (options_.readDimensions && xlSheet.col_dims != nullptr) {
+                for (int d = 0; d < xlSheet.col_dim_count; ++d) {
+                    if (xlSheet.col_dims[d].col == c) {
+                        // Convert Excel width units to pixels (approximately 7 pixels per character)
+                        col->size = static_cast<uint32_t>(xlSheet.col_dims[d].width * 7.0);
+                        break;
+                    }
+                }
+            }
+
+            columnIds.push_back(col->id);
+            sheet->addColumn(std::move(col));
+        }
+
+        for (int r = 0; r < xlSheet.row_count; ++r) {
+            auto row = std::make_unique<Axis>(generate_id(), false);
+            row->position = static_cast<uint32_t>(r);
+            row->size = 20;  // Default height in pixels
+
+            // Apply row dimensions if available
+            if (options_.readDimensions && xlSheet.row_dims != nullptr) {
+                for (int d = 0; d < xlSheet.row_dim_count; ++d) {
+                    if (xlSheet.row_dims[d].row == r) {
+                        // Convert points to pixels (1 point = 1.333 pixels at 96 DPI)
+                        row->size = static_cast<uint32_t>(xlSheet.row_dims[d].height * 1.333);
+                        break;
+                    }
+                }
+            }
+
+            rowIds.push_back(row->id);
+            sheet->addRow(std::move(row));
+        }
+
+        // Read cells
+        for (int cellIdx = 0; cellIdx < xlSheet.cell_count; ++cellIdx) {
+            const XLSXCell& xlCell = xlSheet.cells[cellIdx];
+
+            // Validate indices
+            if (xlCell.row < 0 || xlCell.row >= xlSheet.row_count ||
+                xlCell.col < 0 || xlCell.col >= xlSheet.col_count) {
+                addWarning("Cell at invalid position (" + std::to_string(xlCell.row) +
+                           ", " + std::to_string(xlCell.col) + "), skipping");
                 continue;
             }
 
-            // Create columns and rows
-            std::vector<ID> columnIds;
-            std::vector<ID> rowIds;
+            // Create cell
+            auto cell = std::make_unique<Cell>(
+                generate_id(),
+                columnIds[xlCell.col],
+                rowIds[xlCell.row]);
 
-            for (uint16_t c = 1; c <= colCount; ++c) {
-                auto col = std::make_unique<Axis>(generate_id(), true);
-                col->position = c - 1;
+            // Parse cell value
+            cell->value = parseCellValue(xlCell);
 
-                // Read column width if requested
-                if (options_.readDimensions) {
-                    try {
-                        auto xlCol = xlSheet.column(c);
-                        float width = xlCol.width();
-                        // Convert Excel width units to pixels (approximate)
-                        // Excel width = number of '0' characters that fit
-                        // Roughly 7 pixels per character
-                        col->size = static_cast<uint32_t>(width * 7.0f);
-                    } catch (...) {
-                        // Column info may not exist, use default
-                        col->size = 64;  // Default width
-                    }
-                }
-
-                columnIds.push_back(col->id);
-                sheet->addColumn(std::move(col));
-            }
-
-            for (uint32_t r = 1; r <= rowCount; ++r) {
-                auto row = std::make_unique<Axis>(generate_id(), false);
-                row->position = r - 1;
-                rowIds.push_back(row->id);
-                sheet->addRow(std::move(row));
-            }
-
-            // Read row heights using row iterator (much faster than random access)
-            if (options_.readDimensions) {
-                for (const auto& xlRow : xlSheet.rows()) {
-                    uint32_t r = xlRow.rowNumber();
-                    if (r < 1 || r > rowCount)
-                        continue;
-                    try {
-                        double height = xlRow.height();
-                        auto* row = sheet->getRow(rowIds[r - 1]);
-                        if (row) {
-                            row->size = static_cast<uint32_t>(height * 1.333);
-                        }
-                    } catch (...) {
-                        // Height may not be set, use default
-                    }
+            // Read formula if present and requested
+            if (options_.readFormulas && xlCell.formula != nullptr && xlCell.formula[0] != '\0') {
+                std::string formulaText(xlCell.formula);
+                if (options_.readFormulaText) {
+                    // Store formula with leading '='
+                    cell->setFormula(new Formula(("=" + formulaText).c_str()));
+                } else {
+                    // Just mark as formula without text
+                    cell->setFormula(new Formula("="));
                 }
             }
 
-            // Read cells - iterate only over populated rows/cells for performance
-            for (const auto& xlRow : xlSheet.rows()) {
-                uint32_t r = xlRow.rowNumber();
-                if (r < 1 || r > rowCount)
-                    continue;
-
-                for (auto& xlCell : xlRow.cells()) {
-                    try {
-                        // Cache the cell value to avoid multiple XLCellValue constructions
-                        const auto& xlValue = xlCell.value();
-                        auto valueType = xlValue.type();
-
-                        // Skip empty cells
-                        if (valueType == OpenXLSX::XLValueType::Empty) {
-                            continue;
-                        }
-
-                        uint16_t c = xlCell.cellReference().column();
-                        if (c < 1 || c > colCount)
-                            continue;
-
-                        // Create cell
-                        auto cell =
-                            std::make_unique<Cell>(generate_id(), columnIds[c - 1], rowIds[r - 1]);
-
-                        switch (valueType) {
-                            case OpenXLSX::XLValueType::Boolean:
-                                cell->value = CellValue(xlValue.get<bool>());
-                                break;
-
-                            case OpenXLSX::XLValueType::Integer:
-                                cell->value =
-                                    CellValue(static_cast<double>(xlValue.get<int64_t>()));
-                                break;
-
-                            case OpenXLSX::XLValueType::Float:
-                                cell->value = CellValue(xlValue.get<double>());
-                                break;
-
-                            case OpenXLSX::XLValueType::String:
-                                cell->value = CellValue(xlValue.get<std::string>());
-                                break;
-
-                            case OpenXLSX::XLValueType::Error:
-                                // Map Excel errors to our error types
-                                {
-                                    std::string errStr = xlValue.get<std::string>();
-                                    CellError err = CellError::NONE;
-                                    if (errStr == "#DIV/0!") {
-                                        err = CellError::DIV;
-                                    } else if (errStr == "#VALUE!") {
-                                        err = CellError::VALUE;
-                                    } else if (errStr == "#REF!") {
-                                        err = CellError::REF;
-                                    } else if (errStr == "#NAME?") {
-                                        err = CellError::NAME;
-                                    } else if (errStr == "#NUM!") {
-                                        err = CellError::NUM;
-                                    } else if (errStr == "#N/A" || errStr == "#NULL!") {
-                                        err = CellError::NULL_REF;
-                                    } else {
-                                        err = CellError::VALUE;  // Default
-                                    }
-                                    cell->value = CellValue(err);
-                                }
-                                break;
-
-                            default:
-                                // Empty or unknown - skip
-                                continue;
-                        }
-
-                        // Read formula if present and requested
-                        // Note: OpenXLSX hasFormula() returns true for shared formulas,
-                        // but formula().get() throws for them (shared formulas not supported).
-                        if (options_.readFormulas && xlCell.hasFormula()) {
-                            // Only try to extract formula text if requested
-                            // (extraction is slow due to exceptions from shared formulas)
-                            if (options_.readFormulaText) {
-                                try {
-                                    std::string formulaText = xlCell.formula().get();
-                                    if (!formulaText.empty()) {
-                                        // Store formula with leading '=' for now
-                                        // Reference conversion will be done in Phase 8
-                                        cell->setFormula(new Formula(("=" + formulaText).c_str()));
-                                    }
-                                } catch (...) {
-                                    // Shared or array formulas - mark cell as formula type
-                                    // but we can't get the formula text
-                                    cell->setFormula(new Formula("="));
-                                }
-                            } else {
-                                // Just mark as formula without text
-                                cell->setFormula(new Formula("="));
-                            }
-                        }
-
-                        sheet->addCell(std::move(cell));
-                    } catch (const std::exception& e) {
-                        addWarning("Error reading cell at " + sheetName + "!" +
-                                   xlCell.cellReference().address() + ": " + e.what());
-                    }
-                }
-            }
-
-            workbook->addSheet(std::move(sheet));
+            sheet->addCell(std::move(cell));
         }
 
-        doc.close();
+        workbook->addSheet(std::move(sheet));
+    }
 
-        result.workbook = std::move(workbook);
-        result.warnings = std::move(warnings_);
-        return result;
-
-    } catch (const std::exception& e) {
-        result.error = XLSXReadError(std::string("Failed to read XLSX file: ") + e.what());
+    // Check if requested sheet was found
+    if (!options_.sheetName.empty() && workbook->sheets.empty()) {
+        XLSXDataFree(xlData);
+        result.error = XLSXReadError("Sheet \"" + options_.sheetName + "\" not found");
         return result;
     }
+
+    // Clean up excelize data
+    XLSXDataFree(xlData);
+
+    result.workbook = std::move(workbook);
+    result.warnings = std::move(warnings_);
+    return result;
 }
 
 // ============================================================================

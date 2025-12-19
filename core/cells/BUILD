@@ -133,7 +133,7 @@ cc_library(
     deps = [
         ":id",
         ":model",
-        "@openxlsx",
+        "//bindings/go:excelize_bridge",
     ],
 )
 
@@ -155,7 +155,7 @@ cc_library(
     deps = [
         ":model",
         ":ref_converter",
-        "@openxlsx",
+        "//bindings/go:excelize_bridge",
     ],
 )
 
