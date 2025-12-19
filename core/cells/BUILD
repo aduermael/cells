@@ -156,6 +156,8 @@ cc_library(
     deps = [
         ":id",
         ":model",
+        ":ref_converter",
+        "//third_party/miniz",
     ],
 )
 

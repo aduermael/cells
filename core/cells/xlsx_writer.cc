@@ -2,6 +2,58 @@
 
 #include <sstream>
 
+#include "miniz.h"
+
+namespace {
+
+// ZIP file writing using miniz
+class ZipWriter {
+public:
+    ZipWriter() = default;
+
+    ~ZipWriter() {
+        if (opened_) {
+            mz_zip_writer_end(&archive_);
+        }
+    }
+
+    bool open(const std::string& path) {
+        memset(&archive_, 0, sizeof(archive_));
+        if (mz_zip_writer_init_file(&archive_, path.c_str(), 0) == 0) {
+            return false;
+        }
+        opened_ = true;
+        return true;
+    }
+
+    // Add content to archive
+    bool addFile(const std::string& name, const std::string& content) {
+        return mz_zip_writer_add_mem(&archive_, name.c_str(), content.data(), content.size(),
+                                     MZ_DEFAULT_COMPRESSION) != 0;
+    }
+
+    // Finalize and close archive
+    bool finalize() {
+        if (!opened_) {
+            return false;
+        }
+        if (mz_zip_writer_finalize_archive(&archive_) == 0) {
+            return false;
+        }
+        if (mz_zip_writer_end(&archive_) == 0) {
+            return false;
+        }
+        opened_ = false;
+        return true;
+    }
+
+private:
+    mz_zip_archive archive_{};
+    bool opened_{false};
+};
+
+}  // namespace
+
 namespace cells {
 
 // ============================================================================
