@@ -28,6 +28,7 @@ struct CellValue {
     CellValue();
     explicit CellValue(double number);
     explicit CellValue(std::string str);
+    explicit CellValue(const char* str);  // Needed to prevent const char* -> bool conversion
     explicit CellValue(bool boolean);
     explicit CellValue(CellError error);
 

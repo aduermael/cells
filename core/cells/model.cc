@@ -33,6 +33,9 @@ CellValue::CellValue(double number)
 CellValue::CellValue(std::string str)
     : raw(std::move(str)), type(CellValueType::STRING), error(CellError::NONE) {}
 
+CellValue::CellValue(const char* str)
+    : raw(str ? str : ""), type(CellValueType::STRING), error(CellError::NONE) {}
+
 CellValue::CellValue(bool boolean)
     : raw(boolean ? "true" : "false"), type(CellValueType::BOOLEAN), error(CellError::NONE) {}
 

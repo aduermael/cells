@@ -157,3 +157,14 @@ cc_library(
         "@openxlsx",
     ],
 )
+
+cc_test(
+    name = "xlsx_writer_test",
+    srcs = ["xlsx_writer_test.cc"],
+    deps = [
+        ":id",
+        ":xlsx_reader",
+        ":xlsx_writer",
+        "@googletest//:gtest_main",
+    ],
+)
