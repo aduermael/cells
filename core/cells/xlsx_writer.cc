@@ -84,6 +84,46 @@ std::string generateRootRels() {
     return xml.str();
 }
 
+// Generate xl/workbook.xml
+std::string generateWorkbook(const std::vector<std::string>& sheetNames) {
+    std::ostringstream xml;
+    xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
+    xml << "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" "
+           "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n";
+    xml << "  <sheets>\n";
+    for (size_t i = 0; i < sheetNames.size(); ++i) {
+        xml << "    <sheet name=\"" << sheetNames[i] << "\" sheetId=\"" << (i + 1)
+            << "\" r:id=\"rId" << (i + 1) << "\"/>\n";
+    }
+    xml << "  </sheets>\n";
+    xml << "</workbook>";
+    return xml.str();
+}
+
+// Generate xl/_rels/workbook.xml.rels
+std::string generateWorkbookRels(size_t sheetCount) {
+    std::ostringstream xml;
+    xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
+    xml << "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n";
+    // Sheet relationships
+    for (size_t i = 0; i < sheetCount; ++i) {
+        xml << "  <Relationship Id=\"rId" << (i + 1)
+            << "\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" "
+               "Target=\"worksheets/sheet"
+            << (i + 1) << ".xml\"/>\n";
+    }
+    // Styles relationship
+    xml << "  <Relationship Id=\"rId" << (sheetCount + 1)
+        << "\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" "
+           "Target=\"styles.xml\"/>\n";
+    // Shared strings relationship
+    xml << "  <Relationship Id=\"rId" << (sheetCount + 2)
+        << "\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" "
+           "Target=\"sharedStrings.xml\"/>\n";
+    xml << "</Relationships>";
+    return xml.str();
+}
+
 }  // namespace
 
 namespace cells {
