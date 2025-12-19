@@ -28,6 +28,8 @@ void Parser::reset() {
     workbook_ = nullptr;
     currentSheet_ = nullptr;
     errorMsg_.clear();
+    pendingSharedFormulas_.clear();
+    cellsByIdForResolution_.clear();
 }
 
 bool Parser::setError(const std::string& message) {
@@ -80,6 +82,13 @@ ParseResult Parser::parse(std::string_view content) {
         }
 
         pos = lineEnd + 1;
+    }
+
+    // Resolve shared formula references after all cells are parsed
+    if (!resolveSharedFormulas()) {
+        ParseResult result;
+        result.error = ParseError(lineNum_, errorMsg_);
+        return result;
     }
 
     ParseResult result;
@@ -576,12 +585,56 @@ bool Parser::parseCell(std::string_view line) {
         return setError("Invalid cell value");
     }
 
-    // If it's a formula, set the formula pointer
+    // If it's a formula, check for shared formula reference =@UUID
     if (type == 'f') {
-        cell->setFormula(new Formula(cell->value.raw.c_str()));
+        const std::string& formulaText = cell->value.raw;
+        if (formulaText.size() >= 2 && formulaText[0] == '=' && formulaText[1] == '@') {
+            // Shared formula reference: =@masterUUID
+            // Extract the master UUID (8 characters after =@)
+            const std::string masterUUID = formulaText.substr(2);
+            if (masterUUID.size() == ID_LENGTH) {
+                // Store for later resolution
+                pendingSharedFormulas_[cell->id] = masterUUID;
+            } else {
+                return setError("Invalid shared formula reference: " + formulaText);
+            }
+        } else {
+            // Regular formula
+            cell->setFormula(new Formula(formulaText.c_str()));
+        }
     }
 
+    // Track cell for shared formula resolution
+    Cell* cellPtr = cell.get();
+    cellsByIdForResolution_[cell->id] = cellPtr;
+
     currentSheet_->addCell(std::move(cell));
+    return true;
+}
+
+bool Parser::resolveSharedFormulas() {
+    // Resolve all pending shared formula references
+    for (const auto& [subscriberId, masterUUIDStr] : pendingSharedFormulas_) {
+        // Find subscriber cell
+        auto subscriberIt = cellsByIdForResolution_.find(subscriberId);
+        if (subscriberIt == cellsByIdForResolution_.end()) {
+            // This shouldn't happen, but handle gracefully
+            return setError("Internal error: subscriber cell not found for shared formula");
+        }
+        Cell* subscriber = subscriberIt->second;
+
+        // Find master cell by UUID
+        const ID masterID(masterUUIDStr);
+        auto masterIt = cellsByIdForResolution_.find(masterID);
+        if (masterIt == cellsByIdForResolution_.end()) {
+            return setError("Shared formula master not found: " + masterUUIDStr);
+        }
+        Cell* master = masterIt->second;
+
+        // Link subscriber to master
+        subscriber->setSharedFormulaRef(master);
+    }
+
     return true;
 }
 

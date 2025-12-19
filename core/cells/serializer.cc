@@ -184,8 +184,12 @@ void Serializer::serializeCellValue(const CellValue& value, const Cell& cell,
             break;
 
         case CellValueType::FORMULA:
-            // Formula text is stored in value.raw or cell.formula->text
-            if (cell.formula != nullptr && cell.formula->text != nullptr) {
+            // Shared formula subscriber: write =@masterUUID reference
+            if (cell.sharedFormulaRef != nullptr) {
+                out << "\"=@" << cell.sharedFormulaRef->id.toString() << "\"";
+            }
+            // Master or regular formula: write actual formula text
+            else if (cell.formula != nullptr && cell.formula->text != nullptr) {
                 out << "\"" << escapeString(cell.formula->text) << "\"";
             } else {
                 out << "\"" << escapeString(value.raw) << "\"";

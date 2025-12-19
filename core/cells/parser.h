@@ -5,6 +5,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_map>
+#include <vector>
 
 #include "core/cells/model.h"
 #include "core/cells/types.h"
@@ -51,8 +53,16 @@ private:
     Sheet* currentSheet_{nullptr};  // Current sheet being parsed
     std::string errorMsg_;          // Error message if parsing failed
 
+    // Shared formula tracking: subscriber cell ID -> master cell UUID string
+    std::unordered_map<ID, std::string, IDHash> pendingSharedFormulas_;
+    // Cell ID -> Cell* for resolving references after parsing
+    std::unordered_map<ID, Cell*, IDHash> cellsByIdForResolution_;
+
     // Reset parser state for new parse
     void reset();
+
+    // Resolve shared formula references after all cells are parsed
+    bool resolveSharedFormulas();
 
     // Set error and return false
     bool setError(const std::string& message);

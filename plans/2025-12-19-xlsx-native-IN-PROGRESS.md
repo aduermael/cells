@@ -96,7 +96,7 @@ In our `.cells` format, cell references use `<colUUID>:<rowUUID>` with optional 
 - [x] 2b: Add SharedFormulaGroup and sharedFormulaRef to Cell model
 - [x] 2c: Implement XLSX reader shared formula parsing (master and subscriber cells)
 - [x] 2d: Implement shared formula master deletion/promotion (done in 2b via SharedFormulaGroup::promoteMaster)
-- [ ] 2e: Update .cells format parser/writer for shared formulas
+- [x] 2e: Update .cells format parser/writer for shared formulas
 - [ ] 2f: Add tests for shared formula round-trip
 
 ### Design Notes
