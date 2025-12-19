@@ -430,7 +430,8 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                                     sharedFormulaMasters[si] = rawPtr;
                                     continue;
                                 }
-                                // Subscriber cell has only si attribute (rawPtr used for setSharedFormulaRef)
+                                // Subscriber cell has only si attribute (rawPtr used for
+                                // setSharedFormulaRef)
                                 Cell* rawPtr = cell.get();  // NOLINT(misc-const-correctness)
                                 sheet->addCell(std::move(cell));
                                 sharedFormulaSubscribers[si].push_back(rawPtr);
