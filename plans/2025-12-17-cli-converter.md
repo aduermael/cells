@@ -324,7 +324,7 @@ Final touches for release.
 - [x] **10b:** Test on sample real-world files
 - [x] **10c:** Performance testing with large files (100K+ cells)
 - [x] **10d:** Memory profiling
-- [ ] **10e:** Update GETTING_STARTED.md with CLI usage
+- [x] **10e:** Update GETTING_STARTED.md with CLI usage
 - [ ] **10f:** Create example scripts in `examples/`
 
 **Deliverables:**

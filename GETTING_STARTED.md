@@ -67,6 +67,57 @@ Run with verbose output:
 bazel test //core/... --test_output=all
 ```
 
+## CLI Tool
+
+The `cells` CLI converts between spreadsheet formats.
+
+### Building
+
+```bash
+bazel build //apps/cli:cells
+```
+
+The binary is at `bazel-bin/apps/cli/cells`.
+
+### Basic Usage
+
+```bash
+# Convert between formats
+cells -i data.csv output.cells
+cells -i budget.xlsx report.csv
+cells -i legacy.csv modern.xlsx
+
+# File inspection
+cells -I data.xlsx
+cells -I spreadsheet.cells
+```
+
+### Supported Formats
+
+| Format | Extension | Notes |
+|--------|-----------|-------|
+| Cells | `.cells` | Native format, preserves all features |
+| CSV | `.csv`, `.tsv` | Single sheet, values only |
+| Excel | `.xlsx` | Excel 2007+ format |
+
+### Examples
+
+```bash
+# CSV with custom delimiter
+cells -i data.tsv output.cells          # Auto-detects tab
+cells -i data.txt --delimiter ';' out.cells
+
+# XLSX sheet selection
+cells -i workbook.xlsx --sheet 'Q1' q1.csv
+cells -i workbook.xlsx --all-sheets -t csv reports/
+
+# Scripting
+cells -i input.xlsx output.csv -q -y    # Quiet, overwrite
+cells -i data.csv out.xlsx --time       # Show timing
+```
+
+Run `cells --help` for full documentation.
+
 ## Code Formatting
 
 Format all C++ code:
@@ -140,6 +191,8 @@ This generates `compile_commands.json` in the workspace root, which is recognize
 
 ```
 cells/
+├── apps/                   # Applications
+│   └── cli/                # CLI converter tool
 ├── core/                   # C++17 core engine
 │   ├── cells/              # Main library
 │   │   ├── *.h             # Headers
@@ -159,6 +212,7 @@ cells/
 | Task | Command |
 |------|---------|
 | Build all | `make build` |
+| Build CLI | `bazel build //apps/cli:cells` |
 | Run tests | `make test` |
 | Format code | `make format` |
 | Check formatting | `make format-check` |
@@ -168,6 +222,8 @@ cells/
 | Fix all | `make fix` |
 | Generate compile DB | `make compile-db` |
 | Clean | `make clean` |
+| Convert files | `cells -i input.xlsx output.csv` |
+| File info | `cells -I file.xlsx` |
 
 ## Troubleshooting
 
