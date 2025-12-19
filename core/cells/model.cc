@@ -1,5 +1,6 @@
 #include "core/cells/model.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 
@@ -101,15 +102,20 @@ Formula& Formula::operator=(Formula&& other) noexcept {
 // Cell
 // ============================================================================
 
-Cell::Cell() : id(), colId(), rowId(), value(), formula(nullptr) {}
+Cell::Cell()
+    : id(), colId(), rowId(), value(), formula(nullptr), sharedFormulaRef(nullptr) {}
 
-Cell::Cell(const ID& id) : id(id), colId(), rowId(), value(), formula(nullptr) {}
+Cell::Cell(const ID& id)
+    : id(id), colId(), rowId(), value(), formula(nullptr), sharedFormulaRef(nullptr) {}
 
 Cell::Cell(const ID& id, const ID& col, const ID& row)
-    : id(id), colId(col), rowId(row), value(), formula(nullptr) {}
+    : id(id), colId(col), rowId(row), value(), formula(nullptr), sharedFormulaRef(nullptr) {}
 
 Cell::~Cell() {
-    delete formula;
+    // Only delete formula if we own it (not a shared formula subscriber)
+    if (formula != nullptr && sharedFormulaRef == nullptr) {
+        delete formula;
+    }
 }
 
 Cell::Cell(Cell&& other) noexcept
@@ -117,42 +123,168 @@ Cell::Cell(Cell&& other) noexcept
       colId(other.colId),
       rowId(other.rowId),
       value(std::move(other.value)),
-      formula(other.formula) {
+      formula(other.formula),
+      sharedFormulaRef(other.sharedFormulaRef),
+      _isSharedFormulaMaster(other._isSharedFormulaMaster) {
     other.formula = nullptr;
+    other.sharedFormulaRef = nullptr;
+    other._isSharedFormulaMaster = false;
 }
 
 Cell& Cell::operator=(Cell&& other) noexcept {
     if (this != &other) {
-        delete formula;
+        // Only delete formula if we own it
+        if (formula != nullptr && sharedFormulaRef == nullptr) {
+            delete formula;
+        }
         id = other.id;
         colId = other.colId;
         rowId = other.rowId;
         value = std::move(other.value);
         formula = other.formula;
+        sharedFormulaRef = other.sharedFormulaRef;
+        _isSharedFormulaMaster = other._isSharedFormulaMaster;
         other.formula = nullptr;
+        other.sharedFormulaRef = nullptr;
+        other._isSharedFormulaMaster = false;
     }
     return *this;
 }
 
 bool Cell::isFormula() const {
-    return formula != nullptr;
+    return formula != nullptr || sharedFormulaRef != nullptr;
+}
+
+bool Cell::isSharedFormula() const {
+    return sharedFormulaRef != nullptr;
+}
+
+bool Cell::isSharedFormulaMaster() const {
+    return _isSharedFormulaMaster;
 }
 
 bool Cell::hasError() const {
     return value.error != CellError::NONE;
 }
 
+Formula* Cell::getFormula() const {
+    if (sharedFormulaRef != nullptr) {
+        return sharedFormulaRef->formula;
+    }
+    return formula;
+}
+
 void Cell::setFormula(Formula* f) {
-    delete formula;
+    // Clear any existing formula or shared ref
+    clearFormula();
     formula = f;
-    if (f) {
+    if (f != nullptr) {
         value.type = CellValueType::FORMULA;
     }
 }
 
+void Cell::setSharedFormulaRef(Cell* master) {
+    // Clear any existing formula or shared ref
+    clearFormula();
+    sharedFormulaRef = master;
+    if (master != nullptr) {
+        value.type = CellValueType::FORMULA;
+        master->_isSharedFormulaMaster = true;
+    }
+}
+
 void Cell::clearFormula() {
-    delete formula;
+    // Only delete formula if we own it (not a shared formula subscriber)
+    if (formula != nullptr && sharedFormulaRef == nullptr) {
+        delete formula;
+    }
     formula = nullptr;
+    sharedFormulaRef = nullptr;
+    // Note: _isSharedFormulaMaster is managed by SharedFormulaGroup
+}
+
+// ============================================================================
+// SharedFormulaGroup
+// ============================================================================
+
+void SharedFormulaGroup::addSubscriber(Cell* cell) {
+    if (cell == nullptr || cell == master) {
+        return;
+    }
+
+    // Set cell's shared formula reference to master
+    cell->setSharedFormulaRef(master);
+    subscribers.push_back(cell);
+}
+
+void SharedFormulaGroup::removeSubscriber(Cell* cell) {
+    if (cell == nullptr) {
+        return;
+    }
+
+    // Find and remove from subscribers
+    auto it = std::find(subscribers.begin(), subscribers.end(), cell);
+    if (it != subscribers.end()) {
+        subscribers.erase(it);
+        cell->sharedFormulaRef = nullptr;
+    }
+
+    // Update master's flag if no more subscribers
+    if (master != nullptr && subscribers.empty()) {
+        master->_isSharedFormulaMaster = false;
+    }
+}
+
+Cell* SharedFormulaGroup::promoteMaster() {
+    if (subscribers.empty()) {
+        // No subscribers, group becomes empty
+        if (master != nullptr) {
+            master->_isSharedFormulaMaster = false;
+        }
+        master = nullptr;
+        return nullptr;
+    }
+
+    // Sort subscribers alphabetically by UUID to get deterministic new master
+    std::sort(subscribers.begin(), subscribers.end(), [](const Cell* a, const Cell* b) {
+        return a->id.toString() < b->id.toString();
+    });
+
+    // New master is first subscriber alphabetically
+    Cell* newMaster = subscribers.front();
+    subscribers.erase(subscribers.begin());
+
+    // Clone formula from old master to new master
+    if (master != nullptr && master->formula != nullptr) {
+        newMaster->formula = new Formula(master->formula->text);
+        newMaster->sharedFormulaRef = nullptr;
+    }
+
+    // Update all remaining subscribers to point to new master
+    for (Cell* sub : subscribers) {
+        sub->sharedFormulaRef = newMaster;
+    }
+
+    // Update master flags
+    if (master != nullptr) {
+        master->_isSharedFormulaMaster = false;
+    }
+    newMaster->_isSharedFormulaMaster = !subscribers.empty();
+
+    master = newMaster;
+    return newMaster;
+}
+
+std::vector<Cell*> SharedFormulaGroup::getAllCells() const {
+    std::vector<Cell*> cells;
+    cells.reserve(1 + subscribers.size());
+
+    if (master != nullptr) {
+        cells.push_back(master);
+    }
+    cells.insert(cells.end(), subscribers.begin(), subscribers.end());
+
+    return cells;
 }
 
 // ============================================================================

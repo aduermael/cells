@@ -17,6 +17,7 @@ struct Axis;
 struct Cell;
 struct Sheet;
 struct Workbook;
+struct SharedFormulaGroup;
 
 // Cell value - stores the raw value as a string (for simplicity)
 // The type field indicates how to interpret it
@@ -66,6 +67,10 @@ struct Cell {
     CellValue value;   // Direct value OR cached formula result
     Formula* formula;  // null = value cell, non-null = formula cell (owned)
 
+    // Shared formula support: if non-null, this cell uses master's formula
+    // (does not own the formula - master owns it)
+    Cell* sharedFormulaRef;
+
     Cell();
     explicit Cell(const ID& id);
     Cell(const ID& id, const ID& col, const ID& row);
@@ -79,14 +84,56 @@ struct Cell {
     Cell(Cell&& other) noexcept;
     Cell& operator=(Cell&& other) noexcept;
 
+    // Returns true if cell has a formula (own or shared)
     [[nodiscard]] bool isFormula() const;
+
+    // Returns true if cell uses another cell's formula
+    [[nodiscard]] bool isSharedFormula() const;
+
+    // Returns true if cell is a shared formula master (has subscribers)
+    [[nodiscard]] bool isSharedFormulaMaster() const;
+
     [[nodiscard]] bool hasError() const;
+
+    // Get the effective formula (own formula or master's formula)
+    [[nodiscard]] Formula* getFormula() const;
 
     // Set cell to a formula (takes ownership)
     void setFormula(Formula* f);
 
+    // Set cell to use another cell's formula (shared formula subscriber)
+    void setSharedFormulaRef(Cell* master);
+
     // Clear formula, making this a value cell
     void clearFormula();
+
+private:
+    // Track if this cell is a shared formula master (has subscribers)
+    bool _isSharedFormulaMaster = false;
+    friend struct SharedFormulaGroup;
+};
+
+// SharedFormulaGroup - manages shared formula master/subscriber relationships
+// Master cell owns the formula, subscribers reference it
+struct SharedFormulaGroup {
+    Cell* master;                     // First alphabetically, owns the formula
+    std::vector<Cell*> subscribers;   // Cells using =@master
+
+    SharedFormulaGroup() : master(nullptr) {}
+    explicit SharedFormulaGroup(Cell* master) : master(master) {}
+
+    // Add a subscriber to this group
+    void addSubscriber(Cell* cell);
+
+    // Remove a subscriber from this group
+    void removeSubscriber(Cell* cell);
+
+    // Promote next subscriber to master (when master is deleted)
+    // Returns new master, or nullptr if no subscribers remain
+    Cell* promoteMaster();
+
+    // Get all cells in the group (master + subscribers)
+    [[nodiscard]] std::vector<Cell*> getAllCells() const;
 };
 
 // Axis - represents a column or row
