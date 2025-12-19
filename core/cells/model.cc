@@ -1,9 +1,9 @@
 #include "core/cells/model.h"
 
-#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 
+#include <algorithm>
 #include <utility>
 
 namespace cells {
@@ -102,8 +102,7 @@ Formula& Formula::operator=(Formula&& other) noexcept {
 // Cell
 // ============================================================================
 
-Cell::Cell()
-    : id(), colId(), rowId(), value(), formula(nullptr), sharedFormulaRef(nullptr) {}
+Cell::Cell() : id(), colId(), rowId(), value(), formula(nullptr), sharedFormulaRef(nullptr) {}
 
 Cell::Cell(const ID& id)
     : id(id), colId(), rowId(), value(), formula(nullptr), sharedFormulaRef(nullptr) {}
@@ -246,9 +245,21 @@ Cell* SharedFormulaGroup::promoteMaster() {
     }
 
     // Sort subscribers alphabetically by UUID to get deterministic new master
-    std::sort(subscribers.begin(), subscribers.end(), [](const Cell* a, const Cell* b) {
-        return a->id.toString() < b->id.toString();
-    });
+    // Use a temporary vector with (id_string, index) pairs to avoid pointer sorting
+    std::vector<std::pair<std::string, size_t>> sortedIndices;
+    sortedIndices.reserve(subscribers.size());
+    for (size_t i = 0; i < subscribers.size(); ++i) {
+        sortedIndices.emplace_back(subscribers[i]->id.toString(), i);
+    }
+    std::sort(sortedIndices.begin(), sortedIndices.end());
+
+    // Rebuild subscribers in sorted order
+    std::vector<Cell*> sortedSubscribers;
+    sortedSubscribers.reserve(subscribers.size());
+    for (const auto& [idStr, idx] : sortedIndices) {
+        sortedSubscribers.push_back(subscribers[idx]);
+    }
+    subscribers = std::move(sortedSubscribers);
 
     // New master is first subscriber alphabetically
     Cell* newMaster = subscribers.front();

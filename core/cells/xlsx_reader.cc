@@ -407,7 +407,8 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                     auto fNode = cellNode.child("f");
                     if (fNode) {
                         const char* formulaType = fNode.attribute("t").value();
-                        const bool isShared = formulaType && std::strcmp(formulaType, "shared") == 0;
+                        const bool isShared =
+                            (formulaType != nullptr) && std::strcmp(formulaType, "shared") == 0;
 
                         if (isShared) {
                             const int si = fNode.attribute("si").as_int(-1);
@@ -416,7 +417,8 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
 
                             if (si >= 0) {
                                 // Master cell has ref attribute and formula text
-                                if (ref && ref[0] != '\0' && formulaText && formulaText[0] != '\0') {
+                                if (ref && ref[0] != '\0' && formulaText &&
+                                    formulaText[0] != '\0') {
                                     if (options_.readFormulaText) {
                                         cell->setFormula(
                                             new Formula(("=" + std::string(formulaText)).c_str()));
@@ -429,6 +431,8 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                                     continue;
                                 }
                                 // Subscriber cell has only si attribute
+                                // NOLINTNEXTLINE(misc-const-correctness) - needs non-const for
+                                // setSharedFormulaRef later
                                 Cell* rawPtr = cell.get();
                                 sheet->addCell(std::move(cell));
                                 sharedFormulaSubscribers[si].push_back(rawPtr);

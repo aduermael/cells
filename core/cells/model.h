@@ -116,8 +116,8 @@ private:
 // SharedFormulaGroup - manages shared formula master/subscriber relationships
 // Master cell owns the formula, subscribers reference it
 struct SharedFormulaGroup {
-    Cell* master;                     // First alphabetically, owns the formula
-    std::vector<Cell*> subscribers;   // Cells using =@master
+    Cell* master;                    // First alphabetically, owns the formula
+    std::vector<Cell*> subscribers;  // Cells using =@master
 
     SharedFormulaGroup() : master(nullptr) {}
     explicit SharedFormulaGroup(Cell* master) : master(master) {}
