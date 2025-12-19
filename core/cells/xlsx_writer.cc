@@ -483,11 +483,96 @@ std::string XLSXWriter::convertFormula(const std::string& formula, const Sheet& 
     return formula;
 }
 
-XLSXWriteResult XLSXWriter::writeFile(const Workbook& /*workbook*/, const std::string& /*path*/) {
+XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::string& path) {
     reset();
     XLSXWriteResult result;
-    // TODO: Implement native XLSX writing with miniz + pugixml
-    result.error = XLSXWriteError("XLSX writing not yet implemented in native mode");
+
+    if (workbook.sheets.empty()) {
+        result.error = XLSXWriteError("Workbook has no sheets");
+        return result;
+    }
+
+    // Open ZIP archive
+    ZipWriter zip;
+    if (!zip.open(path)) {
+        result.error = XLSXWriteError("Failed to create XLSX file: " + path);
+        return result;
+    }
+
+    // Collect sheet names
+    std::vector<std::string> sheetNames;
+    sheetNames.reserve(workbook.sheets.size());
+    for (const auto& sheet : workbook.sheets) {
+        sheetNames.push_back(sheet->name);
+    }
+
+    // Write root files
+    if (!zip.addFile("[Content_Types].xml", generateContentTypes(workbook.sheets.size()))) {
+        result.error = XLSXWriteError("Failed to write [Content_Types].xml");
+        return result;
+    }
+
+    if (!zip.addFile("_rels/.rels", generateRootRels())) {
+        result.error = XLSXWriteError("Failed to write _rels/.rels");
+        return result;
+    }
+
+    // Write workbook files
+    if (!zip.addFile("xl/workbook.xml", generateWorkbook(sheetNames))) {
+        result.error = XLSXWriteError("Failed to write xl/workbook.xml");
+        return result;
+    }
+
+    if (!zip.addFile("xl/_rels/workbook.xml.rels", generateWorkbookRels(workbook.sheets.size()))) {
+        result.error = XLSXWriteError("Failed to write xl/_rels/workbook.xml.rels");
+        return result;
+    }
+
+    // Write styles
+    if (!zip.addFile("xl/styles.xml", generateStyles())) {
+        result.error = XLSXWriteError("Failed to write xl/styles.xml");
+        return result;
+    }
+
+    // Shared string table (populated during worksheet generation)
+    SharedStringTable sst;
+
+    // Write worksheets
+    size_t totalCells = 0;
+    for (size_t i = 0; i < workbook.sheets.size(); ++i) {
+        const Sheet& sheet = *workbook.sheets[i];
+
+        // Set up ref converter for this sheet
+        RefConverter refConverter;
+        refConverter.setContext(sheet);
+
+        // Generate worksheet XML
+        const std::string sheetXml =
+            generateWorksheet(sheet, sst, refConverter, options_.writeFormulas);
+
+        const std::string sheetPath = "xl/worksheets/sheet" + std::to_string(i + 1) + ".xml";
+        if (!zip.addFile(sheetPath, sheetXml)) {
+            result.error = XLSXWriteError("Failed to write " + sheetPath, sheet.name);
+            return result;
+        }
+
+        totalCells += sheet.cells.size();
+    }
+
+    // Write shared strings (after all worksheets so all strings are collected)
+    if (!zip.addFile("xl/sharedStrings.xml", generateSharedStrings(sst))) {
+        result.error = XLSXWriteError("Failed to write xl/sharedStrings.xml");
+        return result;
+    }
+
+    // Finalize archive
+    if (!zip.finalize()) {
+        result.error = XLSXWriteError("Failed to finalize XLSX archive");
+        return result;
+    }
+
+    result.cellsWritten = totalCells;
+    result.warnings = std::move(warnings_);
     return result;
 }
 
