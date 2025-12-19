@@ -120,6 +120,7 @@ struct Sheet {
     Cell* getCell(const ID& cellId);
     Cell* getCellAt(const ID& colId, const ID& rowId);
     void addCell(std::unique_ptr<Cell> cell);
+    void reserveCells(size_t count);  // Pre-allocate capacity for bulk imports
 
     // Axis operations
     Axis* getColumn(const ID& colId);

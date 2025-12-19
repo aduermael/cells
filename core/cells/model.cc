@@ -207,6 +207,11 @@ void Sheet::addCell(std::unique_ptr<Cell> cell) {
     cells[cellId] = std::move(cell);
 }
 
+void Sheet::reserveCells(size_t count) {
+    cells.reserve(count);
+    _cellIndex.reserve(count);
+}
+
 Axis* Sheet::getColumn(const ID& colId) {
     auto it = columns.find(colId);
     return (it != columns.end()) ? it->second.get() : nullptr;

@@ -133,7 +133,8 @@ cc_library(
     deps = [
         ":id",
         ":model",
-        "//bindings/go:excelize_bridge",
+        "//third_party/miniz",
+        "@pugixml",
     ],
 )
 
@@ -153,9 +154,8 @@ cc_library(
     hdrs = ["xlsx_writer.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":id",
         ":model",
-        ":ref_converter",
-        "//bindings/go:excelize_bridge",
     ],
 )
 

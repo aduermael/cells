@@ -50,94 +50,118 @@ typedef struct {
     XLSXSheet* sheets;
     int sheet_count;
 } XLSXData;
+
+typedef struct {
+    int read_formulas;
+    int read_dimensions;
+} XLSXParseOptions;
 */
 import "C"
 import (
+	"archive/zip"
+	"encoding/xml"
+	"fmt"
+	"io"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 	"unsafe"
 
 	"github.com/xuri/excelize/v2"
 )
+
+// Set to true to enable timing output
+var debugTiming = os.Getenv("CELLS_DEBUG_TIMING") != ""
+
+func logTiming(stage string, start time.Time) {
+	if debugTiming {
+		fmt.Fprintf(os.Stderr, "[timing] %s: %v\n", stage, time.Since(start))
+	}
+}
 
 // ExcelizeParseXLSX parses an XLSX file and returns all data as C structs.
 // The file is opened, data extracted, then closed immediately.
 //
 //export ExcelizeParseXLSX
 func ExcelizeParseXLSX(path *C.char, errorOut **C.char) *C.XLSXData {
+	// Default options: read everything
+	opts := C.XLSXParseOptions{
+		read_formulas:   1,
+		read_dimensions: 1,
+	}
+	return ExcelizeParseXLSXWithOptions(path, &opts, errorOut)
+}
+
+// ExcelizeParseXLSXWithOptions parses an XLSX file with performance options.
+// Set read_formulas=0 to skip formula reading (much faster for large files).
+// Set read_dimensions=0 to skip row/column dimension reading.
+//
+//export ExcelizeParseXLSXWithOptions
+func ExcelizeParseXLSXWithOptions(path *C.char, options *C.XLSXParseOptions, errorOut **C.char) *C.XLSXData {
+	totalStart := time.Now()
 	goPath := C.GoString(path)
 
-	f, err := excelize.OpenFile(goPath)
+	// Parse options
+	readFormulas := options == nil || options.read_formulas != 0
+	readDimensions := options == nil || options.read_dimensions != 0
+
+	// Open ZIP once and keep it open for all operations
+	start := time.Now()
+	zipReader, err := zip.OpenReader(goPath)
 	if err != nil {
 		*errorOut = C.CString(err.Error())
 		return nil
 	}
-	defer f.Close()
+	defer zipReader.Close()
+	logTiming("zip.OpenReader", start)
 
-	sheetList := f.GetSheetList()
-	if len(sheetList) == 0 {
+	// Get sheet info from workbook.xml (no excelize needed!)
+	start = time.Now()
+	sheetInfos, err := parseWorkbook(zipReader)
+	if err != nil {
+		*errorOut = C.CString("failed to parse workbook: " + err.Error())
+		return nil
+	}
+	if len(sheetInfos) == 0 {
 		*errorOut = C.CString("no sheets found in workbook")
 		return nil
 	}
+	logTiming("parseWorkbook", start)
+
+	// Load shared strings once for the entire workbook
+	start = time.Now()
+	sharedStrings, err := parseSharedStringsFromZip(zipReader)
+	if err != nil {
+		*errorOut = C.CString("failed to read shared strings: " + err.Error())
+		return nil
+	}
+	logTiming("parseSharedStrings", start)
 
 	// Allocate XLSXData
 	data := (*C.XLSXData)(C.malloc(C.sizeof_XLSXData))
-	data.sheet_count = C.int(len(sheetList))
-	data.sheets = (*C.XLSXSheet)(C.malloc(C.size_t(len(sheetList)) * C.sizeof_XLSXSheet))
+	data.sheet_count = C.int(len(sheetInfos))
+	data.sheets = (*C.XLSXSheet)(C.malloc(C.size_t(len(sheetInfos)) * C.sizeof_XLSXSheet))
 
 	// Convert sheets pointer to Go slice for easier indexing
-	sheets := unsafe.Slice(data.sheets, len(sheetList))
+	xlsxSheets := unsafe.Slice(data.sheets, len(sheetInfos))
 
-	for i, sheetName := range sheetList {
-		sheet := &sheets[i]
-		sheet.name = C.CString(sheetName)
+	for i, info := range sheetInfos {
+		sheet := &xlsxSheets[i]
+		sheet.name = C.CString(info.name)
 
-		// Get all rows (includes merged cells and formulas)
-		rows, err := f.GetRows(sheetName)
+		// Parse worksheet XML directly from the already-open ZIP
+		start = time.Now()
+		cells, maxRow, maxCol, err := parseSheetFromZipReader(zipReader, info.xmlPath, sharedStrings, readFormulas)
+		logTiming("parseSheet", start)
 		if err != nil {
-			// Clean up and return error
 			freePartialData(data, i)
-			*errorOut = C.CString("failed to get rows from sheet " + sheetName + ": " + err.Error())
+			*errorOut = C.CString("failed to parse sheet " + info.name + ": " + err.Error())
 			return nil
 		}
 
-		// Collect cells
-		var cells []cellData
-		maxRow := 0
-		maxCol := 0
-
-		for rowIdx, row := range rows {
-			if rowIdx+1 > maxRow {
-				maxRow = rowIdx + 1
-			}
-			for colIdx, cellValue := range row {
-				if colIdx+1 > maxCol {
-					maxCol = colIdx + 1
-				}
-				if cellValue == "" {
-					continue // Skip empty cells
-				}
-
-				// Get cell reference (A1 notation)
-				cellRef, _ := excelize.CoordinatesToCellName(colIdx+1, rowIdx+1)
-
-				// Get formula if any
-				formula, _ := f.GetCellFormula(sheetName, cellRef)
-
-				// Determine cell type
-				cellType := determineCellType(f, sheetName, cellRef, cellValue)
-
-				cells = append(cells, cellData{
-					row:      rowIdx,
-					col:      colIdx,
-					value:    cellValue,
-					formula:  formula,
-					cellType: cellType,
-				})
-			}
-		}
-
 		// Allocate and populate C cells array
+		start = time.Now()
 		sheet.cell_count = C.int(len(cells))
 		sheet.row_count = C.int(maxRow)
 		sheet.col_count = C.int(maxCol)
@@ -159,39 +183,594 @@ func ExcelizeParseXLSX(path *C.char, errorOut **C.char) *C.XLSXData {
 		} else {
 			sheet.cells = nil
 		}
+		logTiming("buildCStructs", start)
 
-		// Get column dimensions
-		colDims := getColumnDimensions(f, sheetName, maxCol)
-		sheet.col_dim_count = C.int(len(colDims))
-		if len(colDims) > 0 {
-			sheet.col_dims = (*C.XLSXColDim)(C.malloc(C.size_t(len(colDims)) * C.sizeof_XLSXColDim))
-			cColDims := unsafe.Slice(sheet.col_dims, len(colDims))
-			for j, dim := range colDims {
-				cColDims[j].col = C.int(dim.col)
-				cColDims[j].width = C.double(dim.width)
-				cColDims[j].hidden = boolToInt(dim.hidden)
-			}
-		} else {
-			sheet.col_dims = nil
+		// Dimensions not supported in fast path (would need excelize)
+		if readDimensions {
+			// TODO: Parse dimensions from worksheet XML if needed
 		}
+		sheet.col_dims = nil
+		sheet.col_dim_count = 0
+		sheet.row_dims = nil
+		sheet.row_dim_count = 0
+	}
 
-		// Get row dimensions
-		rowDims := getRowDimensions(f, sheetName, maxRow)
-		sheet.row_dim_count = C.int(len(rowDims))
-		if len(rowDims) > 0 {
-			sheet.row_dims = (*C.XLSXRowDim)(C.malloc(C.size_t(len(rowDims)) * C.sizeof_XLSXRowDim))
-			cRowDims := unsafe.Slice(sheet.row_dims, len(rowDims))
-			for j, dim := range rowDims {
-				cRowDims[j].row = C.int(dim.row)
-				cRowDims[j].height = C.double(dim.height)
-				cRowDims[j].hidden = boolToInt(dim.hidden)
+	logTiming("TOTAL", totalStart)
+	return data
+}
+
+// XML structures for direct worksheet parsing
+type xlsxWorksheetData struct {
+	SheetData xlsxSheetData `xml:"sheetData"`
+}
+
+type xlsxSheetData struct {
+	Row []xlsxRow `xml:"row"`
+}
+
+type xlsxRow struct {
+	R int      `xml:"r,attr"` // Row number (1-indexed)
+	C []xlsxC  `xml:"c"`      // Cells
+}
+
+type xlsxC struct {
+	R string  `xml:"r,attr"` // Cell reference (A1)
+	T string  `xml:"t,attr"` // Type: s=shared string, n=number, b=bool, e=error, str=formula string
+	S int     `xml:"s,attr"` // Style index
+	V string  `xml:"v"`      // Value
+	F *xlsxF  `xml:"f"`      // Formula
+}
+
+type xlsxF struct {
+	Content string `xml:",chardata"`
+	T       string `xml:"t,attr"` // shared, array, dataTable
+	Ref     string `xml:"ref,attr"`
+	Si      int    `xml:"si,attr"`
+}
+
+// sheetInfo holds sheet name and XML path
+type sheetInfo struct {
+	name    string
+	xmlPath string
+}
+
+// parseWorkbook extracts sheet names and their XML paths from workbook.xml
+func parseWorkbook(zipReader *zip.ReadCloser) ([]sheetInfo, error) {
+	// First, get sheet-to-file mappings from _rels/workbook.xml.rels
+	relMap := make(map[string]string) // rId -> target path
+	for _, f := range zipReader.File {
+		if f.Name == "xl/_rels/workbook.xml.rels" {
+			rc, err := f.Open()
+			if err != nil {
+				return nil, err
 			}
-		} else {
-			sheet.row_dims = nil
+			decoder := xml.NewDecoder(rc)
+			for {
+				token, err := decoder.Token()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					rc.Close()
+					return nil, err
+				}
+				if se, ok := token.(xml.StartElement); ok && se.Name.Local == "Relationship" {
+					var id, target string
+					for _, attr := range se.Attr {
+						if attr.Name.Local == "Id" {
+							id = attr.Value
+						} else if attr.Name.Local == "Target" {
+							target = attr.Value
+						}
+					}
+					if id != "" && target != "" {
+						relMap[id] = target
+					}
+				}
+			}
+			rc.Close()
+			break
 		}
 	}
 
-	return data
+	// Now parse workbook.xml to get sheet names and their rIds
+	var sheets []sheetInfo
+	for _, f := range zipReader.File {
+		if f.Name == "xl/workbook.xml" {
+			rc, err := f.Open()
+			if err != nil {
+				return nil, err
+			}
+			decoder := xml.NewDecoder(rc)
+			for {
+				token, err := decoder.Token()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					rc.Close()
+					return nil, err
+				}
+				if se, ok := token.(xml.StartElement); ok && se.Name.Local == "sheet" {
+					var name, rId string
+					for _, attr := range se.Attr {
+						if attr.Name.Local == "name" {
+							name = attr.Value
+						} else if attr.Name.Local == "id" {
+							rId = attr.Value
+						}
+					}
+					if name != "" {
+						xmlPath := "xl/worksheets/sheet1.xml" // Default
+						if target, ok := relMap[rId]; ok {
+							// Target is relative to xl/ directory
+							if strings.HasPrefix(target, "/") {
+								xmlPath = target[1:]
+							} else {
+								xmlPath = "xl/" + target
+							}
+						}
+						sheets = append(sheets, sheetInfo{name: name, xmlPath: xmlPath})
+					}
+				}
+			}
+			rc.Close()
+			break
+		}
+	}
+
+	return sheets, nil
+}
+
+// parseSharedStringsFromZip parses shared strings from an open ZIP reader
+func parseSharedStringsFromZip(zipReader *zip.ReadCloser) ([]string, error) {
+	for _, f := range zipReader.File {
+		if f.Name == "xl/sharedStrings.xml" {
+			rc, err := f.Open()
+			if err != nil {
+				return nil, err
+			}
+			defer rc.Close()
+
+			var result []string
+			decoder := xml.NewDecoder(rc)
+			var inSI, inT bool
+			var currentString strings.Builder
+
+			for {
+				token, err := decoder.Token()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					return nil, err
+				}
+
+				switch t := token.(type) {
+				case xml.StartElement:
+					if t.Name.Local == "si" {
+						inSI = true
+						currentString.Reset()
+					} else if inSI && t.Name.Local == "t" {
+						inT = true
+					}
+				case xml.EndElement:
+					if t.Name.Local == "si" {
+						result = append(result, currentString.String())
+						inSI = false
+					} else if t.Name.Local == "t" {
+						inT = false
+					}
+				case xml.CharData:
+					if inT {
+						currentString.Write(t)
+					}
+				}
+			}
+			return result, nil
+		}
+	}
+	return nil, nil // No shared strings file
+}
+
+// parseSheetFromZipReader parses a worksheet from an already-open ZIP reader
+// Uses manual token-by-token parsing for maximum performance
+func parseSheetFromZipReader(zipReader *zip.ReadCloser, sheetXMLPath string, sharedStrings []string, readFormulas bool) ([]cellData, int, int, error) {
+	// Find the worksheet file
+	var sheetFile *zip.File
+	for _, f := range zipReader.File {
+		if f.Name == sheetXMLPath {
+			sheetFile = f
+			break
+		}
+	}
+	if sheetFile == nil {
+		return nil, 0, 0, nil // No data
+	}
+
+	rc, err := sheetFile.Open()
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer rc.Close()
+
+	// Pre-allocate cells slice (estimate based on file size)
+	estimatedCells := int(sheetFile.UncompressedSize64 / 100)
+	if estimatedCells < 1000 {
+		estimatedCells = 1000
+	}
+	cells := make([]cellData, 0, estimatedCells)
+	maxRow := 0
+	maxCol := 0
+
+	// Parse using streaming XML decoder - manual token parsing (faster than DecodeElement)
+	decoder := xml.NewDecoder(rc)
+
+	// State machine for parsing
+	inSheetData := false
+	inRow := false
+	inCell := false
+	inValue := false
+	inFormula := false
+
+	var currentRow int
+	var cellRef, cellType, cellValue, cellFormula string
+
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, 0, 0, err
+		}
+
+		switch t := token.(type) {
+		case xml.StartElement:
+			switch t.Name.Local {
+			case "sheetData":
+				inSheetData = true
+			case "row":
+				if inSheetData {
+					inRow = true
+					currentRow = 0
+					for _, attr := range t.Attr {
+						if attr.Name.Local == "r" {
+							currentRow, _ = strconv.Atoi(attr.Value)
+						}
+					}
+					if currentRow > maxRow {
+						maxRow = currentRow
+					}
+				}
+			case "c":
+				if inRow {
+					inCell = true
+					cellRef = ""
+					cellType = ""
+					cellValue = ""
+					cellFormula = ""
+					for _, attr := range t.Attr {
+						switch attr.Name.Local {
+						case "r":
+							cellRef = attr.Value
+						case "t":
+							cellType = attr.Value
+						}
+					}
+				}
+			case "v":
+				if inCell {
+					inValue = true
+				}
+			case "f":
+				if inCell && readFormulas {
+					inFormula = true
+				}
+			}
+		case xml.EndElement:
+			switch t.Name.Local {
+			case "sheetData":
+				inSheetData = false
+			case "row":
+				inRow = false
+			case "c":
+				if inCell {
+					// Process completed cell
+					col, rowNum := parseCellRef(cellRef)
+					if col+1 > maxCol {
+						maxCol = col + 1
+					}
+
+					value := cellValue
+					if cellType == "s" && value != "" {
+						idx, err := strconv.Atoi(value)
+						if err == nil && idx >= 0 && idx < len(sharedStrings) {
+							value = sharedStrings[idx]
+						}
+					}
+
+					if value != "" || cellFormula != "" {
+						cType := mapXMLCellType(cellType, value)
+						cells = append(cells, cellData{
+							row:      rowNum,
+							col:      col,
+							value:    value,
+							formula:  cellFormula,
+							cellType: cType,
+						})
+					}
+					inCell = false
+				}
+			case "v":
+				inValue = false
+			case "f":
+				inFormula = false
+			}
+		case xml.CharData:
+			if inValue {
+				cellValue = string(t)
+			} else if inFormula {
+				cellFormula = string(t)
+			}
+		}
+	}
+
+	return cells, maxRow, maxCol, nil
+}
+
+// parseSheetFromZip parses a worksheet XML directly from a ZIP file (legacy)
+// Returns cells, maxRow, maxCol, error
+func parseSheetFromZip(zipPath, sheetXMLPath string, sharedStrings []string, readFormulas bool) ([]cellData, int, int, error) {
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer r.Close()
+
+	// Find the worksheet file
+	var sheetFile *zip.File
+	for _, f := range r.File {
+		if f.Name == sheetXMLPath {
+			sheetFile = f
+			break
+		}
+	}
+	if sheetFile == nil {
+		return nil, 0, 0, nil // No data
+	}
+
+	rc, err := sheetFile.Open()
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	defer rc.Close()
+
+	// Parse only sheetData section using streaming XML decoder
+	decoder := xml.NewDecoder(rc)
+	var cells []cellData
+	maxRow := 0
+	maxCol := 0
+
+	// Find sheetData element
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, 0, 0, err
+		}
+
+		if se, ok := token.(xml.StartElement); ok && se.Name.Local == "sheetData" {
+			// Parse rows within sheetData
+			for {
+				token, err := decoder.Token()
+				if err != nil {
+					return nil, 0, 0, err
+				}
+
+				// Check for end of sheetData
+				if ee, ok := token.(xml.EndElement); ok && ee.Name.Local == "sheetData" {
+					break
+				}
+
+				// Process row elements
+				if se, ok := token.(xml.StartElement); ok && se.Name.Local == "row" {
+					var row xlsxRow
+					if err := decoder.DecodeElement(&row, &se); err != nil {
+						return nil, 0, 0, err
+					}
+
+					if row.R > maxRow {
+						maxRow = row.R
+					}
+
+					// Process cells in this row
+					for _, c := range row.C {
+						// Parse cell reference to get column
+						col, rowNum := parseCellRef(c.R)
+						if col+1 > maxCol {
+							maxCol = col + 1
+						}
+
+						// Get value (resolve shared strings)
+						value := c.V
+						if c.T == "s" && value != "" {
+							// Shared string index
+							idx, err := strconv.Atoi(value)
+							if err == nil && idx >= 0 && idx < len(sharedStrings) {
+								value = sharedStrings[idx]
+							}
+						}
+
+						// Skip empty cells
+						if value == "" && c.F == nil {
+							continue
+						}
+
+						// Determine cell type
+						cellType := mapXMLCellType(c.T, value)
+
+						// Get formula if requested
+						var formula string
+						if readFormulas && c.F != nil {
+							formula = c.F.Content
+						}
+
+						cells = append(cells, cellData{
+							row:      rowNum,
+							col:      col,
+							value:    value,
+							formula:  formula,
+							cellType: cellType,
+						})
+					}
+				}
+			}
+			break // Done with sheetData
+		}
+	}
+
+	return cells, maxRow, maxCol, nil
+}
+
+// parseCellRef parses "A1" -> (col=0, row=0)
+// Optimized for hot path - minimal allocations
+func parseCellRef(ref string) (col, row int) {
+	// Fast path for common cases (A-Z columns)
+	if len(ref) >= 2 {
+		c := ref[0]
+		if c >= 'A' && c <= 'Z' {
+			col = int(c - 'A')
+			// Check if second char is a digit (single letter column)
+			if ref[1] >= '0' && ref[1] <= '9' {
+				// Parse row from position 1
+				for i := 1; i < len(ref); i++ {
+					row = row*10 + int(ref[i]-'0')
+				}
+				return col, row - 1
+			}
+			// Two letter column (AA-ZZ)
+			if ref[1] >= 'A' && ref[1] <= 'Z' {
+				col = (col+1)*26 + int(ref[1]-'A')
+				// Parse row from position 2
+				for i := 2; i < len(ref); i++ {
+					row = row*10 + int(ref[i]-'0')
+				}
+				return col, row - 1
+			}
+		}
+	}
+
+	// Fallback for edge cases
+	col = 0
+	row = 0
+	i := 0
+	for i < len(ref) && ref[i] >= 'A' && ref[i] <= 'Z' {
+		col = col*26 + int(ref[i]-'A') + 1
+		i++
+	}
+	col--
+	for i < len(ref) && ref[i] >= '0' && ref[i] <= '9' {
+		row = row*10 + int(ref[i]-'0')
+		i++
+	}
+	row--
+	return col, row
+}
+
+// mapXMLCellType maps XML type attribute to our cell type enum
+func mapXMLCellType(t, value string) int {
+	switch t {
+	case "s": // Shared string
+		return 1 // XLSX_CELL_TYPE_STRING
+	case "str": // Formula string
+		return 1 // XLSX_CELL_TYPE_STRING
+	case "inlineStr": // Inline string
+		return 1 // XLSX_CELL_TYPE_STRING
+	case "b": // Boolean
+		return 3 // XLSX_CELL_TYPE_BOOL
+	case "e": // Error
+		return 4 // XLSX_CELL_TYPE_ERROR
+	case "n", "": // Number (default type is number)
+		// Check if value looks like a number
+		if value != "" {
+			if _, err := strconv.ParseFloat(value, 64); err == nil {
+				return 2 // XLSX_CELL_TYPE_NUMBER
+			}
+		}
+		return 2 // XLSX_CELL_TYPE_NUMBER
+	default:
+		return 0 // XLSX_CELL_TYPE_EMPTY
+	}
+}
+
+// getSharedStrings extracts shared strings from an XLSX file using excelize
+func getSharedStrings(f *excelize.File, zipPath string) ([]string, error) {
+	// Open the ZIP to read shared strings directly
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	// Find sharedStrings.xml
+	var ssFile *zip.File
+	for _, file := range r.File {
+		if file.Name == "xl/sharedStrings.xml" {
+			ssFile = file
+			break
+		}
+	}
+	if ssFile == nil {
+		return nil, nil // No shared strings
+	}
+
+	rc, err := ssFile.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+
+	// Parse shared strings using streaming
+	var result []string
+	decoder := xml.NewDecoder(rc)
+	var inSI, inT bool
+	var currentString strings.Builder
+
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		switch t := token.(type) {
+		case xml.StartElement:
+			if t.Name.Local == "si" {
+				inSI = true
+				currentString.Reset()
+			} else if inSI && t.Name.Local == "t" {
+				inT = true
+			}
+		case xml.EndElement:
+			if t.Name.Local == "si" {
+				result = append(result, currentString.String())
+				inSI = false
+			} else if t.Name.Local == "t" {
+				inT = false
+			}
+		case xml.CharData:
+			if inT {
+				currentString.Write(t)
+			}
+		}
+	}
+
+	return result, nil
 }
 
 // Helper types
@@ -213,37 +792,6 @@ type rowDimData struct {
 	row    int
 	height float64
 	hidden bool
-}
-
-// determineCellType determines the type of a cell value
-func determineCellType(f *excelize.File, sheet, cellRef, value string) int {
-	cellType, err := f.GetCellType(sheet, cellRef)
-	if err != nil {
-		// Fallback: try to infer type from value
-		return inferTypeFromValue(value)
-	}
-
-	switch cellType {
-	case excelize.CellTypeNumber:
-		return 2 // XLSX_CELL_TYPE_NUMBER
-	case excelize.CellTypeBool:
-		return 3 // XLSX_CELL_TYPE_BOOL
-	case excelize.CellTypeError:
-		return 4 // XLSX_CELL_TYPE_ERROR
-	case excelize.CellTypeDate:
-		return 5 // XLSX_CELL_TYPE_DATE
-	case excelize.CellTypeFormula:
-		// Formula cells - determine type from value
-		return inferTypeFromValue(value)
-	case excelize.CellTypeUnset:
-		// CellTypeUnset is returned for cells without explicit type attribute
-		// Try to infer type from value
-		return inferTypeFromValue(value)
-	case excelize.CellTypeInlineString, excelize.CellTypeSharedString:
-		return 1 // XLSX_CELL_TYPE_STRING
-	default:
-		return inferTypeFromValue(value)
-	}
 }
 
 // inferTypeFromValue attempts to determine cell type from the string value

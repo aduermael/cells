@@ -340,9 +340,9 @@ int show_file_info(const Options& opts) {
     } else if (opts.input_format == Format::kXlsx) {
         // XLSX reader reads from file path directly
         cells::XLSXReadOptions xlsx_opts;
-        xlsx_opts.readFormulas = true;
-        xlsx_opts.readFormulaText = false;  // Skip formula text for --info (faster)
-        xlsx_opts.readDimensions = true;
+        xlsx_opts.readFormulas = true;      // Need formulas for counting
+        xlsx_opts.readFormulaText = false;  // Don't need formula text
+        xlsx_opts.readDimensions = false;   // Skip dimension reading for --info (faster)
 
         // Apply --sheet filter if specified
         if (!opts.xlsx.sheet_name.empty()) {

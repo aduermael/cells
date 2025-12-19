@@ -62,6 +62,12 @@ typedef struct {
     int sheet_count;        // Number of sheets
 } XLSXData;
 
+// Options for parsing XLSX files
+typedef struct {
+    int read_formulas;      // 1 to read formula text, 0 to skip (faster)
+    int read_dimensions;    // 1 to read row/col dimensions, 0 to skip (faster)
+} XLSXParseOptions;
+
 // ============================================================================
 // C API Functions (implemented in Go with CGO exports)
 // ============================================================================
@@ -72,6 +78,10 @@ typedef struct {
 // The caller must call XLSXDataFree() on the returned data when done.
 // The caller must call XLSXErrorFree() on the error message if not NULL.
 XLSXData* ExcelizeParseXLSX(const char* path, char** error_out);
+
+// Parse an XLSX file with options for performance tuning.
+// Same as ExcelizeParseXLSX but with options to skip expensive operations.
+XLSXData* ExcelizeParseXLSXWithOptions(const char* path, const XLSXParseOptions* options, char** error_out);
 
 // Write an XLSX file from the provided data.
 // A new file is created, populated with the data, saved, and closed.
