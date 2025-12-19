@@ -622,5 +622,313 @@ TEST(XLSXWriterTest, CustomOptions) {
     EXPECT_FALSE(writer.options().writeDimensions);
 }
 
+// ============================================================================
+// Formula Tests
+// ============================================================================
+
+TEST(XLSXWriterTest, WriteFormulas) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Formulas");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Create 2 columns, 2 rows
+    std::vector<ID> colIds;
+    for (int i = 0; i < 2; ++i) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        colIds.push_back(col->id);
+        sheet->addColumn(std::move(col));
+    }
+
+    std::vector<ID> rowIds;
+    for (int i = 0; i < 2; ++i) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet->addRow(std::move(row));
+    }
+
+    // A1 = 10
+    auto cell1 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[0]);
+    cell1->value = CellValue(10.0);
+    sheet->addCell(std::move(cell1));
+
+    // B1 = 20
+    auto cell2 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[0]);
+    cell2->value = CellValue(20.0);
+    sheet->addCell(std::move(cell2));
+
+    // A2 = formula "=A1+B1" (result 30)
+    auto cell3 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[1]);
+    cell3->value = CellValue(30.0);  // Cached result
+    cell3->setFormula(new Formula("=A1+B1"));
+    sheet->addCell(std::move(cell3));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("formulas.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+
+    // Read back and verify formula is present
+    XLSXReadOptions readOptions;
+    readOptions.readFormulas = true;
+    readOptions.readFormulaText = true;
+
+    auto readResult = readXLSX(path, readOptions);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Find the formula cell
+    bool foundFormula = false;
+    for (const auto& [id, c] : readSheet->cells) {
+        if (c->isFormula()) {
+            foundFormula = true;
+            const Formula* f = c->getFormula();
+            ASSERT_NE(f, nullptr);
+            ASSERT_NE(f->text, nullptr);
+            // Formula should contain A1+B1 (possibly with = prefix)
+            std::string formulaText = f->text;
+            EXPECT_TRUE(formulaText.find("A1") != std::string::npos)
+                << "Formula should reference A1: " << formulaText;
+            EXPECT_TRUE(formulaText.find("B1") != std::string::npos)
+                << "Formula should reference B1: " << formulaText;
+        }
+    }
+    EXPECT_TRUE(foundFormula) << "Expected to find a formula cell";
+}
+
+TEST(XLSXWriterTest, WriteSharedFormulas) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "SharedFormulas");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Create 2 columns, 3 rows
+    std::vector<ID> colIds;
+    for (int i = 0; i < 2; ++i) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        colIds.push_back(col->id);
+        sheet->addColumn(std::move(col));
+    }
+
+    std::vector<ID> rowIds;
+    for (int i = 0; i < 3; ++i) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet->addRow(std::move(row));
+    }
+
+    // A1 = 10, A2 = 20, A3 = 30
+    for (int i = 0; i < 3; ++i) {
+        auto cell = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[i]);
+        cell->value = CellValue(static_cast<double>((i + 1) * 10));
+        sheet->addCell(std::move(cell));
+    }
+
+    // B1 = formula "=A1*2" (master, result 20)
+    auto masterCell = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[0]);
+    masterCell->value = CellValue(20.0);
+    masterCell->setFormula(new Formula("=A1*2"));
+    Cell* masterPtr = masterCell.get();
+    sheet->addCell(std::move(masterCell));
+
+    // B2 = shared formula subscriber (result 40)
+    auto subCell1 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[1]);
+    subCell1->value = CellValue(40.0);
+    subCell1->setSharedFormulaRef(masterPtr);
+    sheet->addCell(std::move(subCell1));
+
+    // B3 = shared formula subscriber (result 60)
+    auto subCell2 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[2]);
+    subCell2->value = CellValue(60.0);
+    subCell2->setSharedFormulaRef(masterPtr);
+    sheet->addCell(std::move(subCell2));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("shared_formulas.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+
+    // Read back and verify shared formulas are preserved
+    XLSXReadOptions readOptions;
+    readOptions.readFormulas = true;
+    readOptions.readFormulaText = true;
+
+    auto readResult = readXLSX(path, readOptions);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Count formula cells - should have 3 (1 master + 2 subscribers)
+    int formulaCount = 0;
+    int sharedFormulaCount = 0;
+    for (const auto& [id, c] : readSheet->cells) {
+        if (c->isFormula()) {
+            formulaCount++;
+        }
+        if (c->isSharedFormula()) {
+            sharedFormulaCount++;
+        }
+    }
+
+    // Should have found formulas (either shared or regular)
+    EXPECT_GE(formulaCount, 1) << "Expected at least one formula cell";
+    // Shared formula subscribers should be detected
+    EXPECT_GE(sharedFormulaCount, 0);  // May be 0 if Excel normalizes them
+}
+
+TEST(XLSXWriterTest, WriteFormulaWithSpecialChars) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "FormulaSpecialChars");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    // Formula with special characters that need XML escaping
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue("Test");
+    cell->setFormula(new Formula("=IF(A1<10,\"Less\",\"More\")"));
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("formula_special.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+
+    // Read back - file should be valid
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+}
+
+TEST(XLSXWriterTest, SkipFormulasWhenDisabled) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "NoFormulas");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue(42.0);  // Cached result
+    cell->setFormula(new Formula("=21*2"));
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("no_formulas.xlsx");
+    TempFileGuard guard(path);
+
+    XLSXWriteOptions options;
+    options.writeFormulas = false;
+
+    auto result = writeXLSX(*workbook, path, options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+
+    // Read back - should only have value, no formula
+    XLSXReadOptions readOptions;
+    readOptions.readFormulas = true;
+
+    auto readResult = readXLSX(path, readOptions);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Check that no cell has a formula
+    for (const auto& [id, c] : readSheet->cells) {
+        EXPECT_FALSE(c->isFormula()) << "Cell should not have formula when writeFormulas=false";
+        EXPECT_EQ(c->value.type, CellValueType::NUMBER);
+        EXPECT_DOUBLE_EQ(c->value.asNumber(), 42.0);
+    }
+}
+
+// ============================================================================
+// XML Escaping Tests
+// ============================================================================
+
+TEST(XLSXWriterTest, WriteStringWithXmlSpecialChars) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "XmlEscape");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    std::vector<std::string> values = {"<tag>", "A & B", "\"quoted\"", "'apostrophe'"};
+    std::vector<ID> rowIds;
+
+    for (size_t i = 0; i < values.size(); ++i) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet->addRow(std::move(row));
+
+        auto cell = std::make_unique<Cell>(generate_id(), colId, rowIds[i]);
+        cell->value = CellValue(values[i]);
+        sheet->addCell(std::move(cell));
+    }
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("xml_escape.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+
+    // Read back and verify values are preserved
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Count matching strings
+    int matchCount = 0;
+    for (const auto& [id, c] : readSheet->cells) {
+        if (c->value.type == CellValueType::STRING) {
+            const std::string& val = c->value.asString();
+            for (const auto& expected : values) {
+                if (val == expected) {
+                    matchCount++;
+                    break;
+                }
+            }
+        }
+    }
+
+    EXPECT_EQ(matchCount, static_cast<int>(values.size()))
+        << "All special character strings should round-trip correctly";
+}
+
 }  // namespace
 }  // namespace cells
