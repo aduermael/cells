@@ -61,8 +61,8 @@ static CellValue parseCellValue(const XLSXCell& xlCell) {
     switch (xlCell.cell_type) {
         case XLSX_CELL_TYPE_NUMBER: {
             // Try to parse as double
-            char* end = nullptr;
-            double num = std::strtod(value, &end);
+            char* end = nullptr;  // NOLINT(misc-const-correctness)
+            const double num = std::strtod(value, &end);
             if (end != value && *end == '\0') {
                 return CellValue(num);
             }
@@ -70,18 +70,16 @@ static CellValue parseCellValue(const XLSXCell& xlCell) {
         }
 
         case XLSX_CELL_TYPE_BOOL: {
-            std::string val(value);
-            bool boolVal = (val == "TRUE" || val == "true" || val == "1");
+            const std::string val(value);
+            const bool boolVal = (val == "TRUE" || val == "true" || val == "1");
             return CellValue(boolVal);
         }
 
         case XLSX_CELL_TYPE_ERROR: {
-            std::string errStr(value);
+            const std::string errStr(value);
             CellError err = CellError::NONE;
             if (errStr == "#DIV/0!") {
                 err = CellError::DIV;
-            } else if (errStr == "#VALUE!") {
-                err = CellError::VALUE;
             } else if (errStr == "#REF!") {
                 err = CellError::REF;
             } else if (errStr == "#NAME?") {
@@ -99,8 +97,8 @@ static CellValue parseCellValue(const XLSXCell& xlCell) {
         case XLSX_CELL_TYPE_DATE:
             // Store dates as numbers (Excel serial date format)
             {
-                char* end = nullptr;
-                double num = std::strtod(value, &end);
+                char* end = nullptr;  // NOLINT(misc-const-correctness)
+                const double num = std::strtod(value, &end);
                 if (end != value && *end == '\0') {
                     return CellValue(num);
                 }
@@ -139,7 +137,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
     // Process each sheet
     for (int sheetIdx = 0; sheetIdx < xlData->sheet_count; ++sheetIdx) {
         const XLSXSheet& xlSheet = xlData->sheets[sheetIdx];
-        std::string sheetName(xlSheet.name);
+        const std::string sheetName(xlSheet.name);
 
         // Filter sheets if specific sheet requested
         if (!options_.sheetName.empty() && sheetName != options_.sheetName) {
@@ -221,7 +219,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
 
             // Read formula if present and requested
             if (options_.readFormulas && xlCell.formula != nullptr && xlCell.formula[0] != '\0') {
-                std::string formulaText(xlCell.formula);
+                const std::string formulaText(xlCell.formula);
                 if (options_.readFormulaText) {
                     // Store formula with leading '='
                     cell->setFormula(new Formula(("=" + formulaText).c_str()));

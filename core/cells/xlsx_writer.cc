@@ -127,7 +127,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
     }
 
     // Allocate XLSXData structure
-    XLSXData* xlData = static_cast<XLSXData*>(malloc(sizeof(XLSXData)));
+    auto* xlData = static_cast<XLSXData*>(malloc(sizeof(XLSXData)));
     if (xlData == nullptr) {
         result.error = XLSXWriteError("Failed to allocate memory");
         return result;
@@ -187,7 +187,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
                 auto it = sheet->columns.find(columnIds[c]);
                 if (it != sheet->columns.end() && it->second->size > 0) {
                     // Convert pixels to Excel width units (approximately 7 pixels per character)
-                    double width = static_cast<double>(it->second->size) / 7.0;
+                    const double width = static_cast<double>(it->second->size) / 7.0;
                     if (width > 0 && width != 64.0 / 7.0) {  // Skip default width
                         XLSXColDim dim;
                         dim.col = static_cast<int>(c);
@@ -212,7 +212,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
                 auto it = sheet->rows.find(rowIds[r]);
                 if (it != sheet->rows.end() && it->second->size > 0) {
                     // Convert pixels to points (1 point = 1.333 pixels at 96 DPI)
-                    double height = static_cast<double>(it->second->size) / 1.333;
+                    const double height = static_cast<double>(it->second->size) / 1.333;
                     if (height > 0 && height != 15.0) {  // Skip default height
                         XLSXRowDim dim;
                         dim.row = static_cast<int>(r);
@@ -258,16 +258,16 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
                 case CellValueType::NUMBER:
                 case CellValueType::DATE:
                 case CellValueType::DATE_TIME: {
-                    double num = cell.value.asNumber();
+                    const double num = cell.value.asNumber();
                     if (std::isnan(num) || std::isinf(num)) {
                         valueStr = cell.value.raw;
                         xlCell.cell_type = XLSX_CELL_TYPE_STRING;
                     } else {
                         valueStr = std::to_string(num);
                         // Remove trailing zeros after decimal point
-                        size_t dot = valueStr.find('.');
+                        const size_t dot = valueStr.find('.');
                         if (dot != std::string::npos) {
-                            size_t last = valueStr.find_last_not_of('0');
+                            const size_t last = valueStr.find_last_not_of('0');
                             if (last > dot) {
                                 valueStr = valueStr.substr(0, last + 1);
                             } else {
@@ -298,8 +298,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
                     // Formula cells - write computed value
                     if (!cell.value.raw.empty()) {
                         // Try to parse as number first
-                        char* end = nullptr;
-                        double num = std::strtod(cell.value.raw.c_str(), &end);
+                        char* end = nullptr;  // NOLINT(misc-const-correctness)
+                        const double num = std::strtod(cell.value.raw.c_str(), &end);
                         if (end != cell.value.raw.c_str() && *end == '\0' && !std::isnan(num) &&
                             !std::isinf(num)) {
                             valueStr = std::to_string(num);
@@ -324,7 +324,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
                 }
 
                 // Convert UUID references to A1 notation
-                std::string convertedFormula =
+                const std::string convertedFormula =
                     convertFormula(formulaText, *sheet, columnIds, rowIds);
 
                 if (!convertedFormula.empty()) {
@@ -346,7 +346,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
 
     // Write XLSX file using excelize
     char* error = nullptr;
-    int writeResult = ExcelizeWriteXLSX(path.c_str(), xlData, &error);
+    const int writeResult = ExcelizeWriteXLSX(path.c_str(), xlData, &error);
 
     // Free the XLSXData structure
     XLSXDataFree(xlData);
