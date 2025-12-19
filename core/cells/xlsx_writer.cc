@@ -1,7 +1,11 @@
 #include "core/cells/xlsx_writer.h"
 
+#include <algorithm>
+#include <cstring>
 #include <sstream>
+#include <unordered_map>
 
+#include "core/cells/ref_converter.h"
 #include "miniz.h"
 
 namespace {
@@ -121,6 +125,228 @@ std::string generateWorkbookRels(size_t sheetCount) {
         << "\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings\" "
            "Target=\"sharedStrings.xml\"/>\n";
     xml << "</Relationships>";
+    return xml.str();
+}
+
+// Shared string table for deduplication
+class SharedStringTable {
+public:
+    // Get or add a string, returns index
+    size_t getOrAdd(const std::string& str) {
+        auto it = index_.find(str);
+        if (it != index_.end()) {
+            return it->second;
+        }
+        const size_t idx = strings_.size();
+        strings_.push_back(str);
+        index_[str] = idx;
+        return idx;
+    }
+
+    [[nodiscard]] const std::vector<std::string>& strings() const { return strings_; }
+    [[nodiscard]] size_t size() const { return strings_.size(); }
+
+private:
+    std::vector<std::string> strings_;
+    std::unordered_map<std::string, size_t> index_;
+};
+
+// Escape XML special characters
+std::string escapeXml(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    for (const char c : str) {
+        switch (c) {
+            case '&':
+                result += "&amp;";
+                break;
+            case '<':
+                result += "&lt;";
+                break;
+            case '>':
+                result += "&gt;";
+                break;
+            case '"':
+                result += "&quot;";
+                break;
+            case '\'':
+                result += "&apos;";
+                break;
+            default:
+                result += c;
+                break;
+        }
+    }
+    return result;
+}
+
+// Convert column index (0-based) to Excel letter (A, B, ..., Z, AA, ...)
+std::string colIndexToLetter(size_t index) {
+    std::string result;
+    size_t n = index + 1;  // Convert to 1-based
+    while (n > 0) {
+        n--;
+        result.insert(result.begin(), static_cast<char>('A' + (n % 26)));
+        n = n / 26;
+    }
+    return result;
+}
+
+// Generate worksheet XML
+std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
+                              const cells::RefConverter& refConverter, bool writeFormulas) {
+    std::ostringstream xml;
+    xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
+    xml << "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\n";
+
+    // Get ordered columns and rows
+    std::vector<std::pair<uint32_t, cells::ID>> columns;
+    for (const auto& pair : sheet.columns) {
+        columns.emplace_back(pair.second->position, pair.first);
+    }
+    std::sort(columns.begin(), columns.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    std::vector<std::pair<uint32_t, cells::ID>> rows;
+    for (const auto& pair : sheet.rows) {
+        rows.emplace_back(pair.second->position, pair.first);
+    }
+    std::sort(rows.begin(), rows.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    // Build column/row ID to index maps
+    std::unordered_map<std::string, size_t> colIdToIndex;
+    std::unordered_map<std::string, size_t> rowIdToIndex;
+    for (size_t i = 0; i < columns.size(); ++i) {
+        colIdToIndex[columns[i].second.toString()] = i;
+    }
+    for (size_t i = 0; i < rows.size(); ++i) {
+        rowIdToIndex[rows[i].second.toString()] = i;
+    }
+
+    // Build cell lookup: (colIdx, rowIdx) -> Cell*
+    std::unordered_map<uint64_t, const cells::Cell*> cellGrid;
+    for (const auto& pair : sheet.cells) {
+        const cells::Cell* cell = pair.second.get();
+        auto colIt = colIdToIndex.find(cell->colId.toString());
+        auto rowIt = rowIdToIndex.find(cell->rowId.toString());
+        if (colIt != colIdToIndex.end() && rowIt != rowIdToIndex.end()) {
+            const uint64_t key = (static_cast<uint64_t>(rowIt->second) << 32) | colIt->second;
+            cellGrid[key] = cell;
+        }
+    }
+
+    // Write dimension
+    if (!columns.empty() && !rows.empty()) {
+        xml << "  <dimension ref=\"A1:" << colIndexToLetter(columns.size() - 1) << rows.size()
+            << "\"/>\n";
+    }
+
+    xml << "  <sheetData>\n";
+
+    // Write rows
+    for (size_t rowIdx = 0; rowIdx < rows.size(); ++rowIdx) {
+        bool hasAnyCells = false;
+
+        // Check if this row has any cells
+        for (size_t colIdx = 0; colIdx < columns.size(); ++colIdx) {
+            const uint64_t key = (static_cast<uint64_t>(rowIdx) << 32) | colIdx;
+            if (cellGrid.count(key) > 0) {
+                hasAnyCells = true;
+                break;
+            }
+        }
+
+        if (!hasAnyCells) {
+            continue;
+        }
+
+        xml << "    <row r=\"" << (rowIdx + 1) << "\">\n";
+
+        for (size_t colIdx = 0; colIdx < columns.size(); ++colIdx) {
+            const uint64_t key = (static_cast<uint64_t>(rowIdx) << 32) | colIdx;
+            auto it = cellGrid.find(key);
+            if (it == cellGrid.end()) {
+                continue;
+            }
+
+            const cells::Cell* cell = it->second;
+            const std::string cellRef = colIndexToLetter(colIdx) + std::to_string(rowIdx + 1);
+
+            // Determine cell type and value
+            const cells::CellValue& value = cell->value;
+            const cells::Formula* formula = cell->getFormula();
+
+            xml << "      <c r=\"" << cellRef << "\"";
+
+            // Handle formula cells
+            if (writeFormulas && formula != nullptr && formula->text != nullptr &&
+                std::strlen(formula->text) > 1) {
+                // Formula cell - write as number type with formula
+                xml << ">\n";
+                // Skip the leading '=' in formula text
+                const char* formulaText = formula->text;
+                if (formulaText[0] == '=') {
+                    formulaText++;
+                }
+                // Convert UUID refs to A1 notation
+                const std::string a1Formula = refConverter.formulaToA1(formulaText);
+                xml << "        <f>" << escapeXml(a1Formula) << "</f>\n";
+
+                // Write cached value if available
+                if (value.type == cells::CellValueType::NUMBER) {
+                    xml << "        <v>" << value.raw << "</v>\n";
+                } else if (value.type == cells::CellValueType::STRING && !value.raw.empty()) {
+                    // For formula results that are strings, write inline
+                    xml << "        <v>" << escapeXml(value.raw) << "</v>\n";
+                }
+                xml << "      </c>\n";
+            } else {
+                // Value cell
+                switch (value.type) {
+                    case cells::CellValueType::NUMBER:
+                        xml << ">\n";
+                        xml << "        <v>" << value.raw << "</v>\n";
+                        xml << "      </c>\n";
+                        break;
+
+                    case cells::CellValueType::STRING:
+                        if (!value.raw.empty()) {
+                            const size_t sstIndex = sst.getOrAdd(value.raw);
+                            xml << " t=\"s\">\n";
+                            xml << "        <v>" << sstIndex << "</v>\n";
+                            xml << "      </c>\n";
+                        } else {
+                            xml << "/>\n";
+                        }
+                        break;
+
+                    case cells::CellValueType::BOOLEAN:
+                        xml << " t=\"b\">\n";
+                        xml << "        <v>" << (value.raw == "true" || value.raw == "1" ? "1" : "0")
+                            << "</v>\n";
+                        xml << "      </c>\n";
+                        break;
+
+                    case cells::CellValueType::ERROR:
+                        xml << " t=\"e\">\n";
+                        xml << "        <v>" << escapeXml(value.raw) << "</v>\n";
+                        xml << "      </c>\n";
+                        break;
+
+                    default:
+                        xml << "/>\n";
+                        break;
+                }
+            }
+        }
+
+        xml << "    </row>\n";
+    }
+
+    xml << "  </sheetData>\n";
+    xml << "</worksheet>";
+
     return xml.str();
 }
 
