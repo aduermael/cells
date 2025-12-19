@@ -92,7 +92,7 @@ In our `.cells` format, cell references use `<colUUID>:<rowUUID>` with optional 
 
 ## Phase 2: Support Shared Formulas
 
-- [ ] 2a: Ensure .cells writer outputs UUIDs in alphabetical order (columns, rows, cells)
+- [x] 2a: Ensure .cells writer outputs UUIDs in alphabetical order (columns, rows, cells)
 - [ ] 2b: Add SharedFormulaGroup and sharedFormulaRef to Cell model
 - [ ] 2c: Implement XLSX reader shared formula parsing (master and subscriber cells)
 - [ ] 2d: Implement shared formula master deletion/promotion

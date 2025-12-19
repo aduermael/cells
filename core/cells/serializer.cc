@@ -74,16 +74,16 @@ void Serializer::serializeSheet(const Sheet& sheet, std::ostream& out) const {
 }
 
 void Serializer::serializeColumns(const Sheet& sheet, std::ostream& out) const {
-    // Collect columns with sort keys (position, id) for deterministic ordering
-    std::vector<std::pair<std::pair<uint32_t, std::string>, const Axis*>> ordered;
+    // Collect columns for alphabetical ordering by UUID
+    std::vector<std::pair<std::string, const Axis*>> ordered;
     ordered.reserve(sheet.columns.size());
 
     for (const auto& pair : sheet.columns) {
         const Axis* axis = pair.second.get();
-        ordered.emplace_back(std::make_pair(axis->position, axis->id.toString()), axis);
+        ordered.emplace_back(axis->id.toString(), axis);
     }
 
-    // Sort by (position, id) - fully deterministic
+    // Sort alphabetically by UUID (required for deterministic shared formula masters)
     std::sort(ordered.begin(), ordered.end(),
               [](const auto& a, const auto& b) { return a.first < b.first; });
 
@@ -94,16 +94,16 @@ void Serializer::serializeColumns(const Sheet& sheet, std::ostream& out) const {
 }
 
 void Serializer::serializeRows(const Sheet& sheet, std::ostream& out) const {
-    // Collect rows with sort keys (position, id) for deterministic ordering
-    std::vector<std::pair<std::pair<uint32_t, std::string>, const Axis*>> ordered;
+    // Collect rows for alphabetical ordering by UUID
+    std::vector<std::pair<std::string, const Axis*>> ordered;
     ordered.reserve(sheet.rows.size());
 
     for (const auto& pair : sheet.rows) {
         const Axis* axis = pair.second.get();
-        ordered.emplace_back(std::make_pair(axis->position, axis->id.toString()), axis);
+        ordered.emplace_back(axis->id.toString(), axis);
     }
 
-    // Sort by (position, id) - fully deterministic
+    // Sort alphabetically by UUID (required for deterministic shared formula masters)
     std::sort(ordered.begin(), ordered.end(),
               [](const auto& a, const auto& b) { return a.first < b.first; });
 
@@ -114,8 +114,22 @@ void Serializer::serializeRows(const Sheet& sheet, std::ostream& out) const {
 }
 
 void Serializer::serializeCells(const Sheet& sheet, std::ostream& out) const {
+    // Collect cells for alphabetical ordering by UUID
+    std::vector<std::pair<std::string, const Cell*>> ordered;
+    ordered.reserve(sheet.cells.size());
+
     for (const auto& pair : sheet.cells) {
-        serializeCell(*pair.second, out);
+        const Cell* cell = pair.second.get();
+        ordered.emplace_back(cell->id.toString(), cell);
+    }
+
+    // Sort alphabetically by UUID (required for deterministic shared formula masters)
+    std::sort(ordered.begin(), ordered.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    // Serialize in order
+    for (const auto& item : ordered) {
+        serializeCell(*item.second, out);
     }
 }
 
