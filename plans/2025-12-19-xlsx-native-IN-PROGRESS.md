@@ -92,9 +92,15 @@ In our `.cells` format, cell references use `<colUUID>:<rowUUID>` with optional 
 
 ## Phase 2: Support Shared Formulas
 
-### 2.1 File Format for Shared Formulas
+- [ ] 2a: Add SharedFormulaGroup and sharedFormulaRef to Cell model
+- [ ] 2b: Implement XLSX reader shared formula parsing (master and subscriber cells)
+- [ ] 2c: Implement shared formula master deletion/promotion
+- [ ] 2d: Update .cells format parser/writer for shared formulas
+- [ ] 2e: Add tests for shared formula round-trip
 
-Formulas are part of cell definitions (no separate `f` lines). Shared formulas use `=@UUID` to reference another cell's formula:
+### Design Notes
+
+**File Format**: Formulas are part of cell definitions. Shared formulas use `=@UUID` to reference another cell's formula:
 
 ```
 # Cells written in UUID alphabetical order
@@ -104,18 +110,12 @@ c c002  ...  =@c001
 c c003  ...  =@c001
 ```
 
-Where `cA01`, `rB02`, `rB03` are actual column/row UUIDs.
-
 **Key rules:**
 - Cells are written in UUID alphabetical order
-- Master cell = first cell alphabetically among the shared group (deterministic, no marking needed)
-- Master has the formula text with locking notation
+- Master cell = first cell alphabetically among the shared group (deterministic)
 - Subscribers use `=@masterUUID` to reference the master's formula
-- When reading, master is encountered first (guaranteed by ordering)
 
-### 2.2 Reference Syntax in Formulas
-
-Cell references use `colUUID:rowUUID` format with optional locking prefix:
+**Reference Syntax**: Cell references use `colUUID:rowUUID` format with optional locking prefix:
 
 | Syntax | Meaning | Excel equivalent |
 |--------|---------|------------------|
@@ -124,13 +124,9 @@ Cell references use `colUUID:rowUUID` format with optional locking prefix:
 | `$~cXXX:rYYY` | Col absolute, row relative | `$A1` |
 | `~$cXXX:rYYY` | Col relative, row absolute | `A$1` |
 
-Example formula: `=cA01:rB02+$$cA01:rB03*$~cC05:rD06`
-
-### 2.3 Model Changes
-
+**Model Changes**:
 ```cpp
 struct Cell {
-    // ... existing fields ...
     Formula* formula;           // Own formula, or nullptr
     Cell* sharedFormulaRef;     // Points to master if using shared formula
 };
@@ -141,44 +137,24 @@ struct SharedFormulaGroup {
 };
 ```
 
-### 2.4 XLSX Reader Changes
+**XLSX Reader**: When encountering `<f t="shared" ref="..." si="N">formula</f>` (master), parse and store. When encountering `<f t="shared" si="N"/>` (subscriber), link to master.
 
-When encountering `<f t="shared" ref="..." si="N">formula</f>` (master):
-1. Parse formula, convert A1 refs to UUID refs with locking markers
-2. Store formula on cell
-3. Track in temporary map: `xlsx_shared_groups[si] = cell`
+**Master Deletion**: When master is deleted, promote next subscriber (first alphabetically) to master, clone AST, update references.
 
-When encountering `<f t="shared" si="N"/>` (subscriber):
-1. Look up master from `xlsx_shared_groups[si]`
-2. Set `cell->sharedFormulaRef = master`
-3. Add to master's subscriber list
-
-After import, recompute masters based on UUID alphabetical order (XLSX order may differ).
-
-### 2.5 Master Cell Deletion
-
-When the master cell of a shared formula is deleted:
-1. Pick next subscriber (first alphabetically) as new master
-2. Clone AST to new master, adjust references for offset
-3. Update remaining subscribers to point to new master
-
-Handled internally - transparent to users.
-
-### 2.6 AST Evaluation with Offset
-
-When evaluating a subscriber cell's formula:
-1. Get master's AST
-2. Calculate row/col offset from master to subscriber
-3. During evaluation, adjust relative references by offset
-4. Absolute references (`$$`) remain unchanged
+**AST Evaluation**: For subscribers, get master's AST and adjust relative references by row/col offset. Absolute references (`$$`) unchanged
 
 ---
 
 ## Phase 3: Support Array Formulas (Reader)
 
-### 3.1 Model Changes
+- [ ] 3a: Add isArrayFormula and arrayRange fields to Formula struct
+- [ ] 3b: Implement XLSX reader array formula parsing
+- [ ] 3c: Update .cells format for array formula preservation
+- [ ] 3d: Add tests for array formula support
 
-Option A: **Flag on Formula struct**
+### Design Notes
+
+**Model Changes** (Option A - flag on Formula struct):
 ```cpp
 struct Formula {
     char* text;
@@ -189,20 +165,9 @@ struct Formula {
 };
 ```
 
-Option B: **Separate ArrayFormula type** (more explicit but more complex)
+**Reader**: When parsing `<f t="array" ref="..." aca="...">`, set `isArrayFormula = true` and store `arrayRange`. Mark master cell only.
 
-**Recommendation**: Option A (simpler, array formulas are relatively rare)
-
-### 3.2 Reader Changes
-
-When parsing `<f t="array" ref="..." aca="...">`:
-- Set `formula->isArrayFormula = true`
-- Store `formula->arrayRange` (needed for write round-trip)
-- Mark the master cell only; other cells in range don't have formulas
-
-### 3.3 File Format Update
-
-If we want to preserve array formula info in `.cells` format:
+**File Format**: Preserve array formula info in `.cells`:
 ```
 f <cell_id>	=FORMULA	array:A1:A5
 ```
@@ -211,20 +176,29 @@ f <cell_id>	=FORMULA	array:A1:A5
 
 ## Phase 4: Implement XLSX Write (Native)
 
-### 4.1 ZIP Creation with miniz
+- [ ] 4a: Set up ZIP archive creation with miniz
+- [ ] 4b: Implement Content_Types.xml and root relationships (_rels/.rels)
+- [ ] 4c: Implement workbook.xml and sheet relationships
+- [ ] 4d: Implement worksheet XML generation (sheetData)
+- [ ] 4e: Implement shared strings table (xl/sharedStrings.xml)
+- [ ] 4f: Implement minimal styles.xml
+- [ ] 4g: Implement formula conversion (UUID→A1 with locking markers)
+- [ ] 4h: Implement shared formula export
+- [ ] 4i: Implement array formula export
+- [ ] 4j: Add comprehensive XLSX write tests
 
+### Design Notes
+
+**ZIP Creation with miniz**:
 ```cpp
 mz_zip_archive archive;
 mz_zip_writer_init_file(&archive, path.c_str(), 0);
-
-// Add files to archive
 mz_zip_writer_add_mem(&archive, "[Content_Types].xml", content, size, MZ_DEFAULT_COMPRESSION);
-
 mz_zip_writer_finalize_archive(&archive);
 mz_zip_writer_end(&archive);
 ```
 
-### 4.2 Required XLSX Parts
+**Required XLSX Parts**:
 
 | File | Purpose |
 |------|---------|
@@ -236,23 +210,7 @@ mz_zip_writer_end(&archive);
 | `xl/styles.xml` | Cell styles (minimal) |
 | `xl/sharedStrings.xml` | String table |
 
-### 4.3 XML Generation with pugixml
-
-```cpp
-pugi::xml_document doc;
-auto decl = doc.append_child(pugi::node_declaration);
-decl.append_attribute("version") = "1.0";
-decl.append_attribute("encoding") = "UTF-8";
-
-auto worksheet = doc.append_child("worksheet");
-worksheet.append_attribute("xmlns") = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-
-// Build sheetData...
-```
-
-### 4.4 Shared String Table
-
-Build string table during cell enumeration:
+**Shared String Table**:
 ```cpp
 std::vector<std::string> sharedStrings;
 std::unordered_map<std::string, size_t> stringIndex;
@@ -267,29 +225,11 @@ size_t getOrAddString(const std::string& str) {
 }
 ```
 
-### 4.5 Formula Conversion
+**Formula Conversion**: Convert UUID-based formulas back to A1 notation using `RefConverter`. Locking markers: `UUID`→`A1`, `$$UUID`→`$A$1`, `$~UUID`→`$A1`, `~$UUID`→`A$1`.
 
-Convert UUID-based formulas back to A1 notation:
-- Build column/row position maps
-- Convert reference locking markers to Excel format:
-  - `UUID` → `A1` (relative)
-  - `$$UUID` → `$A$1` (absolute)
-  - `$~UUID` → `$A1` (col absolute)
-  - `~$UUID` → `A$1` (row absolute)
-- Use existing `RefConverter` class
+**Shared Formula Export**: Group cells by master, assign sequential `si` indices, write master with `<f t="shared" ref="..." si="N">formula</f>`, subscribers with `<f t="shared" si="N"/>`.
 
-### 4.6 Shared Formula Export
-
-For cells with `=@masterUUID` (shared formula subscribers):
-1. Group cells by their master reference
-2. Assign sequential `si` indices (0, 1, 2...)
-3. Write master cell with `<f t="shared" ref="..." si="N">formula</f>`
-4. Write subscriber cells with `<f t="shared" si="N"/>`
-5. Convert UUID refs back to A1, adjusting for each cell's offset from master
-
-### 4.7 Array Formula Output
-
-For cells with `isArrayFormula`:
+**Array Formula Output**:
 ```xml
 <c r="A1">
   <f t="array" ref="A1:A5">TRANSPOSE(B1:F1)</f>
