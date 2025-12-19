@@ -255,7 +255,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
     logTiming("parse sharedStrings", start);
 
     // Create workbook
-    auto workbook = std::make_unique<Workbook>(generate_sequential_id(), "Imported");
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Imported");
 
     // Process each sheet
     for (const auto& [sheetName, sheetPath] : sheetInfo) {
@@ -281,7 +281,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
         logTiming("parse sheet XML", start);
 
         // Create our Sheet
-        auto sheet = std::make_unique<Sheet>(generate_sequential_id(), sheetName);
+        auto sheet = std::make_unique<Sheet>(generate_id(), sheetName);
 
         // First pass: find dimensions
         start = std::chrono::steady_clock::now();
@@ -312,7 +312,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
         rowIds.reserve(maxRow);
 
         for (int c = 0; c < maxCol; ++c) {
-            auto col = std::make_unique<Axis>(generate_sequential_id(), true);
+            auto col = std::make_unique<Axis>(generate_id(), true);
             col->position = static_cast<uint32_t>(c);
             col->size = 64;
             columnIds.push_back(col->id);
@@ -320,7 +320,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
         }
 
         for (int r = 0; r < maxRow; ++r) {
-            auto row = std::make_unique<Axis>(generate_sequential_id(), false);
+            auto row = std::make_unique<Axis>(generate_id(), false);
             row->position = static_cast<uint32_t>(r);
             row->size = 20;
             rowIds.push_back(row->id);
@@ -378,8 +378,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                 }
 
                 // Create cell
-                auto cell = std::make_unique<Cell>(generate_sequential_id(), columnIds[col],
-                                                   rowIds[rowNum]);
+                auto cell = std::make_unique<Cell>(generate_id(), columnIds[col], rowIds[rowNum]);
 
                 // Parse value based on type
                 const char* type = cellNode.attribute("t").value();

@@ -42,22 +42,6 @@ ID generate_id() {
     return id;
 }
 
-// Thread-local counter for sequential IDs
-thread_local uint64_t sequential_counter = 0;
-
-ID generate_sequential_id() {
-    ID id;
-    uint64_t value = sequential_counter++;
-
-    // Convert to base62, filling from right to left
-    for (int i = ID_LENGTH - 1; i >= 0; --i) {
-        id.data[i] = BASE62_CHARS[value % 62];
-        value /= 62;
-    }
-
-    return id;
-}
-
 bool is_valid_id(const char* str) {
     if (str == nullptr) {
         return false;

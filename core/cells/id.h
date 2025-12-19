@@ -15,11 +15,6 @@ constexpr const char* BASE62_CHARS =
 // Thread-safe (uses thread-local RNG state)
 ID generate_id();
 
-// Generate a sequential ID for bulk imports (much faster than random)
-// Uses a thread-local counter converted to base62
-// IDs are unique within the process but not globally unique
-ID generate_sequential_id();
-
 // Validate that a string is a valid 8-character base62 ID
 // Returns true if valid, false otherwise
 bool is_valid_id(const char* str);
