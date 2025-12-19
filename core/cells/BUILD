@@ -154,6 +154,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":model",
+        ":ref_converter",
         "@openxlsx",
     ],
 )

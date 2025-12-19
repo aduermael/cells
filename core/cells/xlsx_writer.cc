@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include "core/cells/ref_converter.h"
 #include "core/cells/types.h"
 
 namespace cells {
@@ -95,50 +96,10 @@ std::string XLSXWriter::columnIndexToLetter(size_t index) {
 std::string XLSXWriter::convertFormula(const std::string& formula, const Sheet& /*sheet*/,
                                        const std::vector<ID>& columnIds,
                                        const std::vector<ID>& rowIds) const {
-    // Build lookup maps for column/row ID to index
-    std::unordered_map<std::string, size_t> colIdToIndex;
-    std::unordered_map<std::string, size_t> rowIdToIndex;
-
-    for (size_t i = 0; i < columnIds.size(); ++i) {
-        colIdToIndex[columnIds[i].toString()] = i;
-    }
-    for (size_t i = 0; i < rowIds.size(); ++i) {
-        rowIdToIndex[rowIds[i].toString()] = i;
-    }
-
-    // Parse the formula and convert UUID refs to A1 notation
-    // Formula format: =$colId$rowId or similar patterns
-    // For now, do a simple conversion for cell references
-
-    std::string result;
-    result.reserve(formula.size());
-
-    size_t i = 0;
-    while (i < formula.size()) {
-        // Look for $<8-char-id>$<8-char-id> pattern (cell reference)
-        if (formula[i] == '$' && i + 17 < formula.size() && formula[i + 9] == '$') {
-            // Extract column ID (chars 1-8) and row ID (chars 10-17)
-            std::string colIdStr = formula.substr(i + 1, 8);
-            std::string rowIdStr = formula.substr(i + 10, 8);
-
-            auto colIt = colIdToIndex.find(colIdStr);
-            auto rowIt = rowIdToIndex.find(rowIdStr);
-
-            if (colIt != colIdToIndex.end() && rowIt != rowIdToIndex.end()) {
-                // Convert to A1 notation
-                result += columnIndexToLetter(colIt->second);
-                result += std::to_string(rowIt->second + 1);  // Excel rows are 1-based
-                i += 18;                                      // Skip the entire reference
-                continue;
-            }
-        }
-
-        // Not a reference, copy character as-is
-        result += formula[i];
-        ++i;
-    }
-
-    return result;
+    // Use RefConverter for robust UUID to A1 conversion
+    RefConverter converter;
+    converter.setContext(columnIds, rowIds);
+    return converter.formulaToA1(formula);
 }
 
 XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::string& path) {
