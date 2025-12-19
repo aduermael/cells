@@ -496,15 +496,15 @@ Write:  Workbook ──► excelize (build) ──► XLSX ──► excelize fr
 
 ---
 
-### Phase 11a: Bazel Go Toolchain Setup
+### Phase 11a: Bazel Go Toolchain Setup ✅
 
 Set up rules_go for building Go code in Bazel.
 
-- [ ] **11a-1:** Add rules_go to MODULE.bazel
-- [ ] **11a-2:** Configure Go toolchain
-- [ ] **11a-3:** Create `bindings/go/BUILD.bazel`
-- [ ] **11a-4:** Add excelize as a Go dependency via gazelle
-- [ ] **11a-5:** Verify Go builds work: `bazel build //bindings/go:excelize_bridge`
+- [x] **11a-1:** Add rules_go to MODULE.bazel
+- [x] **11a-2:** Configure Go toolchain
+- [x] **11a-3:** Create `bindings/go/BUILD.bazel`
+- [x] **11a-4:** Add excelize as a Go dependency via gazelle
+- [x] **11a-5:** Verify Go builds work: `bazel build //bindings/go:excelize_bridge`
 
 **Deliverables:**
 - Go toolchain working in Bazel
@@ -512,16 +512,16 @@ Set up rules_go for building Go code in Bazel.
 
 ---
 
-### Phase 11b: C Data Structures
+### Phase 11b: C Data Structures ✅
 
 Define C-compatible data structures for transferring spreadsheet data across the CGO boundary.
 
-- [ ] **11b-1:** Create `bindings/go/excelize_types.h` with C structs
-- [ ] **11b-2:** Define `XLSXCell` struct (row, col, value, formula, type)
-- [ ] **11b-3:** Define `XLSXSheet` struct (name, cells array, row/col dimensions)
-- [ ] **11b-4:** Define `XLSXData` struct (sheets array, sheet count)
-- [ ] **11b-5:** Define `XLSXError` struct (code, message)
-- [ ] **11b-6:** Add memory management functions (`XLSXDataFree`, etc.)
+- [x] **11b-1:** Create `bindings/go/excelize_types.h` with C structs
+- [x] **11b-2:** Define `XLSXCell` struct (row, col, value, formula, type)
+- [x] **11b-3:** Define `XLSXSheet` struct (name, cells array, row/col dimensions)
+- [x] **11b-4:** Define `XLSXData` struct (sheets array, sheet count)
+- [x] **11b-5:** Define `XLSXError` struct (code, message)
+- [x] **11b-6:** Add memory management functions (`XLSXDataFree`, etc.)
 
 **Data structures:**
 ```c
@@ -562,18 +562,18 @@ void XLSXErrorFree(char* error);
 
 ---
 
-### Phase 11c: Go Parser Implementation
+### Phase 11c: Go Parser Implementation ✅
 
 Implement the Go side that parses XLSX and returns C structs.
 
-- [ ] **11c-1:** Create `bindings/go/excelize_bridge.go`
-- [ ] **11c-2:** Implement `ExcelizeParseXLSX` - open, extract all data, close, return
-- [ ] **11c-3:** Handle shared formulas (excelize expands them automatically)
-- [ ] **11c-4:** Handle array formulas
-- [ ] **11c-5:** Extract cell types correctly (number, string, bool, error)
-- [ ] **11c-6:** Extract column widths and row heights
-- [ ] **11c-7:** Implement proper C memory allocation for returned data
-- [ ] **11c-8:** Build as C-archive and verify header generation
+- [x] **11c-1:** Create `bindings/go/excelize_bridge.go`
+- [x] **11c-2:** Implement `ExcelizeParseXLSX` - open, extract all data, close, return
+- [x] **11c-3:** Handle shared formulas (excelize expands them automatically)
+- [x] **11c-4:** Handle array formulas
+- [x] **11c-5:** Extract cell types correctly (number, string, bool, error)
+- [x] **11c-6:** Extract column widths and row heights
+- [x] **11c-7:** Implement proper C memory allocation for returned data
+- [x] **11c-8:** Build as C-archive and verify header generation
 
 **Key pattern - transient parse:**
 ```go
@@ -598,16 +598,16 @@ func ExcelizeParseXLSX(path *C.char, errorOut **C.char) *C.XLSXData {
 
 ---
 
-### Phase 11d: Go Writer Implementation
+### Phase 11d: Go Writer Implementation ✅
 
 Implement the Go side that writes XLSX from C structs.
 
-- [ ] **11d-1:** Implement `ExcelizeWriteXLSX` - create file, populate, save, close
-- [ ] **11d-2:** Write cell values with correct types
-- [ ] **11d-3:** Write formulas
-- [ ] **11d-4:** Write column widths and row heights
-- [ ] **11d-5:** Handle multiple sheets
-- [ ] **11d-6:** Add Go-side tests
+- [x] **11d-1:** Implement `ExcelizeWriteXLSX` - create file, populate, save, close
+- [x] **11d-2:** Write cell values with correct types
+- [x] **11d-3:** Write formulas
+- [x] **11d-4:** Write column widths and row heights
+- [x] **11d-5:** Handle multiple sheets
+- [x] **11d-6:** Add Go-side tests
 
 **Key pattern - transient write:**
 ```go
@@ -633,17 +633,17 @@ func ExcelizeWriteXLSX(path *C.char, data *C.XLSXData, errorOut **C.char) C.int 
 
 ---
 
-### Phase 11e: C++ Integration
+### Phase 11e: C++ Integration ✅
 
 Update the C++ xlsx_reader/writer to use the excelize C API.
 
-- [ ] **11e-1:** Update `xlsx_reader.cc` to call `ExcelizeParseXLSX`
-- [ ] **11e-2:** Convert `XLSXData*` to our `Workbook` model
-- [ ] **11e-3:** Call `XLSXDataFree` after conversion
-- [ ] **11e-4:** Update `xlsx_writer.cc` to build `XLSXData*` from `Workbook`
-- [ ] **11e-5:** Call `ExcelizeWriteXLSX` and free the data
-- [ ] **11e-6:** Update BUILD files to link against libexcelize.a
-- [ ] **11e-7:** Keep the public `XLSXReader`/`XLSXWriter` interface unchanged
+- [x] **11e-1:** Update `xlsx_reader.cc` to call `ExcelizeParseXLSX`
+- [x] **11e-2:** Convert `XLSXData*` to our `Workbook` model
+- [x] **11e-3:** Call `XLSXDataFree` after conversion
+- [x] **11e-4:** Update `xlsx_writer.cc` to build `XLSXData*` from `Workbook`
+- [x] **11e-5:** Call `ExcelizeWriteXLSX` and free the data
+- [x] **11e-6:** Update BUILD files to link against libexcelize.a
+- [x] **11e-7:** Keep the public `XLSXReader`/`XLSXWriter` interface unchanged
 
 **C++ integration pattern:**
 ```cpp
@@ -672,17 +672,17 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
 
 ---
 
-### Phase 11f: Cleanup & Validation
+### Phase 11f: Cleanup & Validation ✅
 
 Remove OpenXLSX and validate the migration.
 
-- [ ] **11f-1:** Remove OpenXLSX from MODULE.bazel/WORKSPACE
-- [ ] **11f-2:** Remove any OpenXLSX-specific includes/code
-- [ ] **11f-3:** Add tests for shared formula reading
-- [ ] **11f-4:** Add tests for array formula reading
-- [ ] **11f-5:** Test with real-world Excel files (calendars, financial models, etc.)
-- [ ] **11f-6:** Performance benchmark: excelize vs OpenXLSX
-- [ ] **11f-7:** Update documentation
+- [x] **11f-1:** Remove OpenXLSX from MODULE.bazel/WORKSPACE
+- [x] **11f-2:** Remove any OpenXLSX-specific includes/code
+- [ ] **11f-3:** Add tests for shared formula reading *(deferred)*
+- [ ] **11f-4:** Add tests for array formula reading *(deferred)*
+- [ ] **11f-5:** Test with real-world Excel files (calendars, financial models, etc.) *(deferred)*
+- [ ] **11f-6:** Performance benchmark: excelize vs OpenXLSX *(deferred)*
+- [x] **11f-7:** Update documentation
 
 **Deliverables:**
 - Clean codebase with single XLSX implementation
