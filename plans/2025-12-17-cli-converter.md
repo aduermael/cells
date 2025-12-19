@@ -322,7 +322,7 @@ Final touches for release.
 
 - [x] **10a:** Add man page or `--help` documentation
 - [x] **10b:** Test on sample real-world files
-- [ ] **10c:** Performance testing with large files (100K+ cells)
+- [x] **10c:** Performance testing with large files (100K+ cells)
 - [ ] **10d:** Memory profiling
 - [ ] **10e:** Update GETTING_STARTED.md with CLI usage
 - [ ] **10f:** Create example scripts in `examples/`
