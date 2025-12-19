@@ -300,18 +300,19 @@ Convert between UUID-based and A1 notation for Excel compatibility.
 
 ---
 
-## Phase 9: XLSX Integration
+## Phase 9: XLSX Integration ✅
 
 Wire XLSX support into the CLI.
 
-- [ ] **9a:** Add XLSX reader/writer to CLI conversion pipeline
-- [ ] **9b:** Integrate formula reference conversion
-- [ ] **9c:** Add XLSX-specific CLI options (--sheet, --all-sheets)
-- [ ] **9d:** Create end-to-end tests (xlsx → cells, cells → xlsx, csv ↔ xlsx)
+- [x] **9a:** Add XLSX reader/writer to CLI conversion pipeline
+- [x] **9b:** Integrate formula reference conversion
+- [x] **9c:** Add XLSX-specific CLI options (--sheet, --all-sheets)
+- [x] **9d:** Create end-to-end tests (xlsx → cells, cells → xlsx, csv ↔ xlsx)
 
 **Deliverables:**
-- Full `cells` CLI with XLSX support
+- Full `cells` CLI with XLSX support (23 tests passing)
 - Complete format conversion matrix tested
+- --sheet filter and --all-sheets export working
 
 ---
 
