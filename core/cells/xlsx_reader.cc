@@ -119,34 +119,41 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
             for (uint32_t r = 1; r <= rowCount; ++r) {
                 auto row = std::make_unique<Axis>(generate_id(), false);
                 row->position = r - 1;
-
-                // Read row height if requested
-                if (options_.readDimensions) {
-                    try {
-                        auto xlRow = xlSheet.row(r);
-                        double height = xlRow.height();
-                        // Convert points to pixels (1 point = 1.333 pixels at 96 DPI)
-                        row->size = static_cast<uint32_t>(height * 1.333);
-                    } catch (...) {
-                        // Row info may not exist, use default
-                        row->size = 20;  // Default height
-                    }
-                }
-
                 rowIds.push_back(row->id);
                 sheet->addRow(std::move(row));
             }
 
-            // Read cells
-            for (uint32_t r = 1; r <= rowCount; ++r) {
-                for (uint16_t c = 1; c <= colCount; ++c) {
+            // Read row heights using row iterator (much faster than random access)
+            if (options_.readDimensions) {
+                for (const auto& xlRow : xlSheet.rows()) {
+                    uint32_t r = xlRow.rowNumber();
+                    if (r < 1 || r > rowCount) continue;
                     try {
-                        auto xlCell = xlSheet.cell(r, c);
+                        double height = xlRow.height();
+                        auto* row = sheet->getRow(rowIds[r - 1]);
+                        if (row) {
+                            row->size = static_cast<uint32_t>(height * 1.333);
+                        }
+                    } catch (...) {
+                        // Height may not be set, use default
+                    }
+                }
+            }
 
+            // Read cells - iterate only over populated rows/cells for performance
+            for (const auto& xlRow : xlSheet.rows()) {
+                uint32_t r = xlRow.rowNumber();
+                if (r < 1 || r > rowCount) continue;
+
+                for (auto& xlCell : xlRow.cells()) {
+                    try {
                         // Skip empty cells
                         if (xlCell.value().type() == OpenXLSX::XLValueType::Empty) {
                             continue;
                         }
+
+                        uint16_t c = xlCell.cellReference().column();
+                        if (c < 1 || c > colCount) continue;
 
                         // Create cell
                         auto cell =
@@ -220,9 +227,8 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
 
                         sheet->addCell(std::move(cell));
                     } catch (const std::exception& e) {
-                        addWarning("Error reading cell at row " + std::to_string(r) + ", column " +
-                                   std::to_string(c) + " in sheet \"" + sheetName +
-                                   "\": " + e.what());
+                        addWarning("Error reading cell at " + sheetName + "!" +
+                                   xlCell.cellReference().address() + ": " + e.what());
                     }
                 }
             }
