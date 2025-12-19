@@ -14,6 +14,7 @@
 
 #include "core/cells/csv_reader.h"
 #include "core/cells/parser.h"
+#include "core/cells/xlsx_reader.h"
 
 namespace {
 
@@ -267,17 +268,17 @@ size_t calc_grid_dimension(
 
 // Show file information
 int show_file_info(const Options& opts) {
-    // Read the file
-    std::string content = read_file(opts.input_file);
-    if (content.empty()) {
-        std::cerr << "Error: Could not read file: " << opts.input_file << "\n";
-        return 1;
-    }
-
     // Parse the file based on format
     std::unique_ptr<cells::Workbook> workbook;
 
     if (opts.input_format == Format::kCells) {
+        // Read file content for text-based formats
+        std::string content = read_file(opts.input_file);
+        if (content.empty()) {
+            std::cerr << "Error: Could not read file: " << opts.input_file << "\n";
+            return 1;
+        }
+
         cells::ParseResult result = cells::parse(content);
         if (!result.ok()) {
             std::cerr << "Error: " << result.error->toString() << "\n";
@@ -285,6 +286,12 @@ int show_file_info(const Options& opts) {
         }
         workbook = std::move(result.workbook);
     } else if (opts.input_format == Format::kCsv) {
+        // Read file content for text-based formats
+        std::string content = read_file(opts.input_file);
+        if (content.empty()) {
+            std::cerr << "Error: Could not read file: " << opts.input_file << "\n";
+            return 1;
+        }
         // Build CSV options from CLI options
         cells::CSVReadOptions csv_opts;
         if (!opts.csv.delimiter.empty()) {
@@ -299,8 +306,25 @@ int show_file_info(const Options& opts) {
             return 1;
         }
         workbook = std::move(result.workbook);
+    } else if (opts.input_format == Format::kXlsx) {
+        // XLSX reader reads from file path directly
+        cells::XLSXReadOptions xlsx_opts;
+        xlsx_opts.readFormulas = true;
+        xlsx_opts.readDimensions = true;
+
+        // Apply --sheet filter if specified
+        if (!opts.xlsx.sheet_name.empty()) {
+            xlsx_opts.sheetName = opts.xlsx.sheet_name;
+        }
+
+        cells::XLSXReadResult result = cells::readXLSX(opts.input_file, xlsx_opts);
+        if (!result.ok()) {
+            std::cerr << "Error: " << result.error->toString() << "\n";
+            return 1;
+        }
+        workbook = std::move(result.workbook);
     } else {
-        std::cerr << "Error: --info only supports .cells and .csv files currently\n";
+        std::cerr << "Error: Unsupported format for --info\n";
         return 1;
     }
 

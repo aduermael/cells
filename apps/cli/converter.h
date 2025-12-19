@@ -65,6 +65,9 @@ private:
 
     // Generate warnings for feature loss during conversion
     void checkFeatureLoss(const Workbook& workbook);
+
+    // Convert A1 formulas to UUID references (for XLSX import)
+    void convertFormulasToUuid(Workbook& workbook);
 };
 
 }  // namespace cells::cli

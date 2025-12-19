@@ -8,7 +8,10 @@
 #include "core/cells/csv_reader.h"
 #include "core/cells/csv_writer.h"
 #include "core/cells/parser.h"
+#include "core/cells/ref_converter.h"
 #include "core/cells/serializer.h"
+#include "core/cells/xlsx_reader.h"
+#include "core/cells/xlsx_writer.h"
 
 namespace cells::cli {
 
@@ -54,14 +57,14 @@ ConversionResult Converter::convert() {
 }
 
 std::unique_ptr<Workbook> Converter::readInput(std::string& error_out) {
-    // Read file contents
-    const std::string content = readFileContents(options_.input_file, error_out);
-    if (content.empty() && !error_out.empty()) {
-        return nullptr;
-    }
-
     switch (options_.input_format) {
         case Format::kCells: {
+            // Read file contents for text-based formats
+            const std::string content = readFileContents(options_.input_file, error_out);
+            if (content.empty() && !error_out.empty()) {
+                return nullptr;
+            }
+
             ParseResult result = parse(content);
             if (!result.ok() && result.error.has_value()) {
                 error_out = result.error->toString();
@@ -71,6 +74,12 @@ std::unique_ptr<Workbook> Converter::readInput(std::string& error_out) {
         }
 
         case Format::kCsv: {
+            // Read file contents for text-based formats
+            const std::string content = readFileContents(options_.input_file, error_out);
+            if (content.empty() && !error_out.empty()) {
+                return nullptr;
+            }
+
             CSVReadOptions csv_opts;
             if (!options_.csv.delimiter.empty()) {
                 csv_opts.delimiter = options_.csv.delimiter[0];
@@ -86,9 +95,34 @@ std::unique_ptr<Workbook> Converter::readInput(std::string& error_out) {
             return std::move(result.workbook);
         }
 
-        case Format::kXlsx:
-            error_out = "XLSX format not yet supported";
-            return nullptr;
+        case Format::kXlsx: {
+            // XLSX reader reads directly from file path
+            XLSXReadOptions xlsx_opts;
+            xlsx_opts.readFormulas = true;
+            xlsx_opts.readDimensions = true;
+
+            // Apply --sheet filter if specified
+            if (!options_.xlsx.sheet_name.empty()) {
+                xlsx_opts.sheetName = options_.xlsx.sheet_name;
+            }
+
+            XLSXReadResult result = readXLSX(options_.input_file, xlsx_opts);
+
+            // Convert warnings
+            for (const auto& warning : result.warnings) {
+                addWarning(warning);
+            }
+
+            if (!result.ok() && result.error.has_value()) {
+                error_out = result.error->toString();
+                return nullptr;
+            }
+
+            // Convert A1 formulas to UUID references
+            convertFormulasToUuid(*result.workbook);
+
+            return std::move(result.workbook);
+        }
 
         case Format::kUnknown:
             error_out = "Unknown input format";
@@ -100,13 +134,11 @@ std::unique_ptr<Workbook> Converter::readInput(std::string& error_out) {
 }
 
 bool Converter::writeOutput(const Workbook& workbook, std::string& error_out) {
-    std::string content;
-
     switch (options_.output_format) {
         case Format::kCells: {
             const Serializer serializer;
-            content = serializer.serialize(workbook);
-            break;
+            std::string content = serializer.serialize(workbook);
+            return writeFileContents(options_.output_file, content, error_out);
         }
 
         case Format::kCsv: {
@@ -121,20 +153,36 @@ bool Converter::writeOutput(const Workbook& workbook, std::string& error_out) {
                 error_out = result.error->toString();
                 return false;
             }
-            content = std::move(result.output);
-            break;
+            return writeFileContents(options_.output_file, result.output, error_out);
         }
 
-        case Format::kXlsx:
-            error_out = "XLSX format not yet supported";
-            return false;
+        case Format::kXlsx: {
+            // XLSX writer writes directly to file path
+            XLSXWriteOptions xlsx_opts;
+            xlsx_opts.writeFormulas = true;
+            xlsx_opts.writeDimensions = true;
+
+            XLSXWriteResult result = writeXLSX(workbook, options_.output_file, xlsx_opts);
+
+            // Convert warnings
+            for (const auto& warning : result.warnings) {
+                addWarning(warning);
+            }
+
+            if (!result.ok() && result.error.has_value()) {
+                error_out = result.error->toString();
+                return false;
+            }
+            return true;
+        }
 
         case Format::kUnknown:
             error_out = "Unknown output format";
             return false;
     }
 
-    return writeFileContents(options_.output_file, content, error_out);
+    error_out = "Unexpected output format";
+    return false;
 }
 
 std::string Converter::readFileContents(const std::string& path, std::string& error_out) {
@@ -205,6 +253,52 @@ void Converter::checkFeatureLoss(const Workbook& workbook) {
         }
         if (has_formulas) {
             addWarning("Formulas will be exported as computed values only.");
+        }
+    }
+
+    // Check for feature loss when converting to XLSX
+    if (options_.output_format == Format::kXlsx) {
+        // Check for Excel row/column limits
+        for (const auto& sheet : workbook.sheets) {
+            size_t row_count = sheet->rows.size();
+            size_t col_count = sheet->columns.size();
+
+            if (row_count > 1048576) {
+                addWarning("Sheet \"" + sheet->name + "\" has " + std::to_string(row_count) +
+                           " rows (Excel limit: 1,048,576). Data may be truncated.");
+            }
+            if (col_count > 16384) {
+                addWarning("Sheet \"" + sheet->name + "\" has " + std::to_string(col_count) +
+                           " columns (Excel limit: 16,384). Data may be truncated.");
+            }
+        }
+    }
+}
+
+void Converter::convertFormulasToUuid(Workbook& workbook) {
+    RefConverter converter;
+
+    for (auto& sheet : workbook.sheets) {
+        // Set up context for this sheet
+        converter.setContext(*sheet);
+
+        // Convert formulas in each cell
+        for (auto& [id, cell] : sheet->cells) {
+            if (cell->formula != nullptr && cell->formula->text != nullptr) {
+                std::string formula_text = cell->formula->text;
+
+                // Skip if formula doesn't look like it has A1 refs
+                // (Already in UUID format or no refs)
+                if (formula_text.empty()) {
+                    continue;
+                }
+
+                // Convert A1 refs to UUID refs
+                std::string converted = converter.formulaToUuid(formula_text);
+                if (converted != formula_text) {
+                    cell->setFormula(new Formula(converted.c_str()));
+                }
+            }
         }
     }
 }
