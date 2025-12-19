@@ -287,15 +287,15 @@ Implement Excel export.
 
 Convert between UUID-based and A1 notation for Excel compatibility.
 
-- [ ] **8a:** Create `core/cells/ref_converter.h` and `ref_converter.cc`
-- [ ] **8b:** Implement UUID-to-A1 conversion (for export)
-- [ ] **8c:** Implement A1-to-UUID conversion (for import)
-- [ ] **8d:** Handle absolute vs relative references ($A$1 vs A1)
-- [ ] **8e:** Handle range references (A1:C3)
-- [ ] **8f:** Add `ref_converter_test.cc`
+- [x] **8a:** Create `core/cells/ref_converter.h` and `ref_converter.cc`
+- [x] **8b:** Implement UUID-to-A1 conversion (for export)
+- [x] **8c:** Implement A1-to-UUID conversion (for import)
+- [x] **8d:** Handle absolute vs relative references ($A$1 vs A1)
+- [x] **8e:** Handle range references (A1:C3)
+- [x] **8f:** Add `ref_converter_test.cc`
 
 **Deliverables:**
-- `ref_converter.h` / `ref_converter.cc` - reference conversion
+- `ref_converter.h` / `ref_converter.cc` - reference conversion (45 tests passing)
 - `ref_converter_test.cc` - unit tests
 
 ---
