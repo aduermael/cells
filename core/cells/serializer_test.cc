@@ -463,5 +463,182 @@ TEST(RoundtripTest, InMemoryWorkbook) {
     compareWorkbooks(*wb, *result.workbook);
 }
 
+// --- Shared Formula Tests ---
+
+TEST(SharedFormulaTest, SerializeSharedFormulaMaster) {
+    // Master cell should serialize with full formula text
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+
+    auto masterCell = std::make_unique<Cell>(ID("xMaster01"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    masterCell->setFormula(new Formula("=SUM(A1:A10)"));
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(masterCell));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+
+    // Master should have full formula
+    EXPECT_NE(output.find("f \"=SUM(A1:A10)\""), std::string::npos);
+}
+
+TEST(SharedFormulaTest, SerializeSharedFormulaSubscriber) {
+    // Subscriber cell should serialize with =@masterUUID
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row1 = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row1->position = 0;
+    auto row2 = std::make_unique<Axis>(ID("rB3dE4fG"), false);
+    row2->position = 1;
+
+    // Master cell (first alphabetically: xAMaster)
+    auto masterCell = std::make_unique<Cell>(ID("xAMaster"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    masterCell->setFormula(new Formula("=SUM(A1:A10)"));
+    Cell* masterPtr = masterCell.get();
+
+    // Subscriber cell (second alphabetically: xBSubscr)
+    auto subCell = std::make_unique<Cell>(ID("xBSubscr"), ID("cA1bC2dE"), ID("rB3dE4fG"));
+    subCell->setSharedFormulaRef(masterPtr);
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row1));
+    sheet->addRow(std::move(row2));
+    sheet->addCell(std::move(masterCell));
+    sheet->addCell(std::move(subCell));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+
+    // Master should have full formula
+    EXPECT_NE(output.find("f \"=SUM(A1:A10)\""), std::string::npos);
+    // Subscriber should have =@masterUUID
+    EXPECT_NE(output.find("f \"=@xAMaster\""), std::string::npos);
+}
+
+TEST(SharedFormulaTest, RoundtripSharedFormulas) {
+    // Create workbook with shared formulas
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row1 = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row1->position = 0;
+    auto row2 = std::make_unique<Axis>(ID("rB3dE4fG"), false);
+    row2->position = 1;
+    auto row3 = std::make_unique<Axis>(ID("rC5fG6hI"), false);
+    row3->position = 2;
+
+    // Master cell
+    auto masterCell = std::make_unique<Cell>(ID("xAMaster"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    masterCell->setFormula(new Formula("=A1+B1"));
+    Cell* masterPtr = masterCell.get();
+
+    // Two subscriber cells
+    auto sub1 = std::make_unique<Cell>(ID("xBSub001"), ID("cA1bC2dE"), ID("rB3dE4fG"));
+    sub1->setSharedFormulaRef(masterPtr);
+
+    auto sub2 = std::make_unique<Cell>(ID("xCSub002"), ID("cA1bC2dE"), ID("rC5fG6hI"));
+    sub2->setSharedFormulaRef(masterPtr);
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row1));
+    sheet->addRow(std::move(row2));
+    sheet->addRow(std::move(row3));
+    sheet->addCell(std::move(masterCell));
+    sheet->addCell(std::move(sub1));
+    sheet->addCell(std::move(sub2));
+    wb->addSheet(std::move(sheet));
+
+    // Serialize
+    const std::string serialized = serialize(*wb);
+
+    // Verify output format
+    EXPECT_NE(serialized.find("f \"=A1+B1\""), std::string::npos);
+    EXPECT_NE(serialized.find("f \"=@xAMaster\""), std::string::npos);
+
+    // Parse back
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Verify structure
+    ASSERT_EQ(result.workbook->sheetCount(), 1u);
+    Sheet* parsedSheet = result.workbook->getSheetByIndex(0);
+    ASSERT_EQ(parsedSheet->cellCount(), 3u);
+
+    // Find cells by ID
+    Cell* parsedMaster = parsedSheet->getCell(ID("xAMaster"));
+    Cell* parsedSub1 = parsedSheet->getCell(ID("xBSub001"));
+    Cell* parsedSub2 = parsedSheet->getCell(ID("xCSub002"));
+
+    ASSERT_NE(parsedMaster, nullptr);
+    ASSERT_NE(parsedSub1, nullptr);
+    ASSERT_NE(parsedSub2, nullptr);
+
+    // Verify master has formula
+    EXPECT_TRUE(parsedMaster->isFormula());
+    EXPECT_FALSE(parsedMaster->isSharedFormula());
+    EXPECT_NE(parsedMaster->formula, nullptr);
+    EXPECT_STREQ(parsedMaster->formula->text, "=A1+B1");
+
+    // Verify subscribers reference master
+    EXPECT_TRUE(parsedSub1->isFormula());
+    EXPECT_TRUE(parsedSub1->isSharedFormula());
+    EXPECT_EQ(parsedSub1->sharedFormulaRef, parsedMaster);
+
+    EXPECT_TRUE(parsedSub2->isFormula());
+    EXPECT_TRUE(parsedSub2->isSharedFormula());
+    EXPECT_EQ(parsedSub2->sharedFormulaRef, parsedMaster);
+
+    // Verify master is marked as master
+    EXPECT_TRUE(parsedMaster->isSharedFormulaMaster());
+}
+
+TEST(SharedFormulaTest, ParseSharedFormulaSubscriberBeforeMaster) {
+    // Test that parsing works even if subscriber appears before master
+    // (cells are sorted alphabetically in output, master is first alphabetically)
+    const std::string content = R"(
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+C cA1bC2dE 0
+R rA1bC2dE 0
+R rB3dE4fG 1
+X xBSubscr cA1bC2dE rB3dE4fG f "=@xAMaster"
+X xAMaster cA1bC2dE rA1bC2dE f "=A1+B1"
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    Cell* master = sheet->getCell(ID("xAMaster"));
+    Cell* subscriber = sheet->getCell(ID("xBSubscr"));
+
+    ASSERT_NE(master, nullptr);
+    ASSERT_NE(subscriber, nullptr);
+
+    EXPECT_TRUE(subscriber->isSharedFormula());
+    EXPECT_EQ(subscriber->sharedFormulaRef, master);
+}
+
+TEST(SharedFormulaTest, ParseInvalidSharedFormulaReference) {
+    // Test that parsing fails gracefully when master doesn't exist
+    const std::string content = R"(
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+C cA1bC2dE 0
+R rA1bC2dE 0
+X xSubscrb cA1bC2dE rA1bC2dE f "=@NOTEXIST"
+)";
+
+    ParseResult result = parse(content);
+    EXPECT_FALSE(result.ok());
+    EXPECT_TRUE(result.error.has_value());
+    EXPECT_NE(result.error->message.find("master not found"), std::string::npos);
+}
+
 }  // namespace
 }  // namespace cells
