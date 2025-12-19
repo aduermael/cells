@@ -1,11 +1,13 @@
 #include "core/cells/xlsx_writer.h"
 
 #include <cstdio>
+
 #include <filesystem>
 #include <string>
 
 #include "core/cells/id.h"
 #include "core/cells/xlsx_reader.h"
+
 #include "gtest/gtest.h"
 
 namespace cells {

@@ -267,19 +267,19 @@ Options for reading XLSX:
 
 Implement Excel export.
 
-- [ ] **7a:** Create `core/cells/xlsx_writer.h` and `xlsx_writer.cc`
-- [ ] **7b:** Implement basic cell writing (numbers, strings)
-- [ ] **7c:** Implement formula writing (convert UUID refs to A1)
-- [ ] **7d:** Write cell styles (basic)
-- [ ] **7e:** Write column widths and row heights
-- [ ] **7f:** Handle multiple sheets
-- [ ] **7g:** Add warning system for feature loss
-- [ ] **7h:** Add `xlsx_writer_test.cc`
-- [ ] **7i:** Add roundtrip tests (xlsx -> cells -> xlsx)
+- [x] **7a:** Create `core/cells/xlsx_writer.h` and `xlsx_writer.cc`
+- [x] **7b:** Implement basic cell writing (numbers, strings)
+- [x] **7c:** Implement formula writing (convert UUID refs to A1)
+- [ ] **7d:** Write cell styles (basic) *(deferred - not critical for MVP)*
+- [x] **7e:** Write column widths and row heights
+- [x] **7f:** Handle multiple sheets
+- [x] **7g:** Add warning system for feature loss
+- [x] **7h:** Add `xlsx_writer_test.cc`
+- [x] **7i:** Add roundtrip tests (xlsx -> cells -> xlsx)
 
 **Deliverables:**
-- `xlsx_writer.h` / `xlsx_writer.cc` - Workbook to XLSX
-- `xlsx_writer_test.cc` - unit tests
+- `xlsx_writer.h` / `xlsx_writer.cc` - Workbook to XLSX (17 tests passing)
+- `xlsx_writer_test.cc` - unit tests including roundtrip tests
 
 ---
 

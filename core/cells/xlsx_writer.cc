@@ -1,8 +1,9 @@
 #include "core/cells/xlsx_writer.h"
 
+#include <cmath>
+
 #include <OpenXLSX/OpenXLSX.hpp>  // NOLINT(build/include_order)
 #include <algorithm>
-#include <cmath>
 #include <sstream>
 #include <unordered_map>
 #include <utility>
@@ -91,7 +92,7 @@ std::string XLSXWriter::columnIndexToLetter(size_t index) {
     return result;
 }
 
-std::string XLSXWriter::convertFormula(const std::string& formula, const Sheet& sheet,
+std::string XLSXWriter::convertFormula(const std::string& formula, const Sheet& /*sheet*/,
                                        const std::vector<ID>& columnIds,
                                        const std::vector<ID>& rowIds) const {
     // Build lookup maps for column/row ID to index
@@ -127,7 +128,7 @@ std::string XLSXWriter::convertFormula(const std::string& formula, const Sheet& 
                 // Convert to A1 notation
                 result += columnIndexToLetter(colIt->second);
                 result += std::to_string(rowIt->second + 1);  // Excel rows are 1-based
-                i += 18;  // Skip the entire reference
+                i += 18;                                      // Skip the entire reference
                 continue;
             }
         }
@@ -157,16 +158,14 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         auto xlWorkbook = doc.workbook();
 
         // OpenXLSX creates a default "Sheet1" - we'll rename or delete it
-        bool firstSheet = true;
-
-        for (const auto& sheet : workbook.sheets) {
+        for (size_t sheetIdx = 0; sheetIdx < workbook.sheets.size(); ++sheetIdx) {
+            const auto& sheet = workbook.sheets[sheetIdx];
             std::string xlSheetName;
 
-            if (firstSheet) {
+            if (sheetIdx == 0) {
                 // Rename the default sheet
                 xlWorkbook.worksheet("Sheet1").setName(sheet->name);
                 xlSheetName = sheet->name;
-                firstSheet = false;
             } else {
                 // Add new sheet
                 xlWorkbook.addWorksheet(sheet->name);
@@ -189,7 +188,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
                 for (size_t c = 0; c < columnIds.size(); ++c) {
                     auto it = sheet->columns.find(columnIds[c]);
                     if (it != sheet->columns.end()) {
-                        // Convert pixels to Excel width units (approximately 7 pixels per character)
+                        // Convert pixels to Excel width units (approximately 7 pixels per
+                        // character)
                         float width = static_cast<float>(it->second->size) / 7.0f;
                         if (width > 0) {
                             xlSheet.column(static_cast<uint16_t>(c + 1)).setWidth(width);
@@ -230,8 +230,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
                 size_t rowIndex = static_cast<size_t>(rowIt - rowIds.begin());
 
                 // Excel uses 1-based indexing
-                auto xlCell =
-                    xlSheet.cell(static_cast<uint32_t>(rowIndex + 1), static_cast<uint16_t>(colIndex + 1));
+                auto xlCell = xlSheet.cell(static_cast<uint32_t>(rowIndex + 1),
+                                           static_cast<uint16_t>(colIndex + 1));
 
                 // Write cell value based on type
                 switch (cell.value.type) {
@@ -279,7 +279,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
                 }
 
                 // Write formula if present and enabled
-                if (options_.writeFormulas && cell.formula != nullptr && cell.formula->text != nullptr) {
+                if (options_.writeFormulas && cell.formula != nullptr &&
+                    cell.formula->text != nullptr) {
                     std::string formulaText = cell.formula->text;
                     // Remove leading '=' if present (OpenXLSX adds it)
                     if (!formulaText.empty() && formulaText[0] == '=') {
