@@ -316,7 +316,7 @@ Wire XLSX support into the CLI.
 
 ---
 
-## Phase 10: Polish
+## Phase 10: Polish ✅
 
 Final touches for release.
 
@@ -325,7 +325,7 @@ Final touches for release.
 - [x] **10c:** Performance testing with large files (100K+ cells)
 - [x] **10d:** Memory profiling
 - [x] **10e:** Update GETTING_STARTED.md with CLI usage
-- [ ] **10f:** Create example scripts in `examples/`
+- [x] **10f:** Create example scripts in `examples/`
 
 **Deliverables:**
 - Complete, tested CLI tool
