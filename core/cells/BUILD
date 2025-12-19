@@ -179,3 +179,13 @@ cc_library(
         ":types",
     ],
 )
+
+cc_test(
+    name = "ref_converter_test",
+    srcs = ["ref_converter_test.cc"],
+    deps = [
+        ":id",
+        ":ref_converter",
+        "@googletest//:gtest_main",
+    ],
+)

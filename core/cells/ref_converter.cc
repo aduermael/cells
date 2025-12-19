@@ -83,14 +83,12 @@ void RefConverter::clearContext() {
 
 std::string RefConverter::columnIndexToLetter(size_t index) {
     std::string result;
-    size_t n = index;
-    do {
+    size_t n = index + 1;  // Convert to 1-based (A=1, not A=0)
+    while (n > 0) {
+        n--;  // Adjust back for 0-based letter calculation
         result.insert(result.begin(), static_cast<char>('A' + (n % 26)));
         n = n / 26;
-        if (n > 0) {
-            n--;  // Adjust for 1-based "digits" (A=0, not A=1)
-        }
-    } while (n > 0);
+    }
     return result;
 }
 
