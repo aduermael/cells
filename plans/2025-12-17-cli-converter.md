@@ -320,8 +320,8 @@ Wire XLSX support into the CLI.
 
 Final touches for release.
 
-- [ ] **10a:** Add man page or `--help` documentation
-- [ ] **10b:** Test on sample real-world files
+- [x] **10a:** Add man page or `--help` documentation
+- [x] **10b:** Test on sample real-world files
 - [ ] **10c:** Performance testing with large files (100K+ cells)
 - [ ] **10d:** Memory profiling
 - [ ] **10e:** Update GETTING_STARTED.md with CLI usage
@@ -445,3 +445,393 @@ http_archive(
 2. **Usability:** Clear error messages and warnings
 3. **Performance:** Convert 100K cells in < 5 seconds
 4. **Compatibility:** Successfully import/export real-world Excel files
+
+---
+
+## Phase 11: Replace OpenXLSX with Excelize
+
+**Motivation:** OpenXLSX doesn't support shared or array formulas, which are very common in real Excel files. Excelize (Go) has better Excel parity and is actively maintained.
+
+### Design Principle: Transient Codec
+
+Excelize is used **only** as a transient parser/serializer. The document is never held open in excelize - our `Workbook` model is the single source of truth.
+
+```
+Read:   XLSX ──► excelize (parse) ──► Workbook ──► excelize freed immediately
+Write:  Workbook ──► excelize (build) ──► XLSX ──► excelize freed immediately
+```
+
+**Benefits:**
+- No handle management or lifecycle complexity
+- Go's GC can reclaim memory immediately after read/write
+- Simpler CGO interface - single function calls, not stateful APIs
+- Clear ownership: C++ owns all data after parsing
+
+**Trade-offs (acceptable for now):**
+- Excel features not in our model are discarded on read (charts, pivot tables, etc.)
+- These features won't round-trip through our format
+- We can add model support for these features later
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    C++ Code (existing)                       │
+│                    xlsx_reader.cc / xlsx_writer.cc           │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    C API (single-call functions)             │
+│      ExcelizeParseXLSX(path) -> XLSXData*                   │
+│      ExcelizeWriteXLSX(path, XLSXData*) -> error            │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Go Library (transient)                    │
+│                    Open file, extract data, close, return    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### Phase 11a: Bazel Go Toolchain Setup
+
+Set up rules_go for building Go code in Bazel.
+
+- [ ] **11a-1:** Add rules_go to MODULE.bazel
+- [ ] **11a-2:** Configure Go toolchain
+- [ ] **11a-3:** Create `bindings/go/BUILD.bazel`
+- [ ] **11a-4:** Add excelize as a Go dependency via gazelle
+- [ ] **11a-5:** Verify Go builds work: `bazel build //bindings/go:excelize_bridge`
+
+**Deliverables:**
+- Go toolchain working in Bazel
+- excelize dependency resolved
+
+---
+
+### Phase 11b: C Data Structures
+
+Define C-compatible data structures for transferring spreadsheet data across the CGO boundary.
+
+- [ ] **11b-1:** Create `bindings/go/excelize_types.h` with C structs
+- [ ] **11b-2:** Define `XLSXCell` struct (row, col, value, formula, type)
+- [ ] **11b-3:** Define `XLSXSheet` struct (name, cells array, row/col dimensions)
+- [ ] **11b-4:** Define `XLSXData` struct (sheets array, sheet count)
+- [ ] **11b-5:** Define `XLSXError` struct (code, message)
+- [ ] **11b-6:** Add memory management functions (`XLSXDataFree`, etc.)
+
+**Data structures:**
+```c
+// excelize_types.h
+typedef struct {
+    int row;
+    int col;
+    char* value;      // String representation
+    char* formula;    // NULL if not a formula
+    int cell_type;    // 0=empty, 1=string, 2=number, 3=bool, 4=error
+} XLSXCell;
+
+typedef struct {
+    char* name;
+    XLSXCell* cells;
+    int cell_count;
+    int row_count;
+    int col_count;
+    float* col_widths;   // NULL or array of col_count widths
+    float* row_heights;  // NULL or array of row_count heights
+} XLSXSheet;
+
+typedef struct {
+    XLSXSheet* sheets;
+    int sheet_count;
+} XLSXData;
+
+// Single-call API
+XLSXData* ExcelizeParseXLSX(const char* path, char** error_out);
+int ExcelizeWriteXLSX(const char* path, const XLSXData* data, char** error_out);
+void XLSXDataFree(XLSXData* data);
+void XLSXErrorFree(char* error);
+```
+
+**Deliverables:**
+- `excelize_types.h` - C-compatible data structures
+- Clean memory ownership model (Go allocates, C++ frees via provided functions)
+
+---
+
+### Phase 11c: Go Parser Implementation
+
+Implement the Go side that parses XLSX and returns C structs.
+
+- [ ] **11c-1:** Create `bindings/go/excelize_bridge.go`
+- [ ] **11c-2:** Implement `ExcelizeParseXLSX` - open, extract all data, close, return
+- [ ] **11c-3:** Handle shared formulas (excelize expands them automatically)
+- [ ] **11c-4:** Handle array formulas
+- [ ] **11c-5:** Extract cell types correctly (number, string, bool, error)
+- [ ] **11c-6:** Extract column widths and row heights
+- [ ] **11c-7:** Implement proper C memory allocation for returned data
+- [ ] **11c-8:** Build as C-archive and verify header generation
+
+**Key pattern - transient parse:**
+```go
+//export ExcelizeParseXLSX
+func ExcelizeParseXLSX(path *C.char, errorOut **C.char) *C.XLSXData {
+    f, err := excelize.OpenFile(C.GoString(path))
+    if err != nil {
+        *errorOut = C.CString(err.Error())
+        return nil
+    }
+    defer f.Close()  // Always close!
+
+    // Extract all data into C structs
+    data := extractAllData(f)
+    return data
+}
+```
+
+**Deliverables:**
+- `excelize_bridge.go` - Go parser with CGO exports
+- `libexcelize.a` + `excelize.h` - C-compatible library
+
+---
+
+### Phase 11d: Go Writer Implementation
+
+Implement the Go side that writes XLSX from C structs.
+
+- [ ] **11d-1:** Implement `ExcelizeWriteXLSX` - create file, populate, save, close
+- [ ] **11d-2:** Write cell values with correct types
+- [ ] **11d-3:** Write formulas
+- [ ] **11d-4:** Write column widths and row heights
+- [ ] **11d-5:** Handle multiple sheets
+- [ ] **11d-6:** Add Go-side tests
+
+**Key pattern - transient write:**
+```go
+//export ExcelizeWriteXLSX
+func ExcelizeWriteXLSX(path *C.char, data *C.XLSXData, errorOut **C.char) C.int {
+    f := excelize.NewFile()
+    defer f.Close()  // Cleanup even on error
+
+    // Populate from C structs
+    populateFromData(f, data)
+
+    if err := f.SaveAs(C.GoString(path)); err != nil {
+        *errorOut = C.CString(err.Error())
+        return -1
+    }
+    return 0
+}
+```
+
+**Deliverables:**
+- Complete read/write support
+- Go-side tests for both directions
+
+---
+
+### Phase 11e: C++ Integration
+
+Update the C++ xlsx_reader/writer to use the excelize C API.
+
+- [ ] **11e-1:** Update `xlsx_reader.cc` to call `ExcelizeParseXLSX`
+- [ ] **11e-2:** Convert `XLSXData*` to our `Workbook` model
+- [ ] **11e-3:** Call `XLSXDataFree` after conversion
+- [ ] **11e-4:** Update `xlsx_writer.cc` to build `XLSXData*` from `Workbook`
+- [ ] **11e-5:** Call `ExcelizeWriteXLSX` and free the data
+- [ ] **11e-6:** Update BUILD files to link against libexcelize.a
+- [ ] **11e-7:** Keep the public `XLSXReader`/`XLSXWriter` interface unchanged
+
+**C++ integration pattern:**
+```cpp
+XLSXReadResult XLSXReader::readFile(const std::string& path) {
+    char* error = nullptr;
+    XLSXData* data = ExcelizeParseXLSX(path.c_str(), &error);
+
+    if (error) {
+        std::string msg(error);
+        XLSXErrorFree(error);
+        return XLSXReadResult{nullptr, XLSXReadError(msg)};
+    }
+
+    // Convert to our Workbook model
+    auto workbook = convertToWorkbook(data);
+    XLSXDataFree(data);  // Free immediately after conversion
+
+    return XLSXReadResult{std::move(workbook), std::nullopt};
+}
+```
+
+**Deliverables:**
+- `xlsx_reader.cc` / `xlsx_writer.cc` updated
+- All existing tests pass
+- Shared/array formulas now work
+
+---
+
+### Phase 11f: Cleanup & Validation
+
+Remove OpenXLSX and validate the migration.
+
+- [ ] **11f-1:** Remove OpenXLSX from MODULE.bazel/WORKSPACE
+- [ ] **11f-2:** Remove any OpenXLSX-specific includes/code
+- [ ] **11f-3:** Add tests for shared formula reading
+- [ ] **11f-4:** Add tests for array formula reading
+- [ ] **11f-5:** Test with real-world Excel files (calendars, financial models, etc.)
+- [ ] **11f-6:** Performance benchmark: excelize vs OpenXLSX
+- [ ] **11f-7:** Update documentation
+
+**Deliverables:**
+- Clean codebase with single XLSX implementation
+- Better Excel parity verified with real files
+- Performance comparison documented
+
+---
+
+## Phase 11 File Layout
+
+```
+cells/
+├── bindings/
+│   └── go/
+│       ├── BUILD.bazel
+│       ├── go.mod                    # Go module (excelize dependency)
+│       ├── excelize_types.h          # C-compatible data structures
+│       └── excelize_bridge.go        # Go codec with CGO exports
+├── core/
+│   └── cells/
+│       ├── xlsx_reader.cc            # Updated to use excelize
+│       └── xlsx_writer.cc            # Updated to use excelize
+```
+
+---
+
+## Phase 11 Technical Notes
+
+### Design Pattern: Transient Codec
+
+All format codecs (CSV, XLSX, .cells) follow the same pattern:
+
+```
+┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+│  File on    │ ───► │  Transient  │ ───► │  Workbook   │
+│  disk       │      │  Parser     │      │  (in memory)│
+└─────────────┘      └─────────────┘      └─────────────┘
+                           │
+                           ▼
+                     Parser closed,
+                     memory freed
+
+┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+│  Workbook   │ ───► │  Transient  │ ───► │  File on    │
+│  (in memory)│      │  Serializer │      │  disk       │
+└─────────────┘      └─────────────┘      └─────────────┘
+                           │
+                           ▼
+                     Serializer closed,
+                     memory freed
+```
+
+**Benefits:**
+- Single source of truth (Workbook model)
+- No codec-specific state to manage
+- Clear memory ownership
+- Easy to add new formats
+
+### CGO Memory Management
+
+Since we use transient parsing, memory management is simple:
+
+1. **Go allocates** - `C.malloc` for structs, `C.CString` for strings
+2. **C++ converts** - Copy data into Workbook model
+3. **C++ frees** - Call `XLSXDataFree()` immediately after conversion
+
+```go
+// Go side - allocate C memory
+func allocXLSXCell(row, col int, value, formula string, cellType int) *C.XLSXCell {
+    cell := (*C.XLSXCell)(C.malloc(C.sizeof_XLSXCell))
+    cell.row = C.int(row)
+    cell.col = C.int(col)
+    cell.value = C.CString(value)
+    if formula != "" {
+        cell.formula = C.CString(formula)
+    } else {
+        cell.formula = nil
+    }
+    cell.cell_type = C.int(cellType)
+    return cell
+}
+```
+
+```cpp
+// C++ side - free after use
+void XLSXDataFree(XLSXData* data) {
+    for (int i = 0; i < data->sheet_count; i++) {
+        XLSXSheet* sheet = &data->sheets[i];
+        free(sheet->name);
+        for (int j = 0; j < sheet->cell_count; j++) {
+            free(sheet->cells[j].value);
+            free(sheet->cells[j].formula);  // NULL-safe
+        }
+        free(sheet->cells);
+        free(sheet->col_widths);
+        free(sheet->row_heights);
+    }
+    free(data->sheets);
+    free(data);
+}
+```
+
+### Bazel CGO Integration
+
+```starlark
+# bindings/go/BUILD.bazel
+load("@rules_go//go:def.bzl", "go_binary")
+
+go_binary(
+    name = "libexcelize",
+    srcs = ["excelize_bridge.go"],
+    cgo = True,
+    linkmode = "c-archive",
+    deps = ["@com_github_xuri_excelize_v2//:excelize"],
+    visibility = ["//visibility:public"],
+)
+
+# This produces:
+#   bazel-bin/bindings/go/libexcelize.a  (static library)
+#   bazel-bin/bindings/go/libexcelize.h  (generated header)
+```
+
+```starlark
+# core/cells/BUILD
+cc_library(
+    name = "xlsx_reader",
+    srcs = ["xlsx_reader.cc"],
+    hdrs = ["xlsx_reader.h"],
+    deps = [
+        ":model",
+        "//bindings/go:libexcelize",  # Link the Go library
+    ],
+)
+```
+
+---
+
+## Excelize Feature Comparison
+
+| Feature | OpenXLSX | Excelize |
+|---------|----------|----------|
+| Shared formulas | ❌ Throws | ✅ Expands automatically |
+| Array formulas | ❌ Throws | ✅ Supported |
+| Streaming read | ❌ | ✅ For large files |
+| Streaming write | ❌ | ✅ For large files |
+| Charts | Partial | ✅ Full support |
+| Pivot tables | ❌ | ✅ Supported |
+| Conditional formatting | ❌ | ✅ Supported |
+| Data validation | Partial | ✅ Full support |
+| Images | ✅ | ✅ |
+| Comments | ✅ | ✅ |
+| Maintenance | Active | Very active (18k+ stars) |
