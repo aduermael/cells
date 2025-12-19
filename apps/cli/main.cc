@@ -31,9 +31,16 @@ void print_usage(const char* program_name) {
     std::cerr << "cells - spreadsheet format converter\n"
               << "\n"
               << "Usage: " << program_name << " [options] -i <input> <output>\n"
+              << "       " << program_name << " -I <file>     (info mode)\n"
               << "\n"
               << "Convert between spreadsheet formats (.cells, .csv, .xlsx).\n"
               << "Format is auto-detected from file extension.\n"
+              << "\n"
+              << "Supported Formats:\n"
+              << "  .cells    Native format (preserves all features)\n"
+              << "  .csv      Comma-separated values (single sheet, values only)\n"
+              << "  .tsv      Tab-separated values (auto-detected)\n"
+              << "  .xlsx     Excel 2007+ format\n"
               << "\n"
               << "Input/Output:\n"
               << "  -i <file>           Input file (required)\n"
@@ -41,13 +48,13 @@ void print_usage(const char* program_name) {
               << "  -t <format>         Force output format (cells, csv, xlsx)\n"
               << "\n"
               << "CSV Options:\n"
-              << "  --delimiter <char>  CSV delimiter (default: ,)\n"
+              << "  --delimiter <char>  CSV delimiter (default: , or tab for .tsv)\n"
               << "  --no-header         CSV has no header row\n"
               << "  --encoding <enc>    Character encoding (default: utf-8)\n"
               << "\n"
               << "XLSX Options:\n"
-              << "  --sheet <name>      Export only this sheet\n"
-              << "  --all-sheets        Export all sheets\n"
+              << "  --sheet <name>      Export/import only this sheet\n"
+              << "  --all-sheets        Export all sheets to separate files\n"
               << "\n"
               << "Output Options:\n"
               << "  -y                  Overwrite output without asking\n"
@@ -61,11 +68,35 @@ void print_usage(const char* program_name) {
               << "  --help              Show this help\n"
               << "\n"
               << "Examples:\n"
+              << "  # Basic conversion\n"
               << "  cells -i data.csv output.cells\n"
               << "  cells -i budget.xlsx report.csv\n"
               << "  cells -i legacy.csv modern.xlsx\n"
-              << "  cells -i data.tsv --delimiter '\\t' output.cells\n"
-              << "  cells -I data.cells             # Show file info\n";
+              << "\n"
+              << "  # CSV with custom delimiter\n"
+              << "  cells -i data.tsv output.cells          # Auto-detects tab\n"
+              << "  cells -i data.txt --delimiter ';' out.cells\n"
+              << "\n"
+              << "  # XLSX sheet selection\n"
+              << "  cells -i workbook.xlsx --sheet 'Q1' q1.csv\n"
+              << "  cells -i workbook.xlsx --all-sheets reports/\n"
+              << "\n"
+              << "  # File inspection\n"
+              << "  cells -I data.cells                     # Show file info\n"
+              << "  cells -I budget.xlsx --sheet 'Summary'  # Info for one sheet\n"
+              << "\n"
+              << "  # Scripting\n"
+              << "  cells -i input.xlsx output.csv -q -y    # Quiet, overwrite\n"
+              << "  cells -i data.csv out.xlsx --time       # Show timing\n"
+              << "\n"
+              << "Feature Preservation:\n"
+              << "  When converting to CSV, formulas become values and only the\n"
+              << "  first sheet is exported. Warnings are shown for lost features\n"
+              << "  unless -q (quiet) is specified.\n"
+              << "\n"
+              << "Exit Codes:\n"
+              << "  0   Success\n"
+              << "  1   Error (invalid arguments, file not found, parse error)\n";
 }
 
 void print_version() { std::cout << "cells " << kVersion << "\n"; }
@@ -310,6 +341,7 @@ int show_file_info(const Options& opts) {
         // XLSX reader reads from file path directly
         cells::XLSXReadOptions xlsx_opts;
         xlsx_opts.readFormulas = true;
+        xlsx_opts.readFormulaText = false;  // Skip formula text for --info (faster)
         xlsx_opts.readDimensions = true;
 
         // Apply --sheet filter if specified
