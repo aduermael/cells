@@ -127,7 +127,8 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
             if (options_.readDimensions) {
                 for (const auto& xlRow : xlSheet.rows()) {
                     uint32_t r = xlRow.rowNumber();
-                    if (r < 1 || r > rowCount) continue;
+                    if (r < 1 || r > rowCount)
+                        continue;
                     try {
                         double height = xlRow.height();
                         auto* row = sheet->getRow(rowIds[r - 1]);
@@ -143,47 +144,50 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
             // Read cells - iterate only over populated rows/cells for performance
             for (const auto& xlRow : xlSheet.rows()) {
                 uint32_t r = xlRow.rowNumber();
-                if (r < 1 || r > rowCount) continue;
+                if (r < 1 || r > rowCount)
+                    continue;
 
                 for (auto& xlCell : xlRow.cells()) {
                     try {
+                        // Cache the cell value to avoid multiple XLCellValue constructions
+                        const auto& xlValue = xlCell.value();
+                        auto valueType = xlValue.type();
+
                         // Skip empty cells
-                        if (xlCell.value().type() == OpenXLSX::XLValueType::Empty) {
+                        if (valueType == OpenXLSX::XLValueType::Empty) {
                             continue;
                         }
 
                         uint16_t c = xlCell.cellReference().column();
-                        if (c < 1 || c > colCount) continue;
+                        if (c < 1 || c > colCount)
+                            continue;
 
                         // Create cell
                         auto cell =
                             std::make_unique<Cell>(generate_id(), columnIds[c - 1], rowIds[r - 1]);
 
-                        // Read cell value
-                        auto valueType = xlCell.value().type();
-
                         switch (valueType) {
                             case OpenXLSX::XLValueType::Boolean:
-                                cell->value = CellValue(xlCell.value().get<bool>());
+                                cell->value = CellValue(xlValue.get<bool>());
                                 break;
 
                             case OpenXLSX::XLValueType::Integer:
                                 cell->value =
-                                    CellValue(static_cast<double>(xlCell.value().get<int64_t>()));
+                                    CellValue(static_cast<double>(xlValue.get<int64_t>()));
                                 break;
 
                             case OpenXLSX::XLValueType::Float:
-                                cell->value = CellValue(xlCell.value().get<double>());
+                                cell->value = CellValue(xlValue.get<double>());
                                 break;
 
                             case OpenXLSX::XLValueType::String:
-                                cell->value = CellValue(xlCell.value().get<std::string>());
+                                cell->value = CellValue(xlValue.get<std::string>());
                                 break;
 
                             case OpenXLSX::XLValueType::Error:
                                 // Map Excel errors to our error types
                                 {
-                                    std::string errStr = xlCell.value().get<std::string>();
+                                    std::string errStr = xlValue.get<std::string>();
                                     CellError err = CellError::NONE;
                                     if (errStr == "#DIV/0!") {
                                         err = CellError::DIV;
@@ -210,18 +214,27 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                         }
 
                         // Read formula if present and requested
+                        // Note: OpenXLSX hasFormula() returns true for shared formulas,
+                        // but formula().get() throws for them (shared formulas not supported).
                         if (options_.readFormulas && xlCell.hasFormula()) {
-                            try {
-                                std::string formulaText = xlCell.formula().get();
-                                if (!formulaText.empty()) {
-                                    // Store formula with leading '=' for now
-                                    // Reference conversion will be done in Phase 8
-                                    cell->setFormula(new Formula(("=" + formulaText).c_str()));
+                            // Only try to extract formula text if requested
+                            // (extraction is slow due to exceptions from shared formulas)
+                            if (options_.readFormulaText) {
+                                try {
+                                    std::string formulaText = xlCell.formula().get();
+                                    if (!formulaText.empty()) {
+                                        // Store formula with leading '=' for now
+                                        // Reference conversion will be done in Phase 8
+                                        cell->setFormula(new Formula(("=" + formulaText).c_str()));
+                                    }
+                                } catch (...) {
+                                    // Shared or array formulas - mark cell as formula type
+                                    // but we can't get the formula text
+                                    cell->setFormula(new Formula("="));
                                 }
-                            } catch (...) {
-                                // Shared or array formulas may not be readable
-                                addWarning("Could not read formula at " + sheetName + "!" +
-                                           xlCell.cellReference().address());
+                            } else {
+                                // Just mark as formula without text
+                                cell->setFormula(new Formula("="));
                             }
                         }
 
