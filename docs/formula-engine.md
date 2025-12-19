@@ -77,9 +77,23 @@ FunctionCall("IF")
 
 ### Reference Resolution
 
-Convert A1-style references to UUID-based references for stability:
-- `A1` → `$kR7pN2wQ$jH4sW8nF` (col UUID, row UUID)
-- Moving columns doesn't break formulas
+Convert A1-style references to UUID-based references for stability.
+
+Format: `[col_flag][row_flag]cellUUID` where `$`=absolute, `~`=relative
+
+| A1 Notation | Internal Format | Meaning |
+|-------------|-----------------|---------|
+| `$A$1` | `$$kR7pN2wQ` | Both absolute |
+| `$A1` | `$~kR7pN2wQ` | Col absolute, row relative |
+| `A$1` | `~$kR7pN2wQ` | Col relative, row absolute |
+| `A1` | `kR7pN2wQ` | Both relative (`~~` omitted) |
+
+Resolution: `cellUUID` → `Cell` → `(cell.colId, cell.rowId)` → axis positions
+
+Benefits:
+- Moving columns/rows doesn't break formulas
+- 8-10 chars vs 18 chars (col+row UUIDs)
+- Cell UUID directly references the target cell
 
 ### Dependency Extraction
 
