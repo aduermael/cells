@@ -340,6 +340,11 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
         }
         sheet->reserveCells(cellCount);
 
+        // Track shared formulas: si index -> master cell
+        std::unordered_map<int, Cell*> sharedFormulaMasters;
+        // Track subscribers that need to be linked: si index -> list of subscriber cells
+        std::unordered_map<int, std::vector<Cell*>> sharedFormulaSubscribers;
+
         for (auto row : sheetData.children("row")) {
             for (auto cellNode : row.children("c")) {
                 int col = 0, rowNum = 0;
@@ -401,6 +406,37 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                 if (options_.readFormulas) {
                     auto fNode = cellNode.child("f");
                     if (fNode) {
+                        const char* formulaType = fNode.attribute("t").value();
+                        const bool isShared = formulaType && std::strcmp(formulaType, "shared") == 0;
+
+                        if (isShared) {
+                            const int si = fNode.attribute("si").as_int(-1);
+                            const char* ref = fNode.attribute("ref").value();
+                            const char* formulaText = fNode.text().get();
+
+                            if (si >= 0) {
+                                // Master cell has ref attribute and formula text
+                                if (ref && ref[0] != '\0' && formulaText && formulaText[0] != '\0') {
+                                    if (options_.readFormulaText) {
+                                        cell->setFormula(
+                                            new Formula(("=" + std::string(formulaText)).c_str()));
+                                    } else {
+                                        cell->setFormula(new Formula("="));
+                                    }
+                                    Cell* rawPtr = cell.get();
+                                    sheet->addCell(std::move(cell));
+                                    sharedFormulaMasters[si] = rawPtr;
+                                    continue;
+                                }
+                                // Subscriber cell has only si attribute
+                                Cell* rawPtr = cell.get();
+                                sheet->addCell(std::move(cell));
+                                sharedFormulaSubscribers[si].push_back(rawPtr);
+                                continue;
+                            }
+                        }
+
+                        // Regular formula (not shared)
                         if (options_.readFormulaText) {
                             const std::string formulaText = fNode.text().get();
                             cell->setFormula(new Formula(("=" + formulaText).c_str()));
@@ -411,6 +447,20 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                 }
 
                 sheet->addCell(std::move(cell));
+            }
+        }
+
+        // Link shared formula subscribers to their masters
+        for (const auto& [si, subscribers] : sharedFormulaSubscribers) {
+            auto masterIt = sharedFormulaMasters.find(si);
+            if (masterIt != sharedFormulaMasters.end()) {
+                Cell* master = masterIt->second;
+                for (Cell* subscriber : subscribers) {
+                    subscriber->setSharedFormulaRef(master);
+                }
+            } else {
+                // Master not found - add warning and leave subscriber without formula
+                addWarning("Shared formula master not found for si=" + std::to_string(si));
             }
         }
         logTiming("create cells", start);
