@@ -21,8 +21,22 @@ YYYY-MM-DD-topic-slug-STATUS.md
 ### Plan Structure
 Each plan should contain:
 1. Clear phases (numbered: 1, 2, 3...)
-2. Subtasks within each phase (lettered: a, b, c...)
-3. Checkmarks for tracking progress: `- [ ]` (pending) or `- [x]` (done)
+2. Subtasks within each phase as checkmarks: `- [ ]` (pending) or `- [x]` (done)
+
+**Important:** ALL phases must use checkmarks for their sub-tasks. Each checkmark corresponds to a single commit. The checkmark should be marked as `- [x]` in the same commit that completes the sub-task.
+
+Example:
+```markdown
+## Phase 1: Core Data Model
+- [x] 1a: Add Cell and Axis structs
+- [x] 1b: Add Workbook and Sheet structs
+- [ ] 1c: Add serialization helpers
+
+## Phase 2: Parser Implementation
+- [ ] 2a: Implement text format parser
+- [ ] 2b: Add parser error handling
+- [ ] 2c: Add parser tests
+```
 
 ### Commit Naming During Plan Execution
 When executing a plan, each subtask gets its own commit named by phase and subtask:
