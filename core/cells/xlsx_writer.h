@@ -41,7 +41,7 @@ struct XLSXWriteResult {
 };
 
 // XLSX writer class
-// Uses Excelize (Go) to write our Workbook model to Excel files
+// Writes our Workbook model to Excel files using miniz and pugixml
 class XLSXWriter {
 public:
     XLSXWriter();
