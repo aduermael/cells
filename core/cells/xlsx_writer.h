@@ -41,7 +41,7 @@ struct XLSXWriteResult {
 };
 
 // XLSX writer class
-// Uses OpenXLSX to write our Workbook model to Excel files
+// Uses Excelize (Go) to write our Workbook model to Excel files
 class XLSXWriter {
 public:
     XLSXWriter();

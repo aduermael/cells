@@ -49,7 +49,7 @@ struct XLSXReadResult {
 };
 
 // XLSX reader class
-// Uses OpenXLSX to read Excel files into our Workbook model
+// Uses Excelize (Go) to read Excel files into our Workbook model
 class XLSXReader {
 public:
     XLSXReader();
