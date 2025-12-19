@@ -47,9 +47,25 @@ Array formulas compute over ranges and can return multiple values. Legacy syntax
 
 ### Our Strategy for Formulas
 
-**For reading**: Expand shared formulas at import time into our model (each cell gets its own formula). This is simpler and matches our UUID-based reference model. We don't need to preserve the optimization - we have our own format.
+**For reading**: Preserve shared formulas in our model. The master cell stores the formula text, subscriber cells reference the master. This enables AST reuse (parse once, clone and adjust references per cell).
 
-**For writing**: We won't generate shared formulas (Excel will optimize on load). Array formulas need the `t="array"` attribute preserved.
+**For writing**: Export shared formulas back to XLSX format. Array formulas need the `t="array"` attribute preserved.
+
+### Reference Locking Syntax (UUID-based)
+
+In our `.cells` format, cell references use `<colUUID>:<rowUUID>` with optional locking prefix:
+
+| Syntax | Meaning | Excel equivalent |
+|--------|---------|------------------|
+| `cXXX:rYYY` | Both relative (default) | `A1` |
+| `$$cXXX:rYYY` | Both absolute | `$A$1` |
+| `$~cXXX:rYYY` | Col absolute, row relative | `$A1` |
+| `~$cXXX:rYYY` | Col relative, row absolute | `A$1` |
+
+- `cXXX` = column UUID, `rYYY` = row UUID
+- No prefix = implicit `~~` (both relative) - most common case
+- When any dimension is locked, both markers are explicit for clarity
+- The `:` separates column UUID from row UUID
 
 ---
 
@@ -74,41 +90,87 @@ Array formulas compute over ranges and can return multiple values. Legacy syntax
 
 ---
 
-## Phase 2: Support Shared Formulas (Reader)
+## Phase 2: Support Shared Formulas
 
-### 2.1 Parse Shared Formula Master
+### 2.1 File Format for Shared Formulas
 
-When encountering `<f t="shared" ref="..." si="N">formula</f>`:
-- Store in a map: `shared_formulas[si] = {master_ref, master_formula, ref_range}`
+Formulas are part of cell definitions (no separate `f` lines). Shared formulas use `=@UUID` to reference another cell's formula:
 
-### 2.2 Expand Shared Formula References
+```
+# Cells written in UUID alphabetical order
+# Master (c001) is first alphabetically, has the actual formula
+c c001  ...  =cA01:rB02+$$cA01:rB03
+c c002  ...  =@c001
+c c003  ...  =@c001
+```
 
-When encountering `<f t="shared" si="N"/>` (no formula text):
-1. Look up master formula from `shared_formulas[si]`
-2. Calculate offset from master cell to current cell
-3. Adjust relative references in formula (A1 style)
-4. Convert to our UUID-based formula
+Where `cA01`, `rB02`, `rB03` are actual column/row UUIDs.
 
-### 2.3 Reference Adjustment Logic
+**Key rules:**
+- Cells are written in UUID alphabetical order
+- Master cell = first cell alphabetically among the shared group (deterministic, no marking needed)
+- Master has the formula text with locking notation
+- Subscribers use `=@masterUUID` to reference the master's formula
+- When reading, master is encountered first (guaranteed by ordering)
 
-For a formula like `=A1+B1` in cell C1, referenced from C5:
-- Row offset = 5 - 1 = 4
-- `A1` becomes `A5`, `B1` becomes `B5`
-- Absolute refs (`$A$1`) don't change
-- Mixed refs (`$A1`, `A$1`) adjust appropriately
+### 2.2 Reference Syntax in Formulas
 
-Implementation approach:
+Cell references use `colUUID:rowUUID` format with optional locking prefix:
+
+| Syntax | Meaning | Excel equivalent |
+|--------|---------|------------------|
+| `cXXX:rYYY` | Both relative | `A1` |
+| `$$cXXX:rYYY` | Both absolute | `$A$1` |
+| `$~cXXX:rYYY` | Col absolute, row relative | `$A1` |
+| `~$cXXX:rYYY` | Col relative, row absolute | `A$1` |
+
+Example formula: `=cA01:rB02+$$cA01:rB03*$~cC05:rD06`
+
+### 2.3 Model Changes
+
 ```cpp
-struct SharedFormulaInfo {
-    int masterRow, masterCol;
-    std::string formulaText;
-    std::string refRange;
+struct Cell {
+    // ... existing fields ...
+    Formula* formula;           // Own formula, or nullptr
+    Cell* sharedFormulaRef;     // Points to master if using shared formula
 };
 
-std::string expandSharedFormula(
-    const SharedFormulaInfo& master,
-    int currentRow, int currentCol);
+struct SharedFormulaGroup {
+    Cell* master;                    // First alphabetically
+    std::vector<Cell*> subscribers;  // Cells using =@master
+};
 ```
+
+### 2.4 XLSX Reader Changes
+
+When encountering `<f t="shared" ref="..." si="N">formula</f>` (master):
+1. Parse formula, convert A1 refs to UUID refs with locking markers
+2. Store formula on cell
+3. Track in temporary map: `xlsx_shared_groups[si] = cell`
+
+When encountering `<f t="shared" si="N"/>` (subscriber):
+1. Look up master from `xlsx_shared_groups[si]`
+2. Set `cell->sharedFormulaRef = master`
+3. Add to master's subscriber list
+
+After import, recompute masters based on UUID alphabetical order (XLSX order may differ).
+
+### 2.5 Master Cell Deletion
+
+When the master cell of a shared formula is deleted:
+1. Pick next subscriber (first alphabetically) as new master
+2. Clone AST to new master, adjust references for offset
+3. Update remaining subscribers to point to new master
+
+Handled internally - transparent to users.
+
+### 2.6 AST Evaluation with Offset
+
+When evaluating a subscriber cell's formula:
+1. Get master's AST
+2. Calculate row/col offset from master to subscriber
+3. During evaluation, adjust relative references by offset
+4. Absolute references (`$$`) remain unchanged
 
 ---
 
@@ -209,10 +271,23 @@ size_t getOrAddString(const std::string& str) {
 
 Convert UUID-based formulas back to A1 notation:
 - Build column/row position maps
-- Replace `$<colUUID>$<rowUUID>` with `$A$1` style refs
+- Convert reference locking markers to Excel format:
+  - `UUID` → `A1` (relative)
+  - `$$UUID` → `$A$1` (absolute)
+  - `$~UUID` → `$A1` (col absolute)
+  - `~$UUID` → `A$1` (row absolute)
 - Use existing `RefConverter` class
 
-### 4.6 Array Formula Output
+### 4.6 Shared Formula Export
+
+For cells with `=@masterUUID` (shared formula subscribers):
+1. Group cells by their master reference
+2. Assign sequential `si` indices (0, 1, 2...)
+3. Write master cell with `<f t="shared" ref="..." si="N">formula</f>`
+4. Write subscriber cells with `<f t="shared" si="N"/>`
+5. Convert UUID refs back to A1, adjusting for each cell's offset from master
+
+### 4.7 Array Formula Output
 
 For cells with `isArrayFormula`:
 ```xml
@@ -236,7 +311,10 @@ For cells with `isArrayFormula`:
 ## Testing Strategy
 
 ### Unit Tests
-- Shared formula expansion with various reference types
+- Reference locking syntax parsing (`UUID`, `$$UUID`, `$~UUID`, `~$UUID`)
+- Shared formula group management (master, subscribers)
+- Master deletion and promotion
+- AST offset evaluation for subscribers
 - Array formula flag preservation
 - String table deduplication
 - A1 reference parsing edge cases (XFD1048576)
