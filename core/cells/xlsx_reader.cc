@@ -53,8 +53,9 @@ void parseCellRef(const char* ref, int& col, int& row) {
 
 // Map XML cell type to our enum
 int mapCellType(const char* type) {
-    if (type == nullptr || *type == '\0')
+    if (type == nullptr || *type == '\0') {
         return 2;  // Default is number
+    }
 
     switch (type[0]) {
         case 's':
@@ -84,7 +85,7 @@ public:
     }
 
     bool open(const std::string& path) {
-        if (!mz_zip_reader_init_file(&archive_, path.c_str(), 0)) {
+        if (mz_zip_reader_init_file(&archive_, path.c_str(), 0) == 0) {
             return false;
         }
         opened_ = true;
@@ -93,20 +94,21 @@ public:
 
     // Read entire file into string
     std::string readFile(const std::string& name) {
-        int index = mz_zip_reader_locate_file(&archive_, name.c_str(), nullptr, 0);
+        const int index = mz_zip_reader_locate_file(&archive_, name.c_str(), nullptr, 0);
         if (index < 0) {
             return {};
         }
 
         mz_zip_archive_file_stat stat;
-        if (!mz_zip_reader_file_stat(&archive_, index, &stat)) {
+        if (mz_zip_reader_file_stat(&archive_, index, &stat) == 0) {
             return {};
         }
 
         std::string content;
         content.resize(stat.m_uncomp_size);
 
-        if (!mz_zip_reader_extract_to_mem(&archive_, index, content.data(), content.size(), 0)) {
+        if (mz_zip_reader_extract_to_mem(&archive_, index, content.data(), content.size(), 0) ==
+            0) {
             return {};
         }
 
@@ -182,7 +184,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                 const char* target = rel.attribute("Target").value();
                 if (id && target) {
                     // Target is relative to xl/, e.g., "worksheets/sheet1.xml"
-                    std::string fullPath = "xl/" + std::string(target);
+                    const std::string fullPath = "xl/" + std::string(target);
                     sheetPaths[id] = fullPath;
                 }
             }
@@ -235,7 +237,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                 // Handle both <t> and <r> (rich text) elements
                 auto t = si.child("t");
                 if (t) {
-                    sharedStrings.push_back(t.text().get());
+                    sharedStrings.emplace_back(t.text().get());
                 } else {
                     // Rich text: concatenate all <t> elements within <r> elements
                     std::string text;
@@ -287,15 +289,17 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
         auto sheetData = sheetDoc.child("worksheet").child("sheetData");
 
         for (auto row : sheetData.children("row")) {
-            int rowNum = row.attribute("r").as_int() - 1;  // 0-indexed
-            if (rowNum >= maxRow)
+            const int rowNum = row.attribute("r").as_int() - 1;  // 0-indexed
+            if (rowNum >= maxRow) {
                 maxRow = rowNum + 1;
+            }
 
             for (auto cell : row.children("c")) {
-                int col, r;
+                int col = 0, r = 0;
                 parseCellRef(cell.attribute("r").value(), col, r);
-                if (col >= maxCol)
+                if (col >= maxCol) {
                     maxCol = col + 1;
+                }
             }
         }
         logTiming("find dimensions", start);
@@ -338,7 +342,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
 
         for (auto row : sheetData.children("row")) {
             for (auto cellNode : row.children("c")) {
-                int col, rowNum;
+                int col = 0, rowNum = 0;
                 parseCellRef(cellNode.attribute("r").value(), col, rowNum);
 
                 if (col < 0 || col >= maxCol || rowNum < 0 || rowNum >= maxRow) {
@@ -354,7 +358,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
 
                     if (type && type[0] == 's') {
                         // Shared string
-                        int idx = std::atoi(rawValue);
+                        const int idx = std::atoi(rawValue);
                         if (idx >= 0 && idx < static_cast<int>(sharedStrings.size())) {
                             value = sharedStrings[idx];
                         }
@@ -374,7 +378,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
 
                 // Parse value based on type
                 const char* type = cellNode.attribute("t").value();
-                int cellType = mapCellType(type);
+                const int cellType = mapCellType(type);
 
                 switch (cellType) {
                     case 2:  // Number
@@ -398,7 +402,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                     auto fNode = cellNode.child("f");
                     if (fNode) {
                         if (options_.readFormulaText) {
-                            std::string formulaText = fNode.text().get();
+                            const std::string formulaText = fNode.text().get();
                             cell->setFormula(new Formula(("=" + formulaText).c_str()));
                         } else {
                             cell->setFormula(new Formula("="));
