@@ -49,7 +49,7 @@ struct XLSXReadResult {
 };
 
 // XLSX reader class
-// Uses Excelize (Go) to read Excel files into our Workbook model
+// Reads Excel files into our Workbook model using miniz and pugixml
 class XLSXReader {
 public:
     XLSXReader();
