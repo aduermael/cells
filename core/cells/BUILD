@@ -168,3 +168,14 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "ref_converter",
+    srcs = ["ref_converter.cc"],
+    hdrs = ["ref_converter.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":model",
+        ":types",
+    ],
+)
