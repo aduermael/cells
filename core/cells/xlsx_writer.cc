@@ -52,6 +52,38 @@ private:
     bool opened_{false};
 };
 
+// Generate [Content_Types].xml
+std::string generateContentTypes(size_t sheetCount) {
+    std::ostringstream xml;
+    xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
+    xml << "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">\n";
+    xml << "  <Default Extension=\"rels\" "
+           "ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>\n";
+    xml << "  <Default Extension=\"xml\" ContentType=\"application/xml\"/>\n";
+    xml << "  <Override PartName=\"/xl/workbook.xml\" "
+           "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>\n";
+    xml << "  <Override PartName=\"/xl/styles.xml\" "
+           "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>\n";
+    xml << "  <Override PartName=\"/xl/sharedStrings.xml\" "
+           "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml\"/>\n";
+    for (size_t i = 0; i < sheetCount; ++i) {
+        xml << "  <Override PartName=\"/xl/worksheets/sheet" << (i + 1) << ".xml\" "
+               "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>\n";
+    }
+    xml << "</Types>";
+    return xml.str();
+}
+
+// Generate _rels/.rels (root relationships)
+std::string generateRootRels() {
+    std::ostringstream xml;
+    xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
+    xml << "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n";
+    xml << "  <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>\n";
+    xml << "</Relationships>";
+    return xml.str();
+}
+
 }  // namespace
 
 namespace cells {
