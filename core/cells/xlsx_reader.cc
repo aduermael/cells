@@ -1,8 +1,9 @@
 #include "core/cells/xlsx_reader.h"
 
-#include <chrono>
 #include <cstdlib>
 #include <cstring>
+
+#include <chrono>
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
@@ -18,7 +19,7 @@ namespace {
 
 // Debug timing - set via environment variable
 bool debugTiming() {
-    static bool enabled = std::getenv("CELLS_DEBUG_TIMING") != nullptr;
+    static const bool enabled = std::getenv("CELLS_DEBUG_TIMING") != nullptr;
     return enabled;
 }
 
@@ -52,22 +53,29 @@ void parseCellRef(const char* ref, int& col, int& row) {
 
 // Map XML cell type to our enum
 int mapCellType(const char* type) {
-    if (!type || !*type) return 2;  // Default is number
+    if (type == nullptr || *type == '\0')
+        return 2;  // Default is number
 
     switch (type[0]) {
-        case 's': return 1;  // Shared string -> STRING
-        case 'b': return 3;  // Boolean
-        case 'e': return 4;  // Error
-        case 'n': return 2;  // Number
-        case 'd': return 5;  // Date
-        default: return 2;   // Default to number
+        case 's':
+            return 1;  // Shared string -> STRING
+        case 'b':
+            return 3;  // Boolean
+        case 'e':
+            return 4;  // Error
+        case 'n':
+            return 2;  // Number
+        case 'd':
+            return 5;  // Date
+        default:
+            return 2;  // Default to number
     }
 }
 
 // ZIP file reading using miniz
 class ZipReader {
 public:
-    ZipReader() : archive_{} {}
+    ZipReader() = default;
 
     ~ZipReader() {
         if (opened_) {
@@ -98,8 +106,7 @@ public:
         std::string content;
         content.resize(stat.m_uncomp_size);
 
-        if (!mz_zip_reader_extract_to_mem(&archive_, index, content.data(),
-                                           content.size(), 0)) {
+        if (!mz_zip_reader_extract_to_mem(&archive_, index, content.data(), content.size(), 0)) {
             return {};
         }
 
@@ -107,7 +114,7 @@ public:
     }
 
 private:
-    mz_zip_archive archive_;
+    mz_zip_archive archive_{};
     bool opened_{false};
 };
 
@@ -281,12 +288,14 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
 
         for (auto row : sheetData.children("row")) {
             int rowNum = row.attribute("r").as_int() - 1;  // 0-indexed
-            if (rowNum >= maxRow) maxRow = rowNum + 1;
+            if (rowNum >= maxRow)
+                maxRow = rowNum + 1;
 
             for (auto cell : row.children("c")) {
                 int col, r;
                 parseCellRef(cell.attribute("r").value(), col, r);
-                if (col >= maxCol) maxCol = col + 1;
+                if (col >= maxCol)
+                    maxCol = col + 1;
             }
         }
         logTiming("find dimensions", start);
@@ -360,8 +369,8 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                 }
 
                 // Create cell
-                auto cell = std::make_unique<Cell>(
-                    generate_sequential_id(), columnIds[col], rowIds[rowNum]);
+                auto cell = std::make_unique<Cell>(generate_sequential_id(), columnIds[col],
+                                                   rowIds[rowNum]);
 
                 // Parse value based on type
                 const char* type = cellNode.attribute("t").value();
