@@ -107,3 +107,20 @@ filegroup(
     name = "types",
     srcs = ["cells.d.ts"],
 )
+
+# Standalone HTML for distribution
+filegroup(
+    name = "static_files",
+    srcs = ["static/index.html"],
+)
+
+# All files needed for standalone distribution
+# Use: bazel build //apps/wasm:dist_files
+filegroup(
+    name = "dist_files",
+    srcs = [
+        ":static_files",
+        ":worker_files",
+        ":types",
+    ],
+)

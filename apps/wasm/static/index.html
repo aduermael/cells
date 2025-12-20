@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cells - Spreadsheet Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: #fff;
+        }
+        #header {
+            padding: 8px 16px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        #header h1 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #212529;
+        }
+        #header .info {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        #toolbar {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+        }
+        .btn {
+            padding: 4px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: #fff;
+            color: #495057;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+        .btn:active {
+            background: #dee2e6;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 14px;
+            color: #6c757d;
+            display: none;
+        }
+        #error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 14px;
+            color: #dc3545;
+            text-align: center;
+            display: none;
+        }
+        /* Drop zone overlay */
+        #drop-zone {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(13, 110, 253, 0.1);
+            border: 3px dashed #0d6efd;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+        #drop-zone.visible {
+            display: flex;
+        }
+        #drop-zone-content {
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+        #drop-zone-content h2 {
+            font-size: 18px;
+            color: #0d6efd;
+            margin-bottom: 8px;
+        }
+        #drop-zone-content p {
+            font-size: 13px;
+            color: #6c757d;
+        }
+        /* Empty state (no file loaded) */
+        #empty-state {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        #empty-state.hidden {
+            display: none;
+        }
+        #empty-state h2 {
+            font-size: 20px;
+            color: #212529;
+            margin-bottom: 12px;
+        }
+        #empty-state p {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+        #empty-state .file-types {
+            font-size: 12px;
+            color: #adb5bd;
+            margin-top: 12px;
+        }
+        .btn-primary {
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            border-radius: 6px;
+            background: #0d6efd;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-primary:hover {
+            background: #0b5ed7;
+        }
+        .btn-primary:active {
+            background: #0a58ca;
+        }
+        #file-input {
+            display: none;
+        }
+        /* Mode indicator */
+        .mode-indicator {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+            background: #cce5ff;
+            color: #004085;
+        }
+        #cell-editor {
+            position: absolute;
+            display: none;
+            border: 2px solid #0d6efd;
+            background: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 13px;
+            padding: 2px 4px;
+            outline: none;
+            box-sizing: border-box;
+            z-index: 100;
+        }
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #dee2e6;
+            border-top-color: #0d6efd;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="header">
+            <button class="btn" onclick="openFile()">Open File</button>
+            <input type="file" id="file-input" accept=".cells,.csv,.tsv,.xlsx" />
+            <h1 id="sheet-name">Cells Viewer</h1>
+            <span class="info" id="sheet-info"></span>
+            <div id="toolbar">
+                <span class="mode-indicator">Local (WASM)</span>
+                <button class="btn" id="export-csv" onclick="exportAs('csv')" disabled>Export CSV</button>
+                <button class="btn" id="export-xlsx" onclick="exportAs('xlsx')" disabled>Export XLSX</button>
+                <button class="btn" id="export-cells" onclick="exportAs('cells')" disabled>Export CELLS</button>
+            </div>
+        </div>
+        <div id="canvas-container">
+            <canvas id="grid"></canvas>
+            <input type="text" id="cell-editor" />
+            <div id="loading"><span class="spinner"></span>Loading...</div>
+            <div id="error">Failed to load file</div>
+            <div id="drop-zone">
+                <div id="drop-zone-content">
+                    <h2>Drop file here</h2>
+                    <p>.cells, .csv, .xlsx</p>
+                </div>
+            </div>
+            <div id="empty-state">
+                <h2>Open a Spreadsheet</h2>
+                <p>Drag and drop a file here, or click below to browse</p>
+                <button class="btn-primary" onclick="openFile()">Choose File</button>
+                <div class="file-types">Supported: .cells, .csv, .tsv, .xlsx</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load the client library -->
+    <script src="client.js"></script>
+
+    <script>
+        // ========================================================================
+        // WASM Data Source (communicates with Web Worker)
+        // ========================================================================
+
+        class WasmDataSource {
+            constructor(client) {
+                this._client = client;
+                this._workbookName = 'Untitled';
+            }
+
+            setWorkbookName(name) {
+                this._workbookName = name;
+            }
+
+            async getSheetInfo() {
+                const info = await this._client.getSheetInfo();
+                return {
+                    name: info.name,
+                    rowCount: info.rowCount,
+                    colCount: info.colCount
+                };
+            }
+
+            async getViewport(x1, y1, x2, y2) {
+                return this._client.queryViewport(x1, y1, x2, y2);
+            }
+
+            async createCell(col, row, value) {
+                return this._client.createCell(col, row, value);
+            }
+
+            async updateCell(cellId, value) {
+                await this._client.updateCell(cellId, value);
+                return { success: true };
+            }
+
+            async resizeColumn(colId, width) {
+                await this._client.resizeColumn(colId, width);
+                return { success: true };
+            }
+
+            async resizeColumnByPos(pos, width) {
+                return this._client.resizeColumnByPos(pos, width);
+            }
+
+            async resizeRow(rowId, height) {
+                await this._client.resizeRow(rowId, height);
+                return { success: true };
+            }
+
+            async moveColumn(colId, targetPos) {
+                await this._client.moveColumn(colId, targetPos);
+                return { success: true };
+            }
+
+            async moveRow(rowId, targetPos) {
+                await this._client.moveRow(rowId, targetPos);
+                return { success: true };
+            }
+
+            async exportAs(format) {
+                const result = await this._client.exportAs(format);
+                const blob = new Blob([result.data], {
+                    type: format === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
+                          format === 'csv' ? 'text/csv' : 'text/plain'
+                });
+                return { blob, filename: result.filename || `${this._workbookName}.${format}` };
+            }
+        }
+
+        // ========================================================================
+        // Global State and DOM Elements
+        // ========================================================================
+
+        const canvas = document.getElementById('grid');
+        const ctx = canvas.getContext('2d');
+        const loading = document.getElementById('loading');
+        const errorEl = document.getElementById('error');
+        const sheetNameEl = document.getElementById('sheet-name');
+        const sheetInfoEl = document.getElementById('sheet-info');
+        const dropZone = document.getElementById('drop-zone');
+        const emptyState = document.getElementById('empty-state');
+        const fileInput = document.getElementById('file-input');
+
+        let dataSource = null;
+        let wasmClient = null;
+        let hasFileLoaded = false;
+
+        // Grid constants
+        const HEADER_HEIGHT = 24;
+        const HEADER_WIDTH = 50;
+        const DEFAULT_COL_WIDTH = 100;
+        const DEFAULT_ROW_HEIGHT = 24;
+        const CELL_PADDING = 4;
+
+        // Colors
+        const COLORS = {
+            gridLine: '#e9ecef',
+            headerBg: '#f8f9fa',
+            headerBorder: '#dee2e6',
+            headerText: '#495057',
+            cellText: '#212529',
+            selectionBorder: '#0d6efd',
+            selectionBg: 'rgba(13, 110, 253, 0.1)',
+            cornerBg: '#e9ecef'
+        };
+
+        // State
+        let sheetInfo = null;
+        let cells = [];
+        let columns = [];
+        let rows = [];
+        let scrollX = 0;
+        let scrollY = 0;
+        let selectedCell = null;
+        let selectedColumn = null;
+        let selectedRow = null;
+
+        // Editing state
+        let isEditing = false;
+        const cellEditor = document.getElementById('cell-editor');
+
+        // Column resize state
+        let isResizing = false;
+        let resizeColIndex = -1;
+        let resizeStartX = 0;
+        let resizeStartWidth = 0;
+        let resizePreviewX = 0;
+        const RESIZE_HANDLE_WIDTH = 6;
+
+        // Column/row reorder state
+        let isDraggingColumn = false;
+        let isDraggingRow = false;
+        let dragSourceIndex = -1;
+        let dragTargetIndex = -1;
+        let dragMouseX = 0;
+        let dragMouseY = 0;
+
+        // Size caches
+        let colWidths = new Map();
+        let rowHeights = new Map();
+
+        // ========================================================================
+        // Utility Functions
+        // ========================================================================
+
+        function getColX(colPos) {
+            let x = HEADER_WIDTH;
+            for (let i = 0; i < colPos; i++) {
+                x += colWidths.get(i) || DEFAULT_COL_WIDTH;
+            }
+            return x;
+        }
+
+        function getRowY(rowPos) {
+            let y = HEADER_HEIGHT;
+            for (let i = 0; i < rowPos; i++) {
+                y += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+            }
+            return y;
+        }
+
+        function getColAtX(x) {
+            if (x < HEADER_WIDTH) return -1;
+            let accX = HEADER_WIDTH - scrollX;
+            let col = 0;
+            while (accX < x && col < (sheetInfo?.colCount || 1000)) {
+                accX += colWidths.get(col) || DEFAULT_COL_WIDTH;
+                if (accX > x) return col;
+                col++;
+            }
+            return col;
+        }
+
+        function getRowAtY(y) {
+            if (y < HEADER_HEIGHT) return -1;
+            let accY = HEADER_HEIGHT - scrollY;
+            let row = 0;
+            while (accY < y && row < (sheetInfo?.rowCount || 1000)) {
+                accY += rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+                if (accY > y) return row;
+                row++;
+            }
+            return row;
+        }
+
+        function getResizeHandleCol(mouseX) {
+            if (!sheetInfo) return -1;
+            let x = HEADER_WIDTH - scrollX;
+            for (let col = 0; col < sheetInfo.colCount; col++) {
+                const colW = colWidths.get(col) || DEFAULT_COL_WIDTH;
+                const rightEdge = x + colW;
+                if (mouseX >= rightEdge - RESIZE_HANDLE_WIDTH && mouseX <= rightEdge + RESIZE_HANDLE_WIDTH) {
+                    return col;
+                }
+                x = rightEdge;
+            }
+            return -1;
+        }
+
+        function getColumnId(colPos) {
+            for (const col of columns) {
+                if (col.pos === colPos) return col.id;
+            }
+            return null;
+        }
+
+        function getRowId(rowPos) {
+            for (const row of rows) {
+                if (row.pos === rowPos) return row.id;
+            }
+            return null;
+        }
+
+        function getDropTargetCol(mouseX) {
+            if (mouseX < HEADER_WIDTH) return 0;
+            let x = HEADER_WIDTH - scrollX;
+            for (let col = 0; col < (sheetInfo?.colCount || 1000); col++) {
+                const colW = colWidths.get(col) || DEFAULT_COL_WIDTH;
+                const midX = x + colW / 2;
+                if (mouseX < midX) return col;
+                x += colW;
+            }
+            return sheetInfo?.colCount || 0;
+        }
+
+        function getDropTargetRow(mouseY) {
+            if (mouseY < HEADER_HEIGHT) return 0;
+            let y = HEADER_HEIGHT - scrollY;
+            for (let row = 0; row < (sheetInfo?.rowCount || 1000); row++) {
+                const rowH = rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+                const midY = y + rowH / 2;
+                if (mouseY < midY) return row;
+                y += rowH;
+            }
+            return sheetInfo?.rowCount || 0;
+        }
+
+        function getDragAdjustedColX(col) {
+            if (!isDraggingColumn || dragTargetIndex === dragSourceIndex || dragTargetIndex === dragSourceIndex + 1) {
+                let x = HEADER_WIDTH - scrollX;
+                for (let i = 0; i < col; i++) {
+                    x += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                }
+                return x;
+            }
+
+            const sourceW = colWidths.get(dragSourceIndex) || DEFAULT_COL_WIDTH;
+            let x = HEADER_WIDTH - scrollX;
+
+            for (let i = 0; i < col; i++) {
+                if (i === dragSourceIndex) continue;
+                if (i === dragTargetIndex && dragTargetIndex < dragSourceIndex) {
+                    x += sourceW;
+                }
+                x += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                if (i === dragTargetIndex - 1 && dragTargetIndex > dragSourceIndex + 1) {
+                    x += sourceW;
+                }
+            }
+            return x;
+        }
+
+        function getDragAdjustedRowY(row) {
+            if (!isDraggingRow || dragTargetIndex === dragSourceIndex || dragTargetIndex === dragSourceIndex + 1) {
+                let y = HEADER_HEIGHT - scrollY;
+                for (let i = 0; i < row; i++) {
+                    y += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                }
+                return y;
+            }
+
+            const sourceH = rowHeights.get(dragSourceIndex) || DEFAULT_ROW_HEIGHT;
+            let y = HEADER_HEIGHT - scrollY;
+
+            for (let i = 0; i < row; i++) {
+                if (i === dragSourceIndex) continue;
+                if (i === dragTargetIndex && dragTargetIndex < dragSourceIndex) {
+                    y += sourceH;
+                }
+                y += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                if (i === dragTargetIndex - 1 && dragTargetIndex > dragSourceIndex + 1) {
+                    y += sourceH;
+                }
+            }
+            return y;
+        }
+
+        function colToLetter(col) {
+            let s = '';
+            let n = col + 1;
+            while (n > 0) {
+                n--;
+                s = String.fromCharCode(65 + (n % 26)) + s;
+                n = Math.floor(n / 26);
+            }
+            return s;
+        }
+
+        function getCellAt(col, row) {
+            return cells.find(c => c.col === col && c.row === row);
+        }
+
+        // ========================================================================
+        // Canvas Rendering
+        // ========================================================================
+
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = container.clientWidth * dpr;
+            canvas.height = container.clientHeight * dpr;
+            canvas.style.width = container.clientWidth + 'px';
+            canvas.style.height = container.clientHeight + 'px';
+            ctx.scale(dpr, dpr);
+            render();
+        }
+
+        function render() {
+            if (!sheetInfo) return;
+
+            const container = document.getElementById('canvas-container');
+            const viewWidth = container.clientWidth;
+            const viewHeight = container.clientHeight;
+
+            ctx.clearRect(0, 0, viewWidth, viewHeight);
+
+            // Draw cells area (clipped)
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(HEADER_WIDTH, HEADER_HEIGHT, viewWidth - HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
+            ctx.clip();
+
+            // Grid lines
+            ctx.strokeStyle = COLORS.gridLine;
+            ctx.lineWidth = 1;
+
+            const colHasMoved = isDraggingColumn && dragTargetIndex !== dragSourceIndex && dragTargetIndex !== dragSourceIndex + 1;
+            const rowHasMoved = isDraggingRow && dragTargetIndex !== dragSourceIndex && dragTargetIndex !== dragSourceIndex + 1;
+
+            // Vertical lines
+            for (let col = 0; col <= sheetInfo.colCount; col++) {
+                if (colHasMoved && col === dragSourceIndex) continue;
+                const lineX = getDragAdjustedColX(col) + 0.5;
+                if (lineX >= HEADER_WIDTH && lineX < viewWidth) {
+                    ctx.beginPath();
+                    ctx.moveTo(lineX, HEADER_HEIGHT);
+                    ctx.lineTo(lineX, viewHeight);
+                    ctx.stroke();
+                }
+            }
+
+            // Horizontal lines
+            for (let row = 0; row <= sheetInfo.rowCount; row++) {
+                if (rowHasMoved && row === dragSourceIndex) continue;
+                const lineY = getDragAdjustedRowY(row) + 0.5;
+                if (lineY >= HEADER_HEIGHT && lineY < viewHeight) {
+                    ctx.beginPath();
+                    ctx.moveTo(HEADER_WIDTH, lineY);
+                    ctx.lineTo(viewWidth, lineY);
+                    ctx.stroke();
+                }
+            }
+
+            // Cell values
+            ctx.fillStyle = COLORS.cellText;
+            ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+
+            for (const cell of cells) {
+                if (colHasMoved && cell.col === dragSourceIndex) continue;
+                if (rowHasMoved && cell.row === dragSourceIndex) continue;
+
+                const colWidth = colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
+                const rowHeight = rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
+                const cellX = getDragAdjustedColX(cell.col);
+                const cellY = getDragAdjustedRowY(cell.row);
+
+                if (cellX + colWidth < HEADER_WIDTH || cellX > viewWidth) continue;
+                if (cellY + rowHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
+
+                const displayValue = cell.display || cell.value || '';
+                ctx.save();
+                ctx.beginPath();
+                ctx.rect(cellX + 1, cellY + 1, colWidth - 2, rowHeight - 2);
+                ctx.clip();
+                ctx.fillText(displayValue, cellX + CELL_PADDING, cellY + rowHeight / 2);
+                ctx.restore();
+            }
+
+            // Selection
+            if (selectedCell) {
+                let selX = HEADER_WIDTH - scrollX;
+                for (let i = 0; i < selectedCell.col; i++) {
+                    selX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                }
+                let selY = HEADER_HEIGHT - scrollY;
+                for (let i = 0; i < selectedCell.row; i++) {
+                    selY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                }
+                const selW = colWidths.get(selectedCell.col) || DEFAULT_COL_WIDTH;
+                const selH = rowHeights.get(selectedCell.row) || DEFAULT_ROW_HEIGHT;
+
+                if (selX + selW > HEADER_WIDTH && selX < viewWidth &&
+                    selY + selH > HEADER_HEIGHT && selY < viewHeight) {
+                    ctx.fillStyle = COLORS.selectionBg;
+                    ctx.fillRect(selX, selY, selW, selH);
+                    ctx.strokeStyle = COLORS.selectionBorder;
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(selX + 1, selY + 1, selW - 2, selH - 2);
+                }
+            }
+
+            ctx.restore();
+
+            // Column headers
+            ctx.fillStyle = COLORS.headerBg;
+            ctx.fillRect(HEADER_WIDTH, 0, viewWidth - HEADER_WIDTH, HEADER_HEIGHT);
+
+            ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            for (let col = 0; col < sheetInfo.colCount; col++) {
+                if (colHasMoved && col === dragSourceIndex) continue;
+                const colW = colWidths.get(col) || DEFAULT_COL_WIDTH;
+                const headerX = getDragAdjustedColX(col);
+                if (headerX >= viewWidth || headerX + colW < HEADER_WIDTH) continue;
+
+                const isSelected = (selectedCell && selectedCell.col === col) || selectedColumn === col;
+                if (isSelected && !isDraggingColumn) {
+                    ctx.fillStyle = COLORS.selectionBorder;
+                    ctx.fillRect(Math.max(HEADER_WIDTH, headerX), 0, Math.min(colW, headerX + colW - HEADER_WIDTH), HEADER_HEIGHT);
+                    ctx.fillStyle = '#fff';
+                } else {
+                    ctx.fillStyle = COLORS.headerText;
+                }
+                ctx.fillText(colToLetter(col), headerX + colW / 2, HEADER_HEIGHT / 2);
+            }
+
+            // Row headers
+            ctx.fillStyle = COLORS.headerBg;
+            ctx.fillRect(0, HEADER_HEIGHT, HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
+
+            for (let row = 0; row < sheetInfo.rowCount; row++) {
+                if (rowHasMoved && row === dragSourceIndex) continue;
+                const rowH = rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+                const headerY = getDragAdjustedRowY(row);
+                if (headerY >= viewHeight || headerY + rowH < HEADER_HEIGHT) continue;
+
+                const isSelected = (selectedCell && selectedCell.row === row) || selectedRow === row;
+                if (isSelected && !isDraggingRow) {
+                    ctx.fillStyle = COLORS.selectionBorder;
+                    ctx.fillRect(0, Math.max(HEADER_HEIGHT, headerY), HEADER_WIDTH, Math.min(rowH, headerY + rowH - HEADER_HEIGHT));
+                    ctx.fillStyle = '#fff';
+                } else {
+                    ctx.fillStyle = COLORS.headerText;
+                }
+                ctx.fillText(String(row + 1), HEADER_WIDTH / 2, headerY + rowH / 2);
+            }
+
+            // Corner
+            ctx.fillStyle = COLORS.cornerBg;
+            ctx.fillRect(0, 0, HEADER_WIDTH, HEADER_HEIGHT);
+
+            // Header borders
+            ctx.strokeStyle = COLORS.headerBorder;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, HEADER_HEIGHT + 0.5);
+            ctx.lineTo(viewWidth, HEADER_HEIGHT + 0.5);
+            ctx.moveTo(HEADER_WIDTH + 0.5, 0);
+            ctx.lineTo(HEADER_WIDTH + 0.5, viewHeight);
+            ctx.stroke();
+        }
+
+        function drawResizePreview() {
+            if (!isResizing) return;
+            const container = document.getElementById('canvas-container');
+            const viewHeight = container.clientHeight;
+
+            ctx.save();
+            ctx.strokeStyle = COLORS.selectionBorder;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(resizePreviewX + 0.5, 0);
+            ctx.lineTo(resizePreviewX + 0.5, viewHeight);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+
+        function drawDragGhost() {
+            if (!isDraggingColumn && !isDraggingRow) return;
+
+            const container = document.getElementById('canvas-container');
+            const viewWidth = container.clientWidth;
+            const viewHeight = container.clientHeight;
+
+            ctx.save();
+            ctx.globalAlpha = 0.6;
+
+            if (isDraggingColumn) {
+                const colW = colWidths.get(dragSourceIndex) || DEFAULT_COL_WIDTH;
+                const ghostX = dragMouseX - colW / 2;
+
+                ctx.fillStyle = COLORS.selectionBorder;
+                ctx.fillRect(ghostX, 0, colW, HEADER_HEIGHT);
+
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(colToLetter(dragSourceIndex), ghostX + colW / 2, HEADER_HEIGHT / 2);
+
+                ctx.fillStyle = COLORS.selectionBg;
+                ctx.fillRect(ghostX, HEADER_HEIGHT, colW, viewHeight - HEADER_HEIGHT);
+
+                ctx.strokeStyle = COLORS.selectionBorder;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(ghostX, 0, colW, viewHeight);
+            } else if (isDraggingRow) {
+                const rowH = rowHeights.get(dragSourceIndex) || DEFAULT_ROW_HEIGHT;
+                const ghostY = dragMouseY - rowH / 2;
+
+                ctx.fillStyle = COLORS.selectionBorder;
+                ctx.fillRect(0, ghostY, HEADER_WIDTH, rowH);
+
+                ctx.fillStyle = '#fff';
+                ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(dragSourceIndex + 1), HEADER_WIDTH / 2, ghostY + rowH / 2);
+
+                ctx.fillStyle = COLORS.selectionBg;
+                ctx.fillRect(HEADER_WIDTH, ghostY, viewWidth - HEADER_WIDTH, rowH);
+
+                ctx.strokeStyle = COLORS.selectionBorder;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(0, ghostY, viewWidth, rowH);
+            }
+
+            ctx.restore();
+        }
+
+        // ========================================================================
+        // Data Fetching
+        // ========================================================================
+
+        async function fetchSheetInfo() {
+            if (!dataSource) return;
+            try {
+                sheetInfo = await dataSource.getSheetInfo();
+                sheetNameEl.textContent = sheetInfo.name;
+                sheetInfoEl.textContent = `${sheetInfo.rowCount} rows x ${sheetInfo.colCount} columns`;
+            } catch (e) {
+                console.error('Error fetching sheet info:', e);
+                throw e;
+            }
+        }
+
+        async function fetchViewport() {
+            if (!sheetInfo || !dataSource) return;
+
+            const container = document.getElementById('canvas-container');
+            const viewWidth = container.clientWidth;
+            const viewHeight = container.clientHeight;
+
+            const startCol = Math.max(0, Math.floor(scrollX / DEFAULT_COL_WIDTH) - 2);
+            const startRow = Math.max(0, Math.floor(scrollY / DEFAULT_ROW_HEIGHT) - 2);
+            const endCol = Math.min(sheetInfo.colCount, startCol + Math.ceil(viewWidth / DEFAULT_COL_WIDTH) + 4);
+            const endRow = Math.min(sheetInfo.rowCount, startRow + Math.ceil(viewHeight / DEFAULT_ROW_HEIGHT) + 4);
+
+            try {
+                const data = await dataSource.getViewport(startCol, startRow, endCol, endRow);
+                cells = data.cells || [];
+                columns = data.columns || [];
+                rows = data.rows || [];
+
+                for (const col of columns) {
+                    colWidths.set(col.pos, col.width || DEFAULT_COL_WIDTH);
+                }
+                for (const row of rows) {
+                    rowHeights.set(row.pos, row.height || DEFAULT_ROW_HEIGHT);
+                }
+            } catch (e) {
+                console.error('Error fetching viewport:', e);
+            }
+        }
+
+        let fetchInFlight = false;
+        let fetchPending = false;
+        async function fetchViewportNow() {
+            if (fetchInFlight) {
+                fetchPending = true;
+                return;
+            }
+            fetchInFlight = true;
+            try {
+                await fetchViewport();
+                render();
+            } finally {
+                fetchInFlight = false;
+                if (fetchPending) {
+                    fetchPending = false;
+                    fetchViewportNow();
+                }
+            }
+        }
+
+        // ========================================================================
+        // Cell Editing
+        // ========================================================================
+
+        async function startEditing() {
+            if (!selectedCell || isEditing || !dataSource) return;
+
+            let cell = getCellAt(selectedCell.col, selectedCell.row);
+
+            if (!cell) {
+                try {
+                    const data = await dataSource.createCell(selectedCell.col, selectedCell.row, '');
+                    cell = { id: data.id, col: selectedCell.col, row: selectedCell.row, value: '', type: 's' };
+                    cells.push(cell);
+                } catch (e) {
+                    console.error('Error creating cell:', e);
+                    return;
+                }
+            }
+
+            isEditing = true;
+
+            let cellX = HEADER_WIDTH - scrollX;
+            for (let i = 0; i < selectedCell.col; i++) {
+                cellX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+            }
+            let cellY = HEADER_HEIGHT - scrollY;
+            for (let i = 0; i < selectedCell.row; i++) {
+                cellY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+            }
+
+            const cellWidth = colWidths.get(selectedCell.col) || DEFAULT_COL_WIDTH;
+            const cellHeight = rowHeights.get(selectedCell.row) || DEFAULT_ROW_HEIGHT;
+
+            cellEditor.style.left = cellX + 'px';
+            cellEditor.style.top = cellY + 'px';
+            cellEditor.style.width = cellWidth + 'px';
+            cellEditor.style.height = cellHeight + 'px';
+            cellEditor.style.display = 'block';
+
+            cellEditor.value = cell.formula || cell.value || '';
+            cellEditor.focus();
+            cellEditor.select();
+        }
+
+        function cancelEditing() {
+            if (!isEditing) return;
+            isEditing = false;
+            cellEditor.style.display = 'none';
+            cellEditor.value = '';
+            canvas.focus();
+        }
+
+        async function confirmEditing() {
+            if (!isEditing || !selectedCell || !dataSource) return;
+
+            const cell = getCellAt(selectedCell.col, selectedCell.row);
+            if (!cell) {
+                cancelEditing();
+                return;
+            }
+
+            const newValue = cellEditor.value;
+            isEditing = false;
+            cellEditor.style.display = 'none';
+
+            try {
+                await dataSource.updateCell(cell.id, newValue);
+                await fetchViewport();
+                render();
+            } catch (e) {
+                console.error('Error updating cell:', e);
+            }
+        }
+
+        cellEditor.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelEditing();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmEditing();
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                confirmEditing().then(() => {
+                    if (selectedCell) {
+                        if (e.shiftKey) {
+                            selectedCell.col = Math.max(0, selectedCell.col - 1);
+                        } else {
+                            selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
+                        }
+                        render();
+                    }
+                });
+            }
+        });
+
+        cellEditor.addEventListener('blur', () => {
+            if (isEditing) {
+                confirmEditing();
+            }
+        });
+
+        // ========================================================================
+        // Event Handlers
+        // ========================================================================
+
+        canvas.addEventListener('wheel', (e) => {
+            if (!sheetInfo) return;
+            e.preventDefault();
+
+            const maxScrollX = Math.max(0, sheetInfo.colCount * DEFAULT_COL_WIDTH - canvas.clientWidth + HEADER_WIDTH);
+            const maxScrollY = Math.max(0, sheetInfo.rowCount * DEFAULT_ROW_HEIGHT - canvas.clientHeight + HEADER_HEIGHT);
+
+            scrollX = Math.max(0, Math.min(maxScrollX, scrollX + e.deltaX));
+            scrollY = Math.max(0, Math.min(maxScrollY, scrollY + e.deltaY));
+
+            render();
+            fetchViewportNow();
+        }, { passive: false });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (!sheetInfo) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Column resize
+            if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
+                const resizeCol = getResizeHandleCol(x);
+                if (resizeCol >= 0) {
+                    isResizing = true;
+                    resizeColIndex = resizeCol;
+                    resizeStartX = e.clientX;
+                    resizeStartWidth = colWidths.get(resizeCol) || DEFAULT_COL_WIDTH;
+
+                    let colX = HEADER_WIDTH - scrollX;
+                    for (let i = 0; i <= resizeCol; i++) {
+                        colX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                    }
+                    resizePreviewX = colX;
+
+                    canvas.style.cursor = 'col-resize';
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // Column header click (select + drag)
+            if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
+                const col = getColAtX(x);
+                if (col >= 0) {
+                    selectedCell = null;
+                    selectedRow = null;
+                    selectedColumn = col;
+
+                    isDraggingColumn = true;
+                    dragSourceIndex = col;
+                    dragTargetIndex = col;
+                    dragMouseX = x;
+                    dragMouseY = y;
+
+                    canvas.style.cursor = 'grab';
+                    render();
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // Row header click (select + drag)
+            if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
+                const row = getRowAtY(y);
+                if (row >= 0) {
+                    selectedCell = null;
+                    selectedColumn = null;
+                    selectedRow = row;
+
+                    isDraggingRow = true;
+                    dragSourceIndex = row;
+                    dragTargetIndex = row;
+                    dragMouseX = x;
+                    dragMouseY = y;
+
+                    canvas.style.cursor = 'grab';
+                    render();
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // Cell selection
+            if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+                selectedColumn = null;
+                selectedRow = null;
+
+                const col = getColAtX(x);
+                const row = getRowAtY(y);
+
+                if (col >= 0 && row >= 0) {
+                    selectedCell = { col, row };
+                    render();
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!sheetInfo) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (isResizing) {
+                const delta = e.clientX - resizeStartX;
+                const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
+
+                let colX = HEADER_WIDTH - scrollX;
+                for (let i = 0; i < resizeColIndex; i++) {
+                    colX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                }
+                resizePreviewX = colX + newWidth;
+
+                render();
+                drawResizePreview();
+            } else if (isDraggingColumn) {
+                dragTargetIndex = getDropTargetCol(x);
+                dragMouseX = x;
+                dragMouseY = y;
+
+                canvas.style.cursor = 'grabbing';
+                render();
+                drawDragGhost();
+            } else if (isDraggingRow) {
+                dragTargetIndex = getDropTargetRow(y);
+                dragMouseX = x;
+                dragMouseY = y;
+
+                canvas.style.cursor = 'grabbing';
+                render();
+                drawDragGhost();
+            } else {
+                // Resize cursor
+                if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
+                    const resizeCol = getResizeHandleCol(x);
+                    canvas.style.cursor = resizeCol >= 0 ? 'col-resize' : 'default';
+                } else {
+                    canvas.style.cursor = 'default';
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', async (e) => {
+            if (isResizing && dataSource) {
+                const delta = e.clientX - resizeStartX;
+                const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
+
+                colWidths.set(resizeColIndex, newWidth);
+
+                const colId = getColumnId(resizeColIndex);
+                try {
+                    if (colId) {
+                        await dataSource.resizeColumn(colId, newWidth);
+                    } else {
+                        await dataSource.resizeColumnByPos(resizeColIndex, newWidth);
+                        await fetchViewport();
+                    }
+                } catch (err) {
+                    console.error('Error resizing column:', err);
+                }
+
+                isResizing = false;
+                resizeColIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            } else if (isDraggingColumn && dataSource) {
+                if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
+                    const colId = getColumnId(dragSourceIndex);
+                    if (colId) {
+                        try {
+                            await dataSource.moveColumn(colId, dragTargetIndex);
+                            if (dragTargetIndex > dragSourceIndex) {
+                                selectedColumn = dragTargetIndex - 1;
+                            } else {
+                                selectedColumn = dragTargetIndex;
+                            }
+                            await fetchSheetInfo();
+                            await fetchViewport();
+                        } catch (err) {
+                            console.error('Error moving column:', err);
+                        }
+                    }
+                }
+
+                isDraggingColumn = false;
+                dragSourceIndex = -1;
+                dragTargetIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            } else if (isDraggingRow && dataSource) {
+                if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
+                    const rowId = getRowId(dragSourceIndex);
+                    if (rowId) {
+                        try {
+                            await dataSource.moveRow(rowId, dragTargetIndex);
+                            if (dragTargetIndex > dragSourceIndex) {
+                                selectedRow = dragTargetIndex - 1;
+                            } else {
+                                selectedRow = dragTargetIndex;
+                            }
+                            await fetchSheetInfo();
+                            await fetchViewport();
+                        } catch (err) {
+                            console.error('Error moving row:', err);
+                        }
+                    }
+                }
+
+                isDraggingRow = false;
+                dragSourceIndex = -1;
+                dragTargetIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            if (isResizing) {
+                isResizing = false;
+                resizeColIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            } else if (isDraggingColumn) {
+                isDraggingColumn = false;
+                dragSourceIndex = -1;
+                dragTargetIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            } else if (isDraggingRow) {
+                isDraggingRow = false;
+                dragSourceIndex = -1;
+                dragTargetIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            }
+        });
+
+        canvas.addEventListener('dblclick', (e) => {
+            if (!sheetInfo) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+                const col = getColAtX(x);
+                const row = getRowAtY(y);
+
+                if (col >= 0 && row >= 0) {
+                    selectedCell = { col, row };
+                    render();
+                    startEditing();
+                }
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (isEditing) return;
+            if (!selectedCell || !sheetInfo) return;
+
+            let newCol = selectedCell.col;
+            let newRow = selectedCell.row;
+
+            switch (e.key) {
+                case 'ArrowUp':
+                    newRow = Math.max(0, selectedCell.row - 1);
+                    break;
+                case 'ArrowDown':
+                    newRow = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
+                    break;
+                case 'ArrowLeft':
+                    newCol = Math.max(0, selectedCell.col - 1);
+                    break;
+                case 'ArrowRight':
+                    newCol = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
+                    break;
+                case 'Tab':
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        newCol = Math.max(0, selectedCell.col - 1);
+                    } else {
+                        newCol = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
+                    }
+                    break;
+                case 'Enter':
+                case 'F2':
+                    e.preventDefault();
+                    startEditing();
+                    return;
+                default:
+                    return;
+            }
+
+            selectedCell = { col: newCol, row: newRow };
+
+            // Scroll to keep selection visible
+            let selX = HEADER_WIDTH;
+            for (let i = 0; i < newCol; i++) {
+                selX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+            }
+            let selY = HEADER_HEIGHT;
+            for (let i = 0; i < newRow; i++) {
+                selY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+            }
+            const selW = colWidths.get(newCol) || DEFAULT_COL_WIDTH;
+            const selH = rowHeights.get(newRow) || DEFAULT_ROW_HEIGHT;
+
+            const viewWidth = canvas.clientWidth;
+            const viewHeight = canvas.clientHeight;
+
+            if (selX - scrollX < HEADER_WIDTH) {
+                scrollX = selX - HEADER_WIDTH;
+            } else if (selX + selW - scrollX > viewWidth) {
+                scrollX = selX + selW - viewWidth;
+            }
+
+            if (selY - scrollY < HEADER_HEIGHT) {
+                scrollY = selY - HEADER_HEIGHT;
+            } else if (selY + selH - scrollY > viewHeight) {
+                scrollY = selY + selH - viewHeight;
+            }
+
+            render();
+            fetchViewportNow();
+        });
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+            fetchViewportNow();
+        });
+
+        // ========================================================================
+        // File Loading
+        // ========================================================================
+
+        function detectFormat(filename, data) {
+            const ext = filename.split('.').pop().toLowerCase();
+            if (ext === 'cells') return 'cells';
+            if (ext === 'csv' || ext === 'tsv') return 'csv';
+            if (ext === 'xlsx') return 'xlsx';
+
+            if (data instanceof ArrayBuffer) {
+                const view = new Uint8Array(data.slice(0, 4));
+                if (view[0] === 0x50 && view[1] === 0x4B) return 'xlsx';
+            }
+            return 'csv';
+        }
+
+        function getBaseName(filename) {
+            const lastDot = filename.lastIndexOf('.');
+            return lastDot > 0 ? filename.substring(0, lastDot) : filename;
+        }
+
+        async function ensureWasmClient() {
+            if (wasmClient) return wasmClient;
+
+            wasmClient = new CellsClient('./worker.js');
+            await wasmClient.ready;
+            return wasmClient;
+        }
+
+        async function loadFile(file) {
+            loading.textContent = '';
+            loading.innerHTML = '<span class="spinner"></span>Loading ' + file.name + '...';
+            loading.style.display = 'block';
+            errorEl.style.display = 'none';
+            emptyState.classList.add('hidden');
+
+            try {
+                const data = await file.arrayBuffer();
+                const format = detectFormat(file.name, data);
+                const baseName = getBaseName(file.name);
+
+                const client = await ensureWasmClient();
+
+                if (format === 'cells') {
+                    const text = new TextDecoder().decode(data);
+                    await client.loadCells(text);
+                } else if (format === 'csv') {
+                    await client.loadCSV(data);
+                } else if (format === 'xlsx') {
+                    await client.loadXLSX(data);
+                }
+
+                dataSource = new WasmDataSource(client);
+                dataSource.setWorkbookName(baseName);
+                hasFileLoaded = true;
+
+                // Reset state
+                scrollX = 0;
+                scrollY = 0;
+                selectedCell = null;
+                selectedColumn = null;
+                selectedRow = null;
+                colWidths.clear();
+                rowHeights.clear();
+
+                // Enable export buttons
+                document.getElementById('export-csv').disabled = false;
+                document.getElementById('export-xlsx').disabled = false;
+                document.getElementById('export-cells').disabled = false;
+
+                await fetchSheetInfo();
+                await fetchViewport();
+                render();
+                loading.style.display = 'none';
+
+            } catch (e) {
+                console.error('Error loading file:', e);
+                loading.style.display = 'none';
+                errorEl.textContent = 'Failed to load: ' + e.message;
+                errorEl.style.display = 'block';
+            }
+        }
+
+        function openFile() {
+            fileInput.click();
+        }
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                loadFile(file);
+                fileInput.value = '';
+            }
+        });
+
+        async function exportAs(format) {
+            if (!dataSource) {
+                alert('No file loaded');
+                return;
+            }
+            try {
+                const result = await dataSource.exportAs(format);
+                const url = URL.createObjectURL(result.blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = result.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                console.error('Export error:', e);
+                alert('Export failed: ' + e.message);
+            }
+        }
+
+        // ========================================================================
+        // Drag and Drop
+        // ========================================================================
+
+        let dragCounter = 0;
+
+        document.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            if (dragCounter === 1) {
+                dropZone.classList.add('visible');
+            }
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter === 0) {
+                dropZone.classList.remove('visible');
+            }
+        });
+
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            dropZone.classList.remove('visible');
+
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                loadFile(file);
+            }
+        });
+
+        // ========================================================================
+        // Initialization
+        // ========================================================================
+
+        function init() {
+            resizeCanvas();
+            // Show empty state initially
+            emptyState.classList.remove('hidden');
+            canvas.style.display = 'none';
+        }
+
+        init();
+    </script>
+</body>
+</html>

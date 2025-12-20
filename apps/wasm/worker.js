@@ -16,7 +16,7 @@ async function initModule() {
         if (typeof importScripts === 'function') {
             // Classic worker - use importScripts
             importScripts('./cells_wasm.js');
-            Module = await createModule();
+            Module = await createCellsModule();
         } else {
             // Module worker - use dynamic import
             const module = await import('./cells_wasm.js');

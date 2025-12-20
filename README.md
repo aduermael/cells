@@ -147,16 +147,50 @@ cells/
 **Bazel** - Fast incremental builds, hermetic, scales well.
 
 ```bash
-# Build all
-bazel build //core/...
+# Build core library
+make build          # or: bazel build //core/...
 
 # Run tests
-bazel test //core/...
+make test           # or: bazel test //core/...
 
-# Build for specific platform
-bazel build //core:cells --config=macos
-bazel build //core:cells --config=wasm
+# Build CLI (development)
+make cli            # Creates ./cells binary
+
+# Build CLI (optimized)
+make release        # Creates optimized ./cells binary
 ```
+
+### WebAssembly Build
+
+The cells engine compiles to WebAssembly for in-browser spreadsheet viewing:
+
+```bash
+# Build WASM module (development)
+make wasm
+
+# Build distribution package (optimized)
+make wasm-dist
+
+# Output: dist/ folder ready for deployment
+```
+
+The distribution package includes:
+- `cells_wasm.wasm` - WASM binary (~292KB)
+- `cells_wasm.js` - Emscripten JS glue
+- `index.html` - Standalone viewer
+- `worker.js` - Web Worker for async processing
+- `client.js` - Main thread API
+
+**Test locally:**
+```bash
+make wasm-dist
+python3 -m http.server 8080 --directory dist
+# Open http://localhost:8080/
+```
+
+**Deploy to static hosting:**
+- Upload contents of `dist/` to any static host (GitHub Pages, Netlify, Vercel, etc.)
+- No server-side code required - runs entirely in browser
 
 ```
                     C++17 Core Source

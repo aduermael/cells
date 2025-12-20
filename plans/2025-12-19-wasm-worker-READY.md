@@ -226,26 +226,67 @@ type WorkerResponse =
 └────────────────────────────────────────────────────────┘
 ```
 
-### Phase 5: Build & Distribution
+### Phase 5: Build & Distribution ✅
 
 **Goal:** Package WASM build for standalone deployment
 
-- [ ] 5a: Create `apps/wasm/static/` with standalone HTML (no server)
-- [ ] 5b: Add build step to copy WASM artifacts to web directory
-- [ ] 5c: Create `make wasm-dist` target for production build
-- [ ] 5d: Test standalone deployment (file:// protocol or static server)
-- [ ] 5e: Document deployment options (GitHub Pages, static hosting)
-- [ ] 5f: Update README with WASM build instructions
+- [x] 5a: Create `apps/wasm/static/` with standalone HTML (no server)
+- [x] 5b: Add build step to copy WASM artifacts to web directory
+- [x] 5c: Create `make wasm-dist` target for production build
+- [x] 5d: Test standalone deployment (file:// protocol or static server)
+- [x] 5e: Document deployment options (GitHub Pages, static hosting)
+- [x] 5f: Update README with WASM build instructions
+
+**Files created/modified:**
+- `apps/wasm/static/index.html` - Standalone viewer (WASM-only mode)
+- `apps/wasm/BUILD` - Added filegroups for static_files and dist_files
+- `Makefile` - Added wasm-dist and wasm-dist-full targets
+- `apps/wasm/worker.js` - Fixed module name (createCellsModule)
 
 **Output Structure:**
 ```
 dist/
-├── index.html          # Standalone viewer
-├── cells.js            # Emscripten JS glue
-├── cells.wasm          # WASM binary
-├── worker.js           # Web Worker
-└── client.js           # Main thread API
+├── index.html          # Standalone viewer (52KB)
+├── cells_wasm.js       # Emscripten JS glue (51KB)
+├── cells_wasm.wasm     # WASM binary (292KB)
+├── worker.js           # Web Worker (11KB)
+├── client.js           # Main thread API (12KB)
+└── cells.d.ts          # TypeScript definitions (8KB)
 ```
+
+**Build Commands:**
+- `make wasm` - Build WASM module (development)
+- `make wasm-dist` - Build production distribution (without XLSX)
+- `make wasm-dist-full` - Build production distribution (with XLSX support)
+
+**Deployment Options:**
+
+1. **Local testing:**
+   ```bash
+   make wasm-dist
+   python3 -m http.server 8080 --directory dist
+   # Open http://localhost:8080/
+   ```
+
+2. **GitHub Pages:**
+   - Copy contents of `dist/` to repository root or `docs/` folder
+   - Enable GitHub Pages in repository settings
+   - Note: file:// protocol doesn't work due to CORS, use static server
+
+3. **Static hosting (Netlify, Vercel, etc.):**
+   - Upload contents of `dist/` to hosting provider
+   - No server-side code required
+
+4. **Self-hosted:**
+   - Any web server that can serve static files
+   - Example nginx config:
+     ```nginx
+     location / {
+         root /path/to/dist;
+         add_header Cross-Origin-Opener-Policy same-origin;
+         add_header Cross-Origin-Embedder-Policy require-corp;
+     }
+     ```
 
 ### Phase 6: Testing & Polish
 
