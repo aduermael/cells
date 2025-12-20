@@ -199,6 +199,14 @@ declare module 'cells-wasm' {
      */
     resizeRow(rowId: string, height: number): string;
 
+    /**
+     * Resize a row by position, creating if needed
+     * @param pos - Row position (0-based)
+     * @param height - New height in pixels (10-500)
+     * @returns JSON string with OperationResult including row ID
+     */
+    resizeRowByPos(pos: number, height: number): string;
+
     // ========================================================================
     // Column/row rename
     // ========================================================================

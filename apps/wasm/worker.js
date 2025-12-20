@@ -193,6 +193,17 @@ function handleMessage(msg) {
                 break;
             }
 
+            case 'resizeRowByPos': {
+                const { pos, height } = params;
+                const result = JSON.parse(engine.resizeRowByPos(pos, height));
+                if (result.error) {
+                    respond({ type: 'error', error: result.error });
+                } else {
+                    respond({ type: 'rowResized', id: result.id, success: true });
+                }
+                break;
+            }
+
             case 'renameColumn': {
                 const { colId, name } = params;
                 const result = JSON.parse(engine.renameColumn(colId, name));

@@ -120,6 +120,10 @@
                 return { success: true };
             }
 
+            async resizeRowByPos(pos, height) {
+                return this._client.resizeRowByPos(pos, height);
+            }
+
             async moveColumn(colId, targetPos) {
                 await this._client.moveColumn(colId, targetPos);
                 return { success: true };
@@ -1138,15 +1142,19 @@
                 const delta = e.clientX - resizeStartX;
                 const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
 
-                colWidths.set(resizeColIndex, newWidth);
-
                 const colId = getColumnId(resizeColIndex);
                 try {
                     if (colId) {
                         await dataSource.resizeColumn(colId, newWidth);
+                        colWidths.set(resizeColIndex, newWidth);
                     } else {
-                        await dataSource.resizeColumnByPos(resizeColIndex, newWidth);
-                        await fetchViewport();
+                        // Column doesn't exist - create it with resizeColumnByPos
+                        const result = await dataSource.resizeColumnByPos(resizeColIndex, newWidth);
+                        colWidths.set(resizeColIndex, newWidth);
+                        // Add new column to local cache so getColumnId works
+                        if (result && result.id) {
+                            columns.push({ id: result.id, pos: resizeColIndex, width: newWidth, name: '' });
+                        }
                     }
                 } catch (err) {
                     console.error('Error resizing column:', err);
@@ -1160,14 +1168,20 @@
                 const delta = e.clientY - resizeStartY;
                 const newHeight = Math.max(16, Math.min(500, resizeStartHeight + delta));
 
-                rowHeights.set(resizeRowIndex, newHeight);
-
                 const rowId = getRowId(resizeRowIndex);
                 try {
                     if (rowId) {
                         await dataSource.resizeRow(rowId, newHeight);
+                        rowHeights.set(resizeRowIndex, newHeight);
+                    } else {
+                        // Row doesn't exist - create it with resizeRowByPos
+                        const result = await dataSource.resizeRowByPos(resizeRowIndex, newHeight);
+                        rowHeights.set(resizeRowIndex, newHeight);
+                        // Add new row to local cache so getRowId works
+                        if (result && result.id) {
+                            rows.push({ id: result.id, pos: resizeRowIndex, height: newHeight, name: '' });
+                        }
                     }
-                    // Note: resizeRowByPos not implemented yet, rows always have IDs in practice
                 } catch (err) {
                     console.error('Error resizing row:', err);
                 }
@@ -1178,9 +1192,18 @@
                 render();
             } else if (isDraggingColumn && dataSource) {
                 if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
-                    const colId = getColumnId(dragSourceIndex);
-                    if (colId) {
-                        try {
+                    let colId = getColumnId(dragSourceIndex);
+                    try {
+                        // If column doesn't exist, create it first with default width
+                        if (!colId) {
+                            const defaultWidth = colWidths.get(dragSourceIndex) || DEFAULT_COL_WIDTH;
+                            const result = await dataSource.resizeColumnByPos(dragSourceIndex, defaultWidth);
+                            if (result && result.id) {
+                                colId = result.id;
+                                columns.push({ id: colId, pos: dragSourceIndex, width: defaultWidth, name: '' });
+                            }
+                        }
+                        if (colId) {
                             await dataSource.moveColumn(colId, dragTargetIndex);
                             if (dragTargetIndex > dragSourceIndex) {
                                 selectedColumn = dragTargetIndex - 1;
@@ -1189,9 +1212,9 @@
                             }
                             await fetchSheetInfo();
                             await fetchViewport();
-                        } catch (err) {
-                            console.error('Error moving column:', err);
                         }
+                    } catch (err) {
+                        console.error('Error moving column:', err);
                     }
                 }
 
@@ -1202,9 +1225,18 @@
                 render();
             } else if (isDraggingRow && dataSource) {
                 if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
-                    const rowId = getRowId(dragSourceIndex);
-                    if (rowId) {
-                        try {
+                    let rowId = getRowId(dragSourceIndex);
+                    try {
+                        // If row doesn't exist, create it first with default height
+                        if (!rowId) {
+                            const defaultHeight = rowHeights.get(dragSourceIndex) || DEFAULT_ROW_HEIGHT;
+                            const result = await dataSource.resizeRowByPos(dragSourceIndex, defaultHeight);
+                            if (result && result.id) {
+                                rowId = result.id;
+                                rows.push({ id: rowId, pos: dragSourceIndex, height: defaultHeight, name: '' });
+                            }
+                        }
+                        if (rowId) {
                             await dataSource.moveRow(rowId, dragTargetIndex);
                             if (dragTargetIndex > dragSourceIndex) {
                                 selectedRow = dragTargetIndex - 1;
@@ -1213,9 +1245,9 @@
                             }
                             await fetchSheetInfo();
                             await fetchViewport();
-                        } catch (err) {
-                            console.error('Error moving row:', err);
                         }
+                    } catch (err) {
+                        console.error('Error moving row:', err);
                     }
                 }
 

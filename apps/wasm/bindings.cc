@@ -522,6 +522,44 @@ public:
         return "{\"success\":true}";
     }
 
+    std::string resizeRowByPos(uint32_t pos, uint32_t height) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        // Clamp height
+        if (height < 10) height = 10;
+        if (height > 500) height = 500;
+
+        // Find row at position, or create it
+        Axis* row = nullptr;
+        for (auto& [id, r] : sheet->rows) {
+            if (r->position == pos) {
+                row = r.get();
+                break;
+            }
+        }
+
+        if (!row) {
+            auto newRow = std::make_unique<Axis>(generate_id(), false);
+            newRow->position = pos;
+            newRow->size = height;
+            row = newRow.get();
+            sheet->addRow(std::move(newRow));
+        } else {
+            row->size = height;
+        }
+
+        std::ostringstream json;
+        json << "{\"success\":true,\"id\":\"" << row->id.toString() << "\"}";
+        return json.str();
+    }
+
     // ========================================================================
     // Column/row rename operations
     // ========================================================================
@@ -787,6 +825,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)
         .function("resizeColumnByPos", &cells::wasm::CellsEngine::resizeColumnByPos)
         .function("resizeRow", &cells::wasm::CellsEngine::resizeRow)
+        .function("resizeRowByPos", &cells::wasm::CellsEngine::resizeRowByPos)
         // Column/row rename
         .function("renameColumn", &cells::wasm::CellsEngine::renameColumn)
         // Column/row move

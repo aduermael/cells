@@ -300,6 +300,17 @@ class CellsClient {
     }
 
     /**
+     * Resize a row by position (creates row if needed)
+     * @param {number} pos - Row position (0-based)
+     * @param {number} height - New height in pixels
+     * @returns {Promise<{id: string, success: boolean}>}
+     */
+    async resizeRowByPos(pos, height) {
+        const response = await this._send('resizeRowByPos', { pos, height });
+        return { id: response.id, success: true };
+    }
+
+    /**
      * Move a column to a new position
      * @param {string} colId - Column ID to move
      * @param {number} targetPos - Target position (insert before)
