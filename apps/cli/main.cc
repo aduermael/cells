@@ -1,10 +1,8 @@
-// Cells CLI - spreadsheet format converter and viewer
+// Cells CLI - spreadsheet format converter
 // Usage: cells -i <input> <output>
-//        cells serve <file>
 
 #include "converter.h"
 #include "options.h"
-#include "server.h"
 
 #include <chrono>
 #include <cstring>
@@ -26,17 +24,14 @@ using cells::cli::detect_format;
 using cells::cli::Format;
 using cells::cli::format_name;
 using cells::cli::Options;
-using cells::cli::Server;
-using cells::cli::ServerOptions;
 
 constexpr const char* kVersion = "0.0.1";
 
 void print_usage(const char* program_name) {
-    std::cerr << "cells - spreadsheet format converter and viewer\n"
+    std::cerr << "cells - spreadsheet format converter\n"
               << "\n"
               << "Usage: " << program_name << " [options] -i <input> <output>\n"
               << "       " << program_name << " -I <file>     (info mode)\n"
-              << "       " << program_name << " serve <file>  (web viewer)\n"
               << "\n"
               << "Convert between spreadsheet formats (.cells, .csv, .xlsx).\n"
               << "Format is auto-detected from file extension.\n"
@@ -67,11 +62,6 @@ void print_usage(const char* program_name) {
               << "  -v                  Verbose output\n"
               << "  --time              Show processing time\n"
               << "\n"
-              << "Web Viewer:\n"
-              << "  serve <file>        Start HTTP server to view spreadsheet\n"
-              << "  --port <port>       Server port (default: 8888)\n"
-              << "  --open              Open browser automatically\n"
-              << "\n"
               << "Info:\n"
               << "  -I, --info          Show file information (no conversion)\n"
               << "  --version           Show version\n"
@@ -98,11 +88,6 @@ void print_usage(const char* program_name) {
               << "  # Scripting\n"
               << "  cells -i input.xlsx output.csv -q -y    # Quiet, overwrite\n"
               << "  cells -i data.csv out.xlsx --time       # Show timing\n"
-              << "\n"
-              << "  # Web viewer\n"
-              << "  cells serve budget.xlsx                 # Start viewer on :8888\n"
-              << "  cells serve data.cells --port 9000      # Custom port\n"
-              << "  cells serve report.xlsx --open          # Open browser\n"
               << "\n"
               << "Feature Preservation:\n"
               << "  When converting to CSV, formulas become values and only the\n"
@@ -419,133 +404,9 @@ int show_file_info(const Options& opts) {
     return 0;
 }
 
-// Run serve command
-int run_serve(int argc, char* argv[]) {
-    // Parse serve-specific args: serve <file> [--port N] [--open] [-v] [--web-dir DIR]
-    std::string input_file;
-    std::string web_dir = "apps/cli/web";  // Default: source tree location
-    ServerOptions server_opts;
-
-    for (int i = 2; i < argc; ++i) {
-        std::string_view arg = argv[i];
-
-        if (arg == "--port" && i + 1 < argc) {
-            server_opts.port = static_cast<uint16_t>(std::stoi(argv[++i]));
-            continue;
-        }
-        if (arg == "--open") {
-            server_opts.open_browser = true;
-            continue;
-        }
-        if (arg == "-v") {
-            server_opts.verbose = true;
-            continue;
-        }
-        if (arg == "--web-dir" && i + 1 < argc) {
-            web_dir = argv[++i];
-            continue;
-        }
-        if (arg == "--help") {
-            std::cout << "Usage: cells serve <file> [--port N] [--open] [-v] [--web-dir DIR]\n"
-                      << "\n"
-                      << "Start an HTTP server to view a spreadsheet in the browser.\n"
-                      << "\n"
-                      << "Options:\n"
-                      << "  --port <port>    Server port (default: 8888)\n"
-                      << "  --open           Open browser automatically\n"
-                      << "  --web-dir <dir>  Web assets directory (default: apps/cli/web)\n"
-                      << "  -v               Verbose output\n";
-            return 0;
-        }
-        // Positional argument (input file)
-        if (!arg.empty() && arg[0] != '-') {
-            if (input_file.empty()) {
-                input_file = std::string(arg);
-            } else {
-                std::cerr << "Error: Unexpected argument: " << arg << "\n";
-                return 1;
-            }
-            continue;
-        }
-        std::cerr << "Error: Unknown option: " << arg << "\n";
-        return 1;
-    }
-
-    if (input_file.empty()) {
-        std::cerr << "Error: Input file required\n";
-        std::cerr << "Usage: cells serve <file> [--port N] [--open]\n";
-        return 1;
-    }
-
-    // Detect format and load file
-    Format format = detect_format(input_file);
-    if (format == Format::kUnknown) {
-        std::cerr << "Error: Cannot detect format from extension\n";
-        return 1;
-    }
-
-    std::unique_ptr<cells::Workbook> workbook;
-
-    if (format == Format::kCells) {
-        std::string content = read_file(input_file);
-        if (content.empty()) {
-            std::cerr << "Error: Could not read file: " << input_file << "\n";
-            return 1;
-        }
-        cells::ParseResult result = cells::parse(content);
-        if (!result.ok()) {
-            std::cerr << "Error: " << result.error->toString() << "\n";
-            return 1;
-        }
-        workbook = std::move(result.workbook);
-    } else if (format == Format::kCsv) {
-        std::string content = read_file(input_file);
-        if (content.empty()) {
-            std::cerr << "Error: Could not read file: " << input_file << "\n";
-            return 1;
-        }
-        cells::CSVReadOptions csv_opts;
-        cells::CSVReadResult result = cells::readCSV(content, csv_opts);
-        if (!result.ok()) {
-            std::cerr << "Error: " << result.error->toString() << "\n";
-            return 1;
-        }
-        workbook = std::move(result.workbook);
-    } else if (format == Format::kXlsx) {
-        cells::XLSXReadOptions xlsx_opts;
-        xlsx_opts.readFormulas = true;
-        cells::XLSXReadResult result = cells::readXLSX(input_file, xlsx_opts);
-        if (!result.ok()) {
-            std::cerr << "Error: " << result.error->toString() << "\n";
-            return 1;
-        }
-        workbook = std::move(result.workbook);
-    }
-
-    if (!workbook || workbook->sheetCount() == 0) {
-        std::cerr << "Error: No sheets found in file\n";
-        return 1;
-    }
-
-    if (server_opts.verbose) {
-        std::cout << "Loaded: " << input_file << " (" << workbook->sheetCount() << " sheet"
-                  << (workbook->sheetCount() != 1 ? "s" : "") << ")\n";
-        std::cout << "Web directory: " << web_dir << "\n";
-    }
-
-    // Start server
-    Server server(std::move(workbook), web_dir);
-    return server.run(server_opts);
-}
-
 }  // namespace
 
 int main(int argc, char* argv[]) {
-    // Check for serve command first
-    if (argc >= 2 && std::string_view(argv[1]) == "serve") {
-        return run_serve(argc, argv);
-    }
-
     Options opts;
 
     if (!parse_args(argc, argv, opts)) {

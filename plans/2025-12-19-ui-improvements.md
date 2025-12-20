@@ -23,12 +23,51 @@ Add a formula/cell bar between the header toolbar and the canvas area. Shows:
 - [x] 2b: Implement formula bar state updates (selected cell display)
 - [x] 2c: Enable editing cell value directly from formula bar
 
+## Phase 2.5: Remove CLI Server Mode (Cleanup)
+
+Now that WASM is stable, remove the `cli server` command and the web UI served via HTTP server. This simplifies the codebase by removing the need for shared files between two different serving modes.
+
+- [x] 2.5a: Remove `server` subcommand from CLI
+- [ ] 2.5b: Remove `apps/cli/web/` directory and related server code
+- [ ] 2.5c: Update `apps/shared/` to only serve WASM needs (remove server-specific code if any)
+- [ ] 2.5d: Clean up any build rules related to CLI server mode
+
+## Phase 2.6: Core Cell Editing Behavior
+
+Fix fundamental cell editing behavior to match spreadsheet conventions.
+
+**Single-click vs Double-click:**
+- Single click + start typing → erases content, starts inserting new content (replace mode)
+- Double click → puts cursor at end of existing content (append/edit mode)
+
+**Auto-commit on navigation:**
+- Content is committed immediately when navigating away (click another cell, arrow keys, Tab, Enter)
+- ENTER moves to cell below (commits content as side effect)
+- No explicit "confirm" action required
+
+**Empty cell handling:**
+- Clicking an empty cell should allow editing (create cell on demand with new UUID)
+- Deleting all content from a cell should remove the cell UUID entirely
+
+**Formula bar sync:**
+- Editing via formula bar and clicking another cell should cleanly commit and move selection
+- Fix split/duplicate selector visual bug when clicking away from formula bar
+
+- [ ] 2.6a: Implement single-click selection without entering edit mode
+- [ ] 2.6b: Implement typing-to-replace behavior (single click + type = replace content)
+- [ ] 2.6c: Implement double-click to enter edit mode with cursor at end
+- [ ] 2.6d: Auto-commit cell content on any navigation (click, arrows, Tab, Enter)
+- [ ] 2.6e: ENTER commits and moves selection down, Shift+ENTER moves up
+- [ ] 2.6f: Create cells on demand when editing empty positions (assign UUID)
+- [ ] 2.6g: Delete cell UUID when content is completely cleared
+- [ ] 2.6h: Fix formula bar commit when clicking another cell (single clean selection)
+
 ## Phase 3: Visual Polish
 
 Minor visual improvements for a cleaner look.
 
 - [ ] 3a: Add discreet grid lines (very subtle separators, almost invisible)
-- [ ] 3b: Remove "Local (WASM)" and "Server" mode badges
+- [ ] 3b: Remove "Local (WASM)" badge (no longer needed after CLI server removal)
 - [ ] 3c: Remove sheet dimensions display ("X rows x Y columns")
 
 ## Phase 4: Export Dropdown
@@ -101,7 +140,7 @@ Display sheet tabs at the bottom of the grid for multi-sheet navigation and mana
 
 ## Technical Notes
 
-### File Structure After Consolidation
+### File Structure After Consolidation (Post Phase 2.5)
 
 ```
 apps/
@@ -110,14 +149,14 @@ apps/
 │   ├── grid-renderer.js     # Canvas rendering
 │   ├── grid-events.js       # Mouse/keyboard handlers
 │   └── utils.js             # Helper functions
-├── wasm/
-│   ├── static/
-│   │   └── index.html       # WASM-specific wrapper
-│   ├── client.js
-│   └── worker.js
-└── cli/
-    └── web/
-        └── index.html       # CLI-specific wrapper (server mode)
+└── wasm/
+    ├── static/
+    │   └── index.html       # WASM web UI
+    ├── client.js
+    └── worker.js
+
+# REMOVED (Phase 2.5):
+# └── cli/web/               # CLI server mode removed - WASM only
 ```
 
 ### Grid Line Colors

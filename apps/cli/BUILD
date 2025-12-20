@@ -5,20 +5,15 @@ cc_binary(
         "converter.h",
         "main.cc",
         "options.h",
-        "server.cc",
-        "server.h",
     ],
     deps = [
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
         "//core/cells:model",
         "//core/cells:parser",
-        "//core/cells:quadtree",
-        "//core/cells:ref_converter",
         "//core/cells:serializer",
         "//core/cells:xlsx_reader",
         "//core/cells:xlsx_writer",
-        "//third_party/httplib",
     ],
 )
 
