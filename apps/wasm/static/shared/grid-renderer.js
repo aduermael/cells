@@ -56,6 +56,9 @@ export class GridRenderer {
         this.resizePreviewX = 0;
         this.isResizingRow = false;
         this.resizePreviewY = 0;
+
+        // Editing state
+        this.editingColumnIndex = -1;
     }
 
     /**
@@ -323,7 +326,10 @@ export class GridRenderer {
             } else {
                 ctx.fillStyle = COLORS.headerText;
             }
-            ctx.fillText(this.getColumnHeaderText(col), headerX + colW / 2, HEADER_HEIGHT / 2);
+            // Skip drawing header text if this column is being edited (editor covers it)
+            if (col !== this.editingColumnIndex) {
+                ctx.fillText(this.getColumnHeaderText(col), headerX + colW / 2, HEADER_HEIGHT / 2);
+            }
         }
 
         // Column header separators (vertical lines between A, B, C...)
