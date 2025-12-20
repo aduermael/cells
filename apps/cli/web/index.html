@@ -346,6 +346,7 @@
 
         // Cell editor event handlers
         cellEditor.addEventListener('keydown', (e) => {
+            e.stopPropagation(); // Prevent bubbling to document handler
             if (e.key === 'Escape') {
                 e.preventDefault();
                 cancelEditing();
