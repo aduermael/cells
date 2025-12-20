@@ -426,6 +426,17 @@ class CellsClient {
         return { success: true };
     }
 
+    /**
+     * Rename a column by position (creates column if it doesn't exist)
+     * @param {number} pos - Column position (0-indexed)
+     * @param {string} name - New column name (empty string to clear)
+     * @returns {Promise<{success: boolean, id: string}>}
+     */
+    async renameColumnByPos(pos, name) {
+        const result = await this._send('renameColumnByPos', { pos, name });
+        return { success: true, id: result.id };
+    }
+
     // ========================================================================
     // Export API
     // ========================================================================

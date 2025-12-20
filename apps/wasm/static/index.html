@@ -154,6 +154,10 @@
                 return { success: true };
             }
 
+            async renameColumnByPos(pos, name) {
+                return await this._client.renameColumnByPos(pos, name);
+            }
+
             // Sheet management
             async getSheets() {
                 return this._client.getSheets();
@@ -872,19 +876,23 @@
             editingColumnIndex = -1;
             columnHeaderEditor.style.display = 'none';
 
-            if (colId) {
-                try {
+            try {
+                if (colId) {
                     await dataSource.renameColumn(colId, newName);
-                    // Update local cache
-                    if (newName) {
-                        colNames.set(savedColIndex, newName);
-                    } else {
-                        colNames.delete(savedColIndex);
-                    }
-                    render();
-                } catch (e) {
-                    console.error('Error renaming column:', e);
+                } else {
+                    // Column doesn't exist - create it to store the name
+                    await dataSource.renameColumnByPos(savedColIndex, newName);
                 }
+                // Update local cache
+                if (newName) {
+                    colNames.set(savedColIndex, newName);
+                } else {
+                    colNames.delete(savedColIndex);
+                }
+                await fetchViewport();
+                render();
+            } catch (e) {
+                console.error('Error renaming column:', e);
             }
 
             canvas.focus();

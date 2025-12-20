@@ -219,6 +219,14 @@ declare module 'cells-wasm' {
      */
     renameColumn(colId: string, name: string): string;
 
+    /**
+     * Rename a column by position (creates column if it doesn't exist)
+     * @param pos - Column position (0-indexed)
+     * @param name - New column name (empty string to clear)
+     * @returns JSON string with OperationResult including the column ID
+     */
+    renameColumnByPos(pos: number, name: string): string;
+
     // ========================================================================
     // Column/row move
     // ========================================================================

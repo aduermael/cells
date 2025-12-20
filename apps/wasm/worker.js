@@ -274,6 +274,17 @@ function handleMessage(msg) {
                 break;
             }
 
+            case 'renameColumnByPos': {
+                const { pos, name } = params;
+                const result = JSON.parse(engine.renameColumnByPos(pos, name));
+                if (result.error) {
+                    respond({ type: 'error', error: result.error });
+                } else {
+                    respond({ type: 'columnRenamed', id: result.id, success: true });
+                }
+                break;
+            }
+
             case 'moveColumn': {
                 const { colId, targetPos } = params;
                 const result = JSON.parse(engine.moveColumn(colId, targetPos));
