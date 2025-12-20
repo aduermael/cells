@@ -1,25 +1,16 @@
-.PHONY: build test format lint check clean compile-db cli cli-release release wasm wasm-dist wasm-serve copy-shared
+.PHONY: build test format lint check clean compile-db cli cli-release release wasm wasm-dist wasm-serve
 
 # Build
 build:
 	bazel build //core/...
 
-# Copy shared modules to static directories
-copy-shared:
-	@mkdir -p apps/wasm/static/shared
-	@mkdir -p apps/cli/web/shared
-	@cp apps/shared/*.css apps/wasm/static/shared/
-	@cp apps/shared/*.js apps/wasm/static/shared/
-	@cp apps/shared/*.css apps/cli/web/shared/
-	@cp apps/shared/*.js apps/cli/web/shared/
-
 # Build CLI and copy to repo root (fast build, for development)
-cli: copy-shared
+cli:
 	bazel build //apps/cli:cells
 	cp -f bazel-bin/apps/cli/cells ./cells
 
 # Build CLI with optimizations (for production/release)
-cli-release: copy-shared
+cli-release:
 	bazel build -c opt //apps/cli:cells
 	cp -f bazel-bin/apps/cli/cells ./cells
 
@@ -33,7 +24,7 @@ wasm:
 
 # Build production WASM distribution package
 # Output: dist/ directory with all files needed for standalone deployment
-wasm-dist: copy-shared
+wasm-dist:
 	@echo "Building WASM module..."
 	bazel build --config=wasm -c opt //apps/wasm:cells_wasm
 	@echo "Creating dist directory..."
@@ -50,8 +41,8 @@ wasm-dist: copy-shared
 	@cp apps/wasm/static/index.html dist/
 	@cp apps/wasm/cells.d.ts dist/
 	@echo "Copying shared modules..."
-	@cp apps/shared/*.css dist/shared/
-	@cp apps/shared/*.js dist/shared/
+	@cp apps/wasm/static/shared/*.css dist/shared/
+	@cp apps/wasm/static/shared/*.js dist/shared/
 	@echo ""
 	@echo "Distribution package created in dist/"
 	@echo "Files:"
