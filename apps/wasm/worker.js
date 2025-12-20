@@ -237,6 +237,28 @@ function handleMessage(msg) {
                 break;
             }
 
+            case 'shiftColumnsForEmptyMove': {
+                const { sourcePos, targetPos } = params;
+                const result = JSON.parse(engine.shiftColumnsForEmptyMove(sourcePos, targetPos));
+                if (result.error) {
+                    respond({ type: 'error', error: result.error });
+                } else {
+                    respond({ type: 'columnsShifted', success: true });
+                }
+                break;
+            }
+
+            case 'shiftRowsForEmptyMove': {
+                const { sourcePos, targetPos } = params;
+                const result = JSON.parse(engine.shiftRowsForEmptyMove(sourcePos, targetPos));
+                if (result.error) {
+                    respond({ type: 'error', error: result.error });
+                } else {
+                    respond({ type: 'rowsShifted', success: true });
+                }
+                break;
+            }
+
             case 'export': {
                 const { format } = params;
                 let data, filename;

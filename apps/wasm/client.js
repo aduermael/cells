@@ -333,6 +333,28 @@ class CellsClient {
     }
 
     /**
+     * Shift columns when moving an empty column position
+     * @param {number} sourcePos - Source position (empty)
+     * @param {number} targetPos - Target position (insert before)
+     * @returns {Promise<{success: boolean}>}
+     */
+    async shiftColumnsForEmptyMove(sourcePos, targetPos) {
+        await this._send('shiftColumnsForEmptyMove', { sourcePos, targetPos });
+        return { success: true };
+    }
+
+    /**
+     * Shift rows when moving an empty row position
+     * @param {number} sourcePos - Source position (empty)
+     * @param {number} targetPos - Target position (insert before)
+     * @returns {Promise<{success: boolean}>}
+     */
+    async shiftRowsForEmptyMove(sourcePos, targetPos) {
+        await this._send('shiftRowsForEmptyMove', { sourcePos, targetPos });
+        return { success: true };
+    }
+
+    /**
      * Rename a column
      * @param {string} colId - Column ID
      * @param {string} name - New column name (empty string to clear)

@@ -592,6 +592,79 @@ public:
     // Column/row move operations
     // ========================================================================
 
+    // Shift column positions to make room for an "empty" column move
+    // When moving empty position S to target T:
+    // - If S > T (moving left): columns at [T, S) shift right (+1)
+    // - If S < T (moving right): columns at (S, T] shift left (-1)
+    std::string shiftColumnsForEmptyMove(uint32_t sourcePos, uint32_t targetPos) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        if (sourcePos == targetPos || sourcePos + 1 == targetPos) {
+            return "{\"success\":true}";  // No-op
+        }
+
+        if (sourcePos > targetPos) {
+            // Moving left: columns at [targetPos, sourcePos) shift right
+            for (auto& [id, col] : sheet->columns) {
+                if (col->position >= targetPos && col->position < sourcePos) {
+                    col->position++;
+                }
+            }
+        } else {
+            // Moving right: columns at (sourcePos, targetPos] shift left
+            // Note: targetPos is "insert before", so actual new pos is targetPos-1
+            for (auto& [id, col] : sheet->columns) {
+                if (col->position > sourcePos && col->position < targetPos) {
+                    col->position--;
+                }
+            }
+        }
+
+        rebuildQuadtree();
+        return "{\"success\":true}";
+    }
+
+    std::string shiftRowsForEmptyMove(uint32_t sourcePos, uint32_t targetPos) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        if (sourcePos == targetPos || sourcePos + 1 == targetPos) {
+            return "{\"success\":true}";  // No-op
+        }
+
+        if (sourcePos > targetPos) {
+            // Moving left: rows at [targetPos, sourcePos) shift down
+            for (auto& [id, row] : sheet->rows) {
+                if (row->position >= targetPos && row->position < sourcePos) {
+                    row->position++;
+                }
+            }
+        } else {
+            // Moving right: rows at (sourcePos, targetPos] shift up
+            for (auto& [id, row] : sheet->rows) {
+                if (row->position > sourcePos && row->position < targetPos) {
+                    row->position--;
+                }
+            }
+        }
+
+        rebuildQuadtree();
+        return "{\"success\":true}";
+    }
+
     std::string moveColumn(const std::string& colIdStr, uint32_t targetPos) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -831,6 +904,8 @@ EMSCRIPTEN_BINDINGS(cells) {
         // Column/row move
         .function("moveColumn", &cells::wasm::CellsEngine::moveColumn)
         .function("moveRow", &cells::wasm::CellsEngine::moveRow)
+        .function("shiftColumnsForEmptyMove", &cells::wasm::CellsEngine::shiftColumnsForEmptyMove)
+        .function("shiftRowsForEmptyMove", &cells::wasm::CellsEngine::shiftRowsForEmptyMove)
         // Export
         .function("exportToCells", &cells::wasm::CellsEngine::exportToCells)
         .function("exportToCSV", &cells::wasm::CellsEngine::exportToCSV)

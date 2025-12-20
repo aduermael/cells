@@ -239,6 +239,22 @@ declare module 'cells-wasm' {
      */
     moveRow(rowId: string, targetPos: number): string;
 
+    /**
+     * Shift columns when moving an empty column position
+     * @param sourcePos - Source position (empty)
+     * @param targetPos - Target position (insert before)
+     * @returns JSON string with OperationResult
+     */
+    shiftColumnsForEmptyMove(sourcePos: number, targetPos: number): string;
+
+    /**
+     * Shift rows when moving an empty row position
+     * @param sourcePos - Source position (empty)
+     * @param targetPos - Target position (insert before)
+     * @returns JSON string with OperationResult
+     */
+    shiftRowsForEmptyMove(sourcePos: number, targetPos: number): string;
+
     // ========================================================================
     // Export methods
     // ========================================================================
