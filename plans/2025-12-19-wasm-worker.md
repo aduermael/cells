@@ -288,7 +288,7 @@ dist/
      }
      ```
 
-### Phase 6: Bug Fixes & Go Server
+### Phase 6: Bug Fixes & Go Server ✅
 
 **Goal:** Fix WASM loading issues and add Go static file server
 
@@ -297,10 +297,11 @@ dist/
 - [x] 6c: Update worker.js to load `cells_wasm_bin.js`
 - [x] 6d: Create Go static file server (`tools/serve/main.go`)
 - [x] 6e: Add `make wasm-serve` target
-- [ ] 6f: Full audit and replacement of exception-throwing functions for WASM
-  - Partial: `std::stod` → `strtod` in xlsx_reader.cc
-  - Partial: `std::stoi` → `strtol` in ref_converter.cc
-  - TODO: Full codebase audit for other throwing functions
+- [x] 6f: Full audit and replacement of exception-throwing functions for WASM
+  - `std::stod` → `strtod` in xlsx_reader.cc
+  - `std::stoi` → `strtol` in ref_converter.cc
+  - Note: `std::stoul`/`std::stoi` in apps/cli/*.cc are CLI-only, not compiled into WASM
+  - Verified: No `throw`, no `.at()`, no throwing std functions in core/ or apps/wasm/
 
 **Files created/modified:**
 - `Makefile` - Fixed file copying, added wasm-serve target
