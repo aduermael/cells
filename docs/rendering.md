@@ -160,3 +160,97 @@ Split viewport into four regions:
 | Cell edit | < 5ms |
 | Large recalc (10k cells) | < 100ms |
 | Max visible cells | 10,000+ |
+
+---
+
+## Current Implementation
+
+The actual implementation is in `apps/wasm/static/shared/grid-renderer.js` using Canvas2D.
+
+### Architecture (Simplified)
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                   index.html (Main UI)                        │
+│   - Event handling (mouse, keyboard)                         │
+│   - State management (selection, scroll position)            │
+│   - Coordinates GridRenderer updates                         │
+└──────────────────────────────┬───────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    GridRenderer Class                         │
+│   - Receives state via setStateRefs()                        │
+│   - render() draws everything to Canvas2D                    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Constants
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `HEADER_HEIGHT` | 24px | Column header row height |
+| `HEADER_WIDTH` | 50px | Row header column width |
+| `DEFAULT_COL_WIDTH` | 100px | Default column width |
+| `DEFAULT_ROW_HEIGHT` | 24px | Default row height |
+| `CELL_PADDING` | 4px | Text padding inside cells |
+
+### Rendering Pipeline (Actual)
+
+The `render()` method draws in this order:
+
+1. **Clear canvas** - Full clear each frame (no dirty tracking)
+2. **Grid lines** - Vertical and horizontal lines in cell area
+3. **Cell values** - Text content with clipping per cell
+4. **Column selection** - Highlight if column selected
+5. **Row selection** - Highlight if row selected
+6. **Cell/Range selection** - Border and fill for selected cells
+7. **Column headers** - A, B, C... with selection highlight
+8. **Row headers** - 1, 2, 3... with selection highlight
+9. **Corner** - Top-left fixed area
+10. **Header borders** - Lines separating headers from cells
+
+### High-DPI Support
+
+Canvas automatically scales for device pixel ratio:
+```javascript
+const dpr = window.devicePixelRatio || 1;
+canvas.width = container.clientWidth * dpr;
+canvas.height = container.clientHeight * dpr;
+ctx.scale(dpr, dpr);
+```
+
+### Drag and Drop Rendering
+
+Special handling for column/row reordering:
+- `getDragAdjustedColX()` / `getDragAdjustedRowY()` - Calculate positions with gap for dragged item
+- `drawDragGhost()` - Semi-transparent ghost following cursor
+- Source column/row is hidden during drag, gap appears at target position
+
+### Resize Preview
+
+- `drawResizePreview()` - Dashed line showing new column/row boundary
+- Called after main `render()` when resizing is active
+
+### Color Palette
+
+```javascript
+COLORS = {
+    gridLine: '#f0f0f0',      // Subtle grid
+    headerBg: '#f8f9fa',      // Header background
+    headerBorder: '#dee2e6',  // Header border
+    headerText: '#495057',    // Header text
+    cellText: '#212529',      // Cell text
+    selectionBorder: '#0d6efd', // Selection border (blue)
+    selectionBg: 'rgba(13, 110, 253, 0.1)', // Selection fill
+    cornerBg: '#e9ecef'       // Corner background
+}
+```
+
+### Not Implemented
+
+- **Dirty region tracking** - Full redraw every frame
+- **WebGL acceleration** - Canvas2D only
+- **Frozen panes** - Not supported
+- **Zoom** - Not supported
+- **Smooth scrolling easing** - Direct scroll position updates
