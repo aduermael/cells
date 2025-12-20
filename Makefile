@@ -1,4 +1,4 @@
-.PHONY: build test format lint check clean compile-db cli cli-release release
+.PHONY: build test format lint check clean compile-db cli cli-release release wasm
 
 # Build
 build:
@@ -16,6 +16,11 @@ cli-release:
 
 # Alias for cli-release
 release: cli-release
+
+# Build WASM module (for browser usage)
+wasm:
+	bazel build //apps/wasm:hello_wasm
+	@echo "WASM output: bazel-bin/apps/wasm/hello_wasm/"
 
 # Test (when tests exist)
 test:

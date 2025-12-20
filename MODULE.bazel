@@ -6,6 +6,9 @@ module(
 # Platforms for OS-specific configurations
 bazel_dep(name = "platforms", version = "0.0.11")
 
+# Emscripten SDK for WebAssembly builds
+bazel_dep(name = "emsdk", version = "4.0.17")
+
 # Google Test
 bazel_dep(name = "googletest", version = "1.14.0.bcr.1")
 

@@ -41,21 +41,22 @@ Build the cells app as a WASM module that runs in a Web Worker, enabling:
 
 ## Phases
 
-### Phase 1: Emscripten Toolchain Setup
+### Phase 1: Emscripten Toolchain Setup ✅
 
 **Goal:** Configure Bazel to build WASM targets with Emscripten
 
-- [ ] 1a: Add `emsdk` to MODULE.bazel as external dependency
-- [ ] 1b: Create `.bazelrc` config for `--config=wasm`
-- [ ] 1c: Create `platforms/BUILD` for wasm32 platform definition
-- [ ] 1d: Test minimal "hello world" WASM build
-- [ ] 1e: Update Makefile with `make wasm` target
+- [x] 1a: Add `emsdk` to MODULE.bazel as external dependency
+- [x] 1b: Create `.bazelrc` config for `--config=wasm`
+- [x] 1c: Create `platforms/BUILD` for wasm32 platform definition (not needed - wasm_cc_binary handles transitions)
+- [x] 1d: Test minimal "hello world" WASM build
+- [x] 1e: Update Makefile with `make wasm` target
 
-**Files to create/modify:**
-- `MODULE.bazel` - Add rules_emscripten
-- `.bazelrc` - Add wasm config
-- `platforms/BUILD` - Platform definitions
-- `Makefile` - Add wasm targets
+**Files created/modified:**
+- `MODULE.bazel` - Added emsdk 4.0.17
+- `.bazelrc` - Created with wasm config
+- `apps/wasm/BUILD` - WASM build rules
+- `apps/wasm/hello.cc` - Hello world test
+- `Makefile` - Added wasm target
 
 ### Phase 2: WASM Bindings Layer
 
