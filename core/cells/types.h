@@ -56,11 +56,19 @@ struct ID {
 // Hash function for ID (for use in unordered_map/unordered_set)
 struct IDHash {
     std::size_t operator()(const ID& id) const {
-        // FNV-1a hash
-        std::size_t hash = 14695981039346656037ULL;
+        // FNV-1a hash with platform-appropriate constants
+        // 32-bit: offset=2166136261, prime=16777619
+        // 64-bit: offset=14695981039346656037, prime=1099511628211
+        constexpr std::size_t fnv_offset = sizeof(std::size_t) == 8
+                                               ? static_cast<std::size_t>(14695981039346656037ULL)
+                                               : static_cast<std::size_t>(2166136261UL);
+        constexpr std::size_t fnv_prime = sizeof(std::size_t) == 8
+                                              ? static_cast<std::size_t>(1099511628211ULL)
+                                              : static_cast<std::size_t>(16777619UL);
+        std::size_t hash = fnv_offset;
         for (const char i : id.data) {
             hash ^= static_cast<unsigned char>(i);
-            hash *= 1099511628211ULL;
+            hash *= fnv_prime;
         }
         return hash;
     }
@@ -72,11 +80,17 @@ struct IDHash {
 template <>
 struct std::hash<cells::ID> {
     std::size_t operator()(const cells::ID& id) const {
-        // FNV-1a hash
-        std::size_t hash = 14695981039346656037ULL;
+        // FNV-1a hash with platform-appropriate constants
+        constexpr std::size_t fnv_offset = sizeof(std::size_t) == 8
+                                               ? static_cast<std::size_t>(14695981039346656037ULL)
+                                               : static_cast<std::size_t>(2166136261UL);
+        constexpr std::size_t fnv_prime = sizeof(std::size_t) == 8
+                                              ? static_cast<std::size_t>(1099511628211ULL)
+                                              : static_cast<std::size_t>(16777619UL);
+        std::size_t hash = fnv_offset;
         for (const char i : id.data) {
             hash ^= static_cast<unsigned char>(i);
-            hash *= 1099511628211ULL;
+            hash *= fnv_prime;
         }
         return hash;
     }

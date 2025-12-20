@@ -1372,6 +1372,10 @@
                 document.getElementById('export-xlsx').disabled = false;
                 document.getElementById('export-cells').disabled = false;
 
+                // Show the canvas and resize it
+                canvas.style.display = 'block';
+                resizeCanvas();
+
                 await fetchSheetInfo();
                 await fetchViewport();
                 render();
