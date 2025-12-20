@@ -173,13 +173,20 @@
         // Editing state
         let isEditing = false;
 
-        // Resize state
+        // Column resize state
         let isResizing = false;
         let resizeColIndex = -1;
         let resizeStartX = 0;
         let resizeStartWidth = 0;
         let resizePreviewX = 0;
         const RESIZE_HANDLE_WIDTH = 6;
+
+        // Row resize state
+        let isResizingRow = false;
+        let resizeRowIndex = -1;
+        let resizeStartY = 0;
+        let resizeStartHeight = 0;
+        let resizePreviewY = 0;
 
         // Drag state
         let isDraggingColumn = false;
@@ -231,6 +238,20 @@
                     return col;
                 }
                 x = rightEdge;
+            }
+            return -1;
+        }
+
+        function getResizeHandleRow(mouseY) {
+            if (!sheetInfo) return -1;
+            let y = HEADER_HEIGHT - scrollY;
+            for (let row = 0; row < sheetInfo.rowCount; row++) {
+                const rowH = rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+                const bottomEdge = y + rowH;
+                if (mouseY >= bottomEdge - RESIZE_HANDLE_WIDTH && mouseY <= bottomEdge + RESIZE_HANDLE_WIDTH) {
+                    return row;
+                }
+                y = bottomEdge;
             }
             return -1;
         }
@@ -335,14 +356,16 @@
                 dragMouseX,
                 dragMouseY,
                 isResizing,
-                resizePreviewX
+                resizePreviewX,
+                isResizingRow,
+                resizePreviewY
             });
         }
 
         function render() {
             updateRendererState();
             renderer.render();
-            if (isResizing) {
+            if (isResizing || isResizingRow) {
                 renderer.drawResizePreview();
             }
             if (isDraggingColumn || isDraggingRow) {
@@ -816,6 +839,27 @@
                 }
             }
 
+            // Row resize
+            if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
+                const resizeRow = getResizeHandleRow(y);
+                if (resizeRow >= 0) {
+                    isResizingRow = true;
+                    resizeRowIndex = resizeRow;
+                    resizeStartY = e.clientY;
+                    resizeStartHeight = rowHeights.get(resizeRow) || DEFAULT_ROW_HEIGHT;
+
+                    let rowY = HEADER_HEIGHT - scrollY;
+                    for (let i = 0; i <= resizeRow; i++) {
+                        rowY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                    }
+                    resizePreviewY = rowY;
+
+                    canvas.style.cursor = 'row-resize';
+                    e.preventDefault();
+                    return;
+                }
+            }
+
             // Row header click (select + drag)
             if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
                 const row = getRowAtY(y);
@@ -890,6 +934,17 @@
                 resizePreviewX = colX + newWidth;
 
                 render();
+            } else if (isResizingRow) {
+                const delta = e.clientY - resizeStartY;
+                const newHeight = Math.max(16, Math.min(500, resizeStartHeight + delta));
+
+                let rowY = HEADER_HEIGHT - scrollY;
+                for (let i = 0; i < resizeRowIndex; i++) {
+                    rowY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                }
+                resizePreviewY = rowY + newHeight;
+
+                render();
             } else if (isDraggingColumn) {
                 dragTargetIndex = getDropTargetCol(x);
                 dragMouseX = x;
@@ -909,6 +964,9 @@
                 if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
                     const resizeCol = getResizeHandleCol(x);
                     canvas.style.cursor = resizeCol >= 0 ? 'col-resize' : 'default';
+                } else if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
+                    const resizeRow = getResizeHandleRow(y);
+                    canvas.style.cursor = resizeRow >= 0 ? 'row-resize' : 'default';
                 } else {
                     canvas.style.cursor = 'default';
                 }
@@ -936,6 +994,26 @@
 
                 isResizing = false;
                 resizeColIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            } else if (isResizingRow && dataSource) {
+                const delta = e.clientY - resizeStartY;
+                const newHeight = Math.max(16, Math.min(500, resizeStartHeight + delta));
+
+                rowHeights.set(resizeRowIndex, newHeight);
+
+                const rowId = getRowId(resizeRowIndex);
+                try {
+                    if (rowId) {
+                        await dataSource.resizeRow(rowId, newHeight);
+                    }
+                    // Note: resizeRowByPos not implemented yet, rows always have IDs in practice
+                } catch (err) {
+                    console.error('Error resizing row:', err);
+                }
+
+                isResizingRow = false;
+                resizeRowIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
             } else if (isDraggingColumn && dataSource) {
@@ -993,6 +1071,11 @@
             if (isResizing) {
                 isResizing = false;
                 resizeColIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            } else if (isResizingRow) {
+                isResizingRow = false;
+                resizeRowIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
             } else if (isDraggingColumn) {

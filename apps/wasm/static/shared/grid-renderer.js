@@ -53,6 +53,8 @@ export class GridRenderer {
         // Resize state
         this.isResizing = false;
         this.resizePreviewX = 0;
+        this.isResizingRow = false;
+        this.resizePreviewY = 0;
     }
 
     /**
@@ -353,9 +355,8 @@ export class GridRenderer {
      * Draw the resize preview line
      */
     drawResizePreview() {
-        if (!this.isResizing) return;
-
         const container = this.canvas.parentElement;
+        const viewWidth = container.clientWidth;
         const viewHeight = container.clientHeight;
         const ctx = this.ctx;
 
@@ -363,10 +364,21 @@ export class GridRenderer {
         ctx.strokeStyle = COLORS.selectionBorder;
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(this.resizePreviewX + 0.5, 0);
-        ctx.lineTo(this.resizePreviewX + 0.5, viewHeight);
-        ctx.stroke();
+
+        if (this.isResizing) {
+            ctx.beginPath();
+            ctx.moveTo(this.resizePreviewX + 0.5, 0);
+            ctx.lineTo(this.resizePreviewX + 0.5, viewHeight);
+            ctx.stroke();
+        }
+
+        if (this.isResizingRow) {
+            ctx.beginPath();
+            ctx.moveTo(0, this.resizePreviewY + 0.5);
+            ctx.lineTo(viewWidth, this.resizePreviewY + 0.5);
+            ctx.stroke();
+        }
+
         ctx.setLineDash([]);
         ctx.restore();
     }

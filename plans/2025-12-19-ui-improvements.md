@@ -82,9 +82,9 @@ Replace multiple export buttons with a single dropdown.
 
 Allow users to resize row heights by dragging the bottom edge of row headers.
 
-- [ ] 5a: Add row resize handle detection (similar to column resize)
-- [ ] 5b: Implement row resize preview during drag
-- [ ] 5c: Add row resize completion and persistence
+- [x] 5a: Add row resize handle detection (similar to column resize)
+- [x] 5b: Implement row resize preview during drag
+- [x] 5c: Add row resize completion and persistence
 
 ## Phase 6: Column Renaming
 
