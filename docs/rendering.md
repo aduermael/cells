@@ -1,5 +1,25 @@
 # Rendering
 
+## Implementation Status
+
+**Current state (December 2024):** Canvas2D rendering in the browser only.
+
+| Component | Status |
+|-----------|--------|
+| Canvas2D backend (Web) | ✅ Implemented |
+| Grid lines, cells, headers | ✅ Implemented |
+| Selection rendering | ✅ Implemented |
+| Column/row resize preview | ✅ Implemented |
+| Drag-and-drop ghost | ✅ Implemented |
+| WebGL backend | ❌ Not started |
+| Native backends (Metal, DirectX) | ❌ Not started |
+| Dirty region tracking | ❌ Not implemented |
+| Frozen panes | ❌ Not implemented |
+
+The architecture below describes the full vision. See "Current Implementation" section at the end for actual implementation details.
+
+---
+
 ## Design Goals
 
 1. **60 FPS**: Smooth scrolling even with millions of cells
