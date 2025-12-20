@@ -47,14 +47,14 @@ Add a listener/observer pattern at the C++ bindings layer. The Quadtree already 
 
 ---
 
-## Phase 2: Worker & Client Layer Updates
+## Phase 2: Worker & Client Layer Updates ✅
 
 Update the worker and client to support change notifications from WASM.
 
-- [ ] 2a: Add message type for change notifications in worker.js
-- [ ] 2b: Update CellsClient to emit events when WASM notifies of changes
-- [ ] 2c: Update WasmDataSource to expose `onChange` event subscription
-- [ ] 2d: Add change notification callback registration on engine initialization
+- [x] 2a: Add message type for change notifications in worker.js
+- [x] 2b: Update CellsClient to emit events when WASM notifies of changes
+- [x] 2c: Update WasmDataSource to expose `onChange` event subscription
+- [x] 2d: Add change notification callback registration on engine initialization
 
 **Notes:**
 - Worker uses `postMessage` to send unsolicited notifications to main thread

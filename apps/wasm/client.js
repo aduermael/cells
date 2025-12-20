@@ -18,6 +18,7 @@ class CellsClient {
         this._isReady = false;
         this._readyPromise = null;
         this._readyResolve = null;
+        this._onDataChanged = null;  // Optional callback for data change notifications
 
         // Create ready promise
         this._readyPromise = new Promise((resolve, reject) => {
@@ -56,6 +57,14 @@ class CellsClient {
             if (this._readyResolve) {
                 this._readyResolve();
                 this._readyResolve = null;
+            }
+            return;
+        }
+
+        // Handle unsolicited data change notifications from WASM
+        if (msg.type === 'dataChanged') {
+            if (this._onDataChanged) {
+                this._onDataChanged(msg.changeType);
             }
             return;
         }
@@ -108,6 +117,26 @@ class CellsClient {
             reject(new Error('Worker terminated'));
         }
         this._pending.clear();
+    }
+
+    // ========================================================================
+    // Change Notification API
+    // ========================================================================
+
+    /**
+     * Set a callback to be called when data changes in the engine
+     * The callback receives a change type: 'cell', 'structure', 'sheet', or 'loaded'
+     * @param {function(string): void} callback - The callback function
+     */
+    setOnDataChanged(callback) {
+        this._onDataChanged = callback;
+    }
+
+    /**
+     * Remove the data change callback
+     */
+    removeOnDataChanged() {
+        this._onDataChanged = null;
     }
 
     // ========================================================================

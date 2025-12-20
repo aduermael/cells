@@ -78,10 +78,23 @@
             constructor(client) {
                 this._client = client;
                 this._workbookName = 'Untitled';
+                this._onChangeCallback = null;
             }
 
             setWorkbookName(name) {
                 this._workbookName = name;
+            }
+
+            // Change notification subscription
+            // callback receives change type: 'cell', 'structure', 'sheet', or 'loaded'
+            setOnChange(callback) {
+                this._onChangeCallback = callback;
+                this._client.setOnDataChanged(callback);
+            }
+
+            removeOnChange() {
+                this._onChangeCallback = null;
+                this._client.removeOnDataChanged();
             }
 
             async getSheetInfo() {
@@ -515,6 +528,15 @@
         // ========================================================================
         // Data Fetching
         // ========================================================================
+
+        // Handler for WASM data change notifications
+        // Called by the listener infrastructure when data changes in the engine
+        // changeType is one of: 'cell', 'structure', 'sheet', 'loaded'
+        function handleDataChanged(changeType) {
+            // For now, just log the change type
+            // Phase 5 will implement automatic refresh based on this
+            console.debug('[DataChanged]', changeType);
+        }
 
         async function fetchSheetInfo() {
             if (!dataSource) return;
@@ -2107,6 +2129,7 @@
 
             dataSource = new WasmDataSource(client);
             dataSource.setWorkbookName(baseName);
+            dataSource.setOnChange(handleDataChanged);  // Subscribe to WASM change notifications
             hasFileLoaded = true;
 
             // Reset state
@@ -2298,6 +2321,7 @@
 
             dataSource = new WasmDataSource(client);
             dataSource.setWorkbookName('Untitled');
+            dataSource.setOnChange(handleDataChanged);  // Subscribe to WASM change notifications
             hasFileLoaded = true;
 
             // Reset state

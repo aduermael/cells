@@ -26,6 +26,15 @@ async function initModule() {
         // Create the engine instance
         engine = new Module.CellsEngine();
 
+        // Register listener for change notifications from WASM
+        // This sends unsolicited messages to the main thread when data changes
+        engine.setListener((changeType) => {
+            self.postMessage({
+                type: 'dataChanged',
+                changeType: changeType  // 'cell', 'structure', 'sheet', or 'loaded'
+            });
+        });
+
         isReady = true;
 
         // Notify main thread that we're ready
