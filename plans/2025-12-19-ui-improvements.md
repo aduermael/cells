@@ -28,7 +28,7 @@ Add a formula/cell bar between the header toolbar and the canvas area. Shows:
 Now that WASM is stable, remove the `cli server` command and the web UI served via HTTP server. This simplifies the codebase by removing the need for shared files between two different serving modes.
 
 - [x] 2.5a: Remove `server` subcommand from CLI
-- [ ] 2.5b: Remove `apps/cli/web/` directory and related server code
+- [x] 2.5b: Remove `apps/cli/web/` directory and related server code
 - [ ] 2.5c: Update `apps/shared/` to only serve WASM needs (remove server-specific code if any)
 - [ ] 2.5d: Clean up any build rules related to CLI server mode
 
