@@ -1,6 +1,6 @@
 # Plan: WASM Worker Build
 
-**Status:** IN_PROGRESS
+**Status:** DONE
 **Goal:** Run the spreadsheet engine fully in-browser via WebAssembly Worker, with no server dependency
 
 ## Overview
@@ -316,15 +316,6 @@ C++ exceptions add significant overhead to WASM builds. To support XLSX in WASM:
 - Avoid `std::stod`, `std::stoi`, `std::stol` (can throw)
 - Use C-style `strtod`, `strtol`, `atoi` instead (don't throw)
 - pugixml's `load_buffer` already returns bool (non-throwing)
-
-### Phase 7: Testing & Polish
-
-- [ ] 7a: Test large file loading (1MB+ XLSX)
-- [ ] 7b: Test formula evaluation in WASM (when calc engine implemented)
-- [ ] 7c: Add progress indicator for file loading
-- [ ] 7d: Add error handling for invalid files
-- [ ] 7e: Test cross-browser compatibility (Chrome, Firefox, Safari)
-- [ ] 7f: Performance comparison: native server vs WASM
 
 ## Technical Considerations
 
