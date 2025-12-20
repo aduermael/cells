@@ -151,15 +151,21 @@ declare module 'cells' {
 }
 ```
 
-### Phase 3: Web Worker Integration
+### Phase 3: Web Worker Integration ✅
 
 **Goal:** Wrap WASM module in a Web Worker with message-based API
 
-- [ ] 3a: Create `apps/wasm/worker.js` - Worker entry point that loads WASM
-- [ ] 3b: Define message protocol (matching existing REST API semantics)
-- [ ] 3c: Create `apps/wasm/client.js` - Main thread client library
-- [ ] 3d: Handle file loading in worker (ArrayBuffer transfer)
-- [ ] 3e: Test worker with sample .cells file
+- [x] 3a: Create `apps/wasm/worker.js` - Worker entry point that loads WASM
+- [x] 3b: Define message protocol (matching existing REST API semantics)
+- [x] 3c: Create `apps/wasm/client.js` - Main thread client library
+- [x] 3d: Handle file loading in worker (ArrayBuffer transfer)
+- [x] 3e: Test worker with sample .cells file
+
+**Files created/modified:**
+- `apps/wasm/worker.js` - Web Worker entry point, loads WASM module, handles all message types
+- `apps/wasm/client.js` - CellsClient class with Promise-based API matching server semantics
+- `apps/wasm/test_worker.html` - Interactive test page with drag & drop file loading
+- `apps/wasm/BUILD` - Added filegroups for worker_files, test_files, types
 
 **Message Protocol:**
 ```typescript

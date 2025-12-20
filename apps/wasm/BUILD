@@ -83,3 +83,27 @@ wasm_cc_binary(
     name = "cells_wasm_full",
     cc_target = ":cells_wasm_full_bin",
 )
+
+# JavaScript worker files (for packaging)
+filegroup(
+    name = "worker_files",
+    srcs = [
+        "client.js",
+        "worker.js",
+    ],
+)
+
+# Test HTML files
+filegroup(
+    name = "test_files",
+    srcs = [
+        "test.html",
+        "test_worker.html",
+    ],
+)
+
+# TypeScript type definitions
+filegroup(
+    name = "types",
+    srcs = ["cells.d.ts"],
+)

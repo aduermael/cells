@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Cells WASM Worker Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .pass { background: #d4edda; color: #155724; }
+        .fail { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            overflow-x: auto;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        h1, h2 { color: #333; }
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            transition: all 0.3s;
+        }
+        .drop-zone.dragover {
+            border-color: #0d6efd;
+            background: #e7f1ff;
+        }
+        .drop-zone p {
+            margin: 0;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cells WASM Worker Test</h1>
+
+    <div class="drop-zone" id="dropZone">
+        <p>Drop a .cells, .csv, or .xlsx file here to test loading</p>
+        <p><small>Or use the automated tests below</small></p>
+    </div>
+
+    <div id="results"></div>
+
+    <script src="client.js"></script>
+    <script>
+        const results = document.getElementById('results');
+        const dropZone = document.getElementById('dropZone');
+        let client = null;
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+            // Scroll to bottom
+            div.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function assert(condition, testName, details = '') {
+            if (condition) {
+                log(`PASS: ${testName}`, 'pass');
+                return true;
+            } else {
+                log(`FAIL: ${testName}${details ? '<br>Details: ' + details : ''}`, 'fail');
+                return false;
+            }
+        }
+
+        // Drag and drop handling
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+
+            const file = e.dataTransfer.files[0];
+            if (!file) return;
+
+            log(`<h2>Loading file: ${file.name} (${file.size} bytes)</h2>`, 'info');
+
+            // Determine format from extension
+            const ext = file.name.split('.').pop().toLowerCase();
+            let format;
+            if (ext === 'cells') format = 'cells';
+            else if (ext === 'csv' || ext === 'tsv') format = 'csv';
+            else if (ext === 'xlsx') format = 'xlsx';
+            else {
+                log(`Unknown file format: .${ext}`, 'fail');
+                return;
+            }
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const startTime = performance.now();
+
+                if (format === 'cells') {
+                    const content = new TextDecoder().decode(arrayBuffer);
+                    const result = await client.loadCells(content);
+                    log(`Loaded ${result.sheetCount} sheet(s): ${result.sheetNames.join(', ')}`, 'pass');
+                } else if (format === 'csv') {
+                    const result = await client.loadCSV(arrayBuffer);
+                    log(`Loaded ${result.sheetCount} sheet(s)`, 'pass');
+                } else if (format === 'xlsx') {
+                    const result = await client.loadXLSX(arrayBuffer);
+                    log(`Loaded ${result.sheetCount} sheet(s): ${result.sheetNames.join(', ')}`, 'pass');
+                }
+
+                const loadTime = performance.now() - startTime;
+                log(`Load time: ${loadTime.toFixed(2)}ms`, 'info');
+
+                // Get sheet info
+                const sheetInfo = await client.getSheetInfo();
+                log(`Sheet: "${sheetInfo.name}" - ${sheetInfo.rowCount} rows x ${sheetInfo.colCount} cols`, 'info');
+
+                // Query viewport
+                const viewport = await client.queryViewport(0, 0, 10, 20);
+                log(`Viewport: ${viewport.cells.length} cells, ${viewport.columns.length} columns, ${viewport.rows.length} rows`, 'info');
+
+                if (viewport.cells.length > 0) {
+                    log(`<pre>First few cells:\n${JSON.stringify(viewport.cells.slice(0, 5), null, 2)}</pre>`, 'info');
+                }
+
+            } catch (err) {
+                log(`Error loading file: ${err.message}`, 'fail');
+            }
+        });
+
+        async function runTests() {
+            log('<h2>Starting Worker Tests</h2>', 'info');
+            log('Creating CellsClient with worker...', 'info');
+
+            try {
+                client = new CellsClient('./worker.js');
+
+                // Wait for worker to be ready
+                log('Waiting for worker to initialize...', 'info');
+                await client.ready;
+                log('Worker is ready!', 'pass');
+
+                // Test 1: Create empty workbook
+                log('<h3>Test 1: Create empty workbook</h3>', 'info');
+                const createResult = await client.createEmpty();
+                assert(createResult.sheetCount === 1, 'Created workbook with 1 sheet');
+
+                // Test 2: Get sheet info
+                log('<h3>Test 2: Get sheet info</h3>', 'info');
+                const sheetInfo = await client.getSheetInfo();
+                assert(sheetInfo.name === 'Sheet1', 'Sheet name is "Sheet1"', `Got "${sheetInfo.name}"`);
+                assert(sheetInfo.colCount >= 26, 'Has at least 26 columns', `Got ${sheetInfo.colCount}`);
+                assert(sheetInfo.rowCount >= 100, 'Has at least 100 rows', `Got ${sheetInfo.rowCount}`);
+
+                // Test 3: Create a cell
+                log('<h3>Test 3: Create cell</h3>', 'info');
+                const cellResult = await client.createCell(0, 0, 'Hello World');
+                assert(cellResult.id && cellResult.id.length === 8, 'Cell created with valid ID', `Got "${cellResult.id}"`);
+
+                // Test 4: Query viewport
+                log('<h3>Test 4: Query viewport</h3>', 'info');
+                const viewport = await client.queryViewport(0, 0, 10, 10);
+                assert(Array.isArray(viewport.cells), 'Viewport contains cells array');
+                const cell = viewport.cells.find(c => c.id === cellResult.id);
+                assert(cell !== undefined, 'Created cell found in viewport');
+                assert(cell.value === 'Hello World', 'Cell value is correct', `Got "${cell.value}"`);
+
+                // Test 5: Update cell
+                log('<h3>Test 5: Update cell</h3>', 'info');
+                await client.updateCell(cellResult.id, '12345');
+                const viewport2 = await client.queryViewport(0, 0, 10, 10);
+                const updatedCell = viewport2.cells.find(c => c.id === cellResult.id);
+                assert(updatedCell.value === '12345', 'Cell value updated', `Got "${updatedCell.value}"`);
+                assert(updatedCell.type === 'n', 'Cell type is number', `Got "${updatedCell.type}"`);
+
+                // Test 6: Load .cells format
+                log('<h3>Test 6: Load .cells format</h3>', 'info');
+                const cellsContent = `#cells v1
+D TEST1234 "Test Workbook"
+
+S SHEET001 "Data"
+
+#cols
+C COL00001 0
+
+#rows
+R ROW00001 0
+R ROW00002 1
+R ROW00003 2
+
+#cells
+X CELL0001 COL00001 ROW00001 n 100
+X CELL0002 COL00001 ROW00002 s "Hello"
+X CELL0003 COL00001 ROW00003 b true
+`;
+                const loadResult = await client.loadCells(cellsContent);
+                assert(loadResult.sheetCount === 1, 'Loaded 1 sheet');
+                assert(loadResult.sheetNames[0] === 'Data', 'Sheet name is "Data"', `Got "${loadResult.sheetNames[0]}"`);
+
+                const loadedViewport = await client.queryViewport(0, 0, 10, 10);
+                assert(loadedViewport.cells.length === 3, 'Loaded 3 cells', `Got ${loadedViewport.cells.length}`);
+
+                // Test 7: Load CSV
+                log('<h3>Test 7: Load CSV</h3>', 'info');
+                const csvContent = 'Name,Value,Active\nItem1,100,true\nItem2,200,false\nItem3,300,true';
+                const csvData = new TextEncoder().encode(csvContent);
+                const csvResult = await client.loadCSV(csvData.buffer);
+                assert(csvResult.sheetCount === 1, 'CSV loaded');
+
+                const csvViewport = await client.queryViewport(0, 0, 10, 10);
+                assert(csvViewport.cells.length >= 9, 'CSV has correct cell count', `Got ${csvViewport.cells.length}`);
+
+                // Test 8: Export to .cells
+                log('<h3>Test 8: Export to .cells</h3>', 'info');
+                const exportedCells = await client.exportCells();
+                assert(exportedCells.data instanceof ArrayBuffer, 'Export returns ArrayBuffer');
+                const cellsText = new TextDecoder().decode(exportedCells.data);
+                assert(cellsText.includes('D '), 'Export contains document');
+                assert(cellsText.includes('S '), 'Export contains sheet');
+                log(`<pre>Exported (first 300 chars):\n${cellsText.substring(0, 300)}...</pre>`, 'info');
+
+                // Test 9: Export to CSV
+                log('<h3>Test 9: Export to CSV</h3>', 'info');
+                const exportedCSV = await client.exportCSV();
+                assert(exportedCSV.data instanceof ArrayBuffer, 'CSV export returns ArrayBuffer');
+                const csvText = new TextDecoder().decode(exportedCSV.data);
+                assert(csvText.length > 0, 'CSV export has content');
+                log(`<pre>Exported CSV (first 200 chars):\n${csvText.substring(0, 200)}...</pre>`, 'info');
+
+                // Test 10: Workbook name
+                log('<h3>Test 10: Workbook name</h3>', 'info');
+                await client.setWorkbookName('My Test Workbook');
+                const workbookName = await client.getWorkbookName();
+                assert(workbookName === 'My Test Workbook', 'Workbook name set/get works', `Got "${workbookName}"`);
+
+                // Test 11: Column resize
+                log('<h3>Test 11: Column resize</h3>', 'info');
+                await client.createEmpty();
+                const colResize = await client.resizeColumnByPos(0, 150);
+                assert(colResize.success === true, 'Column resize by position works');
+                assert(colResize.id && colResize.id.length === 8, 'Returns column ID', `Got "${colResize.id}"`);
+
+                await client.resizeColumn(colResize.id, 200);
+                log('Column resize by ID works', 'pass');
+
+                // Test 12: Row resize
+                log('<h3>Test 12: Row resize</h3>', 'info');
+                await client.createCell(0, 0, 'test');
+                const viewport3 = await client.queryViewport(0, 0, 10, 10);
+                if (viewport3.rows.length > 0) {
+                    await client.resizeRow(viewport3.rows[0].id, 50);
+                    log('Row resize works', 'pass');
+                }
+
+                // Test 13: Column move
+                log('<h3>Test 13: Column move</h3>', 'info');
+                await client.createCell(1, 0, 'col2');
+                const viewport4 = await client.queryViewport(0, 0, 10, 10);
+                if (viewport4.columns.length >= 2) {
+                    await client.moveColumn(viewport4.columns[0].id, 2);
+                    log('Column move works', 'pass');
+                }
+
+                // Test 14: Error handling
+                log('<h3>Test 14: Error handling</h3>', 'info');
+                try {
+                    await client.updateCell('INVALID1', 'test');
+                    log('Expected error not thrown', 'fail');
+                } catch (err) {
+                    assert(err.message.includes('Invalid') || err.message.includes('not found'),
+                           'Invalid cell ID error caught', err.message);
+                }
+
+                // Summary
+                log('<h2>All Tests Completed!</h2>', 'pass');
+                log('You can now drag and drop files onto the drop zone above to test file loading.', 'info');
+
+            } catch (error) {
+                log(`Error: ${error.message}<br><pre>${error.stack}</pre>`, 'fail');
+            }
+        }
+
+        // Start tests when page loads
+        runTests();
+    </script>
+</body>
+</html>
