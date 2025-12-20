@@ -7,7 +7,7 @@ This plan consolidates and improves the web UI for both WASM and CLI versions.
 Extract common CSS, rendering logic, and utilities into shared modules to avoid duplication between `apps/wasm/static/index.html` (~1477 lines) and `apps/cli/web/index.html` (~1920 lines).
 
 - [x] 1a: Create `apps/shared/` directory with shared CSS (`styles.css`)
-- [ ] 1b: Create shared JavaScript module (`grid-renderer.js`) with canvas rendering logic
+- [x] 1b: Create shared JavaScript module (`grid-renderer.js`) with canvas rendering logic
 - [ ] 1c: Create shared JavaScript module (`grid-events.js`) with event handling
 - [ ] 1d: Create shared JavaScript module (`utils.js`) with utility functions
 - [ ] 1e: Refactor `apps/wasm/static/index.html` to use shared modules
