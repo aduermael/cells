@@ -149,6 +149,17 @@ function handleMessage(msg) {
                 break;
             }
 
+            case 'deleteCell': {
+                const { cellId } = params;
+                const result = JSON.parse(engine.deleteCell(cellId));
+                if (result.error) {
+                    respond({ type: 'error', error: result.error });
+                } else {
+                    respond({ type: 'cellDeleted', success: true });
+                }
+                break;
+            }
+
             case 'resizeColumn': {
                 const { colId, width } = params;
                 const result = JSON.parse(engine.resizeColumn(colId, width));

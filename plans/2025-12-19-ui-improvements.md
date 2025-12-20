@@ -53,14 +53,14 @@ Fix fundamental cell editing behavior to match spreadsheet conventions.
 - Editing via formula bar and clicking another cell should cleanly commit and move selection
 - Fix split/duplicate selector visual bug when clicking away from formula bar
 
-- [ ] 2.6a: Implement single-click selection without entering edit mode
-- [ ] 2.6b: Implement typing-to-replace behavior (single click + type = replace content)
-- [ ] 2.6c: Implement double-click to enter edit mode with cursor at end
-- [ ] 2.6d: Auto-commit cell content on any navigation (click, arrows, Tab, Enter)
-- [ ] 2.6e: ENTER commits and moves selection down, Shift+ENTER moves up
-- [ ] 2.6f: Create cells on demand when editing empty positions (assign UUID)
-- [ ] 2.6g: Delete cell UUID when content is completely cleared
-- [ ] 2.6h: Fix formula bar commit when clicking another cell (single clean selection)
+- [x] 2.6a: Implement single-click selection without entering edit mode
+- [x] 2.6b: Implement typing-to-replace behavior (single click + type = replace content)
+- [x] 2.6c: Implement double-click to enter edit mode with cursor at end
+- [x] 2.6d: Auto-commit cell content on any navigation (click, arrows, Tab, Enter)
+- [x] 2.6e: ENTER commits and moves selection down, Shift+ENTER moves up
+- [x] 2.6f: Create cells on demand when editing empty positions (assign UUID)
+- [x] 2.6g: Delete cell UUID when content is completely cleared
+- [x] 2.6h: Fix formula bar commit when clicking another cell (single clean selection)
 
 ## Phase 3: Visual Polish
 

@@ -252,6 +252,16 @@ class CellsClient {
         return { id: response.id };
     }
 
+    /**
+     * Delete a cell by ID
+     * @param {string} cellId - Cell ID (8-char base62)
+     * @returns {Promise<{success: boolean}>}
+     */
+    async deleteCell(cellId) {
+        await this._send('deleteCell', { cellId });
+        return { success: true };
+    }
+
     // ========================================================================
     // Column/Row Operations API
     // ========================================================================

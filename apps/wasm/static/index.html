@@ -94,6 +94,11 @@
                 return { success: true };
             }
 
+            async deleteCell(cellId) {
+                await this._client.deleteCell(cellId);
+                return { success: true };
+            }
+
             async resizeColumn(colId, width) {
                 await this._client.resizeColumn(colId, width);
                 return { success: true };
@@ -420,8 +425,13 @@
         // Cell Editing
         // ========================================================================
 
+        // Edit modes:
+        // - 'append': Double-click - cursor at end of existing content
+        // - 'replace': Single-click + type - clears content and starts fresh
+        // - 'select': F2/Enter - selects all content
+
         async function startEditing(options = {}) {
-            const { focusCellEditor = true } = options;
+            const { focusCellEditor = true, mode = 'select', initialChar = '' } = options;
             if (!selectedCell || isEditing || !dataSource) return;
 
             let cell = getCellAt(selectedCell.col, selectedCell.row);
@@ -457,11 +467,32 @@
             cellEditor.style.height = cellHeight + 'px';
             cellEditor.style.display = 'block';
 
-            cellEditor.value = cell.formula || cell.value || '';
-            if (focusCellEditor) {
-                cellEditor.focus();
-                cellEditor.select();
+            if (mode === 'replace') {
+                // Replace mode: start with the initial character (clears existing content)
+                cellEditor.value = initialChar;
+                if (focusCellEditor) {
+                    cellEditor.focus();
+                    // Place cursor at end (after the initial character)
+                    cellEditor.setSelectionRange(initialChar.length, initialChar.length);
+                }
+            } else if (mode === 'append') {
+                // Append mode: cursor at end of existing content
+                cellEditor.value = cell.formula || cell.value || '';
+                if (focusCellEditor) {
+                    cellEditor.focus();
+                    cellEditor.setSelectionRange(cellEditor.value.length, cellEditor.value.length);
+                }
+            } else {
+                // Select mode: select all content (default for F2/Enter)
+                cellEditor.value = cell.formula || cell.value || '';
+                if (focusCellEditor) {
+                    cellEditor.focus();
+                    cellEditor.select();
+                }
             }
+
+            // Sync formula bar
+            formulaInput.value = cellEditor.value;
         }
 
         function cancelEditing() {
@@ -486,7 +517,17 @@
             cellEditor.style.display = 'none';
 
             try {
-                await dataSource.updateCell(cell.id, newValue);
+                if (newValue === '' || newValue.trim() === '') {
+                    // Delete cell when content is completely cleared
+                    await dataSource.deleteCell(cell.id);
+                    // Remove from local cells array
+                    const idx = cells.findIndex(c => c.id === cell.id);
+                    if (idx !== -1) {
+                        cells.splice(idx, 1);
+                    }
+                } else {
+                    await dataSource.updateCell(cell.id, newValue);
+                }
                 await fetchViewport();
                 render();
             } catch (e) {
@@ -501,19 +542,64 @@
                 cancelEditing();
             } else if (e.key === 'Enter') {
                 e.preventDefault();
-                confirmEditing();
+                confirmEditing().then(() => {
+                    if (selectedCell && sheetInfo) {
+                        // Enter moves down, Shift+Enter moves up
+                        if (e.shiftKey) {
+                            selectedCell.row = Math.max(0, selectedCell.row - 1);
+                        } else {
+                            selectedCell.row = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
+                        }
+                        render();
+                        updateFormulaBar();
+                        fetchViewportNow();
+                    }
+                });
             } else if (e.key === 'Tab') {
                 e.preventDefault();
                 confirmEditing().then(() => {
-                    if (selectedCell) {
+                    if (selectedCell && sheetInfo) {
                         if (e.shiftKey) {
                             selectedCell.col = Math.max(0, selectedCell.col - 1);
                         } else {
                             selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
                         }
                         render();
+                        updateFormulaBar();
+                        fetchViewportNow();
                     }
                 });
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                // Arrow keys during editing: check if cursor is at boundary
+                const cursorPos = cellEditor.selectionStart;
+                const textLen = cellEditor.value.length;
+                const atStart = cursorPos === 0;
+                const atEnd = cursorPos === textLen;
+
+                // Only commit and navigate if at boundary in the direction of movement
+                if ((e.key === 'ArrowLeft' && atStart) ||
+                    (e.key === 'ArrowRight' && atEnd) ||
+                    e.key === 'ArrowUp' ||
+                    e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    confirmEditing().then(() => {
+                        if (selectedCell && sheetInfo) {
+                            if (e.key === 'ArrowUp') {
+                                selectedCell.row = Math.max(0, selectedCell.row - 1);
+                            } else if (e.key === 'ArrowDown') {
+                                selectedCell.row = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
+                            } else if (e.key === 'ArrowLeft') {
+                                selectedCell.col = Math.max(0, selectedCell.col - 1);
+                            } else if (e.key === 'ArrowRight') {
+                                selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
+                            }
+                            render();
+                            updateFormulaBar();
+                            fetchViewportNow();
+                        }
+                    });
+                }
+                // Otherwise, let the arrow key work normally within the text field
             }
         });
 
@@ -539,12 +625,28 @@
         async function commitFormulaBarEdit() {
             if (!selectedCell || !dataSource) return;
 
+            // Hide cell editor if it's showing
+            if (isEditing) {
+                isEditing = false;
+                cellEditor.style.display = 'none';
+            }
+
             let cell = getCellAt(selectedCell.col, selectedCell.row);
             const newValue = formulaInput.value;
 
             try {
-                if (!cell) {
-                    // Create cell if it doesn't exist
+                if (newValue === '' || newValue.trim() === '') {
+                    // Delete cell when content is completely cleared
+                    if (cell) {
+                        await dataSource.deleteCell(cell.id);
+                        const idx = cells.findIndex(c => c.id === cell.id);
+                        if (idx !== -1) {
+                            cells.splice(idx, 1);
+                        }
+                    }
+                    // If no cell exists and value is empty, nothing to do
+                } else if (!cell) {
+                    // Create cell if it doesn't exist and value is non-empty
                     const data = await dataSource.createCell(selectedCell.col, selectedCell.row, newValue);
                     cell = { id: data.id, col: selectedCell.col, row: selectedCell.row, value: newValue, type: 's' };
                     cells.push(cell);
@@ -711,9 +813,24 @@
                 const row = getRowAtY(y);
 
                 if (col >= 0 && row >= 0) {
-                    selectedCell = { col, row };
-                    render();
-                    updateFormulaBar();
+                    // If editing, commit first then select new cell
+                    if (isEditing) {
+                        confirmEditing().then(() => {
+                            selectedCell = { col, row };
+                            render();
+                            updateFormulaBar();
+                        });
+                    } else if (isEditingFormulaBar) {
+                        commitFormulaBarEdit().then(() => {
+                            selectedCell = { col, row };
+                            render();
+                            updateFormulaBar();
+                        });
+                    } else {
+                        selectedCell = { col, row };
+                        render();
+                        updateFormulaBar();
+                    }
                 }
             }
         });
@@ -869,7 +986,8 @@
                     selectedCell = { col, row };
                     render();
                     updateFormulaBar();
-                    startEditing();
+                    // Double-click enters append mode (cursor at end of content)
+                    startEditing({ mode: 'append' });
                 }
             }
         });
@@ -880,19 +998,24 @@
 
             let newCol = selectedCell.col;
             let newRow = selectedCell.row;
+            let handled = false;
 
             switch (e.key) {
                 case 'ArrowUp':
                     newRow = Math.max(0, selectedCell.row - 1);
+                    handled = true;
                     break;
                 case 'ArrowDown':
                     newRow = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
+                    handled = true;
                     break;
                 case 'ArrowLeft':
                     newCol = Math.max(0, selectedCell.col - 1);
+                    handled = true;
                     break;
                 case 'ArrowRight':
                     newCol = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
+                    handled = true;
                     break;
                 case 'Tab':
                     e.preventDefault();
@@ -901,14 +1024,35 @@
                     } else {
                         newCol = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
                     }
+                    handled = true;
                     break;
                 case 'Enter':
                 case 'F2':
                     e.preventDefault();
-                    startEditing();
+                    startEditing({ mode: 'select' });
+                    return;
+                case 'Delete':
+                case 'Backspace':
+                    // Delete/Backspace clears the cell and starts editing empty
+                    e.preventDefault();
+                    startEditing({ mode: 'replace', initialChar: '' });
+                    return;
+                case 'Escape':
+                    // Escape deselects
                     return;
                 default:
+                    // Check for printable character - start replace mode
+                    // Single printable character (not control keys, not with Ctrl/Meta)
+                    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+                        e.preventDefault();
+                        startEditing({ mode: 'replace', initialChar: e.key });
+                        return;
+                    }
                     return;
+            }
+
+            if (handled) {
+                e.preventDefault();
             }
 
             selectedCell = { col: newCol, row: newRow };

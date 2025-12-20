@@ -398,6 +398,32 @@ public:
         return json.str();
     }
 
+    std::string deleteCell(const std::string& cellIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        if (cellIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid cell ID\"}";
+        }
+        ID cellId(cellIdStr);
+
+        auto it = sheet->cells.find(cellId);
+        if (it == sheet->cells.end()) {
+            return "{\"error\":\"Cell not found\"}";
+        }
+
+        sheet->cells.erase(it);
+        rebuildQuadtree();
+
+        return "{\"success\":true}";
+    }
+
     // ========================================================================
     // Column/row resize operations
     // ========================================================================
@@ -728,6 +754,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         // Cell operations
         .function("updateCell", &cells::wasm::CellsEngine::updateCell)
         .function("createCell", &cells::wasm::CellsEngine::createCell)
+        .function("deleteCell", &cells::wasm::CellsEngine::deleteCell)
         // Column/row resize
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)
         .function("resizeColumnByPos", &cells::wasm::CellsEngine::resizeColumnByPos)
