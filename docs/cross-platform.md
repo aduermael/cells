@@ -1,5 +1,22 @@
 # Cross-Platform Strategy
 
+## Implementation Status
+
+**Current state (December 2024):** Web only via WebAssembly (WASM).
+
+| Component | Status |
+|-----------|--------|
+| Core engine (C++) | ✅ Implemented |
+| WASM build | ✅ Implemented |
+| Web UI (Canvas2D) | ✅ Implemented |
+| Swift bindings | ❌ Not started |
+| macOS/iOS apps | ❌ Not started |
+| Windows/Android | ❌ Not started |
+
+The architecture below describes the full vision. Currently only the Web/WASM path is implemented.
+
+---
+
 ## Target Platforms
 
 | Platform | Priority | Notes |
