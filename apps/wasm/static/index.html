@@ -210,6 +210,13 @@
         let dragMouseX = 0;
         let dragMouseY = 0;
 
+        // Pending drag state (before threshold is exceeded)
+        let pendingDragColumn = false;
+        let pendingDragRow = false;
+        let pendingDragStartX = 0;
+        let pendingDragStartY = 0;
+        const DRAG_THRESHOLD = 5; // Minimum pixels to move before starting drag
+
         // Size caches
         let colWidths = new Map();
         let rowHeights = new Map();
@@ -929,7 +936,7 @@
                 }
             }
 
-            // Column header click (select + drag)
+            // Column header click (select, pending drag)
             if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
                 const col = getColAtX(x);
                 if (col >= 0) {
@@ -937,13 +944,13 @@
                     selectedRow = null;
                     selectedColumn = col;
 
-                    isDraggingColumn = true;
+                    // Start pending drag (actual drag starts after threshold)
+                    pendingDragColumn = true;
+                    pendingDragStartX = x;
+                    pendingDragStartY = y;
                     dragSourceIndex = col;
                     dragTargetIndex = col;
-                    dragMouseX = x;
-                    dragMouseY = y;
 
-                    canvas.style.cursor = 'grab';
                     render();
                     e.preventDefault();
                     return;
@@ -971,7 +978,7 @@
                 }
             }
 
-            // Row header click (select + drag)
+            // Row header click (select, pending drag)
             if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
                 const row = getRowAtY(y);
                 if (row >= 0) {
@@ -979,13 +986,13 @@
                     selectedColumn = null;
                     selectedRow = row;
 
-                    isDraggingRow = true;
+                    // Start pending drag (actual drag starts after threshold)
+                    pendingDragRow = true;
+                    pendingDragStartX = x;
+                    pendingDragStartY = y;
                     dragSourceIndex = row;
                     dragTargetIndex = row;
-                    dragMouseX = x;
-                    dragMouseY = y;
 
-                    canvas.style.cursor = 'grab';
                     render();
                     e.preventDefault();
                     return;
@@ -1033,6 +1040,33 @@
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
+
+            // Check if pending drag should become actual drag (threshold exceeded)
+            if (pendingDragColumn) {
+                const dx = Math.abs(x - pendingDragStartX);
+                const dy = Math.abs(y - pendingDragStartY);
+                if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+                    // Threshold exceeded - start actual drag
+                    pendingDragColumn = false;
+                    isDraggingColumn = true;
+                    dragMouseX = x;
+                    dragMouseY = y;
+                    canvas.style.cursor = 'grabbing';
+                }
+            }
+
+            if (pendingDragRow) {
+                const dx = Math.abs(x - pendingDragStartX);
+                const dy = Math.abs(y - pendingDragStartY);
+                if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+                    // Threshold exceeded - start actual drag
+                    pendingDragRow = false;
+                    isDraggingRow = true;
+                    dragMouseX = x;
+                    dragMouseY = y;
+                    canvas.style.cursor = 'grabbing';
+                }
+            }
 
             if (isResizing) {
                 const delta = e.clientX - resizeStartX;
@@ -1085,6 +1119,20 @@
         });
 
         canvas.addEventListener('mouseup', async (e) => {
+            // Clear pending drag states (click without drag)
+            if (pendingDragColumn) {
+                pendingDragColumn = false;
+                dragSourceIndex = -1;
+                dragTargetIndex = -1;
+                // Keep selectedColumn - column stays selected after click
+            }
+            if (pendingDragRow) {
+                pendingDragRow = false;
+                dragSourceIndex = -1;
+                dragTargetIndex = -1;
+                // Keep selectedRow - row stays selected after click
+            }
+
             if (isResizing && dataSource) {
                 const delta = e.clientX - resizeStartX;
                 const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
@@ -1179,6 +1227,10 @@
         });
 
         canvas.addEventListener('mouseleave', () => {
+            // Clear pending drag states
+            pendingDragColumn = false;
+            pendingDragRow = false;
+
             if (isResizing) {
                 isResizing = false;
                 resizeColIndex = -1;

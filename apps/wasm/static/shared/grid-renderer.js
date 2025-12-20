@@ -246,7 +246,37 @@ export class GridRenderer {
             ctx.restore();
         }
 
-        // Selection
+        // Column selection (highlight entire column)
+        if (this.selectedColumn !== null && !this.isDraggingColumn) {
+            let selX = HEADER_WIDTH - this.scrollX;
+            for (let i = 0; i < this.selectedColumn; i++) {
+                selX += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
+            }
+            const selW = this.colWidths.get(this.selectedColumn) || DEFAULT_COL_WIDTH;
+
+            if (selX + selW > HEADER_WIDTH && selX < viewWidth) {
+                ctx.fillStyle = COLORS.selectionBg;
+                ctx.fillRect(Math.max(HEADER_WIDTH, selX), HEADER_HEIGHT,
+                    Math.min(selW, selX + selW - HEADER_WIDTH), viewHeight - HEADER_HEIGHT);
+            }
+        }
+
+        // Row selection (highlight entire row)
+        if (this.selectedRow !== null && !this.isDraggingRow) {
+            let selY = HEADER_HEIGHT - this.scrollY;
+            for (let i = 0; i < this.selectedRow; i++) {
+                selY += this.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+            }
+            const selH = this.rowHeights.get(this.selectedRow) || DEFAULT_ROW_HEIGHT;
+
+            if (selY + selH > HEADER_HEIGHT && selY < viewHeight) {
+                ctx.fillStyle = COLORS.selectionBg;
+                ctx.fillRect(HEADER_WIDTH, Math.max(HEADER_HEIGHT, selY),
+                    viewWidth - HEADER_WIDTH, Math.min(selH, selY + selH - HEADER_HEIGHT));
+            }
+        }
+
+        // Cell selection
         if (this.selectedCell) {
             let selX = HEADER_WIDTH - this.scrollX;
             for (let i = 0; i < this.selectedCell.col; i++) {
