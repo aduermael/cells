@@ -17,5 +17,9 @@ MODULE.bazel.lock
 /cells
 /dist/
 
+# Generated shared files (copied from apps/shared/)
+/apps/wasm/static/shared/
+/apps/cli/web/shared/
+
 # Clang tooling
 compile_commands.json

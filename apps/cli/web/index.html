@@ -524,7 +524,8 @@
         // Cell Editing
         // ========================================================================
 
-        async function startEditing() {
+        async function startEditing(options = {}) {
+            const { focusCellEditor = true } = options;
             if (!selectedCell || isEditing || !dataSource) return;
 
             let cell = getCellAt(selectedCell.col, selectedCell.row);
@@ -561,8 +562,10 @@
             cellEditor.style.display = 'block';
 
             cellEditor.value = cell.formula || cell.value || '';
-            cellEditor.focus();
-            cellEditor.select();
+            if (focusCellEditor) {
+                cellEditor.focus();
+                cellEditor.select();
+            }
         }
 
         function cancelEditing() {
@@ -671,6 +674,10 @@
 
         formulaInput.addEventListener('focus', () => {
             isEditingFormulaBar = true;
+            // Also start cell editing to show cell editor overlay for live sync
+            if (selectedCell && !isEditing) {
+                startEditing({ focusCellEditor: false });
+            }
         });
 
         formulaInput.addEventListener('keydown', (e) => {
