@@ -439,8 +439,14 @@
             if (!cell) {
                 try {
                     const data = await dataSource.createCell(selectedCell.col, selectedCell.row, '');
-                    cell = { id: data.id, col: selectedCell.col, row: selectedCell.row, value: '', type: 's' };
-                    cells.push(cell);
+                    // Refresh sheet info and viewport to include new cell
+                    await fetchSheetInfo();
+                    await fetchViewport();
+                    cell = getCellAt(selectedCell.col, selectedCell.row);
+                    if (!cell) {
+                        console.error('Cell was created but not found in viewport');
+                        return;
+                    }
                 } catch (e) {
                     console.error('Error creating cell:', e);
                     return;
@@ -520,16 +526,15 @@
                 if (newValue === '' || newValue.trim() === '') {
                     // Delete cell when content is completely cleared
                     await dataSource.deleteCell(cell.id);
-                    // Remove from local cells array
-                    const idx = cells.findIndex(c => c.id === cell.id);
-                    if (idx !== -1) {
-                        cells.splice(idx, 1);
-                    }
+                    // Refresh sheet info (dimensions may have changed)
+                    await fetchSheetInfo();
                 } else {
                     await dataSource.updateCell(cell.id, newValue);
                 }
+                // Always refresh viewport to get latest data from quadtree
                 await fetchViewport();
                 render();
+                updateFormulaBar();
             } catch (e) {
                 console.error('Error updating cell:', e);
             }
@@ -639,20 +644,19 @@
                     // Delete cell when content is completely cleared
                     if (cell) {
                         await dataSource.deleteCell(cell.id);
-                        const idx = cells.findIndex(c => c.id === cell.id);
-                        if (idx !== -1) {
-                            cells.splice(idx, 1);
-                        }
+                        // Refresh sheet info (dimensions may have changed)
+                        await fetchSheetInfo();
                     }
                     // If no cell exists and value is empty, nothing to do
                 } else if (!cell) {
                     // Create cell if it doesn't exist and value is non-empty
                     const data = await dataSource.createCell(selectedCell.col, selectedCell.row, newValue);
-                    cell = { id: data.id, col: selectedCell.col, row: selectedCell.row, value: newValue, type: 's' };
-                    cells.push(cell);
+                    // Refresh sheet info (new column/row may have been created)
+                    await fetchSheetInfo();
                 } else {
                     await dataSource.updateCell(cell.id, newValue);
                 }
+                // Always refresh viewport to get latest data from quadtree
                 await fetchViewport();
                 render();
                 updateFormulaBar();
