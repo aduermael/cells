@@ -30,6 +30,7 @@ wasm-dist:
 	@echo "Creating dist directory..."
 	@rm -rf dist
 	@mkdir -p dist
+	@mkdir -p dist/shared
 	@echo "Copying WASM artifacts..."
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.js dist/
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/
@@ -39,6 +40,9 @@ wasm-dist:
 	@echo "Copying HTML and TypeScript definitions..."
 	@cp apps/wasm/static/index.html dist/
 	@cp apps/wasm/cells.d.ts dist/
+	@echo "Copying shared modules..."
+	@cp apps/wasm/static/shared/*.css dist/shared/
+	@cp apps/wasm/static/shared/*.js dist/shared/
 	@echo ""
 	@echo "Distribution package created in dist/"
 	@echo "Files:"

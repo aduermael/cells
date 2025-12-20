@@ -34,9 +34,19 @@ func main() {
 	// Create file server with custom MIME types
 	fs := http.FileServer(http.Dir(absDir))
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set correct MIME type for .wasm files
-		if filepath.Ext(r.URL.Path) == ".wasm" {
+		// Set correct MIME types based on file extension
+		ext := filepath.Ext(r.URL.Path)
+		switch ext {
+		case ".wasm":
 			w.Header().Set("Content-Type", "application/wasm")
+		case ".js":
+			w.Header().Set("Content-Type", "application/javascript")
+		case ".css":
+			w.Header().Set("Content-Type", "text/css")
+		case ".html":
+			w.Header().Set("Content-Type", "text/html")
+		case ".json":
+			w.Header().Set("Content-Type", "application/json")
 		}
 
 		// CORS headers for local development
