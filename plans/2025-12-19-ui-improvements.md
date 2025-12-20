@@ -107,10 +107,10 @@ Fix drag-and-drop placeholder size to match the dragged entity.
 
 Remember the loaded file across page refreshes using localStorage or IndexedDB.
 
-- [ ] 8a: Save file data to IndexedDB when loaded
-- [ ] 8b: Save file metadata (name, format) to localStorage
-- [ ] 8c: Auto-load persisted file on page load
-- [ ] 8d: Add "Clear" or "New" option to reset persisted state
+- [x] 8a: Save file data to IndexedDB when loaded
+- [x] 8b: Save file metadata (name, format) to localStorage
+- [x] 8c: Auto-load persisted file on page load
+- [x] 8d: Add "Clear" or "New" option to reset persisted state
 
 ## Phase 9: Range Selection
 

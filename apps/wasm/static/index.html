@@ -10,6 +10,7 @@
     <div id="container">
         <div id="header">
             <button class="btn" onclick="openFile()">Open File</button>
+            <button class="btn" id="new-btn" onclick="newFile()" style="display: none;">New</button>
             <input type="file" id="file-input" accept=".cells,.csv,.tsv,.xlsx" />
             <h1 id="sheet-name">Cells Viewer</h1>
             <div id="toolbar">
@@ -1441,6 +1442,84 @@
         });
 
         // ========================================================================
+        // File Persistence (IndexedDB)
+        // ========================================================================
+
+        const DB_NAME = 'cells-viewer';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'files';
+        const FILE_KEY = 'current';
+        const META_KEY = 'cells-viewer-file-meta';
+
+        let db = null;
+
+        async function openDatabase() {
+            if (db) return db;
+
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    db = request.result;
+                    resolve(db);
+                };
+
+                request.onupgradeneeded = (e) => {
+                    const database = e.target.result;
+                    if (!database.objectStoreNames.contains(STORE_NAME)) {
+                        database.createObjectStore(STORE_NAME);
+                    }
+                };
+            });
+        }
+
+        async function saveFileToIndexedDB(data) {
+            const database = await openDatabase();
+            return new Promise((resolve, reject) => {
+                const tx = database.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.put(data, FILE_KEY);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve();
+            });
+        }
+
+        async function loadFileFromIndexedDB() {
+            const database = await openDatabase();
+            return new Promise((resolve, reject) => {
+                const tx = database.transaction(STORE_NAME, 'readonly');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.get(FILE_KEY);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+            });
+        }
+
+        async function clearPersistedFile() {
+            const database = await openDatabase();
+            return new Promise((resolve, reject) => {
+                const tx = database.transaction(STORE_NAME, 'readwrite');
+                const store = tx.objectStore(STORE_NAME);
+                const request = store.delete(FILE_KEY);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => {
+                    localStorage.removeItem(META_KEY);
+                    resolve();
+                };
+            });
+        }
+
+        function saveFileMeta(name, format) {
+            localStorage.setItem(META_KEY, JSON.stringify({ name, format, timestamp: Date.now() }));
+        }
+
+        function loadFileMeta() {
+            const meta = localStorage.getItem(META_KEY);
+            return meta ? JSON.parse(meta) : null;
+        }
+
+        // ========================================================================
         // File Loading
         // ========================================================================
 
@@ -1464,43 +1543,16 @@
                 const format = detectFormat(file.name, data);
                 const baseName = getBaseName(file.name);
 
-                const client = await ensureWasmClient();
+                await loadFileData(data, format, baseName, file.name);
 
-                if (format === 'cells') {
-                    const text = new TextDecoder().decode(data);
-                    await client.loadCells(text);
-                } else if (format === 'csv') {
-                    await client.loadCSV(data);
-                } else if (format === 'xlsx') {
-                    await client.loadXLSX(data);
+                // Persist file to IndexedDB for reload on refresh
+                try {
+                    await saveFileToIndexedDB(data);
+                    saveFileMeta(file.name, format);
+                } catch (persistErr) {
+                    console.warn('Failed to persist file:', persistErr);
                 }
 
-                dataSource = new WasmDataSource(client);
-                dataSource.setWorkbookName(baseName);
-                hasFileLoaded = true;
-
-                // Reset state
-                scrollX = 0;
-                scrollY = 0;
-                selectedCell = null;
-                selectedColumn = null;
-                selectedRow = null;
-                colWidths.clear();
-                rowHeights.clear();
-                colNames.clear();
-
-                // Enable export button
-                document.getElementById('export-btn').disabled = false;
-
-                // Show the canvas and formula bar, resize
-                canvas.style.display = 'block';
-                formulaBar.classList.remove('hidden');
-                resizeCanvas();
-
-                await fetchSheetInfo();
-                await fetchViewport();
-                render();
-                updateFormulaBar();
                 loading.style.display = 'none';
 
             } catch (e) {
@@ -1509,6 +1561,48 @@
                 errorEl.textContent = 'Failed to load: ' + e.message;
                 errorEl.style.display = 'block';
             }
+        }
+
+        // Core file loading logic (shared by loadFile and auto-load from persistence)
+        async function loadFileData(data, format, baseName, displayName) {
+            const client = await ensureWasmClient();
+
+            if (format === 'cells') {
+                const text = new TextDecoder().decode(data);
+                await client.loadCells(text);
+            } else if (format === 'csv') {
+                await client.loadCSV(data);
+            } else if (format === 'xlsx') {
+                await client.loadXLSX(data);
+            }
+
+            dataSource = new WasmDataSource(client);
+            dataSource.setWorkbookName(baseName);
+            hasFileLoaded = true;
+
+            // Reset state
+            scrollX = 0;
+            scrollY = 0;
+            selectedCell = null;
+            selectedColumn = null;
+            selectedRow = null;
+            colWidths.clear();
+            rowHeights.clear();
+            colNames.clear();
+
+            // Enable export button and show New button
+            document.getElementById('export-btn').disabled = false;
+            document.getElementById('new-btn').style.display = '';
+
+            // Show the canvas and formula bar, resize
+            canvas.style.display = 'block';
+            formulaBar.classList.remove('hidden');
+            resizeCanvas();
+
+            await fetchSheetInfo();
+            await fetchViewport();
+            render();
+            updateFormulaBar();
         }
 
         // Make functions available globally
@@ -1536,6 +1630,40 @@
                 console.error('Export error:', e);
                 alert('Export failed: ' + e.message);
             }
+        };
+
+        window.newFile = async function() {
+            // Clear persisted file
+            try {
+                await clearPersistedFile();
+            } catch (e) {
+                console.warn('Failed to clear persisted file:', e);
+            }
+
+            // Reset state
+            dataSource = null;
+            hasFileLoaded = false;
+            sheetInfo = null;
+            cells = [];
+            columns = [];
+            rows = [];
+            scrollX = 0;
+            scrollY = 0;
+            selectedCell = null;
+            selectedColumn = null;
+            selectedRow = null;
+            colWidths.clear();
+            rowHeights.clear();
+            colNames.clear();
+
+            // Reset UI
+            sheetNameEl.textContent = 'Cells Viewer';
+            document.getElementById('export-btn').disabled = true;
+            document.getElementById('new-btn').style.display = 'none';
+            formulaBar.classList.add('hidden');
+            canvas.style.display = 'none';
+            emptyState.classList.remove('hidden');
+            errorEl.style.display = 'none';
         };
 
         // ========================================================================
@@ -1606,11 +1734,47 @@
         // Initialization
         // ========================================================================
 
-        function init() {
+        async function tryAutoLoadPersistedFile() {
+            const meta = loadFileMeta();
+            if (!meta) return false;
+
+            try {
+                const data = await loadFileFromIndexedDB();
+                if (!data) return false;
+
+                loading.textContent = '';
+                loading.innerHTML = '<span class="spinner"></span>Restoring ' + meta.name + '...';
+                loading.style.display = 'block';
+                emptyState.classList.add('hidden');
+
+                const baseName = getBaseName(meta.name);
+                await loadFileData(data, meta.format, baseName, meta.name);
+
+                loading.style.display = 'none';
+                return true;
+            } catch (e) {
+                console.warn('Failed to auto-load persisted file:', e);
+                // Clear corrupted data
+                try {
+                    await clearPersistedFile();
+                } catch (clearErr) {
+                    console.warn('Failed to clear corrupted persistence:', clearErr);
+                }
+                return false;
+            }
+        }
+
+        async function init() {
             resizeCanvas();
-            // Show empty state initially
-            emptyState.classList.remove('hidden');
-            canvas.style.display = 'none';
+
+            // Try to auto-load persisted file
+            const loaded = await tryAutoLoadPersistedFile();
+
+            if (!loaded) {
+                // Show empty state if no persisted file
+                emptyState.classList.remove('hidden');
+                canvas.style.display = 'none';
+            }
         }
 
         init();
