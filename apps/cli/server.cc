@@ -241,6 +241,146 @@ void Server::setupRoutes() {
 
         res.set_content(json.str(), "application/json");
     });
+
+    // POST /api/cell/:id - update cell value
+    _server->Post(R"(/api/cell/([^/]+))",
+                  [this](const httplib::Request& req, httplib::Response& res) {
+                      if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+                          res.status = 500;
+                          res.set_content("{\"error\":\"No sheet available\"}", "application/json");
+                          return;
+                      }
+
+                      auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+                      if (!sheet) {
+                          res.status = 500;
+                          res.set_content("{\"error\":\"Sheet not found\"}", "application/json");
+                          return;
+                      }
+
+                      // Get cell ID from URL
+                      std::string cellIdStr = req.matches[1];
+                      if (cellIdStr.size() != ID_LENGTH) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid cell ID\"}", "application/json");
+                          return;
+                      }
+                      ID cellId(cellIdStr);
+
+                      // Find cell
+                      Cell* cell = sheet->getCell(cellId);
+                      if (!cell) {
+                          res.status = 404;
+                          res.set_content("{\"error\":\"Cell not found\"}", "application/json");
+                          return;
+                      }
+
+                      // Parse request body for "value" field
+                      // Simple JSON parsing for {"value": "..."}
+                      std::string body = req.body;
+                      std::string value;
+
+                      // Find "value": in the JSON
+                      size_t valuePos = body.find("\"value\"");
+                      if (valuePos == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Missing value field\"}", "application/json");
+                          return;
+                      }
+
+                      // Find the colon and opening quote
+                      size_t colonPos = body.find(':', valuePos);
+                      if (colonPos == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
+                          return;
+                      }
+
+                      // Find opening quote
+                      size_t openQuote = body.find('"', colonPos + 1);
+                      if (openQuote == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
+                          return;
+                      }
+
+                      // Find closing quote (handle escaped quotes)
+                      size_t closeQuote = openQuote + 1;
+                      while (closeQuote < body.size()) {
+                          if (body[closeQuote] == '"' && body[closeQuote - 1] != '\\') {
+                              break;
+                          }
+                          closeQuote++;
+                      }
+
+                      if (closeQuote >= body.size()) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
+                          return;
+                      }
+
+                      value = body.substr(openQuote + 1, closeQuote - openQuote - 1);
+
+                      // Unescape JSON string
+                      std::string unescaped;
+                      for (size_t i = 0; i < value.size(); i++) {
+                          if (value[i] == '\\' && i + 1 < value.size()) {
+                              switch (value[i + 1]) {
+                                  case '"':
+                                      unescaped += '"';
+                                      break;
+                                  case '\\':
+                                      unescaped += '\\';
+                                      break;
+                                  case 'n':
+                                      unescaped += '\n';
+                                      break;
+                                  case 'r':
+                                      unescaped += '\r';
+                                      break;
+                                  case 't':
+                                      unescaped += '\t';
+                                      break;
+                                  default:
+                                      unescaped += value[i + 1];
+                                      break;
+                              }
+                              i++;
+                          } else {
+                              unescaped += value[i];
+                          }
+                      }
+
+                      // Update cell value
+                      // Clear formula if cell had one
+                      if (cell->isFormula()) {
+                          cell->clearFormula();
+                      }
+
+                      // Detect value type
+                      if (unescaped.empty()) {
+                          cell->value = CellValue();
+                      } else if (unescaped == "TRUE" || unescaped == "true") {
+                          cell->value = CellValue(true);
+                      } else if (unescaped == "FALSE" || unescaped == "false") {
+                          cell->value = CellValue(false);
+                      } else {
+                          // Try parsing as number
+                          char* endptr = nullptr;
+                          double num = strtod(unescaped.c_str(), &endptr);
+                          if (endptr != nullptr && *endptr == '\0' && endptr != unescaped.c_str()) {
+                              cell->value = CellValue(num);
+                          } else {
+                              // String value
+                              cell->value = CellValue(unescaped);
+                          }
+                      }
+
+                      // Rebuild quadtree to update spatial index
+                      rebuildQuadtree();
+
+                      res.set_content("{\"success\":true}", "application/json");
+                  });
 }
 
 int Server::run(const ServerOptions& opts) {

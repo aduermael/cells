@@ -67,6 +67,18 @@
             text-align: center;
             display: none;
         }
+        #cell-editor {
+            position: absolute;
+            display: none;
+            border: 2px solid #0d6efd;
+            background: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 13px;
+            padding: 2px 4px;
+            outline: none;
+            box-sizing: border-box;
+            z-index: 100;
+        }
     </style>
 </head>
 <body>
@@ -77,6 +89,7 @@
         </div>
         <div id="canvas-container">
             <canvas id="grid"></canvas>
+            <input type="text" id="cell-editor" />
             <div id="loading">Loading spreadsheet...</div>
             <div id="error">Failed to load spreadsheet</div>
         </div>
@@ -120,6 +133,10 @@
         let isDragging = false;
         let lastMouseX = 0;
         let lastMouseY = 0;
+
+        // Editing state
+        let isEditing = false;
+        const cellEditor = document.getElementById('cell-editor');
 
         // Column widths and row heights cache (position -> size)
         let colWidths = new Map();
@@ -245,6 +262,116 @@
         function getCellAt(col, row) {
             return cells.find(c => c.col === col && c.row === row);
         }
+
+        // Start editing a cell
+        function startEditing() {
+            if (!selectedCell || isEditing) return;
+
+            const cell = getCellAt(selectedCell.col, selectedCell.row);
+            if (!cell) return; // Can only edit existing cells for now
+
+            isEditing = true;
+
+            // Calculate cell position on screen
+            let cellX = HEADER_WIDTH - scrollX;
+            for (let i = 0; i < selectedCell.col; i++) {
+                cellX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+            }
+            let cellY = HEADER_HEIGHT - scrollY;
+            for (let i = 0; i < selectedCell.row; i++) {
+                cellY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+            }
+
+            const cellWidth = colWidths.get(selectedCell.col) || DEFAULT_COL_WIDTH;
+            const cellHeight = rowHeights.get(selectedCell.row) || DEFAULT_ROW_HEIGHT;
+
+            // Position and show editor
+            cellEditor.style.left = cellX + 'px';
+            cellEditor.style.top = cellY + 'px';
+            cellEditor.style.width = cellWidth + 'px';
+            cellEditor.style.height = cellHeight + 'px';
+            cellEditor.style.display = 'block';
+
+            // Set initial value (formula or display value)
+            cellEditor.value = cell.formula || cell.value || '';
+            cellEditor.focus();
+            cellEditor.select();
+        }
+
+        // Cancel editing
+        function cancelEditing() {
+            if (!isEditing) return;
+            isEditing = false;
+            cellEditor.style.display = 'none';
+            cellEditor.value = '';
+            canvas.focus();
+        }
+
+        // Confirm editing and save
+        async function confirmEditing() {
+            if (!isEditing || !selectedCell) return;
+
+            const cell = getCellAt(selectedCell.col, selectedCell.row);
+            if (!cell) {
+                cancelEditing();
+                return;
+            }
+
+            const newValue = cellEditor.value;
+            isEditing = false;
+            cellEditor.style.display = 'none';
+
+            try {
+                const res = await fetch(`/api/cell/${cell.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value: newValue })
+                });
+
+                if (!res.ok) {
+                    const error = await res.json();
+                    console.error('Failed to update cell:', error);
+                    return;
+                }
+
+                // Refresh viewport to show updated value
+                await fetchViewport();
+                render();
+            } catch (e) {
+                console.error('Error updating cell:', e);
+            }
+        }
+
+        // Cell editor event handlers
+        cellEditor.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelEditing();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmEditing();
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                confirmEditing().then(() => {
+                    // Move to next cell
+                    if (selectedCell) {
+                        if (e.shiftKey) {
+                            selectedCell.col = Math.max(0, selectedCell.col - 1);
+                        } else {
+                            selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
+                        }
+                        render();
+                    }
+                });
+            }
+        });
+
+        cellEditor.addEventListener('blur', () => {
+            // Only confirm if we're still editing (not if we cancelled)
+            if (isEditing) {
+                confirmEditing();
+            }
+        });
 
         // Render the grid
         function render() {
@@ -518,8 +645,29 @@
             }
         });
 
+        // Handle double-click to edit
+        canvas.addEventListener('dblclick', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            // Only in cell area, not headers
+            if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+                const col = getColAtX(x + scrollX);
+                const row = getRowAtY(y + scrollY);
+
+                if (col >= 0 && row >= 0) {
+                    selectedCell = { col, row };
+                    render();
+                    startEditing();
+                }
+            }
+        });
+
         // Handle keyboard navigation
         document.addEventListener('keydown', (e) => {
+            // Skip if we're editing
+            if (isEditing) return;
             if (!selectedCell) return;
 
             let newCol = selectedCell.col;
@@ -547,9 +695,10 @@
                     }
                     break;
                 case 'Enter':
+                case 'F2':
                     e.preventDefault();
-                    newRow = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
-                    break;
+                    startEditing();
+                    return;
                 default:
                     return;
             }
