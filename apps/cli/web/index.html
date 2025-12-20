@@ -639,20 +639,26 @@
             ctx.restore();
         }
 
-        // Debounce helper
-        function debounce(fn, delay) {
-            let timer = null;
-            return function(...args) {
-                clearTimeout(timer);
-                timer = setTimeout(() => fn.apply(this, args), delay);
-            };
+        // Fetch viewport immediately (quadtree queries are fast)
+        let fetchInFlight = false;
+        let fetchPending = false;
+        async function fetchViewportNow() {
+            if (fetchInFlight) {
+                fetchPending = true;
+                return;
+            }
+            fetchInFlight = true;
+            try {
+                await fetchViewport();
+                render();
+            } finally {
+                fetchInFlight = false;
+                if (fetchPending) {
+                    fetchPending = false;
+                    fetchViewportNow();
+                }
+            }
         }
-
-        // Handle scroll
-        const debouncedFetch = debounce(async () => {
-            await fetchViewport();
-            render();
-        }, 16);
 
         canvas.addEventListener('wheel', (e) => {
             e.preventDefault();
@@ -664,7 +670,7 @@
             scrollY = Math.max(0, Math.min(maxScrollY, scrollY + e.deltaY));
 
             render();
-            debouncedFetch();
+            fetchViewportNow();
         }, { passive: false });
 
         // Handle mouse down for selection, dragging, and column resizing
@@ -748,7 +754,7 @@
                 lastMouseY = e.clientY;
 
                 render();
-                debouncedFetch();
+                fetchViewportNow();
             } else {
                 // Check for resize cursor in header area
                 if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
@@ -912,13 +918,13 @@
             }
 
             render();
-            debouncedFetch();
+            fetchViewportNow();
         });
 
         // Handle resize
         window.addEventListener('resize', () => {
             resizeCanvas();
-            fetchViewport().then(render);
+            fetchViewportNow();
         });
 
         // Initialize
