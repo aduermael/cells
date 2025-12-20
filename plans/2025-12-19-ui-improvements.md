@@ -30,7 +30,7 @@ Now that WASM is stable, remove the `cli server` command and the web UI served v
 - [x] 2.5a: Remove `server` subcommand from CLI
 - [x] 2.5b: Remove `apps/cli/web/` directory and related server code
 - [x] 2.5c: Update `apps/shared/` to only serve WASM needs (remove server-specific code if any)
-- [ ] 2.5d: Clean up any build rules related to CLI server mode
+- [x] 2.5d: Clean up any build rules related to CLI server mode
 
 ## Phase 2.6: Core Cell Editing Behavior
 
