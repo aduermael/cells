@@ -246,10 +246,17 @@ void Server::setupRoutes() {
 int Server::run(const ServerOptions& opts) {
     setupRoutes();
 
+    // Bind to port first (before opening browser)
+    if (!_server->bind_to_port("0.0.0.0", opts.port)) {
+        std::cerr << "Error: Failed to bind to port " << opts.port << "\n";
+        return 1;
+    }
+
     std::cout << "Starting server at http://localhost:" << opts.port << "\n";
 
     if (opts.open_browser) {
         // Platform-specific browser opening
+        // Now safe to open browser since port is bound
 #ifdef __APPLE__
         std::string cmd = "open http://localhost:" + std::to_string(opts.port);
         (void)system(cmd.c_str());
@@ -259,7 +266,8 @@ int Server::run(const ServerOptions& opts) {
 #endif
     }
 
-    if (!_server->listen("0.0.0.0", opts.port)) {
+    // Start accepting connections (blocking)
+    if (!_server->listen_after_bind()) {
         std::cerr << "Error: Failed to start server on port " << opts.port << "\n";
         return 1;
     }
