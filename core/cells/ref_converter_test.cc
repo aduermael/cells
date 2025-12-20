@@ -228,7 +228,7 @@ TEST(RefConverterTest, FormatA1RefInvalid) {
 }
 
 // ============================================================================
-// Helper to create test sheet with columns/rows
+// Helper to create test sheet with columns/rows and cells
 // ============================================================================
 
 std::unique_ptr<Sheet> createTestSheet() {
@@ -250,6 +250,14 @@ std::unique_ptr<Sheet> createTestSheet() {
         row->position = static_cast<uint32_t>(i);
         rowIds.push_back(row->id);
         sheet->addRow(std::move(row));
+    }
+
+    // Create cells at each intersection for testing cell UUID format
+    for (size_t c = 0; c < colIds.size(); ++c) {
+        for (size_t r = 0; r < rowIds.size(); ++r) {
+            auto cell = std::make_unique<Cell>(generate_id(), colIds[c], rowIds[r]);
+            sheet->addCell(std::move(cell));
+        }
     }
 
     return sheet;
@@ -374,15 +382,36 @@ TEST(RefConverterTest, A1RefToUuidWithContext) {
     RefConverter converter;
     converter.setContext(*sheet);
 
-    // Convert A1 to UUID format
+    // Convert A1 to UUID format (new cell UUID format)
+    // For relative refs, output is just the bare cell ID (8 chars)
     std::string uuidRef = converter.a1RefToUuid("A1");
     EXPECT_FALSE(uuidRef.empty());
-    EXPECT_EQ(uuidRef[0], '$');
-    EXPECT_EQ(uuidRef[9], '$');
-    EXPECT_EQ(uuidRef.size(), 18u);
+    EXPECT_EQ(uuidRef.size(), 8u);  // New format: bare cellId (8 chars)
+    // All chars should be alphanumeric (base62 ID)
+    for (char c : uuidRef) {
+        EXPECT_TRUE(std::isalnum(static_cast<unsigned char>(c)));
+    }
 
     // Convert back should give A1
     EXPECT_EQ(converter.uuidRefToA1(uuidRef), "A1");
+
+    // Test absolute references
+    std::string absRef = converter.a1RefToUuid("$A$1");
+    EXPECT_FALSE(absRef.empty());
+    EXPECT_EQ(absRef.size(), 10u);  // $$cellId = 10 chars
+    EXPECT_EQ(absRef.substr(0, 2), "$$");
+    EXPECT_EQ(converter.uuidRefToA1(absRef), "$A$1");
+
+    // Test mixed references
+    std::string colAbsRef = converter.a1RefToUuid("$A1");
+    EXPECT_EQ(colAbsRef.size(), 10u);  // $~cellId = 10 chars
+    EXPECT_EQ(colAbsRef.substr(0, 2), "$~");
+    EXPECT_EQ(converter.uuidRefToA1(colAbsRef), "$A1");
+
+    std::string rowAbsRef = converter.a1RefToUuid("A$1");
+    EXPECT_EQ(rowAbsRef.size(), 10u);  // ~$cellId = 10 chars
+    EXPECT_EQ(rowAbsRef.substr(0, 2), "~$");
+    EXPECT_EQ(converter.uuidRefToA1(rowAbsRef), "A$1");
 }
 
 TEST(RefConverterTest, A1RefToUuidOutOfRange) {
@@ -402,8 +431,11 @@ TEST(RefConverterTest, FormulaToUuidSimple) {
 
     std::string result = converter.formulaToUuid("A1+B2");
 
-    // The result should contain UUID refs
-    EXPECT_NE(result.find('$'), std::string::npos);
+    // The result should contain cell UUID refs (bare IDs for relative refs)
+    // Format: cellId+cellId (8 chars each)
+    // Should be 8 + 1 + 8 = 17 chars total
+    EXPECT_EQ(result.size(), 17u);
+    EXPECT_EQ(result[8], '+');
 
     // Convert back should give original formula
     EXPECT_EQ(converter.formulaToA1(result), "A1+B2");

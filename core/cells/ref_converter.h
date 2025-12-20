@@ -46,6 +46,14 @@ struct RangeRef {
 
 // Reference converter - converts between UUID-based and A1 notation
 // Used for Excel import/export
+//
+// Internal format uses cell UUIDs with absolute/relative markers:
+//   $$cellId  ->  $A$1  (both absolute)
+//   $~cellId  ->  $A1   (col absolute, row relative)
+//   ~$cellId  ->  A$1   (col relative, row absolute)
+//   cellId    ->  A1    (both relative, ~~ prefix omitted)
+//
+// Resolution: cellId -> Cell -> (colId, rowId) -> axis positions -> A1
 class RefConverter {
 public:
     RefConverter() = default;
@@ -55,6 +63,7 @@ public:
     void setContext(const Sheet& sheet);
 
     // Set context from ordered ID lists (for when you already have them computed)
+    // Note: This overload doesn't support cell UUID lookups, only col/row based refs
     void setContext(const std::vector<ID>& columnIds, const std::vector<ID>& rowIds);
 
     // Clear context
@@ -102,7 +111,8 @@ public:
     // Format a CellRef back to A1 notation
     [[nodiscard]] static std::string formatA1Ref(const CellRef& ref);
 
-    // Format a CellRef to UUID notation ($colId$rowId)
+    // Format a CellRef to UUID notation using cell UUID format
+    // Output: $$cellId, $~cellId, ~$cellId, or cellId based on ref.type
     [[nodiscard]] std::string formatUuidRef(const CellRef& ref) const;
 
 private:
@@ -115,21 +125,44 @@ private:
     // Index to row ID mapping
     std::vector<std::string> indexToRowId_;
 
+    // Cell ID to (colId, rowId) mapping for cell UUID format
+    struct CellLocation {
+        std::string colId;
+        std::string rowId;
+    };
+    std::unordered_map<std::string, CellLocation> cellIdToLocation_;
+
+    // (colId, rowId) to cellId mapping for reverse lookup
+    std::unordered_map<std::string, std::string> locationToCellId_;
+
+    // Build composite key for location lookup
+    [[nodiscard]] static std::string makeLocationKey(const std::string& colId,
+                                                     const std::string& rowId);
+
     // Check if a character is a valid column letter
     [[nodiscard]] static bool isColumnChar(char c);
 
-    // Check if we're at the start of a UUID ref pattern ($xxxxxxxx$xxxxxxxx)
-    [[nodiscard]] static bool isUuidRefStart(const std::string& formula, size_t pos);
+    // Check if we're at the start of a cell UUID ref pattern
+    // New format: [$$|$~|~$]cellId or bare cellId (8 alphanumeric chars)
+    [[nodiscard]] static bool isCellRefStart(const std::string& formula, size_t pos);
 
     // Check if we're at the start of an A1 ref pattern
     [[nodiscard]] static bool isA1RefStart(const std::string& formula, size_t pos);
 
-    // Extract UUID ref at position, returns length consumed (0 if not valid)
-    [[nodiscard]] static size_t extractUuidRef(const std::string& formula, size_t pos,
-                                               std::string& colId, std::string& rowId);
+    // Extract cell UUID ref at position, returns length consumed (0 if not valid)
+    // Sets cellId and refType based on the prefix found
+    [[nodiscard]] static size_t extractCellRef(const std::string& formula, size_t pos,
+                                               std::string& cellId, ReferenceType& refType);
 
     // Extract A1 ref at position, returns length consumed (0 if not valid)
     [[nodiscard]] static size_t extractA1Ref(const std::string& formula, size_t pos, CellRef& ref);
+
+    // Legacy: Check if we're at the start of old UUID ref pattern ($colId$rowId)
+    [[nodiscard]] static bool isLegacyUuidRefStart(const std::string& formula, size_t pos);
+
+    // Legacy: Extract old UUID ref at position
+    [[nodiscard]] static size_t extractLegacyUuidRef(const std::string& formula, size_t pos,
+                                                     std::string& colId, std::string& rowId);
 };
 
 }  // namespace cells
