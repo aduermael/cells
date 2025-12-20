@@ -95,6 +95,8 @@ A high-performance, collaborative spreadsheet engine with:
 ```
 cells/
 ├── WORKSPACE               # Bazel workspace root
+├── MODULE.bazel            # Bzlmod module definition
+├── Makefile                # Development commands
 ├── core/                   # C++17 core engine
 │   ├── BUILD
 │   ├── cells/              # Main library
@@ -102,20 +104,19 @@ cells/
 │   │   ├── *.h             # Headers
 │   │   ├── *.cc            # Implementation
 │   │   └── *_test.cc       # Tests (colocated)
-│   └── testdata/           # Sample .cells files
-├── renderer/               # Grid rendering layer
-│   └── shaders/            # If using GPU
-├── bindings/               # Language bindings
-│   ├── wasm/               # WebAssembly build
-│   ├── swift/              # iOS/macOS
-│   └── kotlin/             # Android
-├── apps/                   # Platform apps
-│   ├── web/
-│   ├── macos/
-│   ├── ios/
-│   └── windows/
+│   └── testdata/           # Sample .cells and .xlsx files
+├── apps/                   # Applications
+│   ├── cli/                # Command-line tool
+│   │   ├── BUILD
+│   │   └── main.cc         # CLI entry point
+│   └── wasm/               # WebAssembly build
+│       ├── BUILD
+│       ├── bindings.cc     # Embind bindings
+│       └── static/         # Web UI (index.html, JS)
 ├── docs/                   # Architecture docs
-└── plans/                  # Implementation plans
+├── plans/                  # Implementation plans
+├── scripts/                # Build and dev scripts
+└── dist/                   # Built WASM distribution (generated)
 ```
 
 ## Key Design Decisions
