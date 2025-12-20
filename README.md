@@ -205,13 +205,32 @@ python3 -m http.server 8080 --directory dist
     (macOS/Linux)      (Web)         (Windows)
 ```
 
-## Next Steps
+## Current Implementation Status
 
-1. **Finalize data model** - Lock down the cell/dimension structures
-2. **Prototype formula parser** - Excel subset → AST
-3. **Implement basic CRDT** - Cell value operations
-4. **Create minimal renderer** - Proof of concept
-5. **Design file format** - Git-friendly serialization
+**Core Engine (C++17):**
+- Data model with UUID-based cells, sparse quadtree storage
+- XLSX import (basic support)
+- .cells text format (read/write)
+- Viewport-based querying with spatial indexing
+- Multi-sheet support
+
+**WebAssembly Build:**
+- Full core engine compiled to WASM via Emscripten
+- Web Worker architecture for non-blocking UI
+- Canvas2D-based grid renderer
+- Interactive editing, selection, resizing
+- Keyboard navigation
+- Listener-driven UI refresh
+
+**CLI Tool:**
+- File format conversion (xlsx → cells, cells → xlsx)
+- Basic file inspection
+
+**Not Yet Implemented:**
+- Formula engine (AST parsing and evaluation)
+- CRDT/collaboration
+- Networking (WebRTC)
+- Native platform apps (SwiftUI, WinUI)
 
 ## Decisions Made
 
