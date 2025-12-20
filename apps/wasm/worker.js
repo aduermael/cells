@@ -144,7 +144,7 @@ function handleMessage(msg) {
                 if (result.error) {
                     respond({ type: 'error', error: result.error });
                 } else {
-                    respond({ type: 'cellCreated', id: result.id });
+                    respond({ type: 'cellCreated', cellId: result.id });
                 }
                 break;
             }

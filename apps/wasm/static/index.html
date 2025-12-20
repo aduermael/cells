@@ -670,7 +670,16 @@
 
         function cancelFormulaBarEdit() {
             isEditingFormulaBar = false;
-            updateFormulaBar(); // Restore original value
+            // Remove any temp cell created during live preview
+            const tempIdx = cells.findIndex(c => c.id === '_temp_');
+            if (tempIdx !== -1) {
+                cells.splice(tempIdx, 1);
+            }
+            // Refresh to restore original values
+            fetchViewport().then(() => {
+                render();
+                updateFormulaBar();
+            });
             canvas.focus();
         }
 
@@ -712,6 +721,29 @@
             if (isEditingFormulaBar && selectedCell) {
                 commitFormulaBarEdit();
             }
+        });
+
+        // Live sync: update cell display while typing in formula bar
+        formulaInput.addEventListener('input', () => {
+            if (!isEditingFormulaBar || !selectedCell) return;
+
+            // Update local cell data for live preview (without saving to engine)
+            let cell = getCellAt(selectedCell.col, selectedCell.row);
+            if (cell) {
+                // Update existing cell's display value
+                cell.value = formulaInput.value;
+                cell.formula = formulaInput.value.startsWith('=') ? formulaInput.value : null;
+            } else {
+                // Create a temporary local cell for preview
+                cells.push({
+                    id: '_temp_',
+                    col: selectedCell.col,
+                    row: selectedCell.row,
+                    value: formulaInput.value,
+                    type: 's'
+                });
+            }
+            render();
         });
 
         // ========================================================================
@@ -1028,11 +1060,21 @@
                     }
                     handled = true;
                     break;
-                case 'Enter':
                 case 'F2':
+                    // F2 enters edit mode
                     e.preventDefault();
                     startEditing({ mode: 'select' });
                     return;
+                case 'Enter':
+                    // Enter just moves down (Shift+Enter moves up) - no edit mode
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        newRow = Math.max(0, selectedCell.row - 1);
+                    } else {
+                        newRow = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
+                    }
+                    handled = true;
+                    break;
                 case 'Delete':
                 case 'Backspace':
                     // Delete/Backspace clears the cell and starts editing empty

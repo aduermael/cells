@@ -249,7 +249,7 @@ class CellsClient {
      */
     async createCell(col, row, value = '') {
         const response = await this._send('createCell', { col, row, value });
-        return { id: response.id };
+        return { id: response.cellId };
     }
 
     /**
