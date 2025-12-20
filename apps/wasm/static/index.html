@@ -868,21 +868,16 @@
         async function confirmEditingColumnHeader() {
             if (!isEditingColumnHeader || editingColumnIndex < 0 || !dataSource) return;
 
-            const colId = getColumnId(editingColumnIndex);
             const newName = columnHeaderEditor.value.trim();
+            const savedColIndex = editingColumnIndex;
 
             isEditingColumnHeader = false;
-            const savedColIndex = editingColumnIndex;
             editingColumnIndex = -1;
             columnHeaderEditor.style.display = 'none';
 
             try {
-                if (colId) {
-                    await dataSource.renameColumn(colId, newName);
-                } else {
-                    // Column doesn't exist - create it to store the name
-                    await dataSource.renameColumnByPos(savedColIndex, newName);
-                }
+                // Always use ByPos - engine handles creation if needed
+                await dataSource.renameColumnByPos(savedColIndex, newName);
                 // Update local cache
                 if (newName) {
                     colNames.set(savedColIndex, newName);
@@ -1366,14 +1361,9 @@
                 // Optimistic update for smooth UX
                 colWidths.set(resizeColIndex, newWidth);
 
-                const colId = getColumnId(resizeColIndex);
                 try {
-                    if (colId) {
-                        await dataSource.resizeColumn(colId, newWidth);
-                    } else {
-                        // Column doesn't exist - create it to store non-default size
-                        await dataSource.resizeColumnByPos(resizeColIndex, newWidth);
-                    }
+                    // Always use ByPos - engine handles creation if needed
+                    await dataSource.resizeColumnByPos(resizeColIndex, newWidth);
                     // Refresh from Workbook (source of truth)
                     await fetchViewport();
                 } catch (err) {
@@ -1391,14 +1381,9 @@
                 // Optimistic update for smooth UX
                 rowHeights.set(resizeRowIndex, newHeight);
 
-                const rowId = getRowId(resizeRowIndex);
                 try {
-                    if (rowId) {
-                        await dataSource.resizeRow(rowId, newHeight);
-                    } else {
-                        // Row doesn't exist - create it to store non-default size
-                        await dataSource.resizeRowByPos(resizeRowIndex, newHeight);
-                    }
+                    // Always use ByPos - engine handles creation if needed
+                    await dataSource.resizeRowByPos(resizeRowIndex, newHeight);
                     // Refresh from Workbook (source of truth)
                     await fetchViewport();
                 } catch (err) {
