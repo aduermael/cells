@@ -568,6 +568,228 @@ void Server::setupRoutes() {
                       res.set_content(json.str(), "application/json");
                   });
 
+    // POST /api/column/:id/move - move a column to a new position
+    _server->Post(R"(/api/column/([^/]+)/move)",
+                  [this](const httplib::Request& req, httplib::Response& res) {
+                      if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+                          res.status = 500;
+                          res.set_content("{\"error\":\"No sheet available\"}", "application/json");
+                          return;
+                      }
+
+                      auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+                      if (!sheet) {
+                          res.status = 500;
+                          res.set_content("{\"error\":\"Sheet not found\"}", "application/json");
+                          return;
+                      }
+
+                      // Get column ID from URL
+                      std::string colIdStr = req.matches[1];
+                      if (colIdStr.size() != ID_LENGTH) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid column ID\"}", "application/json");
+                          return;
+                      }
+                      ID colId(colIdStr);
+
+                      // Find column
+                      auto it = sheet->columns.find(colId);
+                      if (it == sheet->columns.end()) {
+                          res.status = 404;
+                          res.set_content("{\"error\":\"Column not found\"}", "application/json");
+                          return;
+                      }
+
+                      // Parse request body for "position" field
+                      std::string body = req.body;
+
+                      // Find "position": in the JSON
+                      size_t posPos = body.find("\"position\"");
+                      if (posPos == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Missing position field\"}", "application/json");
+                          return;
+                      }
+
+                      // Find the colon and value
+                      size_t colonPos = body.find(':', posPos);
+                      if (colonPos == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
+                          return;
+                      }
+
+                      // Find the number
+                      size_t numStart = body.find_first_of("0123456789", colonPos + 1);
+                      if (numStart == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid position value\"}", "application/json");
+                          return;
+                      }
+                      size_t numEnd = body.find_first_not_of("0123456789", numStart);
+                      if (numEnd == std::string::npos) {
+                          numEnd = body.size();
+                      }
+
+                      uint32_t targetPos =
+                          static_cast<uint32_t>(std::stoul(body.substr(numStart, numEnd - numStart)));
+
+                      // Get current position
+                      uint32_t currentPos = it->second->position;
+
+                      // If target is same as current, nothing to do
+                      if (targetPos == currentPos || targetPos == currentPos + 1) {
+                          res.set_content("{\"success\":true}", "application/json");
+                          return;
+                      }
+
+                      // Adjust target position for "insert before" semantics
+                      // If moving right, target becomes target-1 (because we're removing from left)
+                      uint32_t newPos = targetPos;
+                      if (targetPos > currentPos) {
+                          newPos = targetPos - 1;
+                      }
+
+                      // Update positions of affected columns
+                      for (auto& [id, col] : sheet->columns) {
+                          if (id == colId) {
+                              continue;  // Skip the column being moved
+                          }
+
+                          if (currentPos < newPos) {
+                              // Moving right: shift columns between old and new position left
+                              if (col->position > currentPos && col->position <= newPos) {
+                                  col->position--;
+                              }
+                          } else {
+                              // Moving left: shift columns between new and old position right
+                              if (col->position >= newPos && col->position < currentPos) {
+                                  col->position++;
+                              }
+                          }
+                      }
+
+                      // Set the moved column's new position
+                      it->second->position = newPos;
+
+                      // Rebuild quadtree
+                      rebuildQuadtree();
+
+                      res.set_content("{\"success\":true}", "application/json");
+                  });
+
+    // POST /api/row/:id/move - move a row to a new position
+    _server->Post(R"(/api/row/([^/]+)/move)",
+                  [this](const httplib::Request& req, httplib::Response& res) {
+                      if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+                          res.status = 500;
+                          res.set_content("{\"error\":\"No sheet available\"}", "application/json");
+                          return;
+                      }
+
+                      auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+                      if (!sheet) {
+                          res.status = 500;
+                          res.set_content("{\"error\":\"Sheet not found\"}", "application/json");
+                          return;
+                      }
+
+                      // Get row ID from URL
+                      std::string rowIdStr = req.matches[1];
+                      if (rowIdStr.size() != ID_LENGTH) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid row ID\"}", "application/json");
+                          return;
+                      }
+                      ID rowId(rowIdStr);
+
+                      // Find row
+                      auto it = sheet->rows.find(rowId);
+                      if (it == sheet->rows.end()) {
+                          res.status = 404;
+                          res.set_content("{\"error\":\"Row not found\"}", "application/json");
+                          return;
+                      }
+
+                      // Parse request body for "position" field
+                      std::string body = req.body;
+
+                      // Find "position": in the JSON
+                      size_t posPos = body.find("\"position\"");
+                      if (posPos == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Missing position field\"}", "application/json");
+                          return;
+                      }
+
+                      // Find the colon and value
+                      size_t colonPos = body.find(':', posPos);
+                      if (colonPos == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
+                          return;
+                      }
+
+                      // Find the number
+                      size_t numStart = body.find_first_of("0123456789", colonPos + 1);
+                      if (numStart == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid position value\"}", "application/json");
+                          return;
+                      }
+                      size_t numEnd = body.find_first_not_of("0123456789", numStart);
+                      if (numEnd == std::string::npos) {
+                          numEnd = body.size();
+                      }
+
+                      uint32_t targetPos =
+                          static_cast<uint32_t>(std::stoul(body.substr(numStart, numEnd - numStart)));
+
+                      // Get current position
+                      uint32_t currentPos = it->second->position;
+
+                      // If target is same as current, nothing to do
+                      if (targetPos == currentPos || targetPos == currentPos + 1) {
+                          res.set_content("{\"success\":true}", "application/json");
+                          return;
+                      }
+
+                      // Adjust target position for "insert before" semantics
+                      // If moving down, target becomes target-1 (because we're removing from above)
+                      uint32_t newPos = targetPos;
+                      if (targetPos > currentPos) {
+                          newPos = targetPos - 1;
+                      }
+
+                      // Update positions of affected rows
+                      for (auto& [id, row] : sheet->rows) {
+                          if (id == rowId) {
+                              continue;  // Skip the row being moved
+                          }
+
+                          if (currentPos < newPos) {
+                              // Moving down: shift rows between old and new position up
+                              if (row->position > currentPos && row->position <= newPos) {
+                                  row->position--;
+                              }
+                          } else {
+                              // Moving up: shift rows between new and old position down
+                              if (row->position >= newPos && row->position < currentPos) {
+                                  row->position++;
+                              }
+                          }
+                      }
+
+                      // Set the moved row's new position
+                      it->second->position = newPos;
+
+                      // Rebuild quadtree
+                      rebuildQuadtree();
+
+                      res.set_content("{\"success\":true}", "application/json");
+                  });
+
     // POST /api/cell - create new cell at position
     _server->Post("/api/cell", [this](const httplib::Request& req, httplib::Response& res) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {

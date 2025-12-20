@@ -130,6 +130,8 @@
         let scrollX = 0;
         let scrollY = 0;
         let selectedCell = null; // {col, row}
+        let selectedColumn = null; // column index (for entire column selection)
+        let selectedRow = null; // row index (for entire row selection)
         let isDragging = false;
         let lastMouseX = 0;
         let lastMouseY = 0;
@@ -145,6 +147,14 @@
         let resizeStartWidth = 0;
         let resizePreviewX = 0;
         const RESIZE_HANDLE_WIDTH = 6; // pixels on each side of column border
+
+        // Column/row reorder state
+        let isDraggingColumn = false;
+        let isDraggingRow = false;
+        let dragSourceIndex = -1;
+        let dragTargetIndex = -1;
+        let dragPreviewX = 0;
+        let dragPreviewY = 0;
 
         // Column widths and row heights cache (position -> size)
         let colWidths = new Map();
@@ -220,6 +230,42 @@
                 }
             }
             return null;
+        }
+
+        // Get row ID at position
+        function getRowId(rowPos) {
+            for (const row of rows) {
+                if (row.pos === rowPos) {
+                    return row.id;
+                }
+            }
+            return null;
+        }
+
+        // Get drop target column index from X coordinate
+        function getDropTargetCol(mouseX) {
+            if (mouseX < HEADER_WIDTH) return 0;
+            let x = HEADER_WIDTH - scrollX;
+            for (let col = 0; col < (sheetInfo?.colCount || 1000); col++) {
+                const colW = colWidths.get(col) || DEFAULT_COL_WIDTH;
+                const midX = x + colW / 2;
+                if (mouseX < midX) return col;
+                x += colW;
+            }
+            return sheetInfo?.colCount || 0;
+        }
+
+        // Get drop target row index from Y coordinate
+        function getDropTargetRow(mouseY) {
+            if (mouseY < HEADER_HEIGHT) return 0;
+            let y = HEADER_HEIGHT - scrollY;
+            for (let row = 0; row < (sheetInfo?.rowCount || 1000); row++) {
+                const rowH = rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+                const midY = y + rowH / 2;
+                if (mouseY < midY) return row;
+                y += rowH;
+            }
+            return sheetInfo?.rowCount || 0;
         }
 
         // Resize canvas to container
@@ -548,6 +594,38 @@
                 }
             }
 
+            // Draw entire column selection
+            if (selectedColumn !== null) {
+                let selX = HEADER_WIDTH - scrollX;
+                for (let i = 0; i < selectedColumn; i++) {
+                    selX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                }
+                const selW = colWidths.get(selectedColumn) || DEFAULT_COL_WIDTH;
+
+                if (selX + selW > HEADER_WIDTH && selX < viewWidth) {
+                    ctx.fillStyle = COLORS.selectionBg;
+                    const clippedX = Math.max(HEADER_WIDTH, selX);
+                    const clippedW = Math.min(selW, selX + selW - clippedX, viewWidth - clippedX);
+                    ctx.fillRect(clippedX, HEADER_HEIGHT, clippedW, viewHeight - HEADER_HEIGHT);
+                }
+            }
+
+            // Draw entire row selection
+            if (selectedRow !== null) {
+                let selY = HEADER_HEIGHT - scrollY;
+                for (let i = 0; i < selectedRow; i++) {
+                    selY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                }
+                const selH = rowHeights.get(selectedRow) || DEFAULT_ROW_HEIGHT;
+
+                if (selY + selH > HEADER_HEIGHT && selY < viewHeight) {
+                    ctx.fillStyle = COLORS.selectionBg;
+                    const clippedY = Math.max(HEADER_HEIGHT, selY);
+                    const clippedH = Math.min(selH, selY + selH - clippedY, viewHeight - clippedY);
+                    ctx.fillRect(HEADER_WIDTH, clippedY, viewWidth - HEADER_WIDTH, clippedH);
+                }
+            }
+
             ctx.restore();
 
             // Draw column headers
@@ -564,8 +642,9 @@
                 const colW = colWidths.get(col) || DEFAULT_COL_WIDTH;
                 const headerX = x - scrollX;
                 if (headerX + colW > HEADER_WIDTH) {
-                    // Highlight if selected
-                    if (selectedCell && selectedCell.col === col) {
+                    // Highlight if selected (either cell selection or entire column selection)
+                    const isSelected = (selectedCell && selectedCell.col === col) || selectedColumn === col;
+                    if (isSelected) {
                         ctx.fillStyle = COLORS.selectionBorder;
                         ctx.fillRect(Math.max(HEADER_WIDTH, headerX), 0,
                             Math.min(colW, headerX + colW - HEADER_WIDTH), HEADER_HEIGHT);
@@ -589,8 +668,9 @@
                 const rowH = rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
                 const headerY = y - scrollY;
                 if (headerY + rowH > HEADER_HEIGHT) {
-                    // Highlight if selected
-                    if (selectedCell && selectedCell.row === row) {
+                    // Highlight if selected (either cell selection or entire row selection)
+                    const isSelected = (selectedCell && selectedCell.row === row) || selectedRow === row;
+                    if (isSelected) {
                         ctx.fillStyle = COLORS.selectionBorder;
                         ctx.fillRect(0, Math.max(HEADER_HEIGHT, headerY),
                             HEADER_WIDTH, Math.min(rowH, headerY + rowH - HEADER_HEIGHT));
@@ -636,6 +716,53 @@
             ctx.lineTo(resizePreviewX + 0.5, viewHeight);
             ctx.stroke();
             ctx.setLineDash([]);
+            ctx.restore();
+        }
+
+        // Draw drag/drop preview indicator
+        function drawDragPreview() {
+            if (!isDraggingColumn && !isDraggingRow) return;
+
+            const container = document.getElementById('canvas-container');
+            const viewWidth = container.clientWidth;
+            const viewHeight = container.clientHeight;
+
+            ctx.save();
+            ctx.strokeStyle = '#ff6b00'; // Orange for drop indicator
+            ctx.lineWidth = 3;
+
+            if (isDraggingColumn) {
+                // Draw vertical drop indicator line
+                ctx.beginPath();
+                ctx.moveTo(dragPreviewX + 0.5, 0);
+                ctx.lineTo(dragPreviewX + 0.5, viewHeight);
+                ctx.stroke();
+
+                // Draw small triangle at top
+                ctx.fillStyle = '#ff6b00';
+                ctx.beginPath();
+                ctx.moveTo(dragPreviewX, 0);
+                ctx.lineTo(dragPreviewX - 6, 10);
+                ctx.lineTo(dragPreviewX + 6, 10);
+                ctx.closePath();
+                ctx.fill();
+            } else if (isDraggingRow) {
+                // Draw horizontal drop indicator line
+                ctx.beginPath();
+                ctx.moveTo(0, dragPreviewY + 0.5);
+                ctx.lineTo(viewWidth, dragPreviewY + 0.5);
+                ctx.stroke();
+
+                // Draw small triangle on left
+                ctx.fillStyle = '#ff6b00';
+                ctx.beginPath();
+                ctx.moveTo(0, dragPreviewY);
+                ctx.lineTo(10, dragPreviewY - 6);
+                ctx.lineTo(10, dragPreviewY + 6);
+                ctx.closePath();
+                ctx.fill();
+            }
+
             ctx.restore();
         }
 
@@ -702,14 +829,73 @@
                 }
             }
 
-            if (x < HEADER_WIDTH || y < HEADER_HEIGHT) {
-                // Start dragging in header area
-                isDragging = true;
-                lastMouseX = e.clientX;
-                lastMouseY = e.clientY;
-                canvas.style.cursor = 'grabbing';
-            } else {
-                // Cell selection (getColAtX/getRowAtY already handle scroll offset)
+            // Click on column header (not resize handle) - select entire column
+            if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
+                const col = getColAtX(x);
+                if (col >= 0) {
+                    // Clear cell and row selection
+                    selectedCell = null;
+                    selectedRow = null;
+                    selectedColumn = col;
+
+                    // Start column drag reorder
+                    isDraggingColumn = true;
+                    dragSourceIndex = col;
+                    dragTargetIndex = col;
+
+                    // Calculate initial preview position
+                    let colX = HEADER_WIDTH - scrollX;
+                    for (let i = 0; i < col; i++) {
+                        colX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                    }
+                    dragPreviewX = colX;
+
+                    canvas.style.cursor = 'grab';
+                    render();
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // Click on row header - select entire row
+            if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
+                const row = getRowAtY(y);
+                if (row >= 0) {
+                    // Clear cell and column selection
+                    selectedCell = null;
+                    selectedColumn = null;
+                    selectedRow = row;
+
+                    // Start row drag reorder
+                    isDraggingRow = true;
+                    dragSourceIndex = row;
+                    dragTargetIndex = row;
+
+                    // Calculate initial preview position
+                    let rowY = HEADER_HEIGHT - scrollY;
+                    for (let i = 0; i < row; i++) {
+                        rowY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                    }
+                    dragPreviewY = rowY;
+
+                    canvas.style.cursor = 'grab';
+                    render();
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // Click on corner (top-left) - do nothing for now
+            if (x < HEADER_WIDTH && y < HEADER_HEIGHT) {
+                return;
+            }
+
+            // Cell selection in grid area
+            if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+                // Clear column/row selection
+                selectedColumn = null;
+                selectedRow = null;
+
                 const col = getColAtX(x);
                 const row = getRowAtY(y);
 
@@ -740,6 +926,34 @@
                 render();
                 // Draw resize preview line
                 drawResizePreview();
+            } else if (isDraggingColumn) {
+                // Update drag target and preview
+                dragTargetIndex = getDropTargetCol(x);
+
+                // Calculate drop indicator position
+                let targetX = HEADER_WIDTH - scrollX;
+                for (let i = 0; i < dragTargetIndex; i++) {
+                    targetX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                }
+                dragPreviewX = targetX;
+
+                canvas.style.cursor = 'grabbing';
+                render();
+                drawDragPreview();
+            } else if (isDraggingRow) {
+                // Update drag target and preview
+                dragTargetIndex = getDropTargetRow(y);
+
+                // Calculate drop indicator position
+                let targetY = HEADER_HEIGHT - scrollY;
+                for (let i = 0; i < dragTargetIndex; i++) {
+                    targetY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                }
+                dragPreviewY = targetY;
+
+                canvas.style.cursor = 'grabbing';
+                render();
+                drawDragPreview();
             } else if (isDragging) {
                 const dx = e.clientX - lastMouseX;
                 const dy = e.clientY - lastMouseY;
@@ -811,6 +1025,78 @@
                 resizeColIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
+            } else if (isDraggingColumn) {
+                // Finish column drag reorder
+                if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
+                    // Only move if target is different from source
+                    const colId = getColumnId(dragSourceIndex);
+                    if (colId) {
+                        try {
+                            const res = await fetch(`/api/column/${colId}/move`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ position: dragTargetIndex })
+                            });
+                            if (res.ok) {
+                                // Update selection to follow the moved column
+                                if (dragTargetIndex > dragSourceIndex) {
+                                    selectedColumn = dragTargetIndex - 1;
+                                } else {
+                                    selectedColumn = dragTargetIndex;
+                                }
+                                // Refresh data
+                                await fetchSheetInfo();
+                                await fetchViewport();
+                            } else {
+                                console.error('Failed to move column');
+                            }
+                        } catch (err) {
+                            console.error('Error moving column:', err);
+                        }
+                    }
+                }
+
+                isDraggingColumn = false;
+                dragSourceIndex = -1;
+                dragTargetIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            } else if (isDraggingRow) {
+                // Finish row drag reorder
+                if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
+                    // Only move if target is different from source
+                    const rowId = getRowId(dragSourceIndex);
+                    if (rowId) {
+                        try {
+                            const res = await fetch(`/api/row/${rowId}/move`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ position: dragTargetIndex })
+                            });
+                            if (res.ok) {
+                                // Update selection to follow the moved row
+                                if (dragTargetIndex > dragSourceIndex) {
+                                    selectedRow = dragTargetIndex - 1;
+                                } else {
+                                    selectedRow = dragTargetIndex;
+                                }
+                                // Refresh data
+                                await fetchSheetInfo();
+                                await fetchViewport();
+                            } else {
+                                console.error('Failed to move row');
+                            }
+                        } catch (err) {
+                            console.error('Error moving row:', err);
+                        }
+                    }
+                }
+
+                isDraggingRow = false;
+                dragSourceIndex = -1;
+                dragTargetIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
             } else if (isDragging) {
                 isDragging = false;
                 canvas.style.cursor = 'default';
@@ -822,6 +1108,20 @@
                 // Cancel resize on mouse leave
                 isResizing = false;
                 resizeColIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            } else if (isDraggingColumn) {
+                // Cancel column drag on mouse leave
+                isDraggingColumn = false;
+                dragSourceIndex = -1;
+                dragTargetIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            } else if (isDraggingRow) {
+                // Cancel row drag on mouse leave
+                isDraggingRow = false;
+                dragSourceIndex = -1;
+                dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
             } else if (isDragging) {
