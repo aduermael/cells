@@ -709,9 +709,9 @@
                 lastMouseY = e.clientY;
                 canvas.style.cursor = 'grabbing';
             } else {
-                // Cell selection
-                const col = getColAtX(x + scrollX);
-                const row = getRowAtY(y + scrollY);
+                // Cell selection (getColAtX/getRowAtY already handle scroll offset)
+                const col = getColAtX(x);
+                const row = getRowAtY(y);
 
                 if (col >= 0 && row >= 0) {
                     selectedCell = { col, row };
@@ -838,8 +838,8 @@
 
             // Only in cell area, not headers
             if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
-                const col = getColAtX(x + scrollX);
-                const row = getRowAtY(y + scrollY);
+                const col = getColAtX(x);
+                const row = getRowAtY(y);
 
                 if (col >= 0 && row >= 0) {
                     selectedCell = { col, row };
