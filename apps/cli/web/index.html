@@ -624,6 +624,13 @@
             }
         });
 
+        // Live sync: cell editor -> formula bar
+        cellEditor.addEventListener('input', () => {
+            if (isEditing) {
+                formulaInput.value = cellEditor.value;
+            }
+        });
+
         // ========================================================================
         // Formula Bar Editing
         // ========================================================================
@@ -695,6 +702,13 @@
         formulaInput.addEventListener('blur', () => {
             if (isEditingFormulaBar && selectedCell) {
                 commitFormulaBarEdit();
+            }
+        });
+
+        // Live sync: formula bar -> cell editor (when cell editor is visible)
+        formulaInput.addEventListener('input', () => {
+            if (isEditing && cellEditor.style.display !== 'none') {
+                cellEditor.value = formulaInput.value;
             }
         });
 
