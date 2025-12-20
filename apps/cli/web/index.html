@@ -138,6 +138,14 @@
         let isEditing = false;
         const cellEditor = document.getElementById('cell-editor');
 
+        // Column resize state
+        let isResizing = false;
+        let resizeColIndex = -1;
+        let resizeStartX = 0;
+        let resizeStartWidth = 0;
+        let resizePreviewX = 0;
+        const RESIZE_HANDLE_WIDTH = 6; // pixels on each side of column border
+
         // Column widths and row heights cache (position -> size)
         let colWidths = new Map();
         let rowHeights = new Map();
@@ -184,6 +192,34 @@
                 row++;
             }
             return row;
+        }
+
+        // Check if mouse is over a column resize handle (returns column index or -1)
+        function getResizeHandleCol(mouseX) {
+            if (!sheetInfo) return -1;
+
+            let x = HEADER_WIDTH - scrollX;
+            for (let col = 0; col < sheetInfo.colCount; col++) {
+                const colW = colWidths.get(col) || DEFAULT_COL_WIDTH;
+                const rightEdge = x + colW;
+
+                // Check if within resize handle area (near the right edge of column)
+                if (mouseX >= rightEdge - RESIZE_HANDLE_WIDTH && mouseX <= rightEdge + RESIZE_HANDLE_WIDTH) {
+                    return col;
+                }
+                x = rightEdge;
+            }
+            return -1;
+        }
+
+        // Get column ID at position
+        function getColumnId(colPos) {
+            for (const col of columns) {
+                if (col.pos === colPos) {
+                    return col.id;
+                }
+            }
+            return null;
         }
 
         // Resize canvas to container
@@ -584,6 +620,25 @@
             loading.style.display = 'none';
         }
 
+        // Draw resize preview line
+        function drawResizePreview() {
+            if (!isResizing) return;
+
+            const container = document.getElementById('canvas-container');
+            const viewHeight = container.clientHeight;
+
+            ctx.save();
+            ctx.strokeStyle = COLORS.selectionBorder;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(resizePreviewX + 0.5, 0);
+            ctx.lineTo(resizePreviewX + 0.5, viewHeight);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+
         // Debounce helper
         function debounce(fn, delay) {
             let timer = null;
@@ -612,11 +667,34 @@
             debouncedFetch();
         }, { passive: false });
 
-        // Handle mouse down for selection and dragging
+        // Handle mouse down for selection, dragging, and column resizing
         canvas.addEventListener('mousedown', (e) => {
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
+
+            // Check for column resize handle in header area
+            if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
+                const resizeCol = getResizeHandleCol(x);
+                if (resizeCol >= 0) {
+                    // Start column resize
+                    isResizing = true;
+                    resizeColIndex = resizeCol;
+                    resizeStartX = e.clientX;
+                    resizeStartWidth = colWidths.get(resizeCol) || DEFAULT_COL_WIDTH;
+
+                    // Calculate preview line position
+                    let colX = HEADER_WIDTH - scrollX;
+                    for (let i = 0; i <= resizeCol; i++) {
+                        colX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                    }
+                    resizePreviewX = colX;
+
+                    canvas.style.cursor = 'col-resize';
+                    e.preventDefault();
+                    return;
+                }
+            }
 
             if (x < HEADER_WIDTH || y < HEADER_HEIGHT) {
                 // Start dragging in header area
@@ -637,7 +715,26 @@
         });
 
         canvas.addEventListener('mousemove', (e) => {
-            if (isDragging) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            if (isResizing) {
+                // Update resize preview
+                const delta = e.clientX - resizeStartX;
+                const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
+
+                // Update preview position
+                let colX = HEADER_WIDTH - scrollX;
+                for (let i = 0; i < resizeColIndex; i++) {
+                    colX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                }
+                resizePreviewX = colX + newWidth;
+
+                render();
+                // Draw resize preview line
+                drawResizePreview();
+            } else if (isDragging) {
                 const dx = e.clientX - lastMouseX;
                 const dy = e.clientY - lastMouseY;
 
@@ -652,18 +749,76 @@
 
                 render();
                 debouncedFetch();
+            } else {
+                // Check for resize cursor in header area
+                if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
+                    const resizeCol = getResizeHandleCol(x);
+                    if (resizeCol >= 0) {
+                        canvas.style.cursor = 'col-resize';
+                    } else {
+                        canvas.style.cursor = 'default';
+                    }
+                } else {
+                    canvas.style.cursor = 'default';
+                }
             }
         });
 
-        canvas.addEventListener('mouseup', () => {
-            if (isDragging) {
+        canvas.addEventListener('mouseup', async (e) => {
+            if (isResizing) {
+                // Finish column resize
+                const delta = e.clientX - resizeStartX;
+                const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
+
+                // Update local cache
+                colWidths.set(resizeColIndex, newWidth);
+
+                // Get column ID - use position-based API if no column exists yet
+                const colId = getColumnId(resizeColIndex);
+                try {
+                    let url;
+                    if (colId) {
+                        url = `/api/column/${colId}/resize`;
+                    } else {
+                        // Column doesn't exist yet, use position-based endpoint
+                        url = `/api/column-by-pos/${resizeColIndex}/resize`;
+                    }
+
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ width: newWidth })
+                    });
+                    if (!res.ok) {
+                        console.error('Failed to resize column');
+                    } else {
+                        // If a new column was created, refresh viewport to get the ID
+                        if (!colId) {
+                            await fetchViewport();
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error resizing column:', err);
+                }
+
+                isResizing = false;
+                resizeColIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            } else if (isDragging) {
                 isDragging = false;
                 canvas.style.cursor = 'default';
             }
         });
 
         canvas.addEventListener('mouseleave', () => {
-            if (isDragging) {
+            if (isResizing) {
+                // Cancel resize on mouse leave
+                isResizing = false;
+                resizeColIndex = -1;
+                canvas.style.cursor = 'default';
+                render();
+            } else if (isDragging) {
                 isDragging = false;
                 canvas.style.cursor = 'default';
             }

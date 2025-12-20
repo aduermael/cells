@@ -397,6 +397,177 @@ void Server::setupRoutes() {
                       res.set_content("{\"success\":true}", "application/json");
                   });
 
+    // POST /api/column/:id/resize - resize a column
+    _server->Post(R"(/api/column/([^/]+)/resize)",
+                  [this](const httplib::Request& req, httplib::Response& res) {
+                      if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+                          res.status = 500;
+                          res.set_content("{\"error\":\"No sheet available\"}", "application/json");
+                          return;
+                      }
+
+                      auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+                      if (!sheet) {
+                          res.status = 500;
+                          res.set_content("{\"error\":\"Sheet not found\"}", "application/json");
+                          return;
+                      }
+
+                      // Get column ID from URL
+                      std::string colIdStr = req.matches[1];
+                      if (colIdStr.size() != ID_LENGTH) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid column ID\"}", "application/json");
+                          return;
+                      }
+                      ID colId(colIdStr);
+
+                      // Find column
+                      auto it = sheet->columns.find(colId);
+                      if (it == sheet->columns.end()) {
+                          res.status = 404;
+                          res.set_content("{\"error\":\"Column not found\"}", "application/json");
+                          return;
+                      }
+
+                      // Parse request body for "width" field
+                      std::string body = req.body;
+
+                      // Find "width": in the JSON
+                      size_t widthPos = body.find("\"width\"");
+                      if (widthPos == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Missing width field\"}", "application/json");
+                          return;
+                      }
+
+                      // Find the colon and value
+                      size_t colonPos = body.find(':', widthPos);
+                      if (colonPos == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
+                          return;
+                      }
+
+                      // Find the number
+                      size_t numStart = body.find_first_of("0123456789", colonPos + 1);
+                      if (numStart == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid width value\"}", "application/json");
+                          return;
+                      }
+                      size_t numEnd = body.find_first_not_of("0123456789", numStart);
+                      if (numEnd == std::string::npos) {
+                          numEnd = body.size();
+                      }
+
+                      uint32_t newWidth =
+                          static_cast<uint32_t>(std::stoul(body.substr(numStart, numEnd - numStart)));
+
+                      // Minimum width of 20 pixels
+                      if (newWidth < 20) {
+                          newWidth = 20;
+                      }
+                      // Maximum width of 1000 pixels
+                      if (newWidth > 1000) {
+                          newWidth = 1000;
+                      }
+
+                      // Update column width
+                      it->second->size = newWidth;
+
+                      res.set_content("{\"success\":true}", "application/json");
+                  });
+
+    // POST /api/column-by-pos/:pos/resize - resize a column by position (creates column if needed)
+    _server->Post(R"(/api/column-by-pos/(\d+)/resize)",
+                  [this](const httplib::Request& req, httplib::Response& res) {
+                      if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+                          res.status = 500;
+                          res.set_content("{\"error\":\"No sheet available\"}", "application/json");
+                          return;
+                      }
+
+                      auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+                      if (!sheet) {
+                          res.status = 500;
+                          res.set_content("{\"error\":\"Sheet not found\"}", "application/json");
+                          return;
+                      }
+
+                      // Get column position from URL
+                      uint32_t colPos =
+                          static_cast<uint32_t>(std::stoul(std::string(req.matches[1])));
+
+                      // Parse request body for "width" field
+                      std::string body = req.body;
+
+                      // Find "width": in the JSON
+                      size_t widthPos = body.find("\"width\"");
+                      if (widthPos == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Missing width field\"}", "application/json");
+                          return;
+                      }
+
+                      // Find the colon and value
+                      size_t colonPos = body.find(':', widthPos);
+                      if (colonPos == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid JSON\"}", "application/json");
+                          return;
+                      }
+
+                      // Find the number
+                      size_t numStart = body.find_first_of("0123456789", colonPos + 1);
+                      if (numStart == std::string::npos) {
+                          res.status = 400;
+                          res.set_content("{\"error\":\"Invalid width value\"}", "application/json");
+                          return;
+                      }
+                      size_t numEnd = body.find_first_not_of("0123456789", numStart);
+                      if (numEnd == std::string::npos) {
+                          numEnd = body.size();
+                      }
+
+                      uint32_t newWidth =
+                          static_cast<uint32_t>(std::stoul(body.substr(numStart, numEnd - numStart)));
+
+                      // Minimum width of 20 pixels
+                      if (newWidth < 20) {
+                          newWidth = 20;
+                      }
+                      // Maximum width of 1000 pixels
+                      if (newWidth > 1000) {
+                          newWidth = 1000;
+                      }
+
+                      // Find column at position, or create it
+                      Axis* column = nullptr;
+                      for (auto& [id, col] : sheet->columns) {
+                          if (col->position == colPos) {
+                              column = col.get();
+                              break;
+                          }
+                      }
+
+                      if (!column) {
+                          // Create new column
+                          auto newCol = std::make_unique<Axis>(generate_id(), true);
+                          newCol->position = colPos;
+                          newCol->size = newWidth;
+                          column = newCol.get();
+                          sheet->addColumn(std::move(newCol));
+                      } else {
+                          column->size = newWidth;
+                      }
+
+                      // Return the column ID so frontend can update its cache
+                      std::ostringstream json;
+                      json << "{\"success\":true,\"id\":\"" << column->id.toString() << "\"}";
+                      res.set_content(json.str(), "application/json");
+                  });
+
     // POST /api/cell - create new cell at position
     _server->Post("/api/cell", [this](const httplib::Request& req, httplib::Response& res) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
