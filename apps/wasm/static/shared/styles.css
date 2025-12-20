@@ -414,3 +414,152 @@ canvas {
 .dropdown-item:disabled:hover {
     background: none;
 }
+
+/* Sheet Tabs */
+#sheet-tabs {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    gap: 2px;
+    min-height: 32px;
+}
+
+#sheet-tabs.hidden {
+    display: none;
+}
+
+#sheet-tabs-container {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    overflow-x: auto;
+    flex: 1;
+}
+
+/* Hide scrollbar but keep functionality */
+#sheet-tabs-container::-webkit-scrollbar {
+    display: none;
+}
+
+#sheet-tabs-container {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.sheet-tab {
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6c757d;
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 4px 4px 0 0;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    position: relative;
+    user-select: none;
+}
+
+.sheet-tab:hover {
+    background: #e9ecef;
+    color: #495057;
+}
+
+.sheet-tab.active {
+    background: #fff;
+    color: #212529;
+    border-color: #dee2e6;
+    border-bottom-color: #fff;
+    margin-bottom: -1px;
+    padding-bottom: 5px;
+}
+
+.sheet-tab.dragging {
+    opacity: 0.5;
+}
+
+.sheet-tab-add {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 22px;
+    color: #6c757d;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.sheet-tab-add:hover {
+    background: #e9ecef;
+    color: #495057;
+    border-color: #dee2e6;
+}
+
+.sheet-tab-add:active {
+    background: #dee2e6;
+}
+
+/* Sheet Tab Context Menu */
+.sheet-tab-context-menu {
+    position: fixed;
+    min-width: 120px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 2000;
+    padding: 4px 0;
+}
+
+.sheet-tab-context-menu-item {
+    display: block;
+    width: 100%;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #212529;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.sheet-tab-context-menu-item:hover {
+    background: #f8f9fa;
+}
+
+.sheet-tab-context-menu-item:active {
+    background: #e9ecef;
+}
+
+.sheet-tab-context-menu-item.danger {
+    color: #dc3545;
+}
+
+.sheet-tab-context-menu-item.danger:hover {
+    background: #fff5f5;
+}
+
+/* Sheet Tab Inline Editor */
+.sheet-tab-editor {
+    padding: 3px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #212529;
+    background: #fff;
+    border: 2px solid #0d6efd;
+    border-radius: 4px;
+    outline: none;
+    min-width: 60px;
+    max-width: 200px;
+}

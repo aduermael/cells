@@ -127,7 +127,7 @@ Allow click-and-drag to select a rectangular range of cells.
 
 Display sheet tabs at the bottom of the grid for multi-sheet navigation and management.
 
-- [ ] 10a: Add sheet tabs container HTML/CSS at bottom of canvas area
+- [x] 10a: Add sheet tabs container HTML/CSS at bottom of canvas area
 - [ ] 10b: Fetch and display list of sheets from workbook
 - [ ] 10c: Implement sheet switching (click tab to change active sheet)
 - [ ] 10d: Add "+" button to create new sheet
