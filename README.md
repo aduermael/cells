@@ -243,17 +243,22 @@ python3 -m http.server 8080 --directory dist
 - Networking (WebRTC)
 - Native platform apps (SwiftUI, WinUI)
 
-## Decisions Made
+## Design Decisions
 
-- [x] **Language**: C++17 for core engine (C for heavy independent tasks)
-- [x] **Build system**: Bazel - fast incremental builds, hermetic
-- [x] **Formula runtime**: Native AST interpreter - no dependencies, simpler, full control
-- [x] **Cell storage**: Sharded hashmap - O(1) access, parallelizable
-- [x] **Undo/redo**: Branch-based history - aligns with git-friendly philosophy, clean CRDT semantics
-- [x] **Dimensions**: Start with 2D, but model supports N dimensions - naming and structures are dimension-agnostic
-- [x] **UI framework**: Platform-native (SwiftUI for Apple, WinUI for Windows, React+Canvas for web)
-- [x] **Networking**: P2P via WebRTC - no relay servers, CRDT-native sync
-- [x] **Type system**: Completely optional - Excel-like by default, column types as gradual discovery for stickiness
+**Implemented:**
+- [x] **Language**: C++17 for core engine
+- [x] **Build system**: Bazel with Bzlmod - fast incremental builds, hermetic
+- [x] **Cell storage**: Sparse quadtree - efficient viewport queries, O(log n) access
+- [x] **Cell IDs**: 8-character base62 UUIDs - compact, collision-resistant
+- [x] **Web UI**: Canvas2D with Web Worker - non-blocking, responsive
+- [x] **State management**: Listener pattern - WASM notifies JS of changes
+
+**Planned (not yet implemented):**
+- [ ] **Formula runtime**: Native AST interpreter - no dependencies, simpler, full control
+- [ ] **Undo/redo**: Branch-based history - aligns with git-friendly philosophy, clean CRDT semantics
+- [ ] **Networking**: P2P via WebRTC - no relay servers, CRDT-native sync
+- [ ] **Native apps**: Platform-native UI (SwiftUI for Apple, WinUI for Windows)
+- [ ] **Type system**: Completely optional - Excel-like by default, column types as gradual discovery
 
 ## Design Philosophy
 
