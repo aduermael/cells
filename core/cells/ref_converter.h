@@ -62,10 +62,6 @@ public:
     // Must be called before conversion if using UUID refs
     void setContext(const Sheet& sheet);
 
-    // Set context from ordered ID lists (for when you already have them computed)
-    // Note: This overload doesn't support cell UUID lookups, only col/row based refs
-    void setContext(const std::vector<ID>& columnIds, const std::vector<ID>& rowIds);
-
     // Clear context
     void clearContext();
 
@@ -73,7 +69,8 @@ public:
     // UUID to A1 conversion (for export)
     // ============================================================================
 
-    // Convert a single cell reference from UUID format ($colId$rowId) to A1
+    // Convert a single cell reference from UUID format to A1
+    // Input: $$cellId, $~cellId, ~$cellId, or cellId
     // Returns empty string if conversion fails
     [[nodiscard]] std::string uuidRefToA1(const std::string& ref) const;
 
@@ -156,13 +153,6 @@ private:
 
     // Extract A1 ref at position, returns length consumed (0 if not valid)
     [[nodiscard]] static size_t extractA1Ref(const std::string& formula, size_t pos, CellRef& ref);
-
-    // Legacy: Check if we're at the start of old UUID ref pattern ($colId$rowId)
-    [[nodiscard]] static bool isLegacyUuidRefStart(const std::string& formula, size_t pos);
-
-    // Legacy: Extract old UUID ref at position
-    [[nodiscard]] static size_t extractLegacyUuidRef(const std::string& formula, size_t pos,
-                                                     std::string& colId, std::string& rowId);
 };
 
 }  // namespace cells

@@ -263,6 +263,31 @@ std::unique_ptr<Sheet> createTestSheet() {
     return sheet;
 }
 
+// Helper to get cell ID at a given col/row position
+std::string getCellIdAt(const Sheet& sheet, size_t colPos, size_t rowPos) {
+    // Find col and row IDs by position
+    ID colId, rowId;
+    for (const auto& pair : sheet.columns) {
+        if (pair.second->position == colPos) {
+            colId = pair.first;
+            break;
+        }
+    }
+    for (const auto& pair : sheet.rows) {
+        if (pair.second->position == rowPos) {
+            rowId = pair.first;
+            break;
+        }
+    }
+    // Find cell at this col/row
+    for (const auto& pair : sheet.cells) {
+        if (pair.second->colId == colId && pair.second->rowId == rowId) {
+            return pair.second->id.toString();
+        }
+    }
+    return "";
+}
+
 // ============================================================================
 // UUID to A1 Conversion Tests
 // ============================================================================
@@ -272,28 +297,20 @@ TEST(RefConverterTest, UuidRefToA1WithContext) {
     RefConverter converter;
     converter.setContext(*sheet);
 
-    // Get the first column and row IDs
-    std::vector<std::pair<uint32_t, ID>> columns;
-    for (const auto& pair : sheet->columns) {
-        columns.emplace_back(pair.second->position, pair.first);
-    }
-    std::sort(columns.begin(), columns.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
+    // Get cell ID at A1 (col 0, row 0)
+    std::string cellIdA1 = getCellIdAt(*sheet, 0, 0);
+    EXPECT_FALSE(cellIdA1.empty());
+    EXPECT_EQ(converter.uuidRefToA1(cellIdA1), "A1");
 
-    std::vector<std::pair<uint32_t, ID>> rows;
-    for (const auto& pair : sheet->rows) {
-        rows.emplace_back(pair.second->position, pair.first);
-    }
-    std::sort(rows.begin(), rows.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
+    // Get cell ID at C5 (col 2, row 4)
+    std::string cellIdC5 = getCellIdAt(*sheet, 2, 4);
+    EXPECT_FALSE(cellIdC5.empty());
+    EXPECT_EQ(converter.uuidRefToA1(cellIdC5), "C5");
 
-    // Create a UUID ref for A1
-    std::string uuidRef = "$" + columns[0].second.toString() + "$" + rows[0].second.toString();
-    EXPECT_EQ(converter.uuidRefToA1(uuidRef), "A1");
-
-    // Create a UUID ref for C5
-    std::string uuidRef2 = "$" + columns[2].second.toString() + "$" + rows[4].second.toString();
-    EXPECT_EQ(converter.uuidRefToA1(uuidRef2), "C5");
+    // Test with absolute markers
+    EXPECT_EQ(converter.uuidRefToA1("$$" + cellIdA1), "$A$1");
+    EXPECT_EQ(converter.uuidRefToA1("$~" + cellIdA1), "$A1");
+    EXPECT_EQ(converter.uuidRefToA1("~$" + cellIdA1), "A$1");
 }
 
 TEST(RefConverterTest, UuidRefToA1InvalidRef) {
@@ -309,28 +326,12 @@ TEST(RefConverterTest, FormulaToA1Simple) {
     RefConverter converter;
     converter.setContext(*sheet);
 
-    // Get ordered IDs
-    std::vector<std::pair<uint32_t, ID>> columns;
-    for (const auto& pair : sheet->columns) {
-        columns.emplace_back(pair.second->position, pair.first);
-    }
-    std::sort(columns.begin(), columns.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
+    // Get cell IDs
+    std::string cellIdA1 = getCellIdAt(*sheet, 0, 0);
+    std::string cellIdB2 = getCellIdAt(*sheet, 1, 1);
 
-    std::vector<std::pair<uint32_t, ID>> rows;
-    for (const auto& pair : sheet->rows) {
-        rows.emplace_back(pair.second->position, pair.first);
-    }
-    std::sort(rows.begin(), rows.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
-
-    // Create a formula: =A1+B2
-    std::string col0 = columns[0].second.toString();
-    std::string col1 = columns[1].second.toString();
-    std::string row0 = rows[0].second.toString();
-    std::string row1 = rows[1].second.toString();
-
-    std::string formula = "$" + col0 + "$" + row0 + "+$" + col1 + "$" + row1;
+    // Create a formula using cell UUIDs: =A1+B2
+    std::string formula = cellIdA1 + "+" + cellIdB2;
     std::string result = converter.formulaToA1(formula);
     EXPECT_EQ(result, "A1+B2");
 }
@@ -340,28 +341,12 @@ TEST(RefConverterTest, FormulaToA1WithFunctions) {
     RefConverter converter;
     converter.setContext(*sheet);
 
-    // Get ordered IDs
-    std::vector<std::pair<uint32_t, ID>> columns;
-    for (const auto& pair : sheet->columns) {
-        columns.emplace_back(pair.second->position, pair.first);
-    }
-    std::sort(columns.begin(), columns.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
+    // Get cell IDs
+    std::string cellIdA1 = getCellIdAt(*sheet, 0, 0);
+    std::string cellIdB2 = getCellIdAt(*sheet, 1, 1);
 
-    std::vector<std::pair<uint32_t, ID>> rows;
-    for (const auto& pair : sheet->rows) {
-        rows.emplace_back(pair.second->position, pair.first);
-    }
-    std::sort(rows.begin(), rows.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
-
-    // Create a formula: =SUM(A1,B2)
-    std::string col0 = columns[0].second.toString();
-    std::string col1 = columns[1].second.toString();
-    std::string row0 = rows[0].second.toString();
-    std::string row1 = rows[1].second.toString();
-
-    std::string formula = "SUM($" + col0 + "$" + row0 + ",$" + col1 + "$" + row1 + ")";
+    // Create a formula using cell UUIDs: =SUM(A1,B2)
+    std::string formula = "SUM(" + cellIdA1 + "," + cellIdB2 + ")";
     std::string result = converter.formulaToA1(formula);
     EXPECT_EQ(result, "SUM(A1,B2)");
 }
@@ -518,22 +503,6 @@ TEST(RefConverterTest, ClearContext) {
 
     // Should fail now
     EXPECT_TRUE(converter.a1RefToUuid("A1").empty());
-}
-
-TEST(RefConverterTest, SetContextFromIds) {
-    std::vector<ID> columnIds = {generate_id(), generate_id(), generate_id()};
-    std::vector<ID> rowIds = {generate_id(), generate_id()};
-
-    RefConverter converter;
-    converter.setContext(columnIds, rowIds);
-
-    // Should be able to convert A1
-    std::string uuidRef = converter.a1RefToUuid("A1");
-    EXPECT_FALSE(uuidRef.empty());
-
-    // Should contain the first column and row IDs
-    EXPECT_NE(uuidRef.find(columnIds[0].toString()), std::string::npos);
-    EXPECT_NE(uuidRef.find(rowIds[0].toString()), std::string::npos);
 }
 
 // ============================================================================

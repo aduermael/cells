@@ -320,8 +320,8 @@ TEST(XLSXReadErrorTest, ToStringWithLocation) {
     XLSXReadError error("Test error", "Sheet1", 5, 3);
     std::string str = error.toString();
     EXPECT_TRUE(str.find("Sheet1") != std::string::npos);
-    EXPECT_TRUE(str.find("row 5") != std::string::npos);
-    EXPECT_TRUE(str.find("column 3") != std::string::npos);
+    EXPECT_TRUE(str.find("row: 5") != std::string::npos);
+    EXPECT_TRUE(str.find("col: 3") != std::string::npos);
     EXPECT_TRUE(str.find("Test error") != std::string::npos);
 }
 

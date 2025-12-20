@@ -65,30 +65,6 @@ void RefConverter::setContext(const Sheet& sheet) {
     }
 }
 
-void RefConverter::setContext(const std::vector<ID>& columnIds, const std::vector<ID>& rowIds) {
-    colIdToIndex_.clear();
-    rowIdToIndex_.clear();
-    indexToColId_.clear();
-    indexToRowId_.clear();
-    cellIdToLocation_.clear();
-    locationToCellId_.clear();
-
-    indexToColId_.reserve(columnIds.size());
-    indexToRowId_.reserve(rowIds.size());
-
-    for (size_t i = 0; i < columnIds.size(); ++i) {
-        const std::string idStr = columnIds[i].toString();
-        colIdToIndex_[idStr] = i;
-        indexToColId_.push_back(idStr);
-    }
-    for (size_t i = 0; i < rowIds.size(); ++i) {
-        const std::string idStr = rowIds[i].toString();
-        rowIdToIndex_[idStr] = i;
-        indexToRowId_.push_back(idStr);
-    }
-    // Note: Cell lookup maps are not populated - this overload only supports col/row refs
-}
-
 void RefConverter::clearContext() {
     colIdToIndex_.clear();
     rowIdToIndex_.clear();
@@ -265,25 +241,22 @@ std::string RefConverter::formatUuidRef(const CellRef& ref) const {
 
     // Look up cell ID from (colId, rowId)
     auto cellIt = locationToCellId_.find(makeLocationKey(colId, rowId));
-    if (cellIt != locationToCellId_.end()) {
-        // Use new cell UUID format
-        const std::string& cellId = cellIt->second;
-        switch (ref.type) {
-            case ReferenceType::ABSOLUTE:
-                return "$$" + cellId;
-            case ReferenceType::COL_ABS:
-                return "$~" + cellId;
-            case ReferenceType::ROW_ABS:
-                return "~$" + cellId;
-            case ReferenceType::RELATIVE:
-            default:
-                return cellId;
-        }
+    if (cellIt == locationToCellId_.end()) {
+        return "";  // Cell doesn't exist at this location
     }
 
-    // Fall back to legacy format if cell doesn't exist
-    // This can happen when context was set with setContext(columnIds, rowIds)
-    return "$" + colId + "$" + rowId;
+    const std::string& cellId = cellIt->second;
+    switch (ref.type) {
+        case ReferenceType::ABSOLUTE:
+            return "$$" + cellId;
+        case ReferenceType::COL_ABS:
+            return "$~" + cellId;
+        case ReferenceType::ROW_ABS:
+            return "~$" + cellId;
+        case ReferenceType::RELATIVE:
+        default:
+            return cellId;
+    }
 }
 
 // ============================================================================
@@ -405,50 +378,6 @@ size_t RefConverter::extractCellRef(const std::string& formula, size_t pos, std:
 }
 
 // ============================================================================
-// Legacy UUID Ref Extraction (old $colId$rowId format)
-// ============================================================================
-
-bool RefConverter::isLegacyUuidRefStart(const std::string& formula, size_t pos) {
-    // Check for $<8-char-id>$<8-char-id> pattern
-    // Minimum length: 1 + 8 + 1 + 8 = 18
-    if (pos + 17 >= formula.size()) {
-        return false;
-    }
-    if (formula[pos] != '$') {
-        return false;
-    }
-    if (formula[pos + 9] != '$') {
-        return false;
-    }
-    // Check that the 8 characters after first $ and second $ are valid ID characters
-    // (alphanumeric for base62)
-    for (size_t i = 1; i <= 8; ++i) {
-        const char c = formula[pos + i];
-        if (std::isalnum(c) == 0) {
-            return false;
-        }
-    }
-    for (size_t i = 10; i <= 17; ++i) {
-        const char c = formula[pos + i];
-        if (std::isalnum(c) == 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
-size_t RefConverter::extractLegacyUuidRef(const std::string& formula, size_t pos,
-                                          std::string& colId, std::string& rowId) {
-    if (!isLegacyUuidRefStart(formula, pos)) {
-        return 0;
-    }
-
-    colId = formula.substr(pos + 1, 8);
-    rowId = formula.substr(pos + 10, 8);
-    return 18;  // Total length consumed
-}
-
-// ============================================================================
 // A1 Ref Extraction
 // ============================================================================
 
@@ -529,50 +458,40 @@ size_t RefConverter::extractA1Ref(const std::string& formula, size_t pos, CellRe
 // ============================================================================
 
 std::string RefConverter::uuidRefToA1(const std::string& ref) const {
-    // Try new cell UUID format first
     // Format: $$cellId, $~cellId, ~$cellId, or cellId
     std::string cellId;
     ReferenceType refType = ReferenceType::RELATIVE;
     const size_t len = extractCellRef(ref, 0, cellId, refType);
 
-    if (len > 0 && len == ref.size()) {
-        // Found a cell UUID ref, look up the cell
-        auto cellIt = cellIdToLocation_.find(cellId);
-        if (cellIt != cellIdToLocation_.end()) {
-            const CellLocation& loc = cellIt->second;
-            auto colIt = colIdToIndex_.find(loc.colId);
-            auto rowIt = rowIdToIndex_.find(loc.rowId);
-
-            if (colIt != colIdToIndex_.end() && rowIt != rowIdToIndex_.end()) {
-                // Build A1 notation with absolute markers
-                std::string result;
-                if (refType == ReferenceType::ABSOLUTE || refType == ReferenceType::COL_ABS) {
-                    result += '$';
-                }
-                result += columnIndexToLetter(colIt->second);
-                if (refType == ReferenceType::ABSOLUTE || refType == ReferenceType::ROW_ABS) {
-                    result += '$';
-                }
-                result += std::to_string(rowIt->second + 1);
-                return result;
-            }
-        }
+    if (len == 0 || len != ref.size()) {
+        return "";
     }
 
-    // Try legacy format: $colId$rowId (18 chars)
-    if (ref.size() == 18 && ref[0] == '$' && ref[9] == '$') {
-        const std::string colId = ref.substr(1, 8);
-        const std::string rowId = ref.substr(10, 8);
-
-        auto colIt = colIdToIndex_.find(colId);
-        auto rowIt = rowIdToIndex_.find(rowId);
-
-        if (colIt != colIdToIndex_.end() && rowIt != rowIdToIndex_.end()) {
-            return columnIndexToLetter(colIt->second) + std::to_string(rowIt->second + 1);
-        }
+    // Look up the cell
+    auto cellIt = cellIdToLocation_.find(cellId);
+    if (cellIt == cellIdToLocation_.end()) {
+        return "";
     }
 
-    return "";
+    const CellLocation& loc = cellIt->second;
+    auto colIt = colIdToIndex_.find(loc.colId);
+    auto rowIt = rowIdToIndex_.find(loc.rowId);
+
+    if (colIt == colIdToIndex_.end() || rowIt == rowIdToIndex_.end()) {
+        return "";
+    }
+
+    // Build A1 notation with absolute markers
+    std::string result;
+    if (refType == ReferenceType::ABSOLUTE || refType == ReferenceType::COL_ABS) {
+        result += '$';
+    }
+    result += columnIndexToLetter(colIt->second);
+    if (refType == ReferenceType::ABSOLUTE || refType == ReferenceType::ROW_ABS) {
+        result += '$';
+    }
+    result += std::to_string(rowIt->second + 1);
+    return result;
 }
 
 std::string RefConverter::formulaToA1(const std::string& formula) const {
@@ -581,10 +500,9 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
 
     size_t i = 0;
     while (i < formula.size()) {
-        // Try new cell UUID format first
         std::string cellId;
         ReferenceType refType = ReferenceType::RELATIVE;
-        size_t len = extractCellRef(formula, i, cellId, refType);
+        const size_t len = extractCellRef(formula, i, cellId, refType);
 
         if (len > 0) {
             // Found a cell UUID ref, look up the cell
@@ -614,29 +532,9 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
             continue;
         }
 
-        // Try legacy format: $colId$rowId
-        std::string colId;
-        std::string rowId;
-        len = extractLegacyUuidRef(formula, i, colId, rowId);
-
-        if (len > 0) {
-            // Found a legacy UUID ref, convert it
-            auto colIt = colIdToIndex_.find(colId);
-            auto rowIt = rowIdToIndex_.find(rowId);
-
-            if (colIt != colIdToIndex_.end() && rowIt != rowIdToIndex_.end()) {
-                result += columnIndexToLetter(colIt->second);
-                result += std::to_string(rowIt->second + 1);
-            } else {
-                // Couldn't find the IDs, keep original
-                result += formula.substr(i, len);
-            }
-            i += len;
-        } else {
-            // Not a UUID ref, copy character as-is
-            result += formula[i];
-            ++i;
-        }
+        // Not a cell ref, copy character as-is
+        result += formula[i];
+        ++i;
     }
 
     return result;
@@ -652,7 +550,6 @@ std::string RefConverter::a1RefToUuid(const std::string& ref) const {
         return "";
     }
 
-    // Use formatUuidRef which handles both new cell UUID and legacy formats
     return formatUuidRef(parsed);
 }
 
