@@ -9,7 +9,7 @@ Extract common CSS, rendering logic, and utilities into shared modules to avoid 
 - [x] 1a: Create `apps/shared/` directory with shared CSS (`styles.css`)
 - [x] 1b: Create shared JavaScript module (`grid-renderer.js`) with canvas rendering logic
 - [x] 1c: Create shared JavaScript module (`grid-events.js`) with event handling
-- [ ] 1d: Create shared JavaScript module (`utils.js`) with utility functions
+- [x] 1d: Create shared JavaScript module (`utils.js`) with utility functions
 - [ ] 1e: Refactor `apps/wasm/static/index.html` to use shared modules
 - [ ] 1f: Refactor `apps/cli/web/index.html` to use shared modules
 
