@@ -239,25 +239,26 @@ type WorkerResponse =
 
 **Files created/modified:**
 - `apps/wasm/static/index.html` - Standalone viewer (WASM-only mode)
-- `apps/wasm/BUILD` - Added filegroups for static_files and dist_files
-- `Makefile` - Added wasm-dist and wasm-dist-full targets
+- `apps/wasm/BUILD` - Single cells_wasm target with full XLSX support
+- `Makefile` - Added wasm-dist target (uses --config=wasm for exceptions)
 - `apps/wasm/worker.js` - Fixed module name (createCellsModule)
+- `apps/wasm/bindings.cc` - Removed CELLS_WASM_NO_XLSX guards
 
 **Output Structure:**
 ```
 dist/
 ├── index.html          # Standalone viewer (52KB)
-├── cells_wasm.js       # Emscripten JS glue (51KB)
-├── cells_wasm.wasm     # WASM binary (292KB)
+├── cells_wasm_bin.js   # Emscripten JS glue (103KB)
+├── cells_wasm_bin.wasm # WASM binary (457KB optimized, ~1MB debug)
 ├── worker.js           # Web Worker (11KB)
 ├── client.js           # Main thread API (12KB)
 └── cells.d.ts          # TypeScript definitions (8KB)
 ```
 
 **Build Commands:**
-- `make wasm` - Build WASM module (development)
-- `make wasm-dist` - Build production distribution (without XLSX)
-- `make wasm-dist-full` - Build production distribution (with XLSX support)
+- `make wasm` - Build WASM module (development, includes XLSX)
+- `make wasm-dist` - Build production distribution (optimized)
+- `make wasm-serve` - Serve dist/ locally on http://localhost:8081/
 
 **Deployment Options:**
 
