@@ -1,13 +1,21 @@
-.PHONY: build test format lint check clean compile-db cli
+.PHONY: build test format lint check clean compile-db cli cli-release release
 
 # Build
 build:
 	bazel build //core/...
 
-# Build CLI and copy to repo root
+# Build CLI and copy to repo root (fast build, for development)
 cli:
 	bazel build //apps/cli:cells
 	cp -f bazel-bin/apps/cli/cells ./cells
+
+# Build CLI with optimizations (for production/release)
+cli-release:
+	bazel build -c opt //apps/cli:cells
+	cp -f bazel-bin/apps/cli/cells ./cells
+
+# Alias for cli-release
+release: cli-release
 
 # Test (when tests exist)
 test:
