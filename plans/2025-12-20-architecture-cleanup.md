@@ -19,15 +19,15 @@ These invariants simplify the UI significantly - no need to handle or render "em
 
 ---
 
-## Phase 0: Enforce Invariants
+## Phase 0: Enforce Invariants ✅
 
 Fix the current bugs where these invariants can be violated.
 
-- [ ] 0a: Create empty workbook/sheet on startup (before any user action)
-- [ ] 0b: Set default selection to A1 (0,0) on startup and after sheet changes
-- [ ] 0c: Change "New" button to create fresh empty sheet (not clear to "no sheet" state)
-- [ ] 0d: Remove "no workbook loaded" UI code paths and empty state rendering
-- [ ] 0e: Ensure selection resets to A1 when switching sheets
+- [x] 0a: Create empty workbook/sheet on startup (before any user action)
+- [x] 0b: Set default selection to A1 (0,0) on startup and after sheet changes
+- [x] 0c: Change "New" button to create fresh empty sheet (not clear to "no sheet" state)
+- [x] 0d: Remove "no workbook loaded" UI code paths and empty state rendering
+- [x] 0e: Ensure selection resets to A1 when switching sheets
 
 ---
 

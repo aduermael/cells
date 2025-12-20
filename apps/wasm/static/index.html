@@ -1808,11 +1808,7 @@
                 // Reset view state
                 scrollX = 0;
                 scrollY = 0;
-                selectedCell = null;
-                selectedColumn = null;
-                selectedRow = null;
-                selectionStart = null;
-                selectionEnd = null;
+                setDefaultSelection();  // Reset selection to A1
                 isSelectingRange = false;
                 colWidths.clear();
                 rowHeights.clear();
@@ -1954,11 +1950,7 @@
                 // Reset view if we deleted the current sheet
                 scrollX = 0;
                 scrollY = 0;
-                selectedCell = null;
-                selectedColumn = null;
-                selectedRow = null;
-                selectionStart = null;
-                selectionEnd = null;
+                setDefaultSelection();  // Reset selection to A1
                 colWidths.clear();
                 rowHeights.clear();
                 colNames.clear();
@@ -2127,11 +2119,7 @@
             // Reset state
             scrollX = 0;
             scrollY = 0;
-            selectedCell = null;
-            selectedColumn = null;
-            selectedRow = null;
-            selectionStart = null;
-            selectionEnd = null;
+            setDefaultSelection();  // Reset selection to A1
             isSelectingRange = false;
             colWidths.clear();
             rowHeights.clear();
@@ -2141,10 +2129,11 @@
             document.getElementById('export-btn').disabled = false;
             document.getElementById('new-btn').style.display = '';
 
-            // Show the canvas, formula bar, and sheet tabs
+            // Show the canvas, formula bar, and sheet tabs (hide empty state)
             canvas.style.display = 'block';
             formulaBar.classList.remove('hidden');
             sheetTabsEl.classList.remove('hidden');
+            emptyState.classList.add('hidden');
             resizeCanvas();
 
             await fetchSheetInfo();
@@ -2190,36 +2179,16 @@
             }
 
             // Reset state
-            dataSource = null;
-            hasFileLoaded = false;
             sheetInfo = null;
             cells = [];
             columns = [];
             rows = [];
-            scrollX = 0;
-            scrollY = 0;
-            selectedCell = null;
-            selectedColumn = null;
-            selectedRow = null;
-            selectionStart = null;
-            selectionEnd = null;
-            isSelectingRange = false;
-            colWidths.clear();
-            rowHeights.clear();
-            colNames.clear();
             sheets = [];
             activeSheetIndex = 0;
-
-            // Reset UI
-            sheetNameEl.textContent = 'Cells Viewer';
-            document.getElementById('export-btn').disabled = true;
-            document.getElementById('new-btn').style.display = 'none';
-            formulaBar.classList.add('hidden');
-            sheetTabsEl.classList.add('hidden');
-            sheetTabsContainer.innerHTML = '';
-            canvas.style.display = 'none';
-            emptyState.classList.remove('hidden');
             errorEl.style.display = 'none';
+
+            // Create fresh empty workbook (keeps UI showing, not empty state)
+            await createEmptyWorkbook();
         };
 
         // ========================================================================
@@ -2320,6 +2289,51 @@
             }
         }
 
+        // Set default selection to A1 (0,0)
+        function setDefaultSelection() {
+            selectedCell = { col: 0, row: 0 };
+            selectionStart = { col: 0, row: 0 };
+            selectionEnd = { col: 0, row: 0 };
+            selectedColumn = null;
+            selectedRow = null;
+        }
+
+        // Create or reset to an empty workbook
+        async function createEmptyWorkbook() {
+            const client = await ensureWasmClient();
+            await client.createEmpty();
+
+            dataSource = new WasmDataSource(client);
+            dataSource.setWorkbookName('Untitled');
+            hasFileLoaded = true;
+
+            // Reset state
+            scrollX = 0;
+            scrollY = 0;
+            setDefaultSelection();
+            isSelectingRange = false;
+            colWidths.clear();
+            rowHeights.clear();
+            colNames.clear();
+
+            // Enable export button and show New button
+            document.getElementById('export-btn').disabled = false;
+            document.getElementById('new-btn').style.display = '';
+
+            // Show the canvas, formula bar, and sheet tabs (hide empty state)
+            canvas.style.display = 'block';
+            formulaBar.classList.remove('hidden');
+            sheetTabsEl.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+            resizeCanvas();
+
+            await fetchSheetInfo();
+            await fetchViewport();
+            await fetchSheets();
+            render();
+            updateFormulaBar();
+        }
+
         async function init() {
             resizeCanvas();
 
@@ -2327,9 +2341,15 @@
             const loaded = await tryAutoLoadPersistedFile();
 
             if (!loaded) {
-                // Show empty state if no persisted file
-                emptyState.classList.remove('hidden');
-                canvas.style.display = 'none';
+                // Create empty workbook on startup (no "empty state" - always have a sheet)
+                await createEmptyWorkbook();
+            } else {
+                // If file loaded, ensure we have a default selection
+                if (!selectedCell) {
+                    setDefaultSelection();
+                    render();
+                    updateFormulaBar();
+                }
             }
         }
 
