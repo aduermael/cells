@@ -162,15 +162,15 @@ Update GETTING_STARTED.md to reflect current development workflow.
 
 ---
 
-## Phase 8: Documentation - Architecture Docs
+## Phase 8: Documentation - Architecture Docs ✅
 
 Add implementation status notes to architecture documents.
 
-- [ ] 8a: Add "Implementation Status" header to `docs/cross-platform.md` noting WASM-only currently
-- [ ] 8b: Add "Implementation Status" header to `docs/rendering.md` noting Canvas2D currently
-- [ ] 8c: Add "Implementation Status" header to `docs/networking.md` noting not yet implemented
-- [ ] 8d: Add "Implementation Status" header to `docs/crdt.md` noting partial/design-only
-- [ ] 8e: Update `docs/rendering.md` with actual Canvas-based implementation details
+- [x] 8a: Add "Implementation Status" header to `docs/cross-platform.md` noting WASM-only currently
+- [x] 8b: Add "Implementation Status" header to `docs/rendering.md` noting Canvas2D currently
+- [x] 8c: Add "Implementation Status" header to `docs/networking.md` noting not yet implemented
+- [x] 8d: Add "Implementation Status" header to `docs/crdt.md` noting partial/design-only
+- [x] 8e: Update `docs/rendering.md` with actual Canvas-based implementation details
 
 ---
 
