@@ -24,7 +24,7 @@
             <input type="text" id="formula-input" placeholder="Select a cell to view or edit its value" />
         </div>
         <div id="canvas-container">
-            <canvas id="grid"></canvas>
+            <canvas id="grid" tabindex="0"></canvas>
             <input type="text" id="cell-editor" />
             <div id="loading"><span class="spinner"></span>Loading...</div>
             <div id="error">Failed to load file</div>
@@ -672,10 +672,8 @@
 
         formulaInput.addEventListener('focus', () => {
             isEditingFormulaBar = true;
-            // Also start cell editing to show cell editor overlay for live sync
-            if (selectedCell && !isEditing) {
-                startEditing({ focusCellEditor: false });
-            }
+            // Don't call startEditing here - formula bar editing is independent
+            // The cell editor would create confusing dual state
         });
 
         formulaInput.addEventListener('keydown', (e) => {
@@ -705,15 +703,10 @@
         });
 
         formulaInput.addEventListener('blur', () => {
+            // isEditingFormulaBar is set to false by mousedown handler before blur fires
+            // So this only commits when focus moves elsewhere (Tab to another element, etc.)
             if (isEditingFormulaBar && selectedCell) {
                 commitFormulaBarEdit();
-            }
-        });
-
-        // Live sync: formula bar -> cell editor (when cell editor is visible)
-        formulaInput.addEventListener('input', () => {
-            if (isEditing && cellEditor.style.display !== 'none') {
-                cellEditor.value = formulaInput.value;
             }
         });
 
@@ -813,23 +806,28 @@
                 const row = getRowAtY(y);
 
                 if (col >= 0 && row >= 0) {
-                    // If editing, commit first then select new cell
+                    // If editing cell editor, commit first then select new cell
                     if (isEditing) {
                         confirmEditing().then(() => {
                             selectedCell = { col, row };
                             render();
                             updateFormulaBar();
+                            canvas.focus();
                         });
                     } else if (isEditingFormulaBar) {
+                        // Mark as not editing BEFORE commit to prevent blur handler double-commit
+                        isEditingFormulaBar = false;
                         commitFormulaBarEdit().then(() => {
                             selectedCell = { col, row };
                             render();
                             updateFormulaBar();
+                            canvas.focus();
                         });
                     } else {
                         selectedCell = { col, row };
                         render();
                         updateFormulaBar();
+                        canvas.focus();
                     }
                 }
             }

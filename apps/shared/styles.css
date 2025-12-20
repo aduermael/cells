@@ -108,6 +108,7 @@ canvas {
     position: absolute;
     top: 0;
     left: 0;
+    outline: none; /* Hide focus ring - we have our own selection highlight */
 }
 
 /* Loading State */
