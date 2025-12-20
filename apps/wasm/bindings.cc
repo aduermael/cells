@@ -197,6 +197,147 @@ public:
         }
     }
 
+    int getActiveSheetIndex() { return static_cast<int>(_activeSheetIndex); }
+
+    std::string addSheet(const std::string& name) {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        // Generate unique name if empty or duplicate
+        std::string sheetName = name.empty() ? "Sheet" : name;
+        int suffix = 1;
+
+        auto isNameTaken = [this](const std::string& n) {
+            for (size_t i = 0; i < _workbook->sheetCount(); i++) {
+                if (_workbook->getSheetByIndex(i)->name == n) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        if (name.empty() || isNameTaken(sheetName)) {
+            std::string baseName = name.empty() ? "Sheet" : name;
+            do {
+                sheetName = baseName + std::to_string(suffix++);
+            } while (isNameTaken(sheetName));
+        }
+
+        auto sheet = std::make_unique<Sheet>(generate_id(), sheetName);
+        size_t newIndex = _workbook->sheetCount();
+        _workbook->addSheet(std::move(sheet));
+
+        std::ostringstream json;
+        json << "{\"success\":true,\"index\":" << newIndex << ",\"name\":\"" << jsonEscape(sheetName)
+             << "\"}";
+        return json.str();
+    }
+
+    std::string deleteSheet(int index) {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        if (index < 0 || static_cast<size_t>(index) >= _workbook->sheetCount()) {
+            return "{\"error\":\"Invalid sheet index\"}";
+        }
+
+        // Don't allow deleting the last sheet - caller should handle this
+        if (_workbook->sheetCount() <= 1) {
+            return "{\"error\":\"Cannot delete last sheet\"}";
+        }
+
+        // Remove the sheet
+        _workbook->sheets.erase(_workbook->sheets.begin() + index);
+
+        // Adjust active sheet index if needed
+        if (_activeSheetIndex >= _workbook->sheetCount()) {
+            _activeSheetIndex = _workbook->sheetCount() - 1;
+        } else if (static_cast<size_t>(index) < _activeSheetIndex) {
+            _activeSheetIndex--;
+        } else if (static_cast<size_t>(index) == _activeSheetIndex) {
+            // Stay on same index (now pointing to next sheet) or go to previous if at end
+            if (_activeSheetIndex >= _workbook->sheetCount()) {
+                _activeSheetIndex = _workbook->sheetCount() - 1;
+            }
+        }
+
+        rebuildQuadtree();
+
+        std::ostringstream json;
+        json << "{\"success\":true,\"activeIndex\":" << _activeSheetIndex << "}";
+        return json.str();
+    }
+
+    std::string renameSheet(int index, const std::string& name) {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        if (index < 0 || static_cast<size_t>(index) >= _workbook->sheetCount()) {
+            return "{\"error\":\"Invalid sheet index\"}";
+        }
+
+        if (name.empty()) {
+            return "{\"error\":\"Sheet name cannot be empty\"}";
+        }
+
+        // Check for duplicate names
+        for (size_t i = 0; i < _workbook->sheetCount(); i++) {
+            if (static_cast<int>(i) != index && _workbook->getSheetByIndex(i)->name == name) {
+                return "{\"error\":\"Sheet name already exists\"}";
+            }
+        }
+
+        _workbook->getSheetByIndex(index)->name = name;
+        return "{\"success\":true}";
+    }
+
+    std::string moveSheet(int fromIndex, int toIndex) {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        size_t count = _workbook->sheetCount();
+        if (fromIndex < 0 || static_cast<size_t>(fromIndex) >= count) {
+            return "{\"error\":\"Invalid source index\"}";
+        }
+        if (toIndex < 0 || static_cast<size_t>(toIndex) > count) {
+            return "{\"error\":\"Invalid target index\"}";
+        }
+
+        if (fromIndex == toIndex || fromIndex + 1 == toIndex) {
+            return "{\"success\":true}";  // No-op
+        }
+
+        // Move the sheet
+        auto sheet = std::move(_workbook->sheets[fromIndex]);
+        _workbook->sheets.erase(_workbook->sheets.begin() + fromIndex);
+
+        int insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex;
+        _workbook->sheets.insert(_workbook->sheets.begin() + insertAt, std::move(sheet));
+
+        // Update active sheet index if it moved
+        if (static_cast<size_t>(fromIndex) == _activeSheetIndex) {
+            _activeSheetIndex = insertAt;
+        } else if (fromIndex < toIndex) {
+            if (_activeSheetIndex > static_cast<size_t>(fromIndex) &&
+                _activeSheetIndex <= static_cast<size_t>(insertAt)) {
+                _activeSheetIndex--;
+            }
+        } else {
+            if (_activeSheetIndex >= static_cast<size_t>(toIndex) &&
+                _activeSheetIndex < static_cast<size_t>(fromIndex)) {
+                _activeSheetIndex++;
+            }
+        }
+
+        std::ostringstream json;
+        json << "{\"success\":true,\"activeIndex\":" << _activeSheetIndex << "}";
+        return json.str();
+    }
+
     // ========================================================================
     // Viewport query (cells in visible area)
     // ========================================================================
@@ -887,7 +1028,12 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getSheetInfo", &cells::wasm::CellsEngine::getSheetInfo)
         .function("getSheetCount", &cells::wasm::CellsEngine::getSheetCount)
         .function("getSheetName", &cells::wasm::CellsEngine::getSheetName)
+        .function("getActiveSheetIndex", &cells::wasm::CellsEngine::getActiveSheetIndex)
         .function("setActiveSheet", &cells::wasm::CellsEngine::setActiveSheet)
+        .function("addSheet", &cells::wasm::CellsEngine::addSheet)
+        .function("deleteSheet", &cells::wasm::CellsEngine::deleteSheet)
+        .function("renameSheet", &cells::wasm::CellsEngine::renameSheet)
+        .function("moveSheet", &cells::wasm::CellsEngine::moveSheet)
         // Viewport
         .function("queryViewport", &cells::wasm::CellsEngine::queryViewport)
         // Cell operations

@@ -127,6 +127,65 @@ function handleMessage(msg) {
                 break;
             }
 
+            case 'getSheets': {
+                const count = engine.getSheetCount();
+                const activeIndex = engine.getActiveSheetIndex();
+                const sheets = [];
+                for (let i = 0; i < count; i++) {
+                    sheets.push({
+                        index: i,
+                        name: engine.getSheetName(i),
+                        active: i === activeIndex
+                    });
+                }
+                respond({ type: 'sheets', sheets, activeIndex });
+                break;
+            }
+
+            case 'addSheet': {
+                const { name } = params;
+                const result = JSON.parse(engine.addSheet(name || ''));
+                if (result.error) {
+                    respond({ type: 'error', error: result.error });
+                } else {
+                    respond({ type: 'sheetAdded', index: result.index, name: result.name });
+                }
+                break;
+            }
+
+            case 'deleteSheet': {
+                const { index } = params;
+                const result = JSON.parse(engine.deleteSheet(index));
+                if (result.error) {
+                    respond({ type: 'error', error: result.error });
+                } else {
+                    respond({ type: 'sheetDeleted', activeIndex: result.activeIndex });
+                }
+                break;
+            }
+
+            case 'renameSheet': {
+                const { index, name } = params;
+                const result = JSON.parse(engine.renameSheet(index, name));
+                if (result.error) {
+                    respond({ type: 'error', error: result.error });
+                } else {
+                    respond({ type: 'sheetRenamed', success: true });
+                }
+                break;
+            }
+
+            case 'moveSheet': {
+                const { fromIndex, toIndex } = params;
+                const result = JSON.parse(engine.moveSheet(fromIndex, toIndex));
+                if (result.error) {
+                    respond({ type: 'error', error: result.error });
+                } else {
+                    respond({ type: 'sheetMoved', activeIndex: result.activeIndex });
+                }
+                break;
+            }
+
             case 'updateCell': {
                 const { cellId, value } = params;
                 const result = JSON.parse(engine.updateCell(cellId, value));

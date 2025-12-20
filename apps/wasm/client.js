@@ -204,6 +204,67 @@ class CellsClient {
         await this._send('setActiveSheet', { index });
     }
 
+    /**
+     * Get list of all sheets in the workbook
+     * @returns {Promise<{sheets: Array<{index: number, name: string, active: boolean}>, activeIndex: number}>}
+     */
+    async getSheets() {
+        const response = await this._send('getSheets');
+        return {
+            sheets: response.sheets || [],
+            activeIndex: response.activeIndex
+        };
+    }
+
+    /**
+     * Add a new sheet to the workbook
+     * @param {string} name - Sheet name (optional, will be auto-generated if empty/duplicate)
+     * @returns {Promise<{index: number, name: string}>}
+     */
+    async addSheet(name = '') {
+        const response = await this._send('addSheet', { name });
+        return {
+            index: response.index,
+            name: response.name
+        };
+    }
+
+    /**
+     * Delete a sheet by index
+     * @param {number} index - Sheet index (0-based)
+     * @returns {Promise<{activeIndex: number}>}
+     */
+    async deleteSheet(index) {
+        const response = await this._send('deleteSheet', { index });
+        return {
+            activeIndex: response.activeIndex
+        };
+    }
+
+    /**
+     * Rename a sheet
+     * @param {number} index - Sheet index (0-based)
+     * @param {string} name - New name
+     * @returns {Promise<{success: boolean}>}
+     */
+    async renameSheet(index, name) {
+        await this._send('renameSheet', { index, name });
+        return { success: true };
+    }
+
+    /**
+     * Move a sheet to a new position
+     * @param {number} fromIndex - Current sheet index
+     * @param {number} toIndex - Target position (insert before)
+     * @returns {Promise<{activeIndex: number}>}
+     */
+    async moveSheet(fromIndex, toIndex) {
+        const response = await this._send('moveSheet', { fromIndex, toIndex });
+        return {
+            activeIndex: response.activeIndex
+        };
+    }
+
     // ========================================================================
     // Viewport API
     // ========================================================================

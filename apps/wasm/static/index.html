@@ -154,6 +154,31 @@
                 return { success: true };
             }
 
+            // Sheet management
+            async getSheets() {
+                return this._client.getSheets();
+            }
+
+            async setActiveSheet(index) {
+                await this._client.setActiveSheet(index);
+            }
+
+            async addSheet(name = '') {
+                return this._client.addSheet(name);
+            }
+
+            async deleteSheet(index) {
+                return this._client.deleteSheet(index);
+            }
+
+            async renameSheet(index, name) {
+                return this._client.renameSheet(index, name);
+            }
+
+            async moveSheet(fromIndex, toIndex) {
+                return this._client.moveSheet(fromIndex, toIndex);
+            }
+
             async exportAs(format) {
                 const result = await this._client.exportAs(format);
                 const blob = new Blob([result.data], { type: getMimeType(format) });
@@ -177,6 +202,9 @@
         const formulaBar = document.getElementById('formula-bar');
         const cellReference = document.getElementById('cell-reference');
         const formulaInput = document.getElementById('formula-input');
+        const sheetTabsEl = document.getElementById('sheet-tabs');
+        const sheetTabsContainer = document.getElementById('sheet-tabs-container');
+        const addSheetBtn = document.getElementById('add-sheet-btn');
 
         // Initialize renderer
         const renderer = new GridRenderer(canvas);
@@ -246,6 +274,18 @@
         // Size caches
         let colWidths = new Map();
         let rowHeights = new Map();
+
+        // Sheet tabs state
+        let sheets = [];           // Array of {index, name, active}
+        let activeSheetIndex = 0;
+        let sheetTabContextMenu = null;  // Reference to context menu element
+        let isEditingSheetTab = false;
+        let editingSheetIndex = -1;
+
+        // Sheet tab drag state
+        let isDraggingSheetTab = false;
+        let dragSheetIndex = -1;
+        let dragSheetTargetIndex = -1;
 
         // ========================================================================
         // Utility Functions
@@ -1640,6 +1680,312 @@
         });
 
         // ========================================================================
+        // Sheet Tabs
+        // ========================================================================
+
+        async function fetchSheets() {
+            if (!dataSource) return;
+            try {
+                const result = await dataSource.getSheets();
+                sheets = result.sheets;
+                activeSheetIndex = result.activeIndex;
+                renderSheetTabs();
+            } catch (e) {
+                console.error('Error fetching sheets:', e);
+            }
+        }
+
+        function renderSheetTabs() {
+            sheetTabsContainer.innerHTML = '';
+
+            sheets.forEach((sheet, idx) => {
+                const tab = document.createElement('div');
+                tab.className = 'sheet-tab' + (sheet.active ? ' active' : '');
+                tab.textContent = sheet.name;
+                tab.dataset.index = idx;
+                tab.draggable = true;
+
+                // Click to switch sheet
+                tab.addEventListener('click', async (e) => {
+                    if (isEditingSheetTab) return;
+                    e.preventDefault();
+                    await switchToSheet(idx);
+                });
+
+                // Double-click to rename
+                tab.addEventListener('dblclick', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    startEditingSheetTab(idx);
+                });
+
+                // Context menu (right-click)
+                tab.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    showSheetTabContextMenu(e.clientX, e.clientY, idx);
+                });
+
+                // Drag start
+                tab.addEventListener('dragstart', (e) => {
+                    isDraggingSheetTab = true;
+                    dragSheetIndex = idx;
+                    tab.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', idx.toString());
+                });
+
+                // Drag end
+                tab.addEventListener('dragend', () => {
+                    isDraggingSheetTab = false;
+                    dragSheetIndex = -1;
+                    tab.classList.remove('dragging');
+                    // Remove any drop indicators
+                    sheetTabsContainer.querySelectorAll('.sheet-tab').forEach(t => {
+                        t.style.marginLeft = '';
+                        t.style.marginRight = '';
+                    });
+                });
+
+                // Drag over
+                tab.addEventListener('dragover', (e) => {
+                    if (!isDraggingSheetTab || dragSheetIndex === idx) return;
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+
+                    const rect = tab.getBoundingClientRect();
+                    const midX = rect.left + rect.width / 2;
+                    const insertBefore = e.clientX < midX;
+
+                    // Reset all margins
+                    sheetTabsContainer.querySelectorAll('.sheet-tab').forEach(t => {
+                        t.style.marginLeft = '';
+                        t.style.marginRight = '';
+                    });
+
+                    // Show drop indicator
+                    if (insertBefore) {
+                        tab.style.marginLeft = '20px';
+                        dragSheetTargetIndex = idx;
+                    } else {
+                        tab.style.marginRight = '20px';
+                        dragSheetTargetIndex = idx + 1;
+                    }
+                });
+
+                // Drop
+                tab.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    if (!isDraggingSheetTab || dragSheetIndex < 0) return;
+
+                    const fromIdx = dragSheetIndex;
+                    const toIdx = dragSheetTargetIndex;
+
+                    if (fromIdx !== toIdx && fromIdx + 1 !== toIdx) {
+                        try {
+                            const result = await dataSource.moveSheet(fromIdx, toIdx);
+                            activeSheetIndex = result.activeIndex;
+                            await fetchSheets();
+                        } catch (err) {
+                            console.error('Error moving sheet:', err);
+                        }
+                    }
+
+                    isDraggingSheetTab = false;
+                    dragSheetIndex = -1;
+                    dragSheetTargetIndex = -1;
+                });
+
+                sheetTabsContainer.appendChild(tab);
+            });
+        }
+
+        async function switchToSheet(index) {
+            if (!dataSource || index === activeSheetIndex) return;
+            try {
+                await dataSource.setActiveSheet(index);
+                activeSheetIndex = index;
+
+                // Reset view state
+                scrollX = 0;
+                scrollY = 0;
+                selectedCell = null;
+                selectedColumn = null;
+                selectedRow = null;
+                selectionStart = null;
+                selectionEnd = null;
+                isSelectingRange = false;
+                colWidths.clear();
+                rowHeights.clear();
+                colNames.clear();
+
+                // Re-fetch data
+                await fetchSheetInfo();
+                await fetchViewport();
+                await fetchSheets();
+                render();
+                updateFormulaBar();
+            } catch (e) {
+                console.error('Error switching sheet:', e);
+            }
+        }
+
+        function startEditingSheetTab(index) {
+            isEditingSheetTab = true;
+            editingSheetIndex = index;
+
+            const tab = sheetTabsContainer.children[index];
+            if (!tab) return;
+
+            const currentName = sheets[index].name;
+
+            // Create inline editor
+            const editor = document.createElement('input');
+            editor.type = 'text';
+            editor.className = 'sheet-tab-editor';
+            editor.value = currentName;
+
+            // Replace tab content with editor
+            tab.textContent = '';
+            tab.appendChild(editor);
+            editor.focus();
+            editor.select();
+
+            const finishEditing = async (save) => {
+                if (!isEditingSheetTab) return;
+                isEditingSheetTab = false;
+                editingSheetIndex = -1;
+
+                const newName = editor.value.trim();
+                tab.textContent = save && newName ? newName : currentName;
+
+                if (save && newName && newName !== currentName) {
+                    try {
+                        await dataSource.renameSheet(index, newName);
+                        await fetchSheets();
+                    } catch (err) {
+                        console.error('Error renaming sheet:', err);
+                        tab.textContent = currentName;
+                    }
+                }
+            };
+
+            editor.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    finishEditing(true);
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    finishEditing(false);
+                }
+                e.stopPropagation();
+            });
+
+            editor.addEventListener('blur', () => {
+                finishEditing(true);
+            });
+        }
+
+        function showSheetTabContextMenu(x, y, sheetIndex) {
+            hideSheetTabContextMenu();
+
+            const menu = document.createElement('div');
+            menu.className = 'sheet-tab-context-menu';
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+
+            // Rename option
+            const renameBtn = document.createElement('button');
+            renameBtn.className = 'sheet-tab-context-menu-item';
+            renameBtn.textContent = 'Rename';
+            renameBtn.addEventListener('click', () => {
+                hideSheetTabContextMenu();
+                startEditingSheetTab(sheetIndex);
+            });
+            menu.appendChild(renameBtn);
+
+            // Delete option
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'sheet-tab-context-menu-item danger';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.addEventListener('click', async () => {
+                hideSheetTabContextMenu();
+                await deleteSheetWithConfirm(sheetIndex);
+            });
+            menu.appendChild(deleteBtn);
+
+            document.body.appendChild(menu);
+            sheetTabContextMenu = menu;
+
+            // Close on click outside
+            setTimeout(() => {
+                document.addEventListener('click', hideSheetTabContextMenu, { once: true });
+            }, 0);
+        }
+
+        function hideSheetTabContextMenu() {
+            if (sheetTabContextMenu) {
+                sheetTabContextMenu.remove();
+                sheetTabContextMenu = null;
+            }
+        }
+
+        async function deleteSheetWithConfirm(index) {
+            if (!dataSource) return;
+
+            // If this is the last sheet, create a new one first
+            if (sheets.length <= 1) {
+                try {
+                    await dataSource.addSheet('Sheet1');
+                    await dataSource.deleteSheet(index);
+                    activeSheetIndex = 0;
+                    await fetchSheets();
+                    await switchToSheet(0);
+                } catch (err) {
+                    console.error('Error handling last sheet delete:', err);
+                }
+                return;
+            }
+
+            try {
+                const result = await dataSource.deleteSheet(index);
+                activeSheetIndex = result.activeIndex;
+                await fetchSheets();
+
+                // Reset view if we deleted the current sheet
+                scrollX = 0;
+                scrollY = 0;
+                selectedCell = null;
+                selectedColumn = null;
+                selectedRow = null;
+                selectionStart = null;
+                selectionEnd = null;
+                colWidths.clear();
+                rowHeights.clear();
+                colNames.clear();
+
+                await fetchSheetInfo();
+                await fetchViewport();
+                render();
+                updateFormulaBar();
+            } catch (err) {
+                console.error('Error deleting sheet:', err);
+            }
+        }
+
+        // Add sheet button
+        addSheetBtn.addEventListener('click', async () => {
+            if (!dataSource) return;
+            try {
+                const result = await dataSource.addSheet();
+                await fetchSheets();
+                // Switch to the new sheet
+                await switchToSheet(result.index);
+            } catch (err) {
+                console.error('Error adding sheet:', err);
+            }
+        });
+
+        // ========================================================================
         // File Persistence (IndexedDB)
         // ========================================================================
 
@@ -1795,13 +2141,15 @@
             document.getElementById('export-btn').disabled = false;
             document.getElementById('new-btn').style.display = '';
 
-            // Show the canvas and formula bar, resize
+            // Show the canvas, formula bar, and sheet tabs
             canvas.style.display = 'block';
             formulaBar.classList.remove('hidden');
+            sheetTabsEl.classList.remove('hidden');
             resizeCanvas();
 
             await fetchSheetInfo();
             await fetchViewport();
+            await fetchSheets();
             render();
             updateFormulaBar();
         }
@@ -1859,12 +2207,16 @@
             colWidths.clear();
             rowHeights.clear();
             colNames.clear();
+            sheets = [];
+            activeSheetIndex = 0;
 
             // Reset UI
             sheetNameEl.textContent = 'Cells Viewer';
             document.getElementById('export-btn').disabled = true;
             document.getElementById('new-btn').style.display = 'none';
             formulaBar.classList.add('hidden');
+            sheetTabsEl.classList.add('hidden');
+            sheetTabsContainer.innerHTML = '';
             canvas.style.display = 'none';
             emptyState.classList.remove('hidden');
             errorEl.style.display = 'none';
