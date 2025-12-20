@@ -90,6 +90,101 @@
             text-align: center;
             display: none;
         }
+        /* Drop zone overlay */
+        #drop-zone {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(13, 110, 253, 0.1);
+            border: 3px dashed #0d6efd;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+        #drop-zone.visible {
+            display: flex;
+        }
+        #drop-zone-content {
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+        #drop-zone-content h2 {
+            font-size: 18px;
+            color: #0d6efd;
+            margin-bottom: 8px;
+        }
+        #drop-zone-content p {
+            font-size: 13px;
+            color: #6c757d;
+        }
+        /* Empty state (no file loaded) */
+        #empty-state {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+        }
+        #empty-state.visible {
+            display: block;
+        }
+        #empty-state h2 {
+            font-size: 20px;
+            color: #212529;
+            margin-bottom: 12px;
+        }
+        #empty-state p {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 20px;
+        }
+        #empty-state .file-types {
+            font-size: 12px;
+            color: #adb5bd;
+            margin-top: 12px;
+        }
+        .btn-primary {
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            border-radius: 6px;
+            background: #0d6efd;
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-primary:hover {
+            background: #0b5ed7;
+        }
+        .btn-primary:active {
+            background: #0a58ca;
+        }
+        #file-input {
+            display: none;
+        }
+        /* Mode indicator */
+        .mode-indicator {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .mode-indicator.server {
+            background: #d4edda;
+            color: #155724;
+        }
+        .mode-indicator.local {
+            background: #cce5ff;
+            color: #004085;
+        }
         #cell-editor {
             position: absolute;
             display: none;
@@ -107,9 +202,12 @@
 <body>
     <div id="container">
         <div id="header">
+            <button class="export-btn" onclick="openFile()">Open File</button>
+            <input type="file" id="file-input" accept=".cells,.csv,.tsv,.xlsx" />
             <h1 id="sheet-name">Loading...</h1>
             <span class="info" id="sheet-info"></span>
             <div id="toolbar">
+                <span class="mode-indicator server" id="mode-indicator">Server</span>
                 <button class="export-btn" onclick="exportAs('csv')">Export CSV</button>
                 <button class="export-btn" onclick="exportAs('xlsx')">Export XLSX</button>
                 <button class="export-btn" onclick="exportAs('cells')">Export CELLS</button>
@@ -120,9 +218,221 @@
             <input type="text" id="cell-editor" />
             <div id="loading">Loading spreadsheet...</div>
             <div id="error">Failed to load spreadsheet</div>
+            <div id="drop-zone">
+                <div id="drop-zone-content">
+                    <h2>Drop file here</h2>
+                    <p>.cells, .csv, .xlsx</p>
+                </div>
+            </div>
+            <div id="empty-state">
+                <h2>Open a Spreadsheet</h2>
+                <p>Drag and drop a file here, or click below to browse</p>
+                <button class="btn-primary" onclick="openFile()">Choose File</button>
+                <div class="file-types">Supported: .cells, .csv, .tsv, .xlsx</div>
+            </div>
         </div>
     </div>
     <script>
+        // ========================================================================
+        // Data Source Abstraction Layer
+        // ========================================================================
+
+        // Base interface for data sources
+        class DataSource {
+            async getSheetInfo() { throw new Error('Not implemented'); }
+            async getViewport(x1, y1, x2, y2) { throw new Error('Not implemented'); }
+            async createCell(col, row, value) { throw new Error('Not implemented'); }
+            async updateCell(cellId, value) { throw new Error('Not implemented'); }
+            async resizeColumn(colId, width) { throw new Error('Not implemented'); }
+            async resizeColumnByPos(pos, width) { throw new Error('Not implemented'); }
+            async resizeRow(rowId, height) { throw new Error('Not implemented'); }
+            async moveColumn(colId, targetPos) { throw new Error('Not implemented'); }
+            async moveRow(rowId, targetPos) { throw new Error('Not implemented'); }
+            async exportAs(format) { throw new Error('Not implemented'); }
+            getMode() { return 'unknown'; }
+        }
+
+        // Server-based data source (REST API)
+        class ServerDataSource extends DataSource {
+            async getSheetInfo() {
+                const res = await fetch('/api/sheet-info');
+                if (!res.ok) throw new Error('Failed to fetch sheet info');
+                return res.json();
+            }
+
+            async getViewport(x1, y1, x2, y2) {
+                const ts = Date.now();
+                const res = await fetch(`/api/viewport?x1=${x1}&y1=${y1}&x2=${x2}&y2=${y2}&_t=${ts}`);
+                if (!res.ok) throw new Error('Failed to fetch viewport');
+                return res.json();
+            }
+
+            async createCell(col, row, value) {
+                const res = await fetch('/api/cell', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ col, row, value })
+                });
+                if (!res.ok) throw new Error('Failed to create cell');
+                return res.json();
+            }
+
+            async updateCell(cellId, value) {
+                const res = await fetch(`/api/cell/${cellId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ value })
+                });
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.error || 'Failed to update cell');
+                }
+                return res.json();
+            }
+
+            async resizeColumn(colId, width) {
+                const res = await fetch(`/api/column/${colId}/resize`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ width })
+                });
+                if (!res.ok) throw new Error('Failed to resize column');
+                return res.json();
+            }
+
+            async resizeColumnByPos(pos, width) {
+                const res = await fetch(`/api/column-by-pos/${pos}/resize`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ width })
+                });
+                if (!res.ok) throw new Error('Failed to resize column');
+                return res.json();
+            }
+
+            async resizeRow(rowId, height) {
+                const res = await fetch(`/api/row/${rowId}/resize`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ height })
+                });
+                if (!res.ok) throw new Error('Failed to resize row');
+                return res.json();
+            }
+
+            async moveColumn(colId, targetPos) {
+                const res = await fetch(`/api/column/${colId}/move`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ position: targetPos })
+                });
+                if (!res.ok) throw new Error('Failed to move column');
+                return res.json();
+            }
+
+            async moveRow(rowId, targetPos) {
+                const res = await fetch(`/api/row/${rowId}/move`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ position: targetPos })
+                });
+                if (!res.ok) throw new Error('Failed to move row');
+                return res.json();
+            }
+
+            async exportAs(format) {
+                const res = await fetch(`/api/export/${format}`);
+                if (!res.ok) {
+                    const error = await res.json();
+                    throw new Error(error.error || 'Export failed');
+                }
+                const disposition = res.headers.get('Content-Disposition');
+                let filename = `spreadsheet.${format}`;
+                if (disposition) {
+                    const match = disposition.match(/filename="?([^"]+)"?/);
+                    if (match) filename = match[1];
+                }
+                const blob = await res.blob();
+                return { blob, filename };
+            }
+
+            getMode() { return 'server'; }
+        }
+
+        // WASM-based data source (Web Worker)
+        class WasmDataSource extends DataSource {
+            constructor(client) {
+                super();
+                this._client = client;
+                this._workbookName = 'Untitled';
+            }
+
+            setWorkbookName(name) {
+                this._workbookName = name;
+            }
+
+            async getSheetInfo() {
+                const info = await this._client.getSheetInfo();
+                return {
+                    name: info.name,
+                    rowCount: info.rowCount,
+                    colCount: info.colCount
+                };
+            }
+
+            async getViewport(x1, y1, x2, y2) {
+                return this._client.queryViewport(x1, y1, x2, y2);
+            }
+
+            async createCell(col, row, value) {
+                return this._client.createCell(col, row, value);
+            }
+
+            async updateCell(cellId, value) {
+                await this._client.updateCell(cellId, value);
+                return { success: true };
+            }
+
+            async resizeColumn(colId, width) {
+                await this._client.resizeColumn(colId, width);
+                return { success: true };
+            }
+
+            async resizeColumnByPos(pos, width) {
+                return this._client.resizeColumnByPos(pos, width);
+            }
+
+            async resizeRow(rowId, height) {
+                await this._client.resizeRow(rowId, height);
+                return { success: true };
+            }
+
+            async moveColumn(colId, targetPos) {
+                await this._client.moveColumn(colId, targetPos);
+                return { success: true };
+            }
+
+            async moveRow(rowId, targetPos) {
+                await this._client.moveRow(rowId, targetPos);
+                return { success: true };
+            }
+
+            async exportAs(format) {
+                const result = await this._client.exportAs(format);
+                const blob = new Blob([result.data], {
+                    type: format === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
+                          format === 'csv' ? 'text/csv' : 'text/plain'
+                });
+                return { blob, filename: result.filename || `${this._workbookName}.${format}` };
+            }
+
+            getMode() { return 'local'; }
+        }
+
+        // ========================================================================
+        // Global State and DOM Elements
+        // ========================================================================
+
         // Canvas and context
         const canvas = document.getElementById('grid');
         const ctx = canvas.getContext('2d');
@@ -130,6 +440,15 @@
         const errorEl = document.getElementById('error');
         const sheetNameEl = document.getElementById('sheet-name');
         const sheetInfoEl = document.getElementById('sheet-info');
+        const dropZone = document.getElementById('drop-zone');
+        const emptyState = document.getElementById('empty-state');
+        const modeIndicator = document.getElementById('mode-indicator');
+        const fileInput = document.getElementById('file-input');
+
+        // Data source (either ServerDataSource or WasmDataSource)
+        let dataSource = null;
+        let wasmClient = null;
+        let hasFileLoaded = false;
 
         // Grid constants
         const HEADER_HEIGHT = 24;
@@ -398,10 +717,9 @@
 
         // Fetch sheet info
         async function fetchSheetInfo() {
+            if (!dataSource) return;
             try {
-                const res = await fetch('/api/sheet-info');
-                if (!res.ok) throw new Error('Failed to fetch sheet info');
-                sheetInfo = await res.json();
+                sheetInfo = await dataSource.getSheetInfo();
                 sheetNameEl.textContent = sheetInfo.name;
                 sheetInfoEl.textContent = `${sheetInfo.rowCount} rows × ${sheetInfo.colCount} columns`;
             } catch (e) {
@@ -412,7 +730,7 @@
 
         // Fetch viewport data
         async function fetchViewport() {
-            if (!sheetInfo) return;
+            if (!sheetInfo || !dataSource) return;
 
             const container = document.getElementById('canvas-container');
             const viewWidth = container.clientWidth;
@@ -425,11 +743,7 @@
             const endRow = Math.min(sheetInfo.rowCount, startRow + Math.ceil(viewHeight / DEFAULT_ROW_HEIGHT) + 4);
 
             try {
-                // Add timestamp to prevent caching
-                const ts = Date.now();
-                const res = await fetch(`/api/viewport?x1=${startCol}&y1=${startRow}&x2=${endCol}&y2=${endRow}&_t=${ts}`);
-                if (!res.ok) throw new Error('Failed to fetch viewport');
-                const data = await res.json();
+                const data = await dataSource.getViewport(startCol, startRow, endCol, endRow);
                 cells = data.cells || [];
                 columns = data.columns || [];
                 rows = data.rows || [];
@@ -465,23 +779,14 @@
 
         // Start editing a cell
         async function startEditing() {
-            if (!selectedCell || isEditing) return;
+            if (!selectedCell || isEditing || !dataSource) return;
 
             let cell = getCellAt(selectedCell.col, selectedCell.row);
 
             // If no cell exists at this position, create one
             if (!cell) {
                 try {
-                    const res = await fetch('/api/cell', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ col: selectedCell.col, row: selectedCell.row, value: '' })
-                    });
-                    if (!res.ok) {
-                        console.error('Failed to create cell');
-                        return;
-                    }
-                    const data = await res.json();
+                    const data = await dataSource.createCell(selectedCell.col, selectedCell.row, '');
                     // Add the new cell to our local cells array
                     cell = { id: data.id, col: selectedCell.col, row: selectedCell.row, value: '', type: 's' };
                     cells.push(cell);
@@ -530,7 +835,7 @@
 
         // Confirm editing and save
         async function confirmEditing() {
-            if (!isEditing || !selectedCell) return;
+            if (!isEditing || !selectedCell || !dataSource) return;
 
             const cell = getCellAt(selectedCell.col, selectedCell.row);
             if (!cell) {
@@ -543,18 +848,7 @@
             cellEditor.style.display = 'none';
 
             try {
-                const res = await fetch(`/api/cell/${cell.id}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ value: newValue })
-                });
-
-                if (!res.ok) {
-                    const error = await res.json();
-                    console.error('Failed to update cell:', error);
-                    return;
-                }
-
+                await dataSource.updateCell(cell.id, newValue);
                 // Refresh viewport to show updated value
                 await fetchViewport();
                 render();
@@ -1171,7 +1465,7 @@
         });
 
         canvas.addEventListener('mouseup', async (e) => {
-            if (isResizing) {
+            if (isResizing && dataSource) {
                 // Finish column resize
                 const delta = e.clientX - resizeStartX;
                 const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
@@ -1182,26 +1476,13 @@
                 // Get column ID - use position-based API if no column exists yet
                 const colId = getColumnId(resizeColIndex);
                 try {
-                    let url;
                     if (colId) {
-                        url = `/api/column/${colId}/resize`;
+                        await dataSource.resizeColumn(colId, newWidth);
                     } else {
                         // Column doesn't exist yet, use position-based endpoint
-                        url = `/api/column-by-pos/${resizeColIndex}/resize`;
-                    }
-
-                    const res = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ width: newWidth })
-                    });
-                    if (!res.ok) {
-                        console.error('Failed to resize column');
-                    } else {
-                        // If a new column was created, refresh viewport to get the ID
-                        if (!colId) {
-                            await fetchViewport();
-                        }
+                        await dataSource.resizeColumnByPos(resizeColIndex, newWidth);
+                        // Refresh viewport to get the new column ID
+                        await fetchViewport();
                     }
                 } catch (err) {
                     console.error('Error resizing column:', err);
@@ -1211,31 +1492,23 @@
                 resizeColIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
-            } else if (isDraggingColumn) {
+            } else if (isDraggingColumn && dataSource) {
                 // Finish column drag reorder
                 if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
                     // Only move if target is different from source
                     const colId = getColumnId(dragSourceIndex);
                     if (colId) {
                         try {
-                            const res = await fetch(`/api/column/${colId}/move`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ position: dragTargetIndex })
-                            });
-                            if (res.ok) {
-                                // Update selection to follow the moved column
-                                if (dragTargetIndex > dragSourceIndex) {
-                                    selectedColumn = dragTargetIndex - 1;
-                                } else {
-                                    selectedColumn = dragTargetIndex;
-                                }
-                                // Refresh data
-                                await fetchSheetInfo();
-                                await fetchViewport();
+                            await dataSource.moveColumn(colId, dragTargetIndex);
+                            // Update selection to follow the moved column
+                            if (dragTargetIndex > dragSourceIndex) {
+                                selectedColumn = dragTargetIndex - 1;
                             } else {
-                                console.error('Failed to move column');
+                                selectedColumn = dragTargetIndex;
                             }
+                            // Refresh data
+                            await fetchSheetInfo();
+                            await fetchViewport();
                         } catch (err) {
                             console.error('Error moving column:', err);
                         }
@@ -1247,31 +1520,23 @@
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
-            } else if (isDraggingRow) {
+            } else if (isDraggingRow && dataSource) {
                 // Finish row drag reorder
                 if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
                     // Only move if target is different from source
                     const rowId = getRowId(dragSourceIndex);
                     if (rowId) {
                         try {
-                            const res = await fetch(`/api/row/${rowId}/move`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ position: dragTargetIndex })
-                            });
-                            if (res.ok) {
-                                // Update selection to follow the moved row
-                                if (dragTargetIndex > dragSourceIndex) {
-                                    selectedRow = dragTargetIndex - 1;
-                                } else {
-                                    selectedRow = dragTargetIndex;
-                                }
-                                // Refresh data
-                                await fetchSheetInfo();
-                                await fetchViewport();
+                            await dataSource.moveRow(rowId, dragTargetIndex);
+                            // Update selection to follow the moved row
+                            if (dragTargetIndex > dragSourceIndex) {
+                                selectedRow = dragTargetIndex - 1;
                             } else {
-                                console.error('Failed to move row');
+                                selectedRow = dragTargetIndex;
                             }
+                            // Refresh data
+                            await fetchSheetInfo();
+                            await fetchViewport();
                         } catch (err) {
                             console.error('Error moving row:', err);
                         }
@@ -1415,30 +1680,17 @@
 
         // Export function
         async function exportAs(format) {
+            if (!dataSource) {
+                alert('No file loaded');
+                return;
+            }
             try {
-                const res = await fetch(`/api/export/${format}`);
-                if (!res.ok) {
-                    const error = await res.json();
-                    alert('Export failed: ' + (error.error || 'Unknown error'));
-                    return;
-                }
-
-                // Get filename from Content-Disposition header or use default
-                const disposition = res.headers.get('Content-Disposition');
-                let filename = `spreadsheet.${format}`;
-                if (disposition) {
-                    const match = disposition.match(/filename="?([^"]+)"?/);
-                    if (match) {
-                        filename = match[1];
-                    }
-                }
-
+                const result = await dataSource.exportAs(format);
                 // Create blob and trigger download
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
+                const url = URL.createObjectURL(result.blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = filename;
+                a.download = result.filename;
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
@@ -1449,17 +1701,215 @@
             }
         }
 
-        // Initialize
-        async function init() {
+        // ========================================================================
+        // File Loading and Mode Management
+        // ========================================================================
+
+        // Update mode indicator UI
+        function updateModeIndicator() {
+            if (!dataSource) {
+                modeIndicator.textContent = 'No File';
+                modeIndicator.className = 'mode-indicator';
+            } else if (dataSource.getMode() === 'server') {
+                modeIndicator.textContent = 'Server';
+                modeIndicator.className = 'mode-indicator server';
+            } else {
+                modeIndicator.textContent = 'Local';
+                modeIndicator.className = 'mode-indicator local';
+            }
+        }
+
+        // Show/hide empty state
+        function updateEmptyState() {
+            if (hasFileLoaded) {
+                emptyState.classList.remove('visible');
+                canvas.style.display = 'block';
+            } else {
+                emptyState.classList.add('visible');
+                canvas.style.display = 'none';
+            }
+        }
+
+        // Detect file format from filename and content
+        function detectFormat(filename, data) {
+            const ext = filename.split('.').pop().toLowerCase();
+            if (ext === 'cells') return 'cells';
+            if (ext === 'csv' || ext === 'tsv') return 'csv';
+            if (ext === 'xlsx') return 'xlsx';
+
+            // Fallback: check magic bytes
+            if (data instanceof ArrayBuffer) {
+                const view = new Uint8Array(data.slice(0, 4));
+                if (view[0] === 0x50 && view[1] === 0x4B) return 'xlsx'; // PK (ZIP)
+            }
+            return 'csv'; // Default to CSV
+        }
+
+        // Get base filename without extension
+        function getBaseName(filename) {
+            const lastDot = filename.lastIndexOf('.');
+            return lastDot > 0 ? filename.substring(0, lastDot) : filename;
+        }
+
+        // Initialize WASM client if needed
+        async function ensureWasmClient() {
+            if (wasmClient) return wasmClient;
+
+            // Dynamically load the CellsClient
+            const script = document.createElement('script');
+            script.src = './client.js';
+            await new Promise((resolve, reject) => {
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+
+            wasmClient = new CellsClient('./worker.js');
+            await wasmClient.ready;
+            return wasmClient;
+        }
+
+        // Load a file (either via WASM or server)
+        async function loadFile(file) {
+            loading.textContent = `Loading ${file.name}...`;
+            loading.style.display = 'block';
+            errorEl.style.display = 'none';
+            emptyState.classList.remove('visible');
+
             try {
-                resizeCanvas();
+                const data = await file.arrayBuffer();
+                const format = detectFormat(file.name, data);
+                const baseName = getBaseName(file.name);
+
+                // Initialize WASM client and load file
+                const client = await ensureWasmClient();
+
+                // Convert ArrayBuffer to appropriate type for loading
+                if (format === 'cells') {
+                    const text = new TextDecoder().decode(data);
+                    await client.loadCells(text);
+                } else if (format === 'csv') {
+                    await client.loadCSV(data);
+                } else if (format === 'xlsx') {
+                    await client.loadXLSX(data);
+                }
+
+                // Switch to WASM data source
+                dataSource = new WasmDataSource(client);
+                dataSource.setWorkbookName(baseName);
+                hasFileLoaded = true;
+
+                // Reset state for new file
+                scrollX = 0;
+                scrollY = 0;
+                selectedCell = null;
+                selectedColumn = null;
+                selectedRow = null;
+                colWidths.clear();
+                rowHeights.clear();
+
+                // Update UI
+                updateModeIndicator();
+                updateEmptyState();
                 await fetchSheetInfo();
                 await fetchViewport();
                 render();
-            } catch (e) {
                 loading.style.display = 'none';
-                errorEl.style.display = 'block';
+
+            } catch (e) {
+                console.error('Error loading file:', e);
+                loading.style.display = 'none';
                 errorEl.textContent = 'Failed to load: ' + e.message;
+                errorEl.style.display = 'block';
+            }
+        }
+
+        // Open file dialog
+        function openFile() {
+            fileInput.click();
+        }
+
+        // File input change handler
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                loadFile(file);
+                // Clear input so same file can be re-selected
+                fileInput.value = '';
+            }
+        });
+
+        // ========================================================================
+        // Drag and Drop Handling
+        // ========================================================================
+
+        let dragCounter = 0;
+
+        document.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dragCounter++;
+            if (dragCounter === 1) {
+                dropZone.classList.add('visible');
+            }
+        });
+
+        document.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dragCounter--;
+            if (dragCounter === 0) {
+                dropZone.classList.remove('visible');
+            }
+        });
+
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            dropZone.classList.remove('visible');
+
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                loadFile(file);
+            }
+        });
+
+        // ========================================================================
+        // Initialization
+        // ========================================================================
+
+        // Initialize
+        async function init() {
+            resizeCanvas();
+            updateModeIndicator();
+
+            // Check if we're running with a server (try to connect)
+            try {
+                const res = await fetch('/api/sheet-info', { method: 'GET' });
+                if (res.ok) {
+                    // Server mode - we have a server serving data
+                    dataSource = new ServerDataSource();
+                    hasFileLoaded = true;
+                    updateModeIndicator();
+                    updateEmptyState();
+                    await fetchSheetInfo();
+                    await fetchViewport();
+                    render();
+                    loading.style.display = 'none';
+                } else {
+                    // No server data - show empty state
+                    loading.style.display = 'none';
+                    updateEmptyState();
+                }
+            } catch (e) {
+                // No server - show empty state (standalone WASM mode)
+                console.log('No server detected, running in standalone mode');
+                loading.style.display = 'none';
+                sheetNameEl.textContent = 'Cells Viewer';
+                sheetInfoEl.textContent = '';
+                updateEmptyState();
             }
         }
 

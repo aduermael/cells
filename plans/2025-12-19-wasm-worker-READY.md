@@ -191,17 +191,20 @@ type WorkerResponse =
   | { type: 'error'; message: string };
 ```
 
-### Phase 4: Web UI Updates
+### Phase 4: Web UI Updates ✅
 
 **Goal:** Update index.html to support both server mode and WASM mode
 
-- [ ] 4a: Add drag & drop file loading UI (drop zone overlay)
-- [ ] 4b: Create abstraction layer for data source (server vs WASM)
-- [ ] 4c: Update API calls to use abstraction layer
-- [ ] 4d: Add "Open File" button and file input
-- [ ] 4e: Add mode indicator (Server/Local) in UI
-- [ ] 4f: Handle empty state (no file loaded) gracefully
-- [ ] 4g: Test with both server mode and WASM mode
+- [x] 4a: Add drag & drop file loading UI (drop zone overlay)
+- [x] 4b: Create abstraction layer for data source (server vs WASM)
+- [x] 4c: Update API calls to use abstraction layer
+- [x] 4d: Add "Open File" button and file input
+- [x] 4e: Add mode indicator (Server/Local) in UI
+- [x] 4f: Handle empty state (no file loaded) gracefully
+- [x] 4g: Test with both server mode and WASM mode
+
+**Files modified:**
+- `apps/cli/web/index.html` - Added DataSource abstraction (ServerDataSource, WasmDataSource), drag & drop handling, file loading via WASM, mode indicator, empty state UI
 
 **UI Changes:**
 ```
