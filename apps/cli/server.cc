@@ -99,6 +99,47 @@ void Server::setupRoutes() {
         res.set_content(ss.str(), "text/html");
     });
 
+    // Serve static files from shared/ directory (CSS, JS)
+    _server->Get("/shared/(.*)", [this](const httplib::Request& req, httplib::Response& res) {
+        std::string filename = req.matches[1].str();
+        std::string filePath = _webDir + "/shared/" + filename;
+
+        // Security: prevent directory traversal
+        if (filename.find("..") != std::string::npos) {
+            res.status = 403;
+            res.set_content("Forbidden", "text/plain");
+            return;
+        }
+
+        std::ifstream file(filePath, std::ios::binary);
+        if (!file.is_open()) {
+            res.status = 404;
+            res.set_content("File not found: " + filename, "text/plain");
+            return;
+        }
+
+        std::ostringstream ss;
+        ss << file.rdbuf();
+        std::string content = ss.str();
+
+        // Determine MIME type based on extension
+        std::string mimeType = "application/octet-stream";
+        if (filename.size() >= 4) {
+            std::string ext = filename.substr(filename.rfind('.'));
+            if (ext == ".css") {
+                mimeType = "text/css";
+            } else if (ext == ".js") {
+                mimeType = "application/javascript";
+            } else if (ext == ".html") {
+                mimeType = "text/html";
+            } else if (ext == ".json") {
+                mimeType = "application/json";
+            }
+        }
+
+        res.set_content(content, mimeType);
+    });
+
     // GET /api/sheet-info - sheet metadata
     _server->Get("/api/sheet-info",
                  [this](const httplib::Request& /*req*/, httplib::Response& res) {
