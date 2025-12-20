@@ -546,10 +546,40 @@
         // Handler for WASM data change notifications
         // Called by the listener infrastructure when data changes in the engine
         // changeType is one of: 'cell', 'structure', 'sheet', 'loaded'
+        let pendingChangeTypes = new Set();
+        let changeHandlerScheduled = false;
+
         function handleDataChanged(changeType) {
-            // For now, just log the change type
-            // Phase 5 will implement automatic refresh based on this
             console.debug('[DataChanged]', changeType);
+            pendingChangeTypes.add(changeType);
+
+            // Debounce: schedule processing if not already scheduled
+            if (!changeHandlerScheduled) {
+                changeHandlerScheduled = true;
+                // Use microtask to batch rapid successive notifications
+                queueMicrotask(processDataChanges);
+            }
+        }
+
+        async function processDataChanges() {
+            changeHandlerScheduled = false;
+            const changeTypes = pendingChangeTypes;
+            pendingChangeTypes = new Set();
+
+            // Structure changes may affect sheet dimensions
+            if (changeTypes.has('structure') || changeTypes.has('sheet') || changeTypes.has('loaded')) {
+                await fetchSheetInfo();
+            }
+
+            // Sheet changes need to update sheet tabs
+            if (changeTypes.has('sheet') || changeTypes.has('loaded')) {
+                await fetchSheets();
+            }
+
+            // All change types need viewport refresh and render
+            await fetchViewport();
+            render();
+            updateFormulaBar();
         }
 
         async function fetchSheetInfo() {
@@ -731,15 +761,10 @@
                 if (newValue === '' || newValue.trim() === '') {
                     // Delete cell when content is completely cleared
                     await dataSource.deleteCell(cell.id);
-                    // Refresh sheet info (dimensions may have changed)
-                    await fetchSheetInfo();
                 } else {
                     await dataSource.updateCell(cell.id, newValue);
                 }
-                // Always refresh viewport to get latest data from quadtree
-                await fetchViewport();
-                render();
-                updateFormulaBar();
+                // Listener handles refresh automatically
             } catch (e) {
                 console.error('Error updating cell:', e);
             }
@@ -763,16 +788,9 @@
                     }
                 }
 
-                // Delete all cells
+                // Delete all cells - listener handles refresh automatically
                 for (const cellId of cellsToDelete) {
                     await dataSource.deleteCell(cellId);
-                }
-
-                if (cellsToDelete.length > 0) {
-                    await fetchSheetInfo();
-                    await fetchViewport();
-                    render();
-                    updateFormulaBar();
                 }
             } catch (e) {
                 console.error('Error deleting range cells:', e);
@@ -794,9 +812,9 @@
                         } else {
                             selectedCell.row = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
                         }
+                        // Update selection visuals immediately; listener handles data refresh
                         render();
                         updateFormulaBar();
-                        fetchViewportNow();
                     }
                 });
             } else if (e.key === 'Tab') {
@@ -808,9 +826,9 @@
                         } else {
                             selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
                         }
+                        // Update selection visuals immediately; listener handles data refresh
                         render();
                         updateFormulaBar();
-                        fetchViewportNow();
                     }
                 });
             } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -837,9 +855,9 @@
                             } else if (e.key === 'ArrowRight') {
                                 selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
                             }
+                            // Update selection visuals immediately; listener handles data refresh
                             render();
                             updateFormulaBar();
-                            fetchViewportNow();
                         }
                     });
                 }
@@ -914,14 +932,13 @@
             try {
                 // Always use ByPos - engine handles creation if needed
                 await dataSource.renameColumnByPos(savedColIndex, newName);
-                // Update local cache
+                // Update local cache optimistically (listener will refresh from source)
                 if (newName) {
                     colNames.set(savedColIndex, newName);
                 } else {
                     colNames.delete(savedColIndex);
                 }
-                await fetchViewport();
-                render();
+                // Listener handles refresh automatically
             } catch (e) {
                 console.error('Error renaming column:', e);
             }
@@ -972,22 +989,15 @@
                     // Delete cell when content is completely cleared
                     if (cell) {
                         await dataSource.deleteCell(cell.id);
-                        // Refresh sheet info (dimensions may have changed)
-                        await fetchSheetInfo();
                     }
                     // If no cell exists and value is empty, nothing to do
                 } else if (!cell) {
                     // Create cell if it doesn't exist and value is non-empty
-                    const data = await dataSource.createCell(editCell.col, editCell.row, newValue);
-                    // Refresh sheet info (new column/row may have been created)
-                    await fetchSheetInfo();
+                    await dataSource.createCell(editCell.col, editCell.row, newValue);
                 } else {
                     await dataSource.updateCell(cell.id, newValue);
                 }
-                // Always refresh viewport to get latest data from quadtree
-                await fetchViewport();
-                render();
-                updateFormulaBar();
+                // Listener handles refresh automatically
             } catch (e) {
                 console.error('Error updating cell from formula bar:', e);
             }
@@ -1398,8 +1408,7 @@
                 try {
                     // Always use ByPos - engine handles creation if needed
                     await dataSource.resizeColumnByPos(resizeColIndex, newWidth);
-                    // Refresh from Workbook (source of truth)
-                    await fetchViewport();
+                    // Listener handles refresh automatically
                 } catch (err) {
                     console.error('Error resizing column:', err);
                 }
@@ -1407,7 +1416,7 @@
                 uiStateMachine.transition(UIEvent.END_COLUMN_RESIZE);
                 resizeColIndex = -1;
                 canvas.style.cursor = 'default';
-                render();
+                render();  // Update UI state immediately (listener will refresh data)
             } else if (isResizingRow() && dataSource) {
                 const delta = e.clientY - resizeStartY;
                 const newHeight = Math.max(16, Math.min(500, resizeStartHeight + delta));
@@ -1418,8 +1427,7 @@
                 try {
                     // Always use ByPos - engine handles creation if needed
                     await dataSource.resizeRowByPos(resizeRowIndex, newHeight);
-                    // Refresh from Workbook (source of truth)
-                    await fetchViewport();
+                    // Listener handles refresh automatically
                 } catch (err) {
                     console.error('Error resizing row:', err);
                 }
@@ -1427,7 +1435,7 @@
                 uiStateMachine.transition(UIEvent.END_ROW_RESIZE);
                 resizeRowIndex = -1;
                 canvas.style.cursor = 'default';
-                render();
+                render();  // Update UI state immediately (listener will refresh data)
             } else if (isDraggingColumn() && dataSource) {
                 if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
                     const colId = getColumnId(dragSourceIndex);
@@ -1445,8 +1453,7 @@
                         } else {
                             selectedColumn = dragTargetIndex;
                         }
-                        await fetchSheetInfo();
-                        await fetchViewport();
+                        // Listener handles refresh automatically
                     } catch (err) {
                         console.error('Error moving column:', err);
                     }
@@ -1456,7 +1463,7 @@
                 dragSourceIndex = -1;
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
-                render();
+                render();  // Update UI state immediately (listener will refresh data)
             } else if (isDraggingRow() && dataSource) {
                 if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
                     const rowId = getRowId(dragSourceIndex);
@@ -1474,8 +1481,7 @@
                         } else {
                             selectedRow = dragTargetIndex;
                         }
-                        await fetchSheetInfo();
-                        await fetchViewport();
+                        // Listener handles refresh automatically
                     } catch (err) {
                         console.error('Error moving row:', err);
                     }
@@ -1485,7 +1491,7 @@
                 dragSourceIndex = -1;
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
-                render();
+                render();  // Update UI state immediately (listener will refresh data)
             }
         });
 
@@ -1819,7 +1825,7 @@
                         try {
                             const result = await dataSource.moveSheet(fromIdx, toIdx);
                             activeSheetIndex = result.activeIndex;
-                            await fetchSheets();
+                            // Listener handles fetchSheets
                         } catch (err) {
                             console.error('Error moving sheet:', err);
                         }
@@ -1837,10 +1843,7 @@
         async function switchToSheet(index) {
             if (!dataSource || index === activeSheetIndex) return;
             try {
-                await dataSource.setActiveSheet(index);
-                activeSheetIndex = index;
-
-                // Reset view state
+                // Reset view state before switching
                 scrollX = 0;
                 scrollY = 0;
                 setDefaultSelection();  // Reset selection to A1
@@ -1849,12 +1852,9 @@
                 rowHeights.clear();
                 colNames.clear();
 
-                // Re-fetch data
-                await fetchSheetInfo();
-                await fetchViewport();
-                await fetchSheets();
-                render();
-                updateFormulaBar();
+                await dataSource.setActiveSheet(index);
+                activeSheetIndex = index;
+                // Listener handles fetchSheetInfo, fetchSheets, fetchViewport, render, updateFormulaBar
             } catch (e) {
                 console.error('Error switching sheet:', e);
             }
@@ -1892,7 +1892,7 @@
                 if (save && newName && newName !== currentName) {
                     try {
                         await dataSource.renameSheet(index, newName);
-                        await fetchSheets();
+                        // Listener handles fetchSheets
                     } catch (err) {
                         console.error('Error renaming sheet:', err);
                         tab.textContent = currentName;
@@ -1969,8 +1969,7 @@
                     await dataSource.addSheet('Sheet1');
                     await dataSource.deleteSheet(index);
                     activeSheetIndex = 0;
-                    await fetchSheets();
-                    await switchToSheet(0);
+                    // Listener handles refresh for both operations
                 } catch (err) {
                     console.error('Error handling last sheet delete:', err);
                 }
@@ -1978,11 +1977,7 @@
             }
 
             try {
-                const result = await dataSource.deleteSheet(index);
-                activeSheetIndex = result.activeIndex;
-                await fetchSheets();
-
-                // Reset view if we deleted the current sheet
+                // Reset view state before deleting
                 scrollX = 0;
                 scrollY = 0;
                 setDefaultSelection();  // Reset selection to A1
@@ -1990,10 +1985,9 @@
                 rowHeights.clear();
                 colNames.clear();
 
-                await fetchSheetInfo();
-                await fetchViewport();
-                render();
-                updateFormulaBar();
+                const result = await dataSource.deleteSheet(index);
+                activeSheetIndex = result.activeIndex;
+                // Listener handles fetchSheetInfo, fetchSheets, fetchViewport, render, updateFormulaBar
             } catch (err) {
                 console.error('Error deleting sheet:', err);
             }
@@ -2004,8 +1998,8 @@
             if (!dataSource) return;
             try {
                 const result = await dataSource.addSheet();
-                await fetchSheets();
-                // Switch to the new sheet
+                // Listener handles fetchSheets, then we switch to the new sheet
+                // Note: switchToSheet will trigger another listener callback
                 await switchToSheet(result.index);
             } catch (err) {
                 console.error('Error adding sheet:', err);

@@ -115,15 +115,15 @@ Replace scattered boolean flags with state machine usage.
 
 ---
 
-## Phase 5: Listener-Driven UI Refresh
+## Phase 5: Listener-Driven UI Refresh ✅
 
 Replace explicit `render()` calls scattered throughout the code with listener-driven updates.
 
-- [ ] 5a: Subscribe UI to WasmDataSource `onChange` event on initialization
-- [ ] 5b: Create `handleDataChanged(changeType)` handler that fetches viewport and renders
-- [ ] 5c: Remove explicit `render()` calls after WASM mutation operations (updateCell, createCell, deleteCell, resize, move)
-- [ ] 5d: Keep explicit `render()` only for pure UI changes (scroll, selection visual updates)
-- [ ] 5e: Add viewport fetch debouncing to handle rapid successive changes
+- [x] 5a: Subscribe UI to WasmDataSource `onChange` event on initialization
+- [x] 5b: Create `handleDataChanged(changeType)` handler that fetches viewport and renders
+- [x] 5c: Remove explicit `render()` calls after WASM mutation operations (updateCell, createCell, deleteCell, resize, move)
+- [x] 5d: Keep explicit `render()` only for pure UI changes (scroll, selection visual updates)
+- [x] 5e: Add viewport fetch debouncing to handle rapid successive changes
 
 **Before (scattered throughout):**
 ```javascript
