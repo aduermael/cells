@@ -363,14 +363,14 @@ export class GridRenderer {
                     Math.min(rangeH, rangeY + rangeH - Math.max(HEADER_HEIGHT, rangeY))
                 );
 
-                // Draw range border
+                // Draw range border (thinner than anchor cell)
                 ctx.strokeStyle = COLORS.selectionBorder;
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 1;
                 ctx.strokeRect(
-                    Math.max(HEADER_WIDTH, rangeX) + 1,
-                    Math.max(HEADER_HEIGHT, rangeY) + 1,
-                    Math.min(rangeW, rangeX + rangeW - Math.max(HEADER_WIDTH, rangeX)) - 2,
-                    Math.min(rangeH, rangeY + rangeH - Math.max(HEADER_HEIGHT, rangeY)) - 2
+                    Math.max(HEADER_WIDTH, rangeX) + 0.5,
+                    Math.max(HEADER_HEIGHT, rangeY) + 0.5,
+                    Math.min(rangeW, rangeX + rangeW - Math.max(HEADER_WIDTH, rangeX)) - 1,
+                    Math.min(rangeH, rangeY + rangeH - Math.max(HEADER_HEIGHT, rangeY)) - 1
                 );
             }
 
@@ -400,10 +400,10 @@ export class GridRenderer {
                     ctx.fillStyle = '#ffffff';
                     ctx.fillRect(clipX + 1, clipY + 1, clipW - 2, clipH - 2);
 
-                    // Thicker border for anchor cell
+                    // Regular border for anchor cell
                     ctx.strokeStyle = COLORS.selectionBorder;
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(clipX + 1.5, clipY + 1.5, clipW - 3, clipH - 3);
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(clipX + 1, clipY + 1, clipW - 2, clipH - 2);
                 }
             }
         } else if (this.selectedCell) {
