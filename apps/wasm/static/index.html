@@ -70,6 +70,12 @@
 
         import { detectFormat, getBaseName, downloadBlob, getMimeType } from './shared/utils.js';
 
+        import {
+            createUIStateMachine,
+            UIState,
+            UIEvent
+        } from './shared/ui-state.js';
+
         // ========================================================================
         // WASM Data Source (communicates with Web Worker)
         // ========================================================================
@@ -225,6 +231,9 @@
 
         // Initialize renderer
         const renderer = new GridRenderer(canvas);
+
+        // Initialize UI state machine
+        const uiStateMachine = createUIStateMachine({ debug: false });
 
         let dataSource = null;
         let wasmClient = null;

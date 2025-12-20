@@ -100,7 +100,7 @@ Context (always available):
 
 Replace scattered boolean flags with state machine usage.
 
-- [ ] 4a: Import state machine into index.html, initialize on load
+- [x] 4a: Import state machine into index.html, initialize on load
 - [ ] 4b: Replace `isEditing`, `isEditingFormulaBar`, `isEditingColumnHeader` with state checks
 - [ ] 4c: Replace `isResizing`, `isResizingRow` with state checks
 - [ ] 4d: Replace `isDraggingColumn`, `isDraggingRow` with state checks
