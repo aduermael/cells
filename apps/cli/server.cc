@@ -1,10 +1,15 @@
 #include "server.h"
 
+#include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 
+#include "core/cells/csv_writer.h"
 #include "core/cells/id.h"
+#include "core/cells/serializer.h"
+#include "core/cells/xlsx_writer.h"
 #include "httplib.h"
 
 namespace cells::cli {
@@ -898,6 +903,94 @@ void Server::setupRoutes() {
         json << "{\"success\":true,\"id\":\"" << cellId.toString() << "\"}";
         res.set_content(json.str(), "application/json");
     });
+
+    // GET /api/export/:format - export spreadsheet
+    _server->Get(R"(/api/export/(csv|xlsx|cells))",
+                 [this](const httplib::Request& req, httplib::Response& res) {
+                     if (!_workbook) {
+                         res.status = 500;
+                         res.set_content("{\"error\":\"No workbook available\"}", "application/json");
+                         return;
+                     }
+
+                     std::string format = req.matches[1];
+
+                     // Get base filename from workbook name
+                     std::string baseName = _workbook->name;
+                     if (baseName.empty()) {
+                         baseName = "spreadsheet";
+                     }
+                     // Remove any existing extension
+                     size_t dotPos = baseName.rfind('.');
+                     if (dotPos != std::string::npos) {
+                         baseName = baseName.substr(0, dotPos);
+                     }
+
+                     if (format == "csv") {
+                         // Export CSV
+                         auto result = writeCSV(*_workbook);
+                         if (!result.ok()) {
+                             res.status = 500;
+                             std::ostringstream json;
+                             json << "{\"error\":\"" << jsonEscape(result.error->message) << "\"}";
+                             res.set_content(json.str(), "application/json");
+                             return;
+                         }
+
+                         res.set_header("Content-Type", "text/csv");
+                         res.set_header("Content-Disposition",
+                                        "attachment; filename=\"" + baseName + ".csv\"");
+                         res.set_content(result.output, "text/csv");
+                     } else if (format == "xlsx") {
+                         // Export XLSX - need to write to temp file first
+                         std::string tempPath =
+                             std::filesystem::temp_directory_path() / (baseName + ".xlsx");
+
+                         auto result = writeXLSX(*_workbook, tempPath);
+                         if (!result.ok()) {
+                             res.status = 500;
+                             std::ostringstream json;
+                             json << "{\"error\":\"" << jsonEscape(result.error->message) << "\"}";
+                             res.set_content(json.str(), "application/json");
+                             return;
+                         }
+
+                         // Read the temp file
+                         std::ifstream file(tempPath, std::ios::binary);
+                         if (!file.is_open()) {
+                             res.status = 500;
+                             res.set_content("{\"error\":\"Failed to read temp file\"}",
+                                             "application/json");
+                             std::remove(tempPath.c_str());
+                             return;
+                         }
+
+                         std::ostringstream ss;
+                         ss << file.rdbuf();
+                         file.close();
+                         std::remove(tempPath.c_str());
+
+                         res.set_header(
+                             "Content-Type",
+                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                         res.set_header("Content-Disposition",
+                                        "attachment; filename=\"" + baseName + ".xlsx\"");
+                         res.set_content(
+                             ss.str(),
+                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                     } else if (format == "cells") {
+                         // Export .cells format
+                         std::string content = serialize(*_workbook);
+
+                         res.set_header("Content-Type", "text/plain");
+                         res.set_header("Content-Disposition",
+                                        "attachment; filename=\"" + baseName + ".cells\"");
+                         res.set_content(content, "text/plain");
+                     } else {
+                         res.status = 400;
+                         res.set_content("{\"error\":\"Unknown format\"}", "application/json");
+                     }
+                 });
 }
 
 int Server::run(const ServerOptions& opts) {
