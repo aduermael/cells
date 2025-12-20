@@ -1,5 +1,21 @@
 # CRDT & Collaboration
 
+## Implementation Status
+
+**Current state (December 2024):** Design only, not implemented.
+
+| Component | Status |
+|-----------|--------|
+| Hybrid Logical Clock | ❌ Not implemented |
+| Cell operations (CRDT) | ❌ Not implemented |
+| Operation log (OpLog) | ❌ Not implemented |
+| Branch-based undo/redo | ❌ Not implemented |
+| Presence/cursors | ❌ Not implemented |
+
+This document describes the planned CRDT architecture for conflict-free collaboration. The current implementation uses simple last-write-wins semantics without operation logs or clocks.
+
+---
+
 ## Overview
 
 CRDTs (Conflict-free Replicated Data Types) enable real-time collaboration without a central server arbitrating conflicts. Each client can make changes locally, and changes merge deterministically.
