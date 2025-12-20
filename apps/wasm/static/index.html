@@ -1401,97 +1401,109 @@
             if (isResizing() && dataSource) {
                 const delta = e.clientX - resizeStartX;
                 const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
+                const colIndexToResize = resizeColIndex;
 
                 // Optimistic update for smooth UX
-                colWidths.set(resizeColIndex, newWidth);
+                colWidths.set(colIndexToResize, newWidth);
 
-                try {
-                    // Always use ByPos - engine handles creation if needed
-                    await dataSource.resizeColumnByPos(resizeColIndex, newWidth);
-                    // Listener handles refresh automatically
-                } catch (err) {
-                    console.error('Error resizing column:', err);
-                }
-
+                // Transition state BEFORE async call to avoid race conditions
                 uiStateMachine.transition(UIEvent.END_COLUMN_RESIZE);
                 resizeColIndex = -1;
                 canvas.style.cursor = 'default';
-                render();  // Update UI state immediately (listener will refresh data)
+                render();
+
+                // Persist to WASM (listener handles refresh)
+                try {
+                    await dataSource.resizeColumnByPos(colIndexToResize, newWidth);
+                } catch (err) {
+                    console.error('Error resizing column:', err);
+                }
             } else if (isResizingRow() && dataSource) {
                 const delta = e.clientY - resizeStartY;
                 const newHeight = Math.max(16, Math.min(500, resizeStartHeight + delta));
+                const rowIndexToResize = resizeRowIndex;
 
                 // Optimistic update for smooth UX
-                rowHeights.set(resizeRowIndex, newHeight);
+                rowHeights.set(rowIndexToResize, newHeight);
 
-                try {
-                    // Always use ByPos - engine handles creation if needed
-                    await dataSource.resizeRowByPos(resizeRowIndex, newHeight);
-                    // Listener handles refresh automatically
-                } catch (err) {
-                    console.error('Error resizing row:', err);
-                }
-
+                // Transition state BEFORE async call to avoid race conditions
                 uiStateMachine.transition(UIEvent.END_ROW_RESIZE);
                 resizeRowIndex = -1;
                 canvas.style.cursor = 'default';
-                render();  // Update UI state immediately (listener will refresh data)
-            } else if (isDraggingColumn() && dataSource) {
-                if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
-                    const colId = getColumnId(dragSourceIndex);
-                    try {
-                        if (colId) {
-                            // Column exists - move it
-                            await dataSource.moveColumn(colId, dragTargetIndex);
-                        } else {
-                            // Empty column - just shift other columns' positions
-                            await dataSource.shiftColumnsForEmptyMove(dragSourceIndex, dragTargetIndex);
-                        }
-                        // Update selected column to its new position
-                        if (dragTargetIndex > dragSourceIndex) {
-                            selectedColumn = dragTargetIndex - 1;
-                        } else {
-                            selectedColumn = dragTargetIndex;
-                        }
-                        // Listener handles refresh automatically
-                    } catch (err) {
-                        console.error('Error moving column:', err);
-                    }
-                }
+                render();
 
+                // Persist to WASM (listener handles refresh)
+                try {
+                    await dataSource.resizeRowByPos(rowIndexToResize, newHeight);
+                } catch (err) {
+                    console.error('Error resizing row:', err);
+                }
+            } else if (isDraggingColumn() && dataSource) {
+                const sourceIdx = dragSourceIndex;
+                const targetIdx = dragTargetIndex;
+                const colId = getColumnId(sourceIdx);
+
+                // Transition state BEFORE async call to avoid race conditions
                 uiStateMachine.transition(UIEvent.END_COLUMN_DRAG);
                 dragSourceIndex = -1;
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
-                render();  // Update UI state immediately (listener will refresh data)
-            } else if (isDraggingRow() && dataSource) {
-                if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
-                    const rowId = getRowId(dragSourceIndex);
-                    try {
-                        if (rowId) {
-                            // Row exists - move it
-                            await dataSource.moveRow(rowId, dragTargetIndex);
-                        } else {
-                            // Empty row - just shift other rows' positions
-                            await dataSource.shiftRowsForEmptyMove(dragSourceIndex, dragTargetIndex);
-                        }
-                        // Update selected row to its new position
-                        if (dragTargetIndex > dragSourceIndex) {
-                            selectedRow = dragTargetIndex - 1;
-                        } else {
-                            selectedRow = dragTargetIndex;
-                        }
-                        // Listener handles refresh automatically
-                    } catch (err) {
-                        console.error('Error moving row:', err);
+
+                // Update selected column to its new position (optimistic)
+                if (sourceIdx !== targetIdx && sourceIdx !== targetIdx - 1) {
+                    if (targetIdx > sourceIdx) {
+                        selectedColumn = targetIdx - 1;
+                    } else {
+                        selectedColumn = targetIdx;
                     }
                 }
+                render();
 
+                // Persist to WASM (listener handles refresh)
+                if (sourceIdx !== targetIdx && sourceIdx !== targetIdx - 1) {
+                    try {
+                        if (colId) {
+                            await dataSource.moveColumn(colId, targetIdx);
+                        } else {
+                            await dataSource.shiftColumnsForEmptyMove(sourceIdx, targetIdx);
+                        }
+                    } catch (err) {
+                        console.error('Error moving column:', err);
+                    }
+                }
+            } else if (isDraggingRow() && dataSource) {
+                const sourceIdx = dragSourceIndex;
+                const targetIdx = dragTargetIndex;
+                const rowId = getRowId(sourceIdx);
+
+                // Transition state BEFORE async call to avoid race conditions
                 uiStateMachine.transition(UIEvent.END_ROW_DRAG);
                 dragSourceIndex = -1;
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
-                render();  // Update UI state immediately (listener will refresh data)
+
+                // Update selected row to its new position (optimistic)
+                if (sourceIdx !== targetIdx && sourceIdx !== targetIdx - 1) {
+                    if (targetIdx > sourceIdx) {
+                        selectedRow = targetIdx - 1;
+                    } else {
+                        selectedRow = targetIdx;
+                    }
+                }
+                render();
+
+                // Persist to WASM (listener handles refresh)
+                if (sourceIdx !== targetIdx && sourceIdx !== targetIdx - 1) {
+                    try {
+                        if (rowId) {
+                            await dataSource.moveRow(rowId, targetIdx);
+                        } else {
+                            await dataSource.shiftRowsForEmptyMove(sourceIdx, targetIdx);
+                        }
+                    } catch (err) {
+                        console.error('Error moving row:', err);
+                    }
+                }
             }
         });
 
