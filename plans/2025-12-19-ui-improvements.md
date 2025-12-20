@@ -140,23 +140,19 @@ Display sheet tabs at the bottom of the grid for multi-sheet navigation and mana
 
 ## Technical Notes
 
-### File Structure After Consolidation (Post Phase 2.5)
+### File Structure After Consolidation
 
 ```
-apps/
-├── shared/
-│   ├── styles.css           # Common CSS
-│   ├── grid-renderer.js     # Canvas rendering
-│   ├── grid-events.js       # Mouse/keyboard handlers
-│   └── utils.js             # Helper functions
-└── wasm/
-    ├── static/
-    │   └── index.html       # WASM web UI
-    ├── client.js
-    └── worker.js
-
-# REMOVED (Phase 2.5):
-# └── cli/web/               # CLI server mode removed - WASM only
+apps/wasm/
+├── static/
+│   ├── index.html           # WASM web UI
+│   └── shared/
+│       ├── styles.css       # CSS styles
+│       ├── grid-renderer.js # Canvas rendering
+│       ├── grid-events.js   # Mouse/keyboard handlers
+│       └── utils.js         # Helper functions
+├── client.js
+└── worker.js
 ```
 
 ### Header Separator Colors
