@@ -1,6 +1,6 @@
 # Plan: WASM Worker Build
 
-**Status:** IN PROGRESS
+**Status:** READY
 **Goal:** Run the spreadsheet engine fully in-browser via WebAssembly Worker, with no server dependency
 
 ## Overview
@@ -45,11 +45,11 @@ Build the cells app as a WASM module that runs in a Web Worker, enabling:
 
 **Goal:** Configure Bazel to build WASM targets with Emscripten
 
-- [ ] 1.1 Add `emsdk` to MODULE.bazel as external dependency
-- [ ] 1.2 Create `.bazelrc` config for `--config=wasm`
-- [ ] 1.3 Create `platforms/BUILD` for wasm32 platform definition
-- [ ] 1.4 Test minimal "hello world" WASM build
-- [ ] 1.5 Update Makefile with `make wasm` target
+- [ ] 1a: Add `emsdk` to MODULE.bazel as external dependency
+- [ ] 1b: Create `.bazelrc` config for `--config=wasm`
+- [ ] 1c: Create `platforms/BUILD` for wasm32 platform definition
+- [ ] 1d: Test minimal "hello world" WASM build
+- [ ] 1e: Update Makefile with `make wasm` target
 
 **Files to create/modify:**
 - `MODULE.bazel` - Add rules_emscripten
@@ -61,8 +61,8 @@ Build the cells app as a WASM module that runs in a Web Worker, enabling:
 
 **Goal:** Create JavaScript bindings for core types using Embind
 
-- [ ] 2.1 Create `apps/wasm/BUILD` with cc_binary target for WASM
-- [ ] 2.2 Create `apps/wasm/bindings.cc` with Embind bindings for:
+- [ ] 2a: Create `apps/wasm/BUILD` with cc_binary target for WASM
+- [ ] 2b: Create `apps/wasm/bindings.cc` with Embind bindings for:
   - Workbook, Sheet, Cell, Axis types
   - Parser functions (parseFromString)
   - Serializer functions (serialize)
@@ -70,8 +70,8 @@ Build the cells app as a WASM module that runs in a Web Worker, enabling:
   - CSV/XLSX writers (to ArrayBuffer)
   - Quadtree viewport queries
   - RefConverter for formula display
-- [ ] 2.3 Create TypeScript type definitions (`apps/wasm/cells.d.ts`)
-- [ ] 2.4 Test bindings with simple JavaScript test
+- [ ] 2c: Create TypeScript type definitions (`apps/wasm/cells.d.ts`)
+- [ ] 2d: Test bindings with simple JavaScript test
 
 **API Design:**
 ```typescript
@@ -142,11 +142,11 @@ declare module 'cells' {
 
 **Goal:** Wrap WASM module in a Web Worker with message-based API
 
-- [ ] 3.1 Create `apps/wasm/worker.js` - Worker entry point that loads WASM
-- [ ] 3.2 Define message protocol (matching existing REST API semantics)
-- [ ] 3.3 Create `apps/wasm/client.js` - Main thread client library
-- [ ] 3.4 Handle file loading in worker (ArrayBuffer transfer)
-- [ ] 3.5 Test worker with sample .cells file
+- [ ] 3a: Create `apps/wasm/worker.js` - Worker entry point that loads WASM
+- [ ] 3b: Define message protocol (matching existing REST API semantics)
+- [ ] 3c: Create `apps/wasm/client.js` - Main thread client library
+- [ ] 3d: Handle file loading in worker (ArrayBuffer transfer)
+- [ ] 3e: Test worker with sample .cells file
 
 **Message Protocol:**
 ```typescript
@@ -176,13 +176,13 @@ type WorkerResponse =
 
 **Goal:** Update index.html to support both server mode and WASM mode
 
-- [ ] 4.1 Add drag & drop file loading UI (drop zone overlay)
-- [ ] 4.2 Create abstraction layer for data source (server vs WASM)
-- [ ] 4.3 Update API calls to use abstraction layer
-- [ ] 4.4 Add "Open File" button and file input
-- [ ] 4.5 Add mode indicator (Server/Local) in UI
-- [ ] 4.6 Handle empty state (no file loaded) gracefully
-- [ ] 4.7 Test with both server mode and WASM mode
+- [ ] 4a: Add drag & drop file loading UI (drop zone overlay)
+- [ ] 4b: Create abstraction layer for data source (server vs WASM)
+- [ ] 4c: Update API calls to use abstraction layer
+- [ ] 4d: Add "Open File" button and file input
+- [ ] 4e: Add mode indicator (Server/Local) in UI
+- [ ] 4f: Handle empty state (no file loaded) gracefully
+- [ ] 4g: Test with both server mode and WASM mode
 
 **UI Changes:**
 ```
@@ -208,12 +208,12 @@ type WorkerResponse =
 
 **Goal:** Package WASM build for standalone deployment
 
-- [ ] 5.1 Create `apps/wasm/static/` with standalone HTML (no server)
-- [ ] 5.2 Add build step to copy WASM artifacts to web directory
-- [ ] 5.3 Create `make wasm-dist` target for production build
-- [ ] 5.4 Test standalone deployment (file:// protocol or static server)
-- [ ] 5.5 Document deployment options (GitHub Pages, static hosting)
-- [ ] 5.6 Update README with WASM build instructions
+- [ ] 5a: Create `apps/wasm/static/` with standalone HTML (no server)
+- [ ] 5b: Add build step to copy WASM artifacts to web directory
+- [ ] 5c: Create `make wasm-dist` target for production build
+- [ ] 5d: Test standalone deployment (file:// protocol or static server)
+- [ ] 5e: Document deployment options (GitHub Pages, static hosting)
+- [ ] 5f: Update README with WASM build instructions
 
 **Output Structure:**
 ```
@@ -227,12 +227,12 @@ dist/
 
 ### Phase 6: Testing & Polish
 
-- [ ] 6.1 Test large file loading (1MB+ XLSX)
-- [ ] 6.2 Test formula evaluation in WASM
-- [ ] 6.3 Add progress indicator for file loading
-- [ ] 6.4 Add error handling for invalid files
-- [ ] 6.5 Test cross-browser compatibility (Chrome, Firefox, Safari)
-- [ ] 6.6 Performance comparison: native server vs WASM
+- [ ] 6a: Test large file loading (1MB+ XLSX)
+- [ ] 6b: Test formula evaluation in WASM
+- [ ] 6c: Add progress indicator for file loading
+- [ ] 6d: Add error handling for invalid files
+- [ ] 6e: Test cross-browser compatibility (Chrome, Firefox, Safari)
+- [ ] 6f: Performance comparison: native server vs WASM
 
 ## Technical Considerations
 
