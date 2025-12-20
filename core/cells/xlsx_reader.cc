@@ -387,7 +387,8 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                 switch (cellType) {
                     case 2:  // Number
                         if (!value.empty()) {
-                            cell->value = CellValue(std::stod(value));
+                            // Use strtod instead of std::stod to avoid exceptions
+                            cell->value = CellValue(strtod(value.c_str(), nullptr));
                         }
                         break;
                     case 3:  // Boolean

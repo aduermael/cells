@@ -1,6 +1,7 @@
 #include "core/cells/ref_converter.h"
 
 #include <cctype>
+#include <cstdlib>
 
 #include <algorithm>
 
@@ -167,7 +168,8 @@ CellRef RefConverter::parseA1Ref(const std::string& ref) {
         return result;
     }
 
-    const int rowNum = std::stoi(rowDigits);
+    // Use strtol instead of std::stoi to avoid exceptions
+    const int rowNum = static_cast<int>(strtol(rowDigits.c_str(), nullptr, 10));
     if (rowNum < 1) {
         return result;  // Excel rows are 1-based
     }
@@ -441,7 +443,8 @@ size_t RefConverter::extractA1Ref(const std::string& formula, size_t pos, CellRe
         return 0;
     }
 
-    const int rowNum = std::stoi(rowDigits);
+    // Use strtol instead of std::stoi to avoid exceptions
+    const int rowNum = static_cast<int>(strtol(rowDigits.c_str(), nullptr, 10));
     if (rowNum < 1) {
         return 0;
     }

@@ -1,4 +1,4 @@
-.PHONY: build test format lint check clean compile-db cli cli-release release wasm wasm-full wasm-dist wasm-dist-full
+.PHONY: build test format lint check clean compile-db cli cli-release release wasm wasm-full wasm-dist wasm-dist-full wasm-serve
 
 # Build
 build:
@@ -36,8 +36,8 @@ wasm-dist:
 	@rm -rf dist
 	@mkdir -p dist
 	@echo "Copying WASM artifacts..."
-	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.js dist/cells_wasm.js
-	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/cells_wasm.wasm
+	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.js dist/
+	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/
 	@echo "Copying JavaScript files..."
 	@cp apps/wasm/worker.js dist/
 	@cp apps/wasm/client.js dist/
@@ -49,8 +49,8 @@ wasm-dist:
 	@echo "Files:"
 	@ls -lh dist/
 	@echo ""
-	@echo "To test locally, run: python3 -m http.server 8080 --directory dist"
-	@echo "Then open: http://localhost:8080/"
+	@echo "To test locally: make wasm-serve"
+	@echo "Then open: http://localhost:8081/"
 
 # Build production WASM distribution with XLSX support
 wasm-dist-full:
@@ -60,8 +60,8 @@ wasm-dist-full:
 	@rm -rf dist
 	@mkdir -p dist
 	@echo "Copying WASM artifacts..."
-	@cp bazel-bin/apps/wasm/cells_wasm_full/cells_wasm_full_bin.js dist/cells_wasm.js
-	@cp bazel-bin/apps/wasm/cells_wasm_full/cells_wasm_full_bin.wasm dist/cells_wasm.wasm
+	@cp bazel-bin/apps/wasm/cells_wasm_full/cells_wasm_full_bin.js dist/cells_wasm_bin.js
+	@cp bazel-bin/apps/wasm/cells_wasm_full/cells_wasm_full_bin.wasm dist/cells_wasm_bin.wasm
 	@echo "Copying JavaScript files..."
 	@cp apps/wasm/worker.js dist/
 	@cp apps/wasm/client.js dist/
@@ -73,8 +73,13 @@ wasm-dist-full:
 	@echo "Files:"
 	@ls -lh dist/
 	@echo ""
-	@echo "To test locally, run: python3 -m http.server 8080 --directory dist"
-	@echo "Then open: http://localhost:8080/"
+	@echo "To test locally: make wasm-serve"
+	@echo "Then open: http://localhost:8081/"
+
+# Serve WASM distribution for local testing
+wasm-serve:
+	@if [ ! -d dist ]; then echo "Error: dist/ not found. Run 'make wasm-dist' first."; exit 1; fi
+	go run tools/serve/main.go -port 8081 -dir dist
 
 # Test (when tests exist)
 test:
