@@ -192,6 +192,13 @@
         let selectedColumn = null;
         let selectedRow = null;
 
+        // Range selection state
+        // When selecting a range, selectionStart is the anchor and selectionEnd is the current position
+        // A single cell selection has selectionStart === selectionEnd (both equal to selectedCell)
+        let selectionStart = null;  // {col, row} - anchor cell for range selection
+        let selectionEnd = null;    // {col, row} - current end of range selection
+        let isSelectingRange = false;  // True while mouse is down and dragging to select
+
         // Editing state
         let isEditing = false;
 
@@ -346,6 +353,23 @@
             return s;
         }
 
+        // Get normalized range (min/max coordinates)
+        function getNormalizedRange() {
+            if (!selectionStart || !selectionEnd) return null;
+            return {
+                minCol: Math.min(selectionStart.col, selectionEnd.col),
+                maxCol: Math.max(selectionStart.col, selectionEnd.col),
+                minRow: Math.min(selectionStart.row, selectionEnd.row),
+                maxRow: Math.max(selectionStart.row, selectionEnd.row)
+            };
+        }
+
+        // Check if we have a multi-cell range selection
+        function hasRangeSelection() {
+            if (!selectionStart || !selectionEnd) return false;
+            return selectionStart.col !== selectionEnd.col || selectionStart.row !== selectionEnd.row;
+        }
+
         // Update formula bar with current selection
         function updateFormulaBar() {
             if (!selectedCell) {
@@ -355,15 +379,31 @@
                 return;
             }
 
-            const ref = colToLetter(selectedCell.col) + (selectedCell.row + 1);
-            cellReference.textContent = ref;
-
-            const cell = getCellAt(selectedCell.col, selectedCell.row);
-            if (cell) {
-                // Show formula if available, otherwise show value
-                formulaInput.value = cell.formula || cell.value || '';
+            // Check if we have a range selection
+            if (hasRangeSelection()) {
+                const range = getNormalizedRange();
+                const startRef = colToLetter(range.minCol) + (range.minRow + 1);
+                const endRef = colToLetter(range.maxCol) + (range.maxRow + 1);
+                cellReference.textContent = startRef + ':' + endRef;
+                // For ranges, show the anchor cell's content (the cell where selection started)
+                const anchorCell = getCellAt(selectionStart.col, selectionStart.row);
+                if (anchorCell) {
+                    formulaInput.value = anchorCell.formula || anchorCell.value || '';
+                } else {
+                    formulaInput.value = '';
+                }
             } else {
-                formulaInput.value = '';
+                // Single cell selection
+                const ref = colToLetter(selectedCell.col) + (selectedCell.row + 1);
+                cellReference.textContent = ref;
+
+                const cell = getCellAt(selectedCell.col, selectedCell.row);
+                if (cell) {
+                    // Show formula if available, otherwise show value
+                    formulaInput.value = cell.formula || cell.value || '';
+                } else {
+                    formulaInput.value = '';
+                }
             }
             formulaInput.placeholder = '';
         }
@@ -386,6 +426,8 @@
                 selectedCell,
                 selectedColumn,
                 selectedRow,
+                selectionStart,
+                selectionEnd,
                 isDraggingColumn,
                 isDraggingRow,
                 dragSourceIndex,
@@ -1032,10 +1074,23 @@
                 const row = getRowAtY(y);
 
                 if (col >= 0 && row >= 0) {
+                    // Shift+click extends selection from current anchor
+                    const isShiftClick = e.shiftKey && selectionStart;
+
                     // If editing cell editor, commit first then select new cell
                     if (isEditing) {
                         confirmEditing().then(() => {
-                            selectedCell = { col, row };
+                            if (isShiftClick) {
+                                // Extend selection from existing anchor
+                                selectionEnd = { col, row };
+                                selectedCell = { col, row };
+                            } else {
+                                // New selection
+                                selectedCell = { col, row };
+                                selectionStart = { col, row };
+                                selectionEnd = { col, row };
+                            }
+                            isSelectingRange = true;
                             render();
                             updateFormulaBar();
                             canvas.focus();
@@ -1044,13 +1099,33 @@
                         // Mark as not editing BEFORE commit to prevent blur handler double-commit
                         isEditingFormulaBar = false;
                         commitFormulaBarEdit().then(() => {
-                            selectedCell = { col, row };
+                            if (isShiftClick) {
+                                // Extend selection from existing anchor
+                                selectionEnd = { col, row };
+                                selectedCell = { col, row };
+                            } else {
+                                // New selection
+                                selectedCell = { col, row };
+                                selectionStart = { col, row };
+                                selectionEnd = { col, row };
+                            }
+                            isSelectingRange = true;
                             render();
                             updateFormulaBar();
                             canvas.focus();
                         });
                     } else {
-                        selectedCell = { col, row };
+                        if (isShiftClick) {
+                            // Extend selection from existing anchor
+                            selectionEnd = { col, row };
+                            selectedCell = { col, row };
+                        } else {
+                            // New selection
+                            selectedCell = { col, row };
+                            selectionStart = { col, row };
+                            selectionEnd = { col, row };
+                        }
+                        isSelectingRange = true;
                         render();
                         updateFormulaBar();
                         canvas.focus();
@@ -1090,6 +1165,23 @@
                     dragMouseY = y;
                     canvas.style.cursor = 'grabbing';
                 }
+            }
+
+            // Range selection drag
+            if (isSelectingRange && x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+                const col = getColAtX(x);
+                const row = getRowAtY(y);
+                if (col >= 0 && row >= 0) {
+                    // Only update if position changed
+                    if (!selectionEnd || selectionEnd.col !== col || selectionEnd.row !== row) {
+                        selectionEnd = { col, row };
+                        // Update selectedCell to the current end position (for formula bar display)
+                        selectedCell = { col, row };
+                        render();
+                        updateFormulaBar();
+                    }
+                }
+                return;  // Don't process other mouse move handlers during range selection
             }
 
             if (isResizing) {
@@ -1143,6 +1235,18 @@
         });
 
         canvas.addEventListener('mouseup', async (e) => {
+            // End range selection
+            if (isSelectingRange) {
+                isSelectingRange = false;
+                // Keep selectionStart and selectionEnd as they are
+                // selectedCell should be set to selectionStart (the anchor)
+                if (selectionStart) {
+                    selectedCell = { col: selectionStart.col, row: selectionStart.row };
+                }
+                render();
+                updateFormulaBar();
+            }
+
             // Clear pending drag states (click without drag)
             if (pendingDragColumn) {
                 pendingDragColumn = false;
@@ -1273,6 +1377,16 @@
             pendingDragColumn = false;
             pendingDragRow = false;
 
+            // End range selection on mouse leave
+            if (isSelectingRange) {
+                isSelectingRange = false;
+                if (selectionStart) {
+                    selectedCell = { col: selectionStart.col, row: selectionStart.row };
+                }
+                render();
+                updateFormulaBar();
+            }
+
             if (isResizing) {
                 isResizing = false;
                 resizeColIndex = -1;
@@ -1321,6 +1435,9 @@
 
                 if (col >= 0 && row >= 0) {
                     selectedCell = { col, row };
+                    // Clear range selection on double-click (start editing single cell)
+                    selectionStart = { col, row };
+                    selectionEnd = { col, row };
                     render();
                     updateFormulaBar();
                     // Double-click enters append mode (cursor at end of content)
@@ -1333,34 +1450,39 @@
             if (isEditing || isEditingFormulaBar || isEditingColumnHeader) return;
             if (!selectedCell || !sheetInfo) return;
 
-            let newCol = selectedCell.col;
-            let newRow = selectedCell.row;
+            // Determine current end position for range extension
+            const currentEnd = selectionEnd || selectedCell;
+            let newCol = currentEnd.col;
+            let newRow = currentEnd.row;
             let handled = false;
+            let isExtendingSelection = e.shiftKey;
 
             switch (e.key) {
                 case 'ArrowUp':
-                    newRow = Math.max(0, selectedCell.row - 1);
+                    newRow = Math.max(0, currentEnd.row - 1);
                     handled = true;
                     break;
                 case 'ArrowDown':
-                    newRow = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
+                    newRow = Math.min(sheetInfo.rowCount - 1, currentEnd.row + 1);
                     handled = true;
                     break;
                 case 'ArrowLeft':
-                    newCol = Math.max(0, selectedCell.col - 1);
+                    newCol = Math.max(0, currentEnd.col - 1);
                     handled = true;
                     break;
                 case 'ArrowRight':
-                    newCol = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
+                    newCol = Math.min(sheetInfo.colCount - 1, currentEnd.col + 1);
                     handled = true;
                     break;
                 case 'Tab':
                     e.preventDefault();
+                    isExtendingSelection = false;  // Tab doesn't extend selection
                     if (e.shiftKey) {
                         newCol = Math.max(0, selectedCell.col - 1);
                     } else {
                         newCol = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
                     }
+                    newRow = selectedCell.row;
                     handled = true;
                     break;
                 case 'F2':
@@ -1371,11 +1493,13 @@
                 case 'Enter':
                     // Enter just moves down (Shift+Enter moves up) - no edit mode
                     e.preventDefault();
+                    isExtendingSelection = false;  // Enter/Shift+Enter doesn't extend selection
                     if (e.shiftKey) {
                         newRow = Math.max(0, selectedCell.row - 1);
                     } else {
                         newRow = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
                     }
+                    newCol = selectedCell.col;
                     handled = true;
                     break;
                 case 'Delete':
@@ -1385,7 +1509,14 @@
                     startEditing({ mode: 'replace', initialChar: '' });
                     return;
                 case 'Escape':
-                    // Escape deselects
+                    // Escape clears range selection (collapses to single cell)
+                    if (hasRangeSelection()) {
+                        e.preventDefault();
+                        selectionEnd = { col: selectionStart.col, row: selectionStart.row };
+                        selectedCell = { col: selectionStart.col, row: selectionStart.row };
+                        render();
+                        updateFormulaBar();
+                    }
                     return;
                 default:
                     // Check for printable character - start replace mode
@@ -1402,7 +1533,19 @@
                 e.preventDefault();
             }
 
-            selectedCell = { col: newCol, row: newRow };
+            if (isExtendingSelection) {
+                // Extend selection: keep anchor, update end
+                if (!selectionStart) {
+                    selectionStart = { col: selectedCell.col, row: selectedCell.row };
+                }
+                selectionEnd = { col: newCol, row: newRow };
+                selectedCell = { col: newCol, row: newRow };
+            } else {
+                // Move selection: collapse to single cell
+                selectedCell = { col: newCol, row: newRow };
+                selectionStart = { col: newCol, row: newRow };
+                selectionEnd = { col: newCol, row: newRow };
+            }
 
             // Scroll to keep selection visible
             let selX = HEADER_WIDTH;
@@ -1586,6 +1729,9 @@
             selectedCell = null;
             selectedColumn = null;
             selectedRow = null;
+            selectionStart = null;
+            selectionEnd = null;
+            isSelectingRange = false;
             colWidths.clear();
             rowHeights.clear();
             colNames.clear();
@@ -1652,6 +1798,9 @@
             selectedCell = null;
             selectedColumn = null;
             selectedRow = null;
+            selectionStart = null;
+            selectionEnd = null;
+            isSelectingRange = false;
             colWidths.clear();
             rowHeights.clear();
             colNames.clear();

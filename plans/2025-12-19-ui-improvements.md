@@ -116,12 +116,12 @@ Remember the loaded file across page refreshes using localStorage or IndexedDB.
 
 Allow click-and-drag to select a rectangular range of cells.
 
-- [ ] 9a: Add range selection state (`selectionStart`, `selectionEnd`)
-- [ ] 9b: Implement mousedown to set selection start
-- [ ] 9c: Implement mousemove during drag to update selection end
-- [ ] 9d: Render range selection highlight
-- [ ] 9e: Support Shift+click to extend selection
-- [ ] 9f: Display range in formula bar (e.g., "A1:B5")
+- [x] 9a: Add range selection state (`selectionStart`, `selectionEnd`)
+- [x] 9b: Implement mousedown to set selection start
+- [x] 9c: Implement mousemove during drag to update selection end
+- [x] 9d: Render range selection highlight
+- [x] 9e: Support Shift+click to extend selection
+- [x] 9f: Display range in formula bar (e.g., "A1:B5")
 
 ## Phase 10: Sheet Tabs
 

@@ -42,6 +42,8 @@ export class GridRenderer {
         this.selectedCell = null;
         this.selectedColumn = null;
         this.selectedRow = null;
+        this.selectionStart = null;
+        this.selectionEnd = null;
 
         // Drag state
         this.isDraggingColumn = false;
@@ -102,6 +104,28 @@ export class GridRenderer {
     getColumnHeaderText(col) {
         const customName = this.colNames.get(col);
         return customName || this.colToLetter(col);
+    }
+
+    /**
+     * Get normalized range selection (min/max coordinates)
+     */
+    getNormalizedRange() {
+        if (!this.selectionStart || !this.selectionEnd) return null;
+        return {
+            minCol: Math.min(this.selectionStart.col, this.selectionEnd.col),
+            maxCol: Math.max(this.selectionStart.col, this.selectionEnd.col),
+            minRow: Math.min(this.selectionStart.row, this.selectionEnd.row),
+            maxRow: Math.max(this.selectionStart.row, this.selectionEnd.row)
+        };
+    }
+
+    /**
+     * Check if we have a multi-cell range selection
+     */
+    hasRangeSelection() {
+        if (!this.selectionStart || !this.selectionEnd) return false;
+        return this.selectionStart.col !== this.selectionEnd.col ||
+               this.selectionStart.row !== this.selectionEnd.row;
     }
 
     /**
@@ -305,8 +329,79 @@ export class GridRenderer {
             }
         }
 
-        // Cell selection
-        if (this.selectedCell) {
+        // Cell/Range selection
+        const range = this.getNormalizedRange();
+        if (range) {
+            // Calculate range bounds
+            let rangeX = HEADER_WIDTH - this.scrollX;
+            for (let i = 0; i < range.minCol; i++) {
+                rangeX += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
+            }
+            let rangeY = HEADER_HEIGHT - this.scrollY;
+            for (let i = 0; i < range.minRow; i++) {
+                rangeY += this.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+            }
+
+            // Calculate total width and height of range
+            let rangeW = 0;
+            for (let i = range.minCol; i <= range.maxCol; i++) {
+                rangeW += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
+            }
+            let rangeH = 0;
+            for (let i = range.minRow; i <= range.maxRow; i++) {
+                rangeH += this.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+            }
+
+            // Draw range fill
+            if (rangeX + rangeW > HEADER_WIDTH && rangeX < viewWidth &&
+                rangeY + rangeH > HEADER_HEIGHT && rangeY < viewHeight) {
+                ctx.fillStyle = COLORS.selectionBg;
+                ctx.fillRect(
+                    Math.max(HEADER_WIDTH, rangeX),
+                    Math.max(HEADER_HEIGHT, rangeY),
+                    Math.min(rangeW, rangeX + rangeW - Math.max(HEADER_WIDTH, rangeX)),
+                    Math.min(rangeH, rangeY + rangeH - Math.max(HEADER_HEIGHT, rangeY))
+                );
+
+                // Draw range border
+                ctx.strokeStyle = COLORS.selectionBorder;
+                ctx.lineWidth = 2;
+                ctx.strokeRect(
+                    Math.max(HEADER_WIDTH, rangeX) + 1,
+                    Math.max(HEADER_HEIGHT, rangeY) + 1,
+                    Math.min(rangeW, rangeX + rangeW - Math.max(HEADER_WIDTH, rangeX)) - 2,
+                    Math.min(rangeH, rangeY + rangeH - Math.max(HEADER_HEIGHT, rangeY)) - 2
+                );
+            }
+
+            // Draw anchor cell highlight (the cell where selection started)
+            // This is only needed for multi-cell ranges to show the "active" cell
+            if (this.hasRangeSelection() && this.selectionStart) {
+                let anchorX = HEADER_WIDTH - this.scrollX;
+                for (let i = 0; i < this.selectionStart.col; i++) {
+                    anchorX += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
+                }
+                let anchorY = HEADER_HEIGHT - this.scrollY;
+                for (let i = 0; i < this.selectionStart.row; i++) {
+                    anchorY += this.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                }
+                const anchorW = this.colWidths.get(this.selectionStart.col) || DEFAULT_COL_WIDTH;
+                const anchorH = this.rowHeights.get(this.selectionStart.row) || DEFAULT_ROW_HEIGHT;
+
+                // Draw a white background for the anchor cell to make it stand out
+                if (anchorX + anchorW > HEADER_WIDTH && anchorX < viewWidth &&
+                    anchorY + anchorH > HEADER_HEIGHT && anchorY < viewHeight) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(
+                        Math.max(HEADER_WIDTH, anchorX) + 1,
+                        Math.max(HEADER_HEIGHT, anchorY) + 1,
+                        Math.min(anchorW, anchorX + anchorW - Math.max(HEADER_WIDTH, anchorX)) - 2,
+                        Math.min(anchorH, anchorY + anchorH - Math.max(HEADER_HEIGHT, anchorY)) - 2
+                    );
+                }
+            }
+        } else if (this.selectedCell) {
+            // Fallback for single cell selection without range state
             let selX = HEADER_WIDTH - this.scrollX;
             for (let i = 0; i < this.selectedCell.col; i++) {
                 selX += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
@@ -344,7 +439,15 @@ export class GridRenderer {
             const headerX = this.getDragAdjustedColX(col);
             if (headerX >= viewWidth || headerX + colW < HEADER_WIDTH) continue;
 
-            const isSelected = (this.selectedCell && this.selectedCell.col === col) || this.selectedColumn === col;
+            // Check if column is in selection range or is selected column
+            let isSelected = this.selectedColumn === col;
+            if (!isSelected && this.selectedCell && this.selectedCell.col === col) {
+                isSelected = true;
+            }
+            if (!isSelected && range && col >= range.minCol && col <= range.maxCol) {
+                isSelected = true;
+            }
+
             if (isSelected && !this.isDraggingColumn) {
                 ctx.fillStyle = COLORS.selectionBorder;
                 ctx.fillRect(Math.max(HEADER_WIDTH, headerX), 0, Math.min(colW, headerX + colW - HEADER_WIDTH), HEADER_HEIGHT);
@@ -382,7 +485,15 @@ export class GridRenderer {
             const headerY = this.getDragAdjustedRowY(row);
             if (headerY >= viewHeight || headerY + rowH < HEADER_HEIGHT) continue;
 
-            const isSelected = (this.selectedCell && this.selectedCell.row === row) || this.selectedRow === row;
+            // Check if row is in selection range or is selected row
+            let isSelected = this.selectedRow === row;
+            if (!isSelected && this.selectedCell && this.selectedCell.row === row) {
+                isSelected = true;
+            }
+            if (!isSelected && range && row >= range.minRow && row <= range.maxRow) {
+                isSelected = true;
+            }
+
             if (isSelected && !this.isDraggingRow) {
                 ctx.fillStyle = COLORS.selectionBorder;
                 ctx.fillRect(0, Math.max(HEADER_HEIGHT, headerY), HEADER_WIDTH, Math.min(rowH, headerY + rowH - HEADER_HEIGHT));
