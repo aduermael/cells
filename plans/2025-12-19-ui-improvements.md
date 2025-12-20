@@ -21,7 +21,7 @@ Add a formula/cell bar between the header toolbar and the canvas area. Shows:
 
 - [x] 2a: Add formula bar HTML structure and CSS styles
 - [x] 2b: Implement formula bar state updates (selected cell display)
-- [ ] 2c: Enable editing cell value directly from formula bar
+- [x] 2c: Enable editing cell value directly from formula bar
 
 ## Phase 3: Visual Polish
 

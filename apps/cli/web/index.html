@@ -625,6 +625,80 @@
         });
 
         // ========================================================================
+        // Formula Bar Editing
+        // ========================================================================
+
+        let isEditingFormulaBar = false;
+
+        async function commitFormulaBarEdit() {
+            if (!selectedCell || !dataSource) return;
+
+            let cell = getCellAt(selectedCell.col, selectedCell.row);
+            const newValue = formulaInput.value;
+
+            try {
+                if (!cell) {
+                    // Create cell if it doesn't exist
+                    const data = await dataSource.createCell(selectedCell.col, selectedCell.row, newValue);
+                    cell = { id: data.id, col: selectedCell.col, row: selectedCell.row, value: newValue, type: 's' };
+                    cells.push(cell);
+                } else {
+                    await dataSource.updateCell(cell.id, newValue);
+                }
+                await fetchViewport();
+                render();
+                updateFormulaBar();
+            } catch (e) {
+                console.error('Error updating cell from formula bar:', e);
+            }
+
+            isEditingFormulaBar = false;
+            canvas.focus();
+        }
+
+        function cancelFormulaBarEdit() {
+            isEditingFormulaBar = false;
+            updateFormulaBar(); // Restore original value
+            canvas.focus();
+        }
+
+        formulaInput.addEventListener('focus', () => {
+            isEditingFormulaBar = true;
+        });
+
+        formulaInput.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelFormulaBarEdit();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                commitFormulaBarEdit();
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                commitFormulaBarEdit().then(() => {
+                    if (selectedCell && sheetInfo) {
+                        if (e.shiftKey) {
+                            selectedCell.col = Math.max(0, selectedCell.col - 1);
+                        } else {
+                            selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
+                        }
+                        render();
+                        updateFormulaBar();
+                        formulaInput.focus();
+                        formulaInput.select();
+                    }
+                });
+            }
+        });
+
+        formulaInput.addEventListener('blur', () => {
+            if (isEditingFormulaBar && selectedCell) {
+                commitFormulaBarEdit();
+            }
+        });
+
+        // ========================================================================
         // Event Handlers
         // ========================================================================
 
@@ -884,7 +958,7 @@
         });
 
         document.addEventListener('keydown', (e) => {
-            if (isEditing) return;
+            if (isEditing || isEditingFormulaBar) return;
             if (!selectedCell || !sheetInfo) return;
 
             let newCol = selectedCell.col;
