@@ -15,6 +15,7 @@ MODULE.bazel.lock
 *.o
 *.a
 /cells
+/dist/
 
 # Clang tooling
 compile_commands.json
