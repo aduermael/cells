@@ -31,14 +31,14 @@ Fix the current bugs where these invariants can be violated.
 
 ---
 
-## Phase 1: Listener Infrastructure in C++ Layer
+## Phase 1: Listener Infrastructure in C++ Layer ✅
 
 Add a listener/observer pattern at the C++ bindings layer. The Quadtree already rebuilds after mutations; we add a notification system that the UI can subscribe to.
 
-- [ ] 1a: Define `WorkbookListener` interface in bindings.cc with `onDataChanged()` callback
-- [ ] 1b: Add listener registration (`addListener`, `removeListener`) to CellsEngine
-- [ ] 1c: Call listeners after all mutation operations (create/update/delete cell, resize, move, sheet changes)
-- [ ] 1d: Expose listener system to JavaScript via Embind (callback from WASM to JS)
+- [x] 1a: Define `WorkbookListener` interface in bindings.cc with `onDataChanged()` callback
+- [x] 1b: Add listener registration (`addListener`, `removeListener`) to CellsEngine
+- [x] 1c: Call listeners after all mutation operations (create/update/delete cell, resize, move, sheet changes)
+- [x] 1d: Expose listener system to JavaScript via Embind (callback from WASM to JS)
 
 **Notes:**
 - The listener fires *after* `rebuildQuadtree()` completes

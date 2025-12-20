@@ -28,6 +28,17 @@ using namespace emscripten;
 namespace cells::wasm {
 
 // ============================================================================
+// Change notification types for listener pattern
+// ============================================================================
+
+enum class ChangeType {
+    CELL_CHANGED,       // Cell value/formula modified
+    STRUCTURE_CHANGED,  // Rows/columns added, removed, resized, moved
+    SHEET_CHANGED,      // Active sheet changed, sheet added/deleted/renamed/moved
+    DATA_LOADED         // New file loaded or workbook created
+};
+
+// ============================================================================
 // Helper functions for JSON serialization (matching server.cc API)
 // ============================================================================
 
@@ -76,7 +87,18 @@ std::string jsonEscape(const std::string& str) {
 
 class CellsEngine {
 public:
-    CellsEngine() : _workbook(nullptr), _activeSheetIndex(0) {}
+    CellsEngine() : _workbook(nullptr), _activeSheetIndex(0), _listener(val::null()) {}
+
+    // ========================================================================
+    // Listener registration for change notifications
+    // ========================================================================
+
+    // Set a JavaScript callback function that will be called on data changes
+    // The callback receives a change type string: "cell", "structure", "sheet", "loaded"
+    void setListener(val callback) { _listener = callback; }
+
+    // Remove the listener
+    void removeListener() { _listener = val::null(); }
 
     // ========================================================================
     // File loading methods
@@ -91,6 +113,7 @@ public:
         _workbook = std::move(result.workbook);
         _activeSheetIndex = 0;
         rebuildQuadtree();
+        notifyListeners(ChangeType::DATA_LOADED);
         return "{\"success\":true,\"sheetCount\":" + std::to_string(_workbook->sheetCount()) + "}";
     }
 
@@ -106,6 +129,7 @@ public:
         _workbook = std::move(result.workbook);
         _activeSheetIndex = 0;
         rebuildQuadtree();
+        notifyListeners(ChangeType::DATA_LOADED);
         return "{\"success\":true,\"sheetCount\":" + std::to_string(_workbook->sheetCount()) + "}";
     }
 
@@ -138,6 +162,7 @@ public:
         _workbook = std::move(result.workbook);
         _activeSheetIndex = 0;
         rebuildQuadtree();
+        notifyListeners(ChangeType::DATA_LOADED);
         return "{\"success\":true,\"sheetCount\":" + std::to_string(_workbook->sheetCount()) + "}";
     }
 
@@ -194,6 +219,7 @@ public:
         if (_workbook && index >= 0 && static_cast<size_t>(index) < _workbook->sheetCount()) {
             _activeSheetIndex = static_cast<size_t>(index);
             rebuildQuadtree();
+            notifyListeners(ChangeType::SHEET_CHANGED);
         }
     }
 
@@ -227,6 +253,7 @@ public:
         auto sheet = std::make_unique<Sheet>(generate_id(), sheetName);
         size_t newIndex = _workbook->sheetCount();
         _workbook->addSheet(std::move(sheet));
+        notifyListeners(ChangeType::SHEET_CHANGED);
 
         std::ostringstream json;
         json << "{\"success\":true,\"index\":" << newIndex << ",\"name\":\"" << jsonEscape(sheetName)
@@ -264,6 +291,7 @@ public:
         }
 
         rebuildQuadtree();
+        notifyListeners(ChangeType::SHEET_CHANGED);
 
         std::ostringstream json;
         json << "{\"success\":true,\"activeIndex\":" << _activeSheetIndex << "}";
@@ -291,6 +319,7 @@ public:
         }
 
         _workbook->getSheetByIndex(index)->name = name;
+        notifyListeners(ChangeType::SHEET_CHANGED);
         return "{\"success\":true}";
     }
 
@@ -332,6 +361,8 @@ public:
                 _activeSheetIndex++;
             }
         }
+
+        notifyListeners(ChangeType::SHEET_CHANGED);
 
         std::ostringstream json;
         json << "{\"success\":true,\"activeIndex\":" << _activeSheetIndex << "}";
@@ -479,6 +510,7 @@ public:
         }
 
         rebuildQuadtree();
+        notifyListeners(ChangeType::CELL_CHANGED);
         return "{\"success\":true}";
     }
 
@@ -533,6 +565,7 @@ public:
         sheet->addCell(std::move(newCell));
 
         rebuildQuadtree();
+        notifyListeners(ChangeType::CELL_CHANGED);
 
         std::ostringstream json;
         json << "{\"success\":true,\"id\":\"" << cellId.toString() << "\"}";
@@ -561,6 +594,7 @@ public:
 
         sheet->cells.erase(it);
         rebuildQuadtree();
+        notifyListeners(ChangeType::CELL_CHANGED);
 
         return "{\"success\":true}";
     }
@@ -594,6 +628,7 @@ public:
         if (width > 1000) width = 1000;
 
         it->second->size = width;
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
 
@@ -630,6 +665,8 @@ public:
             column->size = width;
         }
 
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
+
         std::ostringstream json;
         json << "{\"success\":true,\"id\":\"" << column->id.toString() << "\"}";
         return json.str();
@@ -660,6 +697,7 @@ public:
         if (height > 500) height = 500;
 
         it->second->size = height;
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
 
@@ -696,6 +734,8 @@ public:
             row->size = height;
         }
 
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
+
         std::ostringstream json;
         json << "{\"success\":true,\"id\":\"" << row->id.toString() << "\"}";
         return json.str();
@@ -726,6 +766,7 @@ public:
         }
 
         it->second->name = name;
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
 
@@ -769,6 +810,7 @@ public:
         }
 
         rebuildQuadtree();
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
 
@@ -803,6 +845,7 @@ public:
         }
 
         rebuildQuadtree();
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
 
@@ -853,6 +896,7 @@ public:
 
         it->second->position = newPos;
         rebuildQuadtree();
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
     }
@@ -904,6 +948,7 @@ public:
 
         it->second->position = newPos;
         rebuildQuadtree();
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
     }
@@ -987,6 +1032,7 @@ public:
         _workbook->addSheet(std::move(sheet));
         _activeSheetIndex = 0;
         rebuildQuadtree();
+        notifyListeners(ChangeType::DATA_LOADED);
     }
 
 private:
@@ -1005,10 +1051,39 @@ private:
         _refConverter.setContext(*sheet);
     }
 
+    // Notify the registered listener of a data change
+    // Called after rebuildQuadtree() completes
+    void notifyListeners(ChangeType type) {
+        if (_listener.isNull() || _listener.isUndefined()) {
+            return;
+        }
+
+        // Convert ChangeType to string for JavaScript
+        const char* typeStr = nullptr;
+        switch (type) {
+            case ChangeType::CELL_CHANGED:
+                typeStr = "cell";
+                break;
+            case ChangeType::STRUCTURE_CHANGED:
+                typeStr = "structure";
+                break;
+            case ChangeType::SHEET_CHANGED:
+                typeStr = "sheet";
+                break;
+            case ChangeType::DATA_LOADED:
+                typeStr = "loaded";
+                break;
+        }
+
+        // Call the JavaScript callback with the change type
+        _listener(std::string(typeStr));
+    }
+
     std::unique_ptr<Workbook> _workbook;
     size_t _activeSheetIndex;
     Quadtree _quadtree;
     RefConverter _refConverter;
+    val _listener;  // JavaScript callback for change notifications
 };
 
 }  // namespace cells::wasm
@@ -1020,6 +1095,9 @@ private:
 EMSCRIPTEN_BINDINGS(cells) {
     class_<cells::wasm::CellsEngine>("CellsEngine")
         .constructor<>()
+        // Listener registration
+        .function("setListener", &cells::wasm::CellsEngine::setListener)
+        .function("removeListener", &cells::wasm::CellsEngine::removeListener)
         // File loading
         .function("loadFromCells", &cells::wasm::CellsEngine::loadFromCells)
         .function("loadFromCSV", &cells::wasm::CellsEngine::loadFromCSV)
