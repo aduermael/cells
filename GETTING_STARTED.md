@@ -118,6 +118,53 @@ cells -i data.csv out.xlsx --time       # Show timing
 
 Run `cells --help` for full documentation.
 
+## WASM/Browser UI
+
+The primary UI is a browser-based spreadsheet using WebAssembly.
+
+### Building
+
+```bash
+make wasm
+# or directly:
+bazel build --config=wasm //apps/wasm:cells_wasm
+```
+
+### Running Locally
+
+Build the distribution and start the local server:
+
+```bash
+make wasm-dist    # Build optimized WASM and copy to dist/
+make wasm-serve   # Start local server on port 8081
+```
+
+Then open http://localhost:8081/ in your browser.
+
+### Distribution Package
+
+The `make wasm-dist` command creates a `dist/` directory with all files needed for deployment:
+
+```
+dist/
+├── cells_wasm_bin.js      # WASM loader
+├── cells_wasm_bin.wasm    # Compiled engine
+├── worker.js              # Web Worker for async operations
+├── client.js              # Main thread client API
+├── index.html             # Spreadsheet UI
+├── cells.d.ts             # TypeScript definitions
+└── shared/                # CSS and JS modules
+```
+
+### Features
+
+- Full spreadsheet with resizable columns/rows
+- Cell editing with formula bar
+- Multi-sheet support with tabs
+- Keyboard navigation
+- Import/export: CSV, XLSX, native .cells format
+- File persistence across page refreshes
+
 ## Code Formatting
 
 Format all C++ code:
@@ -192,7 +239,12 @@ This generates `compile_commands.json` in the workspace root, which is recognize
 ```
 cells/
 ├── apps/                   # Applications
-│   └── cli/                # CLI converter tool
+│   ├── cli/                # CLI converter tool
+│   └── wasm/               # Browser UI (WebAssembly)
+│       ├── bindings.cc     # C++ to WASM bindings
+│       ├── worker.js       # Web Worker
+│       ├── client.js       # Main thread API
+│       └── static/         # HTML/CSS/JS
 ├── core/                   # C++17 core engine
 │   ├── cells/              # Main library
 │   │   ├── *.h             # Headers
@@ -202,6 +254,8 @@ cells/
 ├── docs/                   # Architecture documentation
 ├── plans/                  # Implementation plans
 ├── scripts/                # Build/lint scripts
+├── tools/                  # Development utilities
+│   └── serve/              # Local WASM server
 ├── Makefile                # Convenience targets
 ├── MODULE.bazel            # Bazel module definition
 └── WORKSPACE               # Bazel workspace
@@ -212,7 +266,10 @@ cells/
 | Task | Command |
 |------|---------|
 | Build all | `make build` |
-| Build CLI | `bazel build //apps/cli:cells` |
+| Build CLI | `make cli` |
+| Build WASM | `make wasm` |
+| Build WASM dist | `make wasm-dist` |
+| Run WASM UI | `make wasm-serve` |
 | Run tests | `make test` |
 | Format code | `make format` |
 | Check formatting | `make format-check` |

@@ -143,22 +143,22 @@ await dataSource.updateCell(id, value);
 
 Update README.md to reflect actual project state.
 
-- [ ] 6a: Update directory structure (lines 95-119) to show only actual directories (apps/cli, apps/wasm, core, docs, plans)
-- [ ] 6b: Update "Next Steps" section (lines 209-214) - remove completed items, add current status
-- [ ] 6c: Update WebAssembly section (lines 165-194) with current capabilities
-- [ ] 6d: Update "Decisions Made" section to reflect WASM-first reality
-- [ ] 6e: Add "Current Implementation Status" section showing what's built vs planned
+- [x] 6a: Update directory structure (lines 95-119) to show only actual directories (apps/cli, apps/wasm, core, docs, plans)
+- [x] 6b: Update "Next Steps" section (lines 209-214) - remove completed items, add current status
+- [x] 6c: Update WebAssembly section (lines 165-194) with current capabilities
+- [x] 6d: Update "Decisions Made" section to reflect WASM-first reality
+- [x] 6e: Add "Current Implementation Status" section showing what's built vs planned
 
 ---
 
-## Phase 7: Documentation - GETTING_STARTED Updates
+## Phase 7: Documentation - GETTING_STARTED Updates ✅
 
 Update GETTING_STARTED.md to reflect current development workflow.
 
-- [ ] 7a: Remove "CLI Tool" section referencing `cells serve` (removed in Phase 2.5)
-- [ ] 7b: Update build instructions if any commands changed
-- [ ] 7c: Update quick reference section with current commands
-- [ ] 7d: Add section on running WASM UI locally
+- [x] 7a: Remove "CLI Tool" section referencing `cells serve` (removed in Phase 2.5) - N/A, already clean
+- [x] 7b: Update build instructions if any commands changed - current instructions are accurate
+- [x] 7c: Update quick reference section with current commands
+- [x] 7d: Add section on running WASM UI locally
 
 ---
 
