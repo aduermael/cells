@@ -241,6 +241,9 @@
         const emptyState = document.getElementById('empty-state');
         const fileInput = document.getElementById('file-input');
         const cellEditor = document.getElementById('cell-editor');
+        const formulaBar = document.getElementById('formula-bar');
+        const cellReference = document.getElementById('cell-reference');
+        const formulaInput = document.getElementById('formula-input');
 
         // Initialize renderer
         const renderer = new GridRenderer(canvas);
@@ -366,6 +369,40 @@
 
         function getCellAt(col, row) {
             return cells.find(c => c.col === col && c.row === row);
+        }
+
+        // Convert column index to Excel-style letter (A, B, ..., Z, AA, AB, ...)
+        function colToLetter(col) {
+            let s = '';
+            let n = col + 1;
+            while (n > 0) {
+                n--;
+                s = String.fromCharCode(65 + (n % 26)) + s;
+                n = Math.floor(n / 26);
+            }
+            return s;
+        }
+
+        // Update formula bar with current selection
+        function updateFormulaBar() {
+            if (!selectedCell) {
+                cellReference.textContent = '';
+                formulaInput.value = '';
+                formulaInput.placeholder = 'Select a cell to view or edit its value';
+                return;
+            }
+
+            const ref = colToLetter(selectedCell.col) + (selectedCell.row + 1);
+            cellReference.textContent = ref;
+
+            const cell = getCellAt(selectedCell.col, selectedCell.row);
+            if (cell) {
+                // Show formula if available, otherwise show value
+                formulaInput.value = cell.formula || cell.value || '';
+            } else {
+                formulaInput.value = '';
+            }
+            formulaInput.placeholder = '';
         }
 
         // ========================================================================
@@ -685,6 +722,7 @@
                 if (col >= 0 && row >= 0) {
                     selectedCell = { col, row };
                     render();
+                    updateFormulaBar();
                 }
             }
         });
@@ -839,6 +877,7 @@
                 if (col >= 0 && row >= 0) {
                     selectedCell = { col, row };
                     render();
+                    updateFormulaBar();
                     startEditing();
                 }
             }
@@ -911,6 +950,7 @@
             }
 
             render();
+            updateFormulaBar();
             fetchViewportNow();
         });
 
@@ -990,10 +1030,12 @@
                 rowHeights.clear();
 
                 // Update UI
+                formulaBar.classList.remove('hidden');
                 updateEmptyState();
                 await fetchSheetInfo();
                 await fetchViewport();
                 render();
+                updateFormulaBar();
                 loading.style.display = 'none';
 
             } catch (e) {
@@ -1084,10 +1126,12 @@
                     // Server mode - we have a server serving data
                     dataSource = new ServerDataSource();
                     hasFileLoaded = true;
+                    formulaBar.classList.remove('hidden');
                     updateEmptyState();
                     await fetchSheetInfo();
                     await fetchViewport();
                     render();
+                    updateFormulaBar();
                     loading.style.display = 'none';
                 } else {
                     // No server data - show empty state
