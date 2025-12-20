@@ -279,6 +279,15 @@
                 return x;
             }
 
+            // If target is same as source or adjacent (hasn't crossed center), keep normal layout
+            if (dragTargetIndex === dragSourceIndex || dragTargetIndex === dragSourceIndex + 1) {
+                let x = HEADER_WIDTH - scrollX;
+                for (let i = 0; i < col; i++) {
+                    x += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                }
+                return x;
+            }
+
             // During drag, skip source column and add gap at target
             const sourceW = colWidths.get(dragSourceIndex) || DEFAULT_COL_WIDTH;
             let x = HEADER_WIDTH - scrollX;
@@ -287,7 +296,7 @@
                 // Skip source column (it's being dragged)
                 if (i === dragSourceIndex) continue;
 
-                // Add gap before target position
+                // Add gap before target position (when moving left)
                 if (i === dragTargetIndex && dragTargetIndex < dragSourceIndex) {
                     x += sourceW;
                 }
@@ -314,6 +323,15 @@
                 return y;
             }
 
+            // If target is same as source or adjacent (hasn't crossed center), keep normal layout
+            if (dragTargetIndex === dragSourceIndex || dragTargetIndex === dragSourceIndex + 1) {
+                let y = HEADER_HEIGHT - scrollY;
+                for (let i = 0; i < row; i++) {
+                    y += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                }
+                return y;
+            }
+
             // During drag, skip source row and add gap at target
             const sourceH = rowHeights.get(dragSourceIndex) || DEFAULT_ROW_HEIGHT;
             let y = HEADER_HEIGHT - scrollY;
@@ -322,7 +340,7 @@
                 // Skip source row (it's being dragged)
                 if (i === dragSourceIndex) continue;
 
-                // Add gap before target position
+                // Add gap before target position (when moving up)
                 if (i === dragTargetIndex && dragTargetIndex < dragSourceIndex) {
                     y += sourceH;
                 }
@@ -574,9 +592,14 @@
             ctx.lineWidth = 1;
 
             // Vertical lines - use adjusted positions during column drag
+            // Check if we've actually moved past the center of an adjacent column
+            const colHasMoved = isDraggingColumn &&
+                dragTargetIndex !== dragSourceIndex &&
+                dragTargetIndex !== dragSourceIndex + 1;
+
             for (let col = 0; col <= sheetInfo.colCount; col++) {
-                // Skip source column during drag
-                if (isDraggingColumn && col === dragSourceIndex) continue;
+                // Skip source column during drag (only if we've moved past center)
+                if (colHasMoved && col === dragSourceIndex) continue;
 
                 const lineX = getDragAdjustedColX(col) + 0.5;
                 if (lineX >= HEADER_WIDTH && lineX < viewWidth) {
@@ -602,9 +625,14 @@
             }
 
             // Horizontal lines - use adjusted positions during row drag
+            // Check if we've actually moved past the center of an adjacent row
+            const rowHasMoved = isDraggingRow &&
+                dragTargetIndex !== dragSourceIndex &&
+                dragTargetIndex !== dragSourceIndex + 1;
+
             for (let row = 0; row <= sheetInfo.rowCount; row++) {
-                // Skip source row during drag
-                if (isDraggingRow && row === dragSourceIndex) continue;
+                // Skip source row during drag (only if we've moved past center)
+                if (rowHasMoved && row === dragSourceIndex) continue;
 
                 const lineY = getDragAdjustedRowY(row) + 0.5;
                 if (lineY >= HEADER_HEIGHT && lineY < viewHeight) {
@@ -636,9 +664,9 @@
             ctx.textBaseline = 'middle';
 
             for (const cell of cells) {
-                // Skip cells in dragged column/row (will be drawn as ghost)
-                if (isDraggingColumn && cell.col === dragSourceIndex) continue;
-                if (isDraggingRow && cell.row === dragSourceIndex) continue;
+                // Skip cells in dragged column/row (only if we've moved past center)
+                if (colHasMoved && cell.col === dragSourceIndex) continue;
+                if (rowHasMoved && cell.row === dragSourceIndex) continue;
 
                 const colWidth = colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
                 const rowHeight = rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
@@ -735,8 +763,8 @@
             ctx.textBaseline = 'middle';
 
             for (let col = 0; col < sheetInfo.colCount; col++) {
-                // Skip dragged column (will be drawn as ghost)
-                if (isDraggingColumn && col === dragSourceIndex) continue;
+                // Skip dragged column (only if we've moved past center)
+                if (colHasMoved && col === dragSourceIndex) continue;
 
                 const colW = colWidths.get(col) || DEFAULT_COL_WIDTH;
                 const headerX = getDragAdjustedColX(col);
@@ -763,8 +791,8 @@
             ctx.textAlign = 'center';
 
             for (let row = 0; row < sheetInfo.rowCount; row++) {
-                // Skip dragged row (will be drawn as ghost)
-                if (isDraggingRow && row === dragSourceIndex) continue;
+                // Skip dragged row (only if we've moved past center)
+                if (rowHasMoved && row === dragSourceIndex) continue;
 
                 const rowH = rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
                 const headerY = getDragAdjustedRowY(row);
