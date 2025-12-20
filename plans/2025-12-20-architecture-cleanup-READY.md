@@ -7,6 +7,30 @@ This plan addresses three key areas:
 
 ---
 
+## Invariants (bugs to fix)
+
+The following invariants should **always** hold. Currently they can be violated:
+
+1. **A sheet is always loaded.** On startup, load an empty sheet by default. The "New" button creates a fresh empty sheet (not "no sheet displayed" state). This removes the need for "no workbook loaded" UI states.
+
+2. **At least one cell is always selected.** Default to A1 (0,0) on sheet load. There is no "nothing selected" state.
+
+These invariants simplify the UI significantly - no need to handle or render "empty" states.
+
+---
+
+## Phase 0: Enforce Invariants
+
+Fix the current bugs where these invariants can be violated.
+
+- [ ] 0a: Create empty workbook/sheet on startup (before any user action)
+- [ ] 0b: Set default selection to A1 (0,0) on startup and after sheet changes
+- [ ] 0c: Change "New" button to create fresh empty sheet (not clear to "no sheet" state)
+- [ ] 0d: Remove "no workbook loaded" UI code paths and empty state rendering
+- [ ] 0e: Ensure selection resets to A1 when switching sheets
+
+---
+
 ## Phase 1: Listener Infrastructure in C++ Layer
 
 Add a listener/observer pattern at the C++ bindings layer. The Quadtree already rebuilds after mutations; we add a notification system that the UI can subscribe to.
@@ -154,6 +178,7 @@ Add implementation status notes to architecture documents.
 
 | Phase | Focus | Files Affected |
 |-------|-------|----------------|
+| 0 | Enforce Invariants | `apps/wasm/static/index.html` |
 | 1 | C++ Listener Infrastructure | `apps/wasm/bindings.cc` |
 | 2 | Worker/Client Layer | `apps/wasm/worker.js`, `apps/wasm/client.js` |
 | 3 | UI State Machine Design | New: `apps/wasm/static/shared/ui-state.js` |
@@ -164,6 +189,7 @@ Add implementation status notes to architecture documents.
 | 8 | Architecture Doc Updates | `docs/*.md` |
 
 **Dependencies:**
+- Phase 0 is independent (can be done first to simplify later phases)
 - Phase 2 depends on Phase 1
 - Phase 4 depends on Phase 3
 - Phase 5 depends on Phases 2 and 4
