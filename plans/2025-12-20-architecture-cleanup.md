@@ -63,14 +63,14 @@ Update the worker and client to support change notifications from WASM.
 
 ---
 
-## Phase 3: UI State Machine Design
+## Phase 3: UI State Machine Design ✅
 
 Create a formal state machine for UI interaction modes. Currently state is scattered across many boolean flags (`isEditing`, `isResizing`, `isDraggingColumn`, `isSelectingRange`, etc.).
 
-- [ ] 3a: Define UIState enum and state machine in new file `apps/wasm/static/shared/ui-state.js`
-- [ ] 3b: Implement state transitions with guards and context data
-- [ ] 3c: Add modifier key tracking (meta, shift, ctrl, alt) as context
-- [ ] 3d: Export state machine API: `getState()`, `transition(event)`, `getContext()`
+- [x] 3a: Define UIState enum and state machine in new file `apps/wasm/static/shared/ui-state.js`
+- [x] 3b: Implement state transitions with guards and context data
+- [x] 3c: Add modifier key tracking (meta, shift, ctrl, alt) as context
+- [x] 3d: Export state machine API: `getState()`, `transition(event)`, `getContext()`
 
 **State Machine Design:**
 ```
