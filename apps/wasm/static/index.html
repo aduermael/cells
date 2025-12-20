@@ -454,13 +454,21 @@
                 columns = data.columns || [];
                 rows = data.rows || [];
 
+                // Clear caches for viewport range before repopulating from Workbook
+                // This ensures moved columns don't leave stale data behind
+                for (let col = startCol; col < endCol; col++) {
+                    colWidths.delete(col);
+                    colNames.delete(col);
+                }
+                for (let row = startRow; row < endRow; row++) {
+                    rowHeights.delete(row);
+                }
+
+                // Repopulate from Workbook (source of truth)
                 for (const col of columns) {
                     colWidths.set(col.pos, col.width || DEFAULT_COL_WIDTH);
-                    // Cache column names (empty string means use default letter)
                     if (col.name) {
                         colNames.set(col.pos, col.name);
-                    } else {
-                        colNames.delete(col.pos);
                     }
                 }
                 for (const row of rows) {
