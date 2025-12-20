@@ -1,5 +1,21 @@
 # Networking & P2P Collaboration
 
+## Implementation Status
+
+**Current state (December 2024):** Not implemented.
+
+| Component | Status |
+|-----------|--------|
+| WebRTC DataChannel | ❌ Not started |
+| Signaling server | ❌ Not started |
+| STUN/TURN integration | ❌ Not started |
+| Sync protocol | ❌ Not started |
+| Presence/cursors | ❌ Not started |
+
+This document describes the planned architecture for real-time collaboration. None of this is implemented yet - the current application is single-user, local-only.
+
+---
+
 ## Overview
 
 Cells uses **WebRTC for peer-to-peer collaboration**, combined with CRDTs for conflict-free merging. This avoids the need for always-on relay servers.
