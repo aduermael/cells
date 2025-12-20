@@ -39,6 +39,29 @@
             font-size: 12px;
             color: #6c757d;
         }
+        #toolbar {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+        }
+        .export-btn {
+            padding: 4px 12px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: #fff;
+            color: #495057;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .export-btn:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+        .export-btn:active {
+            background: #dee2e6;
+        }
         #canvas-container {
             flex: 1;
             position: relative;
@@ -86,6 +109,11 @@
         <div id="header">
             <h1 id="sheet-name">Loading...</h1>
             <span class="info" id="sheet-info"></span>
+            <div id="toolbar">
+                <button class="export-btn" onclick="exportAs('csv')">Export CSV</button>
+                <button class="export-btn" onclick="exportAs('xlsx')">Export XLSX</button>
+                <button class="export-btn" onclick="exportAs('cells')">Export CELLS</button>
+            </div>
         </div>
         <div id="canvas-container">
             <canvas id="grid"></canvas>
@@ -1384,6 +1412,42 @@
             resizeCanvas();
             fetchViewportNow();
         });
+
+        // Export function
+        async function exportAs(format) {
+            try {
+                const res = await fetch(`/api/export/${format}`);
+                if (!res.ok) {
+                    const error = await res.json();
+                    alert('Export failed: ' + (error.error || 'Unknown error'));
+                    return;
+                }
+
+                // Get filename from Content-Disposition header or use default
+                const disposition = res.headers.get('Content-Disposition');
+                let filename = `spreadsheet.${format}`;
+                if (disposition) {
+                    const match = disposition.match(/filename="?([^"]+)"?/);
+                    if (match) {
+                        filename = match[1];
+                    }
+                }
+
+                // Create blob and trigger download
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                console.error('Export error:', e);
+                alert('Export failed: ' + e.message);
+            }
+        }
 
         // Initialize
         async function init() {
