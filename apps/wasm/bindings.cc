@@ -4,6 +4,8 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 
+#include <sys/stat.h>
+
 #include <cstdint>
 #include <memory>
 #include <sstream>
@@ -110,6 +112,9 @@ public:
     // Parse XLSX from file data (writes to temp file, reads, deletes)
     // Uses Emscripten's virtual filesystem
     std::string loadFromXLSXData(const std::string& data) {
+        // Ensure /tmp directory exists in Emscripten's virtual filesystem
+        mkdir("/tmp", 0777);
+
         // Write data to Emscripten virtual filesystem
         const char* tempPath = "/tmp/upload.xlsx";
 
@@ -625,6 +630,9 @@ public:
         if (!_workbook) {
             return "";
         }
+
+        // Ensure /tmp directory exists in Emscripten's virtual filesystem
+        mkdir("/tmp", 0777);
 
         const char* tempPath = "/tmp/export.xlsx";
         auto result = writeXLSX(*_workbook, tempPath);
