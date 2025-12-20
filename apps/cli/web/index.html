@@ -4,213 +4,19 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cells Viewer</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        }
-        #container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            background: #fff;
-        }
-        #header {
-            padding: 8px 16px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #dee2e6;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-        #header h1 {
-            font-size: 14px;
-            font-weight: 600;
-            color: #212529;
-        }
-        #header .info {
-            font-size: 12px;
-            color: #6c757d;
-        }
-        #toolbar {
-            margin-left: auto;
-            display: flex;
-            gap: 8px;
-        }
-        .export-btn {
-            padding: 4px 12px;
-            font-size: 12px;
-            font-weight: 500;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            background: #fff;
-            color: #495057;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-        .export-btn:hover {
-            background: #e9ecef;
-            border-color: #adb5bd;
-        }
-        .export-btn:active {
-            background: #dee2e6;
-        }
-        #canvas-container {
-            flex: 1;
-            position: relative;
-            overflow: hidden;
-        }
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 14px;
-            color: #6c757d;
-        }
-        #error {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 14px;
-            color: #dc3545;
-            text-align: center;
-            display: none;
-        }
-        /* Drop zone overlay */
-        #drop-zone {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(13, 110, 253, 0.1);
-            border: 3px dashed #0d6efd;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 200;
-        }
-        #drop-zone.visible {
-            display: flex;
-        }
-        #drop-zone-content {
-            text-align: center;
-            padding: 40px;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        }
-        #drop-zone-content h2 {
-            font-size: 18px;
-            color: #0d6efd;
-            margin-bottom: 8px;
-        }
-        #drop-zone-content p {
-            font-size: 13px;
-            color: #6c757d;
-        }
-        /* Empty state (no file loaded) */
-        #empty-state {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            display: none;
-        }
-        #empty-state.visible {
-            display: block;
-        }
-        #empty-state h2 {
-            font-size: 20px;
-            color: #212529;
-            margin-bottom: 12px;
-        }
-        #empty-state p {
-            font-size: 14px;
-            color: #6c757d;
-            margin-bottom: 20px;
-        }
-        #empty-state .file-types {
-            font-size: 12px;
-            color: #adb5bd;
-            margin-top: 12px;
-        }
-        .btn-primary {
-            padding: 10px 24px;
-            font-size: 14px;
-            font-weight: 500;
-            border: none;
-            border-radius: 6px;
-            background: #0d6efd;
-            color: #fff;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-        .btn-primary:hover {
-            background: #0b5ed7;
-        }
-        .btn-primary:active {
-            background: #0a58ca;
-        }
-        #file-input {
-            display: none;
-        }
-        /* Mode indicator */
-        .mode-indicator {
-            font-size: 11px;
-            padding: 3px 8px;
-            border-radius: 4px;
-            font-weight: 500;
-        }
-        .mode-indicator.server {
-            background: #d4edda;
-            color: #155724;
-        }
-        .mode-indicator.local {
-            background: #cce5ff;
-            color: #004085;
-        }
-        #cell-editor {
-            position: absolute;
-            display: none;
-            border: 2px solid #0d6efd;
-            background: #fff;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 13px;
-            padding: 2px 4px;
-            outline: none;
-            box-sizing: border-box;
-            z-index: 100;
-        }
-    </style>
+    <link rel="stylesheet" href="shared/styles.css">
 </head>
 <body>
     <div id="container">
         <div id="header">
-            <button class="export-btn" onclick="openFile()">Open File</button>
+            <button class="btn" onclick="openFile()">Open File</button>
             <input type="file" id="file-input" accept=".cells,.csv,.tsv,.xlsx" />
             <h1 id="sheet-name">Loading...</h1>
             <span class="info" id="sheet-info"></span>
             <div id="toolbar">
-                <span class="mode-indicator server" id="mode-indicator">Server</span>
-                <button class="export-btn" onclick="exportAs('csv')">Export CSV</button>
-                <button class="export-btn" onclick="exportAs('xlsx')">Export XLSX</button>
-                <button class="export-btn" onclick="exportAs('cells')">Export CELLS</button>
+                <button class="btn" onclick="exportAs('csv')">Export CSV</button>
+                <button class="btn" onclick="exportAs('xlsx')">Export XLSX</button>
+                <button class="btn" onclick="exportAs('cells')">Export CELLS</button>
             </div>
         </div>
         <div id="canvas-container">
@@ -224,7 +30,7 @@
                     <p>.cells, .csv, .xlsx</p>
                 </div>
             </div>
-            <div id="empty-state">
+            <div id="empty-state" class="hidden">
                 <h2>Open a Spreadsheet</h2>
                 <p>Drag and drop a file here, or click below to browse</p>
                 <button class="btn-primary" onclick="openFile()">Choose File</button>
@@ -232,28 +38,25 @@
             </div>
         </div>
     </div>
-    <script>
+
+    <script type="module">
+        import {
+            GridRenderer,
+            HEADER_HEIGHT,
+            HEADER_WIDTH,
+            DEFAULT_COL_WIDTH,
+            DEFAULT_ROW_HEIGHT,
+            COLORS
+        } from './shared/grid-renderer.js';
+
+        import { detectFormat, getBaseName, downloadBlob, getMimeType } from './shared/utils.js';
+
         // ========================================================================
         // Data Source Abstraction Layer
         // ========================================================================
 
-        // Base interface for data sources
-        class DataSource {
-            async getSheetInfo() { throw new Error('Not implemented'); }
-            async getViewport(x1, y1, x2, y2) { throw new Error('Not implemented'); }
-            async createCell(col, row, value) { throw new Error('Not implemented'); }
-            async updateCell(cellId, value) { throw new Error('Not implemented'); }
-            async resizeColumn(colId, width) { throw new Error('Not implemented'); }
-            async resizeColumnByPos(pos, width) { throw new Error('Not implemented'); }
-            async resizeRow(rowId, height) { throw new Error('Not implemented'); }
-            async moveColumn(colId, targetPos) { throw new Error('Not implemented'); }
-            async moveRow(rowId, targetPos) { throw new Error('Not implemented'); }
-            async exportAs(format) { throw new Error('Not implemented'); }
-            getMode() { return 'unknown'; }
-        }
-
         // Server-based data source (REST API)
-        class ServerDataSource extends DataSource {
+        class ServerDataSource {
             async getSheetInfo() {
                 const res = await fetch('/api/sheet-info');
                 if (!res.ok) throw new Error('Failed to fetch sheet info');
@@ -355,14 +158,11 @@
                 const blob = await res.blob();
                 return { blob, filename };
             }
-
-            getMode() { return 'server'; }
         }
 
         // WASM-based data source (Web Worker)
-        class WasmDataSource extends DataSource {
+        class WasmDataSource {
             constructor(client) {
-                super();
                 this._client = client;
                 this._workbookName = 'Untitled';
             }
@@ -419,55 +219,32 @@
 
             async exportAs(format) {
                 const result = await this._client.exportAs(format);
-                const blob = new Blob([result.data], {
-                    type: format === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' :
-                          format === 'csv' ? 'text/csv' : 'text/plain'
-                });
+                const blob = new Blob([result.data], { type: getMimeType(format) });
                 return { blob, filename: result.filename || `${this._workbookName}.${format}` };
             }
-
-            getMode() { return 'local'; }
         }
 
         // ========================================================================
         // Global State and DOM Elements
         // ========================================================================
 
-        // Canvas and context
         const canvas = document.getElementById('grid');
-        const ctx = canvas.getContext('2d');
         const loading = document.getElementById('loading');
         const errorEl = document.getElementById('error');
         const sheetNameEl = document.getElementById('sheet-name');
         const sheetInfoEl = document.getElementById('sheet-info');
         const dropZone = document.getElementById('drop-zone');
         const emptyState = document.getElementById('empty-state');
-        const modeIndicator = document.getElementById('mode-indicator');
         const fileInput = document.getElementById('file-input');
+        const cellEditor = document.getElementById('cell-editor');
+
+        // Initialize renderer
+        const renderer = new GridRenderer(canvas);
 
         // Data source (either ServerDataSource or WasmDataSource)
         let dataSource = null;
         let wasmClient = null;
         let hasFileLoaded = false;
-
-        // Grid constants
-        const HEADER_HEIGHT = 24;
-        const HEADER_WIDTH = 50;
-        const DEFAULT_COL_WIDTH = 100;
-        const DEFAULT_ROW_HEIGHT = 24;
-        const CELL_PADDING = 4;
-
-        // Colors
-        const COLORS = {
-            gridLine: '#e9ecef',
-            headerBg: '#f8f9fa',
-            headerBorder: '#dee2e6',
-            headerText: '#495057',
-            cellText: '#212529',
-            selectionBorder: '#0d6efd',
-            selectionBg: 'rgba(13, 110, 253, 0.1)',
-            cornerBg: '#e9ecef'
-        };
 
         // State
         let sheetInfo = null;
@@ -476,56 +253,37 @@
         let rows = [];
         let scrollX = 0;
         let scrollY = 0;
-        let selectedCell = null; // {col, row}
-        let selectedColumn = null; // column index (for entire column selection)
-        let selectedRow = null; // row index (for entire row selection)
-        let isDragging = false;
-        let lastMouseX = 0;
-        let lastMouseY = 0;
+        let selectedCell = null;
+        let selectedColumn = null;
+        let selectedRow = null;
 
         // Editing state
         let isEditing = false;
-        const cellEditor = document.getElementById('cell-editor');
 
-        // Column resize state
+        // Resize state
         let isResizing = false;
         let resizeColIndex = -1;
         let resizeStartX = 0;
         let resizeStartWidth = 0;
         let resizePreviewX = 0;
-        const RESIZE_HANDLE_WIDTH = 6; // pixels on each side of column border
+        const RESIZE_HANDLE_WIDTH = 6;
 
-        // Column/row reorder state
+        // Drag state
         let isDraggingColumn = false;
         let isDraggingRow = false;
         let dragSourceIndex = -1;
         let dragTargetIndex = -1;
-        let dragMouseX = 0; // Current mouse X for ghost position
-        let dragMouseY = 0; // Current mouse Y for ghost position
+        let dragMouseX = 0;
+        let dragMouseY = 0;
 
-        // Column widths and row heights cache (position -> size)
+        // Size caches
         let colWidths = new Map();
         let rowHeights = new Map();
 
-        // Get column X position (accounting for variable widths)
-        function getColX(colPos) {
-            let x = HEADER_WIDTH;
-            for (let i = 0; i < colPos; i++) {
-                x += colWidths.get(i) || DEFAULT_COL_WIDTH;
-            }
-            return x;
-        }
+        // ========================================================================
+        // Utility Functions
+        // ========================================================================
 
-        // Get row Y position (accounting for variable heights)
-        function getRowY(rowPos) {
-            let y = HEADER_HEIGHT;
-            for (let i = 0; i < rowPos; i++) {
-                y += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-            }
-            return y;
-        }
-
-        // Get column at X coordinate
         function getColAtX(x) {
             if (x < HEADER_WIDTH) return -1;
             let accX = HEADER_WIDTH - scrollX;
@@ -538,7 +296,6 @@
             return col;
         }
 
-        // Get row at Y coordinate
         function getRowAtY(y) {
             if (y < HEADER_HEIGHT) return -1;
             let accY = HEADER_HEIGHT - scrollY;
@@ -551,16 +308,12 @@
             return row;
         }
 
-        // Check if mouse is over a column resize handle (returns column index or -1)
         function getResizeHandleCol(mouseX) {
             if (!sheetInfo) return -1;
-
             let x = HEADER_WIDTH - scrollX;
             for (let col = 0; col < sheetInfo.colCount; col++) {
                 const colW = colWidths.get(col) || DEFAULT_COL_WIDTH;
                 const rightEdge = x + colW;
-
-                // Check if within resize handle area (near the right edge of column)
                 if (mouseX >= rightEdge - RESIZE_HANDLE_WIDTH && mouseX <= rightEdge + RESIZE_HANDLE_WIDTH) {
                     return col;
                 }
@@ -569,27 +322,20 @@
             return -1;
         }
 
-        // Get column ID at position
         function getColumnId(colPos) {
             for (const col of columns) {
-                if (col.pos === colPos) {
-                    return col.id;
-                }
+                if (col.pos === colPos) return col.id;
             }
             return null;
         }
 
-        // Get row ID at position
         function getRowId(rowPos) {
             for (const row of rows) {
-                if (row.pos === rowPos) {
-                    return row.id;
-                }
+                if (row.pos === rowPos) return row.id;
             }
             return null;
         }
 
-        // Get drop target column index from X coordinate
         function getDropTargetCol(mouseX) {
             if (mouseX < HEADER_WIDTH) return 0;
             let x = HEADER_WIDTH - scrollX;
@@ -602,7 +348,6 @@
             return sheetInfo?.colCount || 0;
         }
 
-        // Get drop target row index from Y coordinate
         function getDropTargetRow(mouseY) {
             if (mouseY < HEADER_HEIGHT) return 0;
             let y = HEADER_HEIGHT - scrollY;
@@ -615,95 +360,49 @@
             return sheetInfo?.rowCount || 0;
         }
 
-        // Get visual column position during drag (accounts for gap)
-        function getDragAdjustedColX(col) {
-            if (!isDraggingColumn) {
-                // Normal positioning
-                let x = HEADER_WIDTH - scrollX;
-                for (let i = 0; i < col; i++) {
-                    x += colWidths.get(i) || DEFAULT_COL_WIDTH;
-                }
-                return x;
-            }
-
-            // If target is same as source or adjacent (hasn't crossed center), keep normal layout
-            if (dragTargetIndex === dragSourceIndex || dragTargetIndex === dragSourceIndex + 1) {
-                let x = HEADER_WIDTH - scrollX;
-                for (let i = 0; i < col; i++) {
-                    x += colWidths.get(i) || DEFAULT_COL_WIDTH;
-                }
-                return x;
-            }
-
-            // During drag, skip source column and add gap at target
-            const sourceW = colWidths.get(dragSourceIndex) || DEFAULT_COL_WIDTH;
-            let x = HEADER_WIDTH - scrollX;
-
-            for (let i = 0; i < col; i++) {
-                // Skip source column (it's being dragged)
-                if (i === dragSourceIndex) continue;
-
-                // Add gap before target position (when moving left)
-                if (i === dragTargetIndex && dragTargetIndex < dragSourceIndex) {
-                    x += sourceW;
-                }
-
-                x += colWidths.get(i) || DEFAULT_COL_WIDTH;
-
-                // Add gap after target position (when moving right)
-                if (i === dragTargetIndex - 1 && dragTargetIndex > dragSourceIndex + 1) {
-                    x += sourceW;
-                }
-            }
-
-            return x;
+        function getCellAt(col, row) {
+            return cells.find(c => c.col === col && c.row === row);
         }
 
-        // Get visual row position during drag (accounts for gap)
-        function getDragAdjustedRowY(row) {
-            if (!isDraggingRow) {
-                // Normal positioning
-                let y = HEADER_HEIGHT - scrollY;
-                for (let i = 0; i < row; i++) {
-                    y += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-                }
-                return y;
-            }
+        // ========================================================================
+        // Rendering
+        // ========================================================================
 
-            // If target is same as source or adjacent (hasn't crossed center), keep normal layout
-            if (dragTargetIndex === dragSourceIndex || dragTargetIndex === dragSourceIndex + 1) {
-                let y = HEADER_HEIGHT - scrollY;
-                for (let i = 0; i < row; i++) {
-                    y += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-                }
-                return y;
-            }
-
-            // During drag, skip source row and add gap at target
-            const sourceH = rowHeights.get(dragSourceIndex) || DEFAULT_ROW_HEIGHT;
-            let y = HEADER_HEIGHT - scrollY;
-
-            for (let i = 0; i < row; i++) {
-                // Skip source row (it's being dragged)
-                if (i === dragSourceIndex) continue;
-
-                // Add gap before target position (when moving up)
-                if (i === dragTargetIndex && dragTargetIndex < dragSourceIndex) {
-                    y += sourceH;
-                }
-
-                y += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-
-                // Add gap after target position (when moving down)
-                if (i === dragTargetIndex - 1 && dragTargetIndex > dragSourceIndex + 1) {
-                    y += sourceH;
-                }
-            }
-
-            return y;
+        function updateRendererState() {
+            renderer.setStateRefs({
+                sheetInfo,
+                cells,
+                columns,
+                rows,
+                colWidths,
+                rowHeights,
+                scrollX,
+                scrollY,
+                selectedCell,
+                selectedColumn,
+                selectedRow,
+                isDraggingColumn,
+                isDraggingRow,
+                dragSourceIndex,
+                dragTargetIndex,
+                dragMouseX,
+                dragMouseY,
+                isResizing,
+                resizePreviewX
+            });
         }
 
-        // Resize canvas to container
+        function render() {
+            updateRendererState();
+            renderer.render();
+            if (isResizing) {
+                renderer.drawResizePreview();
+            }
+            if (isDraggingColumn || isDraggingRow) {
+                renderer.drawDragGhost();
+            }
+        }
+
         function resizeCanvas() {
             const container = document.getElementById('canvas-container');
             const dpr = window.devicePixelRatio || 1;
@@ -711,24 +410,26 @@
             canvas.height = container.clientHeight * dpr;
             canvas.style.width = container.clientWidth + 'px';
             canvas.style.height = container.clientHeight + 'px';
-            ctx.scale(dpr, dpr);
+            renderer.ctx.scale(dpr, dpr);
             render();
         }
 
-        // Fetch sheet info
+        // ========================================================================
+        // Data Fetching
+        // ========================================================================
+
         async function fetchSheetInfo() {
             if (!dataSource) return;
             try {
                 sheetInfo = await dataSource.getSheetInfo();
                 sheetNameEl.textContent = sheetInfo.name;
-                sheetInfoEl.textContent = `${sheetInfo.rowCount} rows × ${sheetInfo.colCount} columns`;
+                sheetInfoEl.textContent = `${sheetInfo.rowCount} rows x ${sheetInfo.colCount} columns`;
             } catch (e) {
                 console.error('Error fetching sheet info:', e);
                 throw e;
             }
         }
 
-        // Fetch viewport data
         async function fetchViewport() {
             if (!sheetInfo || !dataSource) return;
 
@@ -736,7 +437,6 @@
             const viewWidth = container.clientWidth;
             const viewHeight = container.clientHeight;
 
-            // Calculate visible range with overscan
             const startCol = Math.max(0, Math.floor(scrollX / DEFAULT_COL_WIDTH) - 2);
             const startRow = Math.max(0, Math.floor(scrollY / DEFAULT_ROW_HEIGHT) - 2);
             const endCol = Math.min(sheetInfo.colCount, startCol + Math.ceil(viewWidth / DEFAULT_COL_WIDTH) + 4);
@@ -748,7 +448,6 @@
                 columns = data.columns || [];
                 rows = data.rows || [];
 
-                // Update size caches
                 for (const col of columns) {
                     colWidths.set(col.pos, col.width || DEFAULT_COL_WIDTH);
                 }
@@ -760,513 +459,6 @@
             }
         }
 
-        // Convert column index to letter (A, B, ..., Z, AA, AB, ...)
-        function colToLetter(col) {
-            let s = '';
-            let n = col + 1;
-            while (n > 0) {
-                n--;
-                s = String.fromCharCode(65 + (n % 26)) + s;
-                n = Math.floor(n / 26);
-            }
-            return s;
-        }
-
-        // Get cell at position
-        function getCellAt(col, row) {
-            return cells.find(c => c.col === col && c.row === row);
-        }
-
-        // Start editing a cell
-        async function startEditing() {
-            if (!selectedCell || isEditing || !dataSource) return;
-
-            let cell = getCellAt(selectedCell.col, selectedCell.row);
-
-            // If no cell exists at this position, create one
-            if (!cell) {
-                try {
-                    const data = await dataSource.createCell(selectedCell.col, selectedCell.row, '');
-                    // Add the new cell to our local cells array
-                    cell = { id: data.id, col: selectedCell.col, row: selectedCell.row, value: '', type: 's' };
-                    cells.push(cell);
-                } catch (e) {
-                    console.error('Error creating cell:', e);
-                    return;
-                }
-            }
-
-            isEditing = true;
-
-            // Calculate cell position on screen
-            let cellX = HEADER_WIDTH - scrollX;
-            for (let i = 0; i < selectedCell.col; i++) {
-                cellX += colWidths.get(i) || DEFAULT_COL_WIDTH;
-            }
-            let cellY = HEADER_HEIGHT - scrollY;
-            for (let i = 0; i < selectedCell.row; i++) {
-                cellY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-            }
-
-            const cellWidth = colWidths.get(selectedCell.col) || DEFAULT_COL_WIDTH;
-            const cellHeight = rowHeights.get(selectedCell.row) || DEFAULT_ROW_HEIGHT;
-
-            // Position and show editor
-            cellEditor.style.left = cellX + 'px';
-            cellEditor.style.top = cellY + 'px';
-            cellEditor.style.width = cellWidth + 'px';
-            cellEditor.style.height = cellHeight + 'px';
-            cellEditor.style.display = 'block';
-
-            // Set initial value (formula or display value)
-            cellEditor.value = cell.formula || cell.value || '';
-            cellEditor.focus();
-            cellEditor.select();
-        }
-
-        // Cancel editing
-        function cancelEditing() {
-            if (!isEditing) return;
-            isEditing = false;
-            cellEditor.style.display = 'none';
-            cellEditor.value = '';
-            canvas.focus();
-        }
-
-        // Confirm editing and save
-        async function confirmEditing() {
-            if (!isEditing || !selectedCell || !dataSource) return;
-
-            const cell = getCellAt(selectedCell.col, selectedCell.row);
-            if (!cell) {
-                cancelEditing();
-                return;
-            }
-
-            const newValue = cellEditor.value;
-            isEditing = false;
-            cellEditor.style.display = 'none';
-
-            try {
-                await dataSource.updateCell(cell.id, newValue);
-                // Refresh viewport to show updated value
-                await fetchViewport();
-                render();
-            } catch (e) {
-                console.error('Error updating cell:', e);
-            }
-        }
-
-        // Cell editor event handlers
-        cellEditor.addEventListener('keydown', (e) => {
-            e.stopPropagation(); // Prevent bubbling to document handler
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                cancelEditing();
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                confirmEditing();
-            } else if (e.key === 'Tab') {
-                e.preventDefault();
-                confirmEditing().then(() => {
-                    // Move to next cell
-                    if (selectedCell) {
-                        if (e.shiftKey) {
-                            selectedCell.col = Math.max(0, selectedCell.col - 1);
-                        } else {
-                            selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
-                        }
-                        render();
-                    }
-                });
-            }
-        });
-
-        cellEditor.addEventListener('blur', () => {
-            // Only confirm if we're still editing (not if we cancelled)
-            if (isEditing) {
-                confirmEditing();
-            }
-        });
-
-        // Render the grid
-        function render() {
-            if (!sheetInfo) return;
-
-            const container = document.getElementById('canvas-container');
-            const viewWidth = container.clientWidth;
-            const viewHeight = container.clientHeight;
-
-            ctx.clearRect(0, 0, viewWidth, viewHeight);
-
-            // Calculate visible range
-            const startCol = Math.max(0, Math.floor(scrollX / DEFAULT_COL_WIDTH) - 1);
-            const startRow = Math.max(0, Math.floor(scrollY / DEFAULT_ROW_HEIGHT) - 1);
-
-            // Draw cell backgrounds and values first
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(HEADER_WIDTH, HEADER_HEIGHT, viewWidth - HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
-            ctx.clip();
-
-            // Draw grid lines
-            ctx.strokeStyle = COLORS.gridLine;
-            ctx.lineWidth = 1;
-
-            // Vertical lines - use adjusted positions during column drag
-            // Check if we've actually moved past the center of an adjacent column
-            const colHasMoved = isDraggingColumn &&
-                dragTargetIndex !== dragSourceIndex &&
-                dragTargetIndex !== dragSourceIndex + 1;
-
-            for (let col = 0; col <= sheetInfo.colCount; col++) {
-                // Skip source column during drag (only if we've moved past center)
-                if (colHasMoved && col === dragSourceIndex) continue;
-
-                const lineX = getDragAdjustedColX(col) + 0.5;
-                if (lineX >= HEADER_WIDTH && lineX < viewWidth) {
-                    ctx.beginPath();
-                    ctx.moveTo(lineX, HEADER_HEIGHT);
-                    ctx.lineTo(lineX, viewHeight);
-                    ctx.stroke();
-                }
-            }
-            // Draw right edge of last visible column
-            if (!isDraggingColumn) {
-                let x = HEADER_WIDTH;
-                for (let col = 0; col < sheetInfo.colCount; col++) {
-                    x += colWidths.get(col) || DEFAULT_COL_WIDTH;
-                }
-                const lineX = x - scrollX + 0.5;
-                if (lineX >= HEADER_WIDTH && lineX < viewWidth) {
-                    ctx.beginPath();
-                    ctx.moveTo(lineX, HEADER_HEIGHT);
-                    ctx.lineTo(lineX, viewHeight);
-                    ctx.stroke();
-                }
-            }
-
-            // Horizontal lines - use adjusted positions during row drag
-            // Check if we've actually moved past the center of an adjacent row
-            const rowHasMoved = isDraggingRow &&
-                dragTargetIndex !== dragSourceIndex &&
-                dragTargetIndex !== dragSourceIndex + 1;
-
-            for (let row = 0; row <= sheetInfo.rowCount; row++) {
-                // Skip source row during drag (only if we've moved past center)
-                if (rowHasMoved && row === dragSourceIndex) continue;
-
-                const lineY = getDragAdjustedRowY(row) + 0.5;
-                if (lineY >= HEADER_HEIGHT && lineY < viewHeight) {
-                    ctx.beginPath();
-                    ctx.moveTo(HEADER_WIDTH, lineY);
-                    ctx.lineTo(viewWidth, lineY);
-                    ctx.stroke();
-                }
-            }
-            // Draw bottom edge of last visible row
-            if (!isDraggingRow) {
-                let y = HEADER_HEIGHT;
-                for (let row = 0; row < sheetInfo.rowCount; row++) {
-                    y += rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
-                }
-                const lineY = y - scrollY + 0.5;
-                if (lineY >= HEADER_HEIGHT && lineY < viewHeight) {
-                    ctx.beginPath();
-                    ctx.moveTo(HEADER_WIDTH, lineY);
-                    ctx.lineTo(viewWidth, lineY);
-                    ctx.stroke();
-                }
-            }
-
-            // Draw cell values
-            ctx.fillStyle = COLORS.cellText;
-            ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-
-            for (const cell of cells) {
-                // Skip cells in dragged column/row (only if we've moved past center)
-                if (colHasMoved && cell.col === dragSourceIndex) continue;
-                if (rowHasMoved && cell.row === dragSourceIndex) continue;
-
-                const colWidth = colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
-                const rowHeight = rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
-
-                // Calculate cell position with drag adjustment
-                const cellX = getDragAdjustedColX(cell.col);
-                const cellY = getDragAdjustedRowY(cell.row);
-
-                // Skip if outside visible area
-                if (cellX + colWidth < HEADER_WIDTH || cellX > viewWidth) continue;
-                if (cellY + rowHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
-
-                // Draw value
-                const displayValue = cell.display || cell.value || '';
-                const textX = cellX + CELL_PADDING;
-                const textY = cellY + rowHeight / 2;
-
-                // Clip text to cell width
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(cellX + 1, cellY + 1, colWidth - 2, rowHeight - 2);
-                ctx.clip();
-                ctx.fillText(displayValue, textX, textY);
-                ctx.restore();
-            }
-
-            // Draw selection
-            if (selectedCell) {
-                let selX = HEADER_WIDTH - scrollX;
-                for (let i = 0; i < selectedCell.col; i++) {
-                    selX += colWidths.get(i) || DEFAULT_COL_WIDTH;
-                }
-                let selY = HEADER_HEIGHT - scrollY;
-                for (let i = 0; i < selectedCell.row; i++) {
-                    selY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-                }
-                const selW = colWidths.get(selectedCell.col) || DEFAULT_COL_WIDTH;
-                const selH = rowHeights.get(selectedCell.row) || DEFAULT_ROW_HEIGHT;
-
-                if (selX + selW > HEADER_WIDTH && selX < viewWidth &&
-                    selY + selH > HEADER_HEIGHT && selY < viewHeight) {
-                    // Selection background
-                    ctx.fillStyle = COLORS.selectionBg;
-                    ctx.fillRect(selX, selY, selW, selH);
-
-                    // Selection border
-                    ctx.strokeStyle = COLORS.selectionBorder;
-                    ctx.lineWidth = 2;
-                    ctx.strokeRect(selX + 1, selY + 1, selW - 2, selH - 2);
-                }
-            }
-
-            // Draw entire column selection
-            if (selectedColumn !== null) {
-                let selX = HEADER_WIDTH - scrollX;
-                for (let i = 0; i < selectedColumn; i++) {
-                    selX += colWidths.get(i) || DEFAULT_COL_WIDTH;
-                }
-                const selW = colWidths.get(selectedColumn) || DEFAULT_COL_WIDTH;
-
-                if (selX + selW > HEADER_WIDTH && selX < viewWidth) {
-                    ctx.fillStyle = COLORS.selectionBg;
-                    const clippedX = Math.max(HEADER_WIDTH, selX);
-                    const clippedW = Math.min(selW, selX + selW - clippedX, viewWidth - clippedX);
-                    ctx.fillRect(clippedX, HEADER_HEIGHT, clippedW, viewHeight - HEADER_HEIGHT);
-                }
-            }
-
-            // Draw entire row selection
-            if (selectedRow !== null) {
-                let selY = HEADER_HEIGHT - scrollY;
-                for (let i = 0; i < selectedRow; i++) {
-                    selY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-                }
-                const selH = rowHeights.get(selectedRow) || DEFAULT_ROW_HEIGHT;
-
-                if (selY + selH > HEADER_HEIGHT && selY < viewHeight) {
-                    ctx.fillStyle = COLORS.selectionBg;
-                    const clippedY = Math.max(HEADER_HEIGHT, selY);
-                    const clippedH = Math.min(selH, selY + selH - clippedY, viewHeight - clippedY);
-                    ctx.fillRect(HEADER_WIDTH, clippedY, viewWidth - HEADER_WIDTH, clippedH);
-                }
-            }
-
-            ctx.restore();
-
-            // Draw column headers
-            ctx.fillStyle = COLORS.headerBg;
-            ctx.fillRect(HEADER_WIDTH, 0, viewWidth - HEADER_WIDTH, HEADER_HEIGHT);
-
-            ctx.fillStyle = COLORS.headerText;
-            ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            for (let col = 0; col < sheetInfo.colCount; col++) {
-                // Skip dragged column (only if we've moved past center)
-                if (colHasMoved && col === dragSourceIndex) continue;
-
-                const colW = colWidths.get(col) || DEFAULT_COL_WIDTH;
-                const headerX = getDragAdjustedColX(col);
-
-                if (headerX >= viewWidth || headerX + colW < HEADER_WIDTH) continue;
-
-                // Highlight if selected (either cell selection or entire column selection)
-                const isSelected = (selectedCell && selectedCell.col === col) || selectedColumn === col;
-                if (isSelected && !isDraggingColumn) {
-                    ctx.fillStyle = COLORS.selectionBorder;
-                    ctx.fillRect(Math.max(HEADER_WIDTH, headerX), 0,
-                        Math.min(colW, headerX + colW - HEADER_WIDTH), HEADER_HEIGHT);
-                    ctx.fillStyle = '#fff';
-                } else {
-                    ctx.fillStyle = COLORS.headerText;
-                }
-                ctx.fillText(colToLetter(col), headerX + colW / 2, HEADER_HEIGHT / 2);
-            }
-
-            // Draw row headers
-            ctx.fillStyle = COLORS.headerBg;
-            ctx.fillRect(0, HEADER_HEIGHT, HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
-
-            ctx.textAlign = 'center';
-
-            for (let row = 0; row < sheetInfo.rowCount; row++) {
-                // Skip dragged row (only if we've moved past center)
-                if (rowHasMoved && row === dragSourceIndex) continue;
-
-                const rowH = rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
-                const headerY = getDragAdjustedRowY(row);
-
-                if (headerY >= viewHeight || headerY + rowH < HEADER_HEIGHT) continue;
-
-                // Highlight if selected (either cell selection or entire row selection)
-                const isSelected = (selectedCell && selectedCell.row === row) || selectedRow === row;
-                if (isSelected && !isDraggingRow) {
-                    ctx.fillStyle = COLORS.selectionBorder;
-                    ctx.fillRect(0, Math.max(HEADER_HEIGHT, headerY),
-                        HEADER_WIDTH, Math.min(rowH, headerY + rowH - HEADER_HEIGHT));
-                    ctx.fillStyle = '#fff';
-                } else {
-                    ctx.fillStyle = COLORS.headerText;
-                }
-                ctx.fillText(String(row + 1), HEADER_WIDTH / 2, headerY + rowH / 2);
-            }
-
-            // Draw corner
-            ctx.fillStyle = COLORS.cornerBg;
-            ctx.fillRect(0, 0, HEADER_WIDTH, HEADER_HEIGHT);
-
-            // Draw header borders
-            ctx.strokeStyle = COLORS.headerBorder;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(0, HEADER_HEIGHT + 0.5);
-            ctx.lineTo(viewWidth, HEADER_HEIGHT + 0.5);
-            ctx.moveTo(HEADER_WIDTH + 0.5, 0);
-            ctx.lineTo(HEADER_WIDTH + 0.5, viewHeight);
-            ctx.stroke();
-
-            loading.style.display = 'none';
-        }
-
-        // Draw resize preview line
-        function drawResizePreview() {
-            if (!isResizing) return;
-
-            const container = document.getElementById('canvas-container');
-            const viewHeight = container.clientHeight;
-
-            ctx.save();
-            ctx.strokeStyle = COLORS.selectionBorder;
-            ctx.lineWidth = 2;
-            ctx.setLineDash([4, 4]);
-            ctx.beginPath();
-            ctx.moveTo(resizePreviewX + 0.5, 0);
-            ctx.lineTo(resizePreviewX + 0.5, viewHeight);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            ctx.restore();
-        }
-
-        // Draw semi-transparent ghost of dragged column/row
-        function drawDragGhost() {
-            if (!isDraggingColumn && !isDraggingRow) return;
-
-            const container = document.getElementById('canvas-container');
-            const viewWidth = container.clientWidth;
-            const viewHeight = container.clientHeight;
-
-            ctx.save();
-            ctx.globalAlpha = 0.6;
-
-            if (isDraggingColumn) {
-                const colW = colWidths.get(dragSourceIndex) || DEFAULT_COL_WIDTH;
-                // Position ghost centered on mouse X
-                const ghostX = dragMouseX - colW / 2;
-
-                // Draw column header ghost
-                ctx.fillStyle = COLORS.selectionBorder;
-                ctx.fillRect(ghostX, 0, colW, HEADER_HEIGHT);
-
-                // Draw header text
-                ctx.fillStyle = '#fff';
-                ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(colToLetter(dragSourceIndex), ghostX + colW / 2, HEADER_HEIGHT / 2);
-
-                // Draw column cells ghost background
-                ctx.fillStyle = COLORS.selectionBg;
-                ctx.fillRect(ghostX, HEADER_HEIGHT, colW, viewHeight - HEADER_HEIGHT);
-
-                // Draw column border
-                ctx.strokeStyle = COLORS.selectionBorder;
-                ctx.lineWidth = 2;
-                ctx.strokeRect(ghostX, 0, colW, viewHeight);
-
-                // Draw cell values in the ghost column
-                ctx.fillStyle = COLORS.cellText;
-                ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-                ctx.textAlign = 'left';
-                for (const cell of cells) {
-                    if (cell.col !== dragSourceIndex) continue;
-                    const rowHeight = rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
-                    let cellY = HEADER_HEIGHT - scrollY;
-                    for (let i = 0; i < cell.row; i++) {
-                        cellY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-                    }
-                    if (cellY + rowHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
-                    const displayValue = cell.display || cell.value || '';
-                    ctx.fillText(displayValue, ghostX + CELL_PADDING, cellY + rowHeight / 2);
-                }
-            } else if (isDraggingRow) {
-                const rowH = rowHeights.get(dragSourceIndex) || DEFAULT_ROW_HEIGHT;
-                // Position ghost centered on mouse Y
-                const ghostY = dragMouseY - rowH / 2;
-
-                // Draw row header ghost
-                ctx.fillStyle = COLORS.selectionBorder;
-                ctx.fillRect(0, ghostY, HEADER_WIDTH, rowH);
-
-                // Draw header text
-                ctx.fillStyle = '#fff';
-                ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(String(dragSourceIndex + 1), HEADER_WIDTH / 2, ghostY + rowH / 2);
-
-                // Draw row cells ghost background
-                ctx.fillStyle = COLORS.selectionBg;
-                ctx.fillRect(HEADER_WIDTH, ghostY, viewWidth - HEADER_WIDTH, rowH);
-
-                // Draw row border
-                ctx.strokeStyle = COLORS.selectionBorder;
-                ctx.lineWidth = 2;
-                ctx.strokeRect(0, ghostY, viewWidth, rowH);
-
-                // Draw cell values in the ghost row
-                ctx.fillStyle = COLORS.cellText;
-                ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-                ctx.textAlign = 'left';
-                for (const cell of cells) {
-                    if (cell.row !== dragSourceIndex) continue;
-                    const colWidth = colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
-                    let cellX = HEADER_WIDTH - scrollX;
-                    for (let i = 0; i < cell.col; i++) {
-                        cellX += colWidths.get(i) || DEFAULT_COL_WIDTH;
-                    }
-                    if (cellX + colWidth < HEADER_WIDTH || cellX > viewWidth) continue;
-                    const displayValue = cell.display || cell.value || '';
-                    ctx.fillText(displayValue, cellX + CELL_PADDING, ghostY + rowH / 2);
-                }
-            }
-
-            ctx.restore();
-        }
-
-        // Fetch viewport immediately (quadtree queries are fast)
         let fetchInFlight = false;
         let fetchPending = false;
         async function fetchViewportNow() {
@@ -1287,7 +479,116 @@
             }
         }
 
+        // ========================================================================
+        // Cell Editing
+        // ========================================================================
+
+        async function startEditing() {
+            if (!selectedCell || isEditing || !dataSource) return;
+
+            let cell = getCellAt(selectedCell.col, selectedCell.row);
+
+            if (!cell) {
+                try {
+                    const data = await dataSource.createCell(selectedCell.col, selectedCell.row, '');
+                    cell = { id: data.id, col: selectedCell.col, row: selectedCell.row, value: '', type: 's' };
+                    cells.push(cell);
+                } catch (e) {
+                    console.error('Error creating cell:', e);
+                    return;
+                }
+            }
+
+            isEditing = true;
+
+            let cellX = HEADER_WIDTH - scrollX;
+            for (let i = 0; i < selectedCell.col; i++) {
+                cellX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+            }
+            let cellY = HEADER_HEIGHT - scrollY;
+            for (let i = 0; i < selectedCell.row; i++) {
+                cellY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+            }
+
+            const cellWidth = colWidths.get(selectedCell.col) || DEFAULT_COL_WIDTH;
+            const cellHeight = rowHeights.get(selectedCell.row) || DEFAULT_ROW_HEIGHT;
+
+            cellEditor.style.left = cellX + 'px';
+            cellEditor.style.top = cellY + 'px';
+            cellEditor.style.width = cellWidth + 'px';
+            cellEditor.style.height = cellHeight + 'px';
+            cellEditor.style.display = 'block';
+
+            cellEditor.value = cell.formula || cell.value || '';
+            cellEditor.focus();
+            cellEditor.select();
+        }
+
+        function cancelEditing() {
+            if (!isEditing) return;
+            isEditing = false;
+            cellEditor.style.display = 'none';
+            cellEditor.value = '';
+            canvas.focus();
+        }
+
+        async function confirmEditing() {
+            if (!isEditing || !selectedCell || !dataSource) return;
+
+            const cell = getCellAt(selectedCell.col, selectedCell.row);
+            if (!cell) {
+                cancelEditing();
+                return;
+            }
+
+            const newValue = cellEditor.value;
+            isEditing = false;
+            cellEditor.style.display = 'none';
+
+            try {
+                await dataSource.updateCell(cell.id, newValue);
+                await fetchViewport();
+                render();
+            } catch (e) {
+                console.error('Error updating cell:', e);
+            }
+        }
+
+        cellEditor.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelEditing();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmEditing();
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                confirmEditing().then(() => {
+                    if (selectedCell) {
+                        if (e.shiftKey) {
+                            selectedCell.col = Math.max(0, selectedCell.col - 1);
+                        } else {
+                            selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
+                        }
+                        render();
+                    }
+                });
+            }
+        });
+
+        cellEditor.addEventListener('blur', () => {
+            if (isEditing) {
+                confirmEditing();
+            }
+        });
+
+        // ========================================================================
+        // Event Handlers
+        // ========================================================================
+
         canvas.addEventListener('wheel', (e) => {
+            if (!sheetInfo) return;
             e.preventDefault();
 
             const maxScrollX = Math.max(0, sheetInfo.colCount * DEFAULT_COL_WIDTH - canvas.clientWidth + HEADER_WIDTH);
@@ -1300,23 +601,21 @@
             fetchViewportNow();
         }, { passive: false });
 
-        // Handle mouse down for selection, dragging, and column resizing
         canvas.addEventListener('mousedown', (e) => {
+            if (!sheetInfo) return;
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
-            // Check for column resize handle in header area
+            // Column resize
             if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
                 const resizeCol = getResizeHandleCol(x);
                 if (resizeCol >= 0) {
-                    // Start column resize
                     isResizing = true;
                     resizeColIndex = resizeCol;
                     resizeStartX = e.clientX;
                     resizeStartWidth = colWidths.get(resizeCol) || DEFAULT_COL_WIDTH;
 
-                    // Calculate preview line position
                     let colX = HEADER_WIDTH - scrollX;
                     for (let i = 0; i <= resizeCol; i++) {
                         colX += colWidths.get(i) || DEFAULT_COL_WIDTH;
@@ -1329,16 +628,14 @@
                 }
             }
 
-            // Click on column header (not resize handle) - select entire column
+            // Column header click (select + drag)
             if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
                 const col = getColAtX(x);
                 if (col >= 0) {
-                    // Clear cell and row selection
                     selectedCell = null;
                     selectedRow = null;
                     selectedColumn = col;
 
-                    // Start column drag reorder
                     isDraggingColumn = true;
                     dragSourceIndex = col;
                     dragTargetIndex = col;
@@ -1352,16 +649,14 @@
                 }
             }
 
-            // Click on row header - select entire row
+            // Row header click (select + drag)
             if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
                 const row = getRowAtY(y);
                 if (row >= 0) {
-                    // Clear cell and column selection
                     selectedCell = null;
                     selectedColumn = null;
                     selectedRow = row;
 
-                    // Start row drag reorder
                     isDraggingRow = true;
                     dragSourceIndex = row;
                     dragTargetIndex = row;
@@ -1375,14 +670,8 @@
                 }
             }
 
-            // Click on corner (top-left) - do nothing for now
-            if (x < HEADER_WIDTH && y < HEADER_HEIGHT) {
-                return;
-            }
-
-            // Cell selection in grid area
+            // Cell selection
             if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
-                // Clear column/row selection
                 selectedColumn = null;
                 selectedRow = null;
 
@@ -1397,16 +686,15 @@
         });
 
         canvas.addEventListener('mousemove', (e) => {
+            if (!sheetInfo) return;
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
             if (isResizing) {
-                // Update resize preview
                 const delta = e.clientX - resizeStartX;
                 const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
 
-                // Update preview position
                 let colX = HEADER_WIDTH - scrollX;
                 for (let i = 0; i < resizeColIndex; i++) {
                     colX += colWidths.get(i) || DEFAULT_COL_WIDTH;
@@ -1414,50 +702,25 @@
                 resizePreviewX = colX + newWidth;
 
                 render();
-                // Draw resize preview line
-                drawResizePreview();
             } else if (isDraggingColumn) {
-                // Update drag target and mouse position
                 dragTargetIndex = getDropTargetCol(x);
                 dragMouseX = x;
                 dragMouseY = y;
 
                 canvas.style.cursor = 'grabbing';
                 render();
-                drawDragGhost();
             } else if (isDraggingRow) {
-                // Update drag target and mouse position
                 dragTargetIndex = getDropTargetRow(y);
                 dragMouseX = x;
                 dragMouseY = y;
 
                 canvas.style.cursor = 'grabbing';
                 render();
-                drawDragGhost();
-            } else if (isDragging) {
-                const dx = e.clientX - lastMouseX;
-                const dy = e.clientY - lastMouseY;
-
-                const maxScrollX = Math.max(0, sheetInfo.colCount * DEFAULT_COL_WIDTH - canvas.clientWidth + HEADER_WIDTH);
-                const maxScrollY = Math.max(0, sheetInfo.rowCount * DEFAULT_ROW_HEIGHT - canvas.clientHeight + HEADER_HEIGHT);
-
-                scrollX = Math.max(0, Math.min(maxScrollX, scrollX - dx));
-                scrollY = Math.max(0, Math.min(maxScrollY, scrollY - dy));
-
-                lastMouseX = e.clientX;
-                lastMouseY = e.clientY;
-
-                render();
-                fetchViewportNow();
             } else {
-                // Check for resize cursor in header area
+                // Resize cursor
                 if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
                     const resizeCol = getResizeHandleCol(x);
-                    if (resizeCol >= 0) {
-                        canvas.style.cursor = 'col-resize';
-                    } else {
-                        canvas.style.cursor = 'default';
-                    }
+                    canvas.style.cursor = resizeCol >= 0 ? 'col-resize' : 'default';
                 } else {
                     canvas.style.cursor = 'default';
                 }
@@ -1466,22 +729,17 @@
 
         canvas.addEventListener('mouseup', async (e) => {
             if (isResizing && dataSource) {
-                // Finish column resize
                 const delta = e.clientX - resizeStartX;
                 const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
 
-                // Update local cache
                 colWidths.set(resizeColIndex, newWidth);
 
-                // Get column ID - use position-based API if no column exists yet
                 const colId = getColumnId(resizeColIndex);
                 try {
                     if (colId) {
                         await dataSource.resizeColumn(colId, newWidth);
                     } else {
-                        // Column doesn't exist yet, use position-based endpoint
                         await dataSource.resizeColumnByPos(resizeColIndex, newWidth);
-                        // Refresh viewport to get the new column ID
                         await fetchViewport();
                     }
                 } catch (err) {
@@ -1493,20 +751,16 @@
                 canvas.style.cursor = 'default';
                 render();
             } else if (isDraggingColumn && dataSource) {
-                // Finish column drag reorder
                 if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
-                    // Only move if target is different from source
                     const colId = getColumnId(dragSourceIndex);
                     if (colId) {
                         try {
                             await dataSource.moveColumn(colId, dragTargetIndex);
-                            // Update selection to follow the moved column
                             if (dragTargetIndex > dragSourceIndex) {
                                 selectedColumn = dragTargetIndex - 1;
                             } else {
                                 selectedColumn = dragTargetIndex;
                             }
-                            // Refresh data
                             await fetchSheetInfo();
                             await fetchViewport();
                         } catch (err) {
@@ -1521,20 +775,16 @@
                 canvas.style.cursor = 'default';
                 render();
             } else if (isDraggingRow && dataSource) {
-                // Finish row drag reorder
                 if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
-                    // Only move if target is different from source
                     const rowId = getRowId(dragSourceIndex);
                     if (rowId) {
                         try {
                             await dataSource.moveRow(rowId, dragTargetIndex);
-                            // Update selection to follow the moved row
                             if (dragTargetIndex > dragSourceIndex) {
                                 selectedRow = dragTargetIndex - 1;
                             } else {
                                 selectedRow = dragTargetIndex;
                             }
-                            // Refresh data
                             await fetchSheetInfo();
                             await fetchViewport();
                         } catch (err) {
@@ -1548,46 +798,36 @@
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
-            } else if (isDragging) {
-                isDragging = false;
-                canvas.style.cursor = 'default';
             }
         });
 
         canvas.addEventListener('mouseleave', () => {
             if (isResizing) {
-                // Cancel resize on mouse leave
                 isResizing = false;
                 resizeColIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
             } else if (isDraggingColumn) {
-                // Cancel column drag on mouse leave
                 isDraggingColumn = false;
                 dragSourceIndex = -1;
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
             } else if (isDraggingRow) {
-                // Cancel row drag on mouse leave
                 isDraggingRow = false;
                 dragSourceIndex = -1;
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
-            } else if (isDragging) {
-                isDragging = false;
-                canvas.style.cursor = 'default';
             }
         });
 
-        // Handle double-click to edit
         canvas.addEventListener('dblclick', (e) => {
+            if (!sheetInfo) return;
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
-            // Only in cell area, not headers
             if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
                 const col = getColAtX(x);
                 const row = getRowAtY(y);
@@ -1600,11 +840,9 @@
             }
         });
 
-        // Handle keyboard navigation
         document.addEventListener('keydown', (e) => {
-            // Skip if we're editing
             if (isEditing) return;
-            if (!selectedCell) return;
+            if (!selectedCell || !sheetInfo) return;
 
             let newCol = selectedCell.col;
             let newRow = selectedCell.row;
@@ -1672,83 +910,23 @@
             fetchViewportNow();
         });
 
-        // Handle resize
         window.addEventListener('resize', () => {
             resizeCanvas();
             fetchViewportNow();
         });
 
-        // Export function
-        async function exportAs(format) {
-            if (!dataSource) {
-                alert('No file loaded');
-                return;
-            }
-            try {
-                const result = await dataSource.exportAs(format);
-                // Create blob and trigger download
-                const url = URL.createObjectURL(result.blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = result.filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            } catch (e) {
-                console.error('Export error:', e);
-                alert('Export failed: ' + e.message);
-            }
-        }
-
         // ========================================================================
         // File Loading and Mode Management
         // ========================================================================
 
-        // Update mode indicator UI
-        function updateModeIndicator() {
-            if (!dataSource) {
-                modeIndicator.textContent = 'No File';
-                modeIndicator.className = 'mode-indicator';
-            } else if (dataSource.getMode() === 'server') {
-                modeIndicator.textContent = 'Server';
-                modeIndicator.className = 'mode-indicator server';
-            } else {
-                modeIndicator.textContent = 'Local';
-                modeIndicator.className = 'mode-indicator local';
-            }
-        }
-
-        // Show/hide empty state
         function updateEmptyState() {
             if (hasFileLoaded) {
-                emptyState.classList.remove('visible');
+                emptyState.classList.add('hidden');
                 canvas.style.display = 'block';
             } else {
-                emptyState.classList.add('visible');
+                emptyState.classList.remove('hidden');
                 canvas.style.display = 'none';
             }
-        }
-
-        // Detect file format from filename and content
-        function detectFormat(filename, data) {
-            const ext = filename.split('.').pop().toLowerCase();
-            if (ext === 'cells') return 'cells';
-            if (ext === 'csv' || ext === 'tsv') return 'csv';
-            if (ext === 'xlsx') return 'xlsx';
-
-            // Fallback: check magic bytes
-            if (data instanceof ArrayBuffer) {
-                const view = new Uint8Array(data.slice(0, 4));
-                if (view[0] === 0x50 && view[1] === 0x4B) return 'xlsx'; // PK (ZIP)
-            }
-            return 'csv'; // Default to CSV
-        }
-
-        // Get base filename without extension
-        function getBaseName(filename) {
-            const lastDot = filename.lastIndexOf('.');
-            return lastDot > 0 ? filename.substring(0, lastDot) : filename;
         }
 
         // Initialize WASM client if needed
@@ -1769,12 +947,12 @@
             return wasmClient;
         }
 
-        // Load a file (either via WASM or server)
+        // Load a file (via WASM)
         async function loadFile(file) {
             loading.textContent = `Loading ${file.name}...`;
             loading.style.display = 'block';
             errorEl.style.display = 'none';
-            emptyState.classList.remove('visible');
+            emptyState.classList.add('hidden');
 
             try {
                 const data = await file.arrayBuffer();
@@ -1784,7 +962,6 @@
                 // Initialize WASM client and load file
                 const client = await ensureWasmClient();
 
-                // Convert ArrayBuffer to appropriate type for loading
                 if (format === 'cells') {
                     const text = new TextDecoder().decode(data);
                     await client.loadCells(text);
@@ -1809,7 +986,6 @@
                 rowHeights.clear();
 
                 // Update UI
-                updateModeIndicator();
                 updateEmptyState();
                 await fetchSheetInfo();
                 await fetchViewport();
@@ -1825,19 +1001,33 @@
         }
 
         // Open file dialog
-        function openFile() {
+        window.openFile = function() {
             fileInput.click();
-        }
+        };
 
         // File input change handler
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
                 loadFile(file);
-                // Clear input so same file can be re-selected
                 fileInput.value = '';
             }
         });
+
+        // Export function
+        window.exportAs = async function(format) {
+            if (!dataSource) {
+                alert('No file loaded');
+                return;
+            }
+            try {
+                const result = await dataSource.exportAs(format);
+                downloadBlob(result.blob, result.filename);
+            } catch (e) {
+                console.error('Export error:', e);
+                alert('Export failed: ' + e.message);
+            }
+        };
 
         // ========================================================================
         // Drag and Drop Handling
@@ -1880,10 +1070,8 @@
         // Initialization
         // ========================================================================
 
-        // Initialize
         async function init() {
             resizeCanvas();
-            updateModeIndicator();
 
             // Check if we're running with a server (try to connect)
             try {
@@ -1892,7 +1080,6 @@
                     // Server mode - we have a server serving data
                     dataSource = new ServerDataSource();
                     hasFileLoaded = true;
-                    updateModeIndicator();
                     updateEmptyState();
                     await fetchSheetInfo();
                     await fetchViewport();
