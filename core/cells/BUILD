@@ -192,3 +192,24 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "quadtree",
+    srcs = ["quadtree.cc"],
+    hdrs = ["quadtree.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":model",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "quadtree_test",
+    srcs = ["quadtree_test.cc"],
+    deps = [
+        ":id",
+        ":quadtree",
+        "@googletest//:gtest_main",
+    ],
+)
