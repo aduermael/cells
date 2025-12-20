@@ -1,4 +1,4 @@
-.PHONY: build test format lint check clean compile-db cli cli-release release wasm wasm-full wasm-dist wasm-dist-full wasm-serve
+.PHONY: build test format lint check clean compile-db cli cli-release release wasm wasm-dist wasm-serve
 
 # Build
 build:
@@ -17,51 +17,22 @@ cli-release:
 # Alias for cli-release
 release: cli-release
 
-# Build WASM module (for browser usage)
+# Build WASM module (for browser usage, includes XLSX support)
 wasm:
-	bazel build //apps/wasm:cells_wasm
+	bazel build --config=wasm //apps/wasm:cells_wasm
 	@echo "WASM output: bazel-bin/apps/wasm/cells_wasm/"
-
-# Build WASM module with XLSX support (larger binary)
-wasm-full:
-	bazel build //apps/wasm:cells_wasm_full
-	@echo "WASM output: bazel-bin/apps/wasm/cells_wasm_full/"
 
 # Build production WASM distribution package
 # Output: dist/ directory with all files needed for standalone deployment
 wasm-dist:
 	@echo "Building WASM module..."
-	bazel build -c opt //apps/wasm:cells_wasm
+	bazel build --config=wasm -c opt //apps/wasm:cells_wasm
 	@echo "Creating dist directory..."
 	@rm -rf dist
 	@mkdir -p dist
 	@echo "Copying WASM artifacts..."
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.js dist/
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/
-	@echo "Copying JavaScript files..."
-	@cp apps/wasm/worker.js dist/
-	@cp apps/wasm/client.js dist/
-	@echo "Copying HTML and TypeScript definitions..."
-	@cp apps/wasm/static/index.html dist/
-	@cp apps/wasm/cells.d.ts dist/
-	@echo ""
-	@echo "Distribution package created in dist/"
-	@echo "Files:"
-	@ls -lh dist/
-	@echo ""
-	@echo "To test locally: make wasm-serve"
-	@echo "Then open: http://localhost:8081/"
-
-# Build production WASM distribution with XLSX support
-wasm-dist-full:
-	@echo "Building WASM module with XLSX support..."
-	bazel build -c opt //apps/wasm:cells_wasm_full
-	@echo "Creating dist directory..."
-	@rm -rf dist
-	@mkdir -p dist
-	@echo "Copying WASM artifacts..."
-	@cp bazel-bin/apps/wasm/cells_wasm_full/cells_wasm_full_bin.js dist/cells_wasm_bin.js
-	@cp bazel-bin/apps/wasm/cells_wasm_full/cells_wasm_full_bin.wasm dist/cells_wasm_bin.wasm
 	@echo "Copying JavaScript files..."
 	@cp apps/wasm/worker.js dist/
 	@cp apps/wasm/client.js dist/

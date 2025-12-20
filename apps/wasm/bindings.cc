@@ -18,11 +18,8 @@
 #include "core/cells/quadtree.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/serializer.h"
-
-#ifndef CELLS_WASM_NO_XLSX
 #include "core/cells/xlsx_reader.h"
 #include "core/cells/xlsx_writer.h"
-#endif
 
 using namespace emscripten;
 
@@ -110,10 +107,8 @@ public:
         return "{\"success\":true,\"sheetCount\":" + std::to_string(_workbook->sheetCount()) + "}";
     }
 
-#ifndef CELLS_WASM_NO_XLSX
     // Parse XLSX from file data (writes to temp file, reads, deletes)
-    // Note: In WASM, we'd need to handle this differently - for now, we can use
-    // Emscripten's virtual filesystem
+    // Uses Emscripten's virtual filesystem
     std::string loadFromXLSXData(const std::string& data) {
         // Write data to Emscripten virtual filesystem
         const char* tempPath = "/tmp/upload.xlsx";
@@ -140,12 +135,6 @@ public:
         rebuildQuadtree();
         return "{\"success\":true,\"sheetCount\":" + std::to_string(_workbook->sheetCount()) + "}";
     }
-#else
-    // Stub for XLSX loading when compiled without XLSX support
-    std::string loadFromXLSXData(const std::string& /*data*/) {
-        return "{\"error\":\"XLSX support not compiled in this build\"}";
-    }
-#endif
 
     // ========================================================================
     // Sheet info methods
@@ -630,7 +619,6 @@ public:
         return result.output;
     }
 
-#ifndef CELLS_WASM_NO_XLSX
     // Export to XLSX returns binary data as string
     // JS side should treat this as binary
     std::string exportToXLSX() {
@@ -662,10 +650,6 @@ public:
 
         return data;
     }
-#else
-    // Stub for XLSX export when compiled without XLSX support
-    std::string exportToXLSX() { return ""; }
-#endif
 
     // ========================================================================
     // Workbook name
