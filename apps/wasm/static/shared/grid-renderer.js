@@ -105,7 +105,8 @@ export class GridRenderer {
     }
 
     /**
-     * Get the visual X position for a column during drag operations
+     * Get the visual X position for a column during drag operations.
+     * The placeholder gap should match the width of the dragged column.
      */
     getDragAdjustedColX(col) {
         const colHasMoved = this.isDraggingColumn &&
@@ -123,21 +124,34 @@ export class GridRenderer {
         const sourceW = this.colWidths.get(this.dragSourceIndex) || DEFAULT_COL_WIDTH;
         let x = HEADER_WIDTH - this.scrollX;
 
-        for (let i = 0; i < col; i++) {
-            if (i === this.dragSourceIndex) continue;
-            if (i === this.dragTargetIndex && this.dragTargetIndex < this.dragSourceIndex) {
+        // When moving left (target < source): columns at target and after shift right
+        // When moving right (target > source + 1): columns between source+1 and target-1 shift left
+        if (this.dragTargetIndex < this.dragSourceIndex) {
+            // Moving left: add gap at target position
+            for (let i = 0; i < col; i++) {
+                if (i === this.dragSourceIndex) continue;
+                x += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
+            }
+            // If this column is at or after the target, add the gap
+            if (col >= this.dragTargetIndex && col !== this.dragSourceIndex) {
                 x += sourceW;
             }
-            x += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
-            if (i === this.dragTargetIndex - 1 && this.dragTargetIndex > this.dragSourceIndex + 1) {
-                x += sourceW;
+        } else {
+            // Moving right: add gap after target-1
+            for (let i = 0; i < col; i++) {
+                if (i === this.dragSourceIndex) continue;
+                x += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
+                if (i === this.dragTargetIndex - 1) {
+                    x += sourceW;
+                }
             }
         }
         return x;
     }
 
     /**
-     * Get the visual Y position for a row during drag operations
+     * Get the visual Y position for a row during drag operations.
+     * The placeholder gap should match the height of the dragged row.
      */
     getDragAdjustedRowY(row) {
         const rowHasMoved = this.isDraggingRow &&
@@ -155,14 +169,26 @@ export class GridRenderer {
         const sourceH = this.rowHeights.get(this.dragSourceIndex) || DEFAULT_ROW_HEIGHT;
         let y = HEADER_HEIGHT - this.scrollY;
 
-        for (let i = 0; i < row; i++) {
-            if (i === this.dragSourceIndex) continue;
-            if (i === this.dragTargetIndex && this.dragTargetIndex < this.dragSourceIndex) {
+        // When moving up (target < source): rows at target and after shift down
+        // When moving down (target > source + 1): rows between source+1 and target-1 shift up
+        if (this.dragTargetIndex < this.dragSourceIndex) {
+            // Moving up: add gap at target position
+            for (let i = 0; i < row; i++) {
+                if (i === this.dragSourceIndex) continue;
+                y += this.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+            }
+            // If this row is at or after the target, add the gap
+            if (row >= this.dragTargetIndex && row !== this.dragSourceIndex) {
                 y += sourceH;
             }
-            y += this.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-            if (i === this.dragTargetIndex - 1 && this.dragTargetIndex > this.dragSourceIndex + 1) {
-                y += sourceH;
+        } else {
+            // Moving down: add gap after target-1
+            for (let i = 0; i < row; i++) {
+                if (i === this.dragSourceIndex) continue;
+                y += this.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                if (i === this.dragTargetIndex - 1) {
+                    y += sourceH;
+                }
             }
         }
         return y;

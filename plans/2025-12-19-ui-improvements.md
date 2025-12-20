@@ -99,9 +99,9 @@ Allow users to rename columns by double-clicking the column header.
 
 Fix drag-and-drop placeholder size to match the dragged entity.
 
-- [ ] 7a: Fix column drag placeholder to maintain dragged column width
-- [ ] 7b: Fix row drag placeholder to maintain dragged row height
-- [ ] 7c: Ensure moved column/row keeps original size after drop
+- [x] 7a: Fix column drag placeholder to maintain dragged column width
+- [x] 7b: Fix row drag placeholder to maintain dragged row height
+- [x] 7c: Ensure moved column/row keeps original size after drop
 
 ## Phase 8: Persist File on Refresh
 
