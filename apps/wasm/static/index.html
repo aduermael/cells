@@ -19,6 +19,10 @@
                 <button class="btn" id="export-cells" onclick="exportAs('cells')" disabled>Export CELLS</button>
             </div>
         </div>
+        <div id="formula-bar" class="hidden">
+            <span id="cell-reference">A1</span>
+            <input type="text" id="formula-input" placeholder="Select a cell to view or edit its value" />
+        </div>
         <div id="canvas-container">
             <canvas id="grid"></canvas>
             <input type="text" id="cell-editor" />

@@ -224,6 +224,55 @@ canvas {
     display: none;
 }
 
+/* Formula Bar */
+#formula-bar {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    background: #fff;
+    border-bottom: 1px solid #dee2e6;
+    gap: 8px;
+    min-height: 28px;
+}
+
+#formula-bar.hidden {
+    display: none;
+}
+
+#cell-reference {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: #495057;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    padding: 4px 8px;
+    min-width: 50px;
+    text-align: center;
+}
+
+#formula-input {
+    flex: 1;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    color: #212529;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    padding: 4px 8px;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+
+#formula-input:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+}
+
+#formula-input::placeholder {
+    color: #adb5bd;
+}
+
 /* Cell Editor */
 #cell-editor {
     position: absolute;

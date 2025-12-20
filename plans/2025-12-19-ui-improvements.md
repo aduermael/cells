@@ -19,7 +19,7 @@ Add a formula/cell bar between the header toolbar and the canvas area. Shows:
 - Selected cell reference (e.g., "A1", "B5")
 - Full cell value or formula in an editable input field
 
-- [ ] 2a: Add formula bar HTML structure and CSS styles
+- [x] 2a: Add formula bar HTML structure and CSS styles
 - [ ] 2b: Implement formula bar state updates (selected cell display)
 - [ ] 2c: Enable editing cell value directly from formula bar
 
