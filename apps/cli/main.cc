@@ -421,8 +421,9 @@ int show_file_info(const Options& opts) {
 
 // Run serve command
 int run_serve(int argc, char* argv[]) {
-    // Parse serve-specific args: serve <file> [--port N] [--open] [-v]
+    // Parse serve-specific args: serve <file> [--port N] [--open] [-v] [--web-dir DIR]
     std::string input_file;
+    std::string web_dir = "apps/cli/web";  // Default: source tree location
     ServerOptions server_opts;
 
     for (int i = 2; i < argc; ++i) {
@@ -440,15 +441,20 @@ int run_serve(int argc, char* argv[]) {
             server_opts.verbose = true;
             continue;
         }
+        if (arg == "--web-dir" && i + 1 < argc) {
+            web_dir = argv[++i];
+            continue;
+        }
         if (arg == "--help") {
-            std::cout << "Usage: cells serve <file> [--port N] [--open] [-v]\n"
+            std::cout << "Usage: cells serve <file> [--port N] [--open] [-v] [--web-dir DIR]\n"
                       << "\n"
                       << "Start an HTTP server to view a spreadsheet in the browser.\n"
                       << "\n"
                       << "Options:\n"
-                      << "  --port <port>  Server port (default: 8888)\n"
-                      << "  --open         Open browser automatically\n"
-                      << "  -v             Verbose output\n";
+                      << "  --port <port>    Server port (default: 8888)\n"
+                      << "  --open           Open browser automatically\n"
+                      << "  --web-dir <dir>  Web assets directory (default: apps/cli/web)\n"
+                      << "  -v               Verbose output\n";
             return 0;
         }
         // Positional argument (input file)
@@ -524,10 +530,11 @@ int run_serve(int argc, char* argv[]) {
     if (server_opts.verbose) {
         std::cout << "Loaded: " << input_file << " (" << workbook->sheetCount() << " sheet"
                   << (workbook->sheetCount() != 1 ? "s" : "") << ")\n";
+        std::cout << "Web directory: " << web_dir << "\n";
     }
 
     // Start server
-    Server server(std::move(workbook));
+    Server server(std::move(workbook), web_dir);
     return server.run(server_opts);
 }
 

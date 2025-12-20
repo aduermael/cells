@@ -27,7 +27,7 @@ struct ServerOptions {
 // HTTP server for spreadsheet viewing
 class Server {
 public:
-    explicit Server(std::unique_ptr<Workbook> workbook);
+    Server(std::unique_ptr<Workbook> workbook, std::string webDir);
     ~Server();
 
     // Non-copyable
@@ -44,6 +44,7 @@ public:
 private:
     std::unique_ptr<Workbook> _workbook;
     std::unique_ptr<httplib::Server> _server;
+    std::string _webDir;
     size_t _activeSheetIndex = 0;
 
     // Quadtree for active sheet (rebuilt on sheet change)
