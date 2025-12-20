@@ -661,6 +661,40 @@
             }
         }
 
+        async function deleteRangeCells() {
+            if (!dataSource) return;
+
+            const range = getNormalizedRange();
+            if (!range) return;
+
+            try {
+                // Collect all cells in range that exist
+                const cellsToDelete = [];
+                for (let col = range.minCol; col <= range.maxCol; col++) {
+                    for (let row = range.minRow; row <= range.maxRow; row++) {
+                        const cell = getCellAt(col, row);
+                        if (cell && cell.id && cell.id !== '_temp_') {
+                            cellsToDelete.push(cell.id);
+                        }
+                    }
+                }
+
+                // Delete all cells
+                for (const cellId of cellsToDelete) {
+                    await dataSource.deleteCell(cellId);
+                }
+
+                if (cellsToDelete.length > 0) {
+                    await fetchSheetInfo();
+                    await fetchViewport();
+                    render();
+                    updateFormulaBar();
+                }
+            } catch (e) {
+                console.error('Error deleting range cells:', e);
+            }
+        }
+
         cellEditor.addEventListener('keydown', (e) => {
             e.stopPropagation();
             if (e.key === 'Escape') {
@@ -839,7 +873,9 @@
         let isEditingFormulaBar = false;
 
         async function commitFormulaBarEdit() {
-            if (!selectedCell || !dataSource) return;
+            // Use anchor cell (selectionStart) for editing, not selectedCell
+            const editCell = selectionStart || selectedCell;
+            if (!editCell || !dataSource) return;
 
             // Hide cell editor if it's showing
             if (isEditing) {
@@ -847,7 +883,7 @@
                 cellEditor.style.display = 'none';
             }
 
-            let cell = getCellAt(selectedCell.col, selectedCell.row);
+            let cell = getCellAt(editCell.col, editCell.row);
             const newValue = formulaInput.value;
 
             try {
@@ -861,7 +897,7 @@
                     // If no cell exists and value is empty, nothing to do
                 } else if (!cell) {
                     // Create cell if it doesn't exist and value is non-empty
-                    const data = await dataSource.createCell(selectedCell.col, selectedCell.row, newValue);
+                    const data = await dataSource.createCell(editCell.col, editCell.row, newValue);
                     // Refresh sheet info (new column/row may have been created)
                     await fetchSheetInfo();
                 } else {
@@ -936,10 +972,14 @@
 
         // Live sync: update cell display while typing in formula bar
         formulaInput.addEventListener('input', () => {
-            if (!isEditingFormulaBar || !selectedCell) return;
+            if (!isEditingFormulaBar) return;
+
+            // Use anchor cell (selectionStart) for editing, not selectedCell
+            const editCell = selectionStart || selectedCell;
+            if (!editCell) return;
 
             // Update local cell data for live preview (without saving to engine)
-            let cell = getCellAt(selectedCell.col, selectedCell.row);
+            let cell = getCellAt(editCell.col, editCell.row);
             if (cell) {
                 // Update existing cell's display value
                 cell.value = formulaInput.value;
@@ -948,8 +988,8 @@
                 // Create a temporary local cell for preview
                 cells.push({
                     id: '_temp_',
-                    col: selectedCell.col,
-                    row: selectedCell.row,
+                    col: editCell.col,
+                    row: editCell.row,
                     value: formulaInput.value,
                     type: 's'
                 });
@@ -1009,6 +1049,9 @@
                     selectedCell = null;
                     selectedRow = null;
                     selectedColumn = col;
+                    // Clear range selection when selecting column
+                    selectionStart = null;
+                    selectionEnd = null;
 
                     // Start pending drag (actual drag starts after threshold)
                     pendingDragColumn = true;
@@ -1051,6 +1094,9 @@
                     selectedCell = null;
                     selectedColumn = null;
                     selectedRow = row;
+                    // Clear range selection when selecting row
+                    selectionStart = null;
+                    selectionEnd = null;
 
                     // Start pending drag (actual drag starts after threshold)
                     pendingDragRow = true;
@@ -1504,9 +1550,14 @@
                     break;
                 case 'Delete':
                 case 'Backspace':
-                    // Delete/Backspace clears the cell and starts editing empty
                     e.preventDefault();
-                    startEditing({ mode: 'replace', initialChar: '' });
+                    if (hasRangeSelection()) {
+                        // Delete all cells in range
+                        deleteRangeCells();
+                    } else {
+                        // Single cell - clear and start editing empty
+                        startEditing({ mode: 'replace', initialChar: '' });
+                    }
                     return;
                 case 'Escape':
                     // Escape clears range selection (collapses to single cell)

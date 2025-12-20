@@ -388,16 +388,22 @@ export class GridRenderer {
                 const anchorW = this.colWidths.get(this.selectionStart.col) || DEFAULT_COL_WIDTH;
                 const anchorH = this.rowHeights.get(this.selectionStart.row) || DEFAULT_ROW_HEIGHT;
 
-                // Draw a white background for the anchor cell to make it stand out
+                // Draw anchor cell with white background and thicker border
                 if (anchorX + anchorW > HEADER_WIDTH && anchorX < viewWidth &&
                     anchorY + anchorH > HEADER_HEIGHT && anchorY < viewHeight) {
+                    const clipX = Math.max(HEADER_WIDTH, anchorX);
+                    const clipY = Math.max(HEADER_HEIGHT, anchorY);
+                    const clipW = Math.min(anchorW, anchorX + anchorW - clipX);
+                    const clipH = Math.min(anchorH, anchorY + anchorH - clipY);
+
+                    // White background
                     ctx.fillStyle = '#ffffff';
-                    ctx.fillRect(
-                        Math.max(HEADER_WIDTH, anchorX) + 1,
-                        Math.max(HEADER_HEIGHT, anchorY) + 1,
-                        Math.min(anchorW, anchorX + anchorW - Math.max(HEADER_WIDTH, anchorX)) - 2,
-                        Math.min(anchorH, anchorY + anchorH - Math.max(HEADER_HEIGHT, anchorY)) - 2
-                    );
+                    ctx.fillRect(clipX + 1, clipY + 1, clipW - 2, clipH - 2);
+
+                    // Thicker border for anchor cell
+                    ctx.strokeStyle = COLORS.selectionBorder;
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(clipX + 1.5, clipY + 1.5, clipW - 3, clipH - 3);
                 }
             }
         } else if (this.selectedCell) {
