@@ -163,7 +163,7 @@ make release        # Creates optimized ./cells binary
 
 ### WebAssembly Build
 
-The cells engine compiles to WebAssembly for in-browser spreadsheet viewing:
+The cells engine compiles to WebAssembly for a fully functional in-browser spreadsheet:
 
 ```bash
 # Build WASM module (development)
@@ -176,11 +176,22 @@ make wasm-dist
 ```
 
 The distribution package includes:
-- `cells_wasm.wasm` - WASM binary (~292KB)
-- `cells_wasm.js` - Emscripten JS glue
-- `index.html` - Standalone viewer
-- `worker.js` - Web Worker for async processing
-- `client.js` - Main thread API
+- `cells_wasm_bin.wasm` - WASM binary (~472KB)
+- `cells_wasm_bin.js` - Emscripten JS glue
+- `cells.d.ts` - TypeScript definitions
+- `index.html` - Full spreadsheet UI
+- `worker.js` - Web Worker for async WASM operations
+- `client.js` - Main thread API (CellsClient)
+- `shared/` - Shared utilities (data source, state machine)
+
+**Web UI Features:**
+- Canvas2D grid rendering with virtual scrolling
+- Cell editing (inline and formula bar)
+- Selection with keyboard navigation (arrow keys, Tab, Enter)
+- Column/row resizing and reordering
+- Multi-sheet support with tab bar
+- XLSX file import (drag-and-drop)
+- Listener-driven UI refresh (WASM notifies JS of changes)
 
 **Test locally:**
 ```bash
