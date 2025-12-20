@@ -11,3 +11,6 @@ build:linux --cxxopt=-std=c++17
 
 # WebAssembly (Emscripten) build configuration
 build:wasm --incompatible_enable_cc_toolchain_resolution
+build:wasm --cxxopt=-fexceptions
+build:wasm --linkopt=-fexceptions
+build:wasm --linkopt=-sNO_DISABLE_EXCEPTION_CATCHING

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Cells WASM Bindings Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .pass { background: #d4edda; color: #155724; }
+        .fail { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        pre {
+            background: #f4f4f4;
+            padding: 10px;
+            overflow-x: auto;
+            border-radius: 4px;
+        }
+        h1, h2 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>Cells WASM Bindings Test</h1>
+    <div id="results"></div>
+
+    <script src="cells_wasm_bin.js"></script>
+    <script>
+        const results = document.getElementById('results');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        function assert(condition, testName, details = '') {
+            if (condition) {
+                log(`✅ PASS: ${testName}`, 'pass');
+                return true;
+            } else {
+                log(`❌ FAIL: ${testName}${details ? '<br>Details: ' + details : ''}`, 'fail');
+                return false;
+            }
+        }
+
+        async function runTests() {
+            log('Loading WASM module...', 'info');
+
+            try {
+                const Module = await createCellsModule();
+                log('✅ WASM module loaded successfully', 'pass');
+
+                // Test 1: Create engine instance
+                const engine = new Module.CellsEngine();
+                assert(engine !== null, 'CellsEngine constructor works');
+
+                // Test 2: Create empty workbook
+                engine.createEmptyWorkbook();
+                const sheetCount = engine.getSheetCount();
+                assert(sheetCount === 1, 'createEmptyWorkbook creates workbook with 1 sheet', `Got ${sheetCount} sheets`);
+
+                // Test 3: Get sheet name
+                const sheetName = engine.getSheetName(0);
+                assert(sheetName === 'Sheet1', 'Sheet name is "Sheet1"', `Got "${sheetName}"`);
+
+                // Test 4: Get sheet info
+                const sheetInfoJson = engine.getSheetInfo();
+                const sheetInfo = JSON.parse(sheetInfoJson);
+                assert(sheetInfo.name === 'Sheet1', 'Sheet info contains name');
+                assert(sheetInfo.colCount >= 26, 'Sheet has at least 26 columns', `Got ${sheetInfo.colCount}`);
+                assert(sheetInfo.rowCount >= 100, 'Sheet has at least 100 rows', `Got ${sheetInfo.rowCount}`);
+
+                log(`<pre>Sheet info: ${JSON.stringify(sheetInfo, null, 2)}</pre>`, 'info');
+
+                // Test 5: Create a cell
+                const createResult = JSON.parse(engine.createCell(0, 0, 'Hello'));
+                assert(createResult.success === true, 'createCell succeeds');
+                assert(createResult.id && createResult.id.length === 8, 'createCell returns valid ID', `Got "${createResult.id}"`);
+
+                // Test 6: Query viewport
+                const viewportJson = engine.queryViewport(0, 0, 10, 10);
+                const viewport = JSON.parse(viewportJson);
+                assert(Array.isArray(viewport.cells), 'Viewport contains cells array');
+                assert(viewport.cells.length >= 1, 'Viewport contains at least 1 cell', `Got ${viewport.cells.length}`);
+
+                const cell = viewport.cells.find(c => c.id === createResult.id);
+                assert(cell !== undefined, 'Created cell found in viewport');
+                assert(cell.value === 'Hello', 'Cell value is correct', `Got "${cell.value}"`);
+
+                // Test 7: Update cell
+                const updateResult = JSON.parse(engine.updateCell(createResult.id, '42'));
+                assert(updateResult.success === true, 'updateCell succeeds');
+
+                // Verify update
+                const viewport2 = JSON.parse(engine.queryViewport(0, 0, 10, 10));
+                const updatedCell = viewport2.cells.find(c => c.id === createResult.id);
+                assert(updatedCell.value === '42', 'Cell value updated correctly', `Got "${updatedCell.value}"`);
+                assert(updatedCell.type === 'n', 'Cell type is number', `Got "${updatedCell.type}"`);
+
+                // Test 8: Create cell with formula
+                const formulaResult = JSON.parse(engine.createCell(1, 0, '=A1+10'));
+                assert(formulaResult.success === true, 'createCell with formula succeeds');
+
+                const viewport3 = JSON.parse(engine.queryViewport(0, 0, 10, 10));
+                const formulaCell = viewport3.cells.find(c => c.id === formulaResult.id);
+                assert(formulaCell.type === 'f', 'Formula cell has type "f"', `Got "${formulaCell.type}"`);
+
+                // Test 9: Load from .cells format
+                const cellsContent = `D TEST123 "Test Workbook"
+S SHEET01 "Test Sheet"
+C COL00001 0 w:80
+R ROW00001 0 h:24
+X CELL0001 COL00001 ROW00001 n 100`;
+
+                const loadResult = JSON.parse(engine.loadFromCells(cellsContent));
+                assert(loadResult.success === true, 'loadFromCells succeeds');
+                assert(loadResult.sheetCount === 1, 'Loaded workbook has 1 sheet', `Got ${loadResult.sheetCount}`);
+
+                // Verify loaded content
+                const loadedViewport = JSON.parse(engine.queryViewport(0, 0, 10, 10));
+                assert(loadedViewport.cells.length === 1, 'Loaded sheet has 1 cell');
+                assert(loadedViewport.cells[0].value === '100', 'Loaded cell value is correct', `Got "${loadedViewport.cells[0].value}"`);
+
+                // Test 10: Load from CSV
+                const csvContent = 'Name,Age,City\nAlice,30,NYC\nBob,25,LA';
+                const csvResult = JSON.parse(engine.loadFromCSV(csvContent, 44, true));  // 44 is ASCII for ','
+                assert(csvResult.success === true, 'loadFromCSV succeeds');
+
+                const csvViewport = JSON.parse(engine.queryViewport(0, 0, 10, 10));
+                assert(csvViewport.cells.length >= 6, 'CSV loaded correct number of cells', `Got ${csvViewport.cells.length}`);
+
+                // Test 11: Export to .cells format
+                const exportedCells = engine.exportToCells();
+                assert(exportedCells.length > 0, 'exportToCells returns content');
+                assert(exportedCells.includes('D '), 'Export contains document line');
+                assert(exportedCells.includes('S '), 'Export contains sheet line');
+
+                log(`<pre>Exported .cells (first 500 chars):\n${exportedCells.substring(0, 500)}...</pre>`, 'info');
+
+                // Test 12: Export to CSV
+                const exportedCSV = engine.exportToCSV();
+                assert(exportedCSV.length > 0, 'exportToCSV returns content');
+
+                log(`<pre>Exported CSV (first 200 chars):\n${exportedCSV.substring(0, 200)}...</pre>`, 'info');
+
+                // Test 13: Workbook name
+                engine.setWorkbookName('My Workbook');
+                const name = engine.getWorkbookName();
+                assert(name === 'My Workbook', 'Workbook name set/get works', `Got "${name}"`);
+
+                // Test 14: Column resize
+                engine.createEmptyWorkbook();
+                const colResult = JSON.parse(engine.resizeColumnByPos(0, 150));
+                assert(colResult.success === true, 'resizeColumnByPos succeeds');
+                assert(colResult.id && colResult.id.length === 8, 'resizeColumnByPos returns column ID');
+
+                const resizeResult = JSON.parse(engine.resizeColumn(colResult.id, 200));
+                assert(resizeResult.success === true, 'resizeColumn succeeds');
+
+                // Test 15: XLSX stub (should fail gracefully in no-XLSX build)
+                const xlsxResult = JSON.parse(engine.loadFromXLSXData('fake data'));
+                log(`XLSX load result: ${xlsxResult.error ? 'Expected error: ' + xlsxResult.error : 'Unexpected success'}`, 'info');
+
+                // Clean up
+                engine.delete();
+
+                log('<h2>All tests completed!</h2>', 'info');
+
+            } catch (error) {
+                log(`❌ Error: ${error.message}<br><pre>${error.stack}</pre>`, 'fail');
+            }
+        }
+
+        runTests();
+    </script>
+</body>
+</html>

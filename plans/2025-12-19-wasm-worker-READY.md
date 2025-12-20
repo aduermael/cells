@@ -58,12 +58,12 @@ Build the cells app as a WASM module that runs in a Web Worker, enabling:
 - `apps/wasm/hello.cc` - Hello world test
 - `Makefile` - Added wasm target
 
-### Phase 2: WASM Bindings Layer
+### Phase 2: WASM Bindings Layer ✅
 
 **Goal:** Create JavaScript bindings for core types using Embind
 
-- [ ] 2a: Create `apps/wasm/BUILD` with cc_binary target for WASM
-- [ ] 2b: Create `apps/wasm/bindings.cc` with Embind bindings for:
+- [x] 2a: Create `apps/wasm/BUILD` with cc_binary target for WASM
+- [x] 2b: Create `apps/wasm/bindings.cc` with Embind bindings for:
   - Workbook, Sheet, Cell, Axis types
   - Parser functions (parseFromString)
   - Serializer functions (serialize)
@@ -71,8 +71,20 @@ Build the cells app as a WASM module that runs in a Web Worker, enabling:
   - CSV/XLSX writers (to ArrayBuffer)
   - Quadtree viewport queries
   - RefConverter for formula display
-- [ ] 2c: Create TypeScript type definitions (`apps/wasm/cells.d.ts`)
-- [ ] 2d: Test bindings with simple JavaScript test
+- [x] 2c: Create TypeScript type definitions (`apps/wasm/cells.d.ts`)
+- [x] 2d: Test bindings with simple JavaScript test
+
+**Files created/modified:**
+- `apps/wasm/BUILD` - Updated with cells_wasm and cells_wasm_full targets
+- `apps/wasm/bindings.cc` - CellsEngine class with full Embind bindings
+- `apps/wasm/cells.d.ts` - TypeScript type definitions
+- `apps/wasm/test.html` - Browser test page
+- `apps/wasm/test_node.js` - Node.js test suite (15 tests)
+- `.bazelrc` - Added exception flags for WASM builds
+
+**Notes:**
+- cells_wasm (658KB) - No XLSX support, smaller binary
+- cells_wasm_full - Full XLSX support via exceptions (not yet working - pugixml needs exceptions in all deps)
 
 **API Design:**
 ```typescript
