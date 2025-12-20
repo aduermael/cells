@@ -321,6 +321,17 @@ class CellsClient {
         return { success: true };
     }
 
+    /**
+     * Rename a column
+     * @param {string} colId - Column ID
+     * @param {string} name - New column name (empty string to clear)
+     * @returns {Promise<{success: boolean}>}
+     */
+    async renameColumn(colId, name) {
+        await this._send('renameColumn', { colId, name });
+        return { success: true };
+    }
+
     // ========================================================================
     // Export API
     // ========================================================================

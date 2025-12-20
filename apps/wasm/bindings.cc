@@ -523,6 +523,34 @@ public:
     }
 
     // ========================================================================
+    // Column/row rename operations
+    // ========================================================================
+
+    std::string renameColumn(const std::string& colIdStr, const std::string& name) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        if (colIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid column ID\"}";
+        }
+        ID colId(colIdStr);
+
+        auto it = sheet->columns.find(colId);
+        if (it == sheet->columns.end()) {
+            return "{\"error\":\"Column not found\"}";
+        }
+
+        it->second->name = name;
+        return "{\"success\":true}";
+    }
+
+    // ========================================================================
     // Column/row move operations
     // ========================================================================
 
@@ -759,6 +787,8 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)
         .function("resizeColumnByPos", &cells::wasm::CellsEngine::resizeColumnByPos)
         .function("resizeRow", &cells::wasm::CellsEngine::resizeRow)
+        // Column/row rename
+        .function("renameColumn", &cells::wasm::CellsEngine::renameColumn)
         // Column/row move
         .function("moveColumn", &cells::wasm::CellsEngine::moveColumn)
         .function("moveRow", &cells::wasm::CellsEngine::moveRow)

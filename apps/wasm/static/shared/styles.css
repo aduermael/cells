@@ -289,6 +289,22 @@ canvas {
     z-index: 100;
 }
 
+/* Column Header Editor */
+#column-header-editor {
+    position: absolute;
+    display: none;
+    border: 2px solid #0d6efd;
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 2px 4px;
+    outline: none;
+    box-sizing: border-box;
+    z-index: 100;
+    text-align: center;
+}
+
 /* Export Dropdown */
 .dropdown {
     position: relative;

@@ -36,6 +36,7 @@ export class GridRenderer {
         this.rows = [];
         this.colWidths = new Map();
         this.rowHeights = new Map();
+        this.colNames = new Map();
         this.scrollX = 0;
         this.scrollY = 0;
         this.selectedCell = null;
@@ -90,6 +91,14 @@ export class GridRenderer {
             n = Math.floor(n / 26);
         }
         return s;
+    }
+
+    /**
+     * Get display text for a column header (custom name or default letter)
+     */
+    getColumnHeaderText(col) {
+        const customName = this.colNames.get(col);
+        return customName || this.colToLetter(col);
     }
 
     /**
@@ -284,7 +293,7 @@ export class GridRenderer {
             } else {
                 ctx.fillStyle = COLORS.headerText;
             }
-            ctx.fillText(this.colToLetter(col), headerX + colW / 2, HEADER_HEIGHT / 2);
+            ctx.fillText(this.getColumnHeaderText(col), headerX + colW / 2, HEADER_HEIGHT / 2);
         }
 
         // Column header separators (vertical lines between A, B, C...)
@@ -408,7 +417,7 @@ export class GridRenderer {
             ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(this.colToLetter(this.dragSourceIndex), ghostX + colW / 2, HEADER_HEIGHT / 2);
+            ctx.fillText(this.getColumnHeaderText(this.dragSourceIndex), ghostX + colW / 2, HEADER_HEIGHT / 2);
 
             ctx.fillStyle = COLORS.selectionBg;
             ctx.fillRect(ghostX, HEADER_HEIGHT, colW, viewHeight - HEADER_HEIGHT);

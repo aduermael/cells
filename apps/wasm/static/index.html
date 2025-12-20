@@ -32,6 +32,7 @@
         <div id="canvas-container">
             <canvas id="grid" tabindex="0"></canvas>
             <input type="text" id="cell-editor" />
+            <input type="text" id="column-header-editor" />
             <div id="loading"><span class="spinner"></span>Loading...</div>
             <div id="error">Failed to load file</div>
             <div id="drop-zone">
@@ -129,6 +130,11 @@
                 return { success: true };
             }
 
+            async renameColumn(colId, name) {
+                await this._client.renameColumn(colId, name);
+                return { success: true };
+            }
+
             async exportAs(format) {
                 const result = await this._client.exportAs(format);
                 const blob = new Blob([result.data], { type: getMimeType(format) });
@@ -148,6 +154,7 @@
         const emptyState = document.getElementById('empty-state');
         const fileInput = document.getElementById('file-input');
         const cellEditor = document.getElementById('cell-editor');
+        const columnHeaderEditor = document.getElementById('column-header-editor');
         const formulaBar = document.getElementById('formula-bar');
         const cellReference = document.getElementById('cell-reference');
         const formulaInput = document.getElementById('formula-input');
@@ -172,6 +179,13 @@
 
         // Editing state
         let isEditing = false;
+
+        // Column header editing state
+        let isEditingColumnHeader = false;
+        let editingColumnIndex = -1;
+
+        // Column names cache (maps column position to custom name)
+        let colNames = new Map();
 
         // Column resize state
         let isResizing = false;
@@ -344,6 +358,7 @@
                 rows,
                 colWidths,
                 rowHeights,
+                colNames,
                 scrollX,
                 scrollY,
                 selectedCell,
@@ -419,6 +434,12 @@
 
                 for (const col of columns) {
                     colWidths.set(col.pos, col.width || DEFAULT_COL_WIDTH);
+                    // Cache column names (empty string means use default letter)
+                    if (col.name) {
+                        colNames.set(col.pos, col.name);
+                    } else {
+                        colNames.delete(col.pos);
+                    }
                 }
                 for (const row of rows) {
                     rowHeights.set(row.pos, row.height || DEFAULT_ROW_HEIGHT);
@@ -645,6 +666,96 @@
         cellEditor.addEventListener('input', () => {
             if (isEditing) {
                 formulaInput.value = cellEditor.value;
+            }
+        });
+
+        // ========================================================================
+        // Column Header Editing
+        // ========================================================================
+
+        function startEditingColumnHeader(colIndex) {
+            if (isEditingColumnHeader || !dataSource) return;
+
+            isEditingColumnHeader = true;
+            editingColumnIndex = colIndex;
+
+            // Calculate header position
+            let headerX = HEADER_WIDTH - scrollX;
+            for (let i = 0; i < colIndex; i++) {
+                headerX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+            }
+            const headerW = colWidths.get(colIndex) || DEFAULT_COL_WIDTH;
+
+            // Position the editor over the column header
+            columnHeaderEditor.style.left = headerX + 'px';
+            columnHeaderEditor.style.top = '0px';
+            columnHeaderEditor.style.width = headerW + 'px';
+            columnHeaderEditor.style.height = HEADER_HEIGHT + 'px';
+            columnHeaderEditor.style.display = 'block';
+
+            // Set the current column name (custom or generate from letter)
+            const currentName = colNames.get(colIndex) || '';
+            columnHeaderEditor.value = currentName;
+            columnHeaderEditor.placeholder = colToLetter(colIndex);
+            columnHeaderEditor.focus();
+            columnHeaderEditor.select();
+        }
+
+        function cancelEditingColumnHeader() {
+            if (!isEditingColumnHeader) return;
+            isEditingColumnHeader = false;
+            editingColumnIndex = -1;
+            columnHeaderEditor.style.display = 'none';
+            columnHeaderEditor.value = '';
+            canvas.focus();
+        }
+
+        async function confirmEditingColumnHeader() {
+            if (!isEditingColumnHeader || editingColumnIndex < 0 || !dataSource) return;
+
+            const colId = getColumnId(editingColumnIndex);
+            const newName = columnHeaderEditor.value.trim();
+
+            isEditingColumnHeader = false;
+            const savedColIndex = editingColumnIndex;
+            editingColumnIndex = -1;
+            columnHeaderEditor.style.display = 'none';
+
+            if (colId) {
+                try {
+                    await dataSource.renameColumn(colId, newName);
+                    // Update local cache
+                    if (newName) {
+                        colNames.set(savedColIndex, newName);
+                    } else {
+                        colNames.delete(savedColIndex);
+                    }
+                    render();
+                } catch (e) {
+                    console.error('Error renaming column:', e);
+                }
+            }
+
+            canvas.focus();
+        }
+
+        columnHeaderEditor.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelEditingColumnHeader();
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                confirmEditingColumnHeader();
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                confirmEditingColumnHeader();
+            }
+        });
+
+        columnHeaderEditor.addEventListener('blur', () => {
+            if (isEditingColumnHeader) {
+                confirmEditingColumnHeader();
             }
         });
 
@@ -1099,6 +1210,17 @@
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
+            // Double-click on column header: start column renaming
+            if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
+                const col = getColAtX(x);
+                if (col >= 0) {
+                    startEditingColumnHeader(col);
+                    e.preventDefault();
+                    return;
+                }
+            }
+
+            // Double-click on cell: start cell editing
             if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
                 const col = getColAtX(x);
                 const row = getRowAtY(y);
@@ -1114,7 +1236,7 @@
         });
 
         document.addEventListener('keydown', (e) => {
-            if (isEditing || isEditingFormulaBar) return;
+            if (isEditing || isEditingFormulaBar || isEditingColumnHeader) return;
             if (!selectedCell || !sheetInfo) return;
 
             let newCol = selectedCell.col;
@@ -1272,6 +1394,7 @@
                 selectedRow = null;
                 colWidths.clear();
                 rowHeights.clear();
+                colNames.clear();
 
                 // Enable export button
                 document.getElementById('export-btn').disabled = false;

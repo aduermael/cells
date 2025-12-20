@@ -200,6 +200,18 @@ declare module 'cells-wasm' {
     resizeRow(rowId: string, height: number): string;
 
     // ========================================================================
+    // Column/row rename
+    // ========================================================================
+
+    /**
+     * Rename a column
+     * @param colId - Column ID (8-char base62)
+     * @param name - New column name (empty string to clear)
+     * @returns JSON string with OperationResult
+     */
+    renameColumn(colId: string, name: string): string;
+
+    // ========================================================================
     // Column/row move
     // ========================================================================
 

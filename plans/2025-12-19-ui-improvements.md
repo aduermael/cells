@@ -90,10 +90,10 @@ Allow users to resize row heights by dragging the bottom edge of row headers.
 
 Allow users to rename columns by double-clicking the column header.
 
-- [ ] 6a: Add column name support in data model (if not already present)
-- [ ] 6b: Add double-click handler on column headers to show inline editor
-- [ ] 6c: Implement column rename save via API/WASM
-- [ ] 6d: Display custom column names instead of letters when set
+- [x] 6a: Add column name support in data model (if not already present)
+- [x] 6b: Add double-click handler on column headers to show inline editor
+- [x] 6c: Implement column rename save via API/WASM
+- [x] 6d: Display custom column names instead of letters when set
 
 ## Phase 7: Improved Drag Behavior
 
