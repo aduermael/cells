@@ -235,6 +235,22 @@
         // Initialize UI state machine
         const uiStateMachine = createUIStateMachine({ debug: false });
 
+        // ========================================================================
+        // State Machine Helpers
+        // ========================================================================
+
+        // State checks (replace boolean flags)
+        function isEditing() { return uiStateMachine.isInState(UIState.CELL_EDITING); }
+        function isEditingFormulaBar() { return uiStateMachine.isInState(UIState.FORMULA_BAR_EDITING); }
+        function isEditingColumnHeader() { return uiStateMachine.isInState(UIState.COLUMN_HEADER_EDITING); }
+        function isEditingSheetTab() { return uiStateMachine.isInState(UIState.SHEET_TAB_EDITING); }
+        function isResizing() { return uiStateMachine.isInState(UIState.COLUMN_RESIZING); }
+        function isResizingRow() { return uiStateMachine.isInState(UIState.ROW_RESIZING); }
+        function isDraggingColumn() { return uiStateMachine.isInState(UIState.COLUMN_DRAGGING); }
+        function isDraggingRow() { return uiStateMachine.isInState(UIState.ROW_DRAGGING); }
+        function isSelectingRange() { return uiStateMachine.isInState(UIState.SELECTING); }
+        function isDraggingSheetTab() { return uiStateMachine.isInState(UIState.SHEET_TAB_DRAGGING); }
+
         let dataSource = null;
         let wasmClient = null;
         let hasFileLoaded = false;
@@ -255,42 +271,33 @@
         // A single cell selection has selectionStart === selectionEnd (both equal to selectedCell)
         let selectionStart = null;  // {col, row} - anchor cell for range selection
         let selectionEnd = null;    // {col, row} - current end of range selection
-        let isSelectingRange = false;  // True while mouse is down and dragging to select
 
-        // Editing state
-        let isEditing = false;
-
-        // Column header editing state
-        let isEditingColumnHeader = false;
+        // Column header editing context
         let editingColumnIndex = -1;
 
         // Column names cache (maps column position to custom name)
         let colNames = new Map();
 
-        // Column resize state
-        let isResizing = false;
+        // Column resize context
         let resizeColIndex = -1;
         let resizeStartX = 0;
         let resizeStartWidth = 0;
         let resizePreviewX = 0;
         const RESIZE_HANDLE_WIDTH = 6;
 
-        // Row resize state
-        let isResizingRow = false;
+        // Row resize context
         let resizeRowIndex = -1;
         let resizeStartY = 0;
         let resizeStartHeight = 0;
         let resizePreviewY = 0;
 
-        // Drag state
-        let isDraggingColumn = false;
-        let isDraggingRow = false;
+        // Drag context
         let dragSourceIndex = -1;
         let dragTargetIndex = -1;
         let dragMouseX = 0;
         let dragMouseY = 0;
 
-        // Pending drag state (before threshold is exceeded)
+        // Pending drag context (before threshold is exceeded)
         let pendingDragColumn = false;
         let pendingDragRow = false;
         let pendingDragStartX = 0;
@@ -305,11 +312,9 @@
         let sheets = [];           // Array of {index, name, active}
         let activeSheetIndex = 0;
         let sheetTabContextMenu = null;  // Reference to context menu element
-        let isEditingSheetTab = false;
         let editingSheetIndex = -1;
 
-        // Sheet tab drag state
-        let isDraggingSheetTab = false;
+        // Sheet tab drag context
         let dragSheetIndex = -1;
         let dragSheetTargetIndex = -1;
 
@@ -498,27 +503,27 @@
                 selectedRow,
                 selectionStart,
                 selectionEnd,
-                isDraggingColumn,
-                isDraggingRow,
+                isDraggingColumn: isDraggingColumn(),
+                isDraggingRow: isDraggingRow(),
                 dragSourceIndex,
                 dragTargetIndex,
                 dragMouseX,
                 dragMouseY,
-                isResizing,
+                isResizing: isResizing(),
                 resizePreviewX,
-                isResizingRow,
+                isResizingRow: isResizingRow(),
                 resizePreviewY,
-                editingColumnIndex: isEditingColumnHeader ? editingColumnIndex : -1
+                editingColumnIndex: isEditingColumnHeader() ? editingColumnIndex : -1
             });
         }
 
         function render() {
             updateRendererState();
             renderer.render();
-            if (isResizing || isResizingRow) {
+            if (isResizing() || isResizingRow()) {
                 renderer.drawResizePreview();
             }
-            if (isDraggingColumn || isDraggingRow) {
+            if (isDraggingColumn() || isDraggingRow()) {
                 renderer.drawDragGhost();
             }
         }
@@ -632,7 +637,7 @@
 
         async function startEditing(options = {}) {
             const { focusCellEditor = true, mode = 'select', initialChar = '' } = options;
-            if (!selectedCell || isEditing || !dataSource) return;
+            if (!selectedCell || isEditing() || !dataSource) return;
 
             let cell = getCellAt(selectedCell.col, selectedCell.row);
 
@@ -653,7 +658,7 @@
                 }
             }
 
-            isEditing = true;
+            uiStateMachine.transition(UIEvent.START_CELL_EDIT);
 
             let cellX = HEADER_WIDTH - scrollX;
             for (let i = 0; i < selectedCell.col; i++) {
@@ -702,15 +707,15 @@
         }
 
         function cancelEditing() {
-            if (!isEditing) return;
-            isEditing = false;
+            if (!isEditing()) return;
+            uiStateMachine.transition(UIEvent.CANCEL_CELL_EDIT);
             cellEditor.style.display = 'none';
             cellEditor.value = '';
             canvas.focus();
         }
 
         async function confirmEditing() {
-            if (!isEditing || !selectedCell || !dataSource) return;
+            if (!isEditing() || !selectedCell || !dataSource) return;
 
             const cell = getCellAt(selectedCell.col, selectedCell.row);
             if (!cell) {
@@ -719,7 +724,7 @@
             }
 
             const newValue = cellEditor.value;
-            isEditing = false;
+            uiStateMachine.transition(UIEvent.COMMIT_CELL_EDIT);
             cellEditor.style.display = 'none';
 
             try {
@@ -843,14 +848,14 @@
         });
 
         cellEditor.addEventListener('blur', () => {
-            if (isEditing) {
+            if (isEditing()) {
                 confirmEditing();
             }
         });
 
         // Live sync: cell editor -> formula bar
         cellEditor.addEventListener('input', () => {
-            if (isEditing) {
+            if (isEditing()) {
                 formulaInput.value = cellEditor.value;
             }
         });
@@ -860,9 +865,9 @@
         // ========================================================================
 
         function startEditingColumnHeader(colIndex) {
-            if (isEditingColumnHeader || !dataSource) return;
+            if (isEditingColumnHeader() || !dataSource) return;
 
-            isEditingColumnHeader = true;
+            uiStateMachine.transition(UIEvent.START_COLUMN_HEADER_EDIT);
             editingColumnIndex = colIndex;
 
             // Calculate header position
@@ -888,8 +893,8 @@
         }
 
         function cancelEditingColumnHeader() {
-            if (!isEditingColumnHeader) return;
-            isEditingColumnHeader = false;
+            if (!isEditingColumnHeader()) return;
+            uiStateMachine.transition(UIEvent.CANCEL_COLUMN_HEADER_EDIT);
             editingColumnIndex = -1;
             columnHeaderEditor.style.display = 'none';
             columnHeaderEditor.value = '';
@@ -897,12 +902,12 @@
         }
 
         async function confirmEditingColumnHeader() {
-            if (!isEditingColumnHeader || editingColumnIndex < 0 || !dataSource) return;
+            if (!isEditingColumnHeader() || editingColumnIndex < 0 || !dataSource) return;
 
             const newName = columnHeaderEditor.value.trim();
             const savedColIndex = editingColumnIndex;
 
-            isEditingColumnHeader = false;
+            uiStateMachine.transition(UIEvent.COMMIT_COLUMN_HEADER_EDIT);
             editingColumnIndex = -1;
             columnHeaderEditor.style.display = 'none';
 
@@ -939,7 +944,7 @@
         });
 
         columnHeaderEditor.addEventListener('blur', () => {
-            if (isEditingColumnHeader) {
+            if (isEditingColumnHeader()) {
                 confirmEditingColumnHeader();
             }
         });
@@ -948,16 +953,14 @@
         // Formula Bar Editing
         // ========================================================================
 
-        let isEditingFormulaBar = false;
-
         async function commitFormulaBarEdit() {
             // Use anchor cell (selectionStart) for editing, not selectedCell
             const editCell = selectionStart || selectedCell;
             if (!editCell || !dataSource) return;
 
             // Hide cell editor if it's showing
-            if (isEditing) {
-                isEditing = false;
+            if (isEditing()) {
+                uiStateMachine.transition(UIEvent.COMMIT_CELL_EDIT);
                 cellEditor.style.display = 'none';
             }
 
@@ -989,12 +992,12 @@
                 console.error('Error updating cell from formula bar:', e);
             }
 
-            isEditingFormulaBar = false;
+            uiStateMachine.transition(UIEvent.COMMIT_FORMULA_EDIT);
             canvas.focus();
         }
 
         function cancelFormulaBarEdit() {
-            isEditingFormulaBar = false;
+            uiStateMachine.transition(UIEvent.CANCEL_FORMULA_EDIT);
             // Remove any temp cell created during live preview
             const tempIdx = cells.findIndex(c => c.id === '_temp_');
             if (tempIdx !== -1) {
@@ -1009,7 +1012,7 @@
         }
 
         formulaInput.addEventListener('focus', () => {
-            isEditingFormulaBar = true;
+            uiStateMachine.transition(UIEvent.START_FORMULA_EDIT);
             // Don't call startEditing here - formula bar editing is independent
             // The cell editor would create confusing dual state
         });
@@ -1041,16 +1044,16 @@
         });
 
         formulaInput.addEventListener('blur', () => {
-            // isEditingFormulaBar is set to false by mousedown handler before blur fires
+            // isEditingFormulaBar() is set to false by mousedown handler before blur fires
             // So this only commits when focus moves elsewhere (Tab to another element, etc.)
-            if (isEditingFormulaBar && selectedCell) {
+            if (isEditingFormulaBar() && selectedCell) {
                 commitFormulaBarEdit();
             }
         });
 
         // Live sync: update cell display while typing in formula bar
         formulaInput.addEventListener('input', () => {
-            if (!isEditingFormulaBar) return;
+            if (!isEditingFormulaBar()) return;
 
             // Use anchor cell (selectionStart) for editing, not selectedCell
             const editCell = selectionStart || selectedCell;
@@ -1103,7 +1106,7 @@
             if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
                 const resizeCol = getResizeHandleCol(x);
                 if (resizeCol >= 0) {
-                    isResizing = true;
+                    uiStateMachine.transition(UIEvent.START_COLUMN_RESIZE);
                     resizeColIndex = resizeCol;
                     resizeStartX = e.clientX;
                     resizeStartWidth = colWidths.get(resizeCol) || DEFAULT_COL_WIDTH;
@@ -1148,7 +1151,7 @@
             if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
                 const resizeRow = getResizeHandleRow(y);
                 if (resizeRow >= 0) {
-                    isResizingRow = true;
+                    uiStateMachine.transition(UIEvent.START_ROW_RESIZE);
                     resizeRowIndex = resizeRow;
                     resizeStartY = e.clientY;
                     resizeStartHeight = rowHeights.get(resizeRow) || DEFAULT_ROW_HEIGHT;
@@ -1202,7 +1205,7 @@
                     const isShiftClick = e.shiftKey && selectionStart;
 
                     // If editing cell editor, commit first then select new cell
-                    if (isEditing) {
+                    if (isEditing()) {
                         confirmEditing().then(() => {
                             if (isShiftClick) {
                                 // Extend selection from existing anchor
@@ -1214,14 +1217,14 @@
                                 selectionStart = { col, row };
                                 selectionEnd = { col, row };
                             }
-                            isSelectingRange = true;
+                            uiStateMachine.transition(UIEvent.START_SELECTING);
                             render();
                             updateFormulaBar();
                             canvas.focus();
                         });
-                    } else if (isEditingFormulaBar) {
+                    } else if (isEditingFormulaBar()) {
                         // Mark as not editing BEFORE commit to prevent blur handler double-commit
-                        isEditingFormulaBar = false;
+                        uiStateMachine.transition(UIEvent.COMMIT_FORMULA_EDIT);
                         commitFormulaBarEdit().then(() => {
                             if (isShiftClick) {
                                 // Extend selection from existing anchor
@@ -1233,7 +1236,7 @@
                                 selectionStart = { col, row };
                                 selectionEnd = { col, row };
                             }
-                            isSelectingRange = true;
+                            uiStateMachine.transition(UIEvent.START_SELECTING);
                             render();
                             updateFormulaBar();
                             canvas.focus();
@@ -1249,7 +1252,7 @@
                             selectionStart = { col, row };
                             selectionEnd = { col, row };
                         }
-                        isSelectingRange = true;
+                        uiStateMachine.transition(UIEvent.START_SELECTING);
                         render();
                         updateFormulaBar();
                         canvas.focus();
@@ -1271,7 +1274,7 @@
                 if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
                     // Threshold exceeded - start actual drag
                     pendingDragColumn = false;
-                    isDraggingColumn = true;
+                    uiStateMachine.transition(UIEvent.START_COLUMN_DRAG);
                     dragMouseX = x;
                     dragMouseY = y;
                     canvas.style.cursor = 'grabbing';
@@ -1284,7 +1287,7 @@
                 if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
                     // Threshold exceeded - start actual drag
                     pendingDragRow = false;
-                    isDraggingRow = true;
+                    uiStateMachine.transition(UIEvent.START_ROW_DRAG);
                     dragMouseX = x;
                     dragMouseY = y;
                     canvas.style.cursor = 'grabbing';
@@ -1292,7 +1295,7 @@
             }
 
             // Range selection drag
-            if (isSelectingRange && x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+            if (isSelectingRange() && x > HEADER_WIDTH && y > HEADER_HEIGHT) {
                 const col = getColAtX(x);
                 const row = getRowAtY(y);
                 if (col >= 0 && row >= 0) {
@@ -1308,7 +1311,7 @@
                 return;  // Don't process other mouse move handlers during range selection
             }
 
-            if (isResizing) {
+            if (isResizing()) {
                 const delta = e.clientX - resizeStartX;
                 const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
 
@@ -1319,7 +1322,7 @@
                 resizePreviewX = colX + newWidth;
 
                 render();
-            } else if (isResizingRow) {
+            } else if (isResizingRow()) {
                 const delta = e.clientY - resizeStartY;
                 const newHeight = Math.max(16, Math.min(500, resizeStartHeight + delta));
 
@@ -1330,14 +1333,14 @@
                 resizePreviewY = rowY + newHeight;
 
                 render();
-            } else if (isDraggingColumn) {
+            } else if (isDraggingColumn()) {
                 dragTargetIndex = getDropTargetCol(x);
                 dragMouseX = x;
                 dragMouseY = y;
 
                 canvas.style.cursor = 'grabbing';
                 render();
-            } else if (isDraggingRow) {
+            } else if (isDraggingRow()) {
                 dragTargetIndex = getDropTargetRow(y);
                 dragMouseX = x;
                 dragMouseY = y;
@@ -1360,8 +1363,8 @@
 
         canvas.addEventListener('mouseup', async (e) => {
             // End range selection
-            if (isSelectingRange) {
-                isSelectingRange = false;
+            if (isSelectingRange()) {
+                uiStateMachine.transition(UIEvent.STOP_SELECTING);
                 // Keep selectionStart and selectionEnd as they are
                 // selectedCell should be set to selectionStart (the anchor)
                 if (selectionStart) {
@@ -1385,7 +1388,7 @@
                 // Keep selectedRow - row stays selected after click
             }
 
-            if (isResizing && dataSource) {
+            if (isResizing() && dataSource) {
                 const delta = e.clientX - resizeStartX;
                 const newWidth = Math.max(20, Math.min(1000, resizeStartWidth + delta));
 
@@ -1401,11 +1404,11 @@
                     console.error('Error resizing column:', err);
                 }
 
-                isResizing = false;
+                uiStateMachine.transition(UIEvent.END_COLUMN_RESIZE);
                 resizeColIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
-            } else if (isResizingRow && dataSource) {
+            } else if (isResizingRow() && dataSource) {
                 const delta = e.clientY - resizeStartY;
                 const newHeight = Math.max(16, Math.min(500, resizeStartHeight + delta));
 
@@ -1421,11 +1424,11 @@
                     console.error('Error resizing row:', err);
                 }
 
-                isResizingRow = false;
+                uiStateMachine.transition(UIEvent.END_ROW_RESIZE);
                 resizeRowIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
-            } else if (isDraggingColumn && dataSource) {
+            } else if (isDraggingColumn() && dataSource) {
                 if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
                     const colId = getColumnId(dragSourceIndex);
                     try {
@@ -1449,12 +1452,12 @@
                     }
                 }
 
-                isDraggingColumn = false;
+                uiStateMachine.transition(UIEvent.END_COLUMN_DRAG);
                 dragSourceIndex = -1;
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
-            } else if (isDraggingRow && dataSource) {
+            } else if (isDraggingRow() && dataSource) {
                 if (dragSourceIndex !== dragTargetIndex && dragSourceIndex !== dragTargetIndex - 1) {
                     const rowId = getRowId(dragSourceIndex);
                     try {
@@ -1478,7 +1481,7 @@
                     }
                 }
 
-                isDraggingRow = false;
+                uiStateMachine.transition(UIEvent.END_ROW_DRAG);
                 dragSourceIndex = -1;
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
@@ -1492,8 +1495,8 @@
             pendingDragRow = false;
 
             // End range selection on mouse leave
-            if (isSelectingRange) {
-                isSelectingRange = false;
+            if (isSelectingRange()) {
+                uiStateMachine.transition(UIEvent.STOP_SELECTING);
                 if (selectionStart) {
                     selectedCell = { col: selectionStart.col, row: selectionStart.row };
                 }
@@ -1501,24 +1504,24 @@
                 updateFormulaBar();
             }
 
-            if (isResizing) {
-                isResizing = false;
+            if (isResizing()) {
+                uiStateMachine.transition(UIEvent.CANCEL_COLUMN_RESIZE);
                 resizeColIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
-            } else if (isResizingRow) {
-                isResizingRow = false;
+            } else if (isResizingRow()) {
+                uiStateMachine.transition(UIEvent.CANCEL_ROW_RESIZE);
                 resizeRowIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
-            } else if (isDraggingColumn) {
-                isDraggingColumn = false;
+            } else if (isDraggingColumn()) {
+                uiStateMachine.transition(UIEvent.CANCEL_COLUMN_DRAG);
                 dragSourceIndex = -1;
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
                 render();
-            } else if (isDraggingRow) {
-                isDraggingRow = false;
+            } else if (isDraggingRow()) {
+                uiStateMachine.transition(UIEvent.CANCEL_ROW_DRAG);
                 dragSourceIndex = -1;
                 dragTargetIndex = -1;
                 canvas.style.cursor = 'default';
@@ -1561,7 +1564,10 @@
         });
 
         document.addEventListener('keydown', (e) => {
-            if (isEditing || isEditingFormulaBar || isEditingColumnHeader) return;
+            // Update modifier state for the state machine
+            uiStateMachine.updateModifiersFromEvent(e);
+
+            if (isEditing() || isEditingFormulaBar() || isEditingColumnHeader()) return;
             if (!selectedCell || !sheetInfo) return;
 
             // Determine current end position for range extension
@@ -1703,6 +1709,11 @@
             fetchViewportNow();
         });
 
+        // Track modifier key releases
+        document.addEventListener('keyup', (e) => {
+            uiStateMachine.updateModifiersFromEvent(e);
+        });
+
         // ========================================================================
         // Sheet Tabs
         // ========================================================================
@@ -1731,7 +1742,7 @@
 
                 // Click to switch sheet
                 tab.addEventListener('click', async (e) => {
-                    if (isEditingSheetTab) return;
+                    if (isEditingSheetTab()) return;
                     e.preventDefault();
                     await switchToSheet(idx);
                 });
@@ -1751,7 +1762,7 @@
 
                 // Drag start
                 tab.addEventListener('dragstart', (e) => {
-                    isDraggingSheetTab = true;
+                    uiStateMachine.transition(UIEvent.START_SHEET_TAB_DRAG);
                     dragSheetIndex = idx;
                     tab.classList.add('dragging');
                     e.dataTransfer.effectAllowed = 'move';
@@ -1760,7 +1771,7 @@
 
                 // Drag end
                 tab.addEventListener('dragend', () => {
-                    isDraggingSheetTab = false;
+                    uiStateMachine.transition(UIEvent.END_SHEET_TAB_DRAG);
                     dragSheetIndex = -1;
                     tab.classList.remove('dragging');
                     // Remove any drop indicators
@@ -1772,7 +1783,7 @@
 
                 // Drag over
                 tab.addEventListener('dragover', (e) => {
-                    if (!isDraggingSheetTab || dragSheetIndex === idx) return;
+                    if (!isDraggingSheetTab() || dragSheetIndex === idx) return;
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
 
@@ -1799,7 +1810,7 @@
                 // Drop
                 tab.addEventListener('drop', async (e) => {
                     e.preventDefault();
-                    if (!isDraggingSheetTab || dragSheetIndex < 0) return;
+                    if (!isDraggingSheetTab() || dragSheetIndex < 0) return;
 
                     const fromIdx = dragSheetIndex;
                     const toIdx = dragSheetTargetIndex;
@@ -1814,7 +1825,7 @@
                         }
                     }
 
-                    isDraggingSheetTab = false;
+                    uiStateMachine.transition(UIEvent.END_SHEET_TAB_DRAG);
                     dragSheetIndex = -1;
                     dragSheetTargetIndex = -1;
                 });
@@ -1833,7 +1844,7 @@
                 scrollX = 0;
                 scrollY = 0;
                 setDefaultSelection();  // Reset selection to A1
-                isSelectingRange = false;
+                uiStateMachine.reset();  // Reset to IDLE state
                 colWidths.clear();
                 rowHeights.clear();
                 colNames.clear();
@@ -1850,7 +1861,7 @@
         }
 
         function startEditingSheetTab(index) {
-            isEditingSheetTab = true;
+            uiStateMachine.transition(UIEvent.START_SHEET_TAB_EDIT);
             editingSheetIndex = index;
 
             const tab = sheetTabsContainer.children[index];
@@ -1871,8 +1882,8 @@
             editor.select();
 
             const finishEditing = async (save) => {
-                if (!isEditingSheetTab) return;
-                isEditingSheetTab = false;
+                if (!isEditingSheetTab()) return;
+                uiStateMachine.transition(save ? UIEvent.COMMIT_SHEET_TAB_EDIT : UIEvent.CANCEL_SHEET_TAB_EDIT);
                 editingSheetIndex = -1;
 
                 const newName = editor.value.trim();
@@ -2145,7 +2156,7 @@
             scrollX = 0;
             scrollY = 0;
             setDefaultSelection();  // Reset selection to A1
-            isSelectingRange = false;
+            uiStateMachine.reset();  // Reset to IDLE state
             colWidths.clear();
             rowHeights.clear();
             colNames.clear();
@@ -2337,7 +2348,7 @@
             scrollX = 0;
             scrollY = 0;
             setDefaultSelection();
-            isSelectingRange = false;
+            uiStateMachine.reset();  // Reset to IDLE state
             colWidths.clear();
             rowHeights.clear();
             colNames.clear();
