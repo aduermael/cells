@@ -266,11 +266,32 @@
         }
 
         // Start editing a cell
-        function startEditing() {
+        async function startEditing() {
             if (!selectedCell || isEditing) return;
 
-            const cell = getCellAt(selectedCell.col, selectedCell.row);
-            if (!cell) return; // Can only edit existing cells for now
+            let cell = getCellAt(selectedCell.col, selectedCell.row);
+
+            // If no cell exists at this position, create one
+            if (!cell) {
+                try {
+                    const res = await fetch('/api/cell', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ col: selectedCell.col, row: selectedCell.row, value: '' })
+                    });
+                    if (!res.ok) {
+                        console.error('Failed to create cell');
+                        return;
+                    }
+                    const data = await res.json();
+                    // Add the new cell to our local cells array
+                    cell = { id: data.id, col: selectedCell.col, row: selectedCell.row, value: '', type: 's' };
+                    cells.push(cell);
+                } catch (e) {
+                    console.error('Error creating cell:', e);
+                    return;
+                }
+            }
 
             isEditing = true;
 

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "core/cells/id.h"
 #include "httplib.h"
 
 namespace cells::cli {
@@ -105,8 +106,11 @@ void Server::setupRoutes() {
                      auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
 
                      // Calculate actual dimensions from max position
-                     uint32_t maxCol = 0;
-                     uint32_t maxRow = 0;
+                     // Minimum: 26 columns (A-Z) and 100 rows, like Excel
+                     constexpr uint32_t MIN_COLS = 26;
+                     constexpr uint32_t MIN_ROWS = 100;
+                     uint32_t maxCol = MIN_COLS;
+                     uint32_t maxRow = MIN_ROWS;
                      for (const auto& [id, col] : sheet->columns) {
                          if (col->position >= maxCol) {
                              maxCol = col->position + 1;
@@ -392,6 +396,115 @@ void Server::setupRoutes() {
 
                       res.set_content("{\"success\":true}", "application/json");
                   });
+
+    // POST /api/cell - create new cell at position
+    _server->Post("/api/cell", [this](const httplib::Request& req, httplib::Response& res) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            res.status = 500;
+            res.set_content("{\"error\":\"No sheet available\"}", "application/json");
+            return;
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            res.status = 500;
+            res.set_content("{\"error\":\"Sheet not found\"}", "application/json");
+            return;
+        }
+
+        // Parse request body for col, row, and value
+        std::string body = req.body;
+
+        // Extract col position
+        size_t colPos = body.find("\"col\"");
+        if (colPos == std::string::npos) {
+            res.status = 400;
+            res.set_content("{\"error\":\"Missing col field\"}", "application/json");
+            return;
+        }
+        size_t colColon = body.find(':', colPos);
+        size_t colStart = body.find_first_of("0123456789", colColon);
+        size_t colEnd = body.find_first_not_of("0123456789", colStart);
+        uint32_t col = static_cast<uint32_t>(std::stoul(body.substr(colStart, colEnd - colStart)));
+
+        // Extract row position
+        size_t rowPos = body.find("\"row\"");
+        if (rowPos == std::string::npos) {
+            res.status = 400;
+            res.set_content("{\"error\":\"Missing row field\"}", "application/json");
+            return;
+        }
+        size_t rowColon = body.find(':', rowPos);
+        size_t rowStart = body.find_first_of("0123456789", rowColon);
+        size_t rowEnd = body.find_first_not_of("0123456789", rowStart);
+        uint32_t row = static_cast<uint32_t>(std::stoul(body.substr(rowStart, rowEnd - rowStart)));
+
+        // Extract value (optional)
+        std::string value;
+        size_t valuePos = body.find("\"value\"");
+        if (valuePos != std::string::npos) {
+            size_t valueColon = body.find(':', valuePos);
+            size_t openQuote = body.find('"', valueColon + 1);
+            size_t closeQuote = openQuote + 1;
+            while (closeQuote < body.size()) {
+                if (body[closeQuote] == '"' && body[closeQuote - 1] != '\\') {
+                    break;
+                }
+                closeQuote++;
+            }
+            value = body.substr(openQuote + 1, closeQuote - openQuote - 1);
+        }
+
+        // Find or create column at position
+        ID colId;
+        for (const auto& [id, axis] : sheet->columns) {
+            if (axis->position == col) {
+                colId = id;
+                break;
+            }
+        }
+        if (colId.isNull()) {
+            // Create new column
+            auto newCol = std::make_unique<Axis>(generate_id(), true);
+            newCol->position = col;
+            newCol->size = DEFAULT_COLUMN_WIDTH;
+            colId = newCol->id;
+            sheet->addColumn(std::move(newCol));
+        }
+
+        // Find or create row at position
+        ID rowId;
+        for (const auto& [id, axis] : sheet->rows) {
+            if (axis->position == row) {
+                rowId = id;
+                break;
+            }
+        }
+        if (rowId.isNull()) {
+            // Create new row
+            auto newRow = std::make_unique<Axis>(generate_id(), false);
+            newRow->position = row;
+            newRow->size = DEFAULT_ROW_HEIGHT;
+            rowId = newRow->id;
+            sheet->addRow(std::move(newRow));
+        }
+
+        // Create new cell
+        auto newCell = std::make_unique<Cell>(generate_id(), colId, rowId);
+        if (!value.empty()) {
+            newCell->value = CellValue(value);
+        }
+        ID cellId = newCell->id;
+        sheet->addCell(std::move(newCell));
+
+        // Rebuild quadtree and ref converter
+        rebuildQuadtree();
+
+        // Return the new cell ID
+        std::ostringstream json;
+        json << "{\"success\":true,\"id\":\"" << cellId.toString() << "\"}";
+        res.set_content(json.str(), "application/json");
+    });
 }
 
 int Server::run(const ServerOptions& opts) {
