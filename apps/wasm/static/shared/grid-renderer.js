@@ -10,7 +10,7 @@ export const CELL_PADDING = 4;
 
 // Color palette
 export const COLORS = {
-    gridLine: '#f0f0f0',  // Subtle grid lines
+    gridLine: 'rgba(0, 0, 0, 0.04)',  // Very subtle grid lines
     headerBg: '#f8f9fa',
     headerBorder: '#dee2e6',
     headerText: '#495057',

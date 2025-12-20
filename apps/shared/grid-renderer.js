@@ -13,6 +13,7 @@ export const COLORS = {
     gridLine: '#f0f0f0',  // Subtle grid lines
     headerBg: '#f8f9fa',
     headerBorder: '#dee2e6',
+    headerSeparator: 'rgba(0, 0, 0, 0.06)',  // Very subtle separators between header cells
     headerText: '#495057',
     cellText: '#212529',
     selectionBorder: '#0d6efd',
@@ -284,6 +285,20 @@ export class GridRenderer {
             ctx.fillText(this.colToLetter(col), headerX + colW / 2, HEADER_HEIGHT / 2);
         }
 
+        // Column header separators (vertical lines between A, B, C...)
+        ctx.strokeStyle = COLORS.headerSeparator;
+        ctx.lineWidth = 1;
+        for (let col = 0; col < this.sheetInfo.colCount; col++) {
+            if (colHasMoved && col === this.dragSourceIndex) continue;
+            const lineX = this.getDragAdjustedColX(col) + 0.5;
+            if (lineX > HEADER_WIDTH && lineX < viewWidth) {
+                ctx.beginPath();
+                ctx.moveTo(lineX, 0);
+                ctx.lineTo(lineX, HEADER_HEIGHT);
+                ctx.stroke();
+            }
+        }
+
         // Row headers
         ctx.fillStyle = COLORS.headerBg;
         ctx.fillRect(0, HEADER_HEIGHT, HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
@@ -303,6 +318,20 @@ export class GridRenderer {
                 ctx.fillStyle = COLORS.headerText;
             }
             ctx.fillText(String(row + 1), HEADER_WIDTH / 2, headerY + rowH / 2);
+        }
+
+        // Row header separators (horizontal lines between 1, 2, 3...)
+        ctx.strokeStyle = COLORS.headerSeparator;
+        ctx.lineWidth = 1;
+        for (let row = 0; row < this.sheetInfo.rowCount; row++) {
+            if (rowHasMoved && row === this.dragSourceIndex) continue;
+            const lineY = this.getDragAdjustedRowY(row) + 0.5;
+            if (lineY > HEADER_HEIGHT && lineY < viewHeight) {
+                ctx.beginPath();
+                ctx.moveTo(0, lineY);
+                ctx.lineTo(HEADER_WIDTH, lineY);
+                ctx.stroke();
+            }
         }
 
         // Corner

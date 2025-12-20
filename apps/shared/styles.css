@@ -38,11 +38,6 @@ html, body {
     color: #212529;
 }
 
-#header .info {
-    font-size: 12px;
-    color: #6c757d;
-}
-
 /* Toolbar */
 #toolbar {
     margin-left: auto;

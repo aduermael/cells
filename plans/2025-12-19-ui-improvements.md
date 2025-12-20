@@ -66,9 +66,9 @@ Fix fundamental cell editing behavior to match spreadsheet conventions.
 
 Minor visual improvements for a cleaner look.
 
-- [ ] 3a: Add discreet grid lines (very subtle separators, almost invisible)
-- [ ] 3b: Remove "Local (WASM)" badge (no longer needed after CLI server removal)
-- [ ] 3c: Remove sheet dimensions display ("X rows x Y columns")
+- [x] 3a: Add separator lines between header cells (A, B, C... and 1, 2, 3...)
+- [x] 3b: Remove "Local (WASM)" badge (no longer needed after CLI server removal) - N/A, badge never existed
+- [x] 3c: Remove sheet dimensions display ("X rows x Y columns")
 
 ## Phase 4: Export Dropdown
 
@@ -159,9 +159,8 @@ apps/
 # └── cli/web/               # CLI server mode removed - WASM only
 ```
 
-### Grid Line Colors
-Current: `#e9ecef` (visible gray)
-Proposed: `#f0f0f0` or `rgba(0,0,0,0.05)` (barely visible)
+### Header Separator Colors
+Header separators: `rgba(0, 0, 0, 0.06)` (very subtle lines between A, B, C... and 1, 2, 3...)
 
 ### Formula Bar Layout
 ```

@@ -12,7 +12,6 @@
             <button class="btn" onclick="openFile()">Open File</button>
             <input type="file" id="file-input" accept=".cells,.csv,.tsv,.xlsx" />
             <h1 id="sheet-name">Cells Viewer</h1>
-            <span class="info" id="sheet-info"></span>
             <div id="toolbar">
                 <button class="btn" id="export-csv" onclick="exportAs('csv')" disabled>Export CSV</button>
                 <button class="btn" id="export-xlsx" onclick="exportAs('xlsx')" disabled>Export XLSX</button>
@@ -138,7 +137,6 @@
         const loading = document.getElementById('loading');
         const errorEl = document.getElementById('error');
         const sheetNameEl = document.getElementById('sheet-name');
-        const sheetInfoEl = document.getElementById('sheet-info');
         const dropZone = document.getElementById('drop-zone');
         const emptyState = document.getElementById('empty-state');
         const fileInput = document.getElementById('file-input');
@@ -365,7 +363,6 @@
             try {
                 sheetInfo = await dataSource.getSheetInfo();
                 sheetNameEl.textContent = sheetInfo.name;
-                sheetInfoEl.textContent = `${sheetInfo.rowCount} rows x ${sheetInfo.colCount} columns`;
             } catch (e) {
                 console.error('Error fetching sheet info:', e);
                 throw e;
