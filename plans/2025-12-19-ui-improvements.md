@@ -74,9 +74,9 @@ Minor visual improvements for a cleaner look.
 
 Replace multiple export buttons with a single dropdown.
 
-- [ ] 4a: Create dropdown button component with CSS
-- [ ] 4b: Replace export buttons with single "Export" dropdown menu
-- [ ] 4c: Populate dropdown with format options (CSV, XLSX, CELLS)
+- [x] 4a: Create dropdown button component with CSS
+- [x] 4b: Replace export buttons with single "Export" dropdown menu
+- [x] 4c: Populate dropdown with format options (CSV, XLSX, CELLS)
 
 ## Phase 5: Row Height Resizing
 

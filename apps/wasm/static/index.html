@@ -13,9 +13,16 @@
             <input type="file" id="file-input" accept=".cells,.csv,.tsv,.xlsx" />
             <h1 id="sheet-name">Cells Viewer</h1>
             <div id="toolbar">
-                <button class="btn" id="export-csv" onclick="exportAs('csv')" disabled>Export CSV</button>
-                <button class="btn" id="export-xlsx" onclick="exportAs('xlsx')" disabled>Export XLSX</button>
-                <button class="btn" id="export-cells" onclick="exportAs('cells')" disabled>Export CELLS</button>
+                <div class="dropdown" id="export-dropdown">
+                    <button class="dropdown-btn" id="export-btn" disabled>
+                        Export <span class="arrow">▼</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <button class="dropdown-item" onclick="exportAs('csv')">CSV</button>
+                        <button class="dropdown-item" onclick="exportAs('xlsx')">XLSX</button>
+                        <button class="dropdown-item" onclick="exportAs('cells')">CELLS</button>
+                    </div>
+                </div>
             </div>
         </div>
         <div id="formula-bar" class="hidden">
@@ -1183,10 +1190,8 @@
                 colWidths.clear();
                 rowHeights.clear();
 
-                // Enable export buttons
-                document.getElementById('export-csv').disabled = false;
-                document.getElementById('export-xlsx').disabled = false;
-                document.getElementById('export-cells').disabled = false;
+                // Enable export button
+                document.getElementById('export-btn').disabled = false;
 
                 // Show the canvas and formula bar, resize
                 canvas.style.display = 'block';
@@ -1269,6 +1274,33 @@
             if (file) {
                 loadFile(file);
             }
+        });
+
+        // ========================================================================
+        // Export Dropdown
+        // ========================================================================
+
+        const exportDropdown = document.getElementById('export-dropdown');
+        const exportBtn = document.getElementById('export-btn');
+
+        exportBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (exportBtn.disabled) return;
+            exportDropdown.classList.toggle('open');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!exportDropdown.contains(e.target)) {
+                exportDropdown.classList.remove('open');
+            }
+        });
+
+        // Close dropdown when clicking a menu item
+        exportDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+            item.addEventListener('click', () => {
+                exportDropdown.classList.remove('open');
+            });
         });
 
         // ========================================================================

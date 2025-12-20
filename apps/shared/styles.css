@@ -288,3 +288,113 @@ canvas {
     box-sizing: border-box;
     z-index: 100;
 }
+
+/* Export Dropdown */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: #fff;
+    color: #495057;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dropdown-btn:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.dropdown-btn:active {
+    background: #dee2e6;
+}
+
+.dropdown-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.dropdown-btn .arrow {
+    font-size: 8px;
+    transition: transform 0.15s ease;
+}
+
+.dropdown.open .dropdown-btn .arrow {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    min-width: 140px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: all 0.15s ease;
+}
+
+.dropdown.open .dropdown-menu {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #212529;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.dropdown-item:first-child {
+    border-radius: 5px 5px 0 0;
+}
+
+.dropdown-item:last-child {
+    border-radius: 0 0 5px 5px;
+}
+
+.dropdown-item:only-child {
+    border-radius: 5px;
+}
+
+.dropdown-item:hover {
+    background: #f8f9fa;
+}
+
+.dropdown-item:active {
+    background: #e9ecef;
+}
+
+.dropdown-item:disabled {
+    color: #adb5bd;
+    cursor: not-allowed;
+}
+
+.dropdown-item:disabled:hover {
+    background: none;
+}
