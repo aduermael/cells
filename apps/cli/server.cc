@@ -239,6 +239,7 @@ void Server::setupRoutes() {
 
         json << "]}";
 
+        res.set_header("Cache-Control", "no-cache, no-store, must-revalidate");
         res.set_content(json.str(), "application/json");
     });
 
@@ -357,8 +358,18 @@ void Server::setupRoutes() {
                           cell->clearFormula();
                       }
 
-                      // Detect value type
-                      if (unescaped.empty()) {
+                      // Check if this is a formula (starts with =)
+                      if (!unescaped.empty() && unescaped[0] == '=') {
+                          // Convert A1 refs to UUID format
+                          std::string uuidFormula = _refConverter.formulaToUuid(unescaped);
+                          // Create and set formula
+                          auto* formula = new Formula(uuidFormula.c_str());
+                          cell->setFormula(formula);
+                          // Set display value (for now, just show the A1 formula)
+                          // TODO: Evaluate formula and set computed value
+                          cell->value = CellValue(unescaped);
+                          cell->value.type = CellValueType::FORMULA;
+                      } else if (unescaped.empty()) {
                           cell->value = CellValue();
                       } else if (unescaped == "TRUE" || unescaped == "true") {
                           cell->value = CellValue(true);

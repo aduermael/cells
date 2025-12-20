@@ -227,7 +227,9 @@
             const endRow = Math.min(sheetInfo.rowCount, startRow + Math.ceil(viewHeight / DEFAULT_ROW_HEIGHT) + 4);
 
             try {
-                const res = await fetch(`/api/viewport?x1=${startCol}&y1=${startRow}&x2=${endCol}&y2=${endRow}`);
+                // Add timestamp to prevent caching
+                const ts = Date.now();
+                const res = await fetch(`/api/viewport?x1=${startCol}&y1=${startRow}&x2=${endCol}&y2=${endRow}&_t=${ts}`);
                 if (!res.ok) throw new Error('Failed to fetch viewport');
                 const data = await res.json();
                 cells = data.cells || [];
