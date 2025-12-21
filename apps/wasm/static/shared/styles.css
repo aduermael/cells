@@ -43,6 +43,14 @@ html, body {
     margin-left: auto;
     display: flex;
     gap: 8px;
+    align-items: center;
+}
+
+/* Collaboration UI Container */
+#collab-ui-container {
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
 /* Buttons */

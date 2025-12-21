@@ -14,6 +14,7 @@
             <input type="file" id="file-input" accept=".cells,.csv,.tsv,.xlsx" />
             <h1 id="sheet-name">Cells Viewer</h1>
             <div id="toolbar">
+                <div id="collab-ui-container"></div>
                 <div class="dropdown" id="export-dropdown">
                     <button class="dropdown-btn" id="export-btn" disabled>
                         Export <span class="arrow">▼</span>
@@ -75,6 +76,8 @@
             UIState,
             UIEvent
         } from './shared/ui-state.js';
+
+        import { CollabUI } from './shared/collab-ui.js';
 
         // ========================================================================
         // WASM Data Source (communicates with Web Worker)
@@ -234,6 +237,10 @@
 
         // Initialize UI state machine
         const uiStateMachine = createUIStateMachine({ debug: false });
+
+        // Initialize collaboration UI (status badge and share button)
+        const collabUIContainer = document.getElementById('collab-ui-container');
+        const collabUI = new CollabUI({ container: collabUIContainer });
 
         // ========================================================================
         // State Machine Helpers
