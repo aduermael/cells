@@ -1,10 +1,52 @@
 #include "core/cells/crdt.h"
 
 #include <algorithm>
+#include <cstdio>
 
 namespace cells {
 
 namespace {
+
+// Simple JSON string escaping for payloads
+std::string jsonEscape(const std::string& str) {
+    std::string result;
+    result.reserve(str.size() + 16);  // Pre-allocate with some extra space
+    for (char c : str) {
+        switch (c) {
+            case '"':
+                result += "\\\"";
+                break;
+            case '\\':
+                result += "\\\\";
+                break;
+            case '\b':
+                result += "\\b";
+                break;
+            case '\f':
+                result += "\\f";
+                break;
+            case '\n':
+                result += "\\n";
+                break;
+            case '\r':
+                result += "\\r";
+                break;
+            case '\t':
+                result += "\\t";
+                break;
+            default:
+                if (static_cast<unsigned char>(c) < 0x20) {
+                    char buf[8];
+                    snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
+                    result += buf;
+                } else {
+                    result += c;
+                }
+                break;
+        }
+    }
+    return result;
+}
 
 // Simple JSON value extraction (reused from operation.cc pattern)
 std::string extractJSONString(const std::string& json, const std::string& key) {
@@ -131,12 +173,24 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
     // Apply the value based on type
     const CellValueType type = charToValueType(type_str[0]);
     cell->value.type = type;
-    cell->value.raw = value_str;
     cell->value.error = CellError::NONE;
 
-    // Clear formula if it was a formula cell
-    if (cell->formula != nullptr) {
-        cell->clearFormula();
+    if (type == CellValueType::FORMULA) {
+        // For formulas: value_str contains UUID formula, display contains A1 formula
+        const std::string display_str = extractJSONString(op.payload, "display");
+
+        // Create the formula object using UUID formula
+        auto* formula = new Formula(value_str.c_str());
+        cell->setFormula(formula);
+
+        // Store display formula in raw for UI display
+        cell->value.raw = display_str.empty() ? value_str : display_str;
+    } else {
+        // Clear formula if it was a formula cell
+        if (cell->formula != nullptr) {
+            cell->clearFormula();
+        }
+        cell->value.raw = value_str;
     }
 
     return ApplyResult::SUCCESS;
@@ -185,17 +239,19 @@ ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op) {
 
 // Apply CELL_CLEAR operation
 ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
-    Cell* cell = nullptr;
+    Sheet* targetSheet = nullptr;
 
     for (auto& s : workbook.sheets) {
-        cell = s->getCell(op.target_id);
-        if (cell != nullptr) {
+        if (s->getCell(op.target_id) != nullptr) {
+            targetSheet = s.get();
             break;
         }
     }
 
-    if (cell == nullptr) {
-        return ApplyResult::INVALID_TARGET;
+    if (targetSheet == nullptr) {
+        // Cell doesn't exist - nothing to clear
+        // Still return SUCCESS so the operation is recorded in OpLog
+        return ApplyResult::SUCCESS;
     }
 
     // Check for newer operations
@@ -209,9 +265,8 @@ ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
         }
     }
 
-    // Clear the cell
-    cell->value = CellValue();
-    cell->clearFormula();
+    // Remove the cell from the sheet entirely
+    targetSheet->cells.erase(op.target_id);
 
     return ApplyResult::SUCCESS;
 }
@@ -614,15 +669,15 @@ size_t bootstrapOpLog(Workbook& workbook) {
             if (cell->isFormula()) {
                 const Formula* formula = cell->getFormula();
                 if (formula != nullptr && formula->text != nullptr) {
-                    payload = "{\"type\":\"f\",\"value\":\"" + std::string(formula->text) +
-                              "\",\"display\":\"" + cell->value.raw + "\"" + idSuffix;
+                    payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(std::string(formula->text)) +
+                              "\",\"display\":\"" + jsonEscape(cell->value.raw) + "\"" + idSuffix;
                 } else {
                     continue;  // Skip cells with invalid formulas
                 }
             } else {
                 const char typeChar = valueTypeToChar(cell->value.type);
                 payload = "{\"type\":\"" + std::string(1, typeChar) + "\",\"value\":\"" +
-                          cell->value.raw + "\"" + idSuffix;
+                          jsonEscape(cell->value.raw) + "\"" + idSuffix;
             }
 
             const Operation op = makeCellSetValueOp(workbook, cell->id, payload);

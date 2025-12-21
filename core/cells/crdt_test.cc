@@ -68,9 +68,10 @@ TEST_F(CRDTTest, ApplyCellSetValue) {
 }
 
 TEST_F(CRDTTest, ApplyCellClear) {
-    // First verify cell has a value
+    // First verify cell exists and has a value
     Sheet* sheet = workbook->getSheetByIndex(0);
     Cell* cell = sheet->getCell(cell1);
+    ASSERT_NE(cell, nullptr);
     EXPECT_EQ(cell->value.type, CellValueType::NUMBER);
 
     // Create and apply clear operation
@@ -78,9 +79,9 @@ TEST_F(CRDTTest, ApplyCellClear) {
     ApplyResult result = applyOperation(*workbook, op);
     EXPECT_EQ(result, ApplyResult::SUCCESS);
 
-    // Verify the cell was cleared
-    EXPECT_EQ(cell->value.type, CellValueType::STRING);
-    EXPECT_TRUE(cell->value.raw.empty());
+    // Verify the cell was removed from the sheet
+    cell = sheet->getCell(cell1);
+    EXPECT_EQ(cell, nullptr);
 }
 
 TEST_F(CRDTTest, DuplicateOperationRejected) {
