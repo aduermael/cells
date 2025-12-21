@@ -86,6 +86,27 @@ std::string jsonEscape(const std::string& str) {
     return ss.str();
 }
 
+// Helper to extract a JSON string field from operation payload
+// Payload format: {"type":"n","value":"42",...}
+std::string extractPayloadField(const std::string& payload, const std::string& key) {
+    const std::string searchKey = "\"" + key + "\":\"";
+    size_t pos = payload.find(searchKey);
+    if (pos == std::string::npos) {
+        return "";
+    }
+    pos += searchKey.length();
+
+    size_t end = pos;
+    while (end < payload.size() && payload[end] != '"') {
+        if (payload[end] == '\\' && end + 1 < payload.size()) {
+            end++;  // Skip escaped char
+        }
+        end++;
+    }
+
+    return payload.substr(pos, end - pos);
+}
+
 // ============================================================================
 // CellsEngine - main wrapper class exposing the spreadsheet engine to JS
 // ============================================================================
@@ -405,14 +426,34 @@ public:
             json << "\"row\":" << entry.y << ",";
 
             // Check for pending operation on this cell
+            // Priority: pending > committed (Last-Writer-Wins with pending preview)
             const Operation* pendingOp = _workbook->getPendingOpForTarget(entry.cell->id);
             bool isPending = (pendingOp != nullptr);
 
             if (isPending) {
                 json << "\"pending\":true,";
-            }
 
-            if (entry.cell->isFormula()) {
+                // Extract value from pending operation's payload
+                // Payload format: {"type":"n","value":"42",...} or
+                // {"type":"f","value":"=A1+B1","display":"=A1+B1",...}
+                std::string pendingType = extractPayloadField(pendingOp->payload, "type");
+                std::string pendingValue = extractPayloadField(pendingOp->payload, "value");
+                std::string pendingDisplay = extractPayloadField(pendingOp->payload, "display");
+
+                if (pendingType == "f") {
+                    // Formula - show formula in A1 notation
+                    json << "\"type\":\"f\",";
+                    if (!pendingDisplay.empty()) {
+                        json << "\"formula\":\"" << jsonEscape(pendingDisplay) << "\",";
+                    }
+                    // For display, use cached cell value if available, otherwise formula
+                    json << "\"display\":\"" << jsonEscape(entry.cell->value.raw) << "\"";
+                } else {
+                    // Non-formula - use pending value directly
+                    json << "\"type\":\"" << (pendingType.empty() ? "s" : pendingType) << "\",";
+                    json << "\"value\":\"" << jsonEscape(pendingValue) << "\"";
+                }
+            } else if (entry.cell->isFormula()) {
                 json << "\"type\":\"f\",";
                 Formula* formula = entry.cell->getFormula();
                 if (formula != nullptr && formula->text != nullptr) {

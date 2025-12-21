@@ -335,12 +335,15 @@ Address specific bugs and ensure all operations sync.
     - A sends sync-response with all operations
     - B applies operations and refreshes UI via notifyListeners
 
-- [ ] 7b: Fix duplicate values in concurrent edits
+- [x] 7b: Fix duplicate values in concurrent edits
   - **Invariant: It must be IMPOSSIBLE to see 2 values in same cell**
   - Ensure only ONE value per cell in viewport query
   - Priority: pending (local) > pending (remote) > committed
   - Last-Writer-Wins properly supersedes old values
   - If this invariant is violated, there's a bug in the architecture
+  - Fixed: queryViewport now extracts and displays pending operation values
+    instead of committed cell values when a pending operation exists.
+    Local pending ops update cell directly, remote pending ops extracted from payload.
 
 - [ ] 7c: Verify operation ordering
   - DIM_INSERT_AXIS ops always applied before CELL_SET_VALUE
