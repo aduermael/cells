@@ -164,7 +164,7 @@ Implement WebRTC peer-to-peer connections in the WASM web app.
 
 Connect the CRDT engine to the WebRTC layer and implement the sync protocol.
 
-- [ ] 4a: Add WASM bindings for CRDT operations
+- [x] 4a: Add WASM bindings for CRDT operations
   - Export `workbook_get_oplog_operations_since(hlc)` in `apps/wasm/bindings.cc`
   - Export `workbook_apply_operation(op_json)` for remote operations
   - Export `workbook_get_current_hlc()` to get local HLC

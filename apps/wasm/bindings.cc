@@ -12,10 +12,14 @@
 #include <string>
 #include <vector>
 
+#include "core/cells/crdt.h"
 #include "core/cells/csv_reader.h"
 #include "core/cells/csv_writer.h"
+#include "core/cells/hlc.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
+#include "core/cells/operation.h"
+#include "core/cells/oplog.h"
 #include "core/cells/parser.h"
 #include "core/cells/quadtree.h"
 #include "core/cells/ref_converter.h"
@@ -1072,6 +1076,251 @@ public:
         notifyListeners(ChangeType::DATA_LOADED);
     }
 
+    // ========================================================================
+    // CRDT collaboration methods
+    // ========================================================================
+
+    // Set the local node ID for HLC generation.
+    // Should be called once when initializing collaboration.
+    std::string setNodeId(const std::string& nodeIdStr) {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        if (nodeIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid node ID length\"}";
+        }
+
+        ID nodeId(nodeIdStr);
+        _workbook->setNodeId(nodeId);
+
+        return "{\"success\":true}";
+    }
+
+    // Get the local node ID.
+    std::string getNodeId() {
+        if (!_workbook) {
+            return "";
+        }
+
+        const ID& nodeId = _workbook->getNodeId();
+        if (nodeId.isNull()) {
+            return "";
+        }
+
+        return nodeId.toString();
+    }
+
+    // Get the current (highest) HLC timestamp as a string.
+    std::string getCurrentHLC() {
+        if (!_workbook) {
+            return "";
+        }
+
+        HLC hlc = _workbook->getCurrentHLC();
+        return hlc.toString();
+    }
+
+    // Get all operations since a given HLC timestamp (exclusive).
+    // Returns JSON array of operations in HLC order.
+    // If sinceHLC is empty, returns all operations.
+    std::string getOperationsSince(const std::string& sinceHLCStr) {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        OpLog* oplog = _workbook->getOpLog();
+        if (!oplog) {
+            return "{\"error\":\"No oplog\"}";
+        }
+
+        HLC sinceHLC;
+        if (!sinceHLCStr.empty()) {
+            sinceHLC = HLC::fromString(sinceHLCStr);
+        }
+
+        std::vector<Operation> ops = oplog->getOperationsSince(sinceHLC);
+
+        std::ostringstream json;
+        json << "{\"operations\":[";
+
+        bool first = true;
+        for (const auto& op : ops) {
+            if (!first) {
+                json << ",";
+            }
+            first = false;
+            json << op.toJSON();
+        }
+
+        json << "]}";
+        return json.str();
+    }
+
+    // Apply a remote operation from JSON format.
+    // Returns result indicating success/failure and reason.
+    std::string applyRemoteOperation(const std::string& opJson) {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\",\"result\":\"error\"}";
+        }
+
+        Operation op = Operation::fromJSON(opJson);
+        if (op.isNull()) {
+            return "{\"error\":\"Invalid operation JSON\",\"result\":\"error\"}";
+        }
+
+        ApplyResult result = applyOperation(*_workbook, op);
+
+        std::string resultStr;
+        switch (result) {
+            case ApplyResult::SUCCESS:
+                resultStr = "success";
+                // Rebuild quadtree and notify listeners for successful operations
+                rebuildQuadtree();
+                notifyListeners(ChangeType::CELL_CHANGED);
+                break;
+            case ApplyResult::ALREADY_APPLIED:
+                resultStr = "already_applied";
+                break;
+            case ApplyResult::SUPERSEDED:
+                resultStr = "superseded";
+                break;
+            case ApplyResult::INVALID_TARGET:
+                resultStr = "invalid_target";
+                break;
+            case ApplyResult::INVALID_PAYLOAD:
+                resultStr = "invalid_payload";
+                break;
+            case ApplyResult::RESURRECTED:
+                resultStr = "resurrected";
+                rebuildQuadtree();
+                notifyListeners(ChangeType::CELL_CHANGED);
+                break;
+        }
+
+        std::ostringstream json;
+        json << "{\"result\":\"" << resultStr << "\"}";
+        return json.str();
+    }
+
+    // Apply multiple remote operations from JSON array.
+    // Returns count of successfully applied operations.
+    std::string applyRemoteOperations(const std::string& opsJson) {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        // Parse JSON array of operations
+        // Expected format: {"operations":[{op1},{op2},...]}
+        // For simplicity, we'll parse it manually
+
+        std::vector<Operation> ops;
+
+        // Find the operations array
+        size_t arrStart = opsJson.find("\"operations\":[");
+        if (arrStart == std::string::npos) {
+            return "{\"error\":\"Invalid format, expected operations array\"}";
+        }
+        arrStart += 14;  // Skip past "operations":[
+
+        size_t arrEnd = opsJson.rfind(']');
+        if (arrEnd == std::string::npos || arrEnd <= arrStart) {
+            return "{\"error\":\"Invalid format, malformed operations array\"}";
+        }
+
+        std::string arrContent = opsJson.substr(arrStart, arrEnd - arrStart);
+
+        // Parse individual operations
+        // Each operation is a JSON object {...}
+        size_t pos = 0;
+        while (pos < arrContent.size()) {
+            // Skip whitespace and commas
+            while (pos < arrContent.size() &&
+                   (arrContent[pos] == ' ' || arrContent[pos] == ',' || arrContent[pos] == '\n' ||
+                    arrContent[pos] == '\r' || arrContent[pos] == '\t')) {
+                pos++;
+            }
+            if (pos >= arrContent.size()) {
+                break;
+            }
+
+            // Find the start of an object
+            if (arrContent[pos] != '{') {
+                break;
+            }
+
+            // Find matching closing brace (handle nested objects)
+            size_t objStart = pos;
+            int braceCount = 1;
+            pos++;
+            while (pos < arrContent.size() && braceCount > 0) {
+                if (arrContent[pos] == '{') {
+                    braceCount++;
+                } else if (arrContent[pos] == '}') {
+                    braceCount--;
+                } else if (arrContent[pos] == '"') {
+                    // Skip string content
+                    pos++;
+                    while (pos < arrContent.size() && arrContent[pos] != '"') {
+                        if (arrContent[pos] == '\\' && pos + 1 < arrContent.size()) {
+                            pos++;
+                        }
+                        pos++;
+                    }
+                }
+                pos++;
+            }
+
+            if (braceCount == 0) {
+                std::string opJson = arrContent.substr(objStart, pos - objStart);
+                Operation op = Operation::fromJSON(opJson);
+                if (!op.isNull()) {
+                    ops.push_back(op);
+                }
+            }
+        }
+
+        size_t applied = applyOperations(*_workbook, ops);
+
+        if (applied > 0) {
+            rebuildQuadtree();
+            notifyListeners(ChangeType::CELL_CHANGED);
+        }
+
+        std::ostringstream json;
+        json << "{\"applied\":" << applied << ",\"total\":" << ops.size() << "}";
+        return json.str();
+    }
+
+    // Get the number of operations in the OpLog.
+    int getOpLogSize() {
+        if (!_workbook) {
+            return 0;
+        }
+
+        OpLog* oplog = _workbook->getOpLog();
+        if (!oplog) {
+            return 0;
+        }
+
+        return static_cast<int>(oplog->size());
+    }
+
+    // Check if an operation with the given HLC already exists in the OpLog.
+    bool hasOperation(const std::string& hlcStr) {
+        if (!_workbook) {
+            return false;
+        }
+
+        OpLog* oplog = _workbook->getOpLog();
+        if (!oplog) {
+            return false;
+        }
+
+        HLC hlc = HLC::fromString(hlcStr);
+        return oplog->hasOperation(hlc);
+    }
+
 private:
     void rebuildQuadtree() {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
@@ -1175,5 +1424,14 @@ EMSCRIPTEN_BINDINGS(cells) {
         // Workbook management
         .function("getWorkbookName", &cells::wasm::CellsEngine::getWorkbookName)
         .function("setWorkbookName", &cells::wasm::CellsEngine::setWorkbookName)
-        .function("createEmptyWorkbook", &cells::wasm::CellsEngine::createEmptyWorkbook);
+        .function("createEmptyWorkbook", &cells::wasm::CellsEngine::createEmptyWorkbook)
+        // CRDT collaboration
+        .function("setNodeId", &cells::wasm::CellsEngine::setNodeId)
+        .function("getNodeId", &cells::wasm::CellsEngine::getNodeId)
+        .function("getCurrentHLC", &cells::wasm::CellsEngine::getCurrentHLC)
+        .function("getOperationsSince", &cells::wasm::CellsEngine::getOperationsSince)
+        .function("applyRemoteOperation", &cells::wasm::CellsEngine::applyRemoteOperation)
+        .function("applyRemoteOperations", &cells::wasm::CellsEngine::applyRemoteOperations)
+        .function("getOpLogSize", &cells::wasm::CellsEngine::getOpLogSize)
+        .function("hasOperation", &cells::wasm::CellsEngine::hasOperation);
 }

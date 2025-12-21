@@ -21,6 +21,41 @@ declare module 'cells-wasm' {
   }
 
   /**
+   * Result from applying a CRDT operation
+   */
+  interface ApplyOperationResult {
+    result: 'success' | 'already_applied' | 'superseded' | 'invalid_target' | 'invalid_payload' | 'resurrected' | 'error';
+    error?: string;
+  }
+
+  /**
+   * Result from applying multiple CRDT operations
+   */
+  interface ApplyOperationsResult {
+    applied: number;  // Number of operations successfully applied
+    total: number;    // Total operations in batch
+    error?: string;
+  }
+
+  /**
+   * CRDT Operation for sync protocol
+   */
+  interface CRDTOperation {
+    hlc: string;      // Hybrid Logical Clock timestamp: "wall.logical.node"
+    op: string;       // Operation type: CELL_SET_VALUE, CELL_CLEAR, etc.
+    target: string;   // Target entity ID (cell, axis, or sheet)
+    payload: object;  // Operation-specific data
+  }
+
+  /**
+   * Response from getOperationsSince
+   */
+  interface OperationsResponse {
+    operations: CRDTOperation[];
+    error?: string;
+  }
+
+  /**
    * Sheet information
    */
   interface SheetInfo {
@@ -306,6 +341,64 @@ declare module 'cells-wasm' {
      */
     createEmptyWorkbook(): void;
 
+    // ========================================================================
+    // CRDT collaboration methods
+    // ========================================================================
+
+    /**
+     * Set the local node ID for HLC generation
+     * Should be called once when initializing collaboration
+     * @param nodeId - 8-character base62 ID
+     * @returns JSON string with OperationResult
+     */
+    setNodeId(nodeId: string): string;
+
+    /**
+     * Get the local node ID
+     * @returns Node ID string, or empty if not set
+     */
+    getNodeId(): string;
+
+    /**
+     * Get the current (highest) HLC timestamp
+     * @returns HLC string in format "wall.logical.node", or empty if no workbook
+     */
+    getCurrentHLC(): string;
+
+    /**
+     * Get all operations since a given HLC timestamp (exclusive)
+     * @param sinceHLC - HLC string to get operations after, or empty for all
+     * @returns JSON string with OperationsResponse
+     */
+    getOperationsSince(sinceHLC: string): string;
+
+    /**
+     * Apply a remote CRDT operation
+     * @param opJson - Operation in JSON format
+     * @returns JSON string with ApplyOperationResult
+     */
+    applyRemoteOperation(opJson: string): string;
+
+    /**
+     * Apply multiple remote CRDT operations
+     * @param opsJson - JSON with {"operations":[...]} array
+     * @returns JSON string with ApplyOperationsResult
+     */
+    applyRemoteOperations(opsJson: string): string;
+
+    /**
+     * Get the number of operations in the OpLog
+     * @returns Operation count
+     */
+    getOpLogSize(): number;
+
+    /**
+     * Check if an operation with the given HLC exists
+     * @param hlc - HLC string to check
+     * @returns true if operation exists
+     */
+    hasOperation(hlc: string): boolean;
+
     /**
      * Delete the CellsEngine instance and free memory
      */
@@ -341,6 +434,10 @@ declare module 'cells-wasm' {
   export {
     LoadResult,
     OperationResult,
+    ApplyOperationResult,
+    ApplyOperationsResult,
+    CRDTOperation,
+    OperationsResponse,
     SheetInfo,
     CellData,
     ColumnInfo,

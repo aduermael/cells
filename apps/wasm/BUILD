@@ -38,10 +38,14 @@ cc_binary(
         "-s SINGLE_FILE=0",  # Keep .wasm separate for better caching
     ],
     deps = [
+        "//core/cells:crdt",
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
+        "//core/cells:hlc",
         "//core/cells:id",
         "//core/cells:model",
+        "//core/cells:operation",
+        "//core/cells:oplog",
         "//core/cells:parser",
         "//core/cells:quadtree",
         "//core/cells:ref_converter",
