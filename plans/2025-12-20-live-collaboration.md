@@ -31,7 +31,7 @@ This plan implements real-time collaboration for Cells using custom CRDTs, WebRT
 
 Implement the core CRDT data structures and operation log in C++ for the engine.
 
-- [ ] 1a: Add HLC (Hybrid Logical Clock) struct and implementation
+- [x] 1a: Add HLC (Hybrid Logical Clock) struct and implementation
   - `struct HLC { int64_t wall_time; uint32_t logical; ID node_id; }`
   - Comparison operators (wall_time → logical → node_id)
   - `generate_hlc()` function using system time

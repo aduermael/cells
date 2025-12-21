@@ -22,6 +22,23 @@ cc_test(
 )
 
 cc_library(
+    name = "hlc",
+    srcs = ["hlc.cc"],
+    hdrs = ["hlc.h"],
+    visibility = ["//visibility:public"],
+    deps = [":types"],
+)
+
+cc_test(
+    name = "hlc_test",
+    srcs = ["hlc_test.cc"],
+    deps = [
+        ":hlc",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "model",
     srcs = ["model.cc"],
     hdrs = ["model.h"],
