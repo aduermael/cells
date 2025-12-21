@@ -264,14 +264,14 @@ Implement user presence, online indicators, and collaboration UI elements.
 
 Add session persistence, random user identity, and final polish.
 
-- [ ] 6a: Implement session identity
+- [x] 6a: Implement session identity
   - Generate random peer ID on first visit (8-char base62)
   - Store in localStorage: `session.peerId`
   - Reuse same peer ID across sessions
   - Generate random display name: "User <random_number>"
   - Store in sessionStorage: `session.displayName` (reset each session)
 
-- [ ] 6b: Add session name customization
+- [x] 6b: Add session name customization
   - Add "Set Name" option in UI (click status badge)
   - Show modal/popup with input field
   - Update local display name in sessionStorage

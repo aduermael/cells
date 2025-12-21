@@ -95,9 +95,26 @@ export class CollabUI {
                 <span class="label">Peers</span>
                 <span class="value" id="collab-detail-peers">0</span>
             </div>
+            <div class="collab-status-details-row name-row">
+                <span class="label">Your Name</span>
+                <span class="value editable" id="collab-detail-name">-</span>
+            </div>
             <div class="collab-status-details-peers" id="collab-peers-list" style="display: none;"></div>
         `;
         this._statusBadge.appendChild(this._detailsPanel);
+
+        // Create name edit popup
+        this._nameEditPopup = document.createElement('div');
+        this._nameEditPopup.className = 'collab-name-edit-popup';
+        this._nameEditPopup.innerHTML = `
+            <div class="collab-name-edit-header">Set Your Name</div>
+            <input type="text" id="collab-name-input" maxlength="20" placeholder="Enter your name">
+            <div class="collab-name-edit-buttons">
+                <button class="cancel-btn">Cancel</button>
+                <button class="save-btn">Save</button>
+            </div>
+        `;
+        document.body.appendChild(this._nameEditPopup);
 
         // Create share button
         this._shareBtn = document.createElement('button');
@@ -135,11 +152,56 @@ export class CollabUI {
             if (this._showingDetails && !this._statusBadge.contains(e.target)) {
                 this._hideDetails();
             }
+            // Close name edit popup when clicking outside
+            if (this._nameEditPopup.classList.contains('visible') &&
+                !this._nameEditPopup.contains(e.target) &&
+                !e.target.closest('#collab-detail-name')) {
+                this._hideNameEditPopup();
+            }
         });
 
         // Share button click
         this._shareBtn.addEventListener('click', () => {
             this._handleShare();
+        });
+
+        // Name edit click handler
+        const nameElement = this._detailsPanel.querySelector('#collab-detail-name');
+        if (nameElement) {
+            nameElement.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._showNameEditPopup();
+            });
+        }
+
+        // Name edit popup event handlers
+        const nameInput = this._nameEditPopup.querySelector('#collab-name-input');
+        const cancelBtn = this._nameEditPopup.querySelector('.cancel-btn');
+        const saveBtn = this._nameEditPopup.querySelector('.save-btn');
+
+        cancelBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._hideNameEditPopup();
+        });
+
+        saveBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._saveDisplayName();
+        });
+
+        nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this._saveDisplayName();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this._hideNameEditPopup();
+            }
+        });
+
+        // Prevent clicks inside popup from bubbling
+        this._nameEditPopup.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
     }
 
@@ -175,6 +237,77 @@ export class CollabUI {
         this._presenceManager.on('presenceupdated', () => {
             this._updatePeersList();
         });
+
+        this._presenceManager.on('initialized', ({ name }) => {
+            this._updateLocalName(name);
+        });
+
+        this._presenceManager.on('localnamechanged', (name) => {
+            this._updateLocalName(name);
+        });
+
+        // Update with current name if already initialized
+        if (this._presenceManager.localName) {
+            this._updateLocalName(this._presenceManager.localName);
+        }
+    }
+
+    /**
+     * Update the displayed local name
+     * @param {string} name
+     * @private
+     */
+    _updateLocalName(name) {
+        const nameElement = this._detailsPanel.querySelector('#collab-detail-name');
+        if (nameElement) {
+            nameElement.textContent = name;
+        }
+    }
+
+    /**
+     * Show the name edit popup
+     * @private
+     */
+    _showNameEditPopup() {
+        const nameElement = this._detailsPanel.querySelector('#collab-detail-name');
+        const input = this._nameEditPopup.querySelector('#collab-name-input');
+
+        // Position popup near the name element
+        const rect = nameElement.getBoundingClientRect();
+        this._nameEditPopup.style.top = `${rect.bottom + 8}px`;
+        this._nameEditPopup.style.right = `${window.innerWidth - rect.right}px`;
+
+        // Set current name in input
+        if (this._presenceManager && this._presenceManager.localName) {
+            input.value = this._presenceManager.localName;
+        }
+
+        this._nameEditPopup.classList.add('visible');
+        input.focus();
+        input.select();
+    }
+
+    /**
+     * Hide the name edit popup
+     * @private
+     */
+    _hideNameEditPopup() {
+        this._nameEditPopup.classList.remove('visible');
+    }
+
+    /**
+     * Save the display name from the edit popup
+     * @private
+     */
+    _saveDisplayName() {
+        const input = this._nameEditPopup.querySelector('#collab-name-input');
+        const newName = input.value.trim();
+
+        if (newName && this._presenceManager) {
+            this._presenceManager.setLocalName(newName);
+        }
+
+        this._hideNameEditPopup();
     }
 
     /**
@@ -376,6 +509,9 @@ export class CollabUI {
     destroy() {
         if (this._shareTooltip && this._shareTooltip.parentNode) {
             this._shareTooltip.parentNode.removeChild(this._shareTooltip);
+        }
+        if (this._nameEditPopup && this._nameEditPopup.parentNode) {
+            this._nameEditPopup.parentNode.removeChild(this._nameEditPopup);
         }
     }
 }
