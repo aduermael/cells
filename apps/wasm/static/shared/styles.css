@@ -921,3 +921,59 @@ canvas {
     border-color: #adb5bd;
     color: #212529;
 }
+
+/* Debug section in status details */
+.collab-status-details-debug {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e9ecef;
+}
+
+.collab-status-details-debug .debug-toggle label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #6c757d;
+    cursor: pointer;
+}
+
+.collab-status-details-debug .debug-toggle input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.collab-status-details-debug .debug-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.collab-status-details-debug .debug-btn {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #495057;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.collab-status-details-debug .debug-btn:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.collab-status-details-debug .debug-btn.danger {
+    color: #dc3545;
+    border-color: #f5c6cb;
+}
+
+.collab-status-details-debug .debug-btn.danger:hover {
+    background: #fff5f5;
+    border-color: #dc3545;
+}

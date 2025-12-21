@@ -105,8 +105,167 @@ export class CollabManager {
         this._pingInterval = null;
         this._pingIntervalMs = 5000; // Ping every 5 seconds
 
+        // Debug mode
+        this._debugMode = this._loadDebugMode();
+        this._operationLog = []; // Log of all operations for debugging
+        this._maxLogSize = 500; // Maximum operations to keep in log
+
         this._setupWebRTCHandlers();
         this._setupSignalingHandlers();
+    }
+
+    /**
+     * Load debug mode setting from localStorage
+     * @returns {boolean}
+     * @private
+     */
+    _loadDebugMode() {
+        try {
+            return localStorage.getItem('cells.debugMode') === 'true';
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Enable or disable debug mode
+     * @param {boolean} enabled
+     */
+    setDebugMode(enabled) {
+        this._debugMode = enabled;
+        try {
+            if (enabled) {
+                localStorage.setItem('cells.debugMode', 'true');
+                this._log('Debug mode enabled');
+            } else {
+                localStorage.removeItem('cells.debugMode');
+                this._log('Debug mode disabled');
+            }
+        } catch (e) {
+            // Ignore storage errors
+        }
+    }
+
+    /**
+     * Check if debug mode is enabled
+     * @returns {boolean}
+     */
+    get debugMode() {
+        return this._debugMode;
+    }
+
+    /**
+     * Log a debug message
+     * @param {...any} args
+     * @private
+     */
+    _log(...args) {
+        if (this._debugMode) {
+            console.log('[Collab]', ...args);
+        }
+    }
+
+    /**
+     * Log an operation to the operation log
+     * @param {string} direction - 'sent' or 'received'
+     * @param {string} peerId - Peer ID (or 'broadcast' for outgoing)
+     * @param {Object} operation - The operation
+     * @private
+     */
+    _logOperation(direction, peerId, operation) {
+        const entry = {
+            timestamp: Date.now(),
+            direction,
+            peerId,
+            operation: JSON.parse(JSON.stringify(operation)) // Deep copy
+        };
+
+        this._operationLog.push(entry);
+
+        // Trim log if too large
+        if (this._operationLog.length > this._maxLogSize) {
+            this._operationLog = this._operationLog.slice(-this._maxLogSize);
+        }
+
+        if (this._debugMode) {
+            this._log(`Operation ${direction}`, peerId, operation);
+        }
+    }
+
+    /**
+     * Get the operation log
+     * @returns {Array}
+     */
+    getOperationLog() {
+        return [...this._operationLog];
+    }
+
+    /**
+     * Clear the operation log
+     */
+    clearOperationLog() {
+        this._operationLog = [];
+        this._log('Operation log cleared');
+    }
+
+    /**
+     * Export debug data as JSON
+     * @returns {Object}
+     */
+    exportDebugData() {
+        return {
+            timestamp: new Date().toISOString(),
+            peerId: this._peerId,
+            roomId: this._roomId,
+            state: this._state,
+            stats: { ...this._stats },
+            peerSyncState: Object.fromEntries(this._peerSyncState),
+            peerLatencies: Object.fromEntries(
+                Array.from(this._peerLatencies.entries()).map(([k, v]) => [k, v.latency])
+            ),
+            operationLog: this._operationLog,
+            pendingOperationsCount: this._pendingOperations.length
+        };
+    }
+
+    /**
+     * Download debug data as a JSON file
+     */
+    downloadDebugData() {
+        const data = this.exportDebugData();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `collab-debug-${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    /**
+     * Reset sync state for recovery (use when stuck)
+     */
+    resetSyncState() {
+        this._log('Resetting sync state');
+
+        // Clear peer sync state
+        this._peerSyncState.clear();
+
+        // Clear latencies
+        this._peerLatencies.clear();
+
+        // Clear pending operations
+        this._pendingOperations = [];
+
+        // Close existing connections
+        this._webrtcManager.close();
+
+        // Go offline
+        this._setState(CollabState.OFFLINE);
+
+        this._emitter.emit('syncreset');
     }
 
     /**
@@ -383,6 +542,9 @@ export class CollabManager {
      * @param {Object} operation - Operation in JSON format
      */
     broadcastOperation(operation) {
+        // Log sent operation
+        this._logOperation('sent', 'broadcast', operation);
+
         const message = JSON.stringify({
             type: 'operations',
             batch: [operation]
@@ -405,6 +567,11 @@ export class CollabManager {
      */
     broadcastOperations(operations) {
         if (operations.length === 0) return;
+
+        // Log sent operations
+        for (const op of operations) {
+            this._logOperation('sent', 'broadcast', op);
+        }
 
         const message = JSON.stringify({
             type: 'operations',
@@ -801,6 +968,11 @@ export class CollabManager {
      * @private
      */
     _handleOperationsBatch(peerId, operations) {
+        // Log received operations
+        for (const op of operations) {
+            this._logOperation('received', peerId, op);
+        }
+
         this._applyRemoteOperations(operations);
 
         // Update last known HLC for this peer

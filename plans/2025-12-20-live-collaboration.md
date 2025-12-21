@@ -300,12 +300,12 @@ Add session persistence, random user identity, and final polish.
   - Show data transfer stats (ops sent/received) via updateStats()
   - Add "Force Reconnect" button in actions panel
 
-- [ ] 6f: Add debugging and diagnostics
-  - Add dev mode toggle (localStorage flag)
-  - Show detailed connection logs in console
-  - Show operation log viewer (all operations in order)
-  - Export OpLog for debugging
-  - Add "Reset Sync State" option for recovery
+- [x] 6f: Add debugging and diagnostics
+  - Add debug mode toggle (localStorage: cells.debugMode)
+  - Show detailed connection logs in console when debug enabled
+  - Operation log tracking (last 500 operations)
+  - Export debug data as JSON file (downloadDebugData)
+  - Add "Reset Sync State" button for recovery
 
 ## Phase 7: Testing & Documentation
 

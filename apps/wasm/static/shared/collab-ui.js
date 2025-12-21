@@ -65,6 +65,7 @@ export class CollabUI {
         this._collabManager = collabManager;
         this._setupCollabManagerListeners();
         this._updateState(collabManager.state);
+        this._updateDebugModeCheckbox();
     }
 
     /**
@@ -124,6 +125,18 @@ export class CollabUI {
             <div class="collab-status-details-peers" id="collab-peers-list" style="display: none;"></div>
             <div class="collab-status-details-actions" id="collab-actions" style="display: none;">
                 <button class="reconnect-btn" id="collab-reconnect-btn">Force Reconnect</button>
+            </div>
+            <div class="collab-status-details-debug" id="collab-debug-section">
+                <div class="debug-toggle">
+                    <label>
+                        <input type="checkbox" id="collab-debug-mode">
+                        Debug mode
+                    </label>
+                </div>
+                <div class="debug-actions" id="collab-debug-actions" style="display: none;">
+                    <button class="debug-btn" id="collab-export-debug">Export Debug Data</button>
+                    <button class="debug-btn danger" id="collab-reset-sync">Reset Sync State</button>
+                </div>
             </div>
         `;
         this._statusBadge.appendChild(this._detailsPanel);
@@ -237,6 +250,34 @@ export class CollabUI {
                 this._handleForceReconnect();
             });
         }
+
+        // Debug mode toggle
+        const debugToggle = this._detailsPanel.querySelector('#collab-debug-mode');
+        if (debugToggle) {
+            debugToggle.addEventListener('change', (e) => {
+                this._handleDebugModeToggle(e.target.checked);
+            });
+            // Initialize checkbox state
+            this._updateDebugModeCheckbox();
+        }
+
+        // Export debug data button
+        const exportBtn = this._detailsPanel.querySelector('#collab-export-debug');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._handleExportDebug();
+            });
+        }
+
+        // Reset sync state button
+        const resetBtn = this._detailsPanel.querySelector('#collab-reset-sync');
+        if (resetBtn) {
+            resetBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._handleResetSync();
+            });
+        }
     }
 
     /**
@@ -246,6 +287,64 @@ export class CollabUI {
     _handleForceReconnect() {
         if (this._collabManager && typeof this._collabManager.forceReconnect === 'function') {
             this._collabManager.forceReconnect();
+        }
+    }
+
+    /**
+     * Handle debug mode toggle
+     * @param {boolean} enabled
+     * @private
+     */
+    _handleDebugModeToggle(enabled) {
+        if (this._collabManager && typeof this._collabManager.setDebugMode === 'function') {
+            this._collabManager.setDebugMode(enabled);
+        }
+        this._updateDebugActionsVisibility();
+    }
+
+    /**
+     * Handle export debug data button click
+     * @private
+     */
+    _handleExportDebug() {
+        if (this._collabManager && typeof this._collabManager.downloadDebugData === 'function') {
+            this._collabManager.downloadDebugData();
+        }
+    }
+
+    /**
+     * Handle reset sync state button click
+     * @private
+     */
+    _handleResetSync() {
+        if (confirm('Reset sync state? This will disconnect you from all peers.')) {
+            if (this._collabManager && typeof this._collabManager.resetSyncState === 'function') {
+                this._collabManager.resetSyncState();
+            }
+        }
+    }
+
+    /**
+     * Update debug mode checkbox state
+     * @private
+     */
+    _updateDebugModeCheckbox() {
+        const checkbox = this._detailsPanel.querySelector('#collab-debug-mode');
+        if (checkbox && this._collabManager) {
+            checkbox.checked = this._collabManager.debugMode || false;
+        }
+        this._updateDebugActionsVisibility();
+    }
+
+    /**
+     * Update debug actions visibility based on debug mode
+     * @private
+     */
+    _updateDebugActionsVisibility() {
+        const debugActions = this._detailsPanel.querySelector('#collab-debug-actions');
+        const checkbox = this._detailsPanel.querySelector('#collab-debug-mode');
+        if (debugActions && checkbox) {
+            debugActions.style.display = checkbox.checked ? '' : 'none';
         }
     }
 
