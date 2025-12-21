@@ -128,8 +128,12 @@
                 return this._client.createCell(col, row, value);
             }
 
-            async createCellIfNeeded(col, row) {
-                return this._client.createCellIfNeeded(col, row);
+            async getOrCreateCellAt(col, row) {
+                return this._client.getOrCreateCellAt(col, row);
+            }
+
+            async deleteCellAt(col, row) {
+                return this._client.deleteCellAt(col, row);
             }
 
             async updateCell(cellId, value) {
@@ -822,29 +826,22 @@
             const { focusCellEditor = true, mode = 'select', initialChar = '' } = options;
             if (!selectedCell || isEditing() || !dataSource) return;
 
-            // Get or create cell using createCellIfNeeded
-            // This reserves the cell UUID immediately and handles column/row creation
+            // Get or create cell - single call returns ID and value
+            // No need for separate getCellAt check - this is more efficient
             let cellId = null;
-            let existingCell = getCellAt(selectedCell.col, selectedCell.row);
             let initialValue = '';
 
-            if (existingCell) {
-                // Cell exists - use its ID and value
-                cellId = existingCell.id;
-                initialValue = existingCell.formula || existingCell.value || '';
-            } else {
-                // Cell doesn't exist - create it now (reserves UUID, creates col/row if needed)
-                try {
-                    const result = await dataSource.createCellIfNeeded(selectedCell.col, selectedCell.row);
-                    cellId = result.id;
-                    // New cell has no value
-                    initialValue = '';
-                    // Refresh viewport to include the new cell
+            try {
+                const result = await dataSource.getOrCreateCellAt(selectedCell.col, selectedCell.row);
+                cellId = result.id;
+                initialValue = result.formula || result.value || '';
+                // If cell was created, refresh viewport to include it
+                if (!result.existed) {
                     await fetchViewport();
-                } catch (e) {
-                    console.error('Error creating cell:', e);
-                    return;
                 }
+            } catch (e) {
+                console.error('Error getting/creating cell:', e);
+                return;
             }
 
             // Store the cell ID for commit
@@ -944,20 +941,12 @@
             if (!range) return;
 
             try {
-                // Collect all cells in range that exist
-                const cellsToDelete = [];
+                // Delete cells at each position - deleteCellAt is a no-op if cell doesn't exist
+                // This is more efficient than first checking if cells exist
                 for (let col = range.minCol; col <= range.maxCol; col++) {
                     for (let row = range.minRow; row <= range.maxRow; row++) {
-                        const cell = getCellAt(col, row);
-                        if (cell && cell.id && cell.id !== '_temp_') {
-                            cellsToDelete.push(cell.id);
-                        }
+                        await dataSource.deleteCellAt(col, row);
                     }
-                }
-
-                // Delete all cells - listener handles refresh automatically
-                for (const cellId of cellsToDelete) {
-                    await dataSource.deleteCell(cellId);
                 }
             } catch (e) {
                 console.error('Error deleting range cells:', e);

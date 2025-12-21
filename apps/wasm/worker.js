@@ -217,13 +217,19 @@ function handleMessage(msg) {
                 break;
             }
 
-            case 'createCellIfNeeded': {
+            case 'getOrCreateCellAt': {
                 const { col, row } = params;
-                const result = JSON.parse(engine.createCellIfNeeded(col, row));
+                const result = JSON.parse(engine.getOrCreateCellAt(col, row));
                 if (result.error) {
                     respond({ type: 'error', error: result.error });
                 } else {
-                    respond({ type: 'cellCreated', cellId: result.id, existed: result.existed });
+                    respond({
+                        type: 'cellInfo',
+                        cellId: result.id,
+                        existed: result.existed,
+                        value: result.value,
+                        formula: result.formula || null
+                    });
                 }
                 break;
             }
@@ -235,6 +241,17 @@ function handleMessage(msg) {
                     respond({ type: 'error', error: result.error });
                 } else {
                     respond({ type: 'cellDeleted', success: true });
+                }
+                break;
+            }
+
+            case 'deleteCellAt': {
+                const { col, row } = params;
+                const result = JSON.parse(engine.deleteCellAt(col, row));
+                if (result.error) {
+                    respond({ type: 'error', error: result.error });
+                } else {
+                    respond({ type: 'cellDeleted', deleted: result.deleted });
                 }
                 break;
             }

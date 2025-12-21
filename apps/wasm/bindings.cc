@@ -719,13 +719,12 @@ public:
         return json.str();
     }
 
-    // Create cell if it doesn't exist, also creating column/row if needed.
-    // This is a streamlined version of createCell that:
-    // - Returns existing cell ID if cell already exists at position
+    // Get or create a cell at the given position.
+    // - Returns existing cell ID and value if cell already exists
     // - Creates column/row/cell as needed, with operations committed immediately
-    // - Does NOT set any value (value setting happens later via updateCell)
-    // Designed for startEditing flow to reserve UUID for coords quickly.
-    std::string createCellIfNeeded(uint32_t col, uint32_t row) {
+    // - For new cells, returns empty value
+    // This is the primary API for editing - single call avoids multiple round trips.
+    std::string getOrCreateCellAt(uint32_t col, uint32_t row) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
         }
@@ -792,9 +791,22 @@ public:
         // Check if cell already exists at this position
         for (const auto& [id, cell] : sheet->cells) {
             if (cell->colId == colId && cell->rowId == rowId) {
-                // Cell already exists, return its ID
+                // Cell already exists, return its ID and current value
                 std::ostringstream json;
-                json << "{\"success\":true,\"id\":\"" << id.toString() << "\",\"existed\":true}";
+                json << "{\"success\":true,\"id\":\"" << id.toString() << "\",\"existed\":true,";
+
+                // Include value/formula
+                if (cell->isFormula()) {
+                    Formula* formula = cell->getFormula();
+                    if (formula != nullptr && formula->text != nullptr) {
+                        std::string a1Formula = _refConverter.formulaToA1(formula->text);
+                        json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
+                    }
+                    json << "\"value\":\"" << jsonEscape(cell->value.raw) << "\"";
+                } else {
+                    json << "\"value\":\"" << jsonEscape(cell->value.raw) << "\"";
+                }
+                json << "}";
                 return json.str();
             }
         }
@@ -808,7 +820,7 @@ public:
         notifyListeners(ChangeType::CELL_CHANGED);
 
         std::ostringstream json;
-        json << "{\"success\":true,\"id\":\"" << cellId.toString() << "\",\"existed\":false}";
+        json << "{\"success\":true,\"id\":\"" << cellId.toString() << "\",\"existed\":false,\"value\":\"\"}";
         return json.str();
     }
 
@@ -837,6 +849,60 @@ public:
         notifyListeners(ChangeType::CELL_CHANGED);
 
         return "{\"success\":true}";
+    }
+
+    // Delete a cell at the given position if it exists.
+    // - Does nothing if no cell exists at that position (returns deleted: false)
+    // - Returns deleted: true if a cell was actually deleted
+    // This simplifies deletion logic - no need to first check if cell exists.
+    std::string deleteCellAt(uint32_t col, uint32_t row) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        // Find column at position
+        ID colId;
+        for (const auto& [id, axis] : sheet->columns) {
+            if (axis->position == col) {
+                colId = id;
+                break;
+            }
+        }
+        if (colId.isNull()) {
+            // No column at this position means no cell
+            return "{\"success\":true,\"deleted\":false}";
+        }
+
+        // Find row at position
+        ID rowId;
+        for (const auto& [id, axis] : sheet->rows) {
+            if (axis->position == row) {
+                rowId = id;
+                break;
+            }
+        }
+        if (rowId.isNull()) {
+            // No row at this position means no cell
+            return "{\"success\":true,\"deleted\":false}";
+        }
+
+        // Find and delete cell at this position
+        for (auto it = sheet->cells.begin(); it != sheet->cells.end(); ++it) {
+            if (it->second->colId == colId && it->second->rowId == rowId) {
+                sheet->cells.erase(it);
+                rebuildQuadtree();
+                notifyListeners(ChangeType::CELL_CHANGED);
+                return "{\"success\":true,\"deleted\":true}";
+            }
+        }
+
+        // No cell at this position
+        return "{\"success\":true,\"deleted\":false}";
     }
 
     // ========================================================================
@@ -2021,8 +2087,9 @@ EMSCRIPTEN_BINDINGS(cells) {
         // Cell operations
         .function("updateCell", &cells::wasm::CellsEngine::updateCell)
         .function("createCell", &cells::wasm::CellsEngine::createCell)
-        .function("createCellIfNeeded", &cells::wasm::CellsEngine::createCellIfNeeded)
+        .function("getOrCreateCellAt", &cells::wasm::CellsEngine::getOrCreateCellAt)
         .function("deleteCell", &cells::wasm::CellsEngine::deleteCell)
+        .function("deleteCellAt", &cells::wasm::CellsEngine::deleteCellAt)
         // Column/row resize
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)
         .function("resizeColumnByPos", &cells::wasm::CellsEngine::resizeColumnByPos)

@@ -289,11 +289,10 @@ Refactor the JavaScript UI state machine for cleaner architecture and better sep
   - NOTE: API implemented in ui-state.js; actual listener registration will be added in 5e/5f
 
 - [x] 5e: Update `startEditing` to use new architecture
-  - Call `createCellIfNeeded(col, row)` to get cell UUID
+  - Call `getOrCreateCellAt(col, row)` to get cell UUID and value (renamed from createCellIfNeeded)
   - Transition to editing state with context: `{ cellId, col, row, initialValue }`
   - Cell display: editing context value takes priority, then workbook cell value
   - No pending operation for cell creation - committed immediately
-  - Added `createCellIfNeeded()` to WasmDataSource
   - `startEditing` now uses `editingCellId` to track the cell being edited
   - `confirmEditing` uses `editingCellId` directly instead of re-looking up the cell
 
@@ -303,6 +302,20 @@ Refactor the JavaScript UI state machine for cleaner architecture and better sep
   - Registered state change listener placeholder for future centralization
   - Note: Inline render()/updateFormulaBar() calls retained for precise timing control
   - The listener pattern is set up but not actively removing inline calls yet (risk of timing issues)
+
+- [x] 5g: API optimization - reduce round trips
+  - Renamed `createCellIfNeeded` to `getOrCreateCellAt`:
+    - Returns cell ID, value, formula, and existed flag in single call
+    - Eliminates need for separate `getCellAt` check before editing
+  - Added `deleteCellAt(col, row)`:
+    - Deletes cell if exists, no-op if not
+    - Eliminates need for `getCellAt` + `deleteCell` pattern
+  - Updated `startEditing`:
+    - Uses `getOrCreateCellAt` directly - single API call
+    - No more separate existence check
+  - Updated `deleteRangeCells`:
+    - Uses `deleteCellAt` for each position
+    - Simpler loop, no need to collect cell IDs first
 
 ## Phase 6: Export Feature
 

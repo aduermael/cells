@@ -343,18 +343,23 @@ class CellsClient {
     }
 
     /**
-     * Create a cell if it doesn't exist, also creating column/row if needed.
-     * This is a streamlined version for the startEditing flow:
-     * - Returns existing cell ID if cell already exists at position
+     * Get or create a cell at the given position.
+     * This is the primary API for editing - single call avoids multiple round trips:
+     * - Returns existing cell ID and value if cell already exists
      * - Creates column/row/cell as needed, with operations committed immediately
-     * - Does NOT set any value (value setting happens later via updateCell)
+     * - For new cells, returns empty value
      * @param {number} col - Column position (0-based)
      * @param {number} row - Row position (0-based)
-     * @returns {Promise<{id: string, existed: boolean}>}
+     * @returns {Promise<{id: string, existed: boolean, value: string, formula: string|null}>}
      */
-    async createCellIfNeeded(col, row) {
-        const response = await this._send('createCellIfNeeded', { col, row });
-        return { id: response.cellId, existed: response.existed };
+    async getOrCreateCellAt(col, row) {
+        const response = await this._send('getOrCreateCellAt', { col, row });
+        return {
+            id: response.cellId,
+            existed: response.existed,
+            value: response.value,
+            formula: response.formula
+        };
     }
 
     /**
@@ -365,6 +370,18 @@ class CellsClient {
     async deleteCell(cellId) {
         await this._send('deleteCell', { cellId });
         return { success: true };
+    }
+
+    /**
+     * Delete a cell at the given position if it exists.
+     * Does nothing if no cell exists at that position.
+     * @param {number} col - Column position (0-based)
+     * @param {number} row - Row position (0-based)
+     * @returns {Promise<{deleted: boolean}>}
+     */
+    async deleteCellAt(col, row) {
+        const response = await this._send('deleteCellAt', { col, row });
+        return { deleted: response.deleted };
     }
 
     // ========================================================================
