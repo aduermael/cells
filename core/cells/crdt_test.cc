@@ -243,5 +243,283 @@ TEST_F(CRDTTest, GetOperationsSinceForSync) {
     EXPECT_EQ(ops.size(), 2);
 }
 
+// =============================================================================
+// Multi-peer convergence tests
+// =============================================================================
+
+class CRDTConvergenceTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Create two workbooks simulating two peers
+        node_a = ID("NodeAAAA");
+        node_b = ID("NodeBBBB");
+
+        workbook_a = createWorkbook(node_a);
+        workbook_b = createWorkbook(node_b);
+
+        // Store shared IDs for use across both workbooks
+        cell_id = workbook_a->getSheetByIndex(0)->cells.begin()->first;
+    }
+
+    std::unique_ptr<Workbook> createWorkbook(const ID& node_id) {
+        auto wb = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
+        wb->setNodeId(node_id);
+
+        auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+        // Create a column and row
+        ID col = generate_id();
+        ID row = generate_id();
+        auto c = std::make_unique<Axis>(col, true);
+        auto r = std::make_unique<Axis>(row, false);
+        sheet->addColumn(std::move(c));
+        sheet->addRow(std::move(r));
+
+        // Create a cell
+        ID cell = generate_id();
+        auto cell_obj = std::make_unique<Cell>(cell, col, row);
+        cell_obj->value = CellValue(0.0);
+        sheet->addCell(std::move(cell_obj));
+
+        wb->addSheet(std::move(sheet));
+        return wb;
+    }
+
+    // Synchronize operations from source to target
+    void syncOperations(Workbook& source, Workbook& target, const HLC& since = HLC()) {
+        auto ops = source.getOpLog()->getOperationsSince(since);
+        for (const auto& op : ops) {
+            applyOperation(target, op);
+        }
+    }
+
+    std::unique_ptr<Workbook> workbook_a;
+    std::unique_ptr<Workbook> workbook_b;
+    ID node_a, node_b;
+    ID cell_id;
+};
+
+TEST_F(CRDTConvergenceTest, TwoPeersConvergeOnConcurrentEdits) {
+    // Get cell IDs from both workbooks (they have different IDs since created separately)
+    auto* sheet_a = workbook_a->getSheetByIndex(0);
+    auto* sheet_b = workbook_b->getSheetByIndex(0);
+    ID cell_a = sheet_a->cells.begin()->first;
+    ID cell_b = sheet_b->cells.begin()->first;
+
+    // Peer A makes an edit
+    Operation op_a = makeCellSetValueOp(*workbook_a, cell_a, R"({"type":"n","value":"100"})");
+    applyOperation(*workbook_a, op_a);
+
+    // Peer B makes an edit (to its own cell, different ID)
+    Operation op_b = makeCellSetValueOp(*workbook_b, cell_b, R"({"type":"n","value":"200"})");
+    applyOperation(*workbook_b, op_b);
+
+    // Sync A -> B
+    applyOperation(*workbook_b, op_a);
+
+    // Sync B -> A
+    applyOperation(*workbook_a, op_b);
+
+    // Both should have the operation in their OpLogs
+    EXPECT_EQ(workbook_a->getOpLog()->size(), 2);
+    EXPECT_EQ(workbook_b->getOpLog()->size(), 2);
+}
+
+TEST_F(CRDTConvergenceTest, SameCellConcurrentEditsConverge) {
+    // Create a shared cell ID that both workbooks know about
+    ID shared_cell = generate_id();
+    ID shared_col = generate_id();
+    ID shared_row = generate_id();
+
+    // Add the same cell to both workbooks
+    auto* sheet_a = workbook_a->getSheetByIndex(0);
+    auto* sheet_b = workbook_b->getSheetByIndex(0);
+
+    auto col_a = std::make_unique<Axis>(shared_col, true);
+    auto col_b = std::make_unique<Axis>(shared_col, true);
+    auto row_a = std::make_unique<Axis>(shared_row, false);
+    auto row_b = std::make_unique<Axis>(shared_row, false);
+    auto cell_a = std::make_unique<Cell>(shared_cell, shared_col, shared_row);
+    auto cell_b = std::make_unique<Cell>(shared_cell, shared_col, shared_row);
+    cell_a->value = CellValue(0.0);
+    cell_b->value = CellValue(0.0);
+
+    sheet_a->addColumn(std::move(col_a));
+    sheet_a->addRow(std::move(row_a));
+    sheet_a->addCell(std::move(cell_a));
+    sheet_b->addColumn(std::move(col_b));
+    sheet_b->addRow(std::move(row_b));
+    sheet_b->addCell(std::move(cell_b));
+
+    // Both peers edit the same cell concurrently
+    // Use fixed timestamps to control ordering
+    HLC hlc_a(1000, 0, node_a);
+    HLC hlc_b(1000, 0, node_b);
+
+    Operation op_a(hlc_a, OpType::CELL_SET_VALUE, shared_cell, R"({"type":"n","value":"100"})");
+    Operation op_b(hlc_b, OpType::CELL_SET_VALUE, shared_cell, R"({"type":"n","value":"200"})");
+
+    // Apply in different orders on each workbook
+    applyOperation(*workbook_a, op_a);
+    applyOperation(*workbook_a, op_b);
+
+    applyOperation(*workbook_b, op_b);
+    applyOperation(*workbook_b, op_a);
+
+    // Both should converge to the same value
+    // Node B > Node A lexicographically, so op_b wins
+    Cell* cell_final_a = sheet_a->getCell(shared_cell);
+    Cell* cell_final_b = sheet_b->getCell(shared_cell);
+
+    EXPECT_EQ(cell_final_a->value.asNumber(), 200);
+    EXPECT_EQ(cell_final_b->value.asNumber(), 200);
+}
+
+TEST_F(CRDTConvergenceTest, ThreePeersConverge) {
+    // Add a third peer
+    ID node_c("NodeCCCC");
+    auto workbook_c = createWorkbook(node_c);
+
+    // Create a shared cell ID
+    ID shared_cell = generate_id();
+    ID shared_col = generate_id();
+    ID shared_row = generate_id();
+
+    // Add the same cell to all three workbooks
+    for (auto* wb : {workbook_a.get(), workbook_b.get(), workbook_c.get()}) {
+        auto* sheet = wb->getSheetByIndex(0);
+        auto col = std::make_unique<Axis>(shared_col, true);
+        auto row = std::make_unique<Axis>(shared_row, false);
+        auto cell = std::make_unique<Cell>(shared_cell, shared_col, shared_row);
+        cell->value = CellValue(0.0);
+        sheet->addColumn(std::move(col));
+        sheet->addRow(std::move(row));
+        sheet->addCell(std::move(cell));
+    }
+
+    // All three peers edit concurrently
+    HLC hlc_a(1000, 0, node_a);
+    HLC hlc_b(1000, 0, node_b);
+    HLC hlc_c(1000, 0, node_c);
+
+    Operation op_a(hlc_a, OpType::CELL_SET_VALUE, shared_cell, R"({"type":"n","value":"100"})");
+    Operation op_b(hlc_b, OpType::CELL_SET_VALUE, shared_cell, R"({"type":"n","value":"200"})");
+    Operation op_c(hlc_c, OpType::CELL_SET_VALUE, shared_cell, R"({"type":"n","value":"300"})");
+
+    // Apply in different orders on each workbook
+    applyOperation(*workbook_a, op_a);
+    applyOperation(*workbook_a, op_b);
+    applyOperation(*workbook_a, op_c);
+
+    applyOperation(*workbook_b, op_c);
+    applyOperation(*workbook_b, op_a);
+    applyOperation(*workbook_b, op_b);
+
+    applyOperation(*workbook_c, op_b);
+    applyOperation(*workbook_c, op_c);
+    applyOperation(*workbook_c, op_a);
+
+    // All should converge to the same value (NodeCCCC > NodeBBBB > NodeAAAA)
+    Cell* cell_a = workbook_a->getSheetByIndex(0)->getCell(shared_cell);
+    Cell* cell_b = workbook_b->getSheetByIndex(0)->getCell(shared_cell);
+    Cell* cell_c = workbook_c->getSheetByIndex(0)->getCell(shared_cell);
+
+    EXPECT_EQ(cell_a->value.asNumber(), 300);
+    EXPECT_EQ(cell_b->value.asNumber(), 300);
+    EXPECT_EQ(cell_c->value.asNumber(), 300);
+}
+
+TEST_F(CRDTConvergenceTest, RapidSequentialEditsPreserveOrder) {
+    // Create a shared cell
+    ID shared_cell = generate_id();
+    ID shared_col = generate_id();
+    ID shared_row = generate_id();
+
+    auto* sheet_a = workbook_a->getSheetByIndex(0);
+    auto* sheet_b = workbook_b->getSheetByIndex(0);
+
+    auto col_a = std::make_unique<Axis>(shared_col, true);
+    auto col_b = std::make_unique<Axis>(shared_col, true);
+    auto row_a = std::make_unique<Axis>(shared_row, false);
+    auto row_b = std::make_unique<Axis>(shared_row, false);
+    auto cell_a = std::make_unique<Cell>(shared_cell, shared_col, shared_row);
+    auto cell_b = std::make_unique<Cell>(shared_cell, shared_col, shared_row);
+    cell_a->value = CellValue(0.0);
+    cell_b->value = CellValue(0.0);
+
+    sheet_a->addColumn(std::move(col_a));
+    sheet_a->addRow(std::move(row_a));
+    sheet_a->addCell(std::move(cell_a));
+    sheet_b->addColumn(std::move(col_b));
+    sheet_b->addRow(std::move(row_b));
+    sheet_b->addCell(std::move(cell_b));
+
+    // Peer A makes rapid sequential edits
+    std::vector<Operation> ops;
+    for (int i = 1; i <= 10; i++) {
+        Operation op = makeCellSetValueOp(*workbook_a, shared_cell,
+                                          R"({"type":"n","value":")" + std::to_string(i) + R"("})");
+        ops.push_back(op);
+        applyOperation(*workbook_a, op);
+    }
+
+    // Apply to workbook_b in reverse order (out of order delivery)
+    for (auto it = ops.rbegin(); it != ops.rend(); ++it) {
+        applyOperation(*workbook_b, *it);
+    }
+
+    // Both should have value 10 (latest operation)
+    Cell* cell_final_a = sheet_a->getCell(shared_cell);
+    Cell* cell_final_b = sheet_b->getCell(shared_cell);
+
+    EXPECT_EQ(cell_final_a->value.asNumber(), 10);
+    EXPECT_EQ(cell_final_b->value.asNumber(), 10);
+}
+
+TEST_F(CRDTConvergenceTest, DifferentCellsConcurrentEdits) {
+    // Create two shared cells
+    ID cell1 = generate_id();
+    ID cell2 = generate_id();
+    ID col = generate_id();
+    ID row1 = generate_id();
+    ID row2 = generate_id();
+
+    // Add to both workbooks
+    for (auto* wb : {workbook_a.get(), workbook_b.get()}) {
+        auto* sheet = wb->getSheetByIndex(0);
+        sheet->addColumn(std::make_unique<Axis>(col, true));
+        sheet->addRow(std::make_unique<Axis>(row1, false));
+        sheet->addRow(std::make_unique<Axis>(row2, false));
+
+        auto c1 = std::make_unique<Cell>(cell1, col, row1);
+        auto c2 = std::make_unique<Cell>(cell2, col, row2);
+        c1->value = CellValue(0.0);
+        c2->value = CellValue(0.0);
+        sheet->addCell(std::move(c1));
+        sheet->addCell(std::move(c2));
+    }
+
+    // Peer A edits cell1
+    Operation op_a = makeCellSetValueOp(*workbook_a, cell1, R"({"type":"n","value":"100"})");
+    applyOperation(*workbook_a, op_a);
+
+    // Peer B edits cell2
+    Operation op_b = makeCellSetValueOp(*workbook_b, cell2, R"({"type":"n","value":"200"})");
+    applyOperation(*workbook_b, op_b);
+
+    // Sync both ways
+    applyOperation(*workbook_b, op_a);
+    applyOperation(*workbook_a, op_b);
+
+    // Both should have both values
+    auto* sheet_a = workbook_a->getSheetByIndex(0);
+    auto* sheet_b = workbook_b->getSheetByIndex(0);
+
+    EXPECT_EQ(sheet_a->getCell(cell1)->value.asNumber(), 100);
+    EXPECT_EQ(sheet_a->getCell(cell2)->value.asNumber(), 200);
+    EXPECT_EQ(sheet_b->getCell(cell1)->value.asNumber(), 100);
+    EXPECT_EQ(sheet_b->getCell(cell2)->value.asNumber(), 200);
+}
+
 }  // namespace
 }  // namespace cells

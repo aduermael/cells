@@ -202,7 +202,7 @@ Connect the CRDT engine to the WebRTC layer and implement the sync protocol.
   - Compress operation payloads using GZIP or similar
   - Add flow control to prevent overwhelming slow peers
 
-- [ ] 4f: Add conflict resolution testing
+- [x] 4f: Add conflict resolution testing
   - Create test scenarios for concurrent edits
   - Test same-cell conflicts (Last-Writer-Wins)
   - Test concurrent axis inserts (interleaving)
