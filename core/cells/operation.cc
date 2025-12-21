@@ -242,7 +242,17 @@ std::string findJSONValue(const std::string& json, const std::string& key) {
     const bool isArray = (json[pos] == '[');
     while (end < json.size()) {
         const char c = json[end];
-        if (c == '{') {
+        if (c == '"') {
+            // Skip string content (don't count braces/brackets inside strings)
+            end++;
+            while (end < json.size() && json[end] != '"') {
+                if (json[end] == '\\' && end + 1 < json.size()) {
+                    end++;  // Skip escaped char
+                }
+                end++;
+            }
+            // end now points to closing quote (or past the end)
+        } else if (c == '{') {
             braceCount++;
         } else if (c == '}') {
             braceCount--;
