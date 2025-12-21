@@ -38,7 +38,7 @@ Implement the core CRDT data structures and operation log in C++ for the engine.
   - HLC serialization/deserialization for `.cells` format
   - Add tests in `core/cells/hlc_test.cc`
 
-- [ ] 1b: Define operation types enum and Operation struct
+- [x] 1b: Define operation types enum and Operation struct
   - `enum class OpType` with values: CELL_SET_VALUE, CELL_CLEAR, CELL_SET_STYLE, DIM_INSERT_AXIS, DIM_DELETE_AXIS, DIM_MOVE_AXIS, DIM_RESIZE_AXIS, SHEET_CREATE, SHEET_DELETE, SHEET_RENAME
   - `struct Operation { HLC hlc; OpType type; ID target_id; std::string payload; }`
   - Operation serialization to/from JSON for network transport

@@ -39,6 +39,26 @@ cc_test(
 )
 
 cc_library(
+    name = "operation",
+    srcs = ["operation.cc"],
+    hdrs = ["operation.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":hlc",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "operation_test",
+    srcs = ["operation_test.cc"],
+    deps = [
+        ":operation",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "model",
     srcs = ["model.cc"],
     hdrs = ["model.h"],
