@@ -87,14 +87,14 @@ Extend the existing Go server with WebSocket signaling for WebRTC connection set
   - Thread-safe operations using `sync.RWMutex`
   - Add unit tests in `tools/serve/rooms_test.go`
 
-- [ ] 2c: Add WebSocket signaling endpoint `/ws`
+- [x] 2c: Add WebSocket signaling endpoint `/ws`
   - Upgrade HTTP to WebSocket in `tools/serve/main.go`
   - Handle WebSocket messages: `join`, `leave`, `offer`, `answer`, `ice-candidate`
   - Parse room ID from query parameter or message body
   - Broadcast peer events to room members
   - Add connection timeout and cleanup
 
-- [ ] 2d: Implement signaling message relay
+- [x] 2d: Implement signaling message relay
   - Relay SDP offers/answers between peers
   - Relay ICE candidates (trickle ICE)
   - Notify peers when new peer joins (`peer-joined` message)

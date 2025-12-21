@@ -1,24 +1,238 @@
-// Static file server for Cells WASM distribution
+// Static file server for Cells WASM distribution with WebSocket signaling
 // Usage: go run tools/serve/main.go [options]
 //
 // This server is designed to serve the WASM distribution with correct
 // MIME types and CORS headers for local development and testing.
+// It also provides WebSocket signaling for WebRTC peer connections.
 
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
+
+	"github.com/gorilla/websocket"
 )
+
+// SignalingMessage represents a WebSocket signaling message.
+type SignalingMessage struct {
+	Type      string          `json:"type"`
+	Room      string          `json:"room,omitempty"`
+	PeerID    string          `json:"peer_id,omitempty"`
+	Target    string          `json:"target,omitempty"`
+	From      string          `json:"from,omitempty"`
+	SDP       string          `json:"sdp,omitempty"`
+	Candidate json.RawMessage `json:"candidate,omitempty"`
+	Error     string          `json:"error,omitempty"`
+	Peers     []string        `json:"peers,omitempty"`
+}
+
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true // Allow all origins for development
+	},
+}
+
+var roomManager *RoomManager
+
+func handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WebSocket upgrade error: %v", err)
+		return
+	}
+
+	// Read room and peer ID from query params or first message
+	roomID := r.URL.Query().Get("room")
+	peerID := r.URL.Query().Get("peer_id")
+
+	// If not in query params, wait for join message
+	if roomID == "" || peerID == "" {
+		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		_, msgBytes, err := conn.ReadMessage()
+		if err != nil {
+			log.Printf("Failed to read join message: %v", err)
+			conn.Close()
+			return
+		}
+		conn.SetReadDeadline(time.Time{}) // Reset deadline
+
+		var msg SignalingMessage
+		if err := json.Unmarshal(msgBytes, &msg); err != nil {
+			log.Printf("Failed to parse join message: %v", err)
+			sendError(conn, "invalid_message", "Failed to parse message")
+			conn.Close()
+			return
+		}
+
+		if msg.Type != "join" {
+			sendError(conn, "expected_join", "First message must be 'join'")
+			conn.Close()
+			return
+		}
+
+		roomID = msg.Room
+		peerID = msg.PeerID
+	}
+
+	if roomID == "" {
+		sendError(conn, "missing_room", "Room ID is required")
+		conn.Close()
+		return
+	}
+
+	if peerID == "" {
+		sendError(conn, "missing_peer_id", "Peer ID is required")
+		conn.Close()
+		return
+	}
+
+	// Join room
+	room := roomManager.GetOrCreateRoom(roomID)
+	peer, ok := room.AddPeer(peerID, conn)
+	if !ok {
+		sendError(conn, "room_full", "Room is full")
+		conn.Close()
+		return
+	}
+
+	log.Printf("Peer %s joined room %s", peerID, roomID)
+
+	// Notify existing peers about new peer
+	notifyPeerJoined(room, peerID)
+
+	// Send list of existing peers to new peer
+	sendPeerList(conn, room, peerID)
+
+	// Handle messages until disconnect
+	handlePeerMessages(room, peer)
+
+	// Cleanup on disconnect
+	room.RemovePeer(peerID)
+	notifyPeerLeft(room, peerID)
+	log.Printf("Peer %s left room %s", peerID, roomID)
+}
+
+func sendError(conn *websocket.Conn, code string, message string) {
+	msg := SignalingMessage{
+		Type:  "error",
+		Error: fmt.Sprintf("%s: %s", code, message),
+	}
+	msgBytes, _ := json.Marshal(msg)
+	conn.WriteMessage(websocket.TextMessage, msgBytes)
+}
+
+func notifyPeerJoined(room *Room, peerID string) {
+	msg := SignalingMessage{
+		Type:   "peer-joined",
+		PeerID: peerID,
+	}
+	msgBytes, _ := json.Marshal(msg)
+	room.Broadcast(peerID, msgBytes)
+}
+
+func notifyPeerLeft(room *Room, peerID string) {
+	msg := SignalingMessage{
+		Type:   "peer-left",
+		PeerID: peerID,
+	}
+	msgBytes, _ := json.Marshal(msg)
+	room.Broadcast(peerID, msgBytes)
+}
+
+func sendPeerList(conn *websocket.Conn, room *Room, excludePeerID string) {
+	peers := room.GetPeers()
+	// Filter out the requesting peer
+	otherPeers := make([]string, 0, len(peers)-1)
+	for _, p := range peers {
+		if p != excludePeerID {
+			otherPeers = append(otherPeers, p)
+		}
+	}
+
+	msg := SignalingMessage{
+		Type:  "peer-list",
+		Peers: otherPeers,
+	}
+	msgBytes, _ := json.Marshal(msg)
+	conn.WriteMessage(websocket.TextMessage, msgBytes)
+}
+
+func handlePeerMessages(room *Room, peer *Peer) {
+	for {
+		_, msgBytes, err := peer.Conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+				log.Printf("WebSocket error for peer %s: %v", peer.ID, err)
+			}
+			return
+		}
+
+		peer.UpdateActivity()
+
+		var msg SignalingMessage
+		if err := json.Unmarshal(msgBytes, &msg); err != nil {
+			log.Printf("Failed to parse message from peer %s: %v", peer.ID, err)
+			continue
+		}
+
+		switch msg.Type {
+		case "offer", "answer", "ice-candidate":
+			// Relay signaling messages to target peer
+			relayMessage(room, peer.ID, msg)
+		case "leave":
+			// Peer is leaving
+			return
+		default:
+			log.Printf("Unknown message type from peer %s: %s", peer.ID, msg.Type)
+		}
+	}
+}
+
+func relayMessage(room *Room, fromPeerID string, msg SignalingMessage) {
+	if msg.Target == "" {
+		log.Printf("Missing target in %s message from peer %s", msg.Type, fromPeerID)
+		return
+	}
+
+	// Add sender info
+	relayedMsg := SignalingMessage{
+		Type:      msg.Type,
+		From:      fromPeerID,
+		SDP:       msg.SDP,
+		Candidate: msg.Candidate,
+	}
+	msgBytes, _ := json.Marshal(relayedMsg)
+
+	if err := room.SendTo(msg.Target, msgBytes); err != nil {
+		log.Printf("Failed to relay %s to peer %s: %v", msg.Type, msg.Target, err)
+	}
+}
 
 func main() {
 	port := flag.Int("port", 8081, "Port to listen on")
 	dir := flag.String("dir", "dist", "Directory to serve")
+	enableCollab := flag.Bool("enable-collab", false, "Enable collaboration WebSocket endpoint")
+	maxRoomSize := flag.Int("max-room-size", 10, "Maximum peers per room")
+	roomTimeout := flag.Duration("room-timeout", time.Hour, "Timeout for empty rooms")
 	flag.Parse()
+
+	// Initialize room manager if collaboration is enabled
+	if *enableCollab {
+		roomManager = NewRoomManager(*maxRoomSize, *roomTimeout)
+		// Start cleanup routine
+		stop := make(chan struct{})
+		roomManager.StartCleanupRoutine(time.Minute, stop)
+		log.Println("Collaboration enabled with WebSocket signaling at /ws")
+	}
 
 	// Resolve directory path
 	absDir, err := filepath.Abs(*dir)
@@ -33,7 +247,7 @@ func main() {
 
 	// Create file server with custom MIME types
 	fs := http.FileServer(http.Dir(absDir))
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	fileHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Set correct MIME types based on file extension
 		ext := filepath.Ext(r.URL.Path)
 		switch ext {
@@ -63,11 +277,21 @@ func main() {
 		fs.ServeHTTP(w, r)
 	})
 
+	// Set up routes
+	mux := http.NewServeMux()
+	if *enableCollab {
+		mux.HandleFunc("/ws", handleWebSocket)
+	}
+	mux.Handle("/", fileHandler)
+
 	addr := fmt.Sprintf(":%d", *port)
 	fmt.Printf("Serving %s on http://localhost%s/\n", absDir, addr)
+	if *enableCollab {
+		fmt.Printf("WebSocket signaling at ws://localhost%s/ws\n", addr)
+	}
 	fmt.Println("Press Ctrl+C to stop")
 
-	if err := http.ListenAndServe(addr, handler); err != nil {
+	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
 }
