@@ -80,7 +80,7 @@ Extend the existing Go server with WebSocket signaling for WebRTC connection set
   - Run `go mod tidy`
   - Update `tools/serve/README.md` with new dependency
 
-- [ ] 2b: Implement room management in Go server
+- [x] 2b: Implement room management in Go server
   - Create `tools/serve/rooms.go` with `Room` and `RoomManager` structs
   - `Room` tracks connected peers (peer ID → websocket connection)
   - `RoomManager` manages multiple rooms (room ID → Room)
