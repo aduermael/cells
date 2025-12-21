@@ -427,6 +427,58 @@ export class PeerConnector {
     }
 
     /**
+     * Get mesh topology status
+     * Returns information about the current peer mesh
+     * @returns {Object} Mesh status object
+     */
+    getMeshStatus() {
+        const allPeers = this._rtc.getAllPeerIds();
+        const connectedPeers = this._rtc.getConnectedPeerIds();
+        const readyPeers = [];
+        for (const peerId of allPeers) {
+            const peer = this._rtc.getPeer(peerId);
+            if (peer && peer.isReady()) {
+                readyPeers.push(peerId);
+            }
+        }
+
+        return {
+            localPeerId: this._peerId,
+            roomId: this._roomId,
+            totalPeers: allPeers.length,
+            connectedPeers: connectedPeers.length,
+            readyPeers: readyPeers.length,
+            maxPeers: this._rtc.maxPeers,
+            peers: allPeers.map(peerId => {
+                const peer = this._rtc.getPeer(peerId);
+                return {
+                    peerId,
+                    state: peer ? peer.state : 'unknown',
+                    ready: peer ? peer.isReady() : false
+                };
+            })
+        };
+    }
+
+    /**
+     * Check if the mesh is fully connected
+     * (all peers have ready data channels)
+     * @returns {boolean}
+     */
+    isMeshReady() {
+        const allPeers = this._rtc.getAllPeerIds();
+        if (allPeers.length === 0) return true; // No peers to connect to
+
+        for (const peerId of allPeers) {
+            const peer = this._rtc.getPeer(peerId);
+            if (!peer || !peer.isReady()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Register an event listener
      * @param {string} event - Event name
      * @param {Function} callback - Callback function

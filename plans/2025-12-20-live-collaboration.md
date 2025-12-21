@@ -153,7 +153,7 @@ Implement WebRTC peer-to-peer connections in the WASM web app.
   - Add configuration option for custom TURN servers
   - Fallback to multiple STUN servers for redundancy
 
-- [ ] 3f: Implement mesh topology for small groups
+- [x] 3f: Implement mesh topology for small groups
   - Connect to all peers in room (full mesh)
   - Track active connections in WebRTCManager
   - Handle peer join: establish new connection
