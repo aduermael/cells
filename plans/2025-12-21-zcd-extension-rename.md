@@ -24,10 +24,10 @@ Rename the native file format extension from `.cells` to `.zcd` (Zero-Conflict D
 
 ## Phase 3: Update CLI Application
 
-- [ ] 3a: Update `apps/cli/main.cc` - extension handling
-- [ ] 3b: Update `apps/cli/options.h` - help text and extension constants
-- [ ] 3c: Update `apps/cli/converter.cc` - format detection
-- [ ] 3d: Update `apps/cli/converter_test.cc` - test file paths
+- [x] 3a: Update `apps/cli/main.cc` - extension handling
+- [x] 3b: Update `apps/cli/options.h` - help text and extension constants
+- [x] 3c: Update `apps/cli/converter.cc` - format detection
+- [x] 3d: Update `apps/cli/converter_test.cc` - test file paths
 
 ## Phase 4: Update WASM/Web Application
 

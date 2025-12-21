@@ -33,19 +33,19 @@ void print_usage(const char* program_name) {
               << "Usage: " << program_name << " [options] -i <input> <output>\n"
               << "       " << program_name << " -I <file>     (info mode)\n"
               << "\n"
-              << "Convert between spreadsheet formats (.cells, .csv, .xlsx).\n"
+              << "Convert between spreadsheet formats (.zcd, .csv, .xlsx).\n"
               << "Format is auto-detected from file extension.\n"
               << "\n"
               << "Supported Formats:\n"
-              << "  .cells    Native format (preserves all features)\n"
+              << "  .zcd      Native format (preserves all features)\n"
               << "  .csv      Comma-separated values (single sheet, values only)\n"
               << "  .tsv      Tab-separated values (auto-detected)\n"
               << "  .xlsx     Excel 2007+ format\n"
               << "\n"
               << "Input/Output:\n"
               << "  -i <file>           Input file (required)\n"
-              << "  -f <format>         Force input format (cells, csv, xlsx)\n"
-              << "  -t <format>         Force output format (cells, csv, xlsx)\n"
+              << "  -f <format>         Force input format (zcd, csv, xlsx)\n"
+              << "  -t <format>         Force output format (zcd, csv, xlsx)\n"
               << "\n"
               << "CSV Options:\n"
               << "  --delimiter <char>  CSV delimiter (default: , or tab for .tsv)\n"
@@ -69,20 +69,20 @@ void print_usage(const char* program_name) {
               << "\n"
               << "Examples:\n"
               << "  # Basic conversion\n"
-              << "  cells -i data.csv output.cells\n"
+              << "  cells -i data.csv output.zcd\n"
               << "  cells -i budget.xlsx report.csv\n"
               << "  cells -i legacy.csv modern.xlsx\n"
               << "\n"
               << "  # CSV with custom delimiter\n"
-              << "  cells -i data.tsv output.cells          # Auto-detects tab\n"
-              << "  cells -i data.txt --delimiter ';' out.cells\n"
+              << "  cells -i data.tsv output.zcd            # Auto-detects tab\n"
+              << "  cells -i data.txt --delimiter ';' out.zcd\n"
               << "\n"
               << "  # XLSX sheet selection\n"
               << "  cells -i workbook.xlsx --sheet 'Q1' q1.csv\n"
               << "  cells -i workbook.xlsx --all-sheets reports/\n"
               << "\n"
               << "  # File inspection\n"
-              << "  cells -I data.cells                     # Show file info\n"
+              << "  cells -I data.zcd                       # Show file info\n"
               << "  cells -I budget.xlsx --sheet 'Summary'  # Info for one sheet\n"
               << "\n"
               << "  # Scripting\n"
@@ -102,7 +102,7 @@ void print_usage(const char* program_name) {
 void print_version() { std::cout << "cells " << kVersion << "\n"; }
 
 Format parse_format(std::string_view format_str) {
-    if (format_str == "cells") return Format::kCells;
+    if (format_str == "zcd") return Format::kZcd;
     if (format_str == "csv") return Format::kCsv;
     if (format_str == "xlsx") return Format::kXlsx;
     return Format::kUnknown;
@@ -302,7 +302,7 @@ int show_file_info(const Options& opts) {
     // Parse the file based on format
     std::unique_ptr<cells::Workbook> workbook;
 
-    if (opts.input_format == Format::kCells) {
+    if (opts.input_format == Format::kZcd) {
         // Read file content for text-based formats
         std::string content = read_file(opts.input_file);
         if (content.empty()) {

@@ -9,9 +9,9 @@ namespace cells::cli {
 // Supported file formats
 enum class Format {
     kUnknown,
-    kCells,  // .cells - native format
-    kCsv,    // .csv - comma-separated values
-    kXlsx,   // .xlsx - Excel 2007+
+    kZcd,   // .zcd - native format (Zero-Conflict Document)
+    kCsv,   // .csv - comma-separated values
+    kXlsx,  // .xlsx - Excel 2007+
 };
 
 // CSV-specific options
@@ -67,7 +67,7 @@ inline Format detect_format(std::string_view filename) {
 
     std::string_view ext = filename.substr(dot_pos);
 
-    if (ext == ".cells") return Format::kCells;
+    if (ext == ".zcd") return Format::kZcd;
     if (ext == ".csv") return Format::kCsv;
     if (ext == ".tsv") return Format::kCsv;  // TSV is CSV with tab delimiter
     if (ext == ".xlsx") return Format::kXlsx;
@@ -78,7 +78,7 @@ inline Format detect_format(std::string_view filename) {
 // Convert format enum to string for display
 inline const char* format_name(Format fmt) {
     switch (fmt) {
-        case Format::kCells: return "cells";
+        case Format::kZcd: return "zcd";
         case Format::kCsv: return "csv";
         case Format::kXlsx: return "xlsx";
         case Format::kUnknown: return "unknown";

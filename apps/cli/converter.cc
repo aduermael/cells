@@ -194,7 +194,7 @@ ConversionResult Converter::convertAllSheets() {
 
 std::unique_ptr<Workbook> Converter::readInput(std::string& error_out) {
     switch (options_.input_format) {
-        case Format::kCells: {
+        case Format::kZcd: {
             // Read file contents for text-based formats
             const std::string content = readFileContents(options_.input_file, error_out);
             if (content.empty() && !error_out.empty()) {
@@ -271,7 +271,7 @@ std::unique_ptr<Workbook> Converter::readInput(std::string& error_out) {
 
 bool Converter::writeOutput(const Workbook& workbook, std::string& error_out) {
     switch (options_.output_format) {
-        case Format::kCells: {
+        case Format::kZcd: {
             const Serializer serializer;
             std::string content = serializer.serialize(workbook);
             return writeFileContents(options_.output_file, content, error_out);

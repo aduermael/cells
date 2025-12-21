@@ -67,22 +67,22 @@ private:
 };
 
 // ============================================================
-// CSV to .cells conversion tests
+// CSV to .zcd conversion tests
 // ============================================================
 
-TEST_F(ConverterTest, CsvToCells_SimpleData) {
+TEST_F(ConverterTest, CsvToZcd_SimpleData) {
     // CSV: header row (A,B,C) + 2 data rows (1,2,3) and (4,5,6)
     // Header row becomes column names, so we have 2 data rows × 3 columns = 6 cells
     std::string csv_content = "A,B,C\n1,2,3\n4,5,6\n";
     std::string input = tempFile(".csv", csv_content);
-    std::string output = tempFile(".cells", "");
+    std::string output = tempFile(".zcd", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
     opts.input_format = Format::kCsv;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.output.overwrite = true;
 
     Converter converter(opts);
@@ -92,24 +92,24 @@ TEST_F(ConverterTest, CsvToCells_SimpleData) {
     EXPECT_EQ(result.cells_converted, 6);  // 2 data rows × 3 columns
     EXPECT_TRUE(result.warnings.empty());
 
-    // Verify output file exists and has valid cells content
+    // Verify output file exists and has valid zcd content
     std::string output_content = readFile(output);
     EXPECT_FALSE(output_content.empty());
-    // Serializer starts with "D" (document) line, not "#cells v1"
+    // Serializer starts with "D" (document) line
     EXPECT_TRUE(output_content.find("D ") != std::string::npos);
 }
 
-TEST_F(ConverterTest, CsvToCells_NumericDetection) {
+TEST_F(ConverterTest, CsvToZcd_NumericDetection) {
     std::string csv_content = "Name,Value\nTest,42\nOther,3.14\n";
     std::string input = tempFile(".csv", csv_content);
-    std::string output = tempFile(".cells", "");
+    std::string output = tempFile(".zcd", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
     opts.input_format = Format::kCsv;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.output.overwrite = true;
 
     Converter converter(opts);
@@ -123,19 +123,19 @@ TEST_F(ConverterTest, CsvToCells_NumericDetection) {
     EXPECT_TRUE(output_content.find(" n 3.14") != std::string::npos);
 }
 
-TEST_F(ConverterTest, CsvToCells_CustomDelimiter) {
+TEST_F(ConverterTest, CsvToZcd_CustomDelimiter) {
     // TSV: header row (A,B,C) + 1 data row (1,2,3)
     // Header row becomes column names, so we have 1 data row × 3 columns = 3 cells
     std::string tsv_content = "A\tB\tC\n1\t2\t3\n";
     std::string input = tempFile(".tsv", tsv_content);
-    std::string output = tempFile(".cells", "");
+    std::string output = tempFile(".zcd", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
     opts.input_format = Format::kCsv;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.csv.delimiter = "\t";
     opts.output.overwrite = true;
 
@@ -147,11 +147,11 @@ TEST_F(ConverterTest, CsvToCells_CustomDelimiter) {
 }
 
 // ============================================================
-// .cells to CSV conversion tests
+// .zcd to CSV conversion tests
 // ============================================================
 
-TEST_F(ConverterTest, CellsToCsv_SimpleData) {
-    std::string cells_content = R"(D doc1 "TestDoc"
+TEST_F(ConverterTest, ZcdToCsv_SimpleData) {
+    std::string zcd_content = R"(D doc1 "TestDoc"
 S sheet1 "Sheet1"
 C col1 0
 C col2 1
@@ -163,14 +163,14 @@ X cell3 col1 row2 s "World"
 X cell4 col2 row2 n 100
 )";
 
-    std::string input = tempFile(".cells", cells_content);
+    std::string input = tempFile(".zcd", zcd_content);
     std::string output = tempFile(".csv", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
-    opts.input_format = Format::kCells;
+    opts.input_format = Format::kZcd;
     opts.output_format = Format::kCsv;
     opts.output.overwrite = true;
 
@@ -186,8 +186,8 @@ X cell4 col2 row2 n 100
     EXPECT_TRUE(csv_output.find("42") != std::string::npos);
 }
 
-TEST_F(ConverterTest, CellsToCsv_MultiSheetWarning) {
-    std::string cells_content = R"(D doc1 "TestDoc"
+TEST_F(ConverterTest, ZcdToCsv_MultiSheetWarning) {
+    std::string zcd_content = R"(D doc1 "TestDoc"
 S sheet1 "Sheet1"
 C col1 0
 R row1 0
@@ -198,14 +198,14 @@ R row2 0
 X cell2 col2 row2 n 2
 )";
 
-    std::string input = tempFile(".cells", cells_content);
+    std::string input = tempFile(".zcd", zcd_content);
     std::string output = tempFile(".csv", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
-    opts.input_format = Format::kCells;
+    opts.input_format = Format::kZcd;
     opts.output_format = Format::kCsv;
     opts.output.overwrite = true;
 
@@ -226,8 +226,8 @@ X cell2 col2 row2 n 2
     EXPECT_TRUE(found_warning) << "Expected warning about multiple sheets";
 }
 
-TEST_F(ConverterTest, CellsToCsv_FormulaWarning) {
-    std::string cells_content = R"(D doc1 "TestDoc"
+TEST_F(ConverterTest, ZcdToCsv_FormulaWarning) {
+    std::string zcd_content = R"(D doc1 "TestDoc"
 S sheet1 "Sheet1"
 C col1 0
 C col2 1
@@ -236,14 +236,14 @@ X cell1 col1 row1 n 10
 X cell2 col2 row1 f "=$col1$row1*2"
 )";
 
-    std::string input = tempFile(".cells", cells_content);
+    std::string input = tempFile(".zcd", zcd_content);
     std::string output = tempFile(".csv", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
-    opts.input_format = Format::kCells;
+    opts.input_format = Format::kZcd;
     opts.output_format = Format::kCsv;
     opts.output.overwrite = true;
 
@@ -264,43 +264,43 @@ X cell2 col2 row1 f "=$col1$row1*2"
 }
 
 // ============================================================
-// Roundtrip tests (CSV -> cells -> CSV)
+// Roundtrip tests (CSV -> zcd -> CSV)
 // ============================================================
 
-TEST_F(ConverterTest, Roundtrip_CsvToCellsToCsv) {
+TEST_F(ConverterTest, Roundtrip_CsvToZcdToCsv) {
     std::string original_csv = "Name,Age,City\r\nAlice,30,NYC\r\nBob,25,LA\r\n";
     std::string csv_input = tempFile(".csv", original_csv);
-    std::string cells_intermediate = tempFile(".cells", "");
+    std::string zcd_intermediate = tempFile(".zcd", "");
     std::string csv_output = tempFile(".csv", "");
-    trackFile(cells_intermediate);
+    trackFile(zcd_intermediate);
     trackFile(csv_output);
 
-    // Step 1: CSV -> .cells
+    // Step 1: CSV -> .zcd
     {
         Options opts;
         opts.input_file = csv_input;
-        opts.output_file = cells_intermediate;
+        opts.output_file = zcd_intermediate;
         opts.input_format = Format::kCsv;
-        opts.output_format = Format::kCells;
+        opts.output_format = Format::kZcd;
         opts.output.overwrite = true;
 
         Converter converter(opts);
         ConversionResult result = converter.convert();
-        ASSERT_TRUE(result.ok()) << "CSV->cells failed: " << result.error;
+        ASSERT_TRUE(result.ok()) << "CSV->zcd failed: " << result.error;
     }
 
-    // Step 2: .cells -> CSV
+    // Step 2: .zcd -> CSV
     {
         Options opts;
-        opts.input_file = cells_intermediate;
+        opts.input_file = zcd_intermediate;
         opts.output_file = csv_output;
-        opts.input_format = Format::kCells;
+        opts.input_format = Format::kZcd;
         opts.output_format = Format::kCsv;
         opts.output.overwrite = true;
 
         Converter converter(opts);
         ConversionResult result = converter.convert();
-        ASSERT_TRUE(result.ok()) << "cells->CSV failed: " << result.error;
+        ASSERT_TRUE(result.ok()) << "zcd->CSV failed: " << result.error;
     }
 
     // Verify roundtrip preserves data
@@ -314,8 +314,8 @@ TEST_F(ConverterTest, Roundtrip_CsvToCellsToCsv) {
     EXPECT_TRUE(result_csv.find("LA") != std::string::npos);
 }
 
-TEST_F(ConverterTest, Roundtrip_CellsToCsvToCells) {
-    std::string original_cells = R"(D doc1 "TestDoc"
+TEST_F(ConverterTest, Roundtrip_ZcdToCsvToZcd) {
+    std::string original_zcd = R"(D doc1 "TestDoc"
 S sheet1 "Data"
 C col1 0
 C col2 1
@@ -327,48 +327,48 @@ X cell3 col1 row2 s "Widget"
 X cell4 col2 row2 n 99.99
 )";
 
-    std::string cells_input = tempFile(".cells", original_cells);
+    std::string zcd_input = tempFile(".zcd", original_zcd);
     std::string csv_intermediate = tempFile(".csv", "");
-    std::string cells_output = tempFile(".cells", "");
+    std::string zcd_output = tempFile(".zcd", "");
     trackFile(csv_intermediate);
-    trackFile(cells_output);
+    trackFile(zcd_output);
 
-    // Step 1: .cells -> CSV
+    // Step 1: .zcd -> CSV
     {
         Options opts;
-        opts.input_file = cells_input;
+        opts.input_file = zcd_input;
         opts.output_file = csv_intermediate;
-        opts.input_format = Format::kCells;
+        opts.input_format = Format::kZcd;
         opts.output_format = Format::kCsv;
         opts.output.overwrite = true;
 
         Converter converter(opts);
         ConversionResult result = converter.convert();
-        ASSERT_TRUE(result.ok()) << "cells->CSV failed: " << result.error;
+        ASSERT_TRUE(result.ok()) << "zcd->CSV failed: " << result.error;
     }
 
-    // Step 2: CSV -> .cells
+    // Step 2: CSV -> .zcd
     {
         Options opts;
         opts.input_file = csv_intermediate;
-        opts.output_file = cells_output;
+        opts.output_file = zcd_output;
         opts.input_format = Format::kCsv;
-        opts.output_format = Format::kCells;
+        opts.output_format = Format::kZcd;
         opts.output.overwrite = true;
 
         Converter converter(opts);
         ConversionResult result = converter.convert();
-        ASSERT_TRUE(result.ok()) << "CSV->cells failed: " << result.error;
+        ASSERT_TRUE(result.ok()) << "CSV->zcd failed: " << result.error;
     }
 
     // Verify roundtrip preserves data
-    std::string result_cells = readFile(cells_output);
-    EXPECT_TRUE(result_cells.find("Product") != std::string::npos);
-    EXPECT_TRUE(result_cells.find("Price") != std::string::npos);
-    EXPECT_TRUE(result_cells.find("Widget") != std::string::npos);
+    std::string result_zcd = readFile(zcd_output);
+    EXPECT_TRUE(result_zcd.find("Product") != std::string::npos);
+    EXPECT_TRUE(result_zcd.find("Price") != std::string::npos);
+    EXPECT_TRUE(result_zcd.find("Widget") != std::string::npos);
     // Note: 99.99 may have floating-point precision changes (99.989999999999995)
     // so we check for "99.9" as a prefix
-    EXPECT_TRUE(result_cells.find("99.9") != std::string::npos);
+    EXPECT_TRUE(result_zcd.find("99.9") != std::string::npos);
 }
 
 // ============================================================
@@ -376,14 +376,14 @@ X cell4 col2 row2 n 99.99
 // ============================================================
 
 TEST_F(ConverterTest, Error_InputFileNotFound) {
-    std::string output = tempFile(".cells", "");
+    std::string output = tempFile(".zcd", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = "/nonexistent/path/file.csv";
     opts.output_file = output;
     opts.input_format = Format::kCsv;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.output.overwrite = true;
 
     Converter converter(opts);
@@ -396,14 +396,14 @@ TEST_F(ConverterTest, Error_InputFileNotFound) {
 
 TEST_F(ConverterTest, Error_OverwriteProtection) {
     std::string input = tempFile(".csv", "A,B\n1,2\n");
-    std::string output = tempFile(".cells", "existing content");
+    std::string output = tempFile(".zcd", "existing content");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
     opts.input_format = Format::kCsv;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.output.overwrite = false;  // Explicitly disable overwrite
 
     Converter converter(opts);
@@ -413,16 +413,16 @@ TEST_F(ConverterTest, Error_OverwriteProtection) {
     EXPECT_TRUE(result.error.find("already exists") != std::string::npos);
 }
 
-TEST_F(ConverterTest, Error_InvalidCellsFormat) {
-    std::string invalid_cells = "This is not a valid cells file\n";
-    std::string input = tempFile(".cells", invalid_cells);
+TEST_F(ConverterTest, Error_InvalidZcdFormat) {
+    std::string invalid_zcd = "This is not a valid zcd file\n";
+    std::string input = tempFile(".zcd", invalid_zcd);
     std::string output = tempFile(".csv", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
-    opts.input_format = Format::kCells;
+    opts.input_format = Format::kZcd;
     opts.output_format = Format::kCsv;
     opts.output.overwrite = true;
 
@@ -454,16 +454,16 @@ std::string getTestDataPath(const std::string& filename) {
     return runfiles_path;
 }
 
-TEST_F(ConverterTest, XlsxToCells_SimpleData) {
+TEST_F(ConverterTest, XlsxToZcd_SimpleData) {
     std::string input = getTestDataPath("simple.xlsx");
-    std::string output = tempFile(".cells", "");
+    std::string output = tempFile(".zcd", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
     opts.input_format = Format::kXlsx;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.output.overwrite = true;
 
     Converter converter(opts);
@@ -472,22 +472,22 @@ TEST_F(ConverterTest, XlsxToCells_SimpleData) {
     ASSERT_TRUE(result.ok()) << "Error: " << result.error;
     EXPECT_GT(result.cells_converted, 0);
 
-    // Verify output file exists and has valid cells content
+    // Verify output file exists and has valid zcd content
     std::string output_content = readFile(output);
     EXPECT_FALSE(output_content.empty());
     EXPECT_TRUE(output_content.find("D ") != std::string::npos);
 }
 
-TEST_F(ConverterTest, XlsxToCells_WithFormulas) {
+TEST_F(ConverterTest, XlsxToZcd_WithFormulas) {
     std::string input = getTestDataPath("formulas.xlsx");
-    std::string output = tempFile(".cells", "");
+    std::string output = tempFile(".zcd", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
     opts.input_format = Format::kXlsx;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.output.overwrite = true;
 
     Converter converter(opts);
@@ -501,16 +501,16 @@ TEST_F(ConverterTest, XlsxToCells_WithFormulas) {
     EXPECT_TRUE(output_content.find(" f \"=") != std::string::npos);
 }
 
-TEST_F(ConverterTest, XlsxToCells_MultiSheet) {
+TEST_F(ConverterTest, XlsxToZcd_MultiSheet) {
     std::string input = getTestDataPath("multi_sheet.xlsx");
-    std::string output = tempFile(".cells", "");
+    std::string output = tempFile(".zcd", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
     opts.input_format = Format::kXlsx;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.output.overwrite = true;
 
     Converter converter(opts);
@@ -534,8 +534,8 @@ TEST_F(ConverterTest, XlsxToCells_MultiSheet) {
     EXPECT_GE(sheet_count, 2) << "Expected multiple sheets in output";
 }
 
-TEST_F(ConverterTest, CellsToXlsx_SimpleData) {
-    std::string cells_content = R"(D doc1 "TestDoc"
+TEST_F(ConverterTest, ZcdToXlsx_SimpleData) {
+    std::string zcd_content = R"(D doc1 "TestDoc"
 S sheet1 "Sheet1"
 C col1 0
 C col2 1
@@ -547,14 +547,14 @@ X cell3 col1 row2 s "World"
 X cell4 col2 row2 n 100
 )";
 
-    std::string input = tempFile(".cells", cells_content);
+    std::string input = tempFile(".zcd", zcd_content);
     std::string output = tempFile(".xlsx", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
-    opts.input_format = Format::kCells;
+    opts.input_format = Format::kZcd;
     opts.output_format = Format::kXlsx;
     opts.output.overwrite = true;
 
@@ -617,55 +617,55 @@ TEST_F(ConverterTest, CsvToXlsx_SimpleData) {
     EXPECT_GT(std::filesystem::file_size(output), 0);
 }
 
-TEST_F(ConverterTest, Roundtrip_XlsxToCellsToXlsx) {
+TEST_F(ConverterTest, Roundtrip_XlsxToZcdToXlsx) {
     std::string xlsx_input = getTestDataPath("simple.xlsx");
-    std::string cells_intermediate = tempFile(".cells", "");
+    std::string zcd_intermediate = tempFile(".zcd", "");
     std::string xlsx_output = tempFile(".xlsx", "");
-    trackFile(cells_intermediate);
+    trackFile(zcd_intermediate);
     trackFile(xlsx_output);
 
-    // Step 1: XLSX -> .cells
+    // Step 1: XLSX -> .zcd
     size_t cells_count_1 = 0;
     {
         Options opts;
         opts.input_file = xlsx_input;
-        opts.output_file = cells_intermediate;
+        opts.output_file = zcd_intermediate;
         opts.input_format = Format::kXlsx;
-        opts.output_format = Format::kCells;
+        opts.output_format = Format::kZcd;
         opts.output.overwrite = true;
 
         Converter converter(opts);
         ConversionResult result = converter.convert();
-        ASSERT_TRUE(result.ok()) << "XLSX->cells failed: " << result.error;
+        ASSERT_TRUE(result.ok()) << "XLSX->zcd failed: " << result.error;
         cells_count_1 = result.cells_converted;
     }
 
-    // Step 2: .cells -> XLSX
+    // Step 2: .zcd -> XLSX
     {
         Options opts;
-        opts.input_file = cells_intermediate;
+        opts.input_file = zcd_intermediate;
         opts.output_file = xlsx_output;
-        opts.input_format = Format::kCells;
+        opts.input_format = Format::kZcd;
         opts.output_format = Format::kXlsx;
         opts.output.overwrite = true;
 
         Converter converter(opts);
         ConversionResult result = converter.convert();
-        ASSERT_TRUE(result.ok()) << "cells->XLSX failed: " << result.error;
+        ASSERT_TRUE(result.ok()) << "zcd->XLSX failed: " << result.error;
         EXPECT_EQ(result.cells_converted, cells_count_1);
     }
 }
 
 TEST_F(ConverterTest, XlsxSheetFilter) {
     std::string input = getTestDataPath("multi_sheet.xlsx");
-    std::string output = tempFile(".cells", "");
+    std::string output = tempFile(".zcd", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
     opts.input_format = Format::kXlsx;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.xlsx.sheet_name = "Sales";  // Filter to only "Sales" sheet
     opts.output.overwrite = true;
 
@@ -736,14 +736,14 @@ TEST_F(ConverterTest, XlsxAllSheets) {
 TEST_F(ConverterTest, EmptyCsv) {
     std::string empty_csv = "";
     std::string input = tempFile(".csv", empty_csv);
-    std::string output = tempFile(".cells", "");
+    std::string output = tempFile(".zcd", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
     opts.input_format = Format::kCsv;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.output.overwrite = true;
 
     Converter converter(opts);
@@ -760,14 +760,14 @@ TEST_F(ConverterTest, CsvWithQuotedFields) {
 "Gadget","Has ""quotes"" inside"
 )";
     std::string input = tempFile(".csv", csv_content);
-    std::string output = tempFile(".cells", "");
+    std::string output = tempFile(".zcd", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
     opts.input_format = Format::kCsv;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.output.overwrite = true;
 
     Converter converter(opts);
@@ -775,23 +775,23 @@ TEST_F(ConverterTest, CsvWithQuotedFields) {
 
     ASSERT_TRUE(result.ok()) << "Error: " << result.error;
 
-    // Verify the cells file contains the properly unquoted content
-    std::string cells_output = readFile(output);
-    EXPECT_TRUE(cells_output.find("Widget") != std::string::npos);
-    EXPECT_TRUE(cells_output.find("small, useful device") != std::string::npos);
+    // Verify the zcd file contains the properly unquoted content
+    std::string zcd_output = readFile(output);
+    EXPECT_TRUE(zcd_output.find("Widget") != std::string::npos);
+    EXPECT_TRUE(zcd_output.find("small, useful device") != std::string::npos);
 }
 
 TEST_F(ConverterTest, CsvWithUnicode) {
     std::string csv_content = "Name,City\nTokyo,\xE6\x9D\xB1\xE4\xBA\xAC\nParis,\xC3\x89toile\n";
     std::string input = tempFile(".csv", csv_content);
-    std::string output = tempFile(".cells", "");
+    std::string output = tempFile(".zcd", "");
     trackFile(output);
 
     Options opts;
     opts.input_file = input;
     opts.output_file = output;
     opts.input_format = Format::kCsv;
-    opts.output_format = Format::kCells;
+    opts.output_format = Format::kZcd;
     opts.output.overwrite = true;
 
     Converter converter(opts);
