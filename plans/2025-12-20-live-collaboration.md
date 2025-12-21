@@ -213,7 +213,7 @@ Connect the CRDT engine to the WebRTC layer and implement the sync protocol.
 
 Implement user presence, online indicators, and collaboration UI elements.
 
-- [ ] 5a: Implement presence data structure
+- [x] 5a: Implement presence data structure
   - `struct Presence { ID peer_id; string name; string color; ID sheet_id; CellPos cursor; CellRange selection; }`
   - Generate random names: "User <number>" or random adjective+animal
   - Assign random colors from palette (10+ distinct colors)
