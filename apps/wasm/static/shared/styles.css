@@ -1,5 +1,12 @@
 /* Cells Shared Styles */
 
+/* Spacing scale */
+:root {
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+}
+
 /* Reset */
 * {
     margin: 0;
@@ -24,32 +31,33 @@ html, body {
 
 /* Header */
 #header {
-    padding: 8px 16px;
+    padding: var(--spacing-sm) var(--spacing-md);
     background: #f8f9fa;
     border-bottom: none;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: var(--spacing-sm);
 }
 
 #header h1 {
     font-size: 14px;
     font-weight: 600;
     color: #212529;
+    margin-left: var(--spacing-xs);
 }
 
 /* Toolbar */
 #toolbar {
     margin-left: auto;
     display: flex;
-    gap: 8px;
+    gap: var(--spacing-sm);
     align-items: center;
 }
 
 /* Collaboration UI Container */
 #collab-ui-container {
     display: flex;
-    gap: 8px;
+    gap: var(--spacing-sm);
     align-items: center;
 }
 
@@ -232,10 +240,10 @@ canvas {
 #formula-bar {
     display: flex;
     align-items: center;
-    padding: 6px 16px 8px 16px;
+    padding: var(--spacing-sm) var(--spacing-md);
     background: #f8f9fa;
     border-bottom: 1px solid #dee2e6;
-    gap: 8px;
+    gap: var(--spacing-sm);
 }
 
 #formula-bar.hidden {
@@ -361,7 +369,7 @@ canvas {
     position: absolute;
     top: 100%;
     right: 0;
-    margin-top: 4px;
+    margin-top: var(--spacing-xs);
     min-width: 140px;
     background: #fff;
     border: 1px solid #dee2e6;
@@ -577,7 +585,7 @@ canvas {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px;
+    padding: 4px 12px;
     font-size: 12px;
     font-weight: 500;
     border: 1px solid #dee2e6;
@@ -649,7 +657,7 @@ canvas {
     position: absolute;
     top: 100%;
     right: 0;
-    margin-top: 8px;
+    margin-top: var(--spacing-xs);
     min-width: 200px;
     background: #fff;
     border: 1px solid #dee2e6;
@@ -660,7 +668,7 @@ canvas {
     visibility: hidden;
     transform: translateY(-4px);
     transition: all 0.15s ease;
-    padding: 12px;
+    padding: var(--spacing-md);
 }
 
 .collab-status-badge.show-details .collab-status-details {
@@ -673,8 +681,8 @@ canvas {
     font-size: 13px;
     font-weight: 600;
     color: #212529;
-    margin-bottom: 8px;
-    padding-bottom: 8px;
+    margin-bottom: var(--spacing-sm);
+    padding-bottom: var(--spacing-sm);
     border-bottom: 1px solid #e9ecef;
 }
 
@@ -684,7 +692,7 @@ canvas {
     align-items: center;
     font-size: 12px;
     color: #495057;
-    padding: 4px 0;
+    padding: var(--spacing-xs) 0;
 }
 
 .collab-status-details-row .label {
@@ -696,16 +704,16 @@ canvas {
 }
 
 .collab-status-details-peers {
-    margin-top: 8px;
-    padding-top: 8px;
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
     border-top: 1px solid #e9ecef;
 }
 
 .collab-status-details-peers .peer-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 0;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
     font-size: 12px;
 }
 
@@ -726,10 +734,10 @@ canvas {
     padding: 4px 12px;
     font-size: 12px;
     font-weight: 500;
-    border: 1px solid #0d6efd;
+    border: 1px solid #dee2e6;
     border-radius: 4px;
-    background: #0d6efd;
-    color: #fff;
+    background: #fff;
+    color: #495057;
     cursor: pointer;
     transition: all 0.15s ease;
     display: flex;
@@ -739,13 +747,12 @@ canvas {
 }
 
 .collab-collaborate-btn:hover {
-    background: #0b5ed7;
-    border-color: #0b5ed7;
+    background: #e9ecef;
+    border-color: #adb5bd;
 }
 
 .collab-collaborate-btn:active {
-    background: #0a58ca;
-    border-color: #0a58ca;
+    background: #dee2e6;
 }
 
 /* Status dot inside collaborate button */
@@ -789,13 +796,13 @@ canvas {
 
 /* Share section in modal */
 .collab-status-share-section {
-    margin-bottom: 12px;
+    margin-bottom: var(--spacing-md);
 }
 
 .collab-share-description {
     font-size: 12px;
     color: #6c757d;
-    margin: 0 0 10px 0;
+    margin: 0 0 var(--spacing-sm) 0;
     line-height: 1.4;
 }
 
@@ -831,7 +838,7 @@ canvas {
 .collab-status-details-divider {
     height: 1px;
     background: #e9ecef;
-    margin: 12px 0;
+    margin: var(--spacing-md) 0;
 }
 
 /* Inline name input */
@@ -843,7 +850,7 @@ canvas {
 
 .collab-name-edit-inline input {
     width: 120px;
-    padding: 4px 8px;
+    padding: var(--spacing-xs) var(--spacing-sm);
     font-size: 12px;
     color: #212529;
     background: #fff;
@@ -866,7 +873,7 @@ canvas {
 /* Share tooltip */
 .collab-share-tooltip {
     position: fixed;
-    padding: 8px 12px;
+    padding: var(--spacing-sm) var(--spacing-md);
     font-size: 12px;
     font-weight: 500;
     color: #fff;
@@ -905,14 +912,14 @@ canvas {
 
 /* Actions panel in status details */
 .collab-status-details-actions {
-    margin-top: 10px;
-    padding-top: 10px;
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
     border-top: 1px solid #e9ecef;
 }
 
 .collab-status-details-actions .reconnect-btn {
     width: 100%;
-    padding: 8px 12px;
+    padding: var(--spacing-sm) var(--spacing-md);
     font-size: 12px;
     font-weight: 500;
     color: #495057;
@@ -931,8 +938,8 @@ canvas {
 
 /* Debug section in status details */
 .collab-status-details-debug {
-    margin-top: 10px;
-    padding-top: 10px;
+    margin-top: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
     border-top: 1px solid #e9ecef;
 }
 
@@ -953,8 +960,8 @@ canvas {
 .collab-status-details-debug .debug-actions {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    margin-top: 8px;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-sm);
 }
 
 .collab-status-details-debug .debug-btn {
