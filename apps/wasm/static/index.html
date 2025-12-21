@@ -78,7 +78,11 @@
         } from './shared/ui-state.js';
 
         import { CollabUI } from './shared/collab-ui.js';
-        import { clearRoomIdFromUrl } from './shared/room-url.js';
+        import { clearRoomIdFromUrl, getRoomIdFromUrl, RoomManager } from './shared/room-url.js';
+        import { SignalingClient } from './shared/signaling-client.js';
+        import { WebRTCManager } from './shared/webrtc-manager.js';
+        import { CollabManager } from './shared/collab-manager.js';
+        import { PresenceManager } from './shared/presence.js';
 
         // ========================================================================
         // WASM Data Source (communicates with Web Worker)
@@ -242,6 +246,131 @@
         // Initialize collaboration UI (status badge and share button)
         const collabUIContainer = document.getElementById('collab-ui-container');
         const collabUI = new CollabUI({ container: collabUIContainer });
+
+        // Collaboration managers (initialized lazily when needed)
+        let signalingClient = null;
+        let webrtcManager = null;
+        let collabManager = null;
+        let roomManager = null;
+        let presenceManager = null;
+        let collaborationInitialized = false;
+        let collaborationInitializing = false;
+
+        // Set callback for on-demand collaboration initialization
+        // Called when user clicks "Copy Link" for the first time
+        collabUI.setOnInitializeRequest(async () => {
+            // Ensure WASM client exists
+            const client = await ensureWasmClient();
+
+            // Ensure a workbook is loaded (setNodeId requires a workbook)
+            if (!hasFileLoaded) {
+                await createEmptyWorkbook();
+            }
+
+            // Now initialize collaboration
+            await initializeCollaboration(client);
+        });
+
+        /**
+         * Initialize collaboration infrastructure
+         * Called after WASM client is ready
+         */
+        async function initializeCollaboration(client) {
+            if (collaborationInitialized) {
+                console.log('Collaboration already initialized');
+                return;
+            }
+            if (collaborationInitializing) {
+                console.log('Collaboration initialization in progress, waiting...');
+                // Wait for initialization to complete
+                while (collaborationInitializing && !collaborationInitialized) {
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+                return;
+            }
+            collaborationInitializing = true;
+            console.log('Starting collaboration initialization...');
+
+            try {
+                // Create signaling client (connects to Go signaling server)
+                // URL will be auto-derived from window.location
+                signalingClient = new SignalingClient();
+
+                // Create WebRTC manager
+                webrtcManager = new WebRTCManager();
+
+                // Create collab manager (bridges WASM engine and WebRTC)
+                collabManager = new CollabManager({
+                    engine: client,  // CellsClient has the async CRDT methods
+                    webrtcManager: webrtcManager,
+                    signalingClient: signalingClient
+                });
+
+                // Create presence manager
+                presenceManager = new PresenceManager({
+                    webrtcManager: webrtcManager
+                });
+
+                // Create room manager
+                roomManager = new RoomManager({
+                    collabManager: collabManager
+                });
+
+                // Initialize collaboration (sets node ID in WASM engine)
+                await collabManager.initialize();
+
+                // Initialize last known HLC for operation tracking
+                lastKnownHLC = await client.getCurrentHLC() || '';
+
+                // Initialize presence (generates name and color)
+                presenceManager.initialize(collabManager.peerId);
+
+                // Connect UI to managers
+                collabUI.setCollabManager(collabManager);
+                collabUI.setPresenceManager(presenceManager);
+                collabUI.setRoomManager(roomManager);
+
+                // Listen for remote operation events to prevent re-broadcasting
+                collabManager.on('remoteoperationsstart', () => {
+                    isApplyingRemoteOp = true;
+                });
+                collabManager.on('remoteoperationsend', () => {
+                    isApplyingRemoteOp = false;
+                    // Update our last known HLC after receiving remote ops
+                    wasmClient.getCurrentHLC().then(hlc => {
+                        if (hlc) lastKnownHLC = hlc;
+                    }).catch(err => console.warn('Failed to get HLC:', err));
+                });
+
+                collaborationInitialized = true;
+                collaborationInitializing = false;
+                console.log('Collaboration initialized successfully, peer ID:', collabManager.peerId);
+
+            } catch (err) {
+                console.error('Failed to initialize collaboration:', err);
+                collaborationInitializing = false;
+                throw err; // Re-throw so caller knows it failed
+            }
+        }
+
+        /**
+         * Check for room ID in URL and auto-join if present
+         * Should be called after file is loaded
+         */
+        async function checkAutoJoinRoom() {
+            const roomIdFromUrl = getRoomIdFromUrl();
+            if (roomIdFromUrl && hasFileLoaded) {
+                console.log('Auto-joining room from URL:', roomIdFromUrl);
+                try {
+                    // Initialize collaboration first
+                    await initializeCollaboration(wasmClient);
+                    // Then join the room
+                    await roomManager.joinRoom(roomIdFromUrl);
+                } catch (err) {
+                    console.error('Failed to auto-join room:', err);
+                }
+            }
+        }
 
         // ========================================================================
         // State Machine Helpers
@@ -556,6 +685,8 @@
         // changeType is one of: 'cell', 'structure', 'sheet', 'loaded'
         let pendingChangeTypes = new Set();
         let changeHandlerScheduled = false;
+        let lastKnownHLC = '';  // Track last HLC for operation broadcasting
+        let isApplyingRemoteOp = false;  // Flag to prevent re-broadcasting remote ops
 
         function handleDataChanged(changeType) {
             console.debug('[DataChanged]', changeType);
@@ -588,6 +719,50 @@
             await fetchViewport();
             render();
             updateFormulaBar();
+
+            // Broadcast operations to peers if this is a local edit
+            console.log('[Collab] processDataChanges check:', {
+                isApplyingRemoteOp,
+                collaborationInitialized,
+                hasCollabManager: !!collabManager,
+                hasWasmClient: !!wasmClient
+            });
+            if (!isApplyingRemoteOp && collaborationInitialized && collabManager && wasmClient) {
+                await broadcastNewOperations();
+            }
+        }
+
+        /**
+         * Get new operations since last known HLC and broadcast them
+         */
+        async function broadcastNewOperations() {
+            try {
+                console.log('[Collab] broadcastNewOperations called, lastKnownHLC:', lastKnownHLC);
+                const resultStr = await wasmClient.getOperationsSince(lastKnownHLC);
+                console.log('[Collab] getOperationsSince result:', resultStr);
+                const result = JSON.parse(resultStr);
+
+                if (result.error) {
+                    console.error('[Collab] getOperationsSince error:', result.error);
+                    return;
+                }
+
+                if (result.operations && result.operations.length > 0) {
+                    console.log(`[Collab] Broadcasting ${result.operations.length} new operations`);
+                    for (const op of result.operations) {
+                        collabManager.broadcastOperation(op);
+                    }
+                    // Update last known HLC to the latest operation's HLC
+                    const lastOp = result.operations[result.operations.length - 1];
+                    if (lastOp && lastOp.hlc) {
+                        lastKnownHLC = lastOp.hlc;
+                    }
+                } else {
+                    console.log('[Collab] No new operations to broadcast');
+                }
+            } catch (err) {
+                console.error('[Collab] Failed to broadcast operations:', err);
+            }
         }
 
         async function fetchSheetInfo() {
@@ -2113,6 +2288,10 @@
 
             wasmClient = new CellsClient('./worker.js');
             await wasmClient.ready;
+
+            // NOTE: Collaboration is NOT initialized here - it's done lazily
+            // when user clicks "Copy Link" (requires a workbook to be loaded first)
+
             return wasmClient;
         }
 
@@ -2191,6 +2370,9 @@
             await fetchSheets();
             render();
             updateFormulaBar();
+
+            // Check if we should auto-join a collaboration room from URL
+            checkAutoJoinRoom();
         }
 
         // Make functions available globally
@@ -2228,7 +2410,10 @@
                 console.warn('Failed to clear persisted file:', e);
             }
 
-            // Clear collaboration room URL parameter
+            // Leave collaboration room and clear URL parameter
+            if (roomManager && roomManager.currentRoomId) {
+                roomManager.leaveRoom();
+            }
             clearRoomIdFromUrl();
 
             // Reset state
@@ -2386,6 +2571,9 @@
             await fetchSheets();
             render();
             updateFormulaBar();
+
+            // Check if we should auto-join a collaboration room from URL
+            checkAutoJoinRoom();
         }
 
         async function init() {

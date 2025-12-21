@@ -458,12 +458,14 @@ export class CollabManager {
     /**
      * Initialize collaboration with a peer ID
      * @param {string} [peerId] - Optional peer ID (generated if not provided)
+     * @returns {Promise<void>}
      */
-    initialize(peerId = null) {
+    async initialize(peerId = null) {
         this._peerId = peerId || this._loadOrGeneratePeerId();
 
         // Set node ID in the WASM engine for HLC generation
-        const result = JSON.parse(this._engine.setNodeId(this._peerId));
+        const resultStr = await this._engine.setNodeId(this._peerId);
+        const result = JSON.parse(resultStr);
         if (result.error) {
             throw new Error(`Failed to set node ID: ${result.error}`);
         }
@@ -592,10 +594,11 @@ export class CollabManager {
     /**
      * Get all operations since a given HLC (for sync)
      * @param {string} [sinceHLC=''] - HLC to get operations after
-     * @returns {Object[]} Array of operations
+     * @returns {Promise<Object[]>} Array of operations
      */
-    getOperationsSince(sinceHLC = '') {
-        const result = JSON.parse(this._engine.getOperationsSince(sinceHLC));
+    async getOperationsSince(sinceHLC = '') {
+        const resultStr = await this._engine.getOperationsSince(sinceHLC);
+        const result = JSON.parse(resultStr);
         if (result.error) {
             console.error('Failed to get operations:', result.error);
             return [];
@@ -605,18 +608,18 @@ export class CollabManager {
 
     /**
      * Get the current HLC timestamp
-     * @returns {string}
+     * @returns {Promise<string>}
      */
-    getCurrentHLC() {
-        return this._engine.getCurrentHLC();
+    async getCurrentHLC() {
+        return await this._engine.getCurrentHLC();
     }
 
     /**
      * Get the number of operations in the OpLog
-     * @returns {number}
+     * @returns {Promise<number>}
      */
-    getOpLogSize() {
-        return this._engine.getOpLogSize();
+    async getOpLogSize() {
+        return await this._engine.getOpLogSize();
     }
 
     /**
@@ -657,22 +660,28 @@ export class CollabManager {
     _setupSignalingHandlers() {
         // Handle room join confirmation
         this._signalingClient.on('joined', (room, existingPeers) => {
-            // Connect to all existing peers in the room
-            for (const peerId of existingPeers) {
-                this._initiateConnection(peerId);
-            }
+            console.log(`[Collab] Joined room ${room}, existing peers:`, existingPeers);
+            // Don't initiate connections here - existing peers will initiate via 'peer-joined'
+            // This avoids race conditions where both sides try to create offers simultaneously
 
             if (existingPeers.length === 0) {
                 // We're the first/only peer, go online immediately
                 this._setState(CollabState.ONLINE);
             }
+            // If there are existing peers, wait for them to send offers via 'peer-joined' handler
+        });
+
+        // Handle peer list update (e.g., after reconnection)
+        this._signalingClient.on('peerlist', (peers) => {
+            console.log(`[Collab] Received peer list:`, peers);
+            // Don't initiate connections - existing peers will initiate when they see us join
         });
 
         // Handle new peer joining
         this._signalingClient.on('peerjoined', (peerId) => {
-            // Existing peers create connections to new peers
-            // New peer already initiated connections in 'joined' handler
-            // This ensures we don't create duplicate connections
+            console.log(`[Collab] Peer joined: ${peerId}, initiating connection`);
+            // Existing peer initiates connection to new peer
+            this._initiateConnection(peerId);
         });
 
         // Handle peer leaving
@@ -684,16 +693,19 @@ export class CollabManager {
 
         // Handle incoming offer
         this._signalingClient.on('offer', async (fromPeerId, sdp) => {
+            console.log(`[Collab] Received offer from ${fromPeerId}`);
             await this._handleOffer(fromPeerId, sdp);
         });
 
         // Handle incoming answer
         this._signalingClient.on('answer', async (fromPeerId, sdp) => {
+            console.log(`[Collab] Received answer from ${fromPeerId}`);
             await this._handleAnswer(fromPeerId, sdp);
         });
 
         // Handle incoming ICE candidate
         this._signalingClient.on('icecandidate', async (fromPeerId, candidate) => {
+            console.log(`[Collab] Received ICE candidate from ${fromPeerId}`);
             await this._handleIceCandidate(fromPeerId, candidate);
         });
 
@@ -715,6 +727,7 @@ export class CollabManager {
      */
     async _initiateConnection(peerId) {
         try {
+            console.log(`[Collab] Initiating connection to ${peerId}`);
             const peer = this._webrtcManager.createPeerConnection(peerId);
 
             // Set up ICE candidate handler
@@ -724,6 +737,7 @@ export class CollabManager {
 
             // Create and send offer
             const offer = await peer.createOffer();
+            console.log(`[Collab] Sending offer to ${peerId}`);
             this._signalingClient.sendOffer(peerId, offer);
         } catch (err) {
             console.error(`Failed to initiate connection to ${peerId}:`, err);
@@ -738,6 +752,7 @@ export class CollabManager {
      */
     async _handleOffer(fromPeerId, sdp) {
         try {
+            console.log(`[Collab] Handling offer from ${fromPeerId}`);
             const peer = this._webrtcManager.acceptPeerConnection(fromPeerId);
 
             // Set up ICE candidate handler
@@ -748,6 +763,7 @@ export class CollabManager {
             // Set remote description and create answer
             await peer.setRemoteDescription(sdp);
             const answer = await peer.createAnswer();
+            console.log(`[Collab] Sending answer to ${fromPeerId}`);
             this._signalingClient.sendAnswer(fromPeerId, answer);
         } catch (err) {
             console.error(`Failed to handle offer from ${fromPeerId}:`, err);
@@ -794,6 +810,7 @@ export class CollabManager {
      * @private
      */
     _onPeerReady(peerId) {
+        console.log(`[Collab] Peer ${peerId} is ready (data channels open)`);
         this._setState(CollabState.SYNCING);
 
         // Send hello message with our current HLC
@@ -805,13 +822,14 @@ export class CollabManager {
      * @param {string} peerId
      * @private
      */
-    _sendHello(peerId) {
-        const currentHLC = this.getCurrentHLC();
+    async _sendHello(peerId) {
+        const currentHLC = await this.getCurrentHLC();
+        const opLogSize = await this.getOpLogSize();
         const message = JSON.stringify({
             type: 'hello',
             peer_id: this._peerId,
             hlc: currentHLC,
-            op_count: this.getOpLogSize()
+            op_count: opLogSize
         });
 
         this._webrtcManager.sendOperationToPeer(peerId, message);
@@ -823,25 +841,25 @@ export class CollabManager {
      * @param {string} data - JSON string
      * @private
      */
-    _handleOperationsMessage(peerId, data) {
+    async _handleOperationsMessage(peerId, data) {
         try {
             const message = JSON.parse(data);
 
             switch (message.type) {
                 case 'hello':
-                    this._handleHello(peerId, message);
+                    await this._handleHello(peerId, message);
                     break;
 
                 case 'sync-request':
-                    this._handleSyncRequest(peerId, message);
+                    await this._handleSyncRequest(peerId, message);
                     break;
 
                 case 'sync-response':
-                    this._handleSyncResponse(peerId, message);
+                    await this._handleSyncResponse(peerId, message);
                     break;
 
                 case 'operations':
-                    this._handleOperationsBatch(peerId, message.batch || []);
+                    await this._handleOperationsBatch(peerId, message.batch || []);
                     break;
 
                 case 'ping':
@@ -866,7 +884,7 @@ export class CollabManager {
      * @param {Object} message
      * @private
      */
-    _handleHello(peerId, message) {
+    async _handleHello(peerId, message) {
         const peerHLC = message.hlc || '';
         const peerOpCount = message.op_count || 0;
 
@@ -877,7 +895,7 @@ export class CollabManager {
         });
 
         // Request operations we don't have
-        const ourHLC = this.getCurrentHLC();
+        const ourHLC = await this.getCurrentHLC();
         this._sendSyncRequest(peerId, ourHLC);
     }
 
@@ -902,9 +920,9 @@ export class CollabManager {
      * @param {Object} message
      * @private
      */
-    _handleSyncRequest(peerId, message) {
+    async _handleSyncRequest(peerId, message) {
         const sinceHLC = message.since_hlc || '';
-        const operations = this.getOperationsSince(sinceHLC);
+        const operations = await this.getOperationsSince(sinceHLC);
 
         // Send operations in response (batch of max 100)
         const batchSize = 100;
@@ -939,13 +957,13 @@ export class CollabManager {
      * @param {Object} message
      * @private
      */
-    _handleSyncResponse(peerId, message) {
+    async _handleSyncResponse(peerId, message) {
         const operations = message.operations || [];
         const isComplete = message.complete || false;
 
         // Apply received operations
         if (operations.length > 0) {
-            this._applyRemoteOperations(operations);
+            await this._applyRemoteOperations(operations);
         }
 
         // Mark sync as complete when we receive the final batch
@@ -967,13 +985,13 @@ export class CollabManager {
      * @param {Object[]} operations
      * @private
      */
-    _handleOperationsBatch(peerId, operations) {
+    async _handleOperationsBatch(peerId, operations) {
         // Log received operations
         for (const op of operations) {
             this._logOperation('received', peerId, op);
         }
 
-        this._applyRemoteOperations(operations);
+        await this._applyRemoteOperations(operations);
 
         // Update last known HLC for this peer
         if (operations.length > 0) {
@@ -991,23 +1009,33 @@ export class CollabManager {
      * @param {Object[]} operations
      * @private
      */
-    _applyRemoteOperations(operations) {
-        for (const op of operations) {
-            this._stats.operationsReceived++;
+    async _applyRemoteOperations(operations) {
+        if (operations.length === 0) return;
 
-            // Apply via WASM
-            const opJson = JSON.stringify(op);
-            const resultStr = this._engine.applyRemoteOperation(opJson);
-            const result = JSON.parse(resultStr);
+        // Signal that we're starting to apply remote operations
+        this._emitter.emit('remoteoperationsstart');
 
-            if (result.result === 'success' || result.result === 'resurrected') {
-                this._stats.operationsApplied++;
-                this._emitter.emit('operationapplied', op);
-            } else if (result.result === 'already_applied') {
-                this._stats.operationsDuplicate++;
-            } else if (result.result !== 'superseded') {
-                console.warn('Failed to apply operation:', result.result, op);
+        try {
+            for (const op of operations) {
+                this._stats.operationsReceived++;
+
+                // Apply via WASM
+                const opJson = JSON.stringify(op);
+                const resultStr = await this._engine.applyRemoteOperation(opJson);
+                const result = JSON.parse(resultStr);
+
+                if (result.result === 'success' || result.result === 'resurrected') {
+                    this._stats.operationsApplied++;
+                    this._emitter.emit('operationapplied', op);
+                } else if (result.result === 'already_applied') {
+                    this._stats.operationsDuplicate++;
+                } else if (result.result !== 'superseded') {
+                    console.warn('Failed to apply operation:', result.result, op);
+                }
             }
+        } finally {
+            // Signal that we're done applying remote operations
+            this._emitter.emit('remoteoperationsend');
         }
     }
 

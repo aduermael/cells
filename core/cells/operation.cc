@@ -233,20 +233,30 @@ std::string findJSONValue(const std::string& json, const std::string& key) {
     size_t end = pos;
     int braceCount = 0;
     int bracketCount = 0;
+    bool isObject = (json[pos] == '{');
+    bool isArray = (json[pos] == '[');
     while (end < json.size()) {
         const char c = json[end];
         if (c == '{') {
             braceCount++;
-        }
-        if (c == '}') {
+        } else if (c == '}') {
             braceCount--;
-        }
-        if (c == '[') {
+            // If we're extracting an object and just closed it, include this brace and stop
+            if (isObject && braceCount == 0) {
+                end++;
+                break;
+            }
+        } else if (c == '[') {
             bracketCount++;
-        }
-        if (c == ']') {
+        } else if (c == ']') {
             bracketCount--;
+            // If we're extracting an array and just closed it, include this bracket and stop
+            if (isArray && bracketCount == 0) {
+                end++;
+                break;
+            }
         }
+        // Stop at delimiter when not inside nested structure
         if (braceCount == 0 && bracketCount == 0 && (c == ',' || c == '}' || c == ']')) {
             break;
         }

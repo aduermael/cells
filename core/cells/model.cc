@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <utility>
 
+#include "core/cells/id.h"
+
 namespace cells {
 
 // ============================================================================
@@ -392,10 +394,10 @@ std::string Sheet::makeCellKey(const ID& colId, const ID& rowId) {
 // Workbook
 // ============================================================================
 
-Workbook::Workbook() : id(), name("Untitled"), _oplog(std::make_unique<OpLog>()), _nodeId() {}
+Workbook::Workbook() : id(), name("Untitled"), _oplog(std::make_unique<OpLog>()), _nodeId(generate_id()) {}
 
 Workbook::Workbook(const ID& id, std::string name)
-    : id(id), name(std::move(name)), _oplog(std::make_unique<OpLog>()), _nodeId() {}
+    : id(id), name(std::move(name)), _oplog(std::make_unique<OpLog>()), _nodeId(generate_id()) {}
 
 Workbook::~Workbook() = default;
 

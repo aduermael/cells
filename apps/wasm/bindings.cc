@@ -484,38 +484,63 @@ public:
             return "{\"error\":\"Cell not found\"}";
         }
 
-        // Clear formula if cell had one
-        if (cell->isFormula()) {
-            cell->clearFormula();
-        }
+        // Get column and row IDs for CRDT sync
+        std::string colIdStr = cell->colId.toString();
+        std::string rowIdStr = cell->rowId.toString();
 
-        // Check if this is a formula
+        // Build ID suffix for payload
+        std::string idSuffix = ",\"col_id\":\"" + colIdStr + "\",\"row_id\":\"" + rowIdStr + "\"}";
+
+        // Build the payload for the CRDT operation
+        std::string payload;
+        char typeChar = 's';  // default to string
+
         if (!value.empty() && value[0] == '=') {
+            // Formula
             std::string uuidFormula = _refConverter.formulaToUuid(value);
-            auto* formula = new Formula(uuidFormula.c_str());
-            cell->setFormula(formula);
-            cell->value = CellValue(value);
-            cell->value.type = CellValueType::FORMULA;
+            typeChar = 'f';
+            payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\",\"display\":\"" + jsonEscape(value) + "\"" + idSuffix;
         } else if (value.empty()) {
-            cell->value = CellValue();
+            typeChar = 'e';  // empty
+            payload = "{\"type\":\"e\",\"value\":\"\"" + idSuffix;
         } else if (value == "TRUE" || value == "true") {
-            cell->value = CellValue(true);
+            typeChar = 'b';
+            payload = "{\"type\":\"b\",\"value\":\"true\"" + idSuffix;
         } else if (value == "FALSE" || value == "false") {
-            cell->value = CellValue(false);
+            typeChar = 'b';
+            payload = "{\"type\":\"b\",\"value\":\"false\"" + idSuffix;
         } else {
             // Try parsing as number
             char* endptr = nullptr;
-            double num = strtod(value.c_str(), &endptr);
+            strtod(value.c_str(), &endptr);
             if (endptr != nullptr && *endptr == '\0' && endptr != value.c_str()) {
-                cell->value = CellValue(num);
+                typeChar = 'n';
+                payload = "{\"type\":\"n\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
             } else {
-                cell->value = CellValue(value);
+                typeChar = 's';
+                payload = "{\"type\":\"s\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
             }
         }
 
-        rebuildQuadtree();
-        notifyListeners(ChangeType::CELL_CHANGED);
-        return "{\"success\":true}";
+        // Create and apply the CRDT operation
+        Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
+        ApplyResult result = applyOperation(*_workbook, op);
+
+        if (result == ApplyResult::SUCCESS || result == ApplyResult::SUPERSEDED) {
+            // For formulas, we need to also set up the formula object for evaluation
+            if (typeChar == 'f' && !value.empty() && value[0] == '=') {
+                std::string uuidFormula = _refConverter.formulaToUuid(value);
+                auto* formula = new Formula(uuidFormula.c_str());
+                cell->setFormula(formula);
+                cell->value.type = CellValueType::FORMULA;
+            }
+
+            rebuildQuadtree();
+            notifyListeners(ChangeType::CELL_CHANGED);
+            return "{\"success\":true}";
+        }
+
+        return "{\"error\":\"Failed to apply operation\"}";
     }
 
     std::string createCell(uint32_t col, uint32_t row, const std::string& value) {
@@ -537,11 +562,13 @@ public:
             }
         }
         if (colId.isNull()) {
-            auto newCol = std::make_unique<Axis>(generate_id(), true);
-            newCol->position = col;
-            newCol->size = DEFAULT_COLUMN_WIDTH;
-            colId = newCol->id;
-            sheet->addColumn(std::move(newCol));
+            colId = generate_id();
+            // Create DIM_INSERT_AXIS operation for new column
+            std::string colPayload = "{\"pos\":" + std::to_string(col) +
+                                     ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) +
+                                     ",\"isCol\":\"true\"}";
+            Operation colOp = makeDimInsertAxisOp(*_workbook, colId, colPayload);
+            applyOperation(*_workbook, colOp);
         }
 
         // Find or create row at position
@@ -553,20 +580,52 @@ public:
             }
         }
         if (rowId.isNull()) {
-            auto newRow = std::make_unique<Axis>(generate_id(), false);
-            newRow->position = row;
-            newRow->size = DEFAULT_ROW_HEIGHT;
-            rowId = newRow->id;
-            sheet->addRow(std::move(newRow));
+            rowId = generate_id();
+            // Create DIM_INSERT_AXIS operation for new row
+            std::string rowPayload = "{\"pos\":" + std::to_string(row) +
+                                     ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) +
+                                     ",\"isCol\":\"false\"}";
+            Operation rowOp = makeDimInsertAxisOp(*_workbook, rowId, rowPayload);
+            applyOperation(*_workbook, rowOp);
         }
 
         // Create new cell
-        auto newCell = std::make_unique<Cell>(generate_id(), colId, rowId);
-        if (!value.empty()) {
-            newCell->value = CellValue(value);
-        }
-        ID cellId = newCell->id;
+        ID cellId = generate_id();
+        auto newCell = std::make_unique<Cell>(cellId, colId, rowId);
         sheet->addCell(std::move(newCell));
+
+        // If value is provided, create a CRDT operation for it
+        if (!value.empty()) {
+            // Get the cell we just added
+            Cell* cell = sheet->getCell(cellId);
+            if (cell) {
+                // Build ID suffix for payload
+                std::string idSuffix = ",\"col_id\":\"" + colId.toString() + "\",\"row_id\":\"" + rowId.toString() + "\"}";
+
+                // Determine type and build payload
+                std::string payload;
+                if (value[0] == '=') {
+                    std::string uuidFormula = _refConverter.formulaToUuid(value);
+                    payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\",\"display\":\"" + jsonEscape(value) + "\"" + idSuffix;
+                } else if (value == "TRUE" || value == "true") {
+                    payload = "{\"type\":\"b\",\"value\":\"true\"" + idSuffix;
+                } else if (value == "FALSE" || value == "false") {
+                    payload = "{\"type\":\"b\",\"value\":\"false\"" + idSuffix;
+                } else {
+                    char* endptr = nullptr;
+                    strtod(value.c_str(), &endptr);
+                    if (endptr != nullptr && *endptr == '\0' && endptr != value.c_str()) {
+                        payload = "{\"type\":\"n\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+                    } else {
+                        payload = "{\"type\":\"s\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+                    }
+                }
+
+                // Create and apply the CRDT operation
+                Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
+                applyOperation(*_workbook, op);
+            }
+        }
 
         rebuildQuadtree();
         notifyListeners(ChangeType::CELL_CHANGED);

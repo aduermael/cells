@@ -36,14 +36,48 @@ std::string extractJSONString(const std::string& json, const std::string& key) {
     return json.substr(pos, end - pos);
 }
 
+// Extract integer from JSON (for col/row positions)
+int extractJSONInt(const std::string& json, const std::string& key, int defaultValue = -1) {
+    const std::string searchKey = "\"" + key + "\":";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) {
+        return defaultValue;
+    }
+    pos += searchKey.length();
+
+    // Skip whitespace
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
+        pos++;
+    }
+
+    if (pos >= json.size()) {
+        return defaultValue;
+    }
+
+    // Parse integer
+    int value = 0;
+    bool negative = false;
+    if (json[pos] == '-') {
+        negative = true;
+        pos++;
+    }
+    while (pos < json.size() && json[pos] >= '0' && json[pos] <= '9') {
+        value = value * 10 + (json[pos] - '0');
+        pos++;
+    }
+    return negative ? -value : value;
+}
+
 // Apply CELL_SET_VALUE operation
 ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
     // Find the target cell across all sheets
     Cell* cell = nullptr;
+    Sheet* targetSheet = nullptr;
 
     for (auto& s : workbook.sheets) {
         cell = s->getCell(op.target_id);
         if (cell != nullptr) {
+            targetSheet = s.get();
             break;
         }
     }
@@ -58,19 +92,40 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         return ApplyResult::SUPERSEDED;
     }
 
-    if (cell == nullptr) {
-        // Cell doesn't exist - this could be a resurrection case
-        // For now, we just note that the target is invalid
-        // In a full implementation, we would create the cell
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Parse payload: {"type":"n","value":"42"} or {"type":"s","value":"hello"}
+    // Parse payload: {"type":"n","value":"42","col_id":"abc123","row_id":"def456"}
     const std::string type_str = extractJSONString(op.payload, "type");
     const std::string value_str = extractJSONString(op.payload, "value");
+    const std::string col_id_str = extractJSONString(op.payload, "col_id");
+    const std::string row_id_str = extractJSONString(op.payload, "row_id");
 
     if (type_str.empty()) {
         return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    if (cell == nullptr) {
+        // Cell doesn't exist - create it if we have col_id and row_id
+        if (col_id_str.empty() || row_id_str.empty()) {
+            return ApplyResult::INVALID_TARGET;
+        }
+
+        // Use the first sheet for now
+        if (workbook.sheets.empty()) {
+            return ApplyResult::INVALID_TARGET;
+        }
+        targetSheet = workbook.sheets[0].get();
+
+        ID colId(col_id_str);
+        ID rowId(row_id_str);
+
+        // Verify the column and row exist (they should have been created by DIM_INSERT_AXIS)
+        if (targetSheet->getColumn(colId) == nullptr || targetSheet->getRow(rowId) == nullptr) {
+            return ApplyResult::INVALID_TARGET;
+        }
+
+        // Create the cell with the SAME ID as in the operation
+        auto newCell = std::make_unique<Cell>(op.target_id, colId, rowId);
+        cell = newCell.get();
+        targetSheet->addCell(std::move(newCell));
     }
 
     // Apply the value based on type
@@ -82,6 +137,47 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
     // Clear formula if it was a formula cell
     if (cell->formula != nullptr) {
         cell->clearFormula();
+    }
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply DIM_INSERT_AXIS operation
+ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op) {
+    // Parse payload: {"pos":0,"size":100,"isCol":true}
+    const int pos = extractJSONInt(op.payload, "pos", -1);
+    const int size = extractJSONInt(op.payload, "size", -1);
+    const std::string isColStr = extractJSONString(op.payload, "isCol");
+
+    if (pos < 0 || size < 0) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    bool isColumn = (isColStr == "true" || isColStr == "1");
+
+    // Use the first sheet for now
+    if (workbook.sheets.empty()) {
+        return ApplyResult::INVALID_TARGET;
+    }
+    Sheet* sheet = workbook.sheets[0].get();
+
+    // Check if axis with this ID already exists
+    if (isColumn) {
+        if (sheet->getColumn(op.target_id) != nullptr) {
+            return ApplyResult::ALREADY_APPLIED;
+        }
+        auto newAxis = std::make_unique<Axis>(op.target_id, true);
+        newAxis->position = static_cast<uint32_t>(pos);
+        newAxis->size = static_cast<uint32_t>(size);
+        sheet->addColumn(std::move(newAxis));
+    } else {
+        if (sheet->getRow(op.target_id) != nullptr) {
+            return ApplyResult::ALREADY_APPLIED;
+        }
+        auto newAxis = std::make_unique<Axis>(op.target_id, false);
+        newAxis->position = static_cast<uint32_t>(pos);
+        newAxis->size = static_cast<uint32_t>(size);
+        sheet->addRow(std::move(newAxis));
     }
 
     return ApplyResult::SUCCESS;
@@ -224,11 +320,14 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             break;
 
         case OpType::CELL_SET_STYLE:
-        case OpType::DIM_INSERT_AXIS:
         case OpType::DIM_DELETE_AXIS:
         case OpType::DIM_MOVE_AXIS:
             // Not fully implemented yet - just accept it
             result = ApplyResult::SUCCESS;
+            break;
+
+        case OpType::DIM_INSERT_AXIS:
+            result = applyDimInsertAxis(workbook, op);
             break;
 
         case OpType::DIM_RESIZE_AXIS:
