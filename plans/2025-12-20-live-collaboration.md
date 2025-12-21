@@ -220,7 +220,7 @@ Implement user presence, online indicators, and collaboration UI elements.
   - Track current sheet, cursor position, and selection range
   - Presence is ephemeral: NOT stored in OpLog or persisted to file
 
-- [ ] 5b: Add presence broadcasting via DataChannel
+- [x] 5b: Add presence broadcasting via DataChannel
   - Create separate DataChannel labeled "presence" (unreliable, unordered)
   - Broadcast presence updates at 5 Hz (200ms interval) while user is active
   - Include: peer name, color, sheet, cursor position, selection range, viewport
