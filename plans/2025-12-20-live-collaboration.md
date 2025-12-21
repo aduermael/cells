@@ -107,7 +107,7 @@ Extend the existing Go server with WebSocket signaling for WebRTC connection set
   - Clean up empty rooms after timeout
   - Log connection events for debugging
 
-- [ ] 2f: Update Go server with configuration options
+- [x] 2f: Update Go server with configuration options
   - Add `-enable-collab` flag to enable collaboration features
   - Add `-max-room-size` flag (default: 10 peers)
   - Add `-room-timeout` flag (default: 1 hour of inactivity)
