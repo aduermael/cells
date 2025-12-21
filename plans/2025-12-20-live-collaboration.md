@@ -44,7 +44,7 @@ Implement the core CRDT data structures and operation log in C++ for the engine.
   - Operation serialization to/from JSON for network transport
   - Add tests in `core/cells/operation_test.cc`
 
-- [ ] 1c: Implement OpLog (operation log) data structure
+- [x] 1c: Implement OpLog (operation log) data structure
   - `struct OpLog` with append-only vector of operations
   - Index by entity ID for quick lookup (`by_cell_id`, `by_axis_id`)
   - `addOperation(Operation op)` method

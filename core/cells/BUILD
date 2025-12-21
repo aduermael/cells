@@ -59,6 +59,26 @@ cc_test(
 )
 
 cc_library(
+    name = "oplog",
+    srcs = ["oplog.cc"],
+    hdrs = ["oplog.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":operation",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "oplog_test",
+    srcs = ["oplog_test.cc"],
+    deps = [
+        ":oplog",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "model",
     srcs = ["model.cc"],
     hdrs = ["model.h"],
