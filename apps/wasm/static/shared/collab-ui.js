@@ -109,11 +109,22 @@ export class CollabUI {
                 <span class="label">Pending</span>
                 <span class="value" id="collab-detail-pending">0 edits</span>
             </div>
+            <div class="collab-status-details-row" id="collab-latency-row" style="display: none;">
+                <span class="label">Latency</span>
+                <span class="value" id="collab-detail-latency">-</span>
+            </div>
+            <div class="collab-status-details-row" id="collab-stats-row" style="display: none;">
+                <span class="label">Sync</span>
+                <span class="value" id="collab-detail-stats">-</span>
+            </div>
             <div class="collab-status-details-row name-row">
                 <span class="label">Your Name</span>
                 <span class="value editable" id="collab-detail-name">-</span>
             </div>
             <div class="collab-status-details-peers" id="collab-peers-list" style="display: none;"></div>
+            <div class="collab-status-details-actions" id="collab-actions" style="display: none;">
+                <button class="reconnect-btn" id="collab-reconnect-btn">Force Reconnect</button>
+            </div>
         `;
         this._statusBadge.appendChild(this._detailsPanel);
 
@@ -217,6 +228,25 @@ export class CollabUI {
         this._nameEditPopup.addEventListener('click', (e) => {
             e.stopPropagation();
         });
+
+        // Force reconnect button
+        const reconnectBtn = this._detailsPanel.querySelector('#collab-reconnect-btn');
+        if (reconnectBtn) {
+            reconnectBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._handleForceReconnect();
+            });
+        }
+    }
+
+    /**
+     * Handle force reconnect button click
+     * @private
+     */
+    _handleForceReconnect() {
+        if (this._collabManager && typeof this._collabManager.forceReconnect === 'function') {
+            this._collabManager.forceReconnect();
+        }
     }
 
     /**
@@ -228,6 +258,10 @@ export class CollabUI {
 
         this._collabManager.on('statechange', (newState, oldState) => {
             this._updateState(newState);
+        });
+
+        this._collabManager.on('latencyupdate', (peerId, latency) => {
+            this._updateLatencyDisplay();
         });
     }
 
@@ -349,6 +383,12 @@ export class CollabUI {
         if (state === CollabState.ONLINE || state === CollabState.SYNCING) {
             this._shareBtn.style.display = '';
         }
+
+        // Update latency display visibility
+        this._updateLatencyDisplay();
+
+        // Update actions panel visibility
+        this._updateActionsVisibility();
     }
 
     /**
@@ -392,6 +432,72 @@ export class CollabUI {
         } else {
             pendingRow.style.display = 'none';
         }
+    }
+
+    /**
+     * Update the latency display
+     * @private
+     */
+    _updateLatencyDisplay() {
+        if (!this._collabManager) return;
+
+        const latencyRow = this._detailsPanel.querySelector('#collab-latency-row');
+        const latencyValue = this._detailsPanel.querySelector('#collab-detail-latency');
+
+        if (!latencyRow || !latencyValue) return;
+
+        const avgLatency = this._collabManager.getAverageLatency();
+
+        if (avgLatency !== null && this._currentState === CollabState.ONLINE) {
+            latencyRow.style.display = '';
+            const isPoor = avgLatency > 500;
+            latencyValue.textContent = `${avgLatency}ms`;
+            latencyValue.classList.toggle('poor', isPoor);
+            if (isPoor) {
+                latencyValue.title = 'Connection quality is poor';
+            } else {
+                latencyValue.removeAttribute('title');
+            }
+        } else {
+            latencyRow.style.display = 'none';
+        }
+    }
+
+    /**
+     * Update the data transfer stats display
+     */
+    updateStats() {
+        if (!this._collabManager) return;
+
+        const statsRow = this._detailsPanel.querySelector('#collab-stats-row');
+        const statsValue = this._detailsPanel.querySelector('#collab-detail-stats');
+
+        if (!statsRow || !statsValue) return;
+
+        const stats = this._collabManager.stats;
+
+        if (stats && this._currentState === CollabState.ONLINE) {
+            statsRow.style.display = '';
+            statsValue.textContent = `${stats.operationsSent} sent / ${stats.operationsReceived} recv`;
+        } else {
+            statsRow.style.display = 'none';
+        }
+    }
+
+    /**
+     * Update the actions panel visibility
+     * @private
+     */
+    _updateActionsVisibility() {
+        const actionsPanel = this._detailsPanel.querySelector('#collab-actions');
+        if (!actionsPanel) return;
+
+        // Show actions when connecting or online (to allow force reconnect)
+        const showActions = this._currentState === CollabState.CONNECTING ||
+                           this._currentState === CollabState.SYNCING ||
+                           this._currentState === CollabState.ONLINE;
+
+        actionsPanel.style.display = showActions ? '' : 'none';
     }
 
     /**

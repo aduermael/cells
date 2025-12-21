@@ -293,12 +293,12 @@ Add session persistence, random user identity, and final polish.
   - Show pending operations count when offline
   - Auto-reconnect when network restored (signaling-client.js exponential backoff)
 
-- [ ] 6e: Add connection quality indicators
-  - Measure round-trip latency via ping/pong
+- [x] 6e: Add connection quality indicators
+  - Measure round-trip latency via ping/pong (periodic 5s ping)
   - Show latency in status badge details
-  - Warn if latency >500ms (connection quality poor)
-  - Show data transfer stats (ops sent/received)
-  - Add "Force Reconnect" option if stuck
+  - Warn if latency >500ms (red "poor" indicator)
+  - Show data transfer stats (ops sent/received) via updateStats()
+  - Add "Force Reconnect" button in actions panel
 
 - [ ] 6f: Add debugging and diagnostics
   - Add dev mode toggle (localStorage flag)

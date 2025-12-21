@@ -889,3 +889,35 @@ canvas {
     background: #0b5ed7;
     border-color: #0b5ed7;
 }
+
+/* Latency warning style */
+.collab-status-details-row .value.poor {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+/* Actions panel in status details */
+.collab-status-details-actions {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e9ecef;
+}
+
+.collab-status-details-actions .reconnect-btn {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #495057;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.collab-status-details-actions .reconnect-btn:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+    color: #212529;
+}

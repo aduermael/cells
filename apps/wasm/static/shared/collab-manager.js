@@ -100,6 +100,11 @@ export class CollabManager {
             operationsDuplicate: 0
         };
 
+        // Latency tracking
+        this._peerLatencies = new Map(); // peerId -> {lastPing, latency}
+        this._pingInterval = null;
+        this._pingIntervalMs = 5000; // Ping every 5 seconds
+
         this._setupWebRTCHandlers();
         this._setupSignalingHandlers();
     }
@@ -150,6 +155,145 @@ export class CollabManager {
      */
     getPendingOperationCount() {
         return this._pendingOperations.length;
+    }
+
+    /**
+     * Get average latency across all connected peers (in ms)
+     * @returns {number|null} Average latency or null if no data
+     */
+    getAverageLatency() {
+        let total = 0;
+        let count = 0;
+        for (const data of this._peerLatencies.values()) {
+            if (data.latency !== null) {
+                total += data.latency;
+                count++;
+            }
+        }
+        return count > 0 ? Math.round(total / count) : null;
+    }
+
+    /**
+     * Get latency for a specific peer
+     * @param {string} peerId
+     * @returns {number|null}
+     */
+    getPeerLatency(peerId) {
+        const data = this._peerLatencies.get(peerId);
+        return data ? data.latency : null;
+    }
+
+    /**
+     * Check if connection quality is poor (latency > 500ms)
+     * @returns {boolean}
+     */
+    isConnectionPoor() {
+        const avgLatency = this.getAverageLatency();
+        return avgLatency !== null && avgLatency > 500;
+    }
+
+    /**
+     * Start periodic latency pinging
+     * @private
+     */
+    _startPinging() {
+        if (this._pingInterval) return;
+
+        this._pingInterval = setInterval(() => {
+            this._sendPingToAll();
+        }, this._pingIntervalMs);
+
+        // Send initial ping immediately
+        this._sendPingToAll();
+    }
+
+    /**
+     * Stop periodic pinging
+     * @private
+     */
+    _stopPinging() {
+        if (this._pingInterval) {
+            clearInterval(this._pingInterval);
+            this._pingInterval = null;
+        }
+    }
+
+    /**
+     * Send ping to all connected peers
+     * @private
+     */
+    _sendPingToAll() {
+        const timestamp = Date.now();
+        const message = JSON.stringify({
+            type: 'ping',
+            ts: timestamp
+        });
+
+        for (const peerId of this._webrtcManager.getAllPeerIds()) {
+            const peer = this._webrtcManager.getPeer(peerId);
+            if (peer && peer.isReady()) {
+                peer.sendOperation(message);
+                // Store ping timestamp for this peer
+                const data = this._peerLatencies.get(peerId) || { lastPing: 0, latency: null };
+                data.lastPing = timestamp;
+                this._peerLatencies.set(peerId, data);
+            }
+        }
+    }
+
+    /**
+     * Handle incoming ping message
+     * @param {string} peerId
+     * @param {number} timestamp
+     * @private
+     */
+    _handlePing(peerId, timestamp) {
+        // Respond with pong
+        const message = JSON.stringify({
+            type: 'pong',
+            ts: timestamp
+        });
+        this._webrtcManager.sendOperationToPeer(peerId, message);
+    }
+
+    /**
+     * Handle incoming pong message
+     * @param {string} peerId
+     * @param {number} timestamp
+     * @private
+     */
+    _handlePong(peerId, timestamp) {
+        const now = Date.now();
+        const rtt = now - timestamp;
+
+        const data = this._peerLatencies.get(peerId) || { lastPing: 0, latency: null };
+        data.latency = rtt;
+        this._peerLatencies.set(peerId, data);
+
+        this._emitter.emit('latencyupdate', peerId, rtt);
+    }
+
+    /**
+     * Force reconnect to all peers
+     */
+    forceReconnect() {
+        if (this._roomId && this._signalingClient) {
+            // Leave and rejoin the room to force new connections
+            this._signalingClient.leave();
+            this._webrtcManager.close();
+            this._peerSyncState.clear();
+            this._peerLatencies.clear();
+            this._setState(CollabState.CONNECTING);
+
+            // Reconnect after a short delay
+            setTimeout(() => {
+                this._signalingClient.connect(this._roomId, this._peerId)
+                    .catch(err => {
+                        console.error('Force reconnect failed:', err);
+                        this._setState(CollabState.OFFLINE);
+                    });
+            }, 500);
+        }
     }
 
     /**
@@ -222,9 +366,11 @@ export class CollabManager {
      * Leave the current room
      */
     leaveRoom() {
+        this._stopPinging();
         this._signalingClient.leave();
         this._webrtcManager.close();
         this._peerSyncState.clear();
+        this._peerLatencies.clear();
         this._pendingOperations = [];
         this._roomId = null;
         this._setState(CollabState.OFFLINE);
@@ -332,6 +478,7 @@ export class CollabManager {
 
         this._webrtcManager.on('peerremoved', (peerId) => {
             this._peerSyncState.delete(peerId);
+            this._peerLatencies.delete(peerId);
             this._updateState();
         });
     }
@@ -530,6 +677,14 @@ export class CollabManager {
                     this._handleOperationsBatch(peerId, message.batch || []);
                     break;
 
+                case 'ping':
+                    this._handlePing(peerId, message.ts);
+                    break;
+
+                case 'pong':
+                    this._handlePong(peerId, message.ts);
+                    break;
+
                 default:
                     console.warn('Unknown operations message type:', message.type);
             }
@@ -705,6 +860,9 @@ export class CollabManager {
             }
 
             this._setState(CollabState.ONLINE);
+
+            // Start latency pinging
+            this._startPinging();
         }
     }
 
