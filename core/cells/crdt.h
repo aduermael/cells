@@ -53,6 +53,12 @@ Operation makeDimDeleteAxisOp(Workbook& workbook, const ID& axisId);
 // Generate a DIM_RESIZE_AXIS operation for resizing a column or row.
 Operation makeDimResizeAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
 
+// Generate a DIM_MOVE_AXIS operation for moving a column or row to a new position.
+Operation makeDimMoveAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+
+// Generate a DIM_RENAME_AXIS operation for renaming a column or row.
+Operation makeDimRenameAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+
 // Generate a SHEET_CREATE operation.
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload);
 

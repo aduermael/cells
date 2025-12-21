@@ -354,11 +354,18 @@ Address specific bugs and ensure all operations sync.
     2. `applyOperations()` sorts by HLC before applying (crdt.cc:357-358)
     3. `applyCellSetValue()` validates column/row exist before creating cell (crdt.cc:120-123)
 
-- [ ] 7d: Ensure all structure operations sync
+- [x] 7d: Ensure all structure operations sync
   - Column/row **move** (DIM_MOVE_AXIS) → sync to peers
   - Column/row **resize** (DIM_RESIZE_AXIS) → sync to peers
   - Column/row **rename** → sync to peers (add new op type if needed)
   - All structure changes must reflect on all connected clients
+  - Implemented:
+    1. Added DIM_RENAME_AXIS operation type (OpType::DIM_RENAME_AXIS = 14)
+    2. Implemented `makeDimMoveAxisOp()`, `makeDimRenameAxisOp()` helper functions
+    3. Implemented `applyDimMoveAxis()`, `applyDimRenameAxis()` in crdt.cc
+    4. Updated `moveColumn()`, `moveRow()` to create DIM_MOVE_AXIS ops when collaborating
+    5. Updated `renameColumn()`, `renameColumnByPos()` to create DIM_RENAME_AXIS ops
+    6. DIM_RESIZE_AXIS was already working from Phase 3c
 
 ## Phase 8: Testing & Validation
 

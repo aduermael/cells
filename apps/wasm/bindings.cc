@@ -1182,7 +1182,16 @@ public:
             return "{\"error\":\"Column not found\"}";
         }
 
-        it->second->name = name;
+        if (_workbook->isCollaborating()) {
+            // Create and apply DIM_RENAME_AXIS operation
+            std::string payload = "{\"name\":\"" + jsonEscape(name) + "\"}";
+            Operation op = makeDimRenameAxisOp(*_workbook, colId, payload);
+            applyOperation(*_workbook, op);
+        } else {
+            // Direct mutation (offline mode)
+            it->second->name = name;
+        }
+
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
@@ -1197,30 +1206,60 @@ public:
             return "{\"error\":\"Sheet not found\"}";
         }
 
+        bool const isCollab = _workbook->isCollaborating();
+
         // Find column at position, or create it
         Axis* column = nullptr;
+        ID colId;
         for (auto& [id, col] : sheet->columns) {
             if (col->position == pos) {
                 column = col.get();
+                colId = id;
                 break;
             }
         }
 
         if (!column) {
-            auto newCol = std::make_unique<Axis>(generate_id(), true);
-            newCol->position = pos;
-            newCol->size = DEFAULT_COLUMN_WIDTH;
-            newCol->name = name;
-            column = newCol.get();
-            sheet->addColumn(std::move(newCol));
+            colId = generate_id();
+            if (isCollab) {
+                // Create DIM_INSERT_AXIS operation for new column
+                std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
+                                           ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) +
+                                           ",\"isCol\":\"true\"}";
+                Operation insertOp = makeDimInsertAxisOp(*_workbook, colId, insertPayload);
+                applyOperation(*_workbook, insertOp);
+
+                // Now rename it
+                std::string renamePayload = "{\"name\":\"" + jsonEscape(name) + "\"}";
+                Operation renameOp = makeDimRenameAxisOp(*_workbook, colId, renamePayload);
+                applyOperation(*_workbook, renameOp);
+
+                column = sheet->getColumn(colId);
+            } else {
+                // Direct creation (offline mode)
+                auto newCol = std::make_unique<Axis>(colId, true);
+                newCol->position = pos;
+                newCol->size = DEFAULT_COLUMN_WIDTH;
+                newCol->name = name;
+                column = newCol.get();
+                sheet->addColumn(std::move(newCol));
+            }
         } else {
-            column->name = name;
+            if (isCollab) {
+                // Create and apply DIM_RENAME_AXIS operation
+                std::string payload = "{\"name\":\"" + jsonEscape(name) + "\"}";
+                Operation op = makeDimRenameAxisOp(*_workbook, colId, payload);
+                applyOperation(*_workbook, op);
+            } else {
+                // Direct mutation (offline mode)
+                column->name = name;
+            }
         }
 
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         std::ostringstream json;
-        json << "{\"success\":true,\"id\":\"" << column->id.toString() << "\"}";
+        json << "{\"success\":true,\"id\":\"" << (column ? column->id.toString() : colId.toString()) << "\"}";
         return json.str();
     }
 
@@ -1329,26 +1368,35 @@ public:
             return "{\"success\":true}";
         }
 
-        uint32_t newPos = targetPos;
-        if (targetPos > currentPos) {
-            newPos = targetPos - 1;
-        }
+        if (_workbook->isCollaborating()) {
+            // Create and apply DIM_MOVE_AXIS operation
+            std::string payload = "{\"targetPos\":" + std::to_string(targetPos) + "}";
+            Operation op = makeDimMoveAxisOp(*_workbook, colId, payload);
+            applyOperation(*_workbook, op);
+        } else {
+            // Direct mutation (offline mode)
+            uint32_t newPos = targetPos;
+            if (targetPos > currentPos) {
+                newPos = targetPos - 1;
+            }
 
-        for (auto& [id, col] : sheet->columns) {
-            if (id == colId) continue;
+            for (auto& [id, col] : sheet->columns) {
+                if (id == colId) continue;
 
-            if (currentPos < newPos) {
-                if (col->position > currentPos && col->position <= newPos) {
-                    col->position--;
-                }
-            } else {
-                if (col->position >= newPos && col->position < currentPos) {
-                    col->position++;
+                if (currentPos < newPos) {
+                    if (col->position > currentPos && col->position <= newPos) {
+                        col->position--;
+                    }
+                } else {
+                    if (col->position >= newPos && col->position < currentPos) {
+                        col->position++;
+                    }
                 }
             }
+
+            it->second->position = newPos;
         }
 
-        it->second->position = newPos;
         rebuildQuadtree();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
@@ -1381,26 +1429,35 @@ public:
             return "{\"success\":true}";
         }
 
-        uint32_t newPos = targetPos;
-        if (targetPos > currentPos) {
-            newPos = targetPos - 1;
-        }
+        if (_workbook->isCollaborating()) {
+            // Create and apply DIM_MOVE_AXIS operation
+            std::string payload = "{\"targetPos\":" + std::to_string(targetPos) + "}";
+            Operation op = makeDimMoveAxisOp(*_workbook, rowId, payload);
+            applyOperation(*_workbook, op);
+        } else {
+            // Direct mutation (offline mode)
+            uint32_t newPos = targetPos;
+            if (targetPos > currentPos) {
+                newPos = targetPos - 1;
+            }
 
-        for (auto& [id, row] : sheet->rows) {
-            if (id == rowId) continue;
+            for (auto& [id, row] : sheet->rows) {
+                if (id == rowId) continue;
 
-            if (currentPos < newPos) {
-                if (row->position > currentPos && row->position <= newPos) {
-                    row->position--;
-                }
-            } else {
-                if (row->position >= newPos && row->position < currentPos) {
-                    row->position++;
+                if (currentPos < newPos) {
+                    if (row->position > currentPos && row->position <= newPos) {
+                        row->position--;
+                    }
+                } else {
+                    if (row->position >= newPos && row->position < currentPos) {
+                        row->position++;
+                    }
                 }
             }
+
+            it->second->position = newPos;
         }
 
-        it->second->position = newPos;
         rebuildQuadtree();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 

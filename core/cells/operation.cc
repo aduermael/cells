@@ -22,6 +22,8 @@ const char* opTypeToString(OpType type) {
             return "DIM_MOVE_AXIS";
         case OpType::DIM_RESIZE_AXIS:
             return "DIM_RESIZE_AXIS";
+        case OpType::DIM_RENAME_AXIS:
+            return "DIM_RENAME_AXIS";
         case OpType::SHEET_CREATE:
             return "SHEET_CREATE";
         case OpType::SHEET_DELETE:
@@ -53,6 +55,9 @@ OpType stringToOpType(const std::string& str) {
     }
     if (str == "DIM_RESIZE_AXIS") {
         return OpType::DIM_RESIZE_AXIS;
+    }
+    if (str == "DIM_RENAME_AXIS") {
+        return OpType::DIM_RENAME_AXIS;
     }
     if (str == "SHEET_CREATE") {
         return OpType::SHEET_CREATE;

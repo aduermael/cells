@@ -298,6 +298,117 @@ ApplyResult applySheetRename(Workbook& workbook, const Operation& op) {
     return ApplyResult::SUCCESS;
 }
 
+// Apply DIM_MOVE_AXIS operation
+// Payload: {"targetPos":5}
+ApplyResult applyDimMoveAxis(Workbook& workbook, const Operation& op) {
+    Axis* axis = nullptr;
+    Sheet* targetSheet = nullptr;
+    bool isColumn = false;
+
+    for (auto& s : workbook.sheets) {
+        axis = s->getColumn(op.target_id);
+        if (axis != nullptr) {
+            targetSheet = s.get();
+            isColumn = true;
+            break;
+        }
+        axis = s->getRow(op.target_id);
+        if (axis != nullptr) {
+            targetSheet = s.get();
+            isColumn = false;
+            break;
+        }
+    }
+
+    if (axis == nullptr || targetSheet == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer move operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if (existing.type == OpType::DIM_MOVE_AXIS && existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    // Parse payload: {"targetPos":5}
+    int targetPos = extractJSONInt(op.payload, "targetPos", -1);
+    if (targetPos < 0) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    uint32_t currentPos = axis->position;
+    auto newPos = static_cast<uint32_t>(targetPos);
+
+    if (newPos == currentPos || newPos == currentPos + 1) {
+        return ApplyResult::SUCCESS;  // No-op
+    }
+
+    // Adjust newPos if moving forward (same logic as JS)
+    if (newPos > currentPos) {
+        newPos = newPos - 1;
+    }
+
+    // Update other axes' positions
+    auto& axisMap = isColumn ? targetSheet->columns : targetSheet->rows;
+    for (auto& [id, ax] : axisMap) {
+        if (id == op.target_id) continue;
+
+        if (currentPos < newPos) {
+            if (ax->position > currentPos && ax->position <= newPos) {
+                ax->position--;
+            }
+        } else {
+            if (ax->position >= newPos && ax->position < currentPos) {
+                ax->position++;
+            }
+        }
+    }
+
+    axis->position = newPos;
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply DIM_RENAME_AXIS operation
+// Payload: {"name":"NewName"}
+ApplyResult applyDimRenameAxis(Workbook& workbook, const Operation& op) {
+    Axis* axis = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        axis = s->getColumn(op.target_id);
+        if (axis == nullptr) {
+            axis = s->getRow(op.target_id);
+        }
+        if (axis != nullptr) {
+            break;
+        }
+    }
+
+    if (axis == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer rename operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if (existing.type == OpType::DIM_RENAME_AXIS && existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    // Parse payload: {"name":"NewName"}
+    const std::string name = extractJSONString(op.payload, "name");
+    // Note: empty name is valid (it clears the custom name)
+
+    axis->name = name;
+
+    return ApplyResult::SUCCESS;
+}
+
 }  // namespace
 
 ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
@@ -321,7 +432,6 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
 
         case OpType::CELL_SET_STYLE:
         case OpType::DIM_DELETE_AXIS:
-        case OpType::DIM_MOVE_AXIS:
             // Not fully implemented yet - just accept it
             result = ApplyResult::SUCCESS;
             break;
@@ -332,6 +442,14 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
 
         case OpType::DIM_RESIZE_AXIS:
             result = applyDimResizeAxis(workbook, op);
+            break;
+
+        case OpType::DIM_MOVE_AXIS:
+            result = applyDimMoveAxis(workbook, op);
+            break;
+
+        case OpType::DIM_RENAME_AXIS:
+            result = applyDimRenameAxis(workbook, op);
             break;
 
         case OpType::SHEET_CREATE:
@@ -399,6 +517,16 @@ Operation makeDimDeleteAxisOp(Workbook& workbook, const ID& axisId) {
 Operation makeDimResizeAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::DIM_RESIZE_AXIS, axisId, payload};
+}
+
+Operation makeDimMoveAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::DIM_MOVE_AXIS, axisId, payload};
+}
+
+Operation makeDimRenameAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::DIM_RENAME_AXIS, axisId, payload};
 }
 
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {

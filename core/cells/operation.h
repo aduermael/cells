@@ -23,6 +23,7 @@ enum class OpType : uint8_t {
     DIM_DELETE_AXIS = 11,  // Delete column or row
     DIM_MOVE_AXIS = 12,    // Move column or row to new position
     DIM_RESIZE_AXIS = 13,  // Resize column width or row height
+    DIM_RENAME_AXIS = 14,  // Rename column or row
 
     // Sheet operations
     SHEET_CREATE = 20,  // Create new sheet

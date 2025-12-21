@@ -14,6 +14,7 @@ TEST(OpTypeTest, OpTypeToStringAndBack) {
     EXPECT_STREQ(opTypeToString(OpType::DIM_DELETE_AXIS), "DIM_DELETE_AXIS");
     EXPECT_STREQ(opTypeToString(OpType::DIM_MOVE_AXIS), "DIM_MOVE_AXIS");
     EXPECT_STREQ(opTypeToString(OpType::DIM_RESIZE_AXIS), "DIM_RESIZE_AXIS");
+    EXPECT_STREQ(opTypeToString(OpType::DIM_RENAME_AXIS), "DIM_RENAME_AXIS");
     EXPECT_STREQ(opTypeToString(OpType::SHEET_CREATE), "SHEET_CREATE");
     EXPECT_STREQ(opTypeToString(OpType::SHEET_DELETE), "SHEET_DELETE");
     EXPECT_STREQ(opTypeToString(OpType::SHEET_RENAME), "SHEET_RENAME");
@@ -26,6 +27,7 @@ TEST(OpTypeTest, OpTypeToStringAndBack) {
     EXPECT_EQ(stringToOpType("DIM_DELETE_AXIS"), OpType::DIM_DELETE_AXIS);
     EXPECT_EQ(stringToOpType("DIM_MOVE_AXIS"), OpType::DIM_MOVE_AXIS);
     EXPECT_EQ(stringToOpType("DIM_RESIZE_AXIS"), OpType::DIM_RESIZE_AXIS);
+    EXPECT_EQ(stringToOpType("DIM_RENAME_AXIS"), OpType::DIM_RENAME_AXIS);
     EXPECT_EQ(stringToOpType("SHEET_CREATE"), OpType::SHEET_CREATE);
     EXPECT_EQ(stringToOpType("SHEET_DELETE"), OpType::SHEET_DELETE);
     EXPECT_EQ(stringToOpType("SHEET_RENAME"), OpType::SHEET_RENAME);
@@ -100,6 +102,7 @@ TEST(OperationTest, FromStringWithAllOpTypes) {
         {"1000.0.Kj7mXp2Q DIM_DELETE_AXIS nP6kR2mW {}", OpType::DIM_DELETE_AXIS},
         {"1000.0.Kj7mXp2Q DIM_MOVE_AXIS nP6kR2mW {}", OpType::DIM_MOVE_AXIS},
         {"1000.0.Kj7mXp2Q DIM_RESIZE_AXIS nP6kR2mW {}", OpType::DIM_RESIZE_AXIS},
+        {"1000.0.Kj7mXp2Q DIM_RENAME_AXIS nP6kR2mW {}", OpType::DIM_RENAME_AXIS},
         {"1000.0.Kj7mXp2Q SHEET_CREATE nP6kR2mW {}", OpType::SHEET_CREATE},
         {"1000.0.Kj7mXp2Q SHEET_DELETE nP6kR2mW {}", OpType::SHEET_DELETE},
         {"1000.0.Kj7mXp2Q SHEET_RENAME nP6kR2mW {}", OpType::SHEET_RENAME},
