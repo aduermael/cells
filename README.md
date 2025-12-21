@@ -143,6 +143,16 @@ cells/
 3. **CRDT-compatible**: Each link is independently addressable
 4. **Flexible iteration**: Forward/backward traversal
 
+## Requirements
+
+- **Bazel** 7.0+ (build system)
+- **C++17** compatible compiler (Clang, GCC, or MSVC)
+- **Go 1.22+** (for WASM development server)
+  - **Important**: macOS 15+ (Sequoia) requires Go 1.22 or newer
+  - Older Go versions will fail with `dyld: missing LC_UUID load command` error
+  - Install/upgrade: `brew install go`
+- **Python 3** (optional, for simple HTTP server)
+
 ## Build System
 
 **Bazel** - Fast incremental builds, hermetic, scales well.

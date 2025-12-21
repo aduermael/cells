@@ -54,6 +54,13 @@ wasm-dist:
 # Serve WASM distribution for local testing
 wasm-serve:
 	@if [ ! -d dist ]; then echo "Error: dist/ not found. Run 'make wasm-dist' first."; exit 1; fi
+	@# Check Go version (require 1.22+ for macOS 15+ compatibility)
+	@go version | awk '{print $$3}' | sed 's/go//' | awk -F. '{if ($$1 < 1 || ($$1 == 1 && $$2 < 22)) { \
+		print "Error: Go 1.22+ required (you have: " $$0 ")"; \
+		print "  macOS 15+ requires Go 1.22+ to avoid dyld errors"; \
+		print "  Install: brew install go"; \
+		exit 1 \
+	}}'
 	go run tools/serve/main.go -port 8081 -dir dist
 
 # Test (when tests exist)
