@@ -278,12 +278,12 @@ Add session persistence, random user identity, and final polish.
   - Broadcast updated presence to all peers
   - Persist choice only for current session (reset on refresh)
 
-- [ ] 6c: Add "New Document" option for clean session
-  - Add "New Document" button to header toolbar
-  - Clear current workbook and IndexedDB
-  - Generate new random document ID
-  - Create new room (not join existing)
-  - Clear URL room parameter
+- [x] 6c: Add "New Document" option for clean session
+  - Add "New Document" button to header toolbar (already exists)
+  - Clear current workbook and IndexedDB (already exists via clearPersistedFile)
+  - Generate new random document ID (happens in createEmptyWorkbook)
+  - Clear URL room parameter (added - no room created until Share clicked)
+  - Note: No room is auto-created; collaboration only starts when Share is clicked
 
 - [ ] 6d: Implement graceful offline handling
   - Detect when all peers disconnect

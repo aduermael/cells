@@ -78,6 +78,7 @@
         } from './shared/ui-state.js';
 
         import { CollabUI } from './shared/collab-ui.js';
+        import { clearRoomIdFromUrl } from './shared/room-url.js';
 
         // ========================================================================
         // WASM Data Source (communicates with Web Worker)
@@ -2226,6 +2227,9 @@
             } catch (e) {
                 console.warn('Failed to clear persisted file:', e);
             }
+
+            // Clear collaboration room URL parameter
+            clearRoomIdFromUrl();
 
             // Reset state
             sheetInfo = null;
