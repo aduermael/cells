@@ -24,7 +24,7 @@ struct OpLog;
 
 // Collaboration mode for the workbook
 // Determines how edits are tracked and synchronized
-enum class CollabMode {
+enum class CollabMode : std::uint8_t {
     OFFLINE,       // No collaboration - edits bypass OpLog, direct mutation
     COLLABORATING  // Active collaboration - edits tracked in OpLog, broadcast to peers
 };

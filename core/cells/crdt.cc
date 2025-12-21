@@ -436,9 +436,10 @@ size_t bootstrapOpLog(Workbook& workbook) {
 
         // Generate DIM_INSERT_AXIS operations for columns (in position order)
         for (const auto& [pos, axis] : columns) {
-            std::string payload = "{\"pos\":" + std::to_string(pos) +
-                                  ",\"size\":" + std::to_string(axis->size) + ",\"isCol\":\"true\"}";
-            Operation op = makeDimInsertAxisOp(workbook, axis->id, payload);
+            const std::string payload = "{\"pos\":" + std::to_string(pos) +
+                                        ",\"size\":" + std::to_string(axis->size) +
+                                        ",\"isCol\":\"true\"}";
+            const Operation op = makeDimInsertAxisOp(workbook, axis->id, payload);
             oplog->addOperation(op);
             count++;
         }
@@ -453,9 +454,10 @@ size_t bootstrapOpLog(Workbook& workbook) {
 
         // Generate DIM_INSERT_AXIS operations for rows (in position order)
         for (const auto& [pos, axis] : rows) {
-            std::string payload = "{\"pos\":" + std::to_string(pos) +
-                                  ",\"size\":" + std::to_string(axis->size) + ",\"isCol\":\"false\"}";
-            Operation op = makeDimInsertAxisOp(workbook, axis->id, payload);
+            const std::string payload = "{\"pos\":" + std::to_string(pos) +
+                                        ",\"size\":" + std::to_string(axis->size) +
+                                        ",\"isCol\":\"false\"}";
+            const Operation op = makeDimInsertAxisOp(workbook, axis->id, payload);
             oplog->addOperation(op);
             count++;
         }
@@ -469,14 +471,19 @@ size_t bootstrapOpLog(Workbook& workbook) {
             }
 
             // Build payload based on cell type
-            std::string payload;
             const std::string colIdStr = cell->colId.toString();
             const std::string rowIdStr = cell->rowId.toString();
-            const std::string idSuffix =
-                ",\"col_id\":\"" + colIdStr + "\",\"row_id\":\"" + rowIdStr + "\"}";
+            std::string idSuffix;
+            idSuffix.reserve(40);
+            idSuffix += ",\"col_id\":\"";
+            idSuffix += colIdStr;
+            idSuffix += "\",\"row_id\":\"";
+            idSuffix += rowIdStr;
+            idSuffix += "\"}";
 
+            std::string payload;
             if (cell->isFormula()) {
-                Formula* formula = cell->getFormula();
+                const Formula* formula = cell->getFormula();
                 if (formula != nullptr && formula->text != nullptr) {
                     payload = "{\"type\":\"f\",\"value\":\"" + std::string(formula->text) +
                               "\",\"display\":\"" + cell->value.raw + "\"" + idSuffix;
@@ -489,7 +496,7 @@ size_t bootstrapOpLog(Workbook& workbook) {
                           cell->value.raw + "\"" + idSuffix;
             }
 
-            Operation op = makeCellSetValueOp(workbook, cell->id, payload);
+            const Operation op = makeCellSetValueOp(workbook, cell->id, payload);
             oplog->addOperation(op);
             count++;
         }

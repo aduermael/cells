@@ -243,10 +243,11 @@ Implement proper offline vs collaborating mode.
   - Generate operations for current state (all axes, all cells)
   - Future edits go through operation path
 
-- [ ] 4d: Handle returning to offline
+- [x] 4d: Handle returning to offline
   - "Leave Room" → stay COLLABORATING (ops still tracked)
-  - "New Document" → reset to OFFLINE
+  - "New Document" → reset to OFFLINE (createEmptyWorkbook defaults to OFFLINE)
   - OpLog persists for rejoining same room
+  - Loading files (loadFromCells, loadFromCSV, loadFromXLSX) creates new workbooks in OFFLINE mode
 
 ## Phase 5: Export Feature
 
