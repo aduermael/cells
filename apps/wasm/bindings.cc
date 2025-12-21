@@ -1691,6 +1691,54 @@ public:
         return static_cast<int>(_workbook->pendingOpsCount());
     }
 
+    // ========================================================================
+    // Collaboration mode methods (Phase 4a)
+    // ========================================================================
+
+    // Get current collaboration mode as string: "offline" or "collaborating"
+    std::string getCollabMode() {
+        if (!_workbook) {
+            return "offline";
+        }
+        return _workbook->isCollaborating() ? "collaborating" : "offline";
+    }
+
+    // Check if currently in collaboration mode
+    bool isCollaborating() {
+        if (!_workbook) {
+            return false;
+        }
+        return _workbook->isCollaborating();
+    }
+
+    // Start collaboration mode - call when user clicks "Share" or joins a room.
+    // This switches to COLLABORATING mode and will bootstrap OpLog if needed.
+    std::string startCollaboration() {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        _workbook->startCollaboration();
+        return "{\"success\":true,\"mode\":\"collaborating\"}";
+    }
+
+    // Set collaboration mode explicitly (for testing or edge cases)
+    std::string setCollabMode(const std::string& mode) {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        if (mode == "offline") {
+            _workbook->setCollabMode(cells::CollabMode::OFFLINE);
+        } else if (mode == "collaborating") {
+            _workbook->setCollabMode(cells::CollabMode::COLLABORATING);
+        } else {
+            return "{\"error\":\"Invalid mode. Use 'offline' or 'collaborating'\"}";
+        }
+
+        return "{\"success\":true,\"mode\":\"" + mode + "\"}";
+    }
+
 private:
     void rebuildQuadtree() {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
@@ -1819,5 +1867,10 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("commitPendingOps", &cells::wasm::CellsEngine::commitPendingOps)
         .function("commitPendingOpsForCell", &cells::wasm::CellsEngine::commitPendingOpsForCell)
         .function("hasPendingOps", &cells::wasm::CellsEngine::hasPendingOps)
-        .function("getPendingOpsCount", &cells::wasm::CellsEngine::getPendingOpsCount);
+        .function("getPendingOpsCount", &cells::wasm::CellsEngine::getPendingOpsCount)
+        // Collaboration mode
+        .function("getCollabMode", &cells::wasm::CellsEngine::getCollabMode)
+        .function("isCollaborating", &cells::wasm::CellsEngine::isCollaborating)
+        .function("startCollaboration", &cells::wasm::CellsEngine::startCollaboration)
+        .function("setCollabMode", &cells::wasm::CellsEngine::setCollabMode);
 }

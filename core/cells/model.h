@@ -22,6 +22,13 @@ struct Workbook;
 struct SharedFormulaGroup;
 struct OpLog;
 
+// Collaboration mode for the workbook
+// Determines how edits are tracked and synchronized
+enum class CollabMode {
+    OFFLINE,       // No collaboration - edits bypass OpLog, direct mutation
+    COLLABORATING  // Active collaboration - edits tracked in OpLog, broadcast to peers
+};
+
 // Cell value - stores the raw value as a string (for simplicity)
 // The type field indicates how to interpret it
 struct CellValue {
@@ -269,6 +276,24 @@ struct Workbook {
     // Get count of pending operations
     [[nodiscard]] size_t pendingOpsCount() const;
 
+    // ========================================================================
+    // Collaboration mode
+    // ========================================================================
+
+    // Get current collaboration mode
+    [[nodiscard]] CollabMode getCollabMode() const;
+
+    // Set collaboration mode
+    // Switching to COLLABORATING may trigger OpLog bootstrap (see startCollaboration)
+    void setCollabMode(CollabMode mode);
+
+    // Check if in collaboration mode
+    [[nodiscard]] bool isCollaborating() const;
+
+    // Start collaboration - switches mode and bootstraps OpLog if needed
+    // Call this when user clicks "Share" or joins a room
+    void startCollaboration();
+
 private:
     // Sheet lookup by ID
     std::unordered_map<ID, Sheet*, IDHash> _sheetIndex;
@@ -285,6 +310,9 @@ private:
 
     // Last HLC used for generating operations
     mutable HLC _lastHLC;
+
+    // Collaboration mode (default: OFFLINE)
+    CollabMode _collabMode{CollabMode::OFFLINE};
 };
 
 }  // namespace cells

@@ -589,4 +589,33 @@ size_t Workbook::pendingOpsCount() const {
     return _pendingOps.size();
 }
 
+// ============================================================================
+// Workbook - Collaboration Mode
+// ============================================================================
+
+CollabMode Workbook::getCollabMode() const {
+    return _collabMode;
+}
+
+void Workbook::setCollabMode(CollabMode mode) {
+    _collabMode = mode;
+}
+
+bool Workbook::isCollaborating() const {
+    return _collabMode == CollabMode::COLLABORATING;
+}
+
+void Workbook::startCollaboration() {
+    if (_collabMode == CollabMode::COLLABORATING) {
+        // Already collaborating, nothing to do
+        return;
+    }
+
+    // Switch to collaboration mode
+    _collabMode = CollabMode::COLLABORATING;
+
+    // Bootstrap OpLog with current state will be done in Phase 4c
+    // For now, just switch the mode
+}
+
 }  // namespace cells

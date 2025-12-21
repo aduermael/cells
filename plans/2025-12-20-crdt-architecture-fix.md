@@ -228,7 +228,7 @@ Add pending operation support for live typing visibility.
 
 Implement proper offline vs collaborating mode.
 
-- [ ] 4a: Add collaboration mode to Workbook
+- [x] 4a: Add collaboration mode to Workbook
   - `enum class CollabMode { OFFLINE, COLLABORATING }`
   - Default: OFFLINE
   - Switch to COLLABORATING on first Share/Join
