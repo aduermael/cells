@@ -35,7 +35,7 @@ if [ ! -f "$COMPILE_DB" ]; then
 fi
 
 # Get Bazel external directory for third-party includes
-BAZEL_OUTPUT_BASE=$(bazelisk info output_base 2>/dev/null || echo "")
+BAZEL_OUTPUT_BASE=$(bazel info output_base 2>/dev/null || bazelisk info output_base 2>/dev/null || echo "")
 PUGIXML_INCLUDE=""
 if [ -n "$BAZEL_OUTPUT_BASE" ]; then
     PUGIXML_DIR=$(find "$BAZEL_OUTPUT_BASE/external" -name "pugixml.hpp" -type f 2>/dev/null | grep -v openxlsx | head -1 | xargs dirname 2>/dev/null || echo "")
@@ -109,7 +109,7 @@ for file in "${FILES[@]}"; do
         -std=c++17 \
         -I"$PROJECT_ROOT" \
         -I"$PROJECT_ROOT/third_party/miniz" \
-        $PUGIXML_INCLUDE \
+        ${PUGIXML_INCLUDE:+"$PUGIXML_INCLUDE"} \
         > "$TMPFILE" 2>&1 || TIDY_EXIT=$?
 
     # Filter and display output (remove noise from system headers)
