@@ -1,6 +1,7 @@
 #include "core/cells/operation.h"
 
 #include <cstring>
+
 #include <sstream>
 
 namespace cells {
@@ -95,42 +96,42 @@ Operation Operation::fromString(const std::string& str) {
     // Parse: "wall.logical.node OP_TYPE target_id payload"
 
     // Find first space (after HLC)
-    size_t first_space = str.find(' ');
+    const size_t first_space = str.find(' ');
     if (first_space == std::string::npos) {
-        return Operation();
+        return {};
     }
 
     // Find second space (after OpType)
-    size_t second_space = str.find(' ', first_space + 1);
+    const size_t second_space = str.find(' ', first_space + 1);
     if (second_space == std::string::npos) {
-        return Operation();
+        return {};
     }
 
     // Find third space (after target_id)
-    size_t third_space = str.find(' ', second_space + 1);
+    const size_t third_space = str.find(' ', second_space + 1);
     if (third_space == std::string::npos) {
-        return Operation();
+        return {};
     }
 
     // Parse HLC
-    std::string hlc_str = str.substr(0, first_space);
-    HLC hlc = HLC::fromString(hlc_str);
+    const std::string hlc_str = str.substr(0, first_space);
+    const HLC hlc = HLC::fromString(hlc_str);
     if (hlc.isZero() && hlc_str != "0.0.~") {
-        return Operation();  // Parse failed
+        return {};  // Parse failed
     }
 
     // Parse OpType
-    std::string op_str = str.substr(first_space + 1, second_space - first_space - 1);
-    OpType type = stringToOpType(op_str);
+    const std::string op_str = str.substr(first_space + 1, second_space - first_space - 1);
+    const OpType type = stringToOpType(op_str);
 
     // Parse target_id
-    std::string target_str = str.substr(second_space + 1, third_space - second_space - 1);
-    ID target(target_str);
+    const std::string target_str = str.substr(second_space + 1, third_space - second_space - 1);
+    const ID target(target_str);
 
     // Rest is payload
-    std::string payload = str.substr(third_space + 1);
+    const std::string payload = str.substr(third_space + 1);
 
-    return Operation(hlc, type, target, payload);
+    return {hlc, type, target, payload};
 }
 
 namespace {
@@ -141,7 +142,7 @@ std::string unescapeJSON(const std::string& str) {
     size_t i = 0;
     while (i < str.size()) {
         if (str[i] == '\\' && i + 1 < str.size()) {
-            char next = str[i + 1];
+            const char next = str[i + 1];
             switch (next) {
                 case '"':
                     oss << '"';
@@ -175,7 +176,7 @@ std::string unescapeJSON(const std::string& str) {
                     // Unicode escape - simplified handling
                     if (i + 5 < str.size()) {
                         char hex[5] = {str[i + 2], str[i + 3], str[i + 4], str[i + 5], 0};
-                        int code = static_cast<int>(strtol(hex, nullptr, 16));
+                        const int code = static_cast<int>(strtol(hex, nullptr, 16));
                         if (code < 128) {
                             oss << static_cast<char>(code);
                         }
@@ -199,7 +200,7 @@ std::string unescapeJSON(const std::string& str) {
 
 // Find value after a JSON key
 std::string findJSONValue(const std::string& json, const std::string& key) {
-    std::string searchKey = "\"" + key + "\":";
+    const std::string searchKey = "\"" + key + "\":";
     size_t pos = json.find(searchKey);
     if (pos == std::string::npos) {
         return "";
@@ -233,7 +234,7 @@ std::string findJSONValue(const std::string& json, const std::string& key) {
     int braceCount = 0;
     int bracketCount = 0;
     while (end < json.size()) {
-        char c = json[end];
+        const char c = json[end];
         if (c == '{') {
             braceCount++;
         }
@@ -268,20 +269,20 @@ std::string Operation::toJSON() const {
 }
 
 Operation Operation::fromJSON(const std::string& json) {
-    std::string hlc_str = findJSONValue(json, "hlc");
-    std::string op_str = findJSONValue(json, "op");
-    std::string target_str = findJSONValue(json, "target");
-    std::string payload_str = findJSONValue(json, "payload");
+    const std::string hlc_str = findJSONValue(json, "hlc");
+    const std::string op_str = findJSONValue(json, "op");
+    const std::string target_str = findJSONValue(json, "target");
+    const std::string payload_str = findJSONValue(json, "payload");
 
     if (hlc_str.empty() || op_str.empty() || target_str.empty()) {
-        return Operation();
+        return {};
     }
 
-    HLC hlc = HLC::fromString(hlc_str);
-    OpType type = stringToOpType(op_str);
-    ID target(target_str);
+    const HLC hlc = HLC::fromString(hlc_str);
+    const OpType type = stringToOpType(op_str);
+    const ID target(target_str);
 
-    return Operation(hlc, type, target, payload_str);
+    return {hlc, type, target, payload_str};
 }
 
 }  // namespace cells

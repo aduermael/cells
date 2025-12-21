@@ -656,7 +656,7 @@ bool Parser::parseOperation(std::string_view line) {
     }
 
     const std::string hlcStr(line.substr(0, spacePos));
-    HLC hlc = HLC::fromString(hlcStr);
+    const HLC hlc = HLC::fromString(hlcStr);
     // Note: we don't validate HLC strictly here, zero HLC is acceptable in some edge cases
 
     line = line.substr(spacePos + 1);
@@ -685,7 +685,7 @@ bool Parser::parseOperation(std::string_view line) {
     const std::string payload(line.substr(spacePos + 1));
 
     // Create operation and add to OpLog
-    Operation op(hlc, opType, targetId, payload);
+    const Operation op(hlc, opType, targetId, payload);
     OpLog* oplog = workbook_->getOpLog();
     if (oplog != nullptr) {
         oplog->addOperation(op);

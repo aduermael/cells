@@ -60,7 +60,7 @@ private:
     std::unordered_map<std::string, size_t> _hlc_index;
 
     // Find insertion point to maintain sorted order
-    size_t findInsertionPoint(const HLC& hlc) const;
+    [[nodiscard]] size_t findInsertionPoint(const HLC& hlc) const;
 };
 
 }  // namespace cells

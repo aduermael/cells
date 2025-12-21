@@ -14,15 +14,15 @@ namespace cells {
 // Each operation modifies a specific entity (cell, axis, or sheet).
 enum class OpType : uint8_t {
     // Cell operations
-    CELL_SET_VALUE = 0,   // Set cell value (number, string, boolean, formula)
-    CELL_CLEAR = 1,       // Clear cell contents
-    CELL_SET_STYLE = 2,   // Set cell style properties
+    CELL_SET_VALUE = 0,  // Set cell value (number, string, boolean, formula)
+    CELL_CLEAR = 1,      // Clear cell contents
+    CELL_SET_STYLE = 2,  // Set cell style properties
 
     // Axis (column/row) operations
-    DIM_INSERT_AXIS = 10,   // Insert new column or row
-    DIM_DELETE_AXIS = 11,   // Delete column or row
-    DIM_MOVE_AXIS = 12,     // Move column or row to new position
-    DIM_RESIZE_AXIS = 13,   // Resize column width or row height
+    DIM_INSERT_AXIS = 10,  // Insert new column or row
+    DIM_DELETE_AXIS = 11,  // Delete column or row
+    DIM_MOVE_AXIS = 12,    // Move column or row to new position
+    DIM_RESIZE_AXIS = 13,  // Resize column width or row height
 
     // Sheet operations
     SHEET_CREATE = 20,  // Create new sheet

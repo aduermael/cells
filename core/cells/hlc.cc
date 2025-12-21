@@ -1,7 +1,8 @@
 #include "core/cells/hlc.h"
 
-#include <chrono>
 #include <cstdlib>
+
+#include <chrono>
 #include <sstream>
 
 namespace cells {
@@ -77,36 +78,36 @@ HLC HLC::fromString(const std::string& str) {
     // Format: wall_time.logical.node_id
     // Example: 1705312200000.0.N3f8hJ2w
 
-    size_t first_dot = str.find('.');
+    const size_t first_dot = str.find('.');
     if (first_dot == std::string::npos) {
-        return HLC();  // Invalid format
+        return {};  // Invalid format
     }
 
-    size_t second_dot = str.find('.', first_dot + 1);
+    const size_t second_dot = str.find('.', first_dot + 1);
     if (second_dot == std::string::npos) {
-        return HLC();  // Invalid format
+        return {};  // Invalid format
     }
 
     // Parse wall_time
-    std::string wall_str = str.substr(0, first_dot);
-    char* end = nullptr;
-    int64_t wall = std::strtoll(wall_str.c_str(), &end, 10);
+    const std::string wall_str = str.substr(0, first_dot);
+    char* end = nullptr;  // NOLINT(misc-const-correctness)
+    const int64_t wall = std::strtoll(wall_str.c_str(), &end, 10);
     if (end == wall_str.c_str()) {
-        return HLC();  // Failed to parse
+        return {};  // Failed to parse
     }
 
     // Parse logical
-    std::string logical_str = str.substr(first_dot + 1, second_dot - first_dot - 1);
-    unsigned long logical_val = std::strtoul(logical_str.c_str(), &end, 10);
+    const std::string logical_str = str.substr(first_dot + 1, second_dot - first_dot - 1);
+    const unsigned long logical_val = std::strtoul(logical_str.c_str(), &end, 10);
     if (end == logical_str.c_str()) {
-        return HLC();  // Failed to parse
+        return {};  // Failed to parse
     }
 
     // Parse node_id
-    std::string node_str = str.substr(second_dot + 1);
-    ID node(node_str);
+    const std::string node_str = str.substr(second_dot + 1);
+    const ID node(node_str);
 
-    return HLC(wall, static_cast<uint32_t>(logical_val), node);
+    return {wall, static_cast<uint32_t>(logical_val), node};
 }
 
 int64_t current_time_ms() {
@@ -116,23 +117,23 @@ int64_t current_time_ms() {
 }
 
 HLC generate_hlc(const HLC& last_hlc, const ID& node_id) {
-    int64_t now = current_time_ms();
+    const int64_t now = current_time_ms();
 
     // If wall clock has advanced, use new time with logical 0
     if (now > last_hlc.wall_time) {
-        return HLC(now, 0, node_id);
+        return {now, 0, node_id};
     }
 
     // Wall clock hasn't advanced (or went backwards), increment logical
-    return HLC(last_hlc.wall_time, last_hlc.logical + 1, node_id);
+    return {last_hlc.wall_time, last_hlc.logical + 1, node_id};
 }
 
 HLC generate_initial_hlc(const ID& node_id) {
-    return HLC(current_time_ms(), 0, node_id);
+    return {current_time_ms(), 0, node_id};
 }
 
 HLC update_hlc(const HLC& last_local, const HLC& received, const ID& node_id) {
-    int64_t now = current_time_ms();
+    const int64_t now = current_time_ms();
 
     // Choose the maximum wall_time among now, last_local, and received
     int64_t max_wall = now;
@@ -150,8 +151,8 @@ HLC update_hlc(const HLC& last_local, const HLC& received, const ID& node_id) {
         new_logical = 0;
     } else if (max_wall == last_local.wall_time && max_wall == received.wall_time) {
         // All three are at the same wall_time
-        new_logical = (last_local.logical > received.logical ? last_local.logical : received.logical)
-                      + 1;
+        new_logical =
+            (last_local.logical > received.logical ? last_local.logical : received.logical) + 1;
     } else if (max_wall == last_local.wall_time) {
         // last_local has the highest wall_time
         new_logical = last_local.logical + 1;
@@ -167,7 +168,7 @@ HLC update_hlc(const HLC& last_local, const HLC& received, const ID& node_id) {
         }
     }
 
-    return HLC(max_wall, new_logical, node_id);
+    return {max_wall, new_logical, node_id};
 }
 
 }  // namespace cells

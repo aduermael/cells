@@ -75,7 +75,7 @@ Implement the core CRDT data structures and operation log in C++ for the engine.
 
 Extend the existing Go server with WebSocket signaling for WebRTC connection setup.
 
-- [ ] 2a: Add WebSocket dependencies to Go module
+- [x] 2a: Add WebSocket dependencies to Go module
   - Add `github.com/gorilla/websocket` to `go.mod`
   - Run `go mod tidy`
   - Update `tools/serve/README.md` with new dependency

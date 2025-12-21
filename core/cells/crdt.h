@@ -1,19 +1,21 @@
 #ifndef CELLS_CRDT_H_
 #define CELLS_CRDT_H_
 
+#include <cstdint>
+
 #include "core/cells/model.h"
 #include "core/cells/operation.h"
 
 namespace cells {
 
 // Result of applying an operation
-enum class ApplyResult {
-    SUCCESS,           // Operation applied successfully
-    ALREADY_APPLIED,   // Operation already in OpLog (duplicate)
-    SUPERSEDED,        // A newer operation already exists for this entity
-    INVALID_TARGET,    // Target entity not found (for cell/axis operations)
-    INVALID_PAYLOAD,   // Payload could not be parsed
-    RESURRECTED,       // Entity was deleted but resurrected by this edit
+enum class ApplyResult : std::uint8_t {
+    SUCCESS,          // Operation applied successfully
+    ALREADY_APPLIED,  // Operation already in OpLog (duplicate)
+    SUPERSEDED,       // A newer operation already exists for this entity
+    INVALID_TARGET,   // Target entity not found (for cell/axis operations)
+    INVALID_PAYLOAD,  // Payload could not be parsed
+    RESURRECTED,      // Entity was deleted but resurrected by this edit
 };
 
 // Apply a CRDT operation to a workbook.

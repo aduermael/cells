@@ -8,13 +8,13 @@ OpLog::OpLog() = default;
 
 bool OpLog::addOperation(const Operation& op) {
     // Check for duplicate
-    std::string hlc_str = op.hlc.toString();
+    const std::string hlc_str = op.hlc.toString();
     if (_hlc_index.find(hlc_str) != _hlc_index.end()) {
         return false;  // Already exists
     }
 
     // Find insertion point to maintain sorted order
-    size_t insert_pos = findInsertionPoint(op.hlc);
+    const size_t insert_pos = findInsertionPoint(op.hlc);
 
     // Insert operation
     _operations.insert(_operations.begin() + static_cast<ptrdiff_t>(insert_pos), op);
@@ -64,7 +64,7 @@ std::vector<Operation> OpLog::getOperationsForEntity(const ID& entity_id) const 
     }
 
     // Collect operations and sort by HLC
-    for (size_t idx : it->second) {
+    for (const size_t idx : it->second) {
         if (idx < _operations.size()) {
             result.push_back(_operations[idx]);
         }
@@ -80,7 +80,7 @@ std::vector<Operation> OpLog::getOperationsForEntity(const ID& entity_id) const 
 Operation OpLog::getLatestOperationForEntity(const ID& entity_id) const {
     auto ops = getOperationsForEntity(entity_id);
     if (ops.empty()) {
-        return Operation();
+        return {};
     }
     return ops.back();
 }
@@ -91,7 +91,7 @@ const std::vector<Operation>& OpLog::getAllOperations() const {
 
 HLC OpLog::getCurrentHLC() const {
     if (_operations.empty()) {
-        return HLC();
+        return {};
     }
     return _operations.back().hlc;
 }
@@ -120,7 +120,7 @@ size_t OpLog::findInsertionPoint(const HLC& hlc) const {
     size_t right = _operations.size();
 
     while (left < right) {
-        size_t mid = left + (right - left) / 2;
+        const size_t mid = left + (right - left) / 2;
         if (_operations[mid].hlc < hlc) {
             left = mid + 1;
         } else {

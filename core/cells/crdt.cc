@@ -8,7 +8,7 @@ namespace {
 
 // Simple JSON value extraction (reused from operation.cc pattern)
 std::string extractJSONString(const std::string& json, const std::string& key) {
-    std::string searchKey = "\"" + key + "\":";
+    const std::string searchKey = "\"" + key + "\":";
     size_t pos = json.find(searchKey);
     if (pos == std::string::npos) {
         return "";
@@ -50,7 +50,7 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
 
     // Check if there's a newer operation for this cell
     const OpLog* oplog = workbook.getOpLog();
-    Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
 
     if (!latest.isNull() && latest.hlc >= op.hlc) {
         // This operation is older than or equal to existing, skip it
@@ -66,15 +66,15 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
     }
 
     // Parse payload: {"type":"n","value":"42"} or {"type":"s","value":"hello"}
-    std::string type_str = extractJSONString(op.payload, "type");
-    std::string value_str = extractJSONString(op.payload, "value");
+    const std::string type_str = extractJSONString(op.payload, "type");
+    const std::string value_str = extractJSONString(op.payload, "value");
 
     if (type_str.empty()) {
         return ApplyResult::INVALID_PAYLOAD;
     }
 
     // Apply the value based on type
-    CellValueType type = charToValueType(type_str[0]);
+    const CellValueType type = charToValueType(type_str[0]);
     cell->value.type = type;
     cell->value.raw = value_str;
     cell->value.error = CellError::NONE;
@@ -104,7 +104,7 @@ ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
 
     // Check for newer operations
     const OpLog* oplog = workbook.getOpLog();
-    Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
 
     if (!latest.isNull() && latest.hlc > op.hlc) {
         // A newer operation exists - if it's an edit, it resurrects
@@ -148,7 +148,7 @@ ApplyResult applyDimResizeAxis(Workbook& workbook, const Operation& op) {
     }
 
     // Parse payload: {"size":150}
-    std::string size_str = extractJSONString(op.payload, "size");
+    std::string size_str = extractJSONString(op.payload, "size");  // NOLINT(misc-const-correctness)
     if (size_str.empty()) {
         // Try numeric format
         size_t pos = op.payload.find("\"size\":");
@@ -169,7 +169,7 @@ ApplyResult applyDimResizeAxis(Workbook& workbook, const Operation& op) {
         return ApplyResult::INVALID_PAYLOAD;
     }
 
-    uint32_t new_size = static_cast<uint32_t>(std::stoul(size_str));
+    const auto new_size = static_cast<uint32_t>(std::stoul(size_str));
     axis->size = new_size;
 
     return ApplyResult::SUCCESS;
@@ -192,7 +192,7 @@ ApplyResult applySheetRename(Workbook& workbook, const Operation& op) {
     }
 
     // Parse payload: {"name":"NewName"}
-    std::string name = extractJSONString(op.payload, "name");
+    const std::string name = extractJSONString(op.payload, "name");
     if (name.empty()) {
         return ApplyResult::INVALID_PAYLOAD;
     }
@@ -224,24 +224,10 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             break;
 
         case OpType::CELL_SET_STYLE:
-            // Style operations use LWW similar to value
-            // Not fully implemented yet - just accept it
-            result = ApplyResult::SUCCESS;
-            break;
-
         case OpType::DIM_INSERT_AXIS:
-            // Axis insert uses interleaving by HLC
-            // Not fully implemented yet - just accept it
-            result = ApplyResult::SUCCESS;
-            break;
-
         case OpType::DIM_DELETE_AXIS:
-            // Axis delete - check for resurrection
-            result = ApplyResult::SUCCESS;
-            break;
-
         case OpType::DIM_MOVE_AXIS:
-            // Axis move uses LWW
+            // Not fully implemented yet - just accept it
             result = ApplyResult::SUCCESS;
             break;
 
@@ -250,12 +236,8 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             break;
 
         case OpType::SHEET_CREATE:
-            // Sheet create - just accept it
-            result = ApplyResult::SUCCESS;
-            break;
-
         case OpType::SHEET_DELETE:
-            // Sheet delete - check for resurrection
+            // Not fully implemented yet - just accept it
             result = ApplyResult::SUCCESS;
             break;
 
@@ -278,7 +260,7 @@ size_t applyOperations(Workbook& workbook, const std::vector<Operation>& ops) {
 
     size_t applied = 0;
     for (const auto& op : sorted) {
-        ApplyResult result = applyOperation(workbook, op);
+        const ApplyResult result = applyOperation(workbook, op);
         if (result == ApplyResult::SUCCESS || result == ApplyResult::SUPERSEDED ||
             result == ApplyResult::RESURRECTED) {
             applied++;
@@ -290,49 +272,49 @@ size_t applyOperations(Workbook& workbook, const std::vector<Operation>& ops) {
 
 bool isSuperseded(const Workbook& workbook, const Operation& op) {
     const OpLog* oplog = workbook.getOpLog();
-    Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
 
     return !latest.isNull() && latest.hlc >= op.hlc;
 }
 
 Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const std::string& payload) {
-    HLC hlc = workbook.getCurrentHLC();
-    return Operation(hlc, OpType::CELL_SET_VALUE, cellId, payload);
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::CELL_SET_VALUE, cellId, payload};
 }
 
 Operation makeCellClearOp(Workbook& workbook, const ID& cellId) {
-    HLC hlc = workbook.getCurrentHLC();
-    return Operation(hlc, OpType::CELL_CLEAR, cellId, "{}");
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::CELL_CLEAR, cellId, "{}"};
 }
 
 Operation makeDimInsertAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    HLC hlc = workbook.getCurrentHLC();
-    return Operation(hlc, OpType::DIM_INSERT_AXIS, axisId, payload);
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::DIM_INSERT_AXIS, axisId, payload};
 }
 
 Operation makeDimDeleteAxisOp(Workbook& workbook, const ID& axisId) {
-    HLC hlc = workbook.getCurrentHLC();
-    return Operation(hlc, OpType::DIM_DELETE_AXIS, axisId, "{}");
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::DIM_DELETE_AXIS, axisId, "{}"};
 }
 
 Operation makeDimResizeAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    HLC hlc = workbook.getCurrentHLC();
-    return Operation(hlc, OpType::DIM_RESIZE_AXIS, axisId, payload);
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::DIM_RESIZE_AXIS, axisId, payload};
 }
 
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {
-    HLC hlc = workbook.getCurrentHLC();
-    return Operation(hlc, OpType::SHEET_CREATE, sheetId, payload);
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::SHEET_CREATE, sheetId, payload};
 }
 
 Operation makeSheetDeleteOp(Workbook& workbook, const ID& sheetId) {
-    HLC hlc = workbook.getCurrentHLC();
-    return Operation(hlc, OpType::SHEET_DELETE, sheetId, "{}");
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::SHEET_DELETE, sheetId, "{}"};
 }
 
 Operation makeSheetRenameOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {
-    HLC hlc = workbook.getCurrentHLC();
-    return Operation(hlc, OpType::SHEET_RENAME, sheetId, payload);
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::SHEET_RENAME, sheetId, payload};
 }
 
 }  // namespace cells

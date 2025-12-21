@@ -442,12 +442,12 @@ const ID& Workbook::getNodeId() const {
 HLC Workbook::getCurrentHLC() const {
     // If no node ID set, return zero HLC
     if (_nodeId.isNull()) {
-        return HLC();
+        return {};
     }
 
     // Get the latest HLC from the OpLog or last generated
-    HLC oplog_hlc = _oplog->getCurrentHLC();
-    HLC base = (_lastHLC > oplog_hlc) ? _lastHLC : oplog_hlc;
+    const HLC oplog_hlc = _oplog->getCurrentHLC();
+    const HLC base = (_lastHLC > oplog_hlc) ? _lastHLC : oplog_hlc;
 
     // Generate new HLC
     _lastHLC = generate_hlc(base, _nodeId);

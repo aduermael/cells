@@ -1,6 +1,7 @@
 #include "core/cells/crdt.h"
 
 #include "core/cells/id.h"
+
 #include "gtest/gtest.h"
 
 namespace cells {
@@ -234,7 +235,8 @@ TEST_F(CRDTTest, GetOperationsSinceForSync) {
     applyOperation(*workbook, makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"1"})"));
     HLC sync_point = workbook->getOpLog()->getCurrentHLC();
     applyOperation(*workbook, makeCellSetValueOp(*workbook, cell1, R"({"type":"n","value":"2"})"));
-    applyOperation(*workbook, makeCellSetValueOp(*workbook, cell2, R"({"type":"s","value":"test"})"));
+    applyOperation(*workbook,
+                   makeCellSetValueOp(*workbook, cell2, R"({"type":"s","value":"test"})"));
 
     // Get operations since sync point
     auto ops = workbook->getOpLog()->getOperationsSince(sync_point);

@@ -81,7 +81,8 @@ TEST(OperationTest, ToStringAndFromString) {
     Operation original(hlc, OpType::CELL_SET_VALUE, target, R"({"type":"n","value":"42"})");
 
     std::string str = original.toString();
-    EXPECT_EQ(str, R"(1705312200000.42.Kj7mXp2Q CELL_SET_VALUE nP6kR2mW {"type":"n","value":"42"})");
+    EXPECT_EQ(str,
+              R"(1705312200000.42.Kj7mXp2Q CELL_SET_VALUE nP6kR2mW {"type":"n","value":"42"})");
 
     Operation parsed = Operation::fromString(str);
     EXPECT_EQ(parsed.hlc, original.hlc);
