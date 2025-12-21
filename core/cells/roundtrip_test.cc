@@ -89,7 +89,7 @@ bool testFile(const std::string& path) {
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <file.cells> [file2.cells ...]\n";
+        std::cerr << "Usage: " << argv[0] << " <file.zcd> [file2.zcd ...]\n";
         return 1;
     }
 

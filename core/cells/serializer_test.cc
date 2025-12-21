@@ -314,7 +314,7 @@ TEST(SerializerTest, ConvenienceSerializeToStreamFunction) {
 
 namespace {
 std::string readTestFile(const std::string& filename) {
-    const std::string path = "core/testdata/" + filename;
+    const std::string path = "testdata/" + filename;
     std::ifstream file(path);
     if (!file.is_open()) {
         return "";
@@ -342,7 +342,7 @@ void compareWorkbooks(const Workbook& wb1, const Workbook& wb2) {
 }  // namespace
 
 TEST(RoundtripTest, MinimalFile) {
-    const std::string content = readTestFile("minimal.cells");
+    const std::string content = readTestFile("minimal.zcd");
     ASSERT_FALSE(content.empty());
 
     // Parse original
@@ -362,7 +362,7 @@ TEST(RoundtripTest, MinimalFile) {
 }
 
 TEST(RoundtripTest, SimpleFile) {
-    const std::string content = readTestFile("simple.cells");
+    const std::string content = readTestFile("simple.zcd");
     ASSERT_FALSE(content.empty());
 
     ParseResult result1 = parse(content);
@@ -377,7 +377,7 @@ TEST(RoundtripTest, SimpleFile) {
 }
 
 TEST(RoundtripTest, BudgetFile) {
-    const std::string content = readTestFile("budget.cells");
+    const std::string content = readTestFile("budget.zcd");
     ASSERT_FALSE(content.empty());
 
     ParseResult result1 = parse(content);
@@ -392,7 +392,7 @@ TEST(RoundtripTest, BudgetFile) {
 }
 
 TEST(RoundtripTest, AllTypesFile) {
-    const std::string content = readTestFile("all_types.cells");
+    const std::string content = readTestFile("all_types.zcd");
     ASSERT_FALSE(content.empty());
 
     ParseResult result1 = parse(content);
@@ -407,7 +407,7 @@ TEST(RoundtripTest, AllTypesFile) {
 }
 
 TEST(RoundtripTest, SparseFile) {
-    const std::string content = readTestFile("sparse.cells");
+    const std::string content = readTestFile("sparse.zcd");
     ASSERT_FALSE(content.empty());
 
     ParseResult result1 = parse(content);
@@ -422,7 +422,7 @@ TEST(RoundtripTest, SparseFile) {
 }
 
 TEST(RoundtripTest, UnicodeFile) {
-    const std::string content = readTestFile("unicode.cells");
+    const std::string content = readTestFile("unicode.zcd");
     ASSERT_FALSE(content.empty());
 
     ParseResult result1 = parse(content);
@@ -437,7 +437,7 @@ TEST(RoundtripTest, UnicodeFile) {
 }
 
 TEST(RoundtripTest, EmptyFile) {
-    const std::string content = readTestFile("empty.cells");
+    const std::string content = readTestFile("empty.zcd");
     ASSERT_FALSE(content.empty());
 
     ParseResult result1 = parse(content);

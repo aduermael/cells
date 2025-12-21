@@ -623,11 +623,11 @@ R xY9zA1bC 0
 }
 
 // --- Sample File Tests ---
-// These tests parse the sample .cells files from core/testdata/
+// These tests parse the sample .zcd files from testdata/
 
 namespace {
 std::string readTestFile(const std::string& filename) {
-    const std::string path = "core/testdata/" + filename;
+    const std::string path = "testdata/" + filename;
     std::ifstream file(path);
     if (!file.is_open()) {
         return "";
@@ -639,8 +639,8 @@ std::string readTestFile(const std::string& filename) {
 }  // namespace
 
 TEST(SampleFileTest, ParseMinimalCells) {
-    const std::string content = readTestFile("minimal.cells");
-    ASSERT_FALSE(content.empty()) << "Could not read minimal.cells";
+    const std::string content = readTestFile("minimal.zcd");
+    ASSERT_FALSE(content.empty()) << "Could not read minimal.zcd";
 
     ParseResult result = parse(content);
     EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
@@ -658,8 +658,8 @@ TEST(SampleFileTest, ParseMinimalCells) {
 }
 
 TEST(SampleFileTest, ParseSimpleCells) {
-    const std::string content = readTestFile("simple.cells");
-    ASSERT_FALSE(content.empty()) << "Could not read simple.cells";
+    const std::string content = readTestFile("simple.zcd");
+    ASSERT_FALSE(content.empty()) << "Could not read simple.zcd";
 
     ParseResult result = parse(content);
     EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
@@ -676,8 +676,8 @@ TEST(SampleFileTest, ParseSimpleCells) {
 }
 
 TEST(SampleFileTest, ParseBudgetCells) {
-    const std::string content = readTestFile("budget.cells");
-    ASSERT_FALSE(content.empty()) << "Could not read budget.cells";
+    const std::string content = readTestFile("budget.zcd");
+    ASSERT_FALSE(content.empty()) << "Could not read budget.zcd";
 
     ParseResult result = parse(content);
     EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
@@ -695,8 +695,8 @@ TEST(SampleFileTest, ParseBudgetCells) {
 }
 
 TEST(SampleFileTest, ParseAllTypesCells) {
-    const std::string content = readTestFile("all_types.cells");
-    ASSERT_FALSE(content.empty()) << "Could not read all_types.cells";
+    const std::string content = readTestFile("all_types.zcd");
+    ASSERT_FALSE(content.empty()) << "Could not read all_types.zcd";
 
     ParseResult result = parse(content);
     EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
@@ -712,8 +712,8 @@ TEST(SampleFileTest, ParseAllTypesCells) {
 }
 
 TEST(SampleFileTest, ParseSparsePositionsCells) {
-    const std::string content = readTestFile("sparse.cells");
-    ASSERT_FALSE(content.empty()) << "Could not read sparse.cells";
+    const std::string content = readTestFile("sparse.zcd");
+    ASSERT_FALSE(content.empty()) << "Could not read sparse.zcd";
 
     ParseResult result = parse(content);
     EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
@@ -742,8 +742,8 @@ TEST(SampleFileTest, ParseSparsePositionsCells) {
 }
 
 TEST(SampleFileTest, ParseUnicodeCells) {
-    const std::string content = readTestFile("unicode.cells");
-    ASSERT_FALSE(content.empty()) << "Could not read unicode.cells";
+    const std::string content = readTestFile("unicode.zcd");
+    ASSERT_FALSE(content.empty()) << "Could not read unicode.zcd";
 
     ParseResult result = parse(content);
     EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
@@ -760,8 +760,8 @@ TEST(SampleFileTest, ParseUnicodeCells) {
 }
 
 TEST(SampleFileTest, ParseEmptyCells) {
-    const std::string content = readTestFile("empty.cells");
-    ASSERT_FALSE(content.empty()) << "Could not read empty.cells";
+    const std::string content = readTestFile("empty.zcd");
+    ASSERT_FALSE(content.empty()) << "Could not read empty.zcd";
 
     ParseResult result = parse(content);
     EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");

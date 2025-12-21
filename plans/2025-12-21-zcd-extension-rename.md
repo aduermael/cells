@@ -12,15 +12,15 @@ Rename the native file format extension from `.cells` to `.zcd` (Zero-Conflict D
 
 ## Phase 2: Update C++ Code
 
-- [ ] 2a: Update `parser.h` - change extension constant and comments
-- [ ] 2b: Update `serializer.h` and `serializer.cc` - extension references
-- [ ] 2c: Update `serializer_test.cc` - test file paths
-- [ ] 2d: Update `parser_test.cc` - test file paths
-- [ ] 2e: Update `roundtrip_test.cc` - test file paths
-- [ ] 2f: Update `ref_converter_test.cc` - test file paths
-- [ ] 2g: Update `ref_converter.cc` - any extension references
-- [ ] 2h: Update `quadtree.cc` - any extension references
-- [ ] 2i: Update `xlsx_writer.cc` and `xlsx_writer_test.cc` - extension references
+- [x] 2a: Update `parser.h` - change extension constant and comments
+- [x] 2b: Update `serializer.h` and `serializer.cc` - extension references
+- [x] 2c: Update `serializer_test.cc` - test file paths
+- [x] 2d: Update `parser_test.cc` - test file paths
+- [x] 2e: Update `roundtrip_test.cc` - test file paths
+- [x] 2f: Update `ref_converter_test.cc` - test file paths (N/A - only has sheet.cells member refs)
+- [x] 2g: Update `ref_converter.cc` - any extension references (N/A - only has sheet.cells member refs)
+- [x] 2h: Update `quadtree.cc` - any extension references (N/A - only has sheet.cells member refs)
+- [x] 2i: Update `xlsx_writer.cc` and `xlsx_writer_test.cc` - extension references (N/A - only has sheet.cells member refs)
 
 ## Phase 3: Update CLI Application
 

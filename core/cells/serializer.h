@@ -10,7 +10,7 @@
 
 namespace cells {
 
-// Serializer for .cells v1 text format
+// Serializer for .zcd v1 text format
 //
 // Produces output matching the format specification in docs/persistence.md:
 //   D <id> "<name>"
@@ -61,7 +61,7 @@ private:
     void serializeOperation(const Operation& op, std::ostream& out) const;
 };
 
-// Escape a string for the .cells format (handles quotes, newlines, etc.)
+// Escape a string for the .zcd format (handles quotes, newlines, etc.)
 // Returns the escaped string WITHOUT surrounding quotes
 [[nodiscard]] std::string escapeString(const std::string& str);
 

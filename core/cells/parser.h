@@ -28,7 +28,7 @@ struct ParseError {
     [[nodiscard]] std::string toString() const;
 };
 
-// Result of parsing a .cells file
+// Result of parsing a .zcd file
 struct ParseResult {
     std::unique_ptr<Workbook> workbook{};  // Non-null on success
     std::optional<ParseError> error{};     // Present on failure
@@ -42,7 +42,7 @@ class Parser {
 public:
     Parser();
 
-    // Parse a .cells file from string content
+    // Parse a .zcd file from string content
     // Returns ParseResult with workbook on success, error on failure
     ParseResult parse(const std::string& content);
     ParseResult parse(std::string_view content);
