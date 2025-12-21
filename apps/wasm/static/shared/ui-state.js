@@ -283,6 +283,9 @@ export function createUIStateMachine(options = {}) {
      * Attempt a state transition
      * @param {UIEvent} event - Event to process
      * @param {Object} context - Optional context data for the new state
+     *   - If context contains `selectedCell`, it updates selectionRange.start and selectionRange.end
+     *   - If context contains `selectionStart`, it updates selectionRange.start
+     *   - If context contains `selectionEnd`, it updates selectionRange.end
      * @returns {boolean} True if transition occurred, false otherwise
      */
     function transition(event, context = {}) {
@@ -307,6 +310,19 @@ export function createUIStateMachine(options = {}) {
         const previousState = currentState;
         currentState = transitionDef.nextState;
         stateContext = context;
+
+        // Merge selection-related context fields into selectionRange
+        if (context.selectedCell) {
+            // selectedCell sets both start and end (single cell selection)
+            selectionRange.start = { ...context.selectedCell };
+            selectionRange.end = { ...context.selectedCell };
+        }
+        if (context.selectionStart) {
+            selectionRange.start = { ...context.selectionStart };
+        }
+        if (context.selectionEnd) {
+            selectionRange.end = { ...context.selectionEnd };
+        }
 
         log(`Transition: ${previousState} --(${event})--> ${currentState}`, context);
 
@@ -435,6 +451,39 @@ export function createUIStateMachine(options = {}) {
         return () => listeners.delete(listener);
     }
 
+    /**
+     * Alias for subscribe - register a state change listener
+     * @param {Function} listener - Callback function({ previousState, currentState, event, context })
+     * @returns {Function} Unsubscribe function
+     */
+    function onStateChange(listener) {
+        return subscribe(listener);
+    }
+
+    /**
+     * Get the currently selected cell (anchor of selection)
+     * @returns {{col: number, row: number}} Selected cell coordinates
+     */
+    function getSelectedCell() {
+        return { ...selectionRange.start };
+    }
+
+    /**
+     * Get the selection start (anchor cell)
+     * @returns {{col: number, row: number}} Selection start coordinates
+     */
+    function getSelectionStart() {
+        return { ...selectionRange.start };
+    }
+
+    /**
+     * Get the selection end (current end of range)
+     * @returns {{col: number, row: number}} Selection end coordinates
+     */
+    function getSelectionEnd() {
+        return { ...selectionRange.end };
+    }
+
     return {
         // State queries
         getState,
@@ -458,13 +507,17 @@ export function createUIStateMachine(options = {}) {
         setSelectionRange,
         getSelectionRange,
         isSingleCellSelected,
+        getSelectedCell,
+        getSelectionStart,
+        getSelectionEnd,
 
         // Sheet tracking
         setActiveSheet,
         getActiveSheet,
 
         // Event subscription
-        subscribe
+        subscribe,
+        onStateChange
     };
 }
 

@@ -269,22 +269,24 @@ Refactor the JavaScript UI state machine for cleaner architecture and better sep
   - Returns cell UUID (existing or newly created)
   - Eliminates getCellAt/createCell dance with viewport refresh
 
-- [ ] 5b: Refactor `transition()` to return boolean
+- [x] 5b: Refactor `transition()` to return boolean
   - Return `false` if transition is not valid from current state
   - Remove separate validation checks at start of event handlers
   - Callers can check: `if (!uiStateMachine.transition(event, context)) return;`
+  - NOTE: Already implemented in ui-state.js; usage patterns will be updated in 5e/5f
 
-- [ ] 5c: Add context parameter to transitions
+- [x] 5c: Add context parameter to transitions
   - `transition(event, context)` where context contains relevant data
   - Example: `uiStateMachine.transition(UIEvent.START_SELECTING, { selectedCell: {col, row}, selectionStart: {col, row}, selectionEnd: {col, row} })`
   - State machine merges context into current state on valid transition
   - Getters: `uiStateMachine.getSelectedCell()`, `uiStateMachine.getSelectionStart()`, etc.
 
-- [ ] 5d: Add state change listener for refreshes
+- [x] 5d: Add state change listener for refreshes
   - Register listener: `uiStateMachine.onStateChange((oldState, newState, context) => { ... })`
   - Listener calls appropriate refresh functions based on state change
   - Centralized refresh logic - no more scattered render()/updateFormulaBar() calls
   - Refreshes only execute if transition succeeds
+  - NOTE: API implemented in ui-state.js; actual listener registration will be added in 5e/5f
 
 - [ ] 5e: Update `startEditing` to use new architecture
   - Call `createCellIfNeeded(col, row)` to get cell UUID
