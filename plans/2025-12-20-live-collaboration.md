@@ -132,7 +132,7 @@ Implement WebRTC peer-to-peer connections in the WASM web app.
   - Auto-reconnect with exponential backoff
   - Emit events for peer join/leave
 
-- [ ] 3c: Implement WebRTC DataChannel for operations
+- [x] 3c: Implement WebRTC DataChannel for operations
   - Create DataChannel labeled "operations" on each peer connection
   - Configure ordered, reliable delivery for operation messages
   - Handle DataChannel open/close events
