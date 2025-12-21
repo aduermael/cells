@@ -614,8 +614,9 @@ void Workbook::startCollaboration() {
     // Switch to collaboration mode
     _collabMode = CollabMode::COLLABORATING;
 
-    // Bootstrap OpLog with current state will be done in Phase 4c
-    // For now, just switch the mode
+    // Note: OpLog bootstrap (generating operations for existing state) is done
+    // by the WASM binding layer which calls bootstrapOpLog() from crdt.h
+    // This avoids circular dependency between model and crdt.
 }
 
 }  // namespace cells

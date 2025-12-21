@@ -1805,14 +1805,27 @@ public:
     }
 
     // Start collaboration mode - call when user clicks "Share" or joins a room.
-    // This switches to COLLABORATING mode and will bootstrap OpLog if needed.
+    // This switches to COLLABORATING mode and bootstraps OpLog with current state.
     std::string startCollaboration() {
         if (!_workbook) {
             return "{\"error\":\"No workbook\"}";
         }
 
+        // Check if already collaborating
+        if (_workbook->isCollaborating()) {
+            return "{\"success\":true,\"mode\":\"collaborating\",\"bootstrapped\":0}";
+        }
+
+        // Switch to collaboration mode
         _workbook->startCollaboration();
-        return "{\"success\":true,\"mode\":\"collaborating\"}";
+
+        // Bootstrap OpLog with current workbook state
+        // This generates operations for all existing axes and cells
+        size_t opCount = bootstrapOpLog(*_workbook);
+
+        std::ostringstream json;
+        json << "{\"success\":true,\"mode\":\"collaborating\",\"bootstrapped\":" << opCount << "}";
+        return json.str();
     }
 
     // Set collaboration mode explicitly (for testing or edge cases)

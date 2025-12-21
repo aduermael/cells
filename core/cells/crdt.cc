@@ -416,4 +416,86 @@ Operation makeSheetRenameOp(Workbook& workbook, const ID& sheetId, const std::st
     return {hlc, OpType::SHEET_RENAME, sheetId, payload};
 }
 
+size_t bootstrapOpLog(Workbook& workbook) {
+    size_t count = 0;
+    OpLog* oplog = workbook.getOpLog();
+
+    // Clear any existing operations (start fresh)
+    // We're bootstrapping from current state, so existing ops would be stale
+    oplog->clear();
+
+    // Iterate through all sheets
+    for (const auto& sheet : workbook.sheets) {
+        // Collect and sort columns by position
+        std::vector<std::pair<uint32_t, Axis*>> columns;
+        for (const auto& [id, axis] : sheet->columns) {
+            columns.emplace_back(axis->position, axis.get());
+        }
+        std::sort(columns.begin(), columns.end(),
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
+
+        // Generate DIM_INSERT_AXIS operations for columns (in position order)
+        for (const auto& [pos, axis] : columns) {
+            std::string payload = "{\"pos\":" + std::to_string(pos) +
+                                  ",\"size\":" + std::to_string(axis->size) + ",\"isCol\":\"true\"}";
+            Operation op = makeDimInsertAxisOp(workbook, axis->id, payload);
+            oplog->addOperation(op);
+            count++;
+        }
+
+        // Collect and sort rows by position
+        std::vector<std::pair<uint32_t, Axis*>> rows;
+        for (const auto& [id, axis] : sheet->rows) {
+            rows.emplace_back(axis->position, axis.get());
+        }
+        std::sort(rows.begin(), rows.end(),
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
+
+        // Generate DIM_INSERT_AXIS operations for rows (in position order)
+        for (const auto& [pos, axis] : rows) {
+            std::string payload = "{\"pos\":" + std::to_string(pos) +
+                                  ",\"size\":" + std::to_string(axis->size) + ",\"isCol\":\"false\"}";
+            Operation op = makeDimInsertAxisOp(workbook, axis->id, payload);
+            oplog->addOperation(op);
+            count++;
+        }
+
+        // Generate CELL_SET_VALUE operations for all cells
+        for (const auto& [cellId, cell] : sheet->cells) {
+            // Skip empty cells
+            if (cell->value.type == CellValueType::STRING && cell->value.raw.empty() &&
+                cell->formula == nullptr) {
+                continue;
+            }
+
+            // Build payload based on cell type
+            std::string payload;
+            const std::string colIdStr = cell->colId.toString();
+            const std::string rowIdStr = cell->rowId.toString();
+            const std::string idSuffix =
+                ",\"col_id\":\"" + colIdStr + "\",\"row_id\":\"" + rowIdStr + "\"}";
+
+            if (cell->isFormula()) {
+                Formula* formula = cell->getFormula();
+                if (formula != nullptr && formula->text != nullptr) {
+                    payload = "{\"type\":\"f\",\"value\":\"" + std::string(formula->text) +
+                              "\",\"display\":\"" + cell->value.raw + "\"" + idSuffix;
+                } else {
+                    continue;  // Skip cells with invalid formulas
+                }
+            } else {
+                const char typeChar = valueTypeToChar(cell->value.type);
+                payload = "{\"type\":\"" + std::string(1, typeChar) + "\",\"value\":\"" +
+                          cell->value.raw + "\"" + idSuffix;
+            }
+
+            Operation op = makeCellSetValueOp(workbook, cell->id, payload);
+            oplog->addOperation(op);
+            count++;
+        }
+    }
+
+    return count;
+}
+
 }  // namespace cells

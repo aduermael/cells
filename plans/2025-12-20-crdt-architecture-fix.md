@@ -238,7 +238,7 @@ Implement proper offline vs collaborating mode.
   - No HLC overhead, no OpLog storage
   - File save excludes `#oplog` section
 
-- [ ] 4c: Bootstrap OpLog on collaboration start
+- [x] 4c: Bootstrap OpLog on collaboration start
   - On "Share" click: switch to COLLABORATING
   - Generate operations for current state (all axes, all cells)
   - Future edits go through operation path

@@ -62,6 +62,12 @@ Operation makeSheetDeleteOp(Workbook& workbook, const ID& sheetId);
 // Generate a SHEET_RENAME operation.
 Operation makeSheetRenameOp(Workbook& workbook, const ID& sheetId, const std::string& payload);
 
+// Bootstrap the OpLog with the current workbook state.
+// Called when transitioning from OFFLINE to COLLABORATING mode.
+// Generates operations for all existing axes and cells in HLC order.
+// Returns the number of operations created.
+size_t bootstrapOpLog(Workbook& workbook);
+
 }  // namespace cells
 
 #endif  // CELLS_CRDT_H_

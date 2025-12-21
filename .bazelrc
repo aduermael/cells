@@ -14,3 +14,16 @@ build:wasm --incompatible_enable_cc_toolchain_resolution
 build:wasm --cxxopt=-fexceptions
 build:wasm --linkopt=-fexceptions
 build:wasm --linkopt=-sNO_DISABLE_EXCEPTION_CATCHING
+
+# WebAssembly debug build (includes DWARF for Chrome DevTools debugging)
+# See: https://developer.chrome.com/docs/devtools/wasm
+build:wasm-debug --incompatible_enable_cc_toolchain_resolution
+build:wasm-debug --cxxopt=-fexceptions
+build:wasm-debug --linkopt=-fexceptions
+build:wasm-debug --linkopt=-sNO_DISABLE_EXCEPTION_CATCHING
+build:wasm-debug --copt=-g
+build:wasm-debug --cxxopt=-g
+build:wasm-debug --linkopt=-g
+build:wasm-debug --copt=-O0
+build:wasm-debug --cxxopt=-O0
+build:wasm-debug --linkopt=-O0

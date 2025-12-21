@@ -1,4 +1,4 @@
-.PHONY: build test format lint check clean compile-db cli cli-release release wasm wasm-dist wasm-serve
+.PHONY: build test format lint check clean compile-db cli cli-release release wasm wasm-debug wasm-dist wasm-debug-dist wasm-serve
 
 # Build
 build:
@@ -21,6 +21,12 @@ release: cli-release
 wasm:
 	bazel build --config=wasm //apps/wasm:cells_wasm
 	@echo "WASM output: bazel-bin/apps/wasm/cells_wasm/"
+
+# Build WASM module with debug info (for Chrome DevTools debugging)
+# See: https://developer.chrome.com/docs/devtools/wasm
+wasm-debug:
+	bazel build --config=wasm-debug //apps/wasm:cells_wasm
+	@echo "WASM debug output: bazel-bin/apps/wasm/cells_wasm/"
 
 # Build production WASM distribution package
 # Output: dist/ directory with all files needed for standalone deployment
@@ -50,6 +56,40 @@ wasm-dist:
 	@echo ""
 	@echo "To test locally: make wasm-serve"
 	@echo "Then open: http://localhost:8081/"
+
+# Build debug WASM distribution package (with DWARF for Chrome DevTools)
+# See: https://developer.chrome.com/docs/devtools/wasm
+# Output: dist/ directory with debug-enabled WASM
+wasm-debug-dist:
+	@echo "Building WASM module with debug info..."
+	bazel build --config=wasm-debug //apps/wasm:cells_wasm
+	@echo "Creating dist directory..."
+	@rm -rf dist
+	@mkdir -p dist
+	@mkdir -p dist/shared
+	@echo "Copying WASM artifacts (with debug info)..."
+	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.js dist/
+	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/
+	@echo "Copying JavaScript files..."
+	@cp apps/wasm/worker.js dist/
+	@cp apps/wasm/client.js dist/
+	@echo "Copying HTML and TypeScript definitions..."
+	@cp apps/wasm/static/index.html dist/
+	@cp apps/wasm/cells.d.ts dist/
+	@echo "Copying shared modules..."
+	@cp apps/wasm/static/shared/*.css dist/shared/
+	@cp apps/wasm/static/shared/*.js dist/shared/
+	@echo ""
+	@echo "Debug distribution package created in dist/"
+	@echo "Files:"
+	@ls -lh dist/
+	@echo ""
+	@echo "To debug in Chrome:"
+	@echo "  1. Run: make wasm-serve"
+	@echo "  2. Open: http://localhost:8081/"
+	@echo "  3. Open Chrome DevTools (F12)"
+	@echo "  4. Install C/C++ DevTools extension if not installed"
+	@echo "  5. Source files will appear in Sources panel under file://"
 
 # Serve WASM distribution for local testing
 wasm-serve:
