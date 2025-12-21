@@ -70,6 +70,7 @@ wasm-debug-dist:
 	@echo "Copying WASM artifacts (with debug info)..."
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.js dist/
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/
+	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm.map dist/ 2>/dev/null || true
 	@echo "Copying JavaScript files..."
 	@cp apps/wasm/worker.js dist/
 	@cp apps/wasm/client.js dist/
@@ -79,6 +80,14 @@ wasm-debug-dist:
 	@echo "Copying shared modules..."
 	@cp apps/wasm/static/shared/*.css dist/shared/
 	@cp apps/wasm/static/shared/*.js dist/shared/
+	@echo "Copying C++ source files for debugging..."
+	@mkdir -p dist/core dist/apps/wasm
+	@cp -r core/* dist/core/
+	@cp apps/wasm/*.cc apps/wasm/*.h dist/apps/wasm/ 2>/dev/null || true
+	@echo "Fixing source map paths..."
+	@if [ -f dist/cells_wasm_bin.wasm.map ]; then \
+		sed -i '' 's|[^"]*execroot/_main/||g' dist/cells_wasm_bin.wasm.map; \
+	fi
 	@echo ""
 	@echo "Debug distribution package created in dist/"
 	@echo "Files:"
@@ -88,8 +97,8 @@ wasm-debug-dist:
 	@echo "  1. Run: make wasm-serve"
 	@echo "  2. Open: http://localhost:8081/"
 	@echo "  3. Open Chrome DevTools (F12)"
-	@echo "  4. Install C/C++ DevTools extension if not installed"
-	@echo "  5. Source files will appear in Sources panel under file://"
+	@echo "  4. Install C/C++ DevTools Support (DWARF) extension"
+	@echo "  5. Source files will appear in Sources panel"
 
 # Serve WASM distribution for local testing
 wasm-serve:

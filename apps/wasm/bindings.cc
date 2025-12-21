@@ -719,6 +719,99 @@ public:
         return json.str();
     }
 
+    // Create cell if it doesn't exist, also creating column/row if needed.
+    // This is a streamlined version of createCell that:
+    // - Returns existing cell ID if cell already exists at position
+    // - Creates column/row/cell as needed, with operations committed immediately
+    // - Does NOT set any value (value setting happens later via updateCell)
+    // Designed for startEditing flow to reserve UUID for coords quickly.
+    std::string createCellIfNeeded(uint32_t col, uint32_t row) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        bool const isCollab = _workbook->isCollaborating();
+
+        // Find or create column at position
+        ID colId;
+        for (const auto& [id, axis] : sheet->columns) {
+            if (axis->position == col) {
+                colId = id;
+                break;
+            }
+        }
+        if (colId.isNull()) {
+            colId = generate_id();
+            if (isCollab) {
+                // Create DIM_INSERT_AXIS operation for new column
+                std::string colPayload = "{\"pos\":" + std::to_string(col) +
+                                         ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) +
+                                         ",\"isCol\":\"true\"}";
+                Operation colOp = makeDimInsertAxisOp(*_workbook, colId, colPayload);
+                applyOperation(*_workbook, colOp);
+            } else {
+                // Direct creation (offline mode)
+                auto newCol = std::make_unique<Axis>(colId, true);
+                newCol->position = col;
+                newCol->size = DEFAULT_COLUMN_WIDTH;
+                sheet->addColumn(std::move(newCol));
+            }
+        }
+
+        // Find or create row at position
+        ID rowId;
+        for (const auto& [id, axis] : sheet->rows) {
+            if (axis->position == row) {
+                rowId = id;
+                break;
+            }
+        }
+        if (rowId.isNull()) {
+            rowId = generate_id();
+            if (isCollab) {
+                // Create DIM_INSERT_AXIS operation for new row
+                std::string rowPayload = "{\"pos\":" + std::to_string(row) +
+                                         ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) +
+                                         ",\"isCol\":\"false\"}";
+                Operation rowOp = makeDimInsertAxisOp(*_workbook, rowId, rowPayload);
+                applyOperation(*_workbook, rowOp);
+            } else {
+                // Direct creation (offline mode)
+                auto newRow = std::make_unique<Axis>(rowId, false);
+                newRow->position = row;
+                newRow->size = DEFAULT_ROW_HEIGHT;
+                sheet->addRow(std::move(newRow));
+            }
+        }
+
+        // Check if cell already exists at this position
+        for (const auto& [id, cell] : sheet->cells) {
+            if (cell->colId == colId && cell->rowId == rowId) {
+                // Cell already exists, return its ID
+                std::ostringstream json;
+                json << "{\"success\":true,\"id\":\"" << id.toString() << "\",\"existed\":true}";
+                return json.str();
+            }
+        }
+
+        // Create new cell (no value set - that's done separately via updateCell)
+        ID cellId = generate_id();
+        auto newCell = std::make_unique<Cell>(cellId, colId, rowId);
+        sheet->addCell(std::move(newCell));
+
+        rebuildQuadtree();
+        notifyListeners(ChangeType::CELL_CHANGED);
+
+        std::ostringstream json;
+        json << "{\"success\":true,\"id\":\"" << cellId.toString() << "\",\"existed\":false}";
+        return json.str();
+    }
+
     std::string deleteCell(const std::string& cellIdStr) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -1928,6 +2021,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         // Cell operations
         .function("updateCell", &cells::wasm::CellsEngine::updateCell)
         .function("createCell", &cells::wasm::CellsEngine::createCell)
+        .function("createCellIfNeeded", &cells::wasm::CellsEngine::createCellIfNeeded)
         .function("deleteCell", &cells::wasm::CellsEngine::deleteCell)
         // Column/row resize
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)

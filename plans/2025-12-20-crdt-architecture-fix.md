@@ -249,78 +249,127 @@ Implement proper offline vs collaborating mode.
   - OpLog persists for rejoining same room
   - Loading files (loadFromCells, loadFromCSV, loadFromXLSX) creates new workbooks in OFFLINE mode
 
-## Phase 5: Export Feature
+## Phase 5: UI State Machine Refactor
+
+Refactor the JavaScript UI state machine for cleaner architecture and better separation of concerns.
+
+### Design Principles
+
+1. **State machine owns all editing context** - selectedCell, selectionStart, selectionEnd, editValue, etc. live in state machine context
+2. **Transitions return success/failure** - No separate validation before calling transition
+3. **Listeners handle side effects** - Render, updateFormulaBar, etc. triggered by state change listeners, not inline after transition calls
+4. **Cell creation commits immediately** - Reserve UUID for coords ASAP to avoid conflicts; display edited value from editing context, not cell state
+
+### Implementation
+
+- [x] 5a: Add `createCellIfNeeded(col, row)` to engine
+  - Single function that creates cell if it doesn't exist
+  - Also creates column/row if needed (via DIM_INSERT_AXIS)
+  - Operations committed immediately (state updated + added to history)
+  - Returns cell UUID (existing or newly created)
+  - Eliminates getCellAt/createCell dance with viewport refresh
+
+- [ ] 5b: Refactor `transition()` to return boolean
+  - Return `false` if transition is not valid from current state
+  - Remove separate validation checks at start of event handlers
+  - Callers can check: `if (!uiStateMachine.transition(event, context)) return;`
+
+- [ ] 5c: Add context parameter to transitions
+  - `transition(event, context)` where context contains relevant data
+  - Example: `uiStateMachine.transition(UIEvent.START_SELECTING, { selectedCell: {col, row}, selectionStart: {col, row}, selectionEnd: {col, row} })`
+  - State machine merges context into current state on valid transition
+  - Getters: `uiStateMachine.getSelectedCell()`, `uiStateMachine.getSelectionStart()`, etc.
+
+- [ ] 5d: Add state change listener for refreshes
+  - Register listener: `uiStateMachine.onStateChange((oldState, newState, context) => { ... })`
+  - Listener calls appropriate refresh functions based on state change
+  - Centralized refresh logic - no more scattered render()/updateFormulaBar() calls
+  - Refreshes only execute if transition succeeds
+
+- [ ] 5e: Update `startEditing` to use new architecture
+  - Call `createCellIfNeeded(col, row)` to get cell UUID
+  - Transition to editing state with context: `{ cellId, col, row, initialValue }`
+  - Cell display: editing context value takes priority, then workbook cell value
+  - No pending operation for cell creation - committed immediately
+
+- [ ] 5f: Update event handlers to use new pattern
+  - Mouse handlers: `transition(event, context)` pattern
+  - Keyboard handlers: same pattern
+  - Remove inline render()/updateFormulaBar() calls
+  - Let state change listener handle all refreshes
+
+## Phase 6: Export Feature
 
 Add ability to export .cells file with operations.
 
-- [ ] 5a: Add "Export .cells" button to UI
+- [ ] 6a: Add "Export .cells" button to UI
   - Add button in header toolbar (near Share)
   - Trigger download of current workbook as .cells file
   - Include full OpLog section if collaborating
 
-- [ ] 5b: Verify serializer includes OpLog
+- [ ] 6b: Verify serializer includes OpLog
   - Check `exportToCells()` includes `#oplog` section
   - Operations in HLC order
   - Format: `O <hlc> <op-type> <target-id> <payload-json>`
 
-- [ ] 5c: Add download trigger in JS
+- [ ] 6c: Add download trigger in JS
   - Call `engine.exportToCells()`
   - Create Blob and trigger download
   - Filename: `<workbook-name>.cells`
 
-## Phase 6: Bug Fixes & Structure Sync
+## Phase 7: Bug Fixes & Structure Sync
 
 Address specific bugs and ensure all operations sync.
 
-- [ ] 6a: Fix initial file not loading on room join
+- [ ] 7a: Fix initial file not loading on room join
   - Ensure workbook loads from IndexedDB BEFORE sync
   - Add "full state" message for new joiners with no local data
   - Sync protocol handles empty vs populated workbook
 
-- [ ] 6b: Fix duplicate values in concurrent edits
+- [ ] 7b: Fix duplicate values in concurrent edits
   - **Invariant: It must be IMPOSSIBLE to see 2 values in same cell**
   - Ensure only ONE value per cell in viewport query
   - Priority: pending (local) > pending (remote) > committed
   - Last-Writer-Wins properly supersedes old values
   - If this invariant is violated, there's a bug in the architecture
 
-- [ ] 6c: Verify operation ordering
+- [ ] 7c: Verify operation ordering
   - DIM_INSERT_AXIS ops always applied before CELL_SET_VALUE
   - Sort incoming batches by HLC
   - Validate target exists before applying
 
-- [ ] 6d: Ensure all structure operations sync
+- [ ] 7d: Ensure all structure operations sync
   - Column/row **move** (DIM_MOVE_AXIS) → sync to peers
   - Column/row **resize** (DIM_RESIZE_AXIS) → sync to peers
   - Column/row **rename** → sync to peers (add new op type if needed)
   - All structure changes must reflect on all connected clients
 
-## Phase 7: Testing & Validation
+## Phase 8: Testing & Validation
 
 Verify the architecture fixes work correctly.
 
-- [ ] 7a: Test offline editing (no room)
+- [ ] 8a: Test offline editing (no room)
   - Create new document, edit cells
   - Verify no OpLog (CollabMode::OFFLINE)
   - Export file, verify no `#oplog` section
 
-- [ ] 7b: Test collaboration start
+- [ ] 8b: Test collaboration start
   - Click Share, verify mode switches to COLLABORATING
   - Edit cell, verify operation created
   - Export file, verify `#oplog` section present
 
-- [ ] 7c: Test concurrent editing
+- [ ] 8c: Test concurrent editing
   - Two clients, same cell
   - Verify only one value shows (LWW)
   - Export both files, compare OpLogs
 
-- [ ] 7d: Test room join with existing file
+- [ ] 8d: Test room join with existing file
   - Client A creates room, edits
   - Client B joins with URL
   - Verify B receives A's state
   - Verify B's edits sync to A
 
-- [ ] 7e: Test live typing visibility
+- [ ] 8e: Test live typing visibility
   - Client A types slowly in cell
   - Client B sees pending value updating
   - A commits (blur/enter), B sees final value
@@ -457,13 +506,18 @@ This creates a "genesis" OpLog that represents current state.
 Current state vs target:
 | Component | Current | Target | Gap |
 |-----------|---------|--------|-----|
-| OpLog storage | C++ | C++ | Done |
-| HLC generation | C++ | C++ | Done |
-| applyOperation | C++ | C++ | Done |
-| Peer sync state | JS | C++ | **Move** |
-| Sync protocol | JS | C++ | **Move** |
-| Outgoing queue | JS | C++ | **Move** |
-| Pending ops | None | C++ | **Add** |
-| Collab mode | None | C++ | **Add** |
+| OpLog storage | C++ | C++ | ✅ Done |
+| HLC generation | C++ | C++ | ✅ Done |
+| applyOperation | C++ | C++ | ✅ Done |
+| Peer sync state | C++ | C++ | ✅ Done (Phase 1) |
+| Sync protocol | C++ | C++ | ✅ Done (Phase 1) |
+| Outgoing queue | C++ | C++ | ✅ Done (Phase 1) |
+| JS transport layer | Mixed | JS only | ✅ Done (Phase 2) |
+| Pending ops | C++ | C++ | ✅ Done (Phase 3) |
+| Collab mode | C++ | C++ | ✅ Done (Phase 4) |
+| UI State Machine | Scattered | Centralized | **Phase 5** |
+| Export feature | None | JS+C++ | Phase 6 |
+| Bug fixes | TBD | Fixed | Phase 7 |
+| Testing | TBD | Validated | Phase 8 |
 
-The core CRDT logic is in C++. Main work is moving sync orchestration to C++ and simplifying JS.
+Phases 1-4 complete. Phase 5 is a UI architecture refactor for cleaner state management.

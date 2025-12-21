@@ -217,6 +217,17 @@ function handleMessage(msg) {
                 break;
             }
 
+            case 'createCellIfNeeded': {
+                const { col, row } = params;
+                const result = JSON.parse(engine.createCellIfNeeded(col, row));
+                if (result.error) {
+                    respond({ type: 'error', error: result.error });
+                } else {
+                    respond({ type: 'cellCreated', cellId: result.id, existed: result.existed });
+                }
+                break;
+            }
+
             case 'deleteCell': {
                 const { cellId } = params;
                 const result = JSON.parse(engine.deleteCell(cellId));
@@ -456,6 +467,61 @@ function handleMessage(msg) {
                 const { hlc } = params;
                 const exists = engine.hasOperation(hlc);
                 respond({ type: 'hasOperation', exists });
+                break;
+            }
+
+            // ================================================================
+            // SyncManager methods
+            // ================================================================
+
+            case 'initSyncManager': {
+                const result = engine.initSyncManager();
+                respond({ type: 'syncManagerInitialized', result });
+                break;
+            }
+
+            case 'addPeer': {
+                const { peerId } = params;
+                const result = engine.addPeer(peerId);
+                respond({ type: 'peerAdded', result });
+                break;
+            }
+
+            case 'removePeer': {
+                const { peerId } = params;
+                const result = engine.removePeer(peerId);
+                respond({ type: 'peerRemoved', result });
+                break;
+            }
+
+            case 'getPeerIds': {
+                const result = engine.getPeerIds();
+                respond({ type: 'peerIds', result });
+                break;
+            }
+
+            case 'getPeerCount': {
+                const count = engine.getPeerCount();
+                respond({ type: 'peerCount', count });
+                break;
+            }
+
+            case 'handlePeerMessage': {
+                const { peerId, messageJson } = params;
+                const result = engine.handlePeerMessage(peerId, messageJson);
+                respond({ type: 'peerMessageHandled', result });
+                break;
+            }
+
+            case 'getOutgoingMessages': {
+                const result = engine.getOutgoingMessages();
+                respond({ type: 'outgoingMessages', result });
+                break;
+            }
+
+            case 'queueOperationsBroadcast': {
+                const result = engine.queueOperationsBroadcast();
+                respond({ type: 'operationsQueued', result });
                 break;
             }
 

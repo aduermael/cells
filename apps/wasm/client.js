@@ -343,6 +343,21 @@ class CellsClient {
     }
 
     /**
+     * Create a cell if it doesn't exist, also creating column/row if needed.
+     * This is a streamlined version for the startEditing flow:
+     * - Returns existing cell ID if cell already exists at position
+     * - Creates column/row/cell as needed, with operations committed immediately
+     * - Does NOT set any value (value setting happens later via updateCell)
+     * @param {number} col - Column position (0-based)
+     * @param {number} row - Row position (0-based)
+     * @returns {Promise<{id: string, existed: boolean}>}
+     */
+    async createCellIfNeeded(col, row) {
+        const response = await this._send('createCellIfNeeded', { col, row });
+        return { id: response.cellId, existed: response.existed };
+    }
+
+    /**
      * Delete a cell by ID
      * @param {string} cellId - Cell ID (8-char base62)
      * @returns {Promise<{success: boolean}>}
@@ -608,6 +623,87 @@ class CellsClient {
     async hasOperation(hlc) {
         const response = await this._send('hasOperation', { hlc });
         return response.exists;
+    }
+
+    // ========================================================================
+    // SyncManager API
+    // ========================================================================
+
+    /**
+     * Initialize the SyncManager
+     * Must be called after setNodeId
+     * @returns {Promise<string>} JSON result
+     */
+    async initSyncManager() {
+        const response = await this._send('initSyncManager');
+        return response.result;
+    }
+
+    /**
+     * Add a peer to the SyncManager
+     * @param {string} peerId - Peer ID
+     * @returns {Promise<string>} JSON result
+     */
+    async addPeer(peerId) {
+        const response = await this._send('addPeer', { peerId });
+        return response.result;
+    }
+
+    /**
+     * Remove a peer from the SyncManager
+     * @param {string} peerId - Peer ID
+     * @returns {Promise<string>} JSON result
+     */
+    async removePeer(peerId) {
+        const response = await this._send('removePeer', { peerId });
+        return response.result;
+    }
+
+    /**
+     * Get all peer IDs
+     * @returns {Promise<string>} JSON result with peer IDs
+     */
+    async getPeerIds() {
+        const response = await this._send('getPeerIds');
+        return response.result;
+    }
+
+    /**
+     * Get the number of connected peers
+     * @returns {Promise<number>}
+     */
+    async getPeerCount() {
+        const response = await this._send('getPeerCount');
+        return response.count;
+    }
+
+    /**
+     * Handle a message from a peer
+     * @param {string} peerId - Peer ID
+     * @param {string} messageJson - JSON message
+     * @returns {Promise<string>} JSON result with any response messages
+     */
+    async handlePeerMessage(peerId, messageJson) {
+        const response = await this._send('handlePeerMessage', { peerId, messageJson });
+        return response.result;
+    }
+
+    /**
+     * Get outgoing messages to send to peers
+     * @returns {Promise<string>} JSON result with messages
+     */
+    async getOutgoingMessages() {
+        const response = await this._send('getOutgoingMessages');
+        return response.result;
+    }
+
+    /**
+     * Queue local operations for broadcast to all peers
+     * @returns {Promise<string>} JSON result
+     */
+    async queueOperationsBroadcast() {
+        const response = await this._send('queueOperationsBroadcast');
+        return response.result;
     }
 }
 
