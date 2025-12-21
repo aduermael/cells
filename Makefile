@@ -61,7 +61,7 @@ wasm-serve:
 		print "  Install: brew install go"; \
 		exit 1 \
 	}}'
-	go run tools/serve/main.go -port 8081 -dir dist
+	cd tools/serve && go run . -port 8081 -dir ../../dist
 
 # Test (when tests exist)
 test:
