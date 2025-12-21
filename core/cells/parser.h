@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "core/cells/model.h"
+#include "core/cells/oplog.h"
 #include "core/cells/types.h"
 
 namespace cells {
@@ -72,11 +73,12 @@ private:
     bool parseLine(std::string_view line);
 
     // Line type parsers
-    bool parseDocument(std::string_view line);  // D <id> "<name>"
-    bool parseSheet(std::string_view line);     // S <id> "<name>"
-    bool parseColumn(std::string_view line);    // C <id> <pos> [props]
-    bool parseRow(std::string_view line);       // R <id> <pos> [props]
-    bool parseCell(std::string_view line);      // X <id> <col> <row> <type> <value>
+    bool parseDocument(std::string_view line);   // D <id> "<name>"
+    bool parseSheet(std::string_view line);      // S <id> "<name>"
+    bool parseColumn(std::string_view line);     // C <id> <pos> [props]
+    bool parseRow(std::string_view line);        // R <id> <pos> [props]
+    bool parseCell(std::string_view line);       // X <id> <col> <row> <type> <value>
+    bool parseOperation(std::string_view line);  // O <hlc> <op-type> <target-id> <payload>
 
     // Helper parsers
     static bool parseQuotedString(std::string_view input, std::string& out, size_t& consumed);

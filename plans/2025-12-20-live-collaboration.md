@@ -65,7 +65,7 @@ Implement the core CRDT data structures and operation log in C++ for the engine.
   - Delete vs edit conflicts: Edit resurrects (no data loss)
   - Add comprehensive tests in `core/cells/crdt_test.cc`
 
-- [ ] 1f: Update serializer to include OpLog section
+- [x] 1f: Update serializer to include OpLog section
   - Add `#oplog` section to `.cells` format
   - Format: `O <hlc> <op-type> <target-id> <payload-json>`
   - Serialize operations in HLC order

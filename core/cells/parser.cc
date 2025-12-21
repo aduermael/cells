@@ -129,12 +129,13 @@ bool Parser::parseLine(std::string_view line) {
         case 'X':  // Cell
             return parseCell(line.substr(firstNonSpace));
 
-        case 'T':    // Style definition (ignored for now)
-        case 'Y':    // Cell-style mapping (ignored for now)
-        case 'O': {  // OpLog entry (ignored for now)
+        case 'T':  // Style definition (ignored for now)
+        case 'Y':  // Cell-style mapping (ignored for now)
             // These sections are deferred to a later implementation plan
             return true;
-        }
+
+        case 'O':  // OpLog entry
+            return parseOperation(line.substr(firstNonSpace));
 
         default:
             // Unknown line type - ignore gracefully
@@ -633,6 +634,61 @@ bool Parser::resolveSharedFormulas() {
 
         // Link subscriber to master
         subscriber->setSharedFormulaRef(master);
+    }
+
+    return true;
+}
+
+bool Parser::parseOperation(std::string_view line) {
+    // Format: O <hlc> <op-type> <target-id> <payload-json>
+    // Example: O 1705312200000.0.N3f8hJ2w CELL_SET_VALUE nP6kR2mW {"type":"n","value":"42"}
+
+    if (line.size() < 2 || line[0] != 'O' || line[1] != ' ') {
+        return setError("Invalid operation line");
+    }
+
+    line = line.substr(2);  // Skip "O "
+
+    // Parse HLC (format: wall.logical.nodeid)
+    size_t spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos) {
+        return setError("Missing operation type");
+    }
+
+    const std::string hlcStr(line.substr(0, spacePos));
+    HLC hlc = HLC::fromString(hlcStr);
+    // Note: we don't validate HLC strictly here, zero HLC is acceptable in some edge cases
+
+    line = line.substr(spacePos + 1);
+
+    // Parse operation type
+    spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos) {
+        return setError("Missing target ID");
+    }
+
+    const std::string opTypeStr(line.substr(0, spacePos));
+    const OpType opType = stringToOpType(opTypeStr);
+
+    line = line.substr(spacePos + 1);
+
+    // Parse target ID (8 characters)
+    spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos) {
+        return setError("Missing payload");
+    }
+
+    const std::string targetStr(line.substr(0, spacePos));
+    const ID targetId(targetStr);
+
+    // Rest is payload (JSON)
+    const std::string payload(line.substr(spacePos + 1));
+
+    // Create operation and add to OpLog
+    Operation op(hlc, opType, targetId, payload);
+    OpLog* oplog = workbook_->getOpLog();
+    if (oplog != nullptr) {
+        oplog->addOperation(op);
     }
 
     return true;

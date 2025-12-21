@@ -117,6 +117,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":model",
+        ":oplog",
         ":types",
     ],
 )
@@ -128,6 +129,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":model",
+        ":oplog",
         ":types",
     ],
 )

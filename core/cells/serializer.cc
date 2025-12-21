@@ -56,6 +56,12 @@ void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
     for (const auto& sheet : workbook.sheets) {
         serializeSheet(*sheet, out);
     }
+
+    // Serialize operation log if it has operations
+    const OpLog* oplog = workbook.getOpLog();
+    if (oplog != nullptr && !oplog->empty()) {
+        serializeOpLog(*oplog, out);
+    }
 }
 
 void Serializer::serializeHeader(const Workbook& workbook, std::ostream& out) const {
@@ -211,6 +217,24 @@ void Serializer::serializeCellValue(const CellValue& value, const Cell& cell,
             out << value.raw;
             break;
     }
+}
+
+void Serializer::serializeOpLog(const OpLog& oplog, std::ostream& out) const {
+    // OpLog section header
+    out << "#oplog\n";
+
+    // Serialize each operation in HLC order
+    const auto& operations = oplog.getAllOperations();
+    for (const auto& op : operations) {
+        serializeOperation(op, out);
+    }
+}
+
+void Serializer::serializeOperation(const Operation& op, std::ostream& out) const {
+    // Format: O <hlc> <op-type> <target-id> <payload-json>
+    // Example: O 1705312200000.0.N3f8hJ2w CELL_SET_VALUE nP6kR2mW {"type":"n","value":"42"}
+    out << "O " << op.hlc.toString() << " " << opTypeToString(op.type) << " "
+        << op.target_id.toString() << " " << op.payload << "\n";
 }
 
 // --- Convenience functions ---

@@ -5,6 +5,7 @@
 #include <string>
 
 #include "core/cells/model.h"
+#include "core/cells/oplog.h"
 #include "core/cells/types.h"
 
 namespace cells {
@@ -52,6 +53,12 @@ private:
 
     // Serialize cell value based on type
     void serializeCellValue(const CellValue& value, const Cell& cell, std::ostream& out) const;
+
+    // Serialize operation log section
+    void serializeOpLog(const OpLog& oplog, std::ostream& out) const;
+
+    // Serialize a single operation
+    void serializeOperation(const Operation& op, std::ostream& out) const;
 };
 
 // Escape a string for the .cells format (handles quotes, newlines, etc.)
