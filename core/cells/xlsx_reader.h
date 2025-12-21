@@ -59,6 +59,10 @@ public:
     // Returns XLSXReadResult with workbook on success, error on failure
     XLSXReadResult readFile(const std::string& path);
 
+    // Read XLSX from memory buffer
+    // Returns XLSXReadResult with workbook on success, error on failure
+    XLSXReadResult readFromMemory(const char* data, size_t size);
+
     // Get/set options
     [[nodiscard]] const XLSXReadOptions& options() const { return options_; }
     void setOptions(const XLSXReadOptions& options) { options_ = options; }
@@ -74,9 +78,11 @@ private:
     void reset();
 };
 
-// Convenience function for one-shot reading
+// Convenience functions for one-shot reading
 XLSXReadResult readXLSX(const std::string& path);
 XLSXReadResult readXLSX(const std::string& path, const XLSXReadOptions& options);
+XLSXReadResult readXLSXFromMemory(const char* data, size_t size);
+XLSXReadResult readXLSXFromMemory(const char* data, size_t size, const XLSXReadOptions& options);
 
 }  // namespace cells
 

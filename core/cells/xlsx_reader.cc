@@ -73,7 +73,13 @@ int mapCellType(const char* type) {
     }
 }
 
-// ZIP file reading using miniz
+}  // namespace
+
+namespace cells {
+
+// Internal ZIP reader class (needs to be in cells namespace to be used by XLSXReader)
+namespace detail {
+
 class ZipReader {
 public:
     ZipReader() = default;
@@ -92,7 +98,18 @@ public:
         return true;
     }
 
-    // Read entire file into string
+    bool openFromMemory(const char* data, size_t size) {
+        if (mz_zip_reader_init_mem(&archive_, data, size, 0) == 0) {
+            lastError_ = mz_zip_get_last_error(&archive_);
+            return false;
+        }
+        opened_ = true;
+        return true;
+    }
+
+    mz_zip_error getLastError() const { return lastError_; }
+
+    // Read entire file from archive into string
     std::string readFile(const std::string& name) {
         const int index = mz_zip_reader_locate_file(&archive_, name.c_str(), nullptr, 0);
         if (index < 0) {
@@ -118,11 +135,10 @@ public:
 private:
     mz_zip_archive archive_{};
     bool opened_{false};
+    mz_zip_error lastError_{MZ_ZIP_NO_ERROR};
 };
 
-}  // namespace
-
-namespace cells {
+}  // namespace detail
 
 // ============================================================================
 // XLSXReadError implementation
@@ -157,19 +173,15 @@ void XLSXReader::reset() {
     warnings_.clear();
 }
 
-XLSXReadResult XLSXReader::readFile(const std::string& path) {
+// Static helper to parse XLSX from an already-opened ZipReader
+static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOptions& options,
+                                       std::vector<std::string>& warnings) {
     auto totalStart = std::chrono::steady_clock::now();
-    reset();
     XLSXReadResult result;
-
-    // Open ZIP archive
     auto start = std::chrono::steady_clock::now();
-    ZipReader zip;
-    if (!zip.open(path)) {
-        result.error = XLSXReadError("Failed to open XLSX file: " + path);
-        return result;
-    }
-    logTiming("zip.open", start);
+
+    // Helper lambda to add warnings
+    auto addWarning = [&warnings](const std::string& msg) { warnings.push_back(msg); };
 
     // Parse workbook relationships to get sheet paths
     start = std::chrono::steady_clock::now();
@@ -260,7 +272,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
     // Process each sheet
     for (const auto& [sheetName, sheetPath] : sheetInfo) {
         // Filter sheets if specific sheet requested
-        if (!options_.sheetName.empty() && sheetName != options_.sheetName) {
+        if (!options.sheetName.empty() && sheetName != options.sheetName) {
             continue;
         }
 
@@ -403,7 +415,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                 }
 
                 // Read formula if present and requested
-                if (options_.readFormulas) {
+                if (options.readFormulas) {
                     auto fNode = cellNode.child("f");
                     if (fNode) {
                         const char* formulaType = fNode.attribute("t").value();
@@ -419,7 +431,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                                 // Master cell has ref attribute and formula text
                                 if (ref && ref[0] != '\0' && formulaText &&
                                     formulaText[0] != '\0') {
-                                    if (options_.readFormulaText) {
+                                    if (options.readFormulaText) {
                                         cell->setFormula(
                                             new Formula(("=" + std::string(formulaText)).c_str()));
                                     } else {
@@ -440,7 +452,7 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
                         }
 
                         // Regular formula (not shared)
-                        if (options_.readFormulaText) {
+                        if (options.readFormulaText) {
                             const std::string formulaText = fNode.text().get();
                             cell->setFormula(new Formula(("=" + formulaText).c_str()));
                         } else {
@@ -472,16 +484,46 @@ XLSXReadResult XLSXReader::readFile(const std::string& path) {
     }
 
     // Check if requested sheet was found
-    if (!options_.sheetName.empty() && workbook->sheets.empty()) {
-        result.error = XLSXReadError("Sheet \"" + options_.sheetName + "\" not found");
+    if (!options.sheetName.empty() && workbook->sheets.empty()) {
+        result.error = XLSXReadError("Sheet \"" + options.sheetName + "\" not found");
         return result;
     }
 
     logTiming("TOTAL", totalStart);
 
     result.workbook = std::move(workbook);
-    result.warnings = std::move(warnings_);
+    result.warnings = std::move(warnings);
     return result;
+}
+
+// ============================================================================
+// XLSXReader public methods
+// ============================================================================
+
+XLSXReadResult XLSXReader::readFile(const std::string& path) {
+    reset();
+    detail::ZipReader zip;
+    if (!zip.open(path)) {
+        XLSXReadResult result;
+        result.error = XLSXReadError("Failed to open XLSX file: " + path);
+        return result;
+    }
+    return parseXLSXFromZip(zip, options_, warnings_);
+}
+
+XLSXReadResult XLSXReader::readFromMemory(const char* data, size_t size) {
+    reset();
+    detail::ZipReader zip;
+    if (!zip.openFromMemory(data, size)) {
+        XLSXReadResult result;
+        std::string errorMsg = "Failed to read XLSX data from memory";
+        errorMsg += " (size=" + std::to_string(size) + ", miniz error: ";
+        errorMsg += mz_zip_get_error_string(zip.getLastError());
+        errorMsg += ")";
+        result.error = XLSXReadError(errorMsg);
+        return result;
+    }
+    return parseXLSXFromZip(zip, options_, warnings_);
 }
 
 // ============================================================================
@@ -496,6 +538,16 @@ XLSXReadResult readXLSX(const std::string& path) {
 XLSXReadResult readXLSX(const std::string& path, const XLSXReadOptions& options) {
     XLSXReader reader(options);
     return reader.readFile(path);
+}
+
+XLSXReadResult readXLSXFromMemory(const char* data, size_t size) {
+    XLSXReader reader;
+    return reader.readFromMemory(data, size);
+}
+
+XLSXReadResult readXLSXFromMemory(const char* data, size_t size, const XLSXReadOptions& options) {
+    XLSXReader reader(options);
+    return reader.readFromMemory(data, size);
 }
 
 }  // namespace cells

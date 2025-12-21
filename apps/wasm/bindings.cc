@@ -159,28 +159,11 @@ public:
         return "{\"success\":true,\"sheetCount\":" + std::to_string(_workbook->sheetCount()) + "}";
     }
 
-    // Parse XLSX from file data (writes to temp file, reads, deletes)
-    // Uses Emscripten's virtual filesystem
-    std::string loadFromXLSXData(const std::string& data) {
-        // Ensure /tmp directory exists in Emscripten's virtual filesystem
-        mkdir("/tmp", 0777);
-
-        // Write data to Emscripten virtual filesystem
-        const char* tempPath = "/tmp/upload.xlsx";
-
-        // Write binary data to temp file
-        FILE* f = fopen(tempPath, "wb");
-        if (!f) {
-            return "{\"error\":\"Failed to create temp file\"}";
-        }
-        fwrite(data.data(), 1, data.size(), f);
-        fclose(f);
-
-        // Read XLSX
-        auto result = readXLSX(tempPath);
-
-        // Clean up temp file
-        remove(tempPath);
+    // Parse XLSX from binary data passed via WASM heap pointer
+    // This avoids UTF-8 encoding issues that occur with string parameters
+    std::string loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
+        const char* data = reinterpret_cast<const char*>(ptr);
+        auto result = readXLSXFromMemory(data, size);
 
         if (!result.ok()) {
             return "{\"error\":\"" + jsonEscape(result.error->message) + "\"}";
@@ -425,35 +408,7 @@ public:
             json << "\"col\":" << entry.x << ",";
             json << "\"row\":" << entry.y << ",";
 
-            // Check for pending operation on this cell
-            // Priority: pending > committed (Last-Writer-Wins with pending preview)
-            const Operation* pendingOp = _workbook->getPendingOpForTarget(entry.cell->id);
-            bool isPending = (pendingOp != nullptr);
-
-            if (isPending) {
-                json << "\"pending\":true,";
-
-                // Extract value from pending operation's payload
-                // Payload format: {"type":"n","value":"42",...} or
-                // {"type":"f","value":"=A1+B1","display":"=A1+B1",...}
-                std::string pendingType = extractPayloadField(pendingOp->payload, "type");
-                std::string pendingValue = extractPayloadField(pendingOp->payload, "value");
-                std::string pendingDisplay = extractPayloadField(pendingOp->payload, "display");
-
-                if (pendingType == "f") {
-                    // Formula - show formula in A1 notation
-                    json << "\"type\":\"f\",";
-                    if (!pendingDisplay.empty()) {
-                        json << "\"formula\":\"" << jsonEscape(pendingDisplay) << "\",";
-                    }
-                    // For display, use cached cell value if available, otherwise formula
-                    json << "\"display\":\"" << jsonEscape(entry.cell->value.raw) << "\"";
-                } else {
-                    // Non-formula - use pending value directly
-                    json << "\"type\":\"" << (pendingType.empty() ? "s" : pendingType) << "\",";
-                    json << "\"value\":\"" << jsonEscape(pendingValue) << "\"";
-                }
-            } else if (entry.cell->isFormula()) {
+            if (entry.cell->isFormula()) {
                 json << "\"type\":\"f\",";
                 Formula* formula = entry.cell->getFormula();
                 if (formula != nullptr && formula->text != nullptr) {
@@ -1747,9 +1702,6 @@ public:
         if (result.dataModified) {
             rebuildQuadtree();
             notifyListeners(ChangeType::CELL_CHANGED);
-        } else if (result.pendingModified) {
-            // Pending ops changed (remote cursor/typing) - notify but no quadtree rebuild
-            notifyListeners(ChangeType::CELL_CHANGED);
         }
 
         std::ostringstream json;
@@ -1811,104 +1763,8 @@ public:
         return "{\"success\":true}";
     }
 
-    // Queue a pending operation broadcast for a specific cell.
-    // Call this after updateCell() to broadcast the pending edit to peers.
-    // This enables live typing visibility - peers see the edit before commit.
-    std::string queuePendingBroadcast(const std::string& cellIdStr) {
-        if (!_syncManager) {
-            return "{\"error\":\"SyncManager not initialized\"}";
-        }
-
-        if (!_workbook) {
-            return "{\"error\":\"No workbook\"}";
-        }
-
-        if (cellIdStr.size() != ID_LENGTH) {
-            return "{\"error\":\"Invalid cell ID\"}";
-        }
-        ID cellId(cellIdStr);
-
-        // Get the pending operation for this cell
-        const Operation* pendingOp = _workbook->getPendingOpForTarget(cellId);
-        if (pendingOp == nullptr) {
-            return "{\"error\":\"No pending operation for cell\"}";
-        }
-
-        // Broadcast the pending operation to peers
-        _syncManager->queuePendingBroadcast(*pendingOp);
-        return "{\"success\":true}";
-    }
-
     // ========================================================================
-    // Pending operations methods
-    // ========================================================================
-
-    // Commit all local pending operations to the OpLog.
-    // Call this on blur, Enter key, or navigation to finalize edits.
-    // Returns JSON with count of committed operations and their HLCs.
-    std::string commitPendingOps() {
-        if (!_workbook) {
-            return "{\"error\":\"No workbook\"}";
-        }
-
-        std::vector<Operation> committed = _workbook->commitPendingOps();
-
-        std::ostringstream json;
-        json << "{\"committed\":" << committed.size() << ",\"operations\":[";
-        for (size_t i = 0; i < committed.size(); i++) {
-            if (i > 0) {
-                json << ",";
-            }
-            json << committed[i].toJSON();
-        }
-        json << "]}";
-        return json.str();
-    }
-
-    // Commit pending operations for a specific cell.
-    // Useful when committing just the active cell.
-    std::string commitPendingOpsForCell(const std::string& cellIdStr) {
-        if (!_workbook) {
-            return "{\"error\":\"No workbook\"}";
-        }
-
-        if (cellIdStr.size() != ID_LENGTH) {
-            return "{\"error\":\"Invalid cell ID\"}";
-        }
-        ID cellId(cellIdStr);
-
-        std::vector<Operation> committed = _workbook->commitPendingOpsForTarget(cellId);
-
-        std::ostringstream json;
-        json << "{\"committed\":" << committed.size() << ",\"operations\":[";
-        for (size_t i = 0; i < committed.size(); i++) {
-            if (i > 0) {
-                json << ",";
-            }
-            json << committed[i].toJSON();
-        }
-        json << "]}";
-        return json.str();
-    }
-
-    // Check if there are any pending operations.
-    bool hasPendingOps() {
-        if (!_workbook) {
-            return false;
-        }
-        return _workbook->hasPendingOps();
-    }
-
-    // Get the count of pending operations.
-    int getPendingOpsCount() {
-        if (!_workbook) {
-            return 0;
-        }
-        return static_cast<int>(_workbook->pendingOpsCount());
-    }
-
-    // ========================================================================
-    // Collaboration mode methods (Phase 4a)
+    // Collaboration mode methods
     // ========================================================================
 
     // Get current collaboration mode as string: "offline" or "collaborating"
@@ -2035,7 +1891,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         // File loading
         .function("loadFromCells", &cells::wasm::CellsEngine::loadFromCells)
         .function("loadFromCSV", &cells::wasm::CellsEngine::loadFromCSV)
-        .function("loadFromXLSXData", &cells::wasm::CellsEngine::loadFromXLSXData)
+        .function("loadFromXLSXDataPtr", &cells::wasm::CellsEngine::loadFromXLSXDataPtr)
         // Sheet info
         .function("getSheetInfo", &cells::wasm::CellsEngine::getSheetInfo)
         .function("getSheetCount", &cells::wasm::CellsEngine::getSheetCount)
@@ -2093,12 +1949,6 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("handlePeerMessage", &cells::wasm::CellsEngine::handlePeerMessage)
         .function("getOutgoingMessages", &cells::wasm::CellsEngine::getOutgoingMessages)
         .function("queueOperationsBroadcast", &cells::wasm::CellsEngine::queueOperationsBroadcast)
-        .function("queuePendingBroadcast", &cells::wasm::CellsEngine::queuePendingBroadcast)
-        // Pending operations
-        .function("commitPendingOps", &cells::wasm::CellsEngine::commitPendingOps)
-        .function("commitPendingOpsForCell", &cells::wasm::CellsEngine::commitPendingOpsForCell)
-        .function("hasPendingOps", &cells::wasm::CellsEngine::hasPendingOps)
-        .function("getPendingOpsCount", &cells::wasm::CellsEngine::getPendingOpsCount)
         // Collaboration mode
         .function("getCollabMode", &cells::wasm::CellsEngine::getCollabMode)
         .function("isCollaborating", &cells::wasm::CellsEngine::isCollaborating)

@@ -79,13 +79,12 @@ function handleMessage(msg) {
                     const hasHeader = params.hasHeader !== false;
                     result = JSON.parse(engine.loadFromCSV(content, delimiter.charCodeAt(0), hasHeader));
                 } else if (format === 'xlsx') {
-                    // data is ArrayBuffer, convert to binary string for C++
+                    // data is ArrayBuffer - copy directly to WASM heap to avoid UTF-8 encoding issues
                     const bytes = new Uint8Array(data);
-                    let binaryStr = '';
-                    for (let i = 0; i < bytes.length; i++) {
-                        binaryStr += String.fromCharCode(bytes[i]);
-                    }
-                    result = JSON.parse(engine.loadFromXLSXData(binaryStr));
+                    const ptr = Module._malloc(bytes.length);
+                    Module.HEAPU8.set(bytes, ptr);
+                    result = JSON.parse(engine.loadFromXLSXDataPtr(ptr, bytes.length));
+                    Module._free(ptr);
                 } else {
                     respond({ type: 'error', error: 'Unknown format: ' + format });
                     return;
