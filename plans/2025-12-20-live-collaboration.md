@@ -253,7 +253,7 @@ Implement user presence, online indicators, and collaboration UI elements.
   - Copy link to clipboard on click
   - Show tooltip: "Link copied! Share with collaborators"
 
-- [ ] 5f: Add room join from URL
+- [x] 5f: Add room join from URL
   - Parse `?room=<roomId>` from URL query parameters
   - Auto-join room on page load if room parameter present
   - Show "Joining room..." message during connection
