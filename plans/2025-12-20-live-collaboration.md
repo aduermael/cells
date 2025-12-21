@@ -171,7 +171,7 @@ Connect the CRDT engine to the WebRTC layer and implement the sync protocol.
   - Export `workbook_set_node_id(node_id)` to set local peer ID
   - Add error handling and validation
 
-- [ ] 4b: Implement operation capture in WASM client
+- [x] 4b: Implement operation capture in WASM client
   - Create `apps/wasm/static/shared/collab-manager.js`
   - `class CollabManager` to manage collaboration state
   - Intercept local edits (cell value, style, axis operations)
@@ -179,7 +179,7 @@ Connect the CRDT engine to the WebRTC layer and implement the sync protocol.
   - Add to local OpLog via WASM
   - Broadcast to all connected peers via DataChannel
 
-- [ ] 4c: Implement operation reception and application
+- [x] 4c: Implement operation reception and application
   - Receive operations from peer DataChannels
   - Parse and validate incoming operations
   - Apply to local workbook via WASM `workbook_apply_operation`
@@ -187,7 +187,7 @@ Connect the CRDT engine to the WebRTC layer and implement the sync protocol.
   - Deduplicate operations (skip if already in OpLog)
   - Handle application errors gracefully
 
-- [ ] 4d: Implement sync protocol on connection
+- [x] 4d: Implement sync protocol on connection
   - On peer connection established, exchange `hello` messages
   - `hello` includes: peer ID, current HLC, document ID
   - Request missing operations: `syncRequest(since_hlc)`
@@ -195,7 +195,7 @@ Connect the CRDT engine to the WebRTC layer and implement the sync protocol.
   - Apply received operations in HLC order
   - Mark sync complete when caught up
 
-- [ ] 4e: Implement incremental sync
+- [x] 4e: Implement incremental sync
   - Track last synced HLC per peer
   - Send only new operations since last sync
   - Batch operations for efficiency (max 100 ops per message)
