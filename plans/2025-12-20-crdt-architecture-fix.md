@@ -192,10 +192,11 @@ Add pending operation support for live typing visibility.
     `removePendingOpsFromPeer()`, `commitPendingOps()`, `commitPendingOpsForTarget()`,
     `getPendingOps()`, `getPendingOpForTarget()`, `hasPendingOps()`, `pendingOpsCount()`
 
-- [ ] 3b: Modify cell edit flow
+- [x] 3b: Modify cell edit flow
   - `updateCell()` creates pending operation for cell value
   - Pending op immediately queued for broadcast (peers see typing)
   - Pending op NOT in OpLog yet
+  - Value applied directly to cell for immediate visual feedback
 
 - [ ] 3c: Structure operations commit immediately
   - DIM_INSERT_AXIS (column/row creation) → immediate commit

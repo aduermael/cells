@@ -465,6 +465,10 @@ public:
     // Cell operations
     // ========================================================================
 
+    // Update a cell value. This creates a PENDING operation (not committed yet).
+    // The pending operation is applied locally for immediate visual feedback,
+    // but not added to the OpLog until commitPendingOps() is called.
+    // This enables live typing visibility for collaborators.
     std::string updateCell(const std::string& cellIdStr, const std::string& value) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -523,25 +527,41 @@ public:
             }
         }
 
-        // Create and apply the CRDT operation
+        // Create the operation (this generates an HLC)
         Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
-        ApplyResult result = applyOperation(*_workbook, op);
 
-        if (result == ApplyResult::SUCCESS || result == ApplyResult::SUPERSEDED) {
-            // For formulas, we need to also set up the formula object for evaluation
-            if (typeChar == 'f' && !value.empty() && value[0] == '=') {
-                std::string uuidFormula = _refConverter.formulaToUuid(value);
-                auto* formula = new Formula(uuidFormula.c_str());
-                cell->setFormula(formula);
-                cell->value.type = CellValueType::FORMULA;
+        // Add to pending operations (replaces existing pending op for same target)
+        _workbook->addPendingOp(op);
+
+        // Apply the value directly to the cell for immediate visual feedback
+        // This is NOT committed to the OpLog yet
+        // Note: 'e' in payload means empty, but we use STRING type with empty raw
+        CellValueType cellType;
+        if (typeChar == 'e') {
+            cellType = CellValueType::STRING;  // Empty cells are STRING with empty raw
+        } else {
+            cellType = charToValueType(typeChar);
+        }
+        cell->value.type = cellType;
+        cell->value.raw = value;
+        cell->value.error = CellError::NONE;
+
+        // For formulas, set up the formula object for evaluation
+        if (typeChar == 'f' && !value.empty() && value[0] == '=') {
+            std::string uuidFormula = _refConverter.formulaToUuid(value);
+            auto* formula = new Formula(uuidFormula.c_str());
+            cell->setFormula(formula);
+            cell->value.type = CellValueType::FORMULA;
+        } else {
+            // Clear formula if it was a formula cell
+            if (cell->formula != nullptr) {
+                cell->clearFormula();
             }
-
-            rebuildQuadtree();
-            notifyListeners(ChangeType::CELL_CHANGED);
-            return "{\"success\":true}";
         }
 
-        return "{\"error\":\"Failed to apply operation\"}";
+        rebuildQuadtree();
+        notifyListeners(ChangeType::CELL_CHANGED);
+        return "{\"success\":true}";
     }
 
     std::string createCell(uint32_t col, uint32_t row, const std::string& value) {
