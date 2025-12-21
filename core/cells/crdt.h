@@ -1,0 +1,65 @@
+#ifndef CELLS_CRDT_H_
+#define CELLS_CRDT_H_
+
+#include "core/cells/model.h"
+#include "core/cells/operation.h"
+
+namespace cells {
+
+// Result of applying an operation
+enum class ApplyResult {
+    SUCCESS,           // Operation applied successfully
+    ALREADY_APPLIED,   // Operation already in OpLog (duplicate)
+    SUPERSEDED,        // A newer operation already exists for this entity
+    INVALID_TARGET,    // Target entity not found (for cell/axis operations)
+    INVALID_PAYLOAD,   // Payload could not be parsed
+    RESURRECTED,       // Entity was deleted but resurrected by this edit
+};
+
+// Apply a CRDT operation to a workbook.
+// Handles conflict resolution using HLC timestamps:
+// - Cell value conflicts: Last-Writer-Wins (higher HLC wins)
+// - Axis insert conflicts: Interleave by HLC (lower HLC comes first)
+// - Delete vs edit conflicts: Edit resurrects (no data loss)
+//
+// The operation is added to the OpLog if successful.
+// Returns the result of applying the operation.
+ApplyResult applyOperation(Workbook& workbook, const Operation& op);
+
+// Apply multiple operations, typically from a sync response.
+// Applies in HLC order to maintain consistency.
+// Returns the number of operations successfully applied.
+size_t applyOperations(Workbook& workbook, const std::vector<Operation>& ops);
+
+// Check if an operation would be superseded by existing operations.
+// Used to avoid unnecessary work when receiving old operations.
+bool isSuperseded(const Workbook& workbook, const Operation& op);
+
+// Generate a CELL_SET_VALUE operation for a cell.
+// Creates the operation with current HLC from the workbook.
+Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const std::string& payload);
+
+// Generate a CELL_CLEAR operation for a cell.
+Operation makeCellClearOp(Workbook& workbook, const ID& cellId);
+
+// Generate a DIM_INSERT_AXIS operation for inserting a column or row.
+Operation makeDimInsertAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+
+// Generate a DIM_DELETE_AXIS operation for deleting a column or row.
+Operation makeDimDeleteAxisOp(Workbook& workbook, const ID& axisId);
+
+// Generate a DIM_RESIZE_AXIS operation for resizing a column or row.
+Operation makeDimResizeAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+
+// Generate a SHEET_CREATE operation.
+Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload);
+
+// Generate a SHEET_DELETE operation.
+Operation makeSheetDeleteOp(Workbook& workbook, const ID& sheetId);
+
+// Generate a SHEET_RENAME operation.
+Operation makeSheetRenameOp(Workbook& workbook, const ID& sheetId, const std::string& payload);
+
+}  // namespace cells
+
+#endif  // CELLS_CRDT_H_

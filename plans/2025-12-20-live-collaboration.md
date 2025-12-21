@@ -58,7 +58,7 @@ Implement the core CRDT data structures and operation log in C++ for the engine.
   - Expose via `getOpLog()` method
   - Ensure proper cleanup in destructor
 
-- [ ] 1e: Implement operation application and conflict resolution
+- [x] 1e: Implement operation application and conflict resolution
   - `applyOperation(const Operation& op)` method in Workbook
   - Cell value conflicts: Last-Writer-Wins (higher HLC wins)
   - Axis insert conflicts: Interleave by HLC (lower HLC comes first)

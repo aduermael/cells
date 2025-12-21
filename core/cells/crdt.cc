@@ -1,0 +1,338 @@
+#include "core/cells/crdt.h"
+
+#include <algorithm>
+
+namespace cells {
+
+namespace {
+
+// Simple JSON value extraction (reused from operation.cc pattern)
+std::string extractJSONString(const std::string& json, const std::string& key) {
+    std::string searchKey = "\"" + key + "\":";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) {
+        return "";
+    }
+    pos += searchKey.length();
+
+    // Skip whitespace
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
+        pos++;
+    }
+
+    if (pos >= json.size() || json[pos] != '"') {
+        return "";
+    }
+
+    pos++;  // Skip opening quote
+    size_t end = pos;
+    while (end < json.size() && json[end] != '"') {
+        if (json[end] == '\\' && end + 1 < json.size()) {
+            end++;  // Skip escaped char
+        }
+        end++;
+    }
+
+    return json.substr(pos, end - pos);
+}
+
+// Apply CELL_SET_VALUE operation
+ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
+    // Find the target cell across all sheets
+    Cell* cell = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        cell = s->getCell(op.target_id);
+        if (cell != nullptr) {
+            break;
+        }
+    }
+
+    // Check if there's a newer operation for this cell
+    const OpLog* oplog = workbook.getOpLog();
+    Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+
+    if (!latest.isNull() && latest.hlc >= op.hlc) {
+        // This operation is older than or equal to existing, skip it
+        // (but still add to OpLog for history)
+        return ApplyResult::SUPERSEDED;
+    }
+
+    if (cell == nullptr) {
+        // Cell doesn't exist - this could be a resurrection case
+        // For now, we just note that the target is invalid
+        // In a full implementation, we would create the cell
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Parse payload: {"type":"n","value":"42"} or {"type":"s","value":"hello"}
+    std::string type_str = extractJSONString(op.payload, "type");
+    std::string value_str = extractJSONString(op.payload, "value");
+
+    if (type_str.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    // Apply the value based on type
+    CellValueType type = charToValueType(type_str[0]);
+    cell->value.type = type;
+    cell->value.raw = value_str;
+    cell->value.error = CellError::NONE;
+
+    // Clear formula if it was a formula cell
+    if (cell->formula != nullptr) {
+        cell->clearFormula();
+    }
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply CELL_CLEAR operation
+ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
+    Cell* cell = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        cell = s->getCell(op.target_id);
+        if (cell != nullptr) {
+            break;
+        }
+    }
+
+    if (cell == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer operations
+    const OpLog* oplog = workbook.getOpLog();
+    Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+
+    if (!latest.isNull() && latest.hlc > op.hlc) {
+        // A newer operation exists - if it's an edit, it resurrects
+        if (latest.type == OpType::CELL_SET_VALUE) {
+            return ApplyResult::RESURRECTED;
+        }
+    }
+
+    // Clear the cell
+    cell->value = CellValue();
+    cell->clearFormula();
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply DIM_RESIZE_AXIS operation
+ApplyResult applyDimResizeAxis(Workbook& workbook, const Operation& op) {
+    Axis* axis = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        axis = s->getColumn(op.target_id);
+        if (axis == nullptr) {
+            axis = s->getRow(op.target_id);
+        }
+        if (axis != nullptr) {
+            break;
+        }
+    }
+
+    if (axis == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer resize operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if (existing.type == OpType::DIM_RESIZE_AXIS && existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    // Parse payload: {"size":150}
+    std::string size_str = extractJSONString(op.payload, "size");
+    if (size_str.empty()) {
+        // Try numeric format
+        size_t pos = op.payload.find("\"size\":");
+        if (pos != std::string::npos) {
+            pos += 7;  // Skip "size":
+            while (pos < op.payload.size() && (op.payload[pos] == ' ' || op.payload[pos] == '\t')) {
+                pos++;
+            }
+            size_t end = pos;
+            while (end < op.payload.size() && op.payload[end] >= '0' && op.payload[end] <= '9') {
+                end++;
+            }
+            size_str = op.payload.substr(pos, end - pos);
+        }
+    }
+
+    if (size_str.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    uint32_t new_size = static_cast<uint32_t>(std::stoul(size_str));
+    axis->size = new_size;
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply SHEET_RENAME operation
+ApplyResult applySheetRename(Workbook& workbook, const Operation& op) {
+    Sheet* sheet = workbook.getSheet(op.target_id);
+    if (sheet == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer rename operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if (existing.type == OpType::SHEET_RENAME && existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    // Parse payload: {"name":"NewName"}
+    std::string name = extractJSONString(op.payload, "name");
+    if (name.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    sheet->name = name;
+
+    return ApplyResult::SUCCESS;
+}
+
+}  // namespace
+
+ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
+    OpLog* oplog = workbook.getOpLog();
+
+    // Check for duplicate
+    if (oplog->hasOperation(op.hlc)) {
+        return ApplyResult::ALREADY_APPLIED;
+    }
+
+    ApplyResult result = ApplyResult::SUCCESS;
+
+    switch (op.type) {
+        case OpType::CELL_SET_VALUE:
+            result = applyCellSetValue(workbook, op);
+            break;
+
+        case OpType::CELL_CLEAR:
+            result = applyCellClear(workbook, op);
+            break;
+
+        case OpType::CELL_SET_STYLE:
+            // Style operations use LWW similar to value
+            // Not fully implemented yet - just accept it
+            result = ApplyResult::SUCCESS;
+            break;
+
+        case OpType::DIM_INSERT_AXIS:
+            // Axis insert uses interleaving by HLC
+            // Not fully implemented yet - just accept it
+            result = ApplyResult::SUCCESS;
+            break;
+
+        case OpType::DIM_DELETE_AXIS:
+            // Axis delete - check for resurrection
+            result = ApplyResult::SUCCESS;
+            break;
+
+        case OpType::DIM_MOVE_AXIS:
+            // Axis move uses LWW
+            result = ApplyResult::SUCCESS;
+            break;
+
+        case OpType::DIM_RESIZE_AXIS:
+            result = applyDimResizeAxis(workbook, op);
+            break;
+
+        case OpType::SHEET_CREATE:
+            // Sheet create - just accept it
+            result = ApplyResult::SUCCESS;
+            break;
+
+        case OpType::SHEET_DELETE:
+            // Sheet delete - check for resurrection
+            result = ApplyResult::SUCCESS;
+            break;
+
+        case OpType::SHEET_RENAME:
+            result = applySheetRename(workbook, op);
+            break;
+    }
+
+    // Add to OpLog regardless of result (for history/sync)
+    // Only skip if it's truly a duplicate (already checked above)
+    oplog->addOperation(op);
+
+    return result;
+}
+
+size_t applyOperations(Workbook& workbook, const std::vector<Operation>& ops) {
+    // Sort operations by HLC to ensure consistent application order
+    std::vector<Operation> sorted = ops;
+    std::sort(sorted.begin(), sorted.end());
+
+    size_t applied = 0;
+    for (const auto& op : sorted) {
+        ApplyResult result = applyOperation(workbook, op);
+        if (result == ApplyResult::SUCCESS || result == ApplyResult::SUPERSEDED ||
+            result == ApplyResult::RESURRECTED) {
+            applied++;
+        }
+    }
+
+    return applied;
+}
+
+bool isSuperseded(const Workbook& workbook, const Operation& op) {
+    const OpLog* oplog = workbook.getOpLog();
+    Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+
+    return !latest.isNull() && latest.hlc >= op.hlc;
+}
+
+Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const std::string& payload) {
+    HLC hlc = workbook.getCurrentHLC();
+    return Operation(hlc, OpType::CELL_SET_VALUE, cellId, payload);
+}
+
+Operation makeCellClearOp(Workbook& workbook, const ID& cellId) {
+    HLC hlc = workbook.getCurrentHLC();
+    return Operation(hlc, OpType::CELL_CLEAR, cellId, "{}");
+}
+
+Operation makeDimInsertAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+    HLC hlc = workbook.getCurrentHLC();
+    return Operation(hlc, OpType::DIM_INSERT_AXIS, axisId, payload);
+}
+
+Operation makeDimDeleteAxisOp(Workbook& workbook, const ID& axisId) {
+    HLC hlc = workbook.getCurrentHLC();
+    return Operation(hlc, OpType::DIM_DELETE_AXIS, axisId, "{}");
+}
+
+Operation makeDimResizeAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+    HLC hlc = workbook.getCurrentHLC();
+    return Operation(hlc, OpType::DIM_RESIZE_AXIS, axisId, payload);
+}
+
+Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {
+    HLC hlc = workbook.getCurrentHLC();
+    return Operation(hlc, OpType::SHEET_CREATE, sheetId, payload);
+}
+
+Operation makeSheetDeleteOp(Workbook& workbook, const ID& sheetId) {
+    HLC hlc = workbook.getCurrentHLC();
+    return Operation(hlc, OpType::SHEET_DELETE, sheetId, "{}");
+}
+
+Operation makeSheetRenameOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {
+    HLC hlc = workbook.getCurrentHLC();
+    return Operation(hlc, OpType::SHEET_RENAME, sheetId, payload);
+}
+
+}  // namespace cells

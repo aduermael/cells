@@ -90,6 +90,27 @@ cc_library(
 )
 
 cc_library(
+    name = "crdt",
+    srcs = ["crdt.cc"],
+    hdrs = ["crdt.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":model",
+        ":operation",
+    ],
+)
+
+cc_test(
+    name = "crdt_test",
+    srcs = ["crdt_test.cc"],
+    deps = [
+        ":crdt",
+        ":id",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "parser",
     srcs = ["parser.cc"],
     hdrs = ["parser.h"],
