@@ -334,12 +334,12 @@ ApplyResult applyDimMoveAxis(Workbook& workbook, const Operation& op) {
     }
 
     // Parse payload: {"targetPos":5}
-    int targetPos = extractJSONInt(op.payload, "targetPos", -1);
+    const int targetPos = extractJSONInt(op.payload, "targetPos", -1);
     if (targetPos < 0) {
         return ApplyResult::INVALID_PAYLOAD;
     }
 
-    uint32_t currentPos = axis->position;
+    const uint32_t currentPos = axis->position;
     auto newPos = static_cast<uint32_t>(targetPos);
 
     if (newPos == currentPos || newPos == currentPos + 1) {
@@ -354,7 +354,8 @@ ApplyResult applyDimMoveAxis(Workbook& workbook, const Operation& op) {
     // Update other axes' positions
     auto& axisMap = isColumn ? targetSheet->columns : targetSheet->rows;
     for (auto& [id, ax] : axisMap) {
-        if (id == op.target_id) continue;
+        if (id == op.target_id)
+            continue;
 
         if (currentPos < newPos) {
             if (ax->position > currentPos && ax->position <= newPos) {

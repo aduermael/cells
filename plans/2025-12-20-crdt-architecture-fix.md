@@ -344,6 +344,11 @@ Address specific bugs and ensure all operations sync.
   - Fixed: queryViewport now extracts and displays pending operation values
     instead of committed cell values when a pending operation exists.
     Local pending ops update cell directly, remote pending ops extracted from payload.
+  - **CRITICAL FIX**: Added `commitPendingOpsForCell()` calls in `confirmEditing()`
+    and `commitFormulaBarEdit()` in index.html. The bug was that `updateCell()`
+    creates a pending operation, but it was never committed to OpLog. Only
+    structure operations (DIM_INSERT_AXIS) were being broadcast because they
+    commit immediately. Cell values stayed pending forever and never synced.
 
 - [x] 7c: Verify operation ordering
   - DIM_INSERT_AXIS ops always applied before CELL_SET_VALUE
