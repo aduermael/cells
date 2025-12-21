@@ -23,7 +23,6 @@ build:wasm-debug --linkopt=-fexceptions
 build:wasm-debug --linkopt=-sNO_DISABLE_EXCEPTION_CATCHING
 build:wasm-debug --copt=-g
 build:wasm-debug --cxxopt=-g
-build:wasm-debug --linkopt=-g
 build:wasm-debug --linkopt=-gsource-map
 build:wasm-debug --copt=-O0
 build:wasm-debug --cxxopt=-O0
