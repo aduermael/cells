@@ -166,8 +166,8 @@ TEST_F(SyncManagerTest, HandleSyncResponse) {
     applyOperation(*workbook_a, op);
 
     // Get operations from A as JSON
-    std::string syncResponse = R"({"type":"sync-response","operations":[)" + op.toJSON() +
-                               R"(],"complete":true})";
+    std::string syncResponse =
+        R"({"type":"sync-response","operations":[)" + op.toJSON() + R"(],"complete":true})";
 
     // B receives sync-response
     sync_b->addPeer(node_a);
@@ -190,8 +190,8 @@ TEST_F(SyncManagerTest, HandleOperationsBatch) {
     applyOperation(*workbook_a, op2);
 
     // Send as operations batch
-    std::string opsBatch = R"({"type":"operations","batch":[)" + op1.toJSON() + "," + op2.toJSON() +
-                           R"(]})";
+    std::string opsBatch =
+        R"({"type":"operations","batch":[)" + op1.toJSON() + "," + op2.toJSON() + R"(]})";
 
     auto responses = sync_b->handleMessage(node_a, opsBatch);
 

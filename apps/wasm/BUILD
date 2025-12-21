@@ -50,6 +50,7 @@ cc_binary(
         "//core/cells:quadtree",
         "//core/cells:ref_converter",
         "//core/cells:serializer",
+        "//core/cells:sync_manager",
         "//core/cells:xlsx_reader",
         "//core/cells:xlsx_writer",
     ],

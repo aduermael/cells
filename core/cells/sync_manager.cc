@@ -110,7 +110,7 @@ std::vector<Operation> extractJSONOperations(const std::string& json, const std:
 
         if (json[pos] == '{') {
             // Find matching closing brace
-            size_t start = pos;
+            const size_t start = pos;
             int braceCount = 1;
             pos++;
             while (pos < json.size() && braceCount > 0) {
@@ -132,8 +132,8 @@ std::vector<Operation> extractJSONOperations(const std::string& json, const std:
             }
 
             // Extract and parse the operation
-            std::string opJson = json.substr(start, pos - start);
-            Operation op = Operation::fromJSON(opJson);
+            const std::string opJson = json.substr(start, pos - start);
+            const Operation op = Operation::fromJSON(opJson);
             if (!op.isNull()) {
                 ops.push_back(op);
             }
@@ -146,9 +146,6 @@ std::vector<Operation> extractJSONOperations(const std::string& json, const std:
 }
 
 }  // namespace
-
-// PeerSyncState implementation
-PeerSyncState::PeerSyncState() : lastSyncedHLC(), isSynced(false), opCount(0) {}
 
 // OutgoingMessage implementation
 OutgoingMessage::OutgoingMessage() : peerId(), json() {}
@@ -261,7 +258,7 @@ void SyncManager::queueOperationsBroadcast() {
     }
 
     // Create and queue the operations message
-    std::string msg = makeOperationsMessage(minHLC);
+    const std::string msg = makeOperationsMessage(minHLC);
     if (!msg.empty()) {
         queueBroadcast(msg);
     }
@@ -275,7 +272,7 @@ std::vector<OutgoingMessage> SyncManager::handleHello(const ID& peerId, const st
     const std::string hlcStr = extractJSONString(json, "hlc");
     const int64_t opCount = extractJSONInt(json, "op_count", 0);
 
-    HLC peerHLC = HLC::fromString(hlcStr);
+    const HLC peerHLC = HLC::fromString(hlcStr);
 
     // Update peer state
     auto it = _peers.find(peerId);
@@ -295,7 +292,7 @@ std::vector<OutgoingMessage> SyncManager::handleHello(const ID& peerId, const st
 
     if (static_cast<size_t>(opCount) > localOpCount) {
         // They have more operations - request sync
-        HLC localHLC = oplog->getCurrentHLC();
+        const HLC localHLC = oplog->getCurrentHLC();
         response.emplace_back(peerId, makeSyncRequestMessage(localHLC));
     } else if (static_cast<size_t>(opCount) < localOpCount) {
         // We have more operations - send sync response
@@ -315,7 +312,7 @@ std::vector<OutgoingMessage> SyncManager::handleSyncRequest(const ID& peerId,
 
     // Parse: {"type":"sync-request","since_hlc":"..."}
     const std::string sinceHLCStr = extractJSONString(json, "since_hlc");
-    HLC sinceHLC = HLC::fromString(sinceHLCStr);
+    const HLC sinceHLC = HLC::fromString(sinceHLCStr);
 
     // Send operations since their HLC
     response.emplace_back(peerId, makeSyncResponseMessage(sinceHLC));
@@ -327,7 +324,7 @@ std::vector<OutgoingMessage> SyncManager::handleSyncRequest(const ID& peerId,
 std::vector<OutgoingMessage> SyncManager::handleSyncResponse(const ID& peerId,
                                                              const std::string& json) {
     // Parse: {"type":"sync-response","operations":[...],"complete":true}
-    std::vector<Operation> ops = extractJSONOperations(json, "operations");
+    const std::vector<Operation> ops = extractJSONOperations(json, "operations");
 
     // Apply operations to workbook
     if (!ops.empty()) {
@@ -350,7 +347,7 @@ std::vector<OutgoingMessage> SyncManager::handleSyncResponse(const ID& peerId,
 std::vector<OutgoingMessage> SyncManager::handleOperations(const ID& peerId,
                                                            const std::string& json) {
     // Parse: {"type":"operations","batch":[...]}
-    std::vector<Operation> ops = extractJSONOperations(json, "batch");
+    const std::vector<Operation> ops = extractJSONOperations(json, "batch");
 
     // Apply operations to workbook
     if (!ops.empty()) {
@@ -382,8 +379,8 @@ std::vector<OutgoingMessage> SyncManager::handlePending(const ID& /*peerId*/,
 
 std::string SyncManager::makeHelloMessage() const {
     const OpLog* oplog = _workbook->getOpLog();
-    HLC currentHLC = oplog->getCurrentHLC();
-    size_t opCount = oplog->size();
+    const HLC currentHLC = oplog->getCurrentHLC();
+    const size_t opCount = oplog->size();
 
     std::ostringstream oss;
     oss << "{";

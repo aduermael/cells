@@ -233,8 +233,8 @@ std::string findJSONValue(const std::string& json, const std::string& key) {
     size_t end = pos;
     int braceCount = 0;
     int bracketCount = 0;
-    bool isObject = (json[pos] == '{');
-    bool isArray = (json[pos] == '[');
+    const bool isObject = (json[pos] == '{');
+    const bool isArray = (json[pos] == '[');
     while (end < json.size()) {
         const char c = json[end];
         if (c == '{') {

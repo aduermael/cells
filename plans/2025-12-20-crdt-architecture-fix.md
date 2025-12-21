@@ -141,11 +141,13 @@ Move all CRDT sync state from JavaScript to C++ engine.
   - Messages are JSON strings ready to send
   - Queue is filled by: local operations, sync responses, hello messages
 
-- [ ] 1e: Expose new API in WASM bindings
-  - `handlePeerMessage(peerId, msg)` → returns JSON array of outgoing messages
-  - `addPeer(peerId)` / `removePeer(peerId)`
-  - `getOutgoingMessages()` → for polling
-  - Listener callback for "sync" events (new ops applied)
+- [x] 1e: Expose new API in WASM bindings
+  - `handlePeerMessage(peerId, msg)` → returns JSON with outgoing messages
+  - `addPeer(peerId)` / `removePeer(peerId)` / `getPeerIds()` / `getPeerCount()`
+  - `getOutgoingMessages()` → returns and clears outgoing queue
+  - `initSyncManager()` → initialize sync manager before use
+  - `queueOperationsBroadcast()` → queue local ops for broadcast
+  - Existing listener callback notifies on state changes
 
 ## Phase 2: Simplify JS to Transport Layer
 

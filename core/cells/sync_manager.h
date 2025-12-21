@@ -15,17 +15,17 @@ struct Workbook;
 
 // State of synchronization with a peer
 struct PeerSyncState {
-    HLC lastSyncedHLC;  // Last HLC we know they have
-    bool isSynced;      // True if fully synced (no pending operations)
-    size_t opCount;     // Number of operations they reported in hello
+    HLC lastSyncedHLC;     // Last HLC we know they have
+    bool isSynced{false};  // True if fully synced (no pending operations)
+    size_t opCount{0};     // Number of operations they reported in hello
 
-    PeerSyncState();
+    PeerSyncState() = default;
 };
 
 // Outgoing message to be sent to peers
 struct OutgoingMessage {
-    ID peerId;        // Target peer ID (empty = broadcast to all peers)
-    std::string json; // JSON message ready to send
+    ID peerId;         // Target peer ID (empty = broadcast to all peers)
+    std::string json;  // JSON message ready to send
 
     OutgoingMessage();
     OutgoingMessage(const ID& peer, std::string msg);

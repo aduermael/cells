@@ -114,8 +114,8 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         }
         targetSheet = workbook.sheets[0].get();
 
-        ID colId(col_id_str);
-        ID rowId(row_id_str);
+        const ID colId(col_id_str);
+        const ID rowId(row_id_str);
 
         // Verify the column and row exist (they should have been created by DIM_INSERT_AXIS)
         if (targetSheet->getColumn(colId) == nullptr || targetSheet->getRow(rowId) == nullptr) {
@@ -153,7 +153,7 @@ ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op) {
         return ApplyResult::INVALID_PAYLOAD;
     }
 
-    bool isColumn = (isColStr == "true" || isColStr == "1");
+    const bool isColumn = (isColStr == "true" || isColStr == "1");
 
     // Use the first sheet for now
     if (workbook.sheets.empty()) {

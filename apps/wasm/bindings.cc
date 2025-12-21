@@ -24,6 +24,7 @@
 #include "core/cells/quadtree.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/serializer.h"
+#include "core/cells/sync_manager.h"
 #include "core/cells/xlsx_reader.h"
 #include "core/cells/xlsx_writer.h"
 
@@ -1380,6 +1381,160 @@ public:
         return oplog->hasOperation(hlc);
     }
 
+    // ========================================================================
+    // SyncManager methods (Phase 1e)
+    // ========================================================================
+
+    // Initialize the sync manager. Must be called before using sync features.
+    // Should be called after setNodeId.
+    std::string initSyncManager() {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        _syncManager = std::make_unique<SyncManager>(_workbook.get());
+        return "{\"success\":true}";
+    }
+
+    // Add a peer to track. Queues a hello message for the peer.
+    std::string addPeer(const std::string& peerIdStr) {
+        if (!_syncManager) {
+            return "{\"error\":\"SyncManager not initialized\"}";
+        }
+
+        if (peerIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid peer ID length\"}";
+        }
+
+        ID peerId(peerIdStr);
+        _syncManager->addPeer(peerId);
+        return "{\"success\":true}";
+    }
+
+    // Remove a peer from tracking.
+    std::string removePeer(const std::string& peerIdStr) {
+        if (!_syncManager) {
+            return "{\"error\":\"SyncManager not initialized\"}";
+        }
+
+        if (peerIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid peer ID length\"}";
+        }
+
+        ID peerId(peerIdStr);
+        _syncManager->removePeer(peerId);
+        return "{\"success\":true}";
+    }
+
+    // Get list of connected peer IDs as JSON array.
+    std::string getPeerIds() {
+        if (!_syncManager) {
+            return "{\"error\":\"SyncManager not initialized\"}";
+        }
+
+        std::vector<ID> peers = _syncManager->getPeerIds();
+
+        std::ostringstream json;
+        json << "{\"peers\":[";
+        for (size_t i = 0; i < peers.size(); i++) {
+            if (i > 0) {
+                json << ",";
+            }
+            json << "\"" << peers[i].toString() << "\"";
+        }
+        json << "]}";
+        return json.str();
+    }
+
+    // Get the number of connected peers.
+    int getPeerCount() {
+        if (!_syncManager) {
+            return 0;
+        }
+        return static_cast<int>(_syncManager->peerCount());
+    }
+
+    // Handle an incoming message from a peer.
+    // Returns JSON with outgoing messages to send.
+    // Format: {"messages":[{"peerId":"...","json":"..."}, ...]}
+    // If peerId is empty/null, it's a broadcast message.
+    std::string handlePeerMessage(const std::string& peerIdStr, const std::string& messageJson) {
+        if (!_syncManager) {
+            return "{\"error\":\"SyncManager not initialized\"}";
+        }
+
+        if (peerIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid peer ID length\"}";
+        }
+
+        ID peerId(peerIdStr);
+        std::vector<OutgoingMessage> responses = _syncManager->handleMessage(peerId, messageJson);
+
+        // Check if any operations were applied (sync-response or operations message)
+        // by looking at the oplog size change
+        // For now, always notify on message handling as it may have changed state
+        rebuildQuadtree();
+        notifyListeners(ChangeType::CELL_CHANGED);
+
+        std::ostringstream json;
+        json << "{\"messages\":[";
+        for (size_t i = 0; i < responses.size(); i++) {
+            if (i > 0) {
+                json << ",";
+            }
+            json << "{";
+            if (responses[i].isBroadcast()) {
+                json << "\"peerId\":null,";
+            } else {
+                json << "\"peerId\":\"" << responses[i].peerId.toString() << "\",";
+            }
+            // Escape the JSON message
+            json << "\"json\":" << "\"" << jsonEscape(responses[i].json) << "\"";
+            json << "}";
+        }
+        json << "]}";
+        return json.str();
+    }
+
+    // Get and clear all pending outgoing messages.
+    // Format: {"messages":[{"peerId":"...","json":"..."}, ...]}
+    std::string getOutgoingMessages() {
+        if (!_syncManager) {
+            return "{\"error\":\"SyncManager not initialized\"}";
+        }
+
+        std::vector<OutgoingMessage> messages = _syncManager->getOutgoingMessages();
+
+        std::ostringstream json;
+        json << "{\"messages\":[";
+        for (size_t i = 0; i < messages.size(); i++) {
+            if (i > 0) {
+                json << ",";
+            }
+            json << "{";
+            if (messages[i].isBroadcast()) {
+                json << "\"peerId\":null,";
+            } else {
+                json << "\"peerId\":\"" << messages[i].peerId.toString() << "\",";
+            }
+            json << "\"json\":" << "\"" << jsonEscape(messages[i].json) << "\"";
+            json << "}";
+        }
+        json << "]}";
+        return json.str();
+    }
+
+    // Queue a broadcast of new operations to all peers.
+    // Call this after local edits to push changes.
+    std::string queueOperationsBroadcast() {
+        if (!_syncManager) {
+            return "{\"error\":\"SyncManager not initialized\"}";
+        }
+
+        _syncManager->queueOperationsBroadcast();
+        return "{\"success\":true}";
+    }
+
 private:
     void rebuildQuadtree() {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
@@ -1429,6 +1584,7 @@ private:
     Quadtree _quadtree;
     RefConverter _refConverter;
     val _listener;  // JavaScript callback for change notifications
+    std::unique_ptr<SyncManager> _syncManager;  // CRDT sync manager
 };
 
 }  // namespace cells::wasm
@@ -1492,5 +1648,14 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("applyRemoteOperation", &cells::wasm::CellsEngine::applyRemoteOperation)
         .function("applyRemoteOperations", &cells::wasm::CellsEngine::applyRemoteOperations)
         .function("getOpLogSize", &cells::wasm::CellsEngine::getOpLogSize)
-        .function("hasOperation", &cells::wasm::CellsEngine::hasOperation);
+        .function("hasOperation", &cells::wasm::CellsEngine::hasOperation)
+        // SyncManager methods
+        .function("initSyncManager", &cells::wasm::CellsEngine::initSyncManager)
+        .function("addPeer", &cells::wasm::CellsEngine::addPeer)
+        .function("removePeer", &cells::wasm::CellsEngine::removePeer)
+        .function("getPeerIds", &cells::wasm::CellsEngine::getPeerIds)
+        .function("getPeerCount", &cells::wasm::CellsEngine::getPeerCount)
+        .function("handlePeerMessage", &cells::wasm::CellsEngine::handlePeerMessage)
+        .function("getOutgoingMessages", &cells::wasm::CellsEngine::getOutgoingMessages)
+        .function("queueOperationsBroadcast", &cells::wasm::CellsEngine::queueOperationsBroadcast);
 }
