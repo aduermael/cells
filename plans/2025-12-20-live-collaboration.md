@@ -236,7 +236,7 @@ Implement user presence, online indicators, and collaboration UI elements.
   - Show "Connecting..." (yellow) during connection setup
   - Add click to show connection details (# of peers, latency)
 
-- [ ] 5d: Add UI for collaborator cursors and selections
+- [x] 5d: Add UI for collaborator cursors and selections
   - Render remote user cursor position (active cell) with colored border
   - Render remote user selection ranges as colored overlays (semi-transparent)
   - Show remote user name label next to cursor

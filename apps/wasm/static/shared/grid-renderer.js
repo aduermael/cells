@@ -21,6 +21,11 @@ export const COLORS = {
     cornerBg: '#e9ecef'
 };
 
+// Remote presence label styling
+const PRESENCE_LABEL_FONT = '10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+const PRESENCE_LABEL_PADDING = 4;
+const PRESENCE_LABEL_HEIGHT = 16;
+
 /**
  * GridRenderer handles all canvas drawing operations for the spreadsheet
  */
@@ -61,6 +66,10 @@ export class GridRenderer {
 
         // Editing state
         this.editingColumnIndex = -1;
+
+        // Remote presence state
+        // Array of { peerId, name, color, cursor: {col, row}, selection: {start, end}, opacity }
+        this.remotePresence = [];
     }
 
     /**
@@ -626,5 +635,188 @@ export class GridRenderer {
         }
 
         ctx.restore();
+    }
+
+    /**
+     * Draw remote user presence (cursors and selections)
+     * This should be called after render() to draw presence on top of local selection
+     */
+    drawRemotePresence() {
+        if (!this.sheetInfo || this.remotePresence.length === 0) return;
+
+        const container = this.canvas.parentElement;
+        const viewWidth = container.clientWidth;
+        const viewHeight = container.clientHeight;
+        const ctx = this.ctx;
+
+        // Clip to cells area (exclude headers)
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(HEADER_WIDTH, HEADER_HEIGHT, viewWidth - HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
+        ctx.clip();
+
+        for (const presence of this.remotePresence) {
+            if (!presence.cursor && !presence.selection) continue;
+
+            const opacity = presence.opacity !== undefined ? presence.opacity : 1.0;
+            if (opacity <= 0) continue;
+
+            const color = presence.color || '#888888';
+
+            // Draw selection range first (behind cursor)
+            if (presence.selection && presence.selection.start && presence.selection.end) {
+                this._drawRemoteSelection(ctx, presence.selection, color, opacity);
+            }
+
+            // Draw cursor (active cell)
+            if (presence.cursor && presence.cursor.col !== undefined && presence.cursor.row !== undefined) {
+                this._drawRemoteCursor(ctx, presence.cursor, presence.name, color, opacity, viewWidth, viewHeight);
+            }
+        }
+
+        ctx.restore();
+    }
+
+    /**
+     * Draw a remote user's selection range
+     * @private
+     */
+    _drawRemoteSelection(ctx, selection, color, opacity) {
+        const start = selection.start;
+        const end = selection.end;
+
+        // Normalize selection bounds
+        const minCol = Math.min(start.col, end.col);
+        const maxCol = Math.max(start.col, end.col);
+        const minRow = Math.min(start.row, end.row);
+        const maxRow = Math.max(start.row, end.row);
+
+        // Calculate position and size
+        let selX = HEADER_WIDTH - this.scrollX;
+        for (let i = 0; i < minCol; i++) {
+            selX += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
+        }
+        let selY = HEADER_HEIGHT - this.scrollY;
+        for (let i = 0; i < minRow; i++) {
+            selY += this.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+        }
+
+        let selW = 0;
+        for (let i = minCol; i <= maxCol; i++) {
+            selW += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
+        }
+        let selH = 0;
+        for (let i = minRow; i <= maxRow; i++) {
+            selH += this.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+        }
+
+        // Check if visible
+        const container = this.canvas.parentElement;
+        const viewWidth = container.clientWidth;
+        const viewHeight = container.clientHeight;
+
+        if (selX + selW <= HEADER_WIDTH || selX >= viewWidth ||
+            selY + selH <= HEADER_HEIGHT || selY >= viewHeight) {
+            return; // Off screen
+        }
+
+        // Draw semi-transparent fill
+        ctx.globalAlpha = opacity * 0.15;
+        ctx.fillStyle = color;
+        ctx.fillRect(
+            Math.max(HEADER_WIDTH, selX),
+            Math.max(HEADER_HEIGHT, selY),
+            Math.min(selW, selX + selW - Math.max(HEADER_WIDTH, selX)),
+            Math.min(selH, selY + selH - Math.max(HEADER_HEIGHT, selY))
+        );
+
+        // Draw border
+        ctx.globalAlpha = opacity * 0.5;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(
+            Math.max(HEADER_WIDTH, selX) + 0.5,
+            Math.max(HEADER_HEIGHT, selY) + 0.5,
+            Math.min(selW, selX + selW - Math.max(HEADER_WIDTH, selX)) - 1,
+            Math.min(selH, selY + selH - Math.max(HEADER_HEIGHT, selY)) - 1
+        );
+
+        ctx.globalAlpha = 1;
+    }
+
+    /**
+     * Draw a remote user's cursor (active cell) with name label
+     * @private
+     */
+    _drawRemoteCursor(ctx, cursor, name, color, opacity, viewWidth, viewHeight) {
+        // Calculate cell position
+        let cellX = HEADER_WIDTH - this.scrollX;
+        for (let i = 0; i < cursor.col; i++) {
+            cellX += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
+        }
+        let cellY = HEADER_HEIGHT - this.scrollY;
+        for (let i = 0; i < cursor.row; i++) {
+            cellY += this.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+        }
+
+        const cellW = this.colWidths.get(cursor.col) || DEFAULT_COL_WIDTH;
+        const cellH = this.rowHeights.get(cursor.row) || DEFAULT_ROW_HEIGHT;
+
+        // Check if visible
+        if (cellX + cellW <= HEADER_WIDTH || cellX >= viewWidth ||
+            cellY + cellH <= HEADER_HEIGHT || cellY >= viewHeight) {
+            return; // Off screen
+        }
+
+        // Draw cursor border (thicker, colored)
+        ctx.globalAlpha = opacity;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+
+        const clipX = Math.max(HEADER_WIDTH, cellX);
+        const clipY = Math.max(HEADER_HEIGHT, cellY);
+        const clipW = Math.min(cellW, cellX + cellW - clipX);
+        const clipH = Math.min(cellH, cellY + cellH - clipY);
+
+        ctx.strokeRect(clipX + 1, clipY + 1, clipW - 2, clipH - 2);
+
+        // Draw name label above the cursor
+        if (name) {
+            ctx.font = PRESENCE_LABEL_FONT;
+            const textWidth = ctx.measureText(name).width;
+            const labelWidth = textWidth + PRESENCE_LABEL_PADDING * 2;
+            const labelHeight = PRESENCE_LABEL_HEIGHT;
+
+            // Position label above the cell, aligned to left edge
+            let labelX = clipX;
+            let labelY = clipY - labelHeight - 2;
+
+            // If label would be above header, show it below the cell instead
+            if (labelY < HEADER_HEIGHT) {
+                labelY = clipY + clipH + 2;
+            }
+
+            // Keep label within visible area horizontally
+            if (labelX + labelWidth > viewWidth) {
+                labelX = viewWidth - labelWidth - 2;
+            }
+            if (labelX < HEADER_WIDTH) {
+                labelX = HEADER_WIDTH + 2;
+            }
+
+            // Draw label background
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(labelX, labelY, labelWidth, labelHeight, 3);
+            ctx.fill();
+
+            // Draw label text
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(name, labelX + PRESENCE_LABEL_PADDING, labelY + labelHeight / 2);
+        }
+
+        ctx.globalAlpha = 1;
     }
 }
