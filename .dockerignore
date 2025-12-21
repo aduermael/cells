@@ -1,0 +1,31 @@
+# Git
+.git
+.gitignore
+
+# Bazel
+bazel-*
+.bazelrc.user
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Build artifacts (we only need dist/)
+apps/
+core/
+docs/
+scripts/
+platforms/
+
+# Development files
+*.md
+Makefile
+MODULE.bazel
+WORKSPACE
+.bazelversion
+
+# Test files in dist (shouldn't be there but excluding just in case)
+dist/core/
+dist/apps/
