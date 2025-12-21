@@ -128,6 +128,10 @@
                 return this._client.createCell(col, row, value);
             }
 
+            async createCellIfNeeded(col, row) {
+                return this._client.createCellIfNeeded(col, row);
+            }
+
             async updateCell(cellId, value) {
                 await this._client.updateCell(cellId, value);
                 return { success: true };
@@ -802,31 +806,50 @@
         // - 'replace': Single-click + type - clears content and starts fresh
         // - 'select': F2/Enter - selects all content
 
+        // Track cell being edited (for commit)
+        let editingCellId = null;
+
         async function startEditing(options = {}) {
             const { focusCellEditor = true, mode = 'select', initialChar = '' } = options;
             if (!selectedCell || isEditing() || !dataSource) return;
 
-            let cell = getCellAt(selectedCell.col, selectedCell.row);
+            // Get or create cell using createCellIfNeeded
+            // This reserves the cell UUID immediately and handles column/row creation
+            let cellId = null;
+            let existingCell = getCellAt(selectedCell.col, selectedCell.row);
+            let initialValue = '';
 
-            if (!cell) {
+            if (existingCell) {
+                // Cell exists - use its ID and value
+                cellId = existingCell.id;
+                initialValue = existingCell.formula || existingCell.value || '';
+            } else {
+                // Cell doesn't exist - create it now (reserves UUID, creates col/row if needed)
                 try {
-                    const data = await dataSource.createCell(selectedCell.col, selectedCell.row, '');
-                    // Refresh sheet info and viewport to include new cell
-                    await fetchSheetInfo();
+                    const result = await dataSource.createCellIfNeeded(selectedCell.col, selectedCell.row);
+                    cellId = result.id;
+                    // New cell has no value
+                    initialValue = '';
+                    // Refresh viewport to include the new cell
                     await fetchViewport();
-                    cell = getCellAt(selectedCell.col, selectedCell.row);
-                    if (!cell) {
-                        console.error('Cell was created but not found in viewport');
-                        return;
-                    }
                 } catch (e) {
                     console.error('Error creating cell:', e);
                     return;
                 }
             }
 
-            uiStateMachine.transition(UIEvent.START_CELL_EDIT);
+            // Store the cell ID for commit
+            editingCellId = cellId;
 
+            // Transition to editing state with context
+            uiStateMachine.transition(UIEvent.START_CELL_EDIT, {
+                cellId,
+                col: selectedCell.col,
+                row: selectedCell.row,
+                initialValue
+            });
+
+            // Position the editor
             let cellX = HEADER_WIDTH - scrollX;
             for (let i = 0; i < selectedCell.col; i++) {
                 cellX += colWidths.get(i) || DEFAULT_COL_WIDTH;
@@ -855,14 +878,14 @@
                 }
             } else if (mode === 'append') {
                 // Append mode: cursor at end of existing content
-                cellEditor.value = cell.formula || cell.value || '';
+                cellEditor.value = initialValue;
                 if (focusCellEditor) {
                     cellEditor.focus();
                     cellEditor.setSelectionRange(cellEditor.value.length, cellEditor.value.length);
                 }
             } else {
                 // Select mode: select all content (default for F2/Enter)
-                cellEditor.value = cell.formula || cell.value || '';
+                cellEditor.value = initialValue;
                 if (focusCellEditor) {
                     cellEditor.focus();
                     cellEditor.select();
@@ -878,28 +901,26 @@
             uiStateMachine.transition(UIEvent.CANCEL_CELL_EDIT);
             cellEditor.style.display = 'none';
             cellEditor.value = '';
+            editingCellId = null;
             canvas.focus();
         }
 
         async function confirmEditing() {
-            if (!isEditing() || !selectedCell || !dataSource) return;
-
-            const cell = getCellAt(selectedCell.col, selectedCell.row);
-            if (!cell) {
-                cancelEditing();
-                return;
-            }
+            if (!isEditing() || !editingCellId || !dataSource) return;
 
             const newValue = cellEditor.value;
+            const cellId = editingCellId;  // Capture before clearing
+
             uiStateMachine.transition(UIEvent.COMMIT_CELL_EDIT);
             cellEditor.style.display = 'none';
+            editingCellId = null;
 
             try {
                 if (newValue === '' || newValue.trim() === '') {
                     // Delete cell when content is completely cleared
-                    await dataSource.deleteCell(cell.id);
+                    await dataSource.deleteCell(cellId);
                 } else {
-                    await dataSource.updateCell(cell.id, newValue);
+                    await dataSource.updateCell(cellId, newValue);
                 }
                 // Listener handles refresh automatically
             } catch (e) {

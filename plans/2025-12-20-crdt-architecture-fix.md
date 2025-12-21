@@ -288,11 +288,14 @@ Refactor the JavaScript UI state machine for cleaner architecture and better sep
   - Refreshes only execute if transition succeeds
   - NOTE: API implemented in ui-state.js; actual listener registration will be added in 5e/5f
 
-- [ ] 5e: Update `startEditing` to use new architecture
+- [x] 5e: Update `startEditing` to use new architecture
   - Call `createCellIfNeeded(col, row)` to get cell UUID
   - Transition to editing state with context: `{ cellId, col, row, initialValue }`
   - Cell display: editing context value takes priority, then workbook cell value
   - No pending operation for cell creation - committed immediately
+  - Added `createCellIfNeeded()` to WasmDataSource
+  - `startEditing` now uses `editingCellId` to track the cell being edited
+  - `confirmEditing` uses `editingCellId` directly instead of re-looking up the cell
 
 - [ ] 5f: Update event handlers to use new pattern
   - Mouse handlers: `transition(event, context)` pattern
