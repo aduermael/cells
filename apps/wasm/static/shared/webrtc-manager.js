@@ -1,15 +1,7 @@
 // WebRTC Connection Manager Module
 // Manages multiple peer-to-peer WebRTC connections for collaboration
 
-/**
- * Default ICE servers for NAT traversal
- * Uses public STUN servers for peer discovery
- */
-const DEFAULT_ICE_SERVERS = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun.cloudflare.com:3478' }
-];
+import { getIceServers, getRTCConfiguration } from './ice-config.js';
 
 /**
  * Connection states for tracking peer status
@@ -321,12 +313,19 @@ class PeerConnection {
 export class WebRTCManager {
     /**
      * @param {Object} options - Configuration options
-     * @param {RTCIceServer[]} [options.iceServers] - ICE server configuration
+     * @param {RTCIceServer[]} [options.iceServers] - ICE server configuration (uses centralized config if not provided)
      * @param {number} [options.maxPeers] - Maximum number of peers (default: 10)
+     * @param {boolean} [options.stunOnly] - Use only STUN servers
+     * @param {boolean} [options.turnOnly] - Use only TURN servers (relay mode)
      */
     constructor(options = {}) {
-        this.iceServers = options.iceServers || DEFAULT_ICE_SERVERS;
+        // Use provided iceServers or get from centralized config
+        this.iceServers = options.iceServers || getIceServers({
+            stunOnly: options.stunOnly,
+            turnOnly: options.turnOnly
+        });
         this.maxPeers = options.maxPeers || 10;
+        this._configOptions = options;
         this.localPeerId = null;
         this._peers = new Map();
         this._emitter = new EventEmitter();
@@ -346,10 +345,17 @@ export class WebRTCManager {
      * @private
      */
     _getConfig() {
-        return {
-            iceServers: this.iceServers,
-            iceCandidatePoolSize: 10
-        };
+        // Use centralized config if no custom iceServers were provided
+        if (this._configOptions.iceServers) {
+            return {
+                iceServers: this.iceServers,
+                iceCandidatePoolSize: 10
+            };
+        }
+        return getRTCConfiguration({
+            stunOnly: this._configOptions.stunOnly,
+            turnOnly: this._configOptions.turnOnly
+        });
     }
 
     /**

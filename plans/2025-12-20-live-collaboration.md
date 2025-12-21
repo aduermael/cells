@@ -147,7 +147,7 @@ Implement WebRTC peer-to-peer connections in the WASM web app.
   - Exchange ICE candidates (trickle ICE)
   - Establish DataChannel once connection is ready
 
-- [ ] 3e: Add STUN/TURN server configuration
+- [x] 3e: Add STUN/TURN server configuration
   - Configure ICE servers in RTCPeerConnection
   - Use free public STUN servers: `stun:stun.l.google.com:19302`
   - Add configuration option for custom TURN servers
