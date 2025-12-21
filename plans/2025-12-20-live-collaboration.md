@@ -124,7 +124,7 @@ Implement WebRTC peer-to-peer connections in the WASM web app.
   - Handle ICE candidate gathering and connection state changes
   - Add event emitter for connection events
 
-- [ ] 3b: Implement WebSocket signaling client
+- [x] 3b: Implement WebSocket signaling client
   - Create `apps/wasm/static/shared/signaling-client.js`
   - `class SignalingClient` to manage WebSocket to Go server
   - Connect to `/ws?room=<roomId>` endpoint
