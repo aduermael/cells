@@ -402,6 +402,63 @@ function handleMessage(msg) {
                 break;
             }
 
+            // ================================================================
+            // CRDT Collaboration methods
+            // ================================================================
+
+            case 'setNodeId': {
+                const { nodeId } = params;
+                const result = engine.setNodeId(nodeId);
+                respond({ type: 'nodeIdSet', result });
+                break;
+            }
+
+            case 'getNodeId': {
+                const nodeId = engine.getNodeId();
+                respond({ type: 'nodeId', nodeId });
+                break;
+            }
+
+            case 'getCurrentHLC': {
+                const hlc = engine.getCurrentHLC();
+                respond({ type: 'currentHLC', hlc });
+                break;
+            }
+
+            case 'getOperationsSince': {
+                const { sinceHLC } = params;
+                const result = engine.getOperationsSince(sinceHLC || '');
+                respond({ type: 'operationsSince', result });
+                break;
+            }
+
+            case 'applyRemoteOperation': {
+                const { opJson } = params;
+                const result = engine.applyRemoteOperation(opJson);
+                respond({ type: 'operationApplied', result });
+                break;
+            }
+
+            case 'applyRemoteOperations': {
+                const { opsJson } = params;
+                const result = engine.applyRemoteOperations(opsJson);
+                respond({ type: 'operationsApplied', result });
+                break;
+            }
+
+            case 'getOpLogSize': {
+                const size = engine.getOpLogSize();
+                respond({ type: 'opLogSize', size });
+                break;
+            }
+
+            case 'hasOperation': {
+                const { hlc } = params;
+                const exists = engine.hasOperation(hlc);
+                respond({ type: 'hasOperation', exists });
+                break;
+            }
+
             default:
                 respond({ type: 'error', error: 'Unknown message type: ' + type });
         }

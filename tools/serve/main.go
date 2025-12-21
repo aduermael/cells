@@ -27,7 +27,7 @@ type SignalingMessage struct {
 	PeerID    string          `json:"peer_id,omitempty"`
 	Target    string          `json:"target,omitempty"`
 	From      string          `json:"from,omitempty"`
-	SDP       string          `json:"sdp,omitempty"`
+	SDP       json.RawMessage `json:"sdp,omitempty"`
 	Candidate json.RawMessage `json:"candidate,omitempty"`
 	Error     string          `json:"error,omitempty"`
 	Peers     []string        `json:"peers,omitempty"`
@@ -116,8 +116,8 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Notify existing peers about new peer
 	notifyPeerJoined(room, peerID)
 
-	// Send list of existing peers to new peer
-	sendPeerList(conn, room, peerID)
+	// Send 'joined' confirmation with list of existing peers
+	sendJoinedConfirmation(conn, room, peerID)
 
 	// Set up ping/pong for connection health monitoring
 	done := make(chan struct{})
@@ -198,18 +198,20 @@ func notifyPeerLeft(room *Room, peerID string) {
 	room.Broadcast(peerID, msgBytes)
 }
 
-func sendPeerList(conn *websocket.Conn, room *Room, excludePeerID string) {
+func sendJoinedConfirmation(conn *websocket.Conn, room *Room, peerID string) {
 	peers := room.GetPeers()
 	// Filter out the requesting peer
 	otherPeers := make([]string, 0, len(peers)-1)
 	for _, p := range peers {
-		if p != excludePeerID {
+		if p != peerID {
 			otherPeers = append(otherPeers, p)
 		}
 	}
 
+	// Send 'joined' confirmation with list of existing peers
 	msg := SignalingMessage{
-		Type:  "peer-list",
+		Type:  "joined",
+		Room:  room.ID,
 		Peers: otherPeers,
 	}
 	msgBytes, _ := json.Marshal(msg)
@@ -252,6 +254,8 @@ func relayMessage(room *Room, fromPeerID string, msg SignalingMessage) {
 		log.Printf("Missing target in %s message from peer %s", msg.Type, fromPeerID)
 		return
 	}
+
+	log.Printf("Relaying %s from %s to %s", msg.Type, fromPeerID, msg.Target)
 
 	// Add sender info
 	relayedMsg := SignalingMessage{

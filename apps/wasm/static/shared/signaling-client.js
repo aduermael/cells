@@ -247,6 +247,11 @@ export class SignalingClient {
                 this._emitter.emit('icecandidate', message.from, message.candidate);
                 break;
 
+            case 'peer-list':
+                // List of peers currently in the room
+                this._emitter.emit('peerlist', message.peers || []);
+                break;
+
             case 'error':
                 // Server error message
                 this._emitter.emit('servererror', message.message);

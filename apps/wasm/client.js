@@ -528,6 +528,87 @@ class CellsClient {
     async setWorkbookName(name) {
         await this._send('setWorkbookName', { name });
     }
+
+    // ========================================================================
+    // CRDT Collaboration API
+    // ========================================================================
+
+    /**
+     * Set the node ID for HLC generation
+     * @param {string} nodeId - 8-char base62 ID
+     * @returns {Promise<string>} JSON result
+     */
+    async setNodeId(nodeId) {
+        const response = await this._send('setNodeId', { nodeId });
+        return response.result;
+    }
+
+    /**
+     * Get the current node ID
+     * @returns {Promise<string>}
+     */
+    async getNodeId() {
+        const response = await this._send('getNodeId');
+        return response.nodeId;
+    }
+
+    /**
+     * Get the current HLC timestamp
+     * @returns {Promise<string>}
+     */
+    async getCurrentHLC() {
+        const response = await this._send('getCurrentHLC');
+        return response.hlc;
+    }
+
+    /**
+     * Get operations since a given HLC
+     * @param {string} sinceHLC - HLC to get operations after
+     * @returns {Promise<string>} JSON result with operations
+     */
+    async getOperationsSince(sinceHLC = '') {
+        const response = await this._send('getOperationsSince', { sinceHLC });
+        return response.result;
+    }
+
+    /**
+     * Apply a remote CRDT operation
+     * @param {string} opJson - Operation JSON
+     * @returns {Promise<string>} JSON result
+     */
+    async applyRemoteOperation(opJson) {
+        const response = await this._send('applyRemoteOperation', { opJson });
+        return response.result;
+    }
+
+    /**
+     * Apply multiple remote CRDT operations
+     * @param {string} opsJson - JSON with operations array
+     * @returns {Promise<string>} JSON result
+     */
+    async applyRemoteOperations(opsJson) {
+        const response = await this._send('applyRemoteOperations', { opsJson });
+        return response.result;
+    }
+
+    /**
+     * Get the number of operations in the OpLog
+     * @returns {Promise<number>}
+     */
+    async getOpLogSize() {
+        const response = await this._send('getOpLogSize');
+        return response.size;
+    }
+
+    /**
+     * Check if an operation with the given HLC exists
+     * @param {string} hlc - HLC to check
+     * @returns {Promise<boolean>}
+     */
+    async hasOperation(hlc) {
+        const response = await this._send('hasOperation', { hlc });
+        return response.exists;
+    }
 }
 
 // Export for both browser and module environments

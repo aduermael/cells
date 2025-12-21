@@ -32,6 +32,7 @@ export class CollabUI {
      * @param {HTMLElement} options.container - Container element to add UI elements to
      * @param {Object} [options.collabManager] - CollabManager instance (optional, can be set later)
      * @param {Object} [options.presenceManager] - PresenceManager instance (optional, can be set later)
+     * @param {Object} [options.roomManager] - RoomManager instance (optional, can be set later)
      */
     constructor(options) {
         if (!options.container) {
@@ -41,17 +42,18 @@ export class CollabUI {
         this._container = options.container;
         this._collabManager = options.collabManager || null;
         this._presenceManager = options.presenceManager || null;
+        this._roomManager = options.roomManager || null;
 
-        this._statusBadge = null;
+        this._collaborateBtn = null;
         this._statusDot = null;
-        this._statusText = null;
         this._detailsPanel = null;
-        this._shareBtn = null;
         this._shareTooltip = null;
 
         this._currentState = CollabState.OFFLINE;
         this._peerCount = 0;
         this._showingDetails = false;
+        this._linkCopied = false; // Track if link has been copied at least once
+        this._onInitializeRequest = null; // Callback to initialize collaboration on demand
 
         this._createElements();
         this._setupEventListeners();
@@ -78,31 +80,59 @@ export class CollabUI {
     }
 
     /**
+     * Set the RoomManager instance
+     * @param {Object} roomManager
+     */
+    setRoomManager(roomManager) {
+        this._roomManager = roomManager;
+    }
+
+    /**
+     * Set a callback to request collaboration initialization
+     * Called when user clicks Copy Link before collaboration is ready
+     * @param {Function} callback - Async function to initialize collaboration
+     */
+    setOnInitializeRequest(callback) {
+        this._onInitializeRequest = callback;
+    }
+
+    /**
      * Create the UI elements
      * @private
      */
     _createElements() {
-        // Create status badge
-        this._statusBadge = document.createElement('div');
-        this._statusBadge.className = 'collab-status-badge offline';
-        this._statusBadge.innerHTML = `
-            <span class="status-dot"></span>
-            <span class="status-text">Offline</span>
+        // Create "Collaborate" button with integrated status dot
+        this._collaborateBtn = document.createElement('button');
+        this._collaborateBtn.className = 'collab-collaborate-btn';
+        this._collaborateBtn.innerHTML = `
+            <span>Collaborate</span>
+            <span class="collab-status-dot" style="display: none;"></span>
         `;
 
-        this._statusDot = this._statusBadge.querySelector('.status-dot');
-        this._statusText = this._statusBadge.querySelector('.status-text');
+        this._statusDot = this._collaborateBtn.querySelector('.collab-status-dot');
 
         // Create details panel (inside status badge for positioning)
         this._detailsPanel = document.createElement('div');
         this._detailsPanel.className = 'collab-status-details';
         this._detailsPanel.innerHTML = `
-            <div class="collab-status-details-header">Connection Status</div>
-            <div class="collab-status-details-row">
+            <div class="collab-status-details-header">Collaborate</div>
+            <div class="collab-status-share-section">
+                <p class="collab-share-description">Share this link to collaborate in real-time:</p>
+                <button class="collab-copy-link-btn" id="collab-copy-link-btn">Copy Link</button>
+            </div>
+            <div class="collab-status-details-divider"></div>
+            <div class="collab-status-details-row name-row">
+                <span class="label">Your Name</span>
+                <div class="collab-name-edit-inline">
+                    <input type="text" id="collab-name-input" maxlength="20" placeholder="Enter your name">
+                </div>
+            </div>
+            <div class="collab-status-details-divider" id="collab-connection-divider" style="display: none;"></div>
+            <div class="collab-status-details-row" id="collab-status-row" style="display: none;">
                 <span class="label">Status</span>
                 <span class="value" id="collab-detail-status">Offline</span>
             </div>
-            <div class="collab-status-details-row">
+            <div class="collab-status-details-row" id="collab-peers-row" style="display: none;">
                 <span class="label">Peers</span>
                 <span class="value" id="collab-detail-peers">0</span>
             </div>
@@ -117,10 +147,6 @@ export class CollabUI {
             <div class="collab-status-details-row" id="collab-stats-row" style="display: none;">
                 <span class="label">Sync</span>
                 <span class="value" id="collab-detail-stats">-</span>
-            </div>
-            <div class="collab-status-details-row name-row">
-                <span class="label">Your Name</span>
-                <span class="value editable" id="collab-detail-name">-</span>
             </div>
             <div class="collab-status-details-peers" id="collab-peers-list" style="display: none;"></div>
             <div class="collab-status-details-actions" id="collab-actions" style="display: none;">
@@ -139,29 +165,8 @@ export class CollabUI {
                 </div>
             </div>
         `;
-        this._statusBadge.appendChild(this._detailsPanel);
-
-        // Create name edit popup
-        this._nameEditPopup = document.createElement('div');
-        this._nameEditPopup.className = 'collab-name-edit-popup';
-        this._nameEditPopup.innerHTML = `
-            <div class="collab-name-edit-header">Set Your Name</div>
-            <input type="text" id="collab-name-input" maxlength="20" placeholder="Enter your name">
-            <div class="collab-name-edit-buttons">
-                <button class="cancel-btn">Cancel</button>
-                <button class="save-btn">Save</button>
-            </div>
-        `;
-        document.body.appendChild(this._nameEditPopup);
-
-        // Create share button
-        this._shareBtn = document.createElement('button');
-        this._shareBtn.className = 'collab-share-btn';
-        this._shareBtn.innerHTML = `
-            <span class="share-icon">🔗</span>
-            <span>Share</span>
-        `;
-        this._shareBtn.style.display = 'none'; // Hidden until collaboration is enabled
+        // Append details panel to collaborate button
+        this._collaborateBtn.appendChild(this._detailsPanel);
 
         // Create share tooltip
         this._shareTooltip = document.createElement('div');
@@ -169,9 +174,8 @@ export class CollabUI {
         this._shareTooltip.textContent = 'Link copied!';
         document.body.appendChild(this._shareTooltip);
 
-        // Add elements to container
-        this._container.appendChild(this._shareBtn);
-        this._container.appendChild(this._statusBadge);
+        // Add button to container
+        this._container.appendChild(this._collaborateBtn);
     }
 
     /**
@@ -179,68 +183,71 @@ export class CollabUI {
      * @private
      */
     _setupEventListeners() {
-        // Toggle details on status badge click
-        this._statusBadge.addEventListener('click', (e) => {
+        // Collaborate button opens the modal
+        this._collaborateBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this._toggleDetails();
         });
 
+        // Prevent clicks inside details panel from closing it
+        this._detailsPanel.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
         // Close details when clicking outside
         document.addEventListener('click', (e) => {
-            if (this._showingDetails && !this._statusBadge.contains(e.target)) {
+            if (this._showingDetails && !this._collaborateBtn.contains(e.target)) {
                 this._hideDetails();
             }
-            // Close name edit popup when clicking outside
-            if (this._nameEditPopup.classList.contains('visible') &&
-                !this._nameEditPopup.contains(e.target) &&
-                !e.target.closest('#collab-detail-name')) {
-                this._hideNameEditPopup();
-            }
         });
 
-        // Share button click
-        this._shareBtn.addEventListener('click', () => {
-            this._handleShare();
-        });
-
-        // Name edit click handler
-        const nameElement = this._detailsPanel.querySelector('#collab-detail-name');
-        if (nameElement) {
-            nameElement.addEventListener('click', (e) => {
+        // Copy Link button click
+        const copyLinkBtn = this._detailsPanel.querySelector('#collab-copy-link-btn');
+        if (copyLinkBtn) {
+            copyLinkBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this._showNameEditPopup();
+                this._handleCopyLink();
             });
         }
 
-        // Name edit popup event handlers
-        const nameInput = this._nameEditPopup.querySelector('#collab-name-input');
-        const cancelBtn = this._nameEditPopup.querySelector('.cancel-btn');
-        const saveBtn = this._nameEditPopup.querySelector('.save-btn');
+        // Inline name input event handlers
+        const nameInput = this._detailsPanel.querySelector('#collab-name-input');
+        if (nameInput) {
+            // Stop all keyboard events from propagating (prevents cell editing)
+            nameInput.addEventListener('keydown', (e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this._saveDisplayName();
+                    nameInput.blur();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    // Restore original name
+                    if (this._presenceManager && this._presenceManager.localName) {
+                        nameInput.value = this._presenceManager.localName;
+                    }
+                    nameInput.blur();
+                }
+            });
 
-        cancelBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this._hideNameEditPopup();
-        });
+            nameInput.addEventListener('keyup', (e) => {
+                e.stopPropagation();
+            });
 
-        saveBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this._saveDisplayName();
-        });
+            nameInput.addEventListener('keypress', (e) => {
+                e.stopPropagation();
+            });
 
-        nameInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
+            // Save on blur
+            nameInput.addEventListener('blur', () => {
                 this._saveDisplayName();
-            } else if (e.key === 'Escape') {
-                e.preventDefault();
-                this._hideNameEditPopup();
-            }
-        });
+            });
 
-        // Prevent clicks inside popup from bubbling
-        this._nameEditPopup.addEventListener('click', (e) => {
-            e.stopPropagation();
-        });
+            // Prevent input events from bubbling
+            nameInput.addEventListener('input', (e) => {
+                e.stopPropagation();
+            });
+        }
 
         // Force reconnect button
         const reconnectBtn = this._detailsPanel.querySelector('#collab-reconnect-btn');
@@ -255,6 +262,7 @@ export class CollabUI {
         const debugToggle = this._detailsPanel.querySelector('#collab-debug-mode');
         if (debugToggle) {
             debugToggle.addEventListener('change', (e) => {
+                e.stopPropagation();
                 this._handleDebugModeToggle(e.target.checked);
             });
             // Initialize checkbox state
@@ -405,56 +413,112 @@ export class CollabUI {
      * @private
      */
     _updateLocalName(name) {
-        const nameElement = this._detailsPanel.querySelector('#collab-detail-name');
-        if (nameElement) {
-            nameElement.textContent = name;
+        const nameInput = this._detailsPanel.querySelector('#collab-name-input');
+        if (nameInput && document.activeElement !== nameInput) {
+            nameInput.value = name;
         }
     }
 
     /**
-     * Show the name edit popup
-     * @private
-     */
-    _showNameEditPopup() {
-        const nameElement = this._detailsPanel.querySelector('#collab-detail-name');
-        const input = this._nameEditPopup.querySelector('#collab-name-input');
-
-        // Position popup near the name element
-        const rect = nameElement.getBoundingClientRect();
-        this._nameEditPopup.style.top = `${rect.bottom + 8}px`;
-        this._nameEditPopup.style.right = `${window.innerWidth - rect.right}px`;
-
-        // Set current name in input
-        if (this._presenceManager && this._presenceManager.localName) {
-            input.value = this._presenceManager.localName;
-        }
-
-        this._nameEditPopup.classList.add('visible');
-        input.focus();
-        input.select();
-    }
-
-    /**
-     * Hide the name edit popup
-     * @private
-     */
-    _hideNameEditPopup() {
-        this._nameEditPopup.classList.remove('visible');
-    }
-
-    /**
-     * Save the display name from the edit popup
+     * Save the display name from the inline input
      * @private
      */
     _saveDisplayName() {
-        const input = this._nameEditPopup.querySelector('#collab-name-input');
-        const newName = input.value.trim();
+        const nameInput = this._detailsPanel.querySelector('#collab-name-input');
+        if (!nameInput) return;
+
+        const newName = nameInput.value.trim();
 
         if (newName && this._presenceManager) {
             this._presenceManager.setLocalName(newName);
         }
+    }
 
-        this._hideNameEditPopup();
+    /**
+     * Handle copy link button click
+     * Creates/joins a room if needed and copies the share link
+     * @private
+     */
+    async _handleCopyLink() {
+        const copyLinkBtn = this._detailsPanel.querySelector('#collab-copy-link-btn');
+
+        // Check if collaboration is set up
+        if (!this._roomManager || !this._collabManager) {
+            // Try to initialize if we have an initializer callback
+            if (this._onInitializeRequest) {
+                copyLinkBtn.textContent = 'Initializing...';
+                copyLinkBtn.disabled = true;
+                try {
+                    await this._onInitializeRequest();
+                } catch (err) {
+                    console.error('Failed to initialize collaboration:', err);
+                    copyLinkBtn.textContent = 'Failed';
+                    copyLinkBtn.disabled = false;
+                    setTimeout(() => {
+                        copyLinkBtn.textContent = 'Copy Link';
+                    }, 2000);
+                    return;
+                }
+                copyLinkBtn.disabled = false;
+            }
+
+            // Check again after initialization attempt
+            if (!this._roomManager || !this._collabManager) {
+                console.warn('Collaboration not configured');
+                copyLinkBtn.textContent = 'Loading...';
+                setTimeout(() => {
+                    copyLinkBtn.textContent = 'Copy Link';
+                }, 2000);
+                return;
+            }
+        }
+
+        try {
+            // If not in a room yet, create and join one
+            if (!this._roomManager.currentRoomId) {
+                copyLinkBtn.textContent = 'Creating room...';
+                copyLinkBtn.disabled = true;
+                await this._roomManager.createAndJoinRoom();
+            }
+
+            // Generate share URL
+            const roomId = this._collabManager.roomId;
+            if (!roomId) {
+                console.warn('Cannot share: not in a room');
+                copyLinkBtn.textContent = 'Copy Link';
+                copyLinkBtn.disabled = false;
+                return;
+            }
+
+            const url = new URL(window.location.href);
+            url.searchParams.set('room', roomId);
+            const shareUrl = url.toString();
+
+            // Copy to clipboard
+            await navigator.clipboard.writeText(shareUrl);
+
+            // Mark link as copied - show status dot
+            this._linkCopied = true;
+            this._statusDot.style.display = '';
+
+            // Show success feedback
+            copyLinkBtn.textContent = 'Copied!';
+            copyLinkBtn.disabled = false;
+            setTimeout(() => {
+                copyLinkBtn.textContent = 'Copy Link';
+            }, 2000);
+
+            // Show tooltip
+            this._showShareTooltip();
+
+        } catch (err) {
+            console.error('Failed to copy share link:', err);
+            copyLinkBtn.textContent = 'Failed to copy';
+            copyLinkBtn.disabled = false;
+            setTimeout(() => {
+                copyLinkBtn.textContent = 'Copy Link';
+            }, 2000);
+        }
     }
 
     /**
@@ -465,22 +529,32 @@ export class CollabUI {
     _updateState(state) {
         this._currentState = state;
 
-        // Update badge class
-        this._statusBadge.classList.remove('offline', 'connecting', 'syncing', 'online');
-        this._statusBadge.classList.add(state);
+        // Update status dot color class
+        this._statusDot.classList.remove('offline', 'connecting', 'syncing', 'online');
+        this._statusDot.classList.add(state);
 
-        // Update status text
-        this._statusText.textContent = STATUS_TEXT[state] || 'Unknown';
-
-        // Update details panel with more detailed status
+        // Update details panel with status text
         const detailStatus = this._detailsPanel.querySelector('#collab-detail-status');
         if (detailStatus) {
             detailStatus.textContent = DETAILED_STATUS_TEXT[state] || STATUS_TEXT[state] || 'Unknown';
         }
 
-        // Show/hide share button based on state
-        if (state === CollabState.ONLINE || state === CollabState.SYNCING) {
-            this._shareBtn.style.display = '';
+        // Show connection info rows when we're in collaboration mode (link copied or joined via URL)
+        const isInRoom = this._collabManager && this._collabManager.roomId;
+        const showConnectionInfo = isInRoom || this._linkCopied;
+
+        const connectionDivider = this._detailsPanel.querySelector('#collab-connection-divider');
+        const statusRow = this._detailsPanel.querySelector('#collab-status-row');
+        const peersRow = this._detailsPanel.querySelector('#collab-peers-row');
+
+        if (connectionDivider) connectionDivider.style.display = showConnectionInfo ? '' : 'none';
+        if (statusRow) statusRow.style.display = showConnectionInfo ? '' : 'none';
+        if (peersRow) peersRow.style.display = showConnectionInfo ? '' : 'none';
+
+        // Show status dot when collaboration is active
+        if (isInRoom || this._linkCopied) {
+            this._statusDot.style.display = '';
+            this._linkCopied = true;
         }
 
         // Update latency display visibility
@@ -502,15 +576,6 @@ export class CollabUI {
         const detailPeers = this._detailsPanel.querySelector('#collab-detail-peers');
         if (detailPeers) {
             detailPeers.textContent = this._peerCount.toString();
-        }
-
-        // Update status text to show peer count when online
-        if (this._currentState === CollabState.ONLINE) {
-            if (this._peerCount > 0) {
-                this._statusText.textContent = `Online (${this._peerCount})`;
-            } else {
-                this._statusText.textContent = 'Online';
-            }
         }
     }
 
@@ -649,9 +714,10 @@ export class CollabUI {
      */
     _showDetails() {
         this._showingDetails = true;
-        this._statusBadge.classList.add('show-details');
+        this._collaborateBtn.classList.add('show-details');
         this._updatePeerCount();
         this._updatePeersList();
+        this._updateState(this._currentState); // Refresh connection info visibility
     }
 
     /**
@@ -660,32 +726,7 @@ export class CollabUI {
      */
     _hideDetails() {
         this._showingDetails = false;
-        this._statusBadge.classList.remove('show-details');
-    }
-
-    /**
-     * Handle share button click
-     * @private
-     */
-    _handleShare() {
-        if (!this._collabManager || !this._collabManager.roomId) {
-            console.warn('Cannot share: not in a room');
-            return;
-        }
-
-        // Generate share URL
-        const url = new URL(window.location.href);
-        url.searchParams.set('room', this._collabManager.roomId);
-        const shareUrl = url.toString();
-
-        // Copy to clipboard
-        navigator.clipboard.writeText(shareUrl).then(() => {
-            this._showShareTooltip();
-        }).catch(err => {
-            console.error('Failed to copy share link:', err);
-            // Fallback: show prompt
-            prompt('Share this link with collaborators:', shareUrl);
-        });
+        this._collaborateBtn.classList.remove('show-details');
     }
 
     /**
@@ -693,8 +734,11 @@ export class CollabUI {
      * @private
      */
     _showShareTooltip() {
-        // Position tooltip below share button
-        const btnRect = this._shareBtn.getBoundingClientRect();
+        // Position tooltip below copy link button
+        const copyLinkBtn = this._detailsPanel.querySelector('#collab-copy-link-btn');
+        if (!copyLinkBtn) return;
+
+        const btnRect = copyLinkBtn.getBoundingClientRect();
         this._shareTooltip.style.left = `${btnRect.left + btnRect.width / 2}px`;
         this._shareTooltip.style.top = `${btnRect.bottom + 8}px`;
         this._shareTooltip.style.transform = 'translateX(-50%)';
@@ -720,20 +764,6 @@ export class CollabUI {
     }
 
     /**
-     * Show the share button (when collaboration is enabled)
-     */
-    showShareButton() {
-        this._shareBtn.style.display = '';
-    }
-
-    /**
-     * Hide the share button
-     */
-    hideShareButton() {
-        this._shareBtn.style.display = 'none';
-    }
-
-    /**
      * Get the current room ID (for share link generation)
      * @returns {string|null}
      */
@@ -742,14 +772,19 @@ export class CollabUI {
     }
 
     /**
+     * Check if the link has been copied (collaboration started)
+     * @returns {boolean}
+     */
+    isCollaborating() {
+        return this._linkCopied;
+    }
+
+    /**
      * Clean up resources
      */
     destroy() {
         if (this._shareTooltip && this._shareTooltip.parentNode) {
             this._shareTooltip.parentNode.removeChild(this._shareTooltip);
-        }
-        if (this._nameEditPopup && this._nameEditPopup.parentNode) {
-            this._nameEditPopup.parentNode.removeChild(this._nameEditPopup);
         }
     }
 }
