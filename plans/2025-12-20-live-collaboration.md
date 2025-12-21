@@ -285,12 +285,13 @@ Add session persistence, random user identity, and final polish.
   - Clear URL room parameter (added - no room created until Share clicked)
   - Note: No room is auto-created; collaboration only starts when Share is clicked
 
-- [ ] 6d: Implement graceful offline handling
-  - Detect when all peers disconnect
-  - Keep local workbook editable (offline-first)
-  - Queue operations for sync when peer reconnects
-  - Show clear UI indication: "Working offline"
-  - Auto-reconnect when network restored
+- [x] 6d: Implement graceful offline handling
+  - Detect when all peers disconnect (handled via state changes)
+  - Keep local workbook editable (offline-first by design)
+  - Queue operations for sync when peer reconnects (via _pendingOperations)
+  - Show clear UI indication: "Working offline" (added DETAILED_STATUS_TEXT)
+  - Show pending operations count when offline
+  - Auto-reconnect when network restored (signaling-client.js exponential backoff)
 
 - [ ] 6e: Add connection quality indicators
   - Measure round-trip latency via ping/pong

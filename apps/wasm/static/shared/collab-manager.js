@@ -145,6 +145,14 @@ export class CollabManager {
     }
 
     /**
+     * Get number of pending operations waiting to be sent
+     * @returns {number}
+     */
+    getPendingOperationCount() {
+        return this._pendingOperations.length;
+    }
+
+    /**
      * Initialize collaboration with a peer ID
      * @param {string} [peerId] - Optional peer ID (generated if not provided)
      */

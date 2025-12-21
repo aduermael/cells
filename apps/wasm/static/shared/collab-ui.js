@@ -14,6 +14,16 @@ const STATUS_TEXT = {
 };
 
 /**
+ * Detailed status text shown in the details panel
+ */
+const DETAILED_STATUS_TEXT = {
+    [CollabState.OFFLINE]: 'Working offline',
+    [CollabState.CONNECTING]: 'Establishing connection...',
+    [CollabState.SYNCING]: 'Synchronizing data...',
+    [CollabState.ONLINE]: 'Connected'
+};
+
+/**
  * Creates and manages the collaboration UI elements
  */
 export class CollabUI {
@@ -94,6 +104,10 @@ export class CollabUI {
             <div class="collab-status-details-row">
                 <span class="label">Peers</span>
                 <span class="value" id="collab-detail-peers">0</span>
+            </div>
+            <div class="collab-status-details-row" id="collab-pending-row" style="display: none;">
+                <span class="label">Pending</span>
+                <span class="value" id="collab-detail-pending">0 edits</span>
             </div>
             <div class="collab-status-details-row name-row">
                 <span class="label">Your Name</span>
@@ -325,10 +339,10 @@ export class CollabUI {
         // Update status text
         this._statusText.textContent = STATUS_TEXT[state] || 'Unknown';
 
-        // Update details panel
+        // Update details panel with more detailed status
         const detailStatus = this._detailsPanel.querySelector('#collab-detail-status');
         if (detailStatus) {
-            detailStatus.textContent = STATUS_TEXT[state] || 'Unknown';
+            detailStatus.textContent = DETAILED_STATUS_TEXT[state] || STATUS_TEXT[state] || 'Unknown';
         }
 
         // Show/hide share button based on state
@@ -358,6 +372,25 @@ export class CollabUI {
             } else {
                 this._statusText.textContent = 'Online';
             }
+        }
+    }
+
+    /**
+     * Update the pending operations count display
+     * @param {number} count - Number of pending operations
+     */
+    updatePendingCount(count) {
+        const pendingRow = this._detailsPanel.querySelector('#collab-pending-row');
+        const pendingValue = this._detailsPanel.querySelector('#collab-detail-pending');
+
+        if (!pendingRow || !pendingValue) return;
+
+        if (count > 0 && this._currentState !== CollabState.ONLINE) {
+            pendingRow.style.display = '';
+            const editText = count === 1 ? 'edit' : 'edits';
+            pendingValue.textContent = `${count} ${editText}`;
+        } else {
+            pendingRow.style.display = 'none';
         }
     }
 
