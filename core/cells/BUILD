@@ -101,6 +101,31 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "sync_manager",
+    srcs = ["sync_manager.cc"],
+    hdrs = ["sync_manager.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":crdt",
+        ":hlc",
+        ":model",
+        ":operation",
+        ":oplog",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "sync_manager_test",
+    srcs = ["sync_manager_test.cc"],
+    deps = [
+        ":id",
+        ":sync_manager",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_test(
     name = "crdt_test",
     srcs = ["crdt_test.cc"],

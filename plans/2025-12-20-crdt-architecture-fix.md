@@ -115,13 +115,13 @@ This plan addresses fundamental architecture issues in the collaboration system 
 
 Move all CRDT sync state from JavaScript to C++ engine.
 
-- [ ] 1a: Add SyncManager class to engine
+- [x] 1a: Add SyncManager class to engine
   - Create `core/cells/sync_manager.h` and `sync_manager.cc`
   - `class SyncManager` owned by Workbook
   - Track peer sync state: `std::map<ID, PeerSyncState>` where PeerSyncState = {lastSyncedHLC, isSynced}
   - Track outgoing message queue: `std::vector<OutgoingMessage>` where OutgoingMessage = {peerId (or broadcast), messageJson}
 
-- [ ] 1b: Move sync protocol to C++
+- [x] 1b: Move sync protocol to C++
   - `handlePeerMessage(peerId, messageJson)` → parses and processes:
     - `hello` → stores peer HLC, queues sync-request
     - `sync-request` → queries OpLog, queues sync-response
@@ -130,13 +130,13 @@ Move all CRDT sync state from JavaScript to C++ engine.
   - Returns list of outgoing messages to send
   - All sync logic in C++, no JS decision-making
 
-- [ ] 1c: Add peer management API
+- [x] 1c: Add peer management API
   - `addPeer(peerId)` → register new peer, queue hello message
   - `removePeer(peerId)` → cleanup peer state
   - `getPeerIds()` → list connected peers
   - `getPeerSyncState(peerId)` → check if synced
 
-- [ ] 1d: Add outgoing message queue
+- [x] 1d: Add outgoing message queue
   - `getOutgoingMessages()` → returns and clears queue
   - Messages are JSON strings ready to send
   - Queue is filled by: local operations, sync responses, hello messages
