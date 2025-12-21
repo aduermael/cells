@@ -563,3 +563,215 @@ canvas {
     min-width: 60px;
     max-width: 200px;
 }
+
+/* Collaboration Status Badge */
+.collab-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    position: relative;
+}
+
+.collab-status-badge:hover {
+    background: #f8f9fa;
+    border-color: #adb5bd;
+}
+
+.collab-status-badge .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.collab-status-badge .status-text {
+    color: #495057;
+}
+
+/* Status states */
+.collab-status-badge.offline .status-dot {
+    background: #6c757d;
+}
+
+.collab-status-badge.offline .status-text {
+    color: #6c757d;
+}
+
+.collab-status-badge.connecting .status-dot {
+    background: #ffc107;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.collab-status-badge.connecting .status-text {
+    color: #856404;
+}
+
+.collab-status-badge.syncing .status-dot {
+    background: #17a2b8;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.collab-status-badge.syncing .status-text {
+    color: #0c5460;
+}
+
+.collab-status-badge.online .status-dot {
+    background: #28a745;
+}
+
+.collab-status-badge.online .status-text {
+    color: #155724;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+/* Connection details popup */
+.collab-status-details {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 8px;
+    min-width: 200px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: all 0.15s ease;
+    padding: 12px;
+}
+
+.collab-status-badge.show-details .collab-status-details {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.collab-status-details-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.collab-status-details-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #495057;
+    padding: 4px 0;
+}
+
+.collab-status-details-row .label {
+    color: #6c757d;
+}
+
+.collab-status-details-row .value {
+    font-weight: 500;
+}
+
+.collab-status-details-peers {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #e9ecef;
+}
+
+.collab-status-details-peers .peer-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 12px;
+}
+
+.collab-status-details-peers .peer-color {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.collab-status-details-peers .peer-name {
+    color: #212529;
+    flex: 1;
+}
+
+/* Share button */
+.collab-share-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border: 1px solid #0d6efd;
+    border-radius: 4px;
+    background: #0d6efd;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.collab-share-btn:hover {
+    background: #0b5ed7;
+    border-color: #0b5ed7;
+}
+
+.collab-share-btn:active {
+    background: #0a58ca;
+    border-color: #0a58ca;
+}
+
+.collab-share-btn .share-icon {
+    font-size: 10px;
+}
+
+/* Share tooltip */
+.collab-share-tooltip {
+    position: fixed;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #fff;
+    background: #212529;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    pointer-events: none;
+}
+
+.collab-share-tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+}
+
+.collab-share-tooltip::after {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 0 6px 6px 6px;
+    border-style: solid;
+    border-color: transparent transparent #212529 transparent;
+}

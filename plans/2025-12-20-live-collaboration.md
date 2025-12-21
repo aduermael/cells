@@ -229,7 +229,7 @@ Implement user presence, online indicators, and collaboration UI elements.
   - Throttle updates to avoid flooding (max 5 per second)
   - Presence messages are ephemeral events, never persisted
 
-- [ ] 5c: Add UI for online/offline indicator
+- [x] 5c: Add UI for online/offline indicator
   - Add status badge to header toolbar (top-right)
   - Show "Online" (green) when connected to ≥1 peer
   - Show "Offline" (gray) when no connections
