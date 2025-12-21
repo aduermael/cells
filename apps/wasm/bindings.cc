@@ -378,6 +378,9 @@ public:
     // Viewport query (cells in visible area)
     // ========================================================================
 
+    // Query cells in the visible viewport area.
+    // Returns pending values if available (pending > committed priority).
+    // The "pending" field indicates if the value is from a pending operation.
     std::string queryViewport(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -400,6 +403,14 @@ public:
             json << "\"id\":\"" << entry.cell->id.toString() << "\",";
             json << "\"col\":" << entry.x << ",";
             json << "\"row\":" << entry.y << ",";
+
+            // Check for pending operation on this cell
+            const Operation* pendingOp = _workbook->getPendingOpForTarget(entry.cell->id);
+            bool isPending = (pendingOp != nullptr);
+
+            if (isPending) {
+                json << "\"pending\":true,";
+            }
 
             if (entry.cell->isFormula()) {
                 json << "\"type\":\"f\",";

@@ -211,9 +211,9 @@ Add pending operation support for live typing visibility.
   - JS should call on: blur, Enter, navigation (no timeout)
   - Same target pending ops replace previous (debounce) - handled in addPendingOp()
 
-- [ ] 3e: Render pending operations
-  - Query viewport returns pending op values too
-  - Pending value shown over committed value
+- [x] 3e: Render pending operations
+  - Query viewport now includes `pending: true` flag for cells with pending ops
+  - Cell values are already showing pending data (applied in updateCell)
   - **Only ONE value per cell** - pending replaces committed in display
 
 - [ ] 3f: Handle remote pending operations
