@@ -20,3 +20,4 @@ MODULE.bazel.lock
 
 # Clang tooling
 compile_commands.json
+.claude/settings.local.json
