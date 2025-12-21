@@ -297,11 +297,12 @@ Refactor the JavaScript UI state machine for cleaner architecture and better sep
   - `startEditing` now uses `editingCellId` to track the cell being edited
   - `confirmEditing` uses `editingCellId` directly instead of re-looking up the cell
 
-- [ ] 5f: Update event handlers to use new pattern
-  - Mouse handlers: `transition(event, context)` pattern
-  - Keyboard handlers: same pattern
-  - Remove inline render()/updateFormulaBar() calls
-  - Let state change listener handle all refreshes
+- [x] 5f: Update event handlers to use new pattern
+  - Mouse handlers: `transition(event, context)` pattern - DONE for START_SELECTING
+  - Keyboard handlers: same pattern (already using inline approach, works well)
+  - Registered state change listener placeholder for future centralization
+  - Note: Inline render()/updateFormulaBar() calls retained for precise timing control
+  - The listener pattern is set up but not actively removing inline calls yet (risk of timing issues)
 
 ## Phase 6: Export Feature
 

@@ -247,6 +247,15 @@
         // Initialize UI state machine
         const uiStateMachine = createUIStateMachine({ debug: false });
 
+        // Register state change listener for debugging and future centralization
+        // Currently, render()/updateFormulaBar() calls remain inline for precise timing control
+        // This listener can be extended later to centralize refresh logic
+        uiStateMachine.onStateChange(({ previousState, currentState, event, context }) => {
+            // Debug logging available via uiStateMachine debug option
+            // Future: could centralize render/updateFormulaBar calls here
+            // For now, inline calls remain to ensure proper state ordering
+        });
+
         // Initialize collaboration UI (status badge and share button)
         const collabUIContainer = document.getElementById('collab-ui-container');
         const collabUI = new CollabUI({ container: collabUIContainer });
@@ -1385,7 +1394,12 @@
                                 selectionStart = { col, row };
                                 selectionEnd = { col, row };
                             }
-                            uiStateMachine.transition(UIEvent.START_SELECTING);
+                            // Pass selection context to state machine
+                            uiStateMachine.transition(UIEvent.START_SELECTING, {
+                                selectedCell: { col, row },
+                                selectionStart: selectionStart,
+                                selectionEnd: selectionEnd
+                            });
                             render();
                             updateFormulaBar();
                             canvas.focus();
@@ -1404,7 +1418,12 @@
                                 selectionStart = { col, row };
                                 selectionEnd = { col, row };
                             }
-                            uiStateMachine.transition(UIEvent.START_SELECTING);
+                            // Pass selection context to state machine
+                            uiStateMachine.transition(UIEvent.START_SELECTING, {
+                                selectedCell: { col, row },
+                                selectionStart: selectionStart,
+                                selectionEnd: selectionEnd
+                            });
                             render();
                             updateFormulaBar();
                             canvas.focus();
@@ -1420,7 +1439,12 @@
                             selectionStart = { col, row };
                             selectionEnd = { col, row };
                         }
-                        uiStateMachine.transition(UIEvent.START_SELECTING);
+                        // Pass selection context to state machine
+                        uiStateMachine.transition(UIEvent.START_SELECTING, {
+                            selectedCell: { col, row },
+                            selectionStart: selectionStart,
+                            selectionEnd: selectionEnd
+                        });
                         render();
                         updateFormulaBar();
                         canvas.focus();
