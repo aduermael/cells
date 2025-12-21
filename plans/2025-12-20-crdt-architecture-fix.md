@@ -204,10 +204,12 @@ Add pending operation support for live typing visibility.
   - DIM_MOVE_AXIS, rename → deferred to Phase 6 (requires more work)
   - This prevents conflicts when multiple users edit same area
 
-- [ ] 3d: Implement commit logic for cell values
-  - `commitPendingOps()` moves pending → OpLog
-  - Triggers on: blur, Enter, navigation (no timeout)
-  - Same target pending ops replace previous (debounce)
+- [x] 3d: Implement commit logic for cell values
+  - `commitPendingOps()` moves pending → OpLog - exposed in WASM
+  - `commitPendingOpsForCell(cellId)` commits just one cell
+  - `hasPendingOps()` / `getPendingOpsCount()` for querying state
+  - JS should call on: blur, Enter, navigation (no timeout)
+  - Same target pending ops replace previous (debounce) - handled in addPendingOp()
 
 - [ ] 3e: Render pending operations
   - Query viewport returns pending op values too

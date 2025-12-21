@@ -1584,6 +1584,74 @@ public:
         return "{\"success\":true}";
     }
 
+    // ========================================================================
+    // Pending operations methods
+    // ========================================================================
+
+    // Commit all local pending operations to the OpLog.
+    // Call this on blur, Enter key, or navigation to finalize edits.
+    // Returns JSON with count of committed operations and their HLCs.
+    std::string commitPendingOps() {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        std::vector<Operation> committed = _workbook->commitPendingOps();
+
+        std::ostringstream json;
+        json << "{\"committed\":" << committed.size() << ",\"operations\":[";
+        for (size_t i = 0; i < committed.size(); i++) {
+            if (i > 0) {
+                json << ",";
+            }
+            json << committed[i].toJSON();
+        }
+        json << "]}";
+        return json.str();
+    }
+
+    // Commit pending operations for a specific cell.
+    // Useful when committing just the active cell.
+    std::string commitPendingOpsForCell(const std::string& cellIdStr) {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        if (cellIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid cell ID\"}";
+        }
+        ID cellId(cellIdStr);
+
+        std::vector<Operation> committed = _workbook->commitPendingOpsForTarget(cellId);
+
+        std::ostringstream json;
+        json << "{\"committed\":" << committed.size() << ",\"operations\":[";
+        for (size_t i = 0; i < committed.size(); i++) {
+            if (i > 0) {
+                json << ",";
+            }
+            json << committed[i].toJSON();
+        }
+        json << "]}";
+        return json.str();
+    }
+
+    // Check if there are any pending operations.
+    bool hasPendingOps() {
+        if (!_workbook) {
+            return false;
+        }
+        return _workbook->hasPendingOps();
+    }
+
+    // Get the count of pending operations.
+    int getPendingOpsCount() {
+        if (!_workbook) {
+            return 0;
+        }
+        return static_cast<int>(_workbook->pendingOpsCount());
+    }
+
 private:
     void rebuildQuadtree() {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
@@ -1706,5 +1774,10 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getPeerCount", &cells::wasm::CellsEngine::getPeerCount)
         .function("handlePeerMessage", &cells::wasm::CellsEngine::handlePeerMessage)
         .function("getOutgoingMessages", &cells::wasm::CellsEngine::getOutgoingMessages)
-        .function("queueOperationsBroadcast", &cells::wasm::CellsEngine::queueOperationsBroadcast);
+        .function("queueOperationsBroadcast", &cells::wasm::CellsEngine::queueOperationsBroadcast)
+        // Pending operations
+        .function("commitPendingOps", &cells::wasm::CellsEngine::commitPendingOps)
+        .function("commitPendingOpsForCell", &cells::wasm::CellsEngine::commitPendingOpsForCell)
+        .function("hasPendingOps", &cells::wasm::CellsEngine::hasPendingOps)
+        .function("getPendingOpsCount", &cells::wasm::CellsEngine::getPendingOpsCount);
 }
