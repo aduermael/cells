@@ -819,9 +819,6 @@
         // - 'replace': Single-click + type - clears content and starts fresh
         // - 'select': F2/Enter - selects all content
 
-        // Track cell being edited (for commit)
-        let editingCellId = null;
-
         async function startEditing(options = {}) {
             const { focusCellEditor = true, mode = 'select', initialChar = '' } = options;
             if (!selectedCell || isEditing() || !dataSource) return;
@@ -844,10 +841,7 @@
                 return;
             }
 
-            // Store the cell ID for commit
-            editingCellId = cellId;
-
-            // Transition to editing state with context
+            // Transition to editing state with context (cellId stored in state machine)
             uiStateMachine.transition(UIEvent.START_CELL_EDIT, {
                 cellId,
                 col: selectedCell.col,
@@ -907,19 +901,20 @@
             uiStateMachine.transition(UIEvent.CANCEL_CELL_EDIT);
             cellEditor.style.display = 'none';
             cellEditor.value = '';
-            editingCellId = null;
             canvas.focus();
         }
 
         async function confirmEditing() {
-            if (!isEditing() || !editingCellId || !dataSource) return;
+            if (!isEditing() || !dataSource) return;
+
+            // Get cellId from state machine context before transitioning
+            const { cellId } = uiStateMachine.getStateContext();
+            if (!cellId) return;
 
             const newValue = cellEditor.value;
-            const cellId = editingCellId;  // Capture before clearing
 
             uiStateMachine.transition(UIEvent.COMMIT_CELL_EDIT);
             cellEditor.style.display = 'none';
-            editingCellId = null;
 
             try {
                 if (newValue === '' || newValue.trim() === '') {
