@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "core/cells/hlc.h"
+#include "core/cells/operation.h"
 #include "core/cells/types.h"
 
 namespace cells {
@@ -75,6 +76,10 @@ public:
     // Queue operations broadcast (called after local edit)
     // Creates an "operations" message with ops newer than peers have seen
     void queueOperationsBroadcast();
+
+    // Queue a pending operation broadcast for live typing visibility
+    // Call this after creating a local pending operation to show to peers
+    void queuePendingBroadcast(const Operation& op);
 
 private:
     // Handle specific message types

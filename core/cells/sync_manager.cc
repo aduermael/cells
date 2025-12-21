@@ -176,6 +176,11 @@ void SyncManager::addPeer(const ID& peerId) {
 
 void SyncManager::removePeer(const ID& peerId) {
     _peers.erase(peerId);
+
+    // Clean up any remote pending operations from this peer
+    if (_workbook != nullptr) {
+        _workbook->removePendingOpsFromPeer(peerId);
+    }
 }
 
 std::vector<ID> SyncManager::getPeerIds() const {
@@ -262,6 +267,17 @@ void SyncManager::queueOperationsBroadcast() {
     if (!msg.empty()) {
         queueBroadcast(msg);
     }
+}
+
+void SyncManager::queuePendingBroadcast(const Operation& op) {
+    if (_peers.empty()) {
+        return;
+    }
+
+    // Create pending message: {"type":"pending","operation":{...}}
+    std::ostringstream oss;
+    oss << "{\"type\":\"pending\",\"operation\":" << op.toJSON() << "}";
+    queueBroadcast(oss.str());
 }
 
 // Handle hello message from peer
@@ -362,6 +378,12 @@ std::vector<OutgoingMessage> SyncManager::handleOperations(const ID& peerId,
                 }
             }
         }
+
+        // Clear remote pending ops for targets that now have committed operations
+        // This handles the case where a peer commits their pending edit
+        for (const auto& op : ops) {
+            _workbook->removePendingOpsForTarget(op.target_id);
+        }
     }
 
     // No response needed
@@ -369,11 +391,59 @@ std::vector<OutgoingMessage> SyncManager::handleOperations(const ID& peerId,
 }
 
 // Handle pending operation (for live typing visibility)
-std::vector<OutgoingMessage> SyncManager::handlePending(const ID& /*peerId*/,
-                                                        const std::string& /*json*/) {
-    // TODO: Implement pending operations for live typing
-    // For now, just ignore pending messages
-    // This will be implemented in Phase 3
+// Pending operations are shown in UI but not committed to OpLog.
+// They are replaced when a new pending or committed operation arrives from the same peer.
+std::vector<OutgoingMessage> SyncManager::handlePending(const ID& peerId, const std::string& json) {
+    // Parse: {"type":"pending","operation":{...}}
+    // Find the "operation" object
+    size_t pos = json.find("\"operation\":");
+    if (pos == std::string::npos) {
+        return {};
+    }
+    pos += 12;  // Skip "operation":
+
+    // Skip whitespace
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\n')) {
+        pos++;
+    }
+
+    if (pos >= json.size() || json[pos] != '{') {
+        return {};
+    }
+
+    // Find matching closing brace
+    const size_t start = pos;
+    int braceCount = 1;
+    pos++;
+    while (pos < json.size() && braceCount > 0) {
+        if (json[pos] == '{') {
+            braceCount++;
+        } else if (json[pos] == '}') {
+            braceCount--;
+        } else if (json[pos] == '"') {
+            // Skip string content
+            pos++;
+            while (pos < json.size() && json[pos] != '"') {
+                if (json[pos] == '\\' && pos + 1 < json.size()) {
+                    pos++;
+                }
+                pos++;
+            }
+        }
+        pos++;
+    }
+
+    // Parse the operation
+    const std::string opJson = json.substr(start, pos - start);
+    const Operation op = Operation::fromJSON(opJson);
+    if (op.isNull()) {
+        return {};
+    }
+
+    // Add as remote pending operation (replaces existing pending from same peer for same target)
+    _workbook->addRemotePendingOp(op, peerId);
+
+    // No response needed
     return {};
 }
 

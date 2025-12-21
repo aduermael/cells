@@ -193,11 +193,11 @@ private:
 
 // Pending operation with associated peer ID (for remote pending operations)
 struct PendingOperation {
-    Operation op;       // The operation itself
-    ID sourcePeerId;    // Empty = local, non-empty = from remote peer
+    Operation op;     // The operation itself
+    ID sourcePeerId;  // Empty = local, non-empty = from remote peer
 
     PendingOperation() = default;
-    PendingOperation(Operation op, ID peerId = ID());
+    explicit PendingOperation(Operation op, ID peerId = ID());
 };
 
 // Workbook - top-level container

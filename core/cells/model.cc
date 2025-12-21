@@ -505,20 +505,17 @@ void Workbook::addRemotePendingOp(const Operation& op, const ID& peerId) {
 }
 
 void Workbook::removePendingOpsForTarget(const ID& targetId) {
-    _pendingOps.erase(
-        std::remove_if(_pendingOps.begin(), _pendingOps.end(),
-                       [&targetId](const PendingOperation& p) {
-                           return p.op.target_id == targetId;
-                       }),
-        _pendingOps.end());
+    _pendingOps.erase(std::remove_if(_pendingOps.begin(), _pendingOps.end(),
+                                     [&targetId](const PendingOperation& p) {
+                                         return p.op.target_id == targetId;
+                                     }),
+                      _pendingOps.end());
 }
 
 void Workbook::removePendingOpsFromPeer(const ID& peerId) {
     _pendingOps.erase(
         std::remove_if(_pendingOps.begin(), _pendingOps.end(),
-                       [&peerId](const PendingOperation& p) {
-                           return p.sourcePeerId == peerId;
-                       }),
+                       [&peerId](const PendingOperation& p) { return p.sourcePeerId == peerId; }),
         _pendingOps.end());
 }
 

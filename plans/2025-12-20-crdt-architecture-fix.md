@@ -216,9 +216,11 @@ Add pending operation support for live typing visibility.
   - Cell values are already showing pending data (applied in updateCell)
   - **Only ONE value per cell** - pending replaces committed in display
 
-- [ ] 3f: Handle remote pending operations
-  - Receive "pending" message type from peers
-  - Show in UI but don't add to OpLog
+- [x] 3f: Handle remote pending operations
+  - SyncManager.handlePending() parses and stores remote pending ops
+  - SyncManager.queuePendingBroadcast(op) broadcasts local pending ops
+  - queuePendingBroadcast(cellId) exposed in WASM for JS to call after updateCell()
+  - Remote pending ops cleaned up when: peer disconnects, committed op arrives
   - Replace on next pending or commit from same peer
   - **Never show multiple values** - latest pending wins
 

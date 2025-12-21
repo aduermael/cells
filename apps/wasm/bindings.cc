@@ -1595,6 +1595,34 @@ public:
         return "{\"success\":true}";
     }
 
+    // Queue a pending operation broadcast for a specific cell.
+    // Call this after updateCell() to broadcast the pending edit to peers.
+    // This enables live typing visibility - peers see the edit before commit.
+    std::string queuePendingBroadcast(const std::string& cellIdStr) {
+        if (!_syncManager) {
+            return "{\"error\":\"SyncManager not initialized\"}";
+        }
+
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        if (cellIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid cell ID\"}";
+        }
+        ID cellId(cellIdStr);
+
+        // Get the pending operation for this cell
+        const Operation* pendingOp = _workbook->getPendingOpForTarget(cellId);
+        if (pendingOp == nullptr) {
+            return "{\"error\":\"No pending operation for cell\"}";
+        }
+
+        // Broadcast the pending operation to peers
+        _syncManager->queuePendingBroadcast(*pendingOp);
+        return "{\"success\":true}";
+    }
+
     // ========================================================================
     // Pending operations methods
     // ========================================================================
@@ -1786,6 +1814,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("handlePeerMessage", &cells::wasm::CellsEngine::handlePeerMessage)
         .function("getOutgoingMessages", &cells::wasm::CellsEngine::getOutgoingMessages)
         .function("queueOperationsBroadcast", &cells::wasm::CellsEngine::queueOperationsBroadcast)
+        .function("queuePendingBroadcast", &cells::wasm::CellsEngine::queuePendingBroadcast)
         // Pending operations
         .function("commitPendingOps", &cells::wasm::CellsEngine::commitPendingOps)
         .function("commitPendingOpsForCell", &cells::wasm::CellsEngine::commitPendingOpsForCell)
