@@ -68,7 +68,7 @@ export class GridRenderer {
         this.editingColumnIndex = -1;
 
         // Remote presence state
-        // Array of { peerId, name, color, cursor: {col, row}, selection: {start, end}, opacity }
+        // Array of { peerId, name, color, cursor: {col, row}, selection: {start, end}, mouse: {x, y}, opacity }
         this.remotePresence = [];
     }
 
@@ -473,6 +473,8 @@ export class GridRenderer {
             // Skip drawing header text if this column is being edited (editor covers it)
             if (col !== this.editingColumnIndex) {
                 ctx.fillText(this.getColumnHeaderText(col), headerX + colW / 2, HEADER_HEIGHT / 2);
+            } else {
+                console.log('Skipping header text for col', col, 'editingColumnIndex =', this.editingColumnIndex);
             }
         }
 
@@ -656,21 +658,24 @@ export class GridRenderer {
         ctx.clip();
 
         for (const presence of this.remotePresence) {
-            if (!presence.cursor && !presence.selection) continue;
-
-            const opacity = presence.opacity !== undefined ? presence.opacity : 1.0;
-            if (opacity <= 0) continue;
-
+            const mouseOpacity = presence.opacity !== undefined ? presence.opacity : 1.0;
             const color = presence.color || '#888888';
+            const hasCursorOrSelection = presence.cursor || presence.selection;
 
-            // Draw selection range first (behind cursor)
+            // Draw selection range first (behind cursor) - always visible
             if (presence.selection && presence.selection.start && presence.selection.end) {
-                this._drawRemoteSelection(ctx, presence.selection, color, opacity);
+                this._drawRemoteSelection(ctx, presence.selection, color, 1.0);
             }
 
-            // Draw cursor (active cell)
+            // Draw cursor (active cell) - always visible
             if (presence.cursor && presence.cursor.col !== undefined && presence.cursor.row !== undefined) {
-                this._drawRemoteCursor(ctx, presence.cursor, presence.name, color, opacity, viewWidth, viewHeight);
+                this._drawRemoteCursor(ctx, presence.cursor, presence.name, color, 1.0, viewWidth, viewHeight);
+            }
+
+            // Draw mouse pointer (fades out after inactivity)
+            if (presence.mouse && presence.mouse.x !== undefined && presence.mouse.y !== undefined && mouseOpacity > 0) {
+                const showName = !hasCursorOrSelection;
+                this._drawRemoteMouse(ctx, presence.mouse, showName ? presence.name : null, color, mouseOpacity, viewWidth, viewHeight);
             }
         }
 
@@ -802,6 +807,82 @@ export class GridRenderer {
             }
             if (labelX < HEADER_WIDTH) {
                 labelX = HEADER_WIDTH + 2;
+            }
+
+            // Draw label background
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.roundRect(labelX, labelY, labelWidth, labelHeight, 3);
+            ctx.fill();
+
+            // Draw label text
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(name, labelX + PRESENCE_LABEL_PADDING, labelY + labelHeight / 2);
+        }
+
+        ctx.globalAlpha = 1;
+    }
+
+    /**
+     * Draw a remote user's mouse pointer
+     * @private
+     */
+    _drawRemoteMouse(ctx, mouse, name, color, opacity, viewWidth, viewHeight) {
+        // Mouse coordinates are relative to canvas, adjust for scroll
+        const mouseX = mouse.x;
+        const mouseY = mouse.y;
+
+        // Check if visible (within cells area)
+        if (mouseX < HEADER_WIDTH || mouseX >= viewWidth ||
+            mouseY < HEADER_HEIGHT || mouseY >= viewHeight) {
+            return;
+        }
+
+        ctx.globalAlpha = opacity;
+
+        // Draw pointer arrow shape
+        ctx.fillStyle = color;
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+
+        ctx.beginPath();
+        // Arrow pointer shape (standard cursor)
+        ctx.moveTo(mouseX, mouseY);           // Tip
+        ctx.lineTo(mouseX, mouseY + 16);      // Down
+        ctx.lineTo(mouseX + 4, mouseY + 12);  // Notch
+        ctx.lineTo(mouseX + 8, mouseY + 18);  // Tail end
+        ctx.lineTo(mouseX + 10, mouseY + 16); // Tail corner
+        ctx.lineTo(mouseX + 6, mouseY + 10);  // Back to notch
+        ctx.lineTo(mouseX + 11, mouseY + 10); // Right
+        ctx.closePath();
+
+        ctx.fill();
+        ctx.stroke();
+
+        // Draw name label next to pointer if provided
+        if (name) {
+            ctx.font = PRESENCE_LABEL_FONT;
+            const textWidth = ctx.measureText(name).width;
+            const labelWidth = textWidth + PRESENCE_LABEL_PADDING * 2;
+            const labelHeight = PRESENCE_LABEL_HEIGHT;
+
+            let labelX = mouseX + 14;
+            let labelY = mouseY + 8;
+
+            // Keep label within visible area
+            if (labelX + labelWidth > viewWidth) {
+                labelX = mouseX - labelWidth - 4;
+            }
+            if (labelY + labelHeight > viewHeight) {
+                labelY = mouseY - labelHeight - 4;
+            }
+            if (labelX < HEADER_WIDTH) {
+                labelX = HEADER_WIDTH + 2;
+            }
+            if (labelY < HEADER_HEIGHT) {
+                labelY = HEADER_HEIGHT + 2;
             }
 
             // Draw label background

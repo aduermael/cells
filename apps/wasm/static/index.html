@@ -353,6 +353,30 @@
                     isApplyingRemoteOp = false;
                 });
 
+                // Listen for presence updates from remote peers
+                presenceManager.on('presenceupdated', (peerId, presence) => {
+                    updateRemotePresenceDisplay();
+                    renderPresenceOnly();
+                });
+                presenceManager.on('peerleft', (peerId, presence) => {
+                    updateRemotePresenceDisplay();
+                    renderPresenceOnly();
+                });
+
+                // Start a presence render loop to handle fading
+                // Only re-renders when there are remote peers to display
+                setInterval(() => {
+                    if (collaborationInitialized && presenceManager) {
+                        const hadPresence = renderer.remotePresence.length > 0;
+                        updateRemotePresenceDisplay();
+                        const hasPresence = renderer.remotePresence.length > 0;
+                        // Only re-render if there are/were remote cursors to update
+                        if (hadPresence || hasPresence) {
+                            renderPresenceOnly();
+                        }
+                    }
+                }, 50); // Update at 20 Hz for smooth mouse tracking
+
                 collaborationInitialized = true;
                 collaborationInitializing = false;
                 console.log('Collaboration initialized successfully, peer ID:', collabManager.peerId);
@@ -593,6 +617,88 @@
             return selectionStart.col !== selectionEnd.col || selectionStart.row !== selectionEnd.row;
         }
 
+        // Broadcast local presence (cursor/selection) to peers
+        function broadcastLocalPresence() {
+            if (!presenceManager || !collaborationInitialized) return;
+
+            // Update current sheet (use index as identifier)
+            presenceManager.setCurrentSheet(String(activeSheetIndex));
+
+            // Update cursor position (anchor cell of selection)
+            const cursorCell = selectionStart || selectedCell;
+            if (cursorCell) {
+                presenceManager.setCursor(cursorCell.col, cursorCell.row);
+            }
+
+            // Update selection range if different from cursor
+            if (selectionStart && selectionEnd) {
+                presenceManager.setSelection(
+                    { col: selectionStart.col, row: selectionStart.row },
+                    { col: selectionEnd.col, row: selectionEnd.row }
+                );
+            }
+        }
+
+        // Interpolated mouse positions for smooth rendering (peerId -> {x, y})
+        const interpolatedMouse = new Map();
+        const MOUSE_LERP_FACTOR = 0.3; // How fast to interpolate (0-1, higher = faster)
+
+        // Update renderer's remote presence display from PresenceManager
+        function updateRemotePresenceDisplay() {
+            if (!presenceManager) {
+                renderer.remotePresence = [];
+                interpolatedMouse.clear();
+                return;
+            }
+
+            const currentSheetId = String(activeSheetIndex);
+            const peers = presenceManager.getPeersOnSheet(currentSheetId);
+            const activePeerIds = new Set();
+
+            renderer.remotePresence = peers.map(presence => {
+                const peerId = presence.peer_id;
+                activePeerIds.add(peerId);
+                const opacity = presenceManager.getPresenceOpacity(peerId);
+
+                // Lerp mouse position for smooth movement
+                let smoothMouse = null;
+                if (presence.mouse && presence.mouse.x !== undefined) {
+                    const targetX = presence.mouse.x;
+                    const targetY = presence.mouse.y;
+
+                    if (interpolatedMouse.has(peerId)) {
+                        const current = interpolatedMouse.get(peerId);
+                        // Lerp toward target
+                        current.x += (targetX - current.x) * MOUSE_LERP_FACTOR;
+                        current.y += (targetY - current.y) * MOUSE_LERP_FACTOR;
+                        smoothMouse = current;
+                    } else {
+                        // First time seeing this peer's mouse - start at target
+                        const newPos = { x: targetX, y: targetY };
+                        interpolatedMouse.set(peerId, newPos);
+                        smoothMouse = newPos;
+                    }
+                }
+
+                return {
+                    peerId: peerId,
+                    name: presence.name,
+                    color: presence.color,
+                    cursor: presence.cursor,
+                    selection: presence.selection,
+                    mouse: smoothMouse,
+                    opacity: opacity  // Used for mouse fade only
+                };
+            });
+
+            // Clean up interpolated positions for peers no longer present
+            for (const peerId of interpolatedMouse.keys()) {
+                if (!activePeerIds.has(peerId)) {
+                    interpolatedMouse.delete(peerId);
+                }
+            }
+        }
+
         // Update formula bar with current selection
         function updateFormulaBar() {
             if (!selectedCell) {
@@ -668,6 +774,23 @@
         function render() {
             updateRendererState();
             renderer.render();
+            // Draw remote cursors/selections on top of local selection
+            renderer.drawRemotePresence();
+            if (isResizing() || isResizingRow()) {
+                renderer.drawResizePreview();
+            }
+            if (isDraggingColumn() || isDraggingRow()) {
+                renderer.drawDragGhost();
+            }
+            // Broadcast local presence (rate-limited by PresenceManager)
+            broadcastLocalPresence();
+        }
+
+        // Lightweight render for presence updates only (no presence broadcast to avoid loops)
+        function renderPresenceOnly() {
+            updateRendererState();
+            renderer.render();
+            renderer.drawRemotePresence();
             if (isResizing() || isResizingRow()) {
                 renderer.drawResizePreview();
             }
@@ -964,6 +1087,8 @@
                         } else {
                             selectedCell.row = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
                         }
+                        selectionStart = { col: selectedCell.col, row: selectedCell.row };
+                        selectionEnd = { col: selectedCell.col, row: selectedCell.row };
                         // Update selection visuals immediately; listener handles data refresh
                         render();
                         updateFormulaBar();
@@ -978,6 +1103,8 @@
                         } else {
                             selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
                         }
+                        selectionStart = { col: selectedCell.col, row: selectedCell.row };
+                        selectionEnd = { col: selectedCell.col, row: selectedCell.row };
                         // Update selection visuals immediately; listener handles data refresh
                         render();
                         updateFormulaBar();
@@ -1007,6 +1134,8 @@
                             } else if (e.key === 'ArrowRight') {
                                 selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
                             }
+                            selectionStart = { col: selectedCell.col, row: selectedCell.row };
+                            selectionEnd = { col: selectedCell.col, row: selectedCell.row };
                             // Update selection visuals immediately; listener handles data refresh
                             render();
                             updateFormulaBar();
@@ -1039,6 +1168,8 @@
 
             uiStateMachine.transition(UIEvent.START_COLUMN_HEADER_EDIT);
             editingColumnIndex = colIndex;
+            console.log('startEditingColumnHeader: editingColumnIndex =', editingColumnIndex, 'state =', uiStateMachine.getState());
+            render(); // Redraw to hide the column header text
 
             // Calculate header position
             let headerX = HEADER_WIDTH - scrollX;
@@ -1136,6 +1267,17 @@
             let cell = getCellAt(editCell.col, editCell.row);
             const newValue = formulaInput.value;
 
+            // Check if cell is the temp preview cell (not a real cell in the backend)
+            const isTemp = cell && cell.id === '_temp_';
+            if (isTemp) {
+                // Remove temp cell from local array - it will be replaced by real data
+                const tempIdx = cells.findIndex(c => c.id === '_temp_');
+                if (tempIdx !== -1) {
+                    cells.splice(tempIdx, 1);
+                }
+                cell = null; // Treat as no cell exists
+            }
+
             try {
                 if (newValue === '' || newValue.trim() === '') {
                     // Delete cell when content is completely cleared
@@ -1186,7 +1328,20 @@
                 cancelFormulaBarEdit();
             } else if (e.key === 'Enter') {
                 e.preventDefault();
-                commitFormulaBarEdit();
+                commitFormulaBarEdit().then(() => {
+                    if (selectedCell && sheetInfo) {
+                        // Enter moves down, Shift+Enter moves up
+                        if (e.shiftKey) {
+                            selectedCell.row = Math.max(0, selectedCell.row - 1);
+                        } else {
+                            selectedCell.row = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
+                        }
+                        selectionStart = { col: selectedCell.col, row: selectedCell.row };
+                        selectionEnd = { col: selectedCell.col, row: selectedCell.row };
+                        render();
+                        updateFormulaBar();
+                    }
+                });
             } else if (e.key === 'Tab') {
                 e.preventDefault();
                 commitFormulaBarEdit().then(() => {
@@ -1196,6 +1351,8 @@
                         } else {
                             selectedCell.col = Math.min(sheetInfo.colCount - 1, selectedCell.col + 1);
                         }
+                        selectionStart = { col: selectedCell.col, row: selectedCell.row };
+                        selectionEnd = { col: selectedCell.col, row: selectedCell.row };
                         render();
                         updateFormulaBar();
                         formulaInput.focus();
@@ -1444,6 +1601,11 @@
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
+            // Track mouse position for presence sharing
+            if (presenceManager && collaborationInitialized) {
+                presenceManager.setMousePosition(x, y);
+            }
+
             // Check if pending drag should become actual drag (threshold exceeded)
             if (pendingDragColumn) {
                 const dx = Math.abs(x - pendingDragStartX);
@@ -1675,6 +1837,11 @@
         });
 
         canvas.addEventListener('mouseleave', () => {
+            // Clear mouse position for presence
+            if (presenceManager && collaborationInitialized) {
+                presenceManager.clearMousePosition();
+            }
+
             // Clear pending drag states
             pendingDragColumn = false;
             pendingDragRow = false;

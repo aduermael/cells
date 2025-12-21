@@ -35,19 +35,19 @@ export const USER_COLORS = [
 ];
 
 /**
- * Presence update interval in milliseconds (5 Hz)
+ * Presence update interval in milliseconds (20 Hz for smooth mouse tracking)
  */
-const PRESENCE_UPDATE_INTERVAL = 200;
+const PRESENCE_UPDATE_INTERVAL = 50;
 
 /**
  * How long to keep broadcasting after user stops moving (ms)
  */
-const PRESENCE_LINGER_TIME = 3000;
+const PRESENCE_LINGER_TIME = 2000;
 
 /**
  * How long to show remote presence after last update (ms)
  */
-const PRESENCE_FADE_TIMEOUT = 3000;
+const PRESENCE_FADE_TIMEOUT = 2000;
 
 /**
  * Generate a random display name (Adjective + Animal)
@@ -115,6 +115,7 @@ class EventEmitter {
  * @property {string} sheet_id - Current sheet ID
  * @property {Object|null} cursor - Current cursor position {col: ID, row: ID}
  * @property {Object|null} selection - Selected range {start: {col, row}, end: {col, row}}
+ * @property {Object|null} mouse - Mouse pointer position {x, y} relative to grid
  * @property {number} timestamp - Last update timestamp (ms)
  */
 
@@ -141,6 +142,7 @@ export class PresenceManager {
         this._localSheetId = null;
         this._localCursor = null;
         this._localSelection = null;
+        this._localMouse = null;
 
         // Remote user presence (peerId -> PresenceData)
         this._remotePeers = new Map();
@@ -268,6 +270,24 @@ export class PresenceManager {
     }
 
     /**
+     * Update the mouse pointer position
+     * @param {number} x - X coordinate relative to grid origin
+     * @param {number} y - Y coordinate relative to grid origin
+     */
+    setMousePosition(x, y) {
+        this._localMouse = { x, y };
+        this._markActivity();
+    }
+
+    /**
+     * Clear mouse position (e.g., when mouse leaves the grid)
+     */
+    clearMousePosition() {
+        this._localMouse = null;
+        this._markActivity();
+    }
+
+    /**
      * Clear cursor and selection (e.g., when leaving editor mode)
      */
     clearCursorAndSelection() {
@@ -340,6 +360,7 @@ export class PresenceManager {
             sheet_id: this._localSheetId,
             cursor: this._localCursor,
             selection: this._localSelection,
+            mouse: this._localMouse,
             timestamp: Date.now()
         };
 
@@ -395,6 +416,7 @@ export class PresenceManager {
                 sheet_id: presence.sheet_id,
                 cursor: presence.cursor,
                 selection: presence.selection,
+                mouse: presence.mouse,
                 timestamp: presence.timestamp || Date.now()
             });
 
@@ -446,12 +468,10 @@ export class PresenceManager {
      */
     getPeersOnSheet(sheetId) {
         const peers = [];
-        const now = Date.now();
 
         for (const [peerId, presence] of this._remotePeers) {
-            // Only include peers on this sheet and with recent activity
-            if (presence.sheet_id === sheetId &&
-                (now - presence.timestamp) < PRESENCE_FADE_TIMEOUT) {
+            // Include all peers on this sheet (mouse fading handled by opacity)
+            if (presence.sheet_id === sheetId) {
                 peers.push(presence);
             }
         }

@@ -321,6 +321,11 @@ canvas {
     text-align: center;
 }
 
+#column-header-editor::placeholder {
+    color: #adb5bd;
+    opacity: 1;
+}
+
 /* Export Dropdown */
 .dropdown {
     position: relative;
