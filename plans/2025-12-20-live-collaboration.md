@@ -139,7 +139,7 @@ Implement WebRTC peer-to-peer connections in the WASM web app.
   - Implement message serialization (JSON or MessagePack)
   - Add error handling and reconnection logic
 
-- [ ] 3d: Implement WebRTC connection flow
+- [x] 3d: Implement WebRTC connection flow
   - Generate local peer ID (8-char base62, same as document IDs)
   - Join room via signaling server
   - Create offer when new peer joins
