@@ -7,6 +7,22 @@ A high-performance, collaborative spreadsheet engine with:
 - Multi-dimensional data model
 - Cross-platform deployment (native + web)
 
+## Project Stats
+
+| Language | Lines |
+|----------|------:|
+| C++ | 19,763 |
+| JavaScript | 8,109 |
+| HTML | 3,075 |
+| Go | 1,039 |
+| CSS | 986 |
+
+- **Commits**: 306
+- **WASM Module**: 613 KB
+- **Total Web Bundle**: 1.07 MB
+
+<sub>Generated with `./scripts/generate-stats.sh`</sub>
+
 ## Architecture Overview
 
 ```
