@@ -131,4 +131,65 @@ size_t OpLog::findInsertionPoint(const HLC& hlc) const {
     return left;
 }
 
+size_t OpLog::pruneOperationsBefore(const HLC& threshold) {
+    if (_operations.empty()) {
+        return 0;
+    }
+
+    // Find first operation with HLC > threshold (binary search)
+    size_t keep_from = 0;
+    size_t left = 0;
+    size_t right = _operations.size();
+
+    while (left < right) {
+        const size_t mid = left + (right - left) / 2;
+        if (_operations[mid].hlc <= threshold) {
+            left = mid + 1;
+        } else {
+            right = mid;
+        }
+    }
+    keep_from = left;
+
+    if (keep_from == 0) {
+        return 0;  // Nothing to prune
+    }
+
+    const size_t pruned_count = keep_from;
+
+    // Remove from HLC index and entity index for pruned operations
+    for (size_t i = 0; i < keep_from; ++i) {
+        const auto& op = _operations[i];
+        _hlc_index.erase(op.hlc.toString());
+
+        // Remove from entity index
+        auto entity_it = _by_entity.find(op.target_id);
+        if (entity_it != _by_entity.end()) {
+            auto& indices = entity_it->second;
+            indices.erase(std::remove(indices.begin(), indices.end(), i), indices.end());
+            if (indices.empty()) {
+                _by_entity.erase(entity_it);
+            }
+        }
+    }
+
+    // Remove pruned operations from vector
+    _operations.erase(_operations.begin(), _operations.begin() + static_cast<ptrdiff_t>(keep_from));
+
+    // Update all indices (shift down by pruned_count)
+    std::unordered_map<std::string, size_t> new_hlc_index;
+    for (auto& [hlc_str, idx] : _hlc_index) {
+        new_hlc_index[hlc_str] = idx - pruned_count;
+    }
+    _hlc_index = std::move(new_hlc_index);
+
+    for (auto& [entity, indices] : _by_entity) {
+        for (auto& idx : indices) {
+            idx -= pruned_count;
+        }
+    }
+
+    return pruned_count;
+}
+
 }  // namespace cells

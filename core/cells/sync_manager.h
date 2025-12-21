@@ -35,6 +35,19 @@ struct OutgoingMessage {
     [[nodiscard]] bool isBroadcast() const;
 };
 
+// Result of handling a peer message
+struct HandleMessageResult {
+    std::vector<OutgoingMessage> messages;  // Response messages to send
+    bool dataModified{false};               // True if cell/structure data changed
+    bool pendingModified{false};            // True if remote pending ops changed
+
+    HandleMessageResult() = default;
+    explicit HandleMessageResult(std::vector<OutgoingMessage> msgs,
+                                 bool data = false,
+                                 bool pending = false)
+        : messages(std::move(msgs)), dataModified(data), pendingModified(pending) {}
+};
+
 // SyncManager handles CRDT synchronization with peers.
 // All sync state and protocol logic lives here - JS is just a transport layer.
 //
@@ -59,9 +72,10 @@ public:
     [[nodiscard]] const PeerSyncState* getPeerSyncState(const ID& peerId) const;
 
     // Handle incoming message from a peer.
-    // Processes the message and returns any response messages to send.
-    // The returned messages should be sent to their respective targets.
-    std::vector<OutgoingMessage> handleMessage(const ID& peerId, const std::string& json);
+    // Processes the message and returns response messages plus flags indicating what changed.
+    // - dataModified: true if cell/structure data was modified (needs rebuildQuadtree + notify)
+    // - pendingModified: true if remote pending ops changed (needs notify only)
+    HandleMessageResult handleMessage(const ID& peerId, const std::string& json);
 
     // Get and clear all pending outgoing messages.
     // Call this periodically or after local edits to send queued messages.
@@ -81,13 +95,19 @@ public:
     // Call this after creating a local pending operation to show to peers
     void queuePendingBroadcast(const Operation& op);
 
+    // Prune old operations from the OpLog.
+    // - If no peers: prunes ALL operations (nothing to sync)
+    // - If peers: prunes operations older than the minimum HLC all peers have
+    // Returns number of operations pruned.
+    size_t pruneOpLog();
+
 private:
-    // Handle specific message types
-    std::vector<OutgoingMessage> handleHello(const ID& peerId, const std::string& json);
-    std::vector<OutgoingMessage> handleSyncRequest(const ID& peerId, const std::string& json);
-    std::vector<OutgoingMessage> handleSyncResponse(const ID& peerId, const std::string& json);
-    std::vector<OutgoingMessage> handleOperations(const ID& peerId, const std::string& json);
-    std::vector<OutgoingMessage> handlePending(const ID& peerId, const std::string& json);
+    // Handle specific message types (return result with appropriate flags)
+    HandleMessageResult handleHello(const ID& peerId, const std::string& json);
+    HandleMessageResult handleSyncRequest(const ID& peerId, const std::string& json);
+    HandleMessageResult handleSyncResponse(const ID& peerId, const std::string& json);
+    HandleMessageResult handleOperations(const ID& peerId, const std::string& json);
+    HandleMessageResult handlePending(const ID& peerId, const std::string& json);
 
     // Create hello message for sending to new peer
     [[nodiscard]] std::string makeHelloMessage() const;

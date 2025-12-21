@@ -208,7 +208,7 @@ const PeerSyncState* SyncManager::getPeerSyncState(const ID& peerId) const {
     return &it->second;
 }
 
-std::vector<OutgoingMessage> SyncManager::handleMessage(const ID& peerId, const std::string& json) {
+HandleMessageResult SyncManager::handleMessage(const ID& peerId, const std::string& json) {
     // Extract message type
     const std::string type = extractJSONString(json, "type");
 
@@ -228,8 +228,8 @@ std::vector<OutgoingMessage> SyncManager::handleMessage(const ID& peerId, const 
         return handlePending(peerId, json);
     }
 
-    // Unknown message type - no response
-    return {};
+    // Unknown message type - no response, no changes
+    return HandleMessageResult();
 }
 
 std::vector<OutgoingMessage> SyncManager::getOutgoingMessages() {
@@ -280,8 +280,43 @@ void SyncManager::queuePendingBroadcast(const Operation& op) {
     queueBroadcast(oss.str());
 }
 
+size_t SyncManager::pruneOpLog() {
+    if (_workbook == nullptr) {
+        return 0;
+    }
+
+    OpLog* oplog = _workbook->getOpLog();
+    if (oplog == nullptr || oplog->empty()) {
+        return 0;
+    }
+
+    if (_peers.empty()) {
+        // No peers - prune everything (use current HLC as threshold)
+        const HLC currentHLC = oplog->getCurrentHLC();
+        return oplog->pruneOperationsBefore(currentHLC);
+    }
+
+    // Find the minimum HLC that all peers have synced
+    HLC minHLC;
+    bool first = true;
+    for (const auto& pair : _peers) {
+        if (first || pair.second.lastSyncedHLC < minHLC) {
+            minHLC = pair.second.lastSyncedHLC;
+            first = false;
+        }
+    }
+
+    // If minHLC is zero (no synced operations), don't prune anything
+    if (minHLC.wall_time == 0 && minHLC.logical == 0) {
+        return 0;
+    }
+
+    return oplog->pruneOperationsBefore(minHLC);
+}
+
 // Handle hello message from peer
-std::vector<OutgoingMessage> SyncManager::handleHello(const ID& peerId, const std::string& json) {
+// No data modification - just peer state management
+HandleMessageResult SyncManager::handleHello(const ID& peerId, const std::string& json) {
     std::vector<OutgoingMessage> response;
 
     // Parse hello: {"type":"hello","peer_id":"...","hlc":"...","op_count":N}
@@ -318,12 +353,13 @@ std::vector<OutgoingMessage> SyncManager::handleHello(const ID& peerId, const st
         it->second.isSynced = true;
     }
 
-    return response;
+    // hello doesn't modify data, just peer state
+    return HandleMessageResult(std::move(response), false, false);
 }
 
 // Handle sync-request from peer
-std::vector<OutgoingMessage> SyncManager::handleSyncRequest(const ID& peerId,
-                                                            const std::string& json) {
+// No data modification - just sends our operations to peer
+HandleMessageResult SyncManager::handleSyncRequest(const ID& peerId, const std::string& json) {
     std::vector<OutgoingMessage> response;
 
     // Parse: {"type":"sync-request","since_hlc":"..."}
@@ -333,18 +369,22 @@ std::vector<OutgoingMessage> SyncManager::handleSyncRequest(const ID& peerId,
     // Send operations since their HLC
     response.emplace_back(peerId, makeSyncResponseMessage(sinceHLC));
 
-    return response;
+    // sync-request doesn't modify our data
+    return HandleMessageResult(std::move(response), false, false);
 }
 
 // Handle sync-response from peer
-std::vector<OutgoingMessage> SyncManager::handleSyncResponse(const ID& peerId,
-                                                             const std::string& json) {
+// DATA MODIFIED if operations applied successfully
+HandleMessageResult SyncManager::handleSyncResponse(const ID& peerId, const std::string& json) {
     // Parse: {"type":"sync-response","operations":[...],"complete":true}
     const std::vector<Operation> ops = extractJSONOperations(json, "operations");
 
+    bool dataModified = false;
+
     // Apply operations to workbook
     if (!ops.empty()) {
-        applyOperations(*_workbook, ops);
+        size_t applied = applyOperations(*_workbook, ops);
+        dataModified = (applied > 0);
     }
 
     // Update peer sync state
@@ -355,19 +395,22 @@ std::vector<OutgoingMessage> SyncManager::handleSyncResponse(const ID& peerId,
         it->second.isSynced = true;
     }
 
-    // No response needed
-    return {};
+    // No response messages, but report if data was modified
+    return HandleMessageResult({}, dataModified, false);
 }
 
 // Handle operations batch from peer
-std::vector<OutgoingMessage> SyncManager::handleOperations(const ID& peerId,
-                                                           const std::string& json) {
+// DATA MODIFIED if operations applied successfully
+HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::string& json) {
     // Parse: {"type":"operations","batch":[...]}
     const std::vector<Operation> ops = extractJSONOperations(json, "batch");
 
+    bool dataModified = false;
+
     // Apply operations to workbook
     if (!ops.empty()) {
-        applyOperations(*_workbook, ops);
+        size_t applied = applyOperations(*_workbook, ops);
+        dataModified = (applied > 0);
 
         // Update peer sync state with the latest HLC from received operations
         auto it = _peers.find(peerId);
@@ -386,19 +429,20 @@ std::vector<OutgoingMessage> SyncManager::handleOperations(const ID& peerId,
         }
     }
 
-    // No response needed
-    return {};
+    // No response messages, but report if data was modified
+    return HandleMessageResult({}, dataModified, false);
 }
 
 // Handle pending operation (for live typing visibility)
 // Pending operations are shown in UI but not committed to OpLog.
 // They are replaced when a new pending or committed operation arrives from the same peer.
-std::vector<OutgoingMessage> SyncManager::handlePending(const ID& peerId, const std::string& json) {
+// PENDING MODIFIED - needs notify but not quadtree rebuild
+HandleMessageResult SyncManager::handlePending(const ID& peerId, const std::string& json) {
     // Parse: {"type":"pending","operation":{...}}
     // Find the "operation" object
     size_t pos = json.find("\"operation\":");
     if (pos == std::string::npos) {
-        return {};
+        return HandleMessageResult();
     }
     pos += 12;  // Skip "operation":
 
@@ -408,7 +452,7 @@ std::vector<OutgoingMessage> SyncManager::handlePending(const ID& peerId, const 
     }
 
     if (pos >= json.size() || json[pos] != '{') {
-        return {};
+        return HandleMessageResult();
     }
 
     // Find matching closing brace
@@ -437,14 +481,14 @@ std::vector<OutgoingMessage> SyncManager::handlePending(const ID& peerId, const 
     const std::string opJson = json.substr(start, pos - start);
     const Operation op = Operation::fromJSON(opJson);
     if (op.isNull()) {
-        return {};
+        return HandleMessageResult();
     }
 
     // Add as remote pending operation (replaces existing pending from same peer for same target)
     _workbook->addRemotePendingOp(op, peerId);
 
-    // No response needed
-    return {};
+    // Pending state modified (UI should update to show remote cursor/typing)
+    return HandleMessageResult({}, false, true);
 }
 
 std::string SyncManager::makeHelloMessage() const {

@@ -49,6 +49,11 @@ struct OpLog {
     // Clear all operations (mainly for testing).
     void clear();
 
+    // Prune operations with HLC <= threshold.
+    // Used to garbage collect old operations that all peers have received.
+    // Returns number of operations pruned.
+    size_t pruneOperationsBefore(const HLC& threshold);
+
 private:
     // All operations in HLC order
     std::vector<Operation> _operations;

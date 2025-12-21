@@ -923,8 +923,6 @@
                     await dataSource.deleteCell(cellId);
                 } else {
                     await dataSource.updateCell(cellId, newValue);
-                    // Commit pending operation to OpLog for sync broadcast
-                    await dataSource.commitPendingOpsForCell(cellId);
                 }
                 // Listener handles refresh automatically
             } catch (e) {
@@ -1150,8 +1148,6 @@
                     await dataSource.createCell(editCell.col, editCell.row, newValue);
                 } else {
                     await dataSource.updateCell(cell.id, newValue);
-                    // Commit pending operation to OpLog for sync broadcast
-                    await dataSource.commitPendingOpsForCell(cell.id);
                 }
                 // Listener handles refresh automatically
             } catch (e) {
