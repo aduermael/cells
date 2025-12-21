@@ -687,6 +687,8 @@ public:
     // Column/row resize operations
     // ========================================================================
 
+    // Resize a column. Creates a DIM_RESIZE_AXIS operation and commits immediately.
+    // Structure operations commit immediately (not pending) to avoid conflicts.
     std::string resizeColumn(const std::string& colIdStr, uint32_t width) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -711,11 +713,16 @@ public:
         if (width < 20) width = 20;
         if (width > 1000) width = 1000;
 
-        it->second->size = width;
+        // Create and apply DIM_RESIZE_AXIS operation (commits immediately)
+        std::string payload = "{\"size\":" + std::to_string(width) + "}";
+        Operation op = makeDimResizeAxisOp(*_workbook, colId, payload);
+        applyOperation(*_workbook, op);
+
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
 
+    // Resize a column by position. Creates operations and commits immediately.
     std::string resizeColumnByPos(uint32_t pos, uint32_t width) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -732,30 +739,39 @@ public:
 
         // Find column at position, or create it
         Axis* column = nullptr;
+        ID colId;
         for (auto& [id, col] : sheet->columns) {
             if (col->position == pos) {
                 column = col.get();
+                colId = id;
                 break;
             }
         }
 
         if (!column) {
-            auto newCol = std::make_unique<Axis>(generate_id(), true);
-            newCol->position = pos;
-            newCol->size = width;
-            column = newCol.get();
-            sheet->addColumn(std::move(newCol));
+            // Create new column via DIM_INSERT_AXIS operation
+            colId = generate_id();
+            std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
+                                        ",\"size\":" + std::to_string(width) +
+                                        ",\"isCol\":\"true\"}";
+            Operation insertOp = makeDimInsertAxisOp(*_workbook, colId, insertPayload);
+            applyOperation(*_workbook, insertOp);
+            column = sheet->getColumn(colId);
         } else {
-            column->size = width;
+            // Resize existing column via DIM_RESIZE_AXIS operation
+            std::string resizePayload = "{\"size\":" + std::to_string(width) + "}";
+            Operation resizeOp = makeDimResizeAxisOp(*_workbook, colId, resizePayload);
+            applyOperation(*_workbook, resizeOp);
         }
 
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         std::ostringstream json;
-        json << "{\"success\":true,\"id\":\"" << column->id.toString() << "\"}";
+        json << "{\"success\":true,\"id\":\"" << colId.toString() << "\"}";
         return json.str();
     }
 
+    // Resize a row. Creates a DIM_RESIZE_AXIS operation and commits immediately.
     std::string resizeRow(const std::string& rowIdStr, uint32_t height) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -780,11 +796,16 @@ public:
         if (height < 10) height = 10;
         if (height > 500) height = 500;
 
-        it->second->size = height;
+        // Create and apply DIM_RESIZE_AXIS operation (commits immediately)
+        std::string payload = "{\"size\":" + std::to_string(height) + "}";
+        Operation op = makeDimResizeAxisOp(*_workbook, rowId, payload);
+        applyOperation(*_workbook, op);
+
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
 
+    // Resize a row by position. Creates operations and commits immediately.
     std::string resizeRowByPos(uint32_t pos, uint32_t height) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -801,27 +822,35 @@ public:
 
         // Find row at position, or create it
         Axis* row = nullptr;
+        ID rowId;
         for (auto& [id, r] : sheet->rows) {
             if (r->position == pos) {
                 row = r.get();
+                rowId = id;
                 break;
             }
         }
 
         if (!row) {
-            auto newRow = std::make_unique<Axis>(generate_id(), false);
-            newRow->position = pos;
-            newRow->size = height;
-            row = newRow.get();
-            sheet->addRow(std::move(newRow));
+            // Create new row via DIM_INSERT_AXIS operation
+            rowId = generate_id();
+            std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
+                                        ",\"size\":" + std::to_string(height) +
+                                        ",\"isCol\":\"false\"}";
+            Operation insertOp = makeDimInsertAxisOp(*_workbook, rowId, insertPayload);
+            applyOperation(*_workbook, insertOp);
+            row = sheet->getRow(rowId);
         } else {
-            row->size = height;
+            // Resize existing row via DIM_RESIZE_AXIS operation
+            std::string resizePayload = "{\"size\":" + std::to_string(height) + "}";
+            Operation resizeOp = makeDimResizeAxisOp(*_workbook, rowId, resizePayload);
+            applyOperation(*_workbook, resizeOp);
         }
 
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         std::ostringstream json;
-        json << "{\"success\":true,\"id\":\"" << row->id.toString() << "\"}";
+        json << "{\"success\":true,\"id\":\"" << rowId.toString() << "\"}";
         return json.str();
     }
 

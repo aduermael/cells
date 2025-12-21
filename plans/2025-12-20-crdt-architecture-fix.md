@@ -198,15 +198,15 @@ Add pending operation support for live typing visibility.
   - Pending op NOT in OpLog yet
   - Value applied directly to cell for immediate visual feedback
 
-- [ ] 3c: Structure operations commit immediately
-  - DIM_INSERT_AXIS (column/row creation) → immediate commit
-  - DIM_MOVE_AXIS, DIM_RESIZE_AXIS → immediate commit
-  - Column/row rename → immediate commit
+- [x] 3c: Structure operations commit immediately
+  - DIM_INSERT_AXIS (column/row creation) → immediate commit (already done)
+  - DIM_RESIZE_AXIS → immediate commit (resizeColumn, resizeRow, resizeColumnByPos, resizeRowByPos)
+  - DIM_MOVE_AXIS, rename → deferred to Phase 6 (requires more work)
   - This prevents conflicts when multiple users edit same area
 
 - [ ] 3d: Implement commit logic for cell values
   - `commitPendingOps()` moves pending → OpLog
-  - Triggers on: blur, Enter, navigation, 500ms timeout
+  - Triggers on: blur, Enter, navigation (no timeout)
   - Same target pending ops replace previous (debounce)
 
 - [ ] 3e: Render pending operations
