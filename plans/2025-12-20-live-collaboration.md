@@ -52,7 +52,7 @@ Implement the core CRDT data structures and operation log in C++ for the engine.
   - `getOperationsForEntity(ID entity_id)` for history
   - Add tests in `core/cells/oplog_test.cc`
 
-- [ ] 1d: Add OpLog to Workbook model
+- [x] 1d: Add OpLog to Workbook model
   - Add `std::unique_ptr<OpLog> oplog` field to `Workbook` struct
   - Initialize in constructor
   - Expose via `getOpLog()` method

@@ -83,7 +83,10 @@ cc_library(
     srcs = ["model.cc"],
     hdrs = ["model.h"],
     visibility = ["//visibility:public"],
-    deps = [":types"],
+    deps = [
+        ":oplog",
+        ":types",
+    ],
 )
 
 cc_library(

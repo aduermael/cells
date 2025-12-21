@@ -392,9 +392,12 @@ std::string Sheet::makeCellKey(const ID& colId, const ID& rowId) {
 // Workbook
 // ============================================================================
 
-Workbook::Workbook() : id(), name("Untitled") {}
+Workbook::Workbook() : id(), name("Untitled"), _oplog(std::make_unique<OpLog>()), _nodeId() {}
 
-Workbook::Workbook(const ID& id, std::string name) : id(id), name(std::move(name)) {}
+Workbook::Workbook(const ID& id, std::string name)
+    : id(id), name(std::move(name)), _oplog(std::make_unique<OpLog>()), _nodeId() {}
+
+Workbook::~Workbook() = default;
 
 Sheet* Workbook::getSheet(const ID& sheetId) {
     auto it = _sheetIndex.find(sheetId);
@@ -418,6 +421,37 @@ void Workbook::addSheet(std::unique_ptr<Sheet> sheet) {
 
     sheets.push_back(std::move(sheet));
     _sheetIndex[sheetId] = rawPtr;
+}
+
+OpLog* Workbook::getOpLog() {
+    return _oplog.get();
+}
+
+const OpLog* Workbook::getOpLog() const {
+    return _oplog.get();
+}
+
+void Workbook::setNodeId(const ID& nodeId) {
+    _nodeId = nodeId;
+}
+
+const ID& Workbook::getNodeId() const {
+    return _nodeId;
+}
+
+HLC Workbook::getCurrentHLC() const {
+    // If no node ID set, return zero HLC
+    if (_nodeId.isNull()) {
+        return HLC();
+    }
+
+    // Get the latest HLC from the OpLog or last generated
+    HLC oplog_hlc = _oplog->getCurrentHLC();
+    HLC base = (_lastHLC > oplog_hlc) ? _lastHLC : oplog_hlc;
+
+    // Generate new HLC
+    _lastHLC = generate_hlc(base, _nodeId);
+    return _lastHLC;
 }
 
 }  // namespace cells

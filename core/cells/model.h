@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "core/cells/oplog.h"
 #include "core/cells/types.h"
 
 namespace cells {
@@ -18,6 +19,7 @@ struct Cell;
 struct Sheet;
 struct Workbook;
 struct SharedFormulaGroup;
+struct OpLog;
 
 // Cell value - stores the raw value as a string (for simplicity)
 // The type field indicates how to interpret it
@@ -198,6 +200,7 @@ struct Workbook {
 
     Workbook();
     explicit Workbook(const ID& id, std::string name = "Untitled");
+    ~Workbook();
 
     // Sheet operations
     Sheet* getSheet(const ID& sheetId);
@@ -206,9 +209,29 @@ struct Workbook {
 
     [[nodiscard]] size_t sheetCount() const { return sheets.size(); }
 
+    // Operation log for CRDT collaboration
+    OpLog* getOpLog();
+    [[nodiscard]] const OpLog* getOpLog() const;
+
+    // Node ID for HLC generation (local peer identity)
+    void setNodeId(const ID& nodeId);
+    [[nodiscard]] const ID& getNodeId() const;
+
+    // Current HLC for generating new operations
+    [[nodiscard]] HLC getCurrentHLC() const;
+
 private:
     // Sheet lookup by ID
     std::unordered_map<ID, Sheet*, IDHash> _sheetIndex;
+
+    // Operation log for CRDT synchronization
+    std::unique_ptr<OpLog> _oplog;
+
+    // Local node ID for HLC generation
+    ID _nodeId;
+
+    // Last HLC used for generating operations
+    mutable HLC _lastHLC;
 };
 
 }  // namespace cells
