@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "core/cells/operation.h"
 #include "core/cells/oplog.h"
 #include "core/cells/types.h"
 
@@ -190,6 +191,15 @@ private:
     static std::string makeCellKey(const ID& colId, const ID& rowId);
 };
 
+// Pending operation with associated peer ID (for remote pending operations)
+struct PendingOperation {
+    Operation op;       // The operation itself
+    ID sourcePeerId;    // Empty = local, non-empty = from remote peer
+
+    PendingOperation() = default;
+    PendingOperation(Operation op, ID peerId = ID());
+};
+
 // Workbook - top-level container
 struct Workbook {
     ID id;             // Document ID
@@ -220,12 +230,55 @@ struct Workbook {
     // Current HLC for generating new operations
     [[nodiscard]] HLC getCurrentHLC() const;
 
+    // ========================================================================
+    // Pending operations support (for live typing visibility)
+    // Only CELL_SET_VALUE operations can be pending.
+    // Structure operations (DIM_INSERT_AXIS, etc.) commit immediately.
+    // ========================================================================
+
+    // Add a pending operation (local edit not yet committed)
+    // If a pending op for the same target exists, it's replaced (debounce)
+    void addPendingOp(const Operation& op);
+
+    // Add a remote pending operation from a peer
+    void addRemotePendingOp(const Operation& op, const ID& peerId);
+
+    // Remove pending operations for a target (on commit or clear)
+    void removePendingOpsForTarget(const ID& targetId);
+
+    // Remove pending operations from a specific peer (on peer disconnect)
+    void removePendingOpsFromPeer(const ID& peerId);
+
+    // Commit all local pending operations (moves them to OpLog)
+    // Returns the committed operations (for broadcasting)
+    [[nodiscard]] std::vector<Operation> commitPendingOps();
+
+    // Commit pending operations for a specific target
+    // Returns the committed operation if any
+    [[nodiscard]] std::vector<Operation> commitPendingOpsForTarget(const ID& targetId);
+
+    // Get all pending operations (for viewport rendering)
+    [[nodiscard]] const std::vector<PendingOperation>& getPendingOps() const;
+
+    // Get pending operation for a specific target (returns nullptr if none)
+    [[nodiscard]] const Operation* getPendingOpForTarget(const ID& targetId) const;
+
+    // Check if there are any pending operations
+    [[nodiscard]] bool hasPendingOps() const;
+
+    // Get count of pending operations
+    [[nodiscard]] size_t pendingOpsCount() const;
+
 private:
     // Sheet lookup by ID
     std::unordered_map<ID, Sheet*, IDHash> _sheetIndex;
 
     // Operation log for CRDT synchronization
     std::unique_ptr<OpLog> _oplog;
+
+    // Pending operations (not yet committed to OpLog)
+    // Key insight: only CELL_SET_VALUE can be pending
+    std::vector<PendingOperation> _pendingOps;
 
     // Local node ID for HLC generation
     ID _nodeId;

@@ -183,11 +183,14 @@ Add pending operation support for live typing visibility.
 - **Cell values**: Can be pending (for live typing debounce)
 - **Structure operations** (column/row create, move, resize, rename): Commit immediately to avoid conflicts
 
-- [ ] 3a: Add pending operations to Workbook
-  - `std::vector<Operation> _pendingOps`
+- [x] 3a: Add pending operations to Workbook
+  - `std::vector<PendingOperation> _pendingOps` with `PendingOperation` struct (op + sourcePeerId)
   - Separate from committed OpLog
   - Pending ops have HLC but not in OpLog yet
   - **Only CELL_SET_VALUE can be pending** - structure ops commit immediately
+  - Added methods: `addPendingOp()`, `addRemotePendingOp()`, `removePendingOpsForTarget()`,
+    `removePendingOpsFromPeer()`, `commitPendingOps()`, `commitPendingOpsForTarget()`,
+    `getPendingOps()`, `getPendingOpForTarget()`, `hasPendingOps()`, `pendingOpsCount()`
 
 - [ ] 3b: Modify cell edit flow
   - `updateCell()` creates pending operation for cell value
