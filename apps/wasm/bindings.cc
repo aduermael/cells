@@ -476,10 +476,9 @@ public:
     // Cell operations
     // ========================================================================
 
-    // Update a cell value. This creates a PENDING operation (not committed yet).
-    // The pending operation is applied locally for immediate visual feedback,
-    // but not added to the OpLog until commitPendingOps() is called.
-    // This enables live typing visibility for collaborators.
+    // Update a cell value.
+    // In COLLABORATING mode: Creates a PENDING operation for live typing visibility.
+    // In OFFLINE mode: Direct mutation, no operations created.
     std::string updateCell(const std::string& cellIdStr, const std::string& value) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -500,52 +499,57 @@ public:
             return "{\"error\":\"Cell not found\"}";
         }
 
-        // Get column and row IDs for CRDT sync
-        std::string colIdStr = cell->colId.toString();
-        std::string rowIdStr = cell->rowId.toString();
-
-        // Build ID suffix for payload
-        std::string idSuffix = ",\"col_id\":\"" + colIdStr + "\",\"row_id\":\"" + rowIdStr + "\"}";
-
-        // Build the payload for the CRDT operation
-        std::string payload;
+        // Determine value type
         char typeChar = 's';  // default to string
-
         if (!value.empty() && value[0] == '=') {
-            // Formula
-            std::string uuidFormula = _refConverter.formulaToUuid(value);
-            typeChar = 'f';
-            payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\",\"display\":\"" + jsonEscape(value) + "\"" + idSuffix;
+            typeChar = 'f';  // formula
         } else if (value.empty()) {
             typeChar = 'e';  // empty
-            payload = "{\"type\":\"e\",\"value\":\"\"" + idSuffix;
         } else if (value == "TRUE" || value == "true") {
             typeChar = 'b';
-            payload = "{\"type\":\"b\",\"value\":\"true\"" + idSuffix;
         } else if (value == "FALSE" || value == "false") {
             typeChar = 'b';
-            payload = "{\"type\":\"b\",\"value\":\"false\"" + idSuffix;
         } else {
             // Try parsing as number
             char* endptr = nullptr;
             strtod(value.c_str(), &endptr);
             if (endptr != nullptr && *endptr == '\0' && endptr != value.c_str()) {
                 typeChar = 'n';
-                payload = "{\"type\":\"n\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
-            } else {
-                typeChar = 's';
-                payload = "{\"type\":\"s\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
             }
         }
 
-        // Create the operation (this generates an HLC)
-        Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
+        // Only create operations if collaborating
+        if (_workbook->isCollaborating()) {
+            // Get column and row IDs for CRDT sync
+            std::string colIdStr = cell->colId.toString();
+            std::string rowIdStr = cell->rowId.toString();
 
-        // Add to pending operations (replaces existing pending op for same target)
-        _workbook->addPendingOp(op);
+            // Build ID suffix for payload
+            std::string idSuffix = ",\"col_id\":\"" + colIdStr + "\",\"row_id\":\"" + rowIdStr + "\"}";
+
+            // Build the payload for the CRDT operation
+            std::string payload;
+            if (typeChar == 'f') {
+                std::string uuidFormula = _refConverter.formulaToUuid(value);
+                payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\",\"display\":\"" + jsonEscape(value) + "\"" + idSuffix;
+            } else if (typeChar == 'e') {
+                payload = "{\"type\":\"e\",\"value\":\"\"" + idSuffix;
+            } else if (typeChar == 'b') {
+                payload = "{\"type\":\"b\",\"value\":\"" + std::string(value == "TRUE" || value == "true" ? "true" : "false") + "\"" + idSuffix;
+            } else if (typeChar == 'n') {
+                payload = "{\"type\":\"n\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+            } else {
+                payload = "{\"type\":\"s\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+            }
+
+            // Create the operation (this generates an HLC)
+            Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
+
+            // Add to pending operations (replaces existing pending op for same target)
+            _workbook->addPendingOp(op);
+        }
 
         // Apply the value directly to the cell for immediate visual feedback
-        // This is NOT committed to the OpLog yet
         // Note: 'e' in payload means empty, but we use STRING type with empty raw
         CellValueType cellType;
         if (typeChar == 'e') {
@@ -575,6 +579,9 @@ public:
         return "{\"success\":true}";
     }
 
+    // Create a new cell at the given position.
+    // In COLLABORATING mode: Creates DIM_INSERT_AXIS and CELL_SET_VALUE operations.
+    // In OFFLINE mode: Direct creation, no operations.
     std::string createCell(uint32_t col, uint32_t row, const std::string& value) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -584,6 +591,8 @@ public:
         if (!sheet) {
             return "{\"error\":\"Sheet not found\"}";
         }
+
+        bool const isCollab = _workbook->isCollaborating();
 
         // Find or create column at position
         ID colId;
@@ -595,12 +604,20 @@ public:
         }
         if (colId.isNull()) {
             colId = generate_id();
-            // Create DIM_INSERT_AXIS operation for new column
-            std::string colPayload = "{\"pos\":" + std::to_string(col) +
-                                     ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) +
-                                     ",\"isCol\":\"true\"}";
-            Operation colOp = makeDimInsertAxisOp(*_workbook, colId, colPayload);
-            applyOperation(*_workbook, colOp);
+            if (isCollab) {
+                // Create DIM_INSERT_AXIS operation for new column
+                std::string colPayload = "{\"pos\":" + std::to_string(col) +
+                                         ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) +
+                                         ",\"isCol\":\"true\"}";
+                Operation colOp = makeDimInsertAxisOp(*_workbook, colId, colPayload);
+                applyOperation(*_workbook, colOp);
+            } else {
+                // Direct creation (offline mode)
+                auto newCol = std::make_unique<Axis>(colId, true);
+                newCol->position = col;
+                newCol->size = DEFAULT_COLUMN_WIDTH;
+                sheet->addColumn(std::move(newCol));
+            }
         }
 
         // Find or create row at position
@@ -613,12 +630,20 @@ public:
         }
         if (rowId.isNull()) {
             rowId = generate_id();
-            // Create DIM_INSERT_AXIS operation for new row
-            std::string rowPayload = "{\"pos\":" + std::to_string(row) +
-                                     ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) +
-                                     ",\"isCol\":\"false\"}";
-            Operation rowOp = makeDimInsertAxisOp(*_workbook, rowId, rowPayload);
-            applyOperation(*_workbook, rowOp);
+            if (isCollab) {
+                // Create DIM_INSERT_AXIS operation for new row
+                std::string rowPayload = "{\"pos\":" + std::to_string(row) +
+                                         ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) +
+                                         ",\"isCol\":\"false\"}";
+                Operation rowOp = makeDimInsertAxisOp(*_workbook, rowId, rowPayload);
+                applyOperation(*_workbook, rowOp);
+            } else {
+                // Direct creation (offline mode)
+                auto newRow = std::make_unique<Axis>(rowId, false);
+                newRow->position = row;
+                newRow->size = DEFAULT_ROW_HEIGHT;
+                sheet->addRow(std::move(newRow));
+            }
         }
 
         // Create new cell
@@ -626,36 +651,63 @@ public:
         auto newCell = std::make_unique<Cell>(cellId, colId, rowId);
         sheet->addCell(std::move(newCell));
 
-        // If value is provided, create a CRDT operation for it
+        // If value is provided, set cell value
         if (!value.empty()) {
-            // Get the cell we just added
             Cell* cell = sheet->getCell(cellId);
             if (cell) {
-                // Build ID suffix for payload
-                std::string idSuffix = ",\"col_id\":\"" + colId.toString() + "\",\"row_id\":\"" + rowId.toString() + "\"}";
+                if (isCollab) {
+                    // Build ID suffix for payload
+                    std::string idSuffix = ",\"col_id\":\"" + colId.toString() + "\",\"row_id\":\"" + rowId.toString() + "\"}";
 
-                // Determine type and build payload
-                std::string payload;
-                if (value[0] == '=') {
-                    std::string uuidFormula = _refConverter.formulaToUuid(value);
-                    payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\",\"display\":\"" + jsonEscape(value) + "\"" + idSuffix;
-                } else if (value == "TRUE" || value == "true") {
-                    payload = "{\"type\":\"b\",\"value\":\"true\"" + idSuffix;
-                } else if (value == "FALSE" || value == "false") {
-                    payload = "{\"type\":\"b\",\"value\":\"false\"" + idSuffix;
-                } else {
-                    char* endptr = nullptr;
-                    strtod(value.c_str(), &endptr);
-                    if (endptr != nullptr && *endptr == '\0' && endptr != value.c_str()) {
-                        payload = "{\"type\":\"n\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+                    // Determine type and build payload
+                    std::string payload;
+                    if (value[0] == '=') {
+                        std::string uuidFormula = _refConverter.formulaToUuid(value);
+                        payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\",\"display\":\"" + jsonEscape(value) + "\"" + idSuffix;
+                    } else if (value == "TRUE" || value == "true") {
+                        payload = "{\"type\":\"b\",\"value\":\"true\"" + idSuffix;
+                    } else if (value == "FALSE" || value == "false") {
+                        payload = "{\"type\":\"b\",\"value\":\"false\"" + idSuffix;
                     } else {
-                        payload = "{\"type\":\"s\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+                        char* endptr = nullptr;
+                        strtod(value.c_str(), &endptr);
+                        if (endptr != nullptr && *endptr == '\0' && endptr != value.c_str()) {
+                            payload = "{\"type\":\"n\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+                        } else {
+                            payload = "{\"type\":\"s\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+                        }
                     }
-                }
 
-                // Create and apply the CRDT operation
-                Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
-                applyOperation(*_workbook, op);
+                    // Create and apply the CRDT operation
+                    Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
+                    applyOperation(*_workbook, op);
+                } else {
+                    // Direct value setting (offline mode)
+                    if (value[0] == '=') {
+                        std::string uuidFormula = _refConverter.formulaToUuid(value);
+                        auto* formula = new Formula(uuidFormula.c_str());
+                        cell->setFormula(formula);
+                        cell->value.type = CellValueType::FORMULA;
+                        cell->value.raw = value;
+                    } else if (value == "TRUE" || value == "true") {
+                        cell->value.type = CellValueType::BOOLEAN;
+                        cell->value.raw = "true";
+                    } else if (value == "FALSE" || value == "false") {
+                        cell->value.type = CellValueType::BOOLEAN;
+                        cell->value.raw = "false";
+                    } else {
+                        char* endptr = nullptr;
+                        strtod(value.c_str(), &endptr);
+                        if (endptr != nullptr && *endptr == '\0' && endptr != value.c_str()) {
+                            cell->value.type = CellValueType::NUMBER;
+                            cell->value.raw = value;
+                        } else {
+                            cell->value.type = CellValueType::STRING;
+                            cell->value.raw = value;
+                        }
+                    }
+                    cell->value.error = CellError::NONE;
+                }
             }
         }
 
@@ -696,10 +748,11 @@ public:
 
     // ========================================================================
     // Column/row resize operations
+    // In COLLABORATING mode: Creates operations and commits immediately.
+    // In OFFLINE mode: Direct mutation, no operations.
     // ========================================================================
 
-    // Resize a column. Creates a DIM_RESIZE_AXIS operation and commits immediately.
-    // Structure operations commit immediately (not pending) to avoid conflicts.
+    // Resize a column by ID.
     std::string resizeColumn(const std::string& colIdStr, uint32_t width) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -724,16 +777,21 @@ public:
         if (width < 20) width = 20;
         if (width > 1000) width = 1000;
 
-        // Create and apply DIM_RESIZE_AXIS operation (commits immediately)
-        std::string payload = "{\"size\":" + std::to_string(width) + "}";
-        Operation op = makeDimResizeAxisOp(*_workbook, colId, payload);
-        applyOperation(*_workbook, op);
+        if (_workbook->isCollaborating()) {
+            // Create and apply DIM_RESIZE_AXIS operation (commits immediately)
+            std::string payload = "{\"size\":" + std::to_string(width) + "}";
+            Operation op = makeDimResizeAxisOp(*_workbook, colId, payload);
+            applyOperation(*_workbook, op);
+        } else {
+            // Direct mutation (offline mode)
+            it->second->size = width;
+        }
 
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
 
-    // Resize a column by position. Creates operations and commits immediately.
+    // Resize a column by position.
     std::string resizeColumnByPos(uint32_t pos, uint32_t width) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -748,6 +806,8 @@ public:
         if (width < 20) width = 20;
         if (width > 1000) width = 1000;
 
+        bool const isCollab = _workbook->isCollaborating();
+
         // Find column at position, or create it
         Axis* column = nullptr;
         ID colId;
@@ -760,19 +820,32 @@ public:
         }
 
         if (!column) {
-            // Create new column via DIM_INSERT_AXIS operation
             colId = generate_id();
-            std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
-                                        ",\"size\":" + std::to_string(width) +
-                                        ",\"isCol\":\"true\"}";
-            Operation insertOp = makeDimInsertAxisOp(*_workbook, colId, insertPayload);
-            applyOperation(*_workbook, insertOp);
+            if (isCollab) {
+                // Create new column via DIM_INSERT_AXIS operation
+                std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
+                                            ",\"size\":" + std::to_string(width) +
+                                            ",\"isCol\":\"true\"}";
+                Operation insertOp = makeDimInsertAxisOp(*_workbook, colId, insertPayload);
+                applyOperation(*_workbook, insertOp);
+            } else {
+                // Direct creation (offline mode)
+                auto newCol = std::make_unique<Axis>(colId, true);
+                newCol->position = pos;
+                newCol->size = width;
+                sheet->addColumn(std::move(newCol));
+            }
             column = sheet->getColumn(colId);
         } else {
-            // Resize existing column via DIM_RESIZE_AXIS operation
-            std::string resizePayload = "{\"size\":" + std::to_string(width) + "}";
-            Operation resizeOp = makeDimResizeAxisOp(*_workbook, colId, resizePayload);
-            applyOperation(*_workbook, resizeOp);
+            if (isCollab) {
+                // Resize existing column via DIM_RESIZE_AXIS operation
+                std::string resizePayload = "{\"size\":" + std::to_string(width) + "}";
+                Operation resizeOp = makeDimResizeAxisOp(*_workbook, colId, resizePayload);
+                applyOperation(*_workbook, resizeOp);
+            } else {
+                // Direct mutation (offline mode)
+                column->size = width;
+            }
         }
 
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
@@ -782,7 +855,7 @@ public:
         return json.str();
     }
 
-    // Resize a row. Creates a DIM_RESIZE_AXIS operation and commits immediately.
+    // Resize a row by ID.
     std::string resizeRow(const std::string& rowIdStr, uint32_t height) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -807,16 +880,21 @@ public:
         if (height < 10) height = 10;
         if (height > 500) height = 500;
 
-        // Create and apply DIM_RESIZE_AXIS operation (commits immediately)
-        std::string payload = "{\"size\":" + std::to_string(height) + "}";
-        Operation op = makeDimResizeAxisOp(*_workbook, rowId, payload);
-        applyOperation(*_workbook, op);
+        if (_workbook->isCollaborating()) {
+            // Create and apply DIM_RESIZE_AXIS operation (commits immediately)
+            std::string payload = "{\"size\":" + std::to_string(height) + "}";
+            Operation op = makeDimResizeAxisOp(*_workbook, rowId, payload);
+            applyOperation(*_workbook, op);
+        } else {
+            // Direct mutation (offline mode)
+            it->second->size = height;
+        }
 
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
 
-    // Resize a row by position. Creates operations and commits immediately.
+    // Resize a row by position.
     std::string resizeRowByPos(uint32_t pos, uint32_t height) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
@@ -831,6 +909,8 @@ public:
         if (height < 10) height = 10;
         if (height > 500) height = 500;
 
+        bool const isCollab = _workbook->isCollaborating();
+
         // Find row at position, or create it
         Axis* row = nullptr;
         ID rowId;
@@ -843,19 +923,32 @@ public:
         }
 
         if (!row) {
-            // Create new row via DIM_INSERT_AXIS operation
             rowId = generate_id();
-            std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
-                                        ",\"size\":" + std::to_string(height) +
-                                        ",\"isCol\":\"false\"}";
-            Operation insertOp = makeDimInsertAxisOp(*_workbook, rowId, insertPayload);
-            applyOperation(*_workbook, insertOp);
+            if (isCollab) {
+                // Create new row via DIM_INSERT_AXIS operation
+                std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
+                                            ",\"size\":" + std::to_string(height) +
+                                            ",\"isCol\":\"false\"}";
+                Operation insertOp = makeDimInsertAxisOp(*_workbook, rowId, insertPayload);
+                applyOperation(*_workbook, insertOp);
+            } else {
+                // Direct creation (offline mode)
+                auto newRow = std::make_unique<Axis>(rowId, false);
+                newRow->position = pos;
+                newRow->size = height;
+                sheet->addRow(std::move(newRow));
+            }
             row = sheet->getRow(rowId);
         } else {
-            // Resize existing row via DIM_RESIZE_AXIS operation
-            std::string resizePayload = "{\"size\":" + std::to_string(height) + "}";
-            Operation resizeOp = makeDimResizeAxisOp(*_workbook, rowId, resizePayload);
-            applyOperation(*_workbook, resizeOp);
+            if (isCollab) {
+                // Resize existing row via DIM_RESIZE_AXIS operation
+                std::string resizePayload = "{\"size\":" + std::to_string(height) + "}";
+                Operation resizeOp = makeDimResizeAxisOp(*_workbook, rowId, resizePayload);
+                applyOperation(*_workbook, resizeOp);
+            } else {
+                // Direct mutation (offline mode)
+                row->size = height;
+            }
         }
 
         notifyListeners(ChangeType::STRUCTURE_CHANGED);

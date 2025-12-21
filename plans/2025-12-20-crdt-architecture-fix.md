@@ -233,7 +233,7 @@ Implement proper offline vs collaborating mode.
   - Default: OFFLINE
   - Switch to COLLABORATING on first Share/Join
 
-- [ ] 4b: Bypass OpLog in offline mode
+- [x] 4b: Bypass OpLog in offline mode
   - When OFFLINE: direct cell mutation, no operations
   - No HLC overhead, no OpLog storage
   - File save excludes `#oplog` section
