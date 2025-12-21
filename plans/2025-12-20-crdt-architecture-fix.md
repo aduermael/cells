@@ -153,24 +153,24 @@ Move all CRDT sync state from JavaScript to C++ engine.
 
 Refactor JavaScript to only handle connections, not CRDT logic.
 
-- [ ] 2a: Refactor collab-manager.js
+- [x] 2a: Refactor collab-manager.js
   - Remove `_pendingOperations` (moved to engine)
   - Remove `_peerSyncState` (moved to engine)
   - Remove sync protocol handling (hello/request/response)
   - Keep only: WebRTC setup, message routing
 
-- [ ] 2b: Implement message routing
+- [x] 2b: Implement message routing
   - On WebRTC message received: `engine.handlePeerMessage(peerId, msg)`
   - Get response messages and send them
   - On peer connect: `engine.addPeer(peerId)`
   - On peer disconnect: `engine.removePeer(peerId)`
 
-- [ ] 2c: Implement outgoing message pump
+- [x] 2c: Implement outgoing message pump
   - Poll `engine.getOutgoingMessages()` on timer (50ms)
   - Or trigger after local edit
   - Send messages to appropriate peers
 
-- [ ] 2d: Remove lastKnownHLC from index.html
+- [x] 2d: Remove lastKnownHLC from index.html
   - Engine tracks what needs broadcasting per peer
   - No more `broadcastNewOperations()` polling
   - Local edits automatically queue outgoing messages

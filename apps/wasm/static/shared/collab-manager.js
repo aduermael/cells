@@ -1,5 +1,6 @@
 // Collaboration Manager Module
-// Connects CRDT operations from the WASM engine to the WebRTC P2P layer
+// Thin transport layer that routes messages between WebRTC peers and the C++ engine.
+// All CRDT sync state and protocol logic lives in the C++ SyncManager.
 
 /**
  * Collaboration states
@@ -57,7 +58,8 @@ function generatePeerId() {
 }
 
 /**
- * Manages collaboration between the WASM engine and WebRTC peers
+ * Manages collaboration between the WASM engine and WebRTC peers.
+ * This is a thin transport layer - all CRDT sync state lives in C++ SyncManager.
  */
 export class CollabManager {
     /**
@@ -86,12 +88,6 @@ export class CollabManager {
         this._peerId = null;
         this._roomId = null;
 
-        // Track last synced HLC per peer for incremental sync
-        this._peerSyncState = new Map();
-
-        // Queue for operations waiting to be sent (while connecting)
-        this._pendingOperations = [];
-
         // Statistics
         this._stats = {
             operationsSent: 0,
@@ -104,6 +100,10 @@ export class CollabManager {
         this._peerLatencies = new Map(); // peerId -> {lastPing, latency}
         this._pingInterval = null;
         this._pingIntervalMs = 5000; // Ping every 5 seconds
+
+        // Outgoing message pump interval
+        this._outgoingPumpInterval = null;
+        this._outgoingPumpIntervalMs = 50; // Check for outgoing messages every 50ms
 
         // Debug mode
         this._debugMode = this._loadDebugMode();
@@ -219,12 +219,10 @@ export class CollabManager {
             roomId: this._roomId,
             state: this._state,
             stats: { ...this._stats },
-            peerSyncState: Object.fromEntries(this._peerSyncState),
             peerLatencies: Object.fromEntries(
                 Array.from(this._peerLatencies.entries()).map(([k, v]) => [k, v.latency])
             ),
-            operationLog: this._operationLog,
-            pendingOperationsCount: this._pendingOperations.length
+            operationLog: this._operationLog
         };
     }
 
@@ -250,14 +248,8 @@ export class CollabManager {
     resetSyncState() {
         this._log('Resetting sync state');
 
-        // Clear peer sync state
-        this._peerSyncState.clear();
-
         // Clear latencies
         this._peerLatencies.clear();
-
-        // Clear pending operations
-        this._pendingOperations = [];
 
         // Close existing connections
         this._webrtcManager.close();
@@ -306,14 +298,6 @@ export class CollabManager {
      */
     getConnectedPeerCount() {
         return this._webrtcManager.getReadyConnectionCount();
-    }
-
-    /**
-     * Get number of pending operations waiting to be sent
-     * @returns {number}
-     */
-    getPendingOperationCount() {
-        return this._pendingOperations.length;
     }
 
     /**
@@ -440,7 +424,6 @@ export class CollabManager {
             // Leave and rejoin the room to force new connections
             this._signalingClient.leave();
             this._webrtcManager.close();
-            this._peerSyncState.clear();
             this._peerLatencies.clear();
             this._setState(CollabState.CONNECTING);
 
@@ -468,6 +451,13 @@ export class CollabManager {
         const result = JSON.parse(resultStr);
         if (result.error) {
             throw new Error(`Failed to set node ID: ${result.error}`);
+        }
+
+        // Initialize the SyncManager in the engine
+        const syncResultStr = await this._engine.initSyncManager();
+        const syncResult = JSON.parse(syncResultStr);
+        if (syncResult.error) {
+            throw new Error(`Failed to init SyncManager: ${syncResult.error}`);
         }
 
         this._webrtcManager.setLocalPeerId(this._peerId);
@@ -528,98 +518,33 @@ export class CollabManager {
      */
     leaveRoom() {
         this._stopPinging();
+        this._stopOutgoingPump();
         this._signalingClient.leave();
         this._webrtcManager.close();
-        this._peerSyncState.clear();
         this._peerLatencies.clear();
-        this._pendingOperations = [];
         this._roomId = null;
         this._setState(CollabState.OFFLINE);
         this._emitter.emit('roomleft');
     }
 
     /**
-     * Broadcast a local operation to all connected peers
-     * Called by the application when user makes an edit
-     * @param {Object} operation - Operation in JSON format
+     * Queue local operations for broadcast to all connected peers.
+     * Called by the application after a local edit.
+     * The C++ engine tracks which operations need to be sent to which peers.
      */
-    broadcastOperation(operation) {
-        // Log sent operation
-        this._logOperation('sent', 'broadcast', operation);
-
-        const message = JSON.stringify({
-            type: 'operations',
-            batch: [operation]
-        });
-
-        const readyCount = this._webrtcManager.getReadyConnectionCount();
-        if (readyCount > 0) {
-            this._webrtcManager.broadcastOperation(message);
-            this._stats.operationsSent++;
-            this._emitter.emit('operationsent', operation);
-        } else if (this._state === CollabState.CONNECTING || this._state === CollabState.SYNCING) {
-            // Queue operation for later
-            this._pendingOperations.push(operation);
+    async queueLocalOperationsBroadcast() {
+        try {
+            const resultStr = await this._engine.queueOperationsBroadcast();
+            const result = JSON.parse(resultStr);
+            if (result.error) {
+                console.error('[Collab] Failed to queue operations broadcast:', result.error);
+                return;
+            }
+            // Immediately flush outgoing messages
+            await this._flushOutgoing();
+        } catch (err) {
+            console.error('[Collab] queueLocalOperationsBroadcast error:', err);
         }
-    }
-
-    /**
-     * Broadcast multiple operations as a batch
-     * @param {Object[]} operations - Array of operations
-     */
-    broadcastOperations(operations) {
-        if (operations.length === 0) return;
-
-        // Log sent operations
-        for (const op of operations) {
-            this._logOperation('sent', 'broadcast', op);
-        }
-
-        const message = JSON.stringify({
-            type: 'operations',
-            batch: operations
-        });
-
-        const readyCount = this._webrtcManager.getReadyConnectionCount();
-        if (readyCount > 0) {
-            this._webrtcManager.broadcastOperation(message);
-            this._stats.operationsSent += operations.length;
-            operations.forEach(op => this._emitter.emit('operationsent', op));
-        } else if (this._state === CollabState.CONNECTING || this._state === CollabState.SYNCING) {
-            // Queue operations for later
-            this._pendingOperations.push(...operations);
-        }
-    }
-
-    /**
-     * Get all operations since a given HLC (for sync)
-     * @param {string} [sinceHLC=''] - HLC to get operations after
-     * @returns {Promise<Object[]>} Array of operations
-     */
-    async getOperationsSince(sinceHLC = '') {
-        const resultStr = await this._engine.getOperationsSince(sinceHLC);
-        const result = JSON.parse(resultStr);
-        if (result.error) {
-            console.error('Failed to get operations:', result.error);
-            return [];
-        }
-        return result.operations || [];
-    }
-
-    /**
-     * Get the current HLC timestamp
-     * @returns {Promise<string>}
-     */
-    async getCurrentHLC() {
-        return await this._engine.getCurrentHLC();
-    }
-
-    /**
-     * Get the number of operations in the OpLog
-     * @returns {Promise<number>}
-     */
-    async getOpLogSize() {
-        return await this._engine.getOpLogSize();
     }
 
     /**
@@ -627,7 +552,7 @@ export class CollabManager {
      * @private
      */
     _setupWebRTCHandlers() {
-        // Handle incoming messages
+        // Handle incoming messages - route through engine's SyncManager
         this._webrtcManager.on('message', (peerId, channelType, data) => {
             if (channelType === 'operations') {
                 this._handleOperationsMessage(peerId, data);
@@ -640,17 +565,30 @@ export class CollabManager {
             this._onPeerReady(peerId);
         });
 
-        // Handle peer disconnection
-        this._webrtcManager.on('peerdisconnected', (peerId) => {
-            this._peerSyncState.delete(peerId);
+        // Handle peer disconnection - notify engine
+        this._webrtcManager.on('peerdisconnected', async (peerId) => {
+            await this._removePeerFromEngine(peerId);
             this._updateState();
         });
 
-        this._webrtcManager.on('peerremoved', (peerId) => {
-            this._peerSyncState.delete(peerId);
+        this._webrtcManager.on('peerremoved', async (peerId) => {
+            await this._removePeerFromEngine(peerId);
             this._peerLatencies.delete(peerId);
             this._updateState();
         });
+    }
+
+    /**
+     * Remove peer from engine's SyncManager
+     * @param {string} peerId
+     * @private
+     */
+    async _removePeerFromEngine(peerId) {
+        try {
+            await this._engine.removePeer(peerId);
+        } catch (err) {
+            console.error(`[Collab] Failed to remove peer ${peerId} from engine:`, err);
+        }
     }
 
     /**
@@ -685,9 +623,9 @@ export class CollabManager {
         });
 
         // Handle peer leaving
-        this._signalingClient.on('peerleft', (peerId) => {
+        this._signalingClient.on('peerleft', async (peerId) => {
             this._webrtcManager.removePeer(peerId);
-            this._peerSyncState.delete(peerId);
+            await this._removePeerFromEngine(peerId);
             this._updateState();
         });
 
@@ -809,260 +747,168 @@ export class CollabManager {
      * @param {string} peerId
      * @private
      */
-    _onPeerReady(peerId) {
+    async _onPeerReady(peerId) {
         console.log(`[Collab] Peer ${peerId} is ready (data channels open)`);
         this._setState(CollabState.SYNCING);
 
-        // Send hello message with our current HLC
-        this._sendHello(peerId);
+        // Register peer with engine's SyncManager (this queues a hello message)
+        try {
+            const resultStr = await this._engine.addPeer(peerId);
+            const result = JSON.parse(resultStr);
+            if (result.error) {
+                console.error(`[Collab] Failed to add peer ${peerId}:`, result.error);
+                return;
+            }
+        } catch (err) {
+            console.error(`[Collab] Failed to add peer ${peerId}:`, err);
+            return;
+        }
+
+        // Start the outgoing message pump
+        this._startOutgoingPump();
+
+        // Immediately flush outgoing messages (hello message)
+        await this._flushOutgoing();
+
+        // Start latency pinging
+        this._startPinging();
     }
 
     /**
-     * Send hello message to initiate sync
-     * @param {string} peerId
-     * @private
-     */
-    async _sendHello(peerId) {
-        const currentHLC = await this.getCurrentHLC();
-        const opLogSize = await this.getOpLogSize();
-        const message = JSON.stringify({
-            type: 'hello',
-            peer_id: this._peerId,
-            hlc: currentHLC,
-            op_count: opLogSize
-        });
-
-        this._webrtcManager.sendOperationToPeer(peerId, message);
-    }
-
-    /**
-     * Handle incoming operations message
+     * Handle incoming operations message.
+     * Routes all sync protocol messages through the C++ SyncManager.
      * @param {string} peerId
      * @param {string} data - JSON string
      * @private
      */
     async _handleOperationsMessage(peerId, data) {
         try {
+            // Handle ping/pong locally for latency measurement
             const message = JSON.parse(data);
-
-            switch (message.type) {
-                case 'hello':
-                    await this._handleHello(peerId, message);
-                    break;
-
-                case 'sync-request':
-                    await this._handleSyncRequest(peerId, message);
-                    break;
-
-                case 'sync-response':
-                    await this._handleSyncResponse(peerId, message);
-                    break;
-
-                case 'operations':
-                    await this._handleOperationsBatch(peerId, message.batch || []);
-                    break;
-
-                case 'ping':
-                    this._handlePing(peerId, message.ts);
-                    break;
-
-                case 'pong':
-                    this._handlePong(peerId, message.ts);
-                    break;
-
-                default:
-                    console.warn('Unknown operations message type:', message.type);
+            if (message.type === 'ping') {
+                this._handlePing(peerId, message.ts);
+                return;
             }
-        } catch (err) {
-            console.error('Failed to handle operations message:', err);
-        }
-    }
-
-    /**
-     * Handle hello message from peer
-     * @param {string} peerId
-     * @param {Object} message
-     * @private
-     */
-    async _handleHello(peerId, message) {
-        const peerHLC = message.hlc || '';
-        const peerOpCount = message.op_count || 0;
-
-        // Store peer's HLC for tracking
-        this._peerSyncState.set(peerId, {
-            lastHLC: peerHLC,
-            synced: false
-        });
-
-        // Request operations we don't have
-        const ourHLC = await this.getCurrentHLC();
-        this._sendSyncRequest(peerId, ourHLC);
-    }
-
-    /**
-     * Send sync request to get operations since our last known HLC
-     * @param {string} peerId
-     * @param {string} sinceHLC
-     * @private
-     */
-    _sendSyncRequest(peerId, sinceHLC) {
-        const message = JSON.stringify({
-            type: 'sync-request',
-            since_hlc: sinceHLC
-        });
-
-        this._webrtcManager.sendOperationToPeer(peerId, message);
-    }
-
-    /**
-     * Handle sync request from peer
-     * @param {string} peerId
-     * @param {Object} message
-     * @private
-     */
-    async _handleSyncRequest(peerId, message) {
-        const sinceHLC = message.since_hlc || '';
-        const operations = await this.getOperationsSince(sinceHLC);
-
-        // Send operations in response (batch of max 100)
-        const batchSize = 100;
-        for (let i = 0; i < operations.length; i += batchSize) {
-            const batch = operations.slice(i, i + batchSize);
-            const isLast = i + batchSize >= operations.length;
-
-            const response = JSON.stringify({
-                type: 'sync-response',
-                operations: batch,
-                complete: isLast
-            });
-
-            this._webrtcManager.sendOperationToPeer(peerId, response);
-        }
-
-        // If no operations, still send empty response
-        if (operations.length === 0) {
-            const response = JSON.stringify({
-                type: 'sync-response',
-                operations: [],
-                complete: true
-            });
-
-            this._webrtcManager.sendOperationToPeer(peerId, response);
-        }
-    }
-
-    /**
-     * Handle sync response from peer
-     * @param {string} peerId
-     * @param {Object} message
-     * @private
-     */
-    async _handleSyncResponse(peerId, message) {
-        const operations = message.operations || [];
-        const isComplete = message.complete || false;
-
-        // Apply received operations
-        if (operations.length > 0) {
-            await this._applyRemoteOperations(operations);
-        }
-
-        // Mark sync as complete when we receive the final batch
-        if (isComplete) {
-            const state = this._peerSyncState.get(peerId);
-            if (state) {
-                state.synced = true;
-                this._peerSyncState.set(peerId, state);
+            if (message.type === 'pong') {
+                this._handlePong(peerId, message.ts);
+                return;
             }
 
-            // Check if all peers are synced
-            this._checkSyncComplete();
-        }
-    }
+            // Log received message for debugging
+            this._log('Received message from', peerId, ':', message.type);
 
-    /**
-     * Handle batch of operations from peer
-     * @param {string} peerId
-     * @param {Object[]} operations
-     * @private
-     */
-    async _handleOperationsBatch(peerId, operations) {
-        // Log received operations
-        for (const op of operations) {
-            this._logOperation('received', peerId, op);
-        }
+            // Signal that we're about to apply remote operations
+            this._emitter.emit('remoteoperationsstart');
 
-        await this._applyRemoteOperations(operations);
-
-        // Update last known HLC for this peer
-        if (operations.length > 0) {
-            const lastOp = operations[operations.length - 1];
-            const state = this._peerSyncState.get(peerId) || { synced: true };
-            if (lastOp.hlc) {
-                state.lastHLC = lastOp.hlc;
-            }
-            this._peerSyncState.set(peerId, state);
-        }
-    }
-
-    /**
-     * Apply remote operations to the local workbook
-     * @param {Object[]} operations
-     * @private
-     */
-    async _applyRemoteOperations(operations) {
-        if (operations.length === 0) return;
-
-        // Signal that we're starting to apply remote operations
-        this._emitter.emit('remoteoperationsstart');
-
-        try {
-            for (const op of operations) {
-                this._stats.operationsReceived++;
-
-                // Apply via WASM
-                const opJson = JSON.stringify(op);
-                const resultStr = await this._engine.applyRemoteOperation(opJson);
+            try {
+                // Route all other messages through engine's SyncManager
+                const resultStr = await this._engine.handlePeerMessage(peerId, data);
                 const result = JSON.parse(resultStr);
 
-                if (result.result === 'success' || result.result === 'resurrected') {
-                    this._stats.operationsApplied++;
-                    this._emitter.emit('operationapplied', op);
-                } else if (result.result === 'already_applied') {
-                    this._stats.operationsDuplicate++;
-                } else if (result.result !== 'superseded') {
-                    console.warn('Failed to apply operation:', result.result, op);
+                if (result.error) {
+                    console.error(`[Collab] handlePeerMessage error:`, result.error);
+                    return;
                 }
+
+                // Send any response messages
+                if (result.messages && result.messages.length > 0) {
+                    await this._sendOutgoingMessages(result.messages);
+                }
+
+                // Check if we transitioned to online state
+                // The engine marks peers as synced after sync-response
+                this._updateSyncState();
+            } finally {
+                this._emitter.emit('remoteoperationsend');
             }
-        } finally {
-            // Signal that we're done applying remote operations
-            this._emitter.emit('remoteoperationsend');
+        } catch (err) {
+            console.error('[Collab] Failed to handle operations message:', err);
         }
     }
 
     /**
-     * Check if initial sync is complete with all peers
+     * Start the outgoing message pump
      * @private
      */
-    _checkSyncComplete() {
-        let allSynced = true;
-        for (const [peerId, state] of this._peerSyncState) {
-            if (!state.synced) {
-                allSynced = false;
-                break;
+    _startOutgoingPump() {
+        if (this._outgoingPumpInterval) return;
+
+        this._outgoingPumpInterval = setInterval(() => {
+            this._flushOutgoing();
+        }, this._outgoingPumpIntervalMs);
+    }
+
+    /**
+     * Stop the outgoing message pump
+     * @private
+     */
+    _stopOutgoingPump() {
+        if (this._outgoingPumpInterval) {
+            clearInterval(this._outgoingPumpInterval);
+            this._outgoingPumpInterval = null;
+        }
+    }
+
+    /**
+     * Flush outgoing messages from the engine to WebRTC peers
+     * @private
+     */
+    async _flushOutgoing() {
+        try {
+            const resultStr = await this._engine.getOutgoingMessages();
+            const result = JSON.parse(resultStr);
+
+            if (result.error) {
+                console.error('[Collab] getOutgoingMessages error:', result.error);
+                return;
+            }
+
+            if (result.messages && result.messages.length > 0) {
+                await this._sendOutgoingMessages(result.messages);
+            }
+        } catch (err) {
+            console.error('[Collab] _flushOutgoing error:', err);
+        }
+    }
+
+    /**
+     * Send outgoing messages to WebRTC peers
+     * @param {Array} messages - Array of {peerId, json} objects
+     * @private
+     */
+    async _sendOutgoingMessages(messages) {
+        for (const msg of messages) {
+            // Unescape the JSON string (it was escaped for transport)
+            const jsonStr = msg.json;
+
+            if (msg.peerId === null || msg.peerId === '') {
+                // Broadcast to all peers
+                this._log('Broadcasting message:', jsonStr.substring(0, 100));
+                this._webrtcManager.broadcastOperation(jsonStr);
+                this._stats.operationsSent++;
+            } else {
+                // Send to specific peer
+                this._log('Sending to peer', msg.peerId, ':', jsonStr.substring(0, 100));
+                this._webrtcManager.sendOperationToPeer(msg.peerId, jsonStr);
+                this._stats.operationsSent++;
             }
         }
+    }
 
-        if (allSynced && this._peerSyncState.size > 0) {
-            // Send any pending operations
-            if (this._pendingOperations.length > 0) {
-                this.broadcastOperations(this._pendingOperations);
-                this._pendingOperations = [];
+    /**
+     * Update sync state based on engine peer count
+     * @private
+     */
+    async _updateSyncState() {
+        try {
+            const peerCount = await this._engine.getPeerCount();
+            if (peerCount > 0 && this._state === CollabState.SYNCING) {
+                // We have peers and are syncing - transition to online
+                // The engine handles sync completion internally
+                this._setState(CollabState.ONLINE);
             }
-
-            this._setState(CollabState.ONLINE);
-
-            // Start latency pinging
-            this._startPinging();
+        } catch (err) {
+            console.error('[Collab] _updateSyncState error:', err);
         }
     }
 

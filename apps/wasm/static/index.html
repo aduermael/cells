@@ -316,11 +316,8 @@
                     collabManager: collabManager
                 });
 
-                // Initialize collaboration (sets node ID in WASM engine)
+                // Initialize collaboration (sets node ID in WASM engine, inits SyncManager)
                 await collabManager.initialize();
-
-                // Initialize last known HLC for operation tracking
-                lastKnownHLC = await client.getCurrentHLC() || '';
 
                 // Initialize presence (generates name and color)
                 presenceManager.initialize(collabManager.peerId);
@@ -336,10 +333,6 @@
                 });
                 collabManager.on('remoteoperationsend', () => {
                     isApplyingRemoteOp = false;
-                    // Update our last known HLC after receiving remote ops
-                    wasmClient.getCurrentHLC().then(hlc => {
-                        if (hlc) lastKnownHLC = hlc;
-                    }).catch(err => console.warn('Failed to get HLC:', err));
                 });
 
                 collaborationInitialized = true;
@@ -685,7 +678,6 @@
         // changeType is one of: 'cell', 'structure', 'sheet', 'loaded'
         let pendingChangeTypes = new Set();
         let changeHandlerScheduled = false;
-        let lastKnownHLC = '';  // Track last HLC for operation broadcasting
         let isApplyingRemoteOp = false;  // Flag to prevent re-broadcasting remote ops
 
         function handleDataChanged(changeType) {
@@ -720,48 +712,10 @@
             render();
             updateFormulaBar();
 
-            // Broadcast operations to peers if this is a local edit
-            console.log('[Collab] processDataChanges check:', {
-                isApplyingRemoteOp,
-                collaborationInitialized,
-                hasCollabManager: !!collabManager,
-                hasWasmClient: !!wasmClient
-            });
-            if (!isApplyingRemoteOp && collaborationInitialized && collabManager && wasmClient) {
-                await broadcastNewOperations();
-            }
-        }
-
-        /**
-         * Get new operations since last known HLC and broadcast them
-         */
-        async function broadcastNewOperations() {
-            try {
-                console.log('[Collab] broadcastNewOperations called, lastKnownHLC:', lastKnownHLC);
-                const resultStr = await wasmClient.getOperationsSince(lastKnownHLC);
-                console.log('[Collab] getOperationsSince result:', resultStr);
-                const result = JSON.parse(resultStr);
-
-                if (result.error) {
-                    console.error('[Collab] getOperationsSince error:', result.error);
-                    return;
-                }
-
-                if (result.operations && result.operations.length > 0) {
-                    console.log(`[Collab] Broadcasting ${result.operations.length} new operations`);
-                    for (const op of result.operations) {
-                        collabManager.broadcastOperation(op);
-                    }
-                    // Update last known HLC to the latest operation's HLC
-                    const lastOp = result.operations[result.operations.length - 1];
-                    if (lastOp && lastOp.hlc) {
-                        lastKnownHLC = lastOp.hlc;
-                    }
-                } else {
-                    console.log('[Collab] No new operations to broadcast');
-                }
-            } catch (err) {
-                console.error('[Collab] Failed to broadcast operations:', err);
+            // Queue operations broadcast to peers if this is a local edit
+            // The engine's SyncManager tracks which operations need to be sent
+            if (!isApplyingRemoteOp && collaborationInitialized && collabManager) {
+                await collabManager.queueLocalOperationsBroadcast();
             }
         }
 
