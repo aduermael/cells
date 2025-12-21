@@ -317,33 +317,23 @@ Refactor the JavaScript UI state machine for cleaner architecture and better sep
     - Uses `deleteCellAt` for each position
     - Simpler loop, no need to collect cell IDs first
 
-## Phase 6: Export Feature
+## Phase 6: Export Feature (SKIPPED)
 
-Add ability to export .cells file with operations.
-
-- [ ] 6a: Add "Export .cells" button to UI
-  - Add button in header toolbar (near Share)
-  - Trigger download of current workbook as .cells file
-  - Include full OpLog section if collaborating
-
-- [ ] 6b: Verify serializer includes OpLog
-  - Check `exportToCells()` includes `#oplog` section
-  - Operations in HLC order
-  - Format: `O <hlc> <op-type> <target-id> <payload-json>`
-
-- [ ] 6c: Add download trigger in JS
-  - Call `engine.exportToCells()`
-  - Create Blob and trigger download
-  - Filename: `<workbook-name>.cells`
+Export functionality already exists in the UI (Export dropdown with CSV, XLSX, CELLS options).
+The serializer already includes OpLog when collaborating. Phase skipped.
 
 ## Phase 7: Bug Fixes & Structure Sync
 
 Address specific bugs and ensure all operations sync.
 
-- [ ] 7a: Fix initial file not loading on room join
-  - Ensure workbook loads from IndexedDB BEFORE sync
-  - Add "full state" message for new joiners with no local data
-  - Sync protocol handles empty vs populated workbook
+- [x] 7a: Fix initial file not loading on room join
+  - Added `startCollaboration()` call to collab-manager.js initialize()
+  - This switches to COLLABORATING mode and bootstraps OpLog with current state
+  - When peer B joins with empty workbook, sync protocol now works correctly:
+    - A sends hello with op_count=N (bootstrapped operations)
+    - B sends hello with op_count=0 (empty but COLLABORATING)
+    - A sends sync-response with all operations
+    - B applies operations and refreshes UI via notifyListeners
 
 - [ ] 7b: Fix duplicate values in concurrent edits
   - **Invariant: It must be IMPOSSIBLE to see 2 values in same cell**

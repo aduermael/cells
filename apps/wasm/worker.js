@@ -542,6 +542,12 @@ function handleMessage(msg) {
                 break;
             }
 
+            case 'startCollaboration': {
+                const result = engine.startCollaboration();
+                respond({ type: 'collaborationStarted', result });
+                break;
+            }
+
             default:
                 respond({ type: 'error', error: 'Unknown message type: ' + type });
         }

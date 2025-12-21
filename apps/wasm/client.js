@@ -722,6 +722,17 @@ class CellsClient {
         const response = await this._send('queueOperationsBroadcast');
         return response.result;
     }
+
+    /**
+     * Start collaboration mode
+     * Switches to COLLABORATING mode and bootstraps OpLog with current workbook state.
+     * Call this when user clicks "Share" or joins a room.
+     * @returns {Promise<string>} JSON result with {success, mode, bootstrapped}
+     */
+    async startCollaboration() {
+        const response = await this._send('startCollaboration');
+        return response.result;
+    }
 }
 
 // Export for both browser and module environments

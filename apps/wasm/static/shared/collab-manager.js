@@ -453,6 +453,15 @@ export class CollabManager {
             throw new Error(`Failed to set node ID: ${result.error}`);
         }
 
+        // Start collaboration mode - switches to COLLABORATING and bootstraps OpLog
+        // This must be called before initSyncManager so the OpLog has operations
+        const collabResultStr = await this._engine.startCollaboration();
+        const collabResult = JSON.parse(collabResultStr);
+        if (collabResult.error) {
+            throw new Error(`Failed to start collaboration: ${collabResult.error}`);
+        }
+        this._log('Started collaboration mode, bootstrapped', collabResult.bootstrapped, 'operations');
+
         // Initialize the SyncManager in the engine
         const syncResultStr = await this._engine.initSyncManager();
         const syncResult = JSON.parse(syncResultStr);
