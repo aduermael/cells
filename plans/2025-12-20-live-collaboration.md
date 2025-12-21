@@ -246,7 +246,7 @@ Implement user presence, online indicators, and collaboration UI elements.
   - Purely visual: NOT stored in state, OpLog, or file
   - Limit to current sheet (hide cursors/selections on other sheets)
 
-- [ ] 5e: Implement share link generation
+- [x] 5e: Implement share link generation
   - Generate room ID based on document ID or random
   - Create shareable URL format: `https://<host>/?room=<roomId>`
   - Add "Share" button to header toolbar
