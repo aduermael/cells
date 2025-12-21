@@ -33,6 +33,13 @@ type SignalingMessage struct {
 	Peers     []string        `json:"peers,omitempty"`
 }
 
+// WebSocket connection parameters
+const (
+	pingInterval = 30 * time.Second
+	pongTimeout  = 10 * time.Second
+	writeTimeout = 10 * time.Second
+)
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
@@ -112,8 +119,25 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Send list of existing peers to new peer
 	sendPeerList(conn, room, peerID)
 
+	// Set up ping/pong for connection health monitoring
+	done := make(chan struct{})
+	go pingRoutine(peer, done)
+
+	// Set pong handler to extend read deadline
+	conn.SetPongHandler(func(string) error {
+		conn.SetReadDeadline(time.Now().Add(pingInterval + pongTimeout))
+		peer.UpdateActivity()
+		return nil
+	})
+
+	// Set initial read deadline
+	conn.SetReadDeadline(time.Now().Add(pingInterval + pongTimeout))
+
 	// Handle messages until disconnect
 	handlePeerMessages(room, peer)
+
+	// Stop ping routine
+	close(done)
 
 	// Cleanup on disconnect
 	room.RemovePeer(peerID)
@@ -128,6 +152,32 @@ func sendError(conn *websocket.Conn, code string, message string) {
 	}
 	msgBytes, _ := json.Marshal(msg)
 	conn.WriteMessage(websocket.TextMessage, msgBytes)
+}
+
+// pingRoutine sends periodic ping messages to keep the connection alive
+func pingRoutine(peer *Peer, done <-chan struct{}) {
+	ticker := time.NewTicker(pingInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			peer.mu.Lock()
+			err := peer.Conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+			if err == nil {
+				err = peer.Conn.WriteMessage(websocket.PingMessage, nil)
+			}
+			peer.mu.Unlock()
+
+			if err != nil {
+				log.Printf("Ping failed for peer %s: %v", peer.ID, err)
+				peer.Conn.Close()
+				return
+			}
+		case <-done:
+			return
+		}
+	}
 }
 
 func notifyPeerJoined(room *Room, peerID string) {

@@ -101,7 +101,7 @@ Extend the existing Go server with WebSocket signaling for WebRTC connection set
   - Notify peers when peer leaves (`peer-left` message)
   - Add message validation and error handling
 
-- [ ] 2e: Add connection monitoring and cleanup
+- [x] 2e: Add connection monitoring and cleanup
   - Ping/pong for connection health check
   - Remove disconnected peers from rooms
   - Clean up empty rooms after timeout
