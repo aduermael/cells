@@ -138,10 +138,6 @@
                 return { success: true };
             }
 
-            async commitPendingOpsForCell(cellId) {
-                return this._client.commitPendingOpsForCell(cellId);
-            }
-
             async deleteCell(cellId) {
                 await this._client.deleteCell(cellId);
                 return { success: true };
@@ -2458,15 +2454,16 @@
                 const format = detectFormat(file.name, data);
                 const baseName = getBaseName(file.name);
 
-                await loadFileData(data, format, baseName, file.name);
-
-                // Persist file to IndexedDB for reload on refresh
+                // Persist file to IndexedDB BEFORE loading into WASM
+                // (WASM may detach the ArrayBuffer, making it unclonable)
                 try {
                     await saveFileToIndexedDB(data);
                     saveFileMeta(file.name, format);
                 } catch (persistErr) {
                     console.warn('Failed to persist file:', persistErr);
                 }
+
+                await loadFileData(data, format, baseName, file.name);
 
                 loading.style.display = 'none';
 
