@@ -117,7 +117,7 @@ Extend the existing Go server with WebSocket signaling for WebRTC connection set
 
 Implement WebRTC peer-to-peer connections in the WASM web app.
 
-- [ ] 3a: Create WebRTC connection manager module
+- [x] 3a: Create WebRTC connection manager module
   - Create `apps/wasm/static/shared/webrtc-manager.js`
   - `class WebRTCManager` to manage multiple peer connections
   - `createPeerConnection(peerId)` using RTCPeerConnection API
