@@ -112,7 +112,6 @@ TEST_F(SyncManagerTest, HandleHelloFromPeerWithSameOpCount) {
     EXPECT_EQ(result.messages.size(), 0);
     // Hello doesn't modify data
     EXPECT_FALSE(result.dataModified);
-    EXPECT_FALSE(result.pendingModified);
 }
 
 TEST_F(SyncManagerTest, HandleHelloFromPeerWithMoreOps) {

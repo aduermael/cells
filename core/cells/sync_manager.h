@@ -39,13 +39,10 @@ struct OutgoingMessage {
 struct HandleMessageResult {
     std::vector<OutgoingMessage> messages;  // Response messages to send
     bool dataModified{false};               // True if cell/structure data changed
-    bool pendingModified{false};            // True if remote pending ops changed
 
     HandleMessageResult() = default;
-    explicit HandleMessageResult(std::vector<OutgoingMessage> msgs,
-                                 bool data = false,
-                                 bool pending = false)
-        : messages(std::move(msgs)), dataModified(data), pendingModified(pending) {}
+    explicit HandleMessageResult(std::vector<OutgoingMessage> msgs, bool data = false)
+        : messages(std::move(msgs)), dataModified(data) {}
 };
 
 // SyncManager handles CRDT synchronization with peers.
@@ -56,7 +53,6 @@ struct HandleMessageResult {
 //   - sync-request: Peer requests operations since a given HLC
 //   - sync-response: Response with requested operations
 //   - operations: Batch of new operations from peer
-//   - pending: Uncommitted operation (for live typing visibility)
 class SyncManager {
 public:
     explicit SyncManager(Workbook* workbook);
@@ -91,10 +87,6 @@ public:
     // Creates an "operations" message with ops newer than peers have seen
     void queueOperationsBroadcast();
 
-    // Queue a pending operation broadcast for live typing visibility
-    // Call this after creating a local pending operation to show to peers
-    void queuePendingBroadcast(const Operation& op);
-
     // Prune old operations from the OpLog.
     // - If no peers: prunes ALL operations (nothing to sync)
     // - If peers: prunes operations older than the minimum HLC all peers have
@@ -107,7 +99,6 @@ private:
     HandleMessageResult handleSyncRequest(const ID& peerId, const std::string& json);
     HandleMessageResult handleSyncResponse(const ID& peerId, const std::string& json);
     HandleMessageResult handleOperations(const ID& peerId, const std::string& json);
-    HandleMessageResult handlePending(const ID& peerId, const std::string& json);
 
     // Create hello message for sending to new peer
     [[nodiscard]] std::string makeHelloMessage() const;

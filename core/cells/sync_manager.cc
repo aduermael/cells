@@ -176,11 +176,6 @@ void SyncManager::addPeer(const ID& peerId) {
 
 void SyncManager::removePeer(const ID& peerId) {
     _peers.erase(peerId);
-
-    // Clean up any remote pending operations from this peer
-    if (_workbook != nullptr) {
-        _workbook->removePendingOpsFromPeer(peerId);
-    }
 }
 
 std::vector<ID> SyncManager::getPeerIds() const {
@@ -224,12 +219,9 @@ HandleMessageResult SyncManager::handleMessage(const ID& peerId, const std::stri
     if (type == "operations") {
         return handleOperations(peerId, json);
     }
-    if (type == "pending") {
-        return handlePending(peerId, json);
-    }
 
     // Unknown message type - no response, no changes
-    return HandleMessageResult();
+    return {};
 }
 
 std::vector<OutgoingMessage> SyncManager::getOutgoingMessages() {
@@ -267,17 +259,6 @@ void SyncManager::queueOperationsBroadcast() {
     if (!msg.empty()) {
         queueBroadcast(msg);
     }
-}
-
-void SyncManager::queuePendingBroadcast(const Operation& op) {
-    if (_peers.empty()) {
-        return;
-    }
-
-    // Create pending message: {"type":"pending","operation":{...}}
-    std::ostringstream oss;
-    oss << "{\"type\":\"pending\",\"operation\":" << op.toJSON() << "}";
-    queueBroadcast(oss.str());
 }
 
 size_t SyncManager::pruneOpLog() {
@@ -354,7 +335,7 @@ HandleMessageResult SyncManager::handleHello(const ID& peerId, const std::string
     }
 
     // hello doesn't modify data, just peer state
-    return HandleMessageResult(std::move(response), false, false);
+    return HandleMessageResult(std::move(response), false);
 }
 
 // Handle sync-request from peer
@@ -370,7 +351,7 @@ HandleMessageResult SyncManager::handleSyncRequest(const ID& peerId, const std::
     response.emplace_back(peerId, makeSyncResponseMessage(sinceHLC));
 
     // sync-request doesn't modify our data
-    return HandleMessageResult(std::move(response), false, false);
+    return HandleMessageResult(std::move(response), false);
 }
 
 // Handle sync-response from peer
@@ -383,7 +364,7 @@ HandleMessageResult SyncManager::handleSyncResponse(const ID& peerId, const std:
 
     // Apply operations to workbook
     if (!ops.empty()) {
-        size_t applied = applyOperations(*_workbook, ops);
+        const size_t applied = applyOperations(*_workbook, ops);
         dataModified = (applied > 0);
     }
 
@@ -396,7 +377,7 @@ HandleMessageResult SyncManager::handleSyncResponse(const ID& peerId, const std:
     }
 
     // No response messages, but report if data was modified
-    return HandleMessageResult({}, dataModified, false);
+    return HandleMessageResult({}, dataModified);
 }
 
 // Handle operations batch from peer
@@ -409,7 +390,7 @@ HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::s
 
     // Apply operations to workbook
     if (!ops.empty()) {
-        size_t applied = applyOperations(*_workbook, ops);
+        const size_t applied = applyOperations(*_workbook, ops);
         dataModified = (applied > 0);
 
         // Update peer sync state with the latest HLC from received operations
@@ -421,74 +402,10 @@ HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::s
                 }
             }
         }
-
-        // Clear remote pending ops for targets that now have committed operations
-        // This handles the case where a peer commits their pending edit
-        for (const auto& op : ops) {
-            _workbook->removePendingOpsForTarget(op.target_id);
-        }
     }
 
     // No response messages, but report if data was modified
-    return HandleMessageResult({}, dataModified, false);
-}
-
-// Handle pending operation (for live typing visibility)
-// Pending operations are shown in UI but not committed to OpLog.
-// They are replaced when a new pending or committed operation arrives from the same peer.
-// PENDING MODIFIED - needs notify but not quadtree rebuild
-HandleMessageResult SyncManager::handlePending(const ID& peerId, const std::string& json) {
-    // Parse: {"type":"pending","operation":{...}}
-    // Find the "operation" object
-    size_t pos = json.find("\"operation\":");
-    if (pos == std::string::npos) {
-        return HandleMessageResult();
-    }
-    pos += 12;  // Skip "operation":
-
-    // Skip whitespace
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\n')) {
-        pos++;
-    }
-
-    if (pos >= json.size() || json[pos] != '{') {
-        return HandleMessageResult();
-    }
-
-    // Find matching closing brace
-    const size_t start = pos;
-    int braceCount = 1;
-    pos++;
-    while (pos < json.size() && braceCount > 0) {
-        if (json[pos] == '{') {
-            braceCount++;
-        } else if (json[pos] == '}') {
-            braceCount--;
-        } else if (json[pos] == '"') {
-            // Skip string content
-            pos++;
-            while (pos < json.size() && json[pos] != '"') {
-                if (json[pos] == '\\' && pos + 1 < json.size()) {
-                    pos++;
-                }
-                pos++;
-            }
-        }
-        pos++;
-    }
-
-    // Parse the operation
-    const std::string opJson = json.substr(start, pos - start);
-    const Operation op = Operation::fromJSON(opJson);
-    if (op.isNull()) {
-        return HandleMessageResult();
-    }
-
-    // Add as remote pending operation (replaces existing pending from same peer for same target)
-    _workbook->addRemotePendingOp(op, peerId);
-
-    // Pending state modified (UI should update to show remote cursor/typing)
-    return HandleMessageResult({}, false, true);
+    return HandleMessageResult({}, dataModified);
 }
 
 std::string SyncManager::makeHelloMessage() const {

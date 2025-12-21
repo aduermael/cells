@@ -136,10 +136,6 @@ export class CollabUI {
                 <span class="label">Peers</span>
                 <span class="value" id="collab-detail-peers">0</span>
             </div>
-            <div class="collab-status-details-row" id="collab-pending-row" style="display: none;">
-                <span class="label">Pending</span>
-                <span class="value" id="collab-detail-pending">0 edits</span>
-            </div>
             <div class="collab-status-details-row" id="collab-latency-row" style="display: none;">
                 <span class="label">Latency</span>
                 <span class="value" id="collab-detail-latency">-</span>
@@ -576,25 +572,6 @@ export class CollabUI {
         const detailPeers = this._detailsPanel.querySelector('#collab-detail-peers');
         if (detailPeers) {
             detailPeers.textContent = this._peerCount.toString();
-        }
-    }
-
-    /**
-     * Update the pending operations count display
-     * @param {number} count - Number of pending operations
-     */
-    updatePendingCount(count) {
-        const pendingRow = this._detailsPanel.querySelector('#collab-pending-row');
-        const pendingValue = this._detailsPanel.querySelector('#collab-detail-pending');
-
-        if (!pendingRow || !pendingValue) return;
-
-        if (count > 0 && this._currentState !== CollabState.ONLINE) {
-            pendingRow.style.display = '';
-            const editText = count === 1 ? 'edit' : 'edits';
-            pendingValue.textContent = `${count} ${editText}`;
-        } else {
-            pendingRow.style.display = 'none';
         }
     }
 
