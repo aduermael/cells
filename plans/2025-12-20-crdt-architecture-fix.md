@@ -345,10 +345,14 @@ Address specific bugs and ensure all operations sync.
     instead of committed cell values when a pending operation exists.
     Local pending ops update cell directly, remote pending ops extracted from payload.
 
-- [ ] 7c: Verify operation ordering
+- [x] 7c: Verify operation ordering
   - DIM_INSERT_AXIS ops always applied before CELL_SET_VALUE
   - Sort incoming batches by HLC
   - Validate target exists before applying
+  - Verified: All three requirements are already correctly implemented:
+    1. Operations created sequentially (axis ops before cell ops) get increasing HLCs
+    2. `applyOperations()` sorts by HLC before applying (crdt.cc:357-358)
+    3. `applyCellSetValue()` validates column/row exist before creating cell (crdt.cc:120-123)
 
 - [ ] 7d: Ensure all structure operations sync
   - Column/row **move** (DIM_MOVE_AXIS) → sync to peers
