@@ -6,9 +6,9 @@ Rename the native file format extension from `.cells` to `.zcd` (Zero-Conflict D
 
 ## Phase 1: Rename Test Data Files
 
-- [ ] 1a: Rename all `.cells` test files to `.zcd` in `core/testdata/`
-- [ ] 1b: Update `core/testdata/BUILD` to reference `.zcd` files
-- [ ] 1c: Move `core/testdata/` to `/testdata/` (repo root)
+- [x] 1a: Rename all `.cells` test files to `.zcd` in `core/testdata/`
+- [x] 1b: Update `core/testdata/BUILD` to reference `.zcd` files
+- [x] 1c: Move `core/testdata/` to `/testdata/` (repo root)
 
 ## Phase 2: Update C++ Code
 

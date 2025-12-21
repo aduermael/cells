@@ -1,6 +1,6 @@
 filegroup(
-    name = "sample_cells_files",
-    srcs = glob(["*.cells"]),
+    name = "sample_zcd_files",
+    srcs = glob(["*.zcd"]),
     visibility = ["//visibility:public"],
 )
 
