@@ -1,7 +1,8 @@
 #include "core/cells/crdt.h"
 
-#include <algorithm>
 #include <cstdio>
+
+#include <algorithm>
 
 namespace cells {
 
@@ -11,7 +12,7 @@ namespace {
 std::string jsonEscape(const std::string& str) {
     std::string result;
     result.reserve(str.size() + 16);  // Pre-allocate with some extra space
-    for (char c : str) {
+    for (const char c : str) {
         switch (c) {
             case '"':
                 result += "\\\"";
@@ -409,8 +410,9 @@ ApplyResult applyDimMoveAxis(Workbook& workbook, const Operation& op) {
     // Update other axes' positions
     auto& axisMap = isColumn ? targetSheet->columns : targetSheet->rows;
     for (auto& [id, ax] : axisMap) {
-        if (id == op.target_id)
+        if (id == op.target_id) {
             continue;
+        }
 
         if (currentPos < newPos) {
             if (ax->position > currentPos && ax->position <= newPos) {
@@ -669,8 +671,9 @@ size_t bootstrapOpLog(Workbook& workbook) {
             if (cell->isFormula()) {
                 const Formula* formula = cell->getFormula();
                 if (formula != nullptr && formula->text != nullptr) {
-                    payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(std::string(formula->text)) +
-                              "\",\"display\":\"" + jsonEscape(cell->value.raw) + "\"" + idSuffix;
+                    payload = "{\"type\":\"f\",\"value\":\"" +
+                              jsonEscape(std::string(formula->text)) + "\",\"display\":\"" +
+                              jsonEscape(cell->value.raw) + "\"" + idSuffix;
                 } else {
                     continue;  // Skip cells with invalid formulas
                 }
