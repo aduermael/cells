@@ -47,7 +47,7 @@ Rename the native file format extension from `.cells` to `.zcd` (Zero-Conflict D
 
 ## Phase 6: Create File Format Documentation
 
-- [ ] 6a: Create `docs/file-format.md` documenting the ZCD format specification
+- [x] 6a: Create `docs/file-format.md` documenting the ZCD format specification
   - File header and version
   - Section markers and line prefixes
   - Entity types (D, S, C, R, X, T, Y, O)
