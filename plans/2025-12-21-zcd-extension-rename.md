@@ -104,7 +104,7 @@ Update all docs to accurately reflect current implementation status:
   - Update CLI usage examples
   - Update supported formats table
 
-- [ ] 8c: Update `AGENTS.md`
+- [x] 8c: Update `AGENTS.md`
   - Change `core/testdata/` to `testdata/`
   - Update sample file references
 

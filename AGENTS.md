@@ -72,12 +72,12 @@ When executing a plan, each subtask gets its own commit named by phase and subta
 WORKSPACE                   # Bazel workspace root
 core/
 ├── BUILD                   # Bazel build file
-├── cells/                  # Main library
-│   ├── BUILD               # Library targets
-│   ├── *.h                 # Headers
-│   ├── *.cc                # Implementation
-│   └── *_test.cc           # Tests (colocated)
-└── testdata/               # Sample .cells files for testing
+└── cells/                  # Main library
+    ├── BUILD               # Library targets
+    ├── *.h                 # Headers
+    ├── *.cc                # Implementation
+    └── *_test.cc           # Tests (colocated)
+testdata/                   # Sample .zcd files for testing
 ```
 
 ### Testing
