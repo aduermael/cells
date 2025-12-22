@@ -20,18 +20,19 @@ const ANIMALS = [
 
 /**
  * Color palette for user cursors - distinct colors with good contrast
+ * Colors are chosen to work well with white text labels
  */
 export const USER_COLORS = [
-    '#FF5733', // Red-Orange
-    '#33FF57', // Green
-    '#3357FF', // Blue
-    '#FF33F5', // Magenta
-    '#33FFF5', // Cyan
-    '#F5FF33', // Yellow
-    '#FF8C33', // Orange
-    '#8C33FF', // Purple
-    '#33FF8C', // Mint
-    '#FF338C'  // Pink
+    '#E53935', // Red
+    '#1E88E5', // Blue
+    '#8E24AA', // Purple
+    '#00897B', // Teal
+    '#F57C00', // Orange
+    '#5E35B1', // Deep Purple
+    '#00ACC1', // Cyan
+    '#D81B60', // Pink
+    '#43A047', // Green
+    '#6D4C41'  // Brown
 ];
 
 /**
