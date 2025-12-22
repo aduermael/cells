@@ -99,7 +99,7 @@ Update all docs to accurately reflect current implementation status:
   - Add link to `docs/file-format.md` in Core Components section
   - Update "Current Implementation Status" if needed
 
-- [ ] 8b: Update `GETTING_STARTED.md`
+- [x] 8b: Update `GETTING_STARTED.md`
   - Change all `.cells` references to `.zcd`
   - Update CLI usage examples
   - Update supported formats table

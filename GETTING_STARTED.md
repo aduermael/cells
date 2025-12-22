@@ -83,20 +83,20 @@ The binary is at `bazel-bin/apps/cli/cells`.
 
 ```bash
 # Convert between formats
-cells -i data.csv output.cells
+cells -i data.csv output.zcd
 cells -i budget.xlsx report.csv
 cells -i legacy.csv modern.xlsx
 
 # File inspection
 cells -I data.xlsx
-cells -I spreadsheet.cells
+cells -I spreadsheet.zcd
 ```
 
 ### Supported Formats
 
 | Format | Extension | Notes |
 |--------|-----------|-------|
-| Cells | `.cells` | Native format, preserves all features |
+| ZCD | `.zcd` | Native format, preserves all features |
 | CSV | `.csv`, `.tsv` | Single sheet, values only |
 | Excel | `.xlsx` | Excel 2007+ format |
 
@@ -104,8 +104,8 @@ cells -I spreadsheet.cells
 
 ```bash
 # CSV with custom delimiter
-cells -i data.tsv output.cells          # Auto-detects tab
-cells -i data.txt --delimiter ';' out.cells
+cells -i data.tsv output.zcd          # Auto-detects tab
+cells -i data.txt --delimiter ';' out.zcd
 
 # XLSX sheet selection
 cells -i workbook.xlsx --sheet 'Q1' q1.csv
@@ -162,7 +162,7 @@ dist/
 - Cell editing with formula bar
 - Multi-sheet support with tabs
 - Keyboard navigation
-- Import/export: CSV, XLSX, native .cells format
+- Import/export: CSV, XLSX, native .zcd format
 - File persistence across page refreshes
 
 ## Code Formatting
@@ -246,11 +246,11 @@ cells/
 │       ├── client.js       # Main thread API
 │       └── static/         # HTML/CSS/JS
 ├── core/                   # C++17 core engine
-│   ├── cells/              # Main library
-│   │   ├── *.h             # Headers
-│   │   ├── *.cc            # Implementation
-│   │   └── *_test.cc       # Tests (colocated)
-│   └── testdata/           # Sample .cells files
+│   └── cells/              # Main library
+│       ├── *.h             # Headers
+│       ├── *.cc            # Implementation
+│       └── *_test.cc       # Tests (colocated)
+├── testdata/               # Sample .zcd files
 ├── docs/                   # Architecture documentation
 ├── plans/                  # Implementation plans
 ├── scripts/                # Build/lint scripts
