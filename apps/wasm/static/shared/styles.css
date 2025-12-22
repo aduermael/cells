@@ -1,7 +1,14 @@
 /* Cells Shared Styles */
 
-/* Spacing scale */
+/* Color palette */
 :root {
+    /* Primary brand colors */
+    --color-primary: #058601;
+    --color-secondary: #50AA4D;
+    --color-primary-hover: #046e01;
+    --color-primary-active: #035d01;
+
+    /* Spacing scale */
     --spacing-xs: 4px;
     --spacing-sm: 8px;
     --spacing-md: 12px;
@@ -37,6 +44,11 @@ html, body {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
+}
+
+#header-logo {
+    height: 20px;
+    width: auto;
 }
 
 #header h1 {
@@ -94,18 +106,18 @@ html, body {
     font-weight: 500;
     border: none;
     border-radius: 6px;
-    background: #0d6efd;
+    background: var(--color-primary);
     color: #fff;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .btn-primary:hover {
-    background: #0b5ed7;
+    background: var(--color-primary-hover);
 }
 
 .btn-primary:active {
-    background: #0a58ca;
+    background: var(--color-primary-active);
 }
 
 /* Canvas Container */
@@ -139,7 +151,7 @@ canvas {
     width: 16px;
     height: 16px;
     border: 2px solid #dee2e6;
-    border-top-color: #0d6efd;
+    border-top-color: var(--color-primary);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-right: 8px;
@@ -169,8 +181,8 @@ canvas {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(13, 110, 253, 0.1);
-    border: 3px dashed #0d6efd;
+    background: rgba(5, 134, 1, 0.1);
+    border: 3px dashed var(--color-primary);
     display: none;
     align-items: center;
     justify-content: center;
@@ -191,7 +203,7 @@ canvas {
 
 #drop-zone-content h2 {
     font-size: 18px;
-    color: #0d6efd;
+    color: var(--color-primary);
     margin-bottom: 8px;
 }
 
@@ -284,7 +296,7 @@ canvas {
 }
 
 #formula-input:focus {
-    box-shadow: 0 0 0 1px rgba(13, 110, 253, 0.4), 0 0 0 3px rgba(13, 110, 253, 0.1);
+    box-shadow: 0 0 0 1px rgba(5, 134, 1, 0.4), 0 0 0 3px rgba(5, 134, 1, 0.1);
 }
 
 #formula-input::placeholder {
@@ -295,7 +307,7 @@ canvas {
 #cell-editor {
     position: absolute;
     display: none;
-    border: 2px solid #0d6efd;
+    border: 2px solid var(--color-primary);
     background: #fff;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 13px;
@@ -309,7 +321,7 @@ canvas {
 #column-header-editor {
     position: absolute;
     display: none;
-    border: 2px solid #0d6efd;
+    border: 2px solid var(--color-primary);
     background: #fff;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 12px;
@@ -578,7 +590,7 @@ canvas {
     font-weight: 500;
     color: #212529;
     background: #fff;
-    border: 2px solid #0d6efd;
+    border: 2px solid var(--color-primary);
     border-radius: 4px;
     outline: none;
     min-width: 60px;
@@ -779,7 +791,7 @@ canvas {
 }
 
 .collab-status-dot.syncing {
-    background: #0d6efd;
+    background: var(--color-secondary);
     animation: pulse 1s ease-in-out infinite;
 }
 
@@ -817,21 +829,21 @@ canvas {
     font-size: 13px;
     font-weight: 500;
     color: #fff;
-    background: #0d6efd;
-    border: 1px solid #0d6efd;
+    background: var(--color-primary);
+    border: 1px solid var(--color-primary);
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
 .collab-copy-link-btn:hover {
-    background: #0b5ed7;
-    border-color: #0b5ed7;
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
 }
 
 .collab-copy-link-btn:active {
-    background: #0a58ca;
-    border-color: #0a58ca;
+    background: var(--color-primary-active);
+    border-color: var(--color-primary-active);
 }
 
 .collab-copy-link-btn:disabled {
@@ -867,8 +879,8 @@ canvas {
 }
 
 .collab-name-edit-inline input:focus {
-    border-color: #0d6efd;
-    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.1);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.1);
 }
 
 .collab-name-edit-inline input::placeholder {

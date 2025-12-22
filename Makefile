@@ -49,6 +49,10 @@ wasm-dist:
 	@echo "Copying shared modules..."
 	@cp apps/wasm/static/shared/*.css dist/shared/
 	@cp apps/wasm/static/shared/*.js dist/shared/
+	@echo "Copying favicons and icons..."
+	@mkdir -p dist/favicons
+	@cp apps/shared/favicons/* dist/favicons/
+	@cp apps/shared/icon.svg dist/
 	@echo ""
 	@echo "Distribution package created in dist/"
 	@echo "Files:"
@@ -80,6 +84,10 @@ wasm-debug-dist:
 	@echo "Copying shared modules..."
 	@cp apps/wasm/static/shared/*.css dist/shared/
 	@cp apps/wasm/static/shared/*.js dist/shared/
+	@echo "Copying favicons and icons..."
+	@mkdir -p dist/favicons
+	@cp apps/shared/favicons/* dist/favicons/
+	@cp apps/shared/icon.svg dist/
 	@echo "Copying C++ source files for debugging..."
 	@mkdir -p dist/core dist/apps/wasm
 	@cp -r core/* dist/core/

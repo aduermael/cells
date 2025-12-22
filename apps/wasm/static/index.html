@@ -4,11 +4,16 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cells - Spreadsheet Viewer</title>
+    <link rel="icon" type="image/svg+xml" href="favicons/favicon.svg">
+    <link rel="icon" type="image/png" sizes="96x96" href="favicons/favicon-96x96.png">
+    <link rel="icon" type="image/x-icon" href="favicons/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="favicons/apple-touch-icon.png">
     <link rel="stylesheet" href="shared/styles.css">
 </head>
 <body>
     <div id="container">
         <div id="header">
+            <img src="icon.svg" alt="Cells" id="header-logo">
             <button class="btn" onclick="openFile()">Open</button>
             <button class="btn" id="new-btn" onclick="newFile()" style="display: none;">New</button>
             <input type="file" id="file-input" accept=".zcd,.csv,.tsv,.xlsx" />

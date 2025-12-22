@@ -9,6 +9,10 @@ export const DEFAULT_ROW_HEIGHT = 24;
 export const CELL_PADDING = 4;
 
 // Color palette
+// Primary brand colors (should match CSS variables)
+export const PRIMARY_COLOR = '#058601';
+export const SECONDARY_COLOR = '#50AA4D';
+
 export const COLORS = {
     gridLine: '#f0f0f0',  // Subtle grid lines
     headerBg: '#f8f9fa',
@@ -16,8 +20,8 @@ export const COLORS = {
     headerSeparator: 'rgba(0, 0, 0, 0.06)',  // Very subtle separators between header cells
     headerText: '#495057',
     cellText: '#212529',
-    selectionBorder: '#0d6efd',
-    selectionBg: 'rgba(13, 110, 253, 0.1)',
+    selectionBorder: PRIMARY_COLOR,
+    selectionBg: 'rgba(5, 134, 1, 0.1)',
     cornerBg: '#e9ecef'
 };
 
