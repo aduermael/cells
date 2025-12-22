@@ -78,8 +78,8 @@ Update all docs to accurately reflect current implementation status:
   - Change testdata path from `core/testdata/` to `testdata/` (N/A - no testdata refs)
   - Verify implementation references are accurate ✓
 
-- [ ] 7e: Update `docs/formula-engine.md`
-  - Verify status is accurate (currently shows as not implemented)
+- [x] 7e: Update `docs/formula-engine.md`
+  - Add implementation status section (not implemented)
 
 - [ ] 7f: Update `docs/rendering.md`
   - Verify current implementation status is accurate

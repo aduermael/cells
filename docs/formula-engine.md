@@ -1,5 +1,21 @@
 # Formula Engine
 
+## Implementation Status
+
+**Current state (December 2024):** Not implemented.
+
+| Component | Status |
+|-----------|--------|
+| Lexer/Tokenizer | ❌ Not implemented |
+| AST Parser | ❌ Not implemented |
+| Execution Engine | ❌ Not implemented |
+| Dependency Graph | ❌ Not implemented |
+| Function Library | ❌ Not implemented |
+
+This document describes the planned architecture for the formula engine. The current implementation stores formula text in cells but does not evaluate them.
+
+---
+
 ## Overview
 
 The formula engine parses Excel-style formulas into an AST and executes them natively in C++, managing the dependency graph for reactive updates.
