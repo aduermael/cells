@@ -3,5 +3,5 @@ test_files/**/*.xlsx filter=lfs diff=lfs merge=lfs -text
 test_files/**/*.xls filter=lfs diff=lfs merge=lfs -text
 test_files/**/*.csv filter=lfs diff=lfs merge=lfs -text
 test_files/**/*.ods filter=lfs diff=lfs merge=lfs -text
-test_files/**/*.cells filter=lfs diff=lfs merge=lfs -text
-test_files/**/*.cellsz filter=lfs diff=lfs merge=lfs -text
+test_files/**/*.zcd filter=lfs diff=lfs merge=lfs -text
+test_files/**/*.zcdz filter=lfs diff=lfs merge=lfs -text

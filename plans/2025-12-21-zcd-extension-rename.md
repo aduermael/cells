@@ -108,7 +108,7 @@ Update all docs to accurately reflect current implementation status:
   - Change `core/testdata/` to `testdata/`
   - Update sample file references
 
-- [ ] 8d: Update `.gitattributes`
+- [x] 8d: Update `.gitattributes`
   - Change `.cells` patterns to `.zcd`
 
 ## Phase 9: Update Existing Plans (Historical Accuracy)
