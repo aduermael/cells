@@ -120,8 +120,8 @@ declare module 'cells-wasm' {
     // ========================================================================
 
     /**
-     * Load a workbook from .cells format string
-     * @param content - The .cells file content as a string
+     * Load a workbook from .zcd format string
+     * @param content - The .zcd file content as a string
      * @returns JSON string with LoadResult
      */
     loadFromCells(content: string): string;
@@ -303,8 +303,8 @@ declare module 'cells-wasm' {
     // ========================================================================
 
     /**
-     * Export workbook to .cells format
-     * @returns .cells file content as string, or empty on error
+     * Export workbook to .zcd format
+     * @returns .zcd file content as string, or empty on error
      */
     exportToCells(): string;
 

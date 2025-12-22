@@ -114,7 +114,7 @@
                 const formulaCell = viewport3.cells.find(c => c.id === formulaResult.id);
                 assert(formulaCell.type === 'f', 'Formula cell has type "f"', `Got "${formulaCell.type}"`);
 
-                // Test 9: Load from .cells format
+                // Test 9: Load from .zcd format
                 const cellsContent = `D TEST123 "Test Workbook"
 S SHEET01 "Test Sheet"
 C COL00001 0 w:80
@@ -138,13 +138,13 @@ X CELL0001 COL00001 ROW00001 n 100`;
                 const csvViewport = JSON.parse(engine.queryViewport(0, 0, 10, 10));
                 assert(csvViewport.cells.length >= 6, 'CSV loaded correct number of cells', `Got ${csvViewport.cells.length}`);
 
-                // Test 11: Export to .cells format
+                // Test 11: Export to .zcd format
                 const exportedCells = engine.exportToCells();
                 assert(exportedCells.length > 0, 'exportToCells returns content');
                 assert(exportedCells.includes('D '), 'Export contains document line');
                 assert(exportedCells.includes('S '), 'Export contains sheet line');
 
-                log(`<pre>Exported .cells (first 500 chars):\n${exportedCells.substring(0, 500)}...</pre>`, 'info');
+                log(`<pre>Exported .zcd (first 500 chars):\n${exportedCells.substring(0, 500)}...</pre>`, 'info');
 
                 // Test 12: Export to CSV
                 const exportedCSV = engine.exportToCSV();

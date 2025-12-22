@@ -69,7 +69,7 @@ function handleMessage(msg) {
                 let result;
 
                 if (format === 'cells') {
-                    // data is a string for .cells format
+                    // data is a string for .zcd format
                     const content = typeof data === 'string' ? data : new TextDecoder().decode(data);
                     result = JSON.parse(engine.loadFromCells(content));
                 } else if (format === 'csv') {
@@ -378,7 +378,7 @@ function handleMessage(msg) {
                     }
                     // Convert string to ArrayBuffer for transfer
                     data = new TextEncoder().encode(content).buffer;
-                    filename = workbookName + '.cells';
+                    filename = workbookName + '.zcd';
                 } else if (format === 'csv') {
                     const content = engine.exportToCSV();
                     if (!content) {

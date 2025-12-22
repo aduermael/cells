@@ -48,7 +48,7 @@
     <h1>Cells WASM Worker Test</h1>
 
     <div class="drop-zone" id="dropZone">
-        <p>Drop a .cells, .csv, or .xlsx file here to test loading</p>
+        <p>Drop a .zcd, .csv, or .xlsx file here to test loading</p>
         <p><small>Or use the automated tests below</small></p>
     </div>
 
@@ -101,7 +101,7 @@
             // Determine format from extension
             const ext = file.name.split('.').pop().toLowerCase();
             let format;
-            if (ext === 'cells') format = 'cells';
+            if (ext === 'cells' || ext === 'zcd') format = 'cells';
             else if (ext === 'csv' || ext === 'tsv') format = 'csv';
             else if (ext === 'xlsx') format = 'xlsx';
             else {
@@ -190,8 +190,8 @@
                 assert(updatedCell.value === '12345', 'Cell value updated', `Got "${updatedCell.value}"`);
                 assert(updatedCell.type === 'n', 'Cell type is number', `Got "${updatedCell.type}"`);
 
-                // Test 6: Load .cells format
-                log('<h3>Test 6: Load .cells format</h3>', 'info');
+                // Test 6: Load .zcd format
+                log('<h3>Test 6: Load .zcd format</h3>', 'info');
                 const cellsContent = `#cells v1
 D TEST1234 "Test Workbook"
 
@@ -227,8 +227,8 @@ X CELL0003 COL00001 ROW00003 b true
                 const csvViewport = await client.queryViewport(0, 0, 10, 10);
                 assert(csvViewport.cells.length >= 9, 'CSV has correct cell count', `Got ${csvViewport.cells.length}`);
 
-                // Test 8: Export to .cells
-                log('<h3>Test 8: Export to .cells</h3>', 'info');
+                // Test 8: Export to .zcd
+                log('<h3>Test 8: Export to .zcd</h3>', 'info');
                 const exportedCells = await client.exportCells();
                 assert(exportedCells.data instanceof ArrayBuffer, 'Export returns ArrayBuffer');
                 const cellsText = new TextDecoder().decode(exportedCells.data);

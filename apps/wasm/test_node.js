@@ -110,7 +110,7 @@ async function runTests() {
         assert(cell.type === 'f', `Expected type "f", got "${cell.type}"`);
     });
 
-    test('Load from .cells format', () => {
+    test('Load from .zcd format', () => {
         const content = `D TEST123 "Test"
 S SHEET01 "Data"
 C COL00001 0 w:100
@@ -128,7 +128,7 @@ X CELL0001 COL00001 ROW00001 n 42`;
         assert(result.success === true, 'loadFromCSV should succeed');
     });
 
-    test('Export to .cells', () => {
+    test('Export to .zcd', () => {
         const exported = engine.exportToCells();
         assert(exported.length > 0, 'Should return content');
         assert(exported.includes('D '), 'Should have document line');

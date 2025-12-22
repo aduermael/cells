@@ -31,13 +31,13 @@ Rename the native file format extension from `.cells` to `.zcd` (Zero-Conflict D
 
 ## Phase 4: Update WASM/Web Application
 
-- [ ] 4a: Update `apps/wasm/bindings.cc` - extension references
-- [ ] 4b: Update `apps/wasm/worker.js` - file type handling
-- [ ] 4c: Update `apps/wasm/client.js` - extension references
-- [ ] 4d: Update `apps/wasm/cells.d.ts` - TypeScript definitions
-- [ ] 4e: Update `apps/wasm/static/index.html` - file input accept types
-- [ ] 4f: Update `apps/wasm/static/shared/grid-renderer.js` - any references
-- [ ] 4g: Update test files (`test.html`, `test_worker.html`, `test_node.js`)
+- [x] 4a: Update `apps/wasm/bindings.cc` - extension references
+- [x] 4b: Update `apps/wasm/worker.js` - file type handling
+- [x] 4c: Update `apps/wasm/client.js` - extension references
+- [x] 4d: Update `apps/wasm/cells.d.ts` - TypeScript definitions
+- [x] 4e: Update `apps/wasm/static/index.html` - file input accept types
+- [x] 4f: Update `apps/wasm/static/shared/grid-renderer.js` - any references (N/A - only has data property refs)
+- [x] 4g: Update test files (`test.html`, `test_worker.html`, `test_node.js`)
 
 ## Phase 5: Update Scripts and Examples
 

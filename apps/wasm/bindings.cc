@@ -130,7 +130,7 @@ public:
     // File loading methods
     // ========================================================================
 
-    // Parse .cells format from string
+    // Parse .zcd format from string
     std::string loadFromCells(const std::string& content) {
         auto result = cells::parse(content);
         if (!result.ok()) {

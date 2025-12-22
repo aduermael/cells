@@ -169,8 +169,8 @@ class CellsClient {
     }
 
     /**
-     * Load a .cells file from string content
-     * @param {string} content - .cells file content
+     * Load a .zcd file from string content
+     * @param {string} content - .zcd file content
      * @returns {Promise<{sheetCount: number, sheetNames: string[]}>}
      */
     async loadCells(content) {
@@ -516,7 +516,7 @@ class CellsClient {
     }
 
     /**
-     * Export to .cells format
+     * Export to .zcd format
      * @returns {Promise<{data: ArrayBuffer, filename: string}>}
      */
     async exportCells() {
