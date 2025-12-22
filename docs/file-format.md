@@ -13,8 +13,9 @@
 | Extension | Format | Description |
 |-----------|--------|-------------|
 | `.zcd` | Plain text | Git-friendly, human-readable (primary format) |
-| `.zcz` | Text + zstd | Compressed but still git-diffable |
-| `.zcb` | Binary | Large files, fast random access |
+| `.zcdz` | Text + zstd | Compressed but still git-diffable |
+| `.zcdb` | Binary | Large files, fast random access |
+| `.zcdbz` | Binary + zstd | Maximum compression |
 
 ## Format Version
 
@@ -22,7 +23,7 @@ Current version: **v1**
 
 Files begin with a version header:
 ```
-#cells v1
+#zcd v1
 ```
 
 ## Document Structure
@@ -30,7 +31,7 @@ Files begin with a version header:
 A ZCD file contains the following sections in order:
 
 ```
-#cells v1                           # Version header
+#zcd v1                             # Version header
 D <doc-id> "<name>"                 # Document declaration
 
 S <sheet-id> "<name>"               # Sheet declaration
@@ -287,7 +288,7 @@ Lines beginning with `#` are section markers or comments:
 
 | Marker | Purpose |
 |--------|---------|
-| `#cells v1` | File format version header |
+| `#zcd v1` | File format version header |
 | `#cols` | Start of columns section |
 | `#rows` | Start of rows section |
 | `#cells` | Start of cells section |
@@ -349,7 +350,7 @@ O 1705312200001.0.N3f8hJ2w CELL_SET_VALUE hT8sL4xQ {"type":"s","value":"Hello"}
 A simple spreadsheet with numbers, text, and a formula:
 
 ```
-#cells v1
+#zcd v1
 D aB3cD4eF "Example"
 
 S gH5jK6mN "Sheet1"

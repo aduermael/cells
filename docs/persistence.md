@@ -40,12 +40,12 @@ Entities are sorted by their HLC timestamp, not by visual position:
 Visual order of columns/rows is stored via explicit positions (0-indexed integers).
 Each axis knows its own position, making it simple to sort and serialize.
 
-## Text Format (`.cells`)
+## Text Format (`.zcd`)
 
 ### File Structure
 
 ```
-#cells v1
+#zcd v1
 D <doc-id> "<name>"
 
 S <sheet-id> "<name>"
@@ -74,7 +74,7 @@ O <hlc> <op-type> <args...>
 A simple spreadsheet with: A1=2, A2="foo", D4==A1+10
 
 ```
-#cells v1
+#zcd v1
 D Qx7mXp2L "Untitled"
 
 S bF3hL8mN "Sheet1"
@@ -98,7 +98,7 @@ X wK3nJ7pM vT5mK9xL yB9tX3wN f "=$kR7pN2wQ$jH4sW8nF+10"
 
 | Prefix | Meaning | Format |
 |--------|---------|--------|
-| `#cells` | Format version | `#cells v1` |
+| `#zcd` | Format version | `#zcd v1` |
 | `D` | Document | `D <id> "<name>"` |
 | `S` | Sheet | `S <id> "<name>"` |
 | `C` | Column | `C <id> <position> [props...]` |
@@ -182,17 +182,20 @@ Clear 1-line conflict. User picks one.
 | CSV | 1 line | All lines shift | Poor |
 | JSON | ~3 lines | ~5 lines | Poor |
 | XLSX | Binary | Binary | Impossible |
-| **.cells** | 1 line | 1 line | Excellent |
+| **.zcd** | 1 line | 1 line | Excellent |
 
 ## File Format Variants
 
 | Extension | Format | Use Case |
 |-----------|--------|----------|
-| `.cells` | Raw text | Git repos, human editing |
-| `.cellsz` | Text + zstd | Smaller, still diffable |
-| `.cellsb` | Binary | Large files, fast loading |
+| `.zcd` | Raw text | Git repos, human editing |
+| `.zcdz` | Text + zstd | Smaller, still diffable |
+| `.zcdb` | Binary | Large files, fast loading |
+| `.zcdbz` | Binary + zstd | Maximum compression |
 
-## Binary Format (`.cellsb`)
+For detailed format specification, see [docs/file-format.md](file-format.md).
+
+## Binary Format (`.zcdb`)
 
 Section-based structure with header, section table, and compressed sections. Supports random access and streaming. See implementation for details.
 
@@ -200,4 +203,4 @@ Section-based structure with header, section table, and compressed sections. Sup
 
 - Parser: `core/cells/parser.cc`
 - Serializer: `core/cells/serializer.cc`
-- Test files: `core/testdata/*.cells`
+- Test files: `testdata/*.zcd`

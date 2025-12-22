@@ -69,9 +69,9 @@ Update all docs to accurately reflect current implementation status:
   - Verify current status matches documentation
   - Add any new implementation details
 
-- [ ] 7c: Update `docs/persistence.md`
+- [x] 7c: Update `docs/persistence.md`
   - Change all `.cells` references to `.zcd`
-  - Update format variants table (.zcd, .zcz, .zcb)
+  - Update format variants table (.zcd, .zcdz, .zcdb, .zcdbz)
   - Add reference to new file-format.md
 
 - [ ] 7d: Update `docs/data-model.md`
@@ -134,8 +134,9 @@ Update all docs to accurately reflect current implementation status:
 | Extension | Format | Description |
 |-----------|--------|-------------|
 | `.zcd` | Raw text | Git-friendly, human-readable |
-| `.zcz` | Text + zstd | Compressed, still git-diffable |
-| `.zcb` | Binary | Large files, fast loading |
+| `.zcdz` | Text + zstd | Compressed, still git-diffable |
+| `.zcdb` | Binary | Large files, fast loading |
+| `.zcdbz` | Binary + zstd | Maximum compression |
 
 ### Backward Compatibility
 - No automatic migration needed (format content unchanged)
