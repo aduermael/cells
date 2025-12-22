@@ -9,17 +9,30 @@ A high-performance, collaborative spreadsheet engine with:
 
 ## Project Stats
 
+### Source Code
+
 | Language | Lines |
 |----------|------:|
-| C++ | 19,763 |
-| JavaScript | 8,109 |
-| HTML | 3,075 |
-| Go | 1,039 |
-| CSS | 986 |
+| C++ | 12,258 |
+| JavaScript | 8,230 |
+| HTML | 3,244 |
+| CSS | 1,025 |
+| Markdown | 807 |
+| Shell | 640 |
+| Go | 629 |
+| Starlark | 512 |
+| TypeScript | 447 |
 
-- **Commits**: 306
-- **WASM Module**: 613 KB
-- **Total Web Bundle**: 1.07 MB
+### Test Code
+
+| Language | Lines |
+|----------|------:|
+| C++ | 7,139 |
+| Go | 410 |
+
+- **Commits**: 344
+- **WASM Module**: 603 KB
+- **Total Web Bundle**: 1.13 MB
 
 <sub>Generated with `./scripts/generate-stats.sh`</sub>
 
