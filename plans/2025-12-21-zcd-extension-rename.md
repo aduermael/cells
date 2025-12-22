@@ -41,9 +41,9 @@ Rename the native file format extension from `.cells` to `.zcd` (Zero-Conflict D
 
 ## Phase 5: Update Scripts and Examples
 
-- [ ] 5a: Update `scripts/generate_large_cells.py` - output filename/extension
-- [ ] 5b: Update `examples/convert_all.sh` - extension references
-- [ ] 5c: Update `examples/cli_examples.sh` - extension references
+- [x] 5a: Update `scripts/generate_large_cells.py` - output filename/extension
+- [x] 5b: Update `examples/convert_all.sh` - extension references
+- [x] 5c: Update `examples/cli_examples.sh` - extension references
 
 ## Phase 6: Create File Format Documentation
 

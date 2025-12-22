@@ -5,7 +5,7 @@
 #   ./convert_all.sh INPUT_DIR OUTPUT_DIR [FORMAT]
 #
 # Examples:
-#   ./convert_all.sh data/ output/           # Convert to .cells
+#   ./convert_all.sh data/ output/           # Convert to .zcd
 #   ./convert_all.sh data/ csv_export/ csv   # Convert to CSV
 #   ./convert_all.sh xlsx/ backup/ xlsx      # Convert to XLSX
 
@@ -31,13 +31,13 @@ fi
 # Parse arguments
 INPUT_DIR="${1:-.}"
 OUTPUT_DIR="${2:-./converted}"
-FORMAT="${3:-cells}"
+FORMAT="${3:-zcd}"
 
 # Validate format
 case "$FORMAT" in
-    cells|csv|xlsx) ;;
+    zcd|csv|xlsx) ;;
     *)
-        echo "Error: Invalid format '$FORMAT'. Use: cells, csv, xlsx"
+        echo "Error: Invalid format '$FORMAT'. Use: zcd, csv, xlsx"
         exit 1
         ;;
 esac
@@ -54,7 +54,7 @@ echo ""
 
 # Convert each supported file
 shopt -s nullglob
-for file in "$INPUT_DIR"/*.csv "$INPUT_DIR"/*.tsv "$INPUT_DIR"/*.xlsx "$INPUT_DIR"/*.cells; do
+for file in "$INPUT_DIR"/*.csv "$INPUT_DIR"/*.tsv "$INPUT_DIR"/*.xlsx "$INPUT_DIR"/*.zcd; do
     [ -f "$file" ] || continue
 
     filename=$(basename "$file")

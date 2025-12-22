@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a large test .cells file with multiple sheets, values, and formulas."""
+"""Generate a large test .zcd file with multiple sheets, values, and formulas."""
 
 import random
 import string
@@ -106,11 +106,11 @@ def main():
     print(f'  Analysis: {values} values, {formulas} formulas')
 
     # Write to file
-    with open('core/testdata/large.cells', 'w') as f:
+    with open('testdata/large.zcd', 'w') as f:
         f.write('\n'.join(output))
         f.write('\n')
 
-    print(f'Generated large.cells:')
+    print(f'Generated large.zcd:')
     print(f'  - 3 sheets, {total_values} values, {total_formulas} formulas')
 
 if __name__ == '__main__':

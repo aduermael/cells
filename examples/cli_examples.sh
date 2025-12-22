@@ -31,16 +31,16 @@ CSV
 cat "$TMPDIR/sample.csv"
 echo ""
 
-echo "2. Convert CSV to .cells format"
-"$CELLS_BIN" -i "$TMPDIR/sample.csv" "$TMPDIR/sample.cells" -v --time
+echo "2. Convert CSV to .zcd format"
+"$CELLS_BIN" -i "$TMPDIR/sample.csv" "$TMPDIR/sample.zcd" -v --time
 echo ""
 
-echo "3. Inspect the .cells file"
-"$CELLS_BIN" -I "$TMPDIR/sample.cells"
+echo "3. Inspect the .zcd file"
+"$CELLS_BIN" -I "$TMPDIR/sample.zcd"
 echo ""
 
-echo "4. Convert .cells to XLSX"
-"$CELLS_BIN" -i "$TMPDIR/sample.cells" "$TMPDIR/sample.xlsx" -v --time
+echo "4. Convert .zcd to XLSX"
+"$CELLS_BIN" -i "$TMPDIR/sample.zcd" "$TMPDIR/sample.xlsx" -v --time
 echo ""
 
 echo "5. Inspect the XLSX file"
