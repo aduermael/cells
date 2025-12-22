@@ -107,7 +107,7 @@ public:
         return true;
     }
 
-    mz_zip_error getLastError() const { return lastError_; }
+    [[nodiscard]] mz_zip_error getLastError() const { return lastError_; }
 
     // Read entire file from archive into string
     std::string readFile(const std::string& name) {
