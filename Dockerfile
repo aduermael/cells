@@ -32,6 +32,8 @@ COPY dist/worker.js dist/
 COPY dist/client.js dist/
 COPY dist/cells.d.ts dist/
 COPY dist/shared/ dist/shared/
+COPY dist/favicons/ dist/favicons/
+COPY dist/icon.svg dist/
 
 # Expose the port
 EXPOSE 8080

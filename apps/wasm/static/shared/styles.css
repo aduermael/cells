@@ -675,7 +675,7 @@ canvas {
     top: 100%;
     right: 0;
     margin-top: var(--spacing-xs);
-    min-width: 200px;
+    width: 260px;
     background: #fff;
     border: 1px solid #dee2e6;
     border-radius: 8px;
@@ -685,7 +685,7 @@ canvas {
     visibility: hidden;
     transform: translateY(-4px);
     transition: all 0.15s ease;
-    padding: var(--spacing-md);
+    padding: 16px;
 }
 
 .collab-status-badge.show-details .collab-status-details {
@@ -695,12 +695,7 @@ canvas {
 }
 
 .collab-status-details-header {
-    font-size: 13px;
-    font-weight: 600;
-    color: #212529;
-    margin-bottom: var(--spacing-sm);
-    padding-bottom: var(--spacing-sm);
-    border-bottom: 1px solid #e9ecef;
+    display: none;
 }
 
 .collab-status-details-row {
@@ -813,14 +808,15 @@ canvas {
 
 /* Share section in modal */
 .collab-status-share-section {
-    margin-bottom: var(--spacing-md);
+    margin-bottom: 0;
 }
 
 .collab-share-description {
     font-size: 12px;
     color: #6c757d;
-    margin: 0 0 var(--spacing-sm) 0;
-    line-height: 1.4;
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+    text-align: center;
 }
 
 .collab-copy-link-btn {
@@ -830,7 +826,7 @@ canvas {
     font-weight: 500;
     color: #fff;
     background: var(--color-primary);
-    border: 1px solid var(--color-primary);
+    border: none;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -855,27 +851,37 @@ canvas {
 .collab-status-details-divider {
     height: 1px;
     background: #e9ecef;
-    margin: var(--spacing-md) 0;
+    margin: 16px 0;
+}
+
+/* Name row styling */
+.collab-status-details-row.name-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+}
+
+.collab-status-details-row.name-row .label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #495057;
 }
 
 /* Inline name input */
 .collab-name-edit-inline {
-    flex: 1;
-    display: flex;
-    justify-content: flex-end;
+    width: 100%;
 }
 
 .collab-name-edit-inline input {
-    width: 120px;
-    padding: var(--spacing-xs) var(--spacing-sm);
-    font-size: 12px;
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
     color: #212529;
     background: #fff;
     border: 1px solid #dee2e6;
     border-radius: 4px;
     outline: none;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    text-align: right;
 }
 
 .collab-name-edit-inline input:focus {
@@ -955,8 +961,8 @@ canvas {
 
 /* Debug section in status details */
 .collab-status-details-debug {
-    margin-top: var(--spacing-sm);
-    padding-top: var(--spacing-sm);
+    margin-top: 16px;
+    padding-top: 12px;
     border-top: 1px solid #e9ecef;
 }
 
@@ -964,14 +970,23 @@ canvas {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
-    color: #6c757d;
+    font-size: 11px;
+    color: #adb5bd;
     cursor: pointer;
+}
+
+.collab-status-details-debug .debug-toggle label:hover {
+    color: #6c757d;
 }
 
 .collab-status-details-debug .debug-toggle input[type="checkbox"] {
     margin: 0;
     cursor: pointer;
+    opacity: 0.6;
+}
+
+.collab-status-details-debug .debug-toggle input[type="checkbox"]:checked {
+    opacity: 1;
 }
 
 .collab-status-details-debug .debug-actions {

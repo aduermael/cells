@@ -27,3 +27,4 @@ build:wasm-debug --linkopt=-gsource-map
 build:wasm-debug --copt=-O0
 build:wasm-debug --cxxopt=-O0
 build:wasm-debug --linkopt=-O0
+build:wasm-debug --strip=never

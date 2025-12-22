@@ -2,6 +2,7 @@
 // Manages the UI elements for collaboration status, share button, and peer indicators
 
 import { CollabState } from './collab-manager.js';
+import { generateRandomName } from './presence.js';
 
 /**
  * Status text for each collaboration state
@@ -172,6 +173,44 @@ export class CollabUI {
 
         // Add button to container
         this._container.appendChild(this._collaborateBtn);
+
+        // Initialize the name input with stored or generated name
+        this._initializeNameInput();
+    }
+
+    /**
+     * Get the initial display name from storage or generate a new one
+     * @returns {string}
+     * @private
+     */
+    _getInitialDisplayName() {
+        try {
+            const storedName = sessionStorage.getItem('cells.displayName');
+            if (storedName) {
+                return storedName;
+            }
+        } catch (e) {
+            // sessionStorage not available
+        }
+        // Generate and store a new name
+        const newName = generateRandomName();
+        try {
+            sessionStorage.setItem('cells.displayName', newName);
+        } catch (e) {
+            // sessionStorage not available
+        }
+        return newName;
+    }
+
+    /**
+     * Initialize the name input with the current display name
+     * @private
+     */
+    _initializeNameInput() {
+        const nameInput = this._detailsPanel.querySelector('#collab-name-input');
+        if (nameInput) {
+            nameInput.value = this._getInitialDisplayName();
+        }
     }
 
     /**
