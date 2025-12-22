@@ -1,5 +1,8 @@
 # Web UI Plan - DONE
 
+> **Note (2025-12-21):** The `.cells` extension was renamed to `.zcd` (Zero-Conflict Document).
+> All references to `.cells` in this plan now refer to `.zcd` files.
+
 ## Goal
 First visual UI: `./cells serve <file>` → opens HTML Canvas spreadsheet viewer on port 8888.
 

@@ -4,6 +4,9 @@
 **Created:** 2025-12-17
 **Goal:** Build a command-line tool for converting between spreadsheet formats (.cells, .csv, .xlsx).
 
+> **Note (2025-12-21):** The `.cells` extension was renamed to `.zcd` (Zero-Conflict Document).
+> All references to `.cells` in this plan now refer to `.zcd` files.
+
 ## Overview
 
 Inspired by ffmpeg's interface, the `cells` CLI will provide format conversion:

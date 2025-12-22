@@ -4,6 +4,9 @@
 **Created:** 2025-12-16
 **Goal:** Implement the `.cells` text format parser and serializer with sample files and tests.
 
+> **Note (2025-12-21):** The `.cells` extension was renamed to `.zcd` (Zero-Conflict Document).
+> All references to `.cells` in this plan now refer to `.zcd` files.
+
 ## Scope
 
 Implement parsing and serialization for the `.cells` v1 text format as specified in `docs/persistence.md`. This includes:

@@ -113,7 +113,7 @@ Update all docs to accurately reflect current implementation status:
 
 ## Phase 9: Update Existing Plans (Historical Accuracy)
 
-- [ ] 9a: Add note to completed plans that `.cells` was renamed to `.zcd`
+- [x] 9a: Add note to completed plans that `.cells` was renamed to `.zcd`
 
 ## Phase 10: Verification
 

@@ -1,5 +1,8 @@
 # Plan: Native XLSX Implementation
 
+> **Note (2025-12-21):** The `.cells` extension was renamed to `.zcd` (Zero-Conflict Document).
+> All references to `.cells` in this plan now refer to `.zcd` files.
+
 ## Goals
 
 1. **Remove Excelize completely** - eliminate Go/CGO dependency

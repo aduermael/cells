@@ -3,6 +3,9 @@
 **Status:** DONE
 **Goal:** Run the spreadsheet engine fully in-browser via WebAssembly Worker, with no server dependency
 
+> **Note (2025-12-21):** The `.cells` extension was renamed to `.zcd` (Zero-Conflict Document).
+> All references to `.cells` in this plan now refer to `.zcd` files.
+
 ## Overview
 
 Build the cells app as a WASM module that runs in a Web Worker, enabling:
