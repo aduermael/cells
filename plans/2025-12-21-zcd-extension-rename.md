@@ -117,10 +117,11 @@ Update all docs to accurately reflect current implementation status:
 
 ## Phase 10: Verification
 
-- [ ] 10a: Run `bazel test //core/...` - ensure all tests pass
-- [ ] 10b: Run `bazel build //apps/cli:cells` - ensure CLI builds
-- [ ] 10c: Run `bazel build --config=wasm //apps/wasm:cells_wasm` - ensure WASM builds
-- [ ] 10d: Grep for remaining `.cells` references to ensure none were missed
+- [x] 10a: Run `bazel test //core/...` - ensure all tests pass
+- [x] 10b: Run `bazel build //apps/cli:cells` - ensure CLI builds
+- [x] 10c: Run `bazel build --config=wasm //apps/wasm:cells_wasm` - ensure WASM builds
+- [x] 10d: Grep for remaining `.cells` references to ensure none were missed
+  - Remaining references are either code identifiers (sheet.cells, viewport.cells) or historical plans with disclaimer notes
 
 ## Notes
 

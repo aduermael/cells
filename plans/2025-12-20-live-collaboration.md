@@ -1,5 +1,8 @@
 # Live Collaboration Implementation Plan
 
+> **Note (2025-12-21):** The `.cells` extension was renamed to `.zcd` (Zero-Conflict Document).
+> All references to `.cells` in this plan now refer to `.zcd` files.
+
 This plan implements real-time collaboration for Cells using custom CRDTs, WebRTC P2P, and a Go-based signaling server.
 
 ## Overview
