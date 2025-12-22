@@ -65,7 +65,7 @@ Update all docs to accurately reflect current implementation status:
   - Add implementation references (hlc.h, crdt.h, operation.h, oplog.h, sync_manager.h)
   - Note what's still not implemented (branch-based undo/redo, presence/cursors)
 
-- [ ] 7b: Update `docs/networking.md`
+- [x] 7b: Update `docs/networking.md`
   - Verify current status matches documentation
   - Add any new implementation details
 

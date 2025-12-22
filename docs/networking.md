@@ -2,17 +2,17 @@
 
 ## Implementation Status
 
-**Current state (December 2024):** Not implemented.
+**Current state (December 2024):** Core networking implemented.
 
-| Component | Status |
-|-----------|--------|
-| WebRTC DataChannel | ❌ Not started |
-| Signaling server | ❌ Not started |
-| STUN/TURN integration | ❌ Not started |
-| Sync protocol | ❌ Not started |
-| Presence/cursors | ❌ Not started |
+| Component | Status | Source Files |
+|-----------|--------|--------------|
+| WebRTC DataChannel | ✅ Implemented | `apps/wasm/static/shared/webrtc-manager.js` |
+| Signaling client | ✅ Implemented | `apps/wasm/static/shared/signaling-client.js` |
+| STUN/TURN integration | ✅ Implemented | `apps/wasm/static/shared/ice-config.js` |
+| Sync protocol | ✅ Implemented | `core/cells/sync_manager.h`, `apps/wasm/static/shared/collab-manager.js` |
+| Presence/cursors | ✅ Implemented | `apps/wasm/static/shared/presence.js` (ephemeral, never persisted) |
 
-This document describes the planned architecture for real-time collaboration. None of this is implemented yet - the current application is single-user, local-only.
+The P2P collaboration layer is fully functional. Presence data (cursors, selections) is broadcast in real-time but intentionally ephemeral - it is never stored in files or the Workbook.
 
 ---
 
