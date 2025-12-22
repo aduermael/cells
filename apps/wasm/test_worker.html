@@ -101,7 +101,7 @@
             // Determine format from extension
             const ext = file.name.split('.').pop().toLowerCase();
             let format;
-            if (ext === 'cells' || ext === 'zcd') format = 'cells';
+            if (ext === 'zcd') format = 'zcd';
             else if (ext === 'csv' || ext === 'tsv') format = 'csv';
             else if (ext === 'xlsx') format = 'xlsx';
             else {
@@ -113,7 +113,7 @@
                 const arrayBuffer = await file.arrayBuffer();
                 const startTime = performance.now();
 
-                if (format === 'cells') {
+                if (format === 'zcd') {
                     const content = new TextDecoder().decode(arrayBuffer);
                     const result = await client.loadCells(content);
                     log(`Loaded ${result.sheetCount} sheet(s): ${result.sheetNames.join(', ')}`, 'pass');

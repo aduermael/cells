@@ -68,7 +68,7 @@ function handleMessage(msg) {
                 const { format, data } = params;
                 let result;
 
-                if (format === 'cells') {
+                if (format === 'zcd') {
                     // data is a string for .zcd format
                     const content = typeof data === 'string' ? data : new TextDecoder().decode(data);
                     result = JSON.parse(engine.loadFromCells(content));
@@ -370,7 +370,7 @@ function handleMessage(msg) {
                 let data, filename;
                 const workbookName = engine.getWorkbookName() || 'spreadsheet';
 
-                if (format === 'cells') {
+                if (format === 'zcd') {
                     const content = engine.exportToCells();
                     if (!content) {
                         respond({ type: 'error', error: 'Export failed' });

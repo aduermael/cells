@@ -5,11 +5,11 @@
  * Detect file format from filename and content
  * @param {string} filename - The filename to check
  * @param {ArrayBuffer} data - The file content
- * @returns {string} - Format: 'cells', 'csv', or 'xlsx'
+ * @returns {string} - Format: 'zcd', 'csv', or 'xlsx'
  */
 export function detectFormat(filename, data) {
     const ext = filename.split('.').pop().toLowerCase();
-    if (ext === 'cells') return 'cells';
+    if (ext === 'zcd') return 'zcd';
     if (ext === 'csv' || ext === 'tsv') return 'csv';
     if (ext === 'xlsx') return 'xlsx';
 
@@ -148,7 +148,7 @@ export function downloadBlob(blob, filename) {
 
 /**
  * Get MIME type for a file format
- * @param {string} format - File format ('xlsx', 'csv', 'cells')
+ * @param {string} format - File format ('xlsx', 'csv', 'zcd')
  * @returns {string} - MIME type
  */
 export function getMimeType(format) {
@@ -157,7 +157,7 @@ export function getMimeType(format) {
             return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
         case 'csv':
             return 'text/csv';
-        case 'cells':
+        case 'zcd':
         default:
             return 'text/plain';
     }

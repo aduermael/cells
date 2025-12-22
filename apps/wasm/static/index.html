@@ -9,7 +9,7 @@
 <body>
     <div id="container">
         <div id="header">
-            <button class="btn" onclick="openFile()">Open File</button>
+            <button class="btn" onclick="openFile()">Open</button>
             <button class="btn" id="new-btn" onclick="newFile()" style="display: none;">New</button>
             <input type="file" id="file-input" accept=".zcd,.csv,.tsv,.xlsx" />
             <h1 id="sheet-name">Cells Viewer</h1>
@@ -22,7 +22,7 @@
                     <div class="dropdown-menu">
                         <button class="dropdown-item" onclick="exportAs('csv')">CSV</button>
                         <button class="dropdown-item" onclick="exportAs('xlsx')">XLSX</button>
-                        <button class="dropdown-item" onclick="exportAs('cells')">CELLS</button>
+                        <button class="dropdown-item" onclick="exportAs('zcd')">ZCD</button>
                     </div>
                 </div>
             </div>
@@ -2479,7 +2479,7 @@
         async function loadFileData(data, format, baseName, displayName) {
             const client = await ensureWasmClient();
 
-            if (format === 'cells') {
+            if (format === 'zcd') {
                 const text = new TextDecoder().decode(data);
                 await client.loadCells(text);
             } else if (format === 'csv') {

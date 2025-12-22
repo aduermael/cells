@@ -146,7 +146,7 @@ class CellsClient {
     /**
      * Load a file into the engine
      * @param {ArrayBuffer|string} data - File data
-     * @param {string} format - 'cells', 'csv', or 'xlsx'
+     * @param {string} format - 'zcd', 'csv', or 'xlsx'
      * @param {object} options - Format-specific options
      * @returns {Promise<{sheetCount: number, sheetNames: string[]}>}
      */
@@ -174,7 +174,7 @@ class CellsClient {
      * @returns {Promise<{sheetCount: number, sheetNames: string[]}>}
      */
     async loadCells(content) {
-        return this.loadFile(content, 'cells');
+        return this.loadFile(content, 'zcd');
     }
 
     /**
@@ -504,7 +504,7 @@ class CellsClient {
 
     /**
      * Export the workbook to a format
-     * @param {string} format - 'cells', 'csv', or 'xlsx'
+     * @param {string} format - 'zcd', 'csv', or 'xlsx'
      * @returns {Promise<{data: ArrayBuffer, filename: string}>}
      */
     async exportAs(format) {
@@ -520,7 +520,7 @@ class CellsClient {
      * @returns {Promise<{data: ArrayBuffer, filename: string}>}
      */
     async exportCells() {
-        return this.exportAs('cells');
+        return this.exportAs('zcd');
     }
 
     /**
