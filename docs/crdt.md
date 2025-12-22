@@ -2,17 +2,19 @@
 
 ## Implementation Status
 
-**Current state (December 2024):** Design only, not implemented.
+**Current state (December 2024):** Core CRDT infrastructure implemented.
 
-| Component | Status |
-|-----------|--------|
-| Hybrid Logical Clock | ❌ Not implemented |
-| Cell operations (CRDT) | ❌ Not implemented |
-| Operation log (OpLog) | ❌ Not implemented |
-| Branch-based undo/redo | ❌ Not implemented |
-| Presence/cursors | ❌ Not implemented |
+| Component | Status | Source Files |
+|-----------|--------|--------------|
+| Hybrid Logical Clock | ✅ Implemented | `core/cells/hlc.h`, `hlc.cc` |
+| Cell operations (CRDT) | ✅ Implemented | `core/cells/crdt.h`, `crdt.cc` |
+| Operation types | ✅ Implemented | `core/cells/operation.h`, `operation.cc` |
+| Operation log (OpLog) | ✅ Implemented | `core/cells/oplog.h`, `oplog.cc` |
+| Sync manager | ✅ Implemented | `core/cells/sync_manager.h`, `sync_manager.cc` |
+| Branch-based undo/redo | ❌ Not implemented | — |
+| Presence/cursors | ❌ Not implemented | — |
 
-This document describes the planned CRDT architecture for conflict-free collaboration. The current implementation uses simple last-write-wins semantics without operation logs or clocks.
+The core CRDT engine is fully functional, supporting conflict-free collaborative editing with operation-based synchronization. Branch-based undo/redo and presence features are planned for future implementation.
 
 ---
 

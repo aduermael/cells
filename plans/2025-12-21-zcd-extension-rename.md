@@ -60,7 +60,7 @@ Rename the native file format extension from `.cells` to `.zcd` (Zero-Conflict D
 
 Update all docs to accurately reflect current implementation status:
 
-- [ ] 7a: Update `docs/crdt.md`
+- [x] 7a: Update `docs/crdt.md`
   - Change status: HLC ✅ Implemented, Operation types ✅ Implemented, OpLog ✅ Implemented
   - Add implementation references (hlc.h, crdt.h, operation.h, oplog.h, sync_manager.h)
   - Note what's still not implemented (branch-based undo/redo, presence/cursors)
