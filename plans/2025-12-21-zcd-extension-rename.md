@@ -81,8 +81,8 @@ Update all docs to accurately reflect current implementation status:
 - [x] 7e: Update `docs/formula-engine.md`
   - Add implementation status section (not implemented)
 
-- [ ] 7f: Update `docs/rendering.md`
-  - Verify current implementation status is accurate
+- [x] 7f: Update `docs/rendering.md`
+  - Verify current implementation status is accurate ✓ (already correct)
 
 - [ ] 7g: Update `docs/cross-platform.md`
   - Verify current implementation status is accurate
