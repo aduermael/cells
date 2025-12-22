@@ -115,12 +115,12 @@ cells/
 ├── Makefile                # Development commands
 ├── core/                   # C++17 core engine
 │   ├── BUILD
-│   ├── cells/              # Main library
-│   │   ├── BUILD
-│   │   ├── *.h             # Headers
-│   │   ├── *.cc            # Implementation
-│   │   └── *_test.cc       # Tests (colocated)
-│   └── testdata/           # Sample .cells and .xlsx files
+│   └── cells/              # Main library
+│       ├── BUILD
+│       ├── *.h             # Headers
+│       ├── *.cc            # Implementation
+│       └── *_test.cc       # Tests (colocated)
+├── testdata/               # Sample .zcd and .xlsx files
 ├── apps/                   # Applications
 │   ├── cli/                # Command-line tool
 │   │   ├── BUILD
@@ -247,7 +247,7 @@ python3 -m http.server 8080 --directory dist
 **Core Engine (C++17):**
 - Data model with UUID-based cells, sparse quadtree storage
 - XLSX import (basic support)
-- .cells text format (read/write)
+- .zcd text format (read/write) - see [File Format](./docs/file-format.md)
 - Viewport-based querying with spatial indexing
 - Multi-sheet support
 
@@ -260,7 +260,7 @@ python3 -m http.server 8080 --directory dist
 - Listener-driven UI refresh
 
 **CLI Tool:**
-- File format conversion (xlsx → cells, cells → xlsx)
+- File format conversion (xlsx ↔ zcd)
 - Basic file inspection
 
 **Not Yet Implemented:**

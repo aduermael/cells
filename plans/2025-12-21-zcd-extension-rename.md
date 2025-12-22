@@ -92,7 +92,7 @@ Update all docs to accurately reflect current implementation status:
 
 ## Phase 8: Update Root Documentation
 
-- [ ] 8a: Update `README.md`
+- [x] 8a: Update `README.md`
   - Change all `.cells` references to `.zcd`
   - Update directory structure to show `testdata/` at root
   - Update testdata path in core/ section
