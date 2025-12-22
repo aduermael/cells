@@ -163,7 +163,7 @@ cc_library(
 cc_test(
     name = "parser_test",
     srcs = ["parser_test.cc"],
-    data = ["//core/testdata:sample_cells_files"],
+    data = ["//testdata:sample_zcd_files"],
     deps = [
         ":parser",
         "@googletest//:gtest_main",
@@ -173,7 +173,7 @@ cc_test(
 cc_test(
     name = "serializer_test",
     srcs = ["serializer_test.cc"],
-    data = ["//core/testdata:sample_cells_files"],
+    data = ["//testdata:sample_zcd_files"],
     deps = [
         ":id",
         ":model",
@@ -206,7 +206,7 @@ cc_library(
 cc_test(
     name = "csv_reader_test",
     srcs = ["csv_reader_test.cc"],
-    data = ["//core/testdata:sample_csv_files"],
+    data = ["//testdata:sample_csv_files"],
     deps = [
         ":csv_reader",
         "@googletest//:gtest_main",
@@ -250,7 +250,7 @@ cc_library(
 cc_test(
     name = "xlsx_reader_test",
     srcs = ["xlsx_reader_test.cc"],
-    data = ["//core/testdata/xlsx:sample_xlsx_files"],
+    data = ["//testdata/xlsx:sample_xlsx_files"],
     deps = [
         ":xlsx_reader",
         "@googletest//:gtest_main",

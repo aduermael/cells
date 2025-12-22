@@ -9,7 +9,7 @@ namespace {
 
 // Helper to get test file path
 std::string testFilePath(const std::string& filename) {
-    return "core/testdata/xlsx/" + filename;
+    return "testdata/xlsx/" + filename;
 }
 
 // ============================================================================

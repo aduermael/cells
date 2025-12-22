@@ -11,7 +11,7 @@ namespace {
 
 // Helper to read test files
 std::string readTestFile(const std::string& filename) {
-    const std::string path = "core/testdata/csv/" + filename;
+    const std::string path = "testdata/csv/" + filename;
     std::ifstream file(path);
     if (!file.is_open()) {
         return "";
