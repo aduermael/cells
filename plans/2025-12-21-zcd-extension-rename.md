@@ -87,8 +87,8 @@ Update all docs to accurately reflect current implementation status:
 - [x] 7g: Update `docs/cross-platform.md`
   - Verify current implementation status is accurate ✓ (already correct)
 
-- [ ] 7h: Update `docs/type-system.md`
-  - Verify current implementation status is accurate
+- [x] 7h: Update `docs/type-system.md`
+  - Add implementation status section (basic cell types only)
 
 ## Phase 8: Update Root Documentation
 

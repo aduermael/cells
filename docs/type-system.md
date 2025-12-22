@@ -1,5 +1,22 @@
 # Type System
 
+## Implementation Status
+
+**Current state (December 2024):** Basic cell value types only.
+
+| Component | Status |
+|-----------|--------|
+| Cell value types (number, string, boolean, date) | ✅ Implemented |
+| Column type constraints | ❌ Not implemented |
+| Type validation/coercion | ❌ Not implemented |
+| Relations (foreign keys) | ❌ Not implemented |
+| Select/multi-select | ❌ Not implemented |
+| Formula type hints | ❌ Not implemented |
+
+Cells are currently dynamically typed with no optional constraints. This document describes the planned type system architecture.
+
+---
+
 ## Overview
 
 Cells uses **completely optional typing**: cells are dynamically typed by default (exactly like Excel), and columns can optionally have type constraints.
