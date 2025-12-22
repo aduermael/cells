@@ -74,9 +74,9 @@ Update all docs to accurately reflect current implementation status:
   - Update format variants table (.zcd, .zcdz, .zcdb, .zcdbz)
   - Add reference to new file-format.md
 
-- [ ] 7d: Update `docs/data-model.md`
-  - Change testdata path from `core/testdata/` to `testdata/`
-  - Verify implementation references are accurate
+- [x] 7d: Update `docs/data-model.md`
+  - Change testdata path from `core/testdata/` to `testdata/` (N/A - no testdata refs)
+  - Verify implementation references are accurate ✓
 
 - [ ] 7e: Update `docs/formula-engine.md`
   - Verify status is accurate (currently shows as not implemented)
