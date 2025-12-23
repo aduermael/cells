@@ -96,8 +96,69 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "ice_config_test",
+    srcs = ["ice_config_test.cc"],
+    deps = [
+        ":ice_config",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "rtc_test",
+    srcs = ["rtc_test.cc"],
+    deps = [
+        ":rtc_data_channel",
+        ":rtc_peer_connection",
+        "@googletest//:gtest_main",
+    ],
+)
+
+# ICE configuration for STUN/TURN servers
+cc_library(
+    name = "ice_config",
+    srcs = ["common/ICEConfig.cc"],
+    hdrs = ["include/ICEConfig.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+
+# RTCDataChannel abstraction
+cc_library(
+    name = "rtc_data_channel",
+    srcs = [
+        "common/RTCDataChannel.cc",
+    ] + select({
+        "@platforms//os:emscripten": ["web/RTCDataChannel_web.cc"],
+        # TODO: Use apple/RTCDataChannel.mm with objc_library when rules_apple is added
+        "//conditions:default": ["common/RTCDataChannel_default.cc"],
+    }),
+    hdrs = ["include/RTCDataChannel.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+
+# RTCPeerConnection abstraction
+cc_library(
+    name = "rtc_peer_connection",
+    srcs = [
+        "common/RTCPeerConnection.cc",
+    ] + select({
+        "@platforms//os:emscripten": ["web/RTCPeerConnection_web.cc"],
+        # TODO: Use apple/RTCPeerConnection.mm with objc_library when rules_apple is added
+        "//conditions:default": ["common/RTCPeerConnection_default.cc"],
+    }),
+    hdrs = ["include/RTCPeerConnection.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ice_config",
+        ":rtc_data_channel",
+    ],
+)
+
 # TODO: Add libraries as they are implemented:
-# - RTCPeerConnection: WebRTC peer connection
 # - SignalingClient: WebRTC signaling protocol
 # - SyncClient: Sync protocol over DataChannel
 # - Presence: Cursor/selection presence

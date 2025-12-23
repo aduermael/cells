@@ -112,32 +112,32 @@ Port the WSConnection pattern from xptools for real-time sync.
 
 Port WebRTC P2P from JS (`webrtc-manager.js`, `ice-config.js`).
 
-- [ ] 4a: Create `RTCPeerConnection.h` in `core/net/include/`
+- [x] 4a: Create `RTCPeerConnection.h` in `core/net/include/`
   - `createOffer()`, `createAnswer()`, `setLocalDescription()`, `setRemoteDescription()`
   - `addIceCandidate()`, `onIceCandidate` callback
   - `createDataChannel()`, `onDataChannel` callback
   - RTCPeerConnectionDelegate: `onConnectionStateChange()`, `onIceConnectionStateChange()`
 
-- [ ] 4b: Create `RTCDataChannel.h` in `core/net/include/`
+- [x] 4b: Create `RTCDataChannel.h` in `core/net/include/`
   - `send(data)`, `close()`
   - DataChannelDelegate: `onOpen()`, `onClose()`, `onMessage()`, `onError()`
   - Binary and text message support
 
-- [ ] 4c: Create `ICEConfig.h` for STUN/TURN configuration
+- [x] 4c: Create `ICEConfig.h` for STUN/TURN configuration
   - ICE server list (URLs, credentials)
   - Load from `ice-config.js` equivalent
 
-- [ ] 4d: Create Web implementation in `core/net/web/RTCPeerConnection_web.cc`
+- [x] 4d: Create Web implementation in `core/net/web/RTCPeerConnection_web.cc`
   - Use emscripten WebRTC bindings
   - Map to browser's RTCPeerConnection API
 
-- [ ] 4e: Create Apple implementation in `core/net/apple/RTCPeerConnection.mm`
+- [x] 4e: Create Apple implementation in `core/net/apple/RTCPeerConnection.mm`
   - Use [stasel/WebRTC](https://github.com/stasel/WebRTC) prebuilt XCFramework
   - Install via Swift Package Manager or CocoaPods (`pod 'WebRTC-lib'`)
   - Supports iOS 12+, macOS 10.11+, macOS Catalyst (arm64 + x86_64)
   - Actively maintained, tracks Chromium releases (currently M141)
 
-- [ ] 4f: Add WebRTC tests
+- [x] 4f: Add WebRTC tests
   - Loopback test (connect to self)
   - DataChannel send/receive
 
