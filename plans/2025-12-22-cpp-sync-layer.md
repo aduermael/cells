@@ -437,9 +437,10 @@ The old JS code (`collab-manager.js`, `webrtc-manager.js`, etc.) is still handli
   - `signaling-client.js` (436 lines) - replaced by C++ SignalingClient
   - `ice-config.js` (294 lines) - replaced by C++ ICEConfig
 
-- [ ] 12e: Refactor presence.js
-  - Keep only `generateRandomName()` utility (move to utils.js)
-  - Delete rest - replaced by C++ PresenceManager
+- [x] 12e: Refactor presence.js
+  - Keep only utilities: `generateRandomName()`, `getColorForPeer()`, `USER_COLORS`
+  - Delete PresenceManager class - replaced by C++ PresenceManager
+  - Reduced from 565 to 63 lines (502 lines removed)
 
 - [ ] 12f: Test web sync end-to-end
   - Verify C++ sync works via WASM
