@@ -303,29 +303,35 @@ Simplify JS to thin wrapper - sync happens in C++. Remove existing JS sync code.
 
 Configure Bazel for cross-platform network code including WebRTC.
 
-- [ ] 9a: Create `core/net/BUILD` with platform-specific `select()`
+- [x] 9a: Create `core/net/BUILD` with platform-specific `select()`
   - Common sources always included
-  - Web sources for WASM target (emscripten WebRTC bindings)
-  - Apple sources with WebRTC.framework dependency
+  - Web sources for WASM target via `@platforms//os:emscripten` select
+  - Apple sources with TODO comments for when rules_apple is added
+  - Default stub implementations for non-web/non-apple platforms
 
-- [ ] 9b: Add stasel/WebRTC as external dependency for Apple
+- [~] 9b: Add stasel/WebRTC as external dependency for Apple (DEFERRED)
+  - Requires rules_apple for objc_library support
   - Use [stasel/WebRTC](https://github.com/stasel/WebRTC) prebuilt XCFramework
   - For Bazel: download xcframework and configure as `apple_static_xcframework_import`
-  - Alternative: use CocoaPods/SPM in a separate Xcode project, link via Bazel
   - License: BSD 3-Clause (compatible)
+  - **Deferred**: Focus on web platform first; Apple can be added when building native apps
 
-- [ ] 9c: Update `apps/wasm/BUILD` to link net library
-  - Add dependency on `//core/net:net`
-  - Enable emscripten WebRTC and fetch flags
+- [x] 9c: Update `apps/wasm/BUILD` to link net library
+  - Added dependency on `//core/net:sync_client`
+  - Enabled `-lwebsocket.js` and `-s FETCH=1` for networking
 
-- [ ] 9d: Add platform detection defines
-  - `__CELLS_PLATFORM_WASM` for web
-  - `__CELLS_PLATFORM_APPLE` for iOS/macOS
-  - Consistent with xptools pattern
+- [x] 9d: Add platform detection defines
+  - Using standard `__APPLE__` define for iOS/macOS (already available)
+  - Using `__EMSCRIPTEN__` define for web (already available from emscripten)
+  - No need for custom `__CELLS_PLATFORM_*` defines - standard platform macros work
 
-- [ ] 9e: Add integration tests for network layer
-  - Test targets for each platform
-  - Mock signaling server for testing
+- [x] 9e: Add integration tests for network layer
+  - `core/net/url_test.cc` - URL parsing tests
+  - `core/net/http_response_test.cc` - HTTP response tests
+  - `core/net/ice_config_test.cc` - ICE configuration tests
+  - `core/net/rtc_test.cc` - WebRTC abstraction tests
+  - `core/net/signaling_test.cc` - Signaling protocol tests
+  - `core/net/presence_test.cc` - Presence manager tests
 
 ---
 
