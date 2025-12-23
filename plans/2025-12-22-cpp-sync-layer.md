@@ -31,11 +31,11 @@ Move synchronization handling to the C++ level following the xptools pattern fro
 
 Set up the cross-platform networking infrastructure directory.
 
-- [ ] 1a: Create `core/net/` directory with BUILD file for Bazel
-- [ ] 1b: Create `core/net/include/` for public headers
-- [ ] 1c: Create `core/net/common/` for shared implementation
-- [ ] 1d: Create `core/net/web/` for emscripten/WASM implementations
-- [ ] 1e: Create `core/net/apple/` for iOS/macOS implementations (Objective-C++)
+- [x] 1a: Create `core/net/` directory with BUILD file for Bazel
+- [x] 1b: Create `core/net/include/` for public headers
+- [x] 1c: Create `core/net/common/` for shared implementation
+- [x] 1d: Create `core/net/web/` for emscripten/WASM implementations
+- [x] 1e: Create `core/net/apple/` for iOS/macOS implementations (Objective-C++)
 
 ---
 
