@@ -54,6 +54,7 @@ cc_binary(
         "//core/cells:sync_manager",
         "//core/cells:xlsx_reader",
         "//core/cells:xlsx_writer",
+        "//core/log",
     ],
 )
 

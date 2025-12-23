@@ -416,10 +416,35 @@ declare module 'cells-wasm' {
   }
 
   /**
+   * Log level enum for controlling C++ log output
+   */
+  enum LogLevel {
+    DEBUG = 0,
+    INFO = 1,
+    WARN = 2,
+    ERROR = 3,
+  }
+
+  /**
    * The initialized WASM module
    */
   interface CellsModule {
     CellsEngine: typeof CellsEngine;
+
+    // Logger enum
+    LogLevel: typeof LogLevel;
+
+    // Logger functions - output to browser console
+    logDebug(message: string): void;
+    logInfo(message: string): void;
+    logWarn(message: string): void;
+    logError(message: string): void;
+
+    // Logger configuration
+    setLogEnabled(enabled: boolean): void;
+    isLogEnabled(): boolean;
+    setLogLevel(level: LogLevel): void;
+    getLogLevel(): LogLevel;
   }
 
   /**
@@ -430,7 +455,7 @@ declare module 'cells-wasm' {
   function createCellsModule(options?: CellsModuleOptions): Promise<CellsModule>;
 
   export default createCellsModule;
-  export { CellsEngine, CellsModule, CellsModuleOptions };
+  export { CellsEngine, CellsModule, CellsModuleOptions, LogLevel };
   export {
     LoadResult,
     OperationResult,

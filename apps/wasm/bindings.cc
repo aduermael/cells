@@ -27,6 +27,7 @@
 #include "core/cells/sync_manager.h"
 #include "core/cells/xlsx_reader.h"
 #include "core/cells/xlsx_writer.h"
+#include "core/log/include/Logger.h"
 
 using namespace emscripten;
 
@@ -1362,6 +1363,7 @@ public:
         _activeSheetIndex = 0;
         rebuildQuadtree();
         notifyListeners(ChangeType::DATA_LOADED);
+        LOG_INFO("Created empty workbook with id=%s", _workbook->id.toString().c_str());
     }
 
     // ========================================================================
@@ -1954,4 +1956,39 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("isCollaborating", &cells::wasm::CellsEngine::isCollaborating)
         .function("startCollaboration", &cells::wasm::CellsEngine::startCollaboration)
         .function("setCollabMode", &cells::wasm::CellsEngine::setCollabMode);
+
+    // Logger bindings - control logging from JavaScript
+    enum_<cells::log::Level>("LogLevel")
+        .value("DEBUG", cells::log::Level::DEBUG)
+        .value("INFO", cells::log::Level::INFO)
+        .value("WARN", cells::log::Level::WARN)
+        .value("ERROR", cells::log::Level::ERROR);
+
+    // Free functions for logging
+    function("logDebug", +[](const std::string& msg) {
+        cells::log::Logger::instance().debug("%s", msg.c_str());
+    });
+    function("logInfo", +[](const std::string& msg) {
+        cells::log::Logger::instance().info("%s", msg.c_str());
+    });
+    function("logWarn", +[](const std::string& msg) {
+        cells::log::Logger::instance().warn("%s", msg.c_str());
+    });
+    function("logError", +[](const std::string& msg) {
+        cells::log::Logger::instance().error("%s", msg.c_str());
+    });
+
+    // Logger configuration
+    function("setLogEnabled", +[](bool enabled) {
+        cells::log::Logger::instance().setEnabled(enabled);
+    });
+    function("isLogEnabled", +[]() {
+        return cells::log::Logger::instance().isEnabled();
+    });
+    function("setLogLevel", +[](cells::log::Level level) {
+        cells::log::Logger::instance().setMinLevel(level);
+    });
+    function("getLogLevel", +[]() {
+        return cells::log::Logger::instance().getMinLevel();
+    });
 }
