@@ -176,33 +176,33 @@ Port sync protocol from JS (`collab-manager.js`). Build on CRDT docs.
 
 **Reference existing JS:** Study `collab-manager.js` for message format and sync flow.
 
-- [ ] 6a: Create `SyncClient.h` in `core/net/include/`
-  - `startSync(documentId)`, `stopSync()`
-  - `pushOperation(Operation)` - queue local operation for sync
-  - `onOperationsReceived(callback)` - callback for remote operations
-  - SyncDelegate: `onSyncStateChanged()`, `onPeersChanged()`
+- [x] 6a: Create `SyncClient.h` in `core/net/include/`
+  - `startSync(roomId, peerId)`, `stopSync()`
+  - `broadcastOperations()` - queue local operations for sync
+  - SyncClientDelegate: `syncClientStateDidChange()`, `syncClientPeerDidChange()`, `syncClientDataDidChange()`
+  - Orchestrates SignalingClient + RTCPeerConnection + SyncManager
 
-- [ ] 6b: Create `Operation.h` - CRDT operation structures
+- [x] 6b: `Operation.h` already exists in `core/cells/operation.h`
   - HLC (Hybrid Logical Clock) for ordering
   - Operation types: CELL_SET_VALUE, CELL_CLEAR, DIM_INSERT_AXIS, etc.
   - JSON serialization for wire format
 
-- [ ] 6c: Create `SyncClient.cc` implementation in `core/net/common/`
+- [x] 6c: Create `SyncClient.cc` implementation in `core/net/common/`
   - Uses SignalingClient for connection setup
   - Uses RTCDataChannel for P2P data exchange
-  - Operation batching and deduplication
-  - Sync request/response protocol matching JS
+  - Uses SyncManager from `core/cells/` for sync protocol logic
+  - Handles peer lifecycle (connect, ready, disconnect)
 
-- [ ] 6d: Create `OperationLog.h` and implementation
+- [x] 6d: `OperationLog` already exists in `core/cells/oplog.h`
   - Append-only log of operations
-  - Indexes by cell_id, axis_id
-  - Compaction support (future)
+  - Indexes by entity_id
+  - Compaction support via `pruneOperationsBefore()`
 
-- [ ] 6e: Integrate existing HLC from `core/cells/hlc.h`
-  - Already implemented: `HLC` struct with wall_time, logical, node_id
-  - Has comparison operators, string serialization
+- [x] 6e: HLC already integrated in `core/cells/`
+  - `HLC` struct with wall_time, logical, node_id
+  - Comparison operators, string serialization
   - Functions: `generate_hlc()`, `update_hlc()`, `generate_initial_hlc()`
-  - Just need to wire into SyncClient
+  - SyncManager uses HLC for all operations
 
 ---
 

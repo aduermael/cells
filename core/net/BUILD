@@ -195,6 +195,23 @@ cc_test(
     ],
 )
 
+# Sync client - orchestrates P2P synchronization
+cc_library(
+    name = "sync_client",
+    srcs = ["common/SyncClient.cc"],
+    hdrs = ["include/SyncClient.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ice_config",
+        ":rtc_data_channel",
+        ":rtc_peer_connection",
+        ":signaling_client",
+        "//core/cells:hlc",
+        "//core/cells:model",
+        "//core/cells:sync_manager",
+    ],
+)
+
 # TODO: Add libraries as they are implemented:
-# - SyncClient: Sync protocol over DataChannel
 # - Presence: Cursor/selection presence
