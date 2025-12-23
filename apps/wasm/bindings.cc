@@ -28,6 +28,7 @@
 #include "core/cells/xlsx_reader.h"
 #include "core/cells/xlsx_writer.h"
 #include "core/log/include/Logger.h"
+#include "core/net/include/SyncClient.h"
 
 using namespace emscripten;
 
@@ -41,7 +42,11 @@ enum class ChangeType {
     CELL_CHANGED,       // Cell value/formula modified
     STRUCTURE_CHANGED,  // Rows/columns added, removed, resized, moved
     SHEET_CHANGED,      // Active sheet changed, sheet added/deleted/renamed/moved
-    DATA_LOADED         // New file loaded or workbook created
+    DATA_LOADED,        // New file loaded or workbook created
+    SYNC_STATE_CHANGED, // Sync connection state changed
+    PEER_JOINED,        // A peer joined the sync session
+    PEER_LEFT,          // A peer left the sync session
+    PRESENCE_CHANGED    // Remote peer presence (cursor/selection) changed
 };
 
 // ============================================================================
@@ -112,9 +117,10 @@ std::string extractPayloadField(const std::string& payload, const std::string& k
 // CellsEngine - main wrapper class exposing the spreadsheet engine to JS
 // ============================================================================
 
-class CellsEngine {
+class CellsEngine : public cells::net::SyncClientDelegate {
 public:
     CellsEngine() : _workbook(nullptr), _activeSheetIndex(0), _listener(val::null()) {}
+    ~CellsEngine() override { disableSync(); }
 
     // ========================================================================
     // Listener registration for change notifications
@@ -1826,6 +1832,252 @@ public:
         return "{\"success\":true,\"mode\":\"" + mode + "\"}";
     }
 
+    // ========================================================================
+    // C++ SyncClient methods (P2P synchronization via WebRTC)
+    // ========================================================================
+
+    // Enable sync - connects to signaling server and joins a room.
+    // url: WebSocket URL for signaling server (e.g., "wss://server.example.com/ws")
+    // roomId: Document/room ID to join
+    // peerId: Local peer ID (generated if empty)
+    std::string enableSync(const std::string& url, const std::string& roomId,
+                           const std::string& peerId = "") {
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
+        }
+
+        // Clean up existing sync client if any
+        if (_syncClient) {
+            _syncClient->stopSync();
+            _syncClient.reset();
+        }
+
+        // Configure sync client
+        cells::net::SyncClientConfig config;
+        config.signaling_url = url;
+
+        // Create sync client
+        _syncClient = std::make_unique<cells::net::SyncClient>(_workbook.get(), config);
+        _syncClient->setDelegate(this);
+
+        // Start sync
+        _syncClient->startSync(roomId, peerId);
+
+        std::ostringstream json;
+        json << "{\"success\":true,\"peerId\":\"" << _syncClient->getPeerId() << "\"}";
+        return json.str();
+    }
+
+    // Disable sync - disconnects from peers and signaling server.
+    void disableSync() {
+        if (_syncClient) {
+            _syncClient->stopSync();
+            _syncClient.reset();
+        }
+    }
+
+    // Get current sync state as a JSON object.
+    // Returns: { state, peerId, roomId, peerCount, peers: [...] }
+    std::string getSyncState() {
+        if (!_syncClient) {
+            return "{\"state\":\"offline\",\"peerId\":\"\",\"roomId\":\"\",\"peerCount\":0,\"peers\":[]}";
+        }
+
+        std::ostringstream json;
+        json << "{";
+        json << "\"state\":\"" << cells::net::syncClientStateToString(_syncClient->getState()) << "\",";
+        json << "\"peerId\":\"" << _syncClient->getPeerId() << "\",";
+        json << "\"roomId\":\"" << _syncClient->getRoomId() << "\",";
+        json << "\"peerCount\":" << _syncClient->getPeerCount() << ",";
+        json << "\"peers\":[";
+
+        auto peers = _syncClient->getPeers();
+        for (size_t i = 0; i < peers.size(); i++) {
+            if (i > 0) json << ",";
+            json << "{";
+            json << "\"id\":\"" << peers[i].id << "\",";
+            json << "\"connected\":" << (peers[i].is_connected ? "true" : "false") << ",";
+            json << "\"synced\":" << (peers[i].is_synced ? "true" : "false") << ",";
+            json << "\"latency\":" << peers[i].latency_ms;
+            json << "}";
+        }
+
+        json << "]";
+        json << "}";
+        return json.str();
+    }
+
+    // Check if sync is currently enabled/connected.
+    bool isSyncEnabled() { return _syncClient != nullptr && _syncClient->isConnected(); }
+
+    // Process outgoing sync messages - call periodically (e.g., in requestAnimationFrame).
+    void processSyncOutgoing() {
+        if (_syncClient) {
+            _syncClient->processOutgoing();
+        }
+    }
+
+    // Process pending presence updates - call periodically.
+    void processSyncPresence() {
+        if (_syncClient) {
+            // Process presence updates (presence channel)
+            // Note: This is handled internally by SyncClient when processOutgoing is called
+        }
+    }
+
+    // Broadcast local operations to peers - call after local edits.
+    void broadcastSyncOperations() {
+        if (_syncClient) {
+            _syncClient->broadcastOperations();
+        }
+    }
+
+    // ========================================================================
+    // C++ SyncClient presence methods
+    // ========================================================================
+
+    // Set local user's display name (shown to other peers).
+    void setSyncLocalName(const std::string& name) {
+        if (_syncClient) {
+            _syncClient->setLocalName(name);
+        }
+    }
+
+    // Set current sheet (for multi-sheet presence tracking).
+    void setSyncCurrentSheet(const std::string& sheetId) {
+        if (_syncClient) {
+            _syncClient->setCurrentSheet(sheetId);
+        }
+    }
+
+    // Set cursor position (cell the user is editing).
+    void setSyncCursor(const std::string& colId, const std::string& rowId) {
+        if (_syncClient) {
+            _syncClient->setCursor(colId, rowId);
+        }
+    }
+
+    // Clear cursor position.
+    void clearSyncCursor() {
+        if (_syncClient) {
+            _syncClient->clearCursor();
+        }
+    }
+
+    // Set selection range.
+    void setSyncSelection(const std::string& startCol, const std::string& startRow,
+                          const std::string& endCol, const std::string& endRow) {
+        if (_syncClient) {
+            cells::net::CursorPosition start;
+            start.col = startCol;
+            start.row = startRow;
+            cells::net::CursorPosition end;
+            end.col = endCol;
+            end.row = endRow;
+            _syncClient->setSelection(start, end);
+        }
+    }
+
+    // Clear selection.
+    void clearSyncSelection() {
+        if (_syncClient) {
+            _syncClient->clearSelection();
+        }
+    }
+
+    // Get remote peers' presence data as JSON.
+    std::string getRemotePresences() {
+        if (!_syncClient) {
+            return "{\"peers\":{}}";
+        }
+
+        std::ostringstream json;
+        json << "{\"peers\":{";
+
+        auto remotePeers = _syncClient->getRemotePeers();
+        bool first = true;
+        for (const auto& [peerId, presence] : remotePeers) {
+            if (!first) json << ",";
+            first = false;
+
+            json << "\"" << peerId << "\":{";
+            json << "\"name\":\"" << jsonEscape(presence.name) << "\",";
+            json << "\"color\":\"" << jsonEscape(presence.color) << "\",";
+            json << "\"sheetId\":\"" << jsonEscape(presence.sheet_id) << "\",";
+
+            if (presence.has_cursor) {
+                json << "\"cursor\":{\"col\":\"" << presence.cursor.col
+                     << "\",\"row\":\"" << presence.cursor.row << "\"},";
+            } else {
+                json << "\"cursor\":null,";
+            }
+
+            if (presence.has_selection) {
+                json << "\"selection\":{\"startCol\":\"" << presence.selection.start.col
+                     << "\",\"startRow\":\"" << presence.selection.start.row
+                     << "\",\"endCol\":\"" << presence.selection.end.col
+                     << "\",\"endRow\":\"" << presence.selection.end.row << "\"}";
+            } else {
+                json << "\"selection\":null";
+            }
+
+            json << "}";
+        }
+
+        json << "}}";
+        return json.str();
+    }
+
+    // ========================================================================
+    // SyncClientDelegate implementation
+    // ========================================================================
+
+    void syncClientStateDidChange(cells::net::SyncClient& /*client*/,
+                                  cells::net::SyncClientState /*state*/) override {
+        notifyListeners(ChangeType::SYNC_STATE_CHANGED);
+    }
+
+    void syncClientPeerDidChange(cells::net::SyncClient& /*client*/,
+                                 const cells::net::PeerInfo& peer) override {
+        // Peer connected/synced - notify with PEER_JOINED
+        if (peer.is_connected) {
+            notifyListenersWithData(ChangeType::PEER_JOINED, peer.id);
+        }
+    }
+
+    void syncClientPeerDidDisconnect(cells::net::SyncClient& /*client*/,
+                                     const std::string& peer_id) override {
+        notifyListenersWithData(ChangeType::PEER_LEFT, peer_id);
+    }
+
+    void syncClientDataDidChange(cells::net::SyncClient& /*client*/) override {
+        // Remote operations modified data - rebuild quadtree and notify
+        rebuildQuadtree();
+        notifyListeners(ChangeType::CELL_CHANGED);
+    }
+
+    void syncClientDidError(cells::net::SyncClient& /*client*/,
+                            const std::string& error) override {
+        LOG_ERROR("SyncClient error: %s", error.c_str());
+    }
+
+    void syncClientLatencyDidUpdate(cells::net::SyncClient& /*client*/,
+                                    const std::string& /*peer_id*/,
+                                    int /*latency_ms*/) override {
+        // Latency updates - not currently notified to JS
+    }
+
+    void syncClientPresenceDidUpdate(cells::net::SyncClient& /*client*/,
+                                     const std::string& peer_id,
+                                     const cells::net::PresenceData& /*presence*/) override {
+        notifyListenersWithData(ChangeType::PRESENCE_CHANGED, peer_id);
+    }
+
+    void syncClientPresenceDidRemove(cells::net::SyncClient& /*client*/,
+                                     const std::string& peer_id) override {
+        notifyListenersWithData(ChangeType::PRESENCE_CHANGED, peer_id);
+    }
+
 private:
     void rebuildQuadtree() {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
@@ -1864,10 +2116,61 @@ private:
             case ChangeType::DATA_LOADED:
                 typeStr = "loaded";
                 break;
+            case ChangeType::SYNC_STATE_CHANGED:
+                typeStr = "sync_state";
+                break;
+            case ChangeType::PEER_JOINED:
+                typeStr = "peer_joined";
+                break;
+            case ChangeType::PEER_LEFT:
+                typeStr = "peer_left";
+                break;
+            case ChangeType::PRESENCE_CHANGED:
+                typeStr = "presence";
+                break;
         }
 
         // Call the JavaScript callback with the change type
         _listener(std::string(typeStr));
+    }
+
+    // Notify listener with additional data (e.g., peer ID)
+    void notifyListenersWithData(ChangeType type, const std::string& data) {
+        if (_listener.isNull() || _listener.isUndefined()) {
+            return;
+        }
+
+        // Convert ChangeType to string for JavaScript
+        const char* typeStr = nullptr;
+        switch (type) {
+            case ChangeType::CELL_CHANGED:
+                typeStr = "cell";
+                break;
+            case ChangeType::STRUCTURE_CHANGED:
+                typeStr = "structure";
+                break;
+            case ChangeType::SHEET_CHANGED:
+                typeStr = "sheet";
+                break;
+            case ChangeType::DATA_LOADED:
+                typeStr = "loaded";
+                break;
+            case ChangeType::SYNC_STATE_CHANGED:
+                typeStr = "sync_state";
+                break;
+            case ChangeType::PEER_JOINED:
+                typeStr = "peer_joined";
+                break;
+            case ChangeType::PEER_LEFT:
+                typeStr = "peer_left";
+                break;
+            case ChangeType::PRESENCE_CHANGED:
+                typeStr = "presence";
+                break;
+        }
+
+        // Call the JavaScript callback with the change type and data
+        _listener(std::string(typeStr), data);
     }
 
     std::unique_ptr<Workbook> _workbook;
@@ -1875,7 +2178,8 @@ private:
     Quadtree _quadtree;
     RefConverter _refConverter;
     val _listener;  // JavaScript callback for change notifications
-    std::unique_ptr<SyncManager> _syncManager;  // CRDT sync manager
+    std::unique_ptr<SyncManager> _syncManager;  // CRDT sync manager (for JS-based sync)
+    std::unique_ptr<cells::net::SyncClient> _syncClient;  // C++ sync client (for WebRTC P2P)
 };
 
 }  // namespace cells::wasm
@@ -1955,7 +2259,23 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getCollabMode", &cells::wasm::CellsEngine::getCollabMode)
         .function("isCollaborating", &cells::wasm::CellsEngine::isCollaborating)
         .function("startCollaboration", &cells::wasm::CellsEngine::startCollaboration)
-        .function("setCollabMode", &cells::wasm::CellsEngine::setCollabMode);
+        .function("setCollabMode", &cells::wasm::CellsEngine::setCollabMode)
+        // C++ SyncClient (P2P WebRTC sync)
+        .function("enableSync", &cells::wasm::CellsEngine::enableSync)
+        .function("disableSync", &cells::wasm::CellsEngine::disableSync)
+        .function("getSyncState", &cells::wasm::CellsEngine::getSyncState)
+        .function("isSyncEnabled", &cells::wasm::CellsEngine::isSyncEnabled)
+        .function("processSyncOutgoing", &cells::wasm::CellsEngine::processSyncOutgoing)
+        .function("processSyncPresence", &cells::wasm::CellsEngine::processSyncPresence)
+        .function("broadcastSyncOperations", &cells::wasm::CellsEngine::broadcastSyncOperations)
+        // C++ SyncClient presence
+        .function("setSyncLocalName", &cells::wasm::CellsEngine::setSyncLocalName)
+        .function("setSyncCurrentSheet", &cells::wasm::CellsEngine::setSyncCurrentSheet)
+        .function("setSyncCursor", &cells::wasm::CellsEngine::setSyncCursor)
+        .function("clearSyncCursor", &cells::wasm::CellsEngine::clearSyncCursor)
+        .function("setSyncSelection", &cells::wasm::CellsEngine::setSyncSelection)
+        .function("clearSyncSelection", &cells::wasm::CellsEngine::clearSyncSelection)
+        .function("getRemotePresences", &cells::wasm::CellsEngine::getRemotePresences);
 
     // Logger bindings - control logging from JavaScript
     enum_<cells::log::Level>("LogLevel")

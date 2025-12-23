@@ -240,25 +240,25 @@ Handle cursor positions, selections, and user presence. Presence data is ephemer
 
 Connect the sync layer to the existing engine.
 
-- [ ] 7a: Add SyncClient to CellsEngine
+- [x] 7a: Add SyncClient to CellsEngine
   - `enableSync(serverUrl, documentId)`, `disableSync()`
   - `getSyncState()` - connected, syncing, offline
 
-- [ ] 7b: Hook mutations to generate operations
+- [x] 7b: Hook mutations to generate operations
   - In updateCell, createCell, resizeColumn, etc.
   - Create Operation with HLC timestamp
   - Push to SyncClient
 
-- [ ] 7c: Apply received operations to workbook
+- [x] 7c: Apply received operations to workbook
   - SyncClient calls back into engine with remote operations
   - Apply with conflict resolution (LWW for cells)
   - Skip if operation already applied (dedup by HLC)
 
-- [ ] 7d: Add sync-related callbacks to listener system
+- [x] 7d: Add sync-related callbacks to listener system
   - SYNC_STATE_CHANGED, PEER_JOINED, PEER_LEFT
   - Extend existing onDataChanged mechanism
 
-- [ ] 7e: Update WASM bindings (bindings.cc)
+- [x] 7e: Update WASM bindings (bindings.cc)
   - Expose sync methods: `enableSync()`, `disableSync()`, `getSyncState()`
   - Add sync event callbacks via existing listener pattern
 

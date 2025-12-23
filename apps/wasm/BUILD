@@ -37,6 +37,8 @@ cc_binary(
     srcs = ["bindings.cc"],
     linkopts = EMSCRIPTEN_LINKOPTS + [
         "-s SINGLE_FILE=0",  # Keep .wasm separate for better caching
+        "-lwebsocket.js",  # WebSocket support for networking
+        "-s FETCH=1",  # HTTP fetch support for networking
     ],
     deps = [
         "//core/cells:crdt",
@@ -55,6 +57,7 @@ cc_binary(
         "//core/cells:xlsx_reader",
         "//core/cells:xlsx_writer",
         "//core/log",
+        "//core/net:sync_client",
     ],
 )
 

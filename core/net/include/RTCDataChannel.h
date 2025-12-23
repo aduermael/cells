@@ -115,6 +115,15 @@ public:
     void setDelegate(DataChannelDelegate* delegate) { delegate_ = delegate; }
     [[nodiscard]] DataChannelDelegate* getDelegate() const { return delegate_; }
 
+    // Configuration setters (for platform implementations during construction)
+    void setLabel(std::string label) { label_ = std::move(label); }
+    void setId(int id) { id_ = id; }
+    void setOrdered(bool ordered) { ordered_ = ordered; }
+    void setMaxRetransmits(int max) { max_retransmits_ = max; }
+    void setMaxPacketLifeTime(int max) { max_packet_life_time_ = max; }
+    void setProtocol(std::string protocol) { protocol_ = std::move(protocol); }
+    void setNegotiated(bool negotiated) { negotiated_ = negotiated; }
+
 protected:
     RTCDataChannel() = default;
 
@@ -128,15 +137,6 @@ protected:
 
     // State management
     void setState(DataChannelState state) { state_ = state; }
-    void setLabel(std::string label) { label_ = std::move(label); }
-    void setId(int id) { id_ = id; }
-
-    // Configuration (set during construction)
-    void setOrdered(bool ordered) { ordered_ = ordered; }
-    void setMaxRetransmits(int max) { max_retransmits_ = max; }
-    void setMaxPacketLifeTime(int max) { max_packet_life_time_ = max; }
-    void setProtocol(std::string protocol) { protocol_ = std::move(protocol); }
-    void setNegotiated(bool negotiated) { negotiated_ = negotiated; }
 
     DataChannelDelegate* delegate_ = nullptr;
     DataChannelState state_ = DataChannelState::CONNECTING;

@@ -60,7 +60,10 @@ protected:
         if (payload.isText()) {
             emscripten_websocket_send_utf8_text(socket_, payload.asString().c_str());
         } else {
-            emscripten_websocket_send_binary(socket_, payload.data().data(), payload.data().size());
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) - emscripten API requires void*
+            emscripten_websocket_send_binary(
+                socket_, const_cast<void*>(static_cast<const void*>(payload.data().data())),
+                payload.data().size());
         }
     }
 
