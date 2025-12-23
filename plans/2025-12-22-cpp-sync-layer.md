@@ -410,6 +410,49 @@ cells sync "https://cells.example.com/?room=abc123"
 
 ---
 
+## Phase 12: Native macOS Support
+
+Enable the CLI sync command to work on native macOS using the existing Apple implementations.
+
+**Current state:** Apple implementations exist in `core/net/apple/*.mm` but are not built because:
+1. Bazel `cc_library` doesn't compile Objective-C++ (`.mm` files)
+2. Need `rules_apple` for `objc_library` support
+3. WebRTC requires stasel/WebRTC framework
+
+- [ ] 12a: Add `rules_apple` to MODULE.bazel
+  - Add `bazel_dep(name = "rules_apple", version = "...")`
+  - This enables `objc_library`, `apple_static_xcframework_import`, etc.
+
+- [ ] 12b: Add stasel/WebRTC as external dependency
+  - Download prebuilt XCFramework from [stasel/WebRTC](https://github.com/stasel/WebRTC/releases)
+  - Add to `third_party/webrtc/` or configure as http_archive
+  - Create BUILD file with `apple_static_xcframework_import`
+
+- [ ] 12c: Update `core/net/BUILD` with `objc_library` targets
+  - Create `objc_library` for each Apple implementation:
+    - `http_request_apple` (HttpRequest.mm)
+    - `ws_connection_apple` (WSConnection.mm)
+    - `rtc_peer_connection_apple` (RTCPeerConnection.mm)
+    - `rtc_data_channel_apple` (RTCDataChannel.mm)
+  - Link against Foundation, Network, and WebRTC frameworks
+  - Use `select()` to choose Apple impl on `@platforms//os:macos`
+
+- [ ] 12d: Update CLI BUILD for macOS
+  - Add conditional dependency on Apple networking libraries
+  - Ensure proper framework linking (Foundation, Network, WebRTC)
+
+- [ ] 12e: Test CLI sync on native macOS
+  - `cells sync "http://localhost:3000/?room=test"` should connect
+  - Verify WebSocket connection works
+  - Verify WebRTC peer connections work
+  - Test with web UI running locally
+
+**Reference:**
+- stasel/WebRTC: BSD 3-Clause license, supports macOS 10.11+, arm64 + x86_64
+- Current release: M141 (tracks Chromium)
+
+---
+
 ## Summary
 
 | Phase | Focus | Key Files |
@@ -426,6 +469,7 @@ cells sync "https://cells.example.com/?room=abc123"
 | 9 | Build System | Bazel configs, stasel/WebRTC xcframework |
 | 10 | Documentation | Updated docs |
 | 11 | CLI Sync Observer | `apps/cli/main.cc` sync subcommand |
+| 12 | Native macOS Support | `rules_apple`, `objc_library`, WebRTC framework |
 
 **Dependencies:**
 - Phase 2-3 can be done in parallel
@@ -438,6 +482,7 @@ cells sync "https://cells.example.com/?room=abc123"
 - Phase 9 can start after Phase 1, iterate as needed
 - Phase 10 can be done incrementally
 - Phase 11 depends on Phase 6 (needs sync protocol), can skip Phase 6.5-8
+- Phase 12 depends on Phase 11 (CLI must exist), uses existing Apple code from Phase 2-4
 
 **Out of Scope (for now):**
 - Android support (can add later with JNI)
