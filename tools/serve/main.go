@@ -111,7 +111,8 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Peer %s joined room %s", peerID, roomID)
+	peers := room.GetPeers()
+	log.Printf("[JOIN] Peer %s joined room %s (now %d peers: %v)", peerID, roomID, len(peers), peers)
 
 	// Notify existing peers about new peer
 	notifyPeerJoined(room, peerID)
@@ -223,7 +224,7 @@ func handlePeerMessages(room *Room, peer *Peer) {
 		_, msgBytes, err := peer.Conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket error for peer %s: %v", peer.ID, err)
+				log.Printf("[MSG] WebSocket error for peer %s: %v", peer.ID, err)
 			}
 			return
 		}
@@ -232,9 +233,11 @@ func handlePeerMessages(room *Room, peer *Peer) {
 
 		var msg SignalingMessage
 		if err := json.Unmarshal(msgBytes, &msg); err != nil {
-			log.Printf("Failed to parse message from peer %s: %v", peer.ID, err)
+			log.Printf("[MSG] Failed to parse message from peer %s: %v", peer.ID, err)
 			continue
 		}
+
+		log.Printf("[MSG] Received %s from peer %s (target: %s)", msg.Type, peer.ID, msg.Target)
 
 		switch msg.Type {
 		case "offer", "answer", "ice-candidate":
@@ -244,18 +247,29 @@ func handlePeerMessages(room *Room, peer *Peer) {
 			// Peer is leaving
 			return
 		default:
-			log.Printf("Unknown message type from peer %s: %s", peer.ID, msg.Type)
+			log.Printf("[MSG] Unknown message type from peer %s: %s", peer.ID, msg.Type)
 		}
 	}
 }
 
 func relayMessage(room *Room, fromPeerID string, msg SignalingMessage) {
 	if msg.Target == "" {
-		log.Printf("Missing target in %s message from peer %s", msg.Type, fromPeerID)
+		log.Printf("[RELAY] Missing target in %s message from peer %s", msg.Type, fromPeerID)
 		return
 	}
 
-	log.Printf("Relaying %s from %s to %s", msg.Type, fromPeerID, msg.Target)
+	log.Printf("[RELAY] Relaying %s from %s to %s", msg.Type, fromPeerID, msg.Target)
+
+	// Debug: Check if target peer exists in room
+	targetPeer := room.GetPeer(msg.Target)
+	if targetPeer == nil {
+		log.Printf("[RELAY] WARNING: Target peer %s not found in room!", msg.Target)
+		// List all peers in room
+		peers := room.GetPeers()
+		log.Printf("[RELAY] Peers in room: %v", peers)
+	} else {
+		log.Printf("[RELAY] Target peer %s found", msg.Target)
+	}
 
 	// Add sender info
 	relayedMsg := SignalingMessage{

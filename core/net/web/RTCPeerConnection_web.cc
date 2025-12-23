@@ -1,5 +1,6 @@
 // Web (Emscripten) RTCPeerConnection implementation
-// Uses browser's RTCPeerConnection API via EM_JS
+// Uses message passing to main thread where RTCPeerConnection is available.
+// The WASM runs in a Web Worker, but RTCPeerConnection is main-thread only.
 
 #ifdef __EMSCRIPTEN__
 
@@ -24,296 +25,177 @@ static int g_next_pc_id = 1;
 
 // clang-format off
 
-// Initialize the WebRTC module
+// Initialize the WebRTC module - sets up message handlers
 EM_JS(void, cells_rtc_init, (), {
-    if (!Module._rtcPeerConnections) {
-        Module._rtcPeerConnections = new Map();
-        Module._rtcDataChannels = new Map();
-        Module._nextPcHandle = 1;
-        Module._nextDcHandle = 1;
-    }
+    if (Module._rtcInitialized) return;
+    Module._rtcInitialized = true;
+
+    // Listen for messages from main thread
+    self.addEventListener('message', function(e) {
+        const msg = e.data;
+        if (!msg || !msg.type) return;
+
+        // Debug: Log RTC messages received by worker
+        if (msg.type && msg.type.startsWith('rtc_on_')) {
+            console.log('[Worker RTC] Received:', msg.type, msg);
+        }
+
+        // Handle RTC callbacks from main thread
+        // Note: Functions starting with _ in C are exported with double underscore
+        switch (msg.type) {
+            case 'rtc_on_create_sdp': {
+                console.log('[Worker RTC] Processing rtc_on_create_sdp, registryId:', msg.registryId, 'success:', msg.success);
+                if (msg.success) {
+                    Module.__cells_rtc_on_create_sdp(msg.registryId, 1,
+                        Module.stringToUTF8OnStack(msg.sdp || ""), 0);
+                } else {
+                    Module.__cells_rtc_on_create_sdp(msg.registryId, 0, 0,
+                        Module.stringToUTF8OnStack(msg.error || 'Unknown error'));
+                }
+                console.log('[Worker RTC] Done processing rtc_on_create_sdp');
+                break;
+            }
+            case 'rtc_on_set_sdp': {
+                if (msg.success) {
+                    Module.__cells_rtc_on_set_sdp(msg.registryId, 1, 0);
+                } else {
+                    Module.__cells_rtc_on_set_sdp(msg.registryId, 0,
+                        Module.stringToUTF8OnStack(msg.error || 'Unknown error'));
+                }
+                break;
+            }
+            case 'rtc_on_connection_state':
+                Module.__cells_rtc_on_connection_state(msg.registryId, msg.state);
+                break;
+            case 'rtc_on_ice_connection_state':
+                Module.__cells_rtc_on_ice_connection_state(msg.registryId, msg.state);
+                break;
+            case 'rtc_on_ice_gathering_state':
+                Module.__cells_rtc_on_ice_gathering_state(msg.registryId, msg.state);
+                break;
+            case 'rtc_on_signaling_state':
+                Module.__cells_rtc_on_signaling_state(msg.registryId, msg.state);
+                break;
+            case 'rtc_on_ice_candidate':
+                if (msg.candidate) {
+                    Module.__cells_rtc_on_ice_candidate(msg.registryId,
+                        Module.stringToUTF8OnStack(msg.candidate),
+                        msg.sdpMid ? Module.stringToUTF8OnStack(msg.sdpMid) : 0,
+                        msg.sdpMLineIndex || 0);
+                } else {
+                    Module.__cells_rtc_on_ice_candidate(msg.registryId, 0, 0, 0);
+                }
+                break;
+            case 'rtc_on_data_channel':
+                Module.__cells_rtc_on_data_channel(msg.registryId, msg.dcHandle,
+                    Module.stringToUTF8OnStack(msg.label || ""));
+                break;
+            case 'rtc_on_negotiation_needed':
+                Module.__cells_rtc_on_negotiation_needed(msg.registryId);
+                break;
+            case 'dc_on_open':
+                Module.__cells_dc_on_open(msg.dcHandle);
+                break;
+            case 'dc_on_close':
+                Module.__cells_dc_on_close(msg.dcHandle);
+                break;
+            case 'dc_on_error':
+                Module.__cells_dc_on_error(msg.dcHandle,
+                    Module.stringToUTF8OnStack(msg.error || 'Unknown error'));
+                break;
+            case 'dc_on_message':
+                if (msg.isText) {
+                    // Use heap allocation to avoid stack corruption during C++ processing
+                    const str = msg.data || "";
+                    const strLen = Module.lengthBytesUTF8(str) + 1;
+                    const strPtr = Module._malloc(strLen);
+                    Module.stringToUTF8(str, strPtr, strLen);
+                    Module.__cells_dc_on_message_text(msg.dcHandle, strPtr);
+                    Module._free(strPtr);
+                } else {
+                    const bytes = new Uint8Array(msg.data);
+                    const ptr = Module._malloc(bytes.length);
+                    Module.HEAPU8.set(bytes, ptr);
+                    Module.__cells_dc_on_message_binary(msg.dcHandle, ptr, bytes.length);
+                    Module._free(ptr);
+                }
+                break;
+        }
+    });
 });
 
-// Create a new RTCPeerConnection
-EM_JS(int, cells_rtc_create, (const char* iceServersJson), {
-    const config = {};
-    if (iceServersJson) {
-        const servers = JSON.parse(UTF8ToString(iceServersJson));
-        config.iceServers = servers;
-    }
-
-    const pc = new RTCPeerConnection(config);
-    const handle = Module._nextPcHandle++;
-    Module._rtcPeerConnections.set(handle, pc);
-    return handle;
+// Create a new RTCPeerConnection - sends request to main thread
+// Uses registryId as the identifier (main thread maps this to actual connection)
+EM_JS(void, cells_rtc_create, (const char* iceServersJson, int registryId), {
+    const iceServers = iceServersJson ? JSON.parse(UTF8ToString(iceServersJson)) : null;
+    self.postMessage({
+        type: 'rtc_create',
+        iceServers,
+        registryId
+    });
 });
 
 // Destroy a PeerConnection
-EM_JS(void, cells_rtc_destroy, (int handle), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (pc) {
-        pc.close();
-        Module._rtcPeerConnections.delete(handle);
-    }
+EM_JS(void, cells_rtc_destroy, (int registryId), {
+    self.postMessage({ type: 'rtc_destroy', registryId });
 });
 
 // Close a PeerConnection
-EM_JS(void, cells_rtc_close, (int handle), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (pc) {
-        pc.close();
-    }
+EM_JS(void, cells_rtc_close, (int registryId), {
+    self.postMessage({ type: 'rtc_close', registryId });
 });
 
-// Create offer
-EM_JS(void, cells_rtc_create_offer, (int handle, int registryId), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (!pc) {
-        Module._cells_rtc_on_create_sdp(registryId, 0, 0, Module.stringToUTF8OnStack('PeerConnection not found'));
-        return;
-    }
-
-    pc.createOffer().then(function(offer) {
-        const sdpPtr = Module.stringToUTF8OnStack(offer.sdp);
-        Module._cells_rtc_on_create_sdp(registryId, 1, sdpPtr, 0);
-    }).catch(function(error) {
-        const errorPtr = Module.stringToUTF8OnStack(error.message || 'createOffer failed');
-        Module._cells_rtc_on_create_sdp(registryId, 0, 0, errorPtr);
-    });
+// Create offer - async, response comes via callback
+EM_JS(void, cells_rtc_create_offer, (int registryId), {
+    self.postMessage({ type: 'rtc_create_offer', registryId });
 });
 
-// Create answer
-EM_JS(void, cells_rtc_create_answer, (int handle, int registryId), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (!pc) {
-        Module._cells_rtc_on_create_sdp(registryId, 0, 0, Module.stringToUTF8OnStack('PeerConnection not found'));
-        return;
-    }
-
-    pc.createAnswer().then(function(answer) {
-        const sdpPtr = Module.stringToUTF8OnStack(answer.sdp);
-        Module._cells_rtc_on_create_sdp(registryId, 1, sdpPtr, 0);
-    }).catch(function(error) {
-        const errorPtr = Module.stringToUTF8OnStack(error.message || 'createAnswer failed');
-        Module._cells_rtc_on_create_sdp(registryId, 0, 0, errorPtr);
-    });
+// Create answer - async, response comes via callback
+EM_JS(void, cells_rtc_create_answer, (int registryId), {
+    self.postMessage({ type: 'rtc_create_answer', registryId });
 });
 
 // Set local description
-EM_JS(void, cells_rtc_set_local_description, (int handle, int registryId, const char* type, const char* sdp), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (!pc) {
-        Module._cells_rtc_on_set_sdp(registryId, 0, Module.stringToUTF8OnStack('PeerConnection not found'));
-        return;
-    }
-
-    const desc = {
-        type: UTF8ToString(type),
+EM_JS(void, cells_rtc_set_local_description, (int registryId, const char* type, const char* sdp), {
+    self.postMessage({
+        type: 'rtc_set_local_description',
+        registryId,
+        sdpType: UTF8ToString(type),
         sdp: UTF8ToString(sdp)
-    };
-
-    pc.setLocalDescription(desc).then(function() {
-        Module._cells_rtc_on_set_sdp(registryId, 1, 0);
-    }).catch(function(error) {
-        const errorPtr = Module.stringToUTF8OnStack(error.message || 'setLocalDescription failed');
-        Module._cells_rtc_on_set_sdp(registryId, 0, errorPtr);
     });
 });
 
 // Set remote description
-EM_JS(void, cells_rtc_set_remote_description, (int handle, int registryId, const char* type, const char* sdp), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (!pc) {
-        Module._cells_rtc_on_set_sdp(registryId, 0, Module.stringToUTF8OnStack('PeerConnection not found'));
-        return;
-    }
-
-    const desc = {
-        type: UTF8ToString(type),
+EM_JS(void, cells_rtc_set_remote_description, (int registryId, const char* type, const char* sdp), {
+    self.postMessage({
+        type: 'rtc_set_remote_description',
+        registryId,
+        sdpType: UTF8ToString(type),
         sdp: UTF8ToString(sdp)
-    };
-
-    pc.setRemoteDescription(desc).then(function() {
-        Module._cells_rtc_on_set_sdp(registryId, 1, 0);
-    }).catch(function(error) {
-        const errorPtr = Module.stringToUTF8OnStack(error.message || 'setRemoteDescription failed');
-        Module._cells_rtc_on_set_sdp(registryId, 0, errorPtr);
     });
 });
 
 // Add ICE candidate
-EM_JS(void, cells_rtc_add_ice_candidate, (int handle, int registryId, const char* candidate, const char* sdpMid, int sdpMLineIndex), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (!pc) {
-        Module._cells_rtc_on_set_sdp(registryId, 0, Module.stringToUTF8OnStack('PeerConnection not found'));
-        return;
-    }
-
-    const candidateObj = {
+EM_JS(void, cells_rtc_add_ice_candidate, (int registryId, const char* candidate, const char* sdpMid, int sdpMLineIndex), {
+    self.postMessage({
+        type: 'rtc_add_ice_candidate',
+        registryId,
         candidate: UTF8ToString(candidate),
         sdpMid: sdpMid ? UTF8ToString(sdpMid) : null,
-        sdpMLineIndex: sdpMLineIndex
-    };
-
-    pc.addIceCandidate(candidateObj).then(function() {
-        Module._cells_rtc_on_set_sdp(registryId, 1, 0);
-    }).catch(function(error) {
-        const errorPtr = Module.stringToUTF8OnStack(error.message || 'addIceCandidate failed');
-        Module._cells_rtc_on_set_sdp(registryId, 0, errorPtr);
+        sdpMLineIndex
     });
 });
 
-// Create data channel
-EM_JS(int, cells_rtc_create_data_channel, (int handle, const char* label, int ordered, int maxRetransmits, int maxPacketLifeTime), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (!pc) return -1;
-
-    const options = {};
-    options.ordered = !!ordered;
-    if (maxRetransmits >= 0) options.maxRetransmits = maxRetransmits;
-    if (maxPacketLifeTime >= 0) options.maxPacketLifeTime = maxPacketLifeTime;
-
-    const channel = pc.createDataChannel(UTF8ToString(label), options);
-    const dcHandle = Module._nextDcHandle++;
-    Module._rtcDataChannels.set(dcHandle, channel);
-    return dcHandle;
-});
-
-// Setup callbacks for peer connection
-EM_JS(void, cells_rtc_setup_callbacks, (int handle, int registryId), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (!pc) return;
-
-    pc.onconnectionstatechange = function() {
-        let state = 0; // NEW
-        switch (pc.connectionState) {
-            case 'new': state = 0; break;
-            case 'connecting': state = 1; break;
-            case 'connected': state = 2; break;
-            case 'disconnected': state = 3; break;
-            case 'failed': state = 4; break;
-            case 'closed': state = 5; break;
-        }
-        Module._cells_rtc_on_connection_state(registryId, state);
-    };
-
-    pc.oniceconnectionstatechange = function() {
-        let state = 0; // NEW
-        switch (pc.iceConnectionState) {
-            case 'new': state = 0; break;
-            case 'checking': state = 1; break;
-            case 'connected': state = 2; break;
-            case 'completed': state = 3; break;
-            case 'disconnected': state = 4; break;
-            case 'failed': state = 5; break;
-            case 'closed': state = 6; break;
-        }
-        Module._cells_rtc_on_ice_connection_state(registryId, state);
-    };
-
-    pc.onicegatheringstatechange = function() {
-        let state = 0; // NEW
-        switch (pc.iceGatheringState) {
-            case 'new': state = 0; break;
-            case 'gathering': state = 1; break;
-            case 'complete': state = 2; break;
-        }
-        Module._cells_rtc_on_ice_gathering_state(registryId, state);
-    };
-
-    pc.onsignalingstatechange = function() {
-        let state = 0; // STABLE
-        switch (pc.signalingState) {
-            case 'stable': state = 0; break;
-            case 'have-local-offer': state = 1; break;
-            case 'have-remote-offer': state = 2; break;
-            case 'have-local-pranswer': state = 3; break;
-            case 'have-remote-pranswer': state = 4; break;
-            case 'closed': state = 5; break;
-        }
-        Module._cells_rtc_on_signaling_state(registryId, state);
-    };
-
-    pc.onicecandidate = function(event) {
-        if (event.candidate) {
-            const candPtr = Module.stringToUTF8OnStack(event.candidate.candidate);
-            const midPtr = event.candidate.sdpMid ? Module.stringToUTF8OnStack(event.candidate.sdpMid) : 0;
-            Module._cells_rtc_on_ice_candidate(registryId, candPtr, midPtr, event.candidate.sdpMLineIndex || 0);
-        } else {
-            // End of candidates
-            Module._cells_rtc_on_ice_candidate(registryId, 0, 0, 0);
-        }
-    };
-
-    pc.ondatachannel = function(event) {
-        const channel = event.channel;
-        const dcHandle = Module._nextDcHandle++;
-        Module._rtcDataChannels.set(dcHandle, channel);
-        const labelPtr = Module.stringToUTF8OnStack(channel.label);
-        Module._cells_rtc_on_data_channel(registryId, dcHandle, labelPtr);
-    };
-
-    pc.onnegotiationneeded = function() {
-        Module._cells_rtc_on_negotiation_needed(registryId);
-    };
-});
-
-// Get connection state
-EM_JS(int, cells_rtc_get_connection_state, (int handle), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (!pc) return 5; // CLOSED
-    switch (pc.connectionState) {
-        case 'new': return 0;
-        case 'connecting': return 1;
-        case 'connected': return 2;
-        case 'disconnected': return 3;
-        case 'failed': return 4;
-        case 'closed': return 5;
-    }
-    return 0;
-});
-
-// Get ICE connection state
-EM_JS(int, cells_rtc_get_ice_connection_state, (int handle), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (!pc) return 6; // CLOSED
-    switch (pc.iceConnectionState) {
-        case 'new': return 0;
-        case 'checking': return 1;
-        case 'connected': return 2;
-        case 'completed': return 3;
-        case 'disconnected': return 4;
-        case 'failed': return 5;
-        case 'closed': return 6;
-    }
-    return 0;
-});
-
-// Get ICE gathering state
-EM_JS(int, cells_rtc_get_ice_gathering_state, (int handle), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (!pc) return 2; // COMPLETE
-    switch (pc.iceGatheringState) {
-        case 'new': return 0;
-        case 'gathering': return 1;
-        case 'complete': return 2;
-    }
-    return 0;
-});
-
-// Get signaling state
-EM_JS(int, cells_rtc_get_signaling_state, (int handle), {
-    const pc = Module._rtcPeerConnections.get(handle);
-    if (!pc) return 5; // CLOSED
-    switch (pc.signalingState) {
-        case 'stable': return 0;
-        case 'have-local-offer': return 1;
-        case 'have-remote-offer': return 2;
-        case 'have-local-pranswer': return 3;
-        case 'have-remote-pranswer': return 4;
-        case 'closed': return 5;
-    }
-    return 0;
+// Create data channel - request main thread to create, returns dcHandle via callback
+EM_JS(void, cells_rtc_create_data_channel, (int registryId, const char* label, int ordered, int maxRetransmits, int maxPacketLifeTime), {
+    self.postMessage({
+        type: 'rtc_create_data_channel',
+        registryId,
+        label: UTF8ToString(label),
+        ordered: !!ordered,
+        maxRetransmits,
+        maxPacketLifeTime
+    });
 });
 
 // clang-format on
@@ -323,99 +205,94 @@ public:
     explicit WebRTCPeerConnection(const RTCConfiguration& config) {
         cells_rtc_init();
 
+        // Register this instance first so callbacks can find us
+        {
+            std::lock_guard<std::mutex> lock(g_pc_mutex);
+            registry_id_ = g_next_pc_id++;
+            g_pc_registry[registry_id_] = this;
+        }
+
         // Build ICE servers JSON
         std::string ice_json = buildIceServersJson(config);
 
-        js_handle_ = cells_rtc_create(ice_json.empty() ? nullptr : ice_json.c_str());
-
-        if (js_handle_ <= 0) {
-            return;
-        }
-
-        // Register this instance
-        std::lock_guard<std::mutex> lock(g_pc_mutex);
-        registry_id_ = g_next_pc_id++;
-        g_pc_registry[registry_id_] = this;
-
-        // Setup callbacks
-        cells_rtc_setup_callbacks(js_handle_, registry_id_);
+        // Send create request - no return value, just fire and forget
+        // Main thread will create the connection and send events via callbacks
+        cells_rtc_create(ice_json.empty() ? nullptr : ice_json.c_str(), registry_id_);
     }
 
     ~WebRTCPeerConnection() override {
-        // Unregister
-        {
-            std::lock_guard<std::mutex> lock(g_pc_mutex);
-            g_pc_registry.erase(registry_id_);
-        }
+        // Send destroy request
+        cells_rtc_destroy(registry_id_);
 
-        if (js_handle_ > 0) {
-            cells_rtc_destroy(js_handle_);
-        }
+        // Unregister
+        std::lock_guard<std::mutex> lock(g_pc_mutex);
+        g_pc_registry.erase(registry_id_);
     }
 
     void createOffer(CreateSDPCallback callback) override {
         pending_create_callback_ = std::move(callback);
         pending_sdp_type_ = SDPType::OFFER;
-        cells_rtc_create_offer(js_handle_, registry_id_);
+        cells_rtc_create_offer(registry_id_);
     }
 
     void createAnswer(CreateSDPCallback callback) override {
         pending_create_callback_ = std::move(callback);
         pending_sdp_type_ = SDPType::ANSWER;
-        cells_rtc_create_answer(js_handle_, registry_id_);
+        cells_rtc_create_answer(registry_id_);
     }
 
     void setLocalDescription(const SessionDescription& sdp, SetSDPCallback callback) override {
-        pending_set_callback_ = std::move(callback);
+        pending_set_callbacks_.push(std::move(callback));
         local_description_ = sdp;
-        cells_rtc_set_local_description(js_handle_, registry_id_, sdpTypeToString(sdp.type),
-                                        sdp.sdp.c_str());
+        cells_rtc_set_local_description(registry_id_, sdpTypeToString(sdp.type), sdp.sdp.c_str());
     }
 
     void setRemoteDescription(const SessionDescription& sdp, SetSDPCallback callback) override {
-        pending_set_callback_ = std::move(callback);
+        pending_set_callbacks_.push(std::move(callback));
         remote_description_ = sdp;
-        cells_rtc_set_remote_description(js_handle_, registry_id_, sdpTypeToString(sdp.type),
-                                         sdp.sdp.c_str());
+        cells_rtc_set_remote_description(registry_id_, sdpTypeToString(sdp.type), sdp.sdp.c_str());
     }
 
     void addIceCandidate(const ICECandidate& candidate, SetSDPCallback callback) override {
-        pending_set_callback_ = std::move(callback);
-        cells_rtc_add_ice_candidate(js_handle_, registry_id_, candidate.candidate.c_str(),
+        pending_set_callbacks_.push(std::move(callback));
+        cells_rtc_add_ice_candidate(registry_id_, candidate.candidate.c_str(),
                                     candidate.sdp_mid.empty() ? nullptr : candidate.sdp_mid.c_str(),
                                     candidate.sdp_mline_index);
     }
 
     std::unique_ptr<RTCDataChannel> createDataChannel(const std::string& label,
                                                       const DataChannelConfig& config) override {
-        int dc_handle =
-            cells_rtc_create_data_channel(js_handle_, label.c_str(), config.ordered ? 1 : 0,
-                                          config.max_retransmits, config.max_packet_life_time);
+        // Store pending data channel info for when we receive the callback
+        pending_dc_label_ = label;
+        pending_dc_config_ = config;
+        pending_dc_callback_ = true;
 
-        if (dc_handle < 0) {
-            return nullptr;
-        }
+        // Send request - actual channel created async, callback will provide dcHandle
+        cells_rtc_create_data_channel(registry_id_, label.c_str(), config.ordered ? 1 : 0,
+                                      config.max_retransmits, config.max_packet_life_time);
 
-        return createWebRTCDataChannel(dc_handle, label, config);
+        // Note: This is a design limitation - we can't return the channel synchronously
+        // The caller needs to use the onDataChannel callback instead, or we need
+        // to restructure this to be async. For now, return nullptr and handle via callback.
+        return nullptr;
     }
 
-    void close() override { cells_rtc_close(js_handle_); }
+    void close() override { cells_rtc_close(registry_id_); }
 
+    // These getters return cached state - main thread sends state updates via callbacks
     [[nodiscard]] PeerConnectionState getConnectionState() const override {
-        return static_cast<PeerConnectionState>(cells_rtc_get_connection_state(js_handle_));
+        return connection_state_;
     }
 
     [[nodiscard]] ICEConnectionState getICEConnectionState() const override {
-        return static_cast<ICEConnectionState>(cells_rtc_get_ice_connection_state(js_handle_));
+        return ice_connection_state_;
     }
 
     [[nodiscard]] ICEGatheringState getICEGatheringState() const override {
-        return static_cast<ICEGatheringState>(cells_rtc_get_ice_gathering_state(js_handle_));
+        return ice_gathering_state_;
     }
 
-    [[nodiscard]] SignalingState getSignalingState() const override {
-        return static_cast<SignalingState>(cells_rtc_get_signaling_state(js_handle_));
-    }
+    [[nodiscard]] SignalingState getSignalingState() const override { return signaling_state_; }
 
     [[nodiscard]] const SessionDescription* getLocalDescription() const override {
         return local_description_.sdp.empty() ? nullptr : &local_description_;
@@ -427,37 +304,48 @@ public:
 
     // Callbacks from JS
     void jsOnCreateSDP(bool success, const char* sdp, const char* error) {
+        printf("[RTC C++] jsOnCreateSDP called: success=%d, has_callback=%d\n",
+               success, pending_create_callback_ ? 1 : 0);
         if (pending_create_callback_) {
             auto callback = std::move(pending_create_callback_);
+            printf("[RTC C++] Invoking create callback\n");
             if (success) {
                 callback(true, SessionDescription(pending_sdp_type_, sdp ? sdp : ""), "");
             } else {
                 callback(false, SessionDescription(), error ? error : "Unknown error");
             }
+            printf("[RTC C++] Create callback complete\n");
         }
     }
 
     void jsOnSetSDP(bool success, const char* error) {
-        if (pending_set_callback_) {
-            auto callback = std::move(pending_set_callback_);
-            callback(success, error ? error : "");
+        if (!pending_set_callbacks_.empty()) {
+            auto callback = std::move(pending_set_callbacks_.front());
+            pending_set_callbacks_.pop();
+            if (callback) {
+                callback(success, error ? error : "");
+            }
         }
     }
 
     void jsOnConnectionState(int state) {
-        notifyConnectionStateChange(static_cast<PeerConnectionState>(state));
+        connection_state_ = static_cast<PeerConnectionState>(state);
+        notifyConnectionStateChange(connection_state_);
     }
 
     void jsOnICEConnectionState(int state) {
-        notifyICEConnectionStateChange(static_cast<ICEConnectionState>(state));
+        ice_connection_state_ = static_cast<ICEConnectionState>(state);
+        notifyICEConnectionStateChange(ice_connection_state_);
     }
 
     void jsOnICEGatheringState(int state) {
-        notifyICEGatheringStateChange(static_cast<ICEGatheringState>(state));
+        ice_gathering_state_ = static_cast<ICEGatheringState>(state);
+        notifyICEGatheringStateChange(ice_gathering_state_);
     }
 
     void jsOnSignalingState(int state) {
-        notifySignalingStateChange(static_cast<SignalingState>(state));
+        signaling_state_ = static_cast<SignalingState>(state);
+        notifySignalingStateChange(signaling_state_);
     }
 
     void jsOnICECandidate(const char* candidate, const char* sdp_mid, int sdp_mline_index) {
@@ -472,7 +360,12 @@ public:
     }
 
     void jsOnDataChannel(int dc_handle, const char* label) {
-        DataChannelConfig config;  // Default config for received channels
+        DataChannelConfig config;
+        if (pending_dc_callback_ && pending_dc_label_ == (label ? label : "")) {
+            // This is the channel we just created
+            config = pending_dc_config_;
+            pending_dc_callback_ = false;
+        }
         auto channel = createWebRTCDataChannel(dc_handle, label ? label : "", config);
         notifyDataChannel(std::move(channel));
     }
@@ -480,15 +373,25 @@ public:
     void jsOnNegotiationNeeded() { notifyNegotiationNeeded(); }
 
 private:
-    int js_handle_ = 0;
     int registry_id_ = 0;
 
     SessionDescription local_description_;
     SessionDescription remote_description_;
 
+    // Cached state (updated via callbacks from main thread)
+    PeerConnectionState connection_state_ = PeerConnectionState::NEW;
+    ICEConnectionState ice_connection_state_ = ICEConnectionState::NEW;
+    ICEGatheringState ice_gathering_state_ = ICEGatheringState::NEW;
+    SignalingState signaling_state_ = SignalingState::STABLE;
+
     CreateSDPCallback pending_create_callback_;
-    SetSDPCallback pending_set_callback_;
+    std::queue<SetSDPCallback> pending_set_callbacks_;
     SDPType pending_sdp_type_ = SDPType::OFFER;
+
+    // Pending data channel creation
+    bool pending_dc_callback_ = false;
+    std::string pending_dc_label_;
+    DataChannelConfig pending_dc_config_;
 
     static std::string buildIceServersJson(const RTCConfiguration& config) {
         if (config.ice_servers.empty()) {
@@ -535,10 +438,14 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 void _cells_rtc_on_create_sdp(int registry_id, int success, const char* sdp, const char* error) {
+    printf("[RTC C++] _cells_rtc_on_create_sdp: registry_id=%d, success=%d\n", registry_id, success);
     std::lock_guard<std::mutex> lock(g_pc_mutex);
     auto it = g_pc_registry.find(registry_id);
     if (it != g_pc_registry.end()) {
+        printf("[RTC C++] Found PeerConnection in registry, calling jsOnCreateSDP\n");
         it->second->jsOnCreateSDP(success != 0, sdp, error);
+    } else {
+        printf("[RTC C++] ERROR: PeerConnection %d not found in registry!\n", registry_id);
     }
 }
 

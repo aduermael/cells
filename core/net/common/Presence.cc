@@ -175,7 +175,29 @@ double extractJSONDouble(const std::string& json, const std::string& key,
         return default_value;
     }
 
-    return std::stod(num_str);
+    // Verify the string contains at least one digit (avoid crash on strings like ".", "-", "e")
+    bool has_digit = false;
+    for (char c : num_str) {
+        if (std::isdigit(static_cast<unsigned char>(c)) != 0) {
+            has_digit = true;
+            break;
+        }
+    }
+    if (!has_digit) {
+        return default_value;
+    }
+
+    // Use strtod with error checking instead of std::stod to avoid exceptions
+    char* end_ptr = nullptr;
+    double result = std::strtod(num_str.c_str(), &end_ptr);
+
+    // Check for conversion errors
+    if (end_ptr == num_str.c_str()) {
+        // No conversion performed
+        return default_value;
+    }
+
+    return result;
 }
 
 // Extract an int64 value from JSON

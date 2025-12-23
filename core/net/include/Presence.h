@@ -102,10 +102,10 @@ public:
 class PresenceManager {
 public:
     // Configuration
-    static constexpr int UPDATE_INTERVAL_MS = 50;   // 20 Hz for smooth mouse tracking
+    static constexpr int UPDATE_INTERVAL_MS = 200;  // 5 Hz for cursor/selection updates
     static constexpr int LINGER_TIME_MS = 2000;     // Keep broadcasting after activity stops
     static constexpr int FADE_TIMEOUT_MS = 2000;    // Time to keep showing remote presence
-    static constexpr int MAX_UPDATES_PER_SEC = 30;  // Throttle outbound updates
+    static constexpr int MAX_UPDATES_PER_SEC = 5;   // Throttle outbound updates (5 Hz max)
 
     PresenceManager();
     ~PresenceManager();

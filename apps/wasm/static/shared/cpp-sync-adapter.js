@@ -93,11 +93,12 @@ export class CppSyncAdapter {
 
         // Polling interval for sync state and presence
         this._pollInterval = null;
-        this._pollIntervalMs = 100; // 10 Hz for sync state, presence at 20 Hz handled separately
+        this._pollIntervalMs = 100; // 10 Hz for sync state
 
-        // Presence update interval
+        // Presence update interval - matches C++ MAX_UPDATES_PER_SEC (5 Hz)
+        // Client-side lerping provides smooth cursor display between updates
         this._presenceInterval = null;
-        this._presenceIntervalMs = 50; // 20 Hz for smooth cursor tracking
+        this._presenceIntervalMs = 200; // 5 Hz - cursor lerping smooths display
 
         // Debug mode
         this._debugMode = this._loadDebugMode();
@@ -407,6 +408,9 @@ export class CppSyncAdapter {
 
     async _pollPresence() {
         try {
+            // Process and broadcast our local presence updates
+            await this._client.processSyncPresence();
+
             const result = await this._client.getRemotePresences();
             const peers = result.peers || {};
 
@@ -445,7 +449,7 @@ export class CppSyncAdapter {
                         start: { col: presence.selection.startCol, row: presence.selection.startRow },
                         end: { col: presence.selection.endCol, row: presence.selection.endRow }
                     } : null,
-                    mouse: null, // C++ doesn't track mouse position
+                    mouse: presence.mouse || null,
                     timestamp: Date.now()
                 };
 
@@ -464,7 +468,9 @@ export class CppSyncAdapter {
     }
 
     _mapState(cppState) {
-        switch (cppState) {
+        // C++ returns uppercase states (e.g., "ONLINE"), JS expects lowercase
+        const state = (cppState || '').toLowerCase();
+        switch (state) {
             case 'connecting':
                 return SyncState.CONNECTING;
             case 'syncing':
@@ -574,6 +580,22 @@ export class CppSyncAdapter {
      */
     async clearSelection() {
         await this._client.clearSyncSelection();
+    }
+
+    /**
+     * Set mouse position (canvas coordinates)
+     * @param {number} x
+     * @param {number} y
+     */
+    async setMousePosition(x, y) {
+        await this._client.setSyncMousePosition(x, y);
+    }
+
+    /**
+     * Clear mouse position
+     */
+    async clearMousePosition() {
+        await this._client.clearSyncMousePosition();
     }
 
     /**

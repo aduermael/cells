@@ -638,6 +638,19 @@ function handleMessage(msg) {
                 break;
             }
 
+            case 'setSyncMousePosition': {
+                const { x, y } = params;
+                engine.setSyncMousePosition(x, y);
+                respond({ type: 'syncMousePositionSet', success: true });
+                break;
+            }
+
+            case 'clearSyncMousePosition': {
+                engine.clearSyncMousePosition();
+                respond({ type: 'syncMousePositionCleared', success: true });
+                break;
+            }
+
             case 'getRemotePresences': {
                 const result = engine.getRemotePresences();
                 respond({ type: 'remotePresences', result });

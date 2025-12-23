@@ -11,7 +11,7 @@ EMSCRIPTEN_LINKOPTS = [
     "-s INITIAL_MEMORY=33554432",  # 32MB initial memory
     "-s MAXIMUM_MEMORY=536870912",  # 512MB max memory
     "-s ENVIRONMENT=web,worker,node",  # Target web, web workers, and node (for testing)
-    "-s EXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToUTF8','HEAPU8']",
+    "-s EXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToUTF8','stringToUTF8OnStack','lengthBytesUTF8','HEAPU8']",
     "-s EXPORTED_FUNCTIONS=['_malloc','_free']",
     "-s WASM=1",  # Emit .wasm file
     "-fexceptions",  # Enable C++ exceptions (needed for pugixml XPath)

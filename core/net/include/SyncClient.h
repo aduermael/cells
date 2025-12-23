@@ -220,6 +220,9 @@ public:
     [[nodiscard]] std::map<std::string, PresenceData> getRemotePeers() const;
     [[nodiscard]] std::vector<PresenceData> getPeersOnSheet(const std::string& sheet_id) const;
 
+    // Broadcast pending presence updates to peers
+    void processPresenceUpdates();
+
     // SignalingClientDelegate interface
     void signalingClientStateDidChange(SignalingClient& client,
                                        SignalingClientState state) override;
@@ -258,9 +261,6 @@ private:
 
     // Handle incoming presence message
     void handlePresenceMessage(const std::string& peer_id, const std::string& message);
-
-    // Broadcast presence updates
-    void processPresenceUpdates();
 
     // Handle ping/pong for latency
     void handlePing(const std::string& peer_id, int64_t timestamp);

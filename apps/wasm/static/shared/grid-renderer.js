@@ -662,24 +662,22 @@ export class GridRenderer {
         ctx.clip();
 
         for (const presence of this.remotePresence) {
-            const mouseOpacity = presence.opacity !== undefined ? presence.opacity : 1.0;
+            const mouseOpacity = presence.mouseOpacity !== undefined ? presence.mouseOpacity : 1.0;
             const color = presence.color || '#888888';
-            const hasCursorOrSelection = presence.cursor || presence.selection;
 
-            // Draw selection range first (behind cursor) - always visible
+            // Draw selection range first (behind cursor) - just color, no name
             if (presence.selection && presence.selection.start && presence.selection.end) {
                 this._drawRemoteSelection(ctx, presence.selection, color, 1.0);
             }
 
-            // Draw cursor (active cell) - always visible
+            // Draw cursor (active cell) - just color border, no name label
             if (presence.cursor && presence.cursor.col !== undefined && presence.cursor.row !== undefined) {
-                this._drawRemoteCursor(ctx, presence.cursor, presence.name, color, 1.0, viewWidth, viewHeight);
+                this._drawRemoteCursor(ctx, presence.cursor, color, 1.0, viewWidth, viewHeight);
             }
 
-            // Draw mouse pointer (fades out after inactivity)
+            // Draw mouse pointer with name (Figma-style) - fades out after 3 seconds
             if (presence.mouse && presence.mouse.x !== undefined && presence.mouse.y !== undefined && mouseOpacity > 0) {
-                const showName = !hasCursorOrSelection;
-                this._drawRemoteMouse(ctx, presence.mouse, showName ? presence.name : null, color, mouseOpacity, viewWidth, viewHeight);
+                this._drawRemoteMouse(ctx, presence.mouse, presence.name, color, mouseOpacity, viewWidth, viewHeight);
             }
         }
 
@@ -754,10 +752,11 @@ export class GridRenderer {
     }
 
     /**
-     * Draw a remote user's cursor (active cell) with name label
+     * Draw a remote user's cursor (active cell) - just colored border, no name label
+     * Name is shown on the mouse cursor instead (Figma-style)
      * @private
      */
-    _drawRemoteCursor(ctx, cursor, name, color, opacity, viewWidth, viewHeight) {
+    _drawRemoteCursor(ctx, cursor, color, opacity, viewWidth, viewHeight) {
         // Calculate cell position
         let cellX = HEADER_WIDTH - this.scrollX;
         for (let i = 0; i < cursor.col; i++) {
@@ -789,52 +788,15 @@ export class GridRenderer {
 
         ctx.strokeRect(clipX + 1, clipY + 1, clipW - 2, clipH - 2);
 
-        // Draw name label above the cursor
-        if (name) {
-            ctx.font = PRESENCE_LABEL_FONT;
-            const textWidth = ctx.measureText(name).width;
-            const labelWidth = textWidth + PRESENCE_LABEL_PADDING * 2;
-            const labelHeight = PRESENCE_LABEL_HEIGHT;
-
-            // Position label above the cell, aligned to left edge
-            let labelX = clipX;
-            let labelY = clipY - labelHeight - 2;
-
-            // If label would be above header, show it below the cell instead
-            if (labelY < HEADER_HEIGHT) {
-                labelY = clipY + clipH + 2;
-            }
-
-            // Keep label within visible area horizontally
-            if (labelX + labelWidth > viewWidth) {
-                labelX = viewWidth - labelWidth - 2;
-            }
-            if (labelX < HEADER_WIDTH) {
-                labelX = HEADER_WIDTH + 2;
-            }
-
-            // Draw label background
-            ctx.fillStyle = color;
-            ctx.beginPath();
-            ctx.roundRect(labelX, labelY, labelWidth, labelHeight, 3);
-            ctx.fill();
-
-            // Draw label text
-            ctx.fillStyle = '#ffffff';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(name, labelX + PRESENCE_LABEL_PADDING, labelY + labelHeight / 2);
-        }
-
         ctx.globalAlpha = 1;
     }
 
     /**
-     * Draw a remote user's mouse pointer
+     * Draw a remote user's mouse pointer (Figma-style)
      * @private
      */
     _drawRemoteMouse(ctx, mouse, name, color, opacity, viewWidth, viewHeight) {
-        // Mouse coordinates are relative to canvas, adjust for scroll
+        // Mouse coordinates are relative to canvas
         const mouseX = mouse.x;
         const mouseY = mouse.y;
 
@@ -846,24 +808,39 @@ export class GridRenderer {
 
         ctx.globalAlpha = opacity;
 
-        // Draw pointer arrow shape
-        ctx.fillStyle = color;
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
+        // Figma-style pointer - simple clean triangle
+        const size = 14;
 
+        // Draw shadow
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 3;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 1;
+
+        // Simple triangular pointer shape
         ctx.beginPath();
-        // Arrow pointer shape (standard cursor)
-        ctx.moveTo(mouseX, mouseY);           // Tip
-        ctx.lineTo(mouseX, mouseY + 16);      // Down
-        ctx.lineTo(mouseX + 4, mouseY + 12);  // Notch
-        ctx.lineTo(mouseX + 8, mouseY + 18);  // Tail end
-        ctx.lineTo(mouseX + 10, mouseY + 16); // Tail corner
-        ctx.lineTo(mouseX + 6, mouseY + 10);  // Back to notch
-        ctx.lineTo(mouseX + 11, mouseY + 10); // Right
+        ctx.moveTo(mouseX, mouseY);                    // Tip
+        ctx.lineTo(mouseX, mouseY + size);             // Down
+        ctx.lineTo(mouseX + size * 0.7, mouseY + size * 0.7);  // Diagonal
         ctx.closePath();
 
-        ctx.fill();
+        // White outline
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
         ctx.stroke();
+
+        ctx.restore();
+
+        // Colored fill
+        ctx.beginPath();
+        ctx.moveTo(mouseX, mouseY);
+        ctx.lineTo(mouseX, mouseY + size);
+        ctx.lineTo(mouseX + size * 0.7, mouseY + size * 0.7);
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
 
         // Draw name label next to pointer if provided
         if (name) {
@@ -872,15 +849,16 @@ export class GridRenderer {
             const labelWidth = textWidth + PRESENCE_LABEL_PADDING * 2;
             const labelHeight = PRESENCE_LABEL_HEIGHT;
 
-            let labelX = mouseX + 14;
-            let labelY = mouseY + 8;
+            // Position label at bottom-right of cursor
+            let labelX = mouseX + size * 0.7 + 3;
+            let labelY = mouseY + size * 0.5;
 
             // Keep label within visible area
             if (labelX + labelWidth > viewWidth) {
                 labelX = mouseX - labelWidth - 4;
             }
             if (labelY + labelHeight > viewHeight) {
-                labelY = mouseY - labelHeight - 4;
+                labelY = viewHeight - labelHeight - 2;
             }
             if (labelX < HEADER_WIDTH) {
                 labelX = HEADER_WIDTH + 2;
@@ -889,11 +867,20 @@ export class GridRenderer {
                 labelY = HEADER_HEIGHT + 2;
             }
 
+            // Draw label with shadow
+            ctx.save();
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
+            ctx.shadowBlur = 3;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 1;
+
             // Draw label background
             ctx.fillStyle = color;
             ctx.beginPath();
-            ctx.roundRect(labelX, labelY, labelWidth, labelHeight, 3);
+            ctx.roundRect(labelX, labelY, labelWidth, labelHeight, 4);
             ctx.fill();
+
+            ctx.restore();
 
             // Draw label text
             ctx.fillStyle = '#ffffff';

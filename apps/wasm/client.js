@@ -20,6 +20,11 @@ class CellsClient {
         this._readyResolve = null;
         this._onDataChanged = null;  // Optional callback for data change notifications
 
+        // RTC Proxy for WebRTC operations (main thread only)
+        // Will be initialized async via dynamic import
+        this._rtcProxy = null;
+        this._initRTCProxy();
+
         // Create ready promise
         this._readyPromise = new Promise((resolve, reject) => {
             this._readyResolve = resolve;
@@ -34,6 +39,20 @@ class CellsClient {
         // Handle messages from worker
         this._worker.onmessage = (e) => this._handleMessage(e.data);
         this._worker.onerror = (e) => this._handleError(e);
+    }
+
+    async _initRTCProxy() {
+        try {
+            const { RTCProxy } = await import('./shared/rtc-proxy.js');
+            this._rtcProxy = new RTCProxy();
+            this._rtcProxy.setSendCallback((type, payload) => {
+                // Send RTC events back to the worker
+                // Note: Put type last to avoid payload.type (e.g., SDP type) overwriting message type
+                this._worker.postMessage({ ...payload, type });
+            });
+        } catch (e) {
+            console.warn('Failed to load RTCProxy, WebRTC functionality will be disabled:', e);
+        }
     }
 
     /**
@@ -65,6 +84,26 @@ class CellsClient {
         if (msg.type === 'dataChanged') {
             if (this._onDataChanged) {
                 this._onDataChanged(msg.changeType);
+            }
+            return;
+        }
+
+        // Handle RTC messages from worker - forward to main thread RTC proxy
+        if (msg.type && (msg.type.startsWith('rtc_') || msg.type.startsWith('dc_'))) {
+            // Only log non-frequent messages (skip high-frequency dc_send for presence)
+            if (msg.type !== 'dc_send') {
+                console.log('[CellsClient] RTC message from worker:', msg.type, msg);
+            }
+            if (!this._rtcProxy) {
+                console.warn('RTCProxy not yet initialized, message dropped:', msg.type);
+                return;
+            }
+            const { type, id, ...payload } = msg;
+            const result = this._rtcProxy.handleMessage(type, payload);
+
+            // If the message had an ID, it expects a response
+            if (id !== undefined) {
+                this._worker.postMessage({ id, type: 'rtc_response', ...result });
             }
             return;
         }
@@ -111,6 +150,11 @@ class CellsClient {
      * Terminate the worker
      */
     terminate() {
+        // Clean up RTC proxy
+        if (this._rtcProxy) {
+            this._rtcProxy.destroy();
+        }
+
         this._worker.terminate();
         // Reject all pending requests
         for (const [id, { reject }] of this._pending) {
@@ -859,6 +903,24 @@ class CellsClient {
      */
     async clearSyncSelection() {
         await this._send('clearSyncSelection');
+    }
+
+    /**
+     * Set mouse position for collaboration cursor.
+     * @param {number} x - X coordinate (canvas relative)
+     * @param {number} y - Y coordinate (canvas relative)
+     * @returns {Promise<void>}
+     */
+    async setSyncMousePosition(x, y) {
+        await this._send('setSyncMousePosition', { x, y });
+    }
+
+    /**
+     * Clear mouse position.
+     * @returns {Promise<void>}
+     */
+    async clearSyncMousePosition() {
+        await this._send('clearSyncMousePosition');
     }
 
     /**

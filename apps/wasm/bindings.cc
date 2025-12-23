@@ -1920,8 +1920,7 @@ public:
     // Process pending presence updates - call periodically.
     void processSyncPresence() {
         if (_syncClient) {
-            // Process presence updates (presence channel)
-            // Note: This is handled internally by SyncClient when processOutgoing is called
+            _syncClient->processPresenceUpdates();
         }
     }
 
@@ -1984,6 +1983,20 @@ public:
         }
     }
 
+    // Set mouse position (for cursor tracking).
+    void setSyncMousePosition(double x, double y) {
+        if (_syncClient) {
+            _syncClient->setMousePosition(x, y);
+        }
+    }
+
+    // Clear mouse position.
+    void clearSyncMousePosition() {
+        if (_syncClient) {
+            _syncClient->clearMousePosition();
+        }
+    }
+
     // Get remote peers' presence data as JSON.
     std::string getRemotePresences() {
         if (!_syncClient) {
@@ -2015,9 +2028,16 @@ public:
                 json << "\"selection\":{\"startCol\":" << presence.selection.start.col
                      << ",\"startRow\":" << presence.selection.start.row << ",\"endCol\":"
                      << presence.selection.end.col << ",\"endRow\":" << presence.selection.end.row
+                     << "},";
+            } else {
+                json << "\"selection\":null,";
+            }
+
+            if (presence.has_mouse) {
+                json << "\"mouse\":{\"x\":" << presence.mouse.x << ",\"y\":" << presence.mouse.y
                      << "}";
             } else {
-                json << "\"selection\":null";
+                json << "\"mouse\":null";
             }
 
             json << "}";
@@ -2274,6 +2294,8 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("clearSyncCursor", &cells::wasm::CellsEngine::clearSyncCursor)
         .function("setSyncSelection", &cells::wasm::CellsEngine::setSyncSelection)
         .function("clearSyncSelection", &cells::wasm::CellsEngine::clearSyncSelection)
+        .function("setSyncMousePosition", &cells::wasm::CellsEngine::setSyncMousePosition)
+        .function("clearSyncMousePosition", &cells::wasm::CellsEngine::clearSyncMousePosition)
         .function("getRemotePresences", &cells::wasm::CellsEngine::getRemotePresences);
 
     // Logger bindings - control logging from JavaScript

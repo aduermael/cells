@@ -609,9 +609,52 @@
             }
         }
 
-        // Interpolated mouse positions for smooth rendering (peerId -> {x, y})
+        // Mouse position broadcast throttling (200ms)
+        let lastMouseBroadcastTime = 0;
+        let pendingMouseX = null;
+        let pendingMouseY = null;
+        const MOUSE_BROADCAST_INTERVAL = 200; // ms
+
+        // Broadcast mouse position (throttled)
+        function broadcastMousePosition(x, y) {
+            if (!syncAdapter || !collaborationInitialized) return;
+
+            const now = Date.now();
+            pendingMouseX = x;
+            pendingMouseY = y;
+
+            if (now - lastMouseBroadcastTime >= MOUSE_BROADCAST_INTERVAL) {
+                syncAdapter.setMousePosition(x, y);
+                lastMouseBroadcastTime = now;
+                pendingMouseX = null;
+                pendingMouseY = null;
+            }
+        }
+
+        // Flush pending mouse position (call when mouse leaves or becomes idle)
+        function flushPendingMousePosition() {
+            if (pendingMouseX !== null && pendingMouseY !== null && syncAdapter && collaborationInitialized) {
+                syncAdapter.setMousePosition(pendingMouseX, pendingMouseY);
+                pendingMouseX = null;
+                pendingMouseY = null;
+                lastMouseBroadcastTime = Date.now();
+            }
+        }
+
+        // Clear mouse position when leaving canvas
+        function clearMousePosition() {
+            if (syncAdapter && collaborationInitialized) {
+                syncAdapter.clearMousePosition();
+            }
+            pendingMouseX = null;
+            pendingMouseY = null;
+        }
+
+        // Interpolated mouse positions for smooth rendering (peerId -> {x, y, lastUpdate})
         const interpolatedMouse = new Map();
         const MOUSE_LERP_FACTOR = 0.3; // How fast to interpolate (0-1, higher = faster)
+        const MOUSE_FADE_START = 3000; // Start fading after 3 seconds of no movement
+        const MOUSE_FADE_DURATION = 500; // Fade out over 0.5 seconds
 
         // Update renderer's remote presence display from syncAdapter
         function updateRemotePresenceDisplay() {
@@ -622,32 +665,62 @@
             }
 
             const currentSheetId = String(activeSheetIndex);
+            const allPeers = syncAdapter.getRemotePeers();
             const peers = syncAdapter.getPeersOnSheet(currentSheetId);
+            const now = Date.now();
+
+            // Debug: log remote presence data occasionally
+            if (allPeers.size > 0 && Math.random() < 0.01) {
+                console.debug('[Presence Debug] currentSheet:', currentSheetId,
+                    'allPeers:', Array.from(allPeers.entries()).map(([id, p]) => ({
+                        id, sheet: p.sheet_id, cursor: p.cursor
+                    })),
+                    'peersOnSheet:', peers.length);
+            }
             const activePeerIds = new Set();
 
             renderer.remotePresence = peers.map(presence => {
                 const peerId = presence.peer_id;
                 activePeerIds.add(peerId);
-                // CppSyncAdapter tracks presence age internally via polling
-                const opacity = 1.0;  // Full opacity, fading handled by C++ timestamps
 
-                // Lerp mouse position for smooth movement
+                // Lerp mouse position for smooth movement and track last update time
                 let smoothMouse = null;
+                let mouseOpacity = 0;
+
                 if (presence.mouse && presence.mouse.x !== undefined) {
                     const targetX = presence.mouse.x;
                     const targetY = presence.mouse.y;
 
                     if (interpolatedMouse.has(peerId)) {
                         const current = interpolatedMouse.get(peerId);
+                        // Check if mouse position changed
+                        const moved = Math.abs(targetX - current.targetX) > 0.5 ||
+                                      Math.abs(targetY - current.targetY) > 0.5;
+                        if (moved) {
+                            current.lastUpdate = now;
+                            current.targetX = targetX;
+                            current.targetY = targetY;
+                        }
                         // Lerp toward target
                         current.x += (targetX - current.x) * MOUSE_LERP_FACTOR;
                         current.y += (targetY - current.y) * MOUSE_LERP_FACTOR;
-                        smoothMouse = current;
+                        smoothMouse = { x: current.x, y: current.y };
+
+                        // Calculate opacity based on time since last movement
+                        const timeSinceMove = now - current.lastUpdate;
+                        if (timeSinceMove < MOUSE_FADE_START) {
+                            mouseOpacity = 1.0;
+                        } else if (timeSinceMove < MOUSE_FADE_START + MOUSE_FADE_DURATION) {
+                            mouseOpacity = 1.0 - (timeSinceMove - MOUSE_FADE_START) / MOUSE_FADE_DURATION;
+                        } else {
+                            mouseOpacity = 0;
+                        }
                     } else {
                         // First time seeing this peer's mouse - start at target
-                        const newPos = { x: targetX, y: targetY };
+                        const newPos = { x: targetX, y: targetY, targetX, targetY, lastUpdate: now };
                         interpolatedMouse.set(peerId, newPos);
-                        smoothMouse = newPos;
+                        smoothMouse = { x: targetX, y: targetY };
+                        mouseOpacity = 1.0;
                     }
                 }
 
@@ -658,7 +731,7 @@
                     cursor: presence.cursor,
                     selection: presence.selection,
                     mouse: smoothMouse,
-                    opacity: opacity  // Used for mouse fade only
+                    mouseOpacity: mouseOpacity
                 };
             });
 
@@ -1663,6 +1736,12 @@
                     canvas.style.cursor = 'default';
                 }
             }
+
+            // Broadcast mouse position for collaboration (throttled)
+            // Only broadcast when inside data area
+            if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+                broadcastMousePosition(x, y);
+            }
         });
 
         canvas.addEventListener('mouseup', async (e) => {
@@ -1839,6 +1918,9 @@
                 canvas.style.cursor = 'default';
                 render();
             }
+
+            // Clear mouse position for collaboration when leaving canvas
+            clearMousePosition();
         });
 
         canvas.addEventListener('dblclick', (e) => {

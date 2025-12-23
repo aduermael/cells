@@ -731,25 +731,32 @@ void SyncClient::signalingClientPeerDidJoin(SignalingClient& /*client*/,
     }
 
     // Create offer
+    printf("[Sync] Creating offer for peer %s\n", peer_id.c_str());
     peer->connection->createOffer(
         // NOLINTNEXTLINE(bugprone-exception-escape) - std::string copy is acceptable
         [this, peer_id](bool success, const SessionDescription& sdp, const std::string& /*error*/) {
+            printf("[Sync] createOffer callback: success=%d, peer=%s\n", success, peer_id.c_str());
             if (!success) {
+                printf("[Sync] createOffer failed, returning\n");
                 return;
             }
 
             auto it = peers_.find(peer_id);
             if (it == peers_.end()) {
+                printf("[Sync] ERROR: peer %s not found in peers_ map!\n", peer_id.c_str());
                 return;
             }
+            printf("[Sync] Found peer, calling setLocalDescription\n");
 
             // Set local description
             it->second->connection->setLocalDescription(
                 sdp,
                 // NOLINTNEXTLINE(bugprone-exception-escape)
                 [this, peer_id, sdp](bool set_success, const std::string& /*error*/) {
+                    printf("[Sync] setLocalDescription callback: success=%d\n", set_success);
                     if (set_success) {
                         // Send offer to peer
+                        printf("[Sync] Sending offer to peer %s\n", peer_id.c_str());
                         signaling_client_->sendOffer(peer_id, sdp);
                     }
                 });
