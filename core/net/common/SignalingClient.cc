@@ -5,6 +5,7 @@
 
 #include <random>
 
+#include "core/log/include/Logger.h"
 #include "core/net/include/SignalingProtocol.h"
 
 namespace cells::net {
@@ -41,6 +42,8 @@ void SignalingClient::connect(const std::string& room_id, const std::string& pee
     peer_id_ = peer_id;
     should_reconnect_ = true;
 
+    LOG_INFO("[Signaling] Connecting to %s", config_.url.c_str());
+
     // If already connected, just join the new room
     if (ws_ && ws_->isConnected()) {
         sendJoin();
@@ -52,6 +55,7 @@ void SignalingClient::connect(const std::string& room_id, const std::string& pee
     // Create WebSocket connection
     ws_ = WSConnection::make(config_.url);
     if (!ws_) {
+        LOG_ERROR("[Signaling] Failed to create WebSocket");
         setState(SignalingClientState::DISCONNECTED);
         return;
     }
@@ -114,6 +118,8 @@ bool SignalingClient::isConnected() const {
 }
 
 void SignalingClient::connectionDidEstablish(Connection& /*connection*/) {
+    LOG_INFO("[Signaling] Connected to server");
+
     // Reset reconnection state on successful connect
     current_reconnect_delay_ms_ = config_.reconnect_delay_ms;
     reconnect_attempts_ = 0;
@@ -133,6 +139,8 @@ void SignalingClient::connectionDidReceive(Connection& /*connection*/, const Pay
 }
 
 void SignalingClient::connectionDidClose(Connection& /*connection*/) {
+    LOG_INFO("[Signaling] Connection closed");
+
     const bool was_in_room = (state_ == SignalingClientState::IN_ROOM);
     setState(SignalingClientState::DISCONNECTED);
 
@@ -143,6 +151,7 @@ void SignalingClient::connectionDidClose(Connection& /*connection*/) {
 }
 
 void SignalingClient::connectionDidError(Connection& /*connection*/, const std::string& error) {
+    LOG_ERROR("[Signaling] Error: %s", error.c_str());
     if (delegate_) {
         delegate_->signalingClientDidReceiveError(*this, error);
     }

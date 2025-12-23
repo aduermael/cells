@@ -9,6 +9,7 @@
 #include "core/cells/hlc.h"
 #include "core/cells/model.h"
 #include "core/cells/sync_manager.h"
+#include "core/log/include/Logger.h"
 
 namespace cells::net {
 
@@ -184,6 +185,8 @@ void SyncClient::startSync(const std::string& room_id, const std::string& peer_i
     room_id_ = room_id;
     peer_id_ = peer_id.empty() ? generatePeerId() : peer_id;
 
+    LOG_INFO("[Sync] Starting sync: room=%s peer=%s", room_id_.c_str(), peer_id_.c_str());
+
     // Set node ID on workbook for HLC generation
     workbook_->setNodeId(cells::ID(peer_id_));
 
@@ -353,6 +356,9 @@ std::string SyncClient::generatePeerId() {
 }
 
 ConnectedPeer* SyncClient::createPeerConnection(const std::string& peer_id, bool we_initiate) {
+    LOG_INFO("[Sync] Connecting to peer: %s (initiator=%s)", peer_id.c_str(),
+             we_initiate ? "true" : "false");
+
     auto peer = std::make_unique<ConnectedPeer>();
     peer->id = peer_id;
     peer->we_initiated = we_initiate;
@@ -389,6 +395,7 @@ ConnectedPeer* SyncClient::createPeerConnection(const std::string& peer_id, bool
 void SyncClient::removePeer(const std::string& peer_id) {
     auto it = peers_.find(peer_id);
     if (it != peers_.end()) {
+        LOG_INFO("[Sync] Peer disconnected: %s", peer_id.c_str());
         if (it->second->connection) {
             it->second->connection->close();
         }
@@ -615,6 +622,8 @@ void SyncClient::processPresenceUpdates() {
 
 void SyncClient::setState(SyncClientState new_state) {
     if (state_ != new_state) {
+        LOG_INFO("[Sync] State: %s -> %s", syncClientStateToString(state_),
+                 syncClientStateToString(new_state));
         state_ = new_state;
         if (delegate_) {
             delegate_->syncClientStateDidChange(*this, new_state);

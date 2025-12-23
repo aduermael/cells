@@ -182,6 +182,7 @@ cc_library(
         ":rtc_peer_connection",
         ":signaling_protocol",
         ":ws_connection",
+        "//core/log",
     ],
 )
 
@@ -211,6 +212,7 @@ cc_library(
         "//core/cells:hlc",
         "//core/cells:model",
         "//core/cells:sync_manager",
+        "//core/log",
     ],
 )
 

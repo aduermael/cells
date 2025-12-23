@@ -595,16 +595,17 @@
             syncAdapter.setCurrentSheet(String(activeSheetIndex));
 
             // Update cursor position (anchor cell of selection)
+            // C++ expects string IDs, so convert position numbers to strings
             const cursorCell = selectionStart || selectedCell;
             if (cursorCell) {
-                syncAdapter.setCursor(cursorCell.col, cursorCell.row);
+                syncAdapter.setCursor(String(cursorCell.col), String(cursorCell.row));
             }
 
             // Update selection range if different from cursor
             if (selectionStart && selectionEnd) {
                 syncAdapter.setSelection(
-                    { col: selectionStart.col, row: selectionStart.row },
-                    { col: selectionEnd.col, row: selectionEnd.row }
+                    { col: String(selectionStart.col), row: String(selectionStart.row) },
+                    { col: String(selectionEnd.col), row: String(selectionEnd.row) }
                 );
             }
         }
