@@ -20,6 +20,8 @@ Move synchronization handling to the C++ level following the xptools pattern fro
 - **Wire format**: JSON for simplicity (can optimize to binary later)
 - **Auth**: Out of scope - no authentication for now
 - **WebRTC**: Full port from JS - P2P DataChannel included
+- **Threading**: All network callbacks marshal to main thread before invoking delegates
+- **Browser APIs**: Web implementations call browser APIs directly via EM_ASM/embind (no emscripten wrappers)
 
 **Reference:** `.blip-ref/deps/xptools/` (cloned from bliporg/blip)
 
@@ -130,8 +132,10 @@ Port WebRTC P2P from JS (`webrtc-manager.js`, `ice-config.js`).
   - Map to browser's RTCPeerConnection API
 
 - [ ] 4e: Create Apple implementation in `core/net/apple/RTCPeerConnection.mm`
-  - Use WebRTC.framework (Google's libwebrtc for iOS/macOS)
-  - Or use native Network.framework for simpler cases
+  - Use [stasel/WebRTC](https://github.com/stasel/WebRTC) prebuilt XCFramework
+  - Install via Swift Package Manager or CocoaPods (`pod 'WebRTC-lib'`)
+  - Supports iOS 12+, macOS 10.11+, macOS Catalyst (arm64 + x86_64)
+  - Actively maintained, tracks Chromium releases (currently M141)
 
 - [ ] 4f: Add WebRTC tests
   - Loopback test (connect to self)
@@ -194,10 +198,41 @@ Port sync protocol from JS (`collab-manager.js`). Build on CRDT docs.
   - Indexes by cell_id, axis_id
   - Compaction support (future)
 
-- [ ] 6e: Integrate HLC from CRDT design
-  - `HLC.h` - wall_time, logical counter, node_id
-  - Comparison operators
-  - Thread-safe increment
+- [ ] 6e: Integrate existing HLC from `core/cells/hlc.h`
+  - Already implemented: `HLC` struct with wall_time, logical, node_id
+  - Has comparison operators, string serialization
+  - Functions: `generate_hlc()`, `update_hlc()`, `generate_initial_hlc()`
+  - Just need to wire into SyncClient
+
+---
+
+## Phase 6.5: Presence Abstraction
+
+Handle cursor positions, selections, and user presence. Presence data is ephemeral and never affects the Workbook (only Operations can mutate Workbook state).
+
+- [ ] 6.5a: Create `Presence.h` in `core/net/include/`
+  - `PresenceData` struct: user_id, cursor_cell, selection_range, color, name
+  - `PresenceManager` class: tracks all peers' presence
+  - `updateLocalPresence(PresenceData)` - called when local user moves cursor/selection
+  - `getRemotePresences()` - returns map of peer_id -> PresenceData
+  - PresenceDelegate: `onPresenceChanged(peer_id, PresenceData)`
+
+- [ ] 6.5b: Create `Presence.cc` implementation in `core/net/common/`
+  - Broadcast local presence changes via DataChannel
+  - Receive and store remote presence updates
+  - Automatic cleanup when peer disconnects
+  - Throttle outbound updates (e.g., max 30/sec)
+
+- [ ] 6.5c: Integrate with SyncClient
+  - SyncClient owns PresenceManager
+  - Presence messages use same DataChannel as operations
+  - Separate message type (PRESENCE vs OPERATION)
+
+- [ ] 6.5d: Wire JS presence events to C++
+  - JS calls `updatePresence(cell, selection)` on cursor move
+  - C++ broadcasts to peers, receives from peers
+  - JS receives remote presence via listener callback
+  - Existing `presence.js` renders remote cursors (unchanged)
 
 ---
 
@@ -268,9 +303,11 @@ Configure Bazel for cross-platform network code including WebRTC.
   - Web sources for WASM target (emscripten WebRTC bindings)
   - Apple sources with WebRTC.framework dependency
 
-- [ ] 9b: Add WebRTC.framework as external dependency for Apple
-  - Download or build libwebrtc for iOS/macOS
-  - Configure in WORKSPACE
+- [ ] 9b: Add stasel/WebRTC as external dependency for Apple
+  - Use [stasel/WebRTC](https://github.com/stasel/WebRTC) prebuilt XCFramework
+  - For Bazel: download xcframework and configure as `apple_static_xcframework_import`
+  - Alternative: use CocoaPods/SPM in a separate Xcode project, link via Bazel
+  - License: BSD 3-Clause (compatible)
 
 - [ ] 9c: Update `apps/wasm/BUILD` to link net library
   - Add dependency on `//core/net:net`
@@ -363,10 +400,11 @@ cells sync "wss://cells.example.com/room/abc123"
 | 3 | WebSocket Abstraction | `Connection.h`, `WSConnection.h`, platform impls |
 | 4 | WebRTC Abstraction | `RTCPeerConnection.h`, `RTCDataChannel.h`, platform impls |
 | 5 | Signaling | `SignalingClient.h`, offer/answer/ICE protocol |
-| 6 | Sync Protocol | `SyncClient.h`, `Operation.h`, HLC |
+| 6 | Sync Protocol | `SyncClient.h`, `Operation.h`, existing `hlc.h` |
+| 6.5 | Presence | `Presence.h`, cursor/selection broadcast |
 | 7 | Engine Integration | `CellsEngine` sync methods, bindings |
 | 8 | JavaScript Updates | Remove JS sync, thin wrapper to C++ |
-| 9 | Build System | Bazel configs, WebRTC.framework |
+| 9 | Build System | Bazel configs, stasel/WebRTC xcframework |
 | 10 | Documentation | Updated docs |
 | 11 | CLI Sync Observer | `apps/cli/main.cc` sync subcommand |
 
@@ -375,11 +413,12 @@ cells sync "wss://cells.example.com/room/abc123"
 - Phase 4 depends on Phase 3 (signaling over WebSocket)
 - Phase 5 depends on Phase 3-4
 - Phase 6 depends on Phase 4-5 (uses DataChannel)
-- Phase 7 depends on Phase 6
+- Phase 6.5 depends on Phase 6 (uses SyncClient's DataChannel)
+- Phase 7 depends on Phase 6 and 6.5
 - Phase 8 depends on Phase 7
 - Phase 9 can start after Phase 1, iterate as needed
 - Phase 10 can be done incrementally
-- Phase 11 depends on Phase 6 (needs sync protocol), can skip Phase 7-8
+- Phase 11 depends on Phase 6 (needs sync protocol), can skip Phase 6.5-8
 
 **Out of Scope (for now):**
 - Android support (can add later with JNI)
