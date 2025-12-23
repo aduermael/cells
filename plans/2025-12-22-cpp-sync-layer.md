@@ -461,8 +461,8 @@ Enable the CLI sync command to work on native macOS using the existing Apple imp
 2. Need `rules_apple` for `objc_library` support
 3. WebRTC requires stasel/WebRTC framework
 
-- [ ] 13a: Add `rules_apple` to MODULE.bazel
-  - Add `bazel_dep(name = "rules_apple", version = "...")`
+- [x] 13a: Add `rules_apple` to MODULE.bazel
+  - Added `bazel_dep(name = "rules_apple", version = "4.3.3")`
   - This enables `objc_library`, `apple_static_xcframework_import`, etc.
 
 - [ ] 13b: Add stasel/WebRTC as external dependency

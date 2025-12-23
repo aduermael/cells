@@ -15,6 +15,9 @@ bazel_dep(name = "googletest", version = "1.14.0.bcr.1")
 # Native XLSX parsing - XML parser
 bazel_dep(name = "pugixml", version = "1.14")
 
+# Apple platform rules (for Objective-C++ support on macOS/iOS)
+bazel_dep(name = "rules_apple", version = "4.3.3")
+
 # Hedron's Compile Commands Extractor
 bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
 git_override(
