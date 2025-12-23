@@ -465,10 +465,12 @@ Enable the CLI sync command to work on native macOS using the existing Apple imp
   - Added `bazel_dep(name = "rules_apple", version = "4.3.3")`
   - This enables `objc_library`, `apple_static_xcframework_import`, etc.
 
-- [ ] 13b: Add stasel/WebRTC as external dependency
-  - Download prebuilt XCFramework from [stasel/WebRTC](https://github.com/stasel/WebRTC/releases)
-  - Add to `third_party/webrtc/` or configure as http_archive
-  - Create BUILD file with `apple_static_xcframework_import`
+- [x] 13b: Add stasel/WebRTC as external dependency
+  - Added http_archive in MODULE.bazel to download M141 XCFramework
+  - Created `third_party/webrtc/BUILD.webrtc` with `apple_static_xcframework_import`
+  - URL: https://github.com/stasel/WebRTC/releases/download/141.0.0/WebRTC-M141.xcframework.zip
+  - SHA256: e3b9bc1aed7a6f3f747a62567680ac7837bdbb74d1fae8f0f543131bc1bf8a5f
+  - License: BSD 3-Clause (compatible)
 
 - [ ] 13c: Update `core/net/BUILD` with `objc_library` targets
   - Create `objc_library` for each Apple implementation:

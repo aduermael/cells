@@ -25,3 +25,13 @@ git_override(
     remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
     commit = "1e08f8e0507b6b6b1f4416a9a22cf5c28beaba93",
 )
+
+# WebRTC XCFramework from stasel/WebRTC for Apple platforms
+# https://github.com/stasel/WebRTC - BSD 3-Clause License
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+http_archive(
+    name = "webrtc_xcframework",
+    url = "https://github.com/stasel/WebRTC/releases/download/141.0.0/WebRTC-M141.xcframework.zip",
+    sha256 = "e3b9bc1aed7a6f3f747a62567680ac7837bdbb74d1fae8f0f543131bc1bf8a5f",
+    build_file = "//third_party/webrtc:BUILD.webrtc",
+)

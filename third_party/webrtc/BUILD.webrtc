@@ -1,0 +1,29 @@
+# BUILD file for stasel/WebRTC XCFramework
+# This file is used by http_archive to build the downloaded XCFramework
+# https://github.com/stasel/WebRTC - BSD 3-Clause License
+
+load("@rules_apple//apple:apple.bzl", "apple_static_xcframework_import")
+
+# Import the pre-built WebRTC XCFramework
+apple_static_xcframework_import(
+    name = "webrtc",
+    xcframework_imports = glob(["WebRTC.xcframework/**"]),
+    visibility = ["//visibility:public"],
+    # WebRTC depends on these system frameworks
+    sdk_frameworks = [
+        "AudioToolbox",
+        "AVFoundation",
+        "CoreAudio",
+        "CoreGraphics",
+        "CoreMedia",
+        "CoreVideo",
+        "GLKit",
+        "Metal",
+        "OpenGLES",
+        "VideoToolbox",
+    ],
+    # System libraries WebRTC depends on
+    sdk_dylibs = [
+        "c++",
+    ],
+)
