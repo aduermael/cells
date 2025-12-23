@@ -417,10 +417,10 @@ Remove old JS sync implementation and properly wire C++ sync to web UI.
 **Current problem:** Phase 8 created `cpp-sync-adapter.js` but didn't actually switch to C++ sync.
 The old JS code (`collab-manager.js`, `webrtc-manager.js`, etc.) is still handling all sync.
 
-- [ ] 12a: Wire C++ sync in index.html
+- [x] 12a: Wire C++ sync in index.html
   - Remove old JS imports: `CollabManager`, `SignalingClient`, `WebRTCManager`, `PresenceManager`
-  - Use C++ sync via worker messages: `enableSync()`, `disableSync()`, `getSyncState()`
-  - Forward sync events from worker to UI
+  - Use C++ sync via CppSyncAdapter (which wraps worker messages)
+  - syncAdapter replaces both collabManager and presenceManager
 
 - [ ] 12b: Simplify cpp-sync-adapter.js
   - Remove polling - use event-driven callbacks from worker

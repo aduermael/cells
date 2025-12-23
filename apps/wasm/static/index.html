@@ -81,10 +81,7 @@
 
         import { CollabUI } from './shared/collab-ui.js';
         import { clearRoomIdFromUrl, getRoomIdFromUrl, RoomManager } from './shared/room-url.js';
-        import { SignalingClient } from './shared/signaling-client.js';
-        import { WebRTCManager } from './shared/webrtc-manager.js';
-        import { CollabManager } from './shared/collab-manager.js';
-        import { PresenceManager } from './shared/presence.js';
+        import { CppSyncAdapter } from './shared/cpp-sync-adapter.js';
 
         // ========================================================================
         // WASM Data Source (communicates with Web Worker)
@@ -266,12 +263,9 @@
         const collabUIContainer = document.getElementById('collab-ui-container');
         const collabUI = new CollabUI({ container: collabUIContainer });
 
-        // Collaboration managers (initialized lazily when needed)
-        let signalingClient = null;
-        let webrtcManager = null;
-        let collabManager = null;
+        // Collaboration manager (C++ SyncClient via CppSyncAdapter)
+        let syncAdapter = null;  // CppSyncAdapter instance (replaces collabManager + presenceManager)
         let roomManager = null;
-        let presenceManager = null;
         let collaborationInitialized = false;
         let collaborationInitializing = false;
 
@@ -311,55 +305,30 @@
             console.log('Starting collaboration initialization...');
 
             try {
-                // Create signaling client (connects to Go signaling server)
-                // URL will be auto-derived from window.location
-                signalingClient = new SignalingClient();
-
-                // Create WebRTC manager
-                webrtcManager = new WebRTCManager();
-
-                // Create collab manager (bridges WASM engine and WebRTC)
-                collabManager = new CollabManager({
-                    engine: client,  // CellsClient has the async CRDT methods
-                    webrtcManager: webrtcManager,
-                    signalingClient: signalingClient
+                // Create C++ sync adapter (replaces SignalingClient + WebRTCManager + CollabManager + PresenceManager)
+                syncAdapter = new CppSyncAdapter({
+                    client: client  // CellsClient with C++ SyncClient methods
                 });
 
-                // Create presence manager
-                presenceManager = new PresenceManager({
-                    webrtcManager: webrtcManager
-                });
-
-                // Create room manager
+                // Create room manager (uses syncAdapter as collabManager)
                 roomManager = new RoomManager({
-                    collabManager: collabManager
+                    collabManager: syncAdapter
                 });
 
-                // Initialize collaboration (sets node ID in WASM engine, inits SyncManager)
-                await collabManager.initialize();
+                // Initialize the adapter (generates peer ID, loads name)
+                await syncAdapter.initialize();
 
-                // Initialize presence (generates name and color)
-                presenceManager.initialize(collabManager.peerId);
-
-                // Connect UI to managers
-                collabUI.setCollabManager(collabManager);
-                collabUI.setPresenceManager(presenceManager);
+                // Connect UI to sync adapter (it provides both collabManager and presenceManager interfaces)
+                collabUI.setCollabManager(syncAdapter);
+                collabUI.setPresenceManager(syncAdapter);
                 collabUI.setRoomManager(roomManager);
 
-                // Listen for remote operation events to prevent re-broadcasting
-                collabManager.on('remoteoperationsstart', () => {
-                    isApplyingRemoteOp = true;
-                });
-                collabManager.on('remoteoperationsend', () => {
-                    isApplyingRemoteOp = false;
-                });
-
                 // Listen for presence updates from remote peers
-                presenceManager.on('presenceupdated', (peerId, presence) => {
+                syncAdapter.on('presenceupdated', (peerId, presence) => {
                     updateRemotePresenceDisplay();
                     renderPresenceOnly();
                 });
-                presenceManager.on('peerleft', (peerId, presence) => {
+                syncAdapter.on('peerleft', (peerId, presence) => {
                     updateRemotePresenceDisplay();
                     renderPresenceOnly();
                 });
@@ -367,7 +336,7 @@
                 // Start a presence render loop to handle fading
                 // Only re-renders when there are remote peers to display
                 setInterval(() => {
-                    if (collaborationInitialized && presenceManager) {
+                    if (collaborationInitialized && syncAdapter) {
                         const hadPresence = renderer.remotePresence.length > 0;
                         updateRemotePresenceDisplay();
                         const hasPresence = renderer.remotePresence.length > 0;
@@ -380,7 +349,7 @@
 
                 collaborationInitialized = true;
                 collaborationInitializing = false;
-                console.log('Collaboration initialized successfully, peer ID:', collabManager.peerId);
+                console.log('Collaboration initialized successfully, peer ID:', syncAdapter.peerId);
 
             } catch (err) {
                 console.error('Failed to initialize collaboration:', err);
@@ -620,20 +589,20 @@
 
         // Broadcast local presence (cursor/selection) to peers
         function broadcastLocalPresence() {
-            if (!presenceManager || !collaborationInitialized) return;
+            if (!syncAdapter || !collaborationInitialized) return;
 
             // Update current sheet (use index as identifier)
-            presenceManager.setCurrentSheet(String(activeSheetIndex));
+            syncAdapter.setCurrentSheet(String(activeSheetIndex));
 
             // Update cursor position (anchor cell of selection)
             const cursorCell = selectionStart || selectedCell;
             if (cursorCell) {
-                presenceManager.setCursor(cursorCell.col, cursorCell.row);
+                syncAdapter.setCursor(cursorCell.col, cursorCell.row);
             }
 
             // Update selection range if different from cursor
             if (selectionStart && selectionEnd) {
-                presenceManager.setSelection(
+                syncAdapter.setSelection(
                     { col: selectionStart.col, row: selectionStart.row },
                     { col: selectionEnd.col, row: selectionEnd.row }
                 );
@@ -644,22 +613,23 @@
         const interpolatedMouse = new Map();
         const MOUSE_LERP_FACTOR = 0.3; // How fast to interpolate (0-1, higher = faster)
 
-        // Update renderer's remote presence display from PresenceManager
+        // Update renderer's remote presence display from syncAdapter
         function updateRemotePresenceDisplay() {
-            if (!presenceManager) {
+            if (!syncAdapter) {
                 renderer.remotePresence = [];
                 interpolatedMouse.clear();
                 return;
             }
 
             const currentSheetId = String(activeSheetIndex);
-            const peers = presenceManager.getPeersOnSheet(currentSheetId);
+            const peers = syncAdapter.getPeersOnSheet(currentSheetId);
             const activePeerIds = new Set();
 
             renderer.remotePresence = peers.map(presence => {
                 const peerId = presence.peer_id;
                 activePeerIds.add(peerId);
-                const opacity = presenceManager.getPresenceOpacity(peerId);
+                // CppSyncAdapter tracks presence age internally via polling
+                const opacity = 1.0;  // Full opacity, fading handled by C++ timestamps
 
                 // Lerp mouse position for smooth movement
                 let smoothMouse = null;
@@ -820,7 +790,6 @@
         // changeType is one of: 'cell', 'structure', 'sheet', 'loaded'
         let pendingChangeTypes = new Set();
         let changeHandlerScheduled = false;
-        let isApplyingRemoteOp = false;  // Flag to prevent re-broadcasting remote ops
 
         function handleDataChanged(changeType) {
             console.debug('[DataChanged]', changeType);
@@ -854,10 +823,10 @@
             render();
             updateFormulaBar();
 
-            // Queue operations broadcast to peers if this is a local edit
-            // The engine's SyncManager tracks which operations need to be sent
-            if (!isApplyingRemoteOp && collaborationInitialized && collabManager) {
-                await collabManager.queueLocalOperationsBroadcast();
+            // Queue operations broadcast to peers
+            // C++ SyncManager tracks which operations need to be sent (only unsent local ops)
+            if (collaborationInitialized && syncAdapter) {
+                await syncAdapter.queueLocalOperationsBroadcast();
             }
         }
 
@@ -1602,11 +1571,6 @@
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
 
-            // Track mouse position for presence sharing
-            if (presenceManager && collaborationInitialized) {
-                presenceManager.setMousePosition(x, y);
-            }
-
             // Check if pending drag should become actual drag (threshold exceeded)
             if (pendingDragColumn) {
                 const dx = Math.abs(x - pendingDragStartX);
@@ -1838,11 +1802,6 @@
         });
 
         canvas.addEventListener('mouseleave', () => {
-            // Clear mouse position for presence
-            if (presenceManager && collaborationInitialized) {
-                presenceManager.clearMousePosition();
-            }
-
             // Clear pending drag states
             pendingDragColumn = false;
             pendingDragRow = false;
