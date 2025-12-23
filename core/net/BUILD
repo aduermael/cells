@@ -46,6 +46,36 @@ cc_library(
     ],
 )
 
+# Connection base class
+cc_library(
+    name = "connection",
+    srcs = ["common/Connection.cc"],
+    hdrs = ["include/Connection.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+
+# WebSocket connection abstraction
+# Note: Apple implementation (apple/WSConnection.mm) requires rules_apple.
+# For now, non-WASM platforms use the default stub implementation.
+cc_library(
+    name = "ws_connection",
+    srcs = [
+        "common/WSConnection.cc",
+    ] + select({
+        "@platforms//os:emscripten": ["web/WSConnection_web.cc"],
+        # TODO: Use apple/WSConnection.mm with objc_library when rules_apple is added
+        "//conditions:default": ["common/WSConnection_default.cc"],
+    }),
+    hdrs = ["include/WSConnection.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":connection",
+        ":url",
+    ],
+)
+
 # Tests
 
 cc_test(
@@ -67,7 +97,6 @@ cc_test(
 )
 
 # TODO: Add libraries as they are implemented:
-# - WSConnection: WebSocket connection abstraction
 # - RTCPeerConnection: WebRTC peer connection
 # - SignalingClient: WebRTC signaling protocol
 # - SyncClient: Sync protocol over DataChannel

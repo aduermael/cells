@@ -79,28 +79,28 @@ Port the HttpRequest pattern from xptools. Abstract interface with platform-spec
 
 Port the WSConnection pattern from xptools for real-time sync.
 
-- [ ] 3a: Create `Connection.h` base class in `core/net/include/`
+- [x] 3a: Create `Connection.h` base class in `core/net/include/`
   - Status enum (IDLE, OK, CLOSED_ON_ERROR, CLOSED)
   - Payload class for framing (with metadata support)
   - ConnectionDelegate interface: `connectionDidEstablish()`, `connectionDidReceive()`, `connectionDidClose()`
   - Abstract methods: `connect()`, `reset()`, `close()`, `pushPayloadToWrite()`
 
-- [ ] 3b: Create `WSConnection.h` in `core/net/include/`
+- [x] 3b: Create `WSConnection.h` in `core/net/include/`
   - Extends Connection
   - Factory method `make(url)` or `make(scheme, addr, port, path)`
   - WebSocket-specific: `getURL()`, `getHost()`, `getPort()`, `getPath()`, `getSecure()`
   - Platform hooks: `_init()`, `_connect()`, `_writePayload()`, `_close()`, `_destroy()`
 
-- [ ] 3c: Create common WSConnection implementation in `core/net/common/WSConnection.cc`
+- [x] 3c: Create common WSConnection implementation in `core/net/common/WSConnection.cc`
   - Shared logic (payload queue, received bytes buffer, status management)
   - Write buffering with fragmentation support
 
-- [ ] 3d: Create Web implementation in `core/net/web/WSConnection_web.cc`
+- [x] 3d: Create Web implementation in `core/net/web/WSConnection_web.cc`
   - Use `emscripten_websocket_*` APIs
   - Callbacks: onopen, onerror, onclose, onmessage
   - Binary message support
 
-- [ ] 3e: Create Apple implementation in `core/net/apple/WSConnection.mm`
+- [x] 3e: Create Apple implementation in `core/net/apple/WSConnection.mm`
   - Use NSURLSessionWebSocketTask
   - WebSocketConnection Obj-C wrapper class
   - Handle open/close/message delegates
