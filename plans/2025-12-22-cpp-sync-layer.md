@@ -431,7 +431,7 @@ The old JS code (`collab-manager.js`, `webrtc-manager.js`, etc.) is still handli
   - `peer-connector.js` (498 lines) - not imported anywhere
   - `operation-protocol.js` (256 lines) - not imported anywhere
 
-- [ ] 12d: Delete replaced sync code
+- [x] 12d: Delete replaced sync code
   - `collab-manager.js` (999 lines) - replaced by C++ SyncClient
   - `webrtc-manager.js` (599 lines) - replaced by C++ RTCPeerConnection
   - `signaling-client.js` (436 lines) - replaced by C++ SignalingClient
