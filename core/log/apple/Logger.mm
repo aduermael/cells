@@ -16,19 +16,19 @@ protected:
 
         // Prefix with level for easy filtering in Console.app
         switch (level) {
-            case Level::DEBUG:
+            case Level::kDebug:
                 NSLog(@"[cells:DEBUG] %@", nsMessage);
                 break;
 
-            case Level::INFO:
+            case Level::kInfo:
                 NSLog(@"[cells:INFO] %@", nsMessage);
                 break;
 
-            case Level::WARN:
+            case Level::kWarn:
                 NSLog(@"[cells:WARN] %@", nsMessage);
                 break;
 
-            case Level::ERROR:
+            case Level::kError:
                 NSLog(@"[cells:ERROR] %@", nsMessage);
                 break;
         }

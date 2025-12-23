@@ -1997,6 +1997,20 @@ public:
         }
     }
 
+    // Set editing state (ephemeral, shows what user is typing).
+    void setSyncEditing(int32_t col, int32_t row, const std::string& text) {
+        if (_syncClient) {
+            _syncClient->setEditing(col, row, text);
+        }
+    }
+
+    // Clear editing state.
+    void clearSyncEditing() {
+        if (_syncClient) {
+            _syncClient->clearEditing();
+        }
+    }
+
     // Get remote peers' presence data as JSON.
     std::string getRemotePresences() {
         if (!_syncClient) {
@@ -2035,9 +2049,17 @@ public:
 
             if (presence.has_mouse) {
                 json << "\"mouse\":{\"x\":" << presence.mouse.x << ",\"y\":" << presence.mouse.y
-                     << "}";
+                     << "},";
             } else {
-                json << "\"mouse\":null";
+                json << "\"mouse\":null,";
+            }
+
+            if (presence.is_editing) {
+                json << "\"editing\":{\"col\":" << presence.editing_cell.col
+                     << ",\"row\":" << presence.editing_cell.row << ",\"text\":\""
+                     << jsonEscape(presence.editing_text) << "\"}";
+            } else {
+                json << "\"editing\":null";
             }
 
             json << "}";
@@ -2296,14 +2318,16 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("clearSyncSelection", &cells::wasm::CellsEngine::clearSyncSelection)
         .function("setSyncMousePosition", &cells::wasm::CellsEngine::setSyncMousePosition)
         .function("clearSyncMousePosition", &cells::wasm::CellsEngine::clearSyncMousePosition)
+        .function("setSyncEditing", &cells::wasm::CellsEngine::setSyncEditing)
+        .function("clearSyncEditing", &cells::wasm::CellsEngine::clearSyncEditing)
         .function("getRemotePresences", &cells::wasm::CellsEngine::getRemotePresences);
 
     // Logger bindings - control logging from JavaScript
     enum_<cells::log::Level>("LogLevel")
-        .value("DEBUG", cells::log::Level::DEBUG)
-        .value("INFO", cells::log::Level::INFO)
-        .value("WARN", cells::log::Level::WARN)
-        .value("ERROR", cells::log::Level::ERROR);
+        .value("DEBUG", cells::log::Level::kDebug)
+        .value("INFO", cells::log::Level::kInfo)
+        .value("WARN", cells::log::Level::kWarn)
+        .value("ERROR", cells::log::Level::kError);
 
     // Free functions for logging
     function("logDebug", +[](const std::string& msg) {

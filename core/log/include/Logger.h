@@ -14,11 +14,12 @@
 namespace cells::log {
 
 // Log levels matching browser console methods
+// Note: Using kX names to avoid conflicts with system macros (DEBUG, ERROR)
 enum class Level : std::uint8_t {
-    DEBUG,  // console.debug - verbose debugging info
-    INFO,   // console.info  - general information
-    WARN,   // console.warn  - warnings
-    ERROR   // console.error - errors
+    kDebug,  // console.debug - verbose debugging info
+    kInfo,   // console.info  - general information
+    kWarn,   // console.warn  - warnings
+    kError   // console.error - errors
 };
 
 // Abstract logger interface - platform implementations override _log()
@@ -43,7 +44,7 @@ public:
     void setEnabled(bool enabled) { _enabled = enabled; }
     [[nodiscard]] bool isEnabled() const { return _enabled; }
 
-    // Set minimum log level (default: DEBUG - log everything)
+    // Set minimum log level (default: kDebug - log everything)
     void setMinLevel(Level level) { _minLevel = level; }
     [[nodiscard]] Level getMinLevel() const { return _minLevel; }
 
@@ -54,7 +55,7 @@ protected:
     virtual void _log(Level level, const std::string& message) = 0;
 
     bool _enabled = true;
-    Level _minLevel = Level::DEBUG;
+    Level _minLevel = Level::kDebug;
 };
 
 // Convenience macros for common use

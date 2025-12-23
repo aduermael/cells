@@ -44,20 +44,18 @@ protected:
             // Monitor connection state by attempting to receive
             // NSURLSessionWebSocketTask doesn't have a direct onOpen callback,
             // so we start receiving immediately and treat first receive setup as connected
-            AppleWSConnection* __weak weakSelf = this;
+            // Note: Capturing 'this' directly since the destructor cancels all tasks
+            // before the object is destroyed.
+            AppleWSConnection* self = this;
 
             // Send a ping to verify connection
             [task_ sendPingWithPongReceiveHandler:^(NSError* error) {
               dispatch_async(dispatch_get_main_queue(), ^{
-                AppleWSConnection* strongSelf = weakSelf;
-                if (strongSelf == nullptr) {
-                    return;
-                }
                 if (error != nil) {
-                    strongSelf->onError([[error localizedDescription] UTF8String]);
+                    self->onError([[error localizedDescription] UTF8String]);
                 } else {
-                    strongSelf->onOpen();
-                    strongSelf->startReceiving();
+                    self->onOpen();
+                    self->startReceiving();
                 }
               });
             }];
@@ -87,15 +85,12 @@ protected:
                 message = [[NSURLSessionWebSocketMessage alloc] initWithData:data];
             }
 
-            AppleWSConnection* __weak weakSelf = this;
+            AppleWSConnection* self = this;
             [task_ sendMessage:message
                 completionHandler:^(NSError* error) {
                   if (error != nil) {
                       dispatch_async(dispatch_get_main_queue(), ^{
-                        AppleWSConnection* strongSelf = weakSelf;
-                        if (strongSelf != nullptr) {
-                            strongSelf->onError([[error localizedDescription] UTF8String]);
-                        }
+                        self->onError([[error localizedDescription] UTF8String]);
                       });
                   }
                 }];
@@ -122,21 +117,16 @@ private:
             return;
         }
 
-        AppleWSConnection* __weak weakSelf = this;
+        AppleWSConnection* self = this;
         [task_ receiveMessageWithCompletionHandler:^(NSURLSessionWebSocketMessage* message,
                                                      NSError* error) {
           dispatch_async(dispatch_get_main_queue(), ^{
-            AppleWSConnection* strongSelf = weakSelf;
-            if (strongSelf == nullptr) {
-                return;
-            }
-
             if (error != nil) {
                 // Check if it's a normal close
                 if (error.code == NSURLErrorCancelled) {
-                    strongSelf->onClose(1000, "");
+                    self->onClose(1000, "");
                 } else {
-                    strongSelf->onError([[error localizedDescription] UTF8String]);
+                    self->onError([[error localizedDescription] UTF8String]);
                 }
                 return;
             }
@@ -152,11 +142,11 @@ private:
                                                static_cast<const uint8_t*>(data.bytes) + data.length);
                     payload = Payload(std::move(bytes));
                 }
-                strongSelf->onMessage(payload);
+                self->onMessage(payload);
             }
 
             // Continue receiving
-            strongSelf->startReceiving();
+            self->startReceiving();
           });
         }];
     }

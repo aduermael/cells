@@ -15,19 +15,19 @@ protected:
         const char* msg = message.c_str();
 
         switch (level) {
-            case Level::DEBUG:
+            case Level::kDebug:
                 EM_ASM({ console.debug(UTF8ToString($0)); }, msg);
                 break;
 
-            case Level::INFO:
+            case Level::kInfo:
                 EM_ASM({ console.info(UTF8ToString($0)); }, msg);
                 break;
 
-            case Level::WARN:
+            case Level::kWarn:
                 EM_ASM({ console.warn(UTF8ToString($0)); }, msg);
                 break;
 
-            case Level::ERROR:
+            case Level::kError:
                 EM_ASM({ console.error(UTF8ToString($0)); }, msg);
                 break;
         }

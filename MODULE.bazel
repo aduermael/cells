@@ -6,6 +6,10 @@ module(
 # Platforms for OS-specific configurations
 bazel_dep(name = "platforms", version = "0.0.11")
 
+# Apple support (CC toolchain for objc_library)
+# Must appear before rules_cc if present
+bazel_dep(name = "apple_support", version = "2.0.0")
+
 # Emscripten SDK for WebAssembly builds
 bazel_dep(name = "emsdk", version = "4.0.17")
 

@@ -472,14 +472,15 @@ Enable the CLI sync command to work on native macOS using the existing Apple imp
   - SHA256: e3b9bc1aed7a6f3f747a62567680ac7837bdbb74d1fae8f0f543131bc1bf8a5f
   - License: BSD 3-Clause (compatible)
 
-- [ ] 13c: Update `core/net/BUILD` with `objc_library` targets
-  - Create `objc_library` for each Apple implementation:
-    - `http_request_apple` (HttpRequest.mm)
-    - `ws_connection_apple` (WSConnection.mm)
-    - `rtc_peer_connection_apple` (RTCPeerConnection.mm)
-    - `rtc_data_channel_apple` (RTCDataChannel.mm)
-  - Link against Foundation, Network, and WebRTC frameworks
-  - Use `select()` to choose Apple impl on `@platforms//os:macos`
+- [x] 13c: Update `core/net/BUILD` with `objc_library` targets
+  - Added `apple_support` v2.0.0 to MODULE.bazel (required for Apple CC toolchain)
+  - Added `objc_library` targets for:
+    - `http_request_apple` (HttpRequest.mm) - working
+    - `ws_connection_apple` (WSConnection.mm) - working
+  - WebRTC implementations deferred (stasel/WebRTC macOS slice has incomplete headers)
+  - Used `select()` to choose Apple impl on `@platforms//os:macos` for HTTP/WS
+  - RTCDataChannel and RTCPeerConnection use default stubs on macOS for now
+  - Fixed Logger.h enum naming conflict with Apple toolchain (DEBUG/ERROR macros)
 
 - [ ] 13d: Update CLI BUILD for macOS
   - Add conditional dependency on Apple networking libraries

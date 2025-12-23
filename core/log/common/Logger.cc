@@ -12,28 +12,28 @@ namespace cells::log {
 void Logger::debug(const char* fmt, ...) {
     va_list args;  // NOLINT(cppcoreguidelines-init-variables)
     va_start(args, fmt);
-    logv(Level::DEBUG, fmt, args);
+    logv(Level::kDebug, fmt, args);
     va_end(args);
 }
 
 void Logger::info(const char* fmt, ...) {
     va_list args;  // NOLINT(cppcoreguidelines-init-variables)
     va_start(args, fmt);
-    logv(Level::INFO, fmt, args);
+    logv(Level::kInfo, fmt, args);
     va_end(args);
 }
 
 void Logger::warn(const char* fmt, ...) {
     va_list args;  // NOLINT(cppcoreguidelines-init-variables)
     va_start(args, fmt);
-    logv(Level::WARN, fmt, args);
+    logv(Level::kWarn, fmt, args);
     va_end(args);
 }
 
 void Logger::error(const char* fmt, ...) {
     va_list args;  // NOLINT(cppcoreguidelines-init-variables)
     va_start(args, fmt);
-    logv(Level::ERROR, fmt, args);
+    logv(Level::kError, fmt, args);
     va_end(args);
 }
 

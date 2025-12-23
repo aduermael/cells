@@ -6,6 +6,71 @@
 #   common/   - Shared implementation (all platforms)
 #   web/      - Emscripten/WASM implementations
 #   apple/    - iOS/macOS implementations (Objective-C++)
+#
+# Apple implementations use objc_library for Objective-C++ support.
+# On macOS/iOS, we select the objc_library targets; on other platforms
+# we use the default stub implementations.
+
+# Config settings for platform selection
+config_setting(
+    name = "is_macos",
+    constraint_values = ["@platforms//os:macos"],
+)
+
+config_setting(
+    name = "is_ios",
+    constraint_values = ["@platforms//os:ios"],
+)
+
+# =============================================================================
+# Apple platform implementations (Objective-C++)
+# These objc_library targets compile .mm files and are only used on Apple platforms.
+# =============================================================================
+
+objc_library(
+    name = "http_request_apple",
+    srcs = ["apple/HttpRequest.mm"],
+    hdrs = ["include/HttpRequest.h"],
+    copts = ["-std=c++17"],
+    includes = ["."],
+    sdk_frameworks = ["Foundation"],
+    deps = [
+        ":http_request_common",
+        ":http_response",
+        ":url",
+    ],
+)
+
+objc_library(
+    name = "ws_connection_apple",
+    srcs = ["apple/WSConnection.mm"],
+    hdrs = ["include/WSConnection.h"],
+    copts = ["-std=c++17"],
+    includes = ["."],
+    sdk_frameworks = [
+        "Foundation",
+    ],
+    deps = [
+        ":connection",
+        ":url",
+        ":ws_connection_common",
+    ],
+)
+
+# NOTE: WebRTC Apple implementations (rtc_data_channel_apple, rtc_peer_connection_apple)
+# are deferred. The stasel/WebRTC XCFramework for macOS appears to be incomplete
+# (missing header files in macOS slice). For now, we use the default stub implementations
+# for WebRTC on macOS. This means P2P sync won't work on native macOS CLI yet, but
+# HTTP and WebSocket will work once we integrate those Apple implementations.
+#
+# TODO: Either:
+# 1. Use MacCatalyst slice headers with macOS build
+# 2. Build WebRTC from source for macOS
+# 3. Wait for stasel/WebRTC to fix macOS framework
+
+# =============================================================================
+# Common/shared implementations
+# =============================================================================
 
 # URL parsing utility
 cc_library(
@@ -25,22 +90,57 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+# HTTP request - common base implementation
+cc_library(
+    name = "http_request_common",
+    srcs = ["common/HttpRequest.cc"],
+    hdrs = ["include/HttpRequest.h"],
+    includes = ["."],
+    deps = [
+        ":http_response",
+        ":url",
+    ],
+)
+
 # HTTP request abstraction
-# Note: Apple implementation (apple/HttpRequest.mm) requires rules_apple.
-# For now, non-WASM platforms use the default stub implementation.
+# Platform-specific implementations selected via config
 cc_library(
     name = "http_request",
-    srcs = [
-        "common/HttpRequest.cc",
-    ] + select({
-        "@platforms//os:emscripten": ["web/HttpRequest_web.cc"],
-        # TODO: Use apple/HttpRequest.mm with objc_library when rules_apple is added
-        "//conditions:default": ["common/HttpRequest_default.cc"],
-    }),
     hdrs = ["include/HttpRequest.h"],
     includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
+        ":http_response",
+        ":url",
+    ] + select({
+        "@platforms//os:emscripten": [":http_request_web"],
+        ":is_macos": [":http_request_apple"],
+        ":is_ios": [":http_request_apple"],
+        "//conditions:default": [":http_request_default"],
+    }),
+)
+
+# HTTP request - web implementation
+cc_library(
+    name = "http_request_web",
+    srcs = ["web/HttpRequest_web.cc"],
+    hdrs = ["include/HttpRequest.h"],
+    includes = ["."],
+    deps = [
+        ":http_request_common",
+        ":http_response",
+        ":url",
+    ],
+)
+
+# HTTP request - default stub implementation
+cc_library(
+    name = "http_request_default",
+    srcs = ["common/HttpRequest_default.cc"],
+    hdrs = ["include/HttpRequest.h"],
+    includes = ["."],
+    deps = [
+        ":http_request_common",
         ":http_response",
         ":url",
     ],
@@ -55,24 +155,59 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+# WebSocket connection - common base implementation
+cc_library(
+    name = "ws_connection_common",
+    srcs = ["common/WSConnection.cc"],
+    hdrs = ["include/WSConnection.h"],
+    includes = ["."],
+    deps = [
+        ":connection",
+        ":url",
+    ],
+)
+
 # WebSocket connection abstraction
-# Note: Apple implementation (apple/WSConnection.mm) requires rules_apple.
-# For now, non-WASM platforms use the default stub implementation.
+# Platform-specific implementations selected via config
 cc_library(
     name = "ws_connection",
-    srcs = [
-        "common/WSConnection.cc",
-    ] + select({
-        "@platforms//os:emscripten": ["web/WSConnection_web.cc"],
-        # TODO: Use apple/WSConnection.mm with objc_library when rules_apple is added
-        "//conditions:default": ["common/WSConnection_default.cc"],
-    }),
     hdrs = ["include/WSConnection.h"],
     includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
         ":connection",
         ":url",
+    ] + select({
+        "@platforms//os:emscripten": [":ws_connection_web"],
+        ":is_macos": [":ws_connection_apple"],
+        ":is_ios": [":ws_connection_apple"],
+        "//conditions:default": [":ws_connection_default"],
+    }),
+)
+
+# WebSocket connection - web implementation
+cc_library(
+    name = "ws_connection_web",
+    srcs = ["web/WSConnection_web.cc"],
+    hdrs = ["include/WSConnection.h"],
+    includes = ["."],
+    deps = [
+        ":connection",
+        ":url",
+        ":ws_connection_common",
+    ],
+)
+
+# WebSocket connection - default stub implementation
+cc_library(
+    name = "ws_connection_default",
+    srcs = ["common/WSConnection_default.cc"],
+    hdrs = ["include/WSConnection.h"],
+    includes = ["."],
+    deps = [
+        ":connection",
+        ":url",
+        ":ws_connection_common",
     ],
 )
 
@@ -124,37 +259,100 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+# RTCDataChannel - common base implementation
+cc_library(
+    name = "rtc_data_channel_common",
+    srcs = ["common/RTCDataChannel.cc"],
+    hdrs = ["include/RTCDataChannel.h"],
+    includes = ["."],
+)
+
 # RTCDataChannel abstraction
+# Platform-specific implementations selected via config
+# NOTE: Apple uses default stub until WebRTC XCFramework issue is resolved
 cc_library(
     name = "rtc_data_channel",
-    srcs = [
-        "common/RTCDataChannel.cc",
-    ] + select({
-        "@platforms//os:emscripten": ["web/RTCDataChannel_web.cc"],
-        # TODO: Use apple/RTCDataChannel.mm with objc_library when rules_apple is added
-        "//conditions:default": ["common/RTCDataChannel_default.cc"],
-    }),
     hdrs = ["include/RTCDataChannel.h"],
     includes = ["."],
     visibility = ["//visibility:public"],
+    deps = select({
+        "@platforms//os:emscripten": [":rtc_data_channel_web"],
+        # TODO: Use rtc_data_channel_apple when WebRTC XCFramework is fixed
+        "//conditions:default": [":rtc_data_channel_default"],
+    }),
+)
+
+# RTCDataChannel - web implementation
+cc_library(
+    name = "rtc_data_channel_web",
+    srcs = ["web/RTCDataChannel_web.cc"],
+    hdrs = ["include/RTCDataChannel.h"],
+    includes = ["."],
+    deps = [":rtc_data_channel_common"],
+)
+
+# RTCDataChannel - default stub implementation
+cc_library(
+    name = "rtc_data_channel_default",
+    srcs = ["common/RTCDataChannel_default.cc"],
+    hdrs = ["include/RTCDataChannel.h"],
+    includes = ["."],
+    deps = [":rtc_data_channel_common"],
+)
+
+# RTCPeerConnection - common base implementation
+cc_library(
+    name = "rtc_peer_connection_common",
+    srcs = ["common/RTCPeerConnection.cc"],
+    hdrs = ["include/RTCPeerConnection.h"],
+    includes = ["."],
+    deps = [
+        ":ice_config",
+        ":rtc_data_channel",
+    ],
 )
 
 # RTCPeerConnection abstraction
+# Platform-specific implementations selected via config
+# NOTE: Apple uses default stub until WebRTC XCFramework issue is resolved
 cc_library(
     name = "rtc_peer_connection",
-    srcs = [
-        "common/RTCPeerConnection.cc",
-    ] + select({
-        "@platforms//os:emscripten": ["web/RTCPeerConnection_web.cc"],
-        # TODO: Use apple/RTCPeerConnection.mm with objc_library when rules_apple is added
-        "//conditions:default": ["common/RTCPeerConnection_default.cc"],
-    }),
     hdrs = ["include/RTCPeerConnection.h"],
     includes = ["."],
     visibility = ["//visibility:public"],
     deps = [
         ":ice_config",
         ":rtc_data_channel",
+    ] + select({
+        "@platforms//os:emscripten": [":rtc_peer_connection_web"],
+        # TODO: Use rtc_peer_connection_apple when WebRTC XCFramework is fixed
+        "//conditions:default": [":rtc_peer_connection_default"],
+    }),
+)
+
+# RTCPeerConnection - web implementation
+cc_library(
+    name = "rtc_peer_connection_web",
+    srcs = ["web/RTCPeerConnection_web.cc"],
+    hdrs = ["include/RTCPeerConnection.h"],
+    includes = ["."],
+    deps = [
+        ":ice_config",
+        ":rtc_data_channel",
+        ":rtc_peer_connection_common",
+    ],
+)
+
+# RTCPeerConnection - default stub implementation
+cc_library(
+    name = "rtc_peer_connection_default",
+    srcs = ["common/RTCPeerConnection_default.cc"],
+    hdrs = ["include/RTCPeerConnection.h"],
+    includes = ["."],
+    deps = [
+        ":ice_config",
+        ":rtc_data_channel",
+        ":rtc_peer_connection_common",
     ],
 )
 

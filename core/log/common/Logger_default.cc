@@ -17,16 +17,16 @@ protected:
         const char* levelStr = nullptr;
 
         switch (level) {
-            case Level::DEBUG:
+            case Level::kDebug:
                 levelStr = "DEBUG";
                 break;
-            case Level::INFO:
+            case Level::kInfo:
                 levelStr = "INFO";
                 break;
-            case Level::WARN:
+            case Level::kWarn:
                 levelStr = "WARN";
                 break;
-            case Level::ERROR:
+            case Level::kError:
                 levelStr = "ERROR";
                 break;
         }
