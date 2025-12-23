@@ -1,11 +1,13 @@
 // Default/CLI logger implementation
-// Uses stderr for output (fallback for non-web, non-Apple platforms)
+// Uses stderr for output (all non-web platforms)
+// Note: Apple-specific NSLog implementation exists in apple/Logger.mm but
+// requires rules_apple. This default implementation works fine on macOS.
 
-#if !defined(__EMSCRIPTEN__) && !defined(__APPLE__)
-
-#include "core/log/include/Logger.h"
+#if !defined(__EMSCRIPTEN__)
 
 #include <cstdio>
+
+#include "core/log/include/Logger.h"
 
 namespace cells::log {
 
@@ -41,4 +43,4 @@ Logger& Logger::instance() {
 
 }  // namespace cells::log
 
-#endif  // !__EMSCRIPTEN__ && !__APPLE__
+#endif  // !__EMSCRIPTEN__

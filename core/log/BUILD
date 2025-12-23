@@ -1,5 +1,9 @@
 # Cross-platform logging library
 # Platform-specific implementations selected via config
+#
+# Note: Apple-specific implementation (apple/Logger.mm) requires rules_apple.
+# For now, macOS uses the default stderr-based logger. The .mm implementation
+# can be enabled later when rules_apple is added to the workspace.
 
 cc_library(
     name = "log",
@@ -7,16 +11,10 @@ cc_library(
         "common/Logger.cc",
     ] + select({
         "@platforms//os:emscripten": ["web/Logger_web.cc"],
-        "@platforms//os:macos": ["apple/Logger.mm"],
-        "@platforms//os:ios": ["apple/Logger.mm"],
+        # TODO: Use apple/Logger.mm with objc_library when rules_apple is added
         "//conditions:default": ["common/Logger_default.cc"],
     }),
     hdrs = ["include/Logger.h"],
     includes = ["."],
-    linkopts = select({
-        "@platforms//os:macos": ["-framework Foundation"],
-        "@platforms//os:ios": ["-framework Foundation"],
-        "//conditions:default": [],
-    }),
     visibility = ["//visibility:public"],
 )

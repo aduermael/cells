@@ -3,9 +3,9 @@
 
 #ifdef __EMSCRIPTEN__
 
-#include "core/log/include/Logger.h"
-
 #include <emscripten.h>
+
+#include "core/log/include/Logger.h"
 
 namespace cells::log {
 
@@ -16,27 +16,19 @@ protected:
 
         switch (level) {
             case Level::DEBUG:
-                EM_ASM(
-                    { console.debug(UTF8ToString($0)); },
-                    msg);
+                EM_ASM({ console.debug(UTF8ToString($0)); }, msg);
                 break;
 
             case Level::INFO:
-                EM_ASM(
-                    { console.info(UTF8ToString($0)); },
-                    msg);
+                EM_ASM({ console.info(UTF8ToString($0)); }, msg);
                 break;
 
             case Level::WARN:
-                EM_ASM(
-                    { console.warn(UTF8ToString($0)); },
-                    msg);
+                EM_ASM({ console.warn(UTF8ToString($0)); }, msg);
                 break;
 
             case Level::ERROR:
-                EM_ASM(
-                    { console.error(UTF8ToString($0)); },
-                    msg);
+                EM_ASM({ console.error(UTF8ToString($0)); }, msg);
                 break;
         }
     }

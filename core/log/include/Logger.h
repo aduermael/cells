@@ -7,12 +7,14 @@
 #define CELLS_LOG_LOGGER_H
 
 #include <cstdarg>
+#include <cstdint>
+
 #include <string>
 
 namespace cells::log {
 
 // Log levels matching browser console methods
-enum class Level {
+enum class Level : std::uint8_t {
     DEBUG,  // console.debug - verbose debugging info
     INFO,   // console.info  - general information
     WARN,   // console.warn  - warnings
@@ -39,11 +41,11 @@ public:
 
     // Enable/disable logging (default: enabled)
     void setEnabled(bool enabled) { _enabled = enabled; }
-    bool isEnabled() const { return _enabled; }
+    [[nodiscard]] bool isEnabled() const { return _enabled; }
 
     // Set minimum log level (default: DEBUG - log everything)
     void setMinLevel(Level level) { _minLevel = level; }
-    Level getMinLevel() const { return _minLevel; }
+    [[nodiscard]] Level getMinLevel() const { return _minLevel; }
 
 protected:
     Logger() = default;
