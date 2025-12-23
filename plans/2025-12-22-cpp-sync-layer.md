@@ -482,9 +482,10 @@ Enable the CLI sync command to work on native macOS using the existing Apple imp
   - RTCDataChannel and RTCPeerConnection use default stubs on macOS for now
   - Fixed Logger.h enum naming conflict with Apple toolchain (DEBUG/ERROR macros)
 
-- [ ] 13d: Update CLI BUILD for macOS
-  - Add conditional dependency on Apple networking libraries
-  - Ensure proper framework linking (Foundation, Network, WebRTC)
+- [x] 13d: Update CLI BUILD for macOS
+  - No changes needed - CLI automatically uses Apple implementations via `//core/net:sync_client`
+  - Platform-specific `objc_library` targets handle framework linking (Foundation)
+  - Verified CLI binary links with Foundation.framework via `otool -L`
 
 - [ ] 13e: Test CLI sync on native macOS
   - `cells sync "http://localhost:3000/?room=test"` should connect
