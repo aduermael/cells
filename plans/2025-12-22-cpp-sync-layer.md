@@ -410,7 +410,46 @@ cells sync "https://cells.example.com/?room=abc123"
 
 ---
 
-## Phase 12: Native macOS Support
+## Phase 12: JavaScript Cleanup
+
+Remove old JS sync implementation and properly wire C++ sync to web UI.
+
+**Current problem:** Phase 8 created `cpp-sync-adapter.js` but didn't actually switch to C++ sync.
+The old JS code (`collab-manager.js`, `webrtc-manager.js`, etc.) is still handling all sync.
+
+- [ ] 12a: Wire C++ sync in index.html
+  - Remove old JS imports: `CollabManager`, `SignalingClient`, `WebRTCManager`, `PresenceManager`
+  - Use C++ sync via worker messages: `enableSync()`, `disableSync()`, `getSyncState()`
+  - Forward sync events from worker to UI
+
+- [ ] 12b: Simplify cpp-sync-adapter.js
+  - Remove polling - use event-driven callbacks from worker
+  - Keep only thin wrapper for UI state
+
+- [ ] 12c: Delete dead code
+  - `peer-connector.js` (498 lines) - not imported anywhere
+  - `operation-protocol.js` (256 lines) - not imported anywhere
+
+- [ ] 12d: Delete replaced sync code
+  - `collab-manager.js` (999 lines) - replaced by C++ SyncClient
+  - `webrtc-manager.js` (599 lines) - replaced by C++ RTCPeerConnection
+  - `signaling-client.js` (436 lines) - replaced by C++ SignalingClient
+  - `ice-config.js` (294 lines) - replaced by C++ ICEConfig
+
+- [ ] 12e: Refactor presence.js
+  - Keep only `generateRandomName()` utility (move to utils.js)
+  - Delete rest - replaced by C++ PresenceManager
+
+- [ ] 12f: Test web sync end-to-end
+  - Verify C++ sync works via WASM
+  - Test multi-peer collaboration
+  - Verify presence updates work
+
+**Expected result:** ~3000+ lines of JS removed, sync handled by C++
+
+---
+
+## Phase 13: Native macOS Support
 
 Enable the CLI sync command to work on native macOS using the existing Apple implementations.
 
@@ -419,16 +458,16 @@ Enable the CLI sync command to work on native macOS using the existing Apple imp
 2. Need `rules_apple` for `objc_library` support
 3. WebRTC requires stasel/WebRTC framework
 
-- [ ] 12a: Add `rules_apple` to MODULE.bazel
+- [ ] 13a: Add `rules_apple` to MODULE.bazel
   - Add `bazel_dep(name = "rules_apple", version = "...")`
   - This enables `objc_library`, `apple_static_xcframework_import`, etc.
 
-- [ ] 12b: Add stasel/WebRTC as external dependency
+- [ ] 13b: Add stasel/WebRTC as external dependency
   - Download prebuilt XCFramework from [stasel/WebRTC](https://github.com/stasel/WebRTC/releases)
   - Add to `third_party/webrtc/` or configure as http_archive
   - Create BUILD file with `apple_static_xcframework_import`
 
-- [ ] 12c: Update `core/net/BUILD` with `objc_library` targets
+- [ ] 13c: Update `core/net/BUILD` with `objc_library` targets
   - Create `objc_library` for each Apple implementation:
     - `http_request_apple` (HttpRequest.mm)
     - `ws_connection_apple` (WSConnection.mm)
@@ -437,11 +476,11 @@ Enable the CLI sync command to work on native macOS using the existing Apple imp
   - Link against Foundation, Network, and WebRTC frameworks
   - Use `select()` to choose Apple impl on `@platforms//os:macos`
 
-- [ ] 12d: Update CLI BUILD for macOS
+- [ ] 13d: Update CLI BUILD for macOS
   - Add conditional dependency on Apple networking libraries
   - Ensure proper framework linking (Foundation, Network, WebRTC)
 
-- [ ] 12e: Test CLI sync on native macOS
+- [ ] 13e: Test CLI sync on native macOS
   - `cells sync "http://localhost:3000/?room=test"` should connect
   - Verify WebSocket connection works
   - Verify WebRTC peer connections work
@@ -465,11 +504,12 @@ Enable the CLI sync command to work on native macOS using the existing Apple imp
 | 6 | Sync Protocol | `SyncClient.h`, `Operation.h`, existing `hlc.h` |
 | 6.5 | Presence | `Presence.h`, cursor/selection broadcast |
 | 7 | Engine Integration | `CellsEngine` sync methods, bindings |
-| 8 | JavaScript Updates | Remove JS sync, thin wrapper to C++ |
+| 8 | JavaScript Updates | Added cpp-sync-adapter.js (incomplete) |
 | 9 | Build System | Bazel configs, stasel/WebRTC xcframework |
 | 10 | Documentation | Updated docs |
 | 11 | CLI Sync Observer | `apps/cli/main.cc` sync subcommand |
-| 12 | Native macOS Support | `rules_apple`, `objc_library`, WebRTC framework |
+| 12 | JavaScript Cleanup | Delete old JS sync, wire C++ sync |
+| 13 | Native macOS Support | `rules_apple`, `objc_library`, WebRTC framework |
 
 **Dependencies:**
 - Phase 2-3 can be done in parallel
@@ -482,7 +522,8 @@ Enable the CLI sync command to work on native macOS using the existing Apple imp
 - Phase 9 can start after Phase 1, iterate as needed
 - Phase 10 can be done incrementally
 - Phase 11 depends on Phase 6 (needs sync protocol), can skip Phase 6.5-8
-- Phase 12 depends on Phase 11 (CLI must exist), uses existing Apple code from Phase 2-4
+- Phase 12 depends on Phase 7 (C++ sync must work), completes Phase 8
+- Phase 13 depends on Phase 11 (CLI must exist), uses existing Apple code from Phase 2-4
 
 **Out of Scope (for now):**
 - Android support (can add later with JNI)
