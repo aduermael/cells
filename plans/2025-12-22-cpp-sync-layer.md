@@ -210,25 +210,25 @@ Port sync protocol from JS (`collab-manager.js`). Build on CRDT docs.
 
 Handle cursor positions, selections, and user presence. Presence data is ephemeral and never affects the Workbook (only Operations can mutate Workbook state).
 
-- [ ] 6.5a: Create `Presence.h` in `core/net/include/`
+- [x] 6.5a: Create `Presence.h` in `core/net/include/`
   - `PresenceData` struct: user_id, cursor_cell, selection_range, color, name
   - `PresenceManager` class: tracks all peers' presence
   - `updateLocalPresence(PresenceData)` - called when local user moves cursor/selection
   - `getRemotePresences()` - returns map of peer_id -> PresenceData
   - PresenceDelegate: `onPresenceChanged(peer_id, PresenceData)`
 
-- [ ] 6.5b: Create `Presence.cc` implementation in `core/net/common/`
+- [x] 6.5b: Create `Presence.cc` implementation in `core/net/common/`
   - Broadcast local presence changes via DataChannel
   - Receive and store remote presence updates
   - Automatic cleanup when peer disconnects
   - Throttle outbound updates (e.g., max 30/sec)
 
-- [ ] 6.5c: Integrate with SyncClient
+- [x] 6.5c: Integrate with SyncClient
   - SyncClient owns PresenceManager
   - Presence messages use same DataChannel as operations
   - Separate message type (PRESENCE vs OPERATION)
 
-- [ ] 6.5d: Wire JS presence events to C++
+- [ ] 6.5d: Wire JS presence events to C++ (deferred to Phase 8)
   - JS calls `updatePresence(cell, selection)` on cursor move
   - C++ broadcasts to peers, receives from peers
   - JS receives remote presence via listener callback

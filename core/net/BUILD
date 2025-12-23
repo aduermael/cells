@@ -204,6 +204,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":ice_config",
+        ":presence",
         ":rtc_data_channel",
         ":rtc_peer_connection",
         ":signaling_client",
@@ -213,5 +214,20 @@ cc_library(
     ],
 )
 
-# TODO: Add libraries as they are implemented:
-# - Presence: Cursor/selection presence
+# Presence - cursor/selection presence for collaboration
+cc_library(
+    name = "presence",
+    srcs = ["common/Presence.cc"],
+    hdrs = ["include/Presence.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "presence_test",
+    srcs = ["presence_test.cc"],
+    deps = [
+        ":presence",
+        "@googletest//:gtest_main",
+    ],
+)

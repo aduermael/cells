@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "core/net/include/ICEConfig.h"
+#include "core/net/include/Presence.h"
 #include "core/net/include/RTCDataChannel.h"
 #include "core/net/include/RTCPeerConnection.h"
 #include "core/net/include/SignalingClient.h"
@@ -76,6 +77,20 @@ public:
         (void)client;
         (void)peer_id;
         (void)latency_ms;
+    }
+
+    // Optional: Remote presence updated
+    virtual void syncClientPresenceDidUpdate(SyncClient& client, const std::string& peer_id,
+                                             const PresenceData& presence) {
+        (void)client;
+        (void)peer_id;
+        (void)presence;
+    }
+
+    // Optional: Remote presence removed
+    virtual void syncClientPresenceDidRemove(SyncClient& client, const std::string& peer_id) {
+        (void)client;
+        (void)peer_id;
     }
 };
 
@@ -187,6 +202,24 @@ public:
     // Force reconnect (e.g., after network change)
     void reconnect();
 
+    // Presence management
+    // Get the presence manager for this sync client
+    [[nodiscard]] PresenceManager* getPresenceManager() { return presence_manager_.get(); }
+
+    // Update local presence (convenience methods that forward to PresenceManager)
+    void setLocalName(const std::string& name);
+    void setCurrentSheet(const std::string& sheet_id);
+    void setCursor(const std::string& col_id, const std::string& row_id);
+    void setSelection(const CursorPosition& start, const CursorPosition& end);
+    void setMousePosition(double x, double y);
+    void clearCursor();
+    void clearSelection();
+    void clearMousePosition();
+
+    // Get remote presence info
+    [[nodiscard]] std::map<std::string, PresenceData> getRemotePeers() const;
+    [[nodiscard]] std::vector<PresenceData> getPeersOnSheet(const std::string& sheet_id) const;
+
     // SignalingClientDelegate interface
     void signalingClientStateDidChange(SignalingClient& client,
                                        SignalingClientState state) override;
@@ -223,6 +256,12 @@ private:
     // Handle incoming sync message
     void handleSyncMessage(const std::string& peer_id, const std::string& message);
 
+    // Handle incoming presence message
+    void handlePresenceMessage(const std::string& peer_id, const std::string& message);
+
+    // Broadcast presence updates
+    void processPresenceUpdates();
+
     // Handle ping/pong for latency
     void handlePing(const std::string& peer_id, int64_t timestamp);
     void handlePong(const std::string& peer_id, int64_t timestamp);
@@ -233,6 +272,12 @@ private:
 
     // Send message to all connected peers
     void broadcastToPeers(const std::string& message);
+
+    // Send presence to specific peer (via presence channel)
+    void sendPresenceToPeer(const std::string& peer_id, const std::string& message);
+
+    // Broadcast presence to all peers (via presence channel)
+    void broadcastPresence(const std::string& message);
 
     // Update sync state and notify delegate
     void setState(SyncClientState new_state);
@@ -252,6 +297,9 @@ private:
 
     // Signaling
     std::unique_ptr<SignalingClient> signaling_client_;
+
+    // Presence
+    std::unique_ptr<PresenceManager> presence_manager_;
 
     // Connected peers
     std::map<std::string, std::unique_ptr<ConnectedPeer>> peers_;

@@ -167,6 +167,9 @@ SyncClient::SyncClient(Workbook* workbook, SyncClientConfig config)
 
     signaling_client_ = std::make_unique<SignalingClient>(signaling_config);
     signaling_client_->setDelegate(this);
+
+    // Create presence manager
+    presence_manager_ = std::make_unique<PresenceManager>();
 }
 
 SyncClient::~SyncClient() {
@@ -191,6 +194,9 @@ void SyncClient::startSync(const std::string& room_id, const std::string& peer_i
     if (!sync_manager_) {
         sync_manager_ = new SyncManager(workbook_);
     }
+
+    // Initialize presence manager with our peer ID
+    presence_manager_->initialize(peer_id_);
 
     setState(SyncClientState::CONNECTING);
     signaling_client_->connect(room_id_, peer_id_);
@@ -394,6 +400,14 @@ void SyncClient::removePeer(const std::string& peer_id) {
         sync_manager_->removePeer(cells::ID(peer_id));
     }
 
+    // Remove presence and notify
+    if (presence_manager_) {
+        presence_manager_->removePeer(peer_id);
+        if (delegate_) {
+            delegate_->syncClientPresenceDidRemove(*this, peer_id);
+        }
+    }
+
     // Notify delegate
     if (delegate_) {
         delegate_->syncClientPeerDidDisconnect(*this, peer_id);
@@ -484,6 +498,118 @@ void SyncClient::broadcastToPeers(const std::string& message) {
         if (pair.second->operations_channel && pair.second->operations_channel->isOpen()) {
             pair.second->operations_channel->send(message);
         }
+    }
+}
+
+void SyncClient::sendPresenceToPeer(const std::string& peer_id, const std::string& message) {
+    auto it = peers_.find(peer_id);
+    if (it == peers_.end()) {
+        return;
+    }
+
+    if (it->second->presence_channel && it->second->presence_channel->isOpen()) {
+        it->second->presence_channel->send(message);
+    }
+}
+
+void SyncClient::broadcastPresence(const std::string& message) {
+    for (auto& pair : peers_) {
+        if (pair.second->presence_channel && pair.second->presence_channel->isOpen()) {
+            pair.second->presence_channel->send(message);
+        }
+    }
+}
+
+// ============================================================================
+// Presence methods
+// ============================================================================
+
+void SyncClient::setLocalName(const std::string& name) {
+    if (presence_manager_) {
+        presence_manager_->setLocalName(name);
+    }
+}
+
+void SyncClient::setCurrentSheet(const std::string& sheet_id) {
+    if (presence_manager_) {
+        presence_manager_->setCurrentSheet(sheet_id);
+    }
+}
+
+void SyncClient::setCursor(const std::string& col_id, const std::string& row_id) {
+    if (presence_manager_) {
+        presence_manager_->setCursor(col_id, row_id);
+    }
+}
+
+void SyncClient::setSelection(const CursorPosition& start, const CursorPosition& end) {
+    if (presence_manager_) {
+        presence_manager_->setSelection(start, end);
+    }
+}
+
+void SyncClient::setMousePosition(double x, double y) {
+    if (presence_manager_) {
+        presence_manager_->setMousePosition(x, y);
+    }
+}
+
+void SyncClient::clearCursor() {
+    if (presence_manager_) {
+        presence_manager_->clearCursor();
+    }
+}
+
+void SyncClient::clearSelection() {
+    if (presence_manager_) {
+        presence_manager_->clearSelection();
+    }
+}
+
+void SyncClient::clearMousePosition() {
+    if (presence_manager_) {
+        presence_manager_->clearMousePosition();
+    }
+}
+
+std::map<std::string, PresenceData> SyncClient::getRemotePeers() const {
+    if (presence_manager_) {
+        return presence_manager_->getRemotePeers();
+    }
+    return {};
+}
+
+std::vector<PresenceData> SyncClient::getPeersOnSheet(const std::string& sheet_id) const {
+    if (presence_manager_) {
+        return presence_manager_->getPeersOnSheet(sheet_id);
+    }
+    return {};
+}
+
+void SyncClient::handlePresenceMessage(const std::string& peer_id, const std::string& message) {
+    if (!presence_manager_) {
+        return;
+    }
+
+    presence_manager_->handlePresenceMessage(peer_id, message);
+
+    // Notify delegate
+    if (delegate_) {
+        const PresenceData* presence = presence_manager_->getPeerPresence(peer_id);
+        if (presence) {
+            delegate_->syncClientPresenceDidUpdate(*this, peer_id, *presence);
+        }
+    }
+}
+
+void SyncClient::processPresenceUpdates() {
+    if (!presence_manager_) {
+        return;
+    }
+
+    std::string message;
+    if (presence_manager_->processPendingUpdates(message)) {
+        broadcastPresence(message);
     }
 }
 
@@ -758,8 +884,10 @@ void SyncClient::handlePeerMessage(const std::string& peer_id, const std::string
 
         // Handle sync message
         handleSyncMessage(peer_id, message);
+    } else if (channel_label == PRESENCE_CHANNEL) {
+        // Handle presence message
+        handlePresenceMessage(peer_id, message);
     }
-    // Presence messages handled elsewhere (Phase 6.5)
 }
 
 void SyncClient::handlePeerICECandidate(const std::string& peer_id, const ICECandidate& candidate) {
