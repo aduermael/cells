@@ -1,7 +1,9 @@
 // Collaboration UI Module
 // Manages the UI elements for collaboration status, share button, and peer indicators
 
-import { CollabState } from './collab-manager.js';
+// Import CollabState from the new C++ adapter (with fallback to old collab-manager)
+// The CppSyncAdapter exports CollabState for backwards compatibility
+import { CollabState } from './cpp-sync-adapter.js';
 import { generateRandomName } from './presence.js';
 
 /**

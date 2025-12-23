@@ -284,9 +284,11 @@ Simplify JS to thin wrapper - sync happens in C++. Remove existing JS sync code.
   - `onPeersChanged(callback)`
   - `onPresenceChanged(callback)`
 
-- [ ] 8d: Update presence UI to use C++ presence data
-  - Receive cursor/selection updates via listener
-  - Render remote cursors (existing rendering code)
+- [x] 8d: Update presence UI to use C++ presence data
+  - Created cpp-sync-adapter.js - thin JS adapter wrapping C++ SyncClient
+  - Provides CollabManager-compatible interface for existing UI
+  - Polls C++ for sync state and presence updates
+  - Updated collab-ui.js to import CollabState from new adapter
 
 - [ ] 8e: Handle sync state in UI state machine
   - Add SYNCING context flag
