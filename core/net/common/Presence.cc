@@ -251,17 +251,15 @@ std::string PresenceData::toJSON() const {
     oss << ",\"sheet_id\":\"" << escapeJSONString(sheet_id) << "\"";
 
     if (has_cursor) {
-        oss << ",\"cursor\":{\"col\":\"" << escapeJSONString(cursor.col) << "\",\"row\":\""
-            << escapeJSONString(cursor.row) << "\"}";
+        oss << ",\"cursor\":{\"col\":" << cursor.col << ",\"row\":" << cursor.row << "}";
     } else {
         oss << ",\"cursor\":null";
     }
 
     if (has_selection) {
-        oss << ",\"selection\":{\"start\":{\"col\":\"" << escapeJSONString(selection.start.col)
-            << "\",\"row\":\"" << escapeJSONString(selection.start.row) << "\"},\"end\":{\"col\":\""
-            << escapeJSONString(selection.end.col) << "\",\"row\":\""
-            << escapeJSONString(selection.end.row) << "\"}}";
+        oss << ",\"selection\":{\"start\":{\"col\":" << selection.start.col
+            << ",\"row\":" << selection.start.row << "},\"end\":{\"col\":" << selection.end.col
+            << ",\"row\":" << selection.end.row << "}}";
     } else {
         oss << ",\"selection\":null";
     }
@@ -289,27 +287,29 @@ bool PresenceData::fromJSON(const std::string& json, PresenceData& out) {
     out.sheet_id = extractJSONString(json, "sheet_id");
     out.timestamp = extractJSONInt64(json, "timestamp");
 
-    // Parse cursor
+    // Parse cursor (col/row are integers now)
     const std::string cursor_json = extractJSONObject(json, "cursor");
     if (!cursor_json.empty()) {
         out.has_cursor = true;
-        out.cursor.col = extractJSONString(cursor_json, "col");
-        out.cursor.row = extractJSONString(cursor_json, "row");
+        out.cursor.col = static_cast<int32_t>(extractJSONDouble(cursor_json, "col", -1));
+        out.cursor.row = static_cast<int32_t>(extractJSONDouble(cursor_json, "row", -1));
     } else {
         out.has_cursor = false;
     }
 
-    // Parse selection
+    // Parse selection (col/row are integers now)
     const std::string selection_json = extractJSONObject(json, "selection");
     if (!selection_json.empty()) {
         out.has_selection = true;
         const std::string start_json = extractJSONObject(selection_json, "start");
         const std::string end_json = extractJSONObject(selection_json, "end");
         if (!start_json.empty() && !end_json.empty()) {
-            out.selection.start.col = extractJSONString(start_json, "col");
-            out.selection.start.row = extractJSONString(start_json, "row");
-            out.selection.end.col = extractJSONString(end_json, "col");
-            out.selection.end.row = extractJSONString(end_json, "row");
+            out.selection.start.col =
+                static_cast<int32_t>(extractJSONDouble(start_json, "col", -1));
+            out.selection.start.row =
+                static_cast<int32_t>(extractJSONDouble(start_json, "row", -1));
+            out.selection.end.col = static_cast<int32_t>(extractJSONDouble(end_json, "col", -1));
+            out.selection.end.row = static_cast<int32_t>(extractJSONDouble(end_json, "row", -1));
         } else {
             out.has_selection = false;
         }
@@ -354,10 +354,10 @@ void PresenceManager::setCurrentSheet(const std::string& sheet_id) {
     markActivity();
 }
 
-void PresenceManager::setCursor(const std::string& col_id, const std::string& row_id) {
+void PresenceManager::setCursor(int32_t col, int32_t row) {
     local_has_cursor_ = true;
-    local_cursor_.col = col_id;
-    local_cursor_.row = row_id;
+    local_cursor_.col = col;
+    local_cursor_.row = row;
     markActivity();
 }
 

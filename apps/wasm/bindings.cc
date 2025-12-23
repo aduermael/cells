@@ -1951,9 +1951,9 @@ public:
     }
 
     // Set cursor position (cell the user is editing).
-    void setSyncCursor(const std::string& colId, const std::string& rowId) {
+    void setSyncCursor(int col, int row) {
         if (_syncClient) {
-            _syncClient->setCursor(colId, rowId);
+            _syncClient->setCursor(col, row);
         }
     }
 
@@ -1965,8 +1965,7 @@ public:
     }
 
     // Set selection range.
-    void setSyncSelection(const std::string& startCol, const std::string& startRow,
-                          const std::string& endCol, const std::string& endRow) {
+    void setSyncSelection(int startCol, int startRow, int endCol, int endRow) {
         if (_syncClient) {
             cells::net::CursorPosition start;
             start.col = startCol;
@@ -2006,17 +2005,17 @@ public:
             json << "\"sheetId\":\"" << jsonEscape(presence.sheet_id) << "\",";
 
             if (presence.has_cursor) {
-                json << "\"cursor\":{\"col\":\"" << presence.cursor.col
-                     << "\",\"row\":\"" << presence.cursor.row << "\"},";
+                json << "\"cursor\":{\"col\":" << presence.cursor.col << ",\"row\":"
+                     << presence.cursor.row << "},";
             } else {
                 json << "\"cursor\":null,";
             }
 
             if (presence.has_selection) {
-                json << "\"selection\":{\"startCol\":\"" << presence.selection.start.col
-                     << "\",\"startRow\":\"" << presence.selection.start.row
-                     << "\",\"endCol\":\"" << presence.selection.end.col
-                     << "\",\"endRow\":\"" << presence.selection.end.row << "\"}";
+                json << "\"selection\":{\"startCol\":" << presence.selection.start.col
+                     << ",\"startRow\":" << presence.selection.start.row << ",\"endCol\":"
+                     << presence.selection.end.col << ",\"endRow\":" << presence.selection.end.row
+                     << "}";
             } else {
                 json << "\"selection\":null";
             }

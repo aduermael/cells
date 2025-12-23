@@ -613,8 +613,8 @@ function handleMessage(msg) {
             }
 
             case 'setSyncCursor': {
-                const { colId, rowId } = params;
-                engine.setSyncCursor(colId, rowId);
+                const { col, row } = params;
+                engine.setSyncCursor(col, row);
                 respond({ type: 'syncCursorSet', success: true });
                 break;
             }

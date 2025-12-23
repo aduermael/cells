@@ -545,10 +545,12 @@ export class CppSyncAdapter {
     }
 
     /**
-     * Set cursor position
+     * Set cursor position (zero-based indices)
+     * @param {number} col - Column index
+     * @param {number} row - Row index
      */
-    async setCursor(colId, rowId) {
-        await this._client.setSyncCursor(colId, rowId);
+    async setCursor(col, row) {
+        await this._client.setSyncCursor(col, row);
     }
 
     /**
@@ -559,7 +561,9 @@ export class CppSyncAdapter {
     }
 
     /**
-     * Set selection range
+     * Set selection range (zero-based indices)
+     * @param {{col: number, row: number}} start
+     * @param {{col: number, row: number}} end
      */
     async setSelection(start, end) {
         await this._client.setSyncSelection(start.col, start.row, end.col, end.row);

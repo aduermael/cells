@@ -543,9 +543,9 @@ void SyncClient::setCurrentSheet(const std::string& sheet_id) {
     }
 }
 
-void SyncClient::setCursor(const std::string& col_id, const std::string& row_id) {
+void SyncClient::setCursor(int32_t col, int32_t row) {
     if (presence_manager_) {
-        presence_manager_->setCursor(col_id, row_id);
+        presence_manager_->setCursor(col, row);
     }
 }
 

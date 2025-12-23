@@ -825,12 +825,12 @@ class CellsClient {
 
     /**
      * Set cursor position (cell the user is editing).
-     * @param {string} colId - Column ID
-     * @param {string} rowId - Row ID
+     * @param {number} col - Column index
+     * @param {number} row - Row index
      * @returns {Promise<void>}
      */
-    async setSyncCursor(colId, rowId) {
-        await this._send('setSyncCursor', { colId, rowId });
+    async setSyncCursor(col, row) {
+        await this._send('setSyncCursor', { col, row });
     }
 
     /**
@@ -843,10 +843,10 @@ class CellsClient {
 
     /**
      * Set selection range.
-     * @param {string} startCol - Start column ID
-     * @param {string} startRow - Start row ID
-     * @param {string} endCol - End column ID
-     * @param {string} endRow - End row ID
+     * @param {number} startCol - Start column index
+     * @param {number} startRow - Start row index
+     * @param {number} endCol - End column index
+     * @param {number} endRow - End row index
      * @returns {Promise<void>}
      */
     async setSyncSelection(startCol, startRow, endCol, endRow) {

@@ -34,13 +34,13 @@ TEST(PresenceDataTest, ToJSONWithCursor) {
     data.name = "Test User";
     data.color = "#E53935";
     data.has_cursor = true;
-    data.cursor.col = "col_A";
-    data.cursor.row = "row_1";
+    data.cursor.col = 0;  // Column A
+    data.cursor.row = 0;  // Row 1
     data.timestamp = 1234567890;
 
     std::string json = data.toJSON();
 
-    EXPECT_NE(json.find("\"cursor\":{\"col\":\"col_A\",\"row\":\"row_1\"}"), std::string::npos);
+    EXPECT_NE(json.find("\"cursor\":{\"col\":0,\"row\":0}"), std::string::npos);
 }
 
 TEST(PresenceDataTest, ToJSONWithSelection) {
@@ -49,17 +49,17 @@ TEST(PresenceDataTest, ToJSONWithSelection) {
     data.name = "Test User";
     data.color = "#E53935";
     data.has_selection = true;
-    data.selection.start.col = "col_A";
-    data.selection.start.row = "row_1";
-    data.selection.end.col = "col_C";
-    data.selection.end.row = "row_5";
+    data.selection.start.col = 0;  // Column A
+    data.selection.start.row = 0;  // Row 1
+    data.selection.end.col = 2;    // Column C
+    data.selection.end.row = 4;    // Row 5
     data.timestamp = 1234567890;
 
     std::string json = data.toJSON();
 
     EXPECT_NE(json.find("\"selection\":{"), std::string::npos);
-    EXPECT_NE(json.find("\"start\":{\"col\":\"col_A\",\"row\":\"row_1\"}"), std::string::npos);
-    EXPECT_NE(json.find("\"end\":{\"col\":\"col_C\",\"row\":\"row_5\"}"), std::string::npos);
+    EXPECT_NE(json.find("\"start\":{\"col\":0,\"row\":0}"), std::string::npos);
+    EXPECT_NE(json.find("\"end\":{\"col\":2,\"row\":4}"), std::string::npos);
 }
 
 TEST(PresenceDataTest, ToJSONWithMouse) {
@@ -109,7 +109,7 @@ TEST(PresenceDataTest, FromJSONWithCursor) {
         "name": "User",
         "color": "#8E24AA",
         "sheet_id": "s1",
-        "cursor": {"col": "ABC", "row": "XYZ"},
+        "cursor": {"col": 5, "row": 10},
         "selection": null,
         "mouse": null,
         "timestamp": 123
@@ -118,8 +118,8 @@ TEST(PresenceDataTest, FromJSONWithCursor) {
     PresenceData data;
     EXPECT_TRUE(PresenceData::fromJSON(json, data));
     EXPECT_TRUE(data.has_cursor);
-    EXPECT_EQ(data.cursor.col, "ABC");
-    EXPECT_EQ(data.cursor.row, "XYZ");
+    EXPECT_EQ(data.cursor.col, 5);
+    EXPECT_EQ(data.cursor.row, 10);
 }
 
 TEST(PresenceDataTest, FromJSONWithSelection) {
@@ -131,8 +131,8 @@ TEST(PresenceDataTest, FromJSONWithSelection) {
         "sheet_id": "s2",
         "cursor": null,
         "selection": {
-            "start": {"col": "A", "row": "1"},
-            "end": {"col": "D", "row": "10"}
+            "start": {"col": 0, "row": 0},
+            "end": {"col": 3, "row": 9}
         },
         "mouse": null,
         "timestamp": 456
@@ -141,10 +141,10 @@ TEST(PresenceDataTest, FromJSONWithSelection) {
     PresenceData data;
     EXPECT_TRUE(PresenceData::fromJSON(json, data));
     EXPECT_TRUE(data.has_selection);
-    EXPECT_EQ(data.selection.start.col, "A");
-    EXPECT_EQ(data.selection.start.row, "1");
-    EXPECT_EQ(data.selection.end.col, "D");
-    EXPECT_EQ(data.selection.end.row, "10");
+    EXPECT_EQ(data.selection.start.col, 0);
+    EXPECT_EQ(data.selection.start.row, 0);
+    EXPECT_EQ(data.selection.end.col, 3);
+    EXPECT_EQ(data.selection.end.row, 9);
 }
 
 TEST(PresenceDataTest, FromJSONWithMouse) {
@@ -181,13 +181,13 @@ TEST(PresenceDataTest, Roundtrip) {
     original.color = "#5E35B1";
     original.sheet_id = "test_sheet";
     original.has_cursor = true;
-    original.cursor.col = "col123";
-    original.cursor.row = "row456";
+    original.cursor.col = 123;
+    original.cursor.row = 456;
     original.has_selection = true;
-    original.selection.start.col = "sA";
-    original.selection.start.row = "s1";
-    original.selection.end.col = "eB";
-    original.selection.end.row = "e2";
+    original.selection.start.col = 0;
+    original.selection.start.row = 1;
+    original.selection.end.col = 2;
+    original.selection.end.row = 3;
     original.has_mouse = true;
     original.mouse.x = 123.456;
     original.mouse.y = 789.012;
@@ -240,8 +240,8 @@ TEST(PresenceManagerTest, SetLocalPresence) {
     manager.initialize("local_peer", "Local User");
 
     manager.setCurrentSheet("sheet_A");
-    manager.setCursor("col_B", "row_3");
-    manager.setSelection({"col_A", "row_1"}, {"col_C", "row_5"});
+    manager.setCursor(1, 2);               // col B, row 3 (zero-indexed)
+    manager.setSelection({0, 0}, {2, 4});  // A1 to C5
     manager.setMousePosition(100.0, 200.0);
 
     PresenceData presence = manager.getLocalPresence();
@@ -249,11 +249,11 @@ TEST(PresenceManagerTest, SetLocalPresence) {
     EXPECT_EQ(presence.name, "Local User");
     EXPECT_EQ(presence.sheet_id, "sheet_A");
     EXPECT_TRUE(presence.has_cursor);
-    EXPECT_EQ(presence.cursor.col, "col_B");
-    EXPECT_EQ(presence.cursor.row, "row_3");
+    EXPECT_EQ(presence.cursor.col, 1);
+    EXPECT_EQ(presence.cursor.row, 2);
     EXPECT_TRUE(presence.has_selection);
-    EXPECT_EQ(presence.selection.start.col, "col_A");
-    EXPECT_EQ(presence.selection.end.row, "row_5");
+    EXPECT_EQ(presence.selection.start.col, 0);
+    EXPECT_EQ(presence.selection.end.row, 4);
     EXPECT_TRUE(presence.has_mouse);
     EXPECT_DOUBLE_EQ(presence.mouse.x, 100.0);
     EXPECT_DOUBLE_EQ(presence.mouse.y, 200.0);
@@ -263,8 +263,8 @@ TEST(PresenceManagerTest, ClearLocalPresence) {
     PresenceManager manager;
     manager.initialize("clear_peer", "Clear User");
 
-    manager.setCursor("col", "row");
-    manager.setSelection({"a", "1"}, {"b", "2"});
+    manager.setCursor(0, 0);
+    manager.setSelection({0, 0}, {1, 1});
     manager.setMousePosition(50.0, 50.0);
 
     // Verify set
@@ -294,7 +294,7 @@ TEST(PresenceManagerTest, HandleRemotePresence) {
         "name": "Remote User",
         "color": "#E53935",
         "sheet_id": "sheet1",
-        "cursor": {"col": "X", "row": "Y"},
+        "cursor": {"col": 5, "row": 10},
         "selection": null,
         "mouse": null,
         "timestamp": 123456
@@ -309,7 +309,7 @@ TEST(PresenceManagerTest, HandleRemotePresence) {
     EXPECT_EQ(remote->peer_id, "remote1");
     EXPECT_EQ(remote->name, "Remote User");
     EXPECT_TRUE(remote->has_cursor);
-    EXPECT_EQ(remote->cursor.col, "X");
+    EXPECT_EQ(remote->cursor.col, 5);
 }
 
 TEST(PresenceManagerTest, HandleRemotePresenceMismatchedPeerId) {
@@ -449,7 +449,7 @@ TEST(PresenceManagerTest, ProcessPendingUpdates) {
     EXPECT_FALSE(manager.processPendingUpdates(msg));
 
     // Setting cursor marks activity
-    manager.setCursor("A", "1");
+    manager.setCursor(0, 0);  // A1
     EXPECT_TRUE(manager.isBroadcastingActive());
 
     // Should have a pending update

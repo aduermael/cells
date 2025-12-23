@@ -209,7 +209,7 @@ public:
     // Update local presence (convenience methods that forward to PresenceManager)
     void setLocalName(const std::string& name);
     void setCurrentSheet(const std::string& sheet_id);
-    void setCursor(const std::string& col_id, const std::string& row_id);
+    void setCursor(int32_t col, int32_t row);
     void setSelection(const CursorPosition& start, const CursorPosition& end);
     void setMousePosition(double x, double y);
     void clearCursor();

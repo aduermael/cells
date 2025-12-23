@@ -32,10 +32,10 @@ extern const size_t NAME_ADJECTIVES_COUNT;
 extern const char* const NAME_ANIMALS[];
 extern const size_t NAME_ANIMALS_COUNT;
 
-// Cursor/cell position
+// Cursor/cell position (zero-based indices)
 struct CursorPosition {
-    std::string col;  // Column axis ID
-    std::string row;  // Row axis ID
+    int32_t col{-1};  // Column index (-1 = not set)
+    int32_t row{-1};  // Row index (-1 = not set)
 
     bool operator==(const CursorPosition& other) const {
         return col == other.col && row == other.row;
@@ -130,7 +130,7 @@ public:
 
     // Update local presence
     void setCurrentSheet(const std::string& sheet_id);
-    void setCursor(const std::string& col_id, const std::string& row_id);
+    void setCursor(int32_t col, int32_t row);
     void setSelection(const CursorPosition& start, const CursorPosition& end);
     void setMousePosition(double x, double y);
     void clearCursor();
