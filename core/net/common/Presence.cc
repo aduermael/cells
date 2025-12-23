@@ -16,12 +16,12 @@ const char* const USER_COLORS[] = {
     "#E53935",  // Red
     "#1E88E5",  // Blue
     "#8E24AA",  // Purple
-    "#00897B",  // Teal
+    "#0288D1",  // Light Blue (replacing teal - too green-ish)
     "#F57C00",  // Orange
     "#5E35B1",  // Deep Purple
     "#00ACC1",  // Cyan
     "#D81B60",  // Pink
-    "#43A047",  // Green
+    "#546E7A",  // Blue Gray (avoiding green - too similar to local selection)
     "#6D4C41"   // Brown
 };
 const size_t USER_COLORS_COUNT = sizeof(USER_COLORS) / sizeof(USER_COLORS[0]);
@@ -177,7 +177,7 @@ double extractJSONDouble(const std::string& json, const std::string& key,
 
     // Verify the string contains at least one digit (avoid crash on strings like ".", "-", "e")
     bool has_digit = false;
-    for (char c : num_str) {
+    for (const char c : num_str) {
         if (std::isdigit(static_cast<unsigned char>(c)) != 0) {
             has_digit = true;
             break;
@@ -188,8 +188,8 @@ double extractJSONDouble(const std::string& json, const std::string& key,
     }
 
     // Use strtod with error checking instead of std::stod to avoid exceptions
-    char* end_ptr = nullptr;
-    double result = std::strtod(num_str.c_str(), &end_ptr);
+    const char* end_ptr = nullptr;
+    const double result = std::strtod(num_str.c_str(), const_cast<char**>(&end_ptr));
 
     // Check for conversion errors
     if (end_ptr == num_str.c_str()) {
@@ -292,6 +292,13 @@ std::string PresenceData::toJSON() const {
         oss << ",\"mouse\":null";
     }
 
+    if (is_editing) {
+        oss << ",\"editing\":{\"col\":" << editing_cell.col << ",\"row\":" << editing_cell.row
+            << ",\"text\":\"" << escapeJSONString(editing_text) << "\"}";
+    } else {
+        oss << ",\"editing\":null";
+    }
+
     oss << ",\"timestamp\":" << timestamp << "}";
     return oss.str();
 }
@@ -347,6 +354,17 @@ bool PresenceData::fromJSON(const std::string& json, PresenceData& out) {
         out.mouse.y = extractJSONDouble(mouse_json, "y");
     } else {
         out.has_mouse = false;
+    }
+
+    // Parse editing
+    const std::string editing_json = extractJSONObject(json, "editing");
+    if (!editing_json.empty()) {
+        out.is_editing = true;
+        out.editing_cell.col = static_cast<int32_t>(extractJSONDouble(editing_json, "col", -1));
+        out.editing_cell.row = static_cast<int32_t>(extractJSONDouble(editing_json, "row", -1));
+        out.editing_text = extractJSONString(editing_json, "text");
+    } else {
+        out.is_editing = false;
     }
 
     return true;
@@ -412,6 +430,20 @@ void PresenceManager::clearMousePosition() {
     markActivity();
 }
 
+void PresenceManager::setEditing(int32_t col, int32_t row, const std::string& text) {
+    local_is_editing_ = true;
+    local_editing_cell_.col = col;
+    local_editing_cell_.row = row;
+    local_editing_text_ = text;
+    markActivity();
+}
+
+void PresenceManager::clearEditing() {
+    local_is_editing_ = false;
+    local_editing_text_.clear();
+    markActivity();
+}
+
 PresenceData PresenceManager::getLocalPresence() const {
     PresenceData data;
     data.peer_id = local_peer_id_;
@@ -424,6 +456,9 @@ PresenceData PresenceManager::getLocalPresence() const {
     data.selection = local_selection_;
     data.has_mouse = local_has_mouse_;
     data.mouse = local_mouse_;
+    data.is_editing = local_is_editing_;
+    data.editing_cell = local_editing_cell_;
+    data.editing_text = local_editing_text_;
     data.timestamp = currentTimeMs();
     return data;
 }
