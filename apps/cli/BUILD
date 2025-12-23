@@ -5,15 +5,21 @@ cc_binary(
         "converter.h",
         "main.cc",
         "options.h",
+        "sync_command.cc",
+        "sync_command.h",
     ],
     deps = [
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
+        "//core/cells:id",
         "//core/cells:model",
         "//core/cells:parser",
         "//core/cells:serializer",
+        "//core/cells:sync_manager",
         "//core/cells:xlsx_reader",
         "//core/cells:xlsx_writer",
+        "//core/net:sync_client",
+        "//core/net:url",
     ],
 )
 

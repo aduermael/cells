@@ -1,8 +1,10 @@
-// Cells CLI - spreadsheet format converter
+// Cells CLI - spreadsheet format converter and sync client
 // Usage: cells -i <input> <output>
+//        cells sync <url>
 
 #include "converter.h"
 #include "options.h"
+#include "sync_command.h"
 
 #include <chrono>
 #include <cstring>
@@ -28,10 +30,11 @@ using cells::cli::Options;
 constexpr const char* kVersion = "0.0.1";
 
 void print_usage(const char* program_name) {
-    std::cerr << "cells - spreadsheet format converter\n"
+    std::cerr << "cells - spreadsheet format converter and sync client\n"
               << "\n"
               << "Usage: " << program_name << " [options] -i <input> <output>\n"
               << "       " << program_name << " -I <file>     (info mode)\n"
+              << "       " << program_name << " sync <url>    (sync mode)\n"
               << "\n"
               << "Convert between spreadsheet formats (.zcd, .csv, .xlsx).\n"
               << "Format is auto-detected from file extension.\n"
@@ -67,6 +70,11 @@ void print_usage(const char* program_name) {
               << "  --version           Show version\n"
               << "  --help              Show this help\n"
               << "\n"
+              << "Sync Mode:\n"
+              << "  cells sync <url>              Join room and log operations\n"
+              << "  cells sync <url> --apply <f>  Apply operations to workbook file\n"
+              << "  cells sync <url> --send <f>   Broadcast workbook as operations\n"
+              << "\n"
               << "Examples:\n"
               << "  # Basic conversion\n"
               << "  cells -i data.csv output.zcd\n"
@@ -88,6 +96,9 @@ void print_usage(const char* program_name) {
               << "  # Scripting\n"
               << "  cells -i input.xlsx output.csv -q -y    # Quiet, overwrite\n"
               << "  cells -i data.csv out.xlsx --time       # Show timing\n"
+              << "\n"
+              << "  # Real-time sync (copy URL from web UI address bar)\n"
+              << "  cells sync 'https://cells.example.com/?room=abc123'\n"
               << "\n"
               << "Feature Preservation:\n"
               << "  When converting to CSV, formulas become values and only the\n"
@@ -404,9 +415,64 @@ int show_file_info(const Options& opts) {
     return 0;
 }
 
+// Parse sync subcommand arguments
+// Returns true if sync command was detected, false otherwise
+bool parse_sync_args(int argc, char* argv[], cells::cli::SyncOptions& sync_opts) {
+    if (argc < 2 || std::string_view(argv[1]) != "sync") {
+        return false;
+    }
+
+    for (int i = 2; i < argc; ++i) {
+        std::string_view arg = argv[i];
+
+        if (arg == "-q") {
+            sync_opts.quiet = true;
+            continue;
+        }
+        if (arg == "-v") {
+            sync_opts.verbose = true;
+            continue;
+        }
+        if (arg == "--apply" && i + 1 < argc) {
+            sync_opts.apply = true;
+            sync_opts.workbook_file = argv[++i];
+            continue;
+        }
+        if (arg == "--send" && i + 1 < argc) {
+            sync_opts.send = true;
+            sync_opts.workbook_file = argv[++i];
+            continue;
+        }
+        if (!arg.empty() && arg[0] != '-') {
+            if (sync_opts.url.empty()) {
+                sync_opts.url = arg;
+            } else {
+                std::cerr << "Error: Unexpected argument: " << arg << "\n";
+                return true;  // Return true to indicate sync mode, but with error
+            }
+            continue;
+        }
+        std::cerr << "Error: Unknown option: " << arg << "\n";
+        return true;  // Return true to indicate sync mode, but with error
+    }
+
+    return true;
+}
+
 }  // namespace
 
 int main(int argc, char* argv[]) {
+    // Check for sync subcommand first
+    cells::cli::SyncOptions sync_opts;
+    if (parse_sync_args(argc, argv, sync_opts)) {
+        if (sync_opts.url.empty()) {
+            std::cerr << "Error: URL required for sync command\n";
+            std::cerr << "Usage: " << argv[0] << " sync <url> [--apply <file>] [--send <file>]\n";
+            return 1;
+        }
+        return cells::cli::run_sync_command(sync_opts);
+    }
+
     Options opts;
 
     if (!parse_args(argc, argv, opts)) {
