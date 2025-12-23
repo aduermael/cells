@@ -201,8 +201,19 @@ export function createUIStateMachine(options = {}) {
     // Active sheet index
     let activeSheet = 0;
 
+    // Sync context - tracks collaboration sync state (parallel to UI state)
+    // This is not a UI interaction state but a context flag for sync status
+    const syncContext = {
+        enabled: false,    // Whether sync is enabled
+        state: 'offline',  // Current sync state: 'offline', 'connecting', 'syncing', 'online', 'error'
+        peerCount: 0       // Number of connected peers
+    };
+
     // Listeners for state changes
     const listeners = new Set();
+
+    // Listeners specifically for sync context changes
+    const syncListeners = new Set();
 
     /**
      * Log debug messages
@@ -230,7 +241,7 @@ export function createUIStateMachine(options = {}) {
     }
 
     /**
-     * Get full context (modifiers, selection, activeSheet)
+     * Get full context (modifiers, selection, activeSheet, sync)
      * @returns {Object} Full context object
      */
     function getContext() {
@@ -242,7 +253,8 @@ export function createUIStateMachine(options = {}) {
                 start: { ...selectionRange.start },
                 end: { ...selectionRange.end }
             },
-            activeSheet
+            activeSheet,
+            sync: { ...syncContext }
         };
     }
 
@@ -441,6 +453,83 @@ export function createUIStateMachine(options = {}) {
         return activeSheet;
     }
 
+    // ========================================================================
+    // Sync Context API
+    // ========================================================================
+
+    /**
+     * Update sync context (called by sync adapter)
+     * @param {Object} context - { enabled?, state?, peerCount? }
+     */
+    function setSyncContext(context) {
+        let changed = false;
+        if (context.enabled !== undefined && context.enabled !== syncContext.enabled) {
+            syncContext.enabled = context.enabled;
+            changed = true;
+        }
+        if (context.state !== undefined && context.state !== syncContext.state) {
+            syncContext.state = context.state;
+            changed = true;
+        }
+        if (context.peerCount !== undefined && context.peerCount !== syncContext.peerCount) {
+            syncContext.peerCount = context.peerCount;
+            changed = true;
+        }
+
+        if (changed) {
+            log('Sync context changed:', syncContext);
+            for (const listener of syncListeners) {
+                try {
+                    listener({ ...syncContext });
+                } catch (e) {
+                    console.error('[UIState] Sync listener error:', e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Get current sync context
+     * @returns {Object} { enabled, state, peerCount }
+     */
+    function getSyncContext() {
+        return { ...syncContext };
+    }
+
+    /**
+     * Check if sync is enabled (connected to a room)
+     * @returns {boolean}
+     */
+    function isSyncEnabled() {
+        return syncContext.enabled;
+    }
+
+    /**
+     * Check if currently syncing (initial sync after joining)
+     * @returns {boolean}
+     */
+    function isSyncing() {
+        return syncContext.state === 'syncing';
+    }
+
+    /**
+     * Check if sync is online (fully connected and synced)
+     * @returns {boolean}
+     */
+    function isSyncOnline() {
+        return syncContext.state === 'online';
+    }
+
+    /**
+     * Subscribe to sync context changes
+     * @param {Function} listener - Callback function({ enabled, state, peerCount })
+     * @returns {Function} Unsubscribe function
+     */
+    function onSyncChange(listener) {
+        syncListeners.add(listener);
+        return () => syncListeners.delete(listener);
+    }
+
     /**
      * Subscribe to state changes
      * @param {Function} listener - Callback function(event)
@@ -514,6 +603,14 @@ export function createUIStateMachine(options = {}) {
         // Sheet tracking
         setActiveSheet,
         getActiveSheet,
+
+        // Sync context tracking
+        setSyncContext,
+        getSyncContext,
+        isSyncEnabled,
+        isSyncing,
+        isSyncOnline,
+        onSyncChange,
 
         // Event subscription
         subscribe,

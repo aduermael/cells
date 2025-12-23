@@ -290,9 +290,12 @@ Simplify JS to thin wrapper - sync happens in C++. Remove existing JS sync code.
   - Polls C++ for sync state and presence updates
   - Updated collab-ui.js to import CollabState from new adapter
 
-- [ ] 8e: Handle sync state in UI state machine
-  - Add SYNCING context flag
-  - Visual indicator for sync status
+- [x] 8e: Handle sync state in UI state machine
+  - Added sync context to ui-state.js (enabled, state, peerCount)
+  - Added setSyncContext(), getSyncContext(), isSyncEnabled(), isSyncing(), isSyncOnline()
+  - Added onSyncChange() listener for sync context changes
+  - Included sync in getContext() for full state snapshot
+  - Visual indicator already handled by collab-ui.js status dot
 
 ---
 
