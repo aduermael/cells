@@ -43,7 +43,7 @@ Set up the cross-platform networking infrastructure directory.
 
 Port the HttpRequest pattern from xptools. Abstract interface with platform-specific implementations.
 
-- [ ] 2a: Create `HttpRequest.h` interface in `core/net/include/`
+- [x] 2a: Create `HttpRequest.h` interface in `core/net/include/`
   - Status enum (WAITING, PROCESSING, FAILED, CANCELLED, DONE)
   - Factory method `make(method, host, port, path, queryParams, secure)`
   - `sendAsync()`, `sendSync()`, `cancel()`
@@ -51,24 +51,24 @@ Port the HttpRequest pattern from xptools. Abstract interface with platform-spec
   - Callback mechanism (`setCallback(HttpRequestCallback)`)
   - Platform hooks: `_sendAsync()`, `_cancel()`, `_attachPlatformObject()`, `_detachPlatformObject()`
 
-- [ ] 2b: Create `HttpResponse.h` in `core/net/include/`
+- [x] 2b: Create `HttpResponse.h` in `core/net/include/`
   - Status code, headers, body bytes
   - `appendBytes()`, `readAllBytes()`
   - Success/failure state
 
-- [ ] 2c: Create `URL.h` utility class for URL parsing
+- [x] 2c: Create `URL.h` utility class for URL parsing
   - scheme, host, port, path, query components
   - URL string construction
 
-- [ ] 2d: Create common HttpRequest implementation in `core/net/common/HttpRequest.cc`
+- [x] 2d: Create common HttpRequest implementation in `core/net/common/HttpRequest.cc`
   - Shared logic (callback handling, status management)
   - Calls platform-specific `_sendAsync()`
 
-- [ ] 2e: Create Web implementation in `core/net/web/HttpRequest_web.cc`
+- [x] 2e: Create Web implementation in `core/net/web/HttpRequest_web.cc`
   - Use `emscripten_fetch` API
   - Handle async callbacks via emscripten
 
-- [ ] 2f: Create Apple implementation in `core/net/apple/HttpRequest.mm`
+- [x] 2f: Create Apple implementation in `core/net/apple/HttpRequest.mm`
   - Use NSURLSession with NSURLSessionDataDelegate
   - NetworkManager singleton pattern (like xptools)
   - ARC bridging with `__bridge_retained`/`__bridge`
