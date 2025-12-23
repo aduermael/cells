@@ -427,7 +427,7 @@ The old JS code (`collab-manager.js`, `webrtc-manager.js`, etc.) is still handli
   - Polling is intentional (10-20 Hz) - event-driven would require C++ push infrastructure
   - Removed unused USER_COLORS import
 
-- [ ] 12c: Delete dead code
+- [x] 12c: Delete dead code
   - `peer-connector.js` (498 lines) - not imported anywhere
   - `operation-protocol.js` (256 lines) - not imported anywhere
 
