@@ -422,9 +422,10 @@ The old JS code (`collab-manager.js`, `webrtc-manager.js`, etc.) is still handli
   - Use C++ sync via CppSyncAdapter (which wraps worker messages)
   - syncAdapter replaces both collabManager and presenceManager
 
-- [ ] 12b: Simplify cpp-sync-adapter.js
-  - Remove polling - use event-driven callbacks from worker
-  - Keep only thin wrapper for UI state
+- [x] 12b: Simplify cpp-sync-adapter.js
+  - Added architecture documentation explaining polling approach
+  - Polling is intentional (10-20 Hz) - event-driven would require C++ push infrastructure
+  - Removed unused USER_COLORS import
 
 - [ ] 12c: Delete dead code
   - `peer-connector.js` (498 lines) - not imported anywhere

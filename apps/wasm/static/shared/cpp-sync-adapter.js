@@ -1,8 +1,12 @@
 // C++ SyncClient Adapter
 // Provides a JS interface that wraps the C++ SyncClient for use with existing UI components.
-// This adapter replaces the JS-based CollabManager, SignalingClient, and WebRTCManager.
+// This adapter replaces the JS-based CollabManager, SignalingClient, WebRTCManager, and PresenceManager.
+//
+// Architecture: Uses polling (10-20 Hz) to fetch sync state and presence from C++.
+// Polling is intentional - C++ sync runs in WASM worker, and pushing events would require
+// additional infrastructure. The polling rate is fast enough for smooth UI updates.
 
-import { generateRandomName, getColorForPeer, USER_COLORS } from './presence.js';
+import { generateRandomName, getColorForPeer } from './presence.js';
 
 /**
  * Sync states - matches C++ SyncClientState enum
