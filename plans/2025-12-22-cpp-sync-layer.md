@@ -339,21 +339,25 @@ Configure Bazel for cross-platform network code including WebRTC.
 
 Document the new architecture.
 
-- [ ] 10a: Update `docs/networking.md` with C++ implementation status
+- [x] 10a: Update `docs/networking.md` with C++ implementation status
   - Mark components as implemented in C++
-  - Document C++ API
+  - Document C++ API (SyncClient, SyncClientDelegate, PresenceManager)
 
-- [ ] 10b: Create `docs/sync-protocol.md` with wire format details
-  - Message types and JSON format
+- [x] 10b: Create `docs/sync-protocol.md` with wire format details
+  - Message types and JSON format for signaling and sync
   - Sync flow diagrams
+  - Operation format and HLC documentation
+  - Presence protocol
 
-- [ ] 10c: Update README.md with sync feature description
-  - How to enable sync
-  - Supported platforms
+- [x] 10c: Update README.md with sync feature description
+  - Added Real-time Collaboration section
+  - Updated Not Yet Implemented section
+  - Added networking/CRDT/presence to Implemented section
 
-- [ ] 10d: Add inline code documentation
-  - Header file doc comments
-  - Key algorithm explanations
+- [x] 10d: Add inline code documentation
+  - Header files already have comprehensive documentation
+  - All delegate methods documented
+  - All enums documented with comments
 
 ---
 

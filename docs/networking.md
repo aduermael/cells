@@ -2,17 +2,36 @@
 
 ## Implementation Status
 
-**Current state (December 2024):** Core networking implemented.
+**Current state (December 2024):** Core networking implemented in C++ with cross-platform support.
+
+### C++ Core Layer (`core/net/`)
 
 | Component | Status | Source Files |
 |-----------|--------|--------------|
-| WebRTC DataChannel | ✅ Implemented | `apps/wasm/static/shared/webrtc-manager.js` |
-| Signaling client | ✅ Implemented | `apps/wasm/static/shared/signaling-client.js` |
-| STUN/TURN integration | ✅ Implemented | `apps/wasm/static/shared/ice-config.js` |
-| Sync protocol | ✅ Implemented | `core/cells/sync_manager.h`, `apps/wasm/static/shared/collab-manager.js` |
-| Presence/cursors | ✅ Implemented | `apps/wasm/static/shared/presence.js` (ephemeral, never persisted) |
+| HTTP Abstraction | ✅ Implemented | `core/net/include/HttpRequest.h`, `core/net/common/HttpRequest.cc` |
+| WebSocket Abstraction | ✅ Implemented | `core/net/include/WSConnection.h`, `core/net/common/WSConnection.cc` |
+| WebRTC Abstraction | ✅ Implemented | `core/net/include/RTCPeerConnection.h`, `core/net/include/RTCDataChannel.h` |
+| Signaling Client | ✅ Implemented | `core/net/include/SignalingClient.h`, `core/net/common/SignalingClient.cc` |
+| Sync Client | ✅ Implemented | `core/net/include/SyncClient.h`, `core/net/common/SyncClient.cc` |
+| Presence Manager | ✅ Implemented | `core/net/include/Presence.h`, `core/net/common/Presence.cc` |
 
-The P2P collaboration layer is fully functional. Presence data (cursors, selections) is broadcast in real-time but intentionally ephemeral - it is never stored in files or the Workbook.
+### Platform Implementations
+
+| Platform | Status | Source Files |
+|----------|--------|--------------|
+| Web (Emscripten) | ✅ Implemented | `core/net/web/*.cc` |
+| Apple (iOS/macOS) | 📋 Planned | `core/net/apple/*.mm` (stubs) |
+
+### JavaScript Layer (`apps/wasm/static/shared/`)
+
+| Component | Status | Source Files |
+|-----------|--------|--------------|
+| C++ Sync Adapter | ✅ Implemented | `cpp-sync-adapter.js` (thin wrapper over C++) |
+| Presence UI | ✅ Implemented | `presence.js` (renders remote cursors) |
+| Collab UI | ✅ Implemented | `collab-ui.js` (status indicator) |
+| Legacy JS (deprecated) | ⚠️ Deprecated | `webrtc-manager.js`, `signaling-client.js`, `collab-manager.js` |
+
+The P2P collaboration layer is fully functional. Sync logic lives in C++ (`core/net/`) for cross-platform reuse. JavaScript is now a thin wrapper that handles UI rendering only. Presence data (cursors, selections) is broadcast in real-time but intentionally ephemeral - it is never stored in files or the Workbook.
 
 ---
 
@@ -172,11 +191,74 @@ Reconnection uses exponential backoff: 1s, 2s, 4s, 8s... max 30s.
 - Twilio TURN: ~$0.40/GB (fallback traffic only)
 - Cloudflare: ~$5/mo
 
+## C++ API
+
+### SyncClient
+
+The main entry point for sync functionality:
+
+```cpp
+#include "core/net/include/SyncClient.h"
+
+// Create sync client with callbacks
+auto sync = SyncClient::create();
+sync->setDelegate(myDelegate);
+
+// Connect to a room
+sync->connect("wss://cells.example.com", "room-id", "my-peer-id");
+
+// Check state
+SyncState state = sync->getState();  // DISCONNECTED, CONNECTING, CONNECTED
+
+// Push local operations
+sync->pushOperations(operations);
+
+// Disconnect
+sync->disconnect();
+```
+
+### SyncClientDelegate
+
+Implement to receive sync events:
+
+```cpp
+class MySyncDelegate : public SyncClientDelegate {
+    void syncClientStateDidChange(SyncClient* client, SyncState state) override;
+    void syncClientPeerDidJoin(SyncClient* client, const std::string& peerId) override;
+    void syncClientPeerDidLeave(SyncClient* client, const std::string& peerId) override;
+    void syncClientDidReceiveOperations(SyncClient* client,
+                                         const std::vector<Operation>& ops) override;
+    void syncClientPresenceDidChange(SyncClient* client,
+                                      const std::string& peerId,
+                                      const PresenceData& presence) override;
+};
+```
+
+### PresenceManager
+
+Manages cursor/selection presence:
+
+```cpp
+#include "core/net/include/Presence.h"
+
+// Update local presence (called on cursor move)
+PresenceData presence;
+presence.cursor_cell = "abc123";
+presence.selection_start = "abc123";
+presence.selection_end = "def456";
+presenceManager->updateLocalPresence(presence);
+
+// Get remote presences
+auto remotes = presenceManager->getRemotePresences();
+for (const auto& [peerId, data] : remotes) {
+    // Render remote cursor at data.cursor_cell
+}
+```
+
 ## Platform Libraries
 
-| Platform | Library |
-|----------|---------|
-| iOS/macOS | WebRTC.framework, MultipeerConnectivity |
-| Web | Native RTCPeerConnection |
-| Signaling | Socket.IO, native WebSocket |
-| Serialization | MessagePack, CBOR |
+| Platform | Library | Notes |
+|----------|---------|-------|
+| iOS/macOS | [stasel/WebRTC](https://github.com/stasel/WebRTC) | BSD-3 license, prebuilt XCFramework |
+| Web | Native RTCPeerConnection | Via Emscripten bindings |
+| All | `core/net/` | Cross-platform C++ abstraction |

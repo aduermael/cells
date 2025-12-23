@@ -272,14 +272,19 @@ python3 -m http.server 8080 --directory dist
 - Keyboard navigation
 - Listener-driven UI refresh
 
+**Real-time Collaboration:**
+- P2P sync via WebRTC (no relay servers)
+- CRDT-based conflict resolution (Last-Writer-Wins)
+- Presence/cursor sharing
+- Signaling server for connection setup only
+- See [Networking](./docs/networking.md) and [Sync Protocol](./docs/sync-protocol.md)
+
 **CLI Tool:**
 - File format conversion (xlsx ↔ zcd)
 - Basic file inspection
 
 **Not Yet Implemented:**
 - Formula engine (AST parsing and evaluation)
-- CRDT/collaboration
-- Networking (WebRTC)
 - Native platform apps (SwiftUI, WinUI)
 
 ## Design Decisions
@@ -295,9 +300,13 @@ python3 -m http.server 8080 --directory dist
 **Planned (not yet implemented):**
 - [ ] **Formula runtime**: Native AST interpreter - no dependencies, simpler, full control
 - [ ] **Undo/redo**: Branch-based history - aligns with git-friendly philosophy, clean CRDT semantics
-- [ ] **Networking**: P2P via WebRTC - no relay servers, CRDT-native sync
 - [ ] **Native apps**: Platform-native UI (SwiftUI for Apple, WinUI for Windows)
 - [ ] **Type system**: Completely optional - Excel-like by default, column types as gradual discovery
+
+**Implemented:**
+- [x] **Networking**: P2P via WebRTC - no relay servers, CRDT-native sync
+- [x] **CRDT sync**: Operation-based CRDT with HLC ordering, LWW conflict resolution
+- [x] **Presence**: Real-time cursor/selection sharing
 
 ## Design Philosophy
 
