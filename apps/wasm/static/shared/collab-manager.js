@@ -1,5 +1,17 @@
 // Collaboration Manager Module
-// Thin transport layer that routes messages between WebRTC peers and the C++ engine.
+//
+// DEPRECATED: This file is being replaced by the C++ SyncClient implementation.
+// Use the CellsClient.enableSync(), CellsClient.disableSync(), etc. APIs instead.
+// See client.js for the new C++ SyncClient API methods.
+//
+// This file remains for backwards compatibility but will be removed in a future version.
+// The C++ implementation provides:
+// - Full WebRTC P2P via core/net/
+// - Signaling via core/net/SignalingClient
+// - Presence via core/net/Presence
+// - CRDT sync via core/cells/sync_manager
+//
+// Old: Thin transport layer that routes messages between WebRTC peers and the C++ engine.
 // All CRDT sync state and protocol logic lives in the C++ SyncManager.
 
 /**

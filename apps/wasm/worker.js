@@ -547,6 +547,103 @@ function handleMessage(msg) {
                 break;
             }
 
+            // ================================================================
+            // C++ SyncClient methods (P2P WebRTC sync)
+            // ================================================================
+
+            case 'enableSync': {
+                const { url, roomId, peerId } = params;
+                const result = engine.enableSync(url, roomId, peerId || '');
+                respond({ type: 'syncEnabled', result });
+                break;
+            }
+
+            case 'disableSync': {
+                engine.disableSync();
+                respond({ type: 'syncDisabled', success: true });
+                break;
+            }
+
+            case 'getSyncState': {
+                const result = engine.getSyncState();
+                respond({ type: 'syncState', result });
+                break;
+            }
+
+            case 'isSyncEnabled': {
+                const enabled = engine.isSyncEnabled();
+                respond({ type: 'syncEnabled', enabled });
+                break;
+            }
+
+            case 'processSyncOutgoing': {
+                engine.processSyncOutgoing();
+                respond({ type: 'syncOutgoingProcessed', success: true });
+                break;
+            }
+
+            case 'processSyncPresence': {
+                engine.processSyncPresence();
+                respond({ type: 'syncPresenceProcessed', success: true });
+                break;
+            }
+
+            case 'broadcastSyncOperations': {
+                engine.broadcastSyncOperations();
+                respond({ type: 'syncOperationsBroadcast', success: true });
+                break;
+            }
+
+            // ================================================================
+            // C++ SyncClient presence methods
+            // ================================================================
+
+            case 'setSyncLocalName': {
+                const { name } = params;
+                engine.setSyncLocalName(name);
+                respond({ type: 'syncLocalNameSet', success: true });
+                break;
+            }
+
+            case 'setSyncCurrentSheet': {
+                const { sheetId } = params;
+                engine.setSyncCurrentSheet(sheetId);
+                respond({ type: 'syncCurrentSheetSet', success: true });
+                break;
+            }
+
+            case 'setSyncCursor': {
+                const { colId, rowId } = params;
+                engine.setSyncCursor(colId, rowId);
+                respond({ type: 'syncCursorSet', success: true });
+                break;
+            }
+
+            case 'clearSyncCursor': {
+                engine.clearSyncCursor();
+                respond({ type: 'syncCursorCleared', success: true });
+                break;
+            }
+
+            case 'setSyncSelection': {
+                const { startCol, startRow, endCol, endRow } = params;
+                engine.setSyncSelection(startCol, startRow, endCol, endRow);
+                respond({ type: 'syncSelectionSet', success: true });
+                break;
+            }
+
+            case 'clearSyncSelection': {
+                engine.clearSyncSelection();
+                respond({ type: 'syncSelectionCleared', success: true });
+                break;
+            }
+
+            case 'getRemotePresences': {
+                const result = engine.getRemotePresences();
+                respond({ type: 'remotePresences', result });
+                break;
+            }
+
             default:
                 respond({ type: 'error', error: 'Unknown message type: ' + type });
         }

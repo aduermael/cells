@@ -1,5 +1,12 @@
 // WebRTC Connection Manager Module
-// Manages multiple peer-to-peer WebRTC connections for collaboration
+//
+// DEPRECATED: This file is being replaced by the C++ RTCPeerConnection implementation.
+// Use the CellsClient.enableSync() API instead, which handles WebRTC internally via C++.
+// See core/net/include/RTCPeerConnection.h and core/net/web/RTCPeerConnection_web.cc
+//
+// This file remains for backwards compatibility but will be removed in a future version.
+//
+// Old: Manages multiple peer-to-peer WebRTC connections for collaboration
 
 import { getIceServers, getRTCConfiguration } from './ice-config.js';
 

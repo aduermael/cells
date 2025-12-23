@@ -1,5 +1,12 @@
 // WebSocket Signaling Client Module
-// Manages WebSocket connection to Go signaling server for WebRTC setup
+//
+// DEPRECATED: This file is being replaced by the C++ SignalingClient implementation.
+// Use the CellsClient.enableSync() API instead, which handles signaling internally via C++.
+// See core/net/include/SignalingClient.h and core/net/common/SignalingClient.cc
+//
+// This file remains for backwards compatibility but will be removed in a future version.
+//
+// Old: Manages WebSocket connection to Go signaling server for WebRTC setup
 
 /**
  * Connection states for the signaling client

@@ -270,15 +270,15 @@ Simplify JS to thin wrapper - sync happens in C++. Remove existing JS sync code.
 
 **Reference existing JS:** `webrtc-manager.js`, `signaling-client.js`, `collab-manager.js`, `presence.js` - these will be replaced by C++ calls.
 
-- [ ] 8a: Remove JS sync implementation
+- [x] 8a: Remove JS sync implementation
   - Delete or deprecate `webrtc-manager.js`, `signaling-client.js`, `collab-manager.js`
   - Keep `presence.js` UI rendering, but source data from C++
 
-- [ ] 8b: Update worker.js to forward sync to C++ engine
+- [x] 8b: Update worker.js to forward sync to C++ engine
   - Forward enableSync/disableSync to WASM
   - Relay sync state changes to main thread
 
-- [ ] 8c: Update client.js with thin sync wrapper
+- [x] 8c: Update client.js with thin sync wrapper
   - `enableSync(url)`, `disableSync()`
   - `onSyncStateChanged(callback)`
   - `onPeersChanged(callback)`

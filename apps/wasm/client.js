@@ -733,6 +733,142 @@ class CellsClient {
         const response = await this._send('startCollaboration');
         return response.result;
     }
+
+    // ========================================================================
+    // C++ SyncClient API (P2P WebRTC sync)
+    // ========================================================================
+
+    /**
+     * Enable sync - connects to signaling server and joins a room via C++ SyncClient.
+     * This uses the full C++ implementation for WebRTC P2P sync.
+     * @param {string} url - WebSocket URL for signaling server (e.g., "wss://server.example.com/ws")
+     * @param {string} roomId - Document/room ID to join
+     * @param {string} [peerId] - Local peer ID (generated if empty)
+     * @returns {Promise<{success: boolean, peerId: string}>}
+     */
+    async enableSync(url, roomId, peerId = '') {
+        const response = await this._send('enableSync', { url, roomId, peerId });
+        return JSON.parse(response.result);
+    }
+
+    /**
+     * Disable sync - disconnects from peers and signaling server.
+     * @returns {Promise<void>}
+     */
+    async disableSync() {
+        await this._send('disableSync');
+    }
+
+    /**
+     * Get current sync state.
+     * @returns {Promise<{state: string, peerId: string, roomId: string, peerCount: number, peers: Array}>}
+     */
+    async getSyncState() {
+        const response = await this._send('getSyncState');
+        return JSON.parse(response.result);
+    }
+
+    /**
+     * Check if sync is currently enabled/connected.
+     * @returns {Promise<boolean>}
+     */
+    async isSyncEnabled() {
+        const response = await this._send('isSyncEnabled');
+        return response.enabled;
+    }
+
+    /**
+     * Process outgoing sync messages - call periodically (e.g., in requestAnimationFrame).
+     * @returns {Promise<void>}
+     */
+    async processSyncOutgoing() {
+        await this._send('processSyncOutgoing');
+    }
+
+    /**
+     * Process pending presence updates - call periodically.
+     * @returns {Promise<void>}
+     */
+    async processSyncPresence() {
+        await this._send('processSyncPresence');
+    }
+
+    /**
+     * Broadcast local operations to peers - call after local edits.
+     * @returns {Promise<void>}
+     */
+    async broadcastSyncOperations() {
+        await this._send('broadcastSyncOperations');
+    }
+
+    // ========================================================================
+    // C++ SyncClient Presence API
+    // ========================================================================
+
+    /**
+     * Set local user's display name (shown to other peers).
+     * @param {string} name - Display name
+     * @returns {Promise<void>}
+     */
+    async setSyncLocalName(name) {
+        await this._send('setSyncLocalName', { name });
+    }
+
+    /**
+     * Set current sheet (for multi-sheet presence tracking).
+     * @param {string} sheetId - Sheet ID
+     * @returns {Promise<void>}
+     */
+    async setSyncCurrentSheet(sheetId) {
+        await this._send('setSyncCurrentSheet', { sheetId });
+    }
+
+    /**
+     * Set cursor position (cell the user is editing).
+     * @param {string} colId - Column ID
+     * @param {string} rowId - Row ID
+     * @returns {Promise<void>}
+     */
+    async setSyncCursor(colId, rowId) {
+        await this._send('setSyncCursor', { colId, rowId });
+    }
+
+    /**
+     * Clear cursor position.
+     * @returns {Promise<void>}
+     */
+    async clearSyncCursor() {
+        await this._send('clearSyncCursor');
+    }
+
+    /**
+     * Set selection range.
+     * @param {string} startCol - Start column ID
+     * @param {string} startRow - Start row ID
+     * @param {string} endCol - End column ID
+     * @param {string} endRow - End row ID
+     * @returns {Promise<void>}
+     */
+    async setSyncSelection(startCol, startRow, endCol, endRow) {
+        await this._send('setSyncSelection', { startCol, startRow, endCol, endRow });
+    }
+
+    /**
+     * Clear selection.
+     * @returns {Promise<void>}
+     */
+    async clearSyncSelection() {
+        await this._send('clearSyncSelection');
+    }
+
+    /**
+     * Get remote peers' presence data.
+     * @returns {Promise<{peers: Object}>} Map of peerId -> PresenceData
+     */
+    async getRemotePresences() {
+        const response = await this._send('getRemotePresences');
+        return JSON.parse(response.result);
+    }
 }
 
 // Export for both browser and module environments
