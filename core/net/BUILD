@@ -158,7 +158,43 @@ cc_library(
     ],
 )
 
+# Signaling protocol message builders/parsers
+cc_library(
+    name = "signaling_protocol",
+    srcs = ["common/SignalingProtocol.cc"],
+    hdrs = ["include/SignalingProtocol.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":rtc_peer_connection",
+    ],
+)
+
+# Signaling client for WebRTC connection setup
+cc_library(
+    name = "signaling_client",
+    srcs = ["common/SignalingClient.cc"],
+    hdrs = ["include/SignalingClient.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":connection",
+        ":rtc_peer_connection",
+        ":signaling_protocol",
+        ":ws_connection",
+    ],
+)
+
+cc_test(
+    name = "signaling_test",
+    srcs = ["signaling_test.cc"],
+    deps = [
+        ":signaling_client",
+        ":signaling_protocol",
+        "@googletest//:gtest_main",
+    ],
+)
+
 # TODO: Add libraries as they are implemented:
-# - SignalingClient: WebRTC signaling protocol
 # - SyncClient: Sync protocol over DataChannel
 # - Presence: Cursor/selection presence

@@ -1,7 +1,9 @@
 // Default (stub) WebSocket implementation
-// Used for platforms without native WebSocket support (e.g., testing on Linux)
+// Used for platforms without native WebSocket support
+// Note: Apple has a native implementation but it requires objc_library, so for now
+// we fall back to stub on macOS as well when building with cc_library
 
-#if !defined(__EMSCRIPTEN__) && !defined(__APPLE__)
+#if !defined(__EMSCRIPTEN__)
 
 #include "core/net/include/WSConnection.h"
 
@@ -30,10 +32,10 @@ protected:
 // Factory implementation for unsupported platforms
 std::unique_ptr<WSConnection> WSConnection::make(const std::string& scheme, const std::string& host,
                                                  uint16_t port, const std::string& path) {
-    bool secure = (scheme == "wss" || scheme == "https");
+    const bool secure = (scheme == "wss" || scheme == "https");
     return std::make_unique<DefaultWSConnection>(host, port, path, secure);
 }
 
 }  // namespace cells::net
 
-#endif  // !__EMSCRIPTEN__ && !__APPLE__
+#endif  // !__EMSCRIPTEN__

@@ -149,22 +149,22 @@ Connect to existing Go server for WebRTC signaling (offer/answer/ICE exchange).
 
 **Reference existing JS:** Study `signaling-client.js` to ensure wire-compatibility.
 
-- [ ] 5a: Create `SignalingClient.h` in `core/net/include/`
+- [x] 5a: Create `SignalingClient.h` in `core/net/include/`
   - `connect(serverUrl)`, `disconnect()`
   - `joinRoom(roomId)`, `leaveRoom()`
   - `sendOffer(peerId, sdp)`, `sendAnswer(peerId, sdp)`, `sendIceCandidate(peerId, candidate)`
   - SignalingDelegate: `onPeerJoined()`, `onPeerLeft()`, `onOffer()`, `onAnswer()`, `onIceCandidate()`
 
-- [ ] 5b: Create `SignalingClient.cc` implementation in `core/net/common/`
+- [x] 5b: Create `SignalingClient.cc` implementation in `core/net/common/`
   - Uses WSConnection for server communication
   - JSON message protocol matching existing JS
   - Reconnection logic with exponential backoff
 
-- [ ] 5c: Define signaling message protocol in `core/net/include/SignalingProtocol.h`
+- [x] 5c: Define signaling message protocol in `core/net/include/SignalingProtocol.h`
   - Message types: JOIN, LEAVE, OFFER, ANSWER, ICE_CANDIDATE, PEER_JOINED, PEER_LEFT
   - JSON serialization helpers
 
-- [ ] 5d: Add signaling tests in `core/net/signaling_test.cc`
+- [x] 5d: Add signaling tests in `core/net/signaling_test.cc`
   - Mock WSConnection for unit testing
   - Test join/leave flow, offer/answer exchange
 

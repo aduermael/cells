@@ -136,14 +136,18 @@ const char* sdpTypeToString(SDPType type) {
 }
 
 SDPType sdpTypeFromString(const std::string& type) {
-    if (type == "offer")
+    if (type == "offer") {
         return SDPType::OFFER;
-    if (type == "pranswer")
+    }
+    if (type == "pranswer") {
         return SDPType::PRANSWER;
-    if (type == "answer")
+    }
+    if (type == "answer") {
         return SDPType::ANSWER;
-    if (type == "rollback")
+    }
+    if (type == "rollback") {
         return SDPType::ROLLBACK;
+    }
     return SDPType::OFFER;  // Default
 }
 
