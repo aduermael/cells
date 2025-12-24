@@ -377,7 +377,7 @@ HandleMessageResult SyncManager::handleSyncResponse(const ID& peerId, const std:
     }
 
     // Return operations for delegate notification
-    return HandleMessageResult({}, std::move(ops), dataModified);
+    return {{}, std::move(ops), dataModified};
 }
 
 // Handle operations batch from peer
@@ -405,7 +405,7 @@ HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::s
     }
 
     // Return operations for delegate notification
-    return HandleMessageResult({}, std::move(ops), dataModified);
+    return {{}, std::move(ops), dataModified};
 }
 
 std::string SyncManager::makeHelloMessage() const {
