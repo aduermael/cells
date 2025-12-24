@@ -598,6 +598,20 @@ The MacCatalyst slice appears to have all headers. Options:
   - Peer detection works (sees peers joining/leaving)
   - All tests pass (`make lint`, `make format`, `make test`)
 
+- [x] 14g: Bug fixes discovered during testing
+  - **Reentrancy bug in `removePeer()`**: Closing connection triggered callbacks
+    that called `removePeer()` again → segfault. Fixed by moving peer from map
+    before closing, and clearing delegates first.
+  - **Deadlock in `createOffer()`/`createAnswer()`**: Mutex held while calling
+    libdatachannel, which synchronously calls `onLocalDescription`, which tried
+    to take the same mutex. Fixed by releasing lock before calling libdatachannel.
+  - **libdatachannel auto-generates SDP**: When `createDataChannel()` is called,
+    libdatachannel auto-generates an offer via `onLocalDescription`. When
+    `setRemoteDescription(offer)` is called, it auto-generates an answer.
+    Fixed by checking for pre-existing SDP in `createOffer()`/`createAnswer()`.
+  - Full sync verified: hello/sync-request/sync-response exchange works,
+    operations flow bidirectionally, data channels open properly.
+
 **References:**
 - libdatachannel docs: https://github.com/paullouisageneau/libdatachannel/blob/master/DOC.md
 - libdatachannel API: `include/rtc/peerconnection.hpp`, `include/rtc/datachannel.hpp`
