@@ -12,6 +12,32 @@ import type {
 } from "./types";
 
 // ============================================================================
+// Re-exports for index.html inline script
+// ============================================================================
+export {
+  GridRenderer,
+  HEADER_HEIGHT,
+  HEADER_WIDTH,
+  DEFAULT_COL_WIDTH,
+  DEFAULT_ROW_HEIGHT,
+  COLORS,
+} from "./grid-renderer";
+export {
+  detectFormat,
+  getBaseName,
+  downloadBlob,
+  getMimeType,
+} from "./utils";
+export { createUIStateMachine, UIState, UIEvent } from "./ui-state";
+export { CollabUI } from "./collab-ui";
+export {
+  clearRoomIdFromUrl,
+  getRoomIdFromUrl,
+  RoomManager,
+} from "./room-url";
+export { CppSyncAdapter } from "./cpp-sync-adapter";
+
+// ============================================================================
 // Worker Message Types
 // ============================================================================
 
