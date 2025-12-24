@@ -517,7 +517,8 @@ Enable the CLI sync command to work on native macOS using the existing Apple imp
 | 10 | Documentation | Updated docs |
 | 11 | CLI Sync Observer | `apps/cli/main.cc` sync subcommand |
 | 12 | JavaScript Cleanup | Delete old JS sync, wire C++ sync |
-| 13 | Native macOS Support | `rules_apple`, `objc_library`, WebRTC framework |
+| 13 | Native macOS Support | `rules_apple`, `objc_library`, HTTP/WS Apple impls |
+| 14 | WebRTC on macOS | libdatachannel, RTCPeerConnection/DataChannel |
 
 **Dependencies:**
 - Phase 2-3 can be done in parallel
@@ -532,6 +533,83 @@ Enable the CLI sync command to work on native macOS using the existing Apple imp
 - Phase 11 depends on Phase 6 (needs sync protocol), can skip Phase 6.5-8
 - Phase 12 depends on Phase 7 (C++ sync must work), completes Phase 8
 - Phase 13 depends on Phase 11 (CLI must exist), uses existing Apple code from Phase 2-4
+- Phase 14 depends on Phase 13 (need Apple build infrastructure), implements WebRTC
+
+## Phase 14: WebRTC on macOS
+
+Enable full P2P sync on native macOS by implementing WebRTC using the stasel/WebRTC framework.
+
+**Current blocker:** The stasel/WebRTC M141 XCFramework has incomplete headers in the macOS slice.
+The MacCatalyst slice appears to have all headers. Options:
+1. Use MacCatalyst headers with macOS build
+2. Build WebRTC from source for macOS (complex, but gives full control)
+3. Wait for stasel to fix macOS framework
+4. Use a different WebRTC source (libdatachannel is C++, lighter weight)
+
+**Chosen approach:** Use [libdatachannel](https://github.com/paullouisageneau/libdatachannel) - a lightweight C++ WebRTC library that only implements Data Channels (no media), which is exactly what we need.
+
+- [x] 14a: Evaluate libdatachannel vs stasel/WebRTC
+  - **libdatachannel** (v0.24.0, Nov 2024): C++17, MPL 2.0 license ✓
+    - Supports: DataChannel, ICE, STUN/TURN, DTLS, SCTP
+    - Does NOT support: Audio/Video (we don't need it)
+    - Cross-platform: macOS, iOS, Linux, Windows + WASM (datachannel-wasm)
+    - Dependencies: OpenSSL (or mbedTLS/GnuTLS), libjuice (ICE), usrsctp (SCTP)
+    - Same API for native + WASM builds ✓
+    - NOT in Bazel Central Registry - need rules_foreign_cc (cmake_external)
+    - Actively maintained, tracks WebRTC standards
+  - **stasel/WebRTC** (M141): Full Google WebRTC, ~50MB XCFramework
+    - macOS slice has incomplete headers (blocker)
+    - Includes audio/video we don't need
+    - Obj-C++ API requires bridging to C++
+  - **Decision**: Use libdatachannel - purpose-built for Data Channels, smaller, pure C++
+
+- [ ] 14b: Add libdatachannel to MODULE.bazel
+  - Either as http_archive or git_repository
+  - May need cmake_external or manual BUILD file
+  - Dependencies: OpenSSL (or mbedTLS), libjuice, libsrtp
+
+- [ ] 14c: Create `core/net/apple/RTCPeerConnection_apple.mm` (or pure C++)
+  - Wrap libdatachannel::PeerConnection
+  - Implement RTCPeerConnection interface
+  - Handle ICE candidate gathering
+  - Create/accept offers and answers
+
+- [ ] 14d: Create `core/net/apple/RTCDataChannel_apple.mm` (or pure C++)
+  - Wrap libdatachannel::DataChannel
+  - Implement RTCDataChannel interface
+  - Handle open/close/message events
+  - Binary and text message support
+
+- [ ] 14e: Update `core/net/BUILD` to use new implementations on macOS
+  - Change select() for rtc_peer_connection on macOS/iOS
+  - Change select() for rtc_data_channel on macOS/iOS
+  - May be able to use same implementation for all native platforms (not just Apple)
+
+- [ ] 14f: Test CLI sync end-to-end
+  - `cells sync "https://cells-app.fly.dev/?room=test"` should work
+  - Should connect to web clients via WebRTC
+  - Operations should flow both directions
+
+**Alternative: stasel/WebRTC with MacCatalyst headers**
+
+If libdatachannel proves difficult, we can try using the MacCatalyst slice headers:
+
+- [ ] 14a-alt: Extract headers from MacCatalyst slice
+  - MacCatalyst slice has complete WebRTC.framework/Headers/*
+  - Copy headers to a shared location
+  - Build macOS binary linking against macOS slice but using MacCatalyst headers
+
+- [ ] 14b-alt: Create objc_library for WebRTC on macOS
+  - `rtc_peer_connection_apple` using WebRTC.framework
+  - `rtc_data_channel_apple` using RTCDataChannel from framework
+  - Both use Objective-C++ to bridge WebRTC Obj-C API to C++
+
+**References:**
+- libdatachannel: https://github.com/paullouisageneau/libdatachannel
+- stasel/WebRTC: https://github.com/stasel/WebRTC
+- WebRTC native development: https://webrtc.github.io/webrtc-org/native-code/
+
+---
 
 **Out of Scope (for now):**
 - Android support (can add later with JNI)
