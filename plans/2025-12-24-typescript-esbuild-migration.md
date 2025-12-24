@@ -50,7 +50,7 @@ Convert all JavaScript files in `apps/wasm/` to TypeScript with proper type defi
 
 ## Phase 4: Convert UI modules
 - [x] 4a: Convert `ui-state.js` to `src/ui-state.ts`
-- [ ] 4b: Convert `grid-renderer.js` to `src/grid-renderer.ts`
+- [x] 4b: Convert `grid-renderer.js` to `src/grid-renderer.ts`
 - [ ] 4c: Convert `grid-events.js` to `src/grid-events.ts`
 
 ## Phase 5: Convert collaboration modules
