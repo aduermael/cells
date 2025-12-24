@@ -1,3 +1,9 @@
+# Config setting for macOS platform detection
+config_setting(
+    name = "is_macos",
+    constraint_values = ["@platforms//os:macos"],
+)
+
 cc_binary(
     name = "cells",
     srcs = [
@@ -8,6 +14,14 @@ cc_binary(
         "sync_command.cc",
         "sync_command.h",
     ],
+    # Link CoreFoundation on macOS for CFRunLoop in sync_command
+    linkopts = select({
+        ":is_macos": [
+            "-framework",
+            "CoreFoundation",
+        ],
+        "//conditions:default": [],
+    }),
     deps = [
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
@@ -31,7 +45,7 @@ cc_test(
         "converter_test.cc",
         "options.h",
     ],
-    data = ["//core/testdata/xlsx:sample_xlsx_files"],
+    data = ["//testdata/xlsx:sample_xlsx_files"],
     deps = [
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",

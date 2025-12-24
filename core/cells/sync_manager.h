@@ -37,12 +37,15 @@ struct OutgoingMessage {
 
 // Result of handling a peer message
 struct HandleMessageResult {
-    std::vector<OutgoingMessage> messages;  // Response messages to send
-    bool dataModified{false};               // True if cell/structure data changed
+    std::vector<OutgoingMessage> messages;      // Response messages to send
+    std::vector<Operation> receivedOperations;  // Operations received from peer
+    bool dataModified{false};                   // True if cell/structure data changed
 
     HandleMessageResult() = default;
     explicit HandleMessageResult(std::vector<OutgoingMessage> msgs, bool data = false)
         : messages(std::move(msgs)), dataModified(data) {}
+    HandleMessageResult(std::vector<OutgoingMessage> msgs, std::vector<Operation> ops, bool data)
+        : messages(std::move(msgs)), receivedOperations(std::move(ops)), dataModified(data) {}
 };
 
 // SyncManager handles CRDT synchronization with peers.

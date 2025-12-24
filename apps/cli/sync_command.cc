@@ -56,6 +56,16 @@ bool write_file(const std::string& path, const std::string& content) {
     return file.good();
 }
 
+// Helper to format operation payload for display
+std::string formatPayload(const std::string& payload) {
+    // If payload is short, show it inline
+    if (payload.length() <= 40) {
+        return payload;
+    }
+    // Truncate long payloads
+    return payload.substr(0, 37) + "...";
+}
+
 // SyncClientDelegate that logs operations to stdout
 class SyncLogger : public net::SyncClientDelegate {
 public:
@@ -63,14 +73,14 @@ public:
 
     void syncClientStateDidChange(net::SyncClient& client, net::SyncClientState state) override {
         (void)client;
-        if (!opts_.quiet) {
+        if (!opts_.quiet && !opts_.ops_only) {
             std::cerr << statePrefix(state) << net::syncClientStateToString(state) << "\n";
         }
     }
 
     void syncClientPeerDidChange(net::SyncClient& client, const net::PeerInfo& peer) override {
         (void)client;
-        if (!opts_.quiet) {
+        if (!opts_.quiet && !opts_.ops_only) {
             std::cerr << "Peer " << peer.id;
             if (peer.is_connected) {
                 std::cerr << " connected";
@@ -86,20 +96,14 @@ public:
     void syncClientPeerDidDisconnect(net::SyncClient& client,
                                      const std::string& peer_id) override {
         (void)client;
-        if (!opts_.quiet) {
+        if (!opts_.quiet && !opts_.ops_only) {
             std::cerr << "Peer left: " << peer_id << "\n";
         }
     }
 
     void syncClientDataDidChange(net::SyncClient& client) override {
         (void)client;
-        ops_received_++;
-
-        // In a real implementation, we'd iterate the OpLog to find new operations
-        // For now, just note that data changed
-        if (opts_.verbose) {
-            std::cerr << "Data changed (operations received: " << ops_received_ << ")\n";
-        }
+        // Data change notification (operations are logged separately)
     }
 
     void syncClientDidError(net::SyncClient& client, const std::string& error) override {
@@ -110,16 +114,37 @@ public:
     void syncClientPresenceDidUpdate(net::SyncClient& client, const std::string& peer_id,
                                      const net::PresenceData& presence) override {
         (void)client;
-        if (opts_.verbose) {
+        if (opts_.verbose && !opts_.ops_only) {
             std::cerr << "Presence update from " << peer_id << ": "
                       << (presence.name.empty() ? "(anonymous)" : presence.name) << "\n";
         }
     }
 
+    void syncClientDidReceiveOperations(net::SyncClient& client, const std::string& peer_id,
+                                        const std::vector<Operation>& operations) override {
+        (void)client;
+        ops_received_ += operations.size();
+
+        // Format and print each operation
+        for (const auto& op : operations) {
+            std::cout << "\033[1m" << opTypeToString(op.type) << "\033[0m\n";
+            std::cout << "  ├─ hlc: " << op.hlc.toString() << "\n";
+            std::cout << "  ├─ target: " << op.target_id.toString() << "\n";
+            std::cout << "  ├─ from: " << peer_id << "\n";
+            if (!op.payload.empty()) {
+                std::cout << "  └─ payload: " << formatPayload(op.payload) << "\n";
+            } else {
+                std::cout << "  └─ payload: (none)\n";
+            }
+        }
+    }
+
     void printSummary() const {
-        std::cerr << "\nSummary:\n";
-        std::cerr << "  Peers seen: " << peers_seen_ << "\n";
-        std::cerr << "  Operations received: " << ops_received_ << "\n";
+        if (!opts_.ops_only) {
+            std::cerr << "\nSummary:\n";
+            std::cerr << "  Peers seen: " << peers_seen_ << "\n";
+            std::cerr << "  Operations received: " << ops_received_ << "\n";
+        }
     }
 
 private:

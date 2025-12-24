@@ -10,12 +10,13 @@ namespace cells::cli {
 
 // Options for the sync command
 struct SyncOptions {
-    std::string url;           // URL to sync with (http:// or https://)
-    std::string workbook_file; // Optional: workbook file for --apply or --send
-    bool apply = false;        // Apply incoming operations to workbook
-    bool send = false;         // Broadcast workbook cells as operations
-    bool quiet = false;        // Suppress status messages
-    bool verbose = false;      // Verbose output
+    std::string url;            // URL to sync with (http:// or https://)
+    std::string workbook_file;  // Optional: workbook file for --apply or --send
+    bool apply = false;         // Apply incoming operations to workbook
+    bool send = false;          // Broadcast workbook cells as operations
+    bool quiet = false;         // Suppress status messages
+    bool verbose = false;       // Verbose output
+    bool ops_only = false;      // Only show operations (hide other messages)
 };
 
 // Run the sync command

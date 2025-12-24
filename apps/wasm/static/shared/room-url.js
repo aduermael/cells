@@ -30,21 +30,23 @@ export function isValidRoomId(roomId) {
 
 /**
  * Update URL with room ID without page reload
+ * Uses pushState to enable browser back/forward navigation
  * @param {string} roomId - Room ID to add to URL
  */
 export function setRoomIdInUrl(roomId) {
     const url = new URL(window.location.href);
     url.searchParams.set('room', roomId);
-    window.history.replaceState({}, '', url.toString());
+    window.history.pushState({ roomId }, '', url.toString());
 }
 
 /**
  * Remove room ID from URL without page reload
+ * Uses pushState to enable browser back/forward navigation
  */
 export function clearRoomIdFromUrl() {
     const url = new URL(window.location.href);
     url.searchParams.delete('room');
-    window.history.replaceState({}, '', url.toString());
+    window.history.pushState({}, '', url.toString());
 }
 
 /**

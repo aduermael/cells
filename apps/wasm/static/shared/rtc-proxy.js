@@ -34,10 +34,6 @@ export class RTCProxy {
      * @param {object} payload - Message payload
      */
     handleMessage(type, payload) {
-        // Only log non-frequent messages (skip high-frequency dc_send/dc_on_message for presence)
-        if (type !== 'dc_send' && type !== 'dc_on_message') {
-            console.log('[RTCProxy]', type, payload);
-        }
         switch (type) {
             case 'rtc_create':
                 return this._createPeerConnection(payload);
@@ -428,10 +424,6 @@ export class RTCProxy {
     // ========================================================================
 
     _send(type, payload) {
-        // Only log non-frequent messages (skip high-frequency dc_on_message for presence)
-        if (type !== 'dc_on_message') {
-            console.log('[RTCProxy] -> worker:', type, payload);
-        }
         if (this._sendToWorker) {
             this._sendToWorker(type, payload);
         }

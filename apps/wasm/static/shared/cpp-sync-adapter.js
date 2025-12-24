@@ -450,6 +450,7 @@ export class CppSyncAdapter {
                         end: { col: presence.selection.endCol, row: presence.selection.endRow }
                     } : null,
                     mouse: presence.mouse || null,
+                    editing: presence.editing || null,  // Ephemeral editing text
                     timestamp: Date.now()
                 };
 
@@ -596,6 +597,23 @@ export class CppSyncAdapter {
      */
     async clearMousePosition() {
         await this._client.clearSyncMousePosition();
+    }
+
+    /**
+     * Set editing state (ephemeral, shows what user is typing)
+     * @param {number} col - Column of cell being edited
+     * @param {number} row - Row of cell being edited
+     * @param {string} text - Current text being typed
+     */
+    async setEditing(col, row, text) {
+        await this._client.setSyncEditing(col, row, text);
+    }
+
+    /**
+     * Clear editing state
+     */
+    async clearEditing() {
+        await this._client.clearSyncEditing();
     }
 
     /**

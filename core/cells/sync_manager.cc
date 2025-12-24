@@ -358,7 +358,7 @@ HandleMessageResult SyncManager::handleSyncRequest(const ID& peerId, const std::
 // DATA MODIFIED if operations applied successfully
 HandleMessageResult SyncManager::handleSyncResponse(const ID& peerId, const std::string& json) {
     // Parse: {"type":"sync-response","operations":[...],"complete":true}
-    const std::vector<Operation> ops = extractJSONOperations(json, "operations");
+    std::vector<Operation> ops = extractJSONOperations(json, "operations");
 
     bool dataModified = false;
 
@@ -376,15 +376,15 @@ HandleMessageResult SyncManager::handleSyncResponse(const ID& peerId, const std:
         it->second.isSynced = true;
     }
 
-    // No response messages, but report if data was modified
-    return HandleMessageResult({}, dataModified);
+    // Return operations for delegate notification
+    return HandleMessageResult({}, std::move(ops), dataModified);
 }
 
 // Handle operations batch from peer
 // DATA MODIFIED if operations applied successfully
 HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::string& json) {
     // Parse: {"type":"operations","batch":[...]}
-    const std::vector<Operation> ops = extractJSONOperations(json, "batch");
+    std::vector<Operation> ops = extractJSONOperations(json, "batch");
 
     bool dataModified = false;
 
@@ -404,8 +404,8 @@ HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::s
         }
     }
 
-    // No response messages, but report if data was modified
-    return HandleMessageResult({}, dataModified);
+    // Return operations for delegate notification
+    return HandleMessageResult({}, std::move(ops), dataModified);
 }
 
 std::string SyncManager::makeHelloMessage() const {

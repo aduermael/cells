@@ -138,13 +138,10 @@ public:
         {
             std::lock_guard<std::mutex> lock(mutex_);
             if (local_description_.type == SDPType::OFFER && !local_description_.sdp.empty()) {
-                printf("[RTC] createOffer: using auto-generated offer\n");
                 callback(true, local_description_, "");
                 return;
             }
         }
-
-        printf("[RTC] createOffer: no auto-offer available, generating...\n");
 
         // Store callback before calling libdatachannel (callback may fire synchronously)
         // Don't hold lock while calling into libdatachannel to avoid deadlock
@@ -179,14 +176,10 @@ public:
         {
             std::lock_guard<std::mutex> lock(mutex_);
             if (local_description_.type == SDPType::ANSWER && !local_description_.sdp.empty()) {
-                printf("[RTC] createAnswer: using auto-generated answer\n");
                 callback(true, local_description_, "");
                 return;
             }
         }
-
-        printf("[RTC] createAnswer: signalingState=%d, no auto-answer available\n",
-               static_cast<int>(pc_->signalingState()));
 
         // Store callback before calling libdatachannel (callback may fire synchronously)
         // Don't hold lock while calling into libdatachannel to avoid deadlock
@@ -199,7 +192,6 @@ public:
         try {
             pc_->setLocalDescription(rtc::Description::Type::Answer);
         } catch (const std::exception& e) {
-            printf("[RTC] createAnswer exception: %s\n", e.what());
             std::lock_guard<std::mutex> lock(mutex_);
             auto cb = std::move(pending_create_callback_);
             pending_create_callback_ = nullptr;
@@ -247,21 +239,12 @@ public:
                     type = rtc::Description::Type::Unspec;
             }
 
-            printf("[RTC] setRemoteDescription: type=%d, signalingState before=%d\n",
-                   static_cast<int>(type), static_cast<int>(pc_->signalingState()));
-            printf("[RTC] SDP content (first 200 chars): %.200s\n", sdp.sdp.c_str());
-
             rtc::Description desc(sdp.sdp, type);
-            printf("[RTC] Created Description, calling setRemoteDescription...\n");
             pc_->setRemoteDescription(desc);
-
-            printf("[RTC] setRemoteDescription: signalingState after=%d\n",
-                   static_cast<int>(pc_->signalingState()));
 
             remote_description_ = sdp;
             callback(true, "");
         } catch (const std::exception& e) {
-            printf("[RTC] setRemoteDescription exception: %s\n", e.what());
             callback(false, e.what());
         }
     }
@@ -381,9 +364,6 @@ private:
         });
 
         pc_->onLocalDescription([this](rtc::Description desc) {
-            printf("[RTC] onLocalDescription callback fired, type=%d\n",
-                   static_cast<int>(desc.type()));
-
             std::lock_guard<std::mutex> lock(mutex_);
 
             SDPType type;
@@ -405,8 +385,6 @@ private:
             }
 
             local_description_ = SessionDescription(type, std::string(desc));
-            printf("[RTC] Local description generated, has_callback=%d\n",
-                   pending_create_callback_ != nullptr);
 
             if (pending_create_callback_) {
                 auto callback = std::move(pending_create_callback_);

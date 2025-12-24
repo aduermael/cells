@@ -90,10 +90,6 @@ class CellsClient {
 
         // Handle RTC messages from worker - forward to main thread RTC proxy
         if (msg.type && (msg.type.startsWith('rtc_') || msg.type.startsWith('dc_'))) {
-            // Only log non-frequent messages (skip high-frequency dc_send for presence)
-            if (msg.type !== 'dc_send') {
-                console.log('[CellsClient] RTC message from worker:', msg.type, msg);
-            }
             if (!this._rtcProxy) {
                 console.warn('RTCProxy not yet initialized, message dropped:', msg.type);
                 return;
@@ -921,6 +917,25 @@ class CellsClient {
      */
     async clearSyncMousePosition() {
         await this._send('clearSyncMousePosition');
+    }
+
+    /**
+     * Set editing state (ephemeral, shows what user is typing).
+     * @param {number} col - Column of cell being edited
+     * @param {number} row - Row of cell being edited
+     * @param {string} text - Current text being typed
+     * @returns {Promise<void>}
+     */
+    async setSyncEditing(col, row, text) {
+        await this._send('setSyncEditing', { col, row, text });
+    }
+
+    /**
+     * Clear editing state.
+     * @returns {Promise<void>}
+     */
+    async clearSyncEditing() {
+        await this._send('clearSyncEditing');
     }
 
     /**

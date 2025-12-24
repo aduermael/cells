@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+#include "core/cells/operation.h"
 #include "core/net/include/ICEConfig.h"
 #include "core/net/include/Presence.h"
 #include "core/net/include/RTCDataChannel.h"
@@ -91,6 +92,14 @@ public:
     virtual void syncClientPresenceDidRemove(SyncClient& client, const std::string& peer_id) {
         (void)client;
         (void)peer_id;
+    }
+
+    // Optional: Operations received from a peer
+    virtual void syncClientDidReceiveOperations(SyncClient& client, const std::string& peer_id,
+                                                const std::vector<Operation>& operations) {
+        (void)client;
+        (void)peer_id;
+        (void)operations;
     }
 };
 
@@ -212,9 +221,11 @@ public:
     void setCursor(int32_t col, int32_t row);
     void setSelection(const CursorPosition& start, const CursorPosition& end);
     void setMousePosition(double x, double y);
+    void setEditing(int32_t col, int32_t row, const std::string& text);
     void clearCursor();
     void clearSelection();
     void clearMousePosition();
+    void clearEditing();
 
     // Get remote presence info
     [[nodiscard]] std::map<std::string, PresenceData> getRemotePeers() const;

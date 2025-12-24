@@ -35,16 +35,10 @@ EM_JS(void, cells_rtc_init, (), {
         const msg = e.data;
         if (!msg || !msg.type) return;
 
-        // Debug: Log RTC messages received by worker
-        if (msg.type && msg.type.startsWith('rtc_on_')) {
-            console.log('[Worker RTC] Received:', msg.type, msg);
-        }
-
         // Handle RTC callbacks from main thread
         // Note: Functions starting with _ in C are exported with double underscore
         switch (msg.type) {
             case 'rtc_on_create_sdp': {
-                console.log('[Worker RTC] Processing rtc_on_create_sdp, registryId:', msg.registryId, 'success:', msg.success);
                 if (msg.success) {
                     Module.__cells_rtc_on_create_sdp(msg.registryId, 1,
                         Module.stringToUTF8OnStack(msg.sdp || ""), 0);
@@ -52,7 +46,6 @@ EM_JS(void, cells_rtc_init, (), {
                     Module.__cells_rtc_on_create_sdp(msg.registryId, 0, 0,
                         Module.stringToUTF8OnStack(msg.error || 'Unknown error'));
                 }
-                console.log('[Worker RTC] Done processing rtc_on_create_sdp');
                 break;
             }
             case 'rtc_on_set_sdp': {
@@ -304,17 +297,13 @@ public:
 
     // Callbacks from JS
     void jsOnCreateSDP(bool success, const char* sdp, const char* error) {
-        printf("[RTC C++] jsOnCreateSDP called: success=%d, has_callback=%d\n",
-               success, pending_create_callback_ ? 1 : 0);
         if (pending_create_callback_) {
             auto callback = std::move(pending_create_callback_);
-            printf("[RTC C++] Invoking create callback\n");
             if (success) {
                 callback(true, SessionDescription(pending_sdp_type_, sdp ? sdp : ""), "");
             } else {
                 callback(false, SessionDescription(), error ? error : "Unknown error");
             }
-            printf("[RTC C++] Create callback complete\n");
         }
     }
 
@@ -438,14 +427,10 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE
 void _cells_rtc_on_create_sdp(int registry_id, int success, const char* sdp, const char* error) {
-    printf("[RTC C++] _cells_rtc_on_create_sdp: registry_id=%d, success=%d\n", registry_id, success);
     std::lock_guard<std::mutex> lock(g_pc_mutex);
     auto it = g_pc_registry.find(registry_id);
     if (it != g_pc_registry.end()) {
-        printf("[RTC C++] Found PeerConnection in registry, calling jsOnCreateSDP\n");
         it->second->jsOnCreateSDP(success != 0, sdp, error);
-    } else {
-        printf("[RTC C++] ERROR: PeerConnection %d not found in registry!\n", registry_id);
     }
 }
 

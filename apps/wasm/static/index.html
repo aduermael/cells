@@ -377,6 +377,29 @@
             }
         }
 
+        /**
+         * Handle browser back/forward navigation for room reconnection
+         */
+        window.addEventListener('popstate', async () => {
+            const roomIdFromUrl = getRoomIdFromUrl();
+            const currentRoomId = roomManager?.currentRoomId;
+
+            if (roomIdFromUrl && roomIdFromUrl !== currentRoomId && hasFileLoaded) {
+                // URL has a room ID that we're not currently in - rejoin
+                console.log('Popstate: rejoining room from URL:', roomIdFromUrl);
+                try {
+                    await initializeCollaboration(wasmClient);
+                    await roomManager.joinRoom(roomIdFromUrl);
+                } catch (err) {
+                    console.error('Failed to rejoin room from popstate:', err);
+                }
+            } else if (!roomIdFromUrl && currentRoomId) {
+                // URL no longer has room ID but we're in a room - leave
+                console.log('Popstate: leaving room (no room in URL)');
+                roomManager.leaveRoom();
+            }
+        });
+
         // ========================================================================
         // State Machine Helpers
         // ========================================================================
@@ -609,35 +632,54 @@
             }
         }
 
-        // Mouse position broadcast throttling (200ms)
+        // Mouse position broadcast throttling (200ms) with trailing edge
         let lastMouseBroadcastTime = 0;
-        let pendingMouseX = null;
-        let pendingMouseY = null;
+        let lastSentMouseX = null;
+        let lastSentMouseY = null;
+        let pendingMouseTimer = null;
         const MOUSE_BROADCAST_INTERVAL = 200; // ms
 
-        // Broadcast mouse position (throttled)
+        // Broadcast mouse position (throttled with trailing edge to capture final position)
         function broadcastMousePosition(x, y) {
             if (!syncAdapter || !collaborationInitialized) return;
 
+            // Skip if position hasn't changed from last sent
+            if (x === lastSentMouseX && y === lastSentMouseY) return;
+
             const now = Date.now();
-            pendingMouseX = x;
-            pendingMouseY = y;
+
+            // Clear any pending trailing timer
+            if (pendingMouseTimer) {
+                clearTimeout(pendingMouseTimer);
+                pendingMouseTimer = null;
+            }
 
             if (now - lastMouseBroadcastTime >= MOUSE_BROADCAST_INTERVAL) {
+                // Enough time passed - send immediately
                 syncAdapter.setMousePosition(x, y);
                 lastMouseBroadcastTime = now;
-                pendingMouseX = null;
-                pendingMouseY = null;
+                lastSentMouseX = x;
+                lastSentMouseY = y;
+            } else {
+                // Schedule trailing edge send for final position
+                pendingMouseTimer = setTimeout(() => {
+                    if (x !== lastSentMouseX || y !== lastSentMouseY) {
+                        syncAdapter.setMousePosition(x, y);
+                        lastMouseBroadcastTime = Date.now();
+                        lastSentMouseX = x;
+                        lastSentMouseY = y;
+                    }
+                    pendingMouseTimer = null;
+                }, MOUSE_BROADCAST_INTERVAL - (now - lastMouseBroadcastTime));
             }
         }
 
         // Flush pending mouse position (call when mouse leaves or becomes idle)
         function flushPendingMousePosition() {
-            if (pendingMouseX !== null && pendingMouseY !== null && syncAdapter && collaborationInitialized) {
-                syncAdapter.setMousePosition(pendingMouseX, pendingMouseY);
-                pendingMouseX = null;
-                pendingMouseY = null;
-                lastMouseBroadcastTime = Date.now();
+            // Cancel pending timer - no need to send if we're flushing
+            if (pendingMouseTimer) {
+                clearTimeout(pendingMouseTimer);
+                pendingMouseTimer = null;
             }
         }
 
@@ -646,8 +688,13 @@
             if (syncAdapter && collaborationInitialized) {
                 syncAdapter.clearMousePosition();
             }
-            pendingMouseX = null;
-            pendingMouseY = null;
+            // Cancel pending timer
+            if (pendingMouseTimer) {
+                clearTimeout(pendingMouseTimer);
+                pendingMouseTimer = null;
+            }
+            lastSentMouseX = null;
+            lastSentMouseY = null;
         }
 
         // Interpolated mouse positions for smooth rendering (peerId -> {x, y, lastUpdate})
@@ -722,6 +769,20 @@
                         smoothMouse = { x: targetX, y: targetY };
                         mouseOpacity = 1.0;
                     }
+                } else if (interpolatedMouse.has(peerId)) {
+                    // No new mouse data, but we have a cached position - use it with fade
+                    const current = interpolatedMouse.get(peerId);
+                    smoothMouse = { x: current.x, y: current.y };
+
+                    // Calculate opacity based on time since last movement
+                    const timeSinceMove = now - current.lastUpdate;
+                    if (timeSinceMove < MOUSE_FADE_START) {
+                        mouseOpacity = 1.0;
+                    } else if (timeSinceMove < MOUSE_FADE_START + MOUSE_FADE_DURATION) {
+                        mouseOpacity = 1.0 - (timeSinceMove - MOUSE_FADE_START) / MOUSE_FADE_DURATION;
+                    } else {
+                        mouseOpacity = 0;
+                    }
                 }
 
                 return {
@@ -731,7 +792,8 @@
                     cursor: presence.cursor,
                     selection: presence.selection,
                     mouse: smoothMouse,
-                    mouseOpacity: mouseOpacity
+                    mouseOpacity: mouseOpacity,
+                    editing: presence.editing  // Ephemeral editing text
                 };
             });
 
@@ -745,6 +807,23 @@
 
         // Update formula bar with current selection
         function updateFormulaBar() {
+            // Don't overwrite formula bar while user is actively editing
+            if (isEditing() || isEditingFormulaBar()) {
+                // Still update cell reference display, but preserve user's input
+                if (selectedCell) {
+                    if (hasRangeSelection()) {
+                        const range = getNormalizedRange();
+                        const startRef = colToLetter(range.minCol) + (range.minRow + 1);
+                        const endRef = colToLetter(range.maxCol) + (range.maxRow + 1);
+                        cellReference.textContent = startRef + ':' + endRef;
+                    } else {
+                        const ref = colToLetter(selectedCell.col) + (selectedCell.row + 1);
+                        cellReference.textContent = ref;
+                    }
+                }
+                return;
+            }
+
             if (!selectedCell) {
                 cellReference.textContent = '';
                 formulaInput.value = '';
@@ -1061,6 +1140,11 @@
 
             // Sync formula bar
             formulaInput.value = cellEditor.value;
+
+            // Broadcast initial editing state to peers
+            if (syncAdapter && selectedCell) {
+                syncAdapter.setEditing(selectedCell.col, selectedCell.row, cellEditor.value);
+            }
         }
 
         function cancelEditing() {
@@ -1068,6 +1152,10 @@
             uiStateMachine.transition(UIEvent.CANCEL_CELL_EDIT);
             cellEditor.style.display = 'none';
             cellEditor.value = '';
+            // Clear ephemeral editing state
+            if (syncAdapter) {
+                syncAdapter.clearEditing();
+            }
             canvas.focus();
         }
 
@@ -1082,6 +1170,11 @@
 
             uiStateMachine.transition(UIEvent.COMMIT_CELL_EDIT);
             cellEditor.style.display = 'none';
+
+            // Clear ephemeral editing state
+            if (syncAdapter) {
+                syncAdapter.clearEditing();
+            }
 
             try {
                 if (newValue === '' || newValue.trim() === '') {
@@ -1195,10 +1288,15 @@
             }
         });
 
-        // Live sync: cell editor -> formula bar
+        // Live sync: cell editor -> formula bar + broadcast editing
         cellEditor.addEventListener('input', () => {
             if (isEditing()) {
                 formulaInput.value = cellEditor.value;
+
+                // Broadcast ephemeral editing state to peers
+                if (syncAdapter && selectedCell) {
+                    syncAdapter.setEditing(selectedCell.col, selectedCell.row, cellEditor.value);
+                }
             }
         });
 
@@ -1340,11 +1438,25 @@
             }
 
             uiStateMachine.transition(UIEvent.COMMIT_FORMULA_EDIT);
+            // Hide cell editor if it was showing during formula bar editing
+            cellEditor.style.display = 'none';
+            cellEditor.value = '';
+            // Clear ephemeral editing state
+            if (syncAdapter) {
+                syncAdapter.clearEditing();
+            }
             canvas.focus();
         }
 
         function cancelFormulaBarEdit() {
             uiStateMachine.transition(UIEvent.CANCEL_FORMULA_EDIT);
+            // Hide cell editor if it was showing during formula bar editing
+            cellEditor.style.display = 'none';
+            cellEditor.value = '';
+            // Clear ephemeral editing state
+            if (syncAdapter) {
+                syncAdapter.clearEditing();
+            }
             // Remove any temp cell created during live preview
             const tempIdx = cells.findIndex(c => c.id === '_temp_');
             if (tempIdx !== -1) {
@@ -1359,9 +1471,21 @@
         }
 
         formulaInput.addEventListener('focus', () => {
+            // If coming from cell editor, preserve its value in the formula bar
+            const wasEditingCell = isEditing();
+            const cellEditorValue = wasEditingCell ? cellEditor.value : null;
+
             uiStateMachine.transition(UIEvent.START_FORMULA_EDIT);
-            // Don't call startEditing here - formula bar editing is independent
-            // The cell editor would create confusing dual state
+
+            // If we had a value from cell editor, ensure formula bar has it
+            if (cellEditorValue !== null) {
+                formulaInput.value = cellEditorValue;
+            }
+
+            // Keep cell editor visible and synced (for visual feedback on the cell)
+            if (wasEditingCell && selectedCell) {
+                cellEditor.style.display = 'block';
+            }
         });
 
         formulaInput.addEventListener('keydown', (e) => {
@@ -1417,9 +1541,19 @@
         formulaInput.addEventListener('input', () => {
             if (!isEditingFormulaBar()) return;
 
+            // Sync to cell editor if it's visible (bidirectional sync)
+            if (cellEditor.style.display === 'block') {
+                cellEditor.value = formulaInput.value;
+            }
+
             // Use anchor cell (selectionStart) for editing, not selectedCell
             const editCell = selectionStart || selectedCell;
             if (!editCell) return;
+
+            // Broadcast ephemeral editing state to peers
+            if (syncAdapter) {
+                syncAdapter.setEditing(editCell.col, editCell.row, formulaInput.value);
+            }
 
             // Update local cell data for live preview (without saving to engine)
             let cell = getCellAt(editCell.col, editCell.row);
@@ -1685,6 +1819,8 @@
                         updateFormulaBar();
                     }
                 }
+                // Broadcast mouse position even during range selection
+                broadcastMousePosition(x, y);
                 return;  // Don't process other mouse move handlers during range selection
             }
 

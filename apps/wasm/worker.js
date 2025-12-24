@@ -651,6 +651,19 @@ function handleMessage(msg) {
                 break;
             }
 
+            case 'setSyncEditing': {
+                const { col, row, text } = params;
+                engine.setSyncEditing(col, row, text);
+                respond({ type: 'syncEditingSet', success: true });
+                break;
+            }
+
+            case 'clearSyncEditing': {
+                engine.clearSyncEditing();
+                respond({ type: 'syncEditingCleared', success: true });
+                break;
+            }
+
             case 'getRemotePresences': {
                 const result = engine.getRemotePresences();
                 respond({ type: 'remotePresences', result });

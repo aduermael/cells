@@ -675,6 +675,11 @@ export class GridRenderer {
                 this._drawRemoteCursor(ctx, presence.cursor, color, 1.0, viewWidth, viewHeight);
             }
 
+            // Draw ephemeral editing text (what peer is currently typing)
+            if (presence.editing && presence.editing.col !== undefined && presence.editing.row !== undefined) {
+                this._drawRemoteEditing(ctx, presence.editing, presence.name, color, viewWidth, viewHeight);
+            }
+
             // Draw mouse pointer with name (Figma-style) - fades out after 3 seconds
             if (presence.mouse && presence.mouse.x !== undefined && presence.mouse.y !== undefined && mouseOpacity > 0) {
                 this._drawRemoteMouse(ctx, presence.mouse, presence.name, color, mouseOpacity, viewWidth, viewHeight);
@@ -889,6 +894,63 @@ export class GridRenderer {
             ctx.fillText(name, labelX + PRESENCE_LABEL_PADDING, labelY + labelHeight / 2);
         }
 
+        ctx.globalAlpha = 1;
+    }
+
+    /**
+     * Draw a remote user's editing text (ephemeral, what they're typing)
+     * @private
+     */
+    _drawRemoteEditing(ctx, editing, name, color, viewWidth, viewHeight) {
+        const col = editing.col;
+        const row = editing.row;
+        const text = editing.text || '';
+
+        // Calculate cell position
+        let cellX = HEADER_WIDTH - this.scrollX;
+        for (let i = 0; i < col; i++) {
+            cellX += this.colWidths.get(i) || DEFAULT_COL_WIDTH;
+        }
+        let cellY = HEADER_HEIGHT - this.scrollY;
+        for (let i = 0; i < row; i++) {
+            cellY += this.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+        }
+
+        const cellW = this.colWidths.get(col) || DEFAULT_COL_WIDTH;
+        const cellH = this.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+
+        // Check if visible
+        if (cellX + cellW <= HEADER_WIDTH || cellX >= viewWidth ||
+            cellY + cellH <= HEADER_HEIGHT || cellY >= viewHeight) {
+            return; // Off screen
+        }
+
+        // Clip to visible portion
+        const clipX = Math.max(HEADER_WIDTH, cellX);
+        const clipY = Math.max(HEADER_HEIGHT, cellY);
+        const clipW = Math.min(cellW, cellX + cellW - clipX);
+        const clipH = Math.min(cellH, cellY + cellH - clipY);
+
+        // Draw the editing text (no background, name shown on cursor already)
+        ctx.globalAlpha = 0.7;
+        ctx.fillStyle = '#000000';
+        ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+
+        // Truncate text if too long
+        let displayText = text;
+        const maxWidth = clipW - 8;
+        let textWidth = ctx.measureText(displayText).width;
+        if (textWidth > maxWidth && displayText.length > 0) {
+            while (textWidth > maxWidth && displayText.length > 1) {
+                displayText = displayText.slice(0, -1);
+                textWidth = ctx.measureText(displayText + '…').width;
+            }
+            displayText = displayText + '…';
+        }
+
+        ctx.fillText(displayText, clipX + 4, clipY + clipH / 2);
         ctx.globalAlpha = 1;
     }
 }

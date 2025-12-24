@@ -65,17 +65,20 @@ struct MousePosition {
 
 // Complete presence data for a user
 struct PresenceData {
-    std::string peer_id;        // Unique peer identifier
-    std::string name;           // Display name
-    std::string color;          // Cursor/selection color (hex, e.g., "#E53935")
-    std::string sheet_id;       // Current sheet ID
-    bool has_cursor{false};     // Whether cursor position is set
-    CursorPosition cursor;      // Current cursor position
-    bool has_selection{false};  // Whether selection is set
-    SelectionRange selection;   // Selected range
-    bool has_mouse{false};      // Whether mouse position is set
-    MousePosition mouse;        // Mouse pointer position
-    int64_t timestamp{0};       // Last update timestamp (ms since epoch)
+    std::string peer_id;          // Unique peer identifier
+    std::string name;             // Display name
+    std::string color;            // Cursor/selection color (hex, e.g., "#E53935")
+    std::string sheet_id;         // Current sheet ID
+    bool has_cursor{false};       // Whether cursor position is set
+    CursorPosition cursor;        // Current cursor position
+    bool has_selection{false};    // Whether selection is set
+    SelectionRange selection;     // Selected range
+    bool has_mouse{false};        // Whether mouse position is set
+    MousePosition mouse;          // Mouse pointer position
+    bool is_editing{false};       // Whether user is currently editing a cell
+    CursorPosition editing_cell;  // Cell being edited (if is_editing)
+    std::string editing_text;     // Current text being typed (ephemeral, not committed)
+    int64_t timestamp{0};         // Last update timestamp (ms since epoch)
 
     // Serialize to JSON for wire format
     [[nodiscard]] std::string toJSON() const;
@@ -133,9 +136,11 @@ public:
     void setCursor(int32_t col, int32_t row);
     void setSelection(const CursorPosition& start, const CursorPosition& end);
     void setMousePosition(double x, double y);
+    void setEditing(int32_t col, int32_t row, const std::string& text);
     void clearCursor();
     void clearSelection();
     void clearMousePosition();
+    void clearEditing();
 
     // Get local presence data
     [[nodiscard]] PresenceData getLocalPresence() const;
@@ -188,6 +193,9 @@ private:
     SelectionRange local_selection_;
     bool local_has_mouse_{false};
     MousePosition local_mouse_;
+    bool local_is_editing_{false};
+    CursorPosition local_editing_cell_;
+    std::string local_editing_text_;
 
     // Remote peer presence (peer_id -> PresenceData)
     std::map<std::string, PresenceData> remote_peers_;

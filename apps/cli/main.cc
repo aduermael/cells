@@ -74,6 +74,7 @@ void print_usage(const char* program_name) {
               << "  cells sync <url>              Join room and log operations\n"
               << "  cells sync <url> --apply <f>  Apply operations to workbook file\n"
               << "  cells sync <url> --send <f>   Broadcast workbook as operations\n"
+              << "  cells sync <url> --ops-only   Show only operations (hide other output)\n"
               << "\n"
               << "Examples:\n"
               << "  # Basic conversion\n"
@@ -431,6 +432,10 @@ bool parse_sync_args(int argc, char* argv[], cells::cli::SyncOptions& sync_opts)
         }
         if (arg == "-v") {
             sync_opts.verbose = true;
+            continue;
+        }
+        if (arg == "--ops-only") {
+            sync_opts.ops_only = true;
             continue;
         }
         if (arg == "--apply" && i + 1 < argc) {

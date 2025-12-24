@@ -28,12 +28,12 @@ export const USER_COLORS = [
     '#E53935', // Red
     '#1E88E5', // Blue
     '#8E24AA', // Purple
-    '#00897B', // Teal
+    '#0288D1', // Light Blue (replacing teal - too green-ish)
     '#F57C00', // Orange
     '#5E35B1', // Deep Purple
     '#00ACC1', // Cyan
     '#D81B60', // Pink
-    '#43A047', // Green
+    '#546E7A', // Blue Gray (avoiding green - too similar to local selection)
     '#6D4C41'  // Brown
 ];
 
