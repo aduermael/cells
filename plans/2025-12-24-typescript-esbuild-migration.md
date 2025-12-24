@@ -41,7 +41,7 @@ Convert all JavaScript files in `apps/wasm/` to TypeScript with proper type defi
 - [x] 1c: Create `apps/wasm/build.mjs` esbuild script for bundling
 
 ## Phase 2: Define core type interfaces
-- [ ] 2a: Create `apps/wasm/src/types.ts` with shared interfaces (Cell, Sheet, Presence, etc.)
+- [x] 2a: Create `apps/wasm/src/types.ts` with shared interfaces (Cell, Sheet, Presence, etc.)
 
 ## Phase 3: Convert utility and helper modules (no dependencies)
 - [ ] 3a: Convert `utils.js` to `src/utils.ts`
