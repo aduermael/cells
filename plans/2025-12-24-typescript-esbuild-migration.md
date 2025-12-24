@@ -49,7 +49,7 @@ Convert all JavaScript files in `apps/wasm/` to TypeScript with proper type defi
 - [x] 3c: Convert `room-url.js` to `src/room-url.ts`
 
 ## Phase 4: Convert UI modules
-- [ ] 4a: Convert `ui-state.js` to `src/ui-state.ts`
+- [x] 4a: Convert `ui-state.js` to `src/ui-state.ts`
 - [ ] 4b: Convert `grid-renderer.js` to `src/grid-renderer.ts`
 - [ ] 4c: Convert `grid-events.js` to `src/grid-events.ts`
 
