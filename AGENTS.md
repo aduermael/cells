@@ -70,7 +70,13 @@ Example:
 - [ ] 2c: Add parser tests
 ```
 
-### Commit Naming During Plan Execution
+### Commit Messages
+
+**Format rules:**
+- **Plain text only** — no title/body separation, just raw text
+- **Maximum 5 lines** — keep it brief
+- **No "Co-Authored-By:" lines** — never include these
+- **No "Generated with" text** — never include AI attribution
 
 When executing a plan, each subtask gets its own commit named by phase and subtask:
 
