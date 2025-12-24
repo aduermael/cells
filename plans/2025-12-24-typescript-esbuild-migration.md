@@ -60,7 +60,7 @@ Convert all JavaScript files in `apps/wasm/` to TypeScript with proper type defi
 
 ## Phase 6: Convert main application files
 - [x] 6a: Convert `client.js` to `src/client.ts`
-- [ ] 6b: Convert `worker.js` to `src/worker.ts`
+- [x] 6b: Convert `worker.js` to `src/worker.ts`
 
 ## Phase 7: Update build system
 - [ ] 7a: Update Makefile with new targets (`check-types`, updated `wasm-dist`)
