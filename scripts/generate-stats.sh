@@ -71,6 +71,7 @@ ts_lines=$(count_source_lines "*.ts")
 html_lines=$(count_source_lines "*.html")
 css_lines=$(count_source_lines "*.css")
 go_lines=$(count_source_lines "*.go")
+objcpp_lines=$(count_source_lines "*.mm")
 md_lines=$(count_source_lines "*.md")
 sh_lines=$(count_source_lines "*.sh")
 
@@ -80,6 +81,7 @@ bzl_lines=$(find "$PROJECT_ROOT" -type f \( -name "BUILD" -o -name "*.bzl" -o -n
 
 # Count test lines for each language
 cpp_test_lines=$(count_test_lines "*.cc *.cpp")
+objcpp_test_lines=$(count_test_lines "*.mm")
 js_test_lines=$(count_test_lines "*.js")
 ts_test_lines=$(count_test_lines "*.ts")
 go_test_lines=$(count_test_lines "*.go")
@@ -96,12 +98,14 @@ trap "rm -f $TEMP_FILE $TEMP_TEST_FILE" EXIT
 [ "$html_lines" -gt 0 ] && echo "$html_lines HTML" >> "$TEMP_FILE"
 [ "$css_lines" -gt 0 ] && echo "$css_lines CSS" >> "$TEMP_FILE"
 [ "$go_lines" -gt 0 ] && echo "$go_lines Go" >> "$TEMP_FILE"
+[ "$objcpp_lines" -gt 0 ] && echo "$objcpp_lines Objective-C++" >> "$TEMP_FILE"
 [ "$md_lines" -gt 0 ] && echo "$md_lines Markdown" >> "$TEMP_FILE"
 [ "$bzl_lines" -gt 0 ] && echo "$bzl_lines Starlark" >> "$TEMP_FILE"
 [ "$sh_lines" -gt 0 ] && echo "$sh_lines Shell" >> "$TEMP_FILE"
 
 # Add test lines to test table
 [ "$cpp_test_lines" -gt 0 ] && echo "$cpp_test_lines C++" >> "$TEMP_TEST_FILE"
+[ "$objcpp_test_lines" -gt 0 ] && echo "$objcpp_test_lines Objective-C++" >> "$TEMP_TEST_FILE"
 [ "$js_test_lines" -gt 0 ] && echo "$js_test_lines JavaScript" >> "$TEMP_TEST_FILE"
 [ "$ts_test_lines" -gt 0 ] && echo "$ts_test_lines TypeScript" >> "$TEMP_TEST_FILE"
 [ "$go_test_lines" -gt 0 ] && echo "$go_test_lines Go" >> "$TEMP_TEST_FILE"
