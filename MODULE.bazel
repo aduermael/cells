@@ -13,6 +13,12 @@ bazel_dep(name = "apple_support", version = "2.0.0")
 # Emscripten SDK for WebAssembly builds
 bazel_dep(name = "emsdk", version = "4.0.17")
 
+# rules_foreign_cc for building CMake/Make projects (libdatachannel)
+bazel_dep(name = "rules_foreign_cc", version = "0.15.1")
+
+# OpenSSL for libdatachannel crypto
+bazel_dep(name = "openssl", version = "3.5.4.bcr.0")
+
 # Google Test
 bazel_dep(name = "googletest", version = "1.14.0.bcr.1")
 
@@ -38,4 +44,16 @@ http_archive(
     url = "https://github.com/stasel/WebRTC/releases/download/141.0.0/WebRTC-M141.xcframework.zip",
     sha256 = "e3b9bc1aed7a6f3f747a62567680ac7837bdbb74d1fae8f0f543131bc1bf8a5f",
     build_file = "//third_party/webrtc:BUILD.webrtc",
+)
+
+# libdatachannel - C++ WebRTC DataChannel implementation for native platforms
+# https://github.com/paullouisageneau/libdatachannel - MPL 2.0 License
+# Using git_repository to get submodules (libjuice, usrsctp, plog)
+git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+git_repository(
+    name = "libdatachannel",
+    remote = "https://github.com/paullouisageneau/libdatachannel.git",
+    tag = "v0.24.0",
+    recursive_init_submodules = True,
+    build_file = "//third_party/libdatachannel:BUILD.libdatachannel",
 )

@@ -1,0 +1,48 @@
+# BUILD file for libdatachannel
+# https://github.com/paullouisageneau/libdatachannel - MPL 2.0 License
+#
+# This uses rules_foreign_cc cmake() rule to build libdatachannel
+# with its submodules (libjuice, usrsctp, plog).
+
+load("@rules_foreign_cc//foreign_cc:defs.bzl", "cmake")
+
+filegroup(
+    name = "all_srcs",
+    srcs = glob(["**"]),
+)
+
+cmake(
+    name = "libdatachannel",
+    # Build release by default
+    build_args = ["-j"],
+    cache_entries = {
+        # Disable features we don't need
+        "NO_MEDIA": "ON",           # No audio/video - we only need DataChannels
+        "NO_WEBSOCKET": "OFF",      # Keep WebSocket for signaling
+        # Use submodules (bundled), not system libs
+        "PREFER_SYSTEM_LIB": "OFF",
+        # Use OpenSSL for crypto
+        "USE_GNUTLS": "OFF",
+        "USE_MBEDTLS": "OFF",
+        # Use libjuice for ICE (default, lighter than libnice)
+        "USE_NICE": "OFF",
+        # Build static library for easier linking
+        "BUILD_SHARED_LIBS": "OFF",
+        # Build submodule libs as shared (so they install correctly)
+        "BUILD_SHARED_DEPS_LIBS": "OFF",
+        # Don't build examples/tests
+        "NO_EXAMPLES": "ON",
+        "NO_TESTS": "ON",
+    },
+    generate_args = ["-GNinja"],
+    lib_source = ":all_srcs",
+    # The static lib that gets installed (libdatachannel.a, not -static.a)
+    out_static_libs = ["libdatachannel.a"],
+    # Headers to expose
+    out_include_dir = "include",
+    # Build and install the static library
+    targets = ["datachannel-static", "install"],
+    visibility = ["//visibility:public"],
+    # Link against OpenSSL from BCR
+    deps = ["@openssl"],
+)

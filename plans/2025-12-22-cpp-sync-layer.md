@@ -563,10 +563,13 @@ The MacCatalyst slice appears to have all headers. Options:
     - Obj-C++ API requires bridging to C++
   - **Decision**: Use libdatachannel - purpose-built for Data Channels, smaller, pure C++
 
-- [ ] 14b: Add libdatachannel to MODULE.bazel
-  - Either as http_archive or git_repository
-  - May need cmake_external or manual BUILD file
-  - Dependencies: OpenSSL (or mbedTLS), libjuice, libsrtp
+- [x] 14b: Add libdatachannel to MODULE.bazel
+  - Added `rules_foreign_cc` v0.15.1 for CMake support
+  - Added `openssl` v3.5.4.bcr.0 from BCR for crypto
+  - Added `libdatachannel` v0.24.0 via `git_repository` with `recursive_init_submodules`
+  - Created `third_party/libdatachannel/BUILD.libdatachannel` with cmake() rule
+  - Builds with NO_MEDIA=ON (no audio/video), NO_WEBSOCKET=OFF (keep WS)
+  - Dependencies bundled: libjuice (ICE), usrsctp (SCTP)
 
 - [ ] 14c: Create `core/net/apple/RTCPeerConnection_apple.mm` (or pure C++)
   - Wrap libdatachannel::PeerConnection
