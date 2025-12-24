@@ -17,6 +17,9 @@ MODULE.bazel.lock
 /cells
 /dist/
 
+# Node.js
+node_modules/
+
 
 # Clang tooling
 compile_commands.json
