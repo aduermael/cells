@@ -44,9 +44,9 @@ Convert all JavaScript files in `apps/wasm/` to TypeScript with proper type defi
 - [x] 2a: Create `apps/wasm/src/types.ts` with shared interfaces (Cell, Sheet, Presence, etc.)
 
 ## Phase 3: Convert utility and helper modules (no dependencies)
-- [ ] 3a: Convert `utils.js` to `src/utils.ts`
-- [ ] 3b: Convert `presence.js` to `src/presence.ts`
-- [ ] 3c: Convert `room-url.js` to `src/room-url.ts`
+- [x] 3a: Convert `utils.js` to `src/utils.ts`
+- [x] 3b: Convert `presence.js` to `src/presence.ts`
+- [x] 3c: Convert `room-url.js` to `src/room-url.ts`
 
 ## Phase 4: Convert UI modules
 - [ ] 4a: Convert `ui-state.js` to `src/ui-state.ts`
