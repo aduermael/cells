@@ -79,7 +79,7 @@ interface DcSetThresholdPayload {
 }
 
 // Message type union for handleMessage
-type RTCMessagePayload =
+export type RTCMessagePayload =
   | CreatePeerConnectionPayload
   | RegistryIdPayload
   | SetDescriptionPayload
@@ -87,7 +87,8 @@ type RTCMessagePayload =
   | CreateDataChannelPayload
   | DcSendPayload
   | DcHandlePayload
-  | DcSetThresholdPayload;
+  | DcSetThresholdPayload
+  | Record<string, unknown>; // Allow generic payloads for forward compatibility
 
 // ============================================================================
 // Connection state mappings (C++ enum values)

@@ -59,7 +59,7 @@ Convert all JavaScript files in `apps/wasm/` to TypeScript with proper type defi
 - [x] 5c: Convert `collab-ui.js` to `src/collab-ui.ts`
 
 ## Phase 6: Convert main application files
-- [ ] 6a: Convert `client.js` to `src/client.ts`
+- [x] 6a: Convert `client.js` to `src/client.ts`
 - [ ] 6b: Convert `worker.js` to `src/worker.ts`
 
 ## Phase 7: Update build system
