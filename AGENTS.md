@@ -24,13 +24,18 @@ YYYY-MM-DD-topic-slug-DONE.md
 
 **HEADER**
 
-Each plan should have a header of this form: 
+Each plan should have a header of this form:
 
 ```
 Status: IN-PROGRESS
-Created At: YYYY-MM-DD HH:mm
-Updated At: YYYY-MM-DD HH:mm
+Created At: YYYY-MM-DD HH:mm UTC
+Updated At: YYYY-MM-DD HH:mm UTC
 Following plan management guidelines defined in AGENTS.md
+```
+
+All timestamps must be in **UTC timezone**. To get the current UTC time, run:
+```bash
+date -u '+%Y-%m-%d %H:%M'
 ```
 
 It's important to always include the "Following plan management guidelines defined in AGENTS.md" mention.
