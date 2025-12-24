@@ -1,4 +1,4 @@
-.PHONY: build test format lint check clean compile-db cli cli-release release wasm wasm-debug wasm-dist wasm-debug-dist wasm-serve
+.PHONY: build test format lint check clean compile-db cli cli-release release wasm wasm-debug wasm-dist wasm-debug-dist wasm-serve check-types
 
 # Build
 build:
@@ -40,15 +40,13 @@ wasm-dist:
 	@echo "Copying WASM artifacts..."
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.js dist/
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/
-	@echo "Copying JavaScript files..."
-	@cp apps/wasm/worker.js dist/
-	@cp apps/wasm/client.js dist/
+	@echo "Building TypeScript..."
+	cd apps/wasm && npm run build
 	@echo "Copying HTML and TypeScript definitions..."
 	@cp apps/wasm/static/index.html dist/
 	@cp apps/wasm/cells.d.ts dist/
-	@echo "Copying shared modules..."
+	@echo "Copying shared CSS..."
 	@cp apps/wasm/static/shared/*.css dist/shared/
-	@cp apps/wasm/static/shared/*.js dist/shared/
 	@echo "Copying favicons and icons..."
 	@mkdir -p dist/favicons
 	@cp apps/shared/favicons/* dist/favicons/
@@ -75,15 +73,13 @@ wasm-debug-dist:
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.js dist/
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm.map dist/ 2>/dev/null || true
-	@echo "Copying JavaScript files..."
-	@cp apps/wasm/worker.js dist/
-	@cp apps/wasm/client.js dist/
+	@echo "Building TypeScript..."
+	cd apps/wasm && npm run build
 	@echo "Copying HTML and TypeScript definitions..."
 	@cp apps/wasm/static/index.html dist/
 	@cp apps/wasm/cells.d.ts dist/
-	@echo "Copying shared modules..."
+	@echo "Copying shared CSS..."
 	@cp apps/wasm/static/shared/*.css dist/shared/
-	@cp apps/wasm/static/shared/*.js dist/shared/
 	@echo "Copying favicons and icons..."
 	@mkdir -p dist/favicons
 	@cp apps/shared/favicons/* dist/favicons/
@@ -156,3 +152,7 @@ compile-db:
 # Clean build artifacts
 clean:
 	bazel clean
+
+# TypeScript type checking (apps/wasm)
+check-types:
+	cd apps/wasm && npm run check-types

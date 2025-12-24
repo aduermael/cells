@@ -63,7 +63,7 @@ Convert all JavaScript files in `apps/wasm/` to TypeScript with proper type defi
 - [x] 6b: Convert `worker.js` to `src/worker.ts`
 
 ## Phase 7: Update build system
-- [ ] 7a: Update Makefile with new targets (`check-types`, updated `wasm-dist`)
+- [x] 7a: Update Makefile with new targets (`check-types`, updated `wasm-dist`)
 - [ ] 7b: Remove old JS files, update .gitignore
 - [ ] 7c: Verify build and test end-to-end
 
