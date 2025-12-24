@@ -12,6 +12,10 @@
 #include <sstream>
 #include <thread>
 
+#if defined(__APPLE__)
+#include <CoreFoundation/CoreFoundation.h>
+#endif
+
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/operation.h"
@@ -230,12 +234,24 @@ int run_sync_command(const SyncOptions& opts) {
         std::cerr << "\nListening for operations... (Ctrl+C to exit)\n";
     }
 
-    while (!g_shutdown_requested) {
-        // Process outgoing messages
-        sync_client.processOutgoing();
+    // Set a name for presence
+    sync_client.setLocalName("CLI User");
 
+    while (!g_shutdown_requested) {
+#if defined(__APPLE__)
+        // Pump the main run loop to process incoming WebSocket/WebRTC callbacks
+        // The Apple networking implementations dispatch callbacks to the main queue
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.1, false);
+#else
         // Sleep briefly to avoid busy-waiting
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+#endif
+
+        // Process outgoing messages (sync operations)
+        sync_client.processOutgoing();
+
+        // Process presence updates (cursor/selection info)
+        sync_client.processPresenceUpdates();
     }
 
     // Graceful shutdown

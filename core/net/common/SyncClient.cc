@@ -115,10 +115,13 @@ void ConnectedPeer::peerConnectionDidGatherICECandidate(RTCPeerConnection& /*pc*
 void ConnectedPeer::peerConnectionDidReceiveDataChannel(RTCPeerConnection& /*pc*/,
                                                         std::unique_ptr<RTCDataChannel> channel) {
     if (!channel) {
+        printf("[Sync] Received null data channel\n");
         return;
     }
 
     const std::string label = channel->getLabel();
+    printf("[Sync] Received data channel: %s (state=%d)\n", label.c_str(),
+           static_cast<int>(channel->getState()));
     channel->setDelegate(this);
 
     if (label == OPERATIONS_CHANNEL) {
@@ -129,6 +132,7 @@ void ConnectedPeer::peerConnectionDidReceiveDataChannel(RTCPeerConnection& /*pc*
 }
 
 void ConnectedPeer::dataChannelDidOpen(RTCDataChannel& channel) {
+    printf("[Sync] Data channel opened: %s for peer %s\n", channel.getLabel().c_str(), id.c_str());
     if (sync_client) {
         sync_client->handlePeerDataChannelOpen(id, channel.getLabel());
     }
@@ -142,6 +146,8 @@ void ConnectedPeer::dataChannelDidClose(RTCDataChannel& channel) {
 
 void ConnectedPeer::dataChannelDidReceiveMessage(RTCDataChannel& channel,
                                                  const std::string& message) {
+    printf("[Sync] Received message on %s: %.100s%s\n", channel.getLabel().c_str(), message.c_str(),
+           message.size() > 100 ? "..." : "");
     if (sync_client) {
         sync_client->handlePeerMessage(id, channel.getLabel(), message);
     }
@@ -394,12 +400,30 @@ ConnectedPeer* SyncClient::createPeerConnection(const std::string& peer_id, bool
 
 void SyncClient::removePeer(const std::string& peer_id) {
     auto it = peers_.find(peer_id);
-    if (it != peers_.end()) {
-        LOG_INFO("[Sync] Peer disconnected: %s", peer_id.c_str());
-        if (it->second->connection) {
-            it->second->connection->close();
-        }
-        peers_.erase(it);
+    if (it == peers_.end()) {
+        // Already removed (reentrancy guard)
+        return;
+    }
+
+    LOG_INFO("[Sync] Peer disconnected: %s", peer_id.c_str());
+
+    // Take ownership of the peer before erasing to prevent reentrancy issues
+    // (closing the connection triggers callbacks which might call removePeer again)
+    auto peer = std::move(it->second);
+    peers_.erase(it);
+
+    // Clear data channel delegates to prevent callbacks on destroyed objects
+    if (peer->operations_channel) {
+        peer->operations_channel->setDelegate(nullptr);
+    }
+    if (peer->presence_channel) {
+        peer->presence_channel->setDelegate(nullptr);
+    }
+
+    // Now safe to close - if callbacks fire, the peer is already removed from map
+    if (peer->connection) {
+        peer->connection->setDelegate(nullptr);  // Prevent further callbacks
+        peer->connection->close();
     }
 
     // Remove from SyncManager
@@ -496,6 +520,8 @@ void SyncClient::sendToPeer(const std::string& peer_id, const std::string& messa
     }
 
     if (it->second->operations_channel && it->second->operations_channel->isOpen()) {
+        printf("[Sync] Sending to %s: %.100s%s\n", peer_id.c_str(), message.c_str(),
+               message.size() > 100 ? "..." : "");
         it->second->operations_channel->send(message);
     }
 }
@@ -576,6 +602,18 @@ void SyncClient::clearSelection() {
 void SyncClient::clearMousePosition() {
     if (presence_manager_) {
         presence_manager_->clearMousePosition();
+    }
+}
+
+void SyncClient::setEditing(int32_t col, int32_t row, const std::string& text) {
+    if (presence_manager_) {
+        presence_manager_->setEditing(col, row, text);
+    }
+}
+
+void SyncClient::clearEditing() {
+    if (presence_manager_) {
+        presence_manager_->clearEditing();
     }
 }
 
@@ -771,47 +809,64 @@ void SyncClient::signalingClientPeerDidLeave(SignalingClient& /*client*/,
 void SyncClient::signalingClientDidReceiveOffer(SignalingClient& /*client*/,
                                                 const std::string& from_peer,
                                                 const SessionDescription& sdp) {
+    printf("[Sync] Received offer from peer %s\n", from_peer.c_str());
+
     // Accept peer connection
     ConnectedPeer* peer = createPeerConnection(from_peer, false);
     if (!peer || !peer->connection) {
+        printf("[Sync] ERROR: Failed to create peer connection for %s\n", from_peer.c_str());
         return;
     }
 
     // Set remote description
+    printf("[Sync] Setting remote description for %s\n", from_peer.c_str());
     peer->connection->setRemoteDescription(
         sdp,
         // NOLINTNEXTLINE(bugprone-exception-escape)
-        [this, from_peer](bool success, const std::string& /*error*/) {
+        [this, from_peer](bool success, const std::string& error) {
+            printf("[Sync] setRemoteDescription callback: success=%d, error=%s\n", success,
+                   error.c_str());
             if (!success) {
                 return;
             }
 
             auto it = peers_.find(from_peer);
             if (it == peers_.end()) {
+                printf("[Sync] ERROR: Peer %s not found after setRemoteDescription\n",
+                       from_peer.c_str());
                 return;
             }
 
             // Create answer
+            printf("[Sync] Creating answer for %s\n", from_peer.c_str());
             it->second->connection->createAnswer(
                 // NOLINTNEXTLINE(bugprone-exception-escape)
                 [this, from_peer](bool answer_success, const SessionDescription& answer,
-                                  const std::string& /*error*/) {
+                                  const std::string& error) {
+                    printf("[Sync] createAnswer callback: success=%d, error=%s\n", answer_success,
+                           error.c_str());
                     if (!answer_success) {
                         return;
                     }
 
                     auto it2 = peers_.find(from_peer);
                     if (it2 == peers_.end()) {
+                        printf("[Sync] ERROR: Peer %s not found after createAnswer\n",
+                               from_peer.c_str());
                         return;
                     }
 
                     // Set local description
+                    printf("[Sync] Setting local description (answer) for %s\n", from_peer.c_str());
                     it2->second->connection->setLocalDescription(
                         answer,
                         // NOLINTNEXTLINE(bugprone-exception-escape)
-                        [this, from_peer, answer](bool set_success, const std::string& /*err*/) {
+                        [this, from_peer, answer](bool set_success, const std::string& err) {
+                            printf("[Sync] setLocalDescription callback: success=%d, error=%s\n",
+                                   set_success, err.c_str());
                             if (set_success) {
                                 // Send answer to peer
+                                printf("[Sync] Sending answer to peer %s\n", from_peer.c_str());
                                 signaling_client_->sendAnswer(from_peer, answer);
                             }
                         });
@@ -907,6 +962,8 @@ void SyncClient::handlePeerMessage(const std::string& peer_id, const std::string
 }
 
 void SyncClient::handlePeerICECandidate(const std::string& peer_id, const ICECandidate& candidate) {
+    printf("[Sync] Generated ICE candidate for %s: %s\n", peer_id.c_str(),
+           candidate.candidate.substr(0, 50).c_str());
     // Send ICE candidate to peer via signaling
     signaling_client_->sendICECandidate(peer_id, candidate);
 }
