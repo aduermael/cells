@@ -42,6 +42,8 @@ wasm-dist:
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/
 	@echo "Building TypeScript..."
 	cd apps/wasm && npm run build
+	@cp apps/wasm/dist/client.js apps/wasm/dist/worker.js dist/
+	@cp apps/wasm/dist/*.js.map dist/
 	@echo "Copying HTML and TypeScript definitions..."
 	@cp apps/wasm/static/index.html dist/
 	@cp apps/wasm/cells.d.ts dist/
@@ -75,6 +77,8 @@ wasm-debug-dist:
 	@cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm.map dist/ 2>/dev/null || true
 	@echo "Building TypeScript..."
 	cd apps/wasm && npm run build
+	@cp apps/wasm/dist/client.js apps/wasm/dist/worker.js dist/
+	@cp apps/wasm/dist/*.js.map dist/
 	@echo "Copying HTML and TypeScript definitions..."
 	@cp apps/wasm/static/index.html dist/
 	@cp apps/wasm/cells.d.ts dist/
