@@ -571,46 +571,45 @@ The MacCatalyst slice appears to have all headers. Options:
   - Builds with NO_MEDIA=ON (no audio/video), NO_WEBSOCKET=OFF (keep WS)
   - Dependencies bundled: libjuice (ICE), usrsctp (SCTP)
 
-- [ ] 14c: Create `core/net/apple/RTCPeerConnection_apple.mm` (or pure C++)
-  - Wrap libdatachannel::PeerConnection
-  - Implement RTCPeerConnection interface
-  - Handle ICE candidate gathering
-  - Create/accept offers and answers
+- [ ] 14c: Create `core/net/native/RTCPeerConnection_libdc.cc` (pure C++)
+  - Wrap `rtc::PeerConnection` from libdatachannel
+  - Include: `#include <rtc/rtc.hpp>` (headers in `include/rtc/`)
+  - Key API mappings:
+    - `createOffer()` / `createAnswer()` → `rtc::PeerConnection::setLocalDescription()`
+    - `setLocalDescription()` / `setRemoteDescription()` → same names
+    - `addIceCandidate()` → `rtc::PeerConnection::addRemoteCandidate()`
+    - `createDataChannel()` → `rtc::PeerConnection::createDataChannel(label, init)`
+  - Callbacks use lambdas: `pc.onLocalCandidate([](rtc::Candidate c) {...})`
+  - State enums map directly to our enums
 
-- [ ] 14d: Create `core/net/apple/RTCDataChannel_apple.mm` (or pure C++)
-  - Wrap libdatachannel::DataChannel
-  - Implement RTCDataChannel interface
-  - Handle open/close/message events
-  - Binary and text message support
+- [ ] 14d: Create `core/net/native/RTCDataChannel_libdc.cc` (pure C++)
+  - Wrap `rtc::DataChannel` (shared_ptr from PeerConnection)
+  - Key API:
+    - `send(message)` → `rtc::DataChannel::send(variant<binary,string>)`
+    - `close()` → `rtc::DataChannel::close()`
+    - `isOpen()` / `isClosed()` → same names
+  - Callbacks: `onOpen`, `onClosed`, `onMessage`, `onError`
+  - Binary support via `std::byte` vectors
 
-- [ ] 14e: Update `core/net/BUILD` to use new implementations on macOS
-  - Change select() for rtc_peer_connection on macOS/iOS
-  - Change select() for rtc_data_channel on macOS/iOS
-  - May be able to use same implementation for all native platforms (not just Apple)
+- [ ] 14e: Update `core/net/BUILD` to use libdatachannel on native platforms
+  - Add dependency: `"@libdatachannel//:libdatachannel"`
+  - Create `cc_library` targets for native implementations
+  - Update `select()` for `rtc_peer_connection`:
+    - `"@platforms//os:emscripten"` → web implementation (unchanged)
+    - `"//conditions:default"` → libdatachannel implementation
+  - Same for `rtc_data_channel`
+  - Works on macOS, Linux, potentially Windows (all native platforms)
 
 - [ ] 14f: Test CLI sync end-to-end
   - `cells sync "https://cells-app.fly.dev/?room=test"` should work
-  - Should connect to web clients via WebRTC
+  - Should connect to web clients via WebRTC P2P
   - Operations should flow both directions
-
-**Alternative: stasel/WebRTC with MacCatalyst headers**
-
-If libdatachannel proves difficult, we can try using the MacCatalyst slice headers:
-
-- [ ] 14a-alt: Extract headers from MacCatalyst slice
-  - MacCatalyst slice has complete WebRTC.framework/Headers/*
-  - Copy headers to a shared location
-  - Build macOS binary linking against macOS slice but using MacCatalyst headers
-
-- [ ] 14b-alt: Create objc_library for WebRTC on macOS
-  - `rtc_peer_connection_apple` using WebRTC.framework
-  - `rtc_data_channel_apple` using RTCDataChannel from framework
-  - Both use Objective-C++ to bridge WebRTC Obj-C API to C++
+  - Test with local signaling server first: `cells sync "http://localhost:3000/?room=test"`
 
 **References:**
-- libdatachannel: https://github.com/paullouisageneau/libdatachannel
-- stasel/WebRTC: https://github.com/stasel/WebRTC
-- WebRTC native development: https://webrtc.github.io/webrtc-org/native-code/
+- libdatachannel docs: https://github.com/paullouisageneau/libdatachannel/blob/master/DOC.md
+- libdatachannel API: `include/rtc/peerconnection.hpp`, `include/rtc/datachannel.hpp`
+- Bazel target: `@libdatachannel//:libdatachannel` (builds `libdatachannel.a`)
 
 ---
 
