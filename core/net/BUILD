@@ -57,16 +57,46 @@ objc_library(
     ],
 )
 
-# NOTE: WebRTC Apple implementations (rtc_data_channel_apple, rtc_peer_connection_apple)
-# are deferred. The stasel/WebRTC XCFramework for macOS appears to be incomplete
-# (missing header files in macOS slice). For now, we use the default stub implementations
-# for WebRTC on macOS. This means P2P sync won't work on native macOS CLI yet, but
-# HTTP and WebSocket will work once we integrate those Apple implementations.
+# =============================================================================
+# Native WebRTC implementations using libdatachannel
+# For macOS, Linux, and other native platforms (not emscripten/WASM)
+# =============================================================================
 #
-# TODO: Either:
-# 1. Use MacCatalyst slice headers with macOS build
-# 2. Build WebRTC from source for macOS
-# 3. Wait for stasel/WebRTC to fix macOS framework
+# libdatachannel provides lightweight C++ WebRTC Data Channels implementation.
+# It's used for native platforms instead of the stasel/WebRTC XCFramework
+# which had incomplete headers in the macOS slice.
+
+# RTCDataChannel using libdatachannel (native platforms)
+cc_library(
+    name = "rtc_data_channel_libdc",
+    srcs = ["native/RTCDataChannel_libdc.cc"],
+    hdrs = ["include/RTCDataChannel.h"],
+    copts = ["-std=c++17"],
+    includes = ["."],
+    deps = [
+        ":rtc_data_channel_common",
+        "@libdatachannel",
+        "@openssl//:ssl",     # libdatachannel links against OpenSSL
+        "@openssl//:crypto",  # libdatachannel links against libcrypto
+    ],
+)
+
+# RTCPeerConnection using libdatachannel (native platforms)
+cc_library(
+    name = "rtc_peer_connection_libdc",
+    srcs = ["native/RTCPeerConnection_libdc.cc"],
+    hdrs = ["include/RTCPeerConnection.h"],
+    copts = ["-std=c++17"],
+    includes = ["."],
+    deps = [
+        ":ice_config",
+        ":rtc_data_channel_libdc",
+        ":rtc_peer_connection_common",
+        "@libdatachannel",
+        "@openssl//:ssl",     # libdatachannel links against OpenSSL
+        "@openssl//:crypto",  # libdatachannel links against libcrypto
+    ],
+)
 
 # =============================================================================
 # Common/shared implementations
@@ -269,7 +299,8 @@ cc_library(
 
 # RTCDataChannel abstraction
 # Platform-specific implementations selected via config
-# NOTE: Apple uses default stub until WebRTC XCFramework issue is resolved
+# - Web (emscripten): Uses browser RTCDataChannel via JS interop
+# - Native (macOS, Linux, etc.): Uses libdatachannel C++ library
 cc_library(
     name = "rtc_data_channel",
     hdrs = ["include/RTCDataChannel.h"],
@@ -277,8 +308,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = select({
         "@platforms//os:emscripten": [":rtc_data_channel_web"],
-        # TODO: Use rtc_data_channel_apple when WebRTC XCFramework is fixed
-        "//conditions:default": [":rtc_data_channel_default"],
+        "//conditions:default": [":rtc_data_channel_libdc"],
     }),
 )
 
@@ -314,7 +344,8 @@ cc_library(
 
 # RTCPeerConnection abstraction
 # Platform-specific implementations selected via config
-# NOTE: Apple uses default stub until WebRTC XCFramework issue is resolved
+# - Web (emscripten): Uses browser RTCPeerConnection via JS interop
+# - Native (macOS, Linux, etc.): Uses libdatachannel C++ library
 cc_library(
     name = "rtc_peer_connection",
     hdrs = ["include/RTCPeerConnection.h"],
@@ -325,8 +356,7 @@ cc_library(
         ":rtc_data_channel",
     ] + select({
         "@platforms//os:emscripten": [":rtc_peer_connection_web"],
-        # TODO: Use rtc_peer_connection_apple when WebRTC XCFramework is fixed
-        "//conditions:default": [":rtc_peer_connection_default"],
+        "//conditions:default": [":rtc_peer_connection_libdc"],
     }),
 )
 

@@ -36,8 +36,13 @@ cmake(
     },
     generate_args = ["-GNinja"],
     lib_source = ":all_srcs",
-    # The static lib that gets installed (libdatachannel.a, not -static.a)
-    out_static_libs = ["libdatachannel.a"],
+    # Static libs that get installed - main lib plus submodule dependencies
+    # Order matters: libdatachannel depends on libjuice and libusrsctp
+    out_static_libs = [
+        "libdatachannel.a",
+        "libjuice.a",
+        "libusrsctp.a",
+    ],
     # Headers to expose
     out_include_dir = "include",
     # Build and install the static library
