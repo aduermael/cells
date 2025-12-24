@@ -54,7 +54,7 @@ Convert all JavaScript files in `apps/wasm/` to TypeScript with proper type defi
 - [x] 4c: Convert `grid-events.js` to `src/grid-events.ts`
 
 ## Phase 5: Convert collaboration modules
-- [ ] 5a: Convert `rtc-proxy.js` to `src/rtc-proxy.ts`
+- [x] 5a: Convert `rtc-proxy.js` to `src/rtc-proxy.ts`
 - [ ] 5b: Convert `cpp-sync-adapter.js` to `src/cpp-sync-adapter.ts`
 - [ ] 5c: Convert `collab-ui.js` to `src/collab-ui.ts`
 
