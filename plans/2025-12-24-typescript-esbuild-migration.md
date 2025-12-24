@@ -55,7 +55,7 @@ Convert all JavaScript files in `apps/wasm/` to TypeScript with proper type defi
 
 ## Phase 5: Convert collaboration modules
 - [x] 5a: Convert `rtc-proxy.js` to `src/rtc-proxy.ts`
-- [ ] 5b: Convert `cpp-sync-adapter.js` to `src/cpp-sync-adapter.ts`
+- [x] 5b: Convert `cpp-sync-adapter.js` to `src/cpp-sync-adapter.ts`
 - [ ] 5c: Convert `collab-ui.js` to `src/collab-ui.ts`
 
 ## Phase 6: Convert main application files
