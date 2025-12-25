@@ -341,7 +341,7 @@ Track which cells depend on which for reactive updates, using R-tree for efficie
   - Test sparse coordinates (non-contiguous positions)
   - **Test**: All tests pass before proceeding
 
-- [ ] 4c: Define dependency graph in `core/cells/dependency_graph.h`
+- [x] 4c: Define dependency graph in `core/cells/dependency_graph.h`
   - `DependencyGraph` class wrapping R-tree
   - `dependencies[cellId]` - set of references this formula reads (for display)
   - R-tree stores: rectangle → set of dependent cell IDs
@@ -354,7 +354,7 @@ Track which cells depend on which for reactive updates, using R-tree for efficie
     - `getVolatileCells()` - get all volatile cells
   - **Test**: Basic add/remove/query works
 
-- [ ] 4d: Implement dependency extraction in `core/cells/dependency_graph.cc`
+- [x] 4d: Implement dependency extraction in `core/cells/dependency_graph.cc`
   - Walk AST to extract all references
   - For CellRef: insert 1×1 rectangle at (col, row)
   - For RangeRef: insert rectangle from topLeft to bottomRight corners
@@ -363,14 +363,14 @@ Track which cells depend on which for reactive updates, using R-tree for efficie
   - Track volatile functions (NOW, RAND, etc.) and mark cell
   - **Test**: Extraction works for all reference types
 
-- [ ] 4e: Add circular reference detection (lazy)
+- [x] 4e: Add circular reference detection (lazy)
   - `detectCycle(startCellId)` - DFS from cell, return cycle path if found
   - `getRecalcOrder(changedCells)` - topological sort of affected cells
   - Called at recalc time, not on formula entry
   - Return error info for UI display when cycle detected
   - **Test**: Cycle detection works
 
-- [ ] 4f: Add dependency graph tests in `core/cells/dependency_graph_test.cc`
+- [x] 4f: Add dependency graph tests in `core/cells/dependency_graph_test.cc`
   - Test single cell dependencies
   - Test range dependencies
   - Test whole column/row dependencies

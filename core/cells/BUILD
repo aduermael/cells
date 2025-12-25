@@ -433,3 +433,29 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "dependency_graph",
+    srcs = ["dependency_graph.cc"],
+    hdrs = ["dependency_graph.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":formula_ast",
+        ":rtree",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "dependency_graph_test",
+    srcs = ["dependency_graph_test.cc"],
+    deps = [
+        ":dependency_graph",
+        ":formula_ast",
+        ":formula_parser",
+        ":formula_resolver",
+        ":id",
+        ":model",
+        "@googletest//:gtest_main",
+    ],
+)

@@ -484,9 +484,8 @@ TEST(RTreeTest, ForEach) {
     tree.insert(20, 20, 30, 30, "c");
 
     std::set<std::string> seen;
-    tree.forEach([&](const BoundingRect& /*bounds*/, const std::string& value) {
-        seen.insert(value);
-    });
+    tree.forEach(
+        [&](const BoundingRect& /*bounds*/, const std::string& value) { seen.insert(value); });
 
     EXPECT_EQ(seen.size(), 3u);
     EXPECT_TRUE(seen.count("a"));

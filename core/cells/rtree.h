@@ -29,28 +29,22 @@ struct BoundingRect {
         : minCol(minC), minRow(minR), maxCol(maxC), maxRow(maxR) {}
 
     // Create a point rectangle (1x1)
-    static BoundingRect point(int32_t col, int32_t row) {
-        return BoundingRect(col, row, col, row);
-    }
+    static BoundingRect point(int32_t col, int32_t row) { return {col, row, col, row}; }
 
     // Create a whole-column rectangle
-    static BoundingRect wholeColumn(int32_t col) {
-        return BoundingRect(col, 0, col, MAX_COORD);
-    }
+    static BoundingRect wholeColumn(int32_t col) { return {col, 0, col, MAX_COORD}; }
 
     // Create a column range rectangle
     static BoundingRect columnRange(int32_t startCol, int32_t endCol) {
-        return BoundingRect(startCol, 0, endCol, MAX_COORD);
+        return {startCol, 0, endCol, MAX_COORD};
     }
 
     // Create a whole-row rectangle
-    static BoundingRect wholeRow(int32_t row) {
-        return BoundingRect(0, row, MAX_COORD, row);
-    }
+    static BoundingRect wholeRow(int32_t row) { return {0, row, MAX_COORD, row}; }
 
     // Create a row range rectangle
     static BoundingRect rowRange(int32_t startRow, int32_t endRow) {
-        return BoundingRect(0, startRow, MAX_COORD, endRow);
+        return {0, startRow, MAX_COORD, endRow};
     }
 
     // Check if this rectangle contains a point
@@ -60,8 +54,8 @@ struct BoundingRect {
 
     // Check if this rectangle intersects another
     [[nodiscard]] bool intersects(const BoundingRect& other) const {
-        return !(other.minCol > maxCol || other.maxCol < minCol || other.minRow > maxRow ||
-                 other.maxRow < minRow);
+        return other.minCol <= maxCol && other.maxCol >= minCol && other.minRow <= maxRow &&
+               other.maxRow >= minRow;
     }
 
     // Check if this rectangle contains another entirely
@@ -78,10 +72,10 @@ struct BoundingRect {
 
     // Calculate enlarged area if we include another rect
     [[nodiscard]] double enlargedArea(const BoundingRect& other) const {
-        int32_t newMinCol = std::min(minCol, other.minCol);
-        int32_t newMaxCol = std::max(maxCol, other.maxCol);
-        int32_t newMinRow = std::min(minRow, other.minRow);
-        int32_t newMaxRow = std::max(maxRow, other.maxRow);
+        const int32_t newMinCol = std::min(minCol, other.minCol);
+        const int32_t newMaxCol = std::max(maxCol, other.maxCol);
+        const int32_t newMinRow = std::min(minRow, other.minRow);
+        const int32_t newMaxRow = std::max(maxRow, other.maxRow);
         return static_cast<double>(newMaxCol - newMinCol + 1) *
                static_cast<double>(newMaxRow - newMinRow + 1);
     }
@@ -123,7 +117,7 @@ public:
     static constexpr size_t MAX_ENTRIES = 8;  // Max entries per node
     static constexpr size_t MIN_ENTRIES = 4;  // Min entries per node (half of max)
 
-    RTree() : root_(std::make_unique<RTreeNode<T>>(true)), size_(0) {}
+    RTree() : root_(std::make_unique<RTreeNode<T>>(true)) {}
 
     // Insert a rectangle with associated value
     void insert(const BoundingRect& bounds, const T& value) {
@@ -142,7 +136,7 @@ public:
         }
 
         std::vector<RTreeEntry<T>> orphans;
-        bool found = removeFromNode(root_.get(), bounds, value, orphans);
+        const bool found = removeFromNode(root_.get(), bounds, value, orphans);
 
         if (found) {
             --size_;
@@ -207,7 +201,7 @@ public:
 
 private:
     std::unique_ptr<RTreeNode<T>> root_;
-    size_t size_;
+    size_t size_{0};
 
     void insert(const RTreeEntry<T>& entry) {
         insertInternal(entry);
@@ -251,12 +245,11 @@ private:
         double minArea = std::numeric_limits<double>::max();
 
         for (size_t i = 0; i < node->children.size(); ++i) {
-            double enlargement = node->children[i]->bounds.enlargedArea(entry.bounds) -
-                                 node->children[i]->bounds.area();
-            double area = node->children[i]->bounds.area();
+            const double enlargement = node->children[i]->bounds.enlargedArea(entry.bounds) -
+                                       node->children[i]->bounds.area();
+            const double area = node->children[i]->bounds.area();
 
-            if (enlargement < minEnlargement ||
-                (enlargement == minEnlargement && area < minArea)) {
+            if (enlargement < minEnlargement || (enlargement == minEnlargement && area < minArea)) {
                 minEnlargement = enlargement;
                 minArea = area;
                 bestIdx = i;
@@ -283,16 +276,16 @@ private:
         // Simple split: sort by center and divide
         std::sort(node->entries.begin(), node->entries.end(),
                   [](const RTreeEntry<T>& a, const RTreeEntry<T>& b) {
-                      int64_t centerA =
+                      const int64_t centerA =
                           static_cast<int64_t>(a.bounds.minCol + a.bounds.maxCol) / 2 +
                           static_cast<int64_t>(a.bounds.minRow + a.bounds.maxRow) / 2;
-                      int64_t centerB =
+                      const int64_t centerB =
                           static_cast<int64_t>(b.bounds.minCol + b.bounds.maxCol) / 2 +
                           static_cast<int64_t>(b.bounds.minRow + b.bounds.maxRow) / 2;
                       return centerA < centerB;
                   });
 
-        size_t splitPoint = node->entries.size() / 2;
+        const size_t splitPoint = node->entries.size() / 2;
         for (size_t i = splitPoint; i < node->entries.size(); ++i) {
             newNode->entries.push_back(std::move(node->entries[i]));
         }
@@ -310,18 +303,19 @@ private:
         auto newNode = std::make_unique<RTreeNode<T>>(false);
 
         // Sort children by center and divide
-        std::sort(node->children.begin(), node->children.end(),
-                  [](const std::unique_ptr<RTreeNode<T>>& a, const std::unique_ptr<RTreeNode<T>>& b) {
-                      int64_t centerA =
-                          static_cast<int64_t>(a->bounds.minCol + a->bounds.maxCol) / 2 +
-                          static_cast<int64_t>(a->bounds.minRow + a->bounds.maxRow) / 2;
-                      int64_t centerB =
-                          static_cast<int64_t>(b->bounds.minCol + b->bounds.maxCol) / 2 +
-                          static_cast<int64_t>(b->bounds.minRow + b->bounds.maxRow) / 2;
-                      return centerA < centerB;
-                  });
+        std::sort(
+            node->children.begin(), node->children.end(),
+            [](const std::unique_ptr<RTreeNode<T>>& a, const std::unique_ptr<RTreeNode<T>>& b) {
+                const int64_t centerA =
+                    static_cast<int64_t>(a->bounds.minCol + a->bounds.maxCol) / 2 +
+                    static_cast<int64_t>(a->bounds.minRow + a->bounds.maxRow) / 2;
+                const int64_t centerB =
+                    static_cast<int64_t>(b->bounds.minCol + b->bounds.maxCol) / 2 +
+                    static_cast<int64_t>(b->bounds.minRow + b->bounds.maxRow) / 2;
+                return centerA < centerB;
+            });
 
-        size_t splitPoint = node->children.size() / 2;
+        const size_t splitPoint = node->children.size() / 2;
         for (size_t i = splitPoint; i < node->children.size(); ++i) {
             newNode->children.push_back(std::move(node->children[i]));
         }
@@ -470,7 +464,7 @@ template <typename T>
 struct RTreeNode {
     bool isLeaf;
     BoundingRect bounds;
-    std::vector<RTreeEntry<T>> entries;                 // For leaf nodes
+    std::vector<RTreeEntry<T>> entries;                   // For leaf nodes
     std::vector<std::unique_ptr<RTreeNode<T>>> children;  // For internal nodes
 
     explicit RTreeNode(bool leaf) : isLeaf(leaf) {}
