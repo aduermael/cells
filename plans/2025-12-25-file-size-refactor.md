@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2025-12-25 07:34 UTC
-Updated At: 2025-12-25 08:55 UTC
+Updated At: 2025-12-25 09:20 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # File Size Refactoring Plan
@@ -127,7 +127,7 @@ After extraction, assess and split any files still over 500 lines.
 - `collab-ui.ts` (871) → consider splitting dialog/form from state
 - `cpp-sync-adapter.ts` (809) → may be acceptable as is (single concern)
 
-- [ ] 4a: Split `grid-renderer.ts` into smaller modules
+- [x] 4a: Split `grid-renderer.ts` into smaller modules (455 lines → constants 91, header 279, selection 222, presence 430)
 - [ ] 4b: Evaluate and split `client.ts` if still large
 - [ ] 4c: Evaluate and split `worker.ts` if still large
 - [ ] 4d: Evaluate `collab-ui.ts` - split if logical separation exists
