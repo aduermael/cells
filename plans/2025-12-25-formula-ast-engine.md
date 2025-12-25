@@ -418,13 +418,12 @@ Wire the parser and dependency graph into the Cell/Sheet model.
   - Added `getSheetByName()` to Workbook for cross-sheet references
   - **Test**: Set/get/clear formula works
 
-- [x] 5c: Add serialization support
-  - Formulas stored as A1 notation text in formula.text (simpler approach)
+- [x] 5c: Add serialization support (PARTIAL - needs 5f)
+  - Formulas currently stored as A1 notation text in formula.text
   - Serializer writes formula.text directly (already working)
   - Parser reads formula.text and creates Formula object (already working)
-  - AST is reparsed on demand using Formula::parse() method
-  - Note: UUID-based storage for move stability deferred to future work
-  - **Test**: Serialization round-trip works
+  - **ISSUE**: A1 storage breaks move stability - see Phase 5f for fix
+  - **Test**: Serialization round-trip works (but with A1, not UUID)
 
 - [x] 5d: Add integration tests in `core/cells/formula_integration_test.cc`
   - Test setting formulas via Sheet API
@@ -446,6 +445,80 @@ Wire the parser and dependency graph into the Cell/Sheet model.
     - Create named range "total" → use `=total` in formula → resolves correctly
   - **Expected**: Formulas round-trip through save/load; display matches input
   - **Limitations**: Cell shows formula text, not computed value (execution deferred)
+
+- [ ] 5f: **FIX** - Implement UUID-based formula storage (REQUIRED for Phase 6)
+
+  **Problem**: Current implementation stores A1 notation in formula.text, which breaks
+  move stability. When column A becomes column B, stored `=A1` is now wrong.
+
+  **Correct architecture**:
+  ```
+  User enters: =A1+B1 (A1 notation)
+       ↓
+  Parse to AST (CellRefNode with column="A", row=1)
+       ↓
+  Resolve: Fill in cellId UUIDs for each CellRefNode
+       ↓
+  Generate UUID text: =cellId1+cellId2 (using RefConverter format)
+       ↓
+  Store in formula.text (UUID format, e.g., "=$$xK7mNp2Q+fR3pK7wN")
+       ↓
+  Serialize to .zcd file (UUID format)
+
+  For display:
+  Read formula.text → parse → for each CellRefNode:
+    cellId → lookup cell → get col/row positions → format as A1
+  ```
+
+  **UUID ref format** (from RefConverter):
+  - `$$cellId` → `$A$1` (both absolute)
+  - `$~cellId` → `$A1` (col absolute, row relative)
+  - `~$cellId` → `A$1` (col relative, row absolute)
+  - `cellId` → `A1` (both relative, bare 8-char ID)
+
+  **Sub-tasks**:
+
+  - [ ] 5f.1: Add `FormulaSerializer` class to convert resolved AST → UUID text
+    - Walk AST, for each CellRefNode: format using RefConverter UUID format
+    - Handle ranges: `cellId1:cellId2`
+    - Handle named ranges: pass through as-is
+    - Handle all operators and functions
+    - **Test**: `=A1+B2` with resolved UUIDs → `=xK7mNp2Q+fR3pK7wN`
+
+  - [ ] 5f.2: Update FormulaLexer to tokenize UUID refs
+    - Recognize patterns: `$$`, `$~`, `~$` followed by 8 alphanumeric chars
+    - Recognize bare 8-char alphanumeric as cell ref (if in formula context)
+    - New token types or reuse CELL_REF with additional parsing
+    - **Test**: Lexer tokenizes `=$$xK7mNp2Q+10` correctly
+
+  - [ ] 5f.3: Update FormulaParser to handle UUID ref tokens
+    - CellRefNode stores cellId directly (no column/row needed for UUID refs)
+    - Add `CellRefNode::isUuidFormat` flag or detect from fields
+    - **Test**: Parser produces correct AST from UUID-format formula
+
+  - [ ] 5f.4: Update Sheet::setCellFormula to store UUID format
+    - After resolution, call FormulaSerializer to generate UUID text
+    - Store UUID text in formula.text (NOT the original A1 input)
+    - Keep AST for immediate use
+    - **Test**: After setCellFormula("=A1"), formula.text contains UUID format
+
+  - [ ] 5f.5: Update display to convert UUID → A1 for user
+    - FormulaDisplayConverter or RefConverter::formulaToA1()
+    - Walk AST, convert each UUID ref to A1 based on current cell positions
+    - **Test**: Display shows "=A1+B2" from stored UUID format
+
+  - [ ] 5f.6: Update parser.cc to handle UUID format on load
+    - Formulas in .zcd files are now UUID format
+    - Parse creates Formula with UUID text
+    - AST can be reconstructed by parsing UUID text
+    - **Test**: Load .zcd with UUID formulas, display shows correct A1
+
+  - [ ] 5f.7: Update integration tests
+    - Test UUID storage after setCellFormula
+    - Test display conversion from UUID to A1
+    - Test serialization/load preserves UUID format
+    - Test move stability: move column, display updates, stored UUID unchanged
+    - **Test**: All integration tests pass with UUID storage
 
 ---
 
