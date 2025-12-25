@@ -269,7 +269,6 @@ export class FormulaBarEditor {
 
   private getSelectedCell: () => Position | null;
   private getSelectionStart: () => Position | null;
-  private getSelectionEnd: () => Position | null;
   private getSheetInfo: () => SheetInfo | null;
   private getCells: () => CellData[];
   private setCells: (cells: CellData[]) => void;
@@ -300,7 +299,6 @@ export class FormulaBarEditor {
     canvas: HTMLCanvasElement;
     getSelectedCell: () => Position | null;
     getSelectionStart: () => Position | null;
-    getSelectionEnd: () => Position | null;
     getSheetInfo: () => SheetInfo | null;
     getCells: () => CellData[];
     setCells: (cells: CellData[]) => void;
@@ -317,7 +315,6 @@ export class FormulaBarEditor {
     this.canvas = config.canvas;
     this.getSelectedCell = config.getSelectedCell;
     this.getSelectionStart = config.getSelectionStart;
-    this.getSelectionEnd = config.getSelectionEnd;
     this.getSheetInfo = config.getSheetInfo;
     this.getCells = config.getCells;
     this.setCells = config.setCells;
@@ -572,7 +569,7 @@ export class FormulaBarEditor {
         cell.value = this.formulaInput.value;
         cell.formula = this.formulaInput.value.startsWith("=")
           ? this.formulaInput.value
-          : null;
+          : undefined;
       } else {
         // Create a temporary local cell for preview
         cells.push({

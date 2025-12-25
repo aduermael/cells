@@ -45,9 +45,6 @@ export class SheetTabsManager {
   /** Index of active sheet */
   private activeSheetIndex: number = 0;
 
-  /** Sheet index being edited (-1 for none) */
-  private editingSheetIndex: number = -1;
-
   /** Reference to context menu element */
   private contextMenu: HTMLElement | null = null;
 
@@ -59,7 +56,6 @@ export class SheetTabsManager {
   // Callbacks
   // =========================================================================
 
-  private onSwitchSheet: (index: number) => Promise<void>;
   private onSetActiveSheetIndex: (index: number) => void;
   private onSetEditingSheetIndex: (index: number) => void;
   private onResetViewState: () => void;
@@ -72,7 +68,6 @@ export class SheetTabsManager {
     uiStateMachine: UIStateMachine;
     sheetTabsContainer: HTMLElement;
     addSheetBtn: HTMLButtonElement;
-    onSwitchSheet: (index: number) => Promise<void>;
     onSetActiveSheetIndex: (index: number) => void;
     onSetEditingSheetIndex: (index: number) => void;
     onResetViewState: () => void;
@@ -80,7 +75,6 @@ export class SheetTabsManager {
     this.uiStateMachine = config.uiStateMachine;
     this.sheetTabsContainer = config.sheetTabsContainer;
     this.addSheetBtn = config.addSheetBtn;
-    this.onSwitchSheet = config.onSwitchSheet;
     this.onSetActiveSheetIndex = config.onSetActiveSheetIndex;
     this.onSetEditingSheetIndex = config.onSetEditingSheetIndex;
     this.onResetViewState = config.onResetViewState;
@@ -322,13 +316,14 @@ export class SheetTabsManager {
    */
   startEditingSheetTab(index: number): void {
     this.uiStateMachine.transition(UIEvent.START_SHEET_TAB_EDIT);
-    this.editingSheetIndex = index;
     this.onSetEditingSheetIndex(index);
 
     const tab = this.sheetTabsContainer.children[index] as HTMLElement;
     if (!tab) return;
 
-    const currentName = this.sheets[index].name;
+    const sheet = this.sheets[index];
+    if (!sheet) return;
+    const currentName = sheet.name;
 
     // Create inline editor
     const editor = document.createElement("input");
@@ -347,7 +342,6 @@ export class SheetTabsManager {
       this.uiStateMachine.transition(
         save ? UIEvent.COMMIT_SHEET_TAB_EDIT : UIEvent.CANCEL_SHEET_TAB_EDIT
       );
-      this.editingSheetIndex = -1;
       this.onSetEditingSheetIndex(-1);
 
       const newName = editor.value.trim();

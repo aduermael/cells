@@ -13,7 +13,7 @@ import {
   DEFAULT_ROW_HEIGHT,
 } from "./grid-renderer";
 import type { Position, SheetInfo } from "./types";
-import { getNormalizedRange, type NormalizedRange } from "./grid-utils";
+import { getNormalizedRange } from "./grid-utils";
 
 // =============================================================================
 // Types
@@ -265,7 +265,8 @@ export class CellEditor {
     if (!this.isEditing() || !this.dataSource) return;
 
     // Get cellId from state machine context before transitioning
-    const { cellId } = this.uiStateMachine.getStateContext();
+    const context = this.uiStateMachine.getStateContext();
+    const cellId = context.cellId as string | undefined;
     if (!cellId) return;
 
     const newValue = this.cellEditorInput.value;
