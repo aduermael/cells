@@ -66,6 +66,22 @@ struct Formula {
     // Movable
     Formula(Formula&& other) noexcept;
     Formula& operator=(Formula&& other) noexcept;
+
+    // Parse the formula text into an AST
+    // Returns true if parsing succeeded (AST will be set)
+    // Note: Success doesn't mean the formula is valid - check isValid() for that
+    bool parse();
+
+    // Check if the AST is valid (no ErrorNodes)
+    // Returns false if AST is null or contains errors
+    [[nodiscard]] bool isValid() const;
+
+    // Check if the formula contains volatile functions (NOW, RAND, TODAY, etc.)
+    // Returns false if AST is null
+    [[nodiscard]] bool hasVolatile() const;
+
+    // Get the formula text (for display)
+    [[nodiscard]] const char* getText() const { return text; }
 };
 
 // Cell - fundamental unit of data

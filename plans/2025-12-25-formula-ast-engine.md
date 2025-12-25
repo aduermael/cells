@@ -401,8 +401,8 @@ Track which cells depend on which for reactive updates, using R-tree for efficie
 
 Wire the parser and dependency graph into the Cell/Sheet model.
 
-- [ ] 5a: Update Cell/Formula structs in `core/cells/model.h`
-  - Add `unique_ptr<ASTNode> ast` field to Formula
+- [x] 5a: Update Cell/Formula structs in `core/cells/model.h`
+  - Add `unique_ptr<ASTNode> ast` field to Formula (already present)
   - Add `parse()` method to Formula that uses the parser
   - Add `isValid()` helper to check if AST has no ErrorNodes
   - Add `hasVolatile()` helper to check for volatile functions

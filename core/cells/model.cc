@@ -6,9 +6,56 @@
 #include <algorithm>
 #include <utility>
 
+#include "core/cells/formula_ast.h"
+#include "core/cells/formula_parser.h"
 #include "core/cells/id.h"
 
 namespace cells {
+
+// Local helper to check if an AST contains volatile functions
+// (Avoids circular dependency with formula_resolver.h)
+namespace {
+bool containsVolatileFunctionImpl(const ASTNode* ast) {
+    if (ast == nullptr) {
+        return false;
+    }
+
+    switch (ast->type) {
+        case ASTNodeType::FUNCTION_CALL: {
+            const auto* func = static_cast<const FunctionCallNode*>(ast);
+            if (func->isVolatile || FunctionCallNode::isVolatileFunction(func->name)) {
+                return true;
+            }
+            for (const auto& arg : func->args) {
+                if (containsVolatileFunctionImpl(arg.get())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        case ASTNodeType::BINARY_OP: {
+            const auto* binOp = static_cast<const BinaryOpNode*>(ast);
+            return containsVolatileFunctionImpl(binOp->left.get()) ||
+                   containsVolatileFunctionImpl(binOp->right.get());
+        }
+        case ASTNodeType::UNARY_OP: {
+            const auto* unOp = static_cast<const UnaryOpNode*>(ast);
+            return containsVolatileFunctionImpl(unOp->operand.get());
+        }
+        case ASTNodeType::ERROR_NODE: {
+            const auto* errNode = static_cast<const ErrorNode*>(ast);
+            for (const auto& child : errNode->partialChildren) {
+                if (containsVolatileFunctionImpl(child.get())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        default:
+            return false;
+    }
+}
+}  // namespace
 
 // ============================================================================
 // CellValue
@@ -79,7 +126,7 @@ Formula::Formula(const char* text) : text(nullptr), ast(nullptr), dirty(true) {
 
 Formula::~Formula() {
     delete[] text;
-    // Note: ast cleanup will be handled when ASTNode is implemented
+    delete ast;
 }
 
 Formula::Formula(Formula&& other) noexcept : text(other.text), ast(other.ast), dirty(other.dirty) {
@@ -90,7 +137,7 @@ Formula::Formula(Formula&& other) noexcept : text(other.text), ast(other.ast), d
 Formula& Formula::operator=(Formula&& other) noexcept {
     if (this != &other) {
         delete[] text;
-        // Note: ast cleanup will be handled when ASTNode is implemented
+        delete ast;
         text = other.text;
         ast = other.ast;
         dirty = other.dirty;
@@ -98,6 +145,38 @@ Formula& Formula::operator=(Formula&& other) noexcept {
         other.ast = nullptr;
     }
     return *this;
+}
+
+bool Formula::parse() {
+    // Delete any existing AST
+    delete ast;
+    ast = nullptr;
+
+    if (text == nullptr || text[0] == '\0') {
+        return false;
+    }
+
+    FormulaParser parser(text);
+    std::unique_ptr<ASTNode> parsed = parser.parse();
+    if (parsed) {
+        ast = parsed.release();
+        return true;
+    }
+    return false;
+}
+
+bool Formula::isValid() const {
+    if (ast == nullptr) {
+        return false;
+    }
+    return !ast->hasError();
+}
+
+bool Formula::hasVolatile() const {
+    if (ast == nullptr) {
+        return false;
+    }
+    return containsVolatileFunctionImpl(ast);
 }
 
 // ============================================================================
