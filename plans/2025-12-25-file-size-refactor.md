@@ -65,8 +65,8 @@ Extract the main application orchestration to a new TypeScript module.
 - State machine helpers (lines 418-500) → `src/app.ts`
 - Utility functions (lines 501-627) → `src/grid-utils.ts`
 
-- [ ] 1a: Create `src/wasm-data-source.ts` - extract WasmDataSource class
-- [ ] 1b: Create `src/grid-utils.ts` - extract coordinate/cell lookup utilities
+- [x] 1a: Create `src/wasm-data-source.ts` - extract WasmDataSource class
+- [x] 1b: Create `src/grid-utils.ts` - extract coordinate/cell lookup utilities
 - [ ] 1c: Create `src/app.ts` - extract App class with state and initialization
 - [ ] 1d: Update `build.mjs` to add `src/app.ts` as entry point
 - [ ] 1e: Verify build succeeds and app functions correctly
