@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-25 00:19 UTC
-Updated At: 2025-12-25 02:30 UTC
+Updated At: 2025-12-25 03:15 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -14,6 +14,15 @@ Implement the formula parsing engine with AST representation, UUID-based referen
 - Displaying formulas in A1 notation while storing with UUIDs
 
 Execution (actually computing formula results) is deferred to a separate plan.
+
+### Architecture Boundaries
+
+| Layer | Language | Notes |
+|-------|----------|-------|
+| **Core engine** | C++ | All parsing, AST, resolution, dependency tracking. Compiles to native (desktop/mobile) and WASM (web). |
+| **Web UI** | TypeScript | Calls C++ via WASM exports. All web code is TypeScript (not JavaScript). |
+| **Native UI** | SwiftUI, etc. | Calls C++ directly. No JS/TS involved. |
+| **Build tools** | Various | Tree-sitter uses `grammar.js` as a DSL to generate C code—no JS at runtime. |
 
 ## Testing Philosophy
 
@@ -125,15 +134,16 @@ ErrorNode (errorType, position, partialChildren)
 
 ## Phase 1: Tree-sitter Grammar
 
-Write the tree-sitter grammar for Excel-style formulas.
+Write the tree-sitter grammar for Excel-style formulas. Tree-sitter uses a JavaScript-based DSL (`grammar.js`) to **define** the grammar, but **generates a C parser** that compiles into our C++ codebase. The `grammar.js` file is only used at build time by tree-sitter's code generator—no JavaScript runs at runtime.
 
 - [ ] 1a: Set up tree-sitter infrastructure
   - Create `core/cells/tree-sitter-formula/` directory
   - Initialize tree-sitter grammar project structure
-  - Configure Bazel to build the generated C parser
-  - **Test**: Build compiles successfully
+  - Configure Bazel to run `tree-sitter generate` and build the generated C parser
+  - The generated C parser integrates directly with our C++ code
+  - **Test**: Build compiles successfully, C parser linked into core library
 
-- [ ] 1b: Define grammar in `grammar.js`
+- [ ] 1b: Define grammar in `grammar.js` (tree-sitter's grammar DSL → generates C parser)
   - Formula: `=` followed by expression
   - Literals: numbers (int, decimal, scientific), strings (double-quoted), booleans (TRUE/FALSE)
   - Cell references: A1, $A$1, $A1, A$1 (all absolute/relative combinations)
@@ -467,26 +477,30 @@ Test that formulas remain stable when columns/rows are moved.
 
 ## Phase 7: UI Integration (WASM bindings)
 
-Expose formula functionality to the web UI.
+Expose C++ formula functionality to the TypeScript web UI via WASM bindings. The architecture is:
+- **Core logic**: C++ (parser, resolver, dependency graph) compiled to WASM
+- **Web UI**: TypeScript calling WASM exports
+- **Native clients**: C++ directly (SwiftUI, etc.) - no JS/TS involved
 
 - [ ] 7a: Add WASM bindings for formula parsing in `apps/wasm/`
+  - C++ functions exposed via Emscripten bindings
   - `parseFormula(sheetId, cellId, text)` - parse, resolve, update deps, return success/error
   - `getFormulaDisplay(sheetId, cellId)` - get A1 display string
   - `getCellDependencies(sheetId, cellId)` - get list of cells this formula reads (for UI highlighting)
   - `validateFormula(text)` - parse without side effects, return errors for live feedback
-  - **Test**: WASM bindings work from JS
+  - **Test**: WASM bindings work from TypeScript web UI
 
 - [ ] 7b: Add WASM bindings for dependency visualization
   - `getCellDependents(sheetId, cellId)` - cells that depend on this cell
   - `getFormulaReferences(sheetId, cellId)` - get refs with source positions (for colored highlighting)
   - These enable the colored reference boxes shown in Numbers UI
-  - **Test**: Dependency queries work from JS
+  - **Test**: Dependency queries work from TypeScript web UI
 
 - [ ] 7c: Add WASM bindings for incremental parsing (live highlighting)
   - `parseFormulaIncremental(text)` - parse partial formula, return AST with ErrorNodes
   - `getReferencesFromPartial(text)` - extract valid references from incomplete formula
   - Enables highlighting while user types `=SUM(A1+` (A1 highlighted even though formula incomplete)
-  - **Test**: Incremental parsing works
+  - **Test**: Incremental parsing works from TypeScript
 
 - [ ] 7d: Update web UI to display formula dependencies
   - When editing a formula, highlight referenced cells with colors
@@ -533,4 +547,4 @@ Run all tests: `bazel test //core/cells:all`
 | 4 | `core/cells/rtree_test.cc`, `core/cells/dependency_graph_test.cc` | 4g: Precedent/dependent visualization |
 | 5 | `core/cells/formula_integration_test.cc` | 5e: Formula persistence and display |
 | 6 | `core/cells/formula_move_test.cc` | 6e: Move stability demonstration |
-| 7 | Manual testing + JS integration tests | 7d: Full formula editing UI |
+| 7 | Manual testing + TypeScript integration tests | 7d: Full formula editing UI |
