@@ -2354,10 +2354,10 @@ public:
                     json << "\"type\":\"cell\",";
                     json << "\"cellId\":\"" << ref.cellId.toString() << "\"";
                     // Include resolved position so TypeScript doesn't need viewport lookup
-                    const Cell* cell = sheet->getCellById(ref.cellId);
+                    const Cell* cell = sheet->getCell(ref.cellId);
                     if (cell) {
-                        const Axis* col = sheet->getColumnById(cell->colId);
-                        const Axis* row = sheet->getRowById(cell->rowId);
+                        const Axis* col = sheet->getColumn(cell->colId);
+                        const Axis* row = sheet->getRow(cell->rowId);
                         if (col && row) {
                             json << ",\"col\":" << col->position;
                             json << ",\"row\":" << row->position;
@@ -2370,13 +2370,13 @@ public:
                     json << "\"topLeftCellId\":\"" << ref.topLeftCellId.toString() << "\",";
                     json << "\"bottomRightCellId\":\"" << ref.bottomRightCellId.toString() << "\"";
                     // Include resolved positions for range corners
-                    const Cell* topLeft = sheet->getCellById(ref.topLeftCellId);
-                    const Cell* bottomRight = sheet->getCellById(ref.bottomRightCellId);
+                    const Cell* topLeft = sheet->getCell(ref.topLeftCellId);
+                    const Cell* bottomRight = sheet->getCell(ref.bottomRightCellId);
                     if (topLeft && bottomRight) {
-                        const Axis* startCol = sheet->getColumnById(topLeft->colId);
-                        const Axis* startRow = sheet->getRowById(topLeft->rowId);
-                        const Axis* endCol = sheet->getColumnById(bottomRight->colId);
-                        const Axis* endRow = sheet->getRowById(bottomRight->rowId);
+                        const Axis* startCol = sheet->getColumn(topLeft->colId);
+                        const Axis* startRow = sheet->getRow(topLeft->rowId);
+                        const Axis* endCol = sheet->getColumn(bottomRight->colId);
+                        const Axis* endRow = sheet->getRow(bottomRight->rowId);
                         if (startCol && startRow && endCol && endRow) {
                             json << ",\"startCol\":" << startCol->position;
                             json << ",\"startRow\":" << startRow->position;
@@ -2389,7 +2389,7 @@ public:
                 case ReferenceInfo::Type::COLUMN: {
                     json << "\"type\":\"column\",";
                     json << "\"axisId\":\"" << ref.axisId.toString() << "\"";
-                    const Axis* axis = sheet->getColumnById(ref.axisId);
+                    const Axis* axis = sheet->getColumn(ref.axisId);
                     if (axis) {
                         json << ",\"col\":" << axis->position;
                     }
@@ -2398,7 +2398,7 @@ public:
                 case ReferenceInfo::Type::ROW: {
                     json << "\"type\":\"row\",";
                     json << "\"axisId\":\"" << ref.axisId.toString() << "\"";
-                    const Axis* axis = sheet->getRowById(ref.axisId);
+                    const Axis* axis = sheet->getRow(ref.axisId);
                     if (axis) {
                         json << ",\"row\":" << axis->position;
                     }
@@ -2408,8 +2408,8 @@ public:
                     json << "\"type\":\"columnRange\",";
                     json << "\"startAxisId\":\"" << ref.startAxisId.toString() << "\",";
                     json << "\"endAxisId\":\"" << ref.endAxisId.toString() << "\"";
-                    const Axis* startAxis = sheet->getColumnById(ref.startAxisId);
-                    const Axis* endAxis = sheet->getColumnById(ref.endAxisId);
+                    const Axis* startAxis = sheet->getColumn(ref.startAxisId);
+                    const Axis* endAxis = sheet->getColumn(ref.endAxisId);
                     if (startAxis && endAxis) {
                         json << ",\"startCol\":" << startAxis->position;
                         json << ",\"endCol\":" << endAxis->position;
@@ -2420,8 +2420,8 @@ public:
                     json << "\"type\":\"rowRange\",";
                     json << "\"startAxisId\":\"" << ref.startAxisId.toString() << "\",";
                     json << "\"endAxisId\":\"" << ref.endAxisId.toString() << "\"";
-                    const Axis* startAxis = sheet->getRowById(ref.startAxisId);
-                    const Axis* endAxis = sheet->getRowById(ref.endAxisId);
+                    const Axis* startAxis = sheet->getRow(ref.startAxisId);
+                    const Axis* endAxis = sheet->getRow(ref.endAxisId);
                     if (startAxis && endAxis) {
                         json << ",\"startRow\":" << startAxis->position;
                         json << ",\"endRow\":" << endAxis->position;
