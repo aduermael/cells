@@ -224,6 +224,31 @@ struct Sheet {
     [[nodiscard]] size_t rowCount() const { return rows.size(); }
     [[nodiscard]] size_t cellCount() const { return cells.size(); }
 
+    // Axis movement operations (for move stability testing)
+    // Moves column to new position, shifting other columns as needed
+    // Returns false if colId not found
+    bool moveColumn(const ID& colId, uint32_t newPosition);
+
+    // Moves row to new position, shifting other rows as needed
+    // Returns false if rowId not found
+    bool moveRow(const ID& rowId, uint32_t newPosition);
+
+    // Insert a new column at the given position, shifting existing columns right
+    // Returns the new column
+    Axis* insertColumnAt(uint32_t position);
+
+    // Insert a new row at the given position, shifting existing rows down
+    // Returns the new row
+    Axis* insertRowAt(uint32_t position);
+
+    // Delete a column by ID, shifting other columns left
+    // Returns false if colId not found
+    bool deleteColumn(const ID& colId);
+
+    // Delete a row by ID, shifting other rows up
+    // Returns false if rowId not found
+    bool deleteRow(const ID& rowId);
+
     // Column name utilities (A, B, ..., Z, AA, AB, ...)
     static std::string positionToColumnName(uint32_t position);  // 0 -> "A", 25 -> "Z", 26 -> "AA"
     static int32_t columnNameToPosition(

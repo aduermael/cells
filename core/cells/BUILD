@@ -517,3 +517,19 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "formula_move_test",
+    srcs = ["formula_move_test.cc"],
+    deps = [
+        ":dependency_graph",
+        ":formula_ast",
+        ":formula_display",
+        ":formula_parser",
+        ":formula_resolver",
+        ":id",
+        ":model",
+        ":named_ranges",
+        "@googletest//:gtest_main",
+    ],
+)

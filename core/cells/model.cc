@@ -594,6 +594,190 @@ std::string Sheet::makeCellKey(const ID& colId, const ID& rowId) {
     return colId.toString() + ":" + rowId.toString();
 }
 
+bool Sheet::moveColumn(const ID& colId, uint32_t newPosition) {
+    // Find the column to move
+    auto it = columns.find(colId);
+    if (it == columns.end()) {
+        return false;
+    }
+
+    Axis* col = it->second.get();
+    const uint32_t oldPosition = col->position;
+
+    if (oldPosition == newPosition) {
+        return true;  // No-op
+    }
+
+    // Shift other columns
+    if (newPosition < oldPosition) {
+        // Moving left: shift columns in [newPosition, oldPosition) right by 1
+        for (auto& [id, axis] : columns) {
+            if (axis->position >= newPosition && axis->position < oldPosition) {
+                axis->position++;
+            }
+        }
+    } else {
+        // Moving right: shift columns in (oldPosition, newPosition] left by 1
+        for (auto& [id, axis] : columns) {
+            if (axis->position > oldPosition && axis->position <= newPosition) {
+                axis->position--;
+            }
+        }
+    }
+
+    // Set the new position
+    col->position = newPosition;
+    return true;
+}
+
+bool Sheet::moveRow(const ID& rowId, uint32_t newPosition) {
+    // Find the row to move
+    auto it = rows.find(rowId);
+    if (it == rows.end()) {
+        return false;
+    }
+
+    Axis* row = it->second.get();
+    const uint32_t oldPosition = row->position;
+
+    if (oldPosition == newPosition) {
+        return true;  // No-op
+    }
+
+    // Shift other rows
+    if (newPosition < oldPosition) {
+        // Moving up: shift rows in [newPosition, oldPosition) down by 1
+        for (auto& [id, axis] : rows) {
+            if (axis->position >= newPosition && axis->position < oldPosition) {
+                axis->position++;
+            }
+        }
+    } else {
+        // Moving down: shift rows in (oldPosition, newPosition] up by 1
+        for (auto& [id, axis] : rows) {
+            if (axis->position > oldPosition && axis->position <= newPosition) {
+                axis->position--;
+            }
+        }
+    }
+
+    // Set the new position
+    row->position = newPosition;
+    return true;
+}
+
+Axis* Sheet::insertColumnAt(uint32_t position) {
+    // Shift all columns at position or greater to the right
+    for (auto& [id, axis] : columns) {
+        if (axis->position >= position) {
+            axis->position++;
+        }
+    }
+
+    // Create new column at the specified position
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = position;
+    // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
+    Axis* const rawPtr = col.get();
+    addColumn(std::move(col));
+    return rawPtr;
+}
+
+Axis* Sheet::insertRowAt(uint32_t position) {
+    // Shift all rows at position or greater down
+    for (auto& [id, axis] : rows) {
+        if (axis->position >= position) {
+            axis->position++;
+        }
+    }
+
+    // Create new row at the specified position
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = position;
+    // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
+    Axis* const rawPtr = row.get();
+    addRow(std::move(row));
+    return rawPtr;
+}
+
+bool Sheet::deleteColumn(const ID& colId) {
+    auto it = columns.find(colId);
+    if (it == columns.end()) {
+        return false;
+    }
+
+    const uint32_t deletedPosition = it->second->position;
+
+    // Delete all cells in this column
+    std::vector<ID> cellsToDelete;
+    for (const auto& [cellId, cell] : cells) {
+        if (cell->colId == colId) {
+            cellsToDelete.push_back(cellId);
+        }
+    }
+    for (const ID& cellId : cellsToDelete) {
+        // Clear formula dependencies before removing
+        clearCellFormula(cellId);
+        // Remove from cell index
+        const Cell* const cell = getCell(cellId);
+        if (cell != nullptr) {
+            _cellIndex.erase(makeCellKey(cell->colId, cell->rowId));
+        }
+        cells.erase(cellId);
+    }
+
+    // Remove the column
+    columns.erase(it);
+
+    // Shift columns to the right of the deleted one left by 1
+    for (auto& [id, axis] : columns) {
+        if (axis->position > deletedPosition) {
+            axis->position--;
+        }
+    }
+
+    return true;
+}
+
+bool Sheet::deleteRow(const ID& rowId) {
+    auto it = rows.find(rowId);
+    if (it == rows.end()) {
+        return false;
+    }
+
+    const uint32_t deletedPosition = it->second->position;
+
+    // Delete all cells in this row
+    std::vector<ID> cellsToDelete;
+    for (const auto& [cellId, cell] : cells) {
+        if (cell->rowId == rowId) {
+            cellsToDelete.push_back(cellId);
+        }
+    }
+    for (const ID& cellId : cellsToDelete) {
+        // Clear formula dependencies before removing
+        clearCellFormula(cellId);
+        // Remove from cell index
+        const Cell* const cell = getCell(cellId);
+        if (cell != nullptr) {
+            _cellIndex.erase(makeCellKey(cell->colId, cell->rowId));
+        }
+        cells.erase(cellId);
+    }
+
+    // Remove the row
+    rows.erase(it);
+
+    // Shift rows below the deleted one up by 1
+    for (auto& [id, axis] : rows) {
+        if (axis->position > deletedPosition) {
+            axis->position--;
+        }
+    }
+
+    return true;
+}
+
 FormulaResult Sheet::setCellFormula(const ID& cellId, const std::string& /* formulaText */,
                                     ASTNode* ast) {
     // Get the cell
