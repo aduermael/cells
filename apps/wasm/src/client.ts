@@ -54,6 +54,7 @@ export {
   RESIZE_HANDLE_WIDTH,
   DRAG_THRESHOLD,
 } from "./grid-utils";
+export { App, createApp } from "./app";
 
 // ============================================================================
 // Worker Message Types
