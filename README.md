@@ -13,26 +13,27 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Language | Lines |
 |----------|------:|
-| C++ | 12,258 |
-| JavaScript | 8,230 |
-| HTML | 3,244 |
+| C++ | 20,137 |
+| TypeScript | 8,150 |
+| HTML | 3,420 |
+| Objective-C++ | 1,171 |
 | CSS | 1,025 |
-| Markdown | 807 |
-| Shell | 640 |
-| Go | 629 |
-| Starlark | 512 |
-| TypeScript | 447 |
+| Starlark | 1,024 |
+| Markdown | 873 |
+| Shell | 647 |
+| Go | 643 |
+| JavaScript | 177 |
 
 ### Test Code
 
 | Language | Lines |
 |----------|------:|
-| C++ | 7,139 |
+| C++ | 8,642 |
 | Go | 410 |
 
-- **Commits**: 344
-- **WASM Module**: 603 KB
-- **Total Web Bundle**: 1.13 MB
+- **Commits**: 408
+- **WASM Module**: 729 KB
+- **Total Web Bundle**: 1.36 MB
 
 <sub>Generated with `./scripts/generate-stats.sh`</sub>
 
@@ -41,7 +42,7 @@ A high-performance, collaborative spreadsheet engine with:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        UI Layer                                  │
-│   (Platform-native: SwiftUI / WinUI / React+Canvas)             │
+│   (Platform-native: SwiftUI / WinUI / TypeScript+Canvas2D)      │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -117,7 +118,7 @@ A high-performance, collaborative spreadsheet engine with:
 
 - Core as shared C++17 library
 - WebAssembly compilation for web
-- Platform-native UI (SwiftUI, WinUI, React)
+- Platform-native UI (SwiftUI, WinUI, TypeScript+Canvas2D for web)
 
 ## Directory Structure
 
@@ -141,7 +142,9 @@ cells/
 │   └── wasm/               # WebAssembly build
 │       ├── BUILD
 │       ├── bindings.cc     # Embind bindings
-│       └── static/         # Web UI (index.html, JS)
+│       ├── src/            # TypeScript source (client, worker, grid-renderer)
+│       ├── cells.d.ts      # TypeScript definitions for WASM API
+│       └── static/         # Web UI (index.html, CSS)
 ├── docs/                   # Architecture docs
 ├── plans/                  # Implementation plans
 ├── scripts/                # Build and dev scripts
@@ -215,13 +218,13 @@ make wasm-dist
 ```
 
 The distribution package includes:
-- `cells_wasm_bin.wasm` - WASM binary (~472KB)
+- `cells_wasm_bin.wasm` - WASM binary (~729KB)
 - `cells_wasm_bin.js` - Emscripten JS glue
-- `cells.d.ts` - TypeScript definitions
+- `cells.d.ts` - TypeScript definitions for WASM API
 - `index.html` - Full spreadsheet UI
-- `worker.js` - Web Worker for async WASM operations
-- `client.js` - Main thread API (CellsClient)
-- `shared/` - Shared utilities (data source, state machine)
+- `worker.js` - Web Worker for async WASM operations (bundled from TypeScript)
+- `client.js` - Main thread API with GridRenderer, CollabUI, etc. (bundled from TypeScript)
+- `shared/` - CSS styles
 
 **Web UI Features:**
 - Canvas2D grid rendering with virtual scrolling
@@ -294,13 +297,13 @@ python3 -m http.server 8080 --directory dist
 - [x] **Build system**: Bazel with Bzlmod - fast incremental builds, hermetic
 - [x] **Cell storage**: Sparse quadtree - efficient viewport queries, O(log n) access
 - [x] **Cell IDs**: 8-character base62 UUIDs - compact, collision-resistant
-- [x] **Web UI**: Canvas2D with Web Worker - non-blocking, responsive
-- [x] **State management**: Listener pattern - WASM notifies JS of changes
+- [x] **Web UI**: TypeScript + Canvas2D with Web Worker - non-blocking, responsive, type-safe
+- [x] **State management**: Listener pattern - WASM notifies TypeScript of changes
 
 **Planned (not yet implemented):**
 - [ ] **Formula runtime**: Native AST interpreter - no dependencies, simpler, full control
 - [ ] **Undo/redo**: Branch-based history - aligns with git-friendly philosophy, clean CRDT semantics
-- [ ] **Native apps**: Platform-native UI (SwiftUI for Apple, WinUI for Windows)
+- [ ] **Native apps**: Platform-native UI (SwiftUI for Apple, WinUI for Windows, web already done)
 - [ ] **Type system**: Completely optional - Excel-like by default, column types as gradual discovery
 
 **Implemented:**

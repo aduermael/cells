@@ -165,7 +165,7 @@ Split viewport into four regions:
 
 ## Current Implementation
 
-The actual implementation is in `apps/wasm/static/shared/grid-renderer.js` using Canvas2D.
+The actual implementation is in TypeScript at `apps/wasm/src/grid-renderer.ts` using Canvas2D.
 
 ### Architecture (Simplified)
 
@@ -179,9 +179,10 @@ The actual implementation is in `apps/wasm/static/shared/grid-renderer.js` using
                                │
                                ▼
 ┌──────────────────────────────────────────────────────────────┐
-│                    GridRenderer Class                         │
+│              GridRenderer Class (TypeScript)                  │
 │   - Receives state via setStateRefs()                        │
 │   - render() draws everything to Canvas2D                    │
+│   - Bundled with esbuild into client.js                      │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -213,7 +214,7 @@ The `render()` method draws in this order:
 ### High-DPI Support
 
 Canvas automatically scales for device pixel ratio:
-```javascript
+```typescript
 const dpr = window.devicePixelRatio || 1;
 canvas.width = container.clientWidth * dpr;
 canvas.height = container.clientHeight * dpr;
@@ -234,8 +235,8 @@ Special handling for column/row reordering:
 
 ### Color Palette
 
-```javascript
-COLORS = {
+```typescript
+const COLORS = {
     gridLine: '#f0f0f0',      // Subtle grid
     headerBg: '#f8f9fa',      // Header background
     headerBorder: '#dee2e6',  // Header border
@@ -244,7 +245,7 @@ COLORS = {
     selectionBorder: '#0d6efd', // Selection border (blue)
     selectionBg: 'rgba(13, 110, 253, 0.1)', // Selection fill
     cornerBg: '#e9ecef'       // Corner background
-}
+} as const;
 ```
 
 ### Not Implemented

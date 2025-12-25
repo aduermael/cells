@@ -147,13 +147,13 @@ The `make wasm-dist` command creates a `dist/` directory with all files needed f
 
 ```
 dist/
-├── cells_wasm_bin.js      # WASM loader
-├── cells_wasm_bin.wasm    # Compiled engine
-├── worker.js              # Web Worker for async operations
-├── client.js              # Main thread client API
+├── cells_wasm_bin.js      # WASM loader (Emscripten)
+├── cells_wasm_bin.wasm    # Compiled engine (~729KB)
+├── worker.js              # Web Worker (bundled from TypeScript)
+├── client.js              # Main thread API (bundled from TypeScript)
 ├── index.html             # Spreadsheet UI
-├── cells.d.ts             # TypeScript definitions
-└── shared/                # CSS and JS modules
+├── cells.d.ts             # TypeScript definitions for WASM API
+└── shared/                # CSS styles
 ```
 
 ### Features
@@ -242,9 +242,12 @@ cells/
 │   ├── cli/                # CLI converter tool
 │   └── wasm/               # Browser UI (WebAssembly)
 │       ├── bindings.cc     # C++ to WASM bindings
-│       ├── worker.js       # Web Worker
-│       ├── client.js       # Main thread API
-│       └── static/         # HTML/CSS/JS
+│       ├── src/            # TypeScript source files
+│       │   ├── client.ts   # Main thread API
+│       │   ├── worker.ts   # Web Worker
+│       │   └── grid-renderer.ts  # Canvas2D rendering
+│       ├── cells.d.ts      # TypeScript definitions for WASM
+│       └── static/         # HTML/CSS
 ├── core/                   # C++17 core engine
 │   └── cells/              # Main library
 │       ├── *.h             # Headers
@@ -277,6 +280,7 @@ cells/
 | Lint + fix | `make lint-fix` |
 | All checks | `make check` |
 | Fix all | `make fix` |
+| TypeScript check | `make check-types` |
 | Generate compile DB | `make compile-db` |
 | Clean | `make clean` |
 | Convert files | `cells -i input.xlsx output.csv` |

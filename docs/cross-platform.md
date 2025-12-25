@@ -8,7 +8,7 @@
 |-----------|--------|
 | Core engine (C++) | ✅ Implemented |
 | WASM build | ✅ Implemented |
-| Web UI (Canvas2D) | ✅ Implemented |
+| Web UI (TypeScript + Canvas2D) | ✅ Implemented |
 | Swift bindings | ❌ Not started |
 | macOS/iOS apps | ❌ Not started |
 | Windows/Android | ❌ Not started |
@@ -35,7 +35,7 @@ The architecture below describes the full vision. Currently only the Web/WASM pa
 │                      Application Layer                               │
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐   │
 │  │ Web     │ │ macOS   │ │ Windows │ │ iOS     │ │ Android     │   │
-│  │ (React) │ │ (Swift) │ │ (C#/WPF)│ │ (Swift) │ │ (Kotlin)    │   │
+│  │ (TS)    │ │ (Swift) │ │ (C#/WPF)│ │ (Swift) │ │ (Kotlin)    │   │
 │  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └──────┬──────┘   │
 │       └───────────┴───────────┴─────┬─────┴──────────────┘          │
 │                                     │                                │
@@ -102,7 +102,7 @@ For maximum performance and native feel:
 |----------|-----------|
 | macOS | SwiftUI |
 | iOS | SwiftUI |
-| Web | React + Canvas |
+| Web | TypeScript + Canvas2D (esbuild bundled) |
 | Windows | WinUI 3 |
 | Android | Jetpack Compose |
 
@@ -129,19 +129,21 @@ Each platform wraps the C API in idiomatic code:
 | Platform | Binding Style |
 |----------|---------------|
 | Swift | `@_silgen_name` + wrapper classes |
-| JavaScript | WASM + JS wrapper |
+| TypeScript | WASM + Embind + TypeScript definitions |
 | C# | P/Invoke + wrapper classes |
 | Kotlin | JNI + wrapper classes |
 
 ## Web-Specific Notes
 
-- WASM loaded asynchronously
-- Heavy operations in Web Workers
-- DrawList rendered to Canvas2D or WebGL
+- WASM loaded asynchronously via Web Worker
+- Heavy operations (file parsing, CRDT sync) run in Web Worker
+- UI rendered to Canvas2D with TypeScript GridRenderer
+- TypeScript bundled with esbuild for fast builds and minimal bundle size
+- Type definitions (`cells.d.ts`) provide full type safety for WASM API
 
 ## Development Order
 
 1. **Core engine** (C++) with comprehensive C API
-2. **Swift bindings** + SwiftUI app (primary platform)
-3. **WASM build** + React web app
+2. ✅ **WASM build** + TypeScript web app (implemented)
+3. **Swift bindings** + SwiftUI app (primary native platform)
 4. Other platforms as needed
