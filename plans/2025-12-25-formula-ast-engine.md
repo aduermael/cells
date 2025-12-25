@@ -696,12 +696,15 @@ Address issues found during Phase 7d testing and ensure rock-solid foundation be
 - Implementation: Modified `updateFormulaBar()` in `init.ts` to call `updateFormulaHighlights()`
   with the cell's formula when a formula cell is selected (not in editing mode)
 
-### 8b: Create cells on-demand when referenced in formulas
-- [ ] When typing a formula reference like `=A2`, create the referenced cell UUID immediately if it doesn't exist
-- [ ] This allows highlights to work for empty cell references
-- [ ] Currently cells may be created but too late for the first highlight pass
-- [ ] Ensure this happens during `getReferencesFromPartial()` or as a separate "ensure cells exist" step
-- [ ] **Test**: Type `=A1` in empty sheet → A1 cell created and highlighted
+### 8b: Create cells on-demand when referenced in formulas ✅
+- [x] When typing a formula reference like `=A2`, create the referenced cell UUID immediately if it doesn't exist
+- [x] This allows highlights to work for empty cell references
+- [x] Currently cells may be created but too late for the first highlight pass
+- [x] Ensure this happens during `getReferencesFromPartial()` or as a separate "ensure cells exist" step
+- [x] **Test**: Type `=A1` in empty sheet → A1 cell created and highlighted
+- Implementation: Cells ARE created during `getReferencesFromPartial()` via C++ `FormulaResolver::resolve()`.
+  The issue was that TypeScript's viewport data wasn't refreshed to include newly created cells.
+  Modified `updateFormulaHighlights()` to detect unresolved references and refresh viewport once.
 
 ### 8c: Track and cleanup orphan empty cells
 - [ ] Add a flag or mechanism to identify "auto-created" empty cells

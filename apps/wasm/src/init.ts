@@ -356,6 +356,7 @@ export function initApp(): AppContext {
 
     try {
       // Get references from partial formula (handles incomplete formulas)
+      // This also creates any referenced cells that don't exist yet in C++
       const result = await app.dataSource.client.getReferencesFromPartial(value);
 
       if (result.error) {
@@ -366,13 +367,34 @@ export function initApp(): AppContext {
       }
 
       // Convert references to highlights
-      const highlights: FormulaHighlight[] = [];
+      let highlights: FormulaHighlight[] = [];
+      let hasUnresolvedRefs = false;
+
       for (let i = 0; i < result.references.length; i++) {
         const ref = result.references[i];
         if (!ref) continue;
         const highlight = referenceToHighlight(ref, i);
         if (highlight) {
           highlights.push(highlight);
+        } else if (ref.cellId || ref.topLeftCellId) {
+          // Reference has a cell ID but we couldn't find it in viewport
+          hasUnresolvedRefs = true;
+        }
+      }
+
+      // If there are unresolved references, cells may have been newly created.
+      // Refresh viewport to include them, then retry converting references.
+      if (hasUnresolvedRefs && result.references.length > 0) {
+        await fetchViewport();
+        // Retry conversion with refreshed viewport data
+        highlights = [];
+        for (let i = 0; i < result.references.length; i++) {
+          const ref = result.references[i];
+          if (!ref) continue;
+          const highlight = referenceToHighlight(ref, i);
+          if (highlight) {
+            highlights.push(highlight);
+          }
         }
       }
 
