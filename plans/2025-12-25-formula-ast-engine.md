@@ -684,6 +684,69 @@ Expose C++ formula functionality to the TypeScript web UI via WASM bindings. The
 
 ---
 
+## Phase 8: Polish & Hardening - PENDING
+
+Address issues found during Phase 7d testing and ensure rock-solid foundation before moving to calculation engine.
+
+### 8a: Show highlights when selecting a formula cell (not just while editing)
+- [ ] When a cell with a formula is selected (not editing), show dependency highlights
+- [ ] Parse the formula and highlight referenced cells immediately on selection
+- [ ] Clear highlights when selecting a non-formula cell
+- [ ] **Test**: Select formula cell → highlights visible; select empty cell → no highlights
+
+### 8b: Create cells on-demand when referenced in formulas
+- [ ] When typing a formula reference like `=A2`, create the referenced cell UUID immediately if it doesn't exist
+- [ ] This allows highlights to work for empty cell references
+- [ ] Currently cells may be created but too late for the first highlight pass
+- [ ] Ensure this happens during `getReferencesFromPartial()` or as a separate "ensure cells exist" step
+- [ ] **Test**: Type `=A1` in empty sheet → A1 cell created and highlighted
+
+### 8c: Track and cleanup orphan empty cells
+- [ ] Add a flag or mechanism to identify "auto-created" empty cells
+- [ ] Implement cleanup logic: remove cells that are empty AND not referenced by any formula
+- [ ] Cleanup should happen at appropriate times (e.g., after formula edit commit, on file save)
+- [ ] **Test**: Create formula `=A1`, delete formula → A1 should be cleaned up if still empty
+
+### 8d: In-cell editing should show formula highlights
+- [ ] Wire CellEditor input events to trigger formula highlighting (like FormulaBarEditor)
+- [ ] Sync highlights between cell editor and formula bar editing
+- [ ] **Test**: Double-click cell, type `=B1+C1` → both B1 and C1 highlighted
+
+### 8e: Fix state machine for column/row operations during editing
+- [ ] Allow starting column/row drag while editing a cell
+- [ ] This should commit the current edit (like pressing Enter) and start the drag
+- [ ] Review UIStateMachine transitions for CELL_EDITING → COLUMN_DRAGGING/ROW_DRAGGING
+- [ ] **Test**: Edit cell, drag column header → edit commits, column moves
+
+### 8f: Comprehensive test coverage for formula parsing & AST
+- [ ] Review and expand `formula_lexer_test.cc` - cover all token types, edge cases
+- [ ] Review and expand `formula_parser_test.cc` - complex nested expressions, all operators
+- [ ] Review and expand `formula_ast_test.cc` - visitor patterns, node types
+- [ ] Add tests for partial/incomplete formula parsing (error recovery)
+- [ ] Add tests for formula reference extraction from partial formulas
+- [ ] Add tests for formula display (A1 notation generation)
+- [ ] Ensure 100% coverage of critical paths
+- [ ] **Test**: All C++ tests pass with comprehensive coverage
+
+### 8g: UI Integration Tests (TypeScript)
+- [ ] Add tests for formula highlighting logic in TypeScript
+- [ ] Test reference→highlight conversion
+- [ ] Test color assignment
+- [ ] Test highlight clearing on edit commit/cancel
+- [ ] Consider adding Playwright e2e tests for visual verification
+- [ ] **Test**: TypeScript tests pass, optional e2e tests for visual verification
+
+### 8h: Final UI Polish Checkpoint
+- [ ] Manual testing of all formula editing scenarios
+- [ ] Verify highlights work for: cell refs, range refs, mixed refs
+- [ ] Verify highlights update in real-time while typing
+- [ ] Verify highlights clear appropriately
+- [ ] Verify formula bar and in-cell editing behave identically
+- [ ] Verify state machine allows all expected transitions
+- [ ] **Checkpoint**: Demo video or screenshots showing polished behavior
+
+---
+
 ## Future Work (Separate Plans)
 
 The following are explicitly deferred to separate plans:
@@ -723,3 +786,4 @@ Run all tests: `bazel test //core/cells:all`
 | 5 | `core/cells/formula_integration_test.cc` | 5e: Formula persistence and display |
 | 6 | `core/cells/formula_move_test.cc` | 6e: Move stability demonstration |
 | 7 | Manual testing + TypeScript integration tests | 7d: Full formula editing UI |
+| 8 | Expanded C++ tests + TypeScript tests + e2e | 8h: Final polish checkpoint |
