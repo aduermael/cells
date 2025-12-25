@@ -470,26 +470,31 @@ Wire the parser and dependency graph into the Cell/Sheet model.
     cellId → lookup cell → get col/row positions → format as A1
   ```
 
-  **UUID ref format** (from RefConverter):
+  **UUID ref format** (updated for parsing clarity):
   - `$$cellId` → `$A$1` (both absolute)
   - `$~cellId` → `$A1` (col absolute, row relative)
   - `~$cellId` → `A$1` (col relative, row absolute)
-  - `cellId` → `A1` (both relative, bare 8-char ID)
+  - `~~cellId` → `A1` (both relative)
+
+  All refs are exactly 10 chars (2-char prefix + 8-char cell UUID).
+  This makes lexer/parser simpler - no ambiguity with function names.
+  Note: Binary format will use 2-bit flag, text format uses `~~` for clarity.
+  Note: Existing RefConverter uses bare ID for relative - update to use `~~`.
 
   **Sub-tasks**:
 
   - [ ] 5f.1: Add `FormulaSerializer` class to convert resolved AST → UUID text
-    - Walk AST, for each CellRefNode: format using RefConverter UUID format
-    - Handle ranges: `cellId1:cellId2`
+    - Walk AST, for each CellRefNode: format using UUID ref format
+    - Handle ranges: `~~cellId1:~~cellId2` (or with appropriate abs markers)
     - Handle named ranges: pass through as-is
     - Handle all operators and functions
-    - **Test**: `=A1+B2` with resolved UUIDs → `=xK7mNp2Q+fR3pK7wN`
+    - **Test**: `=A1+B2` with resolved UUIDs → `=~~xK7mNp2Q+~~fR3pK7wN`
 
   - [ ] 5f.2: Update FormulaLexer to tokenize UUID refs
-    - Recognize patterns: `$$`, `$~`, `~$` followed by 8 alphanumeric chars
-    - Recognize bare 8-char alphanumeric as cell ref (if in formula context)
-    - New token types or reuse CELL_REF with additional parsing
-    - **Test**: Lexer tokenizes `=$$xK7mNp2Q+10` correctly
+    - Recognize patterns: `$$`, `$~`, `~$`, `~~` followed by 8 alphanumeric chars
+    - All UUID refs are exactly 10 chars - simple pattern matching
+    - New token type UUID_CELL_REF or extend CELL_REF
+    - **Test**: Lexer tokenizes `=$$xK7mNp2Q+~~fR3pK7wN` correctly
 
   - [ ] 5f.3: Update FormulaParser to handle UUID ref tokens
     - CellRefNode stores cellId directly (no column/row needed for UUID refs)
