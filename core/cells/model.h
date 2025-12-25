@@ -238,8 +238,7 @@ struct Sheet {
     // ast: the parsed and resolved AST (ownership transferred to the cell)
     // Updates dependency graph based on the AST
     // Returns success/error status
-    FormulaResult setCellFormula(const ID& cellId, const std::string& formulaText,
-                                 ASTNode* ast);
+    FormulaResult setCellFormula(const ID& cellId, const std::string& formulaText, ASTNode* ast);
 
     // Set a formula on a cell (parses but does NOT resolve references)
     // For use when references will be resolved later or resolution is not needed

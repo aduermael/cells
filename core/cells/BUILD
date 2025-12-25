@@ -422,6 +422,22 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "formula_integration_test",
+    srcs = ["formula_integration_test.cc"],
+    deps = [
+        ":dependency_graph",
+        ":formula_ast",
+        ":formula_parser",
+        ":formula_resolver",
+        ":model",
+        ":named_ranges",
+        ":parser",
+        ":serializer",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "rtree",
     srcs = ["rtree.cc"],

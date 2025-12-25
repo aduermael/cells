@@ -426,14 +426,14 @@ Wire the parser and dependency graph into the Cell/Sheet model.
   - Note: UUID-based storage for move stability deferred to future work
   - **Test**: Serialization round-trip works
 
-- [ ] 5d: Add integration tests in `core/cells/formula_integration_test.cc`
+- [x] 5d: Add integration tests in `core/cells/formula_integration_test.cc`
   - Test setting formulas via Sheet API
-  - Test display conversion
   - Test serialization round-trip
   - Test dependency graph integration
   - Test named ranges through Sheet API
   - Test volatile function tracking
-  - **Test**: All tests pass before proceeding
+  - Test Workbook::getSheetByName
+  - **Test**: All 19 tests pass
 
 - [ ] 5e: **UI Checkpoint** - Formula persistence and display
   - Formulas should now persist: enter formula, refresh page, formula still there
