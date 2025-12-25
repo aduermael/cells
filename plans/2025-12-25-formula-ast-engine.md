@@ -483,7 +483,7 @@ Wire the parser and dependency graph into the Cell/Sheet model.
 
   **Sub-tasks**:
 
-  - [ ] 5f.1: Add `FormulaSerializer` class to convert resolved AST → UUID text
+  - [x] 5f.1: Add `FormulaSerializer` class to convert resolved AST → UUID text
     - Walk AST, for each CellRefNode: format using UUID ref format
     - Handle ranges: `~~cellId1:~~cellId2` (or with appropriate abs markers)
     - Handle named ranges: pass through as-is

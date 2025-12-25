@@ -411,6 +411,29 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "formula_serializer",
+    srcs = ["formula_serializer.cc"],
+    hdrs = ["formula_serializer.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":formula_ast",
+    ],
+)
+
+cc_test(
+    name = "formula_serializer_test",
+    srcs = ["formula_serializer_test.cc"],
+    deps = [
+        ":formula_parser",
+        ":formula_resolver",
+        ":formula_serializer",
+        ":id",
+        ":model",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_test(
     name = "formula_resolver_test",
     srcs = ["formula_resolver_test.cc"],
