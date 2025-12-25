@@ -88,6 +88,7 @@ export class CellEditor {
     start: Position,
     end: Position
   ) => void;
+  private onUpdateFormulaHighlights: (value: string) => void;
 
   // =========================================================================
   // Constructor
@@ -110,6 +111,7 @@ export class CellEditor {
     onRender: () => void;
     onUpdateFormulaBar: () => void;
     onSetSelection: (cell: Position, start: Position, end: Position) => void;
+    onUpdateFormulaHighlights: (value: string) => void;
   }) {
     this.uiStateMachine = config.uiStateMachine;
     this.cellEditorInput = config.cellEditorInput;
@@ -127,6 +129,7 @@ export class CellEditor {
     this.onRender = config.onRender;
     this.onUpdateFormulaBar = config.onUpdateFormulaBar;
     this.onSetSelection = config.onSetSelection;
+    this.onUpdateFormulaHighlights = config.onUpdateFormulaHighlights;
 
     this.setupEventListeners();
   }
@@ -251,6 +254,8 @@ export class CellEditor {
     this.uiStateMachine.transition(UIEvent.CANCEL_CELL_EDIT);
     this.cellEditorInput.style.display = "none";
     this.cellEditorInput.value = "";
+    // Clear formula highlights
+    this.onUpdateFormulaHighlights("");
     // Clear ephemeral editing state
     if (this.syncAdapter) {
       this.syncAdapter.clearEditing();
@@ -273,6 +278,9 @@ export class CellEditor {
 
     this.uiStateMachine.transition(UIEvent.COMMIT_CELL_EDIT);
     this.cellEditorInput.style.display = "none";
+
+    // Clear formula highlights
+    this.onUpdateFormulaHighlights("");
 
     // Clear ephemeral editing state
     if (this.syncAdapter) {
@@ -475,10 +483,14 @@ export class CellEditor {
       }
     });
 
-    // Live sync: cell editor -> formula bar + broadcast editing
+    // Live sync: cell editor -> formula bar + formula highlights + broadcast editing
     this.cellEditorInput.addEventListener("input", () => {
       if (this.isEditing()) {
-        this.formulaInput.value = this.cellEditorInput.value;
+        const value = this.cellEditorInput.value;
+        this.formulaInput.value = value;
+
+        // Update formula highlights for live feedback while typing formulas
+        this.onUpdateFormulaHighlights(value);
 
         // Broadcast ephemeral editing state to peers
         const selectedCell = this.getSelectedCell();
@@ -486,7 +498,7 @@ export class CellEditor {
           this.syncAdapter.setEditing(
             selectedCell.col,
             selectedCell.row,
-            this.cellEditorInput.value
+            value
           );
         }
       }

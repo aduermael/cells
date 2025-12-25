@@ -592,6 +592,7 @@ export function initApp(): AppContext {
     onRender: render,
     onUpdateFormulaBar: updateFormulaBar,
     onSetSelection: setSelection,
+    onUpdateFormulaHighlights: updateFormulaHighlights,
   });
 
   // =========================================================================

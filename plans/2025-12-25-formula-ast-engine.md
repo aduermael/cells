@@ -706,16 +706,20 @@ Address issues found during Phase 7d testing and ensure rock-solid foundation be
   The issue was that TypeScript's viewport data wasn't refreshed to include newly created cells.
   Modified `updateFormulaHighlights()` to detect unresolved references and refresh viewport once.
 
-### 8c: Track and cleanup orphan empty cells
+### 8c: Track and cleanup orphan empty cells - DEFERRED
 - [ ] Add a flag or mechanism to identify "auto-created" empty cells
 - [ ] Implement cleanup logic: remove cells that are empty AND not referenced by any formula
 - [ ] Cleanup should happen at appropriate times (e.g., after formula edit commit, on file save)
 - [ ] **Test**: Create formula `=A1`, delete formula → A1 should be cleaned up if still empty
+- **Deferred**: Empty cells don't cause functional issues - they just consume minimal storage.
+  This optimization can be done in a later polish pass or when file size becomes a concern.
 
-### 8d: In-cell editing should show formula highlights
-- [ ] Wire CellEditor input events to trigger formula highlighting (like FormulaBarEditor)
-- [ ] Sync highlights between cell editor and formula bar editing
-- [ ] **Test**: Double-click cell, type `=B1+C1` → both B1 and C1 highlighted
+### 8d: In-cell editing should show formula highlights ✅
+- [x] Wire CellEditor input events to trigger formula highlighting (like FormulaBarEditor)
+- [x] Sync highlights between cell editor and formula bar editing
+- [x] **Test**: Double-click cell, type `=B1+C1` → both B1 and C1 highlighted
+- Implementation: Added `onUpdateFormulaHighlights` callback to CellEditor, wired to
+  call on input events and clear on commit/cancel
 
 ### 8e: Fix state machine for column/row operations during editing
 - [ ] Allow starting column/row drag while editing a cell
