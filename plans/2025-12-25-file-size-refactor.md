@@ -110,7 +110,7 @@ Extract remaining code and reduce index.html to pure HTML.
 - [x] 3c: Create `src/persistence.ts` - extract IndexedDB persistence
 - [x] 3d: Create `src/ast-debug.ts` - extract AST debug panel
 - [x] 3e: Create `src/init.ts` - main initialization and module wiring
-- [ ] 3f: Reduce `index.html` to pure HTML template (no inline JS)
+- [x] 3f: Reduce `index.html` to pure HTML template (no inline JS)
 - [ ] 3g: Update build.mjs - app.ts becomes the single entry point
 - [ ] 3h: Full integration test - verify all features work
 
