@@ -174,6 +174,17 @@ struct Axis {
     explicit Axis(const ID& id, bool isColumn = true);
 };
 
+// Forward declarations for formula management
+class DependencyGraph;
+class NamedRangeRegistry;
+struct Workbook;
+
+// Result of formula operations
+struct FormulaResult {
+    bool success{false};
+    std::string errorMessage;
+};
+
 // Sheet - 2D grid containing cells
 struct Sheet {
     ID id;             // Unique identifier
@@ -188,6 +199,7 @@ struct Sheet {
 
     Sheet();
     explicit Sheet(const ID& id, std::string name = "Sheet1");
+    ~Sheet();
 
     // Cell operations
     Cell* getCell(const ID& cellId);
@@ -217,9 +229,41 @@ struct Sheet {
     static int32_t columnNameToPosition(
         const std::string& name);  // "A" -> 0, "Z" -> 25, "AA" -> 26, "" -> -1
 
+    // ========================================================================
+    // Formula management
+    // ========================================================================
+
+    // Set a formula on a cell with a pre-resolved AST
+    // formulaText: the original formula text (stored for display)
+    // ast: the parsed and resolved AST (ownership transferred to the cell)
+    // Updates dependency graph based on the AST
+    // Returns success/error status
+    FormulaResult setCellFormula(const ID& cellId, const std::string& formulaText,
+                                 ASTNode* ast);
+
+    // Set a formula on a cell (parses but does NOT resolve references)
+    // For use when references will be resolved later or resolution is not needed
+    // Returns success/error status
+    FormulaResult setCellFormulaUnresolved(const ID& cellId, const std::string& formulaText);
+
+    // Get the display string for a cell's formula
+    // Returns empty string if cell has no formula
+    // Note: This returns the raw formula text; for A1 display, use FormulaDisplayConverter
+    [[nodiscard]] std::string getCellFormulaText(const ID& cellId) const;
+
+    // Clear a cell's formula (removes from dependency graph)
+    void clearCellFormula(const ID& cellId);
+
+    // Get the dependency graph for this sheet
+    [[nodiscard]] DependencyGraph* getDependencyGraph() { return _depGraph.get(); }
+    [[nodiscard]] const DependencyGraph* getDependencyGraph() const { return _depGraph.get(); }
+
 private:
     // Secondary index: (colId, rowId) -> cellId
     std::unordered_map<std::string, ID> _cellIndex;
+
+    // Dependency graph for tracking formula dependencies
+    std::unique_ptr<DependencyGraph> _depGraph;
 
     // Build composite key for cell index
     static std::string makeCellKey(const ID& colId, const ID& rowId);
@@ -273,12 +317,27 @@ struct Workbook {
     // Call this when user clicks "Share" or joins a room
     void startCollaboration();
 
+    // ========================================================================
+    // Named ranges
+    // ========================================================================
+
+    // Get the named range registry for this workbook
+    [[nodiscard]] NamedRangeRegistry* getNamedRanges() { return _namedRanges.get(); }
+    [[nodiscard]] const NamedRangeRegistry* getNamedRanges() const { return _namedRanges.get(); }
+
+    // Get sheet by name (for cross-sheet references)
+    [[nodiscard]] Sheet* getSheetByName(const std::string& name);
+    [[nodiscard]] const Sheet* getSheetByName(const std::string& name) const;
+
 private:
     // Sheet lookup by ID
     std::unordered_map<ID, Sheet*, IDHash> _sheetIndex;
 
     // Operation log for CRDT synchronization
     std::unique_ptr<OpLog> _oplog;
+
+    // Named range registry (workbook-owned for both workbook and sheet scopes)
+    std::unique_ptr<NamedRangeRegistry> _namedRanges;
 
     // Local node ID for HLC generation
     ID _nodeId;

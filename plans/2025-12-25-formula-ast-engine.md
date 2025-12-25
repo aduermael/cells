@@ -408,12 +408,14 @@ Wire the parser and dependency graph into the Cell/Sheet model.
   - Add `hasVolatile()` helper to check for volatile functions
   - **Test**: Formula struct works with AST
 
-- [ ] 5b: Add formula management to Sheet
-  - `setCellFormula(cellId, formulaText)` - parse, resolve, update deps
-  - `getCellDisplayFormula(cellId)` - get A1 display string
+- [x] 5b: Add formula management to Sheet
+  - `setCellFormula(cellId, formulaText, ast)` - set formula with pre-resolved AST, update deps
+  - `setCellFormulaUnresolved(cellId, formulaText)` - parse only, no resolution
+  - `getCellFormulaText(cellId)` - get raw formula text
   - `clearCellFormula(cellId)` - remove formula and deps
   - Sheet owns one `DependencyGraph` instance
-  - Sheet owns one `NamedRangeRegistry` instance
+  - Workbook owns one `NamedRangeRegistry` instance
+  - Added `getSheetByName()` to Workbook for cross-sheet references
   - **Test**: Set/get/clear formula works
 
 - [ ] 5c: Add serialization support

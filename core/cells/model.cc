@@ -6,9 +6,11 @@
 #include <algorithm>
 #include <utility>
 
+#include "core/cells/dependency_graph.h"
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/id.h"
+#include "core/cells/named_ranges.h"
 
 namespace cells {
 
@@ -396,9 +398,12 @@ Axis::Axis(const ID& id, bool isColumn)
 // Sheet
 // ============================================================================
 
-Sheet::Sheet() : id(), name("Sheet1") {}
+Sheet::Sheet() : id(), name("Sheet1"), _depGraph(std::make_unique<DependencyGraph>()) {}
 
-Sheet::Sheet(const ID& id, std::string name) : id(id), name(std::move(name)) {}
+Sheet::Sheet(const ID& id, std::string name)
+    : id(id), name(std::move(name)), _depGraph(std::make_unique<DependencyGraph>()) {}
+
+Sheet::~Sheet() = default;
 
 Cell* Sheet::getCell(const ID& cellId) {
     auto it = cells.find(cellId);
@@ -588,15 +593,117 @@ std::string Sheet::makeCellKey(const ID& colId, const ID& rowId) {
     return colId.toString() + ":" + rowId.toString();
 }
 
+FormulaResult Sheet::setCellFormula(const ID& cellId, const std::string& formulaText,
+                                    ASTNode* ast) {
+    // Get the cell
+    Cell* cell = getCell(cellId);
+    if (cell == nullptr) {
+        return {false, "Cell not found"};
+    }
+
+    // Clear existing formula and dependencies
+    clearCellFormula(cellId);
+
+    // Create the formula with the provided AST
+    auto* formula = new Formula(formulaText.c_str());
+    formula->ast = ast;  // Transfer ownership
+    formula->dirty = true;
+    cell->setFormula(formula);
+
+    // Add to dependency graph (AST should already be resolved)
+    if (ast != nullptr) {
+        _depGraph->addFormula(cellId, ast);
+
+        // Track volatile functions
+        if (formula->hasVolatile()) {
+            _depGraph->markVolatile(cellId);
+        }
+    }
+
+    return {true, ""};
+}
+
+FormulaResult Sheet::setCellFormulaUnresolved(const ID& cellId, const std::string& formulaText) {
+    // Get the cell
+    Cell* cell = getCell(cellId);
+    if (cell == nullptr) {
+        return {false, "Cell not found"};
+    }
+
+    // Clear existing formula and dependencies
+    clearCellFormula(cellId);
+
+    // Validate formula starts with '='
+    if (formulaText.empty() || formulaText[0] != '=') {
+        return {false, "Formula must start with '='"};
+    }
+
+    // Parse the formula (but don't resolve references)
+    FormulaParser parser(formulaText);
+    std::unique_ptr<ASTNode> ast = parser.parse();
+
+    // Create the formula
+    auto* formula = new Formula(formulaText.c_str());
+    formula->ast = ast.release();
+    formula->dirty = true;
+    cell->setFormula(formula);
+
+    // Note: Not adding to dependency graph since refs aren't resolved
+    // Caller should resolve and update deps separately if needed
+
+    return {!parser.hasErrors(), parser.hasErrors() ? "Formula has syntax errors" : ""};
+}
+
+std::string Sheet::getCellFormulaText(const ID& cellId) const {
+    const Cell* cell = nullptr;
+    auto it = cells.find(cellId);
+    if (it != cells.end()) {
+        cell = it->second.get();
+    }
+
+    if (cell == nullptr || !cell->isFormula()) {
+        return "";
+    }
+
+    const Formula* formula = cell->getFormula();
+    if (formula == nullptr || formula->text == nullptr) {
+        return "";
+    }
+
+    return formula->text;
+}
+
+void Sheet::clearCellFormula(const ID& cellId) {
+    Cell* cell = getCell(cellId);
+    if (cell == nullptr) {
+        return;
+    }
+
+    // Remove from dependency graph
+    _depGraph->removeFormula(cellId);
+    _depGraph->unmarkVolatile(cellId);
+
+    // Clear the formula
+    cell->clearFormula();
+}
+
 // ============================================================================
 // Workbook
 // ============================================================================
 
 Workbook::Workbook()
-    : id(), name("Untitled"), _oplog(std::make_unique<OpLog>()), _nodeId(generate_id()) {}
+    : id(),
+      name("Untitled"),
+      _oplog(std::make_unique<OpLog>()),
+      _namedRanges(std::make_unique<NamedRangeRegistry>()),
+      _nodeId(generate_id()) {}
 
 Workbook::Workbook(const ID& id, std::string name)
-    : id(id), name(std::move(name)), _oplog(std::make_unique<OpLog>()), _nodeId(generate_id()) {}
+    : id(id),
+      name(std::move(name)),
+      _oplog(std::make_unique<OpLog>()),
+      _namedRanges(std::make_unique<NamedRangeRegistry>()),
+      _nodeId(generate_id()) {}
 
 Workbook::~Workbook() = default;
 
@@ -683,6 +790,24 @@ void Workbook::startCollaboration() {
     // Note: OpLog bootstrap (generating operations for existing state) is done
     // by the WASM binding layer which calls bootstrapOpLog() from crdt.h
     // This avoids circular dependency between model and crdt.
+}
+
+Sheet* Workbook::getSheetByName(const std::string& sheetName) {
+    for (auto& sheet : sheets) {
+        if (sheet->name == sheetName) {
+            return sheet.get();
+        }
+    }
+    return nullptr;
+}
+
+const Sheet* Workbook::getSheetByName(const std::string& sheetName) const {
+    for (const auto& sheet : sheets) {
+        if (sheet->name == sheetName) {
+            return sheet.get();
+        }
+    }
+    return nullptr;
 }
 
 }  // namespace cells
