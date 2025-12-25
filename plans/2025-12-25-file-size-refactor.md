@@ -68,8 +68,8 @@ Extract the main application orchestration to a new TypeScript module.
 - [x] 1a: Create `src/wasm-data-source.ts` - extract WasmDataSource class
 - [x] 1b: Create `src/grid-utils.ts` - extract coordinate/cell lookup utilities
 - [x] 1c: Create `src/app.ts` - extract App class with state and initialization
-- [ ] 1d: Update `build.mjs` to add `src/app.ts` as entry point
-- [ ] 1e: Verify build succeeds and app functions correctly
+- [x] 1d: Update `build.mjs` to add `src/app.ts` as entry point (N/A - bundled via client.ts re-export; separate entry point deferred to Phase 3g)
+- [x] 1e: Verify build succeeds and app functions correctly
 
 ---
 
