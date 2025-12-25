@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-25 00:19 UTC
-Updated At: 2025-12-25 21:03 UTC
+Updated At: 2025-12-25 21:09 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -637,7 +637,7 @@ Test that formulas remain stable when columns/rows are moved.
 
 ---
 
-## Phase 7: UI Integration (WASM bindings) ✅ COMPLETE (7a-7c)
+## Phase 7: UI Integration (WASM bindings) - IN PROGRESS (7a-7c ✅, 7d pending)
 
 Expose C++ formula functionality to the TypeScript web UI via WASM bindings. The architecture is:
 - **Core logic**: C++ (parser, resolver, dependency graph) compiled to WASM
@@ -677,11 +677,13 @@ Expose C++ formula functionality to the TypeScript web UI via WASM bindings. The
 
 ## Future Work (Separate Plans)
 
-The following are explicitly deferred:
+The following are explicitly deferred to separate plans:
 
-- **Formula Execution**: Evaluating formulas to compute results (Luau integration)
-- **Function Library**: SUM, IF, VLOOKUP, etc.
-- **Recalculation Engine**: Propagating changes through dependency graph using topological sort
+- **Calculation Engine**: Evaluating formulas to compute results using a pure C++ AST interpreter
+  - No scripting language (Luau/Lua) - keeps the stack simple and performant
+  - Direct AST traversal with C++ function implementations
+  - Function library: SUM, IF, VLOOKUP, AVERAGE, COUNT, etc.
+  - Recalculation engine using topological sort on dependency graph
 - **Shared Formulas**: Master cell with offset-based subscribers for copy/paste with relative reference adjustment
 - **External Workbook References**: `[Book.xlsx]Sheet1!A1` syntax for desktop version
 - **Array Formulas / Spill**: Dynamic arrays that expand results to multiple cells
