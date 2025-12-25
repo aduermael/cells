@@ -266,22 +266,8 @@ export function initApp(): AppContext {
   // =========================================================================
 
   /**
-   * Convert a reference position (cellId) to col/row coordinates
-   * by looking up the cell in the current viewport data.
-   */
-  function getCellPosition(cellId: string): { col: number; row: number } | null {
-    // Look up cell in current cells array
-    const cell = app.cells.find((c) => c.id === cellId);
-    if (cell) {
-      return { col: cell.col, row: cell.row };
-    }
-    // If not in viewport, we can't highlight it (for now)
-    return null;
-  }
-
-  /**
    * Convert ReferenceInfo from WASM to FormulaHighlight for rendering.
-   * This resolves cell UUIDs to col/row positions.
+   * C++ provides resolved positions directly, eliminating viewport lookup race conditions.
    */
   function referenceToHighlight(
     ref: ReferenceInfo,
@@ -289,48 +275,92 @@ export function initApp(): AppContext {
   ): FormulaHighlight | null {
     switch (ref.type) {
       case "cell":
-        if (ref.cellId) {
-          const pos = getCellPosition(ref.cellId);
-          if (pos) {
-            return {
-              type: "cell",
-              colorIndex,
-              col: pos.col,
-              row: pos.row,
-              sourceStart: ref.sourceStart,
-              sourceEnd: ref.sourceEnd,
-            };
-          }
+        // C++ provides col/row directly - no viewport lookup needed
+        if (ref.col !== undefined && ref.row !== undefined) {
+          return {
+            type: "cell",
+            colorIndex,
+            col: ref.col,
+            row: ref.row,
+            sourceStart: ref.sourceStart,
+            sourceEnd: ref.sourceEnd,
+          };
         }
         break;
 
       case "range":
-        if (ref.topLeftCellId && ref.bottomRightCellId) {
-          const topLeft = getCellPosition(ref.topLeftCellId);
-          const bottomRight = getCellPosition(ref.bottomRightCellId);
-          if (topLeft && bottomRight) {
-            return {
-              type: "range",
-              colorIndex,
-              startCol: topLeft.col,
-              startRow: topLeft.row,
-              endCol: bottomRight.col,
-              endRow: bottomRight.row,
-              sourceStart: ref.sourceStart,
-              sourceEnd: ref.sourceEnd,
-            };
-          }
+        // C++ provides startCol/startRow/endCol/endRow directly
+        if (
+          ref.startCol !== undefined &&
+          ref.startRow !== undefined &&
+          ref.endCol !== undefined &&
+          ref.endRow !== undefined
+        ) {
+          return {
+            type: "range",
+            colorIndex,
+            startCol: ref.startCol,
+            startRow: ref.startRow,
+            endCol: ref.endCol,
+            endRow: ref.endRow,
+            sourceStart: ref.sourceStart,
+            sourceEnd: ref.sourceEnd,
+          };
         }
         break;
 
       case "column":
-        // Column refs highlight the entire column - need axis lookup
-        // For now, we'll skip these since they require axis position lookup
+        // C++ provides col position directly
+        if (ref.col !== undefined) {
+          return {
+            type: "column",
+            colorIndex,
+            col: ref.col,
+            sourceStart: ref.sourceStart,
+            sourceEnd: ref.sourceEnd,
+          };
+        }
         break;
 
       case "row":
-        // Row refs highlight the entire row - need axis lookup
-        // For now, we'll skip these since they require axis position lookup
+        // C++ provides row position directly
+        if (ref.row !== undefined) {
+          return {
+            type: "row",
+            colorIndex,
+            row: ref.row,
+            sourceStart: ref.sourceStart,
+            sourceEnd: ref.sourceEnd,
+          };
+        }
+        break;
+
+      case "columnRange":
+        // C++ provides startCol/endCol directly
+        if (ref.startCol !== undefined && ref.endCol !== undefined) {
+          return {
+            type: "column",
+            colorIndex,
+            startCol: ref.startCol,
+            endCol: ref.endCol,
+            sourceStart: ref.sourceStart,
+            sourceEnd: ref.sourceEnd,
+          };
+        }
+        break;
+
+      case "rowRange":
+        // C++ provides startRow/endRow directly
+        if (ref.startRow !== undefined && ref.endRow !== undefined) {
+          return {
+            type: "row",
+            colorIndex,
+            startRow: ref.startRow,
+            endRow: ref.endRow,
+            sourceStart: ref.sourceStart,
+            sourceEnd: ref.sourceEnd,
+          };
+        }
         break;
     }
     return null;
@@ -339,6 +369,7 @@ export function initApp(): AppContext {
   /**
    * Update formula highlights based on formula text.
    * Called live as user types in formula bar.
+   * C++ provides resolved positions directly, so no viewport lookup needed.
    */
   async function updateFormulaHighlights(value: string): Promise<void> {
     // Clear highlights if not editing or empty value
@@ -356,7 +387,7 @@ export function initApp(): AppContext {
 
     try {
       // Get references from partial formula (handles incomplete formulas)
-      // This also creates any referenced cells that don't exist yet in C++
+      // C++ creates any referenced cells and returns positions directly
       const result = await app.dataSource.client.getReferencesFromPartial(value);
 
       if (result.error) {
@@ -366,35 +397,14 @@ export function initApp(): AppContext {
         return;
       }
 
-      // Convert references to highlights
-      let highlights: FormulaHighlight[] = [];
-      let hasUnresolvedRefs = false;
-
+      // Convert references to highlights - positions come from C++ directly
+      const highlights: FormulaHighlight[] = [];
       for (let i = 0; i < result.references.length; i++) {
         const ref = result.references[i];
         if (!ref) continue;
         const highlight = referenceToHighlight(ref, i);
         if (highlight) {
           highlights.push(highlight);
-        } else if (ref.cellId || ref.topLeftCellId) {
-          // Reference has a cell ID but we couldn't find it in viewport
-          hasUnresolvedRefs = true;
-        }
-      }
-
-      // If there are unresolved references, cells may have been newly created.
-      // Refresh viewport to include them, then retry converting references.
-      if (hasUnresolvedRefs && result.references.length > 0) {
-        await fetchViewport();
-        // Retry conversion with refreshed viewport data
-        highlights = [];
-        for (let i = 0; i < result.references.length; i++) {
-          const ref = result.references[i];
-          if (!ref) continue;
-          const highlight = referenceToHighlight(ref, i);
-          if (highlight) {
-            highlights.push(highlight);
-          }
         }
       }
 
