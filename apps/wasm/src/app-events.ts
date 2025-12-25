@@ -106,6 +106,7 @@ export interface AppEventManagerConfig {
   // Callbacks
   render: () => void;
   updateFormulaBar: () => void;
+  clearFormulaHighlights: () => void;
   resizeCanvas: () => void;
   fetchViewportNow: () => void;
   toggleAstDebugPanel: () => void;
@@ -200,7 +201,7 @@ export class AppEventManager {
       setResizeRowIndex, setResizeStartY, setResizeStartHeight, setResizePreviewY,
       setPendingDragColumn, setPendingDragRow, setPendingDragStartX, setPendingDragStartY,
       setDragSourceIndex, setDragTargetIndex,
-      render, updateFormulaBar, cellEditor, commitFormulaBarEdit
+      render, updateFormulaBar, clearFormulaHighlights, cellEditor, commitFormulaBarEdit
     } = this.config;
 
     const sheetInfo = getSheetInfo();
@@ -258,6 +259,7 @@ export class AppEventManager {
         setDragSourceIndex(col);
         setDragTargetIndex(col);
 
+        clearFormulaHighlights();
         render();
         e.preventDefault();
         return;
@@ -308,6 +310,7 @@ export class AppEventManager {
         setDragSourceIndex(row);
         setDragTargetIndex(row);
 
+        clearFormulaHighlights();
         render();
         e.preventDefault();
         return;

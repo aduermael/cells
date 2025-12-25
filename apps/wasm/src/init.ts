@@ -821,6 +821,7 @@ export function initApp(): AppContext {
 
     render,
     updateFormulaBar,
+    clearFormulaHighlights: () => { app.formulaHighlights = []; },
     resizeCanvas,
     fetchViewportNow,
     toggleAstDebugPanel: () => astDebugPanel.toggle(elements.formulaInput.value),
