@@ -1,8 +1,8 @@
 # Formula AST Engine
 
-Status: READY
+Status: DONE
 Created At: 2025-12-25 00:19 UTC
-Updated At: 2025-12-25 22:09 UTC
+Updated At: 2025-12-25 23:45 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -684,7 +684,7 @@ Expose C++ formula functionality to the TypeScript web UI via WASM bindings. The
 
 ---
 
-## Phase 8: Polish & Hardening ✅ (8a-8g complete, 8h ready for manual testing)
+## Phase 8: Polish & Hardening ✅ COMPLETE
 
 Address issues found during Phase 7d testing and ensure rock-solid foundation before moving to calculation engine.
 
@@ -762,14 +762,14 @@ Address issues found during Phase 7d testing and ensure rock-solid foundation be
 Manual testing (8h) will verify UI functionality. Automated UI tests can be
 added when setting up Playwright or similar e2e test infrastructure.
 
-### 8h: Final UI Polish Checkpoint - READY FOR MANUAL TESTING
-- [ ] Manual testing of all formula editing scenarios
-- [ ] Verify highlights work for: cell refs, range refs, mixed refs
-- [ ] Verify highlights update in real-time while typing
-- [ ] Verify highlights clear appropriately
-- [ ] Verify formula bar and in-cell editing behave identically
-- [ ] Verify state machine allows all expected transitions
-- [ ] **Checkpoint**: Demo video or screenshots showing polished behavior
+### 8h: Final UI Polish Checkpoint ✅
+- [x] Manual testing of all formula editing scenarios
+- [x] Verify highlights work for: cell refs, range refs, mixed refs
+- [x] Verify highlights update in real-time while typing
+- [x] Verify highlights clear appropriately
+- [x] Verify formula bar and in-cell editing behave identically
+- [x] Verify state machine allows all expected transitions
+- [x] **Checkpoint**: All manual tests passed
 
 **Manual Testing Checklist (to run with live UI)**:
 1. Formula bar editing: Type `=A1+B2` → both cells highlight with different colors
