@@ -38,15 +38,15 @@ void RefConverter::setContext(const Sheet& sheet) {
     cellIdToLocation_.clear();
     locationToCellId_.clear();
 
-    for (size_t i = 0; i < columns.size(); ++i) {
-        const std::string idStr = columns[i].second.toString();
-        const size_t position = columns[i].first;
+    for (const auto& col : columns) {
+        const std::string idStr = col.second.toString();
+        const size_t position = col.first;
         colIdToIndex_[idStr] = position;
         indexToColId_[position] = idStr;  // Map position to ID for A1->UUID conversion
     }
-    for (size_t i = 0; i < rows.size(); ++i) {
-        const std::string idStr = rows[i].second.toString();
-        const size_t position = rows[i].first;
+    for (const auto& row : rows) {
+        const std::string idStr = row.second.toString();
+        const size_t position = row.first;
         rowIdToIndex_[idStr] = position;
         indexToRowId_[position] = idStr;  // Map position to ID for A1->UUID conversion
     }
