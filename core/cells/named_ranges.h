@@ -27,15 +27,16 @@ struct NamedRangeTarget {
     enum class Type : uint8_t { CELL, RANGE, COLUMN, ROW, COLUMN_RANGE, ROW_RANGE };
 
     Type type;
-    ID id1;       // Cell ID, or first corner cell ID, or column/row ID
-    ID id2;       // Second corner cell ID for ranges, or end column/row for axis ranges
-    ID sheetId;   // Sheet containing the target (null for workbook-scoped absolute refs)
+    ID id1;      // Cell ID, or first corner cell ID, or column/row ID
+    ID id2;      // Second corner cell ID for ranges, or end column/row for axis ranges
+    ID sheetId;  // Sheet containing the target (null for workbook-scoped absolute refs)
 
     // Constructors for different target types
     static NamedRangeTarget cell(const ID& cellId, const ID& sheetId = ID()) {
         return {Type::CELL, cellId, ID(), sheetId};
     }
-    static NamedRangeTarget range(const ID& topLeft, const ID& bottomRight, const ID& sheetId = ID()) {
+    static NamedRangeTarget range(const ID& topLeft, const ID& bottomRight,
+                                  const ID& sheetId = ID()) {
         return {Type::RANGE, topLeft, bottomRight, sheetId};
     }
     static NamedRangeTarget column(const ID& colId, const ID& sheetId = ID()) {
@@ -44,10 +45,12 @@ struct NamedRangeTarget {
     static NamedRangeTarget row(const ID& rowId, const ID& sheetId = ID()) {
         return {Type::ROW, rowId, ID(), sheetId};
     }
-    static NamedRangeTarget columnRange(const ID& startCol, const ID& endCol, const ID& sheetId = ID()) {
+    static NamedRangeTarget columnRange(const ID& startCol, const ID& endCol,
+                                        const ID& sheetId = ID()) {
         return {Type::COLUMN_RANGE, startCol, endCol, sheetId};
     }
-    static NamedRangeTarget rowRange(const ID& startRow, const ID& endRow, const ID& sheetId = ID()) {
+    static NamedRangeTarget rowRange(const ID& startRow, const ID& endRow,
+                                     const ID& sheetId = ID()) {
         return {Type::ROW_RANGE, startRow, endRow, sheetId};
     }
 };
@@ -78,7 +81,8 @@ public:
     // Resolve a name from the perspective of a given sheet
     // Returns nullptr if not found
     // Sheet-scoped names take precedence over workbook-scoped names
-    const NamedRange* resolve(const std::string& name, const ID& currentSheetId) const;
+    [[nodiscard]] const NamedRange* resolve(const std::string& name,
+                                            const ID& currentSheetId) const;
 
     // Remove a workbook-scoped named range
     // Returns false if not found

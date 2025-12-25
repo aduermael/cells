@@ -393,3 +393,27 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "formula_resolver",
+    srcs = ["formula_resolver.cc"],
+    hdrs = ["formula_resolver.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":formula_ast",
+        ":model",
+        ":named_ranges",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "formula_resolver_test",
+    srcs = ["formula_resolver_test.cc"],
+    deps = [
+        ":formula_parser",
+        ":formula_resolver",
+        ":id",
+        "@googletest//:gtest_main",
+    ],
+)

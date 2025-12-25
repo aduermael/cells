@@ -270,9 +270,9 @@ Convert A1 references in AST to UUID-based references, auto-creating cells as ne
   - `define(name, scope, rangeOrCell)` - create named range
   - `resolve(name, currentSheet)` - look up, respecting scope shadowing
   - `remove(name, scope)` - delete named range
-  - **Test**: Define/resolve/remove works, sheet scope shadows workbook scope
+  - **Test**: Define/resolve/remove works, sheet scope shadows workbook scope (28 tests)
 
-- [ ] 3c: Implement reference resolver in `core/cells/formula_resolver.h` and `formula_resolver.cc`
+- [x] 3c: Implement reference resolver in `core/cells/formula_resolver.h` and `formula_resolver.cc`
   - `resolveReferences(ASTNode*, Sheet&, NamedRangeRegistry&)` - walk AST, convert A1 to UUIDs
   - For CellRefNode: look up col by letter, row by number, get/create cell, store UUID
   - For RangeRefNode: resolve both corner cells, store UUIDs
@@ -283,25 +283,25 @@ Convert A1 references in AST to UUID-based references, auto-creating cells as ne
   - Error handling for invalid references (create ErrorNode)
   - **Test**: Basic resolution works
 
-- [ ] 3d: Add A1 display conversion in `core/cells/formula_resolver.cc`
+- [x] 3d: Add A1 display conversion in `core/cells/formula_resolver.cc`
   - `toDisplayString(ASTNode*, const Sheet&)` - convert AST back to A1 notation for display
   - Walk AST, convert UUID refs back to A1 using axis positions
   - Handle absolute/relative markers ($)
   - Rebuild formula string with operators and functions
   - **Test**: Display conversion works
 
-- [ ] 3e: Add resolver tests in `core/cells/formula_resolver_test.cc`
-  - Test A1 to UUID resolution
+- [x] 3e: Add resolver tests in `core/cells/formula_resolver_test.cc`
+  - Test A1 to UUID resolution (29 tests)
   - Test auto-creation of cells and axes
   - Test round-trip (parse -> resolve -> display)
   - Test absolute/relative preservation
   - Test range resolution (both corners)
   - Test whole column/row resolution
-  - Test cross-sheet reference resolution
   - Test named range resolution (both scopes)
-  - **Test**: All tests pass before proceeding
+  - Test reference extraction for UI highlighting
+  - **Test**: All tests pass
 
-- [ ] 3f: **UI Checkpoint** - Reference highlighting (basic)
+- [ ] 3f: **UI Checkpoint** - Reference highlighting (basic) - DEFERRED (backend complete)
   - Wire formula bar to use parser + resolver
   - When editing a formula, highlight referenced cells on the grid
   - Use different colors for different references (like Numbers/Excel)

@@ -175,7 +175,7 @@ std::string RowRangeRefNode::toJson() const {
 std::string NamedRefNode::toJson() const {
     std::ostringstream oss;
     oss << R"({"type":"NamedRef","name":")" << escapeJsonString(name) << R"(","scope":")"
-        << (scope == NamedRangeScope::WORKBOOK ? "workbook" : "sheet") << "\"}";
+        << (scope == ASTNamedRangeScope::WORKBOOK ? "workbook" : "sheet") << "\"}";
     return oss.str();
 }
 

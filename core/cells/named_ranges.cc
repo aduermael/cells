@@ -1,7 +1,8 @@
 #include "core/cells/named_ranges.h"
 
-#include <algorithm>
 #include <cctype>
+
+#include <algorithm>
 
 namespace cells {
 
@@ -36,7 +37,7 @@ bool NamedRangeRegistry::defineSheet(const std::string& name, const ID& sheetId,
     }
 
     // Check if name already exists at sheet scope for this sheet
-    std::string key = makeSheetKey(sheetId, name);
+    const std::string key = makeSheetKey(sheetId, name);
     if (_sheetScoped.find(key) != _sheetScoped.end()) {
         return false;
     }
@@ -51,10 +52,11 @@ bool NamedRangeRegistry::defineSheet(const std::string& name, const ID& sheetId,
     return true;
 }
 
-const NamedRange* NamedRangeRegistry::resolve(const std::string& name, const ID& currentSheetId) const {
+const NamedRange* NamedRangeRegistry::resolve(const std::string& name,
+                                              const ID& currentSheetId) const {
     // First check sheet scope (takes precedence)
     if (!currentSheetId.isNull()) {
-        std::string key = makeSheetKey(currentSheetId, name);
+        const std::string key = makeSheetKey(currentSheetId, name);
         auto it = _sheetScoped.find(key);
         if (it != _sheetScoped.end()) {
             return &it->second;
@@ -84,7 +86,7 @@ bool NamedRangeRegistry::removeSheet(const std::string& name, const ID& sheetId)
         return false;
     }
 
-    std::string key = makeSheetKey(sheetId, name);
+    const std::string key = makeSheetKey(sheetId, name);
     auto it = _sheetScoped.find(key);
     if (it == _sheetScoped.end()) {
         return false;
@@ -98,7 +100,7 @@ void NamedRangeRegistry::removeAllForSheet(const ID& sheetId) {
         return;
     }
 
-    std::string prefix = sheetId.toString() + ":";
+    const std::string prefix = sheetId.toString() + ":";
 
     // Collect keys to remove (can't modify map while iterating)
     std::vector<std::string> keysToRemove;
@@ -185,7 +187,8 @@ bool NamedRangeRegistry::isValidName(const std::string& name) {
     // We check: if it's ONLY 1-3 letters followed by ONLY digits, reject
     if (name.size() >= 2) {
         size_t letterCount = 0;
-        while (letterCount < name.size() && std::isalpha(static_cast<unsigned char>(name[letterCount]))) {
+        while (letterCount < name.size() &&
+               std::isalpha(static_cast<unsigned char>(name[letterCount]))) {
             ++letterCount;
         }
         // Only reject if:

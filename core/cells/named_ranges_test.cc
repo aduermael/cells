@@ -47,15 +47,15 @@ TEST_F(NamedRangesTest, IsValidName_ValidNames) {
 }
 
 TEST_F(NamedRangesTest, IsValidName_InvalidNames) {
-    EXPECT_FALSE(NamedRangeRegistry::isValidName(""));        // Empty
-    EXPECT_FALSE(NamedRangeRegistry::isValidName("123"));     // Starts with digit
-    EXPECT_FALSE(NamedRangeRegistry::isValidName("1abc"));    // Starts with digit
-    EXPECT_FALSE(NamedRangeRegistry::isValidName("A1"));      // Looks like cell ref
-    EXPECT_FALSE(NamedRangeRegistry::isValidName("AB123"));   // Looks like cell ref
-    EXPECT_FALSE(NamedRangeRegistry::isValidName("Z99"));     // Looks like cell ref
-    EXPECT_FALSE(NamedRangeRegistry::isValidName("my-data")); // Contains hyphen
-    EXPECT_FALSE(NamedRangeRegistry::isValidName("my data")); // Contains space
-    EXPECT_FALSE(NamedRangeRegistry::isValidName("data!"));   // Contains special char
+    EXPECT_FALSE(NamedRangeRegistry::isValidName(""));         // Empty
+    EXPECT_FALSE(NamedRangeRegistry::isValidName("123"));      // Starts with digit
+    EXPECT_FALSE(NamedRangeRegistry::isValidName("1abc"));     // Starts with digit
+    EXPECT_FALSE(NamedRangeRegistry::isValidName("A1"));       // Looks like cell ref
+    EXPECT_FALSE(NamedRangeRegistry::isValidName("AB123"));    // Looks like cell ref
+    EXPECT_FALSE(NamedRangeRegistry::isValidName("Z99"));      // Looks like cell ref
+    EXPECT_FALSE(NamedRangeRegistry::isValidName("my-data"));  // Contains hyphen
+    EXPECT_FALSE(NamedRangeRegistry::isValidName("my data"));  // Contains space
+    EXPECT_FALSE(NamedRangeRegistry::isValidName("data!"));    // Contains special char
 }
 
 // ===========================================================================
@@ -136,9 +136,9 @@ TEST_F(NamedRangesTest, DefineWorkbook_DuplicateFails) {
 
 TEST_F(NamedRangesTest, DefineWorkbook_InvalidNameFails) {
     auto target = NamedRangeTarget::cell(cell1, sheet1);
-    EXPECT_FALSE(registry.defineWorkbook("A1", target));      // Cell ref
-    EXPECT_FALSE(registry.defineWorkbook("", target));        // Empty
-    EXPECT_FALSE(registry.defineWorkbook("123", target));     // Starts with digit
+    EXPECT_FALSE(registry.defineWorkbook("A1", target));   // Cell ref
+    EXPECT_FALSE(registry.defineWorkbook("", target));     // Empty
+    EXPECT_FALSE(registry.defineWorkbook("123", target));  // Starts with digit
 }
 
 TEST_F(NamedRangesTest, DefineWorkbook_AccessibleFromAnySheet) {

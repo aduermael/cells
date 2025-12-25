@@ -63,8 +63,10 @@ enum class UnaryOp : std::uint8_t {
     POSITIVE,  // +
 };
 
-// Named range scope
-enum class NamedRangeScope : std::uint8_t {
+// Named range scope (for AST nodes)
+// Note: This duplicates the enum in named_ranges.h intentionally
+// to avoid circular dependencies (AST is lower-level than named_ranges)
+enum class ASTNamedRangeScope : std::uint8_t {
     WORKBOOK,  // Global name
     SHEET,     // Sheet-local name
 };
@@ -328,12 +330,12 @@ struct RowRangeRefNode : public ASTNode {
 // Named range reference: myRange, Sales_Total
 struct NamedRefNode : public ASTNode {
     std::string name;
-    NamedRangeScope scope;
+    ASTNamedRangeScope scope;
 
-    explicit NamedRefNode(std::string n, NamedRangeScope s = NamedRangeScope::WORKBOOK)
+    explicit NamedRefNode(std::string n, ASTNamedRangeScope s = ASTNamedRangeScope::WORKBOOK)
         : ASTNode(ASTNodeType::NAMED_REF), name(std::move(n)), scope(s) {}
 
-    NamedRefNode(std::string n, NamedRangeScope s, SourcePosition pos)
+    NamedRefNode(std::string n, ASTNamedRangeScope s, SourcePosition pos)
         : ASTNode(ASTNodeType::NAMED_REF, pos), name(std::move(n)), scope(s) {}
 
     [[nodiscard]] std::unique_ptr<ASTNode> clone() const override {

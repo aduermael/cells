@@ -103,15 +103,15 @@ TEST(FormulaASTTest, RowRangeRefConstruction) {
 }
 
 TEST(FormulaASTTest, NamedRefConstruction) {
-    NamedRefNode node("MyRange", NamedRangeScope::WORKBOOK);
+    NamedRefNode node("MyRange", ASTNamedRangeScope::WORKBOOK);
     EXPECT_EQ(node.type, ASTNodeType::NAMED_REF);
     EXPECT_EQ(node.name, "MyRange");
-    EXPECT_EQ(node.scope, NamedRangeScope::WORKBOOK);
+    EXPECT_EQ(node.scope, ASTNamedRangeScope::WORKBOOK);
 }
 
 TEST(FormulaASTTest, NamedRefSheetScope) {
-    NamedRefNode node("LocalRange", NamedRangeScope::SHEET);
-    EXPECT_EQ(node.scope, NamedRangeScope::SHEET);
+    NamedRefNode node("LocalRange", ASTNamedRangeScope::SHEET);
+    EXPECT_EQ(node.scope, ASTNamedRangeScope::SHEET);
 }
 
 TEST(FormulaASTTest, BinaryOpConstruction) {
@@ -265,12 +265,12 @@ TEST(FormulaASTTest, CloneRowRangeRef) {
 }
 
 TEST(FormulaASTTest, CloneNamedRef) {
-    NamedRefNode original("Total", NamedRangeScope::SHEET);
+    NamedRefNode original("Total", ASTNamedRangeScope::SHEET);
     original.position = {2, 7};
     auto cloned = original.clone();
     auto* namedClone = static_cast<NamedRefNode*>(cloned.get());
     EXPECT_EQ(namedClone->name, "Total");
-    EXPECT_EQ(namedClone->scope, NamedRangeScope::SHEET);
+    EXPECT_EQ(namedClone->scope, ASTNamedRangeScope::SHEET);
     EXPECT_EQ(namedClone->position.start, 2);
 }
 
@@ -424,7 +424,7 @@ TEST(FormulaASTTest, RowRangeRefToJson) {
 }
 
 TEST(FormulaASTTest, NamedRefToJson) {
-    NamedRefNode node("MyRange", NamedRangeScope::WORKBOOK);
+    NamedRefNode node("MyRange", ASTNamedRangeScope::WORKBOOK);
     std::string json = node.toJson();
     EXPECT_NE(json.find("\"type\":\"NamedRef\""), std::string::npos);
     EXPECT_NE(json.find("\"name\":\"MyRange\""), std::string::npos);
@@ -432,7 +432,7 @@ TEST(FormulaASTTest, NamedRefToJson) {
 }
 
 TEST(FormulaASTTest, NamedRefSheetScopeToJson) {
-    NamedRefNode node("LocalName", NamedRangeScope::SHEET);
+    NamedRefNode node("LocalName", ASTNamedRangeScope::SHEET);
     std::string json = node.toJson();
     EXPECT_NE(json.find("\"scope\":\"sheet\""), std::string::npos);
 }

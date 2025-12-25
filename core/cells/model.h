@@ -185,7 +185,7 @@ struct Sheet {
     Axis* getRow(const ID& rowId);
     Axis* getColumnByPosition(uint32_t position);
     Axis* getRowByPosition(uint32_t position);
-    Axis* getColumnByName(const std::string& name);  // A, B, ..., Z, AA, AB, ...
+    Axis* getColumnByName(const std::string& name);        // A, B, ..., Z, AA, AB, ...
     Axis* getOrCreateColumnByPosition(uint32_t position);  // Auto-creates if needed
     Axis* getOrCreateRowByPosition(uint32_t position);     // Auto-creates if needed
     void addColumn(std::unique_ptr<Axis> col);
@@ -197,8 +197,9 @@ struct Sheet {
     [[nodiscard]] size_t cellCount() const { return cells.size(); }
 
     // Column name utilities (A, B, ..., Z, AA, AB, ...)
-    static std::string positionToColumnName(uint32_t position);   // 0 -> "A", 25 -> "Z", 26 -> "AA"
-    static int32_t columnNameToPosition(const std::string& name);  // "A" -> 0, "Z" -> 25, "AA" -> 26, "" -> -1
+    static std::string positionToColumnName(uint32_t position);  // 0 -> "A", 25 -> "Z", 26 -> "AA"
+    static int32_t columnNameToPosition(
+        const std::string& name);  // "A" -> 0, "Z" -> 25, "AA" -> 26, "" -> -1
 
 private:
     // Secondary index: (colId, rowId) -> cellId

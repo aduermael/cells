@@ -363,7 +363,7 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
                 }
             }
             // It's a named range
-            return std::make_unique<NamedRefNode>(name, NamedRangeScope::WORKBOOK, id.position);
+            return std::make_unique<NamedRefNode>(name, ASTNamedRangeScope::WORKBOOK, id.position);
         }
     }
 
@@ -440,7 +440,7 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
             return errorNode("Expected column after ':'");
         }
         // Just column letter at end - treat as named ref (unusual but possible)
-        return std::make_unique<NamedRefNode>(col, NamedRangeScope::WORKBOOK, pos);
+        return std::make_unique<NamedRefNode>(col, ASTNamedRangeScope::WORKBOOK, pos);
     }
 
     // $ followed by column/identifier (absolute reference)
