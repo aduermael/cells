@@ -84,7 +84,7 @@ Extract feature-specific code to dedicated modules.
 - Column header editing (lines 1318-1407) → `src/header-editor.ts`
 - Sheet tabs (lines 1408-1594) → `src/sheet-tabs.ts`
 
-- [ ] 2a: Create `src/presence-broadcast.ts` - extract presence functions
+- [x] 2a: Create `src/presence-broadcast.ts` - extract presence functions
 - [ ] 2b: Create `src/cell-editor.ts` - extract cell editing logic
 - [ ] 2c: Create `src/header-editor.ts` - extract column/row header editing
 - [ ] 2d: Create `src/sheet-tabs.ts` - extract sheet tab management
