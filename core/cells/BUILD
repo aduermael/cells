@@ -417,3 +417,19 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "rtree",
+    srcs = ["rtree.cc"],
+    hdrs = ["rtree.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "rtree_test",
+    srcs = ["rtree_test.cc"],
+    deps = [
+        ":rtree",
+        "@googletest//:gtest_main",
+    ],
+)

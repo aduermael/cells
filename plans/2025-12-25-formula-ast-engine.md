@@ -321,7 +321,7 @@ Convert A1 references in AST to UUID-based references, auto-creating cells as ne
 
 Track which cells depend on which for reactive updates, using R-tree for efficient range queries.
 
-- [ ] 4a: Implement R-tree in `core/cells/rtree.h` and `rtree.cc`
+- [x] 4a: Implement R-tree in `core/cells/rtree.h` and `rtree.cc`
   - Custom 2D R-tree implementation optimized for sparse cell coordinates
   - `RTree<T>` template class
   - `insert(minCol, minRow, maxCol, maxRow, value)` - insert rectangle
@@ -331,7 +331,7 @@ Track which cells depend on which for reactive updates, using R-tree for efficie
   - Handle whole-column refs (row bounds = 0 to MAX) and whole-row refs (col bounds = 0 to MAX)
   - **Test**: Basic insert/remove/query works
 
-- [ ] 4b: Add R-tree tests in `core/cells/rtree_test.cc`
+- [x] 4b: Add R-tree tests in `core/cells/rtree_test.cc`
   - Test point insertion (1×1 rectangles)
   - Test range insertion
   - Test point queries
