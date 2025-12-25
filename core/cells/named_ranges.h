@@ -26,7 +26,7 @@ enum class NamedRangeScope : uint8_t {
 struct NamedRangeTarget {
     enum class Type : uint8_t { CELL, RANGE, COLUMN, ROW, COLUMN_RANGE, ROW_RANGE };
 
-    Type type;
+    Type type = Type::CELL;
     ID id1;      // Cell ID, or first corner cell ID, or column/row ID
     ID id2;      // Second corner cell ID for ranges, or end column/row for axis ranges
     ID sheetId;  // Sheet containing the target (null for workbook-scoped absolute refs)
@@ -57,8 +57,8 @@ struct NamedRangeTarget {
 
 // A named range definition
 struct NamedRange {
-    std::string name;         // Name of the range (e.g., "TotalSales")
-    NamedRangeScope scope;    // Workbook or Sheet scope
+    std::string name;                                   // Name of the range (e.g., "TotalSales")
+    NamedRangeScope scope = NamedRangeScope::WORKBOOK;  // Workbook or Sheet scope
     ID scopeSheetId;          // For SHEET scope, which sheet owns this name (null for WORKBOOK)
     NamedRangeTarget target;  // What the name refers to
 };

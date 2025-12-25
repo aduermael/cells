@@ -147,7 +147,7 @@ std::vector<const NamedRange*> NamedRangeRegistry::getSheetScoped(const ID& shee
         return result;
     }
 
-    std::string prefix = sheetId.toString() + ":";
+    const std::string prefix = sheetId.toString() + ":";
 
     for (const auto& [key, nr] : _sheetScoped) {
         if (key.compare(0, prefix.size(), prefix) == 0) {
@@ -169,15 +169,15 @@ bool NamedRangeRegistry::isValidName(const std::string& name) {
     }
 
     // First character must be letter or underscore
-    char first = name[0];
-    if (!std::isalpha(static_cast<unsigned char>(first)) && first != '_') {
+    const char first = name[0];
+    if (std::isalpha(static_cast<unsigned char>(first)) == 0 && first != '_') {
         return false;
     }
 
     // Rest must be alphanumeric, underscore, or period
     for (size_t i = 1; i < name.size(); ++i) {
-        char c = name[i];
-        if (!std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '.') {
+        const char c = name[i];
+        if (std::isalnum(static_cast<unsigned char>(c)) == 0 && c != '_' && c != '.') {
             return false;
         }
     }
@@ -188,7 +188,7 @@ bool NamedRangeRegistry::isValidName(const std::string& name) {
     if (name.size() >= 2) {
         size_t letterCount = 0;
         while (letterCount < name.size() &&
-               std::isalpha(static_cast<unsigned char>(name[letterCount]))) {
+               std::isalpha(static_cast<unsigned char>(name[letterCount])) != 0) {
             ++letterCount;
         }
         // Only reject if:
@@ -197,7 +197,7 @@ bool NamedRangeRegistry::isValidName(const std::string& name) {
         if (letterCount >= 1 && letterCount <= 3 && letterCount < name.size()) {
             bool allDigits = true;
             for (size_t i = letterCount; i < name.size(); ++i) {
-                if (!std::isdigit(static_cast<unsigned char>(name[i]))) {
+                if (std::isdigit(static_cast<unsigned char>(name[i])) == 0) {
                     allDigits = false;
                     break;
                 }

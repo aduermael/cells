@@ -481,15 +481,17 @@ std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) co
 
     // If we have a resolved cellId, look up the current position
     if (!node->cellId.empty()) {
-        ID cellIdObj(node->cellId);
+        const ID cellIdObj(node->cellId);
         // Find the cell to get its column and row
         for (const auto& [id, cell] : _sheet.cells) {
             if (id == cellIdObj) {
                 // Get column position
-                Axis* col = _sheet.columns.count(cell->colId) ? _sheet.columns.at(cell->colId).get()
-                                                              : nullptr;
-                Axis* row =
-                    _sheet.rows.count(cell->rowId) ? _sheet.rows.at(cell->rowId).get() : nullptr;
+                const Axis* col = _sheet.columns.count(cell->colId) != 0u
+                                      ? _sheet.columns.at(cell->colId).get()
+                                      : nullptr;
+                const Axis* row = _sheet.rows.count(cell->rowId) != 0u
+                                      ? _sheet.rows.at(cell->rowId).get()
+                                      : nullptr;
 
                 if (col != nullptr && row != nullptr) {
                     if (node->colAbsolute) {
@@ -533,14 +535,16 @@ std::string FormulaDisplayConverter::columnRefToString(const ColumnRefNode* node
 
     // If we have a resolved columnId, look up the current position
     if (!node->columnId.empty()) {
-        ID colIdObj(node->columnId);
+        const ID colIdObj(node->columnId);
         for (const auto& [id, col] : _sheet.columns) {
             if (id == colIdObj) {
                 if (node->absolute) {
                     result += "$";
                 }
-                std::string colName = Sheet::positionToColumnName(col->position);
-                result += colName + ":" + colName;
+                const std::string colName = Sheet::positionToColumnName(col->position);
+                result += colName;
+                result += ":";
+                result += colName;
                 return result;
             }
         }
@@ -564,14 +568,17 @@ std::string FormulaDisplayConverter::rowRefToString(const RowRefNode* node) cons
 
     // If we have a resolved rowId, look up the current position
     if (!node->rowId.empty()) {
-        ID rowIdObj(node->rowId);
+        const ID rowIdObj(node->rowId);
         for (const auto& [id, row] : _sheet.rows) {
             if (id == rowIdObj) {
                 if (node->absolute) {
                     result += "$";
                 }
-                std::string rowNum = std::to_string(row->position + 1);  // Convert to 1-indexed
-                result += rowNum + ":" + rowNum;
+                const std::string rowNum =
+                    std::to_string(row->position + 1);  // Convert to 1-indexed
+                result += rowNum;
+                result += ":";
+                result += rowNum;
                 return result;
             }
         }
@@ -581,8 +588,10 @@ std::string FormulaDisplayConverter::rowRefToString(const RowRefNode* node) cons
     if (node->absolute) {
         result += "$";
     }
-    std::string rowNum = std::to_string(node->row);
-    result += rowNum + ":" + rowNum;
+    const std::string rowNum = std::to_string(node->row);
+    result += rowNum;
+    result += ":";
+    result += rowNum;
 
     return result;
 }
@@ -599,7 +608,7 @@ std::string FormulaDisplayConverter::columnRangeRefToString(const ColumnRangeRef
 
     // If resolved, look up current positions
     if (!node->startColumnId.empty()) {
-        ID startColIdObj(node->startColumnId);
+        const ID startColIdObj(node->startColumnId);
         for (const auto& [id, col] : _sheet.columns) {
             if (id == startColIdObj) {
                 startCol = Sheet::positionToColumnName(col->position);
@@ -608,7 +617,7 @@ std::string FormulaDisplayConverter::columnRangeRefToString(const ColumnRangeRef
         }
     }
     if (!node->endColumnId.empty()) {
-        ID endColIdObj(node->endColumnId);
+        const ID endColIdObj(node->endColumnId);
         for (const auto& [id, col] : _sheet.columns) {
             if (id == endColIdObj) {
                 endCol = Sheet::positionToColumnName(col->position);
@@ -642,7 +651,7 @@ std::string FormulaDisplayConverter::rowRangeRefToString(const RowRangeRefNode* 
 
     // If resolved, look up current positions
     if (!node->startRowId.empty()) {
-        ID startRowIdObj(node->startRowId);
+        const ID startRowIdObj(node->startRowId);
         for (const auto& [id, row] : _sheet.rows) {
             if (id == startRowIdObj) {
                 startRow = static_cast<int>(row->position + 1);  // Convert to 1-indexed
@@ -651,7 +660,7 @@ std::string FormulaDisplayConverter::rowRangeRefToString(const RowRangeRefNode* 
         }
     }
     if (!node->endRowId.empty()) {
-        ID endRowIdObj(node->endRowId);
+        const ID endRowIdObj(node->endRowId);
         for (const auto& [id, row] : _sheet.rows) {
             if (id == endRowIdObj) {
                 endRow = static_cast<int>(row->position + 1);  // Convert to 1-indexed
@@ -759,8 +768,8 @@ bool FormulaDisplayConverter::needsParentheses(const ASTNode* parent, const ASTN
         return 0;
     };
 
-    int parentPrec = precedence(parentOp->op);
-    int childPrec = precedence(childOp->op);
+    const int parentPrec = precedence(parentOp->op);
+    const int childPrec = precedence(childOp->op);
 
     // Lower precedence child needs parentheses
     if (childPrec < parentPrec) {

@@ -387,6 +387,7 @@ void Sheet::addRow(std::unique_ptr<Axis> row) {
 
 Cell* Sheet::getOrCreateCellAt(const ID& colId, const ID& rowId) {
     // Check if cell already exists
+    // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Cell* const existing = getCellAt(colId, rowId);
     if (existing != nullptr) {
         return existing;
@@ -394,6 +395,7 @@ Cell* Sheet::getOrCreateCellAt(const ID& colId, const ID& rowId) {
 
     // Create new cell
     auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Cell* const rawPtr = cell.get();
     addCell(std::move(cell));
     return rawPtr;
@@ -428,6 +430,7 @@ Axis* Sheet::getColumnByName(const std::string& name) {
 
 Axis* Sheet::getOrCreateColumnByPosition(uint32_t position) {
     // Check if column already exists
+    // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const existing = getColumnByPosition(position);
     if (existing != nullptr) {
         return existing;
@@ -436,6 +439,7 @@ Axis* Sheet::getOrCreateColumnByPosition(uint32_t position) {
     // Create new column
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = position;
+    // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const rawPtr = col.get();
     addColumn(std::move(col));
     return rawPtr;
@@ -443,6 +447,7 @@ Axis* Sheet::getOrCreateColumnByPosition(uint32_t position) {
 
 Axis* Sheet::getOrCreateRowByPosition(uint32_t position) {
     // Check if row already exists
+    // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const existing = getRowByPosition(position);
     if (existing != nullptr) {
         return existing;
@@ -451,6 +456,7 @@ Axis* Sheet::getOrCreateRowByPosition(uint32_t position) {
     // Create new row
     auto row = std::make_unique<Axis>(generate_id(), false);
     row->position = position;
+    // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const rawPtr = row.get();
     addRow(std::move(row));
     return rawPtr;
