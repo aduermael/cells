@@ -1472,10 +1472,15 @@ public:
             return "{\"error\":\"No workbook\",\"result\":\"error\"}";
         }
 
+        LOG_INFO("[FORMULA_DEBUG] applyRemoteOperation: received opJson=%s", opJson.c_str());
+
         Operation op = Operation::fromJSON(opJson);
         if (op.isNull()) {
             return "{\"error\":\"Invalid operation JSON\",\"result\":\"error\"}";
         }
+
+        LOG_INFO("[FORMULA_DEBUG] applyRemoteOperation: parsed op type=%d target=%s payload=%s",
+                 static_cast<int>(op.type), op.target_id.toString().c_str(), op.payload.c_str());
 
         ApplyResult result = applyOperation(*_workbook, op);
 

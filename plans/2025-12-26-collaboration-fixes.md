@@ -1,8 +1,8 @@
 # Collaboration Fixes
 
-Status: READY
+Status: IN_PROGRESS
 Created At: 2025-12-25 23:41 UTC
-Updated At: 2025-12-25 23:41 UTC
+Updated At: 2025-12-26 00:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -37,23 +37,40 @@ REMOTE: Receives "=~~cellUUID" → should convert to "=B1" → FAILS, shows UUID
 
 First, add logging and tests to understand exactly where the conversion fails.
 
-- [ ] 1a: Add diagnostic logging to formula conversion path
+- [x] 1a: Add diagnostic logging to formula conversion path
   - Add log in `RefConverter::formulaToA1()` when conversion fails
   - Add log in `queryViewport()` showing formula text before/after conversion
   - Add log in `applyRemoteOperation()` showing operation details
   - **Test**: Run two clients, enter formula, observe logs on receiving client
+  - **DONE**: Added LOG_INFO statements to ref_converter.cc and bindings.cc
 
-- [ ] 1b: Create minimal reproduction test case
-  - Add integration test in `core/cells/sync_integration_test.cc`
+- [x] 1b: Create minimal reproduction test case
+  - Add integration test in `core/cells/sync_formula_test.cc`
   - Test: Apply SetCellValue operation with formula, verify A1 display
   - Test: Simulate two-client scenario with operation exchange
   - **Test**: Test case reliably reproduces the bug
+  - **DONE**: Created sync_formula_test.cc with 7 tests covering formula sync
 
 - [ ] 1c: Identify exact failure point
   - Is RefConverter context empty/stale?
   - Is the cell UUID not found in the quadtree?
   - Is the formula text malformed?
   - Document findings in this plan
+  - **NEEDS MANUAL TESTING**: C++ tests pass, need to run with two browsers
+
+### Phase 1 Findings
+
+**C++ tests pass**: The `sync_formula_test.cc` tests demonstrate that:
+1. Formula operations sync correctly between two workbooks
+2. UUID→A1 conversion works when RefConverter context is set
+3. Conversion fails gracefully (returns UUID) when context is missing
+
+**The bug is likely in the WASM/JS layer**, not C++. Possible causes:
+1. RefConverter context not set before `queryViewport()` is called
+2. Race condition: UI queries before `rebuildQuadtree()` completes
+3. The referenced cell doesn't exist in the receiving client's sheet
+
+**Next step**: Run manual test with two browsers to observe the debug logs.
 
 ---
 

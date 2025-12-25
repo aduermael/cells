@@ -141,6 +141,18 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "sync_formula_test",
+    srcs = ["sync_formula_test.cc"],
+    deps = [
+        ":crdt",
+        ":id",
+        ":model",
+        ":ref_converter",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "parser",
     srcs = ["parser.cc"],

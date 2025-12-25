@@ -1,9 +1,17 @@
 #include "core/cells/ref_converter.h"
 
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 
 #include <algorithm>
+
+// Logging macro (matches bindings.cc)
+#ifdef ENABLE_DEBUG_LOGGING
+#define LOG_INFO(fmt, ...) printf("[INFO] " fmt "\n", ##__VA_ARGS__)
+#else
+#define LOG_INFO(fmt, ...) ((void)0)
+#endif
 
 namespace cells {
 
@@ -529,6 +537,16 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
                     i += len;
                     continue;
                 }
+                // Col/row not found
+                LOG_INFO("[FORMULA_DEBUG] formulaToA1: cellId=%s found but col=%s or row=%s not in "
+                         "index maps (colIdToIndex_.size=%zu, rowIdToIndex_.size=%zu)",
+                         cellId.c_str(), loc.colId.c_str(), loc.rowId.c_str(), colIdToIndex_.size(),
+                         rowIdToIndex_.size());
+            } else {
+                // Cell not found
+                LOG_INFO("[FORMULA_DEBUG] formulaToA1: cellId=%s not found in cellIdToLocation_ "
+                         "(size=%zu)",
+                         cellId.c_str(), cellIdToLocation_.size());
             }
             // Cell not found, keep original
             result += formula.substr(i, len);
