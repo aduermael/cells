@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-25 00:19 UTC
-Updated At: 2025-12-25 21:09 UTC
+Updated At: 2025-12-25 22:09 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -684,7 +684,7 @@ Expose C++ formula functionality to the TypeScript web UI via WASM bindings. The
 
 ---
 
-## Phase 8: Polish & Hardening - PENDING
+## Phase 8: Polish & Hardening ✅ (8a-8g complete, 8h ready for manual testing)
 
 Address issues found during Phase 7d testing and ensure rock-solid foundation before moving to calculation engine.
 
@@ -762,7 +762,7 @@ Address issues found during Phase 7d testing and ensure rock-solid foundation be
 Manual testing (8h) will verify UI functionality. Automated UI tests can be
 added when setting up Playwright or similar e2e test infrastructure.
 
-### 8h: Final UI Polish Checkpoint
+### 8h: Final UI Polish Checkpoint - READY FOR MANUAL TESTING
 - [ ] Manual testing of all formula editing scenarios
 - [ ] Verify highlights work for: cell refs, range refs, mixed refs
 - [ ] Verify highlights update in real-time while typing
@@ -770,6 +770,17 @@ added when setting up Playwright or similar e2e test infrastructure.
 - [ ] Verify formula bar and in-cell editing behave identically
 - [ ] Verify state machine allows all expected transitions
 - [ ] **Checkpoint**: Demo video or screenshots showing polished behavior
+
+**Manual Testing Checklist (to run with live UI)**:
+1. Formula bar editing: Type `=A1+B2` → both cells highlight with different colors
+2. In-cell editing: Double-click cell, type `=C3*D4` → both cells highlight
+3. Range refs: Type `=SUM(A1:C3)` → range highlights as block
+4. Cell selection: Click on formula cell → highlights appear immediately
+5. Clear on commit: Press Enter to commit → highlights clear
+6. Clear on cancel: Press Escape → highlights clear
+7. Column drag during edit: Edit cell, then drag column → edit commits, column moves
+8. Row resize during edit: Edit cell, then resize row → edit commits, row resizes
+9. Cells created on-demand: Type `=ZZ999` → cell exists and highlights
 
 ---
 
