@@ -3,8 +3,11 @@
  * esbuild script for bundling TypeScript sources
  *
  * Entry points:
- * - src/client.ts -> dist/client.js (main application)
+ * - src/main.ts -> dist/main.js (browser application entry point)
  * - src/worker.ts -> dist/worker.js (web worker)
+ *
+ * Note: client.ts is bundled into main.js as a dependency, not as a separate
+ * entry point. It contains the CellsClient class for worker communication.
  *
  * Usage:
  *   node build.mjs         # Production build
@@ -26,10 +29,10 @@ const commonOptions = {
 };
 
 /** @type {esbuild.BuildOptions} */
-const clientOptions = {
+const mainOptions = {
   ...commonOptions,
-  entryPoints: ['src/client.ts'],
-  outfile: 'dist/client.js',
+  entryPoints: ['src/main.ts'],
+  outfile: 'dist/main.js',
 };
 
 /** @type {esbuild.BuildOptions} */
@@ -43,18 +46,18 @@ async function build() {
   try {
     if (isWatch) {
       // Watch mode - create contexts and watch
-      const [clientCtx, workerCtx] = await Promise.all([
-        esbuild.context(clientOptions),
+      const [mainCtx, workerCtx] = await Promise.all([
+        esbuild.context(mainOptions),
         esbuild.context(workerOptions),
       ]);
 
-      await Promise.all([clientCtx.watch(), workerCtx.watch()]);
+      await Promise.all([mainCtx.watch(), workerCtx.watch()]);
 
       console.log('Watching for changes...');
     } else {
       // Production build
       await Promise.all([
-        esbuild.build(clientOptions),
+        esbuild.build(mainOptions),
         esbuild.build(workerOptions),
       ]);
 

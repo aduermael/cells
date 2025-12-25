@@ -12,52 +12,6 @@ import type {
 } from "./types";
 
 // ============================================================================
-// Re-exports for index.html inline script
-// ============================================================================
-export {
-  GridRenderer,
-  HEADER_HEIGHT,
-  HEADER_WIDTH,
-  DEFAULT_COL_WIDTH,
-  DEFAULT_ROW_HEIGHT,
-  COLORS,
-} from "./grid-renderer";
-export {
-  detectFormat,
-  getBaseName,
-  downloadBlob,
-  getMimeType,
-} from "./utils";
-export { createUIStateMachine, UIState, UIEvent } from "./ui-state";
-export { CollabUI } from "./collab-ui";
-export {
-  clearRoomIdFromUrl,
-  getRoomIdFromUrl,
-  RoomManager,
-} from "./room-url";
-export { CppSyncAdapter } from "./cpp-sync-adapter";
-export { WasmDataSource } from "./wasm-data-source";
-export {
-  getColAtX,
-  getRowAtY,
-  getResizeHandleCol,
-  getResizeHandleRow,
-  getDropTargetCol,
-  getDropTargetRow,
-  getColumnId,
-  getRowId,
-  getCellAt,
-  colToLetter,
-  getNormalizedRange,
-  hasRangeSelection,
-  formatCellReference,
-  RESIZE_HANDLE_WIDTH,
-  DRAG_THRESHOLD,
-} from "./grid-utils";
-export { App, createApp } from "./app";
-export { initApp, type AppContext } from "./init";
-
-// ============================================================================
 // Worker Message Types
 // ============================================================================
 

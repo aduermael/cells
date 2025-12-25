@@ -111,7 +111,7 @@ Extract remaining code and reduce index.html to pure HTML.
 - [x] 3d: Create `src/ast-debug.ts` - extract AST debug panel
 - [x] 3e: Create `src/init.ts` - main initialization and module wiring
 - [x] 3f: Reduce `index.html` to pure HTML template (no inline JS)
-- [ ] 3g: Update build.mjs - app.ts becomes the single entry point
+- [x] 3g: Update build.mjs - main.ts becomes the single entry point
 - [ ] 3h: Full integration test - verify all features work
 
 ---
@@ -160,7 +160,9 @@ apps/wasm/
 ├── static/
 │   └── index.html              # Pure HTML template (<100 lines)
 ├── src/
-│   ├── app.ts                  # Main application class + init (NEW)
+│   ├── main.ts                 # Browser entry point (NEW)
+│   ├── init.ts                 # Application initialization and wiring (NEW)
+│   ├── app.ts                  # Main application class and state (NEW)
 │   ├── app-events.ts           # Event handlers (NEW)
 │   ├── wasm-data-source.ts     # WASM worker communication (NEW)
 │   ├── grid-utils.ts           # Coordinate utilities (NEW)
