@@ -112,7 +112,7 @@ Extract remaining code and reduce index.html to pure HTML.
 - [x] 3e: Create `src/init.ts` - main initialization and module wiring
 - [x] 3f: Reduce `index.html` to pure HTML template (no inline JS)
 - [x] 3g: Update build.mjs - main.ts becomes the single entry point
-- [ ] 3h: Full integration test - verify all features work
+- [x] 3h: Full integration test - verify all features work
 
 ---
 
