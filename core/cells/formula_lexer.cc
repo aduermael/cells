@@ -506,7 +506,8 @@ Token FormulaLexer::scanUuidCellRef(size_t start, bool /*colAbsolute*/, bool /*r
     }
 
     if (count != UUID_LENGTH) {
-        return makeErrorToken("Invalid UUID cell reference: expected 8 alphanumeric characters", start);
+        return makeErrorToken("Invalid UUID cell reference: expected 8 alphanumeric characters",
+                              start);
     }
 
     return makeToken(TokenType::UUID_CELL_REF, start);

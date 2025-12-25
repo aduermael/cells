@@ -40,7 +40,7 @@ std::string FormulaSerializer::nodeToUuidString(const ASTNode* node) {
             auto* strNode = static_cast<const StringLiteralNode*>(node);
             // Escape double quotes within the string
             std::string escaped;
-            for (char c : strNode->value) {
+            for (const char c : strNode->value) {
                 if (c == '"') {
                     escaped += "\"\"";
                 } else {
@@ -278,7 +278,8 @@ std::string FormulaSerializer::errorNodeToUuidString(const ErrorNode* node) {
     return result;
 }
 
-bool FormulaSerializer::needsParentheses(const ASTNode* parent, const ASTNode* child, bool isRight) {
+bool FormulaSerializer::needsParentheses(const ASTNode* parent, const ASTNode* child,
+                                         bool isRight) {
     if (child->type != ASTNodeType::BINARY_OP || parent->type != ASTNodeType::BINARY_OP) {
         return false;
     }

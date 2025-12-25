@@ -672,8 +672,8 @@ std::unique_ptr<ASTNode> FormulaParser::parseUuidColumnRef() {
             auto secondNode = parseUuidColumnRef();
             if (auto* secondCol = dynamic_cast<ColumnRefNode*>(secondNode.get())) {
                 // Convert to column range
-                auto rangeNode = std::make_unique<ColumnRangeRefNode>(
-                    "", "", absolute, secondCol->absolute);
+                auto rangeNode =
+                    std::make_unique<ColumnRangeRefNode>("", "", absolute, secondCol->absolute);
                 rangeNode->startColumnId = columnId;
                 rangeNode->endColumnId = secondCol->columnId;
                 return rangeNode;
@@ -709,7 +709,8 @@ std::unique_ptr<ASTNode> FormulaParser::parseUuidRowRef() {
             auto secondNode = parseUuidRowRef();
             if (auto* secondRow = dynamic_cast<RowRefNode*>(secondNode.get())) {
                 // Convert to row range
-                auto rangeNode = std::make_unique<RowRangeRefNode>(0, 0, absolute, secondRow->absolute);
+                auto rangeNode =
+                    std::make_unique<RowRangeRefNode>(0, 0, absolute, secondRow->absolute);
                 rangeNode->startRowId = rowId;
                 rangeNode->endRowId = secondRow->rowId;
                 return rangeNode;
