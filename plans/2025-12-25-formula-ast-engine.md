@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-25 00:19 UTC
-Updated At: 2025-12-25 07:32 UTC
+Updated At: 2025-12-25 08:45 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -222,11 +222,11 @@ arg_list    = expression ("," expression)*
 
 ---
 
-## Phase 2: AST Types
+## Phase 2: AST Types ✅ COMPLETE
 
 Define the AST node types used by the parser. With a hand-written parser, the parser directly produces AST nodes (no CST-to-AST conversion needed).
 
-- [ ] 2a: Define AST node types in `core/cells/formula_ast.h`
+- [x] 2a: Define AST node types in `core/cells/formula_ast.h`
   - ASTNodeType enum (all types from Design Decisions)
   - Base ASTNode struct with type, source position, virtual destructor
   - LiteralNode (number, string, boolean values)
@@ -242,12 +242,12 @@ Define the AST node types used by the parser. With a hand-written parser, the pa
   - `toJson()` method for debug visualization
   - **Test**: Header compiles, basic node creation works
 
-- [ ] 2b: Add AST tests in `core/cells/formula_ast_test.cc`
+- [x] 2b: Add AST tests in `core/cells/formula_ast_test.cc`
   - Test node construction and destruction
   - Test AST cloning (deep copy)
   - Test JSON serialization for debug panel
   - Test source position preservation
-  - **Test**: All AST tests pass
+  - **Test**: All AST tests pass (65 tests)
 
 **Note**: Parser tests (2c, 2d from previous plan) are now in Phase 1 since the parser directly produces AST nodes.
 

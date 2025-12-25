@@ -347,6 +347,15 @@ cc_library(
     deps = [":formula_lexer"],
 )
 
+cc_test(
+    name = "formula_ast_test",
+    srcs = ["formula_ast_test.cc"],
+    deps = [
+        ":formula_ast",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "formula_parser",
     srcs = ["formula_parser.cc"],
