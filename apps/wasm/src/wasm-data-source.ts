@@ -3,6 +3,7 @@
 // through the CellsClient, handling workbook metadata and change notifications.
 
 import type { CellsClient } from "./client";
+import type { SheetInfo, CellData, ColumnInfo, RowInfo } from "./types";
 import { getMimeType } from "./utils";
 
 /** Change notification types */
@@ -10,13 +11,6 @@ export type DataChangeType = "cell" | "structure" | "sheet" | "loaded";
 
 /** Change notification callback */
 export type OnChangeCallback = (changeType: DataChangeType) => void;
-
-/** Sheet information */
-export interface DataSourceSheetInfo {
-  name: string;
-  rowCount: number;
-  colCount: number;
-}
 
 /** Export result */
 export interface ExportResult {
@@ -73,13 +67,8 @@ export class WasmDataSource {
   // ==========================================================================
 
   /** Get current sheet information */
-  async getSheetInfo(): Promise<DataSourceSheetInfo> {
-    const info = await this._client.getSheetInfo();
-    return {
-      name: info.name,
-      rowCount: info.rowCount,
-      colCount: info.colCount,
-    };
+  async getSheetInfo(): Promise<SheetInfo> {
+    return this._client.getSheetInfo();
   }
 
   // ==========================================================================
@@ -93,19 +82,17 @@ export class WasmDataSource {
     x2: number,
     y2: number
   ): Promise<{
-    cells: Array<{
-      id: string;
-      col: number;
-      row: number;
-      type: string;
-      value?: string;
-      formula?: string;
-      display?: string;
-    }>;
-    columns: Array<{ id: string; pos: number; width: number; name: string }>;
-    rows: Array<{ id: string; pos: number; height: number; name: string }>;
+    cells: CellData[];
+    columns: ColumnInfo[];
+    rows: RowInfo[];
   }> {
-    return this._client.queryViewport(x1, y1, x2, y2);
+    const result = await this._client.queryViewport(x1, y1, x2, y2);
+    // Cast cells since WASM returns string type but runtime values are valid
+    return {
+      cells: result.cells as CellData[],
+      columns: result.columns as ColumnInfo[],
+      rows: result.rows as RowInfo[],
+    };
   }
 
   // ==========================================================================
@@ -231,11 +218,11 @@ export class WasmDataSource {
   // ==========================================================================
 
   /** Get all sheets */
-  async getSheets(): Promise<
-    Array<{ index: number; name: string; active: boolean }>
-  > {
-    const result = await this._client.getSheets();
-    return result.sheets;
+  async getSheets(): Promise<{
+    sheets: Array<{ index: number; name: string; active: boolean }>;
+    activeIndex: number;
+  }> {
+    return this._client.getSheets();
   }
 
   /** Set active sheet by index */

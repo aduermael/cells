@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2025-12-25 07:34 UTC
-Updated At: 2025-12-25 08:10 UTC
+Updated At: 2025-12-25 08:55 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # File Size Refactoring Plan
@@ -109,7 +109,7 @@ Extract remaining code and reduce index.html to pure HTML.
 - [x] 3b: Create `src/file-loader.ts` - extract file loading logic
 - [x] 3c: Create `src/persistence.ts` - extract IndexedDB persistence
 - [x] 3d: Create `src/ast-debug.ts` - extract AST debug panel
-- [ ] 3e: Update `src/app.ts` with initialization and connect all modules
+- [x] 3e: Create `src/init.ts` - main initialization and module wiring
 - [ ] 3f: Reduce `index.html` to pure HTML template (no inline JS)
 - [ ] 3g: Update build.mjs - app.ts becomes the single entry point
 - [ ] 3h: Full integration test - verify all features work

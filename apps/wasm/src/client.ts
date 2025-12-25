@@ -55,6 +55,7 @@ export {
   DRAG_THRESHOLD,
 } from "./grid-utils";
 export { App, createApp } from "./app";
+export { initApp, type AppContext } from "./init";
 
 // ============================================================================
 // Worker Message Types

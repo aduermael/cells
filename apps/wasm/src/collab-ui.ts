@@ -39,7 +39,7 @@ interface PresenceManager {
 /** Room manager interface */
 interface RoomManager {
   currentRoomId: RoomId | null;
-  createAndJoinRoom(): Promise<void>;
+  createAndJoinRoom(): Promise<RoomId>;
 }
 
 /** Callback type for initialization requests */

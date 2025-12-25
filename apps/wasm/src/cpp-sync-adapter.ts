@@ -14,7 +14,6 @@ import type {
   SyncStateType,
   SyncStats,
   PeerPresence,
-  CppPresence,
   CppSyncState,
   EnableSyncResult,
   Position,
@@ -32,7 +31,8 @@ interface SyncClient {
   enableSync(url: string, roomId: string, peerId: string): Promise<EnableSyncResult>;
   disableSync(): Promise<void>;
   getSyncState(): Promise<CppSyncState>;
-  getRemotePresences(): Promise<{ peers?: Record<string, CppPresence> }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getRemotePresences(): Promise<{ peers?: Record<string, any> }>;
   processSyncOutgoing(): Promise<void>;
   processSyncPresence(): Promise<void>;
   broadcastSyncOperations(): Promise<void>;
