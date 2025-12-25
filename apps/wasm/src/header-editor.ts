@@ -514,6 +514,10 @@ export class FormulaBarEditor {
       if (wasEditingCell && selectedCell) {
         this.cellEditorInput.style.display = "block";
       }
+
+      // Show formula highlights for the current value when starting to edit
+      // (ensures highlights are shown even if coming from selection mode)
+      this.onUpdateFormulaHighlights(this.formulaInput.value);
     });
 
     this.formulaInput.addEventListener("keydown", (e) => {

@@ -236,6 +236,10 @@ export class CellEditor {
     // Sync formula bar
     this.formulaInput.value = this.cellEditorInput.value;
 
+    // Show formula highlights for the initial value
+    // (input event doesn't fire when value is set programmatically)
+    this.onUpdateFormulaHighlights(this.cellEditorInput.value);
+
     // Broadcast initial editing state to peers
     if (this.syncAdapter && selectedCell) {
       this.syncAdapter.setEditing(
