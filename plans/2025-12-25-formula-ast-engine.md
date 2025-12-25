@@ -165,7 +165,7 @@ arg_list    = expression ("," expression)*
 
 ### Implementation Tasks
 
-- [ ] 1a: Implement lexer (tokenizer) in `core/cells/formula_lexer.h/.cc`
+- [x] 1a: Implement lexer (tokenizer) in `core/cells/formula_lexer.h/.cc`
   - Token types: NUMBER, STRING, BOOLEAN, IDENTIFIER, COLUMN (A-ZZ), ROW (digits)
   - Operators: `+`, `-`, `*`, `/`, `^`, `&`, `=`, `<>`, `<`, `<=`, `>`, `>=`
   - Punctuation: `(`, `)`, `,`, `:`, `!`, `$`
@@ -173,7 +173,7 @@ arg_list    = expression ("," expression)*
   - Track source position (start, end) for each token for error reporting
   - **Test**: Lexer correctly tokenizes sample formulas
 
-- [ ] 1b: Add lexer tests in `core/cells/formula_lexer_test.cc`
+- [x] 1b: Add lexer tests in `core/cells/formula_lexer_test.cc`
   - Test number tokens (integers, decimals, scientific notation)
   - Test string tokens (double-quoted, with escapes)
   - Test boolean tokens (TRUE, FALSE, case-insensitive)
@@ -181,7 +181,7 @@ arg_list    = expression ("," expression)*
   - Test operators and punctuation
   - Test position tracking
   - Test error tokens for invalid input
-  - **Test**: All lexer tests pass
+  - **Test**: All lexer tests pass (75 tests)
 
 - [ ] 1c: Implement recursive descent parser in `core/cells/formula_parser.h/.cc`
   - `FormulaParser` class with `parse(string) -> unique_ptr<ASTNode>`

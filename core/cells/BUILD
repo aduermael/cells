@@ -322,3 +322,19 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "formula_lexer",
+    srcs = ["formula_lexer.cc"],
+    hdrs = ["formula_lexer.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "formula_lexer_test",
+    srcs = ["formula_lexer_test.cc"],
+    deps = [
+        ":formula_lexer",
+        "@googletest//:gtest_main",
+    ],
+)
