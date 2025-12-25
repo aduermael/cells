@@ -385,6 +385,119 @@ void Sheet::addRow(std::unique_ptr<Axis> row) {
     rows[row->id] = std::move(row);
 }
 
+Cell* Sheet::getOrCreateCellAt(const ID& colId, const ID& rowId) {
+    // Check if cell already exists
+    Cell* existing = getCellAt(colId, rowId);
+    if (existing != nullptr) {
+        return existing;
+    }
+
+    // Create new cell
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    Cell* rawPtr = cell.get();
+    addCell(std::move(cell));
+    return rawPtr;
+}
+
+Axis* Sheet::getColumnByPosition(uint32_t position) {
+    for (auto& [id, col] : columns) {
+        if (col->position == position) {
+            return col.get();
+        }
+    }
+    return nullptr;
+}
+
+Axis* Sheet::getRowByPosition(uint32_t position) {
+    for (auto& [id, row] : rows) {
+        if (row->position == position) {
+            return row.get();
+        }
+    }
+    return nullptr;
+}
+
+Axis* Sheet::getColumnByName(const std::string& name) {
+    // Convert name to position, then look up by position
+    int32_t position = columnNameToPosition(name);
+    if (position < 0) {
+        return nullptr;
+    }
+    return getColumnByPosition(static_cast<uint32_t>(position));
+}
+
+Axis* Sheet::getOrCreateColumnByPosition(uint32_t position) {
+    // Check if column already exists
+    Axis* existing = getColumnByPosition(position);
+    if (existing != nullptr) {
+        return existing;
+    }
+
+    // Create new column
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = position;
+    Axis* rawPtr = col.get();
+    addColumn(std::move(col));
+    return rawPtr;
+}
+
+Axis* Sheet::getOrCreateRowByPosition(uint32_t position) {
+    // Check if row already exists
+    Axis* existing = getRowByPosition(position);
+    if (existing != nullptr) {
+        return existing;
+    }
+
+    // Create new row
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = position;
+    Axis* rawPtr = row.get();
+    addRow(std::move(row));
+    return rawPtr;
+}
+
+std::string Sheet::positionToColumnName(uint32_t position) {
+    // Convert 0-indexed position to column name (A, B, ..., Z, AA, AB, ...)
+    // 0 -> A, 25 -> Z, 26 -> AA, 27 -> AB, ...
+    std::string result;
+    uint32_t pos = position;
+    do {
+        result = static_cast<char>('A' + (pos % 26)) + result;
+        pos = pos / 26;
+        if (pos > 0) {
+            pos--;  // Adjust for base-26 without zero digit
+        } else {
+            break;
+        }
+    } while (pos >= 0);
+    return result;
+}
+
+int32_t Sheet::columnNameToPosition(const std::string& name) {
+    // Convert column name (A, B, ..., Z, AA, AB, ...) to 0-indexed position
+    // A -> 0, Z -> 25, AA -> 26, AB -> 27, ...
+    if (name.empty()) {
+        return -1;
+    }
+
+    int32_t position = 0;
+    for (char c : name) {
+        // Convert to uppercase if lowercase
+        char upper = c;
+        if (c >= 'a' && c <= 'z') {
+            upper = static_cast<char>(c - 'a' + 'A');
+        }
+
+        // Validate it's a letter
+        if (upper < 'A' || upper > 'Z') {
+            return -1;
+        }
+
+        position = position * 26 + (upper - 'A' + 1);
+    }
+    return position - 1;  // Convert to 0-indexed
+}
+
 std::string Sheet::makeCellKey(const ID& colId, const ID& rowId) {
     // Simple composite key: colId + ":" + rowId
     return colId.toString() + ":" + rowId.toString();

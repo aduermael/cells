@@ -257,7 +257,7 @@ Define the AST node types used by the parser. With a hand-written parser, the pa
 
 Convert A1 references in AST to UUID-based references, auto-creating cells as needed.
 
-- [ ] 3a: Add cell/axis auto-creation to Sheet in `core/cells/model.h` and `model.cc`
+- [x] 3a: Add cell/axis auto-creation to Sheet in `core/cells/model.h` and `model.cc`
   - `getOrCreateCellAt(colId, rowId)` - returns existing cell or creates new one
   - `getOrCreateAxisByPosition(position, isColumn)` - returns existing axis or creates new one
   - `getAxisByName(name)` - look up column by letter (A, B, ..., Z, AA, AB, ...)
