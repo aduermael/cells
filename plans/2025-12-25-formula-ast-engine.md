@@ -264,7 +264,7 @@ Convert A1 references in AST to UUID-based references, auto-creating cells as ne
   - These are needed when parsing formulas that reference non-existent cells
   - **Test**: Auto-creation works, lookup by name works
 
-- [ ] 3b: Add named range registry in `core/cells/named_ranges.h` and `named_ranges.cc`
+- [x] 3b: Add named range registry in `core/cells/named_ranges.h` and `named_ranges.cc`
   - `NamedRangeRegistry` class
   - Store workbook-scoped and sheet-scoped named ranges
   - `define(name, scope, rangeOrCell)` - create named range

@@ -375,3 +375,21 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "named_ranges",
+    srcs = ["named_ranges.cc"],
+    hdrs = ["named_ranges.h"],
+    visibility = ["//visibility:public"],
+    deps = [":types"],
+)
+
+cc_test(
+    name = "named_ranges_test",
+    srcs = ["named_ranges_test.cc"],
+    deps = [
+        ":id",
+        ":named_ranges",
+        "@googletest//:gtest_main",
+    ],
+)
