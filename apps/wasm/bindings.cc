@@ -423,12 +423,16 @@ public:
             if (entry.cell->isFormula()) {
                 json << "\"type\":\"f\",";
                 Formula* formula = entry.cell->getFormula();
+                std::string a1Formula;
                 if (formula != nullptr && formula->text != nullptr) {
-                    std::string a1Formula = _refConverter.formulaToA1(formula->text);
+                    a1Formula = _refConverter.formulaToA1(formula->text);
                     LOG_INFO("[FORMULA_DEBUG] queryViewport: UUID='%s' -> A1='%s'", formula->text, a1Formula.c_str());
                     json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
                 }
-                json << "\"display\":\"" << jsonEscape(entry.cell->value.raw) << "\"";
+                // Use fresh A1 formula for display (cell->value.raw may have stale formula text)
+                // Once we have a calc engine, this should show the calculated value instead
+                const std::string& displayValue = a1Formula.empty() ? entry.cell->value.raw : a1Formula;
+                json << "\"display\":\"" << jsonEscape(displayValue) << "\"";
             } else {
                 char typeChar = valueTypeToChar(entry.cell->value.type);
                 json << "\"type\":\"" << typeChar << "\",";
