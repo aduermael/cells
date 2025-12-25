@@ -288,6 +288,7 @@ export class FormulaBarEditor {
   private onUpdateAstDebugPanel: (value: string) => void;
   private onUpdateFormulaHighlights: (value: string) => void;
   private isEditing: () => boolean;
+  private onPositionCellEditor: (cell: Position) => void;
 
   // =========================================================================
   // Constructor
@@ -310,6 +311,7 @@ export class FormulaBarEditor {
     onUpdateAstDebugPanel: (value: string) => void;
     onUpdateFormulaHighlights: (value: string) => void;
     isEditing: () => boolean;
+    onPositionCellEditor: (cell: Position) => void;
   }) {
     this.uiStateMachine = config.uiStateMachine;
     this.formulaInput = config.formulaInput;
@@ -327,6 +329,7 @@ export class FormulaBarEditor {
     this.onUpdateAstDebugPanel = config.onUpdateAstDebugPanel;
     this.onUpdateFormulaHighlights = config.onUpdateFormulaHighlights;
     this.isEditing = config.isEditing;
+    this.onPositionCellEditor = config.onPositionCellEditor;
 
     this.setupEventListeners();
   }
@@ -509,10 +512,13 @@ export class FormulaBarEditor {
         this.formulaInput.value = cellEditorValue;
       }
 
-      // Keep cell editor visible and synced (for visual feedback on the cell)
+      // Show cell editor for visual feedback on the cell while editing
       const selectedCell = this.getSelectedCell();
-      if (wasEditingCell && selectedCell) {
+      if (selectedCell) {
+        // Position and show the cell editor overlay
+        this.onPositionCellEditor(selectedCell);
         this.cellEditorInput.style.display = "block";
+        this.cellEditorInput.value = this.formulaInput.value;
       }
 
       // Show formula highlights for the current value when starting to edit

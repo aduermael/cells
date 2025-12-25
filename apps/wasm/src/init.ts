@@ -25,6 +25,8 @@ import {
 import {
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
+  HEADER_WIDTH,
+  HEADER_HEIGHT,
   type FormulaHighlight,
 } from "./grid-renderer";
 import type { ReferenceInfo } from "./client-types";
@@ -633,6 +635,24 @@ export function initApp(): AppContext {
   // Create FormulaBarEditor
   // =========================================================================
 
+  // Position the cell editor overlay at a given cell (for visual feedback)
+  function positionCellEditor(cell: Position): void {
+    let cellX = HEADER_WIDTH - app.scrollX;
+    for (let i = 0; i < cell.col; i++) {
+      cellX += app.colWidths.get(i) ?? DEFAULT_COL_WIDTH;
+    }
+    let cellY = HEADER_HEIGHT - app.scrollY;
+    for (let i = 0; i < cell.row; i++) {
+      cellY += app.rowHeights.get(i) ?? DEFAULT_ROW_HEIGHT;
+    }
+    const cellWidth = app.colWidths.get(cell.col) ?? DEFAULT_COL_WIDTH;
+    const cellHeight = app.rowHeights.get(cell.row) ?? DEFAULT_ROW_HEIGHT;
+    elements.cellEditor.style.left = cellX + "px";
+    elements.cellEditor.style.top = cellY + "px";
+    elements.cellEditor.style.width = cellWidth + "px";
+    elements.cellEditor.style.height = cellHeight + "px";
+  }
+
   const formulaBarEditor = new FormulaBarEditor({
     uiStateMachine: app.uiStateMachine,
     formulaInput: elements.formulaInput,
@@ -652,6 +672,7 @@ export function initApp(): AppContext {
     onUpdateAstDebugPanel: (value) => astDebugPanel.update(value),
     onUpdateFormulaHighlights: updateFormulaHighlights,
     isEditing: () => cellEditor.isEditing(),
+    onPositionCellEditor: positionCellEditor,
   });
 
   // =========================================================================
