@@ -36,6 +36,24 @@ export {
   RoomManager,
 } from "./room-url";
 export { CppSyncAdapter } from "./cpp-sync-adapter";
+export { WasmDataSource } from "./wasm-data-source";
+export {
+  getColAtX,
+  getRowAtY,
+  getResizeHandleCol,
+  getResizeHandleRow,
+  getDropTargetCol,
+  getDropTargetRow,
+  getColumnId,
+  getRowId,
+  getCellAt,
+  colToLetter,
+  getNormalizedRange,
+  hasRangeSelection,
+  formatCellReference,
+  RESIZE_HANDLE_WIDTH,
+  DRAG_THRESHOLD,
+} from "./grid-utils";
 
 // ============================================================================
 // Worker Message Types

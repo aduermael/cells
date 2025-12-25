@@ -1,0 +1,282 @@
+// WASM Data Source - Wrapper around CellsClient for data operations
+// This class provides a clean interface for interacting with the WASM worker
+// through the CellsClient, handling workbook metadata and change notifications.
+
+import type { CellsClient } from "./client";
+import { getMimeType } from "./utils";
+
+/** Change notification types */
+export type DataChangeType = "cell" | "structure" | "sheet" | "loaded";
+
+/** Change notification callback */
+export type OnChangeCallback = (changeType: DataChangeType) => void;
+
+/** Sheet information */
+export interface DataSourceSheetInfo {
+  name: string;
+  rowCount: number;
+  colCount: number;
+}
+
+/** Export result */
+export interface ExportResult {
+  blob: Blob;
+  filename: string;
+}
+
+/**
+ * WasmDataSource - Facade for WASM worker communication
+ *
+ * Wraps CellsClient to provide:
+ * - Workbook metadata management (name)
+ * - Change notification subscription
+ * - Clean async API for all data operations
+ */
+export class WasmDataSource {
+  private _client: CellsClient;
+  private _workbookName: string = "Untitled";
+
+  constructor(client: CellsClient) {
+    this._client = client;
+  }
+
+  /** Get the underlying client for direct access when needed */
+  get client(): CellsClient {
+    return this._client;
+  }
+
+  /** Get current workbook name */
+  get workbookName(): string {
+    return this._workbookName;
+  }
+
+  /** Set workbook name (for display and export) */
+  setWorkbookName(name: string): void {
+    this._workbookName = name;
+  }
+
+  /**
+   * Subscribe to change notifications
+   * @param callback Receives change type: 'cell', 'structure', 'sheet', or 'loaded'
+   */
+  setOnChange(callback: OnChangeCallback): void {
+    this._client.setOnDataChanged(callback);
+  }
+
+  /** Unsubscribe from change notifications */
+  removeOnChange(): void {
+    this._client.removeOnDataChanged();
+  }
+
+  // ==========================================================================
+  // Sheet Information
+  // ==========================================================================
+
+  /** Get current sheet information */
+  async getSheetInfo(): Promise<DataSourceSheetInfo> {
+    const info = await this._client.getSheetInfo();
+    return {
+      name: info.name,
+      rowCount: info.rowCount,
+      colCount: info.colCount,
+    };
+  }
+
+  // ==========================================================================
+  // Viewport Queries
+  // ==========================================================================
+
+  /** Get cells and axes in viewport */
+  async getViewport(
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number
+  ): Promise<{
+    cells: Array<{
+      id: string;
+      col: number;
+      row: number;
+      type: string;
+      value?: string;
+      formula?: string;
+      display?: string;
+    }>;
+    columns: Array<{ id: string; pos: number; width: number; name: string }>;
+    rows: Array<{ id: string; pos: number; height: number; name: string }>;
+  }> {
+    return this._client.queryViewport(x1, y1, x2, y2);
+  }
+
+  // ==========================================================================
+  // Cell Operations
+  // ==========================================================================
+
+  /** Create a new cell at the specified position */
+  async createCell(
+    col: number,
+    row: number,
+    value: string
+  ): Promise<{ id: string }> {
+    return this._client.createCell(col, row, value);
+  }
+
+  /** Get or create a cell at the specified position */
+  async getOrCreateCellAt(
+    col: number,
+    row: number
+  ): Promise<{ id: string; value: string; formula?: string | null }> {
+    return this._client.getOrCreateCellAt(col, row);
+  }
+
+  /** Delete cell at position */
+  async deleteCellAt(col: number, row: number): Promise<{ deleted: boolean }> {
+    return this._client.deleteCellAt(col, row);
+  }
+
+  /** Update cell value by ID */
+  async updateCell(cellId: string, value: string): Promise<{ success: true }> {
+    await this._client.updateCell(cellId, value);
+    return { success: true };
+  }
+
+  /** Delete cell by ID */
+  async deleteCell(cellId: string): Promise<{ success: true }> {
+    await this._client.deleteCell(cellId);
+    return { success: true };
+  }
+
+  // ==========================================================================
+  // Column Operations
+  // ==========================================================================
+
+  /** Resize column by ID */
+  async resizeColumn(colId: string, width: number): Promise<{ success: true }> {
+    await this._client.resizeColumn(colId, width);
+    return { success: true };
+  }
+
+  /** Resize column by position */
+  async resizeColumnByPos(
+    pos: number,
+    width: number
+  ): Promise<{ success: boolean; id?: string }> {
+    return this._client.resizeColumnByPos(pos, width);
+  }
+
+  /** Move column by ID */
+  async moveColumn(colId: string, targetPos: number): Promise<{ success: true }> {
+    await this._client.moveColumn(colId, targetPos);
+    return { success: true };
+  }
+
+  /** Shift columns for empty column move */
+  async shiftColumnsForEmptyMove(
+    sourcePos: number,
+    targetPos: number
+  ): Promise<{ success: true }> {
+    await this._client.shiftColumnsForEmptyMove(sourcePos, targetPos);
+    return { success: true };
+  }
+
+  /** Rename column by ID */
+  async renameColumn(colId: string, name: string): Promise<{ success: true }> {
+    await this._client.renameColumn(colId, name);
+    return { success: true };
+  }
+
+  /** Rename column by position */
+  async renameColumnByPos(
+    pos: number,
+    name: string
+  ): Promise<{ success: boolean; id?: string }> {
+    return await this._client.renameColumnByPos(pos, name);
+  }
+
+  // ==========================================================================
+  // Row Operations
+  // ==========================================================================
+
+  /** Resize row by ID */
+  async resizeRow(rowId: string, height: number): Promise<{ success: true }> {
+    await this._client.resizeRow(rowId, height);
+    return { success: true };
+  }
+
+  /** Resize row by position */
+  async resizeRowByPos(
+    pos: number,
+    height: number
+  ): Promise<{ success: boolean; id?: string }> {
+    return this._client.resizeRowByPos(pos, height);
+  }
+
+  /** Move row by ID */
+  async moveRow(rowId: string, targetPos: number): Promise<{ success: true }> {
+    await this._client.moveRow(rowId, targetPos);
+    return { success: true };
+  }
+
+  /** Shift rows for empty row move */
+  async shiftRowsForEmptyMove(
+    sourcePos: number,
+    targetPos: number
+  ): Promise<{ success: true }> {
+    await this._client.shiftRowsForEmptyMove(sourcePos, targetPos);
+    return { success: true };
+  }
+
+  // ==========================================================================
+  // Sheet Management
+  // ==========================================================================
+
+  /** Get all sheets */
+  async getSheets(): Promise<
+    Array<{ index: number; name: string; active: boolean }>
+  > {
+    const result = await this._client.getSheets();
+    return result.sheets;
+  }
+
+  /** Set active sheet by index */
+  async setActiveSheet(index: number): Promise<void> {
+    await this._client.setActiveSheet(index);
+  }
+
+  /** Add a new sheet */
+  async addSheet(name: string = ""): Promise<{ index: number; name: string }> {
+    return this._client.addSheet(name);
+  }
+
+  /** Delete a sheet by index */
+  async deleteSheet(index: number): Promise<{ activeIndex: number }> {
+    return this._client.deleteSheet(index);
+  }
+
+  /** Rename a sheet */
+  async renameSheet(index: number, name: string): Promise<{ success: boolean }> {
+    return this._client.renameSheet(index, name);
+  }
+
+  /** Move a sheet from one position to another */
+  async moveSheet(
+    fromIndex: number,
+    toIndex: number
+  ): Promise<{ activeIndex: number }> {
+    return this._client.moveSheet(fromIndex, toIndex);
+  }
+
+  // ==========================================================================
+  // Export
+  // ==========================================================================
+
+  /** Export workbook to specified format */
+  async exportAs(format: "csv" | "xlsx" | "zcd"): Promise<ExportResult> {
+    const result = await this._client.exportAs(format);
+    const blob = new Blob([result.data], { type: getMimeType(format) });
+    return {
+      blob,
+      filename: result.filename || `${this._workbookName}.${format}`,
+    };
+  }
+}
