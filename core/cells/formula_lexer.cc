@@ -106,6 +106,12 @@ const char* FormulaLexer::tokenTypeName(TokenType type) {
             return "COLUMN";
         case TokenType::ROW:
             return "ROW";
+        case TokenType::UUID_CELL_REF:
+            return "UUID_CELL_REF";
+        case TokenType::UUID_COLUMN_REF:
+            return "UUID_COLUMN_REF";
+        case TokenType::UUID_ROW_REF:
+            return "UUID_ROW_REF";
         case TokenType::PLUS:
             return "PLUS";
         case TokenType::MINUS:
@@ -260,7 +266,37 @@ Token FormulaLexer::scanToken() {
         case '!':
             return makeToken(TokenType::BANG, start);
         case '$':
+            // Check for UUID cell ref: $$ or $~
+            if (peek() == '$' || peek() == '~') {
+                const bool rowAbsolute = (peek() == '$');
+                advance();  // Consume second char
+                return scanUuidCellRef(start, true, rowAbsolute);
+            }
             return makeToken(TokenType::DOLLAR, start);
+        case '~':
+            // Check for UUID cell ref: ~$ or ~~
+            if (peek() == '$' || peek() == '~') {
+                const bool rowAbsolute = (peek() == '$');
+                advance();  // Consume second char
+                return scanUuidCellRef(start, false, rowAbsolute);
+            }
+            return makeErrorToken("Unexpected character '~'", start);
+        case '@':
+            // Check for UUID column ref: @$ or @~
+            if (peek() == '$' || peek() == '~') {
+                const bool absolute = (peek() == '$');
+                advance();  // Consume second char
+                return scanUuidColumnRef(start, absolute);
+            }
+            return makeErrorToken("Unexpected character '@'", start);
+        case '#':
+            // Check for UUID row ref: #$ or #~
+            if (peek() == '$' || peek() == '~') {
+                const bool absolute = (peek() == '$');
+                advance();  // Consume second char
+                return scanUuidRowRef(start, absolute);
+            }
+            return makeErrorToken("Unexpected character '#'", start);
         case '=':
             return makeToken(TokenType::EQUAL, start);
         case '<':
@@ -452,6 +488,74 @@ Token FormulaLexer::scanRowNumber() {
     }
 
     return makeToken(TokenType::ROW, start);
+}
+
+Token FormulaLexer::scanUuidCellRef(size_t start, bool /*colAbsolute*/, bool /*rowAbsolute*/) {
+    // After prefix ($$, $~, ~$, or ~~), consume 8 alphanumeric chars
+    constexpr size_t UUID_LENGTH = 8;
+    size_t count = 0;
+
+    while (count < UUID_LENGTH && !isAtEndInternal()) {
+        const char c = peek();
+        if (isAlphaNumeric(c)) {
+            advance();
+            ++count;
+        } else {
+            break;
+        }
+    }
+
+    if (count != UUID_LENGTH) {
+        return makeErrorToken("Invalid UUID cell reference: expected 8 alphanumeric characters", start);
+    }
+
+    return makeToken(TokenType::UUID_CELL_REF, start);
+}
+
+Token FormulaLexer::scanUuidColumnRef(size_t start, bool /*absolute*/) {
+    // After prefix (@$ or @~), consume 8 alphanumeric chars
+    constexpr size_t UUID_LENGTH = 8;
+    size_t count = 0;
+
+    while (count < UUID_LENGTH && !isAtEndInternal()) {
+        const char c = peek();
+        if (isAlphaNumeric(c)) {
+            advance();
+            ++count;
+        } else {
+            break;
+        }
+    }
+
+    if (count != UUID_LENGTH) {
+        return makeErrorToken("Invalid UUID column reference: expected 8 alphanumeric characters",
+                              start);
+    }
+
+    return makeToken(TokenType::UUID_COLUMN_REF, start);
+}
+
+Token FormulaLexer::scanUuidRowRef(size_t start, bool /*absolute*/) {
+    // After prefix (#$ or #~), consume 8 alphanumeric chars
+    constexpr size_t UUID_LENGTH = 8;
+    size_t count = 0;
+
+    while (count < UUID_LENGTH && !isAtEndInternal()) {
+        const char c = peek();
+        if (isAlphaNumeric(c)) {
+            advance();
+            ++count;
+        } else {
+            break;
+        }
+    }
+
+    if (count != UUID_LENGTH) {
+        return makeErrorToken("Invalid UUID row reference: expected 8 alphanumeric characters",
+                              start);
+    }
+
+    return makeToken(TokenType::UUID_ROW_REF, start);
 }
 
 }  // namespace cells

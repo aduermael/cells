@@ -501,7 +501,8 @@ TEST(FormulaLexerTest, TabsAndNewlines) {
 // ============================================================================
 
 TEST(FormulaLexerTest, ErrorUnknownCharacter) {
-    FormulaLexer lexer("@");
+    // @ alone is an error, but @$ or @~ start UUID column refs
+    FormulaLexer lexer("@+");  // @ not followed by $ or ~
     Token tok = lexer.nextToken();
     EXPECT_EQ(tok.type, TokenType::ERROR);
     EXPECT_FALSE(tok.errorMessage.empty());
@@ -694,6 +695,153 @@ TEST(FormulaLexerTest, WholeRowReference) {
     ASSERT_EQ(tokens.size(), 4u);
     EXPECT_EQ(tokens[0].type, TokenType::NUMBER);
     EXPECT_EQ(tokens[1].type, TokenType::COLON);
+    EXPECT_EQ(tokens[2].type, TokenType::NUMBER);
+}
+
+// ============================================================================
+// UUID Reference Token Tests
+// ============================================================================
+
+TEST(FormulaLexerTest, UuidCellRefRelative) {
+    FormulaLexer lexer("~~xK7mNp2Q");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::UUID_CELL_REF);
+    EXPECT_EQ(tok.text, "~~xK7mNp2Q");
+}
+
+TEST(FormulaLexerTest, UuidCellRefBothAbsolute) {
+    FormulaLexer lexer("$$xK7mNp2Q");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::UUID_CELL_REF);
+    EXPECT_EQ(tok.text, "$$xK7mNp2Q");
+}
+
+TEST(FormulaLexerTest, UuidCellRefColAbsolute) {
+    FormulaLexer lexer("$~xK7mNp2Q");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::UUID_CELL_REF);
+    EXPECT_EQ(tok.text, "$~xK7mNp2Q");
+}
+
+TEST(FormulaLexerTest, UuidCellRefRowAbsolute) {
+    FormulaLexer lexer("~$xK7mNp2Q");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::UUID_CELL_REF);
+    EXPECT_EQ(tok.text, "~$xK7mNp2Q");
+}
+
+TEST(FormulaLexerTest, UuidColumnRefAbsolute) {
+    FormulaLexer lexer("@$colA0001");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::UUID_COLUMN_REF);
+    EXPECT_EQ(tok.text, "@$colA0001");
+}
+
+TEST(FormulaLexerTest, UuidColumnRefRelative) {
+    FormulaLexer lexer("@~colA0001");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::UUID_COLUMN_REF);
+    EXPECT_EQ(tok.text, "@~colA0001");
+}
+
+TEST(FormulaLexerTest, UuidRowRefAbsolute) {
+    FormulaLexer lexer("#$row10001");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::UUID_ROW_REF);
+    EXPECT_EQ(tok.text, "#$row10001");
+}
+
+TEST(FormulaLexerTest, UuidRowRefRelative) {
+    FormulaLexer lexer("#~row10001");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::UUID_ROW_REF);
+    EXPECT_EQ(tok.text, "#~row10001");
+}
+
+TEST(FormulaLexerTest, UuidFormulaSimpleAddition) {
+    FormulaLexer lexer("=~~xK7mNp2Q+~~fR3pK7wN");
+    auto tokens = lexer.tokenizeAll();
+    ASSERT_EQ(tokens.size(), 5u);  // =, UUID_CELL_REF, +, UUID_CELL_REF, END
+    EXPECT_EQ(tokens[0].type, TokenType::EQUAL);
+    EXPECT_EQ(tokens[1].type, TokenType::UUID_CELL_REF);
+    EXPECT_EQ(tokens[2].type, TokenType::PLUS);
+    EXPECT_EQ(tokens[3].type, TokenType::UUID_CELL_REF);
+    EXPECT_EQ(tokens[4].type, TokenType::END_OF_INPUT);
+}
+
+TEST(FormulaLexerTest, UuidFormulaRange) {
+    FormulaLexer lexer("=~~cellAAA1:~~cellBBB2");
+    auto tokens = lexer.tokenizeAll();
+    ASSERT_EQ(tokens.size(), 5u);  // =, UUID_CELL_REF, :, UUID_CELL_REF, END
+    EXPECT_EQ(tokens[0].type, TokenType::EQUAL);
+    EXPECT_EQ(tokens[1].type, TokenType::UUID_CELL_REF);
+    EXPECT_EQ(tokens[2].type, TokenType::COLON);
+    EXPECT_EQ(tokens[3].type, TokenType::UUID_CELL_REF);
+}
+
+TEST(FormulaLexerTest, UuidFormulaFunction) {
+    FormulaLexer lexer("=SUM(~~xK7mNp2Q,~~fR3pK7wN)");
+    auto tokens = lexer.tokenizeAll();
+    // =, SUM, (, UUID_CELL_REF, ,, UUID_CELL_REF, ), END
+    ASSERT_EQ(tokens.size(), 8u);
+    EXPECT_EQ(tokens[0].type, TokenType::EQUAL);
+    EXPECT_EQ(tokens[1].type, TokenType::IDENTIFIER);
+    EXPECT_EQ(tokens[2].type, TokenType::LPAREN);
+    EXPECT_EQ(tokens[3].type, TokenType::UUID_CELL_REF);
+    EXPECT_EQ(tokens[4].type, TokenType::COMMA);
+    EXPECT_EQ(tokens[5].type, TokenType::UUID_CELL_REF);
+    EXPECT_EQ(tokens[6].type, TokenType::RPAREN);
+}
+
+TEST(FormulaLexerTest, UuidRefInvalidTooShort) {
+    FormulaLexer lexer("~~abc");  // Only 3 chars, need 8
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::ERROR);
+    EXPECT_TRUE(tok.errorMessage.find("8 alphanumeric") != std::string::npos);
+}
+
+TEST(FormulaLexerTest, UuidRefInvalidEmpty) {
+    FormulaLexer lexer("~~+");  // No alphanumeric after prefix
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::ERROR);
+}
+
+TEST(FormulaLexerTest, UuidColumnRefInvalid) {
+    FormulaLexer lexer("@$xyz");  // Only 3 chars, need 8
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::ERROR);
+}
+
+TEST(FormulaLexerTest, UuidRowRefInvalid) {
+    FormulaLexer lexer("#~ab");  // Only 2 chars, need 8
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::ERROR);
+}
+
+TEST(FormulaLexerTest, UuidMixedWithA1) {
+    // A formula that mixes UUID refs with literals
+    FormulaLexer lexer("=~~xK7mNp2Q+42");
+    auto tokens = lexer.tokenizeAll();
+    ASSERT_EQ(tokens.size(), 5u);  // =, UUID_CELL_REF, +, NUMBER, END
+    EXPECT_EQ(tokens[0].type, TokenType::EQUAL);
+    EXPECT_EQ(tokens[1].type, TokenType::UUID_CELL_REF);
+    EXPECT_EQ(tokens[2].type, TokenType::PLUS);
+    EXPECT_EQ(tokens[3].type, TokenType::NUMBER);
+}
+
+TEST(FormulaLexerTest, UuidTokenTypeName) {
+    EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::UUID_CELL_REF), "UUID_CELL_REF");
+    EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::UUID_COLUMN_REF), "UUID_COLUMN_REF");
+    EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::UUID_ROW_REF), "UUID_ROW_REF");
+}
+
+TEST(FormulaLexerTest, DollarSignStillWorksForA1) {
+    // $ not followed by $ or ~ is still just DOLLAR token for A1 absolute refs
+    FormulaLexer lexer("$A1");
+    auto tokens = lexer.tokenizeAll();
+    ASSERT_EQ(tokens.size(), 4u);  // $, A, 1, END
+    EXPECT_EQ(tokens[0].type, TokenType::DOLLAR);
+    EXPECT_EQ(tokens[1].type, TokenType::COLUMN);
     EXPECT_EQ(tokens[2].type, TokenType::NUMBER);
 }
 

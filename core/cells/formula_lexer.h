@@ -25,6 +25,14 @@ enum class TokenType : std::uint8_t {
     COLUMN,      // Column letters (A, AA, XFD)
     ROW,         // Row number (1, 100, 1048576)
 
+    // UUID-based references (for internal storage format)
+    // Cell ref: $$, $~, ~$, ~~ followed by 8-char cell UUID
+    UUID_CELL_REF,
+    // Column ref: @$ or @~ followed by 8-char column UUID
+    UUID_COLUMN_REF,
+    // Row ref: #$ or #~ followed by 8-char row UUID
+    UUID_ROW_REF,
+
     // Operators
     PLUS,           // +
     MINUS,          // -
@@ -134,6 +142,9 @@ private:
     Token scanString();
     Token scanIdentifierOrColumn();
     Token scanRowNumber();
+    Token scanUuidCellRef(size_t start, bool colAbsolute, bool rowAbsolute);
+    Token scanUuidColumnRef(size_t start, bool absolute);
+    Token scanUuidRowRef(size_t start, bool absolute);
 
     // Helper to create token
     [[nodiscard]] Token makeToken(TokenType type, size_t start) const;

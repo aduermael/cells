@@ -490,7 +490,7 @@ Wire the parser and dependency graph into the Cell/Sheet model.
     - Handle all operators and functions
     - **Test**: `=A1+B2` with resolved UUIDs → `=~~xK7mNp2Q+~~fR3pK7wN`
 
-  - [ ] 5f.2: Update FormulaLexer to tokenize UUID refs
+  - [x] 5f.2: Update FormulaLexer to tokenize UUID refs
     - Recognize patterns: `$$`, `$~`, `~$`, `~~` followed by 8 alphanumeric chars
     - All UUID refs are exactly 10 chars - simple pattern matching
     - New token type UUID_CELL_REF or extend CELL_REF
