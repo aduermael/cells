@@ -29,6 +29,28 @@ enum class CollabMode : std::uint8_t {
     COLLABORATING  // Active collaboration - edits tracked in OpLog, broadcast to peers
 };
 
+// =============================================================================
+// IMPORTANT: CRDT Model Modification Contract
+// =============================================================================
+//
+// When CollabMode is COLLABORATING, all model modifications MUST be performed
+// through CRDT operations (see crdt.cc). Direct model mutations (e.g., calling
+// addCell(), addColumn(), addRow() directly) will NOT sync to other peers.
+//
+// The only exceptions are:
+// 1. File loading (initial state, no peers yet)
+// 2. Applying operations from peers (the operation itself handles the mutation)
+//
+// To create/modify entities, use the operation helpers in crdt.h:
+// - makeCellSetValueOp() - create or modify a cell
+// - makeDimInsertAxisOp() - create a column or row
+// - makeDimDeleteAxisOp() - delete a column or row
+// - makeDimSetAxisSizeOp() - resize a column or row
+// - makeDimMoveAxisOp() - move a column or row
+//
+// Then apply with applyOperation() to both mutate the model AND add to OpLog.
+// =============================================================================
+
 // Cell value - stores the raw value as a string (for simplicity)
 // The type field indicates how to interpret it
 struct CellValue {
