@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-25 00:19 UTC
-Updated At: 2025-12-25 01:45 UTC
+Updated At: 2025-12-25 02:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -18,6 +18,16 @@ Execution (actually computing formula results) is deferred to a separate plan.
 ## Testing Philosophy
 
 **Tests must be added and passing after each testable/verifiable step.** This prevents errors from accumulating and becoming harder to fix when detected later. Each phase includes specific test requirements that must pass before proceeding.
+
+**UI Testing Philosophy**: Whenever something can be wired to the UI for manual/visual testing, it should be done—even if the feature is partially implemented. Each phase includes a "UI Checkpoint" step that exposes the new functionality in the web UI. This allows:
+- Visual verification that the feature works as expected
+- Early detection of integration issues
+- User-facing feedback on the implementation direction
+
+UI checkpoints should clearly indicate:
+1. What to test (specific actions to perform)
+2. Expected results (what the user should see)
+3. Known limitations (what won't work yet)
 
 ## Design Decisions
 
@@ -147,6 +157,17 @@ Write the tree-sitter grammar for Excel-style formulas.
   - Test error recovery (partial formulas like `=SUM(A1+`)
   - **Test**: `tree-sitter test` passes all cases
 
+- [ ] 1d: **UI Checkpoint** - Raw parse tree visualization
+  - Add WASM binding: `debugParseFormula(text)` → returns tree-sitter S-expression string
+  - Add debug panel in web UI (hidden by default, toggle with keyboard shortcut)
+  - Display raw parse tree when typing in formula bar
+  - **Test manually**:
+    - Type `=1+2` → see parse tree with `binary_op`, `number` nodes
+    - Type `=SUM(A1:B2)` → see `function_call`, `range_ref` nodes
+    - Type `=SUM(A1+` → see ERROR node in tree (error recovery working)
+  - **Expected**: Tree updates live as you type; ERROR nodes appear for invalid syntax
+  - **Limitations**: No UUID resolution yet, just raw syntax tree
+
 ---
 
 ## Phase 2: AST Types and Conversion
@@ -187,6 +208,19 @@ Define our AST types and convert from tree-sitter's CST.
   - Test complex nested expressions
   - Test error recovery (ErrorNode created for invalid syntax)
   - **Test**: All tests pass before proceeding
+
+- [ ] 2d: **UI Checkpoint** - AST structure visualization
+  - Update debug panel to show our AST (not just tree-sitter's CST)
+  - Add WASM binding: `debugGetAST(text)` → returns JSON representation of AST
+  - Show AST node types, operators, and literal values
+  - Highlight ErrorNodes in red to visualize error recovery
+  - **Test manually**:
+    - Type `=1+2*3` → see BinaryOp tree showing correct precedence (mul before add)
+    - Type `=A1` → see CellRefNode with `colAbsolute: false, rowAbsolute: false`
+    - Type `=$A$1` → see CellRefNode with `colAbsolute: true, rowAbsolute: true`
+    - Type `=IF(` → see FunctionCallNode with ErrorNode child
+  - **Expected**: AST structure visible; precedence correct; partial formulas show ErrorNodes
+  - **Limitations**: Cell references show A1 text, not UUIDs (resolution not done yet)
 
 ---
 
@@ -237,6 +271,20 @@ Convert A1 references in AST to UUID-based references, auto-creating cells as ne
   - Test cross-sheet reference resolution
   - Test named range resolution (both scopes)
   - **Test**: All tests pass before proceeding
+
+- [ ] 3f: **UI Checkpoint** - Reference highlighting (basic)
+  - Wire formula bar to use parser + resolver
+  - When editing a formula, highlight referenced cells on the grid
+  - Use different colors for different references (like Numbers/Excel)
+  - Show both A1 text in formula bar and highlight cells in grid
+  - **Test manually**:
+    - Type `=A1` → cell A1 highlights with color
+    - Type `=A1+B2` → cells A1 and B2 highlight with different colors
+    - Type `=A1:C3` → range A1:C3 highlights as a block
+    - Type `=SUM(A1,B2,C3)` → three cells highlight with three colors
+    - Click on non-existent cell reference (e.g., `=ZZ999`) → cell auto-created, highlighted
+  - **Expected**: Referenced cells visually highlighted; colors match formula segments
+  - **Limitations**: Formula doesn't execute yet (no computed values); no dependency tracking
 
 ---
 
@@ -304,6 +352,20 @@ Track which cells depend on which for reactive updates, using R-tree for efficie
   - Test recalc ordering
   - **Test**: All tests pass before proceeding
 
+- [ ] 4g: **UI Checkpoint** - Dependency visualization
+  - Add "Show Dependencies" mode (toggle with keyboard shortcut or toolbar button)
+  - When a cell with a formula is selected, show:
+    - **Precedents**: cells this formula reads from (highlight in blue)
+    - **Dependents**: cells that read from this cell (highlight in green)
+  - Draw arrows or lines connecting dependent cells (optional, can be simple highlights)
+  - **Test manually**:
+    - Create formula `=A1+B1` in C1, select C1 → A1 and B1 highlight as precedents
+    - Select A1 → C1 highlights as dependent
+    - Create `=C1*2` in D1, select C1 → D1 shows as dependent, A1/B1 as precedents
+    - Create circular ref `=D1` in A1 → warning indicator shown (cycle detected)
+  - **Expected**: Clear visual of what feeds into and out of each formula cell
+  - **Limitations**: No execution yet; values won't update when dependencies change
+
 ---
 
 ## Phase 5: Integration with Model
@@ -341,6 +403,18 @@ Wire the parser and dependency graph into the Cell/Sheet model.
   - Test volatile function tracking
   - **Test**: All tests pass before proceeding
 
+- [ ] 5e: **UI Checkpoint** - Formula persistence and display
+  - Formulas should now persist: enter formula, refresh page, formula still there
+  - Formula bar shows A1 notation when cell selected
+  - Grid cell shows formula text (prefixed with `=`) since execution not implemented yet
+  - **Test manually**:
+    - Enter `=A1+B2` in C1 → formula bar shows `=A1+B2`, cell shows `=A1+B2`
+    - Refresh page → formula still present, references still highlighted when editing
+    - Save file, reload → formula preserved exactly
+    - Create named range "total" → use `=total` in formula → resolves correctly
+  - **Expected**: Formulas round-trip through save/load; display matches input
+  - **Limitations**: Cell shows formula text, not computed value (execution deferred)
+
 ---
 
 ## Phase 6: Column/Row Move Stability
@@ -375,6 +449,19 @@ Test that formulas remain stable when columns/rows are moved.
   - Verify range now includes the new row (bounds-based semantics)
   - Verify display shows `=SUM(A1:A11)`
   - **Test**: Range expansion works
+
+- [ ] 6e: **UI Checkpoint** - Move stability visualization
+  - This is a key demonstration of the UUID-based reference system
+  - Provide UI controls to move columns/rows (drag-and-drop or menu)
+  - **Test manually**:
+    - Enter value `10` in B2, formula `=B2*2` in C2
+    - Move column B to position D (columns now: A, C, D, ...)
+    - Observe: formula in C2 now displays `=D2*2` (auto-updated!)
+    - References still highlight correctly when editing
+    - Insert new column between A and C → formula updates to `=E2*2`
+    - Insert row above row 2 → formula updates to `=E3*2`
+  - **Expected**: Formula references auto-update on structural changes; highlighting stays correct
+  - **Limitations**: Still no execution; values don't compute yet
 
 ---
 
@@ -438,12 +525,12 @@ Run all tests: `bazel test //core/cells:all`
 
 ### Test File Summary
 
-| Phase | Test File |
-|-------|-----------|
-| 1 | `core/cells/tree-sitter-formula/corpus/*.txt` (tree-sitter tests) |
-| 2 | `core/cells/formula_parser_test.cc` |
-| 3 | `core/cells/formula_resolver_test.cc` |
-| 4 | `core/cells/rtree_test.cc`, `core/cells/dependency_graph_test.cc` |
-| 5 | `core/cells/formula_integration_test.cc` |
-| 6 | `core/cells/formula_move_test.cc` |
-| 7 | Manual testing + JS integration tests |
+| Phase | Test File | UI Checkpoint |
+|-------|-----------|---------------|
+| 1 | `core/cells/tree-sitter-formula/corpus/*.txt` (tree-sitter tests) | 1d: Debug panel with raw parse tree |
+| 2 | `core/cells/formula_parser_test.cc` | 2d: AST structure visualization |
+| 3 | `core/cells/formula_resolver_test.cc` | 3f: Reference highlighting in grid |
+| 4 | `core/cells/rtree_test.cc`, `core/cells/dependency_graph_test.cc` | 4g: Precedent/dependent visualization |
+| 5 | `core/cells/formula_integration_test.cc` | 5e: Formula persistence and display |
+| 6 | `core/cells/formula_move_test.cc` | 6e: Move stability demonstration |
+| 7 | Manual testing + JS integration tests | 7d: Full formula editing UI |
