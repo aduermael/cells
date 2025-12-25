@@ -2333,12 +2333,17 @@ public:
         }
 
         // Resolve references in current sheet context
+        // This may create new cells/columns/rows for references to empty locations
         FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
         ResolveResult result = resolver.resolve(ast.get());
 
         if (!result.success) {
             // Still try to extract what we can
         }
+
+        // Rebuild RefConverter to include any newly created cells
+        // This ensures formulaToUuid can find them when the formula is committed
+        rebuildQuadtree();
 
         // Extract references with positions
         std::vector<ReferenceInfo> refs = resolver.extractReferences(ast.get());
