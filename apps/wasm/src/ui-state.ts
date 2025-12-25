@@ -130,6 +130,11 @@ const transitions: TransitionTable = {
     ESCAPE: { nextState: "IDLE" },
     START_FORMULA_EDIT: { nextState: "FORMULA_BAR_EDITING" },
     START_SELECTING: { nextState: "SELECTING" },
+    // Allow starting column/row operations during editing (commits edit implicitly)
+    START_COLUMN_DRAG: { nextState: "COLUMN_DRAGGING" },
+    START_ROW_DRAG: { nextState: "ROW_DRAGGING" },
+    START_COLUMN_RESIZE: { nextState: "COLUMN_RESIZING" },
+    START_ROW_RESIZE: { nextState: "ROW_RESIZING" },
   },
 
   FORMULA_BAR_EDITING: {
@@ -139,6 +144,11 @@ const transitions: TransitionTable = {
     CLICK_AWAY: { nextState: "IDLE" },
     START_CELL_EDIT: { nextState: "CELL_EDITING" },
     START_SELECTING: { nextState: "SELECTING" },
+    // Allow starting column/row operations during editing (commits edit implicitly)
+    START_COLUMN_DRAG: { nextState: "COLUMN_DRAGGING" },
+    START_ROW_DRAG: { nextState: "ROW_DRAGGING" },
+    START_COLUMN_RESIZE: { nextState: "COLUMN_RESIZING" },
+    START_ROW_RESIZE: { nextState: "ROW_RESIZING" },
   },
 
   COLUMN_RESIZING: {

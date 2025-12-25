@@ -721,11 +721,15 @@ Address issues found during Phase 7d testing and ensure rock-solid foundation be
 - Implementation: Added `onUpdateFormulaHighlights` callback to CellEditor, wired to
   call on input events and clear on commit/cancel
 
-### 8e: Fix state machine for column/row operations during editing
-- [ ] Allow starting column/row drag while editing a cell
-- [ ] This should commit the current edit (like pressing Enter) and start the drag
-- [ ] Review UIStateMachine transitions for CELL_EDITING → COLUMN_DRAGGING/ROW_DRAGGING
-- [ ] **Test**: Edit cell, drag column header → edit commits, column moves
+### 8e: Fix state machine for column/row operations during editing ✅
+- [x] Allow starting column/row drag while editing a cell
+- [x] This should commit the current edit (like pressing Enter) and start the drag
+- [x] Review UIStateMachine transitions for CELL_EDITING → COLUMN_DRAGGING/ROW_DRAGGING
+- [x] **Test**: Edit cell, drag column header → edit commits, column moves
+- Implementation:
+  - Added state transitions from CELL_EDITING and FORMULA_BAR_EDITING to dragging/resizing states
+  - Modified handleMouseDown to commit edits before starting resize operations
+  - Modified handleMouseMove to commit edits before starting drag operations
 
 ### 8f: Comprehensive test coverage for formula parsing & AST
 - [ ] Review and expand `formula_lexer_test.cc` - cover all token types, edge cases

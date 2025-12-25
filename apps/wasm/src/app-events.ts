@@ -218,6 +218,12 @@ export class AppEventManager {
     if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
       const resizeCol = getResizeHandleCol(x, scrollX, colWidths, sheetInfo);
       if (resizeCol >= 0) {
+        // Commit any active edit before starting resize
+        if (cellEditor.isEditing()) {
+          cellEditor.confirmEditing();
+        } else if (uiStateMachine.isInState("FORMULA_BAR_EDITING")) {
+          commitFormulaBarEdit();
+        }
         uiStateMachine.transition(UIEvent.START_COLUMN_RESIZE);
         setResizeColIndex(resizeCol);
         setResizeStartX(e.clientX);
@@ -262,6 +268,12 @@ export class AppEventManager {
     if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
       const resizeRow = getResizeHandleRow(y, scrollY, rowHeights, sheetInfo);
       if (resizeRow >= 0) {
+        // Commit any active edit before starting resize
+        if (cellEditor.isEditing()) {
+          cellEditor.confirmEditing();
+        } else if (uiStateMachine.isInState("FORMULA_BAR_EDITING")) {
+          commitFormulaBarEdit();
+        }
         uiStateMachine.transition(UIEvent.START_ROW_RESIZE);
         setResizeRowIndex(resizeRow);
         setResizeStartY(e.clientY);
@@ -353,14 +365,14 @@ export class AppEventManager {
 
   private handleMouseMove(e: MouseEvent): void {
     const {
-      canvas, uiStateMachine, getSheetInfo, getScrollX, getScrollY, getColWidths, getRowHeights,
+      canvas, uiStateMachine, cellEditor, getSheetInfo, getScrollX, getScrollY, getColWidths, getRowHeights,
       getPendingDragColumn, setPendingDragColumn, getPendingDragRow, setPendingDragRow,
       getPendingDragStartX, getPendingDragStartY,
       setDragMouseX, setDragMouseY, setDragTargetIndex,
       getResizeColIndex, getResizeStartX, getResizeStartWidth, setResizePreviewX,
       getResizeRowIndex, getResizeStartY, getResizeStartHeight, setResizePreviewY,
       getSelectionEnd, setSelectionEnd, setSelectedCell,
-      render, updateFormulaBar, presenceBroadcaster
+      render, updateFormulaBar, presenceBroadcaster, commitFormulaBarEdit
     } = this.config;
 
     const sheetInfo = getSheetInfo();
@@ -379,6 +391,12 @@ export class AppEventManager {
       const dx = Math.abs(x - getPendingDragStartX());
       const dy = Math.abs(y - getPendingDragStartY());
       if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+        // Commit any active edit before starting drag
+        if (cellEditor.isEditing()) {
+          cellEditor.confirmEditing();
+        } else if (uiStateMachine.isInState("FORMULA_BAR_EDITING")) {
+          commitFormulaBarEdit();
+        }
         // Threshold exceeded - start actual drag
         setPendingDragColumn(false);
         uiStateMachine.transition(UIEvent.START_COLUMN_DRAG);
@@ -392,6 +410,12 @@ export class AppEventManager {
       const dx = Math.abs(x - getPendingDragStartX());
       const dy = Math.abs(y - getPendingDragStartY());
       if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
+        // Commit any active edit before starting drag
+        if (cellEditor.isEditing()) {
+          cellEditor.confirmEditing();
+        } else if (uiStateMachine.isInState("FORMULA_BAR_EDITING")) {
+          commitFormulaBarEdit();
+        }
         // Threshold exceeded - start actual drag
         setPendingDragRow(false);
         uiStateMachine.transition(UIEvent.START_ROW_DRAG);
