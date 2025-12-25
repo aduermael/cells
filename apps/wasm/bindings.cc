@@ -421,6 +421,7 @@ public:
                 Formula* formula = entry.cell->getFormula();
                 if (formula != nullptr && formula->text != nullptr) {
                     std::string a1Formula = _refConverter.formulaToA1(formula->text);
+                    LOG_INFO("[FORMULA_DEBUG] queryViewport: UUID='%s' -> A1='%s'", formula->text, a1Formula.c_str());
                     json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
                 }
                 json << "\"display\":\"" << jsonEscape(entry.cell->value.raw) << "\"";
@@ -534,6 +535,7 @@ public:
         std::string payload;
         if (typeChar == 'f') {
             std::string uuidFormula = _refConverter.formulaToUuid(value);
+            LOG_INFO("[FORMULA_DEBUG] setCellValue: A1='%s' -> UUID='%s'", value.c_str(), uuidFormula.c_str());
             payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\",\"display\":\"" + jsonEscape(value) + "\"" + idSuffix;
         } else if (typeChar == 'b') {
             payload = "{\"type\":\"b\",\"value\":\"" + std::string(value == "TRUE" || value == "true" ? "true" : "false") + "\"" + idSuffix;
@@ -1243,6 +1245,7 @@ public:
             _syncManager->pruneOpLog();
         }
 
+        LOG_INFO("[FORMULA_DEBUG] moveColumn: colId=%s to targetPos=%u", colIdStr.c_str(), targetPos);
         rebuildQuadtree();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
@@ -2174,6 +2177,14 @@ private:
         _quadtree.clear();
         _quadtree.build(*sheet);
         _refConverter.setContext(*sheet);
+
+        // Debug: log column positions after rebuild
+        std::string colInfo;
+        for (const auto& [id, col] : sheet->columns) {
+            if (!colInfo.empty()) colInfo += ", ";
+            colInfo += col->name + "@" + std::to_string(col->position);
+        }
+        LOG_INFO("[FORMULA_DEBUG] rebuildQuadtree: columns=[%s]", colInfo.c_str());
     }
 
     // Notify the registered listener of a data change

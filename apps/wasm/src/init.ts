@@ -168,6 +168,7 @@ export function initApp(): AppContext {
   // =========================================================================
 
   function updateFormulaBar(): void {
+    console.log("[FORMULA_DEBUG] updateFormulaBar called, selectedCell=", app.selectedCell);
     // Don't overwrite formula bar while user is actively editing
     if (cellEditor.isEditing() || formulaBarEditor.isEditingFormulaBar()) {
       if (app.selectedCell) {
@@ -226,7 +227,9 @@ export function initApp(): AppContext {
         app.cells
       );
       if (cell) {
-        elements.formulaInput.value = cell.formula || cell.value || "";
+        const formulaValue = cell.formula || cell.value || "";
+        console.log("[FORMULA_DEBUG] updateFormulaBar: cell=", cell, "formula=", formulaValue);
+        elements.formulaInput.value = formulaValue;
       } else {
         elements.formulaInput.value = "";
       }
@@ -358,6 +361,7 @@ export function initApp(): AppContext {
     changeHandlerScheduled = false;
     const changeTypes = pendingChangeTypes;
     pendingChangeTypes = new Set();
+    console.log("[FORMULA_DEBUG] processDataChanges: changeTypes=", [...changeTypes]);
 
     if (
       changeTypes.has("structure") ||
@@ -371,7 +375,9 @@ export function initApp(): AppContext {
       await fetchSheets();
     }
 
+    console.log("[FORMULA_DEBUG] processDataChanges: calling fetchViewport");
     await fetchViewport();
+    console.log("[FORMULA_DEBUG] processDataChanges: cells after fetchViewport=", app.cells.filter(c => c.formula));
     render();
     updateFormulaBar();
 

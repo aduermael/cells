@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-25 00:19 UTC
-Updated At: 2025-12-25 20:04 UTC
+Updated At: 2025-12-25 21:00 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -620,7 +620,7 @@ Test that formulas remain stable when columns/rows are moved.
 
   Total: 38 tests in formula_move_test.cc
 
-- [ ] 6e: **UI Checkpoint** - Move stability visualization (DEFERRED)
+- [x] 6e: **UI Checkpoint** - Move stability visualization ✅
   - This is a key demonstration of the UUID-based reference system
   - Provide UI controls to move columns/rows (drag-and-drop or menu)
   - **Test manually**:
@@ -632,6 +632,8 @@ Test that formulas remain stable when columns/rows are moved.
     - Insert row above row 2 → formula updates to `=E3*2`
   - **Expected**: Formula references auto-update on structural changes; highlighting stays correct
   - **Limitations**: Still no execution; values don't compute yet
+  - **Bug fixed**: RefConverter used vectors indexed by loop counter instead of maps indexed by position.
+    Added sparse position tests to catch this regression.
 
 ---
 

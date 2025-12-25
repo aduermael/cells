@@ -538,6 +538,132 @@ TEST(RefConverterTest, RoundtripComplexFormula) {
 }
 
 // ============================================================================
+// Sparse Position Tests (positions don't start at 0 or have gaps)
+// ============================================================================
+
+// This test catches the bug where indexToColId_/indexToRowId_ were vectors
+// indexed by loop counter instead of maps indexed by actual position.
+// When positions don't start at 0, vector indexing fails.
+TEST(RefConverterTest, SparsePositionsA1ToUuid) {
+    auto sheet = std::make_unique<Sheet>(generate_id(), "SparseSheet");
+
+    // Create column at position 0 (like column A)
+    auto colA = std::make_unique<Axis>(generate_id(), true);
+    colA->position = 0;
+    ID colAId = colA->id;
+    sheet->addColumn(std::move(colA));
+
+    // Create row at position 1 (like row 2 in A1 notation - NOT position 0!)
+    // This is the key: the first row exists at position 1, not 0
+    auto row2 = std::make_unique<Axis>(generate_id(), false);
+    row2->position = 1;  // Row 2 in A1 notation
+    ID row2Id = row2->id;
+    sheet->addRow(std::move(row2));
+
+    // Create cell at A2 (col 0, row 1)
+    auto cellA2 = std::make_unique<Cell>(generate_id(), colAId, row2Id);
+    std::string cellA2Id = cellA2->id.toString();
+    sheet->addCell(std::move(cellA2));
+
+    RefConverter converter;
+    converter.setContext(*sheet);
+
+    // Converting "A2" should find the cell at (col 0, row 1)
+    // Before the fix, this would fail because indexToRowId_ was a vector
+    // with one element at index 0, but we needed index 1.
+    std::string uuidRef = converter.a1RefToUuid("A2");
+    EXPECT_FALSE(uuidRef.empty()) << "a1RefToUuid('A2') should find cell at position (0,1)";
+    EXPECT_EQ(uuidRef, cellA2Id) << "UUID ref should be the cell's ID";
+
+    // Converting back should give A2
+    EXPECT_EQ(converter.uuidRefToA1(uuidRef), "A2");
+}
+
+TEST(RefConverterTest, SparsePositionsFormulaRoundtrip) {
+    auto sheet = std::make_unique<Sheet>(generate_id(), "SparseSheet");
+
+    // Create columns at positions 0 and 1
+    auto colA = std::make_unique<Axis>(generate_id(), true);
+    colA->position = 0;
+    ID colAId = colA->id;
+    sheet->addColumn(std::move(colA));
+
+    auto colB = std::make_unique<Axis>(generate_id(), true);
+    colB->position = 1;
+    ID colBId = colB->id;
+    sheet->addColumn(std::move(colB));
+
+    // Create row at position 1 only (row 2 in A1 notation)
+    auto row2 = std::make_unique<Axis>(generate_id(), false);
+    row2->position = 1;
+    ID row2Id = row2->id;
+    sheet->addRow(std::move(row2));
+
+    // Create cells at A2 and B2
+    auto cellA2 = std::make_unique<Cell>(generate_id(), colAId, row2Id);
+    sheet->addCell(std::move(cellA2));
+
+    auto cellB2 = std::make_unique<Cell>(generate_id(), colBId, row2Id);
+    sheet->addCell(std::move(cellB2));
+
+    RefConverter converter;
+    converter.setContext(*sheet);
+
+    // Formula =A2*10 should roundtrip correctly
+    std::string formula = "=A2*10";
+    std::string uuidFormula = converter.formulaToUuid(formula);
+    EXPECT_NE(uuidFormula, formula) << "Formula should be converted to UUID format";
+
+    std::string backToA1 = converter.formulaToA1(uuidFormula);
+    EXPECT_EQ(backToA1, formula) << "Formula should roundtrip correctly";
+}
+
+TEST(RefConverterTest, GappedPositions) {
+    auto sheet = std::make_unique<Sheet>(generate_id(), "GappedSheet");
+
+    // Create columns at positions 0 and 5 (gap at 1-4)
+    auto colA = std::make_unique<Axis>(generate_id(), true);
+    colA->position = 0;
+    ID colAId = colA->id;
+    sheet->addColumn(std::move(colA));
+
+    auto colF = std::make_unique<Axis>(generate_id(), true);
+    colF->position = 5;  // Column F
+    ID colFId = colF->id;
+    sheet->addColumn(std::move(colF));
+
+    // Create row at position 0
+    auto row1 = std::make_unique<Axis>(generate_id(), false);
+    row1->position = 0;
+    ID row1Id = row1->id;
+    sheet->addRow(std::move(row1));
+
+    // Create cells at A1 and F1
+    auto cellA1 = std::make_unique<Cell>(generate_id(), colAId, row1Id);
+    std::string cellA1Id = cellA1->id.toString();
+    sheet->addCell(std::move(cellA1));
+
+    auto cellF1 = std::make_unique<Cell>(generate_id(), colFId, row1Id);
+    std::string cellF1Id = cellF1->id.toString();
+    sheet->addCell(std::move(cellF1));
+
+    RefConverter converter;
+    converter.setContext(*sheet);
+
+    // A1 should convert correctly
+    EXPECT_EQ(converter.a1RefToUuid("A1"), cellA1Id);
+    EXPECT_EQ(converter.uuidRefToA1(cellA1Id), "A1");
+
+    // F1 should convert correctly (column at position 5)
+    EXPECT_EQ(converter.a1RefToUuid("F1"), cellF1Id);
+    EXPECT_EQ(converter.uuidRefToA1(cellF1Id), "F1");
+
+    // B1 through E1 should fail (no columns at those positions)
+    EXPECT_EQ(converter.a1RefToUuid("B1"), "");
+    EXPECT_EQ(converter.a1RefToUuid("C1"), "");
+}
+
+// ============================================================================
 // Edge Cases
 // ============================================================================
 

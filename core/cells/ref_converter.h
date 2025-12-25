@@ -113,14 +113,14 @@ public:
     [[nodiscard]] std::string formatUuidRef(const CellRef& ref) const;
 
 private:
-    // Column ID to index mapping
+    // Column ID to position mapping
     std::unordered_map<std::string, size_t> colIdToIndex_;
-    // Row ID to index mapping
+    // Row ID to position mapping
     std::unordered_map<std::string, size_t> rowIdToIndex_;
-    // Index to column ID mapping
-    std::vector<std::string> indexToColId_;
-    // Index to row ID mapping
-    std::vector<std::string> indexToRowId_;
+    // Position to column ID mapping (for A1->UUID conversion)
+    std::unordered_map<size_t, std::string> indexToColId_;
+    // Position to row ID mapping (for A1->UUID conversion)
+    std::unordered_map<size_t, std::string> indexToRowId_;
 
     // Cell ID to (colId, rowId) mapping for cell UUID format
     struct CellLocation {

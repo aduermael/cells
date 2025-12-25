@@ -87,8 +87,9 @@ std::string unescapeJsonString(const std::string& input) {
                 case 'u':
                     if (i + 5 < input.size()) {
                         const std::string hex = input.substr(i + 2, 4);
-                        try {
-                            const unsigned int code = std::stoul(hex, nullptr, 16);
+                        char* endptr = nullptr;
+                        const unsigned long code = strtoul(hex.c_str(), &endptr, 16);
+                        if (endptr != nullptr && *endptr == '\0') {
                             if (code < 0x80) {
                                 ss << static_cast<char>(code);
                             } else if (code < 0x800) {
@@ -100,7 +101,7 @@ std::string unescapeJsonString(const std::string& input) {
                                 ss << static_cast<char>(0x80 | (code & 0x3F));
                             }
                             i += 5;
-                        } catch (...) {
+                        } else {
                             ss << input[i];
                         }
                     } else {
@@ -183,12 +184,14 @@ static bool findIntValue(const std::string& json, const std::string& key, int& v
     }
 
     if (end > pos) {
-        try {
-            value = std::stoi(json.substr(pos, end - pos));
+        const std::string numStr = json.substr(pos, end - pos);
+        char* endptr = nullptr;
+        const long parsed = strtol(numStr.c_str(), &endptr, 10);
+        if (endptr != nullptr && *endptr == '\0') {
+            value = static_cast<int>(parsed);
             return true;
-        } catch (...) {
-            return false;
         }
+        return false;
     }
 
     return false;

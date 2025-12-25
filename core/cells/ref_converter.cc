@@ -38,18 +38,17 @@ void RefConverter::setContext(const Sheet& sheet) {
     cellIdToLocation_.clear();
     locationToCellId_.clear();
 
-    indexToColId_.reserve(columns.size());
-    indexToRowId_.reserve(rows.size());
-
     for (size_t i = 0; i < columns.size(); ++i) {
         const std::string idStr = columns[i].second.toString();
-        colIdToIndex_[idStr] = i;
-        indexToColId_.push_back(idStr);
+        const size_t position = columns[i].first;
+        colIdToIndex_[idStr] = position;
+        indexToColId_[position] = idStr;  // Map position to ID for A1->UUID conversion
     }
     for (size_t i = 0; i < rows.size(); ++i) {
         const std::string idStr = rows[i].second.toString();
-        rowIdToIndex_[idStr] = i;
-        indexToRowId_.push_back(idStr);
+        const size_t position = rows[i].first;
+        rowIdToIndex_[idStr] = position;
+        indexToRowId_[position] = idStr;  // Map position to ID for A1->UUID conversion
     }
 
     // Build cell lookup maps
@@ -233,13 +232,15 @@ std::string RefConverter::formatUuidRef(const CellRef& ref) const {
         return "";
     }
 
-    // Look up col/row UUIDs from indices
-    if (ref.colIndex >= indexToColId_.size() || ref.rowIndex >= indexToRowId_.size()) {
-        return "";
+    // Look up col/row UUIDs from positions (using maps)
+    auto colIt = indexToColId_.find(ref.colIndex);
+    auto rowIt = indexToRowId_.find(ref.rowIndex);
+    if (colIt == indexToColId_.end() || rowIt == indexToRowId_.end()) {
+        return "";  // Column or row at this position doesn't exist
     }
 
-    const std::string& colId = indexToColId_[ref.colIndex];
-    const std::string& rowId = indexToRowId_[ref.rowIndex];
+    const std::string& colId = colIt->second;
+    const std::string& rowId = rowIt->second;
 
     // Look up cell ID from (colId, rowId)
     auto cellIt = locationToCellId_.find(makeLocationKey(colId, rowId));
