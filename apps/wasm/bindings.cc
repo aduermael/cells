@@ -15,7 +15,11 @@
 #include "core/cells/crdt.h"
 #include "core/cells/csv_reader.h"
 #include "core/cells/csv_writer.h"
+#include "core/cells/dependency_graph.h"
+#include "core/cells/formula_ast.h"
+#include "core/cells/formula_display.h"
 #include "core/cells/formula_parser.h"
+#include "core/cells/formula_resolver.h"
 #include "core/cells/hlc.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
@@ -2124,6 +2128,345 @@ public:
     }
 
     // ========================================================================
+    // Formula API methods (Phase 7)
+    // ========================================================================
+
+    // Validate a formula without side effects.
+    // Returns JSON with parse errors and AST structure.
+    // Used for live feedback while user types in formula bar.
+    // Does NOT require a cell or workbook - just validates syntax.
+    std::string validateFormula(const std::string& formulaText) {
+        FormulaParser parser(formulaText);
+        auto ast = parser.parse();
+
+        std::ostringstream json;
+        json << "{";
+        json << "\"formula\":\"" << jsonEscape(formulaText) << "\",";
+        json << "\"valid\":" << (ast && parser.errors().empty() ? "true" : "false") << ",";
+
+        // Include parse errors
+        json << "\"errors\":[";
+        const auto& errors = parser.errors();
+        for (size_t i = 0; i < errors.size(); ++i) {
+            if (i > 0) json << ",";
+            json << "\"" << jsonEscape(errors[i]) << "\"";
+        }
+        json << "],";
+
+        // Include basic AST info (type of root node) for partial feedback
+        json << "\"rootType\":";
+        if (ast) {
+            // Convert AST node type to string
+            const char* typeStr = "unknown";
+            switch (ast->type) {
+                case ASTNodeType::NUMBER_LITERAL: typeStr = "NumberLiteral"; break;
+                case ASTNodeType::STRING_LITERAL: typeStr = "StringLiteral"; break;
+                case ASTNodeType::BOOLEAN_LITERAL: typeStr = "BooleanLiteral"; break;
+                case ASTNodeType::CELL_REF: typeStr = "CellRef"; break;
+                case ASTNodeType::RANGE_REF: typeStr = "RangeRef"; break;
+                case ASTNodeType::COLUMN_REF: typeStr = "ColumnRef"; break;
+                case ASTNodeType::ROW_REF: typeStr = "RowRef"; break;
+                case ASTNodeType::COLUMN_RANGE_REF: typeStr = "ColumnRangeRef"; break;
+                case ASTNodeType::ROW_RANGE_REF: typeStr = "RowRangeRef"; break;
+                case ASTNodeType::NAMED_REF: typeStr = "NamedRef"; break;
+                case ASTNodeType::BINARY_OP: typeStr = "BinaryOp"; break;
+                case ASTNodeType::UNARY_OP: typeStr = "UnaryOp"; break;
+                case ASTNodeType::FUNCTION_CALL: typeStr = "FunctionCall"; break;
+                case ASTNodeType::ERROR_NODE: typeStr = "Error"; break;
+            }
+            json << "\"" << typeStr << "\"";
+        } else {
+            json << "null";
+        }
+
+        json << "}";
+        return json.str();
+    }
+
+    // Get the A1 display string for a cell's formula.
+    // Returns empty string if cell has no formula.
+    // Used to show formula in formula bar when cell is selected.
+    std::string getFormulaDisplay(const std::string& cellIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) return "";
+
+        if (cellIdStr.size() != ID_LENGTH) return "";
+        ID cellId(cellIdStr);
+
+        Cell* cell = sheet->getCell(cellId);
+        if (!cell || !cell->isFormula()) return "";
+
+        Formula* formula = cell->getFormula();
+        if (!formula || !formula->text) return "";
+
+        // Convert UUID format to A1 notation
+        return _refConverter.formulaToA1(formula->text);
+    }
+
+    // Get dependencies for a cell's formula (what cells this formula reads from).
+    // Returns JSON array of reference info for UI highlighting.
+    // Each reference includes: type, cellId, col/row positions, source position in formula.
+    std::string getCellDependencies(const std::string& cellIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) return "{\"error\":\"Sheet not found\"}";
+
+        if (cellIdStr.size() != ID_LENGTH) return "{\"error\":\"Invalid cell ID\"}";
+        ID cellId(cellIdStr);
+
+        DependencyGraph* depGraph = sheet->getDependencyGraph();
+        if (!depGraph) return "{\"error\":\"No dependency graph\"}";
+
+        std::vector<DependencyRef> deps = depGraph->getDependencies(cellId);
+
+        std::ostringstream json;
+        json << "{\"dependencies\":[";
+
+        for (size_t i = 0; i < deps.size(); ++i) {
+            if (i > 0) json << ",";
+            const auto& dep = deps[i];
+
+            json << "{";
+
+            // Type
+            switch (dep.type) {
+                case DependencyRef::Type::CELL:
+                    json << "\"type\":\"cell\",";
+                    json << "\"cellId\":\"" << dep.cellId.toString() << "\"";
+                    break;
+                case DependencyRef::Type::RANGE:
+                    json << "\"type\":\"range\",";
+                    json << "\"startCellId\":\"" << dep.startCellId.toString() << "\",";
+                    json << "\"endCellId\":\"" << dep.endCellId.toString() << "\"";
+                    break;
+                case DependencyRef::Type::COLUMN:
+                    json << "\"type\":\"column\",";
+                    json << "\"columnId\":\"" << dep.columnId.toString() << "\"";
+                    break;
+                case DependencyRef::Type::ROW:
+                    json << "\"type\":\"row\",";
+                    json << "\"rowId\":\"" << dep.rowId.toString() << "\"";
+                    break;
+                case DependencyRef::Type::COLUMN_RANGE:
+                    json << "\"type\":\"columnRange\",";
+                    json << "\"startColumnId\":\"" << dep.startColumnId.toString() << "\",";
+                    json << "\"endColumnId\":\"" << dep.endColumnId.toString() << "\"";
+                    break;
+                case DependencyRef::Type::ROW_RANGE:
+                    json << "\"type\":\"rowRange\",";
+                    json << "\"startRowId\":\"" << dep.startRowId.toString() << "\",";
+                    json << "\"endRowId\":\"" << dep.endRowId.toString() << "\"";
+                    break;
+            }
+
+            // Source position (for colored highlighting in formula bar)
+            json << ",\"sourceStart\":" << dep.sourceStart;
+            json << ",\"sourceEnd\":" << dep.sourceEnd;
+
+            json << "}";
+        }
+
+        json << "]}";
+        return json.str();
+    }
+
+    // Get cells that depend on the given cell (cells whose formulas read this cell).
+    // Used for "Show Dependents" feature.
+    // Returns JSON array of cell IDs.
+    std::string getCellDependents(const std::string& cellIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) return "{\"error\":\"Sheet not found\"}";
+
+        if (cellIdStr.size() != ID_LENGTH) return "{\"error\":\"Invalid cell ID\"}";
+        ID cellId(cellIdStr);
+
+        DependencyGraph* depGraph = sheet->getDependencyGraph();
+        if (!depGraph) return "{\"error\":\"No dependency graph\"}";
+
+        std::vector<ID> dependents = depGraph->getDependents(cellId);
+
+        std::ostringstream json;
+        json << "{\"dependents\":[";
+
+        for (size_t i = 0; i < dependents.size(); ++i) {
+            if (i > 0) json << ",";
+            json << "\"" << dependents[i].toString() << "\"";
+        }
+
+        json << "]}";
+        return json.str();
+    }
+
+    // Get references from a formula with source positions (for colored highlighting).
+    // Uses the FormulaResolver to extract references from parsed AST.
+    // This parses the formula fresh and resolves references in the current sheet context.
+    // Returns references with their positions in the formula text.
+    std::string getFormulaReferences(const std::string& formulaText) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) return "{\"error\":\"Sheet not found\"}";
+
+        // Parse the formula
+        FormulaParser parser(formulaText);
+        auto ast = parser.parse();
+
+        if (!ast) {
+            return "{\"error\":\"Parse failed\",\"references\":[]}";
+        }
+
+        // Resolve references in current sheet context
+        FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
+        ResolveResult result = resolver.resolve(ast.get());
+
+        if (!result.success) {
+            // Still try to extract what we can
+        }
+
+        // Extract references with positions
+        std::vector<ReferenceInfo> refs = resolver.extractReferences(ast.get());
+
+        std::ostringstream json;
+        json << "{\"references\":[";
+
+        for (size_t i = 0; i < refs.size(); ++i) {
+            if (i > 0) json << ",";
+            const auto& ref = refs[i];
+
+            json << "{";
+
+            // Type and IDs
+            switch (ref.type) {
+                case ReferenceInfo::Type::CELL:
+                    json << "\"type\":\"cell\",";
+                    json << "\"cellId\":\"" << ref.cellId.toString() << "\"";
+                    break;
+                case ReferenceInfo::Type::RANGE:
+                    json << "\"type\":\"range\",";
+                    json << "\"topLeftCellId\":\"" << ref.topLeftCellId.toString() << "\",";
+                    json << "\"bottomRightCellId\":\"" << ref.bottomRightCellId.toString() << "\"";
+                    break;
+                case ReferenceInfo::Type::COLUMN:
+                    json << "\"type\":\"column\",";
+                    json << "\"axisId\":\"" << ref.axisId.toString() << "\"";
+                    break;
+                case ReferenceInfo::Type::ROW:
+                    json << "\"type\":\"row\",";
+                    json << "\"axisId\":\"" << ref.axisId.toString() << "\"";
+                    break;
+                case ReferenceInfo::Type::COLUMN_RANGE:
+                    json << "\"type\":\"columnRange\",";
+                    json << "\"startAxisId\":\"" << ref.startAxisId.toString() << "\",";
+                    json << "\"endAxisId\":\"" << ref.endAxisId.toString() << "\"";
+                    break;
+                case ReferenceInfo::Type::ROW_RANGE:
+                    json << "\"type\":\"rowRange\",";
+                    json << "\"startAxisId\":\"" << ref.startAxisId.toString() << "\",";
+                    json << "\"endAxisId\":\"" << ref.endAxisId.toString() << "\"";
+                    break;
+                case ReferenceInfo::Type::NAMED:
+                    json << "\"type\":\"named\",";
+                    json << "\"name\":\"" << jsonEscape(ref.namedRangeName) << "\"";
+                    break;
+            }
+
+            // Sheet ID (if cross-sheet reference)
+            if (!ref.sheetId.isNull()) {
+                json << ",\"sheetId\":\"" << ref.sheetId.toString() << "\"";
+            }
+
+            // Source position in formula text
+            json << ",\"sourceStart\":" << ref.sourcePosition.start;
+            json << ",\"sourceEnd\":" << ref.sourcePosition.end;
+
+            json << "}";
+        }
+
+        json << "]}";
+        return json.str();
+    }
+
+    // Parse a formula partially (for live editing) and extract valid references.
+    // Used when user is typing incomplete formula like "=SUM(A1+"
+    // Returns references that were successfully parsed, even if formula is incomplete.
+    std::string getReferencesFromPartial(const std::string& formulaText) {
+        // Same as getFormulaReferences - our parser has error recovery
+        // so it extracts valid references even from incomplete formulas
+        return getFormulaReferences(formulaText);
+    }
+
+    // Detect circular reference starting from a cell.
+    // Returns cycle path if found, empty array if no cycle.
+    std::string detectCircularRef(const std::string& cellIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) return "{\"error\":\"Sheet not found\"}";
+
+        if (cellIdStr.size() != ID_LENGTH) return "{\"error\":\"Invalid cell ID\"}";
+        ID cellId(cellIdStr);
+
+        DependencyGraph* depGraph = sheet->getDependencyGraph();
+        if (!depGraph) return "{\"error\":\"No dependency graph\"}";
+
+        std::vector<ID> cycle = depGraph->detectCycle(cellId);
+
+        std::ostringstream json;
+        json << "{\"hasCycle\":" << (cycle.empty() ? "false" : "true") << ",";
+        json << "\"cycle\":[";
+
+        for (size_t i = 0; i < cycle.size(); ++i) {
+            if (i > 0) json << ",";
+            json << "\"" << cycle[i].toString() << "\"";
+        }
+
+        json << "]}";
+        return json.str();
+    }
+
+    // Get list of volatile cells in the current sheet.
+    // Volatile cells (containing NOW, RAND, etc.) need recalculation on every change.
+    std::string getVolatileCells() {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) return "{\"error\":\"Sheet not found\"}";
+
+        DependencyGraph* depGraph = sheet->getDependencyGraph();
+        if (!depGraph) return "{\"error\":\"No dependency graph\"}";
+
+        std::vector<ID> volatile_cells = depGraph->getVolatileCells();
+
+        std::ostringstream json;
+        json << "{\"volatileCells\":[";
+
+        for (size_t i = 0; i < volatile_cells.size(); ++i) {
+            if (i > 0) json << ",";
+            json << "\"" << volatile_cells[i].toString() << "\"";
+        }
+
+        json << "]}";
+        return json.str();
+    }
+
+    // ========================================================================
     // Debug/Development methods
     // ========================================================================
 
@@ -2373,6 +2716,15 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("setSyncEditing", &cells::wasm::CellsEngine::setSyncEditing)
         .function("clearSyncEditing", &cells::wasm::CellsEngine::clearSyncEditing)
         .function("getRemotePresences", &cells::wasm::CellsEngine::getRemotePresences)
+        // Formula API (Phase 7)
+        .function("validateFormula", &cells::wasm::CellsEngine::validateFormula)
+        .function("getFormulaDisplay", &cells::wasm::CellsEngine::getFormulaDisplay)
+        .function("getCellDependencies", &cells::wasm::CellsEngine::getCellDependencies)
+        .function("getCellDependents", &cells::wasm::CellsEngine::getCellDependents)
+        .function("getFormulaReferences", &cells::wasm::CellsEngine::getFormulaReferences)
+        .function("getReferencesFromPartial", &cells::wasm::CellsEngine::getReferencesFromPartial)
+        .function("detectCircularRef", &cells::wasm::CellsEngine::detectCircularRef)
+        .function("getVolatileCells", &cells::wasm::CellsEngine::getVolatileCells)
         // Debug/Development
         .function("debugParseFormula", &cells::wasm::CellsEngine::debugParseFormula);
 

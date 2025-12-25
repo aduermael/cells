@@ -56,6 +56,97 @@ declare module 'cells-wasm' {
   }
 
   /**
+   * Result from validateFormula
+   */
+  interface ValidateFormulaResult {
+    formula: string;
+    valid: boolean;
+    errors: string[];
+    rootType: string | null;  // AST root node type, or null if parse failed
+  }
+
+  /**
+   * Reference type for formula dependencies
+   */
+  type RefType = 'cell' | 'range' | 'column' | 'row' | 'columnRange' | 'rowRange' | 'named';
+
+  /**
+   * Dependency reference from a formula
+   */
+  interface DependencyRef {
+    type: RefType;
+    cellId?: string;           // For cell refs
+    startCellId?: string;      // For range refs
+    endCellId?: string;        // For range refs
+    columnId?: string;         // For column refs
+    rowId?: string;            // For row refs
+    startColumnId?: string;    // For column range refs
+    endColumnId?: string;      // For column range refs
+    startRowId?: string;       // For row range refs
+    endRowId?: string;         // For row range refs
+    sourceStart: number;       // Position in formula text
+    sourceEnd: number;
+  }
+
+  /**
+   * Response from getCellDependencies
+   */
+  interface CellDependenciesResult {
+    dependencies: DependencyRef[];
+    error?: string;
+  }
+
+  /**
+   * Response from getCellDependents
+   */
+  interface CellDependentsResult {
+    dependents: string[];  // Array of cell IDs
+    error?: string;
+  }
+
+  /**
+   * Reference info for formula highlighting
+   */
+  interface ReferenceInfo {
+    type: RefType;
+    cellId?: string;
+    topLeftCellId?: string;
+    bottomRightCellId?: string;
+    axisId?: string;
+    startAxisId?: string;
+    endAxisId?: string;
+    name?: string;          // For named refs
+    sheetId?: string;       // For cross-sheet refs
+    sourceStart: number;
+    sourceEnd: number;
+  }
+
+  /**
+   * Response from getFormulaReferences / getReferencesFromPartial
+   */
+  interface FormulaReferencesResult {
+    references: ReferenceInfo[];
+    error?: string;
+  }
+
+  /**
+   * Response from detectCircularRef
+   */
+  interface CircularRefResult {
+    hasCycle: boolean;
+    cycle: string[];  // Array of cell IDs forming the cycle
+    error?: string;
+  }
+
+  /**
+   * Response from getVolatileCells
+   */
+  interface VolatileCellsResult {
+    volatileCells: string[];  // Array of cell IDs
+    error?: string;
+  }
+
+  /**
    * Sheet information
    */
   interface SheetInfo {
@@ -399,6 +490,72 @@ declare module 'cells-wasm' {
      */
     hasOperation(hlc: string): boolean;
 
+    // ========================================================================
+    // Formula API (Phase 7)
+    // ========================================================================
+
+    /**
+     * Validate a formula without side effects
+     * @param formulaText - Formula text (e.g., "=A1+B2")
+     * @returns JSON string with ValidateFormulaResult
+     */
+    validateFormula(formulaText: string): string;
+
+    /**
+     * Get the A1 display string for a cell's formula
+     * @param cellId - Cell ID (8-char base62)
+     * @returns Formula in A1 notation, or empty string if no formula
+     */
+    getFormulaDisplay(cellId: string): string;
+
+    /**
+     * Get dependencies for a cell's formula (what cells it reads from)
+     * @param cellId - Cell ID (8-char base62)
+     * @returns JSON string with CellDependenciesResult
+     */
+    getCellDependencies(cellId: string): string;
+
+    /**
+     * Get cells that depend on the given cell (what reads this cell)
+     * @param cellId - Cell ID (8-char base62)
+     * @returns JSON string with CellDependentsResult
+     */
+    getCellDependents(cellId: string): string;
+
+    /**
+     * Get references from a formula with source positions (for colored highlighting)
+     * @param formulaText - Formula text (e.g., "=A1+B2")
+     * @returns JSON string with FormulaReferencesResult
+     */
+    getFormulaReferences(formulaText: string): string;
+
+    /**
+     * Parse incomplete formula and extract valid references
+     * @param formulaText - Possibly incomplete formula (e.g., "=SUM(A1+")
+     * @returns JSON string with FormulaReferencesResult
+     */
+    getReferencesFromPartial(formulaText: string): string;
+
+    /**
+     * Detect circular reference starting from a cell
+     * @param cellId - Cell ID to check (8-char base62)
+     * @returns JSON string with CircularRefResult
+     */
+    detectCircularRef(cellId: string): string;
+
+    /**
+     * Get list of volatile cells (containing NOW, RAND, etc.)
+     * @returns JSON string with VolatileCellsResult
+     */
+    getVolatileCells(): string;
+
+    /**
+     * Parse a formula and return its AST as JSON (debug function)
+     * @param formulaText - Formula text (e.g., "=A1+B2")
+     * @returns JSON string with AST structure
+     */
+    debugParseFormula(formulaText: string): string;
+
     /**
      * Delete the CellsEngine instance and free memory
      */
@@ -468,5 +625,15 @@ declare module 'cells-wasm' {
     ColumnInfo,
     RowInfo,
     ViewportResult,
+    // Formula API types (Phase 7)
+    ValidateFormulaResult,
+    RefType,
+    DependencyRef,
+    CellDependenciesResult,
+    CellDependentsResult,
+    ReferenceInfo,
+    FormulaReferencesResult,
+    CircularRefResult,
+    VolatileCellsResult,
   };
 }
