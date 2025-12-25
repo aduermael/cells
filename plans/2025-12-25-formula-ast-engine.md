@@ -507,10 +507,10 @@ Wire the parser and dependency graph into the Cell/Sheet model.
     - Keep AST for immediate use
     - **Test**: After setCellFormula("=A1"), formula.text contains UUID format (3 new tests)
 
-  - [ ] 5f.5: Update display to convert UUID → A1 for user
-    - FormulaDisplayConverter or RefConverter::formulaToA1()
+  - [x] 5f.5: Update display to convert UUID → A1 for user
+    - FormulaDisplayConverter extracted to formula_display.h/.cc
     - Walk AST, convert each UUID ref to A1 based on current cell positions
-    - **Test**: Display shows "=A1+B2" from stored UUID format
+    - **Test**: Display shows "=A1+B2" from stored UUID format (4 new tests)
 
   - [ ] 5f.6: Update parser.cc to handle UUID format on load
     - Formulas in .zcd files are now UUID format

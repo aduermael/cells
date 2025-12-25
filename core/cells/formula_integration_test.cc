@@ -4,6 +4,7 @@
 
 #include "core/cells/dependency_graph.h"
 #include "core/cells/formula_ast.h"
+#include "core/cells/formula_display.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_resolver.h"
 #include "core/cells/formula_serializer.h"
@@ -278,6 +279,94 @@ TEST(FormulaIntegrationTest, SetCellFormulaMixedAbsoluteRefUuidFormat) {
     // Should use $~ prefix for col absolute, row relative
     EXPECT_TRUE(storedFormula.find("$~") != std::string::npos)
         << "Expected UUID format with $~ prefix, got: " << storedFormula;
+}
+
+// ============================================================================
+// Display conversion tests (5f.5) - UUID to A1
+// ============================================================================
+
+TEST(FormulaIntegrationTest, DisplayConversionSimple) {
+    auto wb = createTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    // Parse and resolve a formula
+    FormulaParser parser("=A1+B1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    // Use FormulaDisplayConverter to convert back to A1
+    FormulaDisplayConverter converter(*sheet);
+    std::string display = converter.toDisplayString(ast.get());
+
+    // Should display as A1 notation
+    EXPECT_EQ(display, "=A1+B1");
+}
+
+TEST(FormulaIntegrationTest, DisplayConversionAbsolute) {
+    auto wb = createTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    FormulaParser parser("=$A$1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    FormulaDisplayConverter converter(*sheet);
+    std::string display = converter.toDisplayString(ast.get());
+
+    EXPECT_EQ(display, "=$A$1");
+}
+
+TEST(FormulaIntegrationTest, DisplayConversionRoundTrip) {
+    auto wb = createTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    // Parse and resolve
+    FormulaParser parser("=A1+B1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    // Store the resolved AST (now in UUID format)
+    auto result = sheet->setCellFormula(ID("cellC101"), "=A1+B1", ast.release());
+    EXPECT_TRUE(result.success);
+
+    // Get the cell and its formula
+    Cell* cell = sheet->getCell(ID("cellC101"));
+    ASSERT_NE(cell, nullptr);
+    ASSERT_NE(cell->getFormula(), nullptr);
+    ASSERT_NE(cell->getFormula()->ast, nullptr);
+
+    // Convert the stored AST to display format
+    FormulaDisplayConverter converter(*sheet);
+    std::string display = converter.toDisplayString(cell->getFormula()->ast);
+
+    // Should display as A1 notation even though stored as UUID
+    EXPECT_EQ(display, "=A1+B1");
+}
+
+TEST(FormulaIntegrationTest, DisplayConversionFunctionCall) {
+    auto wb = createTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    FormulaParser parser("=SUM(A1,B1)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    FormulaDisplayConverter converter(*sheet);
+    std::string display = converter.toDisplayString(ast.get());
+
+    EXPECT_EQ(display, "=SUM(A1,B1)");
 }
 
 TEST(FormulaIntegrationTest, DependencyGraphRemoval) {

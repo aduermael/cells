@@ -245,9 +245,9 @@ struct Sheet {
     // Returns success/error status
     FormulaResult setCellFormulaUnresolved(const ID& cellId, const std::string& formulaText);
 
-    // Get the display string for a cell's formula
+    // Get the raw formula text (UUID format for resolved formulas)
     // Returns empty string if cell has no formula
-    // Note: This returns the raw formula text; for A1 display, use FormulaDisplayConverter
+    // Note: For A1 display to users, use FormulaDisplayConverter from formula_display.h
     [[nodiscard]] std::string getCellFormulaText(const ID& cellId) const;
 
     // Clear a cell's formula (removes from dependency graph)

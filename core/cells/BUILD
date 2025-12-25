@@ -406,6 +406,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":formula_ast",
+        ":formula_display",
         ":model",
         ":named_ranges",
         ":types",
@@ -419,6 +420,17 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":formula_ast",
+    ],
+)
+
+cc_library(
+    name = "formula_display",
+    srcs = ["formula_display.cc"],
+    hdrs = ["formula_display.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":formula_ast",
+        ":model",
     ],
 )
 
@@ -452,6 +464,7 @@ cc_test(
     deps = [
         ":dependency_graph",
         ":formula_ast",
+        ":formula_display",
         ":formula_parser",
         ":formula_resolver",
         ":formula_serializer",
