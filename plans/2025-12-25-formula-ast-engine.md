@@ -501,11 +501,11 @@ Wire the parser and dependency graph into the Cell/Sheet model.
     - Add `CellRefNode::isUuidFormat` flag or detect from fields
     - **Test**: Parser produces correct AST from UUID-format formula
 
-  - [ ] 5f.4: Update Sheet::setCellFormula to store UUID format
+  - [x] 5f.4: Update Sheet::setCellFormula to store UUID format
     - After resolution, call FormulaSerializer to generate UUID text
     - Store UUID text in formula.text (NOT the original A1 input)
     - Keep AST for immediate use
-    - **Test**: After setCellFormula("=A1"), formula.text contains UUID format
+    - **Test**: After setCellFormula("=A1"), formula.text contains UUID format (3 new tests)
 
   - [ ] 5f.5: Update display to convert UUID → A1 for user
     - FormulaDisplayConverter or RefConverter::formulaToA1()

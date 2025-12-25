@@ -6,6 +6,7 @@
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_resolver.h"
+#include "core/cells/formula_serializer.h"
 #include "core/cells/model.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/parser.h"
@@ -188,6 +189,95 @@ TEST(FormulaIntegrationTest, DependencyGraphTracking) {
 
     auto deps = depGraph->getDependencies(ID("cellC101"));
     EXPECT_EQ(deps.size(), 2u);  // A1 and B1
+}
+
+// ============================================================================
+// UUID storage format tests (5f.4)
+// ============================================================================
+
+TEST(FormulaIntegrationTest, SetCellFormulaStoresUuidFormat) {
+    auto wb = createTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    // Parse and resolve a formula
+    FormulaParser parser("=A1+B1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    auto resolveResult = resolver.resolve(ast.get());
+    EXPECT_TRUE(resolveResult.success);
+
+    // Set formula with resolved AST - this should store UUID format
+    auto result = sheet->setCellFormula(ID("cellC101"), "=A1+B1", ast.release());
+    EXPECT_TRUE(result.success);
+
+    // Get the stored formula text - it should be in UUID format
+    std::string storedFormula = sheet->getCellFormulaText(ID("cellC101"));
+
+    // The stored format should use ~~ prefix for relative refs
+    // E.g., "=~~cellA101+~~cellB101" (exact IDs from test setup)
+    EXPECT_TRUE(storedFormula.find("~~") != std::string::npos)
+        << "Expected UUID format with ~~ prefix, got: " << storedFormula;
+
+    // Should contain the cell IDs
+    EXPECT_TRUE(storedFormula.find("cellA101") != std::string::npos)
+        << "Expected cellA101 in formula, got: " << storedFormula;
+    EXPECT_TRUE(storedFormula.find("cellB101") != std::string::npos)
+        << "Expected cellB101 in formula, got: " << storedFormula;
+
+    // Should NOT contain A1 notation
+    EXPECT_TRUE(storedFormula.find("A1") == std::string::npos ||
+                storedFormula.find("cellA1") != std::string::npos)
+        << "Should not contain A1 notation, got: " << storedFormula;
+}
+
+TEST(FormulaIntegrationTest, SetCellFormulaAbsoluteRefUuidFormat) {
+    auto wb = createTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    // Parse formula with absolute refs
+    FormulaParser parser("=$A$1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    auto resolveResult = resolver.resolve(ast.get());
+    EXPECT_TRUE(resolveResult.success);
+
+    auto result = sheet->setCellFormula(ID("cellC101"), "=$A$1", ast.release());
+    EXPECT_TRUE(result.success);
+
+    std::string storedFormula = sheet->getCellFormulaText(ID("cellC101"));
+
+    // Should use $$ prefix for both absolute
+    EXPECT_TRUE(storedFormula.find("$$") != std::string::npos)
+        << "Expected UUID format with $$ prefix for absolute ref, got: " << storedFormula;
+    EXPECT_TRUE(storedFormula.find("cellA101") != std::string::npos)
+        << "Expected cellA101 in formula, got: " << storedFormula;
+}
+
+TEST(FormulaIntegrationTest, SetCellFormulaMixedAbsoluteRefUuidFormat) {
+    auto wb = createTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    // Parse formula with mixed absolute ref ($A1 = col absolute, row relative)
+    FormulaParser parser("=$A1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    auto resolveResult = resolver.resolve(ast.get());
+    EXPECT_TRUE(resolveResult.success);
+
+    auto result = sheet->setCellFormula(ID("cellC101"), "=$A1", ast.release());
+    EXPECT_TRUE(result.success);
+
+    std::string storedFormula = sheet->getCellFormulaText(ID("cellC101"));
+
+    // Should use $~ prefix for col absolute, row relative
+    EXPECT_TRUE(storedFormula.find("$~") != std::string::npos)
+        << "Expected UUID format with $~ prefix, got: " << storedFormula;
 }
 
 TEST(FormulaIntegrationTest, DependencyGraphRemoval) {

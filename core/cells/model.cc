@@ -9,6 +9,7 @@
 #include "core/cells/dependency_graph.h"
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_parser.h"
+#include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
 
@@ -593,7 +594,7 @@ std::string Sheet::makeCellKey(const ID& colId, const ID& rowId) {
     return colId.toString() + ":" + rowId.toString();
 }
 
-FormulaResult Sheet::setCellFormula(const ID& cellId, const std::string& formulaText,
+FormulaResult Sheet::setCellFormula(const ID& cellId, const std::string& /* formulaText */,
                                     ASTNode* ast) {
     // Get the cell
     Cell* cell = getCell(cellId);
@@ -604,8 +605,15 @@ FormulaResult Sheet::setCellFormula(const ID& cellId, const std::string& formula
     // Clear existing formula and dependencies
     clearCellFormula(cellId);
 
-    // Create the formula with the provided AST
-    auto* formula = new Formula(formulaText.c_str());
+    // Serialize the AST to UUID format for storage
+    // This is the key change for move stability: we store UUID refs, not A1 refs
+    std::string uuidFormula;
+    if (ast != nullptr) {
+        uuidFormula = FormulaSerializer::serialize(ast);
+    }
+
+    // Create the formula with UUID-format text (not the original A1 input)
+    auto* formula = new Formula(uuidFormula.c_str());
     formula->ast = ast;  // Transfer ownership
     formula->dirty = true;
     cell->setFormula(formula);
