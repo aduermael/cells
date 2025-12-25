@@ -44,6 +44,7 @@ cc_binary(
         "//core/cells:crdt",
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",
+        "//core/cells:formula_parser",
         "//core/cells:hlc",
         "//core/cells:id",
         "//core/cells:model",

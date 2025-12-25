@@ -553,8 +553,7 @@ std::unique_ptr<ASTNode> FormulaParser::parseRowRef(bool startAbsolute, int star
             return node;
         }
         // Row range: 1:5
-        auto node =
-            std::make_unique<RowRangeRefNode>(startRow, endRow, startAbsolute, endAbsolute);
+        auto node = std::make_unique<RowRangeRefNode>(startRow, endRow, startAbsolute, endAbsolute);
         node->sheetName = sheetName;
         return node;
     }

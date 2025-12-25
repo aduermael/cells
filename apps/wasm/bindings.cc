@@ -15,6 +15,7 @@
 #include "core/cells/crdt.h"
 #include "core/cells/csv_reader.h"
 #include "core/cells/csv_writer.h"
+#include "core/cells/formula_parser.h"
 #include "core/cells/hlc.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
@@ -2119,6 +2120,46 @@ public:
         notifyListenersWithData(ChangeType::PRESENCE_CHANGED, peer_id);
     }
 
+    // ========================================================================
+    // Debug/Development methods
+    // ========================================================================
+
+    // Parse a formula and return its AST as JSON.
+    // This is a debug function for visualizing the parse tree.
+    // Does not modify any state or require a workbook to be loaded.
+    std::string debugParseFormula(const std::string& formulaText) {
+        FormulaParser parser(formulaText);
+        auto ast = parser.parse();
+
+        std::ostringstream json;
+        json << "{";
+
+        // Include the original formula
+        json << "\"formula\":\"" << jsonEscape(formulaText) << "\",";
+
+        // Include parse errors if any
+        json << "\"errors\":[";
+        const auto& errors = parser.errors();
+        for (size_t i = 0; i < errors.size(); ++i) {
+            if (i > 0) {
+                json << ",";
+            }
+            json << "\"" << jsonEscape(errors[i]) << "\"";
+        }
+        json << "],";
+
+        // Include the AST (or null if parsing failed completely)
+        json << "\"ast\":";
+        if (ast) {
+            json << ast->toJson();
+        } else {
+            json << "null";
+        }
+
+        json << "}";
+        return json.str();
+    }
+
 private:
     void rebuildQuadtree() {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
@@ -2320,7 +2361,9 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("clearSyncMousePosition", &cells::wasm::CellsEngine::clearSyncMousePosition)
         .function("setSyncEditing", &cells::wasm::CellsEngine::setSyncEditing)
         .function("clearSyncEditing", &cells::wasm::CellsEngine::clearSyncEditing)
-        .function("getRemotePresences", &cells::wasm::CellsEngine::getRemotePresences);
+        .function("getRemotePresences", &cells::wasm::CellsEngine::getRemotePresences)
+        // Debug/Development
+        .function("debugParseFormula", &cells::wasm::CellsEngine::debugParseFormula);
 
     // Logger bindings - control logging from JavaScript
     enum_<cells::log::Level>("LogLevel")

@@ -36,6 +36,16 @@
             <span id="cell-reference">A1</span>
             <input type="text" id="formula-input" placeholder="Select a cell to view or edit its value" />
         </div>
+        <div id="ast-debug-panel" class="hidden">
+            <div id="ast-debug-header">
+                <span>AST Debug Panel</span>
+                <span id="ast-debug-toggle">Ctrl+Shift+D to hide</span>
+            </div>
+            <div id="ast-debug-content">
+                <div id="ast-errors"></div>
+                <pre id="ast-tree"></pre>
+            </div>
+        </div>
         <div id="canvas-container">
             <canvas id="grid" tabindex="0"></canvas>
             <input type="text" id="cell-editor" />
@@ -242,6 +252,12 @@
         const sheetTabsEl = document.getElementById('sheet-tabs');
         const sheetTabsContainer = document.getElementById('sheet-tabs-container');
         const addSheetBtn = document.getElementById('add-sheet-btn');
+
+        // AST Debug Panel elements
+        const astDebugPanel = document.getElementById('ast-debug-panel');
+        const astErrors = document.getElementById('ast-errors');
+        const astTree = document.getElementById('ast-tree');
+        let astDebugPanelVisible = false;
 
         // Initialize renderer
         const renderer = new GridRenderer(canvas);
@@ -1538,6 +1554,9 @@
 
         // Live sync: update cell display while typing in formula bar
         formulaInput.addEventListener('input', () => {
+            // Update AST debug panel live as user types
+            updateAstDebugPanel(formulaInput.value);
+
             if (!isEditingFormulaBar()) return;
 
             // Sync to cell editor if it's visible (bidirectional sync)
@@ -2095,6 +2114,13 @@
         document.addEventListener('keydown', (e) => {
             // Update modifier state for the state machine
             uiStateMachine.updateModifiersFromEvent(e);
+
+            // Ctrl+Shift+D toggles AST debug panel (works even during editing)
+            if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+                e.preventDefault();
+                toggleAstDebugPanel();
+                return;
+            }
 
             if (isEditing() || isEditingFormulaBar() || isEditingColumnHeader()) return;
             if (!selectedCell || !sheetInfo) return;
@@ -2854,6 +2880,132 @@
                 }
                 return false;
             }
+        }
+
+        // ========================================================================
+        // AST Debug Panel Functions
+        // ========================================================================
+
+        /**
+         * Toggle the AST debug panel visibility
+         */
+        function toggleAstDebugPanel() {
+            astDebugPanelVisible = !astDebugPanelVisible;
+            if (astDebugPanelVisible) {
+                astDebugPanel.classList.remove('hidden');
+                // Update with current formula input value
+                updateAstDebugPanel(formulaInput.value);
+            } else {
+                astDebugPanel.classList.add('hidden');
+            }
+        }
+
+        /**
+         * Update the AST debug panel with the parse result for a formula
+         * @param {string} formulaText - The formula text to parse
+         */
+        async function updateAstDebugPanel(formulaText) {
+            if (!astDebugPanelVisible) return;
+
+            // If empty or doesn't start with =, show placeholder
+            if (!formulaText || !formulaText.startsWith('=')) {
+                astErrors.textContent = '';
+                astTree.innerHTML = '<span style="color:#808080">Enter a formula starting with = to see the AST</span>';
+                return;
+            }
+
+            try {
+                const client = await ensureWasmClient();
+                const result = await client.debugParseFormula(formulaText);
+
+                // Show errors if any
+                if (result.errors && result.errors.length > 0) {
+                    astErrors.textContent = result.errors.join('\n');
+                } else {
+                    astErrors.textContent = '';
+                }
+
+                // Show AST with syntax highlighting
+                if (result.ast) {
+                    astTree.innerHTML = formatAstNode(result.ast, 0);
+                } else {
+                    astTree.innerHTML = '<span style="color:#808080">No AST generated</span>';
+                }
+            } catch (err) {
+                astErrors.textContent = `Error: ${err.message}`;
+                astTree.innerHTML = '';
+            }
+        }
+
+        /**
+         * Format an AST node as HTML with syntax highlighting
+         * @param {object} node - The AST node
+         * @param {number} indent - Current indentation level
+         * @returns {string} HTML string
+         */
+        function formatAstNode(node, indent) {
+            if (node === null) return '<span class="ast-null">null</span>';
+            if (typeof node !== 'object') {
+                if (typeof node === 'string') {
+                    return `<span class="ast-string">"${escapeHtml(node)}"</span>`;
+                } else if (typeof node === 'number') {
+                    return `<span class="ast-number">${node}</span>`;
+                } else if (typeof node === 'boolean') {
+                    return `<span class="ast-boolean">${node}</span>`;
+                }
+                return String(node);
+            }
+
+            const spaces = '  '.repeat(indent);
+            const childSpaces = '  '.repeat(indent + 1);
+
+            let html = '{';
+            const keys = Object.keys(node);
+            for (let i = 0; i < keys.length; i++) {
+                const key = keys[i];
+                const value = node[key];
+
+                html += '\n' + childSpaces;
+
+                // Highlight the 'type' key specially
+                if (key === 'type') {
+                    html += `<span class="ast-key">"${key}"</span>: <span class="ast-type">"${escapeHtml(value)}"</span>`;
+                } else {
+                    html += `<span class="ast-key">"${key}"</span>: `;
+                    if (Array.isArray(value)) {
+                        if (value.length === 0) {
+                            html += '[]';
+                        } else {
+                            html += '[';
+                            for (let j = 0; j < value.length; j++) {
+                                html += '\n' + childSpaces + '  ';
+                                html += formatAstNode(value[j], indent + 2);
+                                if (j < value.length - 1) html += ',';
+                            }
+                            html += '\n' + childSpaces + ']';
+                        }
+                    } else if (typeof value === 'object' && value !== null) {
+                        html += formatAstNode(value, indent + 1);
+                    } else {
+                        html += formatAstNode(value, indent + 1);
+                    }
+                }
+
+                if (i < keys.length - 1) html += ',';
+            }
+            html += '\n' + spaces + '}';
+            return html;
+        }
+
+        /**
+         * Escape HTML special characters
+         */
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
         }
 
         // Set default selection to A1 (0,0)

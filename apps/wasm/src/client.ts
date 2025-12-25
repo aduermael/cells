@@ -151,6 +151,19 @@ interface RemotePresencesResult {
   peers: Record<string, PeerPresence>;
 }
 
+/** Formula parse result for debug AST visualization */
+export interface FormulaParseResult {
+  formula: string;
+  errors: string[];
+  ast: ASTNode | null;
+}
+
+/** AST node type - matches C++ AST node types */
+export interface ASTNode {
+  type: string;
+  [key: string]: unknown;
+}
+
 // ============================================================================
 // CellsClient Class
 // ============================================================================
@@ -1009,5 +1022,19 @@ export class CellsClient {
   async getRemotePresences(): Promise<RemotePresencesResult> {
     const response = await this._send("getRemotePresences");
     return JSON.parse(response.result as string) as RemotePresencesResult;
+  }
+
+  // ========================================================================
+  // Debug/Development API
+  // ========================================================================
+
+  /**
+   * Parse a formula and return its AST as JSON.
+   * This is a debug function for visualizing the parse tree.
+   * Does not modify any state or require a workbook to be loaded.
+   */
+  async debugParseFormula(formulaText: string): Promise<FormulaParseResult> {
+    const response = await this._send("debugParseFormula", { formulaText });
+    return JSON.parse(response.result as string) as FormulaParseResult;
   }
 }

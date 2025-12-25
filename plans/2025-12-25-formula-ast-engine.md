@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-25 00:19 UTC
-Updated At: 2025-12-25 04:30 UTC
+Updated At: 2025-12-25 07:17 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -209,9 +209,9 @@ arg_list    = expression ("," expression)*
   - Test error recovery for various malformed inputs
   - **Test**: All parser tests pass (55 tests)
 
-- [ ] 1f: **UI Checkpoint** - Parse tree visualization
+- [x] 1f: **UI Checkpoint** - Parse tree visualization
   - Add WASM binding: `debugParseFormula(text)` → returns JSON AST representation
-  - Add debug panel in web UI (hidden by default, toggle with keyboard shortcut)
+  - Add debug panel in web UI (hidden by default, toggle with keyboard shortcut Ctrl+Shift+D)
   - Display AST tree when typing in formula bar
   - **Test manually**:
     - Type `=1+2` → see AST with BinaryOp, Literal nodes

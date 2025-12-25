@@ -1023,3 +1023,84 @@ canvas {
     background: #fff5f5;
     border-color: #dc3545;
 }
+
+/* ============================================================================
+   AST Debug Panel (for formula parser visualization)
+   ============================================================================ */
+
+#ast-debug-panel {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: 'SF Mono', Menlo, Monaco, 'Courier New', monospace;
+    font-size: 12px;
+    max-height: 300px;
+    overflow: auto;
+    border-bottom: 1px solid #333;
+}
+
+#ast-debug-panel.hidden {
+    display: none;
+}
+
+#ast-debug-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #252526;
+    border-bottom: 1px solid #333;
+    color: #cccccc;
+    font-size: 11px;
+}
+
+#ast-debug-toggle {
+    color: #808080;
+}
+
+#ast-debug-content {
+    padding: 12px;
+    overflow: auto;
+    max-height: 250px;
+}
+
+#ast-errors {
+    color: #f48771;
+    margin-bottom: 8px;
+}
+
+#ast-errors:empty {
+    display: none;
+}
+
+#ast-tree {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.4;
+}
+
+/* Syntax highlighting for AST JSON */
+#ast-tree .ast-type {
+    color: #4ec9b0;
+    font-weight: 600;
+}
+
+#ast-tree .ast-key {
+    color: #9cdcfe;
+}
+
+#ast-tree .ast-string {
+    color: #ce9178;
+}
+
+#ast-tree .ast-number {
+    color: #b5cea8;
+}
+
+#ast-tree .ast-boolean {
+    color: #569cd6;
+}
+
+#ast-tree .ast-null {
+    color: #569cd6;
+}

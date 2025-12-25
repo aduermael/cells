@@ -117,6 +117,9 @@ interface CellsEngine {
   setSyncEditing(col: number, row: number, text: string): void;
   clearSyncEditing(): void;
   getRemotePresences(): string;
+
+  // Debug/Development
+  debugParseFormula(formulaText: string): string;
 }
 
 /** Factory function type for WASM module initialization */
@@ -910,6 +913,17 @@ function handleMessage(msg: WorkerRequest): void {
       case "getRemotePresences": {
         const result = engine.getRemotePresences();
         respond({ type: "remotePresences", result });
+        break;
+      }
+
+      // ================================================================
+      // Debug/Development methods
+      // ================================================================
+
+      case "debugParseFormula": {
+        const { formulaText } = params as { formulaText: string };
+        const result = engine.debugParseFormula(formulaText);
+        respond({ type: "formulaParsed", result });
         break;
       }
 
