@@ -1,8 +1,8 @@
 #include "core/cells/formula_lexer.h"
 
-#include <gtest/gtest.h>
-
 #include <cmath>
+
+#include <gtest/gtest.h>
 
 namespace cells {
 namespace {

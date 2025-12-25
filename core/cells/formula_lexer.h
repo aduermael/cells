@@ -16,9 +16,9 @@ enum class TokenType : std::uint8_t {
     END_OF_INPUT,
 
     // Literals
-    NUMBER,      // 42, 3.14, 1.5e10, -100
-    STRING,      // "Hello", "with ""quotes"""
-    BOOLEAN,     // TRUE, FALSE (case-insensitive)
+    NUMBER,   // 42, 3.14, 1.5e10, -100
+    STRING,   // "Hello", "with ""quotes"""
+    BOOLEAN,  // TRUE, FALSE (case-insensitive)
 
     // Identifiers and references
     IDENTIFIER,  // Function names, named ranges (SUM, myRange)
@@ -26,26 +26,26 @@ enum class TokenType : std::uint8_t {
     ROW,         // Row number (1, 100, 1048576)
 
     // Operators
-    PLUS,         // +
-    MINUS,        // -
-    STAR,         // *
-    SLASH,        // /
-    CARET,        // ^
-    AMPERSAND,    // &
-    EQUAL,        // =
-    NOT_EQUAL,    // <>
-    LESS,         // <
-    LESS_EQUAL,   // <=
-    GREATER,      // >
-    GREATER_EQUAL,// >=
+    PLUS,           // +
+    MINUS,          // -
+    STAR,           // *
+    SLASH,          // /
+    CARET,          // ^
+    AMPERSAND,      // &
+    EQUAL,          // =
+    NOT_EQUAL,      // <>
+    LESS,           // <
+    LESS_EQUAL,     // <=
+    GREATER,        // >
+    GREATER_EQUAL,  // >=
 
     // Punctuation
-    LPAREN,       // (
-    RPAREN,       // )
-    COMMA,        // ,
-    COLON,        // :
-    BANG,         // !
-    DOLLAR,       // $
+    LPAREN,  // (
+    RPAREN,  // )
+    COMMA,   // ,
+    COLON,   // :
+    BANG,    // !
+    DOLLAR,  // $
 
     // Error token (for invalid input)
     ERROR,
@@ -62,9 +62,9 @@ struct SourcePosition {
 // A single token from the lexer
 struct Token {
     TokenType type{TokenType::END_OF_INPUT};
-    std::string_view text;       // View into source string
+    std::string_view text;  // View into source string
     SourcePosition position;
-    std::string errorMessage;    // Only set for ERROR tokens
+    std::string errorMessage;  // Only set for ERROR tokens
 
     Token() = default;
     Token(TokenType t, std::string_view txt, SourcePosition pos)
@@ -136,8 +136,8 @@ private:
     Token scanRowNumber();
 
     // Helper to create token
-    Token makeToken(TokenType type, size_t start) const;
-    Token makeErrorToken(const std::string& message, size_t start) const;
+    [[nodiscard]] Token makeToken(TokenType type, size_t start) const;
+    [[nodiscard]] Token makeErrorToken(const std::string& message, size_t start) const;
 
     // Skip whitespace
     void skipWhitespace();

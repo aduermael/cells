@@ -338,3 +338,31 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "formula_ast",
+    srcs = ["formula_ast.cc"],
+    hdrs = ["formula_ast.h"],
+    visibility = ["//visibility:public"],
+    deps = [":formula_lexer"],
+)
+
+cc_library(
+    name = "formula_parser",
+    srcs = ["formula_parser.cc"],
+    hdrs = ["formula_parser.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":formula_ast",
+        ":formula_lexer",
+    ],
+)
+
+cc_test(
+    name = "formula_parser_test",
+    srcs = ["formula_parser_test.cc"],
+    deps = [
+        ":formula_parser",
+        "@googletest//:gtest_main",
+    ],
+)

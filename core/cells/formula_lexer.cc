@@ -56,8 +56,7 @@ std::string Token::stringValue() const {
 // FormulaLexer implementation
 // ============================================================================
 
-FormulaLexer::FormulaLexer(std::string_view source)
-    : source_(source) {}
+FormulaLexer::FormulaLexer(std::string_view source) : source_(source) {}
 
 Token FormulaLexer::nextToken() {
     if (hasPeeked_) {
@@ -93,32 +92,58 @@ std::vector<Token> FormulaLexer::tokenizeAll() {
 
 const char* FormulaLexer::tokenTypeName(TokenType type) {
     switch (type) {
-        case TokenType::END_OF_INPUT: return "END_OF_INPUT";
-        case TokenType::NUMBER: return "NUMBER";
-        case TokenType::STRING: return "STRING";
-        case TokenType::BOOLEAN: return "BOOLEAN";
-        case TokenType::IDENTIFIER: return "IDENTIFIER";
-        case TokenType::COLUMN: return "COLUMN";
-        case TokenType::ROW: return "ROW";
-        case TokenType::PLUS: return "PLUS";
-        case TokenType::MINUS: return "MINUS";
-        case TokenType::STAR: return "STAR";
-        case TokenType::SLASH: return "SLASH";
-        case TokenType::CARET: return "CARET";
-        case TokenType::AMPERSAND: return "AMPERSAND";
-        case TokenType::EQUAL: return "EQUAL";
-        case TokenType::NOT_EQUAL: return "NOT_EQUAL";
-        case TokenType::LESS: return "LESS";
-        case TokenType::LESS_EQUAL: return "LESS_EQUAL";
-        case TokenType::GREATER: return "GREATER";
-        case TokenType::GREATER_EQUAL: return "GREATER_EQUAL";
-        case TokenType::LPAREN: return "LPAREN";
-        case TokenType::RPAREN: return "RPAREN";
-        case TokenType::COMMA: return "COMMA";
-        case TokenType::COLON: return "COLON";
-        case TokenType::BANG: return "BANG";
-        case TokenType::DOLLAR: return "DOLLAR";
-        case TokenType::ERROR: return "ERROR";
+        case TokenType::END_OF_INPUT:
+            return "END_OF_INPUT";
+        case TokenType::NUMBER:
+            return "NUMBER";
+        case TokenType::STRING:
+            return "STRING";
+        case TokenType::BOOLEAN:
+            return "BOOLEAN";
+        case TokenType::IDENTIFIER:
+            return "IDENTIFIER";
+        case TokenType::COLUMN:
+            return "COLUMN";
+        case TokenType::ROW:
+            return "ROW";
+        case TokenType::PLUS:
+            return "PLUS";
+        case TokenType::MINUS:
+            return "MINUS";
+        case TokenType::STAR:
+            return "STAR";
+        case TokenType::SLASH:
+            return "SLASH";
+        case TokenType::CARET:
+            return "CARET";
+        case TokenType::AMPERSAND:
+            return "AMPERSAND";
+        case TokenType::EQUAL:
+            return "EQUAL";
+        case TokenType::NOT_EQUAL:
+            return "NOT_EQUAL";
+        case TokenType::LESS:
+            return "LESS";
+        case TokenType::LESS_EQUAL:
+            return "LESS_EQUAL";
+        case TokenType::GREATER:
+            return "GREATER";
+        case TokenType::GREATER_EQUAL:
+            return "GREATER_EQUAL";
+        case TokenType::LPAREN:
+            return "LPAREN";
+        case TokenType::RPAREN:
+            return "RPAREN";
+        case TokenType::COMMA:
+            return "COMMA";
+        case TokenType::COLON:
+            return "COLON";
+        case TokenType::BANG:
+            return "BANG";
+        case TokenType::DOLLAR:
+            return "DOLLAR";
+        case TokenType::ERROR:
+            return "ERROR";
     }
     return "UNKNOWN";
 }
@@ -128,17 +153,20 @@ const char* FormulaLexer::tokenTypeName(TokenType type) {
 // ============================================================================
 
 char FormulaLexer::peek() const {
-    if (isAtEndInternal()) return '\0';
+    if (isAtEndInternal())
+        return '\0';
     return source_[pos_];
 }
 
 char FormulaLexer::peekNext() const {
-    if (pos_ + 1 >= source_.size()) return '\0';
+    if (pos_ + 1 >= source_.size())
+        return '\0';
     return source_[pos_ + 1];
 }
 
 char FormulaLexer::advance() {
-    if (isAtEndInternal()) return '\0';
+    if (isAtEndInternal())
+        return '\0';
     return source_[pos_++];
 }
 
@@ -206,19 +234,32 @@ Token FormulaLexer::scanToken() {
 
     // Single-character tokens
     switch (c) {
-        case '+': return makeToken(TokenType::PLUS, start);
-        case '-': return makeToken(TokenType::MINUS, start);
-        case '*': return makeToken(TokenType::STAR, start);
-        case '/': return makeToken(TokenType::SLASH, start);
-        case '^': return makeToken(TokenType::CARET, start);
-        case '&': return makeToken(TokenType::AMPERSAND, start);
-        case '(': return makeToken(TokenType::LPAREN, start);
-        case ')': return makeToken(TokenType::RPAREN, start);
-        case ',': return makeToken(TokenType::COMMA, start);
-        case ':': return makeToken(TokenType::COLON, start);
-        case '!': return makeToken(TokenType::BANG, start);
-        case '$': return makeToken(TokenType::DOLLAR, start);
-        case '=': return makeToken(TokenType::EQUAL, start);
+        case '+':
+            return makeToken(TokenType::PLUS, start);
+        case '-':
+            return makeToken(TokenType::MINUS, start);
+        case '*':
+            return makeToken(TokenType::STAR, start);
+        case '/':
+            return makeToken(TokenType::SLASH, start);
+        case '^':
+            return makeToken(TokenType::CARET, start);
+        case '&':
+            return makeToken(TokenType::AMPERSAND, start);
+        case '(':
+            return makeToken(TokenType::LPAREN, start);
+        case ')':
+            return makeToken(TokenType::RPAREN, start);
+        case ',':
+            return makeToken(TokenType::COMMA, start);
+        case ':':
+            return makeToken(TokenType::COLON, start);
+        case '!':
+            return makeToken(TokenType::BANG, start);
+        case '$':
+            return makeToken(TokenType::DOLLAR, start);
+        case '=':
+            return makeToken(TokenType::EQUAL, start);
         case '<':
             if (peek() == '>') {
                 advance();
@@ -352,8 +393,7 @@ Token FormulaLexer::scanIdentifierOrColumn() {
 
     // Check for booleans first
     std::string upperLetters(letters);
-    std::transform(upperLetters.begin(), upperLetters.end(),
-                   upperLetters.begin(), ::toupper);
+    std::transform(upperLetters.begin(), upperLetters.end(), upperLetters.begin(), ::toupper);
     if (upperLetters == "TRUE" || upperLetters == "FALSE") {
         return makeToken(TokenType::BOOLEAN, start);
     }

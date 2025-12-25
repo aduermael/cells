@@ -183,7 +183,7 @@ arg_list    = expression ("," expression)*
   - Test error tokens for invalid input
   - **Test**: All lexer tests pass (75 tests)
 
-- [ ] 1c: Implement recursive descent parser in `core/cells/formula_parser.h/.cc`
+- [x] 1c: Implement recursive descent parser in `core/cells/formula_parser.h/.cc`
   - `FormulaParser` class with `parse(string) -> unique_ptr<ASTNode>`
   - Implement precedence via grammar structure (comparison < concat < additive < mult < power < unary)
   - Handle all reference types: cell, range, whole column/row, cross-sheet
@@ -191,7 +191,7 @@ arg_list    = expression ("," expression)*
   - Support function calls with arbitrary arity
   - **Test**: Basic parsing works
 
-- [ ] 1d: Implement error recovery in parser
+- [x] 1d: Implement error recovery in parser
   - On unexpected token, create `ErrorNode` with partial children
   - Continue parsing to capture as much structure as possible
   - Example: `=SUM(A1+` → FunctionCall with ErrorNode as second arg
@@ -199,7 +199,7 @@ arg_list    = expression ("," expression)*
   - Store error message and position in ErrorNode
   - **Test**: Error recovery produces useful partial ASTs
 
-- [ ] 1e: Add parser tests in `core/cells/formula_parser_test.cc`
+- [x] 1e: Add parser tests in `core/cells/formula_parser_test.cc`
   - Test literals (all numeric formats, strings, booleans)
   - Test operators with correct precedence: `=1+2*3` → `1+(2*3)` not `(1+2)*3`
   - Test all reference types (cell, range, column, row, cross-sheet)
@@ -207,7 +207,7 @@ arg_list    = expression ("," expression)*
   - Test function calls with 0, 1, many arguments
   - Test nested expressions
   - Test error recovery for various malformed inputs
-  - **Test**: All parser tests pass
+  - **Test**: All parser tests pass (55 tests)
 
 - [ ] 1f: **UI Checkpoint** - Parse tree visualization
   - Add WASM binding: `debugParseFormula(text)` → returns JSON AST representation
