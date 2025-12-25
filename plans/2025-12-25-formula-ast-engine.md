@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-25 00:19 UTC
-Updated At: 2025-12-25 03:15 UTC
+Updated At: 2025-12-25 04:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -22,7 +22,6 @@ Execution (actually computing formula results) is deferred to a separate plan.
 | **Core engine** | C++ | All parsing, AST, resolution, dependency tracking. Compiles to native (desktop/mobile) and WASM (web). |
 | **Web UI** | TypeScript | Calls C++ via WASM exports. All web code is TypeScript (not JavaScript). |
 | **Native UI** | SwiftUI, etc. | Calls C++ directly. No JS/TS involved. |
-| **Build tools** | Various | Tree-sitter uses `grammar.js` as a DSL to generate C code—no JS at runtime. |
 
 ## Testing Philosophy
 
@@ -40,12 +39,14 @@ UI checkpoints should clearly indicate:
 
 ## Design Decisions
 
-### Parser: Tree-sitter
+### Parser: Hand-written Recursive Descent
 
-Use tree-sitter for incremental, error-tolerant parsing:
-- **Custom grammar**: Write a tree-sitter grammar for Excel-style formulas
-- **AST conversion**: Convert tree-sitter's CST to our own AST types for internal use
+Use a hand-written C++ recursive descent parser:
+- **Zero dependencies**: No external libraries required, compiles cleanly to native and WASM
+- **Full control**: Custom error recovery, easy to debug and extend
+- **Sufficient for formulas**: Excel formulas are short (<100 chars typically); incremental parsing unnecessary
 - **Error recovery**: Parse errors create `ErrorNode` placeholders, enabling partial syntax highlighting while user is typing incomplete formulas like `=SUM(A1+`
+- **Single implementation**: Same C++ code serves native clients and web (via WASM)—no reimplementation needed
 
 ### Reference Storage Format
 
@@ -132,57 +133,98 @@ ErrorNode (errorType, position, partialChildren)
 
 ---
 
-## Phase 1: Tree-sitter Grammar
+## Phase 1: Lexer and Parser Foundation
 
-Write the tree-sitter grammar for Excel-style formulas. Tree-sitter uses a JavaScript-based DSL (`grammar.js`) to **define** the grammar, but **generates a C parser** that compiles into our C++ codebase. The `grammar.js` file is only used at build time by tree-sitter's code generator—no JavaScript runs at runtime.
+Build a hand-written recursive descent parser in C++ for Excel-style formulas. This gives us zero external dependencies and full control over error recovery.
 
-- [ ] 1a: Set up tree-sitter infrastructure
-  - Create `core/cells/tree-sitter-formula/` directory
-  - Initialize tree-sitter grammar project structure
-  - Configure Bazel to run `tree-sitter generate` and build the generated C parser
-  - The generated C parser integrates directly with our C++ code
-  - **Test**: Build compiles successfully, C parser linked into core library
+### Grammar (EBNF-style reference)
 
-- [ ] 1b: Define grammar in `grammar.js` (tree-sitter's grammar DSL → generates C parser)
-  - Formula: `=` followed by expression
-  - Literals: numbers (int, decimal, scientific), strings (double-quoted), booleans (TRUE/FALSE)
-  - Cell references: A1, $A$1, $A1, A$1 (all absolute/relative combinations)
-  - Range references: A1:B2, $A$1:$B$2
-  - Whole column/row: A:A, A:C, 1:1, 1:5
-  - Cross-sheet: Sheet2!A1, 'Sheet Name'!A1 (quoted sheet names with spaces)
-  - Operators: +, -, *, /, ^, &, =, <, >, <=, >=, <> with correct precedence
-  - Functions: NAME(args...) with nested expressions
-  - Named ranges: identifiers that aren't keywords
-  - Parentheses for grouping
-  - **Test**: `tree-sitter generate` succeeds
+```
+formula     = "=" expression
+expression  = comparison
+comparison  = concat (("=" | "<>" | "<" | "<=" | ">" | ">=") concat)*
+concat      = additive ("&" additive)*
+additive    = multiplicative (("+" | "-") multiplicative)*
+multiplicative = power (("*" | "/") power)*
+power       = unary ("^" unary)*
+unary       = ("-" | "+")? primary
+primary     = literal | reference | function_call | "(" expression ")" | error_recovery
 
-- [ ] 1c: Add tree-sitter test cases in `corpus/` directory
-  - Test basic literals (numbers, strings, booleans)
-  - Test cell references with all absolute/relative combinations
-  - Test range references and whole column/row refs
-  - Test cross-sheet references
-  - Test operators with correct precedence
-  - Test function calls with various arities
-  - Test complex nested expressions
-  - Test error recovery (partial formulas like `=SUM(A1+`)
-  - **Test**: `tree-sitter test` passes all cases
+literal     = NUMBER | STRING | BOOLEAN
+reference   = [sheet_prefix] (cell_ref | range_ref | column_ref | row_ref | named_ref)
+sheet_prefix = (IDENTIFIER | QUOTED_STRING) "!"
+cell_ref    = "$"? COLUMN "$"? ROW
+range_ref   = cell_ref ":" cell_ref
+column_ref  = "$"? COLUMN (":" "$"? COLUMN)?
+row_ref     = "$"? ROW (":" "$"? ROW)?
+named_ref   = IDENTIFIER
 
-- [ ] 1d: **UI Checkpoint** - Raw parse tree visualization
-  - Add WASM binding: `debugParseFormula(text)` → returns tree-sitter S-expression string
+function_call = IDENTIFIER "(" [arg_list] ")"
+arg_list    = expression ("," expression)*
+```
+
+### Implementation Tasks
+
+- [ ] 1a: Implement lexer (tokenizer) in `core/cells/formula_lexer.h/.cc`
+  - Token types: NUMBER, STRING, BOOLEAN, IDENTIFIER, COLUMN (A-ZZ), ROW (digits)
+  - Operators: `+`, `-`, `*`, `/`, `^`, `&`, `=`, `<>`, `<`, `<=`, `>`, `>=`
+  - Punctuation: `(`, `)`, `,`, `:`, `!`, `$`
+  - Handle scientific notation (1.5e10), negative numbers, quoted strings
+  - Track source position (start, end) for each token for error reporting
+  - **Test**: Lexer correctly tokenizes sample formulas
+
+- [ ] 1b: Add lexer tests in `core/cells/formula_lexer_test.cc`
+  - Test number tokens (integers, decimals, scientific notation)
+  - Test string tokens (double-quoted, with escapes)
+  - Test boolean tokens (TRUE, FALSE, case-insensitive)
+  - Test cell reference tokens (A1, AA100, $A$1)
+  - Test operators and punctuation
+  - Test position tracking
+  - Test error tokens for invalid input
+  - **Test**: All lexer tests pass
+
+- [ ] 1c: Implement recursive descent parser in `core/cells/formula_parser.h/.cc`
+  - `FormulaParser` class with `parse(string) -> unique_ptr<ASTNode>`
+  - Implement precedence via grammar structure (comparison < concat < additive < mult < power < unary)
+  - Handle all reference types: cell, range, whole column/row, cross-sheet
+  - Distinguish named ranges from function calls (lookahead for `(`)
+  - Support function calls with arbitrary arity
+  - **Test**: Basic parsing works
+
+- [ ] 1d: Implement error recovery in parser
+  - On unexpected token, create `ErrorNode` with partial children
+  - Continue parsing to capture as much structure as possible
+  - Example: `=SUM(A1+` → FunctionCall with ErrorNode as second arg
+  - Example: `=A1++B2` → BinaryOp with ErrorNode between operands
+  - Store error message and position in ErrorNode
+  - **Test**: Error recovery produces useful partial ASTs
+
+- [ ] 1e: Add parser tests in `core/cells/formula_parser_test.cc`
+  - Test literals (all numeric formats, strings, booleans)
+  - Test operators with correct precedence: `=1+2*3` → `1+(2*3)` not `(1+2)*3`
+  - Test all reference types (cell, range, column, row, cross-sheet)
+  - Test absolute/relative markers ($A$1, A$1, $A1, A1)
+  - Test function calls with 0, 1, many arguments
+  - Test nested expressions
+  - Test error recovery for various malformed inputs
+  - **Test**: All parser tests pass
+
+- [ ] 1f: **UI Checkpoint** - Parse tree visualization
+  - Add WASM binding: `debugParseFormula(text)` → returns JSON AST representation
   - Add debug panel in web UI (hidden by default, toggle with keyboard shortcut)
-  - Display raw parse tree when typing in formula bar
+  - Display AST tree when typing in formula bar
   - **Test manually**:
-    - Type `=1+2` → see parse tree with `binary_op`, `number` nodes
-    - Type `=SUM(A1:B2)` → see `function_call`, `range_ref` nodes
-    - Type `=SUM(A1+` → see ERROR node in tree (error recovery working)
-  - **Expected**: Tree updates live as you type; ERROR nodes appear for invalid syntax
-  - **Limitations**: No UUID resolution yet, just raw syntax tree
+    - Type `=1+2` → see AST with BinaryOp, Literal nodes
+    - Type `=SUM(A1:B2)` → see FunctionCall, RangeRef nodes
+    - Type `=SUM(A1+` → see ErrorNode in tree (error recovery working)
+  - **Expected**: Tree updates live as you type; ErrorNodes appear for invalid syntax
+  - **Limitations**: No UUID resolution yet, just syntax structure
 
 ---
 
-## Phase 2: AST Types and Conversion
+## Phase 2: AST Types
 
-Define our AST types and convert from tree-sitter's CST.
+Define the AST node types used by the parser. With a hand-written parser, the parser directly produces AST nodes (no CST-to-AST conversion needed).
 
 - [ ] 2a: Define AST node types in `core/cells/formula_ast.h`
   - ASTNodeType enum (all types from Design Decisions)
@@ -197,40 +239,17 @@ Define our AST types and convert from tree-sitter's CST.
   - FunctionCallNode (name, args vector, isVolatile flag)
   - ErrorNode (errorType, position, partialChildren for error recovery)
   - Helper to clone AST trees
+  - `toJson()` method for debug visualization
   - **Test**: Header compiles, basic node creation works
 
-- [ ] 2b: Implement CST-to-AST converter in `core/cells/formula_parser.h/.cc`
-  - Wrap tree-sitter parser initialization
-  - `parse(string) -> unique_ptr<ASTNode>` - parse and convert
-  - Walk tree-sitter nodes, create corresponding ASTNode types
-  - Handle ERROR nodes from tree-sitter → create ErrorNode with partial children
-  - Preserve source positions for error reporting and highlighting
-  - **Test**: Basic conversion works for simple formulas
+- [ ] 2b: Add AST tests in `core/cells/formula_ast_test.cc`
+  - Test node construction and destruction
+  - Test AST cloning (deep copy)
+  - Test JSON serialization for debug panel
+  - Test source position preservation
+  - **Test**: All AST tests pass
 
-- [ ] 2c: Add parser tests in `core/cells/formula_parser_test.cc`
-  - Test literal parsing and type inference
-  - Test cell reference parsing (UUID fields empty until resolution)
-  - Test binary operations with correct precedence
-  - Test unary operations
-  - Test function calls with various arities
-  - Test cross-sheet references
-  - Test whole column/row references
-  - Test complex nested expressions
-  - Test error recovery (ErrorNode created for invalid syntax)
-  - **Test**: All tests pass before proceeding
-
-- [ ] 2d: **UI Checkpoint** - AST structure visualization
-  - Update debug panel to show our AST (not just tree-sitter's CST)
-  - Add WASM binding: `debugGetAST(text)` → returns JSON representation of AST
-  - Show AST node types, operators, and literal values
-  - Highlight ErrorNodes in red to visualize error recovery
-  - **Test manually**:
-    - Type `=1+2*3` → see BinaryOp tree showing correct precedence (mul before add)
-    - Type `=A1` → see CellRefNode with `colAbsolute: false, rowAbsolute: false`
-    - Type `=$A$1` → see CellRefNode with `colAbsolute: true, rowAbsolute: true`
-    - Type `=IF(` → see FunctionCallNode with ErrorNode child
-  - **Expected**: AST structure visible; precedence correct; partial formulas show ErrorNodes
-  - **Limitations**: Cell references show A1 text, not UUIDs (resolution not done yet)
+**Note**: Parser tests (2c, 2d from previous plan) are now in Phase 1 since the parser directly produces AST nodes.
 
 ---
 
@@ -496,11 +515,12 @@ Expose C++ formula functionality to the TypeScript web UI via WASM bindings. The
   - These enable the colored reference boxes shown in Numbers UI
   - **Test**: Dependency queries work from TypeScript web UI
 
-- [ ] 7c: Add WASM bindings for incremental parsing (live highlighting)
-  - `parseFormulaIncremental(text)` - parse partial formula, return AST with ErrorNodes
+- [ ] 7c: Add WASM bindings for live formula editing
+  - `parseFormulaPartial(text)` - parse (possibly incomplete) formula, return AST with ErrorNodes
   - `getReferencesFromPartial(text)` - extract valid references from incomplete formula
   - Enables highlighting while user types `=SUM(A1+` (A1 highlighted even though formula incomplete)
-  - **Test**: Incremental parsing works from TypeScript
+  - Note: With hand-written parser, we re-parse the entire formula on each keystroke (fast enough for short formulas)
+  - **Test**: Partial parsing works from TypeScript
 
 - [ ] 7d: Update web UI to display formula dependencies
   - When editing a formula, highlight referenced cells with colors
@@ -541,8 +561,8 @@ Run all tests: `bazel test //core/cells:all`
 
 | Phase | Test File | UI Checkpoint |
 |-------|-----------|---------------|
-| 1 | `core/cells/tree-sitter-formula/corpus/*.txt` (tree-sitter tests) | 1d: Debug panel with raw parse tree |
-| 2 | `core/cells/formula_parser_test.cc` | 2d: AST structure visualization |
+| 1 | `core/cells/formula_lexer_test.cc`, `core/cells/formula_parser_test.cc` | 1f: Debug panel with AST visualization |
+| 2 | `core/cells/formula_ast_test.cc` | (covered by Phase 1 UI checkpoint) |
 | 3 | `core/cells/formula_resolver_test.cc` | 3f: Reference highlighting in grid |
 | 4 | `core/cells/rtree_test.cc`, `core/cells/dependency_graph_test.cc` | 4g: Precedent/dependent visualization |
 | 5 | `core/cells/formula_integration_test.cc` | 5e: Formula persistence and display |
