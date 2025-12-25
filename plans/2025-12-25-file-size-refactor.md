@@ -108,7 +108,7 @@ Extract remaining code and reduce index.html to pure HTML.
 - [x] 3a: Create `src/app-events.ts` - extract all event handlers
 - [x] 3b: Create `src/file-loader.ts` - extract file loading logic
 - [x] 3c: Create `src/persistence.ts` - extract IndexedDB persistence
-- [ ] 3d: Create `src/ast-debug.ts` - extract AST debug panel
+- [x] 3d: Create `src/ast-debug.ts` - extract AST debug panel
 - [ ] 3e: Update `src/app.ts` with initialization and connect all modules
 - [ ] 3f: Reduce `index.html` to pure HTML template (no inline JS)
 - [ ] 3g: Update build.mjs - app.ts becomes the single entry point
