@@ -608,5 +608,197 @@ TEST(FormulaParserTest, FormulaWithoutEquals) {
     EXPECT_FALSE(parser.hasErrors());
 }
 
+// ============================================================================
+// UUID Reference Parsing Tests
+// ============================================================================
+
+TEST(FormulaParserTest, UuidCellRefRelative) {
+    FormulaParser parser("=~~xK7mNp2Q");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::CELL_REF);
+
+    auto* cellRef = dynamic_cast<CellRefNode*>(ast.get());
+    ASSERT_NE(cellRef, nullptr);
+    EXPECT_EQ(cellRef->cellId, "xK7mNp2Q");
+    EXPECT_FALSE(cellRef->colAbsolute);
+    EXPECT_FALSE(cellRef->rowAbsolute);
+    EXPECT_TRUE(cellRef->column.empty());  // UUID format doesn't store column name
+}
+
+TEST(FormulaParserTest, UuidCellRefBothAbsolute) {
+    FormulaParser parser("=$$abcd1234");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    auto* cellRef = dynamic_cast<CellRefNode*>(ast.get());
+    ASSERT_NE(cellRef, nullptr);
+    EXPECT_EQ(cellRef->cellId, "abcd1234");
+    EXPECT_TRUE(cellRef->colAbsolute);
+    EXPECT_TRUE(cellRef->rowAbsolute);
+}
+
+TEST(FormulaParserTest, UuidCellRefColAbsolute) {
+    FormulaParser parser("=$~abcd1234");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    auto* cellRef = dynamic_cast<CellRefNode*>(ast.get());
+    ASSERT_NE(cellRef, nullptr);
+    EXPECT_EQ(cellRef->cellId, "abcd1234");
+    EXPECT_TRUE(cellRef->colAbsolute);
+    EXPECT_FALSE(cellRef->rowAbsolute);
+}
+
+TEST(FormulaParserTest, UuidCellRefRowAbsolute) {
+    FormulaParser parser("=~$abcd1234");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    auto* cellRef = dynamic_cast<CellRefNode*>(ast.get());
+    ASSERT_NE(cellRef, nullptr);
+    EXPECT_EQ(cellRef->cellId, "abcd1234");
+    EXPECT_FALSE(cellRef->colAbsolute);
+    EXPECT_TRUE(cellRef->rowAbsolute);
+}
+
+TEST(FormulaParserTest, UuidCellRefRange) {
+    FormulaParser parser("=~~cellAAA1:~~cellBBB2");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::RANGE_REF);
+
+    auto* rangeRef = dynamic_cast<RangeRefNode*>(ast.get());
+    ASSERT_NE(rangeRef, nullptr);
+    EXPECT_EQ(rangeRef->topLeft->cellId, "cellAAA1");
+    EXPECT_EQ(rangeRef->bottomRight->cellId, "cellBBB2");
+}
+
+TEST(FormulaParserTest, UuidCellRefBinaryOp) {
+    FormulaParser parser("=~~xK7mNp2Q+~~fR3pK7wN");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::BINARY_OP);
+
+    auto* binOp = dynamic_cast<BinaryOpNode*>(ast.get());
+    ASSERT_NE(binOp, nullptr);
+    EXPECT_EQ(binOp->op, BinaryOp::ADD);
+    EXPECT_EQ(binOp->left->type, ASTNodeType::CELL_REF);
+    EXPECT_EQ(binOp->right->type, ASTNodeType::CELL_REF);
+
+    auto* leftCell = dynamic_cast<CellRefNode*>(binOp->left.get());
+    auto* rightCell = dynamic_cast<CellRefNode*>(binOp->right.get());
+    EXPECT_EQ(leftCell->cellId, "xK7mNp2Q");
+    EXPECT_EQ(rightCell->cellId, "fR3pK7wN");
+}
+
+TEST(FormulaParserTest, UuidCellRefFunction) {
+    FormulaParser parser("=SUM(~~cellA001,~~cellB002)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+
+    auto* func = dynamic_cast<FunctionCallNode*>(ast.get());
+    ASSERT_NE(func, nullptr);
+    EXPECT_EQ(func->name, "SUM");
+    EXPECT_EQ(func->args.size(), 2u);
+    EXPECT_EQ(func->args[0]->type, ASTNodeType::CELL_REF);
+    EXPECT_EQ(func->args[1]->type, ASTNodeType::CELL_REF);
+}
+
+TEST(FormulaParserTest, UuidColumnRef) {
+    FormulaParser parser("=@~colA0001");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::COLUMN_REF);
+
+    auto* colRef = dynamic_cast<ColumnRefNode*>(ast.get());
+    ASSERT_NE(colRef, nullptr);
+    EXPECT_EQ(colRef->columnId, "colA0001");
+    EXPECT_FALSE(colRef->absolute);
+}
+
+TEST(FormulaParserTest, UuidColumnRefAbsolute) {
+    FormulaParser parser("=@$colA0001");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    auto* colRef = dynamic_cast<ColumnRefNode*>(ast.get());
+    ASSERT_NE(colRef, nullptr);
+    EXPECT_EQ(colRef->columnId, "colA0001");
+    EXPECT_TRUE(colRef->absolute);
+}
+
+TEST(FormulaParserTest, UuidColumnRange) {
+    FormulaParser parser("=@~colA0001:@~colC0003");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::COLUMN_RANGE_REF);
+
+    auto* colRange = dynamic_cast<ColumnRangeRefNode*>(ast.get());
+    ASSERT_NE(colRange, nullptr);
+    EXPECT_EQ(colRange->startColumnId, "colA0001");
+    EXPECT_EQ(colRange->endColumnId, "colC0003");
+}
+
+TEST(FormulaParserTest, UuidRowRef) {
+    FormulaParser parser("=#~row10001");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::ROW_REF);
+
+    auto* rowRef = dynamic_cast<RowRefNode*>(ast.get());
+    ASSERT_NE(rowRef, nullptr);
+    EXPECT_EQ(rowRef->rowId, "row10001");
+    EXPECT_FALSE(rowRef->absolute);
+}
+
+TEST(FormulaParserTest, UuidRowRefAbsolute) {
+    FormulaParser parser("=#$row10001");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    auto* rowRef = dynamic_cast<RowRefNode*>(ast.get());
+    ASSERT_NE(rowRef, nullptr);
+    EXPECT_EQ(rowRef->rowId, "row10001");
+    EXPECT_TRUE(rowRef->absolute);
+}
+
+TEST(FormulaParserTest, UuidRowRange) {
+    FormulaParser parser("=#~row10001:#~row50005");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::ROW_RANGE_REF);
+
+    auto* rowRange = dynamic_cast<RowRangeRefNode*>(ast.get());
+    ASSERT_NE(rowRange, nullptr);
+    EXPECT_EQ(rowRange->startRowId, "row10001");
+    EXPECT_EQ(rowRange->endRowId, "row50005");
+}
+
+TEST(FormulaParserTest, UuidMixedWithLiterals) {
+    FormulaParser parser("=~~cellA001*2+10");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::BINARY_OP);
+}
+
+TEST(FormulaParserTest, UuidComplexFormula) {
+    // SUM(cellA:cellB) + IF(condition, ~~cellC, 0)
+    FormulaParser parser("=SUM(~~cellAAA1:~~cellBBB2)+42");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::BINARY_OP);
+}
+
 }  // namespace
 }  // namespace cells

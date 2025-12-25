@@ -234,6 +234,17 @@ std::unique_ptr<ASTNode> FormulaParser::unary() {
 std::unique_ptr<ASTNode> FormulaParser::primary() {
     // primary = literal | reference | function_call | "(" expression ")"
 
+    // UUID reference tokens (stored formula format)
+    if (check(TokenType::UUID_CELL_REF)) {
+        return parseUuidCellRef();
+    }
+    if (check(TokenType::UUID_COLUMN_REF)) {
+        return parseUuidColumnRef();
+    }
+    if (check(TokenType::UUID_ROW_REF)) {
+        return parseUuidRowRef();
+    }
+
     // Check for NUMBER followed by : (row reference)
     // Must check this BEFORE treating as number literal
     if (check(TokenType::NUMBER)) {
@@ -594,6 +605,120 @@ bool FormulaParser::isValidColumnName(const std::string& name) {
         }
     }
     return true;
+}
+
+// ============================================================================
+// UUID Reference Parsing (stored formula format)
+// ============================================================================
+
+std::unique_ptr<ASTNode> FormulaParser::parseUuidCellRef() {
+    // Token text format: PREFIX + 8-char UUID
+    // PREFIX: $$ (both abs), $~ (col abs), ~$ (row abs), ~~ (both rel)
+    const Token tok = current_;
+    const std::string text(tok.text);
+    advance();
+
+    if (text.size() != 10) {
+        return errorNode("Invalid UUID cell reference: expected 10 characters");
+    }
+
+    // Parse prefix to get absolute flags
+    const bool colAbsolute = (text[0] == '$');
+    const bool rowAbsolute = (text[1] == '$');
+    const std::string cellId = text.substr(2, 8);
+
+    // Create CellRefNode with cellId already filled in (no resolution needed)
+    // We set column="" and row=0 since we have the UUID directly
+    auto node = std::make_unique<CellRefNode>("", 0, colAbsolute, rowAbsolute, tok.position);
+    node->cellId = cellId;
+
+    // Check for range (UUID_CELL_REF : UUID_CELL_REF)
+    if (match(TokenType::COLON)) {
+        if (check(TokenType::UUID_CELL_REF)) {
+            auto secondNode = parseUuidCellRef();
+            if (dynamic_cast<CellRefNode*>(secondNode.get()) != nullptr) {
+                return std::make_unique<RangeRefNode>(
+                    std::move(node),
+                    std::unique_ptr<CellRefNode>(static_cast<CellRefNode*>(secondNode.release())));
+            }
+        }
+        return errorNode("Expected UUID cell reference after ':'");
+    }
+
+    return node;
+}
+
+std::unique_ptr<ASTNode> FormulaParser::parseUuidColumnRef() {
+    // Token text format: @$ or @~ followed by 8-char UUID
+    const Token tok = current_;
+    const std::string text(tok.text);
+    advance();
+
+    if (text.size() != 10) {
+        return errorNode("Invalid UUID column reference: expected 10 characters");
+    }
+
+    // Parse prefix: @$ = absolute, @~ = relative
+    const bool absolute = (text[1] == '$');
+    const std::string columnId = text.substr(2, 8);
+
+    // Create ColumnRefNode with columnId already filled in
+    auto node = std::make_unique<ColumnRefNode>("", absolute, tok.position);
+    node->columnId = columnId;
+
+    // Check for column range (@~colId1 : @~colId2)
+    if (match(TokenType::COLON)) {
+        if (check(TokenType::UUID_COLUMN_REF)) {
+            auto secondNode = parseUuidColumnRef();
+            if (auto* secondCol = dynamic_cast<ColumnRefNode*>(secondNode.get())) {
+                // Convert to column range
+                auto rangeNode = std::make_unique<ColumnRangeRefNode>(
+                    "", "", absolute, secondCol->absolute);
+                rangeNode->startColumnId = columnId;
+                rangeNode->endColumnId = secondCol->columnId;
+                return rangeNode;
+            }
+        }
+        return errorNode("Expected UUID column reference after ':'");
+    }
+
+    return node;
+}
+
+std::unique_ptr<ASTNode> FormulaParser::parseUuidRowRef() {
+    // Token text format: #$ or #~ followed by 8-char UUID
+    const Token tok = current_;
+    const std::string text(tok.text);
+    advance();
+
+    if (text.size() != 10) {
+        return errorNode("Invalid UUID row reference: expected 10 characters");
+    }
+
+    // Parse prefix: #$ = absolute, #~ = relative
+    const bool absolute = (text[1] == '$');
+    const std::string rowId = text.substr(2, 8);
+
+    // Create RowRefNode with rowId already filled in
+    auto node = std::make_unique<RowRefNode>(0, absolute, tok.position);
+    node->rowId = rowId;
+
+    // Check for row range (#~rowId1 : #~rowId2)
+    if (match(TokenType::COLON)) {
+        if (check(TokenType::UUID_ROW_REF)) {
+            auto secondNode = parseUuidRowRef();
+            if (auto* secondRow = dynamic_cast<RowRefNode*>(secondNode.get())) {
+                // Convert to row range
+                auto rangeNode = std::make_unique<RowRangeRefNode>(0, 0, absolute, secondRow->absolute);
+                rangeNode->startRowId = rowId;
+                rangeNode->endRowId = secondRow->rowId;
+                return rangeNode;
+            }
+        }
+        return errorNode("Expected UUID row reference after ':'");
+    }
+
+    return node;
 }
 
 }  // namespace cells

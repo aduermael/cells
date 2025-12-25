@@ -496,7 +496,7 @@ Wire the parser and dependency graph into the Cell/Sheet model.
     - New token type UUID_CELL_REF or extend CELL_REF
     - **Test**: Lexer tokenizes `=$$xK7mNp2Q+~~fR3pK7wN` correctly
 
-  - [ ] 5f.3: Update FormulaParser to handle UUID ref tokens
+  - [x] 5f.3: Update FormulaParser to handle UUID ref tokens
     - CellRefNode stores cellId directly (no column/row needed for UUID refs)
     - Add `CellRefNode::isUuidFormat` flag or detect from fields
     - **Test**: Parser produces correct AST from UUID-format formula

@@ -75,6 +75,11 @@ private:
                                          const std::string& sheetName);
     std::unique_ptr<ASTNode> parseFunctionCall(const std::string& name);
 
+    // UUID reference parsing (for stored formula format)
+    std::unique_ptr<ASTNode> parseUuidCellRef();
+    std::unique_ptr<ASTNode> parseUuidColumnRef();
+    std::unique_ptr<ASTNode> parseUuidRowRef();
+
     // Helper to check if identifier could be a column name
     [[nodiscard]] static bool isValidColumnName(const std::string& name);
 
