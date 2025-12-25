@@ -157,7 +157,8 @@ TEST_F(SyncFormulaTest, FormulaWithSumDisplaysCorrectlyAfterSync) {
     // Client A enters formula =SUM(A1:B2) in cell A2
     // Range A1:B2 becomes cellA1:cellB2 in UUID format
 
-    std::string uuidFormula = "SUM(" + sharedCellA1_.toString() + ":" + sharedCellB2_.toString() + ")";
+    std::string uuidFormula =
+        "SUM(" + sharedCellA1_.toString() + ":" + sharedCellB2_.toString() + ")";
     std::string displayFormula = "=SUM(A1:B2)";
 
     std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
@@ -211,8 +212,7 @@ TEST_F(SyncFormulaTest, MixedReferenceDisplaysCorrectlyAfterSync) {
 
     // Test column absolute
     {
-        std::string payload =
-            makeFormulaPayload(sharedColB_, sharedRow1_, uuidColAbs, "=$A1");
+        std::string payload = makeFormulaPayload(sharedColB_, sharedRow1_, uuidColAbs, "=$A1");
         Operation op = makeCellSetValueOp(*workbookA_, sharedCellB1_, payload);
         applyOperation(*workbookB_, op);
 
@@ -226,7 +226,8 @@ TEST_F(SyncFormulaTest, MixedReferenceDisplaysCorrectlyAfterSync) {
 TEST_F(SyncFormulaTest, ComplexFormulaDisplaysCorrectlyAfterSync) {
     // Formula: =IF(A1>0,B1*2,A2+B2)
     std::string uuidFormula = "IF(" + sharedCellA1_.toString() + ">0," + sharedCellB1_.toString() +
-                              "*2," + sharedCellA2_.toString() + "+" + sharedCellB2_.toString() + ")";
+                              "*2," + sharedCellA2_.toString() + "+" + sharedCellB2_.toString() +
+                              ")";
     std::string displayFormula = "=IF(A1>0,B1*2,A2+B2)";
 
     std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
@@ -269,7 +270,8 @@ TEST_F(SyncFormulaTest, FormulaReferencingNewCellDisplaysCorrectly) {
     // Create cell C1 in both workbooks via operation
     {
         std::string payload = "{\"type\":\"n\",\"value\":\"500\",\"col_id\":\"" +
-                              newColC.toString() + "\",\"row_id\":\"" + sharedRow1_.toString() + "\"}";
+                              newColC.toString() + "\",\"row_id\":\"" + sharedRow1_.toString() +
+                              "\"}";
         HLC hlc = workbookA_->getCurrentHLC();
         Operation op(hlc, OpType::CELL_SET_VALUE, newCellC1, payload);
         applyOperation(*workbookA_, op);

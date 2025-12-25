@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -2337,6 +2338,15 @@ public:
             return "{\"error\":\"Parse failed\",\"references\":[]}";
         }
 
+        // Snapshot existing entities before resolution
+        // (to track what gets created by formula resolution)
+        std::set<ID> existingColumns;
+        std::set<ID> existingRows;
+        std::set<ID> existingCells;
+        for (const auto& [id, _] : sheet->columns) existingColumns.insert(id);
+        for (const auto& [id, _] : sheet->rows) existingRows.insert(id);
+        for (const auto& [id, _] : sheet->cells) existingCells.insert(id);
+
         // Resolve references in current sheet context
         // This may create new cells/columns/rows for references to empty locations
         FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
@@ -2344,6 +2354,55 @@ public:
 
         if (!result.success) {
             // Still try to extract what we can
+        }
+
+        // Generate operations for newly created columns, rows, and cells
+        // This ensures they sync to other peers when in collaboration mode
+        if (_workbook->isCollaborating()) {
+            // Generate DIM_INSERT_AXIS operations for new columns
+            for (const auto& [id, col] : sheet->columns) {
+                if (existingColumns.find(id) == existingColumns.end()) {
+                    std::string payload = "{\"pos\":" + std::to_string(col->position) +
+                                          ",\"size\":" + std::to_string(col->size) +
+                                          ",\"isCol\":\"true\"}";
+                    Operation op = makeDimInsertAxisOp(*_workbook, id, payload);
+                    _workbook->getOpLog()->addOperation(op);
+                    LOG_INFO("[FORMULA_DEBUG] Created column operation for %s at pos %u",
+                             id.toString().c_str(), col->position);
+                }
+            }
+
+            // Generate DIM_INSERT_AXIS operations for new rows
+            for (const auto& [id, row] : sheet->rows) {
+                if (existingRows.find(id) == existingRows.end()) {
+                    std::string payload = "{\"pos\":" + std::to_string(row->position) +
+                                          ",\"size\":" + std::to_string(row->size) +
+                                          ",\"isCol\":\"false\"}";
+                    Operation op = makeDimInsertAxisOp(*_workbook, id, payload);
+                    _workbook->getOpLog()->addOperation(op);
+                    LOG_INFO("[FORMULA_DEBUG] Created row operation for %s at pos %u",
+                             id.toString().c_str(), row->position);
+                }
+            }
+
+            // Generate CELL_SET_VALUE operations for new cells
+            // (empty cells created by formula references)
+            for (const auto& [id, cell] : sheet->cells) {
+                if (existingCells.find(id) == existingCells.end()) {
+                    std::string payload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
+                                          cell->colId.toString() + "\",\"row_id\":\"" +
+                                          cell->rowId.toString() + "\"}";
+                    Operation op = makeCellSetValueOp(*_workbook, id, payload);
+                    _workbook->getOpLog()->addOperation(op);
+                    LOG_INFO("[FORMULA_DEBUG] Created cell operation for %s",
+                             id.toString().c_str());
+                }
+            }
+
+            // Queue operations broadcast to peers
+            if (_syncManager) {
+                _syncManager->queueOperationsBroadcast();
+            }
         }
 
         // Rebuild RefConverter to include any newly created cells

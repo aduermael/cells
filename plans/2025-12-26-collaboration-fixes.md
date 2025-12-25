@@ -72,17 +72,31 @@ First, add logging and tests to understand exactly where the conversion fails.
 
 **Next step**: Run manual test with two browsers to observe the debug logs.
 
+### Root Cause Identified!
+
+After code analysis, the root cause is:
+1. When user types `=B1` in cell A2, `FormulaResolver::resolve()` is called
+2. If cell B1 doesn't exist, `getOrCreateCellAt()` creates it with a new ID
+3. This cell is created **directly in the model, NOT via operations**
+4. The formula stores B1's ID in UUID format, and the formula operation syncs
+5. **But cell B1 itself doesn't sync - no operation was generated for it!**
+6. On the receiving client, the formula UUID can't be resolved because B1 doesn't exist
+
+**The fix**: Generate operations for cells/axes created during formula resolution.
+
 ---
 
 ## Phase 2: Fix RefConverter Context
 
 Based on diagnosis, fix the RefConverter context management.
 
-- [ ] 2a: Ensure RefConverter context is set after all cell-creating operations
-  - `applyRemoteOperation()` may create cells that aren't in RefConverter yet
-  - Formula resolution creates cells - these need to be in RefConverter
-  - Call `rebuildQuadtree()` (which calls `_refConverter.setContext()`) at correct time
-  - **Test**: Remote formula displays correctly
+- [x] 2a: Generate operations for cells created during formula resolution
+  - When formula references empty cells, they get created by FormulaResolver
+  - These cells were created directly in model, not via operations
+  - **FIX**: In `getFormulaReferences()`, snapshot existing entities before resolution,
+    then generate DIM_INSERT_AXIS and CELL_SET_VALUE operations for new entities
+  - Operations are added to OpLog and broadcast to peers
+  - **Test**: Remote formula displays correctly (needs manual verification)
 
 - [ ] 2b: Fix formula resolution for remote operations
   - When receiving a formula operation, the AST needs to be re-resolved
