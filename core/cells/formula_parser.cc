@@ -590,7 +590,7 @@ bool FormulaParser::isValidColumnName(const std::string& name) {
         return false;
     }
     for (const char c : name) {
-        if (!std::isalpha(static_cast<unsigned char>(c))) {
+        if (std::isalpha(static_cast<unsigned char>(c)) == 0) {
             return false;
         }
     }

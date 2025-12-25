@@ -16,7 +16,7 @@ double Token::numberValue() const {
         return 0.0;
     }
     // Parse the number from the text view
-    std::string s(text);
+    const std::string s(text);
     return std::strtod(s.c_str(), nullptr);
 }
 
@@ -81,7 +81,7 @@ bool FormulaLexer::isAtEnd() const {
 std::vector<Token> FormulaLexer::tokenizeAll() {
     std::vector<Token> tokens;
     while (true) {
-        Token tok = nextToken();
+        const Token tok = nextToken();
         tokens.push_back(tok);
         if (tok.isEnd()) {
             break;
@@ -153,20 +153,23 @@ const char* FormulaLexer::tokenTypeName(TokenType type) {
 // ============================================================================
 
 char FormulaLexer::peek() const {
-    if (isAtEndInternal())
+    if (isAtEndInternal()) {
         return '\0';
+    }
     return source_[pos_];
 }
 
 char FormulaLexer::peekNext() const {
-    if (pos_ + 1 >= source_.size())
+    if (pos_ + 1 >= source_.size()) {
         return '\0';
+    }
     return source_[pos_ + 1];
 }
 
 char FormulaLexer::advance() {
-    if (isAtEndInternal())
+    if (isAtEndInternal()) {
         return '\0';
+    }
     return source_[pos_++];
 }
 
@@ -193,7 +196,7 @@ Token FormulaLexer::makeErrorToken(const std::string& message, size_t start) con
 
 void FormulaLexer::skipWhitespace() {
     while (!isAtEndInternal()) {
-        char c = peek();
+        const char c = peek();
         if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
             advance();
         } else {
@@ -229,8 +232,8 @@ Token FormulaLexer::scanToken() {
         return makeToken(TokenType::END_OF_INPUT, pos_);
     }
 
-    size_t start = pos_;
-    char c = advance();
+    const size_t start = pos_;
+    const char c = advance();
 
     // Single-character tokens
     switch (c) {
@@ -300,7 +303,7 @@ Token FormulaLexer::scanToken() {
 }
 
 Token FormulaLexer::scanNumber() {
-    size_t start = pos_;
+    const size_t start = pos_;
 
     // Integer part
     while (isDigit(peek())) {
@@ -317,7 +320,7 @@ Token FormulaLexer::scanNumber() {
 
     // Scientific notation (e.g., 1.5e10, 1E-5)
     if (peek() == 'e' || peek() == 'E') {
-        char next = peekNext();
+        const char next = peekNext();
         if (isDigit(next) || next == '+' || next == '-') {
             advance();  // Consume 'e' or 'E'
             if (peek() == '+' || peek() == '-') {
@@ -342,11 +345,11 @@ Token FormulaLexer::scanNumber() {
 }
 
 Token FormulaLexer::scanString() {
-    size_t start = pos_;
+    const size_t start = pos_;
     advance();  // Consume opening "
 
     while (!isAtEndInternal()) {
-        char c = peek();
+        const char c = peek();
         if (c == '"') {
             // Check for escaped quote ""
             if (peekNext() == '"') {
@@ -365,14 +368,14 @@ Token FormulaLexer::scanString() {
 }
 
 Token FormulaLexer::scanIdentifierOrColumn() {
-    size_t start = pos_;
+    const size_t start = pos_;
 
     // Consume all letters first (only A-Z, a-z, not underscore)
     while (isColumnChar(peek())) {
         advance();
     }
 
-    std::string_view letters = source_.substr(start, pos_ - start);
+    const std::string_view letters = source_.substr(start, pos_ - start);
 
     // Check if we have underscore (making it definitely an identifier)
     if (peek() == '_') {
@@ -380,7 +383,7 @@ Token FormulaLexer::scanIdentifierOrColumn() {
         while (isAlphaNumeric(peek())) {
             advance();
         }
-        std::string_view identifier = source_.substr(start, pos_ - start);
+        const std::string_view identifier = source_.substr(start, pos_ - start);
 
         // Check for booleans (though unlikely with underscore)
         std::string upper(identifier);
@@ -399,7 +402,7 @@ Token FormulaLexer::scanIdentifierOrColumn() {
     }
 
     // Check if this could be a valid column name (1-3 letters)
-    bool couldBeColumn = (letters.size() >= 1 && letters.size() <= 3);
+    const bool couldBeColumn = (!letters.empty() && letters.size() <= 3);
 
     // Check if it's followed by digits (making it a cell reference: A1, AA100)
     if (couldBeColumn && isDigit(peek())) {
@@ -410,7 +413,7 @@ Token FormulaLexer::scanIdentifierOrColumn() {
     // In $A$1, after consuming A, we see $ then 1
     if (couldBeColumn && peek() == '$') {
         // Look ahead past the $
-        size_t lookahead = pos_ + 1;
+        const size_t lookahead = pos_ + 1;
         if (lookahead < source_.size() && isDigit(source_[lookahead])) {
             return makeToken(TokenType::COLUMN, start);
         }
@@ -438,7 +441,7 @@ Token FormulaLexer::scanIdentifierOrColumn() {
 }
 
 Token FormulaLexer::scanRowNumber() {
-    size_t start = pos_;
+    const size_t start = pos_;
 
     while (isDigit(peek())) {
         advance();

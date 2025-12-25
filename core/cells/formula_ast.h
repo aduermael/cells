@@ -423,8 +423,9 @@ struct FunctionCallNode : public ASTNode {
 
     [[nodiscard]] bool hasError() const override {
         for (const auto& arg : args) {
-            if (arg->hasError())
+            if (arg->hasError()) {
                 return true;
+            }
         }
         return false;
     }

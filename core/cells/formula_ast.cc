@@ -259,8 +259,9 @@ std::string FunctionCallNode::toJson() const {
     oss << R"({"type":"FunctionCall","name":")" << escapeJsonString(name) << R"(","isVolatile":)"
         << (isVolatile ? "true" : "false") << R"(,"args":[)";
     for (size_t i = 0; i < args.size(); ++i) {
-        if (i > 0)
+        if (i > 0) {
             oss << ",";
+        }
         oss << args[i]->toJson();
     }
     oss << "]}";
@@ -276,8 +277,9 @@ std::string ErrorNode::toJson() const {
     oss << R"({"type":"Error","message":")" << escapeJsonString(message)
         << R"(","partialChildren":[)";
     for (size_t i = 0; i < partialChildren.size(); ++i) {
-        if (i > 0)
+        if (i > 0) {
             oss << ",";
+        }
         oss << partialChildren[i]->toJson();
     }
     oss << "]}";
