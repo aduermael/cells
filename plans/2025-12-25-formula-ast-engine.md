@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-25 00:19 UTC
-Updated At: 2025-12-25 19:53 UTC
+Updated At: 2025-12-25 20:04 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -524,6 +524,61 @@ Wire the parser and dependency graph into the Cell/Sheet model.
     - Added UuidFormatRangeRefRoundTrip test
     - Added UuidFormatFunctionCallRoundTrip test
     - **Test**: All 27 integration tests pass (4 new tests for UUID format)
+
+  - [x] 5f.8: Comprehensive UUID round-trip test suite
+    Formula handling is critical infrastructure - requires aggressive testing.
+    All tests verify: A1 input → UUID storage → serialize → load → parse → A1 display
+
+    **Cell Reference Variations**:
+    - [x] Mixed absolute `$A1` (col absolute, row relative)
+    - [x] Mixed absolute `A$1` (col relative, row absolute)
+    - [x] Multiple refs in one formula `=A1+B1+C1+A2+B2+C2`
+    - [x] Same cell referenced multiple times `=A1+A1+A1`
+    - [x] References to cells in different quadrants of grid
+
+    **Range Reference Variations**:
+    - [x] Fully absolute range `=$A$1:$B$2`
+    - [x] Mixed absolute range `=$A1:B$2`
+    - [x] Single-row range `=SUM(A1:C1)`
+    - [x] Single-column range `=SUM(A1:A3)`
+    - [x] Large range spanning many cells `=SUM(A1:C3)`
+
+    **All Operators**:
+    - [x] Arithmetic: `+`, `-`, `*`, `/`, `^` each with cell refs
+    - [x] Comparison: `=`, `<>`, `<`, `<=`, `>`, `>=` each with cell refs
+    - [x] Concatenation: `=A1&B1`
+    - [x] Unary minus: `=-A1`
+    - [x] Unary plus: `=+A1`
+    - [x] Operator precedence: `=A1+B1*C1` (verify structure preserved)
+
+    **Complex Nested Expressions**:
+    - [x] Deeply nested parens: `=((A1+B1)*C1)/A2` (extra parens optimized away)
+    - [x] Nested function calls: `=SUM(A1,MAX(B1,C1))`
+    - [x] Function with expression args: `=IF(A1+B1>10,C1*2,0)`
+    - [x] Multiple nested levels: `=IF(AND(A1>0,B1>0),SUM(C1:C3),0)`
+
+    **Literals Mixed with Refs**:
+    - [x] Number literals: `=A1+10`, `=A1*3.14`, `=A1/100`
+    - [x] String literals: `=A1&"hello"`, `="prefix"&A1&"suffix"`
+    - [x] Boolean literals: `=IF(TRUE,A1,B1)`, `=AND(A1>0,FALSE)`
+    - [x] Scientific notation: `=A1*1.5e10` (formatted as 1.5e+10)
+
+    **Function Variations**:
+    - [x] Zero-arg functions: `=NOW()`, `=TODAY()`, `=RAND()`
+    - [x] Single-arg functions: `=ABS(A1)`, `=SQRT(B1)`
+    - [x] Multi-arg functions: `=IF(A1,B1,C1)`, `=ROUND(A1,2)`
+    - [x] Variadic functions: `=SUM(A1,B1,C1)`, `=MAX(A1,B1,C1,A2)`
+    - [x] Nested functions: `=ROUND(SUM(A1:B2)/COUNT(A1:B2),2)`
+
+    **Edge Cases**:
+    - [x] Very long formula (10+ refs)
+    - [x] Formula referencing same cell as it's in (circular - should store OK)
+    - [x] Pure literal formulas (no UUID format needed)
+    - [x] Complex combined formula with all features
+    - [x] All absolute marker combinations in one formula
+    - [x] Range with all absolute marker combinations
+
+    **Test**: All 83 integration tests pass (53 new round-trip tests)
 
 ---
 

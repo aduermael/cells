@@ -694,5 +694,397 @@ TEST(FormulaIntegrationTest, GetSheetByNameConst) {
     EXPECT_EQ(found->name, "Sheet1");
 }
 
+// ============================================================================
+// Phase 5f.8: Comprehensive UUID round-trip test suite
+// Tests verify: A1 input → UUID storage → serialize → load → parse → A1 display
+// ============================================================================
+
+// Helper to create a larger workbook with more cells for comprehensive testing
+std::unique_ptr<Workbook> createLargeTestWorkbook() {
+    auto wb = std::make_unique<Workbook>(ID("testWBId"), "TestWorkbook");
+    auto sheet = std::make_unique<Sheet>(ID("testShId"), "Sheet1");
+
+    // Create columns A-F (positions 0-5)
+    std::vector<std::pair<const char*, int>> columns = {{"colA0001", 0}, {"colB0002", 1},
+                                                        {"colC0003", 2}, {"colD0004", 3},
+                                                        {"colE0005", 4}, {"colF0006", 5}};
+    for (const auto& [id, pos] : columns) {
+        auto col = std::make_unique<Axis>(ID(id), true);
+        col->position = pos;
+        sheet->addColumn(std::move(col));
+    }
+
+    // Create rows 1-6 (positions 0-5)
+    std::vector<std::pair<const char*, int>> rows = {{"row10001", 0}, {"row20002", 1},
+                                                     {"row30003", 2}, {"row40004", 3},
+                                                     {"row50005", 4}, {"row60006", 5}};
+    for (const auto& [id, pos] : rows) {
+        auto row = std::make_unique<Axis>(ID(id), false);
+        row->position = pos;
+        sheet->addRow(std::move(row));
+    }
+
+    // Create cells for all intersections A1-F6
+    const char* colIds[] = {"colA0001", "colB0002", "colC0003", "colD0004", "colE0005", "colF0006"};
+    const char* rowIds[] = {"row10001", "row20002", "row30003", "row40004", "row50005", "row60006"};
+
+    int cellNum = 0;
+    for (int c = 0; c < 6; c++) {
+        for (int r = 0; r < 6; r++) {
+            char cellId[16];
+            snprintf(cellId, sizeof(cellId), "cell%c%d%02d", 'A' + c, r + 1, cellNum++);
+            auto cell = std::make_unique<Cell>(ID(cellId), ID(colIds[c]), ID(rowIds[r]));
+            cell->value = CellValue(static_cast<double>((c + 1) * 10 + (r + 1)));
+            sheet->addCell(std::move(cell));
+        }
+    }
+
+    wb->addSheet(std::move(sheet));
+    return wb;
+}
+
+// Helper function to perform full round-trip test
+// Returns pair of {success, error_message}
+std::pair<bool, std::string> testFormulaRoundTrip(const std::string& formulaA1,
+                                                  const std::string& expectedDisplayA1 = "") {
+    auto wb = createLargeTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+    const std::string expected = expectedDisplayA1.empty() ? formulaA1 : expectedDisplayA1;
+
+    // Get a formula cell (E5) using column E (colE0005) and row 5 (row50005)
+    Cell* formulaCell = sheet->getCellAt(ID("colE0005"), ID("row50005"));
+    if (!formulaCell) {
+        return {false, "Could not find formula cell E5"};
+    }
+    ID formulaCellId = formulaCell->id;
+
+    // Step 1: Parse A1 input
+    FormulaParser parser(formulaA1);
+    auto ast = parser.parse();
+    if (!ast) {
+        return {false, "Parse failed for: " + formulaA1};
+    }
+
+    // Step 2: Resolve references (A1 → UUID)
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    auto resolveResult = resolver.resolve(ast.get());
+    if (!resolveResult.success) {
+        return {false, "Resolve failed: " + resolveResult.errorMessage};
+    }
+
+    // Step 3: Store with UUID format
+    auto setResult = sheet->setCellFormula(formulaCellId, formulaA1, ast.release());
+    if (!setResult.success) {
+        return {false, "setCellFormula failed"};
+    }
+
+    // Step 4: Verify stored text is UUID format
+    std::string storedFormula = sheet->getCellFormulaText(formulaCellId);
+    bool hasUuidFormat = (storedFormula.find("~~") != std::string::npos) ||
+                         (storedFormula.find("$$") != std::string::npos) ||
+                         (storedFormula.find("$~") != std::string::npos) ||
+                         (storedFormula.find("~$") != std::string::npos);
+
+    // Only check UUID format if formula has cell refs (letter followed by digit)
+    // We look for patterns like "A1", "B2", etc.
+    bool hasRefs = false;
+    for (size_t i = 0; i + 1 < formulaA1.size(); i++) {
+        char c = formulaA1[i];
+        char next = formulaA1[i + 1];
+        // Skip if we're inside a function name (letter followed by more letters or '(')
+        if (c >= 'A' && c <= 'Z' && next >= '0' && next <= '9') {
+            hasRefs = true;
+            break;
+        }
+    }
+    if (hasRefs && !hasUuidFormat) {
+        return {false, "Stored formula not in UUID format: " + storedFormula};
+    }
+
+    // Step 5: Serialize to .zcd format
+    std::string serialized = serialize(*wb);
+    if (serialized.empty()) {
+        return {false, "Serialization produced empty result"};
+    }
+
+    // Step 6: Parse back from .zcd
+    ParseResult parseResult = parse(serialized);
+    if (!parseResult.ok()) {
+        return {false, "Load from .zcd failed"};
+    }
+
+    // Step 7: Get loaded formula
+    Sheet* loadedSheet = parseResult.workbook->getSheetByIndex(0);
+    if (!loadedSheet) {
+        return {false, "Could not get loaded sheet"};
+    }
+
+    Cell* loadedCell = loadedSheet->getCell(formulaCellId);
+    if (!loadedCell || !loadedCell->isFormula()) {
+        return {false, "Loaded cell has no formula"};
+    }
+
+    Formula* loadedFormula = loadedCell->getFormula();
+    if (!loadedFormula->parse()) {
+        return {false, "Could not parse loaded formula"};
+    }
+
+    // Step 8: Convert to A1 display
+    FormulaDisplayConverter converter(*loadedSheet);
+    std::string display = converter.toDisplayString(loadedFormula->ast);
+
+    if (display != expected) {
+        return {false, "Display mismatch: expected '" + expected + "', got '" + display + "'"};
+    }
+
+    return {true, ""};
+}
+
+// Macro to simplify test definitions
+#define TEST_ROUND_TRIP(name, formula)                                                \
+    TEST(UuidRoundTripTest, name) {                                                   \
+        auto [success, error] = testFormulaRoundTrip(formula);                        \
+        EXPECT_TRUE(success) << "Round-trip failed for " << formula << ": " << error; \
+    }
+
+#define TEST_ROUND_TRIP_EXPECTED(name, formula, expected)                             \
+    TEST(UuidRoundTripTest, name) {                                                   \
+        auto [success, error] = testFormulaRoundTrip(formula, expected);              \
+        EXPECT_TRUE(success) << "Round-trip failed for " << formula << ": " << error; \
+    }
+
+// ============================================================================
+// Cell Reference Variations
+// ============================================================================
+
+TEST_ROUND_TRIP(MixedAbsoluteColAbsRowRel, "=$A1")
+TEST_ROUND_TRIP(MixedAbsoluteColRelRowAbs, "=A$1")
+TEST_ROUND_TRIP(MultipleRefsInFormula, "=A1+B1+C1+A2+B2+C2")
+TEST_ROUND_TRIP(SameCellMultipleTimes, "=A1+A1+A1")
+TEST_ROUND_TRIP(DifferentQuadrants, "=A1+F1+A6+F6")
+
+// ============================================================================
+// Range Reference Variations
+// ============================================================================
+
+TEST_ROUND_TRIP(FullyAbsoluteRange, "=SUM($A$1:$B$2)")
+TEST_ROUND_TRIP(MixedAbsoluteRange, "=SUM($A1:B$2)")
+TEST_ROUND_TRIP(SingleRowRange, "=SUM(A1:C1)")
+TEST_ROUND_TRIP(SingleColumnRange, "=SUM(A1:A3)")
+TEST_ROUND_TRIP(LargeRange, "=SUM(A1:C3)")
+
+// ============================================================================
+// All Operators with Cell Refs
+// ============================================================================
+
+TEST_ROUND_TRIP(OpAdd, "=A1+B1")
+TEST_ROUND_TRIP(OpSubtract, "=A1-B1")
+TEST_ROUND_TRIP(OpMultiply, "=A1*B1")
+TEST_ROUND_TRIP(OpDivide, "=A1/B1")
+TEST_ROUND_TRIP(OpPower, "=A1^B1")
+TEST_ROUND_TRIP(OpEqual, "=A1=B1")
+TEST_ROUND_TRIP(OpNotEqual, "=A1<>B1")
+TEST_ROUND_TRIP(OpLessThan, "=A1<B1")
+TEST_ROUND_TRIP(OpLessEqual, "=A1<=B1")
+TEST_ROUND_TRIP(OpGreaterThan, "=A1>B1")
+TEST_ROUND_TRIP(OpGreaterEqual, "=A1>=B1")
+TEST_ROUND_TRIP(OpConcat, "=A1&B1")
+TEST_ROUND_TRIP(OpUnaryMinus, "=-A1")
+TEST_ROUND_TRIP(OpUnaryPlus, "=+A1")
+TEST_ROUND_TRIP(OpPrecedence, "=A1+B1*C1")
+
+// ============================================================================
+// Complex Nested Expressions
+// ============================================================================
+
+// Note: Extra parens around division operand are dropped since (A1+B1)*C1 binds tighter than /
+TEST_ROUND_TRIP_EXPECTED(DeeplyNestedParens, "=((A1+B1)*C1)/A2", "=(A1+B1)*C1/A2")
+TEST_ROUND_TRIP(NestedFunctionCalls, "=SUM(A1,MAX(B1,C1))")
+TEST_ROUND_TRIP(FunctionWithExpressionArgs, "=IF(A1+B1>10,C1*2,0)")
+TEST_ROUND_TRIP(MultipleNestedLevels, "=IF(AND(A1>0,B1>0),SUM(C1:C3),0)")
+
+// ============================================================================
+// Literals Mixed with Refs
+// ============================================================================
+
+TEST_ROUND_TRIP(NumberLiteralAdd, "=A1+10")
+TEST_ROUND_TRIP(NumberLiteralMult, "=A1*3.14")
+TEST_ROUND_TRIP(NumberLiteralDiv, "=A1/100")
+TEST_ROUND_TRIP(StringLiteralConcat, "=A1&\"hello\"")
+TEST_ROUND_TRIP(StringLiteralPrefixSuffix, "=\"prefix\"&A1&\"suffix\"")
+TEST_ROUND_TRIP(BooleanLiteralInIf, "=IF(TRUE,A1,B1)")
+TEST_ROUND_TRIP(BooleanLiteralInAnd, "=AND(A1>0,FALSE)")
+// Note: Scientific notation formatted with explicit + sign (1.5e+10 vs 1.5e10)
+TEST_ROUND_TRIP_EXPECTED(ScientificNotation, "=A1*1.5e10", "=A1*1.5e+10")
+
+// ============================================================================
+// Function Variations
+// ============================================================================
+
+TEST_ROUND_TRIP(FuncZeroArgsNow, "=NOW()")
+TEST_ROUND_TRIP(FuncZeroArgsToday, "=TODAY()")
+TEST_ROUND_TRIP(FuncZeroArgsRand, "=RAND()")
+TEST_ROUND_TRIP(FuncSingleArgAbs, "=ABS(A1)")
+TEST_ROUND_TRIP(FuncSingleArgSqrt, "=SQRT(B1)")
+TEST_ROUND_TRIP(FuncMultiArgIf, "=IF(A1,B1,C1)")
+TEST_ROUND_TRIP(FuncMultiArgRound, "=ROUND(A1,2)")
+TEST_ROUND_TRIP(FuncVariadicSum, "=SUM(A1,B1,C1)")
+TEST_ROUND_TRIP(FuncVariadicMax, "=MAX(A1,B1,C1,A2)")
+TEST_ROUND_TRIP(FuncNestedRoundSumCount, "=ROUND(SUM(A1:B2)/COUNT(A1:B2),2)")
+
+// ============================================================================
+// Edge Cases
+// ============================================================================
+
+TEST_ROUND_TRIP(VeryLongFormula, "=A1+B1+C1+A2+B2+C2+A3+B3+C3+A4")
+TEST_ROUND_TRIP(CircularRefStorage, "=E5")  // Formula cell references itself
+
+// Test that pure literal formulas work (no cell refs, no UUID format needed)
+TEST(UuidRoundTripTest, PureLiteralFormula) {
+    auto wb = createLargeTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    Cell* formulaCell = sheet->getCellAt(ID("colE0005"), ID("row50005"));
+    ASSERT_NE(formulaCell, nullptr);
+
+    // Parse pure literal formula
+    FormulaParser parser("=1+2+3");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    sheet->setCellFormula(formulaCell->id, "=1+2+3", ast.release());
+
+    // Serialize and load
+    std::string serialized = serialize(*wb);
+    ParseResult parseResult = parse(serialized);
+    EXPECT_TRUE(parseResult.ok());
+
+    Sheet* loadedSheet = parseResult.workbook->getSheetByIndex(0);
+    Cell* loadedCell = loadedSheet->getCell(formulaCell->id);
+    ASSERT_NE(loadedCell, nullptr);
+
+    Formula* loadedFormula = loadedCell->getFormula();
+    EXPECT_TRUE(loadedFormula->parse());
+
+    FormulaDisplayConverter converter(*loadedSheet);
+    std::string display = converter.toDisplayString(loadedFormula->ast);
+    EXPECT_EQ(display, "=1+2+3");
+}
+
+// Test complex combined formula
+TEST(UuidRoundTripTest, ComplexCombined) {
+    auto wb = createLargeTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    Cell* formulaCell = sheet->getCellAt(ID("colE0005"), ID("row50005"));
+    ASSERT_NE(formulaCell, nullptr);
+
+    const std::string formula = "=IF(SUM($A$1:$B$2)>100,MAX(C1,C2,C3)*1.5,MIN(A1:A3)/2)";
+
+    FormulaParser parser(formula);
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    auto resolveResult = resolver.resolve(ast.get());
+    EXPECT_TRUE(resolveResult.success);
+
+    sheet->setCellFormula(formulaCell->id, formula, ast.release());
+
+    std::string serialized = serialize(*wb);
+    ParseResult parseResult = parse(serialized);
+    EXPECT_TRUE(parseResult.ok());
+
+    Sheet* loadedSheet = parseResult.workbook->getSheetByIndex(0);
+    Cell* loadedCell = loadedSheet->getCell(formulaCell->id);
+
+    Formula* loadedFormula = loadedCell->getFormula();
+    EXPECT_TRUE(loadedFormula->parse());
+
+    FormulaDisplayConverter converter(*loadedSheet);
+    std::string display = converter.toDisplayString(loadedFormula->ast);
+    EXPECT_EQ(display, formula);
+}
+
+// Test all absolute marker combinations in one formula
+TEST(UuidRoundTripTest, AllAbsoluteMarkerCombinations) {
+    auto wb = createLargeTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    Cell* formulaCell = sheet->getCellAt(ID("colE0005"), ID("row50005"));
+    ASSERT_NE(formulaCell, nullptr);
+
+    // A1 (rel/rel), $B$1 (abs/abs), $C1 (abs/rel), D$1 (rel/abs)
+    const std::string formula = "=A1+$B$1+$C1+D$1";
+
+    FormulaParser parser(formula);
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    sheet->setCellFormula(formulaCell->id, formula, ast.release());
+
+    // Verify stored format has all marker types
+    std::string storedFormula = sheet->getCellFormulaText(formulaCell->id);
+    EXPECT_TRUE(storedFormula.find("~~") != std::string::npos) << "Missing ~~ marker";
+    EXPECT_TRUE(storedFormula.find("$$") != std::string::npos) << "Missing $$ marker";
+    EXPECT_TRUE(storedFormula.find("$~") != std::string::npos) << "Missing $~ marker";
+    EXPECT_TRUE(storedFormula.find("~$") != std::string::npos) << "Missing ~$ marker";
+
+    std::string serialized = serialize(*wb);
+    ParseResult parseResult = parse(serialized);
+    EXPECT_TRUE(parseResult.ok());
+
+    Sheet* loadedSheet = parseResult.workbook->getSheetByIndex(0);
+    Cell* loadedCell = loadedSheet->getCell(formulaCell->id);
+
+    Formula* loadedFormula = loadedCell->getFormula();
+    EXPECT_TRUE(loadedFormula->parse());
+
+    FormulaDisplayConverter converter(*loadedSheet);
+    std::string display = converter.toDisplayString(loadedFormula->ast);
+    EXPECT_EQ(display, formula);
+}
+
+// Test range with all absolute marker combinations
+TEST(UuidRoundTripTest, RangeAbsoluteMarkerCombinations) {
+    auto wb = createLargeTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    Cell* formulaCell = sheet->getCellAt(ID("colE0005"), ID("row50005"));
+    ASSERT_NE(formulaCell, nullptr);
+
+    // Range with mixed absolute markers: $A1:B$3
+    const std::string formula = "=SUM($A1:B$3)";
+
+    FormulaParser parser(formula);
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    sheet->setCellFormula(formulaCell->id, formula, ast.release());
+
+    std::string serialized = serialize(*wb);
+    ParseResult parseResult = parse(serialized);
+    EXPECT_TRUE(parseResult.ok());
+
+    Sheet* loadedSheet = parseResult.workbook->getSheetByIndex(0);
+    Cell* loadedCell = loadedSheet->getCell(formulaCell->id);
+
+    Formula* loadedFormula = loadedCell->getFormula();
+    EXPECT_TRUE(loadedFormula->parse());
+
+    FormulaDisplayConverter converter(*loadedSheet);
+    std::string display = converter.toDisplayString(loadedFormula->ast);
+    EXPECT_EQ(display, formula);
+}
+
 }  // namespace
 }  // namespace cells
