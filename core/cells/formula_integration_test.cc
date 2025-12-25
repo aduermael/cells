@@ -510,6 +510,167 @@ TEST(FormulaIntegrationTest, SerializationWithMultipleFormulas) {
 }
 
 // ============================================================================
+// UUID format load/save round-trip tests (5f.6)
+// ============================================================================
+
+TEST(FormulaIntegrationTest, UuidFormatSerializationRoundTrip) {
+    auto wb = createTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    // Parse and resolve a formula to get UUID-format AST
+    FormulaParser parser("=A1+B1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    auto resolveResult = resolver.resolve(ast.get());
+    EXPECT_TRUE(resolveResult.success);
+
+    // Set formula with resolved AST - this stores UUID format
+    auto result = sheet->setCellFormula(ID("cellC101"), "=A1+B1", ast.release());
+    EXPECT_TRUE(result.success);
+
+    // Verify stored text is UUID format
+    std::string storedBefore = sheet->getCellFormulaText(ID("cellC101"));
+    EXPECT_TRUE(storedBefore.find("~~") != std::string::npos)
+        << "Pre-serialize: expected UUID format, got: " << storedBefore;
+
+    // Serialize to .zcd format
+    std::string serialized = serialize(*wb);
+    EXPECT_FALSE(serialized.empty());
+
+    // Verify serialized format contains UUID refs
+    EXPECT_TRUE(serialized.find("~~") != std::string::npos)
+        << "Serialized: expected UUID format in file, got: " << serialized;
+
+    // Parse back from .zcd
+    ParseResult parseResult = parse(serialized);
+    EXPECT_TRUE(parseResult.ok()) << "Parse failed: "
+                                  << (parseResult.error ? parseResult.error->toString()
+                                                        : "unknown");
+    ASSERT_NE(parseResult.workbook, nullptr);
+
+    // Get the loaded formula
+    Sheet* loadedSheet = parseResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(loadedSheet, nullptr);
+
+    Cell* loadedCell = loadedSheet->getCell(ID("cellC101"));
+    ASSERT_NE(loadedCell, nullptr);
+    EXPECT_TRUE(loadedCell->isFormula());
+
+    Formula* loadedFormula = loadedCell->getFormula();
+    ASSERT_NE(loadedFormula, nullptr);
+
+    // Verify loaded formula text is still UUID format
+    EXPECT_TRUE(std::string(loadedFormula->text).find("~~") != std::string::npos)
+        << "Loaded formula should be UUID format, got: " << loadedFormula->text;
+
+    // Parse the loaded formula to get AST
+    EXPECT_TRUE(loadedFormula->parse());
+    ASSERT_NE(loadedFormula->ast, nullptr);
+
+    // Convert the loaded AST to display format - should show A1 notation
+    FormulaDisplayConverter converter(*loadedSheet);
+    std::string display = converter.toDisplayString(loadedFormula->ast);
+    EXPECT_EQ(display, "=A1+B1") << "Display should be A1 notation, got: " << display;
+}
+
+TEST(FormulaIntegrationTest, UuidFormatAbsoluteRefRoundTrip) {
+    auto wb = createTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    // Parse formula with absolute refs
+    FormulaParser parser("=$A$1+B$2");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    sheet->setCellFormula(ID("cellC101"), "=$A$1+B$2", ast.release());
+
+    // Verify serialized contains various absolute markers
+    std::string serialized = serialize(*wb);
+    // $$ for both absolute, ~$ for row absolute
+    EXPECT_TRUE(serialized.find("$$") != std::string::npos)
+        << "Expected $$ for absolute ref, got: " << serialized;
+
+    // Parse back and display
+    ParseResult parseResult = parse(serialized);
+    EXPECT_TRUE(parseResult.ok());
+
+    Sheet* loadedSheet = parseResult.workbook->getSheetByIndex(0);
+    Cell* loadedCell = loadedSheet->getCell(ID("cellC101"));
+    ASSERT_NE(loadedCell, nullptr);
+
+    Formula* loadedFormula = loadedCell->getFormula();
+    EXPECT_TRUE(loadedFormula->parse());
+
+    FormulaDisplayConverter converter(*loadedSheet);
+    std::string display = converter.toDisplayString(loadedFormula->ast);
+    EXPECT_EQ(display, "=$A$1+B$2");
+}
+
+TEST(FormulaIntegrationTest, UuidFormatRangeRefRoundTrip) {
+    auto wb = createTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    // Parse formula with range ref
+    FormulaParser parser("=SUM(A1:B2)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    sheet->setCellFormula(ID("cellC101"), "=SUM(A1:B2)", ast.release());
+
+    // Serialize and parse back
+    std::string serialized = serialize(*wb);
+    ParseResult parseResult = parse(serialized);
+    EXPECT_TRUE(parseResult.ok());
+
+    Sheet* loadedSheet = parseResult.workbook->getSheetByIndex(0);
+    Cell* loadedCell = loadedSheet->getCell(ID("cellC101"));
+    ASSERT_NE(loadedCell, nullptr);
+
+    Formula* loadedFormula = loadedCell->getFormula();
+    EXPECT_TRUE(loadedFormula->parse());
+
+    FormulaDisplayConverter converter(*loadedSheet);
+    std::string display = converter.toDisplayString(loadedFormula->ast);
+    EXPECT_EQ(display, "=SUM(A1:B2)");
+}
+
+TEST(FormulaIntegrationTest, UuidFormatFunctionCallRoundTrip) {
+    auto wb = createTestWorkbook();
+    Sheet* sheet = wb->getSheetByIndex(0);
+
+    // Parse formula with nested function call
+    FormulaParser parser("=IF(A1>0,B1,0)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
+    resolver.resolve(ast.get());
+
+    sheet->setCellFormula(ID("cellC101"), "=IF(A1>0,B1,0)", ast.release());
+
+    std::string serialized = serialize(*wb);
+    ParseResult parseResult = parse(serialized);
+    EXPECT_TRUE(parseResult.ok());
+
+    Sheet* loadedSheet = parseResult.workbook->getSheetByIndex(0);
+    Cell* loadedCell = loadedSheet->getCell(ID("cellC101"));
+    Formula* loadedFormula = loadedCell->getFormula();
+    EXPECT_TRUE(loadedFormula->parse());
+
+    FormulaDisplayConverter converter(*loadedSheet);
+    std::string display = converter.toDisplayString(loadedFormula->ast);
+    EXPECT_EQ(display, "=IF(A1>0,B1,0)");
+}
+
+// ============================================================================
 // Workbook::getSheetByName tests
 // ============================================================================
 

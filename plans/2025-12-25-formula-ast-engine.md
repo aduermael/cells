@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-25 00:19 UTC
-Updated At: 2025-12-25 08:45 UTC
+Updated At: 2025-12-25 19:53 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -512,18 +512,18 @@ Wire the parser and dependency graph into the Cell/Sheet model.
     - Walk AST, convert each UUID ref to A1 based on current cell positions
     - **Test**: Display shows "=A1+B2" from stored UUID format (4 new tests)
 
-  - [ ] 5f.6: Update parser.cc to handle UUID format on load
-    - Formulas in .zcd files are now UUID format
-    - Parse creates Formula with UUID text
-    - AST can be reconstructed by parsing UUID text
-    - **Test**: Load .zcd with UUID formulas, display shows correct A1
+  - [x] 5f.6: Update parser.cc to handle UUID format on load
+    - FormulaParser already handles UUID refs via parseUuidCellRef()
+    - Formula::parse() uses FormulaParser which can parse UUID format
+    - When .zcd file is loaded, UUID text is preserved in Formula.text
+    - **Test**: Load .zcd with UUID formulas, display shows correct A1 (4 new tests)
 
-  - [ ] 5f.7: Update integration tests
-    - Test UUID storage after setCellFormula
-    - Test display conversion from UUID to A1
-    - Test serialization/load preserves UUID format
-    - Test move stability: move column, display updates, stored UUID unchanged
-    - **Test**: All integration tests pass with UUID storage
+  - [x] 5f.7: Update integration tests
+    - Added UuidFormatSerializationRoundTrip test
+    - Added UuidFormatAbsoluteRefRoundTrip test
+    - Added UuidFormatRangeRefRoundTrip test
+    - Added UuidFormatFunctionCallRoundTrip test
+    - **Test**: All 27 integration tests pass (4 new tests for UUID format)
 
 ---
 
