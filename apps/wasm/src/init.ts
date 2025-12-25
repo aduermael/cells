@@ -238,6 +238,27 @@ export function initApp(): AppContext {
       }
     }
     elements.formulaInput.placeholder = "";
+
+    // Show formula highlights when a formula cell is selected (not editing)
+    // This allows users to see what cells a formula references just by clicking on it
+    if (!cellEditor.isEditing() && !formulaBarEditor.isEditingFormulaBar()) {
+      const cell = getCellAt(
+        app.selectedCell.col,
+        app.selectedCell.row,
+        app.cells
+      );
+      const formulaValue = cell?.formula || "";
+      if (formulaValue.startsWith("=")) {
+        // Cell has a formula - show highlights
+        updateFormulaHighlights(formulaValue);
+      } else {
+        // Not a formula cell - clear any existing highlights
+        if (app.formulaHighlights.length > 0) {
+          app.formulaHighlights = [];
+          render();
+        }
+      }
+    }
   }
 
   // =========================================================================

@@ -688,11 +688,13 @@ Expose C++ formula functionality to the TypeScript web UI via WASM bindings. The
 
 Address issues found during Phase 7d testing and ensure rock-solid foundation before moving to calculation engine.
 
-### 8a: Show highlights when selecting a formula cell (not just while editing)
-- [ ] When a cell with a formula is selected (not editing), show dependency highlights
-- [ ] Parse the formula and highlight referenced cells immediately on selection
-- [ ] Clear highlights when selecting a non-formula cell
-- [ ] **Test**: Select formula cell → highlights visible; select empty cell → no highlights
+### 8a: Show highlights when selecting a formula cell (not just while editing) ✅
+- [x] When a cell with a formula is selected (not editing), show dependency highlights
+- [x] Parse the formula and highlight referenced cells immediately on selection
+- [x] Clear highlights when selecting a non-formula cell
+- [x] **Test**: Select formula cell → highlights visible; select empty cell → no highlights
+- Implementation: Modified `updateFormulaBar()` in `init.ts` to call `updateFormulaHighlights()`
+  with the cell's formula when a formula cell is selected (not in editing mode)
 
 ### 8b: Create cells on-demand when referenced in formulas
 - [ ] When typing a formula reference like `=A2`, create the referenced cell UUID immediately if it doesn't exist
