@@ -10,7 +10,7 @@ import type {
   RowInfo,
   Position,
 } from "./types";
-import { GridRenderer } from "./grid-renderer";
+import { GridRenderer, type FormulaHighlight } from "./grid-renderer";
 import { WasmDataSource } from "./wasm-data-source";
 import { createUIStateMachine, UIState, type UIStateMachine } from "./ui-state";
 import { CollabUI } from "./collab-ui";
@@ -221,6 +221,13 @@ export class App {
   dragSheetTargetIndex: number = -1;
 
   // =========================================================================
+  // Formula Highlighting State
+  // =========================================================================
+
+  /** Formula reference highlights for the grid */
+  formulaHighlights: FormulaHighlight[] = [];
+
+  // =========================================================================
   // Constructor
   // =========================================================================
 
@@ -351,6 +358,12 @@ export class App {
     this.scrollX = 0;
     this.scrollY = 0;
     this.resetSelection();
+    this.formulaHighlights = [];
+  }
+
+  /** Clear formula highlights (when editing stops) */
+  clearFormulaHighlights(): void {
+    this.formulaHighlights = [];
   }
 }
 

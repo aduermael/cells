@@ -129,3 +129,78 @@ export interface ASTNode {
   type: string;
   [key: string]: unknown;
 }
+
+// ============================================================================
+// Formula API Types (Phase 7d)
+// ============================================================================
+
+/** Reference type for formula dependencies */
+export type RefType =
+  | "cell"
+  | "range"
+  | "column"
+  | "row"
+  | "columnRange"
+  | "rowRange"
+  | "named";
+
+/** Reference info for formula highlighting - with positions for display */
+export interface ReferenceInfo {
+  type: RefType;
+  cellId?: string;
+  topLeftCellId?: string;
+  bottomRightCellId?: string;
+  axisId?: string;
+  startAxisId?: string;
+  endAxisId?: string;
+  name?: string; // For named refs
+  sheetId?: string; // For cross-sheet refs
+  sourceStart: number; // Start position in formula text
+  sourceEnd: number; // End position in formula text
+  // Resolved positions for rendering (added by UI after resolution)
+  col?: number;
+  row?: number;
+  startCol?: number;
+  startRow?: number;
+  endCol?: number;
+  endRow?: number;
+}
+
+/** Response from getFormulaReferences / getReferencesFromPartial */
+export interface FormulaReferencesResult {
+  references: ReferenceInfo[];
+  error?: string;
+}
+
+/** Response from validateFormula */
+export interface ValidateFormulaResult {
+  formula: string;
+  valid: boolean;
+  errors: string[];
+  rootType: string | null;
+}
+
+/** Response from detectCircularRef */
+export interface CircularRefResult {
+  hasCycle: boolean;
+  cycle: string[]; // Array of cell IDs forming the cycle
+  error?: string;
+}
+
+/** Response from getVolatileCells */
+export interface VolatileCellsResult {
+  volatileCells: string[]; // Array of cell IDs
+  error?: string;
+}
+
+/** Response from getCellDependencies */
+export interface CellDependenciesResult {
+  dependencies: ReferenceInfo[];
+  error?: string;
+}
+
+/** Response from getCellDependents */
+export interface CellDependentsResult {
+  dependents: string[]; // Array of cell IDs
+  error?: string;
+}

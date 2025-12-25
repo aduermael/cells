@@ -22,10 +22,27 @@ import type {
   SyncStateResult,
   RemotePresencesResult,
   FormulaParseResult,
+  FormulaReferencesResult,
+  ValidateFormulaResult,
+  CircularRefResult,
+  VolatileCellsResult,
+  CellDependenciesResult,
+  CellDependentsResult,
 } from "./client-types";
 
 // Re-export types for external consumers
-export type { FormulaParseResult, ASTNode } from "./client-types";
+export type {
+  FormulaParseResult,
+  ASTNode,
+  FormulaReferencesResult,
+  ValidateFormulaResult,
+  CircularRefResult,
+  VolatileCellsResult,
+  CellDependenciesResult,
+  CellDependentsResult,
+  ReferenceInfo,
+  RefType,
+} from "./client-types";
 
 /**
  * CellsClient - Communicates with the WASM worker
@@ -543,5 +560,47 @@ export class CellsClient {
   async debugParseFormula(formulaText: string): Promise<FormulaParseResult> {
     const response = await this._send("debugParseFormula", { formulaText });
     return JSON.parse(response.result as string) as FormulaParseResult;
+  }
+
+  // ========== Formula API (Phase 7) ==========
+
+  async validateFormula(formulaText: string): Promise<ValidateFormulaResult> {
+    const response = await this._send("validateFormula", { formulaText });
+    return JSON.parse(response.result as string) as ValidateFormulaResult;
+  }
+
+  async getFormulaDisplay(cellId: string): Promise<string> {
+    const response = await this._send("getFormulaDisplay", { cellId });
+    return response.result as string;
+  }
+
+  async getCellDependencies(cellId: string): Promise<CellDependenciesResult> {
+    const response = await this._send("getCellDependencies", { cellId });
+    return JSON.parse(response.result as string) as CellDependenciesResult;
+  }
+
+  async getCellDependents(cellId: string): Promise<CellDependentsResult> {
+    const response = await this._send("getCellDependents", { cellId });
+    return JSON.parse(response.result as string) as CellDependentsResult;
+  }
+
+  async getFormulaReferences(formulaText: string): Promise<FormulaReferencesResult> {
+    const response = await this._send("getFormulaReferences", { formulaText });
+    return JSON.parse(response.result as string) as FormulaReferencesResult;
+  }
+
+  async getReferencesFromPartial(formulaText: string): Promise<FormulaReferencesResult> {
+    const response = await this._send("getReferencesFromPartial", { formulaText });
+    return JSON.parse(response.result as string) as FormulaReferencesResult;
+  }
+
+  async detectCircularRef(cellId: string): Promise<CircularRefResult> {
+    const response = await this._send("detectCircularRef", { cellId });
+    return JSON.parse(response.result as string) as CircularRefResult;
+  }
+
+  async getVolatileCells(): Promise<VolatileCellsResult> {
+    const response = await this._send("getVolatileCells");
+    return JSON.parse(response.result as string) as VolatileCellsResult;
   }
 }

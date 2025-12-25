@@ -120,6 +120,16 @@ interface CellsEngine {
 
   // Debug/Development
   debugParseFormula(formulaText: string): string;
+
+  // Formula API (Phase 7)
+  validateFormula(formulaText: string): string;
+  getFormulaDisplay(cellId: string): string;
+  getCellDependencies(cellId: string): string;
+  getCellDependents(cellId: string): string;
+  getFormulaReferences(formulaText: string): string;
+  getReferencesFromPartial(formulaText: string): string;
+  detectCircularRef(cellId: string): string;
+  getVolatileCells(): string;
 }
 
 /** Factory function type for WASM module initialization */
@@ -924,6 +934,65 @@ function handleMessage(msg: WorkerRequest): void {
         const { formulaText } = params as { formulaText: string };
         const result = engine.debugParseFormula(formulaText);
         respond({ type: "formulaParsed", result });
+        break;
+      }
+
+      // ================================================================
+      // Formula API (Phase 7)
+      // ================================================================
+
+      case "validateFormula": {
+        const { formulaText } = params as { formulaText: string };
+        const result = engine.validateFormula(formulaText);
+        respond({ type: "formulaValidated", result });
+        break;
+      }
+
+      case "getFormulaDisplay": {
+        const { cellId } = params as { cellId: string };
+        const result = engine.getFormulaDisplay(cellId);
+        respond({ type: "formulaDisplay", result });
+        break;
+      }
+
+      case "getCellDependencies": {
+        const { cellId } = params as { cellId: string };
+        const result = engine.getCellDependencies(cellId);
+        respond({ type: "cellDependencies", result });
+        break;
+      }
+
+      case "getCellDependents": {
+        const { cellId } = params as { cellId: string };
+        const result = engine.getCellDependents(cellId);
+        respond({ type: "cellDependents", result });
+        break;
+      }
+
+      case "getFormulaReferences": {
+        const { formulaText } = params as { formulaText: string };
+        const result = engine.getFormulaReferences(formulaText);
+        respond({ type: "formulaReferences", result });
+        break;
+      }
+
+      case "getReferencesFromPartial": {
+        const { formulaText } = params as { formulaText: string };
+        const result = engine.getReferencesFromPartial(formulaText);
+        respond({ type: "formulaReferences", result });
+        break;
+      }
+
+      case "detectCircularRef": {
+        const { cellId } = params as { cellId: string };
+        const result = engine.detectCircularRef(cellId);
+        respond({ type: "circularRef", result });
+        break;
+      }
+
+      case "getVolatileCells": {
+        const result = engine.getVolatileCells();
+        respond({ type: "volatileCells", result });
         break;
       }
 

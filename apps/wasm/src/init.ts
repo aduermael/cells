@@ -25,7 +25,9 @@ import {
 import {
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
+  type FormulaHighlight,
 } from "./grid-renderer";
+import type { ReferenceInfo } from "./client-types";
 
 // =============================================================================
 // Types
@@ -118,6 +120,7 @@ export function initApp(): AppContext {
       editingColumnIndex: app.isEditingColumnHeader()
         ? app.editingColumnIndex
         : -1,
+      formulaHighlights: app.formulaHighlights,
     });
   }
 
@@ -235,6 +238,130 @@ export function initApp(): AppContext {
       }
     }
     elements.formulaInput.placeholder = "";
+  }
+
+  // =========================================================================
+  // Formula highlighting
+  // =========================================================================
+
+  /**
+   * Convert a reference position (cellId) to col/row coordinates
+   * by looking up the cell in the current viewport data.
+   */
+  function getCellPosition(cellId: string): { col: number; row: number } | null {
+    // Look up cell in current cells array
+    const cell = app.cells.find((c) => c.id === cellId);
+    if (cell) {
+      return { col: cell.col, row: cell.row };
+    }
+    // If not in viewport, we can't highlight it (for now)
+    return null;
+  }
+
+  /**
+   * Convert ReferenceInfo from WASM to FormulaHighlight for rendering.
+   * This resolves cell UUIDs to col/row positions.
+   */
+  function referenceToHighlight(
+    ref: ReferenceInfo,
+    colorIndex: number
+  ): FormulaHighlight | null {
+    switch (ref.type) {
+      case "cell":
+        if (ref.cellId) {
+          const pos = getCellPosition(ref.cellId);
+          if (pos) {
+            return {
+              type: "cell",
+              colorIndex,
+              col: pos.col,
+              row: pos.row,
+              sourceStart: ref.sourceStart,
+              sourceEnd: ref.sourceEnd,
+            };
+          }
+        }
+        break;
+
+      case "range":
+        if (ref.topLeftCellId && ref.bottomRightCellId) {
+          const topLeft = getCellPosition(ref.topLeftCellId);
+          const bottomRight = getCellPosition(ref.bottomRightCellId);
+          if (topLeft && bottomRight) {
+            return {
+              type: "range",
+              colorIndex,
+              startCol: topLeft.col,
+              startRow: topLeft.row,
+              endCol: bottomRight.col,
+              endRow: bottomRight.row,
+              sourceStart: ref.sourceStart,
+              sourceEnd: ref.sourceEnd,
+            };
+          }
+        }
+        break;
+
+      case "column":
+        // Column refs highlight the entire column - need axis lookup
+        // For now, we'll skip these since they require axis position lookup
+        break;
+
+      case "row":
+        // Row refs highlight the entire row - need axis lookup
+        // For now, we'll skip these since they require axis position lookup
+        break;
+    }
+    return null;
+  }
+
+  /**
+   * Update formula highlights based on formula text.
+   * Called live as user types in formula bar.
+   */
+  async function updateFormulaHighlights(value: string): Promise<void> {
+    // Clear highlights if not editing or empty value
+    if (!value || !value.startsWith("=")) {
+      app.formulaHighlights = [];
+      render();
+      return;
+    }
+
+    // Need a data source to call WASM
+    if (!app.dataSource) {
+      app.formulaHighlights = [];
+      return;
+    }
+
+    try {
+      // Get references from partial formula (handles incomplete formulas)
+      const result = await app.dataSource.client.getReferencesFromPartial(value);
+
+      if (result.error) {
+        console.warn("Formula parse error:", result.error);
+        app.formulaHighlights = [];
+        render();
+        return;
+      }
+
+      // Convert references to highlights
+      const highlights: FormulaHighlight[] = [];
+      for (let i = 0; i < result.references.length; i++) {
+        const ref = result.references[i];
+        if (!ref) continue;
+        const highlight = referenceToHighlight(ref, i);
+        if (highlight) {
+          highlights.push(highlight);
+        }
+      }
+
+      app.formulaHighlights = highlights;
+      render();
+    } catch (e) {
+      console.warn("Error updating formula highlights:", e);
+      app.formulaHighlights = [];
+      render();
+    }
   }
 
   // =========================================================================
@@ -469,6 +596,7 @@ export function initApp(): AppContext {
     onUpdateFormulaBar: updateFormulaBar,
     onSetSelection: setSelection,
     onUpdateAstDebugPanel: (value) => astDebugPanel.update(value),
+    onUpdateFormulaHighlights: updateFormulaHighlights,
     isEditing: () => cellEditor.isEditing(),
   });
 

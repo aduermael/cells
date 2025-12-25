@@ -286,6 +286,7 @@ export class FormulaBarEditor {
     end: Position
   ) => void;
   private onUpdateAstDebugPanel: (value: string) => void;
+  private onUpdateFormulaHighlights: (value: string) => void;
   private isEditing: () => boolean;
 
   // =========================================================================
@@ -307,6 +308,7 @@ export class FormulaBarEditor {
     onUpdateFormulaBar: () => void;
     onSetSelection: (cell: Position, start: Position, end: Position) => void;
     onUpdateAstDebugPanel: (value: string) => void;
+    onUpdateFormulaHighlights: (value: string) => void;
     isEditing: () => boolean;
   }) {
     this.uiStateMachine = config.uiStateMachine;
@@ -323,6 +325,7 @@ export class FormulaBarEditor {
     this.onUpdateFormulaBar = config.onUpdateFormulaBar;
     this.onSetSelection = config.onSetSelection;
     this.onUpdateAstDebugPanel = config.onUpdateAstDebugPanel;
+    this.onUpdateFormulaHighlights = config.onUpdateFormulaHighlights;
     this.isEditing = config.isEditing;
 
     this.setupEventListeners();
@@ -404,6 +407,8 @@ export class FormulaBarEditor {
     // Hide cell editor if it was showing during formula bar editing
     this.cellEditorInput.style.display = "none";
     this.cellEditorInput.value = "";
+    // Clear formula highlights
+    this.onUpdateFormulaHighlights("");
     // Clear ephemeral editing state
     if (this.syncAdapter) {
       this.syncAdapter.clearEditing();
@@ -419,6 +424,8 @@ export class FormulaBarEditor {
     // Hide cell editor if it was showing during formula bar editing
     this.cellEditorInput.style.display = "none";
     this.cellEditorInput.value = "";
+    // Clear formula highlights
+    this.onUpdateFormulaHighlights("");
     // Clear ephemeral editing state
     if (this.syncAdapter) {
       this.syncAdapter.clearEditing();
@@ -540,6 +547,9 @@ export class FormulaBarEditor {
     this.formulaInput.addEventListener("input", () => {
       // Update AST debug panel live as user types
       this.onUpdateAstDebugPanel(this.formulaInput.value);
+
+      // Update formula reference highlights live as user types
+      this.onUpdateFormulaHighlights(this.formulaInput.value);
 
       if (!this.isEditingFormulaBar()) return;
 

@@ -12,6 +12,7 @@ import {
   type NormalizedRange,
   type RemotePresenceRender,
   type GridRendererState,
+  type FormulaHighlight,
 } from "./grid-constants.js";
 import { drawRemotePresence } from "./grid-presence-renderer.js";
 import {
@@ -29,6 +30,7 @@ import {
   getColumnHeaderText,
   type HeaderRendererState,
 } from "./grid-header-renderer.js";
+import { drawFormulaHighlights } from "./grid-formula-renderer.js";
 
 // Re-export constants and types for backwards compatibility
 export {
@@ -40,9 +42,12 @@ export {
   PRIMARY_COLOR,
   SECONDARY_COLOR,
   COLORS,
+  FORMULA_REF_COLORS,
+  FORMULA_ERROR_COLOR,
   type NormalizedRange,
   type RemotePresenceRender,
   type GridRendererState,
+  type FormulaHighlight,
 } from "./grid-constants.js";
 
 /**
@@ -87,6 +92,9 @@ export class GridRenderer {
 
   // Remote presence state
   remotePresence: RemotePresenceRender[] = [];
+
+  // Formula reference highlights state
+  formulaHighlights: FormulaHighlight[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -210,6 +218,18 @@ export class GridRenderer {
 
     // Cell values
     this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+
+    // Formula reference highlights (drawn before selection so selection appears on top)
+    if (this.formulaHighlights.length > 0) {
+      const formulaState = {
+        scrollX: this.scrollX,
+        scrollY: this.scrollY,
+        colWidths: this.colWidths,
+        rowHeights: this.rowHeights,
+        formulaHighlights: this.formulaHighlights,
+      };
+      drawFormulaHighlights(ctx, formulaState, viewWidth, viewHeight);
+    }
 
     // Column/row selection highlights
     if (this.selectedColumn !== null && !this.isDraggingColumn) {

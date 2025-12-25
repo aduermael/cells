@@ -34,6 +34,25 @@ export const COLORS = {
   cornerBg: "#e9ecef",
 } as const;
 
+// Formula reference highlight colors (like Numbers/Excel)
+// Each reference in a formula gets a unique color for visual identification
+export const FORMULA_REF_COLORS = [
+  { border: "#4285f4", bg: "rgba(66, 133, 244, 0.15)" }, // Blue
+  { border: "#ea4335", bg: "rgba(234, 67, 53, 0.15)" }, // Red
+  { border: "#fbbc04", bg: "rgba(251, 188, 4, 0.15)" }, // Yellow
+  { border: "#34a853", bg: "rgba(52, 168, 83, 0.15)" }, // Green
+  { border: "#ff6d00", bg: "rgba(255, 109, 0, 0.15)" }, // Orange
+  { border: "#ab47bc", bg: "rgba(171, 71, 188, 0.15)" }, // Purple
+  { border: "#00acc1", bg: "rgba(0, 172, 193, 0.15)" }, // Cyan
+  { border: "#8d6e63", bg: "rgba(141, 110, 99, 0.15)" }, // Brown
+] as const;
+
+// Error highlight color for invalid references
+export const FORMULA_ERROR_COLOR = {
+  border: "#d32f2f",
+  bg: "rgba(211, 47, 47, 0.15)",
+} as const;
+
 // Remote presence label styling
 export const PRESENCE_LABEL_FONT =
   '10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
@@ -46,6 +65,24 @@ export interface NormalizedRange {
   maxCol: number;
   minRow: number;
   maxRow: number;
+}
+
+/** Formula reference highlight for rendering */
+export interface FormulaHighlight {
+  type: "cell" | "range" | "column" | "row";
+  colorIndex: number; // Index into FORMULA_REF_COLORS array
+  isError?: boolean; // Use error color instead
+  // For cell references
+  col?: number;
+  row?: number;
+  // For range references
+  startCol?: number;
+  startRow?: number;
+  endCol?: number;
+  endRow?: number;
+  // Source position in formula text (for text highlighting)
+  sourceStart: number;
+  sourceEnd: number;
 }
 
 /** Remote presence data for rendering */
@@ -88,4 +125,5 @@ export interface GridRendererState {
   resizePreviewY?: number;
   editingColumnIndex?: number;
   remotePresence?: RemotePresenceRender[];
+  formulaHighlights?: FormulaHighlight[];
 }
