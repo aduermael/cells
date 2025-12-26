@@ -43,8 +43,11 @@ EvalResult fn_PERCENTILE_INC(const std::vector<const ASTNode*>& args, EvalContex
 // k must be between 0 and 1 (exclusive)
 EvalResult fn_PERCENTILE_EXC(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// Forward declaration
+class FunctionRegistry;
+
 // Register statistics functions with the registry
-void registerStatsFunctions();
+void registerStatsFunctions(FunctionRegistry& registry);
 
 }  // namespace cells
 

@@ -65,9 +65,7 @@ EvalResult fn_RANDBETWEEN(const std::vector<const ASTNode*>& args, EvalContext& 
     return EvalResult::Number(static_cast<double>(dist(getRandomGenerator())));
 }
 
-void registerRandFunctions() {
-    FunctionRegistry& registry = FunctionRegistry::instance();
-
+void registerRandFunctions(FunctionRegistry& registry) {
     // Register as volatile functions - they recalculate on every sheet change
     registry.registerFunction("RAND", fn_RAND, true);
     registry.registerFunction("RANDBETWEEN", fn_RANDBETWEEN, true);

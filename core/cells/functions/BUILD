@@ -1,39 +1,36 @@
 # Individual formula function implementations
-# Each function is in its own file for maintainability
+# Source files exported for inclusion in //core/cells:formula_eval
 
-cc_library(
-    name = "fn_rand",
-    srcs = ["fn_rand.cc"],
-    hdrs = ["fn_rand.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//core/cells:formula_ast",
-        "//core/cells:formula_eval",
-    ],
-)
+package(default_visibility = ["//core/cells:__pkg__"])
+
+# Export source files for inclusion in formula_eval
+exports_files([
+    "fn_datetime.cc",
+    "fn_datetime.h",
+    "fn_logic.cc",
+    "fn_logic.h",
+    "fn_lookup.cc",
+    "fn_lookup.h",
+    "fn_math.cc",
+    "fn_math.h",
+    "fn_rand.cc",
+    "fn_rand.h",
+    "fn_stats.cc",
+    "fn_stats.h",
+    "fn_text.cc",
+    "fn_text.h",
+])
 
 cc_test(
     name = "fn_rand_test",
     srcs = ["fn_rand_test.cc"],
     deps = [
-        ":fn_rand",
         "//core/cells:formula_eval",
         "//core/cells:formula_parser",
         "//core/cells:formula_resolver",
         "//core/cells:id",
         "//core/cells:model",
         "@googletest//:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "fn_stats",
-    srcs = ["fn_stats.cc"],
-    hdrs = ["fn_stats.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//core/cells:formula_ast",
-        "//core/cells:formula_eval",
     ],
 )
 
@@ -41,25 +38,12 @@ cc_test(
     name = "fn_stats_test",
     srcs = ["fn_stats_test.cc"],
     deps = [
-        ":fn_stats",
         "//core/cells:formula_eval",
         "//core/cells:formula_parser",
         "//core/cells:formula_resolver",
         "//core/cells:id",
         "//core/cells:model",
         "@googletest//:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "fn_lookup",
-    srcs = ["fn_lookup.cc"],
-    hdrs = ["fn_lookup.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        "//core/cells:formula_ast",
-        "//core/cells:formula_eval",
-        "//core/cells:model",
     ],
 )
 
@@ -67,23 +51,11 @@ cc_test(
     name = "fn_lookup_test",
     srcs = ["fn_lookup_test.cc"],
     deps = [
-        ":fn_lookup",
         "//core/cells:formula_eval",
         "//core/cells:formula_parser",
         "//core/cells:formula_resolver",
         "//core/cells:id",
         "//core/cells:model",
         "@googletest//:gtest_main",
-    ],
-)
-
-# Aggregate library that includes all functions
-cc_library(
-    name = "functions",
-    visibility = ["//visibility:public"],
-    deps = [
-        ":fn_lookup",
-        ":fn_rand",
-        ":fn_stats",
     ],
 )

@@ -215,9 +215,7 @@ EvalResult fn_PERCENTILE_EXC(const std::vector<const ASTNode*>& args, EvalContex
     return computePercentile(args, ctx, false);  // Exclusive
 }
 
-void registerStatsFunctions() {
-    FunctionRegistry& registry = FunctionRegistry::instance();
-
+void registerStatsFunctions(FunctionRegistry& registry) {
     registry.registerFunction("MEDIAN", fn_MEDIAN);
     registry.registerFunction("STDEV", fn_STDEV);
     registry.registerFunction("STDEVS", fn_STDEV_S);  // STDEV.S alternative

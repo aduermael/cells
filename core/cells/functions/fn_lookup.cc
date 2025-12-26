@@ -546,9 +546,7 @@ EvalResult fn_HLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     return getCellAtPosition(ctx, bounds, rowIndex - 1, matchCol);
 }
 
-void registerLookupFunctions() {
-    FunctionRegistry& registry = FunctionRegistry::instance();
-
+void registerLookupFunctions(FunctionRegistry& registry) {
     registry.registerFunction("INDEX", fn_INDEX);
     registry.registerFunction("MATCH", fn_MATCH);
     registry.registerFunction("VLOOKUP", fn_VLOOKUP);

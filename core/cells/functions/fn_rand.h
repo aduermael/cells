@@ -13,8 +13,11 @@ EvalResult fn_RAND(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // This is a volatile function - recalculates on every sheet change
 EvalResult fn_RANDBETWEEN(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// Forward declaration
+class FunctionRegistry;
+
 // Register RAND functions with the registry
-void registerRandFunctions();
+void registerRandFunctions(FunctionRegistry& registry);
 
 }  // namespace cells
 

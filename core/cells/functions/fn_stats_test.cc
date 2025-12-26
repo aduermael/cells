@@ -21,9 +21,6 @@ namespace {
 class FnStatsTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Register the stats functions
-        registerStatsFunctions();
-
         // Create a workbook with one sheet
         workbook = std::make_unique<Workbook>(generate_id(), "Test");
         workbook->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));

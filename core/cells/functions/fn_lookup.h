@@ -35,8 +35,11 @@ EvalResult fn_VLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 // range_lookup: TRUE (default) = approximate match, FALSE = exact match
 EvalResult fn_HLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// Forward declaration
+class FunctionRegistry;
+
 // Register lookup functions with the registry
-void registerLookupFunctions();
+void registerLookupFunctions(FunctionRegistry& registry);
 
 }  // namespace cells
 
