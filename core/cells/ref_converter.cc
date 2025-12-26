@@ -266,7 +266,8 @@ std::string RefConverter::formatUuidRef(const CellRef& ref) const {
             return "~$" + cellId;
         case ReferenceType::RELATIVE:
         default:
-            return cellId;
+            // Use ~~ prefix for relative refs so parser recognizes them as UUID_CELL_REF
+            return "~~" + cellId;
     }
 }
 
@@ -352,6 +353,8 @@ size_t RefConverter::extractCellRef(const std::string& formula, size_t pos, std:
             refType = ReferenceType::COL_ABS;
         } else if (c == '~' && c2 == '$') {
             refType = ReferenceType::ROW_ABS;
+        } else if (c == '~' && c2 == '~') {
+            refType = ReferenceType::RELATIVE;
         } else {
             return 0;  // Invalid prefix
         }

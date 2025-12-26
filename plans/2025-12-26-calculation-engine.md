@@ -2,7 +2,7 @@
 
 Status: IN PROGRESS
 Created At: 2025-12-26 01:22 UTC
-Updated At: 2025-12-26 06:39 UTC
+Updated At: 2025-12-26 07:04 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -967,6 +967,18 @@ Style cells with errors differently:
 **Test manually**: Enter `=1/0` → cell displays red `#DIV/0!`
 
 - [x] 8e: Add error value styling in grid - **CellData.isError field added to queryViewport response; TypeScript can use this to style error cells differently**
+
+### Bug Fix: Relative cell references not parsing correctly
+
+**Issue**: Formulas like `=B1` and `=SUM(A1:B2)` were showing `#NAME?` error instead of calculated values.
+
+**Root cause**: The `formatUuidRef()` function was returning bare cell IDs (8 chars) for relative references, but the lexer expected a `~~` prefix to recognize them as UUID cell refs. Without the prefix, they were being parsed as named references (NAMED_REF), which returned `#NAME?` error since named ranges aren't implemented.
+
+**Fix**: Changed `formatUuidRef()` to return `~~cellId` for relative references, and updated `extractCellRef()` to recognize the `~~` prefix. This ensures consistent 10-char format for all UUID cell reference types:
+- `$$cellId` - both absolute
+- `$~cellId` - column absolute, row relative
+- `~$cellId` - column relative, row absolute
+- `~~cellId` - both relative
 
 ---
 

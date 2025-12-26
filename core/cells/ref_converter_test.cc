@@ -368,13 +368,14 @@ TEST(RefConverterTest, A1RefToUuidWithContext) {
     converter.setContext(*sheet);
 
     // Convert A1 to UUID format (new cell UUID format)
-    // For relative refs, output is just the bare cell ID (8 chars)
+    // For relative refs, output is ~~cellId (10 chars) for consistent lexer parsing
     std::string uuidRef = converter.a1RefToUuid("A1");
     EXPECT_FALSE(uuidRef.empty());
-    EXPECT_EQ(uuidRef.size(), 8u);  // New format: bare cellId (8 chars)
-    // All chars should be alphanumeric (base62 ID)
-    for (char c : uuidRef) {
-        EXPECT_TRUE(std::isalnum(static_cast<unsigned char>(c)));
+    EXPECT_EQ(uuidRef.size(), 10u);  // New format: ~~cellId (10 chars)
+    EXPECT_EQ(uuidRef.substr(0, 2), "~~");
+    // Remaining chars should be alphanumeric (base62 ID)
+    for (size_t i = 2; i < uuidRef.size(); ++i) {
+        EXPECT_TRUE(std::isalnum(static_cast<unsigned char>(uuidRef[i])));
     }
 
     // Convert back should give A1
@@ -416,11 +417,11 @@ TEST(RefConverterTest, FormulaToUuidSimple) {
 
     std::string result = converter.formulaToUuid("A1+B2");
 
-    // The result should contain cell UUID refs (bare IDs for relative refs)
-    // Format: cellId+cellId (8 chars each)
-    // Should be 8 + 1 + 8 = 17 chars total
-    EXPECT_EQ(result.size(), 17u);
-    EXPECT_EQ(result[8], '+');
+    // The result should contain cell UUID refs (~~cellId for relative refs)
+    // Format: ~~cellId+~~cellId (10 chars each)
+    // Should be 10 + 1 + 10 = 21 chars total
+    EXPECT_EQ(result.size(), 21u);
+    EXPECT_EQ(result[10], '+');
 
     // Convert back should give original formula
     EXPECT_EQ(converter.formulaToA1(result), "A1+B2");
@@ -573,7 +574,8 @@ TEST(RefConverterTest, SparsePositionsA1ToUuid) {
     // with one element at index 0, but we needed index 1.
     std::string uuidRef = converter.a1RefToUuid("A2");
     EXPECT_FALSE(uuidRef.empty()) << "a1RefToUuid('A2') should find cell at position (0,1)";
-    EXPECT_EQ(uuidRef, cellA2Id) << "UUID ref should be the cell's ID";
+    // Relative refs use ~~ prefix
+    EXPECT_EQ(uuidRef, "~~" + cellA2Id) << "UUID ref should be ~~cellId for relative refs";
 
     // Converting back should give A2
     EXPECT_EQ(converter.uuidRefToA1(uuidRef), "A2");
@@ -650,13 +652,13 @@ TEST(RefConverterTest, GappedPositions) {
     RefConverter converter;
     converter.setContext(*sheet);
 
-    // A1 should convert correctly
-    EXPECT_EQ(converter.a1RefToUuid("A1"), cellA1Id);
-    EXPECT_EQ(converter.uuidRefToA1(cellA1Id), "A1");
+    // A1 should convert correctly (relative refs use ~~ prefix)
+    EXPECT_EQ(converter.a1RefToUuid("A1"), "~~" + cellA1Id);
+    EXPECT_EQ(converter.uuidRefToA1("~~" + cellA1Id), "A1");
 
     // F1 should convert correctly (column at position 5)
-    EXPECT_EQ(converter.a1RefToUuid("F1"), cellF1Id);
-    EXPECT_EQ(converter.uuidRefToA1(cellF1Id), "F1");
+    EXPECT_EQ(converter.a1RefToUuid("F1"), "~~" + cellF1Id);
+    EXPECT_EQ(converter.uuidRefToA1("~~" + cellF1Id), "F1");
 
     // B1 through E1 should fail (no columns at those positions)
     EXPECT_EQ(converter.a1RefToUuid("B1"), "");
