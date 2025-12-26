@@ -331,6 +331,7 @@ struct Workbook {
     Sheet* getSheet(const ID& sheetId);
     Sheet* getSheetByIndex(size_t index);
     void addSheet(std::unique_ptr<Sheet> sheet);
+    bool removeSheet(const ID& sheetId);  // Returns true if sheet was removed
 
     [[nodiscard]] size_t sheetCount() const { return sheets.size(); }
 

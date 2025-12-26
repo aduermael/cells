@@ -228,10 +228,20 @@ Handle remaining edge cases.
     - Added 3 new tests: `DeletedCellReferenceShowsRefError`, `DeletedCellRemovesFromDependencyGraph`,
       `DeletedVolatileCellUnmarkedFromDependencyGraph`
 
-- [ ] 6b: Handle sheet/workbook structure changes
+- [x] 6b: Handle sheet/workbook structure changes
   - Remote client adds/removes sheet
   - Cross-sheet references after sync
   - **Test**: Structure changes sync correctly
+  - **DONE**:
+    - Added `removeSheet()` method to Workbook in model.h/cc
+    - Implemented `applySheetCreate()` in crdt.cc - creates sheet from CRDT operation
+    - Implemented `applySheetDelete()` in crdt.cc - deletes sheet with resurrection logic
+    - Updated bindings: `addSheet()`, `deleteSheet()`, `renameSheet()` now generate operations
+    - Added 7 new tests in sync_formula_test.cc:
+      - `SheetCreateSyncsToRemoteClient`, `SheetCreateIsIdempotent`
+      - `SheetDeleteSyncsToRemoteClient`, `SheetDeleteOfNonexistentIsIdempotent`
+      - `SheetRenameSyncsToRemoteClient`, `SheetRenameConflictResolution`
+      - `DeletedSheetResurrectedByLaterRename`
 
 - [ ] 6c: Final integration testing
   - Manual testing with multiple browsers

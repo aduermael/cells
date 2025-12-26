@@ -272,9 +272,21 @@ public:
             } while (isNameTaken(sheetName));
         }
 
-        auto sheet = std::make_unique<Sheet>(generate_id(), sheetName);
+        // Generate sheet ID
+        ID sheetId = generate_id();
         size_t newIndex = _workbook->sheetCount();
-        _workbook->addSheet(std::move(sheet));
+
+        // Create and apply SHEET_CREATE operation via CRDT system
+        std::string payload = "{\"name\":\"" + jsonEscape(sheetName) + "\"}";
+        Operation op = makeSheetCreateOp(*_workbook, sheetId, payload);
+        applyOperation(*_workbook, op);
+
+        // Queue broadcast to sync with peers (if any) and prune old operations
+        if (_syncManager) {
+            _syncManager->queueOperationsBroadcast();
+            _syncManager->pruneOpLog();
+        }
+
         notifyListeners(ChangeType::SHEET_CHANGED);
 
         std::ostringstream json;
@@ -297,8 +309,19 @@ public:
             return "{\"error\":\"Cannot delete last sheet\"}";
         }
 
-        // Remove the sheet
-        _workbook->sheets.erase(_workbook->sheets.begin() + index);
+        // Get the sheet ID before removing
+        Sheet* sheet = _workbook->getSheetByIndex(static_cast<size_t>(index));
+        ID sheetId = sheet->id;
+
+        // Create and apply SHEET_DELETE operation via CRDT system
+        Operation op = makeSheetDeleteOp(*_workbook, sheetId);
+        applyOperation(*_workbook, op);
+
+        // Queue broadcast to sync with peers (if any) and prune old operations
+        if (_syncManager) {
+            _syncManager->queueOperationsBroadcast();
+            _syncManager->pruneOpLog();
+        }
 
         // Adjust active sheet index if needed
         if (_activeSheetIndex >= _workbook->sheetCount()) {
@@ -340,7 +363,21 @@ public:
             }
         }
 
-        _workbook->getSheetByIndex(index)->name = name;
+        // Get sheet ID
+        Sheet* sheet = _workbook->getSheetByIndex(static_cast<size_t>(index));
+        ID sheetId = sheet->id;
+
+        // Create and apply SHEET_RENAME operation via CRDT system
+        std::string payload = "{\"name\":\"" + jsonEscape(name) + "\"}";
+        Operation op = makeSheetRenameOp(*_workbook, sheetId, payload);
+        applyOperation(*_workbook, op);
+
+        // Queue broadcast to sync with peers (if any) and prune old operations
+        if (_syncManager) {
+            _syncManager->queueOperationsBroadcast();
+            _syncManager->pruneOpLog();
+        }
+
         notifyListeners(ChangeType::SHEET_CHANGED);
         return "{\"success\":true}";
     }

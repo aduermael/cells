@@ -923,6 +923,24 @@ void Workbook::addSheet(std::unique_ptr<Sheet> sheet) {
     _sheetIndex[sheetId] = rawPtr;
 }
 
+bool Workbook::removeSheet(const ID& sheetId) {
+    // Find the sheet
+    auto it =
+        std::find_if(sheets.begin(), sheets.end(),
+                     [&sheetId](const std::unique_ptr<Sheet>& s) { return s->id == sheetId; });
+    if (it == sheets.end()) {
+        return false;
+    }
+
+    // Remove from index
+    _sheetIndex.erase(sheetId);
+
+    // Remove from vector
+    sheets.erase(it);
+
+    return true;
+}
+
 OpLog* Workbook::getOpLog() {
     return _oplog.get();
 }

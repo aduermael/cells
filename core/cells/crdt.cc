@@ -342,7 +342,7 @@ ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op) {
 // Apply CELL_CLEAR operation
 ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
     Sheet* targetSheet = nullptr;
-    Cell* cell = nullptr;
+    const Cell* cell = nullptr;
 
     for (auto& s : workbook.sheets) {
         cell = s->getCell(op.target_id);
@@ -462,6 +462,53 @@ ApplyResult applySheetRename(Workbook& workbook, const Operation& op) {
     }
 
     sheet->name = name;
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply SHEET_CREATE operation
+// Payload: {"name":"SheetName"}
+ApplyResult applySheetCreate(Workbook& workbook, const Operation& op) {
+    // Check if sheet already exists (idempotent operation)
+    if (workbook.getSheet(op.target_id) != nullptr) {
+        return ApplyResult::ALREADY_APPLIED;
+    }
+
+    // Parse payload: {"name":"SheetName"}
+    std::string name = extractJSONString(op.payload, "name");
+    if (name.empty()) {
+        name = "Sheet";  // Default name if not provided
+    }
+
+    // Create and add the new sheet
+    auto sheet = std::make_unique<Sheet>(op.target_id, name);
+    workbook.addSheet(std::move(sheet));
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply SHEET_DELETE operation
+ApplyResult applySheetDelete(Workbook& workbook, const Operation& op) {
+    // Check if sheet exists
+    const Sheet* sheet = workbook.getSheet(op.target_id);
+    if (sheet == nullptr) {
+        // Sheet doesn't exist - already deleted or never existed
+        // Return SUCCESS for idempotency
+        return ApplyResult::SUCCESS;
+    }
+
+    // Check for newer operations that resurrect the sheet
+    const OpLog* oplog = workbook.getOpLog();
+    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    if (!latest.isNull() && latest.hlc > op.hlc) {
+        // A newer operation exists - if it's a rename or create, it resurrects
+        if (latest.type == OpType::SHEET_RENAME || latest.type == OpType::SHEET_CREATE) {
+            return ApplyResult::RESURRECTED;
+        }
+    }
+
+    // Remove the sheet
+    workbook.removeSheet(op.target_id);
 
     return ApplyResult::SUCCESS;
 }
@@ -623,9 +670,11 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             break;
 
         case OpType::SHEET_CREATE:
+            result = applySheetCreate(workbook, op);
+            break;
+
         case OpType::SHEET_DELETE:
-            // Not fully implemented yet - just accept it
-            result = ApplyResult::SUCCESS;
+            result = applySheetDelete(workbook, op);
             break;
 
         case OpType::SHEET_RENAME:
