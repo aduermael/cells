@@ -1,6 +1,6 @@
 # Calculation Engine
 
-Status: COMPLETE (Phases 1-9), OPTIONAL (Phase 10)
+Status: COMPLETE (Phases 1-9), PENDING (Phase 10)
 Created At: 2025-12-26 01:22 UTC
 Updated At: 2025-12-26 18:30 UTC
 Following plan management guidelines defined in AGENTS.md
@@ -1027,7 +1027,7 @@ core/cells/functions/
 
 ---
 
-## Phase 10: Refactor Existing Functions (Optional)
+## Phase 10: Refactor Existing Functions
 
 Split the existing `formula_functions.cc` monolith into individual files for better maintainability.
 
