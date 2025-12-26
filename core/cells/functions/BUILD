@@ -57,7 +57,9 @@ cc_library(
     hdrs = ["fn_lookup.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//core/cells:formula_ast",
         "//core/cells:formula_eval",
+        "//core/cells:model",
     ],
 )
 
