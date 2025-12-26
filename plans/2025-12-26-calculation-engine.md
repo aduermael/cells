@@ -2,7 +2,7 @@
 
 Status: IN PROGRESS
 Created At: 2025-12-26 01:22 UTC
-Updated At: 2025-12-26 07:05 UTC
+Updated At: 2025-12-25 17:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -632,7 +632,7 @@ EvalResult fn_TRIM(args, ctx);
 - `=MID("hello",2,3)` → "ell" (1-indexed)
 - `=TRIM("  hello  world  ")` → "hello world"
 
-- [ ] 5a: Implement basic text functions (LEN, LEFT, RIGHT, MID, TRIM)
+- [x] 5a: Implement basic text functions (LEN, LEFT, RIGHT, MID, TRIM)
 
 ### 5b: Implement case functions
 
@@ -651,7 +651,7 @@ EvalResult fn_PROPER(args, ctx);
 - `=PROPER("hello world")` → "Hello World"
 - `=PROPER("mR. SMITH")` → "Mr. Smith"
 
-- [ ] 5b: Implement case functions (UPPER, LOWER, PROPER)
+- [x] 5b: Implement case functions (UPPER, LOWER, PROPER)
 
 ### 5c: Implement search and replace functions
 
@@ -674,7 +674,7 @@ EvalResult fn_REPLACE(args, ctx);
 - `=SUBSTITUTE("hello","l","L",1)` → "heLlo" (first only)
 - `=REPLACE("hello",2,3,"i")` → "hio"
 
-- [ ] 5c: Implement search/replace functions (FIND, SEARCH, SUBSTITUTE, REPLACE)
+- [x] 5c: Implement search/replace functions (FIND, SEARCH, SUBSTITUTE, REPLACE)
 
 ### 5d: Implement concatenation and conversion
 
@@ -698,7 +698,7 @@ EvalResult fn_VALUE(args, ctx);
 - `=VALUE("$100")` → 100 (strip currency)
 - `=VALUE("abc")` → #VALUE!
 
-- [ ] 5d: Implement concatenation and conversion functions
+- [x] 5d: Implement concatenation and conversion functions
 
 ### 5e: Add Phase 5 text function tests
 
@@ -708,7 +708,7 @@ Target: 80+ test cases covering all text functions.
 
 **Test**: All text function tests pass (80+ tests)
 
-- [ ] 5e: Consolidate text function tests (80+ tests minimum)
+- [x] 5e: Consolidate text function tests (80+ tests minimum) - **110 text function tests implemented**
 
 ---
 

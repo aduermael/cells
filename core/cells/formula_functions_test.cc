@@ -1326,5 +1326,752 @@ TEST_F(FunctionTest, CombinedIferrorIf) {
     EXPECT_EQ(result.getString(), "error");
 }
 
+// =============================================================================
+// LEN Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, LenBasic) {
+    EvalResult result = eval("=LEN(\"hello\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 5.0);
+}
+
+TEST_F(FunctionTest, LenEmpty) {
+    EvalResult result = eval("=LEN(\"\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, LenNumber) {
+    EvalResult result = eval("=LEN(123)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 3.0);  // Coerced to "123"
+}
+
+TEST_F(FunctionTest, LenWithSpaces) {
+    EvalResult result = eval("=LEN(\"  hi  \")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 6.0);
+}
+
+TEST_F(FunctionTest, LenTooManyArgs) {
+    EvalResult result = eval("=LEN(\"a\",\"b\")");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, LenNoArgs) {
+    EvalResult result = eval("=LEN()");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// LEFT Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, LeftBasic) {
+    EvalResult result = eval("=LEFT(\"hello\",2)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "he");
+}
+
+TEST_F(FunctionTest, LeftDefault) {
+    EvalResult result = eval("=LEFT(\"hello\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "h");
+}
+
+TEST_F(FunctionTest, LeftZero) {
+    EvalResult result = eval("=LEFT(\"hello\",0)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+TEST_F(FunctionTest, LeftMoreThanLength) {
+    EvalResult result = eval("=LEFT(\"hi\",10)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hi");
+}
+
+TEST_F(FunctionTest, LeftNegative) {
+    EvalResult result = eval("=LEFT(\"hello\",-1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, LeftEmpty) {
+    EvalResult result = eval("=LEFT(\"\",5)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+// =============================================================================
+// RIGHT Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, RightBasic) {
+    EvalResult result = eval("=RIGHT(\"hello\",2)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "lo");
+}
+
+TEST_F(FunctionTest, RightDefault) {
+    EvalResult result = eval("=RIGHT(\"hello\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "o");
+}
+
+TEST_F(FunctionTest, RightZero) {
+    EvalResult result = eval("=RIGHT(\"hello\",0)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+TEST_F(FunctionTest, RightMoreThanLength) {
+    EvalResult result = eval("=RIGHT(\"hi\",10)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hi");
+}
+
+TEST_F(FunctionTest, RightNegative) {
+    EvalResult result = eval("=RIGHT(\"hello\",-1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// MID Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, MidBasic) {
+    EvalResult result = eval("=MID(\"hello\",2,3)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "ell");
+}
+
+TEST_F(FunctionTest, MidFromStart) {
+    EvalResult result = eval("=MID(\"hello\",1,2)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "he");
+}
+
+TEST_F(FunctionTest, MidToEnd) {
+    EvalResult result = eval("=MID(\"hello\",4,10)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "lo");
+}
+
+TEST_F(FunctionTest, MidBeyondString) {
+    EvalResult result = eval("=MID(\"hello\",10,2)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+TEST_F(FunctionTest, MidZeroLength) {
+    EvalResult result = eval("=MID(\"hello\",2,0)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+TEST_F(FunctionTest, MidStartZero) {
+    EvalResult result = eval("=MID(\"hello\",0,2)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, MidNegativeLength) {
+    EvalResult result = eval("=MID(\"hello\",2,-1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// TRIM Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, TrimLeadingTrailing) {
+    EvalResult result = eval("=TRIM(\"  hello  \")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hello");
+}
+
+TEST_F(FunctionTest, TrimMultipleSpaces) {
+    EvalResult result = eval("=TRIM(\"  hello  world  \")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hello world");
+}
+
+TEST_F(FunctionTest, TrimNoSpaces) {
+    EvalResult result = eval("=TRIM(\"hello\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hello");
+}
+
+TEST_F(FunctionTest, TrimAllSpaces) {
+    EvalResult result = eval("=TRIM(\"     \")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+TEST_F(FunctionTest, TrimEmpty) {
+    EvalResult result = eval("=TRIM(\"\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+// =============================================================================
+// UPPER Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, UpperBasic) {
+    EvalResult result = eval("=UPPER(\"hello\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "HELLO");
+}
+
+TEST_F(FunctionTest, UpperMixed) {
+    EvalResult result = eval("=UPPER(\"HeLLo WoRLd\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "HELLO WORLD");
+}
+
+TEST_F(FunctionTest, UpperAlreadyUpper) {
+    EvalResult result = eval("=UPPER(\"HELLO\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "HELLO");
+}
+
+TEST_F(FunctionTest, UpperWithNumbers) {
+    EvalResult result = eval("=UPPER(\"abc123\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "ABC123");
+}
+
+TEST_F(FunctionTest, UpperEmpty) {
+    EvalResult result = eval("=UPPER(\"\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+// =============================================================================
+// LOWER Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, LowerBasic) {
+    EvalResult result = eval("=LOWER(\"HELLO\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hello");
+}
+
+TEST_F(FunctionTest, LowerMixed) {
+    EvalResult result = eval("=LOWER(\"HeLLo WoRLd\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hello world");
+}
+
+TEST_F(FunctionTest, LowerAlreadyLower) {
+    EvalResult result = eval("=LOWER(\"hello\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hello");
+}
+
+TEST_F(FunctionTest, LowerWithNumbers) {
+    EvalResult result = eval("=LOWER(\"ABC123\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "abc123");
+}
+
+// =============================================================================
+// PROPER Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, ProperBasic) {
+    EvalResult result = eval("=PROPER(\"hello world\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "Hello World");
+}
+
+TEST_F(FunctionTest, ProperAllCaps) {
+    EvalResult result = eval("=PROPER(\"MR. SMITH\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "Mr. Smith");
+}
+
+TEST_F(FunctionTest, ProperAllLower) {
+    EvalResult result = eval("=PROPER(\"this is a test\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "This Is A Test");
+}
+
+TEST_F(FunctionTest, ProperWithNumbers) {
+    EvalResult result = eval("=PROPER(\"abc123def\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "Abc123Def");
+}
+
+TEST_F(FunctionTest, ProperEmpty) {
+    EvalResult result = eval("=PROPER(\"\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+// =============================================================================
+// FIND Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, FindBasic) {
+    EvalResult result = eval("=FIND(\"l\",\"hello\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 3.0);  // 1-indexed
+}
+
+TEST_F(FunctionTest, FindNotFound) {
+    EvalResult result = eval("=FIND(\"x\",\"hello\")");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, FindCaseSensitive) {
+    EvalResult result = eval("=FIND(\"L\",\"hello\")");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, FindWithStartPos) {
+    EvalResult result = eval("=FIND(\"l\",\"hello\",4)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 4.0);
+}
+
+TEST_F(FunctionTest, FindEmptyNeedle) {
+    EvalResult result = eval("=FIND(\"\",\"hello\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, FindAtStart) {
+    EvalResult result = eval("=FIND(\"h\",\"hello\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, FindAtEnd) {
+    EvalResult result = eval("=FIND(\"o\",\"hello\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 5.0);
+}
+
+// =============================================================================
+// SEARCH Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, SearchBasic) {
+    EvalResult result = eval("=SEARCH(\"l\",\"hello\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 3.0);
+}
+
+TEST_F(FunctionTest, SearchCaseInsensitive) {
+    EvalResult result = eval("=SEARCH(\"L\",\"hello\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 3.0);
+}
+
+TEST_F(FunctionTest, SearchNotFound) {
+    EvalResult result = eval("=SEARCH(\"x\",\"hello\")");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, SearchWithStartPos) {
+    EvalResult result = eval("=SEARCH(\"L\",\"HELLO\",4)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 4.0);
+}
+
+// =============================================================================
+// SUBSTITUTE Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, SubstituteAll) {
+    EvalResult result = eval("=SUBSTITUTE(\"hello\",\"l\",\"L\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "heLLo");
+}
+
+TEST_F(FunctionTest, SubstituteFirstOnly) {
+    EvalResult result = eval("=SUBSTITUTE(\"hello\",\"l\",\"L\",1)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "heLlo");
+}
+
+TEST_F(FunctionTest, SubstituteSecondOnly) {
+    EvalResult result = eval("=SUBSTITUTE(\"hello\",\"l\",\"L\",2)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "helLo");
+}
+
+TEST_F(FunctionTest, SubstituteNotFound) {
+    EvalResult result = eval("=SUBSTITUTE(\"hello\",\"x\",\"y\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hello");
+}
+
+TEST_F(FunctionTest, SubstituteEmpty) {
+    EvalResult result = eval("=SUBSTITUTE(\"hello\",\"l\",\"\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "heo");
+}
+
+TEST_F(FunctionTest, SubstituteEmptyOld) {
+    EvalResult result = eval("=SUBSTITUTE(\"hello\",\"\",\"x\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hello");  // No change
+}
+
+// =============================================================================
+// REPLACE Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, ReplaceBasic) {
+    EvalResult result = eval("=REPLACE(\"hello\",2,3,\"i\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hio");
+}
+
+TEST_F(FunctionTest, ReplaceAtStart) {
+    EvalResult result = eval("=REPLACE(\"hello\",1,2,\"XYZ\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "XYZllo");
+}
+
+TEST_F(FunctionTest, ReplaceAtEnd) {
+    EvalResult result = eval("=REPLACE(\"hello\",4,2,\"XYZ\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "helXYZ");
+}
+
+TEST_F(FunctionTest, ReplaceInsert) {
+    EvalResult result = eval("=REPLACE(\"hello\",3,0,\"X\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "heXllo");
+}
+
+TEST_F(FunctionTest, ReplaceDelete) {
+    EvalResult result = eval("=REPLACE(\"hello\",2,2,\"\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hlo");
+}
+
+TEST_F(FunctionTest, ReplacePastEnd) {
+    EvalResult result = eval("=REPLACE(\"hello\",10,2,\"XYZ\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "helloXYZ");
+}
+
+// =============================================================================
+// CONCAT Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, ConcatBasic) {
+    EvalResult result = eval("=CONCAT(\"a\",\"b\",\"c\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "abc");
+}
+
+TEST_F(FunctionTest, ConcatWithNumbers) {
+    EvalResult result = eval("=CONCAT(\"value:\",123)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "value:123");
+}
+
+TEST_F(FunctionTest, ConcatEmpty) {
+    EvalResult result = eval("=CONCAT()");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+TEST_F(FunctionTest, ConcatSingleArg) {
+    EvalResult result = eval("=CONCAT(\"hello\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hello");
+}
+
+TEST_F(FunctionTest, ConcatWithBoolean) {
+    EvalResult result = eval("=CONCAT(\"result:\",TRUE)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "result:TRUE");
+}
+
+// =============================================================================
+// CONCATENATE Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, ConcatenateBasic) {
+    EvalResult result = eval("=CONCATENATE(\"hello\",\" \",\"world\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "hello world");
+}
+
+TEST_F(FunctionTest, ConcatenateWithCells) {
+    setCellValue(0, 0, "Hello");  // A1
+    setCellValue(1, 0, "World");  // B1
+    EvalResult result = eval("=CONCATENATE(A1,\" \",B1)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "Hello World");
+}
+
+// =============================================================================
+// REPT Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, ReptBasic) {
+    EvalResult result = eval("=REPT(\"ab\",3)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "ababab");
+}
+
+TEST_F(FunctionTest, ReptZero) {
+    EvalResult result = eval("=REPT(\"ab\",0)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+TEST_F(FunctionTest, ReptOne) {
+    EvalResult result = eval("=REPT(\"ab\",1)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "ab");
+}
+
+TEST_F(FunctionTest, ReptNegative) {
+    EvalResult result = eval("=REPT(\"ab\",-1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, ReptEmpty) {
+    EvalResult result = eval("=REPT(\"\",5)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "");
+}
+
+// =============================================================================
+// TEXT Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, TextPercentage) {
+    EvalResult result = eval("=TEXT(0.5,\"0%\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "50%");
+}
+
+TEST_F(FunctionTest, TextPercentageDecimals) {
+    EvalResult result = eval("=TEXT(0.567,\"0.0%\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "56.7%");
+}
+
+TEST_F(FunctionTest, TextNoFormat) {
+    EvalResult result = eval("=TEXT(123,\"0\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "123");
+}
+
+TEST_F(FunctionTest, TextDecimalPlaces) {
+    EvalResult result = eval("=TEXT(123.456,\"0.00\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "123.46");
+}
+
+TEST_F(FunctionTest, TextCurrency) {
+    EvalResult result = eval("=TEXT(1234.5,\"$#,##0.00\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "$1,234.50");
+}
+
+TEST_F(FunctionTest, TextNegative) {
+    EvalResult result = eval("=TEXT(-123.45,\"$#,##0.00\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "-$123.45");
+}
+
+// =============================================================================
+// VALUE Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, ValueBasic) {
+    EvalResult result = eval("=VALUE(\"123\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 123.0);
+}
+
+TEST_F(FunctionTest, ValueDecimal) {
+    EvalResult result = eval("=VALUE(\"123.45\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 123.45);
+}
+
+TEST_F(FunctionTest, ValueCurrency) {
+    EvalResult result = eval("=VALUE(\"$100\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 100.0);
+}
+
+TEST_F(FunctionTest, ValuePercentage) {
+    EvalResult result = eval("=VALUE(\"50%\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.5);
+}
+
+TEST_F(FunctionTest, ValueWithCommas) {
+    EvalResult result = eval("=VALUE(\"1,234.56\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1234.56);
+}
+
+TEST_F(FunctionTest, ValueNonNumeric) {
+    EvalResult result = eval("=VALUE(\"abc\")");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, ValueEmpty) {
+    EvalResult result = eval("=VALUE(\"\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, ValueNegative) {
+    EvalResult result = eval("=VALUE(\"-123.45\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), -123.45);
+}
+
+// =============================================================================
+// CHAR Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, CharBasic) {
+    EvalResult result = eval("=CHAR(65)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "A");
+}
+
+TEST_F(FunctionTest, CharLowercase) {
+    EvalResult result = eval("=CHAR(97)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "a");
+}
+
+TEST_F(FunctionTest, CharSpace) {
+    EvalResult result = eval("=CHAR(32)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), " ");
+}
+
+TEST_F(FunctionTest, CharZero) {
+    EvalResult result = eval("=CHAR(0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, CharTooLarge) {
+    EvalResult result = eval("=CHAR(256)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// CODE Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, CodeBasic) {
+    EvalResult result = eval("=CODE(\"A\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 65.0);
+}
+
+TEST_F(FunctionTest, CodeLowercase) {
+    EvalResult result = eval("=CODE(\"a\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 97.0);
+}
+
+TEST_F(FunctionTest, CodeSpace) {
+    EvalResult result = eval("=CODE(\" \")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 32.0);
+}
+
+TEST_F(FunctionTest, CodeEmpty) {
+    EvalResult result = eval("=CODE(\"\")");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, CodeMultipleChars) {
+    // CODE should return the code of the first character only
+    EvalResult result = eval("=CODE(\"ABC\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 65.0);
+}
+
+// =============================================================================
+// Combined Text Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, CombinedLeftLen) {
+    EvalResult result = eval("=LEFT(\"hello\",LEN(\"hi\"))");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "he");
+}
+
+TEST_F(FunctionTest, CombinedUpperTrim) {
+    EvalResult result = eval("=UPPER(TRIM(\"  hello  world  \"))");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "HELLO WORLD");
+}
+
+TEST_F(FunctionTest, CombinedConcatUpper) {
+    EvalResult result = eval("=CONCAT(UPPER(\"hello\"),\" \",LOWER(\"WORLD\"))");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "HELLO world");
+}
+
+TEST_F(FunctionTest, CombinedIfLen) {
+    EvalResult result = eval("=IF(LEN(\"hello\")>3,\"long\",\"short\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "long");
+}
+
+TEST_F(FunctionTest, CombinedValueSum) {
+    EvalResult result = eval("=SUM(VALUE(\"10\"),VALUE(\"20\"))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 30.0);
+}
+
+TEST_F(FunctionTest, CombinedTextConcat) {
+    EvalResult result = eval("=CONCAT(\"Total: \",TEXT(1234,\"#,##0\"))");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "Total: 1,234");
+}
+
+TEST_F(FunctionTest, TextWithCellRef) {
+    setCellValue(0, 0, "hello world");  // A1
+    EvalResult result = eval("=UPPER(A1)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "HELLO WORLD");
+}
+
+TEST_F(FunctionTest, ConcatWithRange) {
+    setCellValue(0, 0, "A");  // A1
+    setCellValue(0, 1, "B");  // A2
+    setCellValue(0, 2, "C");  // A3
+    EvalResult result = eval("=CONCAT(A1:A3)");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "ABC");
+}
+
 }  // namespace
 }  // namespace cells
