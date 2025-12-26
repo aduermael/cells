@@ -32,6 +32,7 @@ cc_library(
     hdrs = ["fn_stats.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//core/cells:formula_ast",
         "//core/cells:formula_eval",
     ],
 )
