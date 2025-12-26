@@ -357,6 +357,67 @@ TEST_F(FormulaRecalcTest, VolatileCellReferenceReturnsConsistentValue) {
         << "evaluateCell on clean formula should return cached value, not re-evaluate";
 }
 
+TEST_F(FormulaRecalcTest, VolatileCellNotRecalculatedOnUnrelatedChange) {
+    // A1=RAND(), B1=A1, C1=5
+    // Changing C1 should NOT trigger A1 or B1 to recalculate
+    Cell* a1 = setCellFormula(0, 0, "=RAND()");
+    Cell* b1 = setCellFormula(1, 0, "=A1");
+    Cell* c1 = setCellValue(2, 0, 5.0);
+    ASSERT_NE(a1, nullptr);
+    ASSERT_NE(b1, nullptr);
+    ASSERT_NE(c1, nullptr);
+
+    // Initial recalculation of volatile cells
+    recalculateVolatile(sheet);
+    double initialA1 = getCellNumber(0, 0);
+    double initialB1 = getCellNumber(1, 0);
+    EXPECT_DOUBLE_EQ(initialA1, initialB1);
+
+    // Change unrelated cell C1
+    c1->value = CellValue(10.0);
+    recalculate(sheet, {c1->id});
+
+    // A1 and B1 should NOT have changed (RAND not re-evaluated)
+    EXPECT_DOUBLE_EQ(getCellNumber(0, 0), initialA1)
+        << "RAND() should not recalculate when unrelated cell changes";
+    EXPECT_DOUBLE_EQ(getCellNumber(1, 0), initialB1)
+        << "Cell referencing RAND() should not change when unrelated cell changes";
+}
+
+TEST_F(FormulaRecalcTest, VolatileCellRecalculateTriggersDependents) {
+    // A1=RAND(), B1=A1, C1=B1+1
+    // When recalculateVolatile is called:
+    // 1. A1 gets a new RAND value
+    // 2. B1 should get A1's new value
+    // 3. C1 should get B1's new value + 1
+    Cell* a1 = setCellFormula(0, 0, "=RAND()");
+    Cell* b1 = setCellFormula(1, 0, "=A1");
+    Cell* c1 = setCellFormula(2, 0, "=B1+1");
+    ASSERT_NE(a1, nullptr);
+    ASSERT_NE(b1, nullptr);
+    ASSERT_NE(c1, nullptr);
+
+    // Initial recalculation
+    recalculateVolatile(sheet);
+    double firstA1 = getCellNumber(0, 0);
+    double firstB1 = getCellNumber(1, 0);
+    double firstC1 = getCellNumber(2, 0);
+
+    EXPECT_DOUBLE_EQ(firstB1, firstA1) << "B1 should equal A1";
+    EXPECT_DOUBLE_EQ(firstC1, firstA1 + 1.0) << "C1 should equal A1 + 1";
+
+    // Recalculate volatile cells again - all values should update consistently
+    recalculateVolatile(sheet);
+    double secondA1 = getCellNumber(0, 0);
+    double secondB1 = getCellNumber(1, 0);
+    double secondC1 = getCellNumber(2, 0);
+
+    // A1 should have a new value (RAND recalculated)
+    // Note: There's a tiny chance RAND produces the same value, but very unlikely
+    EXPECT_DOUBLE_EQ(secondB1, secondA1) << "B1 should equal new A1 value";
+    EXPECT_DOUBLE_EQ(secondC1, secondA1 + 1.0) << "C1 should equal new A1 + 1";
+}
+
 // =============================================================================
 // Dirty Cell Management Tests
 // =============================================================================

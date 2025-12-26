@@ -225,7 +225,7 @@ void recalculate(Sheet* sheet, const std::vector<ID>& changedCells) {
     // Mark all cells in the recalculation set as dirty
     // This ensures they will be re-evaluated even if they were previously clean
     for (const ID& cellId : recalcOrder) {
-        Cell* cell = sheet->getCell(cellId);
+        const Cell* cell = sheet->getCell(cellId);
         if (cell) {
             Formula* formula = cell->getFormula();
             if (formula) {

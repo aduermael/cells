@@ -298,7 +298,7 @@ TEST_F(DependencyGraphTest, RecalcOrderSingleCell) {
     EXPECT_EQ(order[0], cell->id);
 }
 
-TEST_F(DependencyGraphTest, RecalcOrderIncludesVolatile) {
+TEST_F(DependencyGraphTest, RecalcOrderExcludesVolatileUnlessExplicit) {
     auto ast1 = parseFormula("=NOW()");
     Cell* volatileCell = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[0]);
     graph_.addFormula(volatileCell->id, ast1.get());
@@ -307,13 +307,15 @@ TEST_F(DependencyGraphTest, RecalcOrderIncludesVolatile) {
     Cell* normalCell = sheet_->getOrCreateCellAt(colIds_[1], rowIds_[0]);
     graph_.addFormula(normalCell->id, ast2.get());
 
-    // When recalculating something unrelated, volatile cell should be included
+    // When recalculating something unrelated, volatile cell should NOT be included
+    // This is the correct behavior: RAND(), NOW(), etc. should not recalculate
+    // on every cell change, only when explicitly requested via recalculateVolatile()
     ID otherId = generate_id();
     bool hasCycle = false;
     auto order = graph_.getRecalcOrder({otherId}, &hasCycle);
     EXPECT_FALSE(hasCycle);
 
-    // Should include the volatile cell
+    // Should NOT include the volatile cell (it's unrelated to the changed cell)
     bool foundVolatile = false;
     for (const auto& id : order) {
         if (id == volatileCell->id) {
@@ -321,7 +323,20 @@ TEST_F(DependencyGraphTest, RecalcOrderIncludesVolatile) {
             break;
         }
     }
-    EXPECT_TRUE(foundVolatile);
+    EXPECT_FALSE(foundVolatile) << "Volatile cells should not be automatically included";
+
+    // But when volatile cell is explicitly included, it should be in the order
+    hasCycle = false;
+    auto orderWithVolatile = graph_.getRecalcOrder({volatileCell->id}, &hasCycle);
+    EXPECT_FALSE(hasCycle);
+    bool foundVolatileExplicit = false;
+    for (const auto& id : orderWithVolatile) {
+        if (id == volatileCell->id) {
+            foundVolatileExplicit = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundVolatileExplicit) << "Volatile cell should be included when explicit";
 }
 
 // ============================================================================

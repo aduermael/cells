@@ -265,22 +265,24 @@ Benchmark tests can be added in a future optimization pass if performance issues
 2. The `recalculate()` function marks all cells in the recalculation set as dirty before evaluating
 3. Added test `VolatileCellReferenceReturnsConsistentValue` to verify the fix
 
-### Issue 2: Volatile cells recalculate on any sheet change
+### Issue 2: Volatile cells recalculate on any sheet change - ✅ FIXED
 
 **Symptom**: Editing any unrelated cell causes A1 (`=RAND()`) and B1 (`=A1`) to both get new values.
 
-**Expected behavior**: This is partially correct - volatile functions **should** recalculate on sheet changes. However:
-1. The recalculation should happen **once** per edit cycle
-2. Dependents should use the recalculated value, not trigger another recalculation
+**Expected behavior**: Volatile functions should NOT recalculate when unrelated cells change.
+They should only recalculate when explicitly triggered via `recalculateVolatile()`.
 
-**Fix approach**:
-1. Mark volatile cells dirty at the start of recalculation
-2. Use topological sort to ensure volatile cells evaluate before their dependents
-3. Store result in cell value after evaluation
-4. Dependents read from stored value, not re-evaluate
+**Fix**: Removed automatic inclusion of volatile cells from `getRecalcOrder()` in `dependency_graph.cc`:
+1. Volatile cells are no longer automatically added to every recalculation set
+2. They are only included when explicitly passed as changed cells (via `recalculateVolatile()`)
+3. When volatile cells ARE recalculated, their dependents are properly updated
+
+**Tests added**:
+- `VolatileCellNotRecalculatedOnUnrelatedChange` - verifies RAND() doesn't change when C1 changes
+- `VolatileCellRecalculateTriggersDependents` - verifies dependents update when volatile cells recalculate
+- `RecalcOrderExcludesVolatileUnlessExplicit` - verifies getRecalcOrder behavior
 
 ### Related code
 
-- `core/cells/formula_eval.cc` - `evaluateCellRef()` may be re-evaluating instead of using cached value
-- `core/cells/formula_recalc.cc` - `recalculateVolatile()` handles volatile cell marking
-- `core/cells/dependency_graph.cc` - `getVolatileCells()` tracks which cells use volatile functions
+- `core/cells/dependency_graph.cc` - `getRecalcOrder()` no longer auto-includes volatile cells
+- `core/cells/formula_recalc.cc` - `recalculateVolatile()` is the explicit way to trigger volatile cells

@@ -460,10 +460,9 @@ std::vector<ID> DependencyGraph::getRecalcOrder(const std::vector<ID>& changedCe
         }
     }
 
-    // Also include all volatile cells
-    for (const auto& volatileId : volatileCells_) {
-        toRecalc.insert(volatileId);
-    }
+    // NOTE: Volatile cells are NOT automatically included here.
+    // They should only be recalculated when explicitly requested via recalculateVolatile().
+    // This prevents RAND(), NOW(), etc. from recalculating on every unrelated cell change.
 
     // Topological sort using Kahn's algorithm
     // Build in-degree map and adjacency list
