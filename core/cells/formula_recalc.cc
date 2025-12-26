@@ -1,5 +1,6 @@
 #include "core/cells/formula_recalc.h"
 
+#include <string>
 #include <unordered_set>
 #include <vector>
 
@@ -46,6 +47,47 @@ static std::vector<ID> getDependentsWithRanges(Sheet* sheet, const ID& cellId) {
 // Single-Cell Evaluation
 // =============================================================================
 
+// Helper to convert a CellValue to an EvalResult
+static EvalResult cellValueToEvalResult(const CellValue& value) {
+    switch (value.type) {
+        case CellValueType::NUMBER:
+            return EvalResult::Number(value.asNumber());
+        case CellValueType::STRING:
+            if (value.raw.empty()) {
+                return EvalResult::Empty();
+            }
+            return EvalResult::String(value.asString());
+        case CellValueType::BOOLEAN:
+            return EvalResult::Boolean(value.asBoolean());
+        case CellValueType::ERROR:
+            return EvalResult::Error(value.error);
+        case CellValueType::DATE:
+        case CellValueType::DATE_TIME:
+            return EvalResult::Number(value.asNumber());
+        case CellValueType::FORMULA:
+            // Formula type but no AST means unparsed or error
+            if (value.error != CellError::NONE) {
+                return EvalResult::Error(value.error);
+            }
+            // Try to parse as number first
+            if (!value.raw.empty()) {
+                try {
+                    size_t pos = 0;
+                    const double numVal = std::stod(value.raw, &pos);
+                    if (pos == value.raw.size()) {
+                        return EvalResult::Number(numVal);
+                    }
+                } catch (...) {
+                    // Not a number, fall through to return as string
+                    (void)0;  // Suppress bugprone-empty-catch
+                }
+                return EvalResult::String(value.raw);
+            }
+            return EvalResult::Empty();
+    }
+    return EvalResult::Empty();
+}
+
 EvalResult evaluateCell(Sheet* sheet, Cell* cell) {
     if (!sheet || !cell) {
         return EvalResult::Error(CellError::VALUE);
@@ -54,30 +96,13 @@ EvalResult evaluateCell(Sheet* sheet, Cell* cell) {
     // If cell doesn't have a formula, return its current value
     Formula* formula = cell->getFormula();
     if (!formula || !formula->ast) {
-        // Convert cell value to EvalResult
-        switch (cell->value.type) {
-            case CellValueType::NUMBER:
-                return EvalResult::Number(cell->value.asNumber());
-            case CellValueType::STRING:
-                if (cell->value.raw.empty()) {
-                    return EvalResult::Empty();
-                }
-                return EvalResult::String(cell->value.asString());
-            case CellValueType::BOOLEAN:
-                return EvalResult::Boolean(cell->value.asBoolean());
-            case CellValueType::ERROR:
-                return EvalResult::Error(cell->value.error);
-            case CellValueType::DATE:
-            case CellValueType::DATE_TIME:
-                return EvalResult::Number(cell->value.asNumber());
-            case CellValueType::FORMULA:
-                // Formula type but no AST means unparsed or error
-                if (cell->value.error != CellError::NONE) {
-                    return EvalResult::Error(cell->value.error);
-                }
-                return EvalResult::Empty();
-        }
-        return EvalResult::Empty();
+        return cellValueToEvalResult(cell->value);
+    }
+
+    // If formula is not dirty, return the cached value
+    // This prevents re-evaluation of volatile functions like RAND()
+    if (!formula->dirty) {
+        return cellValueToEvalResult(cell->value);
     }
 
     // Set up evaluation context
@@ -195,6 +220,18 @@ void recalculate(Sheet* sheet, const std::vector<ID>& changedCells) {
             }
         }
         return;
+    }
+
+    // Mark all cells in the recalculation set as dirty
+    // This ensures they will be re-evaluated even if they were previously clean
+    for (const ID& cellId : recalcOrder) {
+        Cell* cell = sheet->getCell(cellId);
+        if (cell) {
+            Formula* formula = cell->getFormula();
+            if (formula) {
+                formula->dirty = true;
+            }
+        }
     }
 
     // Evaluate each cell in dependency order

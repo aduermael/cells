@@ -249,7 +249,7 @@ Benchmark tests can be added in a future optimization pass if performance issues
 
 ## Known Issues: Volatile Function Handling
 
-### Issue 1: RAND() re-evaluated on every reference
+### Issue 1: RAND() re-evaluated on every reference - ✅ FIXED
 
 **Symptom**:
 - A1 contains `=RAND()`
@@ -260,7 +260,10 @@ Benchmark tests can be added in a future optimization pass if performance issues
 
 **Root cause**: The calculation engine re-evaluates A1's formula when resolving the reference from B1, instead of using the cached result from A1's cell value.
 
-**Fix approach**: When evaluating a cell reference, use the cell's stored `value` if it's not dirty, rather than re-evaluating the formula. The evaluation should only happen once per recalculation cycle.
+**Fix**: Added dirty flag check to `evaluateCell()` in `formula_recalc.cc`:
+1. `evaluateCell()` now returns the cached value if `formula->dirty` is false
+2. The `recalculate()` function marks all cells in the recalculation set as dirty before evaluating
+3. Added test `VolatileCellReferenceReturnsConsistentValue` to verify the fix
 
 ### Issue 2: Volatile cells recalculate on any sheet change
 

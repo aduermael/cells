@@ -333,6 +333,30 @@ TEST_F(FormulaRecalcTest, TodayIsVolatile) {
     EXPECT_TRUE(depGraph->isVolatile(a1->id));
 }
 
+TEST_F(FormulaRecalcTest, VolatileCellReferenceReturnsConsistentValue) {
+    // Bug test: A1=RAND(), B1=A1 should have the same value after recalculation
+    // Previously, evaluateCell didn't check dirty flag and would re-evaluate RAND()
+    Cell* a1 = setCellFormula(0, 0, "=RAND()");
+    Cell* b1 = setCellFormula(1, 0, "=A1");
+    ASSERT_NE(a1, nullptr);
+    ASSERT_NE(b1, nullptr);
+
+    // Recalculate volatile cells
+    recalculateVolatile(sheet);
+
+    // A1 and B1 should have the same value (B1 references A1's cached result)
+    double a1Value = getCellNumber(0, 0);
+    double b1Value = getCellNumber(1, 0);
+    EXPECT_DOUBLE_EQ(a1Value, b1Value)
+        << "B1 (=A1) should have the same value as A1 (=RAND()) after recalculation";
+
+    // Calling evaluateCell again should NOT change the value if formula is clean
+    EvalResult result = evaluateCell(sheet, a1);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), a1Value)
+        << "evaluateCell on clean formula should return cached value, not re-evaluate";
+}
+
 // =============================================================================
 // Dirty Cell Management Tests
 // =============================================================================
