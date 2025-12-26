@@ -2,7 +2,7 @@
 
 Status: IN_PROGRESS
 Created At: 2025-12-25 23:41 UTC
-Updated At: 2025-12-26 02:45 UTC
+Updated At: 2025-12-26 03:00 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -108,11 +108,15 @@ Based on diagnosis, fix the RefConverter context management.
   - Added 3 new tests: `DependencyGraphUpdatedOnRemoteFormulaSync`,
     `DependencyGraphClearedWhenFormulaReplacedWithValue`, `VolatileFunctionTrackedOnRemoteSync`
 
-- [ ] 2c: Handle cells created by formula references
+- [x] 2c: Handle cells created by formula references
   - Formula `=ZZ999` creates cell ZZ999 if it doesn't exist
   - This cell needs to be in RefConverter for display conversion
   - May need to rebuild RefConverter after formula resolution
   - **Test**: Remote formula referencing non-existent cell displays correctly
+  - **DONE**: Already handled by Phase 2a (cells get operations) + existing `rebuildQuadtree()`
+  - Operations are sorted by HLC, so axis/cell ops apply before formula ops
+  - `rebuildQuadtree()` updates RefConverter after each operation
+  - Existing test `FormulaReferencingNewCellDisplaysCorrectly` verifies this works
 
 ---
 
