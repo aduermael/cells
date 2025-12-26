@@ -2,7 +2,7 @@
 
 Status: IN_PROGRESS
 Created At: 2025-12-25 23:41 UTC
-Updated At: 2025-12-26 00:30 UTC
+Updated At: 2025-12-26 01:15 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -51,12 +51,12 @@ First, add logging and tests to understand exactly where the conversion fails.
   - **Test**: Test case reliably reproduces the bug
   - **DONE**: Created sync_formula_test.cc with 7 tests covering formula sync
 
-- [ ] 1c: Identify exact failure point
+- [x] 1c: Identify exact failure point
   - Is RefConverter context empty/stale?
   - Is the cell UUID not found in the quadtree?
   - Is the formula text malformed?
   - Document findings in this plan
-  - **NEEDS MANUAL TESTING**: C++ tests pass, need to run with two browsers
+  - **DONE**: Root cause identified - cells created by formula resolution weren't synced
 
 ### Phase 1 Findings
 
@@ -96,7 +96,7 @@ Based on diagnosis, fix the RefConverter context management.
   - **FIX**: In `getFormulaReferences()`, snapshot existing entities before resolution,
     then generate DIM_INSERT_AXIS and CELL_SET_VALUE operations for new entities
   - Operations are added to OpLog and broadcast to peers
-  - **Test**: Remote formula displays correctly (needs manual verification)
+  - **Test**: ✅ Manual testing confirmed - formulas display correctly on remote clients!
 
 - [ ] 2b: Fix formula resolution for remote operations
   - When receiving a formula operation, the AST needs to be re-resolved
