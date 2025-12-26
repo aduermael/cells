@@ -132,6 +132,9 @@ export interface AppEventManagerConfig {
 export class AppEventManager {
   private config: AppEventManagerConfig;
 
+  /** Last cell position clicked during formula editing (for Shift+click range references) */
+  private lastFormulaRefPosition: Position | null = null;
+
   constructor(config: AppEventManagerConfig) {
     this.config = config;
   }
@@ -158,7 +161,14 @@ export class AppEventManager {
    */
   private isInFormulaEditingMode(): boolean {
     const { cellEditor, formulaBarEditor } = this.config;
-    return cellEditor.isFormulaMode() || formulaBarEditor.isFormulaMode();
+    const inFormulaMode = cellEditor.isFormulaMode() || formulaBarEditor.isFormulaMode();
+
+    // Clear the last reference position if not in formula mode
+    if (!inFormulaMode) {
+      this.lastFormulaRefPosition = null;
+    }
+
+    return inFormulaMode;
   }
 
   /**
@@ -379,8 +389,19 @@ export class AppEventManager {
         if (this.isInFormulaEditingMode()) {
           const colLetter = colToLetter(col);
           const rowNum = row + 1; // 1-based row number
-          const ref = `${colLetter}${rowNum}`; // Cell reference like "A1"
-          this.insertFormulaReference(ref);
+
+          // Shift+click creates a range from last clicked position
+          if (e.shiftKey && this.lastFormulaRefPosition) {
+            const lastCol = colToLetter(this.lastFormulaRefPosition.col);
+            const lastRow = this.lastFormulaRefPosition.row + 1;
+            const ref = `${lastCol}${lastRow}:${colLetter}${rowNum}`; // Range like "A1:B5"
+            this.insertFormulaReference(ref);
+          } else {
+            const ref = `${colLetter}${rowNum}`; // Cell reference like "A1"
+            this.insertFormulaReference(ref);
+            // Track this position for potential Shift+click range
+            this.lastFormulaRefPosition = { col, row };
+          }
           e.preventDefault();
           return;
         }

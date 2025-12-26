@@ -32,7 +32,7 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 - [x] 1c: Modify `handleMouseDown` in `app-events.ts` to detect formula editing mode and call `insertReferenceAtCursor` instead of committing
 - [x] 1d: Handle click on column header during formula edit (insert column reference like `B:B`)
 - [x] 1e: Handle click on row header during formula edit (insert row reference like `3:3`)
-- [ ] 1f: Support Shift+click to insert range references (from last reference to clicked cell)
+- [x] 1f: Support Shift+click to insert range references (from last reference to clicked cell)
 - [ ] 1g: Add unit tests for reference insertion logic
 
 ### UI Checkpoint 1
