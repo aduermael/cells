@@ -436,21 +436,83 @@ export function initApp(): AppContext {
   function updateColoredDisplays(value: string): void {
     const coloredHtml = colorizeFormula(value, app.formulaHighlights);
 
-    // Update formula bar display if it has focus
+    // Update formula bar display - preserve cursor if focused
     if (document.activeElement === elements.formulaDisplay) {
-      // Don't update while focused - let input handler manage it
-      return;
+      // Save cursor position, update content, restore cursor
+      const selection = window.getSelection();
+      let cursorOffset = 0;
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        cursorOffset = getTextOffsetInElement(elements.formulaDisplay, range);
+      }
+      elements.formulaDisplay.innerHTML = coloredHtml;
+      restoreCursorInElement(elements.formulaDisplay, cursorOffset);
+    } else {
+      elements.formulaDisplay.innerHTML = coloredHtml;
     }
 
-    // Update cell display if it has focus
+    // Update cell display - preserve cursor if focused
     if (document.activeElement === elements.cellDisplay) {
-      // Don't update while focused - let input handler manage it
-      return;
+      const selection = window.getSelection();
+      let cursorOffset = 0;
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        cursorOffset = getTextOffsetInElement(elements.cellDisplay, range);
+      }
+      elements.cellDisplay.innerHTML = coloredHtml;
+      restoreCursorInElement(elements.cellDisplay, cursorOffset);
+    } else {
+      elements.cellDisplay.innerHTML = coloredHtml;
+    }
+  }
+
+  /**
+   * Get text offset from start of element to cursor position.
+   */
+  function getTextOffsetInElement(element: HTMLElement, range: Range): number {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
+    let totalOffset = 0;
+    let current = walker.nextNode();
+    while (current) {
+      if (current === range.startContainer) {
+        return totalOffset + range.startOffset;
+      }
+      totalOffset += current.textContent?.length ?? 0;
+      current = walker.nextNode();
+    }
+    return totalOffset;
+  }
+
+  /**
+   * Restore cursor to text offset position in element.
+   */
+  function restoreCursorInElement(element: HTMLElement, offset: number): void {
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
+    let totalOffset = 0;
+    let current = walker.nextNode();
+    while (current) {
+      const nodeLength = current.textContent?.length ?? 0;
+      if (totalOffset + nodeLength >= offset) {
+        const range = document.createRange();
+        range.setStart(current, offset - totalOffset);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        return;
+      }
+      totalOffset += nodeLength;
+      current = walker.nextNode();
     }
 
-    // Update displays when they're not being actively edited
-    elements.formulaDisplay.innerHTML = coloredHtml;
-    elements.cellDisplay.innerHTML = coloredHtml;
+    // Offset is beyond content, place cursor at end
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
   }
 
   // =========================================================================

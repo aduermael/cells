@@ -90,6 +90,7 @@ private:
         bool colAbsolute{false};
         bool rowAbsolute{false};
         bool valid{false};
+        SourcePosition position;  // Full span of the cell reference
     };
     [[nodiscard]] CellRefComponents parseCellRefComponents();
 };

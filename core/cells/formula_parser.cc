@@ -322,9 +322,10 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
                 if (check(TokenType::NUMBER)) {
                     // Cell reference like "A" then "1" -> A1
                     const int row = static_cast<int>(current_.numberValue());
+                    // Extend position to include row number token
+                    const SourcePosition fullPos{id.position.start, current_.position.end};
                     advance();
-                    auto cellRef =
-                        std::make_unique<CellRefNode>(name, row, false, false, id.position);
+                    auto cellRef = std::make_unique<CellRefNode>(name, row, false, false, fullPos);
 
                     // Check for range
                     if (match(TokenType::COLON)) {
@@ -337,9 +338,11 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
                     advance();
                     if (check(TokenType::NUMBER)) {
                         const int row = static_cast<int>(current_.numberValue());
+                        // Extend position to include $ and row number
+                        const SourcePosition fullPos{id.position.start, current_.position.end};
                         advance();
                         auto cellRef =
-                            std::make_unique<CellRefNode>(name, row, false, true, id.position);
+                            std::make_unique<CellRefNode>(name, row, false, true, fullPos);
                         if (match(TokenType::COLON)) {
                             // Range like A$1:B$2
                             auto second = parseCellOrRangeRef("");
@@ -395,8 +398,10 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
         if (check(TokenType::NUMBER)) {
             // Cell reference: A1
             const int row = static_cast<int>(current_.numberValue());
+            // Extend position to include row number token
+            const SourcePosition fullPos{pos.start, current_.position.end};
             advance();
-            auto cellRef = std::make_unique<CellRefNode>(col, row, false, false, pos);
+            auto cellRef = std::make_unique<CellRefNode>(col, row, false, false, fullPos);
             cellRef->sheetName = sheetName;
 
             // Check for range (A1:B2)
@@ -416,8 +421,10 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
             advance();
             if (check(TokenType::NUMBER)) {
                 const int row = static_cast<int>(current_.numberValue());
+                // Extend position to include $ and row number
+                const SourcePosition fullPos{pos.start, current_.position.end};
                 advance();
-                auto cellRef = std::make_unique<CellRefNode>(col, row, false, true, pos);
+                auto cellRef = std::make_unique<CellRefNode>(col, row, false, true, fullPos);
                 cellRef->sheetName = sheetName;
 
                 // Check for range
@@ -492,8 +499,9 @@ std::unique_ptr<ASTNode> FormulaParser::parseCellOrRangeRef(const std::string& s
         return errorNode("Invalid cell reference");
     }
 
-    auto cellRef = std::make_unique<CellRefNode>(components.column, components.row,
-                                                 components.colAbsolute, components.rowAbsolute);
+    auto cellRef =
+        std::make_unique<CellRefNode>(components.column, components.row, components.colAbsolute,
+                                      components.rowAbsolute, components.position);
     cellRef->sheetName = sheetName;
 
     // Check for range
@@ -507,7 +515,7 @@ std::unique_ptr<ASTNode> FormulaParser::parseCellOrRangeRef(const std::string& s
 
         auto secondCell = std::make_unique<CellRefNode>(
             secondComponents.column, secondComponents.row, secondComponents.colAbsolute,
-            secondComponents.rowAbsolute);
+            secondComponents.rowAbsolute, secondComponents.position);
         secondCell->sheetName = sheetName;
 
         return std::make_unique<RangeRefNode>(std::move(cellRef), std::move(secondCell));
@@ -518,6 +526,9 @@ std::unique_ptr<ASTNode> FormulaParser::parseCellOrRangeRef(const std::string& s
 
 FormulaParser::CellRefComponents FormulaParser::parseCellRefComponents() {
     CellRefComponents result;
+
+    // Track start position (accounting for optional $ before column)
+    const size_t startPos = current_.position.start;
 
     // Optional $ for column absolute
     if (match(TokenType::DOLLAR)) {
@@ -548,6 +559,8 @@ FormulaParser::CellRefComponents FormulaParser::parseCellRefComponents() {
     // Row number
     if (check(TokenType::NUMBER)) {
         result.row = static_cast<int>(current_.numberValue());
+        // Set position to span from start to end of row number
+        result.position = {startPos, current_.position.end};
         advance();
         result.valid = true;
     }
