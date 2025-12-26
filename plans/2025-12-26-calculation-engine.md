@@ -1,8 +1,8 @@
 # Calculation Engine
 
-Status: COMPLETE (Phases 1-9), PENDING (Phase 10)
+Status: COMPLETE (Phases 1-9), DEFERRED (Phase 10)
 Created At: 2025-12-26 01:22 UTC
-Updated At: 2025-12-26 18:30 UTC
+Updated At: 2025-12-27 00:15 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -1027,11 +1027,32 @@ core/cells/functions/
 
 ---
 
-## Phase 10: Refactor Existing Functions
+## Phase 10: Refactor Existing Functions (DEFERRED)
+
+**Status**: Deferred - Requires architectural changes to resolve circular dependencies
+
+**Issue**: Splitting the `formula_functions.cc` monolith into individual files creates circular dependencies between:
+- `registry.h/cc` - needs `EvalResult` from `formula_eval.h`
+- `formula_eval.cc` - needs `FunctionRegistry` from `registry.h`
+- `helpers.cc` - needs `evaluate()` from `formula_eval.cc`
+- Individual function files - need both helpers and registry
+
+**Attempted Solutions**:
+1. Forward declarations in registry.h - works for headers but not for `EvalResult::Error()` calls in registry.cc
+2. Static initializers for auto-registration - creates link-time complexity
+3. Moving registry to functions directory - creates circular build dependencies
+
+**Recommended Future Approach**:
+1. Extract `EvalResult` and `CellError` into a separate `formula_types.h` header
+2. Have `registry.h` depend only on `formula_types.h`
+3. Have individual function modules register via explicit initialization calls (not static initializers)
+4. Create a `functions_init.cc` that calls all registration functions
+
+**Current State**: The existing Phase 9 individual function files (fn_rand, fn_stats, fn_lookup) work correctly because they include `formula_functions.h` directly, which has the full `FunctionRegistry` definition.
+
+### Original Plan (Deferred)
 
 Split the existing `formula_functions.cc` monolith into individual files for better maintainability.
-
-### 10a: Create functions directory structure
 
 ```
 core/cells/functions/
@@ -1043,45 +1064,13 @@ core/cells/functions/
 └── ... (individual function files)
 ```
 
-### 10b: Extract math functions
-
-Move from `formula_functions.cc` to individual files:
-- [ ] fn_sum.cc/h
-- [ ] fn_average.cc/h
-- [ ] fn_count.cc/h (COUNT, COUNTA)
-- [ ] fn_min_max.cc/h (MIN, MAX)
-- [ ] fn_round.cc/h (ROUND, FLOOR, CEILING, INT)
-- [ ] fn_math.cc/h (ABS, SQRT, POWER, MOD)
-
-### 10c: Extract logic functions
-
-- [ ] fn_if.cc/h
-- [ ] fn_and_or_not.cc/h
-- [ ] fn_iferror.cc/h (IFERROR, IFNA)
-- [ ] fn_is.cc/h (ISBLANK, ISNUMBER, ISTEXT, ISERROR)
-
-### 10d: Extract text functions
-
-- [ ] fn_len.cc/h
-- [ ] fn_left_right_mid.cc/h
-- [ ] fn_case.cc/h (UPPER, LOWER, PROPER)
-- [ ] fn_find_search.cc/h
-- [ ] fn_substitute_replace.cc/h
-- [ ] fn_concat.cc/h (CONCAT, CONCATENATE)
-- [ ] fn_text_value.cc/h (TEXT, VALUE)
-- [ ] fn_trim.cc/h
-
-### 10e: Extract date/time functions
-
-- [ ] fn_now_today.cc/h
-- [ ] fn_date_time.cc/h (DATE, TIME, DATEVALUE, TIMEVALUE)
-- [ ] fn_date_parts.cc/h (YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, WEEKDAY)
-
-### 10f: Update BUILD file and tests
-
-- [ ] Create `core/cells/functions/BUILD` with individual targets
-- [ ] Update `core/cells/BUILD` to depend on function library
-- [ ] Ensure all existing tests still pass
+**Deferred subtasks:**
+- [ ] 10a: Create functions directory structure
+- [ ] 10b: Extract math functions
+- [ ] 10c: Extract logic functions
+- [ ] 10d: Extract text functions
+- [ ] 10e: Extract date/time functions
+- [ ] 10f: Update BUILD file and tests
 
 ---
 
