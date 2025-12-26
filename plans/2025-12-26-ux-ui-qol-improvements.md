@@ -40,6 +40,29 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 
 ---
 
+## Phase 1.5: Fix #REF! Error for Range References
+
+**Goal:** Fix the formula engine bug where `=SUM(B1:B4)` returns #REF! when columns/rows in the range don't have explicit Axis objects.
+
+### Architecture
+
+- **Root cause:** `evaluateRangeRef()` in `formula_eval.cc` calls `getColumnByPosition()` and `getRowByPosition()` which return null for sparse columns/rows
+- **Current behavior:** Returns `CellError::REF` when any column/row in the range doesn't exist as an Axis
+- **New behavior:** Range evaluation should work with implicit (virtual) columns/rows, not require explicit Axis objects
+
+### Tasks
+
+- [ ] 1.5a: Investigate `evaluateRangeRef()` in `core/cells/formula_eval.cc` to understand current behavior
+- [ ] 1.5b: Modify range evaluation to handle sparse columns/rows (iterate over cells without requiring Axis objects)
+- [ ] 1.5c: Apply same fix to `evaluateColumnRef()`, `evaluateRowRef()`, `evaluateColumnRangeRef()`, `evaluateRowRangeRef()`
+- [ ] 1.5d: Add unit tests for range formulas with sparse data
+- [ ] 1.5e: Verify `=SUM(B1:B4)` works correctly with values in B1-B4
+
+### UI Checkpoint 1.5
+- [ ] **USER APPROVAL REQUIRED:** Verify `=SUM(B1:B4)` and similar range formulas work without #REF! error
+
+---
+
 ## Phase 2: Color-Coded Formula Reference Text
 
 **Goal:** Display cell and range references in the formula bar/cell editor with the same colors as their highlight borders on the grid.
@@ -197,6 +220,7 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 | Phase | Feature | Key Files |
 |-------|---------|-----------|
 | 1 | Click-to-add references | `app-events.ts`, `cell-editor.ts`, `header-editor.ts` |
+| 1.5 | Fix #REF! for ranges | `formula_eval.cc` (C++ engine) |
 | 2 | Colored formula text | `formula-colorizer.ts` (new), `styles.css` |
 | 3 | Scrollbars | `scrollbar.ts` (new), `index.html`, `styles.css` |
 | 4 | Cell reference width | `styles.css` |
