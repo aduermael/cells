@@ -26,6 +26,7 @@ COPY --from=builder /build/server .
 
 # Copy the WASM distribution files (only the web assets, not source code)
 COPY dist/index.html dist/
+COPY dist/main.js dist/
 COPY dist/cells_wasm_bin.js dist/
 COPY dist/cells_wasm_bin.wasm dist/
 COPY dist/worker.js dist/
