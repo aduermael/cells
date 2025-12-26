@@ -759,6 +759,7 @@ export function initApp(): AppContext {
     uiStateMachine: app.uiStateMachine,
     cellEditor,
     columnHeaderEditor,
+    formulaBarEditor,
     presenceBroadcaster,
     formulaInput: elements.formulaInput,
 

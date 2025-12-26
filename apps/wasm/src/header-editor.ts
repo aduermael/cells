@@ -354,6 +354,56 @@ export class FormulaBarEditor {
     return this.uiStateMachine.isInState("FORMULA_BAR_EDITING");
   }
 
+  /**
+   * Check if currently editing a formula (value starts with '=')
+   */
+  isFormulaMode(): boolean {
+    if (!this.isEditingFormulaBar()) return false;
+    return this.formulaInput.value.startsWith("=");
+  }
+
+  /**
+   * Insert a cell reference at the current cursor position
+   * @param ref The reference to insert (e.g., "A1", "B:B", "3:3")
+   */
+  insertReferenceAtCursor(ref: string): void {
+    if (!this.isEditingFormulaBar()) return;
+
+    const input = this.formulaInput;
+    const start = input.selectionStart ?? input.value.length;
+    const end = input.selectionEnd ?? input.value.length;
+
+    // Insert the reference at cursor position, replacing any selection
+    const before = input.value.slice(0, start);
+    const after = input.value.slice(end);
+    input.value = before + ref + after;
+
+    // Move cursor to after the inserted reference
+    const newPos = start + ref.length;
+    input.setSelectionRange(newPos, newPos);
+
+    // Sync with cell editor if visible
+    if (this.cellEditorInput.style.display === "block") {
+      this.cellEditorInput.value = input.value;
+    }
+
+    // Update formula highlights
+    this.onUpdateFormulaHighlights(input.value);
+
+    // Broadcast editing state
+    const editCell = this.getSelectionStart() || this.getSelectedCell();
+    if (this.syncAdapter && editCell) {
+      this.syncAdapter.setEditing(editCell.col, editCell.row, input.value);
+    }
+  }
+
+  /**
+   * Get the input element for direct manipulation
+   */
+  getInputElement(): HTMLInputElement {
+    return this.formulaInput;
+  }
+
   // =========================================================================
   // Formula Bar Editing Operations
   // =========================================================================

@@ -25,8 +25,9 @@ import {
   hasRangeSelection,
 } from "./grid-utils";
 import type { CellEditor } from "./cell-editor";
-import type { ColumnHeaderEditor } from "./header-editor";
+import type { ColumnHeaderEditor, FormulaBarEditor } from "./header-editor";
 import type { PresenceBroadcaster } from "./presence-broadcast";
+import { colToLetter } from "./grid-utils";
 
 // =============================================================================
 // Types
@@ -38,6 +39,7 @@ export interface AppEventManagerConfig {
   uiStateMachine: UIStateMachine;
   cellEditor: CellEditor;
   columnHeaderEditor: ColumnHeaderEditor;
+  formulaBarEditor: FormulaBarEditor;
   presenceBroadcaster: PresenceBroadcaster;
   formulaInput: HTMLInputElement;
 
@@ -148,6 +150,38 @@ export class AppEventManager {
   }
 
   // =========================================================================
+  // Formula Reference Insertion Helpers
+  // =========================================================================
+
+  /**
+   * Check if we're currently in formula editing mode (editing a formula in cell or formula bar)
+   */
+  private isInFormulaEditingMode(): boolean {
+    const { cellEditor, formulaBarEditor } = this.config;
+    return cellEditor.isFormulaMode() || formulaBarEditor.isFormulaMode();
+  }
+
+  /**
+   * Insert a reference into the active formula editor
+   */
+  private insertFormulaReference(ref: string): void {
+    const { cellEditor, formulaBarEditor, render } = this.config;
+
+    if (cellEditor.isFormulaMode()) {
+      cellEditor.insertReferenceAtCursor(ref);
+      // Refocus the cell editor input
+      cellEditor.getInputElement().focus();
+    } else if (formulaBarEditor.isFormulaMode()) {
+      formulaBarEditor.insertReferenceAtCursor(ref);
+      // Refocus the formula bar input
+      formulaBarEditor.getInputElement().focus();
+    }
+
+    // Re-render to update formula highlights
+    render();
+  }
+
+  // =========================================================================
   // Canvas Events
   // =========================================================================
 
@@ -242,10 +276,19 @@ export class AppEventManager {
       }
     }
 
-    // Column header click (select, pending drag)
+    // Column header click (select, pending drag, or insert reference)
     if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
       const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
       if (col >= 0) {
+        // Check if in formula editing mode - insert column reference instead of selecting
+        if (this.isInFormulaEditingMode()) {
+          const colLetter = colToLetter(col);
+          const ref = `${colLetter}:${colLetter}`; // Column reference like "B:B"
+          this.insertFormulaReference(ref);
+          e.preventDefault();
+          return;
+        }
+
         setSelectedCell(null);
         setSelectedRow(null);
         setSelectedColumn(col);
@@ -293,10 +336,19 @@ export class AppEventManager {
       }
     }
 
-    // Row header click (select, pending drag)
+    // Row header click (select, pending drag, or insert reference)
     if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
       const row = getRowAtY(y, scrollY, rowHeights, sheetInfo.rowCount);
       if (row >= 0) {
+        // Check if in formula editing mode - insert row reference instead of selecting
+        if (this.isInFormulaEditingMode()) {
+          const rowNum = row + 1; // 1-based row number
+          const ref = `${rowNum}:${rowNum}`; // Row reference like "3:3"
+          this.insertFormulaReference(ref);
+          e.preventDefault();
+          return;
+        }
+
         setSelectedCell(null);
         setSelectedColumn(null);
         setSelectedRow(row);
@@ -317,15 +369,25 @@ export class AppEventManager {
       }
     }
 
-    // Cell selection
+    // Cell selection or insert reference
     if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
-      setSelectedColumn(null);
-      setSelectedRow(null);
-
       const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
       const row = getRowAtY(y, scrollY, rowHeights, sheetInfo.rowCount);
 
       if (col >= 0 && row >= 0) {
+        // Check if in formula editing mode - insert cell reference instead of selecting
+        if (this.isInFormulaEditingMode()) {
+          const colLetter = colToLetter(col);
+          const rowNum = row + 1; // 1-based row number
+          const ref = `${colLetter}${rowNum}`; // Cell reference like "A1"
+          this.insertFormulaReference(ref);
+          e.preventDefault();
+          return;
+        }
+
+        setSelectedColumn(null);
+        setSelectedRow(null);
+
         const selStart = getSelectionStart();
         const isShiftClick = e.shiftKey && selStart;
 
