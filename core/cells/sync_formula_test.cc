@@ -7,6 +7,7 @@
 #include <string>
 
 #include "core/cells/crdt.h"
+#include "core/cells/dependency_graph.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/ref_converter.h"
@@ -321,6 +322,110 @@ TEST_F(SyncFormulaTest, ConversionFailsGracefullyWithoutContext) {
     emptyConverter.setContext(*workbookB_->getSheetByIndex(0));
     converted = emptyConverter.formulaToA1(uuidFormula);
     EXPECT_EQ(converted, "B1");
+}
+
+// ============================================================================
+// Dependency graph tests: verify formulas are added to dependency graph on sync
+// ============================================================================
+
+TEST_F(SyncFormulaTest, DependencyGraphUpdatedOnRemoteFormulaSync) {
+    // When a formula operation is received from a remote peer,
+    // the dependency graph should be updated so that:
+    // 1. The formula cell tracks its dependencies
+    // 2. When the referenced cell changes, dependents can be recalculated
+
+    Sheet* sheetB = workbookB_->getSheetByIndex(0);
+    DependencyGraph* depGraph = sheetB->getDependencyGraph();
+    ASSERT_NE(depGraph, nullptr);
+
+    // Initially, A2 should have no dependencies
+    EXPECT_TRUE(depGraph->getDependencies(sharedCellA2_).empty());
+
+    // Client A enters formula =B1 in cell A2
+    std::string uuidFormula = "~~" + sharedCellB1_.toString();
+    std::string displayFormula = "=B1";
+
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
+
+    // Apply to workbook B (remote operation)
+    ApplyResult result = applyOperation(*workbookB_, op);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    // Now A2 should have dependencies (it depends on B1)
+    auto deps = depGraph->getDependencies(sharedCellA2_);
+    EXPECT_FALSE(deps.empty()) << "Formula cell should have dependencies after remote sync";
+
+    // The formula AST should have been parsed
+    Cell* cellA2 = sheetB->getCell(sharedCellA2_);
+    ASSERT_NE(cellA2, nullptr);
+    ASSERT_TRUE(cellA2->isFormula());
+    EXPECT_NE(cellA2->getFormula()->ast, nullptr) << "Formula AST should be parsed for remote ops";
+}
+
+TEST_F(SyncFormulaTest, DependencyGraphClearedWhenFormulaReplacedWithValue) {
+    // When a formula cell is changed to a regular value, the dependency
+    // graph entry should be removed
+
+    Sheet* sheetB = workbookB_->getSheetByIndex(0);
+    DependencyGraph* depGraph = sheetB->getDependencyGraph();
+
+    // First, set a formula
+    std::string uuidFormula = "~~" + sharedCellB1_.toString();
+    std::string displayFormula = "=B1";
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    Operation op1 = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
+    applyOperation(*workbookB_, op1);
+
+    EXPECT_FALSE(depGraph->getDependencies(sharedCellA2_).empty());
+
+    // Now replace with a regular value
+    HLC hlc2 = workbookA_->getCurrentHLC();  // This will be higher than op1
+    std::string valuePayload = "{\"type\":\"n\",\"value\":\"42\",\"col_id\":\"" +
+                               sharedColA_.toString() + "\",\"row_id\":\"" + sharedRow2_.toString() +
+                               "\"}";
+    Operation op2(hlc2, OpType::CELL_SET_VALUE, sharedCellA2_, valuePayload);
+    applyOperation(*workbookB_, op2);
+
+    // Dependencies should be cleared
+    EXPECT_TRUE(depGraph->getDependencies(sharedCellA2_).empty())
+        << "Dependencies should be cleared when formula replaced with value";
+
+    // Cell should no longer be a formula
+    Cell* cell = sheetB->getCell(sharedCellA2_);
+    EXPECT_FALSE(cell->isFormula());
+}
+
+TEST_F(SyncFormulaTest, VolatileFunctionTrackedOnRemoteSync) {
+    // When a formula with NOW() or RAND() is synced, it should be
+    // marked as volatile in the dependency graph
+
+    Sheet* sheetB = workbookB_->getSheetByIndex(0);
+    DependencyGraph* depGraph = sheetB->getDependencyGraph();
+
+    // Initially not volatile
+    EXPECT_FALSE(depGraph->isVolatile(sharedCellA2_));
+
+    // Sync a formula with NOW()
+    std::string uuidFormula = "NOW()";
+    std::string displayFormula = "=NOW()";
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
+    applyOperation(*workbookB_, op);
+
+    // Should now be marked as volatile
+    EXPECT_TRUE(depGraph->isVolatile(sharedCellA2_))
+        << "Volatile functions should be tracked on remote sync";
+
+    auto volatileCells = depGraph->getVolatileCells();
+    bool found = false;
+    for (const auto& id : volatileCells) {
+        if (id == sharedCellA2_) {
+            found = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(found) << "Cell with volatile function should be in volatile cells list";
 }
 
 }  // namespace

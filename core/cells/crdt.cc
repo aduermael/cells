@@ -4,6 +4,8 @@
 
 #include <algorithm>
 
+#include "core/cells/dependency_graph.h"
+
 namespace cells {
 
 namespace {
@@ -180,8 +182,34 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         // For formulas: value_str contains UUID formula, display contains A1 formula
         const std::string display_str = extractJSONString(op.payload, "display");
 
+        // Clear old formula dependencies before setting new formula
+        if (targetSheet != nullptr) {
+            DependencyGraph* depGraph = targetSheet->getDependencyGraph();
+            if (depGraph != nullptr) {
+                depGraph->removeFormula(cell->id);
+            }
+        }
+
         // Create the formula object using UUID formula
         auto* formula = new Formula(value_str.c_str());
+
+        // Parse the formula to create the AST
+        // This is needed for dependency tracking and reference highlighting
+        if (formula->parse()) {
+            // Add to dependency graph for recalculation tracking
+            if (targetSheet != nullptr) {
+                DependencyGraph* depGraph = targetSheet->getDependencyGraph();
+                if (depGraph != nullptr) {
+                    depGraph->addFormula(cell->id, formula->ast);
+
+                    // Track volatile functions
+                    if (formula->hasVolatile()) {
+                        depGraph->markVolatile(cell->id);
+                    }
+                }
+            }
+        }
+
         cell->setFormula(formula);
 
         // Store display formula in raw for UI display
@@ -189,6 +217,14 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
     } else {
         // Clear formula if it was a formula cell
         if (cell->formula != nullptr) {
+            // Remove from dependency graph first
+            if (targetSheet != nullptr) {
+                DependencyGraph* depGraph = targetSheet->getDependencyGraph();
+                if (depGraph != nullptr) {
+                    depGraph->removeFormula(cell->id);
+                    depGraph->unmarkVolatile(cell->id);
+                }
+            }
             cell->clearFormula();
         }
         cell->value.raw = value_str;

@@ -2,7 +2,7 @@
 
 Status: IN_PROGRESS
 Created At: 2025-12-25 23:41 UTC
-Updated At: 2025-12-26 01:15 UTC
+Updated At: 2025-12-26 02:45 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -98,11 +98,15 @@ Based on diagnosis, fix the RefConverter context management.
   - Operations are added to OpLog and broadcast to peers
   - **Test**: ✅ Manual testing confirmed - formulas display correctly on remote clients!
 
-- [ ] 2b: Fix formula resolution for remote operations
+- [x] 2b: Fix formula resolution for remote operations
   - When receiving a formula operation, the AST needs to be re-resolved
   - The `formula.text` contains UUID format - need to parse and resolve
   - Ensure dependency graph is updated for remote formulas
   - **Test**: Formula references highlight correctly on remote client
+  - **DONE**: Added `formula->parse()` call in `applyCellSetValue()` for remote operations
+  - Also updates dependency graph with `addFormula()` and tracks volatile functions
+  - Added 3 new tests: `DependencyGraphUpdatedOnRemoteFormulaSync`,
+    `DependencyGraphClearedWhenFormulaReplacedWithValue`, `VolatileFunctionTrackedOnRemoteSync`
 
 - [ ] 2c: Handle cells created by formula references
   - Formula `=ZZ999` creates cell ZZ999 if it doesn't exist
