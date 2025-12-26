@@ -129,11 +129,24 @@ export interface AppEventManagerConfig {
  * - Keyboard navigation and editing triggers
  * - Window resize handling
  */
+/** Tracks the last inserted formula reference for range building */
+interface FormulaRefState {
+  /** Cell position */
+  position: Position;
+  /** Cursor position in input where reference starts */
+  cursorStart: number;
+  /** Cursor position in input where reference ends */
+  cursorEnd: number;
+}
+
 export class AppEventManager {
   private config: AppEventManagerConfig;
 
-  /** Last cell position clicked during formula editing (for Shift+click range references) */
-  private lastFormulaRefPosition: Position | null = null;
+  /** Last inserted reference during formula editing (for Shift+click/drag range building) */
+  private lastFormulaRef: FormulaRefState | null = null;
+
+  /** Start position for drag-selecting a range during formula editing */
+  private formulaDragStart: Position | null = null;
 
   constructor(config: AppEventManagerConfig) {
     this.config = config;
@@ -163,31 +176,118 @@ export class AppEventManager {
     const { cellEditor, formulaBarEditor } = this.config;
     const inFormulaMode = cellEditor.isFormulaMode() || formulaBarEditor.isFormulaMode();
 
-    // Clear the last reference position if not in formula mode
+    // Clear the formula ref state if not in formula mode
     if (!inFormulaMode) {
-      this.lastFormulaRefPosition = null;
+      this.lastFormulaRef = null;
+      this.formulaDragStart = null;
     }
 
     return inFormulaMode;
   }
 
   /**
-   * Insert a reference into the active formula editor
+   * Get the active formula input element
    */
-  private insertFormulaReference(ref: string): void {
+  private getActiveFormulaInput(): HTMLInputElement | null {
+    const { cellEditor, formulaBarEditor } = this.config;
+    if (cellEditor.isFormulaMode()) {
+      return cellEditor.getInputElement();
+    } else if (formulaBarEditor.isFormulaMode()) {
+      return formulaBarEditor.getInputElement();
+    }
+    return null;
+  }
+
+  /**
+   * Insert a reference into the active formula editor and track cursor positions
+   */
+  private insertFormulaReference(ref: string, position: Position): void {
+    const { cellEditor, formulaBarEditor, render } = this.config;
+
+    const input = this.getActiveFormulaInput();
+    if (!input) return;
+
+    const cursorStart = input.selectionStart ?? input.value.length;
+
+    if (cellEditor.isFormulaMode()) {
+      cellEditor.insertReferenceAtCursor(ref);
+      cellEditor.getInputElement().focus();
+    } else if (formulaBarEditor.isFormulaMode()) {
+      formulaBarEditor.insertReferenceAtCursor(ref);
+      formulaBarEditor.getInputElement().focus();
+    }
+
+    // Track this reference for potential shift+click range extension
+    this.lastFormulaRef = {
+      position,
+      cursorStart,
+      cursorEnd: cursorStart + ref.length,
+    };
+
+    render();
+  }
+
+  /**
+   * Insert a column or row reference (doesn't track for range extension)
+   */
+  private insertColumnOrRowReference(ref: string): void {
     const { cellEditor, formulaBarEditor, render } = this.config;
 
     if (cellEditor.isFormulaMode()) {
       cellEditor.insertReferenceAtCursor(ref);
-      // Refocus the cell editor input
       cellEditor.getInputElement().focus();
     } else if (formulaBarEditor.isFormulaMode()) {
       formulaBarEditor.insertReferenceAtCursor(ref);
-      // Refocus the formula bar input
       formulaBarEditor.getInputElement().focus();
     }
 
-    // Re-render to update formula highlights
+    render();
+  }
+
+  /**
+   * Replace the last inserted reference with a range
+   */
+  private replaceLastRefWithRange(endCol: number, endRow: number): void {
+    const { cellEditor, formulaBarEditor, render } = this.config;
+
+    if (!this.lastFormulaRef) return;
+
+    const input = this.getActiveFormulaInput();
+    if (!input) return;
+
+    const startCol = colToLetter(this.lastFormulaRef.position.col);
+    const startRow = this.lastFormulaRef.position.row + 1;
+    const endColLetter = colToLetter(endCol);
+    const endRowNum = endRow + 1;
+    const rangeRef = `${startCol}${startRow}:${endColLetter}${endRowNum}`;
+
+    // Select and replace the previous reference
+    const before = input.value.slice(0, this.lastFormulaRef.cursorStart);
+    const after = input.value.slice(this.lastFormulaRef.cursorEnd);
+    input.value = before + rangeRef + after;
+
+    // Update cursor position
+    const newCursorEnd = this.lastFormulaRef.cursorStart + rangeRef.length;
+    input.setSelectionRange(newCursorEnd, newCursorEnd);
+
+    // Sync with the other editor
+    if (cellEditor.isFormulaMode()) {
+      const formulaInput = formulaBarEditor.getInputElement();
+      formulaInput.value = input.value;
+    } else if (formulaBarEditor.isFormulaMode()) {
+      const cellInput = cellEditor.getInputElement();
+      if (cellInput.style.display === "block") {
+        cellInput.value = input.value;
+      }
+    }
+
+    // Trigger highlight update by dispatching an input event
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    // Update tracked reference to the new range
+    this.lastFormulaRef.cursorEnd = newCursorEnd;
+
+    input.focus();
     render();
   }
 
@@ -294,7 +394,10 @@ export class AppEventManager {
         if (this.isInFormulaEditingMode()) {
           const colLetter = colToLetter(col);
           const ref = `${colLetter}:${colLetter}`; // Column reference like "B:B"
-          this.insertFormulaReference(ref);
+          // Column references don't support range extension, clear tracking
+          this.lastFormulaRef = null;
+          this.formulaDragStart = null;
+          this.insertColumnOrRowReference(ref);
           e.preventDefault();
           return;
         }
@@ -354,7 +457,10 @@ export class AppEventManager {
         if (this.isInFormulaEditingMode()) {
           const rowNum = row + 1; // 1-based row number
           const ref = `${rowNum}:${rowNum}`; // Row reference like "3:3"
-          this.insertFormulaReference(ref);
+          // Row references don't support range extension, clear tracking
+          this.lastFormulaRef = null;
+          this.formulaDragStart = null;
+          this.insertColumnOrRowReference(ref);
           e.preventDefault();
           return;
         }
@@ -387,20 +493,17 @@ export class AppEventManager {
       if (col >= 0 && row >= 0) {
         // Check if in formula editing mode - insert cell reference instead of selecting
         if (this.isInFormulaEditingMode()) {
-          const colLetter = colToLetter(col);
-          const rowNum = row + 1; // 1-based row number
-
-          // Shift+click creates a range from last clicked position
-          if (e.shiftKey && this.lastFormulaRefPosition) {
-            const lastCol = colToLetter(this.lastFormulaRefPosition.col);
-            const lastRow = this.lastFormulaRefPosition.row + 1;
-            const ref = `${lastCol}${lastRow}:${colLetter}${rowNum}`; // Range like "A1:B5"
-            this.insertFormulaReference(ref);
+          // Shift+click replaces the last reference with a range
+          if (e.shiftKey && this.lastFormulaRef) {
+            this.replaceLastRefWithRange(col, row);
           } else {
-            const ref = `${colLetter}${rowNum}`; // Cell reference like "A1"
-            this.insertFormulaReference(ref);
-            // Track this position for potential Shift+click range
-            this.lastFormulaRefPosition = { col, row };
+            // Insert single cell reference and track for drag/shift+click
+            const colLetter = colToLetter(col);
+            const rowNum = row + 1;
+            const ref = `${colLetter}${rowNum}`;
+            this.insertFormulaReference(ref, { col, row });
+            // Start tracking for potential drag selection
+            this.formulaDragStart = { col, row };
           }
           e.preventDefault();
           return;
@@ -471,6 +574,22 @@ export class AppEventManager {
     const scrollY = getScrollY();
     const colWidths = getColWidths();
     const rowHeights = getRowHeights();
+
+    // Handle drag selection during formula editing (click+drag to select range)
+    if (this.formulaDragStart && this.isInFormulaEditingMode() && x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+      const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+      const row = getRowAtY(y, scrollY, rowHeights, sheetInfo.rowCount);
+      if (col >= 0 && row >= 0) {
+        // Only update if moved to a different cell
+        if (col !== this.formulaDragStart.col || row !== this.formulaDragStart.row) {
+          // Replace the last reference with a range from drag start to current position
+          if (this.lastFormulaRef) {
+            this.replaceLastRefWithRange(col, row);
+          }
+        }
+      }
+      return; // Don't process other handlers during formula drag
+    }
 
     // Check if pending drag should become actual drag (threshold exceeded)
     if (getPendingDragColumn()) {
@@ -602,6 +721,16 @@ export class AppEventManager {
     const dataSource = getDataSource();
     const colWidths = getColWidths();
     const rowHeights = getRowHeights();
+
+    // End formula drag selection (if active)
+    if (this.formulaDragStart) {
+      this.formulaDragStart = null;
+      // Refocus the input element after drag
+      const input = this.getActiveFormulaInput();
+      if (input) {
+        input.focus();
+      }
+    }
 
     // End range selection
     if (uiStateMachine.isInState("SELECTING")) {
