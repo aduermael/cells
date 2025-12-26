@@ -1,8 +1,8 @@
 #include "core/cells/functions/fn_rand.h"
 
-#include <gtest/gtest.h>
-
 #include <cmath>
+
+#include <gtest/gtest.h>
 #include <memory>
 #include <set>
 #include <string>

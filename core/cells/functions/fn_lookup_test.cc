@@ -1,7 +1,6 @@
 #include "core/cells/functions/fn_lookup.h"
 
 #include <gtest/gtest.h>
-
 #include <memory>
 #include <string>
 #include <unordered_set>

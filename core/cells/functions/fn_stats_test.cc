@@ -1,8 +1,8 @@
 #include "core/cells/functions/fn_stats.h"
 
-#include <gtest/gtest.h>
-
 #include <cmath>
+
+#include <gtest/gtest.h>
 #include <memory>
 #include <string>
 #include <unordered_set>

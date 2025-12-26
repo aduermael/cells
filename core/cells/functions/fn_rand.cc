@@ -1,6 +1,7 @@
 #include "core/cells/functions/fn_rand.h"
 
 #include <cmath>
+
 #include <random>
 
 #include "core/cells/formula_ast.h"
@@ -46,13 +47,13 @@ EvalResult fn_RANDBETWEEN(const std::vector<const ASTNode*>& args, EvalContext& 
     }
 
     // Get integer bounds (Excel truncates towards zero)
-    double bottomRaw = bottomResult.getNumber();
-    double topRaw = topResult.getNumber();
+    const double bottomRaw = bottomResult.getNumber();
+    const double topRaw = topResult.getNumber();
 
     // Excel's RANDBETWEEN rounds bottom up and top down (ceiling/floor)
     // This ensures the range is valid integers
-    int64_t bottom = static_cast<int64_t>(std::ceil(bottomRaw));
-    int64_t top = static_cast<int64_t>(std::floor(topRaw));
+    const auto bottom = static_cast<int64_t>(std::ceil(bottomRaw));
+    const auto top = static_cast<int64_t>(std::floor(topRaw));
 
     // Check for invalid range
     if (bottom > top) {

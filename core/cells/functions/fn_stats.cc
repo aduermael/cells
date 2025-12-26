@@ -1,7 +1,8 @@
 #include "core/cells/functions/fn_stats.h"
 
-#include <algorithm>
 #include <cmath>
+
+#include <algorithm>
 #include <vector>
 
 #include "core/cells/formula_ast.h"
@@ -31,20 +32,20 @@ std::pair<double, EvalResult> computeVariance(const std::vector<const ASTNode*>&
 
     // Calculate mean
     double sum = 0.0;
-    for (double v : values) {
+    for (const double v : values) {
         sum += v;
     }
-    double mean = sum / static_cast<double>(values.size());
+    const double mean = sum / static_cast<double>(values.size());
 
     // Calculate sum of squared deviations
     double sumSquaredDev = 0.0;
-    for (double v : values) {
-        double dev = v - mean;
+    for (const double v : values) {
+        const double dev = v - mean;
         sumSquaredDev += dev * dev;
     }
 
     // Divide by n (population) or n-1 (sample)
-    double denominator =
+    const double denominator =
         population ? static_cast<double>(values.size()) : static_cast<double>(values.size() - 1);
 
     return {sumSquaredDev / denominator, EvalResult::Empty()};
@@ -74,7 +75,7 @@ EvalResult computePercentile(const std::vector<const ASTNode*>& args, EvalContex
         return kResult;
     }
 
-    double k = kResult.getNumber();
+    const double k = kResult.getNumber();
 
     // Validate k range
     if (inclusive) {
@@ -85,8 +86,8 @@ EvalResult computePercentile(const std::vector<const ASTNode*>& args, EvalContex
     } else {
         // PERCENTILE.EXC: k must be in (0, 1), also need enough data points
         // Excel requires: k > 1/(n+1) and k < n/(n+1)
-        double n = static_cast<double>(values.size());
-        if (k <= 0.0 || k >= 1.0 || k < 1.0 / (n + 1.0) || k > n / (n + 1.0)) {
+        const auto nDouble = static_cast<double>(values.size());
+        if (k <= 0.0 || k >= 1.0 || k < 1.0 / (nDouble + 1.0) || k > nDouble / (nDouble + 1.0)) {
             return EvalResult::Error(CellError::NUM);
         }
     }
@@ -94,7 +95,7 @@ EvalResult computePercentile(const std::vector<const ASTNode*>& args, EvalContex
     // Sort values
     std::sort(values.begin(), values.end());
 
-    size_t n = values.size();
+    const size_t n = values.size();
 
     if (inclusive) {
         // PERCENTILE.INC formula: rank = k * (n - 1)
@@ -103,36 +104,36 @@ EvalResult computePercentile(const std::vector<const ASTNode*>& args, EvalContex
             return EvalResult::Number(values[0]);
         }
 
-        double rank = k * static_cast<double>(n - 1);
-        size_t lower = static_cast<size_t>(std::floor(rank));
-        size_t upper = static_cast<size_t>(std::ceil(rank));
+        const double rank = k * static_cast<double>(n - 1);
+        const auto lower = static_cast<size_t>(std::floor(rank));
+        const auto upper = static_cast<size_t>(std::ceil(rank));
 
         if (lower == upper || upper >= n) {
             return EvalResult::Number(values[lower]);
         }
 
         // Linear interpolation
-        double fraction = rank - static_cast<double>(lower);
-        double result = values[lower] + fraction * (values[upper] - values[lower]);
-        return EvalResult::Number(result);
-    } else {
-        // PERCENTILE.EXC formula: rank = k * (n + 1) - 1 (0-indexed)
-        double rank = k * static_cast<double>(n + 1) - 1.0;
-        size_t lower = static_cast<size_t>(std::floor(rank));
-        size_t upper = static_cast<size_t>(std::ceil(rank));
-
-        if (upper >= n) {
-            upper = n - 1;
-        }
-        if (lower == upper) {
-            return EvalResult::Number(values[lower]);
-        }
-
-        // Linear interpolation
-        double fraction = rank - static_cast<double>(lower);
-        double result = values[lower] + fraction * (values[upper] - values[lower]);
+        const double fraction = rank - static_cast<double>(lower);
+        const double result = values[lower] + fraction * (values[upper] - values[lower]);
         return EvalResult::Number(result);
     }
+
+    // PERCENTILE.EXC formula: rank = k * (n + 1) - 1 (0-indexed)
+    const double rank = k * static_cast<double>(n + 1) - 1.0;
+    const auto lower = static_cast<size_t>(std::floor(rank));
+    auto upper = static_cast<size_t>(std::ceil(rank));
+
+    if (upper >= n) {
+        upper = n - 1;
+    }
+    if (lower == upper) {
+        return EvalResult::Number(values[lower]);
+    }
+
+    // Linear interpolation
+    const double fraction = rank - static_cast<double>(lower);
+    const double result = values[lower] + fraction * (values[upper] - values[lower]);
+    return EvalResult::Number(result);
 }
 
 }  // namespace
@@ -150,16 +151,16 @@ EvalResult fn_MEDIAN(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     // Sort values
     std::sort(values.begin(), values.end());
 
-    size_t n = values.size();
+    const size_t n = values.size();
     if (n % 2 == 1) {
         // Odd count: return middle value
         return EvalResult::Number(values[n / 2]);
-    } else {
-        // Even count: return average of two middle values
-        double mid1 = values[n / 2 - 1];
-        double mid2 = values[n / 2];
-        return EvalResult::Number((mid1 + mid2) / 2.0);
     }
+
+    // Even count: return average of two middle values
+    const double mid1 = values[n / 2 - 1];
+    const double mid2 = values[n / 2];
+    return EvalResult::Number((mid1 + mid2) / 2.0);
 }
 
 EvalResult fn_STDEV(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
@@ -219,11 +220,11 @@ void registerStatsFunctions() {
 
     registry.registerFunction("MEDIAN", fn_MEDIAN);
     registry.registerFunction("STDEV", fn_STDEV);
-    registry.registerFunction("STDEVS", fn_STDEV_S);   // STDEV.S alternative
-    registry.registerFunction("STDEVP", fn_STDEV_P);   // STDEV.P alternative
+    registry.registerFunction("STDEVS", fn_STDEV_S);  // STDEV.S alternative
+    registry.registerFunction("STDEVP", fn_STDEV_P);  // STDEV.P alternative
     registry.registerFunction("VAR", fn_VAR);
-    registry.registerFunction("VARS", fn_VAR_S);       // VAR.S alternative
-    registry.registerFunction("VARP", fn_VAR_P);       // VAR.P alternative
+    registry.registerFunction("VARS", fn_VAR_S);  // VAR.S alternative
+    registry.registerFunction("VARP", fn_VAR_P);  // VAR.P alternative
     registry.registerFunction("PERCENTILE", fn_PERCENTILE);
     registry.registerFunction("PERCENTILEINC", fn_PERCENTILE_INC);  // PERCENTILE.INC alternative
     registry.registerFunction("PERCENTILEEXC", fn_PERCENTILE_EXC);  // PERCENTILE.EXC alternative

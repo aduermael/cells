@@ -1,7 +1,8 @@
 #include "core/cells/functions/fn_lookup.h"
 
-#include <algorithm>
 #include <cmath>
+
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -32,10 +33,10 @@ RangeDimensions getRangeDimensions(const RangeBounds& bounds, Sheet* sheet) {
     }
 
     // Get start and end axes
-    Axis* startCol = sheet->getColumn(bounds.startColId);
-    Axis* startRow = sheet->getRow(bounds.startRowId);
-    Axis* endCol = sheet->getColumn(bounds.endColId);
-    Axis* endRow = sheet->getRow(bounds.endRowId);
+    const Axis* startCol = sheet->getColumn(bounds.startColId);
+    const Axis* startRow = sheet->getRow(bounds.startRowId);
+    const Axis* endCol = sheet->getColumn(bounds.endColId);
+    const Axis* endRow = sheet->getRow(bounds.endRowId);
 
     if (!startCol || !startRow || !endCol || !endRow) {
         return dims;
@@ -43,10 +44,10 @@ RangeDimensions getRangeDimensions(const RangeBounds& bounds, Sheet* sheet) {
 
     dims.startColPos = startCol->position;
     dims.startRowPos = startRow->position;
-    dims.cols =
-        std::abs(static_cast<int>(endCol->position) - static_cast<int>(startCol->position)) + 1;
-    dims.rows =
-        std::abs(static_cast<int>(endRow->position) - static_cast<int>(startRow->position)) + 1;
+    dims.cols = static_cast<uint32_t>(
+        std::abs(static_cast<int>(endCol->position) - static_cast<int>(startCol->position)) + 1);
+    dims.rows = static_cast<uint32_t>(
+        std::abs(static_cast<int>(endRow->position) - static_cast<int>(startRow->position)) + 1);
     dims.valid = true;
 
     return dims;
@@ -60,27 +61,27 @@ EvalResult getCellAtPosition(EvalContext& ctx, const RangeBounds& bounds, uint32
     }
 
     // Get start axes
-    Axis* startCol = ctx.sheet->getColumn(bounds.startColId);
-    Axis* startRow = ctx.sheet->getRow(bounds.startRowId);
+    const Axis* startCol = ctx.sheet->getColumn(bounds.startColId);
+    const Axis* startRow = ctx.sheet->getRow(bounds.startRowId);
 
     if (!startCol || !startRow) {
         return EvalResult::Error(CellError::REF);
     }
 
     // Calculate target position
-    uint32_t targetColPos = startCol->position + colOffset;
-    uint32_t targetRowPos = startRow->position + rowOffset;
+    const uint32_t targetColPos = startCol->position + colOffset;
+    const uint32_t targetRowPos = startRow->position + rowOffset;
 
     // Find the column and row at those positions
-    Axis* targetCol = ctx.sheet->getColumnByPosition(targetColPos);
-    Axis* targetRow = ctx.sheet->getRowByPosition(targetRowPos);
+    const Axis* targetCol = ctx.sheet->getColumnByPosition(targetColPos);
+    const Axis* targetRow = ctx.sheet->getRowByPosition(targetRowPos);
 
     if (!targetCol || !targetRow) {
         return EvalResult::Error(CellError::REF);
     }
 
     // Get the cell
-    Cell* cell = ctx.sheet->getCellAt(targetCol->id, targetRow->id);
+    const Cell* cell = ctx.sheet->getCellAt(targetCol->id, targetRow->id);
     if (!cell) {
         return EvalResult::Empty();
     }
@@ -110,8 +111,12 @@ EvalResult getCellAtPosition(EvalContext& ctx, const RangeBounds& bounds, uint32
 int compareValues(const EvalResult& a, const EvalResult& b) {
     // Both numbers
     if (a.isNumber() && b.isNumber()) {
-        if (a.getNumber() < b.getNumber()) return -1;
-        if (a.getNumber() > b.getNumber()) return 1;
+        if (a.getNumber() < b.getNumber()) {
+            return -1;
+        }
+        if (a.getNumber() > b.getNumber()) {
+            return 1;
+        }
         return 0;
     }
 
@@ -121,25 +126,41 @@ int compareValues(const EvalResult& a, const EvalResult& b) {
         std::string strB = b.getString();
         std::transform(strA.begin(), strA.end(), strA.begin(), ::tolower);
         std::transform(strB.begin(), strB.end(), strB.begin(), ::tolower);
-        if (strA < strB) return -1;
-        if (strA > strB) return 1;
+        if (strA < strB) {
+            return -1;
+        }
+        if (strA > strB) {
+            return 1;
+        }
         return 0;
     }
 
     // Mixed types - numbers come before strings in Excel
-    if (a.isNumber() && b.isString()) return -1;
-    if (a.isString() && b.isNumber()) return 1;
+    if (a.isNumber() && b.isString()) {
+        return -1;
+    }
+    if (a.isString() && b.isNumber()) {
+        return 1;
+    }
 
     // Booleans
     if (a.isBoolean() && b.isBoolean()) {
-        if (!a.getBoolean() && b.getBoolean()) return -1;
-        if (a.getBoolean() && !b.getBoolean()) return 1;
+        if (!a.getBoolean() && b.getBoolean()) {
+            return -1;
+        }
+        if (a.getBoolean() && !b.getBoolean()) {
+            return 1;
+        }
         return 0;
     }
 
     // Empty values
-    if (a.isEmpty() && !b.isEmpty()) return -1;
-    if (!a.isEmpty() && b.isEmpty()) return 1;
+    if (a.isEmpty() && !b.isEmpty()) {
+        return -1;
+    }
+    if (!a.isEmpty() && b.isEmpty()) {
+        return 1;
+    }
 
     return 0;  // Default equal
 }
@@ -164,13 +185,13 @@ bool valuesMatch(const EvalResult& a, const EvalResult& b) {
     }
     // Coerce string to number for comparison
     if (a.isNumber() && b.isString()) {
-        EvalResult bNum = b.toNumber();
+        const EvalResult bNum = b.toNumber();
         if (bNum.isNumber()) {
             return a.getNumber() == bNum.getNumber();
         }
     }
     if (a.isString() && b.isNumber()) {
-        EvalResult aNum = a.toNumber();
+        const EvalResult aNum = a.toNumber();
         if (aNum.isNumber()) {
             return aNum.getNumber() == b.getNumber();
         }
@@ -197,7 +218,7 @@ EvalResult fn_INDEX(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (rowResult.isError()) {
         return rowResult;
     }
-    int rowNum = static_cast<int>(rowResult.getNumber());
+    const int rowNum = static_cast<int>(rowResult.getNumber());
 
     // Get column number (1-indexed), default to 1
     int colNum = 1;
@@ -219,7 +240,7 @@ EvalResult fn_INDEX(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 
     // Get range bounds and dimensions
     const RangeBounds& bounds = rangeResult.getRangeBounds();
-    RangeDimensions dims = getRangeDimensions(bounds, ctx.sheet);
+    const RangeDimensions dims = getRangeDimensions(bounds, ctx.sheet);
     if (!dims.valid) {
         return EvalResult::Error(CellError::REF);
     }
@@ -282,20 +303,20 @@ EvalResult fn_MATCH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 
     // Get range bounds and dimensions
     const RangeBounds& bounds = rangeResult.getRangeBounds();
-    RangeDimensions dims = getRangeDimensions(bounds, ctx.sheet);
+    const RangeDimensions dims = getRangeDimensions(bounds, ctx.sheet);
     if (!dims.valid) {
         return EvalResult::Error(CellError::REF);
     }
 
     // MATCH works on 1D ranges (single row or column)
-    bool isHorizontal = dims.rows == 1;
-    bool isVertical = dims.cols == 1;
+    const bool isHorizontal = dims.rows == 1;
+    const bool isVertical = dims.cols == 1;
 
     if (!isHorizontal && !isVertical) {
         return EvalResult::Error(CellError::NA);  // Can't MATCH on 2D range
     }
 
-    uint32_t count = isHorizontal ? dims.cols : dims.rows;
+    const uint32_t count = isHorizontal ? dims.cols : dims.rows;
     int bestMatch = -1;  // -1 means no match found
 
     for (uint32_t i = 0; i < count; ++i) {
@@ -310,7 +331,7 @@ EvalResult fn_MATCH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
             continue;  // Skip errors
         }
 
-        int cmp = compareValues(lookupValue, cellValue);
+        const int cmp = compareValues(lookupValue, cellValue);
 
         if (matchType == 0) {
             // Exact match
@@ -371,7 +392,7 @@ EvalResult fn_VLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (colResult.isError()) {
         return colResult;
     }
-    int colIndex = static_cast<int>(colResult.getNumber());
+    const int colIndex = static_cast<int>(colResult.getNumber());
 
     // Get range_lookup (default TRUE = approximate match)
     bool rangeLookup = true;
@@ -385,7 +406,7 @@ EvalResult fn_VLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 
     // Get range bounds and dimensions
     const RangeBounds& bounds = rangeResult.getRangeBounds();
-    RangeDimensions dims = getRangeDimensions(bounds, ctx.sheet);
+    const RangeDimensions dims = getRangeDimensions(bounds, ctx.sheet);
     if (!dims.valid) {
         return EvalResult::Error(CellError::REF);
     }
@@ -400,7 +421,7 @@ EvalResult fn_VLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     int bestMatch = -1;
 
     for (uint32_t i = 0; i < dims.rows; ++i) {
-        EvalResult cellValue = getCellAtPosition(ctx, bounds, i, 0);
+        const EvalResult cellValue = getCellAtPosition(ctx, bounds, i, 0);
         if (cellValue.isError()) {
             continue;
         }
@@ -408,7 +429,7 @@ EvalResult fn_VLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         if (rangeLookup) {
             // Approximate match - find largest value <= lookup
             // Assumes first column is sorted ascending
-            int cmp = compareValues(lookupValue, cellValue);
+            const int cmp = compareValues(lookupValue, cellValue);
             if (cmp >= 0) {
                 bestMatch = static_cast<int>(i);
             } else {
@@ -461,7 +482,7 @@ EvalResult fn_HLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     if (rowResult.isError()) {
         return rowResult;
     }
-    int rowIndex = static_cast<int>(rowResult.getNumber());
+    const int rowIndex = static_cast<int>(rowResult.getNumber());
 
     // Get range_lookup (default TRUE = approximate match)
     bool rangeLookup = true;
@@ -475,7 +496,7 @@ EvalResult fn_HLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 
     // Get range bounds and dimensions
     const RangeBounds& bounds = rangeResult.getRangeBounds();
-    RangeDimensions dims = getRangeDimensions(bounds, ctx.sheet);
+    const RangeDimensions dims = getRangeDimensions(bounds, ctx.sheet);
     if (!dims.valid) {
         return EvalResult::Error(CellError::REF);
     }
@@ -490,7 +511,7 @@ EvalResult fn_HLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
     int bestMatch = -1;
 
     for (uint32_t i = 0; i < dims.cols; ++i) {
-        EvalResult cellValue = getCellAtPosition(ctx, bounds, 0, i);
+        const EvalResult cellValue = getCellAtPosition(ctx, bounds, 0, i);
         if (cellValue.isError()) {
             continue;
         }
@@ -498,7 +519,7 @@ EvalResult fn_HLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
         if (rangeLookup) {
             // Approximate match - find largest value <= lookup
             // Assumes first row is sorted ascending
-            int cmp = compareValues(lookupValue, cellValue);
+            const int cmp = compareValues(lookupValue, cellValue);
             if (cmp >= 0) {
                 bestMatch = static_cast<int>(i);
             } else {
