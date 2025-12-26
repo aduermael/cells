@@ -644,6 +644,10 @@ public:
         std::vector<ID> changed = {cellId};
         cells::recalculate(sheet, changed);
 
+        // Also recalculate volatile cells (RAND, NOW, etc.) on any cell change
+        // This matches Excel behavior where volatile functions update on every edit
+        cells::recalculateVolatile(sheet);
+
         notifyListeners(ChangeType::CELL_CHANGED);
         return "{\"success\":true}";
     }
@@ -739,6 +743,10 @@ public:
         markDirty(sheet, cellId);
         std::vector<ID> changed = {cellId};
         cells::recalculate(sheet, changed);
+
+        // Also recalculate volatile cells (RAND, NOW, etc.) on any cell change
+        // This matches Excel behavior where volatile functions update on every edit
+        cells::recalculateVolatile(sheet);
 
         notifyListeners(ChangeType::CELL_CHANGED);
 
