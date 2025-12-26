@@ -40,35 +40,13 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 
 ---
 
-## Phase 1.5: Fix #REF! Error for Range References
+## ~~Phase 1.5: Fix #REF! Error for Range References~~ (Moved)
 
-**Goal:** Fix the formula engine bug where `=SUM(B1:B4)` returns #REF! when columns/rows in the range don't have explicit Axis objects.
-
-### Architecture
-
-- **Root cause:** `evaluateRangeRef()` in `formula_eval.cc` calls `getColumnByPosition()` and `getRowByPosition()` which return null for sparse columns/rows
-- **Current behavior:** Returns `CellError::REF` when any column/row in the range doesn't exist as an Axis
-- **New behavior:** Range evaluation should work with implicit (virtual) columns/rows, not require explicit Axis objects
-- **Note:** `=SUM(B:B)` (column reference) already works, so range references should follow similar pattern
-
-### Related Issue: Dependency Graph for Column/Row References
-
-When using `=SUM(B:B)`, the formula is NOT re-evaluated when a previously empty cell in column B is set. This is a dependency graph issue:
-- Column/row references need to register dependencies on the entire column/row
-- When any cell in that column/row changes (including new cells), formulas should recalculate
-
-### Tasks
-
-- [x] 1.5a: Investigate `evaluateRangeRef()` in `core/cells/formula_eval.cc` - compare with working `evaluateColumnRef()`
-- [x] 1.5b: Modify range evaluation to use position bounds instead of row IDs (handles sparse rows)
-- [x] 1.5c: Update `iterateCellRange()` and `getRangeSize()` to use position bounds
-- [x] 1.5d: Update `fn_lookup.cc` functions (`getRangeDimensions`, `getCellAtPosition`) for position bounds
-- [x] 1.5e: All existing tests pass with new implementation
-- [ ] 1.5f: Investigate dependency graph registration for column/row references (deferred - separate issue)
-- [ ] 1.5g: Fix dependency tracking so new cells in column/row trigger recalculation (deferred)
-
-### UI Checkpoint 1.5
-- [ ] **USER APPROVAL REQUIRED:** Verify `=SUM(B1:B4)` works correctly
+> **Note:** This phase has been moved to a dedicated plan: `plans/2025-12-26-range-reference-fixes.md`
+>
+> Issues to address:
+> - #REF! error for cell ranges like `=SUM(B1:B4)`
+> - Dependency graph not updating when new cells added to column/row references
 
 ---
 
@@ -229,7 +207,6 @@ When using `=SUM(B:B)`, the formula is NOT re-evaluated when a previously empty 
 | Phase | Feature | Key Files |
 |-------|---------|-----------|
 | 1 | Click-to-add references | `app-events.ts`, `cell-editor.ts`, `header-editor.ts` |
-| 1.5 | Fix #REF! for ranges | `formula_eval.cc` (C++ engine) |
 | 2 | Colored formula text | `formula-colorizer.ts` (new), `styles.css` |
 | 3 | Scrollbars | `scrollbar.ts` (new), `index.html`, `styles.css` |
 | 4 | Cell reference width | `styles.css` |
@@ -238,3 +215,5 @@ When using `=SUM(B:B)`, the formula is NOT re-evaluated when a previously empty 
 | 7 | Unified menus | `menu-state.ts` (new), `file-loader.ts`, `collab-ui.ts` |
 
 All features are mandatory. Each phase ends with a UI checkpoint requiring user approval.
+
+**Note:** Phase 1.5 (range reference fixes) moved to `plans/2025-12-26-range-reference-fixes.md`
