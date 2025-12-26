@@ -1,8 +1,8 @@
 # Calculation Engine
 
-Status: COMPLETE (Phases 1-8), OPTIONAL (Phases 9-10)
+Status: COMPLETE (Phases 1-9), OPTIONAL (Phase 10)
 Created At: 2025-12-26 01:22 UTC
-Updated At: 2025-12-26 08:45 UTC
+Updated At: 2025-12-26 18:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -982,49 +982,45 @@ Style cells with errors differently:
 
 ---
 
-## Phase 9: Additional Functions (Optional Extension)
+## Phase 9: Additional Functions (COMPLETE)
 
-These functions can be added incrementally after the core engine is working.
+These functions were added using the individual file approach.
 
 ### File Organization
 
-**Important**: Each new function should be implemented in its own file within `core/cells/functions/`:
+Functions are organized in individual files within `core/cells/functions/`:
 
 ```
 core/cells/functions/
-├── fn_vlookup.cc
-├── fn_vlookup.h
-├── fn_hlookup.cc
-├── fn_hlookup.h
-├── fn_index.cc
-├── fn_index.h
-├── fn_match.cc
-├── fn_match.h
-├── fn_median.cc
-├── fn_median.h
-├── ...
+├── BUILD
+├── fn_rand.cc/h      # RAND, RANDBETWEEN
+├── fn_rand_test.cc
+├── fn_stats.cc/h     # MEDIAN, STDEV, STDEVP, VAR, VARP, PERCENTILE
+├── fn_stats_test.cc
+├── fn_lookup.cc/h    # INDEX, MATCH, VLOOKUP, HLOOKUP
+├── fn_lookup_test.cc
 ```
 
-This keeps files small and manageable. Each function file should:
-- Include the function implementation
-- Include its own unit tests (or a separate `fn_<name>_test.cc`)
-- Self-register with the FunctionRegistry
-
 ### Lookup Functions
-- [ ] VLOOKUP(lookup_value, table_array, col_index, [range_lookup])
-- [ ] HLOOKUP(lookup_value, table_array, row_index, [range_lookup])
-- [ ] INDEX(array, row_num, [col_num])
-- [ ] MATCH(lookup_value, lookup_array, [match_type])
+- [x] VLOOKUP(lookup_value, table_array, col_index, [range_lookup])
+- [x] HLOOKUP(lookup_value, table_array, row_index, [range_lookup])
+- [x] INDEX(array, row_num, [col_num])
+- [x] MATCH(lookup_value, lookup_array, [match_type])
 
 ### Statistical Functions
-- [ ] MEDIAN(number1, [number2], ...)
-- [ ] STDEV(number1, [number2], ...)
-- [ ] VAR(number1, [number2], ...)
-- [ ] PERCENTILE(array, k)
+- [x] MEDIAN(number1, [number2], ...)
+- [x] STDEV/STDEVS(number1, [number2], ...) - sample standard deviation
+- [x] STDEVP(number1, [number2], ...) - population standard deviation
+- [x] VAR/VARS(number1, [number2], ...) - sample variance
+- [x] VARP(number1, [number2], ...) - population variance
+- [x] PERCENTILE/PERCENTILEINC(array, k) - inclusive percentile
+- [x] PERCENTILEEXC(array, k) - exclusive percentile
 
 ### Random Functions
-- [ ] RAND() - random 0 to 1 (volatile)
-- [ ] RANDBETWEEN(bottom, top) - random integer (volatile)
+- [x] RAND() - random 0 to 1 (volatile)
+- [x] RANDBETWEEN(bottom, top) - random integer (volatile)
+
+**Note**: Function names don't include dots (STDEVP vs STDEV.P) because the lexer doesn't support dots in identifiers.
 
 ### Financial Functions (future)
 - [ ] PMT, PV, FV, NPV, IRR
