@@ -705,5 +705,626 @@ TEST_F(FunctionTest, FunctionWithFormula) {
     EXPECT_DOUBLE_EQ(result.getNumber(), 15.0);  // 3 + 12
 }
 
+// =============================================================================
+// IF Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, IfTrueReturnsFirst) {
+    EvalResult result = eval("=IF(TRUE,1,2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, IfFalseReturnsSecond) {
+    EvalResult result = eval("=IF(FALSE,1,2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 2.0);
+}
+
+TEST_F(FunctionTest, IfWithComparison) {
+    EvalResult result = eval("=IF(1>0,\"yes\",\"no\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "yes");
+}
+
+TEST_F(FunctionTest, IfWithCellRef) {
+    setCellValue(0, 0, 15.0);  // A1
+    EvalResult result = eval("=IF(A1>10,A1*2,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 30.0);
+}
+
+TEST_F(FunctionTest, IfWithCellRefFalse) {
+    setCellValue(0, 0, 5.0);  // A1
+    EvalResult result = eval("=IF(A1>10,A1*2,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, IfTwoArgsReturnsFalse) {
+    EvalResult result = eval("=IF(FALSE,1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IfTwoArgsTrueReturnsValue) {
+    EvalResult result = eval("=IF(TRUE,1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, IfZeroIsFalse) {
+    EvalResult result = eval("=IF(0,1,2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 2.0);
+}
+
+TEST_F(FunctionTest, IfNonZeroIsTrue) {
+    EvalResult result = eval("=IF(1,1,2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, IfNested) {
+    setCellValue(0, 0, 15.0);  // A1
+    EvalResult result = eval("=IF(A1>0,IF(A1>10,\"big\",\"small\"),\"negative\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "big");
+}
+
+TEST_F(FunctionTest, IfNestedSmall) {
+    setCellValue(0, 0, 5.0);  // A1
+    EvalResult result = eval("=IF(A1>0,IF(A1>10,\"big\",\"small\"),\"negative\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "small");
+}
+
+TEST_F(FunctionTest, IfNestedNegative) {
+    setCellValue(0, 0, -5.0);  // A1
+    EvalResult result = eval("=IF(A1>0,IF(A1>10,\"big\",\"small\"),\"negative\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "negative");
+}
+
+TEST_F(FunctionTest, IfErrorInCondition) {
+    EvalResult result = eval("=IF(1/0,1,2)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::DIV);
+}
+
+TEST_F(FunctionTest, IfTooFewArgs) {
+    EvalResult result = eval("=IF(TRUE)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, IfTooManyArgs) {
+    EvalResult result = eval("=IF(TRUE,1,2,3)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// AND Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, AndAllTrue) {
+    EvalResult result = eval("=AND(TRUE,TRUE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, AndOneFalse) {
+    EvalResult result = eval("=AND(TRUE,FALSE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, AndWithNumbers) {
+    EvalResult result = eval("=AND(1,1,1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, AndWithZero) {
+    EvalResult result = eval("=AND(1,0,1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, AndNoArgs) {
+    EvalResult result = eval("=AND()");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());  // Vacuous truth
+}
+
+TEST_F(FunctionTest, AndWithCellRefs) {
+    setCellValue(0, 0, 5.0);  // A1
+    EvalResult result = eval("=AND(A1>0,A1<10)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, AndWithCellRefsFalse) {
+    setCellValue(0, 0, 15.0);  // A1
+    EvalResult result = eval("=AND(A1>0,A1<10)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, AndSingleTrue) {
+    EvalResult result = eval("=AND(TRUE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, AndSingleFalse) {
+    EvalResult result = eval("=AND(FALSE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, AndErrorPropagates) {
+    EvalResult result = eval("=AND(TRUE,1/0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::DIV);
+}
+
+// =============================================================================
+// OR Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, OrAllFalse) {
+    EvalResult result = eval("=OR(FALSE,FALSE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, OrOneTrue) {
+    EvalResult result = eval("=OR(FALSE,TRUE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, OrAllTrue) {
+    EvalResult result = eval("=OR(TRUE,TRUE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, OrNoArgs) {
+    EvalResult result = eval("=OR()");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, OrWithNumbers) {
+    EvalResult result = eval("=OR(0,0,1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, OrAllZeros) {
+    EvalResult result = eval("=OR(0,0,0)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, OrSingleTrue) {
+    EvalResult result = eval("=OR(TRUE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, OrSingleFalse) {
+    EvalResult result = eval("=OR(FALSE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, OrErrorPropagates) {
+    EvalResult result = eval("=OR(FALSE,1/0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::DIV);
+}
+
+// =============================================================================
+// NOT Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, NotTrue) {
+    EvalResult result = eval("=NOT(TRUE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, NotFalse) {
+    EvalResult result = eval("=NOT(FALSE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, NotZero) {
+    EvalResult result = eval("=NOT(0)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, NotNonZero) {
+    EvalResult result = eval("=NOT(1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, NotNegative) {
+    EvalResult result = eval("=NOT(-5)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, NotNoArgs) {
+    EvalResult result = eval("=NOT()");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, NotTooManyArgs) {
+    EvalResult result = eval("=NOT(TRUE,FALSE)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, NotErrorPropagates) {
+    EvalResult result = eval("=NOT(1/0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::DIV);
+}
+
+// =============================================================================
+// IFERROR Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, IferrorWithError) {
+    EvalResult result = eval("=IFERROR(1/0,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, IferrorNoError) {
+    EvalResult result = eval("=IFERROR(5,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 5.0);
+}
+
+TEST_F(FunctionTest, IferrorWithRefError) {
+    setCellError(0, 0, CellError::REF);  // A1
+    EvalResult result = eval("=IFERROR(A1,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, IferrorWithString) {
+    EvalResult result = eval("=IFERROR(SQRT(-1),\"invalid\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "invalid");
+}
+
+TEST_F(FunctionTest, IferrorTooFewArgs) {
+    EvalResult result = eval("=IFERROR(1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, IferrorTooManyArgs) {
+    EvalResult result = eval("=IFERROR(1,2,3)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// IFNA Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, IfnaWithNaError) {
+    setCellError(0, 0, CellError::NA);  // A1
+    EvalResult result = eval("=IFNA(A1,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, IfnaNoError) {
+    EvalResult result = eval("=IFNA(5,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 5.0);
+}
+
+TEST_F(FunctionTest, IfnaWithOtherError) {
+    // IFNA should only catch #N/A, not other errors
+    setCellError(0, 0, CellError::REF);  // A1
+    EvalResult result = eval("=IFNA(A1,0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::REF);
+}
+
+TEST_F(FunctionTest, IfnaTooFewArgs) {
+    EvalResult result = eval("=IFNA(1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// EXACT Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, ExactSameString) {
+    EvalResult result = eval("=EXACT(\"abc\",\"abc\")");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, ExactDifferentCase) {
+    EvalResult result = eval("=EXACT(\"abc\",\"ABC\")");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, ExactDifferentString) {
+    EvalResult result = eval("=EXACT(\"abc\",\"def\")");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, ExactWithNumbers) {
+    EvalResult result = eval("=EXACT(123,123)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, ExactTooFewArgs) {
+    EvalResult result = eval("=EXACT(\"abc\")");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// ISBLANK Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, IsblankEmpty) {
+    // A1 is not created, so it should be blank
+    EvalResult result = eval("=ISBLANK(A1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IsblankNotEmpty) {
+    setCellValue(0, 0, 5.0);  // A1
+    EvalResult result = eval("=ISBLANK(A1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IsblankZero) {
+    setCellValue(0, 0, 0.0);  // A1
+    EvalResult result = eval("=ISBLANK(A1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IsblankLiteral) {
+    EvalResult result = eval("=ISBLANK(0)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IsblankEmptyString) {
+    setCellValue(0, 0, "");  // A1
+    EvalResult result = eval("=ISBLANK(A1)");
+    EXPECT_TRUE(result.isBoolean());
+    // In our implementation, empty string cells are treated as blank (consistent with Excel)
+    EXPECT_TRUE(result.getBoolean());
+}
+
+// =============================================================================
+// ISNUMBER Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, IsnumberTrue) {
+    EvalResult result = eval("=ISNUMBER(5)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IsnumberString) {
+    EvalResult result = eval("=ISNUMBER(\"5\")");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IsnumberBoolean) {
+    EvalResult result = eval("=ISNUMBER(TRUE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IsnumberFormula) {
+    EvalResult result = eval("=ISNUMBER(1+1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+// =============================================================================
+// ISTEXT Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, IstextTrue) {
+    EvalResult result = eval("=ISTEXT(\"hello\")");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IstextNumber) {
+    EvalResult result = eval("=ISTEXT(5)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IstextBoolean) {
+    EvalResult result = eval("=ISTEXT(TRUE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IstextEmptyString) {
+    EvalResult result = eval("=ISTEXT(\"\")");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+// =============================================================================
+// ISERROR Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, IserrorWithError) {
+    EvalResult result = eval("=ISERROR(1/0)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IserrorNoError) {
+    EvalResult result = eval("=ISERROR(5)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IserrorWithRefError) {
+    setCellError(0, 0, CellError::REF);  // A1
+    EvalResult result = eval("=ISERROR(A1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IserrorWithSqrtError) {
+    EvalResult result = eval("=ISERROR(SQRT(-1))");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+// =============================================================================
+// ISLOGICAL Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, IslogicalTrue) {
+    EvalResult result = eval("=ISLOGICAL(TRUE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IslogicalFalse) {
+    EvalResult result = eval("=ISLOGICAL(FALSE)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IslogicalNumber) {
+    EvalResult result = eval("=ISLOGICAL(1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IslogicalComparison) {
+    EvalResult result = eval("=ISLOGICAL(1>0)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+// =============================================================================
+// ISNA Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, IsnaWithNa) {
+    setCellError(0, 0, CellError::NA);  // A1
+    EvalResult result = eval("=ISNA(A1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IsnaWithOtherError) {
+    setCellError(0, 0, CellError::REF);  // A1
+    EvalResult result = eval("=ISNA(A1)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, IsnaNoError) {
+    EvalResult result = eval("=ISNA(5)");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+// =============================================================================
+// TRUE/FALSE Function Tests
+// =============================================================================
+
+TEST_F(FunctionTest, TrueFunction) {
+    EvalResult result = eval("=TRUE()");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, FalseFunction) {
+    EvalResult result = eval("=FALSE()");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_FALSE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, TrueFunctionWithArgs) {
+    EvalResult result = eval("=TRUE(1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, FalseFunctionWithArgs) {
+    EvalResult result = eval("=FALSE(1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// Combined Logic Tests
+// =============================================================================
+
+TEST_F(FunctionTest, CombinedAndOr) {
+    EvalResult result = eval("=AND(OR(TRUE,FALSE),OR(FALSE,TRUE))");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, CombinedIfAnd) {
+    setCellValue(0, 0, 5.0);  // A1
+    EvalResult result = eval("=IF(AND(A1>0,A1<10),\"ok\",\"bad\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "ok");
+}
+
+TEST_F(FunctionTest, CombinedIfOr) {
+    setCellValue(0, 0, 15.0);  // A1
+    EvalResult result = eval("=IF(OR(A1<0,A1>10),\"extreme\",\"normal\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "extreme");
+}
+
+TEST_F(FunctionTest, CombinedNotAnd) {
+    EvalResult result = eval("=NOT(AND(TRUE,FALSE))");
+    EXPECT_TRUE(result.isBoolean());
+    EXPECT_TRUE(result.getBoolean());
+}
+
+TEST_F(FunctionTest, CombinedIferrorIf) {
+    EvalResult result = eval("=IFERROR(IF(TRUE,1/0,0),\"error\")");
+    EXPECT_TRUE(result.isString());
+    EXPECT_EQ(result.getString(), "error");
+}
+
 }  // namespace
 }  // namespace cells

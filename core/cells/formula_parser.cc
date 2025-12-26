@@ -266,9 +266,16 @@ std::unique_ptr<ASTNode> FormulaParser::primary() {
         return std::make_unique<StringLiteralNode>(previous_.stringValue(), previous_.position);
     }
 
-    // Boolean literal
-    if (match(TokenType::BOOLEAN)) {
-        return std::make_unique<BooleanLiteralNode>(previous_.booleanValue(), previous_.position);
+    // Boolean literal - but check if it's actually a function call like TRUE() or FALSE()
+    if (check(TokenType::BOOLEAN)) {
+        const Token boolToken = current_;
+        advance();
+        if (check(TokenType::LPAREN)) {
+            // It's a function call: TRUE() or FALSE()
+            return parseFunctionCall(std::string(boolToken.text));
+        }
+        // Just a boolean literal
+        return std::make_unique<BooleanLiteralNode>(boolToken.booleanValue(), boolToken.position);
     }
 
     // Parenthesized expression

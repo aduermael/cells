@@ -450,6 +450,284 @@ static EvalResult fn_INT(const std::vector<const ASTNode*>& args, EvalContext& c
 }
 
 // =============================================================================
+// Built-in Function Implementations - Logic Functions
+// =============================================================================
+
+// IF(condition, value_if_true, [value_if_false])
+// Returns value_if_true if condition is true, value_if_false otherwise
+static EvalResult fn_IF(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    // Evaluate condition
+    EvalResult condition = evaluate(args[0], ctx);
+    if (condition.isError()) {
+        return condition;
+    }
+
+    // Convert to boolean
+    EvalResult condBool = condition.toBoolean();
+    if (condBool.isError()) {
+        return condBool;
+    }
+
+    if (condBool.getBoolean()) {
+        // Return value_if_true
+        return evaluate(args[1], ctx);
+    }
+    // Return value_if_false (or FALSE if not provided)
+    if (args.size() == 3) {
+        return evaluate(args[2], ctx);
+    }
+    return EvalResult::Boolean(false);
+}
+
+// AND(logical1, [logical2], ...)
+// Returns TRUE if all arguments are true
+static EvalResult fn_AND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Boolean(true);  // Vacuous truth
+    }
+
+    for (const ASTNode* arg : args) {
+        EvalResult result = evaluate(arg, ctx);
+        if (result.isError()) {
+            return result;
+        }
+
+        // Handle ranges by checking all values
+        if (result.isRange()) {
+            const std::vector<EvalResult> rangeValues =
+                collectRangeValues(result.getRangeBounds(), ctx);
+            for (const EvalResult& val : rangeValues) {
+                if (val.isError()) {
+                    return val;
+                }
+                if (val.isEmpty()) {
+                    continue;  // Skip empty cells
+                }
+                EvalResult boolVal = val.toBoolean();
+                if (boolVal.isError()) {
+                    return boolVal;
+                }
+                if (!boolVal.getBoolean()) {
+                    return EvalResult::Boolean(false);
+                }
+            }
+        } else {
+            EvalResult boolVal = result.toBoolean();
+            if (boolVal.isError()) {
+                return boolVal;
+            }
+            if (!boolVal.getBoolean()) {
+                return EvalResult::Boolean(false);
+            }
+        }
+    }
+
+    return EvalResult::Boolean(true);
+}
+
+// OR(logical1, [logical2], ...)
+// Returns TRUE if any argument is true
+static EvalResult fn_OR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.empty()) {
+        return EvalResult::Boolean(false);  // No true values found
+    }
+
+    for (const ASTNode* arg : args) {
+        EvalResult result = evaluate(arg, ctx);
+        if (result.isError()) {
+            return result;
+        }
+
+        // Handle ranges by checking all values
+        if (result.isRange()) {
+            const std::vector<EvalResult> rangeValues =
+                collectRangeValues(result.getRangeBounds(), ctx);
+            for (const EvalResult& val : rangeValues) {
+                if (val.isError()) {
+                    return val;
+                }
+                if (val.isEmpty()) {
+                    continue;  // Skip empty cells
+                }
+                EvalResult boolVal = val.toBoolean();
+                if (boolVal.isError()) {
+                    return boolVal;
+                }
+                if (boolVal.getBoolean()) {
+                    return EvalResult::Boolean(true);
+                }
+            }
+        } else {
+            EvalResult boolVal = result.toBoolean();
+            if (boolVal.isError()) {
+                return boolVal;
+            }
+            if (boolVal.getBoolean()) {
+                return EvalResult::Boolean(true);
+            }
+        }
+    }
+
+    return EvalResult::Boolean(false);
+}
+
+// NOT(logical)
+// Returns the opposite boolean value
+static EvalResult fn_NOT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult result = evaluate(args[0], ctx);
+    if (result.isError()) {
+        return result;
+    }
+
+    EvalResult boolVal = result.toBoolean();
+    if (boolVal.isError()) {
+        return boolVal;
+    }
+
+    return EvalResult::Boolean(!boolVal.getBoolean());
+}
+
+// IFERROR(value, value_if_error)
+// Returns value if not an error, otherwise value_if_error
+static EvalResult fn_IFERROR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult value = evaluate(args[0], ctx);
+    if (value.isError()) {
+        return evaluate(args[1], ctx);
+    }
+    return value;
+}
+
+// IFNA(value, value_if_na)
+// Returns value if not #N/A, otherwise value_if_na
+static EvalResult fn_IFNA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult value = evaluate(args[0], ctx);
+    if (value.isError() && value.getError() == CellError::NA) {
+        return evaluate(args[1], ctx);
+    }
+    return value;
+}
+
+// EXACT(text1, text2)
+// Case-sensitive string comparison
+static EvalResult fn_EXACT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult text1 = evaluateAsString(args[0], ctx);
+    if (text1.isError()) {
+        return text1;
+    }
+
+    EvalResult text2 = evaluateAsString(args[1], ctx);
+    if (text2.isError()) {
+        return text2;
+    }
+
+    return EvalResult::Boolean(text1.getString() == text2.getString());
+}
+
+// ISBLANK(value)
+// Returns TRUE if cell is empty
+static EvalResult fn_ISBLANK(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    const EvalResult result = evaluate(args[0], ctx);
+    return EvalResult::Boolean(result.isEmpty());
+}
+
+// ISNUMBER(value)
+// Returns TRUE if value is a number
+static EvalResult fn_ISNUMBER(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    const EvalResult result = evaluate(args[0], ctx);
+    return EvalResult::Boolean(result.isNumber());
+}
+
+// ISTEXT(value)
+// Returns TRUE if value is text
+static EvalResult fn_ISTEXT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    const EvalResult result = evaluate(args[0], ctx);
+    return EvalResult::Boolean(result.isString());
+}
+
+// ISERROR(value)
+// Returns TRUE if value is any error
+static EvalResult fn_ISERROR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    const EvalResult result = evaluate(args[0], ctx);
+    return EvalResult::Boolean(result.isError());
+}
+
+// ISLOGICAL(value)
+// Returns TRUE if value is a boolean
+static EvalResult fn_ISLOGICAL(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    const EvalResult result = evaluate(args[0], ctx);
+    return EvalResult::Boolean(result.isBoolean());
+}
+
+// ISNA(value)
+// Returns TRUE if value is #N/A
+static EvalResult fn_ISNA(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    const EvalResult result = evaluate(args[0], ctx);
+    return EvalResult::Boolean(result.isError() && result.getError() == CellError::NA);
+}
+
+// TRUE()
+// Returns the boolean value TRUE
+static EvalResult fn_TRUE(const std::vector<const ASTNode*>& args, EvalContext& /*ctx*/) {
+    if (!args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return EvalResult::Boolean(true);
+}
+
+// FALSE()
+// Returns the boolean value FALSE
+static EvalResult fn_FALSE(const std::vector<const ASTNode*>& args, EvalContext& /*ctx*/) {
+    if (!args.empty()) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+    return EvalResult::Boolean(false);
+}
+
+// =============================================================================
 // Register Built-in Functions
 // =============================================================================
 
@@ -471,6 +749,25 @@ void initializeBuiltinFunctions(FunctionRegistry& registry) {
     registry.registerFunction("CEILING", fn_CEILING);
     registry.registerFunction("MOD", fn_MOD);
     registry.registerFunction("INT", fn_INT);
+
+    // Logic functions
+    registry.registerFunction("IF", fn_IF);
+    registry.registerFunction("AND", fn_AND);
+    registry.registerFunction("OR", fn_OR);
+    registry.registerFunction("NOT", fn_NOT);
+    registry.registerFunction("IFERROR", fn_IFERROR);
+    registry.registerFunction("IFNA", fn_IFNA);
+
+    // Type checking functions
+    registry.registerFunction("EXACT", fn_EXACT);
+    registry.registerFunction("ISBLANK", fn_ISBLANK);
+    registry.registerFunction("ISNUMBER", fn_ISNUMBER);
+    registry.registerFunction("ISTEXT", fn_ISTEXT);
+    registry.registerFunction("ISERROR", fn_ISERROR);
+    registry.registerFunction("ISLOGICAL", fn_ISLOGICAL);
+    registry.registerFunction("ISNA", fn_ISNA);
+    registry.registerFunction("TRUE", fn_TRUE);
+    registry.registerFunction("FALSE", fn_FALSE);
 }
 
 }  // namespace cells

@@ -162,6 +162,7 @@ enum class CellError : std::uint8_t {
     NULL_REF,  // #NULL! - incorrect range
     NUM,       // #NUM! - invalid numeric value
     CIRCULAR,  // Circular reference detected
+    NA,        // #N/A - value not available (e.g., lookup not found)
 };
 
 // Error strings as they appear in file format
@@ -172,6 +173,7 @@ constexpr const char* ERROR_DIV_STR = "#DIV/0!";
 constexpr const char* ERROR_NULL_STR = "#NULL!";
 constexpr const char* ERROR_NUM_STR = "#NUM!";
 constexpr const char* ERROR_CIRCULAR_STR = "#CIRCULAR!";
+constexpr const char* ERROR_NA_STR = "#N/A";
 
 // Convert error string to CellError
 inline CellError stringToError(const std::string& s) {
@@ -196,6 +198,9 @@ inline CellError stringToError(const std::string& s) {
     if (s == ERROR_CIRCULAR_STR) {
         return CellError::CIRCULAR;
     }
+    if (s == ERROR_NA_STR) {
+        return CellError::NA;
+    }
     return CellError::NONE;
 }
 
@@ -218,6 +223,8 @@ inline const char* errorToString(CellError error) {
             return ERROR_NUM_STR;
         case CellError::CIRCULAR:
             return ERROR_CIRCULAR_STR;
+        case CellError::NA:
+            return ERROR_NA_STR;
     }
     return "";
 }

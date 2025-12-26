@@ -2,7 +2,7 @@
 
 Status: IN PROGRESS
 Created At: 2025-12-26 01:22 UTC
-Updated At: 2025-12-26 05:30 UTC
+Updated At: 2025-12-26 07:05 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -516,7 +516,7 @@ EvalResult fn_IF(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 - `=IF(1,1,2)` → 1 (non-zero is true)
 - Nested: `=IF(A1>0,IF(A1>10,"big","small"),"negative")`
 
-- [ ] 4a: Implement IF function with comprehensive tests
+- [x] 4a: Implement IF function with comprehensive tests
 
 ### 4b: Implement AND, OR, NOT functions
 
@@ -543,7 +543,7 @@ EvalResult fn_NOT(args, ctx);
 - `=NOT(1)` → FALSE
 - `=AND(A1>0,A1<10)` with A1=5 → TRUE
 
-- [ ] 4b: Implement AND, OR, NOT functions with tests
+- [x] 4b: Implement AND, OR, NOT functions with tests
 
 ### 4c: Implement IFERROR and IFNA functions
 
@@ -560,7 +560,7 @@ EvalResult fn_IFNA(args, ctx);
 - `=IFERROR(A1,0)` where A1=#REF! → 0
 - `=IFERROR(SQRT(-1),"invalid")` → "invalid"
 
-- [ ] 4c: Implement IFERROR and IFNA functions with tests
+- [x] 4c: Implement IFERROR and IFNA functions with tests
 
 ### 4d: Implement comparison functions
 
@@ -589,7 +589,7 @@ EvalResult fn_ISERROR(args, ctx);
 - `=ISERROR(1/0)` → TRUE
 - `=ISERROR(5)` → FALSE
 
-- [ ] 4d: Implement comparison/type-checking functions with tests
+- [x] 4d: Implement comparison/type-checking functions with tests
 
 ### 4e: Add Phase 4 logic function tests
 
@@ -599,7 +599,7 @@ Consolidate all logic function tests. Target: 60+ test cases.
 
 **Test**: All logic function tests pass (60+ tests)
 
-- [ ] 4e: Consolidate logic function tests (60+ tests minimum)
+- [x] 4e: Consolidate logic function tests (60+ tests minimum) - **90 logic tests implemented**
 
 ---
 
