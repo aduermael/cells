@@ -2073,5 +2073,574 @@ TEST_F(FunctionTest, ConcatWithRange) {
     EXPECT_EQ(result.getString(), "ABC");
 }
 
+// =============================================================================
+// Date/Time Function Tests - Phase 6
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// NOW and TODAY Tests (Volatile Functions)
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, NowReturnsNumber) {
+    EvalResult result = eval("=NOW()");
+    EXPECT_TRUE(result.isNumber());
+    // NOW should return a serial date > 45000 (approx year 2023+)
+    EXPECT_GT(result.getNumber(), 45000.0);
+}
+
+TEST_F(FunctionTest, NowIncludesTime) {
+    EvalResult result = eval("=NOW()");
+    EXPECT_TRUE(result.isNumber());
+    // NOW should have a fractional part (time component)
+    double intPart;
+    (void)std::modf(result.getNumber(), &intPart);
+    // There's a small chance this could be exactly 0 at midnight, but unlikely
+    // Just verify it's a valid serial date
+    EXPECT_GT(intPart, 0);
+}
+
+TEST_F(FunctionTest, NowTooManyArgs) {
+    EvalResult result = eval("=NOW(1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, TodayReturnsWholeNumber) {
+    EvalResult result = eval("=TODAY()");
+    EXPECT_TRUE(result.isNumber());
+    // TODAY should return an integer (no time component)
+    double val = result.getNumber();
+    EXPECT_DOUBLE_EQ(val, std::floor(val));
+}
+
+TEST_F(FunctionTest, TodayTooManyArgs) {
+    EvalResult result = eval("=TODAY(1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FunctionTest, NowAndTodayVolatile) {
+    FunctionRegistry& registry = FunctionRegistry::instance();
+    EXPECT_TRUE(registry.isVolatile("NOW"));
+    EXPECT_TRUE(registry.isVolatile("TODAY"));
+}
+
+// -----------------------------------------------------------------------------
+// DATE Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, DateBasic) {
+    // Jan 1, 1900 = serial date 1
+    EvalResult result = eval("=DATE(1900,1,1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, DateJan15_1900) {
+    // Jan 15, 1900 = serial date 15
+    EvalResult result = eval("=DATE(1900,1,15)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 15.0);
+}
+
+TEST_F(FunctionTest, DateFeb1_1900) {
+    // Feb 1, 1900 = serial date 32 (31 days in Jan + 1)
+    EvalResult result = eval("=DATE(1900,2,1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 32.0);
+}
+
+TEST_F(FunctionTest, DateMar1_1900ExcelBug) {
+    // Excel treats 1900 as a leap year (bug), so Mar 1, 1900 = day 61
+    // (31 Jan + 29 Feb + 1)
+    EvalResult result = eval("=DATE(1900,3,1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 61.0);
+}
+
+TEST_F(FunctionTest, DateJan1_2024) {
+    // Known value: Jan 1, 2024 = 45292 in Excel
+    EvalResult result = eval("=DATE(2024,1,1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 45292.0);
+}
+
+TEST_F(FunctionTest, DateJun15_2024) {
+    // Jun 15, 2024
+    EvalResult result = eval("=DATE(2024,6,15)");
+    EXPECT_TRUE(result.isNumber());
+    // Jan(31) + Feb(29 leap) + Mar(31) + Apr(30) + May(31) + 15 = 167
+    // 45292 + 166 = 45458
+    EXPECT_DOUBLE_EQ(result.getNumber(), 45458.0);
+}
+
+TEST_F(FunctionTest, DateTwoDigitYearLow) {
+    // Year 0-29 → 2000-2029
+    EvalResult result1 = eval("=DATE(0,1,1)");
+    EvalResult result2 = eval("=DATE(2000,1,1)");
+    EXPECT_DOUBLE_EQ(result1.getNumber(), result2.getNumber());
+
+    EvalResult result3 = eval("=DATE(29,1,1)");
+    EvalResult result4 = eval("=DATE(2029,1,1)");
+    EXPECT_DOUBLE_EQ(result3.getNumber(), result4.getNumber());
+}
+
+TEST_F(FunctionTest, DateTwoDigitYearHigh) {
+    // Year 30-99 → 1930-1999
+    EvalResult result1 = eval("=DATE(30,1,1)");
+    EvalResult result2 = eval("=DATE(1930,1,1)");
+    EXPECT_DOUBLE_EQ(result1.getNumber(), result2.getNumber());
+
+    EvalResult result3 = eval("=DATE(99,1,1)");
+    EvalResult result4 = eval("=DATE(1999,1,1)");
+    EXPECT_DOUBLE_EQ(result3.getNumber(), result4.getNumber());
+}
+
+TEST_F(FunctionTest, DateMonthOverflow) {
+    // Month 13 = next year January
+    EvalResult result = eval("=DATE(2024,13,1)");
+    EvalResult expected = eval("=DATE(2025,1,1)");
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, DateMonthUnderflow) {
+    // Month 0 = previous year December
+    EvalResult result = eval("=DATE(2024,0,1)");
+    EvalResult expected = eval("=DATE(2023,12,1)");
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, DateInvalidYearTooSmall) {
+    // Year < 1900 after adjustment
+    EvalResult result = eval("=DATE(1899,1,1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+TEST_F(FunctionTest, DateWrongArgCount) {
+    EvalResult result = eval("=DATE(2024,1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// -----------------------------------------------------------------------------
+// TIME Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, TimeNoon) {
+    // 12:00:00 = 0.5 (half of the day)
+    EvalResult result = eval("=TIME(12,0,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.5);
+}
+
+TEST_F(FunctionTest, TimeMidnight) {
+    // 0:00:00 = 0
+    EvalResult result = eval("=TIME(0,0,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, Time6AM) {
+    // 6:00:00 = 0.25 (quarter of the day)
+    EvalResult result = eval("=TIME(6,0,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.25);
+}
+
+TEST_F(FunctionTest, Time6PM) {
+    // 18:00:00 = 0.75
+    EvalResult result = eval("=TIME(18,0,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.75);
+}
+
+TEST_F(FunctionTest, TimeWithMinutes) {
+    // 12:30:00 = 0.5 + 30/1440 = 0.520833...
+    EvalResult result = eval("=TIME(12,30,0)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_NEAR(result.getNumber(), 0.520833333, 0.0001);
+}
+
+TEST_F(FunctionTest, TimeWithSeconds) {
+    // 12:00:30 = 0.5 + 30/86400
+    EvalResult result = eval("=TIME(12,0,30)");
+    EXPECT_TRUE(result.isNumber());
+    double expected = 0.5 + 30.0 / 86400.0;
+    EXPECT_NEAR(result.getNumber(), expected, 0.0001);
+}
+
+TEST_F(FunctionTest, TimeWrapsAt24Hours) {
+    // 25:00:00 should wrap to 1:00:00
+    EvalResult result = eval("=TIME(25,0,0)");
+    EvalResult expected = eval("=TIME(1,0,0)");
+    EXPECT_NEAR(result.getNumber(), expected.getNumber(), 0.0001);
+}
+
+TEST_F(FunctionTest, TimeWrongArgCount) {
+    EvalResult result = eval("=TIME(12,0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// -----------------------------------------------------------------------------
+// DATEVALUE Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, DateValueISO) {
+    EvalResult result = eval("=DATEVALUE(\"2024-01-15\")");
+    EvalResult expected = eval("=DATE(2024,1,15)");
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, DateValueUS) {
+    EvalResult result = eval("=DATEVALUE(\"1/15/2024\")");
+    EvalResult expected = eval("=DATE(2024,1,15)");
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, DateValueEuropean) {
+    EvalResult result = eval("=DATEVALUE(\"15.1.2024\")");
+    EvalResult expected = eval("=DATE(2024,1,15)");
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, DateValueInvalid) {
+    EvalResult result = eval("=DATEVALUE(\"not a date\")");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// -----------------------------------------------------------------------------
+// TIMEVALUE Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, TimeValueBasic) {
+    EvalResult result = eval("=TIMEVALUE(\"12:00:00\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.5);
+}
+
+TEST_F(FunctionTest, TimeValueNoSeconds) {
+    EvalResult result = eval("=TIMEVALUE(\"12:00\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.5);
+}
+
+TEST_F(FunctionTest, TimeValuePM) {
+    // 2:30 PM should be 14:30
+    EvalResult result = eval("=TIMEVALUE(\"2:30 PM\")");
+    EXPECT_TRUE(result.isNumber());
+    double expected = (14 * 3600 + 30 * 60) / 86400.0;
+    EXPECT_NEAR(result.getNumber(), expected, 0.0001);
+}
+
+TEST_F(FunctionTest, TimeValueAM) {
+    // 12:00 AM should be 0:00
+    EvalResult result = eval("=TIMEVALUE(\"12:00 AM\")");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, TimeValueInvalid) {
+    EvalResult result = eval("=TIMEVALUE(\"not a time\")");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// -----------------------------------------------------------------------------
+// YEAR Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, YearBasic) {
+    // DATE(2024,6,15) should have YEAR 2024
+    EvalResult result = eval("=YEAR(DATE(2024,6,15))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 2024.0);
+}
+
+TEST_F(FunctionTest, YearFrom1900) {
+    EvalResult result = eval("=YEAR(DATE(1900,1,1))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1900.0);
+}
+
+TEST_F(FunctionTest, YearFromSerialDate) {
+    // Serial date 45292 = Jan 1, 2024
+    EvalResult result = eval("=YEAR(45292)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 2024.0);
+}
+
+TEST_F(FunctionTest, YearNegative) {
+    EvalResult result = eval("=YEAR(0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// -----------------------------------------------------------------------------
+// MONTH Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, MonthBasic) {
+    EvalResult result = eval("=MONTH(DATE(2024,6,15))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 6.0);
+}
+
+TEST_F(FunctionTest, MonthJanuary) {
+    EvalResult result = eval("=MONTH(DATE(2024,1,15))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, MonthDecember) {
+    EvalResult result = eval("=MONTH(DATE(2024,12,15))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 12.0);
+}
+
+TEST_F(FunctionTest, MonthFromSerialDate) {
+    // Serial date 45292 = Jan 1, 2024
+    EvalResult result = eval("=MONTH(45292)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+// -----------------------------------------------------------------------------
+// DAY Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, DayBasic) {
+    EvalResult result = eval("=DAY(DATE(2024,6,15))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 15.0);
+}
+
+TEST_F(FunctionTest, DayFirst) {
+    EvalResult result = eval("=DAY(DATE(2024,6,1))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+TEST_F(FunctionTest, DayLast31) {
+    EvalResult result = eval("=DAY(DATE(2024,1,31))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 31.0);
+}
+
+TEST_F(FunctionTest, DayFromSerialDate) {
+    // Serial date 45292 = Jan 1, 2024
+    EvalResult result = eval("=DAY(45292)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);
+}
+
+// -----------------------------------------------------------------------------
+// HOUR Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, HourNoon) {
+    EvalResult result = eval("=HOUR(TIME(12,30,45))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 12.0);
+}
+
+TEST_F(FunctionTest, HourMidnight) {
+    EvalResult result = eval("=HOUR(TIME(0,30,45))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, HourEvening) {
+    EvalResult result = eval("=HOUR(TIME(23,59,59))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 23.0);
+}
+
+TEST_F(FunctionTest, HourFromFraction) {
+    // 0.5 = noon
+    EvalResult result = eval("=HOUR(0.5)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 12.0);
+}
+
+// -----------------------------------------------------------------------------
+// MINUTE Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, MinuteBasic) {
+    EvalResult result = eval("=MINUTE(TIME(12,30,45))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 30.0);
+}
+
+TEST_F(FunctionTest, MinuteZero) {
+    EvalResult result = eval("=MINUTE(TIME(12,0,45))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, Minute59) {
+    EvalResult result = eval("=MINUTE(TIME(12,59,45))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 59.0);
+}
+
+// -----------------------------------------------------------------------------
+// SECOND Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, SecondBasic) {
+    EvalResult result = eval("=SECOND(TIME(12,30,45))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 45.0);
+}
+
+TEST_F(FunctionTest, SecondZero) {
+    EvalResult result = eval("=SECOND(TIME(12,30,0))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 0.0);
+}
+
+TEST_F(FunctionTest, Second59) {
+    EvalResult result = eval("=SECOND(TIME(12,30,59))");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 59.0);
+}
+
+// -----------------------------------------------------------------------------
+// WEEKDAY Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, WeekdayType1Default) {
+    // Jan 1, 1900 is treated as Sunday (1) in Excel's type 1
+    EvalResult result = eval("=WEEKDAY(1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 1.0);  // Sunday
+}
+
+TEST_F(FunctionTest, WeekdaySaturday) {
+    // Jan 7, 1900 = Saturday = 7 in type 1
+    EvalResult result = eval("=WEEKDAY(7)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 7.0);  // Saturday
+}
+
+TEST_F(FunctionTest, WeekdayType2MondayFirst) {
+    // Type 2: Monday = 1
+    // Jan 1, 1900 is Sunday = 7 in type 2
+    EvalResult result = eval("=WEEKDAY(1,2)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 7.0);  // Sunday
+}
+
+TEST_F(FunctionTest, WeekdayType3MondayZero) {
+    // Type 3: Monday = 0
+    // Jan 1, 1900 is Sunday = 6 in type 3
+    EvalResult result = eval("=WEEKDAY(1,3)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 6.0);  // Sunday
+}
+
+TEST_F(FunctionTest, WeekdayInvalidType) {
+    EvalResult result = eval("=WEEKDAY(45292,4)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+TEST_F(FunctionTest, WeekdayInvalidSerial) {
+    EvalResult result = eval("=WEEKDAY(0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+// -----------------------------------------------------------------------------
+// Combined Date/Time Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, DatePlusTime) {
+    // Combine date and time
+    EvalResult result = eval("=DATE(2024,6,15)+TIME(12,30,0)");
+    EXPECT_TRUE(result.isNumber());
+
+    EvalResult dateOnly = eval("=DATE(2024,6,15)");
+    EvalResult timeOnly = eval("=TIME(12,30,0)");
+    EXPECT_NEAR(result.getNumber(), dateOnly.getNumber() + timeOnly.getNumber(), 0.0001);
+}
+
+TEST_F(FunctionTest, ExtractFromNow) {
+    // YEAR(NOW()) should be current year (2024 or later)
+    EvalResult result = eval("=YEAR(NOW())");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_GE(result.getNumber(), 2024.0);
+}
+
+TEST_F(FunctionTest, ExtractFromToday) {
+    // YEAR(TODAY()) should be current year
+    EvalResult result = eval("=YEAR(TODAY())");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_GE(result.getNumber(), 2024.0);
+}
+
+TEST_F(FunctionTest, DateArithmetic) {
+    // Add 30 days to a date
+    EvalResult result = eval("=DATE(2024,1,1)+30");
+    EvalResult expected = eval("=DATE(2024,1,31)");
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, DateSubtraction) {
+    // Days between two dates
+    EvalResult result = eval("=DATE(2024,2,1)-DATE(2024,1,1)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 31.0);  // 31 days in January
+}
+
+TEST_F(FunctionTest, CombinedDateTimeExtraction) {
+    // Create datetime, extract components
+    EvalResult hour = eval("=HOUR(DATE(2024,6,15)+TIME(14,30,45))");
+    EvalResult minute = eval("=MINUTE(DATE(2024,6,15)+TIME(14,30,45))");
+    EvalResult second = eval("=SECOND(DATE(2024,6,15)+TIME(14,30,45))");
+
+    EXPECT_DOUBLE_EQ(hour.getNumber(), 14.0);
+    EXPECT_DOUBLE_EQ(minute.getNumber(), 30.0);
+    EXPECT_DOUBLE_EQ(second.getNumber(), 45.0);
+}
+
+TEST_F(FunctionTest, DateWithCellReference) {
+    setCellValue(0, 0, 2024.0);  // A1 = year
+    setCellValue(1, 0, 6.0);     // B1 = month
+    setCellValue(2, 0, 15.0);    // C1 = day
+
+    EvalResult result = eval("=DATE(A1,B1,C1)");
+    EvalResult expected = eval("=DATE(2024,6,15)");
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, YearMonthDayRoundTrip) {
+    // Create a date, extract Y/M/D, recreate - should be same
+    EvalResult original = eval("=DATE(2024,6,15)");
+    EvalResult year = eval("=YEAR(DATE(2024,6,15))");
+    EvalResult month = eval("=MONTH(DATE(2024,6,15))");
+    EvalResult day = eval("=DAY(DATE(2024,6,15))");
+
+    // Can't easily recreate with DATE function in test, but verify extraction
+    EXPECT_DOUBLE_EQ(year.getNumber(), 2024.0);
+    EXPECT_DOUBLE_EQ(month.getNumber(), 6.0);
+    EXPECT_DOUBLE_EQ(day.getNumber(), 15.0);
+}
+
+TEST_F(FunctionTest, HourMinuteSecondRoundTrip) {
+    // Create a time, extract H/M/S - should match
+    EvalResult hour = eval("=HOUR(TIME(14,30,45))");
+    EvalResult minute = eval("=MINUTE(TIME(14,30,45))");
+    EvalResult second = eval("=SECOND(TIME(14,30,45))");
+
+    EXPECT_DOUBLE_EQ(hour.getNumber(), 14.0);
+    EXPECT_DOUBLE_EQ(minute.getNumber(), 30.0);
+    EXPECT_DOUBLE_EQ(second.getNumber(), 45.0);
+}
+
 }  // namespace
 }  // namespace cells

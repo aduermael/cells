@@ -2,7 +2,7 @@
 
 Status: IN PROGRESS
 Created At: 2025-12-26 01:22 UTC
-Updated At: 2025-12-25 17:30 UTC
+Updated At: 2025-12-26 06:04 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -732,7 +732,7 @@ These are volatile functions - they trigger recalculation on every change.
 - `=TODAY()` → returns current date (integer)
 - Both functions are marked volatile in registry
 
-- [ ] 6a: Implement NOW and TODAY volatile functions
+- [x] 6a: Implement NOW and TODAY volatile functions
 
 ### 6b: Implement date construction functions
 
@@ -753,7 +753,7 @@ EvalResult fn_TIMEVALUE(args, ctx);
 - `=DATEVALUE("2024-01-15")` → serial date
 - `=TIMEVALUE("14:30:00")` → time fraction
 
-- [ ] 6b: Implement date construction functions
+- [x] 6b: Implement date construction functions
 
 ### 6c: Implement date extraction functions
 
@@ -780,7 +780,7 @@ EvalResult fn_WEEKDAY(args, ctx);
 - `=DAY(DATE(2024,6,15))` → 15
 - `=WEEKDAY(DATE(2024,6,15))` → depends on type (1=Sunday)
 
-- [ ] 6c: Implement date extraction functions
+- [x] 6c: Implement date extraction functions
 
 ### 6d: Add Phase 6 date/time function tests
 
@@ -790,7 +790,7 @@ Target: 50+ test cases.
 
 **Test**: All date/time function tests pass (50+ tests)
 
-- [ ] 6d: Consolidate date/time function tests (50+ tests minimum)
+- [x] 6d: Consolidate date/time function tests (50+ tests minimum) - **74 date/time tests implemented in formula_functions_test.cc**
 
 ---
 
