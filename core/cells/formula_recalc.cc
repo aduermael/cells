@@ -10,99 +10,36 @@
 namespace cells {
 
 // =============================================================================
-// Range Membership Helpers
+// Dependency Lookup Helpers
 // =============================================================================
 
-// Check if a cell is within the range defined by two corner cells
-static bool isCellInRange(Sheet* sheet, const ID& cellId, const ID& rangeStartCellId,
-                          const ID& rangeEndCellId) {
-    // Get the cell's column and row
-    const Cell* cell = sheet->getCell(cellId);
-    if (!cell) {
-        return false;
-    }
-
-    const Axis* cellCol = sheet->getColumn(cell->colId);
-    const Axis* cellRow = sheet->getRow(cell->rowId);
-    if (!cellCol || !cellRow) {
-        return false;
-    }
-
-    // Get the range start cell's column and row
-    const Cell* startCell = sheet->getCell(rangeStartCellId);
-    const Cell* endCell = sheet->getCell(rangeEndCellId);
-    if (!startCell || !endCell) {
-        return false;
-    }
-
-    const Axis* startCol = sheet->getColumn(startCell->colId);
-    const Axis* startRow = sheet->getRow(startCell->rowId);
-    const Axis* endCol = sheet->getColumn(endCell->colId);
-    const Axis* endRow = sheet->getRow(endCell->rowId);
-
-    if (!startCol || !startRow || !endCol || !endRow) {
-        return false;
-    }
-
-    // Get positions and check bounds
-    const uint32_t minCol = std::min(startCol->position, endCol->position);
-    const uint32_t maxCol = std::max(startCol->position, endCol->position);
-    const uint32_t minRow = std::min(startRow->position, endRow->position);
-    const uint32_t maxRow = std::max(startRow->position, endRow->position);
-
-    return cellCol->position >= minCol && cellCol->position <= maxCol &&
-           cellRow->position >= minRow && cellRow->position <= maxRow;
-}
-
 // Get all formula cells that depend on a given cell (including range dependencies)
-//
-// PERFORMANCE NOTE: This is O(n*m) where n = formula count, m = avg deps per formula,
-// plus additional Sheet lookups for range bounds checking. For large sheets, consider:
-// 1. Adding a reverse index in DependencyGraph for O(1) cell dependency lookup
-// 2. Using the R-tree for range queries instead of iterating all formulas
-// 3. Caching range membership results
+// Uses optimized O(1) reverse index + O(log n) R-tree queries
 static std::vector<ID> getDependentsWithRanges(Sheet* sheet, const ID& cellId) {
     const DependencyGraph* depGraph = sheet->getDependencyGraph();
     if (!depGraph) {
         return {};
     }
 
-    std::vector<ID> dependents;
-
-    // Iterate through all formula cells and check their dependencies
-    for (const auto& [formulaCellId, cellPtr] : sheet->cells) {
-        if (!cellPtr->isFormula()) {
-            continue;
-        }
-
-        auto deps = depGraph->getDependencies(formulaCellId);
-        for (const auto& ref : deps) {
-            bool matches = false;
-            switch (ref.type) {
-                case DependencyRef::Type::CELL:
-                    matches = (ref.cellId == cellId);
-                    break;
-                case DependencyRef::Type::RANGE:
-                    // Check if cellId is within the range
-                    matches = (ref.startCellId == cellId || ref.endCellId == cellId ||
-                               isCellInRange(sheet, cellId, ref.startCellId, ref.endCellId));
-                    break;
-                case DependencyRef::Type::COLUMN:
-                case DependencyRef::Type::ROW:
-                case DependencyRef::Type::COLUMN_RANGE:
-                case DependencyRef::Type::ROW_RANGE:
-                    // Column/row refs would need additional handling
-                    // For now, skip these
-                    break;
-            }
-            if (matches) {
-                dependents.push_back(formulaCellId);
-                break;  // Only add once per formula cell
-            }
-        }
+    // Get the cell's position for R-tree query
+    const Cell* cell = sheet->getCell(cellId);
+    if (!cell) {
+        // Cell doesn't exist - just use direct deps lookup
+        return depGraph->getDependents(cellId);
     }
 
-    return dependents;
+    const Axis* col = sheet->getColumn(cell->colId);
+    const Axis* row = sheet->getRow(cell->rowId);
+    if (!col || !row) {
+        // Can't determine position - fall back to direct deps only
+        return depGraph->getDependents(cellId);
+    }
+
+    // Use optimized combined lookup:
+    // - O(1) reverse index for direct cell references
+    // - O(log n) R-tree query for range references
+    return depGraph->getDependentsForCell(cellId, static_cast<int32_t>(col->position),
+                                          static_cast<int32_t>(row->position));
 }
 
 // =============================================================================

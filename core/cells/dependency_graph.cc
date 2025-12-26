@@ -184,6 +184,12 @@ public:
 }  // namespace
 
 void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast) {
+    // Delegate to overload without position resolver (no R-tree population)
+    addFormula(cellId, ast, nullptr);
+}
+
+void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast,
+                                 const PositionResolver& resolver) {
     // Remove old dependencies first
     removeFormula(cellId);
 
@@ -200,9 +206,68 @@ void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast) {
     dependencies_[cellId] = refs;
 
     // Populate reverse index for O(1) getDependents() lookups
+    // and R-tree for range queries
     for (const auto& ref : refs) {
         if (ref.type == DependencyRef::Type::CELL) {
             reverseDeps_[ref.cellId].push_back(cellId);
+        } else if (ref.type == DependencyRef::Type::RANGE && resolver) {
+            // Get positions of range corners and insert into R-tree
+            auto [startCol, startRow] = resolver(ref.startCellId);
+            auto [endCol, endRow] = resolver(ref.endCellId);
+
+            if (startCol >= 0 && startRow >= 0 && endCol >= 0 && endRow >= 0) {
+                // Normalize bounds (in case start > end)
+                const int32_t minCol = std::min(startCol, endCol);
+                const int32_t maxCol = std::max(startCol, endCol);
+                const int32_t minRow = std::min(startRow, endRow);
+                const int32_t maxRow = std::max(startRow, endRow);
+
+                const BoundingRect rect(minCol, minRow, maxCol, maxRow);
+                rtree_.insert(rect, cellId);
+                cellRects_[cellId].push_back(rect);
+            }
+        } else if (ref.type == DependencyRef::Type::COLUMN && resolver) {
+            // Whole column reference - insert tall rectangle
+            auto [col, row] = resolver(ref.columnId);
+            (void)row;  // Unused for column refs
+            if (col >= 0) {
+                const BoundingRect rect = BoundingRect::wholeColumn(col);
+                rtree_.insert(rect, cellId);
+                cellRects_[cellId].push_back(rect);
+            }
+        } else if (ref.type == DependencyRef::Type::ROW && resolver) {
+            // Whole row reference - insert wide rectangle
+            auto [col, row] = resolver(ref.rowId);
+            (void)col;  // Unused for row refs
+            if (row >= 0) {
+                const BoundingRect rect = BoundingRect::wholeRow(row);
+                rtree_.insert(rect, cellId);
+                cellRects_[cellId].push_back(rect);
+            }
+        } else if (ref.type == DependencyRef::Type::COLUMN_RANGE && resolver) {
+            // Column range reference
+            auto [startCol, dummy1] = resolver(ref.startColumnId);
+            auto [endCol, dummy2] = resolver(ref.endColumnId);
+            (void)dummy1;
+            (void)dummy2;
+            if (startCol >= 0 && endCol >= 0) {
+                const BoundingRect rect = BoundingRect::columnRange(std::min(startCol, endCol),
+                                                                    std::max(startCol, endCol));
+                rtree_.insert(rect, cellId);
+                cellRects_[cellId].push_back(rect);
+            }
+        } else if (ref.type == DependencyRef::Type::ROW_RANGE && resolver) {
+            // Row range reference
+            auto [dummy1, startRow] = resolver(ref.startRowId);
+            auto [dummy2, endRow] = resolver(ref.endRowId);
+            (void)dummy1;
+            (void)dummy2;
+            if (startRow >= 0 && endRow >= 0) {
+                const BoundingRect rect =
+                    BoundingRect::rowRange(std::min(startRow, endRow), std::max(startRow, endRow));
+                rtree_.insert(rect, cellId);
+                cellRects_[cellId].push_back(rect);
+            }
         }
     }
 
@@ -254,6 +319,30 @@ std::vector<ID> DependencyGraph::getDependents(const ID& cellId) const {
         return it->second;
     }
     return {};
+}
+
+std::vector<ID> DependencyGraph::getDependentsForCell(const ID& cellId, int32_t col,
+                                                      int32_t row) const {
+    std::vector<ID> result;
+
+    // 1. Direct cell dependencies from reverse index (O(1))
+    auto it = reverseDeps_.find(cellId);
+    if (it != reverseDeps_.end()) {
+        result = it->second;
+    }
+
+    // 2. Range dependencies from R-tree point query (O(log n))
+    // Find all formulas with ranges that contain this cell's position
+    const std::vector<ID> rangeDeps = rtree_.query(col, row);
+
+    // Merge range deps, avoiding duplicates
+    for (const ID& dep : rangeDeps) {
+        if (std::find(result.begin(), result.end(), dep) == result.end()) {
+            result.push_back(dep);
+        }
+    }
+
+    return result;
 }
 
 std::vector<ID> DependencyGraph::getDependentsInRange(int32_t minCol, int32_t minRow,
@@ -440,6 +529,75 @@ void DependencyGraph::clear() {
     reverseDeps_.clear();
     cellRects_.clear();
     volatileCells_.clear();
+}
+
+void DependencyGraph::rebuildRTree(const PositionResolver& resolver) {
+    if (!resolver) {
+        return;
+    }
+
+    // Clear existing R-tree data
+    rtree_.clear();
+    cellRects_.clear();
+
+    // Re-insert all range dependencies with updated positions
+    for (const auto& [cellId, refs] : dependencies_) {
+        for (const auto& ref : refs) {
+            if (ref.type == DependencyRef::Type::RANGE) {
+                auto [startCol, startRow] = resolver(ref.startCellId);
+                auto [endCol, endRow] = resolver(ref.endCellId);
+
+                if (startCol >= 0 && startRow >= 0 && endCol >= 0 && endRow >= 0) {
+                    const int32_t minCol = std::min(startCol, endCol);
+                    const int32_t maxCol = std::max(startCol, endCol);
+                    const int32_t minRow = std::min(startRow, endRow);
+                    const int32_t maxRow = std::max(startRow, endRow);
+
+                    const BoundingRect rect(minCol, minRow, maxCol, maxRow);
+                    rtree_.insert(rect, cellId);
+                    cellRects_[cellId].push_back(rect);
+                }
+            } else if (ref.type == DependencyRef::Type::COLUMN) {
+                auto [col, row] = resolver(ref.columnId);
+                (void)row;
+                if (col >= 0) {
+                    const BoundingRect rect = BoundingRect::wholeColumn(col);
+                    rtree_.insert(rect, cellId);
+                    cellRects_[cellId].push_back(rect);
+                }
+            } else if (ref.type == DependencyRef::Type::ROW) {
+                auto [col, row] = resolver(ref.rowId);
+                (void)col;
+                if (row >= 0) {
+                    const BoundingRect rect = BoundingRect::wholeRow(row);
+                    rtree_.insert(rect, cellId);
+                    cellRects_[cellId].push_back(rect);
+                }
+            } else if (ref.type == DependencyRef::Type::COLUMN_RANGE) {
+                auto [startCol, dummy1] = resolver(ref.startColumnId);
+                auto [endCol, dummy2] = resolver(ref.endColumnId);
+                (void)dummy1;
+                (void)dummy2;
+                if (startCol >= 0 && endCol >= 0) {
+                    const BoundingRect rect = BoundingRect::columnRange(std::min(startCol, endCol),
+                                                                        std::max(startCol, endCol));
+                    rtree_.insert(rect, cellId);
+                    cellRects_[cellId].push_back(rect);
+                }
+            } else if (ref.type == DependencyRef::Type::ROW_RANGE) {
+                auto [dummy1, startRow] = resolver(ref.startRowId);
+                auto [dummy2, endRow] = resolver(ref.endRowId);
+                (void)dummy1;
+                (void)dummy2;
+                if (startRow >= 0 && endRow >= 0) {
+                    const BoundingRect rect = BoundingRect::rowRange(std::min(startRow, endRow),
+                                                                     std::max(startRow, endRow));
+                    rtree_.insert(rect, cellId);
+                    cellRects_[cellId].push_back(rect);
+                }
+            }
+        }
+    }
 }
 
 int32_t DependencyGraph::positionToCoord(uint32_t position) {

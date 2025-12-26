@@ -3,6 +3,7 @@
 
 #include <cstdint>
 
+#include <functional>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -16,6 +17,10 @@ namespace cells {
 
 // Forward declarations
 struct ASTNode;
+
+// Position resolver callback for converting cell IDs to grid positions
+// Takes a cell ID and returns (col, row) position, or (-1, -1) if not found
+using PositionResolver = std::function<std::pair<int32_t, int32_t>(const ID&)>;
 
 // Dependency reference info for tracking formula dependencies
 // Stores minimal info needed for dependency graph operations
@@ -46,14 +51,27 @@ public:
 
     // Add dependencies for a formula cell
     // Extracts references from AST and adds them to the graph
+    // Use the overload with PositionResolver for R-tree population
     void addFormula(const ID& cellId, const ASTNode* ast);
+
+    // Add dependencies with position resolution for R-tree-based range queries
+    // The resolver converts cell IDs to (col, row) positions for spatial indexing
+    void addFormula(const ID& cellId, const ASTNode* ast, const PositionResolver& resolver);
 
     // Remove all dependencies for a cell
     // Call this when clearing a formula or before updating it
     void removeFormula(const ID& cellId);
 
     // Get cells that depend on the given cell (cells whose formulas read this cell)
+    // Note: This only returns direct cell dependencies, not range dependencies.
+    // Use getDependentsForCell() with position info for complete dependency lookup.
     [[nodiscard]] std::vector<ID> getDependents(const ID& cellId) const;
+
+    // Get cells that depend on a cell at the given position
+    // Combines reverse index lookup (O(1)) + R-tree range query (O(log n))
+    // This is the preferred method when you have position information
+    [[nodiscard]] std::vector<ID> getDependentsForCell(const ID& cellId, int32_t col,
+                                                       int32_t row) const;
 
     // Get cells that depend on any cell in the given range
     [[nodiscard]] std::vector<ID> getDependentsInRange(int32_t minCol, int32_t minRow,
@@ -86,6 +104,10 @@ public:
 
     // Clear all dependencies
     void clear();
+
+    // Rebuild the R-tree using the provided position resolver
+    // Call this after column/row move operations to update spatial indexing
+    void rebuildRTree(const PositionResolver& resolver);
 
     // Get number of formula cells being tracked
     [[nodiscard]] size_t size() const { return dependencies_.size(); }

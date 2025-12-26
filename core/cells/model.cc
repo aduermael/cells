@@ -58,6 +58,40 @@ bool containsVolatileFunctionImpl(const ASTNode* ast) {
             return false;
     }
 }
+
+// Create a position resolver for a Sheet
+// Returns (col, row) position for a cell ID, or (-1, -1) if not found
+PositionResolver makePositionResolver(Sheet* sheet) {
+    return [sheet](const ID& cellId) -> std::pair<int32_t, int32_t> {
+        if (!sheet) {
+            return {-1, -1};
+        }
+
+        const Cell* cell = sheet->getCell(cellId);
+        if (!cell) {
+            // Maybe it's a column or row ID, not a cell ID
+            // Check columns first
+            const Axis* col = sheet->getColumn(cellId);
+            if (col) {
+                return {static_cast<int32_t>(col->position), -1};
+            }
+            // Check rows
+            const Axis* row = sheet->getRow(cellId);
+            if (row) {
+                return {-1, static_cast<int32_t>(row->position)};
+            }
+            return {-1, -1};
+        }
+
+        const Axis* col = sheet->getColumn(cell->colId);
+        const Axis* row = sheet->getRow(cell->rowId);
+        if (!col || !row) {
+            return {-1, -1};
+        }
+
+        return {static_cast<int32_t>(col->position), static_cast<int32_t>(row->position)};
+    };
+}
 }  // namespace
 
 // ============================================================================
@@ -627,6 +661,10 @@ bool Sheet::moveColumn(const ID& colId, uint32_t newPosition) {
 
     // Set the new position
     col->position = newPosition;
+
+    // Rebuild R-tree with updated positions (positions are now stale)
+    _depGraph->rebuildRTree(makePositionResolver(this));
+
     return true;
 }
 
@@ -663,6 +701,10 @@ bool Sheet::moveRow(const ID& rowId, uint32_t newPosition) {
 
     // Set the new position
     row->position = newPosition;
+
+    // Rebuild R-tree with updated positions (positions are now stale)
+    _depGraph->rebuildRTree(makePositionResolver(this));
+
     return true;
 }
 
@@ -680,6 +722,10 @@ Axis* Sheet::insertColumnAt(uint32_t position) {
     // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const rawPtr = col.get();
     addColumn(std::move(col));
+
+    // Rebuild R-tree with updated positions
+    _depGraph->rebuildRTree(makePositionResolver(this));
+
     return rawPtr;
 }
 
@@ -697,6 +743,10 @@ Axis* Sheet::insertRowAt(uint32_t position) {
     // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const rawPtr = row.get();
     addRow(std::move(row));
+
+    // Rebuild R-tree with updated positions
+    _depGraph->rebuildRTree(makePositionResolver(this));
+
     return rawPtr;
 }
 
@@ -735,6 +785,9 @@ bool Sheet::deleteColumn(const ID& colId) {
             axis->position--;
         }
     }
+
+    // Rebuild R-tree with updated positions
+    _depGraph->rebuildRTree(makePositionResolver(this));
 
     return true;
 }
@@ -775,6 +828,9 @@ bool Sheet::deleteRow(const ID& rowId) {
         }
     }
 
+    // Rebuild R-tree with updated positions
+    _depGraph->rebuildRTree(makePositionResolver(this));
+
     return true;
 }
 
@@ -803,8 +859,9 @@ FormulaResult Sheet::setCellFormula(const ID& cellId, const std::string& /* form
     cell->setFormula(formula);
 
     // Add to dependency graph (AST should already be resolved)
+    // Use position resolver to populate R-tree for range queries
     if (ast != nullptr) {
-        _depGraph->addFormula(cellId, ast);
+        _depGraph->addFormula(cellId, ast, makePositionResolver(this));
 
         // Track volatile functions
         if (formula->hasVolatile()) {
