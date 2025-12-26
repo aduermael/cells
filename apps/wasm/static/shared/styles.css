@@ -281,40 +281,94 @@ canvas {
     border-color: #adb5bd;
 }
 
-#formula-input {
+/* Formula Input Container - wrapper for contenteditable and hidden input */
+#formula-input-container {
     flex: 1;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    font-size: 13px;
-    color: #212529;
+    position: relative;
+    display: flex;
+    align-items: center;
     background: #fff;
-    border: none;
     border-radius: 4px;
-    padding: 5px 10px;
-    outline: none;
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
     transition: box-shadow 0.15s ease;
 }
 
-#formula-input:focus {
+#formula-input-container:focus-within {
     box-shadow: 0 0 0 1px rgba(5, 134, 1, 0.4), 0 0 0 3px rgba(5, 134, 1, 0.1);
 }
 
-#formula-input::placeholder {
+/* Hidden input for form submission and IME support */
+#formula-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
+}
+
+/* Contenteditable for colored formula display */
+#formula-display {
+    flex: 1;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    color: #212529;
+    background: transparent;
+    border: none;
+    padding: 5px 10px;
+    outline: none;
+    white-space: pre;
+    overflow: hidden;
+    min-height: 24px;
+    line-height: 1.4;
+}
+
+#formula-display:empty::before {
+    content: attr(data-placeholder);
     color: #adb5bd;
 }
 
-/* Cell Editor */
-#cell-editor {
+/* Formula reference colors in text */
+#formula-display .formula-ref {
+    font-weight: 600;
+}
+
+/* Cell Editor Container - wrapper for contenteditable and hidden input */
+#cell-editor-container {
     position: absolute;
     display: none;
     border: 2px solid var(--color-primary);
     background: #fff;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 13px;
-    padding: 2px 4px;
-    outline: none;
     box-sizing: border-box;
     z-index: 100;
+}
+
+/* Hidden input for cell editor */
+#cell-editor {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
+}
+
+/* Contenteditable for colored cell formula display */
+#cell-display {
+    width: 100%;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 13px;
+    color: #212529;
+    background: transparent;
+    padding: 2px 4px;
+    outline: none;
+    white-space: pre;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+/* Formula reference colors in cell editor */
+#cell-display .formula-ref {
+    font-weight: 600;
 }
 
 /* Column Header Editor */

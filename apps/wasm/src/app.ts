@@ -61,11 +61,14 @@ export interface DOMElements {
   dropZone: HTMLElement;
   emptyState: HTMLElement;
   fileInput: HTMLInputElement;
+  cellEditorContainer: HTMLElement;
   cellEditor: HTMLInputElement;
+  cellDisplay: HTMLElement;
   columnHeaderEditor: HTMLInputElement;
   formulaBar: HTMLElement;
   cellReference: HTMLElement;
   formulaInput: HTMLInputElement;
+  formulaDisplay: HTMLElement;
   sheetTabs: HTMLElement;
   sheetTabsContainer: HTMLElement;
   addSheetBtn: HTMLButtonElement;
@@ -393,11 +396,14 @@ export function createApp(): App {
     dropZone: getElement("drop-zone"),
     emptyState: getElement("empty-state"),
     fileInput: getElement<HTMLInputElement>("file-input"),
+    cellEditorContainer: getElement("cell-editor-container"),
     cellEditor: getElement<HTMLInputElement>("cell-editor"),
+    cellDisplay: getElement("cell-display"),
     columnHeaderEditor: getElement<HTMLInputElement>("column-header-editor"),
     formulaBar: getElement("formula-bar"),
     cellReference: getElement("cell-reference"),
     formulaInput: getElement<HTMLInputElement>("formula-input"),
+    formulaDisplay: getElement("formula-display"),
     sheetTabs: getElement("sheet-tabs"),
     sheetTabsContainer: getElement("sheet-tabs-container"),
     addSheetBtn: getElement<HTMLButtonElement>("add-sheet-btn"),

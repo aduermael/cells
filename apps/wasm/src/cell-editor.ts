@@ -13,7 +13,14 @@ import {
   DEFAULT_ROW_HEIGHT,
 } from "./grid-renderer";
 import type { Position, SheetInfo } from "./types";
+import type { FormulaHighlight } from "./grid-constants";
 import { getNormalizedRange } from "./grid-utils";
+import {
+  colorizeFormula,
+  getPlainText,
+  getCursorPosition,
+  setCursorPosition,
+} from "./formula-colorizer.js";
 
 // =============================================================================
 // Types
@@ -48,6 +55,7 @@ export type AfterEditCallback = () => void;
  * - Canceling cell edits
  * - Handling keyboard navigation after edit
  * - Syncing with formula bar and collaboration
+ * - Color-coded formula reference display
  */
 export class CellEditor {
   // =========================================================================
@@ -55,8 +63,11 @@ export class CellEditor {
   // =========================================================================
 
   private uiStateMachine: UIStateMachine;
-  private cellEditorInput: HTMLInputElement;
+  private cellEditorContainer: HTMLElement;
+  private cellEditorInput: HTMLInputElement; // Hidden input for value storage
+  private cellDisplay: HTMLElement; // Contenteditable for colored display
   private formulaInput: HTMLInputElement;
+  private formulaDisplay: HTMLElement;
   private canvas: HTMLCanvasElement;
 
   // Nullable dependencies (set after construction)
@@ -75,6 +86,7 @@ export class CellEditor {
   private getRowHeights: () => Map<number, number>;
   private getScrollX: () => number;
   private getScrollY: () => number;
+  private getFormulaHighlights: () => FormulaHighlight[];
 
   // =========================================================================
   // Callbacks
@@ -96,8 +108,11 @@ export class CellEditor {
 
   constructor(config: {
     uiStateMachine: UIStateMachine;
+    cellEditorContainer: HTMLElement;
     cellEditorInput: HTMLInputElement;
+    cellDisplay: HTMLElement;
     formulaInput: HTMLInputElement;
+    formulaDisplay: HTMLElement;
     canvas: HTMLCanvasElement;
     getSelectedCell: () => Position | null;
     getSelectionStart: () => Position | null;
@@ -107,6 +122,7 @@ export class CellEditor {
     getRowHeights: () => Map<number, number>;
     getScrollX: () => number;
     getScrollY: () => number;
+    getFormulaHighlights: () => FormulaHighlight[];
     onFetchViewport: () => Promise<void>;
     onRender: () => void;
     onUpdateFormulaBar: () => void;
@@ -114,8 +130,11 @@ export class CellEditor {
     onUpdateFormulaHighlights: (value: string) => void;
   }) {
     this.uiStateMachine = config.uiStateMachine;
+    this.cellEditorContainer = config.cellEditorContainer;
     this.cellEditorInput = config.cellEditorInput;
+    this.cellDisplay = config.cellDisplay;
     this.formulaInput = config.formulaInput;
+    this.formulaDisplay = config.formulaDisplay;
     this.canvas = config.canvas;
     this.getSelectedCell = config.getSelectedCell;
     this.getSelectionStart = config.getSelectionStart;
@@ -125,6 +144,7 @@ export class CellEditor {
     this.getRowHeights = config.getRowHeights;
     this.getScrollX = config.getScrollX;
     this.getScrollY = config.getScrollY;
+    this.getFormulaHighlights = config.getFormulaHighlights;
     this.onFetchViewport = config.onFetchViewport;
     this.onRender = config.onRender;
     this.onUpdateFormulaBar = config.onUpdateFormulaBar;
@@ -159,7 +179,42 @@ export class CellEditor {
    */
   isFormulaMode(): boolean {
     if (!this.isEditing()) return false;
-    return this.cellEditorInput.value.startsWith("=");
+    return this.getValue().startsWith("=");
+  }
+
+  /**
+   * Get the current cell value (plain text from contenteditable)
+   */
+  getValue(): string {
+    return getPlainText(this.cellDisplay);
+  }
+
+  /**
+   * Set the cell value with color highlighting
+   */
+  setValue(value: string): void {
+    this.cellEditorInput.value = value;
+    this.updateColoredDisplay();
+  }
+
+  /**
+   * Update the colored display based on current value and highlights
+   */
+  updateColoredDisplay(): void {
+    const value = this.cellEditorInput.value;
+    const highlights = this.getFormulaHighlights();
+
+    // Get cursor position before update
+    const cursorPos = getCursorPosition(this.cellDisplay);
+
+    // Apply colored HTML
+    this.cellDisplay.innerHTML = colorizeFormula(value, highlights);
+
+    // Restore cursor position
+    setCursorPosition(this.cellDisplay, cursorPos.start);
+
+    // Also update formula display
+    this.formulaDisplay.innerHTML = colorizeFormula(value, highlights);
   }
 
   /**
@@ -169,34 +224,43 @@ export class CellEditor {
   insertReferenceAtCursor(ref: string): void {
     if (!this.isEditing()) return;
 
-    const input = this.cellEditorInput;
-    const start = input.selectionStart ?? input.value.length;
-    const end = input.selectionEnd ?? input.value.length;
+    const cursorPos = getCursorPosition(this.cellDisplay);
+    const value = this.getValue();
+    const start = cursorPos.start;
+    const end = cursorPos.end;
 
     // Insert the reference at cursor position, replacing any selection
-    const before = input.value.slice(0, start);
-    const after = input.value.slice(end);
-    input.value = before + ref + after;
+    const before = value.slice(0, start);
+    const after = value.slice(end);
+    const newValue = before + ref + after;
+
+    // Update values
+    this.cellEditorInput.value = newValue;
+
+    // Update formula highlights (async, will call updateColoredDisplay via callback)
+    this.onUpdateFormulaHighlights(newValue);
 
     // Move cursor to after the inserted reference
     const newPos = start + ref.length;
-    input.setSelectionRange(newPos, newPos);
+    requestAnimationFrame(() => {
+      setCursorPosition(this.cellDisplay, newPos);
+    });
 
     // Sync with formula bar
-    this.formulaInput.value = input.value;
-
-    // Update formula highlights
-    this.onUpdateFormulaHighlights(input.value);
+    this.formulaInput.value = newValue;
 
     // Broadcast editing state
     const selectedCell = this.getSelectedCell();
     if (this.syncAdapter && selectedCell) {
-      this.syncAdapter.setEditing(
-        selectedCell.col,
-        selectedCell.row,
-        input.value
-      );
+      this.syncAdapter.setEditing(selectedCell.col, selectedCell.row, newValue);
     }
+  }
+
+  /**
+   * Get the display element (contenteditable)
+   */
+  getDisplayElement(): HTMLElement {
+    return this.cellDisplay;
   }
 
   /**
@@ -258,35 +322,40 @@ export class CellEditor {
     if (mode === "replace") {
       // Replace mode: start with the initial character (clears existing content)
       this.cellEditorInput.value = initialChar;
+      this.cellDisplay.textContent = initialChar;
       if (focusCellEditor) {
-        this.cellEditorInput.focus();
+        this.cellDisplay.focus();
         // Place cursor at end (after the initial character)
-        this.cellEditorInput.setSelectionRange(
-          initialChar.length,
-          initialChar.length
-        );
+        setCursorPosition(this.cellDisplay, initialChar.length);
       }
     } else if (mode === "append") {
       // Append mode: cursor at end of existing content
       this.cellEditorInput.value = initialValue;
+      this.cellDisplay.textContent = initialValue;
       if (focusCellEditor) {
-        this.cellEditorInput.focus();
-        this.cellEditorInput.setSelectionRange(
-          this.cellEditorInput.value.length,
-          this.cellEditorInput.value.length
-        );
+        this.cellDisplay.focus();
+        setCursorPosition(this.cellDisplay, initialValue.length);
       }
     } else {
       // Select mode: select all content (default for F2/Enter)
       this.cellEditorInput.value = initialValue;
+      this.cellDisplay.textContent = initialValue;
       if (focusCellEditor) {
-        this.cellEditorInput.focus();
-        this.cellEditorInput.select();
+        this.cellDisplay.focus();
+        // Select all text in contenteditable
+        const selection = window.getSelection();
+        if (selection) {
+          const range = document.createRange();
+          range.selectNodeContents(this.cellDisplay);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
       }
     }
 
     // Sync formula bar
     this.formulaInput.value = this.cellEditorInput.value;
+    this.formulaDisplay.textContent = this.cellEditorInput.value;
 
     // Show formula highlights for the initial value
     // (input event doesn't fire when value is set programmatically)
@@ -308,8 +377,9 @@ export class CellEditor {
   cancelEditing(): void {
     if (!this.isEditing()) return;
     this.uiStateMachine.transition(UIEvent.CANCEL_CELL_EDIT);
-    this.cellEditorInput.style.display = "none";
+    this.cellEditorContainer.style.display = "none";
     this.cellEditorInput.value = "";
+    this.cellDisplay.innerHTML = "";
     // Clear formula highlights
     this.onUpdateFormulaHighlights("");
     // Clear ephemeral editing state
@@ -330,10 +400,12 @@ export class CellEditor {
     const cellId = context.cellId as string | undefined;
     if (!cellId) return;
 
-    const newValue = this.cellEditorInput.value;
+    const newValue = this.getValue();
 
     this.uiStateMachine.transition(UIEvent.COMMIT_CELL_EDIT);
-    this.cellEditorInput.style.display = "none";
+    this.cellEditorContainer.style.display = "none";
+    this.cellEditorInput.value = "";
+    this.cellDisplay.innerHTML = "";
 
     // Clear formula highlights
     this.onUpdateFormulaHighlights("");
@@ -477,18 +549,19 @@ export class CellEditor {
     const cellWidth = colWidths.get(cell.col) ?? DEFAULT_COL_WIDTH;
     const cellHeight = rowHeights.get(cell.row) ?? DEFAULT_ROW_HEIGHT;
 
-    this.cellEditorInput.style.left = cellX + "px";
-    this.cellEditorInput.style.top = cellY + "px";
-    this.cellEditorInput.style.width = cellWidth + "px";
-    this.cellEditorInput.style.height = cellHeight + "px";
-    this.cellEditorInput.style.display = "block";
+    this.cellEditorContainer.style.left = cellX + "px";
+    this.cellEditorContainer.style.top = cellY + "px";
+    this.cellEditorContainer.style.width = cellWidth + "px";
+    this.cellEditorContainer.style.height = cellHeight + "px";
+    this.cellEditorContainer.style.display = "block";
   }
 
   /**
-   * Set up event listeners on the cell editor input
+   * Set up event listeners on the cell editor contenteditable
    */
   private setupEventListeners(): void {
-    this.cellEditorInput.addEventListener("keydown", (e) => {
+    // Keyboard events on contenteditable
+    this.cellDisplay.addEventListener("keydown", (e) => {
       e.stopPropagation();
       if (e.key === "Escape") {
         e.preventDefault();
@@ -510,10 +583,10 @@ export class CellEditor {
         e.key === "ArrowRight"
       ) {
         // Arrow keys during editing: check if cursor is at boundary
-        const cursorPos = this.cellEditorInput.selectionStart ?? 0;
-        const textLen = this.cellEditorInput.value.length;
-        const atStart = cursorPos === 0;
-        const atEnd = cursorPos === textLen;
+        const cursorPos = getCursorPosition(this.cellDisplay);
+        const textLen = this.getValue().length;
+        const atStart = cursorPos.start === 0;
+        const atEnd = cursorPos.start === textLen;
 
         // Only commit and navigate if at boundary in the direction of movement
         if (
@@ -533,16 +606,18 @@ export class CellEditor {
       }
     });
 
-    this.cellEditorInput.addEventListener("blur", () => {
+    // Blur commits the edit
+    this.cellDisplay.addEventListener("blur", () => {
       if (this.isEditing()) {
         this.confirmEditing();
       }
     });
 
     // Live sync: cell editor -> formula bar + formula highlights + broadcast editing
-    this.cellEditorInput.addEventListener("input", () => {
+    this.cellDisplay.addEventListener("input", () => {
       if (this.isEditing()) {
-        const value = this.cellEditorInput.value;
+        const value = getPlainText(this.cellDisplay);
+        this.cellEditorInput.value = value;
         this.formulaInput.value = value;
 
         // Update formula highlights for live feedback while typing formulas
@@ -551,13 +626,16 @@ export class CellEditor {
         // Broadcast ephemeral editing state to peers
         const selectedCell = this.getSelectedCell();
         if (this.syncAdapter && selectedCell) {
-          this.syncAdapter.setEditing(
-            selectedCell.col,
-            selectedCell.row,
-            value
-          );
+          this.syncAdapter.setEditing(selectedCell.col, selectedCell.row, value);
         }
       }
+    });
+
+    // Prevent paste from including formatting
+    this.cellDisplay.addEventListener("paste", (e) => {
+      e.preventDefault();
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      document.execCommand("insertText", false, text);
     });
   }
 }

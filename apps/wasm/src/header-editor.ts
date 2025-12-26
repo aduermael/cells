@@ -11,7 +11,14 @@ import {
   DEFAULT_COL_WIDTH,
 } from "./grid-renderer";
 import type { Position, SheetInfo, CellData } from "./types";
+import type { FormulaHighlight } from "./grid-constants";
 import { colToLetter, getCellAt } from "./grid-utils";
+import {
+  colorizeFormula,
+  getPlainText,
+  getCursorPosition,
+  setCursorPosition,
+} from "./formula-colorizer.js";
 
 // =============================================================================
 // ColumnHeaderEditor Class
@@ -248,6 +255,7 @@ export class ColumnHeaderEditor {
  * - Canceling formula bar edits
  * - Live preview of edits
  * - Syncing with cell editor and collaboration
+ * - Color-coded formula reference display
  */
 export class FormulaBarEditor {
   // =========================================================================
@@ -255,8 +263,10 @@ export class FormulaBarEditor {
   // =========================================================================
 
   private uiStateMachine: UIStateMachine;
-  private formulaInput: HTMLInputElement;
+  private formulaInput: HTMLInputElement; // Hidden input for value storage
+  private formulaDisplay: HTMLElement; // Contenteditable for colored display
   private cellEditorInput: HTMLInputElement;
+  private cellDisplay: HTMLElement; // Contenteditable for cell editor colors
   private canvas: HTMLCanvasElement;
 
   // Nullable dependencies (set after construction)
@@ -272,6 +282,7 @@ export class FormulaBarEditor {
   private getSheetInfo: () => SheetInfo | null;
   private getCells: () => CellData[];
   private setCells: (cells: CellData[]) => void;
+  private getFormulaHighlights: () => FormulaHighlight[];
 
   // =========================================================================
   // Callbacks
@@ -297,13 +308,16 @@ export class FormulaBarEditor {
   constructor(config: {
     uiStateMachine: UIStateMachine;
     formulaInput: HTMLInputElement;
+    formulaDisplay: HTMLElement;
     cellEditorInput: HTMLInputElement;
+    cellDisplay: HTMLElement;
     canvas: HTMLCanvasElement;
     getSelectedCell: () => Position | null;
     getSelectionStart: () => Position | null;
     getSheetInfo: () => SheetInfo | null;
     getCells: () => CellData[];
     setCells: (cells: CellData[]) => void;
+    getFormulaHighlights: () => FormulaHighlight[];
     onFetchViewport: () => Promise<void>;
     onRender: () => void;
     onUpdateFormulaBar: () => void;
@@ -315,13 +329,16 @@ export class FormulaBarEditor {
   }) {
     this.uiStateMachine = config.uiStateMachine;
     this.formulaInput = config.formulaInput;
+    this.formulaDisplay = config.formulaDisplay;
     this.cellEditorInput = config.cellEditorInput;
+    this.cellDisplay = config.cellDisplay;
     this.canvas = config.canvas;
     this.getSelectedCell = config.getSelectedCell;
     this.getSelectionStart = config.getSelectionStart;
     this.getSheetInfo = config.getSheetInfo;
     this.getCells = config.getCells;
     this.setCells = config.setCells;
+    this.getFormulaHighlights = config.getFormulaHighlights;
     this.onFetchViewport = config.onFetchViewport;
     this.onRender = config.onRender;
     this.onUpdateFormulaBar = config.onUpdateFormulaBar;
@@ -359,7 +376,44 @@ export class FormulaBarEditor {
    */
   isFormulaMode(): boolean {
     if (!this.isEditingFormulaBar()) return false;
-    return this.formulaInput.value.startsWith("=");
+    return this.getValue().startsWith("=");
+  }
+
+  /**
+   * Get the current formula value (plain text from contenteditable)
+   */
+  getValue(): string {
+    return getPlainText(this.formulaDisplay);
+  }
+
+  /**
+   * Set the formula value with color highlighting
+   */
+  setValue(value: string): void {
+    this.formulaInput.value = value;
+    this.updateColoredDisplay();
+  }
+
+  /**
+   * Update the colored display based on current value and highlights
+   */
+  updateColoredDisplay(): void {
+    const value = this.formulaInput.value;
+    const highlights = this.getFormulaHighlights();
+
+    // Get cursor position before update
+    const cursorPos = getCursorPosition(this.formulaDisplay);
+
+    // Apply colored HTML
+    this.formulaDisplay.innerHTML = colorizeFormula(value, highlights);
+
+    // Restore cursor position
+    setCursorPosition(this.formulaDisplay, cursorPos.start);
+
+    // Also update cell display if visible
+    if (this.cellDisplay.parentElement?.style.display !== "none") {
+      this.cellDisplay.innerHTML = colorizeFormula(value, highlights);
+    }
   }
 
   /**
@@ -369,32 +423,47 @@ export class FormulaBarEditor {
   insertReferenceAtCursor(ref: string): void {
     if (!this.isEditingFormulaBar()) return;
 
-    const input = this.formulaInput;
-    const start = input.selectionStart ?? input.value.length;
-    const end = input.selectionEnd ?? input.value.length;
+    const cursorPos = getCursorPosition(this.formulaDisplay);
+    const value = this.getValue();
+    const start = cursorPos.start;
+    const end = cursorPos.end;
 
     // Insert the reference at cursor position, replacing any selection
-    const before = input.value.slice(0, start);
-    const after = input.value.slice(end);
-    input.value = before + ref + after;
+    const before = value.slice(0, start);
+    const after = value.slice(end);
+    const newValue = before + ref + after;
+
+    // Update values
+    this.formulaInput.value = newValue;
+
+    // Update formula highlights (async, will call updateColoredDisplay via callback)
+    this.onUpdateFormulaHighlights(newValue);
 
     // Move cursor to after the inserted reference
     const newPos = start + ref.length;
-    input.setSelectionRange(newPos, newPos);
+    // Note: cursor will be restored after updateColoredDisplay is called
+    // We need to defer this slightly
+    requestAnimationFrame(() => {
+      setCursorPosition(this.formulaDisplay, newPos);
+    });
 
     // Sync with cell editor if visible
-    if (this.cellEditorInput.style.display === "block") {
-      this.cellEditorInput.value = input.value;
+    if (this.cellDisplay.parentElement?.style.display !== "none") {
+      this.cellEditorInput.value = newValue;
     }
-
-    // Update formula highlights
-    this.onUpdateFormulaHighlights(input.value);
 
     // Broadcast editing state
     const editCell = this.getSelectionStart() || this.getSelectedCell();
     if (this.syncAdapter && editCell) {
-      this.syncAdapter.setEditing(editCell.col, editCell.row, input.value);
+      this.syncAdapter.setEditing(editCell.col, editCell.row, newValue);
     }
+  }
+
+  /**
+   * Get the display element (contenteditable)
+   */
+  getDisplayElement(): HTMLElement {
+    return this.formulaDisplay;
   }
 
   /**
@@ -419,12 +488,13 @@ export class FormulaBarEditor {
     // Hide cell editor if it's showing
     if (this.isEditing()) {
       this.uiStateMachine.transition(UIEvent.COMMIT_CELL_EDIT);
-      this.cellEditorInput.style.display = "none";
+      const container = this.cellEditorInput.parentElement;
+      if (container) container.style.display = "none";
     }
 
     const cells = this.getCells();
     let cell = getCellAt(editCell.col, editCell.row, cells);
-    const newValue = this.formulaInput.value;
+    const newValue = this.getValue();
 
     // Check if cell is the temp preview cell (not a real cell in the backend)
     const isTemp = cell && cell.id === "_temp_";
@@ -458,8 +528,13 @@ export class FormulaBarEditor {
 
     this.uiStateMachine.transition(UIEvent.COMMIT_FORMULA_EDIT);
     // Hide cell editor if it was showing during formula bar editing
-    this.cellEditorInput.style.display = "none";
+    const container = this.cellEditorInput.parentElement;
+    if (container) container.style.display = "none";
     this.cellEditorInput.value = "";
+    this.cellDisplay.innerHTML = "";
+    // Clear formula display
+    this.formulaDisplay.innerHTML = "";
+    this.formulaInput.value = "";
     // Clear formula highlights
     this.onUpdateFormulaHighlights("");
     // Clear ephemeral editing state
@@ -475,8 +550,10 @@ export class FormulaBarEditor {
   cancelFormulaBarEdit(): void {
     this.uiStateMachine.transition(UIEvent.CANCEL_FORMULA_EDIT);
     // Hide cell editor if it was showing during formula bar editing
-    this.cellEditorInput.style.display = "none";
+    const container = this.cellEditorInput.parentElement;
+    if (container) container.style.display = "none";
     this.cellEditorInput.value = "";
+    this.cellDisplay.innerHTML = "";
     // Clear formula highlights
     this.onUpdateFormulaHighlights("");
     // Clear ephemeral editing state
@@ -536,8 +613,15 @@ export class FormulaBarEditor {
     this.onSetSelection(newPos, newPos, newPos);
     this.onRender();
     this.onUpdateFormulaBar();
-    this.formulaInput.focus();
-    this.formulaInput.select();
+    this.formulaDisplay.focus();
+    // Select all text in contenteditable
+    const selection = window.getSelection();
+    if (selection) {
+      const range = document.createRange();
+      range.selectNodeContents(this.formulaDisplay);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
   }
 
   // =========================================================================
@@ -545,14 +629,15 @@ export class FormulaBarEditor {
   // =========================================================================
 
   /**
-   * Set up event listeners on the formula bar input
+   * Set up event listeners on the formula bar contenteditable
    */
   private setupEventListeners(): void {
-    this.formulaInput.addEventListener("focus", () => {
+    // Focus on contenteditable starts formula editing
+    this.formulaDisplay.addEventListener("focus", () => {
       // If coming from cell editor, preserve its value in the formula bar
       const wasEditingCell = this.isEditing();
       const cellEditorValue = wasEditingCell
-        ? this.cellEditorInput.value
+        ? getPlainText(this.cellDisplay)
         : null;
 
       this.uiStateMachine.transition(UIEvent.START_FORMULA_EDIT);
@@ -560,6 +645,7 @@ export class FormulaBarEditor {
       // If we had a value from cell editor, ensure formula bar has it
       if (cellEditorValue !== null) {
         this.formulaInput.value = cellEditorValue;
+        this.updateColoredDisplay();
       }
 
       // Show cell editor for visual feedback on the cell while editing
@@ -567,8 +653,10 @@ export class FormulaBarEditor {
       if (selectedCell) {
         // Position and show the cell editor overlay
         this.onPositionCellEditor(selectedCell);
-        this.cellEditorInput.style.display = "block";
+        const container = this.cellEditorInput.parentElement;
+        if (container) container.style.display = "block";
         this.cellEditorInput.value = this.formulaInput.value;
+        this.cellDisplay.innerHTML = this.formulaDisplay.innerHTML;
       }
 
       // Show formula highlights for the current value when starting to edit
@@ -576,7 +664,8 @@ export class FormulaBarEditor {
       this.onUpdateFormulaHighlights(this.formulaInput.value);
     });
 
-    this.formulaInput.addEventListener("keydown", (e) => {
+    // Keyboard events on contenteditable
+    this.formulaDisplay.addEventListener("keydown", (e) => {
       e.stopPropagation();
       if (e.key === "Escape") {
         e.preventDefault();
@@ -594,7 +683,8 @@ export class FormulaBarEditor {
       }
     });
 
-    this.formulaInput.addEventListener("blur", () => {
+    // Blur commits the edit
+    this.formulaDisplay.addEventListener("blur", () => {
       // isEditingFormulaBar() is set to false by mousedown handler before blur fires
       // So this only commits when focus moves elsewhere (Tab to another element, etc.)
       const selectedCell = this.getSelectedCell();
@@ -604,18 +694,24 @@ export class FormulaBarEditor {
     });
 
     // Live sync: update cell display while typing in formula bar
-    this.formulaInput.addEventListener("input", () => {
+    this.formulaDisplay.addEventListener("input", () => {
+      // Get plain text value from contenteditable
+      const value = getPlainText(this.formulaDisplay);
+      this.formulaInput.value = value;
+
       // Update AST debug panel live as user types
-      this.onUpdateAstDebugPanel(this.formulaInput.value);
+      this.onUpdateAstDebugPanel(value);
 
       // Update formula reference highlights live as user types
-      this.onUpdateFormulaHighlights(this.formulaInput.value);
+      this.onUpdateFormulaHighlights(value);
 
       if (!this.isEditingFormulaBar()) return;
 
       // Sync to cell editor if it's visible (bidirectional sync)
-      if (this.cellEditorInput.style.display === "block") {
-        this.cellEditorInput.value = this.formulaInput.value;
+      const container = this.cellEditorInput.parentElement;
+      if (container?.style.display !== "none") {
+        this.cellEditorInput.value = value;
+        // Cell display will be updated via updateColoredDisplay callback
       }
 
       // Use anchor cell (selectionStart) for editing, not selectedCell
@@ -624,11 +720,7 @@ export class FormulaBarEditor {
 
       // Broadcast ephemeral editing state to peers
       if (this.syncAdapter) {
-        this.syncAdapter.setEditing(
-          editCell.col,
-          editCell.row,
-          this.formulaInput.value
-        );
+        this.syncAdapter.setEditing(editCell.col, editCell.row, value);
       }
 
       // Update local cell data for live preview (without saving to engine)
@@ -636,22 +728,27 @@ export class FormulaBarEditor {
       let cell = getCellAt(editCell.col, editCell.row, cells);
       if (cell) {
         // Update existing cell's display value
-        cell.value = this.formulaInput.value;
-        cell.formula = this.formulaInput.value.startsWith("=")
-          ? this.formulaInput.value
-          : undefined;
+        cell.value = value;
+        cell.formula = value.startsWith("=") ? value : undefined;
       } else {
         // Create a temporary local cell for preview
         cells.push({
           id: "_temp_",
           col: editCell.col,
           row: editCell.row,
-          value: this.formulaInput.value,
+          value: value,
           type: "s",
         });
         this.setCells(cells);
       }
       this.onRender();
+    });
+
+    // Prevent paste from including formatting
+    this.formulaDisplay.addEventListener("paste", (e) => {
+      e.preventDefault();
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      document.execCommand("insertText", false, text);
     });
   }
 }

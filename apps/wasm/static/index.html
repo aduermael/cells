@@ -34,7 +34,10 @@
         </div>
         <div id="formula-bar" class="hidden">
             <span id="cell-reference">A1</span>
-            <input type="text" id="formula-input" placeholder="Select a cell to view or edit its value" />
+            <div id="formula-input-container">
+                <input type="text" id="formula-input" />
+                <div id="formula-display" contenteditable="true" data-placeholder="Select a cell to view or edit its value"></div>
+            </div>
         </div>
         <div id="ast-debug-panel" class="hidden">
             <div id="ast-debug-header">
@@ -48,7 +51,10 @@
         </div>
         <div id="canvas-container">
             <canvas id="grid" tabindex="0"></canvas>
-            <input type="text" id="cell-editor" />
+            <div id="cell-editor-container">
+                <input type="text" id="cell-editor" />
+                <div id="cell-display" contenteditable="true"></div>
+            </div>
             <input type="text" id="column-header-editor" />
             <div id="loading"><span class="spinner"></span>Loading...</div>
             <div id="error">Failed to load file</div>

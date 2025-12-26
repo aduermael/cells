@@ -30,6 +30,7 @@ import {
   type FormulaHighlight,
 } from "./grid-renderer";
 import type { ReferenceInfo } from "./client-types";
+import { colorizeFormula } from "./formula-colorizer.js";
 
 // =============================================================================
 // Types
@@ -199,7 +200,8 @@ export function initApp(): AppContext {
     if (!app.selectedCell) {
       elements.cellReference.textContent = "";
       elements.formulaInput.value = "";
-      elements.formulaInput.placeholder =
+      elements.formulaDisplay.textContent = "";
+      elements.formulaDisplay.dataset.placeholder =
         "Select a cell to view or edit its value";
       return;
     }
@@ -216,10 +218,12 @@ export function initApp(): AppContext {
           app.cells
         );
         if (anchorCell) {
-          elements.formulaInput.value =
-            anchorCell.formula || anchorCell.value || "";
+          const value = anchorCell.formula || anchorCell.value || "";
+          elements.formulaInput.value = value;
+          elements.formulaDisplay.textContent = value;
         } else {
           elements.formulaInput.value = "";
+          elements.formulaDisplay.textContent = "";
         }
       }
     } else {
@@ -235,11 +239,13 @@ export function initApp(): AppContext {
         const formulaValue = cell.formula || cell.value || "";
         console.log("[FORMULA_DEBUG] updateFormulaBar: cell=", cell, "formula=", formulaValue);
         elements.formulaInput.value = formulaValue;
+        elements.formulaDisplay.textContent = formulaValue;
       } else {
         elements.formulaInput.value = "";
+        elements.formulaDisplay.textContent = "";
       }
     }
-    elements.formulaInput.placeholder = "";
+    elements.formulaDisplay.dataset.placeholder = "";
 
     // Show formula highlights when a formula cell is selected (not editing)
     // This allows users to see what cells a formula references just by clicking on it
@@ -377,6 +383,7 @@ export function initApp(): AppContext {
     // Clear highlights if not editing or empty value
     if (!value || !value.startsWith("=")) {
       app.formulaHighlights = [];
+      updateColoredDisplays(value);
       render();
       return;
     }
@@ -395,6 +402,7 @@ export function initApp(): AppContext {
       if (result.error) {
         console.warn("Formula parse error:", result.error);
         app.formulaHighlights = [];
+        updateColoredDisplays(value);
         render();
         return;
       }
@@ -411,12 +419,38 @@ export function initApp(): AppContext {
       }
 
       app.formulaHighlights = highlights;
+      updateColoredDisplays(value);
       render();
     } catch (e) {
       console.warn("Error updating formula highlights:", e);
       app.formulaHighlights = [];
+      updateColoredDisplays(value);
       render();
     }
+  }
+
+  /**
+   * Update the colored formula displays with current highlights.
+   * Called after highlights are computed.
+   */
+  function updateColoredDisplays(value: string): void {
+    const coloredHtml = colorizeFormula(value, app.formulaHighlights);
+
+    // Update formula bar display if it has focus
+    if (document.activeElement === elements.formulaDisplay) {
+      // Don't update while focused - let input handler manage it
+      return;
+    }
+
+    // Update cell display if it has focus
+    if (document.activeElement === elements.cellDisplay) {
+      // Don't update while focused - let input handler manage it
+      return;
+    }
+
+    // Update displays when they're not being actively edited
+    elements.formulaDisplay.innerHTML = coloredHtml;
+    elements.cellDisplay.innerHTML = coloredHtml;
   }
 
   // =========================================================================
@@ -589,8 +623,11 @@ export function initApp(): AppContext {
 
   const cellEditor = new CellEditor({
     uiStateMachine: app.uiStateMachine,
+    cellEditorContainer: elements.cellEditorContainer,
     cellEditorInput: elements.cellEditor,
+    cellDisplay: elements.cellDisplay,
     formulaInput: elements.formulaInput,
+    formulaDisplay: elements.formulaDisplay,
     canvas: elements.canvas,
     getSelectedCell: () => app.selectedCell,
     getSelectionStart: () => app.selectionStart,
@@ -600,6 +637,7 @@ export function initApp(): AppContext {
     getRowHeights: () => app.rowHeights,
     getScrollX: () => app.scrollX,
     getScrollY: () => app.scrollY,
+    getFormulaHighlights: () => app.formulaHighlights,
     onFetchViewport: fetchViewport,
     onRender: render,
     onUpdateFormulaBar: updateFormulaBar,
@@ -647,16 +685,18 @@ export function initApp(): AppContext {
     }
     const cellWidth = app.colWidths.get(cell.col) ?? DEFAULT_COL_WIDTH;
     const cellHeight = app.rowHeights.get(cell.row) ?? DEFAULT_ROW_HEIGHT;
-    elements.cellEditor.style.left = cellX + "px";
-    elements.cellEditor.style.top = cellY + "px";
-    elements.cellEditor.style.width = cellWidth + "px";
-    elements.cellEditor.style.height = cellHeight + "px";
+    elements.cellEditorContainer.style.left = cellX + "px";
+    elements.cellEditorContainer.style.top = cellY + "px";
+    elements.cellEditorContainer.style.width = cellWidth + "px";
+    elements.cellEditorContainer.style.height = cellHeight + "px";
   }
 
   const formulaBarEditor = new FormulaBarEditor({
     uiStateMachine: app.uiStateMachine,
     formulaInput: elements.formulaInput,
+    formulaDisplay: elements.formulaDisplay,
     cellEditorInput: elements.cellEditor,
+    cellDisplay: elements.cellDisplay,
     canvas: elements.canvas,
     getSelectedCell: () => app.selectedCell,
     getSelectionStart: () => app.selectionStart,
@@ -665,6 +705,7 @@ export function initApp(): AppContext {
     setCells: (cells) => {
       app.cells = cells;
     },
+    getFormulaHighlights: () => app.formulaHighlights,
     onFetchViewport: fetchViewport,
     onRender: render,
     onUpdateFormulaBar: updateFormulaBar,

@@ -62,12 +62,12 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 
 ### Tasks
 
-- [ ] 2a: Create `formula-colorizer.ts` module with function to generate colored HTML spans for formula text
-- [ ] 2b: Create a styled contenteditable div overlay or use CSS background gradients for coloring (input elements can't have colored text segments)
-- [ ] 2c: Replace formula input with contenteditable div that syncs with hidden input for form handling
-- [ ] 2d: Apply color styling to cell editor overlay when in formula mode
-- [ ] 2e: Ensure cursor position and selection work correctly in the contenteditable
-- [ ] 2f: Update colors in real-time as user types and references are parsed
+- [x] 2a: Create `formula-colorizer.ts` module with function to generate colored HTML spans for formula text
+- [x] 2b: Create a styled contenteditable div overlay or use CSS background gradients for coloring (input elements can't have colored text segments)
+- [x] 2c: Replace formula input with contenteditable div that syncs with hidden input for form handling
+- [x] 2d: Apply color styling to cell editor overlay when in formula mode
+- [x] 2e: Ensure cursor position and selection work correctly in the contenteditable
+- [x] 2f: Update colors in real-time as user types and references are parsed
 
 ### UI Checkpoint 2
 - [ ] **USER APPROVAL REQUIRED:** Verify formula text colors match grid highlight colors
