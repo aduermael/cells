@@ -1,7 +1,9 @@
 #ifndef CELLS_FORMULA_EVAL_H_
 #define CELLS_FORMULA_EVAL_H_
 
+#include <cctype>
 #include <cstdint>
+#include <cstdlib>
 
 #include <functional>
 #include <string>
@@ -150,18 +152,21 @@ struct EvalResult {
                 if (stringValue.empty()) {
                     return Number(0.0);
                 }
-                // Try to parse as number
-                try {
-                    size_t pos = 0;
-                    const double val = std::stod(stringValue, &pos);
-                    // Check if entire string was consumed
-                    if (pos == stringValue.size()) {
+                // Try to parse as number (no exceptions for WASM compatibility)
+                // NOLINTNEXTLINE(misc-const-correctness) - strtod requires non-const
+                char* endptr = nullptr;
+                const double val = std::strtod(stringValue.c_str(), &endptr);
+                // Check if entire string was consumed (skip trailing whitespace)
+                if (endptr != stringValue.c_str()) {
+                    while (*endptr != '\0' &&
+                           std::isspace(static_cast<unsigned char>(*endptr)) != 0) {
+                        ++endptr;
+                    }
+                    if (*endptr == '\0') {
                         return Number(val);
                     }
-                    return Error(CellError::VALUE);
-                } catch (...) {
-                    return Error(CellError::VALUE);
                 }
+                return Error(CellError::VALUE);
             }
             case Type::BOOLEAN:
                 return Number(boolValue ? 1.0 : 0.0);

@@ -147,6 +147,41 @@ declare module 'cells-wasm' {
   }
 
   /**
+   * Response from getCellDisplayValue
+   */
+  interface CellDisplayValueResult {
+    value: string;                          // The display value (calculated result)
+    type: 'n' | 's' | 'b' | 'e' | 'empty'; // n=number, s=string, b=boolean, e=error, empty
+    error?: string;                         // Error message if type is 'e'
+  }
+
+  /**
+   * Response from recalculate
+   */
+  interface RecalculateResult {
+    recalculated: number;  // Number of cells recalculated
+    errors: number;        // Number of cells that evaluated to errors
+    error?: string;        // Error message if operation failed
+  }
+
+  /**
+   * Response from markCellDirty
+   */
+  interface MarkDirtyResult {
+    success: boolean;
+    markedDirty: number;  // Number of cells marked dirty
+    error?: string;
+  }
+
+  /**
+   * Response from getDirtyCellIds
+   */
+  interface DirtyCellsResult {
+    dirtyCells: string[];  // Array of cell IDs needing recalculation
+    error?: string;
+  }
+
+  /**
    * Sheet information
    */
   interface SheetInfo {
@@ -168,6 +203,7 @@ declare module 'cells-wasm' {
     value?: string;      // For non-formula cells
     formula?: string;    // For formula cells (A1 notation)
     display?: string;    // For formula cells (computed value)
+    isError?: boolean;   // True if formula evaluated to an error
   }
 
   /**
@@ -549,6 +585,47 @@ declare module 'cells-wasm' {
      */
     getVolatileCells(): string;
 
+    // ========================================================================
+    // Formula Evaluation (Phase 8)
+    // ========================================================================
+
+    /**
+     * Evaluate a cell and return its display value (calculated result)
+     * For formula cells, returns the computed result (number, string, boolean, or error)
+     * For non-formula cells, returns the cell's raw value
+     * @param cellId - Cell ID (8-char base62)
+     * @returns JSON string with CellDisplayValueResult
+     */
+    getCellDisplayValue(cellId: string): string;
+
+    /**
+     * Trigger recalculation of all dirty cells
+     * Evaluates formulas marked dirty and updates their values
+     * Uses dependency graph for correct evaluation order
+     * @returns JSON string with RecalculateResult
+     */
+    recalculate(): string;
+
+    /**
+     * Check if any cells need recalculation
+     * @returns true if there are dirty formula cells
+     */
+    hasDirtyCells(): boolean;
+
+    /**
+     * Mark a cell as dirty and mark all its dependents as dirty
+     * Use when a cell's value changes to trigger dependent recalculation
+     * @param cellId - Cell ID (8-char base62)
+     * @returns JSON string with MarkDirtyResult
+     */
+    markCellDirty(cellId: string): string;
+
+    /**
+     * Get list of dirty cell IDs (cells needing recalculation)
+     * @returns JSON string with DirtyCellsResult
+     */
+    getDirtyCellIds(): string;
+
     /**
      * Parse a formula and return its AST as JSON (debug function)
      * @param formulaText - Formula text (e.g., "=A1+B2")
@@ -635,5 +712,10 @@ declare module 'cells-wasm' {
     FormulaReferencesResult,
     CircularRefResult,
     VolatileCellsResult,
+    // Formula Evaluation types (Phase 8)
+    CellDisplayValueResult,
+    RecalculateResult,
+    MarkDirtyResult,
+    DirtyCellsResult,
   };
 }

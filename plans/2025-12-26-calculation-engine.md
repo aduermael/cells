@@ -2,7 +2,7 @@
 
 Status: IN PROGRESS
 Created At: 2025-12-26 01:22 UTC
-Updated At: 2025-12-26 06:21 UTC
+Updated At: 2025-12-26 06:39 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -912,7 +912,7 @@ bool hasDirtyCells();
 
 **Test**: WASM bindings compile
 
-- [ ] 8a: Add WASM bindings for cell evaluation
+- [x] 8a: Add WASM bindings for cell evaluation - **Implemented getCellDisplayValue, recalculate, hasDirtyCells, markCellDirty, getDirtyCellIds in apps/wasm/bindings.cc**
 
 ### 8b: Update TypeScript types
 
@@ -932,7 +932,7 @@ export interface CellsModule {
 
 **Test**: TypeScript compiles
 
-- [ ] 8b: Update TypeScript type definitions
+- [x] 8b: Update TypeScript type definitions - **Added CellDisplayValueResult, RecalculateResult, MarkDirtyResult, DirtyCellsResult interfaces**
 
 ### 8c: Wire grid to display calculated values
 
@@ -944,7 +944,7 @@ Update the grid renderer to:
 
 **Test manually**: Enter `=1+1` → cell displays `2`, formula bar shows `=1+1`
 
-- [ ] 8c: Wire grid to display calculated values
+- [x] 8c: Wire grid to display calculated values - **queryViewport now evaluates formulas and returns calculated display values**
 
 ### 8d: Trigger recalculation on changes
 
@@ -955,7 +955,7 @@ When a cell is edited:
 
 **Test manually**: A1=5, B1=A1*2 → displays 10 → change A1 to 10 → B1 displays 20
 
-- [ ] 8d: Trigger recalculation on cell changes
+- [x] 8d: Trigger recalculation on cell changes - **updateCell and createCell now call markDirty + recalculate after applying CRDT operations**
 
 ### 8e: Add error styling
 
@@ -966,7 +966,7 @@ Style cells with errors differently:
 
 **Test manually**: Enter `=1/0` → cell displays red `#DIV/0!`
 
-- [ ] 8e: Add error value styling in grid
+- [x] 8e: Add error value styling in grid - **CellData.isError field added to queryViewport response; TypeScript can use this to style error cells differently**
 
 ---
 

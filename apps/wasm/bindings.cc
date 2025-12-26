@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 
 #include <cstdint>
+#include <iomanip>
 #include <memory>
 #include <set>
 #include <sstream>
@@ -20,6 +21,8 @@
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_display.h"
 #include "core/cells/formula_parser.h"
+#include "core/cells/formula_eval.h"
+#include "core/cells/formula_recalc.h"
 #include "core/cells/formula_resolver.h"
 #include "core/cells/hlc.h"
 #include "core/cells/id.h"
@@ -467,9 +470,40 @@ public:
                     LOG_INFO("[FORMULA_DEBUG] queryViewport: UUID='%s' -> A1='%s'", formula->text, a1Formula.c_str());
                     json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
                 }
-                // Use fresh A1 formula for display (cell->value.raw may have stale formula text)
-                // Once we have a calc engine, this should show the calculated value instead
-                const std::string& displayValue = a1Formula.empty() ? entry.cell->value.raw : a1Formula;
+
+                // Evaluate the formula and show the calculated value
+                EvalResult result = evaluateCell(sheet, entry.cell);
+                std::string displayValue;
+                if (result.isError()) {
+                    displayValue = errorToString(result.getError());
+                    json << "\"isError\":true,";
+                } else if (result.isNumber()) {
+                    const double num = result.getNumber();
+                    if (std::floor(num) == num && std::abs(num) < 1e15) {
+                        displayValue = std::to_string(static_cast<long long>(num));
+                    } else {
+                        std::ostringstream numStr;
+                        numStr << std::setprecision(15) << num;
+                        displayValue = numStr.str();
+                        // Remove trailing zeros after decimal
+                        size_t dot = displayValue.find('.');
+                        if (dot != std::string::npos) {
+                            size_t last = displayValue.find_last_not_of('0');
+                            if (last != std::string::npos && last > dot) {
+                                displayValue = displayValue.substr(0, last + 1);
+                            } else if (last == dot) {
+                                displayValue = displayValue.substr(0, dot);
+                            }
+                        }
+                    }
+                } else if (result.isString()) {
+                    displayValue = result.getString();
+                } else if (result.isBoolean()) {
+                    displayValue = result.getBoolean() ? "TRUE" : "FALSE";
+                } else {
+                    // Empty or other
+                    displayValue = "";
+                }
                 json << "\"display\":\"" << jsonEscape(displayValue) << "\"";
             } else {
                 char typeChar = valueTypeToChar(entry.cell->value.type);
@@ -603,6 +637,13 @@ public:
         }
 
         rebuildQuadtree();
+
+        // Trigger recalculation: mark dependents dirty and recalculate
+        // This ensures formulas that depend on this cell get updated
+        markDirty(sheet, cellId);
+        std::vector<ID> changed = {cellId};
+        cells::recalculate(sheet, changed);
+
         notifyListeners(ChangeType::CELL_CHANGED);
         return "{\"success\":true}";
     }
@@ -693,6 +734,12 @@ public:
         }
 
         rebuildQuadtree();
+
+        // Trigger recalculation for the new cell and its dependents
+        markDirty(sheet, cellId);
+        std::vector<ID> changed = {cellId};
+        cells::recalculate(sheet, changed);
+
         notifyListeners(ChangeType::CELL_CHANGED);
 
         std::ostringstream json;
@@ -2628,6 +2675,181 @@ public:
     }
 
     // ========================================================================
+    // Formula Evaluation (Phase 8)
+    // ========================================================================
+
+    // Evaluate a cell and return the display value (calculated result).
+    // For formula cells, returns the computed result (number, string, boolean, or error).
+    // For non-formula cells, returns the cell's raw value.
+    // Returns JSON: {"value": "...", "type": "n|s|b|e|empty", "error"?: "..."}
+    std::string getCellDisplayValue(const std::string& cellIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) return "{\"error\":\"Sheet not found\"}";
+
+        if (cellIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid cell ID\"}";
+        }
+        ID cellId(cellIdStr);
+
+        Cell* cell = sheet->getCell(cellId);
+        if (!cell) {
+            // Non-existent cell returns empty
+            return "{\"value\":\"\",\"type\":\"empty\"}";
+        }
+
+        // Evaluate the cell (or get its value if not a formula)
+        EvalResult result = evaluateCell(sheet, cell);
+
+        std::ostringstream json;
+        json << "{";
+
+        if (result.isError()) {
+            json << "\"value\":\"" << jsonEscape(errorToString(result.getError())) << "\",";
+            json << "\"type\":\"e\",";
+            json << "\"error\":\"" << jsonEscape(errorToString(result.getError())) << "\"";
+        } else if (result.isNumber()) {
+            // Format number nicely (avoid unnecessary decimal places)
+            const double num = result.getNumber();
+            if (std::floor(num) == num && std::abs(num) < 1e15) {
+                json << "\"value\":\"" << static_cast<long long>(num) << "\",";
+            } else {
+                std::ostringstream numStr;
+                numStr << std::setprecision(15) << num;
+                json << "\"value\":\"" << numStr.str() << "\",";
+            }
+            json << "\"type\":\"n\"";
+        } else if (result.isString()) {
+            json << "\"value\":\"" << jsonEscape(result.getString()) << "\",";
+            json << "\"type\":\"s\"";
+        } else if (result.isBoolean()) {
+            json << "\"value\":\"" << (result.getBoolean() ? "TRUE" : "FALSE") << "\",";
+            json << "\"type\":\"b\"";
+        } else if (result.isEmpty()) {
+            json << "\"value\":\"\",";
+            json << "\"type\":\"empty\"";
+        } else {
+            // Range or other - shouldn't happen for a single cell result
+            json << "\"value\":\"\",";
+            json << "\"type\":\"empty\"";
+        }
+
+        json << "}";
+        return json.str();
+    }
+
+    // Trigger recalculation of all dirty cells.
+    // This evaluates formulas that are marked dirty and updates their values.
+    // Uses the dependency graph to determine the correct evaluation order.
+    // Returns JSON: {"recalculated": count, "errors": count}
+    std::string recalculate() {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) return "{\"error\":\"Sheet not found\"}";
+
+        // Get all dirty cells in proper recalculation order
+        std::vector<ID> dirtyCells = getDirtyCells(sheet);
+
+        int recalculated = 0;
+        int errors = 0;
+
+        // Recalculate each dirty cell
+        for (const ID& cellId : dirtyCells) {
+            Cell* cell = sheet->getCell(cellId);
+            if (cell && cell->isFormula()) {
+                EvalResult result = evaluateCell(sheet, cell);
+                ++recalculated;
+                if (result.isError()) {
+                    ++errors;
+                }
+            }
+        }
+
+        // Also recalculate volatile cells if any
+        recalculateVolatile(sheet);
+
+        std::ostringstream json;
+        json << "{\"recalculated\":" << recalculated << ",\"errors\":" << errors << "}";
+        return json.str();
+    }
+
+    // Check if any cells need recalculation.
+    // Returns true if there are dirty formula cells.
+    bool hasDirtyCellsCheck() {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return false;
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) return false;
+
+        return hasDirtyCells(sheet);
+    }
+
+    // Mark a cell as dirty and mark all its dependents as dirty.
+    // Use this when a cell's value changes to trigger dependent recalculation.
+    // Returns JSON: {"success": true, "markedDirty": count}
+    std::string markCellDirty(const std::string& cellIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) return "{\"error\":\"Sheet not found\"}";
+
+        if (cellIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid cell ID\"}";
+        }
+        ID cellId(cellIdStr);
+
+        // Mark this cell and its dependents as dirty
+        markDirty(sheet, cellId);
+
+        // Count dirty cells
+        int dirtyCount = 0;
+        for (const auto& [id, cell] : sheet->cells) {
+            const Formula* formula = cell->getFormula();
+            if (formula && formula->dirty) {
+                ++dirtyCount;
+            }
+        }
+
+        std::ostringstream json;
+        json << "{\"success\":true,\"markedDirty\":" << dirtyCount << "}";
+        return json.str();
+    }
+
+    // Get list of dirty cell IDs (cells needing recalculation)
+    // Returns JSON: {"dirtyCells": ["id1", "id2", ...]}
+    std::string getDirtyCellIds() {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) return "{\"error\":\"Sheet not found\"}";
+
+        std::vector<ID> dirtyCells = getDirtyCells(sheet);
+
+        std::ostringstream json;
+        json << "{\"dirtyCells\":[";
+
+        for (size_t i = 0; i < dirtyCells.size(); ++i) {
+            if (i > 0) json << ",";
+            json << "\"" << dirtyCells[i].toString() << "\"";
+        }
+
+        json << "]}";
+        return json.str();
+    }
+
+    // ========================================================================
     // Debug/Development methods
     // ========================================================================
 
@@ -2886,6 +3108,12 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getReferencesFromPartial", &cells::wasm::CellsEngine::getReferencesFromPartial)
         .function("detectCircularRef", &cells::wasm::CellsEngine::detectCircularRef)
         .function("getVolatileCells", &cells::wasm::CellsEngine::getVolatileCells)
+        // Formula Evaluation (Phase 8)
+        .function("getCellDisplayValue", &cells::wasm::CellsEngine::getCellDisplayValue)
+        .function("recalculate", &cells::wasm::CellsEngine::recalculate)
+        .function("hasDirtyCells", &cells::wasm::CellsEngine::hasDirtyCellsCheck)
+        .function("markCellDirty", &cells::wasm::CellsEngine::markCellDirty)
+        .function("getDirtyCellIds", &cells::wasm::CellsEngine::getDirtyCellIds)
         // Debug/Development
         .function("debugParseFormula", &cells::wasm::CellsEngine::debugParseFormula);
 
