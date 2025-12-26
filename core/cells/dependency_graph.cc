@@ -232,6 +232,12 @@ std::vector<ID> DependencyGraph::getDependents(const ID& cellId) const {
     // Find all cells whose formulas depend on cellId
     // This is a reverse lookup - go through all dependencies and find
     // cells that reference the given cellId
+    //
+    // PERFORMANCE NOTE: This is O(n*m) where n = formula count, m = avg deps per formula.
+    // For large sheets (1000+ formulas), consider adding a reverse index:
+    //   std::unordered_map<ID, std::vector<ID>> reverseDeps_;
+    // Updated in addFormula()/removeFormula() for O(1) lookup.
+    // The R-tree (rtree_) is also available for range-based queries once wired up.
     std::vector<ID> dependents;
 
     for (const auto& [formulaCellId, refs] : dependencies_) {

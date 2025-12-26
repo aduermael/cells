@@ -55,6 +55,12 @@ static bool isCellInRange(Sheet* sheet, const ID& cellId, const ID& rangeStartCe
 }
 
 // Get all formula cells that depend on a given cell (including range dependencies)
+//
+// PERFORMANCE NOTE: This is O(n*m) where n = formula count, m = avg deps per formula,
+// plus additional Sheet lookups for range bounds checking. For large sheets, consider:
+// 1. Adding a reverse index in DependencyGraph for O(1) cell dependency lookup
+// 2. Using the R-tree for range queries instead of iterating all formulas
+// 3. Caching range membership results
 static std::vector<ID> getDependentsWithRanges(Sheet* sheet, const ID& cellId) {
     const DependencyGraph* depGraph = sheet->getDependencyGraph();
     if (!depGraph) {
