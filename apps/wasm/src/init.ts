@@ -31,6 +31,7 @@ import {
 } from "./grid-renderer";
 import type { ReferenceInfo } from "./client-types";
 import { colorizeFormula } from "./formula-colorizer.js";
+import { ScrollbarManager, calculateContentDimensions, calculateDiscoveredRows } from "./scrollbar.js";
 
 // =============================================================================
 // Types
@@ -167,6 +168,73 @@ export function initApp(): AppContext {
     elements.canvas.style.height = container.clientHeight + "px";
     app.renderer.ctx.scale(dpr, dpr);
     render();
+    updateScrollbars();
+  }
+
+  // =========================================================================
+  // Scrollbar Management
+  // =========================================================================
+
+  /** Initialize scrollbar manager */
+  function initScrollbars(): void {
+    app.scrollbarManager = new ScrollbarManager(
+      elements.canvasContainer,
+      {
+        getScrollX: () => app.scrollX,
+        getScrollY: () => app.scrollY,
+        setScrollX: (x) => { app.scrollX = x; },
+        setScrollY: (y) => { app.scrollY = y; },
+        getViewportWidth: () => elements.canvas.clientWidth - HEADER_WIDTH,
+        getViewportHeight: () => elements.canvas.clientHeight - HEADER_HEIGHT,
+        getContentWidth: () => {
+          const colCount = app.sheetInfo?.colCount ?? 22;
+          const { width } = calculateContentDimensions(colCount, 0, app.colWidths, app.rowHeights);
+          return width;
+        },
+        getContentHeight: () => {
+          // Use discovered rows for virtual scrolling
+          const { height } = calculateContentDimensions(0, app.discoveredRows, app.colWidths, app.rowHeights);
+          return height;
+        },
+        onScroll: () => {
+          // Update discovered rows based on scroll position
+          const viewportHeight = elements.canvas.clientHeight - HEADER_HEIGHT;
+          const actualRows = app.sheetInfo?.rowCount ?? 100;
+          app.discoveredRows = calculateDiscoveredRows(
+            app.scrollY,
+            viewportHeight,
+            app.discoveredRows,
+            actualRows
+          );
+          render();
+          fetchViewportNow();
+        },
+      }
+    );
+    // Initially hidden until a file is loaded
+    app.scrollbarManager.setVisible(false);
+  }
+
+  /** Update scrollbar positions and visibility */
+  function updateScrollbars(): void {
+    if (!app.scrollbarManager) return;
+
+    // Show scrollbars only when a file is loaded
+    const hasFile = app.hasFileLoaded && app.sheetInfo !== null;
+    app.scrollbarManager.setVisible(hasFile);
+
+    if (hasFile) {
+      // Update discovered rows based on current scroll
+      const viewportHeight = elements.canvas.clientHeight - HEADER_HEIGHT;
+      const actualRows = app.sheetInfo?.rowCount ?? 100;
+      app.discoveredRows = calculateDiscoveredRows(
+        app.scrollY,
+        viewportHeight,
+        app.discoveredRows,
+        actualRows
+      );
+      app.scrollbarManager.update();
+    }
   }
 
   // =========================================================================
@@ -658,6 +726,7 @@ export function initApp(): AppContext {
     console.log("[FORMULA_DEBUG] processDataChanges: cells after fetchViewport=", app.cells.filter(c => c.formula));
     render();
     updateFormulaBar();
+    updateScrollbars();
 
     // Queue operations broadcast to peers
     if (app.collaborationInitialized && app.syncAdapter) {
@@ -930,6 +999,7 @@ export function initApp(): AppContext {
     fetchViewportNow,
     toggleAstDebugPanel: () => astDebugPanel.toggle(elements.formulaInput.value),
     commitFormulaBarEdit: () => formulaBarEditor.commitFormulaBarEdit(),
+    updateScrollbars,
   });
 
   // =========================================================================
@@ -1078,6 +1148,9 @@ export function initApp(): AppContext {
     fileLoader.setupFileInput();
     fileLoader.setupDragAndDrop();
     fileLoader.setupExportDropdown();
+
+    // Initialize scrollbars
+    initScrollbars();
 
     resizeCanvas();
 

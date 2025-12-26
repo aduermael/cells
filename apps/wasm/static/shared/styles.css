@@ -1158,3 +1158,90 @@ canvas {
 #ast-tree .ast-null {
     color: #569cd6;
 }
+
+/* ============================================================================
+   Custom Scrollbars (virtual scrolling)
+   ============================================================================ */
+
+/* Vertical scrollbar track */
+.scrollbar-track-vertical {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 12px;
+    bottom: 12px; /* Leave space for corner */
+    background: #f8f9fa;
+    border-left: 1px solid #dee2e6;
+    z-index: 50;
+}
+
+.scrollbar-track-vertical.hidden {
+    display: none;
+}
+
+.scrollbar-track-vertical.active {
+    background: #e9ecef;
+}
+
+/* Horizontal scrollbar track */
+.scrollbar-track-horizontal {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 12px;
+    right: 12px; /* Leave space for corner */
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    z-index: 50;
+}
+
+.scrollbar-track-horizontal.hidden {
+    display: none;
+}
+
+.scrollbar-track-horizontal.active {
+    background: #e9ecef;
+}
+
+/* Scrollbar thumbs */
+.scrollbar-thumb {
+    position: absolute;
+    background: #c4c4c4;
+    border-radius: 6px;
+    transition: background 0.15s ease;
+    cursor: pointer;
+}
+
+.scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+.scrollbar-thumb:active,
+.scrollbar-track.active .scrollbar-thumb {
+    background: #8c8c8c;
+}
+
+.scrollbar-thumb-vertical {
+    left: 2px;
+    right: 2px;
+    min-height: 30px;
+}
+
+.scrollbar-thumb-horizontal {
+    top: 2px;
+    bottom: 2px;
+    min-width: 30px;
+}
+
+/* Corner where scrollbars meet */
+.scrollbar-corner {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 12px;
+    height: 12px;
+    background: #f8f9fa;
+    border-left: 1px solid #dee2e6;
+    border-top: 1px solid #dee2e6;
+    z-index: 50;
+}

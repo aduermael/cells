@@ -16,6 +16,7 @@ import { createUIStateMachine, UIState, type UIStateMachine } from "./ui-state";
 import { CollabUI } from "./collab-ui";
 import { CppSyncAdapter } from "./cpp-sync-adapter";
 import { RoomManager } from "./room-url";
+import type { ScrollbarManager } from "./scrollbar";
 
 // =============================================================================
 // Types
@@ -76,6 +77,7 @@ export interface DOMElements {
   astErrors: HTMLElement;
   astTree: HTMLElement;
   collabUIContainer: HTMLElement;
+  canvasContainer: HTMLElement;
 }
 
 // =============================================================================
@@ -112,6 +114,7 @@ export class App {
   wasmClient: CellsClient | null = null;
   syncAdapter: CppSyncAdapter | null = null;
   roomManager: RoomManager | null = null;
+  scrollbarManager: ScrollbarManager | null = null;
 
   // =========================================================================
   // Application State Flags
@@ -134,6 +137,9 @@ export class App {
   // Scroll position
   scrollX: number = 0;
   scrollY: number = 0;
+
+  // Virtual scrolling: discovered row count (expands as user scrolls down)
+  discoveredRows: number = 100;
 
   // =========================================================================
   // Selection State
@@ -360,6 +366,7 @@ export class App {
     this.colNames.clear();
     this.scrollX = 0;
     this.scrollY = 0;
+    this.discoveredRows = 100;
     this.resetSelection();
     this.formulaHighlights = [];
   }
@@ -411,6 +418,7 @@ export function createApp(): App {
     astErrors: getElement("ast-errors"),
     astTree: getElement("ast-tree"),
     collabUIContainer: getElement("collab-ui-container"),
+    canvasContainer: getElement("canvas-container"),
   };
 
   return new App(elements);

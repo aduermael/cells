@@ -113,6 +113,7 @@ export interface AppEventManagerConfig {
   fetchViewportNow: () => void;
   toggleAstDebugPanel: () => void;
   commitFormulaBarEdit: () => Promise<void>;
+  updateScrollbars: () => void;
 }
 
 // =============================================================================
@@ -314,7 +315,7 @@ export class AppEventManager {
   }
 
   private handleWheel(e: WheelEvent): void {
-    const { getSheetInfo, getScrollX, getScrollY, setScrollX, setScrollY, render, fetchViewportNow, canvas } = this.config;
+    const { getSheetInfo, getScrollX, getScrollY, setScrollX, setScrollY, render, fetchViewportNow, updateScrollbars, canvas } = this.config;
 
     const sheetInfo = getSheetInfo();
     if (!sheetInfo) return;
@@ -334,6 +335,7 @@ export class AppEventManager {
 
     render();
     fetchViewportNow();
+    updateScrollbars();
   }
 
   private handleMouseDown(e: MouseEvent): void {
