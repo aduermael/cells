@@ -337,8 +337,8 @@ TEST_F(SyncFormulaTest, FormulaReferencingNewCellDisplaysCorrectly) {
 // ============================================================================
 
 TEST_F(SyncFormulaTest, ConversionFailsGracefullyWithoutContext) {
-    // When RefConverter context is not set, conversion should return the
-    // original UUID format (graceful degradation, not a crash)
+    // When RefConverter context is not set, conversion should return #REF!
+    // (standard Excel error, prevents UUID leakage to UI)
 
     RefConverter emptyConverter;
     // Don't call setContext!
@@ -346,8 +346,8 @@ TEST_F(SyncFormulaTest, ConversionFailsGracefullyWithoutContext) {
     std::string uuidFormula = sharedCellB1_.toString();
     std::string converted = emptyConverter.formulaToA1(uuidFormula);
 
-    // With empty context, conversion fails and returns original UUID
-    EXPECT_EQ(converted, uuidFormula);
+    // With empty context, conversion fails and returns #REF!
+    EXPECT_EQ(converted, "#REF!");
 
     // After proper context setup, it should work
     emptyConverter.setContext(*workbookB_->getSheetByIndex(0));
@@ -918,8 +918,8 @@ TEST_F(SyncFormulaTest, RefConverterWithStaleContext) {
     std::string uuidFormula = newCellId.toString();
     std::string converted = conv.formulaToA1(uuidFormula);
 
-    // Should return original UUID when cell not found (graceful degradation)
-    EXPECT_EQ(converted, uuidFormula);
+    // Should return #REF! when cell not found (standard Excel error for broken refs)
+    EXPECT_EQ(converted, "#REF!");
 }
 
 TEST_F(SyncFormulaTest, RefConverterWithMissingCellInRange) {
@@ -936,7 +936,11 @@ TEST_F(SyncFormulaTest, RefConverterWithMissingCellInRange) {
     std::string converted = conv.formulaToA1(uuidFormula);
 
     // Should preserve the formula structure, with partial conversion
+    // First cell (A1) should convert, missing cell should become #REF!
     EXPECT_TRUE(converted.find("SUM(") != std::string::npos);
+    EXPECT_TRUE(converted.find("A1:") != std::string::npos);
+    EXPECT_TRUE(converted.find("#REF!") != std::string::npos);
+    EXPECT_EQ(converted, "SUM(A1:#REF!)");
 }
 
 TEST_F(SyncFormulaTest, RefConverterEmptyFormula) {

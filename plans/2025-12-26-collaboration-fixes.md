@@ -2,7 +2,7 @@
 
 Status: IN_PROGRESS
 Created At: 2025-12-25 23:41 UTC
-Updated At: 2025-12-26 06:45 UTC
+Updated At: 2025-12-26 07:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -187,20 +187,30 @@ Add comprehensive tests to prevent regressions.
 
 Fix any UI-side issues discovered.
 
-- [ ] 5a: Fix TypeScript formula display handling
+- [x] 5a: Fix TypeScript formula display handling
   - Ensure `queryViewport()` returns A1 notation, not UUID
   - Handle fallback gracefully if conversion fails (show error, not UUID)
   - **Test**: UI never shows raw UUID to user
+  - **DONE**: Changed `RefConverter::formulaToA1()` to return `#REF!` instead of raw UUID
+    when a cell reference cannot be resolved. This is the standard Excel error for
+    broken references and prevents UUID leakage to the UI.
+  - Updated tests: `ConversionFailsGracefullyWithoutContext`, `RefConverterWithStaleContext`,
+    `RefConverterWithMissingCellInRange`
 
-- [ ] 5b: Fix formula bar display for remote cells
+- [x] 5b: Fix formula bar display for remote cells
   - When selecting cell modified by remote client, formula bar shows A1
   - Editing remote formula should work correctly
   - **Test**: Formula bar shows correct A1 notation for synced formulas
+  - **DONE**: Already implemented - `getOrCreateCellAt()` calls `formulaToA1()` at line 731
+    of bindings.cc, which converts formula to A1 notation before returning to UI
 
-- [ ] 5c: Fix formula highlighting for remote cells
+- [x] 5c: Fix formula highlighting for remote cells
   - Selecting synced formula cell should highlight references
   - Reference colors should work correctly
   - **Test**: Highlights work for synced formulas
+  - **DONE**: Already implemented - `getFormulaReferences()` parses the formula text
+    (in A1 notation from user input) and returns reference positions for highlighting.
+    Works independently of UUID format.
 
 ---
 

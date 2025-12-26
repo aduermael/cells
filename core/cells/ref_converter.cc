@@ -550,8 +550,9 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
                     "(size=%zu)",
                     cellId.c_str(), cellIdToLocation_.size());
             }
-            // Cell not found, keep original
-            result += formula.substr(i, len);
+            // Cell not found - output #REF! (standard Excel error for broken references)
+            // This prevents raw UUIDs from leaking to UI
+            result += "#REF!";
             i += len;
             continue;
         }
