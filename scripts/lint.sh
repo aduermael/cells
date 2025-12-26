@@ -89,38 +89,89 @@ if $FIX_MODE; then
     TIDY_CMD+=(--fix)
 fi
 
+# Determine parallelism (use number of CPU cores, or fall back to 4)
+NPROCS=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+
 # Run clang-tidy
-echo -e "${GREEN}Running clang-tidy...${NC}"
+echo -e "${GREEN}Running clang-tidy on ${#FILES[@]} files with $NPROCS parallel jobs...${NC}"
 echo ""
 
-FAILED=0
+# Create temp directory for output files
+TMPDIR=$(mktemp -d)
+trap "rm -rf $TMPDIR" EXIT
 
+# Build the extra args string for clang-tidy
+EXTRA_ARGS="-std=c++17 -I$PROJECT_ROOT -I$PROJECT_ROOT/third_party/miniz"
+if [ -n "${PUGIXML_INCLUDE:-}" ]; then
+    EXTRA_ARGS="$EXTRA_ARGS $PUGIXML_INCLUDE"
+fi
+
+# Function to lint a single file (exported for xargs)
+lint_one_file() {
+    local file="$1"
+    local tmpdir="$2"
+    local project_root="$3"
+    local fix_mode="$4"
+    local extra_args="$5"
+
+    if [ ! -f "$file" ]; then
+        return 0
+    fi
+
+    # Create output file named after the source file
+    local outfile="$tmpdir/$(echo "$file" | tr '/' '_').out"
+    local exitfile="$tmpdir/$(echo "$file" | tr '/' '_').exit"
+
+    # Build command
+    local cmd=(clang-tidy)
+    if [ -f "$project_root/compile_commands.json" ]; then
+        cmd+=(-p "$project_root")
+    fi
+    if [ "$fix_mode" = "true" ]; then
+        cmd+=(--fix)
+    fi
+
+    # Run clang-tidy
+    local exit_code=0
+    "${cmd[@]}" \
+        --config-file="$project_root/.clang-tidy" \
+        "$file" \
+        -- \
+        $extra_args \
+        > "$outfile" 2>&1 || exit_code=$?
+
+    echo "$exit_code" > "$exitfile"
+}
+export -f lint_one_file
+
+# Run linting in parallel
+printf '%s\n' "${FILES[@]}" | xargs -P "$NPROCS" -I {} bash -c \
+    'lint_one_file "$1" "$2" "$3" "$4" "$5"' _ {} "$TMPDIR" "$PROJECT_ROOT" "$FIX_MODE" "$EXTRA_ARGS"
+
+# Collect results
+FAILED=0
 for file in "${FILES[@]}"; do
     if [ ! -f "$file" ]; then
         continue
     fi
 
-    echo -e "${YELLOW}Checking:${NC} $file"
+    local_outfile="$TMPDIR/$(echo "$file" | tr '/' '_').out"
+    local_exitfile="$TMPDIR/$(echo "$file" | tr '/' '_').exit"
 
-    # Run clang-tidy with output to temp file to capture exit code reliably
-    TMPFILE=$(mktemp)
-    TIDY_EXIT=0
-    "${TIDY_CMD[@]}" \
-        --config-file="$PROJECT_ROOT/.clang-tidy" \
-        "$file" \
-        -- \
-        -std=c++17 \
-        -I"$PROJECT_ROOT" \
-        -I"$PROJECT_ROOT/third_party/miniz" \
-        ${PUGIXML_INCLUDE:+"$PUGIXML_INCLUDE"} \
-        > "$TMPFILE" 2>&1 || TIDY_EXIT=$?
+    if [ -f "$local_exitfile" ]; then
+        exit_code=$(cat "$local_exitfile")
+        if [ "$exit_code" -ne 0 ]; then
+            FAILED=1
+        fi
+    fi
 
-    # Filter and display output (remove noise from system headers)
-    grep -v -E "^$|warnings generated|Suppressed .* warnings|Use -header-filter|^Error while processing|^Found compiler error" "$TMPFILE" || true
-    rm -f "$TMPFILE"
-
-    if [ $TIDY_EXIT -ne 0 ]; then
-        FAILED=1
+    # Only print output if there's something meaningful
+    if [ -f "$local_outfile" ]; then
+        filtered=$(grep -v -E "^$|warnings generated|Suppressed .* warnings|Use -header-filter|^Error while processing|^Found compiler error" "$local_outfile" 2>/dev/null || true)
+        if [ -n "$filtered" ]; then
+            echo -e "${YELLOW}Checking:${NC} $file"
+            echo "$filtered"
+        fi
     fi
 done
 
