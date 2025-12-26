@@ -47,12 +47,13 @@ static EvalResult cellValueToEvalResult(const CellValue& value) {
             if (!value.raw.empty()) {
                 try {
                     size_t pos = 0;
-                    double val = std::stod(value.raw, &pos);
+                    const double val = std::stod(value.raw, &pos);
                     if (pos == value.raw.size()) {
                         return EvalResult::Number(val);
                     }
                 } catch (...) {
-                    // Not a number, return as string
+                    // Not a number, fall through to return as string
+                    (void)0;  // Suppress bugprone-empty-catch
                 }
                 return EvalResult::String(value.raw);
             }
@@ -86,14 +87,14 @@ static EvalResult evaluateCellRef(const CellRefNode* node, EvalContext& ctx) {
     }
 
     // Get the cell ID (should be resolved already)
-    ID cellId(node->cellId);
+    const ID cellId(node->cellId);
     if (cellId.isNull()) {
         // Unresolved reference
         return EvalResult::Error(CellError::REF);
     }
 
     // Check for circular reference
-    if (ctx.evaluatingCells && ctx.evaluatingCells->count(cellId)) {
+    if (ctx.evaluatingCells && (ctx.evaluatingCells->count(cellId) != 0u)) {
         return EvalResult::Error(CellError::CIRCULAR);
     }
 
@@ -172,10 +173,12 @@ static EvalResult compareEqual(const EvalResult& left, const EvalResult& right) 
                 {
                     std::string l = left.stringValue;
                     std::string r = right.stringValue;
-                    for (auto& c : l)
+                    for (auto& c : l) {
                         c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-                    for (auto& c : r)
+                    }
+                    for (auto& c : r) {
                         c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+                    }
                     return EvalResult::Boolean(l == r);
                 }
             case EvalResult::Type::BOOLEAN:
@@ -186,8 +189,8 @@ static EvalResult compareEqual(const EvalResult& left, const EvalResult& right) 
     }
 
     // Mixed type comparison - try to coerce to number
-    EvalResult leftNum = left.toNumber();
-    EvalResult rightNum = right.toNumber();
+    const EvalResult leftNum = left.toNumber();
+    const EvalResult rightNum = right.toNumber();
     if (!leftNum.isError() && !rightNum.isError()) {
         return EvalResult::Boolean(leftNum.numberValue == rightNum.numberValue);
     }
@@ -202,16 +205,19 @@ static int compareValues(const EvalResult& left, const EvalResult& right) {
     if (left.type == right.type) {
         switch (left.type) {
             case EvalResult::Type::NUMBER:
-                if (left.numberValue < right.numberValue)
+                if (left.numberValue < right.numberValue) {
                     return -1;
-                if (left.numberValue > right.numberValue)
+                }
+                if (left.numberValue > right.numberValue) {
                     return 1;
+                }
                 return 0;
             case EvalResult::Type::STRING:
                 return left.stringValue.compare(right.stringValue);
             case EvalResult::Type::BOOLEAN:
-                if (left.boolValue == right.boolValue)
+                if (left.boolValue == right.boolValue) {
                     return 0;
+                }
                 return left.boolValue ? 1 : -1;  // true > false
             default:
                 return 0;
@@ -219,13 +225,15 @@ static int compareValues(const EvalResult& left, const EvalResult& right) {
     }
 
     // Mixed type - try to coerce to number
-    EvalResult leftNum = left.toNumber();
-    EvalResult rightNum = right.toNumber();
+    const EvalResult leftNum = left.toNumber();
+    const EvalResult rightNum = right.toNumber();
     if (!leftNum.isError() && !rightNum.isError()) {
-        if (leftNum.numberValue < rightNum.numberValue)
+        if (leftNum.numberValue < rightNum.numberValue) {
             return -1;
-        if (leftNum.numberValue > rightNum.numberValue)
+        }
+        if (leftNum.numberValue > rightNum.numberValue) {
             return 1;
+        }
         return 0;
     }
 
@@ -251,79 +259,107 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
     EvalResult right = evaluate(node->right.get(), ctx);
 
     // Error propagation
-    if (left.isError())
+    if (left.isError()) {
         return left;
-    if (right.isError())
+    }
+    if (right.isError()) {
         return right;
+    }
 
     switch (node->op) {
         case BinaryOp::ADD: {
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult leftNum = left.toNumber();
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult rightNum = right.toNumber();
-            if (leftNum.isError())
+            if (leftNum.isError()) {
                 return leftNum;
-            if (rightNum.isError())
+            }
+            if (rightNum.isError()) {
                 return rightNum;
+            }
             return EvalResult::Number(leftNum.numberValue + rightNum.numberValue);
         }
         case BinaryOp::SUBTRACT: {
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult leftNum = left.toNumber();
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult rightNum = right.toNumber();
-            if (leftNum.isError())
+            if (leftNum.isError()) {
                 return leftNum;
-            if (rightNum.isError())
+            }
+            if (rightNum.isError()) {
                 return rightNum;
+            }
             return EvalResult::Number(leftNum.numberValue - rightNum.numberValue);
         }
         case BinaryOp::MULTIPLY: {
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult leftNum = left.toNumber();
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult rightNum = right.toNumber();
-            if (leftNum.isError())
+            if (leftNum.isError()) {
                 return leftNum;
-            if (rightNum.isError())
+            }
+            if (rightNum.isError()) {
                 return rightNum;
+            }
             return EvalResult::Number(leftNum.numberValue * rightNum.numberValue);
         }
         case BinaryOp::DIVIDE: {
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult leftNum = left.toNumber();
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult rightNum = right.toNumber();
-            if (leftNum.isError())
+            if (leftNum.isError()) {
                 return leftNum;
-            if (rightNum.isError())
+            }
+            if (rightNum.isError()) {
                 return rightNum;
+            }
             if (rightNum.numberValue == 0.0) {
                 return EvalResult::Error(CellError::DIV);
             }
             return EvalResult::Number(leftNum.numberValue / rightNum.numberValue);
         }
         case BinaryOp::POWER: {
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult leftNum = left.toNumber();
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult rightNum = right.toNumber();
-            if (leftNum.isError())
+            if (leftNum.isError()) {
                 return leftNum;
-            if (rightNum.isError())
+            }
+            if (rightNum.isError()) {
                 return rightNum;
-            double result = std::pow(leftNum.numberValue, rightNum.numberValue);
+            }
+            const double result = std::pow(leftNum.numberValue, rightNum.numberValue);
             if (std::isnan(result) || std::isinf(result)) {
                 return EvalResult::Error(CellError::NUM);
             }
             return EvalResult::Number(result);
         }
         case BinaryOp::CONCAT: {
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult leftStr = left.toString();
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult rightStr = right.toString();
-            if (leftStr.isError())
+            if (leftStr.isError()) {
                 return leftStr;
-            if (rightStr.isError())
+            }
+            if (rightStr.isError()) {
                 return rightStr;
+            }
             return EvalResult::String(leftStr.stringValue + rightStr.stringValue);
         }
         case BinaryOp::EQUAL:
             return compareEqual(left, right);
         case BinaryOp::NOT_EQUAL: {
+            // NOLINTNEXTLINE(misc-const-correctness)
             EvalResult eq = compareEqual(left, right);
-            if (eq.isError())
+            if (eq.isError()) {
                 return eq;
+            }
             return EvalResult::Boolean(!eq.boolValue);
         }
         case BinaryOp::LESS:
@@ -341,13 +377,17 @@ static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
 
 // Evaluate a unary operation
 static EvalResult evaluateUnaryOp(const UnaryOpNode* node, EvalContext& ctx) {
+    // NOLINTNEXTLINE(misc-const-correctness)
     EvalResult operand = evaluate(node->operand.get(), ctx);
-    if (operand.isError())
+    if (operand.isError()) {
         return operand;
+    }
 
+    // NOLINTNEXTLINE(misc-const-correctness)
     EvalResult num = operand.toNumber();
-    if (num.isError())
+    if (num.isError()) {
         return num;
+    }
 
     switch (node->op) {
         case UnaryOp::NEGATE:
@@ -371,10 +411,10 @@ static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
 
     // For ranges, use the column/row info from the AST to resolve positions
     // Even if cells don't exist, we can compute the bounds from the AST
-    Axis* startCol = ctx.sheet->getColumnByName(node->topLeft->column);
-    Axis* endCol = ctx.sheet->getColumnByName(node->bottomRight->column);
-    Axis* startRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->topLeft->row - 1));
-    Axis* endRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->bottomRight->row - 1));
+    const Axis* startCol = ctx.sheet->getColumnByName(node->topLeft->column);
+    const Axis* endCol = ctx.sheet->getColumnByName(node->bottomRight->column);
+    const Axis* startRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->topLeft->row - 1));
+    const Axis* endRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->bottomRight->row - 1));
 
     if (!startCol || !endCol || !startRow || !endRow) {
         return EvalResult::Error(CellError::REF);
@@ -851,14 +891,10 @@ EvalResult evaluate(const ASTNode* node, EvalContext& ctx) {
         case ASTNodeType::ROW_RANGE_REF:
             return evaluateRowRangeRef(static_cast<const RowRangeRefNode*>(node), ctx);
 
-        // Named references
+        // Named references and function calls - not yet implemented
         case ASTNodeType::NAMED_REF:
-            // TODO: Look up named range and evaluate
-            return EvalResult::Error(CellError::NAME);
-
-        // Function calls
         case ASTNodeType::FUNCTION_CALL:
-            // TODO: Implement function evaluation (Phase 3+)
+            // TODO: Implement named range lookup and function evaluation (Phase 3+)
             return EvalResult::Error(CellError::NAME);
 
         // Error node

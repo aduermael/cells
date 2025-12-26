@@ -153,7 +153,7 @@ struct EvalResult {
                 // Try to parse as number
                 try {
                     size_t pos = 0;
-                    double val = std::stod(stringValue, &pos);
+                    const double val = std::stod(stringValue, &pos);
                     // Check if entire string was consumed
                     if (pos == stringValue.size()) {
                         return Number(val);
@@ -193,9 +193,9 @@ struct EvalResult {
                 }
                 std::string s = std::to_string(numberValue);
                 // Remove trailing zeros after decimal point
-                size_t dot = s.find('.');
+                const size_t dot = s.find('.');
                 if (dot != std::string::npos) {
-                    size_t last = s.find_last_not_of('0');
+                    const size_t last = s.find_last_not_of('0');
                     if (last != std::string::npos && last > dot) {
                         s = s.substr(0, last + 1);
                     } else if (last == dot) {
