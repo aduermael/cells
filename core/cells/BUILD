@@ -589,3 +589,30 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "formula_recalc",
+    srcs = ["formula_recalc.cc"],
+    hdrs = ["formula_recalc.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":dependency_graph",
+        ":formula_eval",
+        ":model",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "formula_recalc_test",
+    srcs = ["formula_recalc_test.cc"],
+    deps = [
+        ":formula_eval",
+        ":formula_parser",
+        ":formula_recalc",
+        ":formula_resolver",
+        ":id",
+        ":model",
+        "@googletest//:gtest_main",
+    ],
+)

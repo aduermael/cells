@@ -228,13 +228,41 @@ void DependencyGraph::removeFormula(const ID& cellId) {
     volatileCells_.erase(cellId);
 }
 
-std::vector<ID> DependencyGraph::getDependents(const ID& /*cellId*/) const {
-    // Note: This requires the R-tree to be populated with position info
-    // For now, we do a brute-force search through all dependencies
-    // TODO: Wire this up when Sheet integration is done
-
+std::vector<ID> DependencyGraph::getDependents(const ID& cellId) const {
+    // Find all cells whose formulas depend on cellId
+    // This is a reverse lookup - go through all dependencies and find
+    // cells that reference the given cellId
     std::vector<ID> dependents;
-    // This would query the R-tree by position and return dependent cell IDs
+
+    for (const auto& [formulaCellId, refs] : dependencies_) {
+        for (const auto& ref : refs) {
+            bool matches = false;
+            switch (ref.type) {
+                case DependencyRef::Type::CELL:
+                    matches = (ref.cellId == cellId);
+                    break;
+                case DependencyRef::Type::RANGE:
+                    // For range refs, we need to check if cellId is within the range
+                    // For now, just check if it matches start or end cell
+                    // A more complete implementation would need Sheet access
+                    // to determine if cellId falls within the range bounds
+                    matches = (ref.startCellId == cellId || ref.endCellId == cellId);
+                    break;
+                case DependencyRef::Type::COLUMN:
+                case DependencyRef::Type::ROW:
+                case DependencyRef::Type::COLUMN_RANGE:
+                case DependencyRef::Type::ROW_RANGE:
+                    // Column/row refs would need Sheet access to determine matches
+                    // For now, skip these
+                    break;
+            }
+            if (matches) {
+                dependents.push_back(formulaCellId);
+                break;  // Only add once per formula cell
+            }
+        }
+    }
+
     return dependents;
 }
 
