@@ -36,7 +36,7 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 - [x] 1g: Unit tests deferred (UI event integration tests require browser environment)
 
 ### UI Checkpoint 1
-- [ ] **USER APPROVAL REQUIRED:** Verify clicking cells/columns/rows while editing formulas inserts references correctly
+- [x] **USER APPROVED:** Click-to-add references works correctly (click, shift+click, click+drag)
 
 ---
 
@@ -49,17 +49,24 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 - **Root cause:** `evaluateRangeRef()` in `formula_eval.cc` calls `getColumnByPosition()` and `getRowByPosition()` which return null for sparse columns/rows
 - **Current behavior:** Returns `CellError::REF` when any column/row in the range doesn't exist as an Axis
 - **New behavior:** Range evaluation should work with implicit (virtual) columns/rows, not require explicit Axis objects
+- **Note:** `=SUM(B:B)` (column reference) already works, so range references should follow similar pattern
+
+### Related Issue: Dependency Graph for Column/Row References
+
+When using `=SUM(B:B)`, the formula is NOT re-evaluated when a previously empty cell in column B is set. This is a dependency graph issue:
+- Column/row references need to register dependencies on the entire column/row
+- When any cell in that column/row changes (including new cells), formulas should recalculate
 
 ### Tasks
 
-- [ ] 1.5a: Investigate `evaluateRangeRef()` in `core/cells/formula_eval.cc` to understand current behavior
-- [ ] 1.5b: Modify range evaluation to handle sparse columns/rows (iterate over cells without requiring Axis objects)
-- [ ] 1.5c: Apply same fix to `evaluateColumnRef()`, `evaluateRowRef()`, `evaluateColumnRangeRef()`, `evaluateRowRangeRef()`
-- [ ] 1.5d: Add unit tests for range formulas with sparse data
-- [ ] 1.5e: Verify `=SUM(B1:B4)` works correctly with values in B1-B4
+- [ ] 1.5a: Investigate `evaluateRangeRef()` in `core/cells/formula_eval.cc` - compare with working `evaluateColumnRef()`
+- [ ] 1.5b: Modify range evaluation to handle sparse columns/rows (use position-based iteration like column refs)
+- [ ] 1.5c: Add unit tests for range formulas with sparse data
+- [ ] 1.5d: Investigate dependency graph registration for column/row references
+- [ ] 1.5e: Fix dependency tracking so new cells in column/row trigger recalculation
 
 ### UI Checkpoint 1.5
-- [ ] **USER APPROVAL REQUIRED:** Verify `=SUM(B1:B4)` and similar range formulas work without #REF! error
+- [ ] **USER APPROVAL REQUIRED:** Verify `=SUM(B1:B4)` works, and `=SUM(B:B)` updates when new cells are added
 
 ---
 
