@@ -1047,5 +1047,122 @@ TEST_F(SyncFormulaTest, RefConverterLargeFormula) {
     EXPECT_EQ(converted, "A1+B1+A2+B2");
 }
 
+// ============================================================================
+// Deleted cell reference tests
+// ============================================================================
+
+TEST_F(SyncFormulaTest, DeletedCellReferenceShowsRefError) {
+    // Test that when a cell is deleted, formulas referencing it show #REF!
+    // This simulates: Client A enters =B1, Client B deletes cell B1
+
+    // Create a formula in A2 that references B1
+    ID formulaCellA2("FormAAAA");
+    auto colA = workbookA_->getSheetByIndex(0)->getColumnByPosition(0);
+    auto row2 = workbookA_->getSheetByIndex(0)->getRowByPosition(1);
+
+    auto cellA2 = std::make_unique<Cell>(formulaCellA2, colA->id, row2->id);
+    workbookA_->getSheetByIndex(0)->addCell(std::move(cellA2));
+
+    // Formula =B1 (references sharedCellB1_)
+    std::string uuidFormula = sharedCellB1_.toString();
+    std::string payload = "{\"type\":\"f\",\"value\":\"" + testJsonEscape(uuidFormula) +
+                          "\",\"display\":\"B1\"}";
+    Operation setFormulaOp(workbookA_->getCurrentHLC(), OpType::CELL_SET_VALUE, formulaCellA2,
+                           payload);
+    applyOperation(*workbookA_, setFormulaOp);
+
+    // Verify formula displays correctly before deletion
+    RefConverter conv;
+    conv.setContext(*workbookA_->getSheetByIndex(0));
+    Cell* cell = workbookA_->getSheetByIndex(0)->getCell(formulaCellA2);
+    ASSERT_NE(cell, nullptr);
+    ASSERT_NE(cell->formula, nullptr);
+    std::string converted = conv.formulaToA1(cell->formula->text);
+    EXPECT_EQ(converted, "B1");
+
+    // Now delete B1 (the referenced cell)
+    Operation clearOp(workbookA_->getCurrentHLC(), OpType::CELL_CLEAR, sharedCellB1_, "{}");
+    applyOperation(*workbookA_, clearOp);
+
+    // Verify B1 is actually deleted
+    Cell* deletedCell = workbookA_->getSheetByIndex(0)->getCell(sharedCellB1_);
+    EXPECT_EQ(deletedCell, nullptr);
+
+    // Rebuild RefConverter context (as would happen in real usage)
+    conv.setContext(*workbookA_->getSheetByIndex(0));
+
+    // Now the formula should show #REF! since B1 no longer exists
+    converted = conv.formulaToA1(cell->formula->text);
+    EXPECT_EQ(converted, "#REF!");
+}
+
+TEST_F(SyncFormulaTest, DeletedCellRemovesFromDependencyGraph) {
+    // Test that when a formula cell is deleted, it's removed from the dependency graph
+
+    auto* sheet = workbookA_->getSheetByIndex(0);
+    DependencyGraph* depGraph = sheet->getDependencyGraph();
+    ASSERT_NE(depGraph, nullptr);
+
+    // Create a formula cell that references A1
+    ID formulaCell("FormBBBB");
+    auto colA = sheet->getColumnByPosition(0);
+    auto row3 = sheet->getOrCreateRowByPosition(2);
+
+    auto cell = std::make_unique<Cell>(formulaCell, colA->id, row3->id);
+    sheet->addCell(std::move(cell));
+
+    // Set formula =A1 (use ~~ prefix for cell reference in UUID format)
+    std::string uuidFormula = "~~" + sharedCellA1_.toString();
+    std::string displayFormula = "=A1";
+    std::string payload = makeFormulaPayload(colA->id, row3->id, uuidFormula, displayFormula);
+    Operation setFormulaOp(workbookA_->getCurrentHLC(), OpType::CELL_SET_VALUE, formulaCell,
+                           payload);
+    applyOperation(*workbookA_, setFormulaOp);
+
+    // Verify the formula cell is in the dependency graph
+    auto deps = depGraph->getDependencies(formulaCell);
+    EXPECT_FALSE(deps.empty()) << "Formula cell should have dependencies in graph";
+
+    // Now delete the formula cell
+    Operation clearOp(workbookA_->getCurrentHLC(), OpType::CELL_CLEAR, formulaCell, "{}");
+    applyOperation(*workbookA_, clearOp);
+
+    // Verify the cell is removed from the dependency graph
+    deps = depGraph->getDependencies(formulaCell);
+    EXPECT_TRUE(deps.empty()) << "Deleted cell should have no dependencies in graph";
+}
+
+TEST_F(SyncFormulaTest, DeletedVolatileCellUnmarkedFromDependencyGraph) {
+    // Test that when a volatile formula cell is deleted, it's unmarked from volatile list
+
+    auto* sheet = workbookA_->getSheetByIndex(0);
+    DependencyGraph* depGraph = sheet->getDependencyGraph();
+    ASSERT_NE(depGraph, nullptr);
+
+    // Create a formula cell with volatile function
+    ID volatileCell("VolatCCC");
+    auto colA = sheet->getColumnByPosition(0);
+    auto row4 = sheet->getOrCreateRowByPosition(3);
+
+    auto cell = std::make_unique<Cell>(volatileCell, colA->id, row4->id);
+    sheet->addCell(std::move(cell));
+
+    // Set formula =NOW() (volatile)
+    std::string payload = "{\"type\":\"f\",\"value\":\"NOW()\",\"display\":\"NOW()\"}";
+    Operation setFormulaOp(workbookA_->getCurrentHLC(), OpType::CELL_SET_VALUE, volatileCell,
+                           payload);
+    applyOperation(*workbookA_, setFormulaOp);
+
+    // Verify the cell is marked as volatile
+    EXPECT_TRUE(depGraph->isVolatile(volatileCell)) << "Cell should be marked volatile";
+
+    // Now delete the volatile cell
+    Operation clearOp(workbookA_->getCurrentHLC(), OpType::CELL_CLEAR, volatileCell, "{}");
+    applyOperation(*workbookA_, clearOp);
+
+    // Verify the cell is no longer marked as volatile
+    EXPECT_FALSE(depGraph->isVolatile(volatileCell)) << "Deleted cell should not be volatile";
+}
+
 }  // namespace
 }  // namespace cells

@@ -218,10 +218,15 @@ Fix any UI-side issues discovered.
 
 Handle remaining edge cases.
 
-- [ ] 6a: Handle deleted cell references gracefully
+- [x] 6a: Handle deleted cell references gracefully
   - If remote client deletes a cell that a formula references
   - Should show #REF! or similar error, not crash
   - **Test**: Deleting referenced cell shows error
+  - **DONE**:
+    - Display already shows `#REF!` for deleted cell references (from Phase 5a)
+    - Fixed `applyCellClear()` in crdt.cc to remove deleted cells from DependencyGraph
+    - Added 3 new tests: `DeletedCellReferenceShowsRefError`, `DeletedCellRemovesFromDependencyGraph`,
+      `DeletedVolatileCellUnmarkedFromDependencyGraph`
 
 - [ ] 6b: Handle sheet/workbook structure changes
   - Remote client adds/removes sheet

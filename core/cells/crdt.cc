@@ -342,9 +342,11 @@ ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op) {
 // Apply CELL_CLEAR operation
 ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
     Sheet* targetSheet = nullptr;
+    Cell* cell = nullptr;
 
     for (auto& s : workbook.sheets) {
-        if (s->getCell(op.target_id) != nullptr) {
+        cell = s->getCell(op.target_id);
+        if (cell != nullptr) {
             targetSheet = s.get();
             break;
         }
@@ -364,6 +366,15 @@ ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
         // A newer operation exists - if it's an edit, it resurrects
         if (latest.type == OpType::CELL_SET_VALUE) {
             return ApplyResult::RESURRECTED;
+        }
+    }
+
+    // Remove from dependency graph if it was a formula cell
+    if (cell->isFormula()) {
+        DependencyGraph* depGraph = targetSheet->getDependencyGraph();
+        if (depGraph != nullptr) {
+            depGraph->removeFormula(op.target_id);
+            depGraph->unmarkVolatile(op.target_id);
         }
     }
 
