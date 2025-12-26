@@ -258,3 +258,40 @@ For 100K dependencies: ~2.4MB additional memory.
 - `core/cells/model.cc` - Pass positions to addFormula()
 - `core/cells/formula_recalc.cc` - Use optimized DependencyGraph methods
 - `core/cells/dependency_graph_test.cc` - Add benchmark tests
+
+---
+
+## Known Issues: Volatile Function Handling
+
+### Issue 1: RAND() re-evaluated on every reference
+
+**Symptom**:
+- A1 contains `=RAND()`
+- B1 contains `=A1`
+- A1 and B1 show **different** values
+
+**Expected**: B1 should show the same value as A1 since it references A1's result.
+
+**Root cause**: The calculation engine re-evaluates A1's formula when resolving the reference from B1, instead of using the cached result from A1's cell value.
+
+**Fix approach**: When evaluating a cell reference, use the cell's stored `value` if it's not dirty, rather than re-evaluating the formula. The evaluation should only happen once per recalculation cycle.
+
+### Issue 2: Volatile cells recalculate on any sheet change
+
+**Symptom**: Editing any unrelated cell causes A1 (`=RAND()`) and B1 (`=A1`) to both get new values.
+
+**Expected behavior**: This is partially correct - volatile functions **should** recalculate on sheet changes. However:
+1. The recalculation should happen **once** per edit cycle
+2. Dependents should use the recalculated value, not trigger another recalculation
+
+**Fix approach**:
+1. Mark volatile cells dirty at the start of recalculation
+2. Use topological sort to ensure volatile cells evaluate before their dependents
+3. Store result in cell value after evaluation
+4. Dependents read from stored value, not re-evaluate
+
+### Related code
+
+- `core/cells/formula_eval.cc` - `evaluateCellRef()` may be re-evaluating instead of using cached value
+- `core/cells/formula_recalc.cc` - `recalculateVolatile()` handles volatile cell marking
+- `core/cells/dependency_graph.cc` - `getVolatileCells()` tracks which cells use volatile functions
