@@ -1,8 +1,8 @@
 # Calculation Engine
 
-Status: READY
+Status: IN PROGRESS
 Created At: 2025-12-26 01:22 UTC
-Updated At: 2025-12-26 01:22 UTC
+Updated At: 2025-12-26 03:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -25,6 +25,8 @@ Implement a pure C++ calculation engine that evaluates parsed formula ASTs and d
 **Value Representation**: Results stored in `Cell.value` (CellValue struct with raw string, type, and error fields). The calculation engine produces `EvalResult` which is then stored appropriately.
 
 **Error Propagation**: Errors propagate through calculations. If any input is an error, the output is typically that error (with some function-specific exceptions like IFERROR).
+
+**CRDT Contract**: This is a collaborative application using CRDTs for real-time sync. The calculation engine is **read-only** with respect to the Workbook—it must **never** introduce Workbook operations. Formula results are computed on-demand, not cached in the CRDT state. Each client evaluates formulas locally from the same synced input data, ensuring consistent results without sync overhead for computed values. This keeps the CRDT layer simple (only user edits sync) and avoids conflicts from derived data.
 
 ### Testing Philosophy
 
@@ -89,7 +91,7 @@ struct EvalContext {
 
 **Test**: Header compiles, EvalResult construction and type coercion works
 
-- [ ] 1a: Define EvalResult struct and EvalContext in formula_eval.h
+- [x] 1a: Define EvalResult struct and EvalContext in formula_eval.h
 
 ### 1b: Implement basic literal evaluation
 
@@ -115,7 +117,7 @@ EvalResult evaluateLiteral(const ASTNode* node) {
 
 **Test**: Evaluating literals returns correct values
 
-- [ ] 1b: Implement literal node evaluation (NUMBER, STRING, BOOLEAN)
+- [x] 1b: Implement literal node evaluation (NUMBER, STRING, BOOLEAN)
 
 ### 1c: Implement cell reference evaluation
 
@@ -143,7 +145,7 @@ EvalResult evaluateCellRef(const CellRefNode* node, EvalContext& ctx) {
 
 **Test**: Cell references resolve to their values
 
-- [ ] 1c: Implement cell reference evaluation with circular reference check
+- [x] 1c: Implement cell reference evaluation with circular reference check
 
 ### 1d: Implement binary operators
 
@@ -177,7 +179,7 @@ EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx) {
 
 **Test**: All arithmetic and comparison operators work correctly
 
-- [ ] 1d: Implement binary operators (arithmetic, comparison, concat)
+- [x] 1d: Implement binary operators (arithmetic, comparison, concat)
 
 ### 1e: Implement unary operators
 
@@ -197,7 +199,7 @@ EvalResult evaluateUnaryOp(const UnaryOpNode* node, EvalContext& ctx) {
 
 **Test**: Unary plus and minus work correctly
 
-- [ ] 1e: Implement unary operators (negate, positive)
+- [x] 1e: Implement unary operators (negate, positive)
 
 ### 1f: Add comprehensive evaluator tests
 
@@ -263,7 +265,7 @@ Create `core/cells/formula_eval_test.cc`:
 
 **Test**: All evaluator tests pass (80+ tests)
 
-- [ ] 1f: Add comprehensive evaluator tests (80+ tests minimum)
+- [x] 1f: Add comprehensive evaluator tests (80+ tests minimum) - **88 tests implemented**
 
 ---
 
@@ -1010,15 +1012,26 @@ Run all tests: `bazel test //core/cells:all`
 
 ---
 
-## UI Checkpoints
+## UI Checkpoints (MANDATORY)
 
-Each phase should include manual testing to verify integration:
+**⚠️ THESE CHECKPOINTS ARE NON-SKIPPABLE ⚠️**
 
-1. **After Phase 1**: Basic arithmetic works (`=1+2` → `3`)
-2. **After Phase 3**: SUM/AVERAGE work (`=SUM(A1:A3)` with values)
-3. **After Phase 4**: IF works (`=IF(A1>5,"big","small")`)
-4. **After Phase 7**: Dependencies work (change A1, B1=A1*2 updates)
-5. **After Phase 8**: Full UI integration working
+Each checkpoint requires:
+1. Manual testing in the web UI
+2. Explicit user confirmation that it works
+3. Cannot proceed to next phase until confirmed
+
+Do NOT mark a checkpoint as complete without user approval.
+
+| Phase | Checkpoint | Test Steps | Status |
+|-------|------------|------------|--------|
+| 1 | Basic arithmetic | Enter `=1+2` → should display `3` | - [ ] Awaiting confirmation |
+| 3 | Aggregate functions | Set A1=1, A2=2, A3=3, then B1=`=SUM(A1:A3)` → should display `6` | - [ ] Awaiting confirmation |
+| 4 | Conditional logic | Set A1=10, B1=`=IF(A1>5,"big","small")` → should display `"big"` | - [ ] Awaiting confirmation |
+| 7 | Dependency cascade | Set A1=5, B1=`=A1*2` → displays `10`, then change A1 to `10` → B1 updates to `20` | - [ ] Awaiting confirmation |
+| 8 | Full integration | All above + error styling (`=1/0` shows red `#DIV/0!`) | - [ ] Awaiting confirmation |
+
+**Procedure**: At each checkpoint, pause execution and ask the user to verify the behavior manually. Only proceed after receiving explicit "confirmed" or equivalent response.
 
 ---
 

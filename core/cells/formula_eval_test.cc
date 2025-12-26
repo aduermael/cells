@@ -1,0 +1,743 @@
+#include "core/cells/formula_eval.h"
+
+#include <cmath>
+
+#include <memory>
+#include <string>
+#include <unordered_set>
+
+#include "core/cells/formula_ast.h"
+#include "core/cells/formula_parser.h"
+#include "core/cells/formula_resolver.h"
+#include "core/cells/id.h"
+#include "core/cells/model.h"
+
+#include "gtest/gtest.h"
+
+namespace cells {
+namespace {
+
+// Helper class for evaluation tests
+class FormulaEvalTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        workbook = std::make_unique<Workbook>(generate_id(), "Test");
+        workbook->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
+        sheet = workbook->getSheetByIndex(0);
+
+        // Create columns A-Z (positions 0-25)
+        for (uint32_t i = 0; i < 26; i++) {
+            auto col = std::make_unique<Axis>(generate_id(), true);
+            col->position = i;
+            col->name = Sheet::positionToColumnName(i);
+            colIds[i] = col->id;
+            sheet->addColumn(std::move(col));
+        }
+
+        // Create rows 1-100 (positions 0-99)
+        for (uint32_t i = 0; i < 100; i++) {
+            auto row = std::make_unique<Axis>(generate_id(), false);
+            row->position = i;
+            rowIds[i] = row->id;
+            sheet->addRow(std::move(row));
+        }
+    }
+
+    // Parse and evaluate a formula, returning the result
+    EvalResult eval(const std::string& formula) {
+        FormulaParser parser(formula);
+        auto ast = parser.parse();
+        if (!ast || parser.hasErrors()) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+
+        // Resolve references
+        FormulaResolver resolver(*workbook, *sheet);
+        resolver.resolve(ast.get());
+
+        // Evaluate
+        std::unordered_set<ID> evaluating;
+        EvalContext ctx;
+        ctx.sheet = sheet;
+        ctx.workbook = workbook.get();
+        ctx.evaluatingCells = &evaluating;
+        ctx.recursionDepth = 0;
+
+        return evaluate(ast.get(), ctx);
+    }
+
+    // Set a cell value at a given column/row position (0-indexed)
+    Cell* setCellValue(uint32_t col, uint32_t row, double value) {
+        Cell* cell = sheet->getOrCreateCellAt(colIds[col], rowIds[row]);
+        cell->value = CellValue(value);
+        return cell;
+    }
+
+    Cell* setCellValue(uint32_t col, uint32_t row, const std::string& value) {
+        Cell* cell = sheet->getOrCreateCellAt(colIds[col], rowIds[row]);
+        cell->value = CellValue(value);
+        return cell;
+    }
+
+    // Explicit const char* overload to prevent implicit conversion to bool
+    Cell* setCellValue(uint32_t col, uint32_t row, const char* value) {
+        Cell* cell = sheet->getOrCreateCellAt(colIds[col], rowIds[row]);
+        cell->value = CellValue(std::string(value));
+        return cell;
+    }
+
+    Cell* setCellValue(uint32_t col, uint32_t row, bool value) {
+        Cell* cell = sheet->getOrCreateCellAt(colIds[col], rowIds[row]);
+        cell->value = CellValue(value);
+        return cell;
+    }
+
+    Cell* setCellError(uint32_t col, uint32_t row, CellError error) {
+        Cell* cell = sheet->getOrCreateCellAt(colIds[col], rowIds[row]);
+        cell->value = CellValue(error);
+        return cell;
+    }
+
+    // Set a formula at a given column/row position
+    Cell* setCellFormula(uint32_t col, uint32_t row, const std::string& formula) {
+        Cell* cell = sheet->getOrCreateCellAt(colIds[col], rowIds[row]);
+
+        FormulaParser parser(formula);
+        auto ast = parser.parse();
+        if (ast && !parser.hasErrors()) {
+            FormulaResolver resolver(*workbook, *sheet);
+            resolver.resolve(ast.get());
+            sheet->setCellFormula(cell->id, formula, ast.release());
+        }
+
+        return cell;
+    }
+
+    std::unique_ptr<Workbook> workbook;
+    Sheet* sheet = nullptr;
+    ID colIds[26];
+    ID rowIds[100];
+};
+
+// =============================================================================
+// LITERAL TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, IntegerLiteral) {
+    EvalResult r = eval("=42");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(42.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, DecimalLiteral) {
+    EvalResult r = eval("=3.14");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(3.14, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, ScientificNotation) {
+    EvalResult r = eval("=1.5e10");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(1.5e10, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, NegativeScientific) {
+    EvalResult r = eval("=2e-3");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(0.002, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, ZeroLiteral) {
+    EvalResult r = eval("=0");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(0.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, StringLiteral) {
+    EvalResult r = eval("=\"hello\"");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("hello", r.getString());
+}
+
+TEST_F(FormulaEvalTest, EmptyStringLiteral) {
+    EvalResult r = eval("=\"\"");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("", r.getString());
+}
+
+TEST_F(FormulaEvalTest, StringWithSpaces) {
+    EvalResult r = eval("=\"hello world\"");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("hello world", r.getString());
+}
+
+TEST_F(FormulaEvalTest, BooleanTrue) {
+    EvalResult r = eval("=TRUE");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, BooleanFalse) {
+    EvalResult r = eval("=FALSE");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_FALSE(r.getBoolean());
+}
+
+// =============================================================================
+// ARITHMETIC OPERATOR TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, Addition) {
+    EvalResult r = eval("=2+3");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(5.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, Subtraction) {
+    EvalResult r = eval("=10-4");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(6.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, Multiplication) {
+    EvalResult r = eval("=3*4");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(12.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, Division) {
+    EvalResult r = eval("=15/3");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(5.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, DivisionByZero) {
+    EvalResult r = eval("=1/0");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::DIV, r.getError());
+}
+
+TEST_F(FormulaEvalTest, Power) {
+    EvalResult r = eval("=2^10");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(1024.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, NegativePower) {
+    EvalResult r = eval("=4^-1");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(0.25, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, ZeroPower) {
+    EvalResult r = eval("=5^0");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(1.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, FractionalPower) {
+    EvalResult r = eval("=9^0.5");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(3.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, OperatorPrecedence) {
+    EvalResult r = eval("=2+3*4");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(14.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, Parentheses) {
+    EvalResult r = eval("=(2+3)*4");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(20.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, ComplexExpression) {
+    EvalResult r = eval("=2+3*4-6/2");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(11.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, NestedParentheses) {
+    EvalResult r = eval("=((2+3)*(4-1))/3");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(5.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, PowerPrecedence) {
+    EvalResult r = eval("=2*3^2");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(18.0, r.getNumber());  // 2 * (3^2) = 2 * 9 = 18
+}
+
+// =============================================================================
+// UNARY OPERATOR TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, UnaryMinus) {
+    EvalResult r = eval("=-5");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(-5.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, UnaryPlus) {
+    EvalResult r = eval("=+5");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(5.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, UnaryMinusInExpression) {
+    EvalResult r = eval("=-5+3");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(-2.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, DoubleNegative) {
+    EvalResult r = eval("=--5");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(5.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, UnaryMinusOnBoolean) {
+    EvalResult r = eval("=-TRUE");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(-1.0, r.getNumber());
+}
+
+// =============================================================================
+// COMPARISON OPERATOR TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, EqualNumbers) {
+    EvalResult r = eval("=5=5");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, NotEqualNumbers) {
+    EvalResult r = eval("=5<>3");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, LessThan) {
+    EvalResult r = eval("=3<5");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, LessThanFalse) {
+    EvalResult r = eval("=5<3");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_FALSE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, LessEqual) {
+    EvalResult r = eval("=5<=5");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, GreaterThan) {
+    EvalResult r = eval("=5>3");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, GreaterEqual) {
+    EvalResult r = eval("=3>=5");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_FALSE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, StringComparison) {
+    EvalResult r = eval("=\"a\"<\"b\"");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, StringEqualityCaseInsensitive) {
+    EvalResult r = eval("=\"ABC\"=\"abc\"");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, MixedTypeComparison) {
+    // "5" = 5 should be true after coercion
+    EvalResult r = eval("=\"5\"=5");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, BooleanNumberComparison) {
+    // TRUE = 1 should be true
+    EvalResult r = eval("=TRUE=1");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+// =============================================================================
+// CONCATENATION TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, StringConcat) {
+    EvalResult r = eval("=\"hello\"&\"world\"");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("helloworld", r.getString());
+}
+
+TEST_F(FormulaEvalTest, NumberConcat) {
+    EvalResult r = eval("=1&2");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("12", r.getString());
+}
+
+TEST_F(FormulaEvalTest, MixedConcat) {
+    EvalResult r = eval("=\"value: \"&100");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("value: 100", r.getString());
+}
+
+TEST_F(FormulaEvalTest, BooleanConcat) {
+    EvalResult r = eval("=TRUE&\" \"&FALSE");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("TRUE FALSE", r.getString());
+}
+
+TEST_F(FormulaEvalTest, EmptyStringConcat) {
+    EvalResult r = eval("=\"test\"&\"\"");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("test", r.getString());
+}
+
+// =============================================================================
+// CELL REFERENCE TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, SimpleCellRef) {
+    setCellValue(0, 0, 10.0);  // A1 = 10
+    EvalResult r = eval("=A1");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(10.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, CellRefChain) {
+    setCellValue(0, 0, 5.0);  // A1 = 5
+    // Set B1 = A1 (we need to set up the formula properly)
+    setCellFormula(1, 0, "=A1");
+    // Now evaluate B1 reference
+    EvalResult r = eval("=B1");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(5.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, EmptyCellRef) {
+    // Z99 is empty - empty cells return 0 in numeric context
+    EvalResult r = eval("=Z99");
+    // Empty cell can be either Empty or Number(0)
+    if (r.isEmpty()) {
+        EvalResult num = r.toNumber();
+        ASSERT_TRUE(num.isNumber());
+        EXPECT_DOUBLE_EQ(0.0, num.getNumber());
+    } else {
+        ASSERT_TRUE(r.isNumber());
+        EXPECT_DOUBLE_EQ(0.0, r.getNumber());
+    }
+}
+
+TEST_F(FormulaEvalTest, CellRefWithArithmetic) {
+    setCellValue(0, 0, 10.0);  // A1 = 10
+    setCellValue(1, 0, 5.0);   // B1 = 5
+    EvalResult r = eval("=A1+B1");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(15.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, StringCellRef) {
+    setCellValue(0, 0, "hello");  // A1 = "hello"
+    EvalResult r = eval("=A1");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("hello", r.getString());
+}
+
+TEST_F(FormulaEvalTest, BooleanCellRef) {
+    setCellValue(0, 0, true);  // A1 = TRUE
+    EvalResult r = eval("=A1");
+    ASSERT_TRUE(r.isBoolean());
+    EXPECT_TRUE(r.getBoolean());
+}
+
+TEST_F(FormulaEvalTest, ErrorCellRef) {
+    setCellError(0, 0, CellError::REF);  // A1 = #REF!
+    EvalResult r = eval("=A1");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::REF, r.getError());
+}
+
+TEST_F(FormulaEvalTest, AbsoluteReference) {
+    setCellValue(0, 0, 42.0);  // A1 = 42
+    EvalResult r = eval("=$A$1");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(42.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, MixedReference) {
+    setCellValue(0, 0, 42.0);  // A1 = 42
+    EvalResult r = eval("=$A1");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(42.0, r.getNumber());
+}
+
+// =============================================================================
+// TYPE COERCION TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, StringToNumberCoercion) {
+    EvalResult r = eval("=\"5\"+3");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(8.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, InvalidStringToNumber) {
+    EvalResult r = eval("=\"abc\"+3");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::VALUE, r.getError());
+}
+
+TEST_F(FormulaEvalTest, BooleanToNumberAdd) {
+    EvalResult r = eval("=TRUE+1");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(2.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, FalseToNumberAdd) {
+    EvalResult r = eval("=FALSE+1");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(1.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, NumberToStringConcat) {
+    EvalResult r = eval("=5&\"\"");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("5", r.getString());
+}
+
+TEST_F(FormulaEvalTest, EmptyStringToNumber) {
+    EvalResult r = eval("=\"\"+5");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(5.0, r.getNumber());  // Empty string coerces to 0
+}
+
+TEST_F(FormulaEvalTest, DecimalStringToNumber) {
+    EvalResult r = eval("=\"3.14\"+1");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(4.14, r.getNumber());
+}
+
+// =============================================================================
+// ERROR PROPAGATION TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, ErrorInLeftOperand) {
+    setCellError(0, 0, CellError::REF);  // A1 = #REF!
+    EvalResult r = eval("=A1+5");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::REF, r.getError());
+}
+
+TEST_F(FormulaEvalTest, ErrorInRightOperand) {
+    setCellError(0, 0, CellError::DIV);  // A1 = #DIV/0!
+    EvalResult r = eval("=5+A1");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::DIV, r.getError());
+}
+
+TEST_F(FormulaEvalTest, ErrorInNestedExpr) {
+    setCellError(0, 0, CellError::VALUE);  // A1 = #VALUE!
+    EvalResult r = eval("=(1+A1)*2");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::VALUE, r.getError());
+}
+
+TEST_F(FormulaEvalTest, FirstErrorWins) {
+    setCellError(0, 0, CellError::REF);    // A1 = #REF!
+    setCellError(1, 0, CellError::VALUE);  // B1 = #VALUE!
+    EvalResult r = eval("=A1+B1");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::REF, r.getError());  // First error propagates
+}
+
+TEST_F(FormulaEvalTest, ErrorInComparison) {
+    setCellError(0, 0, CellError::DIV);  // A1 = #DIV/0!
+    EvalResult r = eval("=A1>5");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::DIV, r.getError());
+}
+
+TEST_F(FormulaEvalTest, ErrorInConcat) {
+    setCellError(0, 0, CellError::NAME);  // A1 = #NAME?
+    EvalResult r = eval("=\"prefix\"&A1");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NAME, r.getError());
+}
+
+// =============================================================================
+// EDGE CASES
+// =============================================================================
+
+TEST_F(FormulaEvalTest, VeryLargeNumber) {
+    EvalResult r = eval("=1e300");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(1e300, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, VerySmallNumber) {
+    EvalResult r = eval("=1e-300");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(1e-300, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, NegativeZero) {
+    EvalResult r = eval("=-0");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(0.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, ZeroDividedByNumber) {
+    EvalResult r = eval("=0/5");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(0.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, LongExpression) {
+    EvalResult r = eval("=1+2+3+4+5+6+7+8+9+10");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(55.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, DeeplyNestedParens) {
+    EvalResult r = eval("=((((1+2)+3)+4)+5)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(15.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, MultiplicationByZero) {
+    EvalResult r = eval("=1000000*0");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(0.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, SubtractingFromZero) {
+    EvalResult r = eval("=0-5");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(-5.0, r.getNumber());
+}
+
+// =============================================================================
+// TYPE COERCION RESULT TESTS (toString, toNumber, toBoolean methods)
+// =============================================================================
+
+TEST(EvalResultTest, NumberToString) {
+    EvalResult r = EvalResult::Number(42.0);
+    EvalResult s = r.toString();
+    ASSERT_TRUE(s.isString());
+    EXPECT_EQ("42", s.getString());
+}
+
+TEST(EvalResultTest, DecimalToString) {
+    EvalResult r = EvalResult::Number(3.14);
+    EvalResult s = r.toString();
+    ASSERT_TRUE(s.isString());
+    // Should have decimal representation
+    EXPECT_TRUE(s.getString().find("3.14") == 0);
+}
+
+TEST(EvalResultTest, BoolToString) {
+    EvalResult t = EvalResult::Boolean(true).toString();
+    EvalResult f = EvalResult::Boolean(false).toString();
+    ASSERT_TRUE(t.isString());
+    ASSERT_TRUE(f.isString());
+    EXPECT_EQ("TRUE", t.getString());
+    EXPECT_EQ("FALSE", f.getString());
+}
+
+TEST(EvalResultTest, StringToNumber_Valid) {
+    EvalResult r = EvalResult::String("123.45");
+    EvalResult n = r.toNumber();
+    ASSERT_TRUE(n.isNumber());
+    EXPECT_DOUBLE_EQ(123.45, n.getNumber());
+}
+
+TEST(EvalResultTest, StringToNumber_Invalid) {
+    EvalResult r = EvalResult::String("abc");
+    EvalResult n = r.toNumber();
+    ASSERT_TRUE(n.isError());
+    EXPECT_EQ(CellError::VALUE, n.getError());
+}
+
+TEST(EvalResultTest, BoolToNumber) {
+    EvalResult t = EvalResult::Boolean(true).toNumber();
+    EvalResult f = EvalResult::Boolean(false).toNumber();
+    ASSERT_TRUE(t.isNumber());
+    ASSERT_TRUE(f.isNumber());
+    EXPECT_DOUBLE_EQ(1.0, t.getNumber());
+    EXPECT_DOUBLE_EQ(0.0, f.getNumber());
+}
+
+TEST(EvalResultTest, NumberToBoolean) {
+    EvalResult zero = EvalResult::Number(0.0).toBoolean();
+    EvalResult nonzero = EvalResult::Number(5.0).toBoolean();
+    EvalResult negative = EvalResult::Number(-1.0).toBoolean();
+    ASSERT_TRUE(zero.isBoolean());
+    ASSERT_TRUE(nonzero.isBoolean());
+    ASSERT_TRUE(negative.isBoolean());
+    EXPECT_FALSE(zero.getBoolean());
+    EXPECT_TRUE(nonzero.getBoolean());
+    EXPECT_TRUE(negative.getBoolean());
+}
+
+TEST(EvalResultTest, StringToBoolean_Error) {
+    EvalResult r = EvalResult::String("true");
+    EvalResult b = r.toBoolean();
+    ASSERT_TRUE(b.isError());
+    EXPECT_EQ(CellError::VALUE, b.getError());
+}
+
+TEST(EvalResultTest, EmptyToNumber) {
+    EvalResult r = EvalResult::Empty();
+    EvalResult n = r.toNumber();
+    ASSERT_TRUE(n.isNumber());
+    EXPECT_DOUBLE_EQ(0.0, n.getNumber());
+}
+
+TEST(EvalResultTest, EmptyToBoolean) {
+    EvalResult r = EvalResult::Empty();
+    EvalResult b = r.toBoolean();
+    ASSERT_TRUE(b.isBoolean());
+    EXPECT_FALSE(b.getBoolean());
+}
+
+TEST(EvalResultTest, EmptyToString) {
+    EvalResult r = EvalResult::Empty();
+    EvalResult s = r.toString();
+    ASSERT_TRUE(s.isString());
+    EXPECT_EQ("", s.getString());
+}
+
+TEST(EvalResultTest, ErrorPropagation_ToNumber) {
+    EvalResult r = EvalResult::Error(CellError::DIV);
+    EvalResult n = r.toNumber();
+    ASSERT_TRUE(n.isError());
+    EXPECT_EQ(CellError::DIV, n.getError());
+}
+
+TEST(EvalResultTest, ErrorPropagation_ToBoolean) {
+    EvalResult r = EvalResult::Error(CellError::REF);
+    EvalResult b = r.toBoolean();
+    ASSERT_TRUE(b.isError());
+    EXPECT_EQ(CellError::REF, b.getError());
+}
+
+}  // namespace
+}  // namespace cells

@@ -545,3 +545,28 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "formula_eval",
+    srcs = ["formula_eval.cc"],
+    hdrs = ["formula_eval.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":formula_ast",
+        ":model",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "formula_eval_test",
+    srcs = ["formula_eval_test.cc"],
+    deps = [
+        ":formula_eval",
+        ":formula_parser",
+        ":formula_resolver",
+        ":id",
+        ":model",
+        "@googletest//:gtest_main",
+    ],
+)
