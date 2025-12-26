@@ -1,8 +1,8 @@
 # Calculation Engine
 
-Status: IN PROGRESS
+Status: COMPLETE (Phases 1-8), OPTIONAL (Phases 9-10)
 Created At: 2025-12-26 01:22 UTC
-Updated At: 2025-12-26 07:04 UTC
+Updated At: 2025-12-26 08:45 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -986,6 +986,30 @@ Style cells with errors differently:
 
 These functions can be added incrementally after the core engine is working.
 
+### File Organization
+
+**Important**: Each new function should be implemented in its own file within `core/cells/functions/`:
+
+```
+core/cells/functions/
+├── fn_vlookup.cc
+├── fn_vlookup.h
+├── fn_hlookup.cc
+├── fn_hlookup.h
+├── fn_index.cc
+├── fn_index.h
+├── fn_match.cc
+├── fn_match.h
+├── fn_median.cc
+├── fn_median.h
+├── ...
+```
+
+This keeps files small and manageable. Each function file should:
+- Include the function implementation
+- Include its own unit tests (or a separate `fn_<name>_test.cc`)
+- Self-register with the FunctionRegistry
+
 ### Lookup Functions
 - [ ] VLOOKUP(lookup_value, table_array, col_index, [range_lookup])
 - [ ] HLOOKUP(lookup_value, table_array, row_index, [range_lookup])
@@ -1004,6 +1028,64 @@ These functions can be added incrementally after the core engine is working.
 
 ### Financial Functions (future)
 - [ ] PMT, PV, FV, NPV, IRR
+
+---
+
+## Phase 10: Refactor Existing Functions (Optional)
+
+Split the existing `formula_functions.cc` monolith into individual files for better maintainability.
+
+### 10a: Create functions directory structure
+
+```
+core/cells/functions/
+├── BUILD
+├── registry.h          # FunctionRegistry singleton
+├── registry.cc
+├── helpers.h           # Common utilities (collectNumericValues, etc.)
+├── helpers.cc
+└── ... (individual function files)
+```
+
+### 10b: Extract math functions
+
+Move from `formula_functions.cc` to individual files:
+- [ ] fn_sum.cc/h
+- [ ] fn_average.cc/h
+- [ ] fn_count.cc/h (COUNT, COUNTA)
+- [ ] fn_min_max.cc/h (MIN, MAX)
+- [ ] fn_round.cc/h (ROUND, FLOOR, CEILING, INT)
+- [ ] fn_math.cc/h (ABS, SQRT, POWER, MOD)
+
+### 10c: Extract logic functions
+
+- [ ] fn_if.cc/h
+- [ ] fn_and_or_not.cc/h
+- [ ] fn_iferror.cc/h (IFERROR, IFNA)
+- [ ] fn_is.cc/h (ISBLANK, ISNUMBER, ISTEXT, ISERROR)
+
+### 10d: Extract text functions
+
+- [ ] fn_len.cc/h
+- [ ] fn_left_right_mid.cc/h
+- [ ] fn_case.cc/h (UPPER, LOWER, PROPER)
+- [ ] fn_find_search.cc/h
+- [ ] fn_substitute_replace.cc/h
+- [ ] fn_concat.cc/h (CONCAT, CONCATENATE)
+- [ ] fn_text_value.cc/h (TEXT, VALUE)
+- [ ] fn_trim.cc/h
+
+### 10e: Extract date/time functions
+
+- [ ] fn_now_today.cc/h
+- [ ] fn_date_time.cc/h (DATE, TIME, DATEVALUE, TIMEVALUE)
+- [ ] fn_date_parts.cc/h (YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, WEEKDAY)
+
+### 10f: Update BUILD file and tests
+
+- [ ] Create `core/cells/functions/BUILD` with individual targets
+- [ ] Update `core/cells/BUILD` to depend on function library
+- [ ] Ensure all existing tests still pass
 
 ---
 
@@ -1037,11 +1119,11 @@ Do NOT mark a checkpoint as complete without user approval.
 
 | Phase | Checkpoint | Test Steps | Status |
 |-------|------------|------------|--------|
-| 1 | Basic arithmetic | Enter `=1+2` → should display `3` | - [ ] Awaiting confirmation |
-| 3 | Aggregate functions | Set A1=1, A2=2, A3=3, then B1=`=SUM(A1:A3)` → should display `6` | - [ ] Awaiting confirmation |
-| 4 | Conditional logic | Set A1=10, B1=`=IF(A1>5,"big","small")` → should display `"big"` | - [ ] Awaiting confirmation |
-| 7 | Dependency cascade | Set A1=5, B1=`=A1*2` → displays `10`, then change A1 to `10` → B1 updates to `20` | - [ ] Awaiting confirmation |
-| 8 | Full integration | All above + error styling (`=1/0` shows red `#DIV/0!`) | - [ ] Awaiting confirmation |
+| 1 | Basic arithmetic | Enter `=1+2` → should display `3` | - [x] Confirmed |
+| 3 | Aggregate functions | Set A1=1, A2=2, A3=3, then B1=`=SUM(A1:A3)` → should display `6` | - [x] Confirmed |
+| 4 | Conditional logic | Set A1=10, B1=`=IF(A1>5,"big","small")` → should display `"big"` | - [x] Confirmed |
+| 7 | Dependency cascade | Set A1=5, B1=`=A1*2` → displays `10`, then change A1 to `10` → B1 updates to `20` | - [x] Confirmed |
+| 8 | Full integration | All above + error styling (`=1/0` shows red `#DIV/0!`) | - [x] Confirmed |
 
 **Procedure**: At each checkpoint, pause execution and ask the user to verify the behavior manually. Only proceed after receiving explicit "confirmed" or equivalent response.
 
