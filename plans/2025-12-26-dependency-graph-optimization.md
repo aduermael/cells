@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-26 06:33 UTC
-Updated At: 2025-12-26 06:33 UTC
+Updated At: 2025-12-26 06:38 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -136,10 +136,14 @@ void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast) {
 
 **Challenge**: DependencyGraph doesn't have Sheet access to resolve cell IDs to positions.
 
+**Note on Cell structure**: Cell has `colId` and `rowId` (IDs), not positions directly.
+To get positions: `cell->colId` → `sheet->getColumn(colId)` → `axis->position`.
+So Sheet access is still needed for the ID → position lookup.
+
 **Options**:
-1. Pass positions to addFormula() - cleanest, minimal change
+1. Pass positions to addFormula() - cleanest, minimal change (Sheet computes positions once)
 2. Store positions in DependencyRef when extracting - more data but self-contained
-3. Pass Sheet* to DependencyGraph - tighter coupling
+3. Pass Sheet* to DependencyGraph - tighter coupling, but allows on-demand lookups
 
 - [ ] 2a: Choose approach and implement R-tree population
 
