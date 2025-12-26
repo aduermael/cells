@@ -1,8 +1,8 @@
 # Dependency Graph Optimization
 
-Status: READY
+Status: IN_PROGRESS
 Created At: 2025-12-26 06:33 UTC
-Updated At: 2025-12-26 06:41 UTC
+Updated At: 2025-12-26 19:24 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -50,7 +50,7 @@ private:
 };
 ```
 
-- [ ] 1a: Add `reverseDeps_` member to DependencyGraph
+- [x] 1a: Add `reverseDeps_` member to DependencyGraph
 
 ### 1b: Update addFormula() to maintain reverse index
 
@@ -67,7 +67,7 @@ void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast) {
 }
 ```
 
-- [ ] 1b: Update addFormula() to populate reverseDeps_
+- [x] 1b: Update addFormula() to populate reverseDeps_
 
 ### 1c: Update removeFormula() to maintain reverse index
 
@@ -87,7 +87,7 @@ void DependencyGraph::removeFormula(const ID& cellId) {
 }
 ```
 
-- [ ] 1c: Update removeFormula() to clean up reverseDeps_
+- [x] 1c: Update removeFormula() to clean up reverseDeps_
 
 ### 1d: Update getDependents() to use reverse index
 
@@ -101,11 +101,11 @@ std::vector<ID> DependencyGraph::getDependents(const ID& cellId) const {
 }
 ```
 
-- [ ] 1d: Rewrite getDependents() to use O(1) lookup
+- [x] 1d: Rewrite getDependents() to use O(1) lookup
 
 ### 1e: Update clear() to reset reverse index
 
-- [ ] 1e: Add reverseDeps_.clear() to DependencyGraph::clear()
+- [x] 1e: Add reverseDeps_.clear() to DependencyGraph::clear()
 
 **Test**: All existing dependency_graph_test cases still pass
 

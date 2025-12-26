@@ -99,6 +99,10 @@ private:
     // Used for displaying what a formula depends on
     std::unordered_map<ID, std::vector<DependencyRef>> dependencies_;
 
+    // Reverse lookup: cellId -> formulas that depend on this cell (O(1) lookup)
+    // Updated in addFormula()/removeFormula() for efficient getDependents() queries
+    std::unordered_map<ID, std::vector<ID>> reverseDeps_;
+
     // Track which rectangles were inserted for each cell (for removal)
     std::unordered_map<ID, std::vector<BoundingRect>> cellRects_;
 

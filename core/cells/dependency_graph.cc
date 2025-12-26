@@ -199,11 +199,12 @@ void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast) {
     // Store for direct lookup
     dependencies_[cellId] = refs;
 
-    // For now, we store cell references by their resolved cell position
-    // Note: This requires knowing the cell's column/row positions
-    // Since we don't have access to Sheet here, we use a simpler approach:
-    // Store (cellId -> [reference IDs]) and do lookups by ID
-    // The R-tree approach would require position info from the Sheet
+    // Populate reverse index for O(1) getDependents() lookups
+    for (const auto& ref : refs) {
+        if (ref.type == DependencyRef::Type::CELL) {
+            reverseDeps_[ref.cellId].push_back(cellId);
+        }
+    }
 
     // Track volatile status
     if (extractor.hasVolatile(ast)) {
@@ -212,6 +213,24 @@ void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast) {
 }
 
 void DependencyGraph::removeFormula(const ID& cellId) {
+    // Clean up reverse index before removing dependencies
+    auto depIt = dependencies_.find(cellId);
+    if (depIt != dependencies_.end()) {
+        for (const auto& ref : depIt->second) {
+            if (ref.type == DependencyRef::Type::CELL) {
+                auto revIt = reverseDeps_.find(ref.cellId);
+                if (revIt != reverseDeps_.end()) {
+                    auto& vec = revIt->second;
+                    vec.erase(std::remove(vec.begin(), vec.end(), cellId), vec.end());
+                    // Clean up empty vectors to save memory
+                    if (vec.empty()) {
+                        reverseDeps_.erase(revIt);
+                    }
+                }
+            }
+        }
+    }
+
     // Remove from dependencies
     dependencies_.erase(cellId);
 
@@ -229,47 +248,12 @@ void DependencyGraph::removeFormula(const ID& cellId) {
 }
 
 std::vector<ID> DependencyGraph::getDependents(const ID& cellId) const {
-    // Find all cells whose formulas depend on cellId
-    // This is a reverse lookup - go through all dependencies and find
-    // cells that reference the given cellId
-    //
-    // PERFORMANCE NOTE: This is O(n*m) where n = formula count, m = avg deps per formula.
-    // For large sheets (1000+ formulas), consider adding a reverse index:
-    //   std::unordered_map<ID, std::vector<ID>> reverseDeps_;
-    // Updated in addFormula()/removeFormula() for O(1) lookup.
-    // The R-tree (rtree_) is also available for range-based queries once wired up.
-    std::vector<ID> dependents;
-
-    for (const auto& [formulaCellId, refs] : dependencies_) {
-        for (const auto& ref : refs) {
-            bool matches = false;
-            switch (ref.type) {
-                case DependencyRef::Type::CELL:
-                    matches = (ref.cellId == cellId);
-                    break;
-                case DependencyRef::Type::RANGE:
-                    // For range refs, we need to check if cellId is within the range
-                    // For now, just check if it matches start or end cell
-                    // A more complete implementation would need Sheet access
-                    // to determine if cellId falls within the range bounds
-                    matches = (ref.startCellId == cellId || ref.endCellId == cellId);
-                    break;
-                case DependencyRef::Type::COLUMN:
-                case DependencyRef::Type::ROW:
-                case DependencyRef::Type::COLUMN_RANGE:
-                case DependencyRef::Type::ROW_RANGE:
-                    // Column/row refs would need Sheet access to determine matches
-                    // For now, skip these
-                    break;
-            }
-            if (matches) {
-                dependents.push_back(formulaCellId);
-                break;  // Only add once per formula cell
-            }
-        }
+    // O(1) lookup using reverse index
+    auto it = reverseDeps_.find(cellId);
+    if (it != reverseDeps_.end()) {
+        return it->second;
     }
-
-    return dependents;
+    return {};
 }
 
 std::vector<ID> DependencyGraph::getDependentsInRange(int32_t minCol, int32_t minRow,
@@ -453,6 +437,7 @@ std::vector<ID> DependencyGraph::getRecalcOrder(const std::vector<ID>& changedCe
 void DependencyGraph::clear() {
     rtree_.clear();
     dependencies_.clear();
+    reverseDeps_.clear();
     cellRects_.clear();
     volatileCells_.clear();
 }
