@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "core/cells/formula_ast.h"
+#include "core/cells/formula_functions.h"
 #include "core/cells/model.h"
 
 namespace cells {
@@ -21,6 +22,7 @@ static EvalResult evaluateColumnRef(const ColumnRefNode* node, EvalContext& ctx)
 static EvalResult evaluateRowRef(const RowRefNode* node, EvalContext& ctx);
 static EvalResult evaluateColumnRangeRef(const ColumnRangeRefNode* node, EvalContext& ctx);
 static EvalResult evaluateRowRangeRef(const RowRangeRefNode* node, EvalContext& ctx);
+static EvalResult evaluateFunctionCall(const FunctionCallNode* node, EvalContext& ctx);
 
 // Convert a CellValue to an EvalResult
 static EvalResult cellValueToEvalResult(const CellValue& value) {
@@ -400,6 +402,24 @@ static EvalResult evaluateUnaryOp(const UnaryOpNode* node, EvalContext& ctx) {
 }
 
 // =============================================================================
+// Function Call Evaluation
+// =============================================================================
+
+// Evaluate a function call
+static EvalResult evaluateFunctionCall(const FunctionCallNode* node, EvalContext& ctx) {
+    // Collect raw AST node pointers for the arguments
+    // Functions receive unevaluated AST nodes so they can implement lazy evaluation
+    std::vector<const ASTNode*> args;
+    args.reserve(node->args.size());
+    for (const auto& arg : node->args) {
+        args.push_back(arg.get());
+    }
+
+    // Call the function through the registry
+    return FunctionRegistry::instance().call(node->name, args, ctx);
+}
+
+// =============================================================================
 // Range Reference Evaluation
 // =============================================================================
 
@@ -413,8 +433,10 @@ static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
     // Even if cells don't exist, we can compute the bounds from the AST
     const Axis* startCol = ctx.sheet->getColumnByName(node->topLeft->column);
     const Axis* endCol = ctx.sheet->getColumnByName(node->bottomRight->column);
-    const Axis* startRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->topLeft->row - 1));
-    const Axis* endRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->bottomRight->row - 1));
+    const Axis* startRow =
+        ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->topLeft->row - 1));
+    const Axis* endRow =
+        ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->bottomRight->row - 1));
 
     if (!startCol || !endCol || !startRow || !endRow) {
         return EvalResult::Error(CellError::REF);
@@ -891,10 +913,13 @@ EvalResult evaluate(const ASTNode* node, EvalContext& ctx) {
         case ASTNodeType::ROW_RANGE_REF:
             return evaluateRowRangeRef(static_cast<const RowRangeRefNode*>(node), ctx);
 
-        // Named references and function calls - not yet implemented
-        case ASTNodeType::NAMED_REF:
+        // Function calls - dispatch to function registry
         case ASTNodeType::FUNCTION_CALL:
-            // TODO: Implement named range lookup and function evaluation (Phase 3+)
+            return evaluateFunctionCall(static_cast<const FunctionCallNode*>(node), ctx);
+
+        // Named references - not yet implemented
+        case ASTNodeType::NAMED_REF:
+            // TODO: Implement named range lookup
             return EvalResult::Error(CellError::NAME);
 
         // Error node

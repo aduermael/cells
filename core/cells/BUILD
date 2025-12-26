@@ -548,8 +548,14 @@ cc_test(
 
 cc_library(
     name = "formula_eval",
-    srcs = ["formula_eval.cc"],
-    hdrs = ["formula_eval.h"],
+    srcs = [
+        "formula_eval.cc",
+        "formula_functions.cc",
+    ],
+    hdrs = [
+        "formula_eval.h",
+        "formula_functions.h",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":formula_ast",
@@ -561,6 +567,19 @@ cc_library(
 cc_test(
     name = "formula_eval_test",
     srcs = ["formula_eval_test.cc"],
+    deps = [
+        ":formula_eval",
+        ":formula_parser",
+        ":formula_resolver",
+        ":id",
+        ":model",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "formula_functions_test",
+    srcs = ["formula_functions_test.cc"],
     deps = [
         ":formula_eval",
         ":formula_parser",
