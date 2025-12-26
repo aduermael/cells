@@ -10,6 +10,69 @@ namespace cells {
 
 namespace {
 
+// Simple JSON string unescaping for parsing payloads
+std::string jsonUnescape(const std::string& str) {
+    std::string result;
+    result.reserve(str.size());
+    size_t i = 0;
+    while (i < str.size()) {
+        if (str[i] == '\\' && i + 1 < str.size()) {
+            const char next = str[i + 1];
+            switch (next) {
+                case '"':
+                    result += '"';
+                    i += 2;
+                    break;
+                case '\\':
+                    result += '\\';
+                    i += 2;
+                    break;
+                case 'b':
+                    result += '\b';
+                    i += 2;
+                    break;
+                case 'f':
+                    result += '\f';
+                    i += 2;
+                    break;
+                case 'n':
+                    result += '\n';
+                    i += 2;
+                    break;
+                case 'r':
+                    result += '\r';
+                    i += 2;
+                    break;
+                case 't':
+                    result += '\t';
+                    i += 2;
+                    break;
+                case 'u':
+                    // Unicode escape - simplified handling
+                    if (i + 5 < str.size()) {
+                        char hex[5] = {str[i + 2], str[i + 3], str[i + 4], str[i + 5], 0};
+                        const int code = static_cast<int>(strtol(hex, nullptr, 16));
+                        if (code < 128) {
+                            result += static_cast<char>(code);
+                        }
+                        i += 6;
+                    } else {
+                        result += str[i];
+                        i++;
+                    }
+                    break;
+                default:
+                    result += str[i];
+                    i++;
+            }
+        } else {
+            result += str[i];
+            i++;
+        }
+    }
+    return result;
+}
+
 // Simple JSON string escaping for payloads
 std::string jsonEscape(const std::string& str) {
     std::string result;
@@ -52,6 +115,7 @@ std::string jsonEscape(const std::string& str) {
 }
 
 // Simple JSON value extraction (reused from operation.cc pattern)
+// Returns the unescaped string value for the given key
 std::string extractJSONString(const std::string& json, const std::string& key) {
     const std::string searchKey = "\"" + key + "\":";
     size_t pos = json.find(searchKey);
@@ -78,7 +142,8 @@ std::string extractJSONString(const std::string& json, const std::string& key) {
         end++;
     }
 
-    return json.substr(pos, end - pos);
+    // Unescape the extracted string to handle escaped quotes, newlines, etc.
+    return jsonUnescape(json.substr(pos, end - pos));
 }
 
 // Extract integer from JSON (for col/row positions)

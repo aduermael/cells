@@ -2,7 +2,7 @@
 
 Status: IN_PROGRESS
 Created At: 2025-12-25 23:41 UTC
-Updated At: 2025-12-26 03:00 UTC
+Updated At: 2025-12-26 04:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -124,21 +124,27 @@ Based on diagnosis, fix the RefConverter context management.
 
 Ensure operations are properly structured and handled.
 
-- [ ] 3a: Audit SetCellValue operation for formulas
+- [x] 3a: Audit SetCellValue operation for formulas
   - Verify formula text is in correct UUID format in operation payload
   - Verify operation deserialization preserves formula correctly
   - Check if AST is serialized/deserialized or just the text
   - **Test**: Operation round-trip preserves formula exactly
+  - **DONE**: Added `FormulaOperationRoundTrip` test verifying JSON and string round-trips
 
-- [ ] 3b: Fix any operation serialization issues
+- [x] 3b: Fix any operation serialization issues
   - Formula text may need escaping in JSON
   - Special characters in formulas (`=`, `+`, etc.) may cause issues
   - **Test**: Complex formulas sync correctly (e.g., `=SUM(A1:B2)+C3*D4`)
+  - **DONE**: Fixed bug in `extractJSONString()` - wasn't unescaping JSON strings
+  - Added `jsonUnescape()` function to `crdt.cc` to properly handle escaped quotes/chars
+  - Added tests: `ComplexFormulaWithSpecialCharsRoundTrip`, `FormulaWithMathOperatorsRoundTrip`,
+    `NestedFunctionFormulaRoundTrip`
 
-- [ ] 3c: Ensure dependency graph updates on remote operations
+- [x] 3c: Ensure dependency graph updates on remote operations
   - When remote formula arrives, add to dependency graph
   - When remote formula changes, update dependencies
   - **Test**: Dependency highlights work on remote client
+  - **DONE**: Already handled in Phase 2b - tests confirm it works
 
 ---
 

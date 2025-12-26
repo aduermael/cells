@@ -17,6 +17,35 @@
 namespace cells {
 namespace {
 
+// Simple JSON string escaping for test payloads
+std::string testJsonEscape(const std::string& str) {
+    std::string result;
+    result.reserve(str.size() + 16);
+    for (const char c : str) {
+        switch (c) {
+            case '"':
+                result += "\\\"";
+                break;
+            case '\\':
+                result += "\\\\";
+                break;
+            case '\n':
+                result += "\\n";
+                break;
+            case '\r':
+                result += "\\r";
+                break;
+            case '\t':
+                result += "\\t";
+                break;
+            default:
+                result += c;
+                break;
+        }
+    }
+    return result;
+}
+
 // ============================================================================
 // Test fixture for sync formula tests
 // ============================================================================
@@ -88,11 +117,13 @@ protected:
     }
 
     // Helper: Create a formula cell operation with proper UUID format
+    // Uses JSON escaping to handle quotes and special chars in formula text
     std::string makeFormulaPayload(const ID& colId, const ID& rowId, const std::string& uuidFormula,
                                    const std::string& displayFormula) {
-        std::string payload = "{\"type\":\"f\",\"value\":\"" + uuidFormula + "\",\"display\":\"" +
-                              displayFormula + "\",\"col_id\":\"" + colId.toString() +
-                              "\",\"row_id\":\"" + rowId.toString() + "\"}";
+        std::string payload = "{\"type\":\"f\",\"value\":\"" + testJsonEscape(uuidFormula) +
+                              "\",\"display\":\"" + testJsonEscape(displayFormula) +
+                              "\",\"col_id\":\"" + colId.toString() + "\",\"row_id\":\"" +
+                              rowId.toString() + "\"}";
         return payload;
     }
 
@@ -382,8 +413,8 @@ TEST_F(SyncFormulaTest, DependencyGraphClearedWhenFormulaReplacedWithValue) {
     // Now replace with a regular value
     HLC hlc2 = workbookA_->getCurrentHLC();  // This will be higher than op1
     std::string valuePayload = "{\"type\":\"n\",\"value\":\"42\",\"col_id\":\"" +
-                               sharedColA_.toString() + "\",\"row_id\":\"" + sharedRow2_.toString() +
-                               "\"}";
+                               sharedColA_.toString() + "\",\"row_id\":\"" +
+                               sharedRow2_.toString() + "\"}";
     Operation op2(hlc2, OpType::CELL_SET_VALUE, sharedCellA2_, valuePayload);
     applyOperation(*workbookB_, op2);
 
@@ -426,6 +457,135 @@ TEST_F(SyncFormulaTest, VolatileFunctionTrackedOnRemoteSync) {
         }
     }
     EXPECT_TRUE(found) << "Cell with volatile function should be in volatile cells list";
+}
+
+// ============================================================================
+// Phase 3: Operation serialization tests for formulas
+// ============================================================================
+
+TEST_F(SyncFormulaTest, FormulaOperationRoundTrip) {
+    // Test that formula operations serialize and deserialize correctly
+    // through JSON (network) and string (file) formats
+
+    std::string uuidFormula = "~~" + sharedCellB1_.toString();
+    std::string displayFormula = "=B1";
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+
+    Operation original = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
+
+    // Test JSON round-trip (network transport)
+    std::string json = original.toJSON();
+    Operation fromJson = Operation::fromJSON(json);
+    EXPECT_EQ(fromJson.hlc, original.hlc);
+    EXPECT_EQ(fromJson.type, original.type);
+    EXPECT_EQ(fromJson.target_id.toString(), original.target_id.toString());
+    EXPECT_EQ(fromJson.payload, original.payload);
+
+    // Test string round-trip (file storage)
+    std::string str = original.toString();
+    Operation fromStr = Operation::fromString(str);
+    EXPECT_EQ(fromStr.hlc, original.hlc);
+    EXPECT_EQ(fromStr.type, original.type);
+    EXPECT_EQ(fromStr.target_id.toString(), original.target_id.toString());
+    EXPECT_EQ(fromStr.payload, original.payload);
+
+    // Verify the formula can still be applied after round-trip
+    ApplyResult result = applyOperation(*workbookB_, fromJson);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellA2_);
+    ASSERT_NE(cell, nullptr);
+    ASSERT_TRUE(cell->isFormula());
+    EXPECT_STREQ(cell->getFormula()->text, uuidFormula.c_str());
+}
+
+TEST_F(SyncFormulaTest, ComplexFormulaWithSpecialCharsRoundTrip) {
+    // Test formulas with special characters that need JSON escaping
+
+    // Formula with quotes and special chars: =IF(A1="test",B1,C1)
+    // In UUID format, string literals are preserved
+    std::string uuidFormula =
+        "IF(" + sharedCellA1_.toString() + "=\"test\"," + sharedCellB1_.toString() + ",0)";
+    std::string displayFormula = "=IF(A1=\"test\",B1,0)";
+
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    Operation original = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
+
+    // Verify the payload contains escaped quotes
+    EXPECT_NE(original.payload.find("\\\"test\\\""), std::string::npos)
+        << "Quotes should be escaped in payload";
+
+    // Test JSON round-trip
+    std::string json = original.toJSON();
+    Operation fromJson = Operation::fromJSON(json);
+    EXPECT_EQ(fromJson.payload, original.payload);
+
+    // Apply and verify
+    ApplyResult result = applyOperation(*workbookB_, fromJson);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellA2_);
+    ASSERT_NE(cell, nullptr);
+    ASSERT_TRUE(cell->isFormula());
+
+    // The formula text should have unescaped quotes
+    std::string formulaText = cell->getFormula()->text;
+    EXPECT_NE(formulaText.find("\"test\""), std::string::npos)
+        << "Formula should contain unescaped quotes after parsing";
+}
+
+TEST_F(SyncFormulaTest, FormulaWithMathOperatorsRoundTrip) {
+    // Test formula with all math operators: =A1+B1-A2*B2/2
+    std::string uuidFormula = sharedCellA1_.toString() + "+" + sharedCellB1_.toString() + "-" +
+                              sharedCellA2_.toString() + "*" + sharedCellB2_.toString() + "/2";
+    std::string displayFormula = "=A1+B1-A2*B2/2";
+
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    Operation original = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
+
+    // Test round-trip
+    std::string json = original.toJSON();
+    Operation fromJson = Operation::fromJSON(json);
+
+    ApplyResult result = applyOperation(*workbookB_, fromJson);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellA2_);
+    ASSERT_NE(cell, nullptr);
+    ASSERT_TRUE(cell->isFormula());
+
+    // Verify display formula is correct
+    RefConverter conv;
+    conv.setContext(*workbookB_->getSheetByIndex(0));
+    std::string converted = conv.formulaToA1(cell->getFormula()->text);
+    EXPECT_EQ(converted, "A1+B1-A2*B2/2");
+}
+
+TEST_F(SyncFormulaTest, NestedFunctionFormulaRoundTrip) {
+    // Test nested functions: =SUM(IF(A1>0,A1:B1,A2:B2))
+    std::string uuidFormula = "SUM(IF(" + sharedCellA1_.toString() + ">0," +
+                              sharedCellA1_.toString() + ":" + sharedCellB1_.toString() + "," +
+                              sharedCellA2_.toString() + ":" + sharedCellB2_.toString() + "))";
+    std::string displayFormula = "=SUM(IF(A1>0,A1:B1,A2:B2))";
+
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    Operation original = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
+
+    // Round-trip through JSON
+    std::string json = original.toJSON();
+    Operation fromJson = Operation::fromJSON(json);
+
+    ApplyResult result = applyOperation(*workbookB_, fromJson);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellA2_);
+    ASSERT_NE(cell, nullptr);
+    ASSERT_TRUE(cell->isFormula());
+
+    RefConverter conv;
+    conv.setContext(*workbookB_->getSheetByIndex(0));
+    std::string converted = conv.formulaToA1(cell->getFormula()->text);
+    EXPECT_EQ(converted, "SUM(IF(A1>0,A1:B1,A2:B2))");
 }
 
 }  // namespace
