@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2025-12-26 06:33 UTC
-Updated At: 2025-12-26 06:38 UTC
+Updated At: 2025-12-26 06:41 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Overview
@@ -140,10 +140,14 @@ void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast) {
 To get positions: `cell->colId` → `sheet->getColumn(colId)` → `axis->position`.
 So Sheet access is still needed for the ID → position lookup.
 
+**IMPORTANT**: Column/row moves change positions without changing formulas (formulas use UUIDs).
+Any cached positions become stale on move operations. This rules out static caching.
+
 **Options**:
-1. Pass positions to addFormula() - cleanest, minimal change (Sheet computes positions once)
-2. Store positions in DependencyRef when extracting - more data but self-contained
-3. Pass Sheet* to DependencyGraph - tighter coupling, but allows on-demand lookups
+1. ~~Pass positions to addFormula()~~ - ❌ Stale on column/row move
+2. ~~Store positions in DependencyRef~~ - ❌ Same problem
+3. **Pass Sheet* to DependencyGraph** - ✅ On-demand lookup, always current
+4. **Invalidate R-tree on move** - ✅ Rebuild on move ops (moves are rare vs lookups)
 
 - [ ] 2a: Choose approach and implement R-tree population
 
