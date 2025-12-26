@@ -32,22 +32,19 @@ RangeDimensions getRangeDimensions(const RangeBounds& bounds, Sheet* sheet) {
         return dims;  // Only support cell ranges for now
     }
 
-    // Get start and end axes
+    // Get start and end columns
     const Axis* startCol = sheet->getColumn(bounds.startColId);
-    const Axis* startRow = sheet->getRow(bounds.startRowId);
     const Axis* endCol = sheet->getColumn(bounds.endColId);
-    const Axis* endRow = sheet->getRow(bounds.endRowId);
 
-    if (!startCol || !startRow || !endCol || !endRow) {
+    if (!startCol || !endCol) {
         return dims;
     }
 
     dims.startColPos = startCol->position;
-    dims.startRowPos = startRow->position;
+    dims.startRowPos = bounds.startRowPos;  // Use position bounds directly
     dims.cols = static_cast<uint32_t>(
         std::abs(static_cast<int>(endCol->position) - static_cast<int>(startCol->position)) + 1);
-    dims.rows = static_cast<uint32_t>(
-        std::abs(static_cast<int>(endRow->position) - static_cast<int>(startRow->position)) + 1);
+    dims.rows = static_cast<uint32_t>(bounds.endRowPos - bounds.startRowPos + 1);
     dims.valid = true;
 
     return dims;
@@ -60,17 +57,16 @@ EvalResult getCellAtPosition(EvalContext& ctx, const RangeBounds& bounds, uint32
         return EvalResult::Error(CellError::REF);
     }
 
-    // Get start axes
+    // Get start column
     const Axis* startCol = ctx.sheet->getColumn(bounds.startColId);
-    const Axis* startRow = ctx.sheet->getRow(bounds.startRowId);
 
-    if (!startCol || !startRow) {
+    if (!startCol) {
         return EvalResult::Error(CellError::REF);
     }
 
-    // Calculate target position
+    // Calculate target position (use position bounds for rows)
     const uint32_t targetColPos = startCol->position + colOffset;
-    const uint32_t targetRowPos = startRow->position + rowOffset;
+    const uint32_t targetRowPos = bounds.startRowPos + rowOffset;
 
     // Find the column and row at those positions
     const Axis* targetCol = ctx.sheet->getColumnByPosition(targetColPos);

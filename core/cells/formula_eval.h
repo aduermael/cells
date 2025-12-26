@@ -36,6 +36,9 @@ struct RangeBounds {
     ID endColId;    // Last column ID (or empty for row-only ranges)
     ID startRowId;  // First row ID (or empty for column-only ranges)
     ID endRowId;    // Last row ID (or empty for column-only ranges)
+    // For CELL_RANGE: store row positions to handle sparse rows (rows may not exist as Axis)
+    uint32_t startRowPos{0};
+    uint32_t endRowPos{0};
     RangeType type{RangeType::CELL_RANGE};
 };
 
@@ -94,13 +97,13 @@ struct EvalResult {
         return r;
     }
 
-    static EvalResult CellRange(const ID& startCol, const ID& endCol, const ID& startRow,
-                                const ID& endRow) {
+    static EvalResult CellRange(const ID& startCol, const ID& endCol, uint32_t startRowPos,
+                                uint32_t endRowPos) {
         RangeBounds bounds;
         bounds.startColId = startCol;
         bounds.endColId = endCol;
-        bounds.startRowId = startRow;
-        bounds.endRowId = endRow;
+        bounds.startRowPos = startRowPos;
+        bounds.endRowPos = endRowPos;
         bounds.type = RangeType::CELL_RANGE;
         return Range(bounds);
     }

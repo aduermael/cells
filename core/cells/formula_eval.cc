@@ -429,28 +429,31 @@ static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
         return EvalResult::Error(CellError::REF);
     }
 
-    // For ranges, use the column/row info from the AST to resolve positions
-    // Even if cells don't exist, we can compute the bounds from the AST
+    // Look up columns by name - columns must exist
     const Axis* startCol = ctx.sheet->getColumnByName(node->topLeft->column);
     const Axis* endCol = ctx.sheet->getColumnByName(node->bottomRight->column);
-    const Axis* startRow =
-        ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->topLeft->row - 1));
-    const Axis* endRow =
-        ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->bottomRight->row - 1));
 
-    if (!startCol || !endCol || !startRow || !endRow) {
+    // For columns, we need Axis objects since we identify columns by name
+    if (!startCol || !endCol) {
         return EvalResult::Error(CellError::REF);
     }
 
+    // For rows, use positions directly from AST (1-based in AST, 0-based for storage)
+    // This allows ranges to work even if row Axis objects don't exist yet
+    auto startRowPos = static_cast<uint32_t>(node->topLeft->row - 1);
+    auto endRowPos = static_cast<uint32_t>(node->bottomRight->row - 1);
+
     // Ensure proper ordering (swap if needed)
+    ID startColId = startCol->id;
+    ID endColId = endCol->id;
     if (startCol->position > endCol->position) {
-        std::swap(startCol, endCol);
+        std::swap(startColId, endColId);
     }
-    if (startRow->position > endRow->position) {
-        std::swap(startRow, endRow);
+    if (startRowPos > endRowPos) {
+        std::swap(startRowPos, endRowPos);
     }
 
-    return EvalResult::CellRange(startCol->id, endCol->id, startRow->id, endRow->id);
+    return EvalResult::CellRange(startColId, endColId, startRowPos, endRowPos);
 }
 
 // Evaluate a whole column reference (A:A)
@@ -596,25 +599,24 @@ static size_t iterateCellRange(const RangeBounds& bounds, Sheet* sheet,
                                const RangeCellCallback& callback) {
     const Axis* startCol = sheet->getColumn(bounds.startColId);
     const Axis* endCol = sheet->getColumn(bounds.endColId);
-    const Axis* startRow = sheet->getRow(bounds.startRowId);
-    const Axis* endRow = sheet->getRow(bounds.endRowId);
 
-    if (!startCol || !endCol || !startRow || !endRow) {
+    if (!startCol || !endCol) {
         return 0;
     }
 
-    // Collect columns and rows in the range, sorted by position
-    // Store (position, id) pairs to avoid nondeterministic pointer sorting
+    // Collect columns in the range, sorted by position
     std::vector<std::pair<uint32_t, ID>> cols;
-    std::vector<std::pair<uint32_t, ID>> rows;
-
     for (const auto& [id, axis] : sheet->columns) {
         if (axis->position >= startCol->position && axis->position <= endCol->position) {
             cols.emplace_back(axis->position, axis->id);
         }
     }
+
+    // Collect rows in the position range (use position bounds, not row IDs)
+    // This allows ranges to work even with sparse rows
+    std::vector<std::pair<uint32_t, ID>> rows;
     for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position >= startRow->position && axis->position <= endRow->position) {
+        if (axis->position >= bounds.startRowPos && axis->position <= bounds.endRowPos) {
             rows.emplace_back(axis->position, axis->id);
         }
     }
@@ -832,24 +834,23 @@ size_t getRangeSize(const RangeBounds& bounds, Sheet* sheet) {
         case RangeType::CELL_RANGE: {
             const Axis* startCol = sheet->getColumn(bounds.startColId);
             const Axis* endCol = sheet->getColumn(bounds.endColId);
-            const Axis* startRow = sheet->getRow(bounds.startRowId);
-            const Axis* endRow = sheet->getRow(bounds.endRowId);
 
-            if (!startCol || !endCol || !startRow || !endRow) {
+            if (!startCol || !endCol) {
                 return 0;
             }
 
-            // Count columns and rows in range
+            // Count columns in range
             size_t colCount = 0;
-            size_t rowCount = 0;
-
             for (const auto& [id, axis] : sheet->columns) {
                 if (axis->position >= startCol->position && axis->position <= endCol->position) {
                     colCount++;
                 }
             }
+
+            // Count rows in position range (using position bounds, not row IDs)
+            size_t rowCount = 0;
             for (const auto& [id, axis] : sheet->rows) {
-                if (axis->position >= startRow->position && axis->position <= endRow->position) {
+                if (axis->position >= bounds.startRowPos && axis->position <= bounds.endRowPos) {
                     rowCount++;
                 }
             }

@@ -1105,16 +1105,16 @@ TEST(EvalResultTest, IsRange_True) {
 TEST(EvalResultTest, CellRangeFactory) {
     ID col1("col1____");
     ID col2("col2____");
-    ID row1("row1____");
-    ID row2("row2____");
+    uint32_t startRowPos = 0;
+    uint32_t endRowPos = 5;
 
-    EvalResult r = EvalResult::CellRange(col1, col2, row1, row2);
+    EvalResult r = EvalResult::CellRange(col1, col2, startRowPos, endRowPos);
     ASSERT_TRUE(r.isRange());
     EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
     EXPECT_EQ(col1, r.getRangeBounds().startColId);
     EXPECT_EQ(col2, r.getRangeBounds().endColId);
-    EXPECT_EQ(row1, r.getRangeBounds().startRowId);
-    EXPECT_EQ(row2, r.getRangeBounds().endRowId);
+    EXPECT_EQ(startRowPos, r.getRangeBounds().startRowPos);
+    EXPECT_EQ(endRowPos, r.getRangeBounds().endRowPos);
 }
 
 TEST(EvalResultTest, ColumnRangeFactory) {
