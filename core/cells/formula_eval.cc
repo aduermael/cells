@@ -2,7 +2,9 @@
 
 #include <cmath>
 
+#include <algorithm>
 #include <string>
+#include <vector>
 
 #include "core/cells/formula_ast.h"
 #include "core/cells/model.h"
@@ -14,6 +16,11 @@ static EvalResult evaluateLiteral(const ASTNode* node);
 static EvalResult evaluateCellRef(const CellRefNode* node, EvalContext& ctx);
 static EvalResult evaluateBinaryOp(const BinaryOpNode* node, EvalContext& ctx);
 static EvalResult evaluateUnaryOp(const UnaryOpNode* node, EvalContext& ctx);
+static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx);
+static EvalResult evaluateColumnRef(const ColumnRefNode* node, EvalContext& ctx);
+static EvalResult evaluateRowRef(const RowRefNode* node, EvalContext& ctx);
+static EvalResult evaluateColumnRangeRef(const ColumnRangeRefNode* node, EvalContext& ctx);
+static EvalResult evaluateRowRangeRef(const RowRangeRefNode* node, EvalContext& ctx);
 
 // Convert a CellValue to an EvalResult
 static EvalResult cellValueToEvalResult(const CellValue& value) {
@@ -352,6 +359,461 @@ static EvalResult evaluateUnaryOp(const UnaryOpNode* node, EvalContext& ctx) {
     return EvalResult::Error(CellError::VALUE);
 }
 
+// =============================================================================
+// Range Reference Evaluation
+// =============================================================================
+
+// Evaluate a range reference (A1:C3)
+static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
+    if (!ctx.sheet) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // For ranges, use the column/row info from the AST to resolve positions
+    // Even if cells don't exist, we can compute the bounds from the AST
+    Axis* startCol = ctx.sheet->getColumnByName(node->topLeft->column);
+    Axis* endCol = ctx.sheet->getColumnByName(node->bottomRight->column);
+    Axis* startRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->topLeft->row - 1));
+    Axis* endRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->bottomRight->row - 1));
+
+    if (!startCol || !endCol || !startRow || !endRow) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // Ensure proper ordering (swap if needed)
+    if (startCol->position > endCol->position) {
+        std::swap(startCol, endCol);
+    }
+    if (startRow->position > endRow->position) {
+        std::swap(startRow, endRow);
+    }
+
+    return EvalResult::CellRange(startCol->id, endCol->id, startRow->id, endRow->id);
+}
+
+// Evaluate a whole column reference (A:A)
+static EvalResult evaluateColumnRef(const ColumnRefNode* node, EvalContext& ctx) {
+    if (!ctx.sheet) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // Look up column by name or resolved ID
+    const Axis* col = nullptr;
+    if (!node->columnId.empty()) {
+        col = ctx.sheet->getColumn(ID(node->columnId));
+    }
+    if (!col) {
+        col = ctx.sheet->getColumnByName(node->column);
+    }
+
+    if (!col) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    return EvalResult::SingleColumn(col->id);
+}
+
+// Evaluate a whole row reference (1:1)
+static EvalResult evaluateRowRef(const RowRefNode* node, EvalContext& ctx) {
+    if (!ctx.sheet) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // Look up row by position or resolved ID
+    const Axis* row = nullptr;
+    if (!node->rowId.empty()) {
+        row = ctx.sheet->getRow(ID(node->rowId));
+    }
+    if (!row) {
+        row = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->row - 1));
+    }
+
+    if (!row) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    return EvalResult::SingleRow(row->id);
+}
+
+// Evaluate a column range reference (A:C)
+static EvalResult evaluateColumnRangeRef(const ColumnRangeRefNode* node, EvalContext& ctx) {
+    if (!ctx.sheet) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // Look up columns by name or resolved ID
+    const Axis* startCol = nullptr;
+    const Axis* endCol = nullptr;
+
+    if (!node->startColumnId.empty()) {
+        startCol = ctx.sheet->getColumn(ID(node->startColumnId));
+    }
+    if (!startCol) {
+        startCol = ctx.sheet->getColumnByName(node->startColumn);
+    }
+
+    if (!node->endColumnId.empty()) {
+        endCol = ctx.sheet->getColumn(ID(node->endColumnId));
+    }
+    if (!endCol) {
+        endCol = ctx.sheet->getColumnByName(node->endColumn);
+    }
+
+    if (!startCol || !endCol) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // Ensure proper ordering
+    if (startCol->position > endCol->position) {
+        std::swap(startCol, endCol);
+    }
+
+    return EvalResult::ColumnRange(startCol->id, endCol->id);
+}
+
+// Evaluate a row range reference (1:5)
+static EvalResult evaluateRowRangeRef(const RowRangeRefNode* node, EvalContext& ctx) {
+    if (!ctx.sheet) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // Look up rows by position or resolved ID
+    const Axis* startRow = nullptr;
+    const Axis* endRow = nullptr;
+
+    if (!node->startRowId.empty()) {
+        startRow = ctx.sheet->getRow(ID(node->startRowId));
+    }
+    if (!startRow) {
+        startRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->startRow - 1));
+    }
+
+    if (!node->endRowId.empty()) {
+        endRow = ctx.sheet->getRow(ID(node->endRowId));
+    }
+    if (!endRow) {
+        endRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->endRow - 1));
+    }
+
+    if (!startRow || !endRow) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // Ensure proper ordering
+    if (startRow->position > endRow->position) {
+        std::swap(startRow, endRow);
+    }
+
+    return EvalResult::RowRange(startRow->id, endRow->id);
+}
+
+// =============================================================================
+// Range Iteration Utilities
+// =============================================================================
+
+// Helper to get cell value as EvalResult
+static EvalResult getCellEvalResult(Cell* cell, EvalContext& ctx) {
+    if (!cell) {
+        return EvalResult::Empty();
+    }
+
+    // If cell has a formula that needs evaluation, evaluate it first
+    const Formula* formula = cell->getFormula();
+    if (formula && formula->dirty && formula->ast) {
+        // Use the existing evaluateCellRef logic for consistency
+        CellRefNode tempNode("", 0, false, false);
+        tempNode.cellId = cell->id.toString();
+        return evaluateCellRef(&tempNode, ctx);
+    }
+
+    return cellValueToEvalResult(cell->value);
+}
+
+// Iterate over a bounded cell range (A1:C3)
+static size_t iterateCellRange(const RangeBounds& bounds, Sheet* sheet,
+                               const RangeCellCallback& callback) {
+    const Axis* startCol = sheet->getColumn(bounds.startColId);
+    const Axis* endCol = sheet->getColumn(bounds.endColId);
+    const Axis* startRow = sheet->getRow(bounds.startRowId);
+    const Axis* endRow = sheet->getRow(bounds.endRowId);
+
+    if (!startCol || !endCol || !startRow || !endRow) {
+        return 0;
+    }
+
+    // Collect columns and rows in the range, sorted by position
+    // Store (position, id) pairs to avoid nondeterministic pointer sorting
+    std::vector<std::pair<uint32_t, ID>> cols;
+    std::vector<std::pair<uint32_t, ID>> rows;
+
+    for (const auto& [id, axis] : sheet->columns) {
+        if (axis->position >= startCol->position && axis->position <= endCol->position) {
+            cols.emplace_back(axis->position, axis->id);
+        }
+    }
+    for (const auto& [id, axis] : sheet->rows) {
+        if (axis->position >= startRow->position && axis->position <= endRow->position) {
+            rows.emplace_back(axis->position, axis->id);
+        }
+    }
+
+    // Sort by position (first element of pair)
+    std::sort(cols.begin(), cols.end());
+    std::sort(rows.begin(), rows.end());
+
+    size_t count = 0;
+    // Iterate in row-major order (A1, B1, C1, A2, B2, C2...)
+    for (const auto& [rowPos, rowId] : rows) {
+        for (const auto& [colPos, colId] : cols) {
+            Cell* cell = sheet->getCellAt(colId, rowId);
+            if (!callback(cell, colPos, rowPos)) {
+                return count;
+            }
+            count++;
+        }
+    }
+
+    return count;
+}
+
+// Iterate over a whole column (A:A) - only populated cells
+static size_t iterateSingleColumn(const RangeBounds& bounds, Sheet* sheet,
+                                  const RangeCellCallback& callback) {
+    const Axis* col = sheet->getColumn(bounds.startColId);
+    if (!col) {
+        return 0;
+    }
+
+    size_t count = 0;
+    // Collect all cells in this column: (row position, cell ID)
+    std::vector<std::pair<uint32_t, ID>> cellsInCol;
+    for (const auto& [id, cell] : sheet->cells) {
+        if (cell->colId == col->id) {
+            const Axis* row = sheet->getRow(cell->rowId);
+            if (row) {
+                cellsInCol.emplace_back(row->position, cell->id);
+            }
+        }
+    }
+
+    // Sort by row position
+    std::sort(cellsInCol.begin(), cellsInCol.end());
+
+    for (const auto& [rowPos, cellId] : cellsInCol) {
+        Cell* cell = sheet->getCell(cellId);
+        if (!callback(cell, col->position, rowPos)) {
+            return count;
+        }
+        count++;
+    }
+
+    return count;
+}
+
+// Iterate over a whole row (1:1) - only populated cells
+static size_t iterateSingleRow(const RangeBounds& bounds, Sheet* sheet,
+                               const RangeCellCallback& callback) {
+    const Axis* row = sheet->getRow(bounds.startRowId);
+    if (!row) {
+        return 0;
+    }
+
+    size_t count = 0;
+    // Collect all cells in this row: (col position, cell ID)
+    std::vector<std::pair<uint32_t, ID>> cellsInRow;
+    for (const auto& [id, cell] : sheet->cells) {
+        if (cell->rowId == row->id) {
+            const Axis* col = sheet->getColumn(cell->colId);
+            if (col) {
+                cellsInRow.emplace_back(col->position, cell->id);
+            }
+        }
+    }
+
+    // Sort by column position
+    std::sort(cellsInRow.begin(), cellsInRow.end());
+
+    for (const auto& [colPos, cellId] : cellsInRow) {
+        Cell* cell = sheet->getCell(cellId);
+        if (!callback(cell, colPos, row->position)) {
+            return count;
+        }
+        count++;
+    }
+
+    return count;
+}
+
+// Iterate over a column range (A:C) - only populated cells
+static size_t iterateColumnRange(const RangeBounds& bounds, Sheet* sheet,
+                                 const RangeCellCallback& callback) {
+    const Axis* startCol = sheet->getColumn(bounds.startColId);
+    const Axis* endCol = sheet->getColumn(bounds.endColId);
+    if (!startCol || !endCol) {
+        return 0;
+    }
+
+    size_t count = 0;
+    // Collect all cells in these columns: (row, col, cell ID)
+    std::vector<std::tuple<uint32_t, uint32_t, ID>> cellsInRange;
+    for (const auto& [id, cell] : sheet->cells) {
+        const Axis* col = sheet->getColumn(cell->colId);
+        if (col && col->position >= startCol->position && col->position <= endCol->position) {
+            const Axis* row = sheet->getRow(cell->rowId);
+            if (row) {
+                cellsInRange.emplace_back(row->position, col->position, cell->id);
+            }
+        }
+    }
+
+    // Sort by row, then column (row-major order)
+    std::sort(cellsInRange.begin(), cellsInRange.end());
+
+    for (const auto& [rowPos, colPos, cellId] : cellsInRange) {
+        Cell* cell = sheet->getCell(cellId);
+        if (!callback(cell, colPos, rowPos)) {
+            return count;
+        }
+        count++;
+    }
+
+    return count;
+}
+
+// Iterate over a row range (1:5) - only populated cells
+static size_t iterateRowRange(const RangeBounds& bounds, Sheet* sheet,
+                              const RangeCellCallback& callback) {
+    const Axis* startRow = sheet->getRow(bounds.startRowId);
+    const Axis* endRow = sheet->getRow(bounds.endRowId);
+    if (!startRow || !endRow) {
+        return 0;
+    }
+
+    size_t count = 0;
+    // Collect all cells in these rows: (row, col, cell ID)
+    std::vector<std::tuple<uint32_t, uint32_t, ID>> cellsInRange;
+    for (const auto& [id, cell] : sheet->cells) {
+        const Axis* row = sheet->getRow(cell->rowId);
+        if (row && row->position >= startRow->position && row->position <= endRow->position) {
+            const Axis* col = sheet->getColumn(cell->colId);
+            if (col) {
+                cellsInRange.emplace_back(row->position, col->position, cell->id);
+            }
+        }
+    }
+
+    // Sort by row, then column (row-major order)
+    std::sort(cellsInRange.begin(), cellsInRange.end());
+
+    for (const auto& [rowPos, colPos, cellId] : cellsInRange) {
+        Cell* cell = sheet->getCell(cellId);
+        if (!callback(cell, colPos, rowPos)) {
+            return count;
+        }
+        count++;
+    }
+
+    return count;
+}
+
+// Public function: Iterate over all cells in a range
+size_t iterateRange(const RangeBounds& bounds, Sheet* sheet, const RangeCellCallback& callback) {
+    if (!sheet) {
+        return 0;
+    }
+
+    switch (bounds.type) {
+        case RangeType::CELL_RANGE:
+            return iterateCellRange(bounds, sheet, callback);
+        case RangeType::COLUMN:
+            return iterateSingleColumn(bounds, sheet, callback);
+        case RangeType::ROW:
+            return iterateSingleRow(bounds, sheet, callback);
+        case RangeType::COLUMN_RANGE:
+            return iterateColumnRange(bounds, sheet, callback);
+        case RangeType::ROW_RANGE:
+            return iterateRowRange(bounds, sheet, callback);
+    }
+
+    return 0;
+}
+
+// Public function: Collect all EvalResults from cells in a range
+std::vector<EvalResult> collectRangeValues(const RangeBounds& bounds, EvalContext& ctx) {
+    std::vector<EvalResult> results;
+
+    if (!ctx.sheet) {
+        return results;
+    }
+
+    // Pre-allocate if we can estimate size
+    const size_t estimatedSize = getRangeSize(bounds, ctx.sheet);
+    if (estimatedSize > 0) {
+        results.reserve(estimatedSize);
+    }
+
+    iterateRange(bounds, ctx.sheet, [&results, &ctx](Cell* cell, uint32_t, uint32_t) {
+        results.push_back(getCellEvalResult(cell, ctx));
+        return true;  // Continue iteration
+    });
+
+    return results;
+}
+
+// Public function: Get the count of cells in a range
+size_t getRangeSize(const RangeBounds& bounds, Sheet* sheet) {
+    if (!sheet) {
+        return 0;
+    }
+
+    switch (bounds.type) {
+        case RangeType::CELL_RANGE: {
+            const Axis* startCol = sheet->getColumn(bounds.startColId);
+            const Axis* endCol = sheet->getColumn(bounds.endColId);
+            const Axis* startRow = sheet->getRow(bounds.startRowId);
+            const Axis* endRow = sheet->getRow(bounds.endRowId);
+
+            if (!startCol || !endCol || !startRow || !endRow) {
+                return 0;
+            }
+
+            // Count columns and rows in range
+            size_t colCount = 0;
+            size_t rowCount = 0;
+
+            for (const auto& [id, axis] : sheet->columns) {
+                if (axis->position >= startCol->position && axis->position <= endCol->position) {
+                    colCount++;
+                }
+            }
+            for (const auto& [id, axis] : sheet->rows) {
+                if (axis->position >= startRow->position && axis->position <= endRow->position) {
+                    rowCount++;
+                }
+            }
+
+            return colCount * rowCount;
+        }
+        case RangeType::COLUMN:
+            [[fallthrough]];
+        case RangeType::ROW:
+            [[fallthrough]];
+        case RangeType::COLUMN_RANGE:
+            [[fallthrough]];
+        case RangeType::ROW_RANGE: {
+            // For unbounded ranges, count populated cells
+            size_t count = 0;
+            iterateRange(bounds, sheet, [&count](Cell*, uint32_t, uint32_t) {
+                count++;
+                return true;
+            });
+            return count;
+        }
+    }
+
+    return 0;
+}
+
 // Main evaluation function
 EvalResult evaluate(const ASTNode* node, EvalContext& ctx) {
     if (!node) {
@@ -376,16 +838,18 @@ EvalResult evaluate(const ASTNode* node, EvalContext& ctx) {
         case ASTNodeType::UNARY_OP:
             return evaluateUnaryOp(static_cast<const UnaryOpNode*>(node), ctx);
 
-        // Range references - these don't evaluate to a single value
+        // Range references - evaluate to Range result type
         // They're consumed by functions like SUM, AVERAGE, etc.
         case ASTNodeType::RANGE_REF:
+            return evaluateRangeRef(static_cast<const RangeRefNode*>(node), ctx);
         case ASTNodeType::COLUMN_REF:
+            return evaluateColumnRef(static_cast<const ColumnRefNode*>(node), ctx);
         case ASTNodeType::ROW_REF:
+            return evaluateRowRef(static_cast<const RowRefNode*>(node), ctx);
         case ASTNodeType::COLUMN_RANGE_REF:
+            return evaluateColumnRangeRef(static_cast<const ColumnRangeRefNode*>(node), ctx);
         case ASTNodeType::ROW_RANGE_REF:
-            // For now, ranges in a scalar context return an error
-            // Functions will handle ranges specially
-            return EvalResult::Error(CellError::VALUE);
+            return evaluateRowRangeRef(static_cast<const RowRangeRefNode*>(node), ctx);
 
         // Named references
         case ASTNodeType::NAMED_REF:

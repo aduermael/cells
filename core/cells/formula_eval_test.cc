@@ -739,5 +739,425 @@ TEST(EvalResultTest, ErrorPropagation_ToBoolean) {
     EXPECT_EQ(CellError::REF, b.getError());
 }
 
+// =============================================================================
+// RANGE EVALUATION TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, RangeRef_SingleCellRange) {
+    // A1:A1 should be a valid range containing 1 cell
+    EvalResult r = eval("=A1:A1");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, RangeRef_SingleRow) {
+    // A1:C1 should be a valid range of 3 cells
+    EvalResult r = eval("=A1:C1");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, RangeRef_SingleColumn) {
+    // A1:A3 should be a valid range of 3 cells
+    EvalResult r = eval("=A1:A3");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, RangeRef_Rectangle) {
+    // A1:C3 should be a valid 3x3 range
+    EvalResult r = eval("=A1:C3");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, RangeRef_Reversed) {
+    // C3:A1 should normalize to A1:C3
+    EvalResult r = eval("=C3:A1");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, WholeColumnRef) {
+    // A:A should be a column reference
+    EvalResult r = eval("=A:A");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::COLUMN, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, WholeRowRef) {
+    // 1:1 should be a row reference
+    EvalResult r = eval("=1:1");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::ROW, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, ColumnRangeRef) {
+    // A:C should be a column range
+    EvalResult r = eval("=A:C");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::COLUMN_RANGE, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, RowRangeRef) {
+    // 1:5 should be a row range
+    EvalResult r = eval("=1:5");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::ROW_RANGE, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, RangeRef_WithAbsoluteRefs) {
+    // $A$1:$C$3 should work the same as A1:C3
+    EvalResult r = eval("=$A$1:$C$3");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+}
+
+// =============================================================================
+// RANGE ITERATION TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, RangeIteration_SingleCellRange) {
+    setCellValue(0, 0, 10.0);  // A1 = 10
+
+    EvalResult r = eval("=A1:A1");
+    ASSERT_TRUE(r.isRange());
+
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.evaluatingCells = &evaluating;
+
+    auto values = collectRangeValues(r.getRangeBounds(), ctx);
+    ASSERT_EQ(1, values.size());
+    ASSERT_TRUE(values[0].isNumber());
+    EXPECT_DOUBLE_EQ(10.0, values[0].getNumber());
+}
+
+TEST_F(FormulaEvalTest, RangeIteration_SingleRowRange) {
+    setCellValue(0, 0, 1.0);  // A1 = 1
+    setCellValue(1, 0, 2.0);  // B1 = 2
+    setCellValue(2, 0, 3.0);  // C1 = 3
+
+    EvalResult r = eval("=A1:C1");
+    ASSERT_TRUE(r.isRange());
+
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.evaluatingCells = &evaluating;
+
+    auto values = collectRangeValues(r.getRangeBounds(), ctx);
+    ASSERT_EQ(3, values.size());
+    EXPECT_DOUBLE_EQ(1.0, values[0].getNumber());
+    EXPECT_DOUBLE_EQ(2.0, values[1].getNumber());
+    EXPECT_DOUBLE_EQ(3.0, values[2].getNumber());
+}
+
+TEST_F(FormulaEvalTest, RangeIteration_SingleColumnRange) {
+    setCellValue(0, 0, 1.0);  // A1 = 1
+    setCellValue(0, 1, 2.0);  // A2 = 2
+    setCellValue(0, 2, 3.0);  // A3 = 3
+
+    EvalResult r = eval("=A1:A3");
+    ASSERT_TRUE(r.isRange());
+
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.evaluatingCells = &evaluating;
+
+    auto values = collectRangeValues(r.getRangeBounds(), ctx);
+    ASSERT_EQ(3, values.size());
+    EXPECT_DOUBLE_EQ(1.0, values[0].getNumber());
+    EXPECT_DOUBLE_EQ(2.0, values[1].getNumber());
+    EXPECT_DOUBLE_EQ(3.0, values[2].getNumber());
+}
+
+TEST_F(FormulaEvalTest, RangeIteration_Rectangle) {
+    // Set up 2x2 grid
+    setCellValue(0, 0, 1.0);  // A1 = 1
+    setCellValue(1, 0, 2.0);  // B1 = 2
+    setCellValue(0, 1, 3.0);  // A2 = 3
+    setCellValue(1, 1, 4.0);  // B2 = 4
+
+    EvalResult r = eval("=A1:B2");
+    ASSERT_TRUE(r.isRange());
+
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.evaluatingCells = &evaluating;
+
+    auto values = collectRangeValues(r.getRangeBounds(), ctx);
+    ASSERT_EQ(4, values.size());
+    // Row-major order: A1, B1, A2, B2
+    EXPECT_DOUBLE_EQ(1.0, values[0].getNumber());
+    EXPECT_DOUBLE_EQ(2.0, values[1].getNumber());
+    EXPECT_DOUBLE_EQ(3.0, values[2].getNumber());
+    EXPECT_DOUBLE_EQ(4.0, values[3].getNumber());
+}
+
+TEST_F(FormulaEvalTest, RangeIteration_WithEmptyCells) {
+    setCellValue(0, 0, 1.0);  // A1 = 1
+    // A2 is empty
+    setCellValue(0, 2, 3.0);  // A3 = 3
+
+    EvalResult r = eval("=A1:A3");
+    ASSERT_TRUE(r.isRange());
+
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.evaluatingCells = &evaluating;
+
+    auto values = collectRangeValues(r.getRangeBounds(), ctx);
+    ASSERT_EQ(3, values.size());
+    EXPECT_TRUE(values[0].isNumber());
+    EXPECT_TRUE(values[1].isEmpty());  // Empty cell
+    EXPECT_TRUE(values[2].isNumber());
+}
+
+TEST_F(FormulaEvalTest, RangeIteration_MixedTypes) {
+    setCellValue(0, 0, 1.0);      // A1 = 1 (number)
+    setCellValue(0, 1, "hello");  // A2 = "hello" (string)
+    setCellValue(0, 2, true);     // A3 = TRUE (boolean)
+
+    EvalResult r = eval("=A1:A3");
+    ASSERT_TRUE(r.isRange());
+
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.evaluatingCells = &evaluating;
+
+    auto values = collectRangeValues(r.getRangeBounds(), ctx);
+    ASSERT_EQ(3, values.size());
+    EXPECT_TRUE(values[0].isNumber());
+    EXPECT_TRUE(values[1].isString());
+    EXPECT_TRUE(values[2].isBoolean());
+}
+
+TEST_F(FormulaEvalTest, WholeColumnIteration_PopulatedCells) {
+    setCellValue(0, 0, 1.0);   // A1 = 1
+    setCellValue(0, 4, 5.0);   // A5 = 5
+    setCellValue(0, 9, 10.0);  // A10 = 10
+
+    EvalResult r = eval("=A:A");
+    ASSERT_TRUE(r.isRange());
+
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.evaluatingCells = &evaluating;
+
+    auto values = collectRangeValues(r.getRangeBounds(), ctx);
+    // Only populated cells are returned for whole column refs
+    ASSERT_EQ(3, values.size());
+    EXPECT_DOUBLE_EQ(1.0, values[0].getNumber());
+    EXPECT_DOUBLE_EQ(5.0, values[1].getNumber());
+    EXPECT_DOUBLE_EQ(10.0, values[2].getNumber());
+}
+
+TEST_F(FormulaEvalTest, WholeRowIteration_PopulatedCells) {
+    setCellValue(0, 0, 1.0);   // A1 = 1
+    setCellValue(4, 0, 5.0);   // E1 = 5
+    setCellValue(9, 0, 10.0);  // J1 = 10
+
+    EvalResult r = eval("=1:1");
+    ASSERT_TRUE(r.isRange());
+
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.evaluatingCells = &evaluating;
+
+    auto values = collectRangeValues(r.getRangeBounds(), ctx);
+    // Only populated cells are returned for whole row refs
+    ASSERT_EQ(3, values.size());
+    EXPECT_DOUBLE_EQ(1.0, values[0].getNumber());
+    EXPECT_DOUBLE_EQ(5.0, values[1].getNumber());
+    EXPECT_DOUBLE_EQ(10.0, values[2].getNumber());
+}
+
+TEST_F(FormulaEvalTest, ColumnRangeIteration) {
+    setCellValue(0, 0, 1.0);  // A1 = 1
+    setCellValue(1, 0, 2.0);  // B1 = 2
+    setCellValue(2, 0, 3.0);  // C1 = 3
+    setCellValue(0, 1, 4.0);  // A2 = 4
+
+    EvalResult r = eval("=A:C");
+    ASSERT_TRUE(r.isRange());
+
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.evaluatingCells = &evaluating;
+
+    auto values = collectRangeValues(r.getRangeBounds(), ctx);
+    // Should get all 4 populated cells in row-major order
+    ASSERT_EQ(4, values.size());
+}
+
+TEST_F(FormulaEvalTest, RowRangeIteration) {
+    setCellValue(0, 0, 1.0);  // A1 = 1
+    setCellValue(1, 0, 2.0);  // B1 = 2
+    setCellValue(0, 1, 3.0);  // A2 = 3
+    setCellValue(0, 4, 4.0);  // A5 = 4
+
+    EvalResult r = eval("=1:5");
+    ASSERT_TRUE(r.isRange());
+
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.evaluatingCells = &evaluating;
+
+    auto values = collectRangeValues(r.getRangeBounds(), ctx);
+    // Should get all 4 populated cells in row-major order
+    ASSERT_EQ(4, values.size());
+}
+
+TEST_F(FormulaEvalTest, RangeSize_BoundedRange) {
+    EvalResult r = eval("=A1:C3");
+    ASSERT_TRUE(r.isRange());
+
+    size_t size = getRangeSize(r.getRangeBounds(), sheet);
+    EXPECT_EQ(9, size);  // 3x3 = 9 cells
+}
+
+TEST_F(FormulaEvalTest, RangeSize_EmptyWholeColumn) {
+    EvalResult r = eval("=Z:Z");
+    ASSERT_TRUE(r.isRange());
+
+    size_t size = getRangeSize(r.getRangeBounds(), sheet);
+    EXPECT_EQ(0, size);  // No populated cells in column Z
+}
+
+TEST_F(FormulaEvalTest, RangeSize_PopulatedWholeColumn) {
+    setCellValue(25, 0, 1.0);  // Z1 = 1
+    setCellValue(25, 5, 2.0);  // Z6 = 2
+
+    EvalResult r = eval("=Z:Z");
+    ASSERT_TRUE(r.isRange());
+
+    size_t size = getRangeSize(r.getRangeBounds(), sheet);
+    EXPECT_EQ(2, size);
+}
+
+// =============================================================================
+// RANGE TO SCALAR CONVERSION TESTS (should fail)
+// =============================================================================
+
+TEST_F(FormulaEvalTest, RangeToNumber_Error) {
+    EvalResult r = eval("=A1:A3");
+    ASSERT_TRUE(r.isRange());
+
+    EvalResult num = r.toNumber();
+    ASSERT_TRUE(num.isError());
+    EXPECT_EQ(CellError::VALUE, num.getError());
+}
+
+TEST_F(FormulaEvalTest, RangeToString_Error) {
+    EvalResult r = eval("=A1:A3");
+    ASSERT_TRUE(r.isRange());
+
+    EvalResult str = r.toString();
+    ASSERT_TRUE(str.isError());
+    EXPECT_EQ(CellError::VALUE, str.getError());
+}
+
+TEST_F(FormulaEvalTest, RangeToBoolean_Error) {
+    EvalResult r = eval("=A1:A3");
+    ASSERT_TRUE(r.isRange());
+
+    EvalResult b = r.toBoolean();
+    ASSERT_TRUE(b.isError());
+    EXPECT_EQ(CellError::VALUE, b.getError());
+}
+
+// =============================================================================
+// RANGE TYPE CHECKING TESTS
+// =============================================================================
+
+TEST(EvalResultTest, IsRange_True) {
+    RangeBounds bounds;
+    bounds.type = RangeType::CELL_RANGE;
+    EvalResult r = EvalResult::Range(bounds);
+    EXPECT_TRUE(r.isRange());
+    EXPECT_FALSE(r.isNumber());
+    EXPECT_FALSE(r.isString());
+    EXPECT_FALSE(r.isBoolean());
+    EXPECT_FALSE(r.isEmpty());
+    EXPECT_FALSE(r.isError());
+}
+
+TEST(EvalResultTest, CellRangeFactory) {
+    ID col1("col1____");
+    ID col2("col2____");
+    ID row1("row1____");
+    ID row2("row2____");
+
+    EvalResult r = EvalResult::CellRange(col1, col2, row1, row2);
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+    EXPECT_EQ(col1, r.getRangeBounds().startColId);
+    EXPECT_EQ(col2, r.getRangeBounds().endColId);
+    EXPECT_EQ(row1, r.getRangeBounds().startRowId);
+    EXPECT_EQ(row2, r.getRangeBounds().endRowId);
+}
+
+TEST(EvalResultTest, ColumnRangeFactory) {
+    ID col1("col1____");
+    ID col2("col2____");
+
+    EvalResult r = EvalResult::ColumnRange(col1, col2);
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::COLUMN_RANGE, r.getRangeBounds().type);
+    EXPECT_EQ(col1, r.getRangeBounds().startColId);
+    EXPECT_EQ(col2, r.getRangeBounds().endColId);
+}
+
+TEST(EvalResultTest, SingleColumnFactory) {
+    ID col("col_____");
+
+    EvalResult r = EvalResult::SingleColumn(col);
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::COLUMN, r.getRangeBounds().type);
+    EXPECT_EQ(col, r.getRangeBounds().startColId);
+    EXPECT_EQ(col, r.getRangeBounds().endColId);
+}
+
+TEST(EvalResultTest, RowRangeFactory) {
+    ID row1("row1____");
+    ID row2("row2____");
+
+    EvalResult r = EvalResult::RowRange(row1, row2);
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::ROW_RANGE, r.getRangeBounds().type);
+    EXPECT_EQ(row1, r.getRangeBounds().startRowId);
+    EXPECT_EQ(row2, r.getRangeBounds().endRowId);
+}
+
+TEST(EvalResultTest, SingleRowFactory) {
+    ID row("row_____");
+
+    EvalResult r = EvalResult::SingleRow(row);
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::ROW, r.getRangeBounds().type);
+    EXPECT_EQ(row, r.getRangeBounds().startRowId);
+    EXPECT_EQ(row, r.getRangeBounds().endRowId);
+}
+
 }  // namespace
 }  // namespace cells
