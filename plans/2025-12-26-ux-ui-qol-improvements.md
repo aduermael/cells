@@ -99,7 +99,7 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 - [x] 3h: Unit tests deferred (no test infrastructure in wasm app)
 
 ### UI Checkpoint 3
-- [ ] **USER APPROVAL REQUIRED:** Verify scrollbars appear, thumb resizes correctly, and scrolling works smoothly
+- [x] **USER APPROVED:** Scrollbars appear, thumb resizes correctly, and scrolling works smoothly
 
 ---
 
@@ -114,9 +114,9 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 
 ### Tasks
 
-- [ ] 4a: Update `#cell-reference` styles: increase `min-width` to ~90px for comfortable range display
-- [ ] 4b: Optionally use monospace font for consistent character width
-- [ ] 4c: Ensure text truncation with ellipsis for extreme cases
+- [x] 4a: Update `#cell-reference` styles: increase `min-width` to ~90px for comfortable range display
+- [x] 4b: Optionally use monospace font for consistent character width
+- [x] 4c: Ensure text truncation with ellipsis for extreme cases
 
 ### UI Checkpoint 4
 - [ ] **USER APPROVAL REQUIRED:** Verify cell reference button width is appropriate and doesn't resize excessively

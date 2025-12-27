@@ -266,13 +266,18 @@ canvas {
     padding: 4px 12px;
     font-size: 12px;
     font-weight: 500;
+    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
     border: 1px solid #dee2e6;
     border-radius: 4px;
     background: #fff;
     color: #495057;
     cursor: pointer;
     transition: all 0.15s ease;
-    min-width: 48px;
+    min-width: 90px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     text-align: center;
 }
 
