@@ -214,6 +214,36 @@ export class WasmDataSource {
   }
 
   // ==========================================================================
+  // Column/Row Insert/Delete Operations
+  // ==========================================================================
+
+  /** Insert a column at the specified position */
+  async insertColumnAt(
+    position: number,
+    insertBefore: boolean
+  ): Promise<{ id: string; position: number }> {
+    return this._client.insertColumnAt(position, insertBefore);
+  }
+
+  /** Insert a row at the specified position */
+  async insertRowAt(
+    position: number,
+    insertBefore: boolean
+  ): Promise<{ id: string; position: number }> {
+    return this._client.insertRowAt(position, insertBefore);
+  }
+
+  /** Delete a column by ID */
+  async deleteColumnById(colId: string): Promise<{ success: boolean }> {
+    return this._client.deleteColumnById(colId);
+  }
+
+  /** Delete a row by ID */
+  async deleteRowById(rowId: string): Promise<{ success: boolean }> {
+    return this._client.deleteRowById(rowId);
+  }
+
+  // ==========================================================================
   // Sheet Management
   // ==========================================================================
 

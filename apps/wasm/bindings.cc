@@ -1395,6 +1395,118 @@ public:
     }
 
     // ========================================================================
+    // Column/row insert/delete operations
+    // ========================================================================
+
+    // Insert a column at the specified position (0-indexed)
+    // If insertBefore is true, insert before the position; otherwise insert after
+    std::string insertColumnAt(uint32_t position, bool insertBefore) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        // Calculate the actual insertion position
+        uint32_t insertPos = insertBefore ? position : position + 1;
+
+        // Insert the column
+        Axis* newCol = sheet->insertColumnAt(insertPos);
+        if (!newCol) {
+            return "{\"error\":\"Failed to insert column\"}";
+        }
+
+        rebuildQuadtree();
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
+
+        return "{\"success\":true,\"id\":\"" + newCol->id.toString() + "\",\"position\":" +
+               std::to_string(newCol->position) + "}";
+    }
+
+    // Insert a row at the specified position (0-indexed)
+    // If insertBefore is true, insert before the position; otherwise insert after
+    std::string insertRowAt(uint32_t position, bool insertBefore) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        // Calculate the actual insertion position
+        uint32_t insertPos = insertBefore ? position : position + 1;
+
+        // Insert the row
+        Axis* newRow = sheet->insertRowAt(insertPos);
+        if (!newRow) {
+            return "{\"error\":\"Failed to insert row\"}";
+        }
+
+        rebuildQuadtree();
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
+
+        return "{\"success\":true,\"id\":\"" + newRow->id.toString() + "\",\"position\":" +
+               std::to_string(newRow->position) + "}";
+    }
+
+    // Delete a column by its ID
+    std::string deleteColumnById(const std::string& colIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        if (colIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid column ID\"}";
+        }
+        ID colId(colIdStr);
+
+        if (!sheet->deleteColumn(colId)) {
+            return "{\"error\":\"Column not found\"}";
+        }
+
+        rebuildQuadtree();
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
+
+        return "{\"success\":true}";
+    }
+
+    // Delete a row by its ID
+    std::string deleteRowById(const std::string& rowIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        if (rowIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid row ID\"}";
+        }
+        ID rowId(rowIdStr);
+
+        if (!sheet->deleteRow(rowId)) {
+            return "{\"error\":\"Row not found\"}";
+        }
+
+        rebuildQuadtree();
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
+
+        return "{\"success\":true}";
+    }
+
+    // ========================================================================
     // Export methods
     // ========================================================================
 
@@ -3056,6 +3168,11 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("moveRow", &cells::wasm::CellsEngine::moveRow)
         .function("shiftColumnsForEmptyMove", &cells::wasm::CellsEngine::shiftColumnsForEmptyMove)
         .function("shiftRowsForEmptyMove", &cells::wasm::CellsEngine::shiftRowsForEmptyMove)
+        // Column/row insert/delete
+        .function("insertColumnAt", &cells::wasm::CellsEngine::insertColumnAt)
+        .function("insertRowAt", &cells::wasm::CellsEngine::insertRowAt)
+        .function("deleteColumnById", &cells::wasm::CellsEngine::deleteColumnById)
+        .function("deleteRowById", &cells::wasm::CellsEngine::deleteRowById)
         // Export
         .function("exportToCells", &cells::wasm::CellsEngine::exportToCells)
         .function("exportToCSV", &cells::wasm::CellsEngine::exportToCSV)

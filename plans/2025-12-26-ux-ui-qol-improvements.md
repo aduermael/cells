@@ -3,7 +3,7 @@
 ```
 Status: IN_PROGRESS
 Created At: 2025-12-26 21:41 UTC
-Updated At: 2025-12-26 23:30 UTC
+Updated At: 2025-12-27 00:15 UTC
 Following plan management guidelines defined in AGENTS.md
 ```
 
@@ -145,7 +145,7 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 - [x] 5h: Test context menu positioning near screen edges
 
 ### UI Checkpoint 5
-- [ ] **USER APPROVAL REQUIRED:** Verify right-click shows a context menu at click position
+- [x] **USER APPROVED:** Context menu appears at click position, dismisses correctly
 
 ---
 
@@ -162,13 +162,13 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 
 ### Tasks
 
-- [ ] 6a: Add `insertColumn(pos, before)` and `deleteColumn(pos)` methods to `WasmDataSource`
-- [ ] 6b: Add `insertRow(pos, before)` and `deleteRow(pos)` methods to `WasmDataSource`
-- [ ] 6c: Implement C++ engine functions `insertColumnAt()`, `deleteColumnAt()`, `insertRowAt()`, `deleteRowAt()`
-- [ ] 6d: Add column context menu items: "Insert column left", "Insert column right", "Delete column"
-- [ ] 6e: Add row context menu items: "Insert row above", "Insert row below", "Delete row"
-- [ ] 6f: Wire up context menu actions to WASM functions
-- [ ] 6g: Add tests for column/row insertion and deletion
+- [x] 6a: Add `insertColumn(pos, before)` and `deleteColumn(pos)` methods to `WasmDataSource`
+- [x] 6b: Add `insertRow(pos, before)` and `deleteRow(pos)` methods to `WasmDataSource`
+- [x] 6c: C++ engine functions already existed in model.cc; added WASM bindings in bindings.cc
+- [x] 6d: Add column context menu items: "Insert column left", "Insert column right", "Delete column"
+- [x] 6e: Add row context menu items: "Insert row above", "Insert row below", "Delete row"
+- [x] 6f: Wire up context menu actions to WASM functions
+- [ ] 6g: Add tests for column/row insertion and deletion (deferred - needs test infrastructure)
 
 ### UI Checkpoint 6
 - [ ] **USER APPROVAL REQUIRED:** Verify right-click on columns/rows shows correct options and actions work

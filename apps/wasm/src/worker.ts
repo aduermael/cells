@@ -59,6 +59,10 @@ interface CellsEngine {
   moveRow(rowId: string, targetPos: number): string;
   shiftColumnsForEmptyMove(sourcePos: number, targetPos: number): string;
   shiftRowsForEmptyMove(sourcePos: number, targetPos: number): string;
+  insertColumnAt(position: number, insertBefore: boolean): string;
+  insertRowAt(position: number, insertBefore: boolean): string;
+  deleteColumnById(colId: string): string;
+  deleteRowById(rowId: string): string;
 
   // Export
   exportToCells(): string;
@@ -597,6 +601,70 @@ function handleMessage(msg: WorkerRequest): void {
           respond({ type: "error", error: result.error });
         } else {
           respond({ type: "rowsShifted", success: true });
+        }
+        break;
+      }
+
+      case "insertColumnAt": {
+        const { position, insertBefore } = params as {
+          position: number;
+          insertBefore: boolean;
+        };
+        const result = JSON.parse(
+          engine.insertColumnAt(position, insertBefore)
+        ) as JsonResult;
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({
+            type: "columnInserted",
+            id: result.id,
+            position: result.position,
+            success: true,
+          });
+        }
+        break;
+      }
+
+      case "insertRowAt": {
+        const { position, insertBefore } = params as {
+          position: number;
+          insertBefore: boolean;
+        };
+        const result = JSON.parse(
+          engine.insertRowAt(position, insertBefore)
+        ) as JsonResult;
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({
+            type: "rowInserted",
+            id: result.id,
+            position: result.position,
+            success: true,
+          });
+        }
+        break;
+      }
+
+      case "deleteColumnById": {
+        const { colId } = params as { colId: string };
+        const result = JSON.parse(engine.deleteColumnById(colId)) as JsonResult;
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({ type: "columnDeleted", success: true });
+        }
+        break;
+      }
+
+      case "deleteRowById": {
+        const { rowId } = params as { rowId: string };
+        const result = JSON.parse(engine.deleteRowById(rowId)) as JsonResult;
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({ type: "rowDeleted", success: true });
         }
         break;
       }

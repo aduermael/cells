@@ -1112,59 +1112,78 @@ export class AppEventManager {
    */
   private buildContextMenuItems(context: ContextType): ContextMenuEntry[] {
     const items: ContextMenuEntry[] = [];
+    const { getDataSource, fetchViewportNow, render } = this.config;
 
     switch (context.type) {
       case "column-header":
-        // Column header context menu - will be expanded in Phase 6
+        // Column header context menu
         items.push({
           label: "Insert column left",
-          action: () => {
-            console.log("Insert column left:", context.col);
+          action: async () => {
+            const ds = getDataSource();
+            if (!ds) return;
+            await ds.insertColumnAt(context.col, true);
+            fetchViewportNow();
+            render();
           },
-          disabled: true,
         });
         items.push({
           label: "Insert column right",
-          action: () => {
-            console.log("Insert column right:", context.col);
+          action: async () => {
+            const ds = getDataSource();
+            if (!ds) return;
+            await ds.insertColumnAt(context.col, false);
+            fetchViewportNow();
+            render();
           },
-          disabled: true,
         });
         items.push({ type: "separator" });
         items.push({
           label: "Delete column",
-          action: () => {
-            console.log("Delete column:", context.col);
+          action: async () => {
+            const ds = getDataSource();
+            if (!ds) return;
+            await ds.deleteColumnById(context.colId);
+            fetchViewportNow();
+            render();
           },
           danger: true,
-          disabled: true,
         });
         break;
 
       case "row-header":
-        // Row header context menu - will be expanded in Phase 6
+        // Row header context menu
         items.push({
           label: "Insert row above",
-          action: () => {
-            console.log("Insert row above:", context.row);
+          action: async () => {
+            const ds = getDataSource();
+            if (!ds) return;
+            await ds.insertRowAt(context.row, true);
+            fetchViewportNow();
+            render();
           },
-          disabled: true,
         });
         items.push({
           label: "Insert row below",
-          action: () => {
-            console.log("Insert row below:", context.row);
+          action: async () => {
+            const ds = getDataSource();
+            if (!ds) return;
+            await ds.insertRowAt(context.row, false);
+            fetchViewportNow();
+            render();
           },
-          disabled: true,
         });
         items.push({ type: "separator" });
         items.push({
           label: "Delete row",
-          action: () => {
-            console.log("Delete row:", context.row);
+          action: async () => {
+            const ds = getDataSource();
+            if (!ds) return;
+            await ds.deleteRowById(context.rowId);
+            fetchViewportNow();
+            render();
           },
           danger: true,
-          disabled: true,
         });
         break;
 
