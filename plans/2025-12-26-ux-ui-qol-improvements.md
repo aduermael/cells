@@ -119,7 +119,7 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 - [x] 4c: Ensure text truncation with ellipsis for extreme cases
 
 ### UI Checkpoint 4
-- [ ] **USER APPROVAL REQUIRED:** Verify cell reference button width is appropriate and doesn't resize excessively
+- [x] **USER APPROVED:** Cell reference button width is appropriate with monospace font and ellipsis truncation
 
 ---
 
@@ -135,14 +135,14 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 
 ### Tasks
 
-- [ ] 5a: Create `context-menu.ts` with `ContextMenu` class and `ContextMenuManager` singleton
-- [ ] 5b: Define `ContextMenuItem` interface with label, action, icon, disabled state, and danger flag
-- [ ] 5c: Add context menu HTML structure and CSS styles (positioned absolutely at click location)
-- [ ] 5d: Add `contextmenu` event listener to canvas and prevent default
-- [ ] 5e: Implement `showContextMenu(x, y, items[])` and `hideContextMenu()` methods
-- [ ] 5f: Close menu on click outside, Escape key, or scroll
-- [ ] 5g: Add animation for menu appearance (fade in, slight translate)
-- [ ] 5h: Test context menu positioning near screen edges
+- [x] 5a: Create `context-menu.ts` with `ContextMenu` class and `ContextMenuManager` singleton
+- [x] 5b: Define `ContextMenuItem` interface with label, action, icon, disabled state, and danger flag
+- [x] 5c: Add context menu HTML structure and CSS styles (positioned absolutely at click location)
+- [x] 5d: Add `contextmenu` event listener to canvas and prevent default
+- [x] 5e: Implement `showContextMenu(x, y, items[])` and `hideContextMenu()` methods
+- [x] 5f: Close menu on click outside, Escape key, or scroll
+- [x] 5g: Add animation for menu appearance (fade in, slight translate)
+- [x] 5h: Test context menu positioning near screen edges
 
 ### UI Checkpoint 5
 - [ ] **USER APPROVAL REQUIRED:** Verify right-click shows a context menu at click position

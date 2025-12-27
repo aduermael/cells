@@ -28,6 +28,12 @@ import type { CellEditor } from "./cell-editor";
 import type { ColumnHeaderEditor, FormulaBarEditor } from "./header-editor";
 import type { PresenceBroadcaster } from "./presence-broadcast";
 import { colToLetter } from "./grid-utils";
+import {
+  showContextMenu,
+  hideContextMenu,
+  type ContextMenuEntry,
+  type ContextType,
+} from "./context-menu";
 
 // =============================================================================
 // Types
@@ -304,6 +310,9 @@ export class AppEventManager {
     canvas.addEventListener("mouseup", (e) => this.handleMouseUp(e));
     canvas.addEventListener("mouseleave", () => this.handleMouseLeave());
     canvas.addEventListener("dblclick", (e) => this.handleDblClick(e));
+
+    // Context menu (right-click)
+    canvas.addEventListener("contextmenu", (e) => this.handleContextMenu(e));
   }
 
   private handleWheel(e: WheelEvent): void {
@@ -979,6 +988,228 @@ export class AppEventManager {
         cellEditor.startEditing({ mode: "append" });
       }
     }
+  }
+
+  // =========================================================================
+  // Context Menu
+  // =========================================================================
+
+  private handleContextMenu(e: MouseEvent): void {
+    e.preventDefault();
+
+    const {
+      canvas,
+      getSheetInfo,
+      getScrollX,
+      getScrollY,
+      getColWidths,
+      getRowHeights,
+      getColumns,
+      getRows,
+    } = this.config;
+
+    const sheetInfo = getSheetInfo();
+    if (!sheetInfo) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const scrollX = getScrollX();
+    const scrollY = getScrollY();
+    const colWidths = getColWidths();
+    const rowHeights = getRowHeights();
+
+    // Determine what was right-clicked
+    const context = this.getContextAtPosition(
+      x,
+      y,
+      scrollX,
+      scrollY,
+      colWidths,
+      rowHeights,
+      sheetInfo
+    );
+
+    // Build menu items based on context
+    const items = this.buildContextMenuItems(context);
+
+    if (items.length > 0) {
+      showContextMenu(e.clientX, e.clientY, items);
+    }
+  }
+
+  /**
+   * Determine what element is at the given position
+   */
+  private getContextAtPosition(
+    x: number,
+    y: number,
+    scrollX: number,
+    scrollY: number,
+    colWidths: Map<number, number>,
+    rowHeights: Map<number, number>,
+    sheetInfo: SheetInfo
+  ): ContextType {
+    const { getColumns, getRows, getDiscoveredRows } = this.config;
+
+    // Corner (top-left area)
+    if (x <= HEADER_WIDTH && y <= HEADER_HEIGHT) {
+      return { type: "corner" };
+    }
+
+    // Column header
+    if (y <= HEADER_HEIGHT && x > HEADER_WIDTH) {
+      const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+      if (col >= 0) {
+        const columns = getColumns();
+        const colId = getColumnId(col, columns);
+        return { type: "column-header", col, colId };
+      }
+      return { type: "empty" };
+    }
+
+    // Row header
+    if (x <= HEADER_WIDTH && y > HEADER_HEIGHT) {
+      const discoveredRows = getDiscoveredRows();
+      const row = getRowAtY(
+        y,
+        scrollY,
+        rowHeights,
+        Math.max(sheetInfo.rowCount, discoveredRows)
+      );
+      if (row >= 0) {
+        const rows = getRows();
+        const rowId = getRowId(row, rows);
+        return { type: "row-header", row, rowId };
+      }
+      return { type: "empty" };
+    }
+
+    // Cell area
+    if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+      const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+      const discoveredRows = getDiscoveredRows();
+      const row = getRowAtY(
+        y,
+        scrollY,
+        rowHeights,
+        Math.max(sheetInfo.rowCount, discoveredRows)
+      );
+      if (col >= 0 && row >= 0) {
+        const columns = getColumns();
+        const rows = getRows();
+        const colId = getColumnId(col, columns);
+        const rowId = getRowId(row, rows);
+        return { type: "cell", col, row, colId, rowId };
+      }
+    }
+
+    return { type: "empty" };
+  }
+
+  /**
+   * Build context menu items based on what was right-clicked
+   */
+  private buildContextMenuItems(context: ContextType): ContextMenuEntry[] {
+    const items: ContextMenuEntry[] = [];
+
+    switch (context.type) {
+      case "column-header":
+        // Column header context menu - will be expanded in Phase 6
+        items.push({
+          label: "Insert column left",
+          action: () => {
+            console.log("Insert column left:", context.col);
+          },
+          disabled: true,
+        });
+        items.push({
+          label: "Insert column right",
+          action: () => {
+            console.log("Insert column right:", context.col);
+          },
+          disabled: true,
+        });
+        items.push({ type: "separator" });
+        items.push({
+          label: "Delete column",
+          action: () => {
+            console.log("Delete column:", context.col);
+          },
+          danger: true,
+          disabled: true,
+        });
+        break;
+
+      case "row-header":
+        // Row header context menu - will be expanded in Phase 6
+        items.push({
+          label: "Insert row above",
+          action: () => {
+            console.log("Insert row above:", context.row);
+          },
+          disabled: true,
+        });
+        items.push({
+          label: "Insert row below",
+          action: () => {
+            console.log("Insert row below:", context.row);
+          },
+          disabled: true,
+        });
+        items.push({ type: "separator" });
+        items.push({
+          label: "Delete row",
+          action: () => {
+            console.log("Delete row:", context.row);
+          },
+          danger: true,
+          disabled: true,
+        });
+        break;
+
+      case "cell":
+        // Cell context menu - basic items for now
+        items.push({
+          label: "Cut",
+          action: () => {
+            console.log("Cut cell:", context.col, context.row);
+          },
+          disabled: true,
+        });
+        items.push({
+          label: "Copy",
+          action: () => {
+            console.log("Copy cell:", context.col, context.row);
+          },
+          disabled: true,
+        });
+        items.push({
+          label: "Paste",
+          action: () => {
+            console.log("Paste at:", context.col, context.row);
+          },
+          disabled: true,
+        });
+        break;
+
+      case "corner":
+        // Select all - placeholder
+        items.push({
+          label: "Select all",
+          action: () => {
+            console.log("Select all");
+          },
+          disabled: true,
+        });
+        break;
+
+      case "empty":
+        // No menu for empty areas
+        break;
+    }
+
+    return items;
   }
 
   // =========================================================================

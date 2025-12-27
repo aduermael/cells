@@ -1250,3 +1250,98 @@ canvas {
     border-top: 1px solid #dee2e6;
     z-index: 50;
 }
+
+/* ============================================================================
+   Context Menu (right-click menu)
+   ============================================================================ */
+
+.context-menu {
+    position: fixed;
+    min-width: 160px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+    z-index: 2000;
+    padding: 4px 0;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px) scale(0.98);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+}
+
+.context-menu.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 400;
+    color: #212529;
+    background: none;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    gap: 8px;
+}
+
+.context-menu-item:hover {
+    background: #f8f9fa;
+}
+
+.context-menu-item:active {
+    background: #e9ecef;
+}
+
+.context-menu-item.disabled {
+    color: #adb5bd;
+    cursor: not-allowed;
+}
+
+.context-menu-item.disabled:hover {
+    background: none;
+}
+
+.context-menu-item.danger {
+    color: #dc3545;
+}
+
+.context-menu-item.danger:hover {
+    background: #fff5f5;
+}
+
+.context-menu-item.first {
+    border-radius: 6px 6px 0 0;
+}
+
+.context-menu-item.last {
+    border-radius: 0 0 6px 6px;
+}
+
+.context-menu-item.first.last {
+    border-radius: 6px;
+}
+
+.context-menu-icon {
+    font-size: 14px;
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.context-menu-label {
+    flex: 1;
+}
+
+.context-menu-separator {
+    height: 1px;
+    background: #e9ecef;
+    margin: 4px 0;
+}
