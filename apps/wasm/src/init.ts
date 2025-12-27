@@ -211,30 +211,24 @@ export function initApp(): AppContext {
         },
       }
     );
-    // Initially hidden until a file is loaded
-    app.scrollbarManager.setVisible(false);
+    // Scrollbars are always visible
+    app.scrollbarManager.setVisible(true);
   }
 
-  /** Update scrollbar positions and visibility */
+  /** Update scrollbar positions and thumb sizes */
   function updateScrollbars(): void {
     if (!app.scrollbarManager) return;
 
-    // Show scrollbars only when a file is loaded
-    const hasFile = app.hasFileLoaded && app.sheetInfo !== null;
-    app.scrollbarManager.setVisible(hasFile);
-
-    if (hasFile) {
-      // Update discovered rows based on current scroll
-      const viewportHeight = elements.canvas.clientHeight - HEADER_HEIGHT;
-      const actualRows = app.sheetInfo?.rowCount ?? 100;
-      app.discoveredRows = calculateDiscoveredRows(
-        app.scrollY,
-        viewportHeight,
-        app.discoveredRows,
-        actualRows
-      );
-      app.scrollbarManager.update();
-    }
+    // Update discovered rows based on current scroll
+    const viewportHeight = elements.canvas.clientHeight - HEADER_HEIGHT;
+    const actualRows = app.sheetInfo?.rowCount ?? 100;
+    app.discoveredRows = calculateDiscoveredRows(
+      app.scrollY,
+      viewportHeight,
+      app.discoveredRows,
+      actualRows
+    );
+    app.scrollbarManager.update();
   }
 
   // =========================================================================
