@@ -429,19 +429,50 @@ static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
         return EvalResult::Error(CellError::REF);
     }
 
-    // Look up columns by name - columns must exist
-    const Axis* startCol = ctx.sheet->getColumnByName(node->topLeft->column);
-    const Axis* endCol = ctx.sheet->getColumnByName(node->bottomRight->column);
+    // Try to look up columns using resolved cell IDs first (from UUID formula),
+    // then fall back to column name lookup (for A1 notation formulas)
+    const Axis* startCol = nullptr;
+    const Axis* endCol = nullptr;
+    uint32_t startRowPos = 0;
+    uint32_t endRowPos = 0;
 
-    // For columns, we need Axis objects since we identify columns by name
+    // Try resolved cell IDs first
+    if (!node->topLeft->cellId.empty()) {
+        const Cell* startCell = ctx.sheet->getCell(ID(node->topLeft->cellId));
+        if (startCell) {
+            startCol = ctx.sheet->getColumn(startCell->colId);
+            const Axis* startRow = ctx.sheet->getRow(startCell->rowId);
+            if (startRow) {
+                startRowPos = startRow->position;
+            }
+        }
+    }
+    if (!node->bottomRight->cellId.empty()) {
+        const Cell* endCell = ctx.sheet->getCell(ID(node->bottomRight->cellId));
+        if (endCell) {
+            endCol = ctx.sheet->getColumn(endCell->colId);
+            const Axis* endRow = ctx.sheet->getRow(endCell->rowId);
+            if (endRow) {
+                endRowPos = endRow->position;
+            }
+        }
+    }
+
+    // Fall back to column name lookup if cell IDs weren't resolved
+    if (!startCol) {
+        startCol = ctx.sheet->getColumnByName(node->topLeft->column);
+        // Use row position from AST (1-based in AST, 0-based for storage)
+        startRowPos = static_cast<uint32_t>(node->topLeft->row - 1);
+    }
+    if (!endCol) {
+        endCol = ctx.sheet->getColumnByName(node->bottomRight->column);
+        endRowPos = static_cast<uint32_t>(node->bottomRight->row - 1);
+    }
+
+    // Columns must exist
     if (!startCol || !endCol) {
         return EvalResult::Error(CellError::REF);
     }
-
-    // For rows, use positions directly from AST (1-based in AST, 0-based for storage)
-    // This allows ranges to work even if row Axis objects don't exist yet
-    auto startRowPos = static_cast<uint32_t>(node->topLeft->row - 1);
-    auto endRowPos = static_cast<uint32_t>(node->bottomRight->row - 1);
 
     // Ensure proper ordering (swap if needed)
     ID startColId = startCol->id;
