@@ -171,7 +171,7 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 - [ ] 6g: Add tests for column/row insertion and deletion (deferred - needs test infrastructure)
 
 ### UI Checkpoint 6
-- [ ] **USER APPROVAL REQUIRED:** Verify right-click on columns/rows shows correct options and actions work
+- [x] **USER APPROVED:** Column/row insert and delete via context menu works correctly
 
 ---
 
