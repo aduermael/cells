@@ -27,6 +27,8 @@ export interface HeaderRendererState {
   dragSourceIndex: number;
   dragTargetIndex: number;
   editingColumnIndex: number;
+  /** Virtual scrolling: discovered row count */
+  discoveredRows: number;
 }
 
 /**
@@ -155,11 +157,18 @@ export function drawColumnHeaders(
   ctx.fillStyle = COLORS.headerBg;
   ctx.fillRect(HEADER_WIDTH, 0, viewWidth - HEADER_WIDTH, HEADER_HEIGHT);
 
+  // Calculate visible column range - only iterate through visible columns
+  const startCol = Math.max(0, Math.floor(state.scrollX / DEFAULT_COL_WIDTH) - 1);
+  const endCol = Math.min(
+    state.sheetInfo.colCount,
+    startCol + Math.ceil(viewWidth / DEFAULT_COL_WIDTH) + 2
+  );
+
   ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  for (let col = 0; col < state.sheetInfo.colCount; col++) {
+  for (let col = startCol; col < endCol; col++) {
     if (colHasMoved && col === state.dragSourceIndex) continue;
     const colW = state.colWidths.get(col) || DEFAULT_COL_WIDTH;
     const headerX = getDragAdjustedColX(col, state);
@@ -193,20 +202,13 @@ export function drawColumnHeaders(
         headerX + colW / 2,
         HEADER_HEIGHT / 2
       );
-    } else {
-      console.log(
-        "Skipping header text for col",
-        col,
-        "editingColumnIndex =",
-        state.editingColumnIndex
-      );
     }
   }
 
   // Column header separators (vertical lines between A, B, C...)
   ctx.strokeStyle = COLORS.headerSeparator;
   ctx.lineWidth = 1;
-  for (let col = 0; col < state.sheetInfo.colCount; col++) {
+  for (let col = startCol; col < endCol; col++) {
     if (colHasMoved && col === state.dragSourceIndex) continue;
     const lineX = getDragAdjustedColX(col, state) + 0.5;
     if (lineX > HEADER_WIDTH && lineX < viewWidth) {
@@ -233,7 +235,21 @@ export function drawRowHeaders(
   ctx.fillStyle = COLORS.headerBg;
   ctx.fillRect(0, HEADER_HEIGHT, HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
 
-  for (let row = 0; row < state.sheetInfo.rowCount; row++) {
+  // Use discoveredRows for virtual scrolling
+  const rowCount = Math.max(state.sheetInfo.rowCount, state.discoveredRows);
+
+  // Calculate visible row range - only iterate through visible rows
+  const startRow = Math.max(0, Math.floor(state.scrollY / DEFAULT_ROW_HEIGHT) - 1);
+  const endRow = Math.min(
+    rowCount,
+    startRow + Math.ceil(viewHeight / DEFAULT_ROW_HEIGHT) + 2
+  );
+
+  ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (let row = startRow; row < endRow; row++) {
     if (rowHasMoved && row === state.dragSourceIndex) continue;
     const rowH = state.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
     const headerY = getDragAdjustedRowY(row, state);
@@ -266,7 +282,7 @@ export function drawRowHeaders(
   // Row header separators (horizontal lines between 1, 2, 3...)
   ctx.strokeStyle = COLORS.headerSeparator;
   ctx.lineWidth = 1;
-  for (let row = 0; row < state.sheetInfo.rowCount; row++) {
+  for (let row = startRow; row < endRow; row++) {
     if (rowHasMoved && row === state.dragSourceIndex) continue;
     const lineY = getDragAdjustedRowY(row, state) + 0.5;
     if (lineY > HEADER_HEIGHT && lineY < viewHeight) {

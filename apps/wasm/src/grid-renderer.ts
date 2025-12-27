@@ -93,6 +93,9 @@ export class GridRenderer {
   // Remote presence state
   remotePresence: RemotePresenceRender[] = [];
 
+  // Virtual scrolling: discovered row count (for drawing rows beyond sheetInfo.rowCount)
+  discoveredRows = 100;
+
   // Formula reference highlights state
   formulaHighlights: FormulaHighlight[] = [];
 
@@ -171,6 +174,7 @@ export class GridRenderer {
       dragSourceIndex: this.dragSourceIndex,
       dragTargetIndex: this.dragTargetIndex,
       editingColumnIndex: this.editingColumnIndex,
+      discoveredRows: this.discoveredRows,
     };
   }
 
@@ -290,8 +294,15 @@ export class GridRenderer {
     ctx.strokeStyle = COLORS.gridLine;
     ctx.lineWidth = 1;
 
-    // Vertical lines
-    for (let col = 0; col <= this.sheetInfo.colCount; col++) {
+    // Calculate visible column range (approximate, then refine)
+    const startCol = Math.max(0, Math.floor(this.scrollX / DEFAULT_COL_WIDTH) - 1);
+    const endCol = Math.min(
+      this.sheetInfo.colCount,
+      startCol + Math.ceil(viewWidth / DEFAULT_COL_WIDTH) + 2
+    );
+
+    // Vertical lines - only iterate through visible columns
+    for (let col = startCol; col <= endCol; col++) {
       if (colHasMoved && col === this.dragSourceIndex) continue;
       const lineX = getColX(col, headerState) + 0.5;
       if (lineX >= HEADER_WIDTH && lineX < viewWidth) {
@@ -302,8 +313,16 @@ export class GridRenderer {
       }
     }
 
-    // Horizontal lines
-    for (let row = 0; row <= this.sheetInfo.rowCount; row++) {
+    // Calculate visible row range
+    const rowCount = Math.max(this.sheetInfo.rowCount, this.discoveredRows);
+    const startRow = Math.max(0, Math.floor(this.scrollY / DEFAULT_ROW_HEIGHT) - 1);
+    const endRow = Math.min(
+      rowCount,
+      startRow + Math.ceil(viewHeight / DEFAULT_ROW_HEIGHT) + 2
+    );
+
+    // Horizontal lines - only iterate through visible rows
+    for (let row = startRow; row <= endRow; row++) {
       if (rowHasMoved && row === this.dragSourceIndex) continue;
       const lineY = getRowY(row, headerState) + 0.5;
       if (lineY >= HEADER_HEIGHT && lineY < viewHeight) {

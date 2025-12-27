@@ -191,14 +191,14 @@ export class AppEventManager {
   }
 
   /**
-   * Get the active formula input element
+   * Get the active formula display element (contenteditable for focus)
    */
-  private getActiveFormulaInput(): HTMLInputElement | null {
+  private getActiveFormulaDisplay(): HTMLElement | null {
     const { cellEditor, formulaBarEditor } = this.config;
     if (cellEditor.isFormulaMode()) {
-      return cellEditor.getInputElement();
+      return cellEditor.getDisplayElement();
     } else if (formulaBarEditor.isFormulaMode()) {
-      return formulaBarEditor.getInputElement();
+      return formulaBarEditor.getDisplayElement();
     }
     return null;
   }
@@ -209,17 +209,17 @@ export class AppEventManager {
   private insertFormulaReference(ref: string, position: Position): void {
     const { cellEditor, formulaBarEditor, render } = this.config;
 
-    const input = this.getActiveFormulaInput();
-    if (!input) return;
-
-    const cursorStart = input.selectionStart ?? input.value.length;
+    // Get cursor position from the editor's tracking BEFORE insertion
+    let cursorStart = 0;
 
     if (cellEditor.isFormulaMode()) {
+      cursorStart = cellEditor.getLastKnownCursorPos().start;
       cellEditor.insertReferenceAtCursor(ref);
-      cellEditor.getInputElement().focus();
+      cellEditor.getDisplayElement().focus();
     } else if (formulaBarEditor.isFormulaMode()) {
+      cursorStart = formulaBarEditor.getLastKnownCursorPos().start;
       formulaBarEditor.insertReferenceAtCursor(ref);
-      formulaBarEditor.getInputElement().focus();
+      formulaBarEditor.getDisplayElement().focus();
     }
 
     // Track this reference for potential shift+click range extension
@@ -240,10 +240,10 @@ export class AppEventManager {
 
     if (cellEditor.isFormulaMode()) {
       cellEditor.insertReferenceAtCursor(ref);
-      cellEditor.getInputElement().focus();
+      cellEditor.getDisplayElement().focus();
     } else if (formulaBarEditor.isFormulaMode()) {
       formulaBarEditor.insertReferenceAtCursor(ref);
-      formulaBarEditor.getInputElement().focus();
+      formulaBarEditor.getDisplayElement().focus();
     }
 
     render();
@@ -257,42 +257,30 @@ export class AppEventManager {
 
     if (!this.lastFormulaRef) return;
 
-    const input = this.getActiveFormulaInput();
-    if (!input) return;
-
     const startCol = colToLetter(this.lastFormulaRef.position.col);
     const startRow = this.lastFormulaRef.position.row + 1;
     const endColLetter = colToLetter(endCol);
     const endRowNum = endRow + 1;
     const rangeRef = `${startCol}${startRow}:${endColLetter}${endRowNum}`;
 
-    // Select and replace the previous reference
-    const before = input.value.slice(0, this.lastFormulaRef.cursorStart);
-    const after = input.value.slice(this.lastFormulaRef.cursorEnd);
-    input.value = before + rangeRef + after;
-
-    // Update cursor position
-    const newCursorEnd = this.lastFormulaRef.cursorStart + rangeRef.length;
-    input.setSelectionRange(newCursorEnd, newCursorEnd);
-
-    // Sync with the other editor
+    // Use the editor's replaceReferenceAtPosition method which handles all updates
     if (cellEditor.isFormulaMode()) {
-      const formulaInput = formulaBarEditor.getInputElement();
-      formulaInput.value = input.value;
+      cellEditor.replaceReferenceAtPosition(
+        this.lastFormulaRef.cursorStart,
+        this.lastFormulaRef.cursorEnd,
+        rangeRef
+      );
     } else if (formulaBarEditor.isFormulaMode()) {
-      const cellInput = cellEditor.getInputElement();
-      if (cellInput.style.display === "block") {
-        cellInput.value = input.value;
-      }
+      formulaBarEditor.replaceReferenceAtPosition(
+        this.lastFormulaRef.cursorStart,
+        this.lastFormulaRef.cursorEnd,
+        rangeRef
+      );
     }
 
-    // Trigger highlight update by dispatching an input event
-    input.dispatchEvent(new Event("input", { bubbles: true }));
+    // Update tracked reference to the new range end position
+    this.lastFormulaRef.cursorEnd = this.lastFormulaRef.cursorStart + rangeRef.length;
 
-    // Update tracked reference to the new range
-    this.lastFormulaRef.cursorEnd = newCursorEnd;
-
-    input.focus();
     render();
   }
 
@@ -472,7 +460,8 @@ export class AppEventManager {
 
     // Row header click (select, pending drag, or insert reference)
     if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
-      const row = getRowAtY(y, scrollY, rowHeights, sheetInfo.rowCount);
+      const discoveredRows = this.config.getDiscoveredRows();
+      const row = getRowAtY(y, scrollY, rowHeights, Math.max(sheetInfo.rowCount, discoveredRows));
       if (row >= 0) {
         // Check if in formula editing mode - insert row reference instead of selecting
         if (this.isInFormulaEditingMode()) {
@@ -509,7 +498,8 @@ export class AppEventManager {
     // Cell selection or insert reference
     if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
       const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
-      const row = getRowAtY(y, scrollY, rowHeights, sheetInfo.rowCount);
+      const discoveredRows = this.config.getDiscoveredRows();
+      const row = getRowAtY(y, scrollY, rowHeights, Math.max(sheetInfo.rowCount, discoveredRows));
 
       if (col >= 0 && row >= 0) {
         // Check if in formula editing mode - insert cell reference instead of selecting
@@ -599,7 +589,8 @@ export class AppEventManager {
     // Handle drag selection during formula editing (click+drag to select range)
     if (this.formulaDragStart && this.isInFormulaEditingMode() && x > HEADER_WIDTH && y > HEADER_HEIGHT) {
       const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
-      const row = getRowAtY(y, scrollY, rowHeights, sheetInfo.rowCount);
+      const discoveredRows = this.config.getDiscoveredRows();
+      const row = getRowAtY(y, scrollY, rowHeights, Math.max(sheetInfo.rowCount, discoveredRows));
       if (col >= 0 && row >= 0) {
         // Only update if moved to a different cell
         if (col !== this.formulaDragStart.col || row !== this.formulaDragStart.row) {
@@ -654,7 +645,8 @@ export class AppEventManager {
     // Range selection drag
     if (uiStateMachine.isInState("SELECTING") && x > HEADER_WIDTH && y > HEADER_HEIGHT) {
       const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
-      const row = getRowAtY(y, scrollY, rowHeights, sheetInfo.rowCount);
+      const discoveredRows = this.config.getDiscoveredRows();
+      const row = getRowAtY(y, scrollY, rowHeights, Math.max(sheetInfo.rowCount, discoveredRows));
       if (col >= 0 && row >= 0) {
         const selEnd = getSelectionEnd();
         // Only update if position changed
@@ -746,10 +738,10 @@ export class AppEventManager {
     // End formula drag selection (if active)
     if (this.formulaDragStart) {
       this.formulaDragStart = null;
-      // Refocus the input element after drag
-      const input = this.getActiveFormulaInput();
-      if (input) {
-        input.focus();
+      // Refocus the display element (contenteditable) after drag/click
+      const display = this.getActiveFormulaDisplay();
+      if (display) {
+        display.focus();
       }
     }
 
@@ -973,7 +965,8 @@ export class AppEventManager {
     // Double-click on cell: start cell editing
     if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
       const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
-      const row = getRowAtY(y, scrollY, rowHeights, sheetInfo.rowCount);
+      const discoveredRows = this.config.getDiscoveredRows();
+      const row = getRowAtY(y, scrollY, rowHeights, Math.max(sheetInfo.rowCount, discoveredRows));
 
       if (col >= 0 && row >= 0) {
         setSelectedCell({ col, row });
@@ -1044,10 +1037,12 @@ export class AppEventManager {
         newRow = Math.max(0, currentEnd.row - 1);
         handled = true;
         break;
-      case "ArrowDown":
-        newRow = Math.min(sheetInfo.rowCount - 1, currentEnd.row + 1);
+      case "ArrowDown": {
+        const discoveredRows = this.config.getDiscoveredRows();
+        newRow = Math.min(Math.max(sheetInfo.rowCount, discoveredRows) - 1, currentEnd.row + 1);
         handled = true;
         break;
+      }
       case "ArrowLeft":
         newCol = Math.max(0, currentEnd.col - 1);
         handled = true;
@@ -1072,18 +1067,21 @@ export class AppEventManager {
         e.preventDefault();
         cellEditor.startEditing({ mode: "select" });
         return;
-      case "Enter":
+      case "Enter": {
         // Enter just moves down (Shift+Enter moves up) - no edit mode
         e.preventDefault();
         isExtendingSelection = false; // Enter/Shift+Enter doesn't extend selection
+        const discoveredRows = this.config.getDiscoveredRows();
+        const maxRow = Math.max(sheetInfo.rowCount, discoveredRows) - 1;
         if (e.shiftKey) {
           newRow = Math.max(0, selectedCell.row - 1);
         } else {
-          newRow = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
+          newRow = Math.min(maxRow, selectedCell.row + 1);
         }
         newCol = selectedCell.col;
         handled = true;
         break;
+      }
       case "Delete":
       case "Backspace":
         e.preventDefault();

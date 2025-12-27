@@ -126,4 +126,6 @@ export interface GridRendererState {
   editingColumnIndex?: number;
   remotePresence?: RemotePresenceRender[];
   formulaHighlights?: FormulaHighlight[];
+  /** Virtual scrolling: discovered row count (expands as user scrolls down) */
+  discoveredRows?: number;
 }

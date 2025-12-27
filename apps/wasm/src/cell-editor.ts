@@ -21,6 +21,7 @@ import {
   getCursorPosition,
   setCursorPosition,
 } from "./formula-colorizer.js";
+import type { FocusManager } from "./focus-manager";
 
 // =============================================================================
 // Types
@@ -68,11 +69,17 @@ export class CellEditor {
   private cellDisplay: HTMLElement; // Contenteditable for colored display
   private formulaInput: HTMLInputElement;
   private formulaDisplay: HTMLElement;
-  private canvas: HTMLCanvasElement;
+  private focusManager: FocusManager;
 
   // Nullable dependencies (set after construction)
   private dataSource: WasmDataSource | null = null;
   private syncAdapter: CppSyncAdapter | null = null;
+
+  // Last known cursor position - updated continuously while editing
+  // This ensures we always have a valid cursor position for reference insertion
+  private lastKnownCursorPos: { start: number; end: number } = { start: 0, end: 0 };
+  // Last known value - updated continuously while editing
+  private lastKnownValue: string = "";
 
   // =========================================================================
   // State accessors (provided by App)
@@ -87,6 +94,7 @@ export class CellEditor {
   private getScrollX: () => number;
   private getScrollY: () => number;
   private getFormulaHighlights: () => FormulaHighlight[];
+  private getDiscoveredRows: () => number;
 
   // =========================================================================
   // Callbacks
@@ -101,6 +109,7 @@ export class CellEditor {
     end: Position
   ) => void;
   private onUpdateFormulaHighlights: (value: string) => void;
+  private onFocusCanvas: () => void;
 
   // =========================================================================
   // Constructor
@@ -113,7 +122,7 @@ export class CellEditor {
     cellDisplay: HTMLElement;
     formulaInput: HTMLInputElement;
     formulaDisplay: HTMLElement;
-    canvas: HTMLCanvasElement;
+    focusManager: FocusManager;
     getSelectedCell: () => Position | null;
     getSelectionStart: () => Position | null;
     getSelectionEnd: () => Position | null;
@@ -123,11 +132,13 @@ export class CellEditor {
     getScrollX: () => number;
     getScrollY: () => number;
     getFormulaHighlights: () => FormulaHighlight[];
+    getDiscoveredRows: () => number;
     onFetchViewport: () => Promise<void>;
     onRender: () => void;
     onUpdateFormulaBar: () => void;
     onSetSelection: (cell: Position, start: Position, end: Position) => void;
     onUpdateFormulaHighlights: (value: string) => void;
+    onFocusCanvas: () => void;
   }) {
     this.uiStateMachine = config.uiStateMachine;
     this.cellEditorContainer = config.cellEditorContainer;
@@ -135,7 +146,7 @@ export class CellEditor {
     this.cellDisplay = config.cellDisplay;
     this.formulaInput = config.formulaInput;
     this.formulaDisplay = config.formulaDisplay;
-    this.canvas = config.canvas;
+    this.focusManager = config.focusManager;
     this.getSelectedCell = config.getSelectedCell;
     this.getSelectionStart = config.getSelectionStart;
     this.getSelectionEnd = config.getSelectionEnd;
@@ -145,11 +156,13 @@ export class CellEditor {
     this.getScrollX = config.getScrollX;
     this.getScrollY = config.getScrollY;
     this.getFormulaHighlights = config.getFormulaHighlights;
+    this.getDiscoveredRows = config.getDiscoveredRows;
     this.onFetchViewport = config.onFetchViewport;
     this.onRender = config.onRender;
     this.onUpdateFormulaBar = config.onUpdateFormulaBar;
     this.onSetSelection = config.onSetSelection;
     this.onUpdateFormulaHighlights = config.onUpdateFormulaHighlights;
+    this.onFocusCanvas = config.onFocusCanvas;
 
     this.setupEventListeners();
   }
@@ -224,36 +237,91 @@ export class CellEditor {
   insertReferenceAtCursor(ref: string): void {
     if (!this.isEditing()) return;
 
-    const cursorPos = getCursorPosition(this.cellDisplay);
-    const value = this.getValue();
-    const start = cursorPos.start;
-    const end = cursorPos.end;
+    // Use last known cursor position and value - these are tracked continuously
+    // This avoids issues with focus loss clearing the selection
+    const start = this.lastKnownCursorPos.start;
+    const end = this.lastKnownCursorPos.end;
+    const value = this.lastKnownValue;
 
     // Insert the reference at cursor position, replacing any selection
     const before = value.slice(0, start);
     const after = value.slice(end);
     const newValue = before + ref + after;
 
-    // Update values
+    // Update tracked value and cursor position for subsequent operations
+    const newCursorPos = start + ref.length;
+    this.lastKnownValue = newValue;
+    this.lastKnownCursorPos = { start: newCursorPos, end: newCursorPos };
+
+    // Update all values SYNCHRONOUSLY - don't rely on async highlights
     this.cellEditorInput.value = newValue;
-
-    // Update formula highlights (async, will call updateColoredDisplay via callback)
-    this.onUpdateFormulaHighlights(newValue);
-
-    // Move cursor to after the inserted reference
-    const newPos = start + ref.length;
-    requestAnimationFrame(() => {
-      setCursorPosition(this.cellDisplay, newPos);
-    });
-
-    // Sync with formula bar
+    this.cellDisplay.textContent = newValue;
     this.formulaInput.value = newValue;
+    this.formulaDisplay.textContent = newValue;
+
+    // Set cursor position immediately (not in requestAnimationFrame)
+    setCursorPosition(this.cellDisplay, newCursorPos);
+
+    // Update formula highlights (async, will add colors but content is already set)
+    this.onUpdateFormulaHighlights(newValue);
 
     // Broadcast editing state
     const selectedCell = this.getSelectedCell();
     if (this.syncAdapter && selectedCell) {
       this.syncAdapter.setEditing(selectedCell.col, selectedCell.row, newValue);
     }
+  }
+
+  /**
+   * Replace a reference at the given position with a new range reference
+   * @param startPos Start position of the reference to replace
+   * @param endPos End position of the reference to replace
+   * @param newRef The new reference text (e.g., "A1:B5")
+   */
+  replaceReferenceAtPosition(startPos: number, endPos: number, newRef: string): void {
+    if (!this.isEditing()) return;
+
+    const value = this.lastKnownValue;
+    const before = value.slice(0, startPos);
+    const after = value.slice(endPos);
+    const newValue = before + newRef + after;
+
+    // Update tracked value and cursor position
+    const newCursorPos = startPos + newRef.length;
+    this.lastKnownValue = newValue;
+    this.lastKnownCursorPos = { start: newCursorPos, end: newCursorPos };
+
+    // Update all values synchronously
+    this.cellEditorInput.value = newValue;
+    this.cellDisplay.textContent = newValue;
+    this.formulaInput.value = newValue;
+    this.formulaDisplay.textContent = newValue;
+
+    // Set cursor position
+    setCursorPosition(this.cellDisplay, newCursorPos);
+
+    // Update formula highlights
+    this.onUpdateFormulaHighlights(newValue);
+
+    // Broadcast editing state
+    const selectedCell = this.getSelectedCell();
+    if (this.syncAdapter && selectedCell) {
+      this.syncAdapter.setEditing(selectedCell.col, selectedCell.row, newValue);
+    }
+  }
+
+  /**
+   * Get the last known value (for external access)
+   */
+  getLastKnownValue(): string {
+    return this.lastKnownValue;
+  }
+
+  /**
+   * Get the last known cursor position (for external access)
+   */
+  getLastKnownCursorPos(): { start: number; end: number } {
+    return this.lastKnownCursorPos;
   }
 
   /**
@@ -315,6 +383,9 @@ export class CellEditor {
       initialValue,
     });
 
+    // Register this editor as active with focus manager
+    this.focusManager.setActiveEditor(this.cellDisplay);
+
     // Position the editor
     this.positionEditor(selectedCell);
 
@@ -323,6 +394,9 @@ export class CellEditor {
       // Replace mode: start with the initial character (clears existing content)
       this.cellEditorInput.value = initialChar;
       this.cellDisplay.textContent = initialChar;
+      // Track value and cursor position
+      this.lastKnownValue = initialChar;
+      this.lastKnownCursorPos = { start: initialChar.length, end: initialChar.length };
       if (focusCellEditor) {
         this.cellDisplay.focus();
         // Place cursor at end (after the initial character)
@@ -332,6 +406,9 @@ export class CellEditor {
       // Append mode: cursor at end of existing content
       this.cellEditorInput.value = initialValue;
       this.cellDisplay.textContent = initialValue;
+      // Track value and cursor position
+      this.lastKnownValue = initialValue;
+      this.lastKnownCursorPos = { start: initialValue.length, end: initialValue.length };
       if (focusCellEditor) {
         this.cellDisplay.focus();
         setCursorPosition(this.cellDisplay, initialValue.length);
@@ -340,6 +417,9 @@ export class CellEditor {
       // Select mode: select all content (default for F2/Enter)
       this.cellEditorInput.value = initialValue;
       this.cellDisplay.textContent = initialValue;
+      // Track value and cursor position (entire content selected)
+      this.lastKnownValue = initialValue;
+      this.lastKnownCursorPos = { start: 0, end: initialValue.length };
       if (focusCellEditor) {
         this.cellDisplay.focus();
         // Select all text in contenteditable
@@ -386,7 +466,9 @@ export class CellEditor {
     if (this.syncAdapter) {
       this.syncAdapter.clearEditing();
     }
-    this.canvas.focus();
+    // Clear active editor from focus manager
+    this.focusManager.setActiveEditor(null);
+    this.onFocusCanvas();
   }
 
   /**
@@ -414,6 +496,9 @@ export class CellEditor {
     if (this.syncAdapter) {
       this.syncAdapter.clearEditing();
     }
+
+    // Clear active editor from focus manager
+    this.focusManager.setActiveEditor(null);
 
     try {
       if (newValue === "" || newValue.trim() === "") {
@@ -466,9 +551,10 @@ export class CellEditor {
     if (!selectedCell || !sheetInfo) return;
 
     // Enter moves down, Shift+Enter moves up
+    const maxRow = Math.max(sheetInfo.rowCount, this.getDiscoveredRows()) - 1;
     const newRow = shiftKey
       ? Math.max(0, selectedCell.row - 1)
-      : Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
+      : Math.min(maxRow, selectedCell.row + 1);
 
     const newPos = { col: selectedCell.col, row: newRow };
     this.onSetSelection(newPos, newPos, newPos);
@@ -508,10 +594,11 @@ export class CellEditor {
     let newCol = selectedCell.col;
     let newRow = selectedCell.row;
 
+    const maxRow = Math.max(sheetInfo.rowCount, this.getDiscoveredRows()) - 1;
     if (key === "ArrowUp") {
       newRow = Math.max(0, selectedCell.row - 1);
     } else if (key === "ArrowDown") {
-      newRow = Math.min(sheetInfo.rowCount - 1, selectedCell.row + 1);
+      newRow = Math.min(maxRow, selectedCell.row + 1);
     } else if (key === "ArrowLeft") {
       newCol = Math.max(0, selectedCell.col - 1);
     } else if (key === "ArrowRight") {
@@ -560,6 +647,9 @@ export class CellEditor {
    * Set up event listeners on the cell editor contenteditable
    */
   private setupEventListeners(): void {
+    // NOTE: Capture-phase mousedown is now handled by FocusManager on the container,
+    // which covers canvas, scrollbars, and all other elements within the grid.
+
     // Keyboard events on contenteditable
     this.cellDisplay.addEventListener("keydown", (e) => {
       e.stopPropagation();
@@ -606,8 +696,15 @@ export class CellEditor {
       }
     });
 
-    // Blur commits the edit
-    this.cellDisplay.addEventListener("blur", () => {
+    // Blur commits the edit - use FocusManager to check if blur should be suppressed
+    this.cellDisplay.addEventListener("blur", (e) => {
+      // Use FocusManager to check if we should suppress this blur
+      // This handles clicks on canvas, scrollbars, or any element in the container
+      if (this.focusManager.shouldSuppressBlur(e.relatedTarget)) {
+        this.focusManager.consumeSuppressFlag();
+        return;
+      }
+
       if (this.isEditing()) {
         this.confirmEditing();
       }
@@ -620,6 +717,10 @@ export class CellEditor {
         this.cellEditorInput.value = value;
         this.formulaInput.value = value;
 
+        // Track value and cursor position continuously
+        this.lastKnownValue = value;
+        this.lastKnownCursorPos = getCursorPosition(this.cellDisplay);
+
         // Update formula highlights for live feedback while typing formulas
         this.onUpdateFormulaHighlights(value);
 
@@ -628,6 +729,13 @@ export class CellEditor {
         if (this.syncAdapter && selectedCell) {
           this.syncAdapter.setEditing(selectedCell.col, selectedCell.row, value);
         }
+      }
+    });
+
+    // Track cursor position on selection changes (arrow keys, mouse clicks in editor)
+    document.addEventListener("selectionchange", () => {
+      if (this.isEditing() && document.activeElement === this.cellDisplay) {
+        this.lastKnownCursorPos = getCursorPosition(this.cellDisplay);
       }
     });
 

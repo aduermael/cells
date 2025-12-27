@@ -2,6 +2,7 @@
 // Custom scrollbar implementation with virtual scrolling support
 
 import { DEFAULT_COL_WIDTH, DEFAULT_ROW_HEIGHT, HEADER_HEIGHT, HEADER_WIDTH } from "./grid-constants.js";
+import type { FocusManager } from "./focus-manager";
 
 /** Scrollbar configuration */
 export interface ScrollbarConfig {
@@ -38,6 +39,7 @@ export interface ScrollbarCallbacks {
 export class ScrollbarManager {
   private config: ScrollbarConfig;
   private callbacks: ScrollbarCallbacks;
+  private focusManager: FocusManager | null = null;
 
   // DOM elements
   private verticalTrack: HTMLElement;
@@ -150,7 +152,6 @@ export class ScrollbarManager {
 
   private handleMouseMove(e: MouseEvent): void {
     if (this.isDraggingVertical) {
-      const deltaY = e.clientY - this.dragStartY;
       const trackHeight = this.verticalTrack.clientHeight;
       const thumbHeight = this.verticalThumb.clientHeight;
       const scrollableTrack = trackHeight - thumbHeight;
@@ -159,15 +160,24 @@ export class ScrollbarManager {
         const contentHeight = this.callbacks.getContentHeight();
         const viewportHeight = this.callbacks.getViewportHeight();
         const maxScrollY = Math.max(0, contentHeight - viewportHeight);
-        const scrollRatio = deltaY / scrollableTrack;
-        const newScrollY = Math.max(0, Math.min(maxScrollY, this.dragStartScrollY + scrollRatio * maxScrollY));
-        this.callbacks.setScrollY(newScrollY);
-        this.callbacks.onScroll();
+
+        if (maxScrollY > 0) {
+          // Calculate thumb position based on drag delta
+          const startThumbTop = (this.dragStartScrollY / maxScrollY) * scrollableTrack;
+          const deltaY = e.clientY - this.dragStartY;
+          const newThumbTop = Math.max(0, Math.min(scrollableTrack, startThumbTop + deltaY));
+
+          // Convert thumb position to scroll position
+          const scrollRatio = newThumbTop / scrollableTrack;
+          const newScrollY = scrollRatio * maxScrollY;
+          this.callbacks.setScrollY(newScrollY);
+          this.updateVertical(); // Update thumb position visually
+          this.callbacks.onScroll();
+        }
       }
     }
 
     if (this.isDraggingHorizontal) {
-      const deltaX = e.clientX - this.dragStartX;
       const trackWidth = this.horizontalTrack.clientWidth;
       const thumbWidth = this.horizontalThumb.clientWidth;
       const scrollableTrack = trackWidth - thumbWidth;
@@ -176,10 +186,20 @@ export class ScrollbarManager {
         const contentWidth = this.callbacks.getContentWidth();
         const viewportWidth = this.callbacks.getViewportWidth();
         const maxScrollX = Math.max(0, contentWidth - viewportWidth);
-        const scrollRatio = deltaX / scrollableTrack;
-        const newScrollX = Math.max(0, Math.min(maxScrollX, this.dragStartScrollX + scrollRatio * maxScrollX));
-        this.callbacks.setScrollX(newScrollX);
-        this.callbacks.onScroll();
+
+        if (maxScrollX > 0) {
+          // Calculate thumb position based on drag delta
+          const startThumbLeft = (this.dragStartScrollX / maxScrollX) * scrollableTrack;
+          const deltaX = e.clientX - this.dragStartX;
+          const newThumbLeft = Math.max(0, Math.min(scrollableTrack, startThumbLeft + deltaX));
+
+          // Convert thumb position to scroll position
+          const scrollRatio = newThumbLeft / scrollableTrack;
+          const newScrollX = scrollRatio * maxScrollX;
+          this.callbacks.setScrollX(newScrollX);
+          this.updateHorizontal(); // Update thumb position visually
+          this.callbacks.onScroll();
+        }
       }
     }
   }
@@ -191,6 +211,19 @@ export class ScrollbarManager {
     this.horizontalTrack.classList.remove("active");
     document.removeEventListener("mousemove", this.boundMouseMove);
     document.removeEventListener("mouseup", this.boundMouseUp);
+
+    // Refocus the active editor if we were editing before scrollbar drag
+    // This restores the cursor to the formula bar or cell editor
+    if (this.focusManager) {
+      this.focusManager.refocusActiveEditor();
+    }
+  }
+
+  /**
+   * Set the focus manager for editor refocusing after scroll
+   */
+  setFocusManager(focusManager: FocusManager): void {
+    this.focusManager = focusManager;
   }
 
   private scrollToVerticalPosition(e: MouseEvent): void {
@@ -321,6 +354,8 @@ export class ScrollbarManager {
 /**
  * Calculate content dimensions based on sheet info
  * Used for scrollbar sizing with virtual scrolling
+ *
+ * Optimized to O(customWidths + customHeights) instead of O(rows + cols)
  */
 export function calculateContentDimensions(
   colCount: number,
@@ -332,23 +367,26 @@ export function calculateContentDimensions(
   // For columns: fixed at 22 (A-V) or actual count, whichever is larger
   const effectiveColCount = Math.max(colCount, 22);
 
-  // Calculate total width considering custom widths
-  let width = 0;
-  for (let c = 0; c < effectiveColCount; c++) {
-    width += colWidths.get(c) ?? DEFAULT_COL_WIDTH;
+  // Calculate total width: default widths + adjustments for custom widths
+  // Only iterate over custom widths (sparse), not all columns
+  let width = effectiveColCount * DEFAULT_COL_WIDTH + HEADER_WIDTH;
+  for (const [col, customWidth] of colWidths) {
+    if (col < effectiveColCount) {
+      width += customWidth - DEFAULT_COL_WIDTH;
+    }
   }
-  width += HEADER_WIDTH;
 
   // For rows: use actual row count up to max virtual rows
-  // The "discovered" row count expands as user scrolls down
   const effectiveRowCount = Math.min(rowCount, maxVirtualRows);
 
-  // Calculate total height considering custom heights
-  let height = 0;
-  for (let r = 0; r < effectiveRowCount; r++) {
-    height += rowHeights.get(r) ?? DEFAULT_ROW_HEIGHT;
+  // Calculate total height: default heights + adjustments for custom heights
+  // Only iterate over custom heights (sparse), not all rows
+  let height = effectiveRowCount * DEFAULT_ROW_HEIGHT + HEADER_HEIGHT;
+  for (const [row, customHeight] of rowHeights) {
+    if (row < effectiveRowCount) {
+      height += customHeight - DEFAULT_ROW_HEIGHT;
+    }
   }
-  height += HEADER_HEIGHT;
 
   return { width, height };
 }

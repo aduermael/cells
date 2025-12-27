@@ -32,6 +32,7 @@ import {
 import type { ReferenceInfo } from "./client-types";
 import { colorizeFormula } from "./formula-colorizer.js";
 import { ScrollbarManager, calculateContentDimensions, calculateDiscoveredRows } from "./scrollbar.js";
+import { FocusManager } from "./focus-manager";
 
 // =============================================================================
 // Types
@@ -125,6 +126,7 @@ export function initApp(): AppContext {
         ? app.editingColumnIndex
         : -1,
       formulaHighlights: app.formulaHighlights,
+      discoveredRows: app.discoveredRows,
     });
   }
 
@@ -236,7 +238,6 @@ export function initApp(): AppContext {
   // =========================================================================
 
   function updateFormulaBar(): void {
-    console.log("[FORMULA_DEBUG] updateFormulaBar called, selectedCell=", app.selectedCell);
     // Don't overwrite formula bar while user is actively editing
     if (cellEditor.isEditing() || formulaBarEditor.isEditingFormulaBar()) {
       if (app.selectedCell) {
@@ -299,7 +300,6 @@ export function initApp(): AppContext {
       );
       if (cell) {
         const formulaValue = cell.formula || cell.value || "";
-        console.log("[FORMULA_DEBUG] updateFormulaBar: cell=", cell, "formula=", formulaValue);
         elements.formulaInput.value = formulaValue;
         elements.formulaDisplay.textContent = formulaValue;
       } else {
@@ -701,7 +701,6 @@ export function initApp(): AppContext {
     changeHandlerScheduled = false;
     const changeTypes = pendingChangeTypes;
     pendingChangeTypes = new Set();
-    console.log("[FORMULA_DEBUG] processDataChanges: changeTypes=", [...changeTypes]);
 
     if (
       changeTypes.has("structure") ||
@@ -715,9 +714,7 @@ export function initApp(): AppContext {
       await fetchSheets();
     }
 
-    console.log("[FORMULA_DEBUG] processDataChanges: calling fetchViewport");
     await fetchViewport();
-    console.log("[FORMULA_DEBUG] processDataChanges: cells after fetchViewport=", app.cells.filter(c => c.formula));
     render();
     updateFormulaBar();
     updateScrollbars();
@@ -743,6 +740,24 @@ export function initApp(): AppContext {
   }
 
   // =========================================================================
+  // Create FocusManager
+  // =========================================================================
+
+  // FocusManager handles focus boundaries for the grid container.
+  // It ensures clicks on canvas, scrollbars, or any element in the container
+  // suppress blur commits during formula editing.
+  const focusManager = new FocusManager({
+    container: elements.canvasContainer,
+    isEditingCell: () => app.uiStateMachine.isInState("CELL_EDITING"),
+    isEditingFormulaBar: () => app.uiStateMachine.isInState("FORMULA_BAR_EDITING"),
+  });
+
+  // Helper to focus the canvas (used after editing commits)
+  function focusCanvas(): void {
+    elements.canvas.focus();
+  }
+
+  // =========================================================================
   // Create CellEditor
   // =========================================================================
 
@@ -753,7 +768,7 @@ export function initApp(): AppContext {
     cellDisplay: elements.cellDisplay,
     formulaInput: elements.formulaInput,
     formulaDisplay: elements.formulaDisplay,
-    canvas: elements.canvas,
+    focusManager,
     getSelectedCell: () => app.selectedCell,
     getSelectionStart: () => app.selectionStart,
     getSelectionEnd: () => app.selectionEnd,
@@ -763,11 +778,13 @@ export function initApp(): AppContext {
     getScrollX: () => app.scrollX,
     getScrollY: () => app.scrollY,
     getFormulaHighlights: () => app.formulaHighlights,
+    getDiscoveredRows: () => app.discoveredRows,
     onFetchViewport: fetchViewport,
     onRender: render,
     onUpdateFormulaBar: updateFormulaBar,
     onSetSelection: setSelection,
     onUpdateFormulaHighlights: updateFormulaHighlights,
+    onFocusCanvas: focusCanvas,
   });
 
   // =========================================================================
@@ -822,7 +839,7 @@ export function initApp(): AppContext {
     formulaDisplay: elements.formulaDisplay,
     cellEditorInput: elements.cellEditor,
     cellDisplay: elements.cellDisplay,
-    canvas: elements.canvas,
+    focusManager,
     getSelectedCell: () => app.selectedCell,
     getSelectionStart: () => app.selectionStart,
     getSheetInfo: () => app.sheetInfo,
@@ -839,6 +856,7 @@ export function initApp(): AppContext {
     onUpdateFormulaHighlights: updateFormulaHighlights,
     isEditing: () => cellEditor.isEditing(),
     onPositionCellEditor: positionCellEditor,
+    onFocusCanvas: focusCanvas,
   });
 
   // =========================================================================
@@ -1148,6 +1166,11 @@ export function initApp(): AppContext {
 
     // Initialize scrollbars
     initScrollbars();
+
+    // Connect focus manager to scrollbar for editor refocusing after scroll
+    if (app.scrollbarManager) {
+      app.scrollbarManager.setFocusManager(focusManager);
+    }
 
     resizeCanvas();
 
