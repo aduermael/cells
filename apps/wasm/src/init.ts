@@ -986,6 +986,9 @@ export function initApp(): AppContext {
     setScrollX: (v) => { app.scrollX = v; },
     setScrollY: (v) => { app.scrollY = v; },
 
+    getDiscoveredRows: () => app.discoveredRows,
+    setDiscoveredRows: (v) => { app.discoveredRows = v; },
+
     render,
     updateFormulaBar,
     clearFormulaHighlights: () => { app.formulaHighlights = []; },

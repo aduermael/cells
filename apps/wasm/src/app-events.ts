@@ -105,6 +105,10 @@ export interface AppEventManagerConfig {
   setScrollX: (v: number) => void;
   setScrollY: (v: number) => void;
 
+  // Virtual scrolling
+  getDiscoveredRows: () => number;
+  setDiscoveredRows: (v: number) => void;
+
   // Callbacks
   render: () => void;
   updateFormulaBar: () => void;
@@ -315,7 +319,9 @@ export class AppEventManager {
   }
 
   private handleWheel(e: WheelEvent): void {
-    const { getSheetInfo, getScrollX, getScrollY, setScrollX, setScrollY, render, fetchViewportNow, updateScrollbars, canvas } = this.config;
+    const { getSheetInfo, getScrollX, getScrollY, setScrollX, setScrollY,
+            getDiscoveredRows, setDiscoveredRows,
+            render, fetchViewportNow, updateScrollbars, canvas } = this.config;
 
     const sheetInfo = getSheetInfo();
     if (!sheetInfo) return;
@@ -325,13 +331,26 @@ export class AppEventManager {
       0,
       sheetInfo.colCount * DEFAULT_COL_WIDTH - canvas.clientWidth + HEADER_WIDTH
     );
+
+    // Use discovered rows for virtual scrolling (expands as user scrolls down)
+    let discoveredRows = getDiscoveredRows();
+    const viewportHeight = canvas.clientHeight - HEADER_HEIGHT;
+    const newScrollY = getScrollY() + e.deltaY;
+
+    // Expand discovered rows when scrolling near bottom
+    const visibleBottomRow = Math.ceil((newScrollY + viewportHeight) / DEFAULT_ROW_HEIGHT);
+    if (visibleBottomRow + 50 > discoveredRows && discoveredRows < 1_000_000) {
+      discoveredRows = Math.min(1_000_000, discoveredRows + 100);
+      setDiscoveredRows(discoveredRows);
+    }
+
     const maxScrollY = Math.max(
       0,
-      sheetInfo.rowCount * DEFAULT_ROW_HEIGHT - canvas.clientHeight + HEADER_HEIGHT
+      discoveredRows * DEFAULT_ROW_HEIGHT - viewportHeight
     );
 
     setScrollX(Math.max(0, Math.min(maxScrollX, getScrollX() + e.deltaX)));
-    setScrollY(Math.max(0, Math.min(maxScrollY, getScrollY() + e.deltaY)));
+    setScrollY(Math.max(0, Math.min(maxScrollY, newScrollY)));
 
     render();
     fetchViewportNow();
