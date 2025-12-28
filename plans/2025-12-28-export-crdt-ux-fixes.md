@@ -1,6 +1,6 @@
-Status: READY
+Status: IN_PROGRESS
 Created At: 2025-12-28 06:49 UTC
-Updated At: 2025-12-28 07:15 UTC
+Updated At: 2025-12-28 11:00 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Export, CRDT Operations, and UX Fixes
@@ -30,13 +30,13 @@ This plan addresses six interconnected issues, ordered by increasing complexity 
 
 ### Tasks
 
-- [ ] 1a: Install Lightpanda npm package (`@lightpanda/browser`) and puppeteer-core
-- [ ] 1b: Create test harness that starts local dev server + Lightpanda
-- [ ] 1c: Add helper functions for common operations (setCellValue, getCellValue, selectCell, etc.)
-- [ ] 1d: Write basic smoke test: create workbook, set values, export, verify
-- [ ] 1e: Add formula test: enter formula, verify computed result
-- [ ] 1f: Add collaboration test: two browser contexts, verify sync
-- [ ] 1g: Document how to run programmatic tests in README
+- [x] 1a: Install Lightpanda npm package (`@lightpanda/browser`) and puppeteer-core
+- [x] 1b: Create test harness that starts local dev server + Lightpanda
+- [x] 1c: Add helper functions for common operations (setCellValue, getCellValue, selectCell, etc.)
+- [x] 1d: Write basic smoke test: create workbook, set values, export, verify
+- [x] 1e: Add formula test: enter formula, verify computed result
+- [x] 1f: Add collaboration test: two browser contexts, verify sync
+- [x] 1g: Document how to run programmatic tests in README
 
 ### Example Test Structure
 

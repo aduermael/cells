@@ -196,6 +196,9 @@ make build          # or: bazel build //core/...
 # Run tests
 make test           # or: bazel test //core/...
 
+# Run e2e tests (requires dist/ from wasm-dist)
+cd apps/wasm && npm test
+
 # Build CLI (development)
 make cli            # Creates ./cells binary
 
@@ -241,6 +244,30 @@ make wasm-dist
 python3 -m http.server 8080 --directory dist
 # Open http://localhost:8080/
 ```
+
+**Run e2e tests (Lightpanda):**
+
+The web app includes e2e tests using [Lightpanda](https://lightpanda.io/) browser (10x faster than Chrome headless):
+
+```bash
+# Build distribution first
+make wasm-dist
+
+# Run all e2e tests
+cd apps/wasm && npm test:all
+
+# Or run specific test suites
+npm test:smoke    # Basic UI functionality
+npm test:formula  # Formula entry and computation
+npm test:collab   # Two-peer collaboration sync
+```
+
+Test files are in `apps/wasm/tests/`:
+- `harness.mjs` - Test harness (starts server + Lightpanda)
+- `helpers.mjs` - Helper functions (clickCell, setCellValue, etc.)
+- `smoke.test.mjs` - Basic UI tests
+- `formula.test.mjs` - Formula tests
+- `collab.test.mjs` - Collaboration tests
 
 **Deploy to static hosting:**
 - Upload contents of `dist/` to any static host (GitHub Pages, Netlify, Vercel, etc.)

@@ -6,10 +6,17 @@
   "scripts": {
     "build": "node build.mjs",
     "check-types": "tsc --noEmit",
-    "watch": "node build.mjs --watch"
+    "watch": "node build.mjs --watch",
+    "test": "node tests/smoke.test.mjs",
+    "test:smoke": "node tests/smoke.test.mjs",
+    "test:formula": "node tests/formula.test.mjs",
+    "test:collab": "node tests/collab.test.mjs",
+    "test:all": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/collab.test.mjs"
   },
   "devDependencies": {
+    "@lightpanda/browser": "^1.0.1",
     "esbuild": "^0.24.2",
+    "puppeteer-core": "^24.34.0",
     "typescript": "^5.7.2"
   }
 }
