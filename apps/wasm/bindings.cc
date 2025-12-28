@@ -156,19 +156,22 @@ public:
         _activeSheetIndex = 0;
         rebuildQuadtree();
 
-        // Evaluate all formulas in all sheets after loading
-        // This computes the cached values that get displayed in cells
+        // Parse and evaluate all formulas in all sheets after loading
+        // Step 1: Parse formula text into ASTs (formulas are stored as UUID-format text)
+        // Step 2: Recalculate to compute the display values
         for (size_t i = 0; i < _workbook->sheetCount(); ++i) {
             auto* sheet = _workbook->getSheetByIndex(i);
             if (sheet) {
-                // Collect all formula cells
                 std::vector<ID> formulaCells;
                 for (const auto& [cellId, cell] : sheet->cells) {
-                    if (cell->isFormula()) {
+                    if (cell->isFormula() && cell->formula != nullptr) {
+                        // Parse the formula text (UUID format) into AST
+                        // This is required for evaluation
+                        cell->formula->parse();
                         formulaCells.push_back(cellId);
                     }
                 }
-                // Recalculate them in dependency order
+                // Recalculate formulas in dependency order
                 if (!formulaCells.empty()) {
                     cells::recalculate(sheet, formulaCells);
                 }
@@ -208,19 +211,22 @@ public:
         _activeSheetIndex = 0;
         rebuildQuadtree();
 
-        // Evaluate all formulas in all sheets after loading
-        // This computes the cached values that get displayed in cells
+        // Parse and evaluate all formulas in all sheets after loading
+        // Step 1: Parse formula text into ASTs (formulas are stored as UUID-format text)
+        // Step 2: Recalculate to compute the display values
         for (size_t i = 0; i < _workbook->sheetCount(); ++i) {
             auto* sheet = _workbook->getSheetByIndex(i);
             if (sheet) {
-                // Collect all formula cells
                 std::vector<ID> formulaCells;
                 for (const auto& [cellId, cell] : sheet->cells) {
-                    if (cell->isFormula()) {
+                    if (cell->isFormula() && cell->formula != nullptr) {
+                        // Parse the formula text (UUID format) into AST
+                        // This is required for evaluation
+                        cell->formula->parse();
                         formulaCells.push_back(cellId);
                     }
                 }
-                // Recalculate them in dependency order
+                // Recalculate formulas in dependency order
                 if (!formulaCells.empty()) {
                     cells::recalculate(sheet, formulaCells);
                 }
