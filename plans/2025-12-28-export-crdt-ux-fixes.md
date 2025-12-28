@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2025-12-28 06:49 UTC
-Updated At: 2025-12-28 13:50 UTC
+Updated At: 2025-12-28 14:35 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Export, CRDT Operations, and UX Fixes
@@ -138,7 +138,7 @@ The xlsx_writer already used RefConverter.formulaToA1() to convert UUID-based fo
 
 ---
 
-## Phase 3: Document Title Editing
+## Phase 3: Document Title Editing ✅ COMPLETE
 
 **Goal**: Allow users to edit document title, use snake_case for export filename.
 
@@ -151,12 +151,37 @@ The xlsx_writer already used RefConverter.formulaToA1() to convert UUID-based fo
 
 ### Tasks
 
-- [ ] 3a: Add title display element in header (show workbook name)
-- [ ] 3b: Make title clickable/editable (contenteditable or input field)
-- [ ] 3c: Connect title changes to setWorkbookName via client
-- [ ] 3d: Add toSnakeCase utility function for filename generation
-- [ ] 3e: Update exportAs to use snake_case version of workbook name as filename
-- [ ] 3f: Add WORKBOOK_RENAME CRDT operation for title changes (sync across peers)
+- [x] 3a: Add title display element in header (show workbook name)
+- [x] 3b: Make title clickable/editable (contenteditable or input field)
+- [x] 3c: Connect title changes to setWorkbookName via client
+- [x] 3d: Add toSnakeCase utility function for filename generation
+- [x] 3e: Update exportAs to use snake_case version of workbook name as filename
+- [x] 3f: Add WORKBOOK_RENAME CRDT operation for title changes (sync across peers)
+
+### Implementation Notes
+
+1. **HTML/CSS Changes**:
+   - Added `#workbook-title` contenteditable span in header
+   - Added CSS for hover/focus states and empty placeholder
+   - Kept hidden `#sheet-name` span for backwards compatibility
+
+2. **TypeScript Changes**:
+   - Created `WorkbookTitleEditor` class (`workbook-title-editor.ts`)
+   - Handles focus, blur, Enter/Escape key events
+   - Commits changes to WASM via `setWorkbookName`
+   - Integrated into `init.ts` and `AppContext`
+
+3. **Utility Function**:
+   - Added `toSnakeCase()` in `utils.ts`
+   - Converts "My Document" → "my_document"
+   - Used in `wasm-data-source.ts` for export filenames
+
+4. **CRDT Operation**:
+   - Added `WORKBOOK_RENAME = 30` to `OpType` enum
+   - Added `applyWorkbookRename()` in `crdt.cc`
+   - Added `makeWorkbookRenameOp()` helper function
+   - Updated `bindings.cc` to create CRDT op when name changes
+   - Payload format: `{"name":"NewName"}`
 
 ---
 

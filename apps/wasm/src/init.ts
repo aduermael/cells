@@ -33,6 +33,7 @@ import type { ReferenceInfo } from "./client-types";
 import { colorizeFormula } from "./formula-colorizer.js";
 import { ScrollbarManager, calculateContentDimensions, calculateDiscoveredRows } from "./scrollbar.js";
 import { FocusManager } from "./focus-manager";
+import { WorkbookTitleEditor } from "./workbook-title-editor";
 
 // =============================================================================
 // Types
@@ -49,6 +50,7 @@ export interface AppContext {
   presenceBroadcaster: PresenceBroadcaster;
   eventManager: AppEventManager;
   astDebugPanel: AstDebugPanel;
+  workbookTitleEditor: WorkbookTitleEditor;
 
   // Methods exposed for index.html onclick handlers
   openFile: () => void;
@@ -90,6 +92,14 @@ export function initApp(): AppContext {
     errorsEl: elements.astErrors,
     treeEl: elements.astTree,
     ensureWasmClient: async () => fileLoader.ensureWasmClient(),
+  });
+
+  // =========================================================================
+  // Create WorkbookTitleEditor
+  // =========================================================================
+
+  const workbookTitleEditor = new WorkbookTitleEditor({
+    titleElement: elements.workbookTitle,
   });
 
   // =========================================================================
@@ -906,6 +916,9 @@ export function initApp(): AppContext {
       columnHeaderEditor.setDataSource(dataSource);
       formulaBarEditor.setDataSource(dataSource);
       sheetTabsManager.setDataSource(dataSource);
+      workbookTitleEditor.setDataSource(dataSource);
+      // Update the title display from the workbook name
+      workbookTitleEditor.setTitle(dataSource.workbookName);
     },
     onDataChanged: handleDataChanged,
     getDataSource: () => app.dataSource,
@@ -1204,6 +1217,7 @@ export function initApp(): AppContext {
     presenceBroadcaster,
     eventManager,
     astDebugPanel,
+    workbookTitleEditor,
 
     openFile: () => fileLoader.openFile(),
     newFile: () => fileLoader.newFile(),

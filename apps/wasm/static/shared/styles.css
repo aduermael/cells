@@ -51,11 +51,44 @@ html, body {
     width: auto;
 }
 
-#header h1 {
+/* Workbook Title */
+#workbook-title-container {
+    display: flex;
+    align-items: center;
+    margin-left: var(--spacing-xs);
+}
+
+#workbook-title {
     font-size: 14px;
     font-weight: 600;
     color: #212529;
-    margin-left: var(--spacing-xs);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    outline: none;
+    cursor: text;
+    min-width: 40px;
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+#workbook-title:hover {
+    background: #e9ecef;
+    border-color: #dee2e6;
+}
+
+#workbook-title:focus {
+    background: #fff;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.1);
+}
+
+#workbook-title:empty::before {
+    content: "Untitled";
+    color: #adb5bd;
 }
 
 /* Toolbar */

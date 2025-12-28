@@ -30,6 +30,8 @@ const char* opTypeToString(OpType type) {
             return "SHEET_DELETE";
         case OpType::SHEET_RENAME:
             return "SHEET_RENAME";
+        case OpType::WORKBOOK_RENAME:
+            return "WORKBOOK_RENAME";
     }
     return "CELL_SET_VALUE";
 }
@@ -67,6 +69,9 @@ OpType stringToOpType(const std::string& str) {
     }
     if (str == "SHEET_RENAME") {
         return OpType::SHEET_RENAME;
+    }
+    if (str == "WORKBOOK_RENAME") {
+        return OpType::WORKBOOK_RENAME;
     }
     return OpType::CELL_SET_VALUE;  // Default
 }

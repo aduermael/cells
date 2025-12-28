@@ -29,6 +29,9 @@ enum class OpType : uint8_t {
     SHEET_CREATE = 20,  // Create new sheet
     SHEET_DELETE = 21,  // Delete sheet
     SHEET_RENAME = 22,  // Rename sheet
+
+    // Workbook operations
+    WORKBOOK_RENAME = 30,  // Rename workbook
 };
 
 // Convert OpType to string for serialization

@@ -185,3 +185,24 @@ export function getMimeType(format: FileFormat): string {
 export function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
+
+/**
+ * Convert a string to snake_case for filenames
+ * @param str - The string to convert
+ * @returns snake_case version of the string
+ *
+ * Examples:
+ * - "My Document" -> "my_document"
+ * - "Hello World 2025" -> "hello_world_2025"
+ * - "test__file" -> "test_file"
+ * - "  spaces  " -> "spaces"
+ */
+export function toSnakeCase(str: string): string {
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-]+/g, "_")  // Replace spaces and hyphens with underscores
+    .replace(/[^a-z0-9_]/g, "") // Remove non-alphanumeric characters except underscores
+    .replace(/_+/g, "_")        // Collapse multiple underscores
+    .replace(/^_|_$/g, "");     // Trim leading/trailing underscores
+}

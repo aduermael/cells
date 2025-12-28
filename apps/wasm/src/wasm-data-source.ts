@@ -4,7 +4,7 @@
 
 import type { CellsClient } from "./client";
 import type { SheetInfo, CellData, ColumnInfo, RowInfo } from "./types";
-import { getMimeType } from "./utils";
+import { getMimeType, toSnakeCase } from "./utils";
 
 /** Change notification types */
 export type DataChangeType = "cell" | "structure" | "sheet" | "loaded";
@@ -296,9 +296,11 @@ export class WasmDataSource {
   async exportAs(format: "csv" | "xlsx" | "zcd"): Promise<ExportResult> {
     const result = await this._client.exportAs(format);
     const blob = new Blob([result.data], { type: getMimeType(format) });
+    // Use snake_case for the filename
+    const snakeCaseName = toSnakeCase(this._workbookName) || "untitled";
     return {
       blob,
-      filename: result.filename || `${this._workbookName}.${format}`,
+      filename: result.filename || `${snakeCaseName}.${format}`,
     };
   }
 }

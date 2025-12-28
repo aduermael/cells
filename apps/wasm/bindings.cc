@@ -1635,9 +1635,20 @@ public:
     std::string getWorkbookName() { return _workbook ? _workbook->name : ""; }
 
     void setWorkbookName(const std::string& name) {
-        if (_workbook) {
-            _workbook->name = name;
+        if (!_workbook) {
+            return;
         }
+
+        // Update the name
+        _workbook->name = name;
+
+        // Create CRDT operation for sync
+        std::ostringstream payload;
+        payload << "{\"name\":\"" << jsonEscape(name) << "\"}";
+        Operation op = makeWorkbookRenameOp(*_workbook, payload.str());
+        applyOperation(*_workbook, op);
+
+        notifyListeners(ChangeType::STRUCTURE_CHANGED);
     }
 
     // ========================================================================

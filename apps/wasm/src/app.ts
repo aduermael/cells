@@ -59,6 +59,7 @@ export interface DOMElements {
   loading: HTMLElement;
   error: HTMLElement;
   sheetName: HTMLElement;
+  workbookTitle: HTMLElement;
   dropZone: HTMLElement;
   emptyState: HTMLElement;
   fileInput: HTMLInputElement;
@@ -400,6 +401,7 @@ export function createApp(): App {
     loading: getElement("loading"),
     error: getElement("error"),
     sheetName: getElement("sheet-name"),
+    workbookTitle: getElement("workbook-title"),
     dropZone: getElement("drop-zone"),
     emptyState: getElement("empty-state"),
     fileInput: getElement<HTMLInputElement>("file-input"),

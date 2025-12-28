@@ -472,6 +472,35 @@ ApplyResult applyDimResizeAxis(Workbook& workbook, const Operation& op) {
     return ApplyResult::SUCCESS;
 }
 
+// Apply WORKBOOK_RENAME operation
+// Payload: {"name":"NewName"}
+ApplyResult applyWorkbookRename(Workbook& workbook, const Operation& op) {
+    // For workbook rename, target_id should be the workbook ID
+    // Check if target matches workbook
+    if (op.target_id != workbook.id) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer rename operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if (existing.type == OpType::WORKBOOK_RENAME && existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    // Parse payload: {"name":"NewName"}
+    const std::string name = extractJSONString(op.payload, "name");
+    if (name.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    workbook.name = name;
+
+    return ApplyResult::SUCCESS;
+}
+
 // Apply SHEET_RENAME operation
 ApplyResult applySheetRename(Workbook& workbook, const Operation& op) {
     Sheet* sheet = workbook.getSheet(op.target_id);
@@ -713,6 +742,10 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
         case OpType::SHEET_RENAME:
             result = applySheetRename(workbook, op);
             break;
+
+        case OpType::WORKBOOK_RENAME:
+            result = applyWorkbookRename(workbook, op);
+            break;
     }
 
     // Add to OpLog regardless of result (for history/sync)
@@ -794,6 +827,11 @@ Operation makeSheetDeleteOp(Workbook& workbook, const ID& sheetId) {
 Operation makeSheetRenameOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::SHEET_RENAME, sheetId, payload};
+}
+
+Operation makeWorkbookRenameOp(Workbook& workbook, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::WORKBOOK_RENAME, workbook.id, payload};
 }
 
 size_t bootstrapOpLog(Workbook& workbook) {

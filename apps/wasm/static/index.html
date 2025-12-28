@@ -17,7 +17,10 @@
             <button class="btn" onclick="openFile()">Open</button>
             <button class="btn" id="new-btn" onclick="newFile()" style="display: none;">New</button>
             <input type="file" id="file-input" accept=".zcd,.csv,.tsv,.xlsx" />
-            <h1 id="sheet-name">Cells Viewer</h1>
+            <div id="workbook-title-container">
+                <span id="workbook-title" contenteditable="true" spellcheck="false">Untitled</span>
+            </div>
+            <span id="sheet-name" style="display: none;"></span>
             <div id="toolbar">
                 <div id="collab-ui-container"></div>
                 <div class="dropdown" id="export-dropdown">
