@@ -19,6 +19,8 @@ const CONFIG = {
   lightpandaHost: '127.0.0.1',
   distDir: join(projectRoot, 'dist'),
   timeout: 30000,
+  // Use Chrome instead of Lightpanda (Lightpanda has limited canvas support)
+  useChrome: process.env.USE_CHROME === '1' || true, // Default to Chrome for canvas-based app
 };
 
 /**
@@ -38,7 +40,12 @@ export class TestContext {
       await this.page.close().catch(() => {});
     }
     if (this.browser) {
-      await this.browser.disconnect().catch(() => {});
+      // Chrome uses close(), Lightpanda uses disconnect()
+      if (CONFIG.useChrome) {
+        await this.browser.close().catch(() => {});
+      } else {
+        await this.browser.disconnect().catch(() => {});
+      }
     }
     if (this.lightpandaProc) {
       this.lightpandaProc.stdout?.destroy();
@@ -104,9 +111,47 @@ async function startServer() {
 }
 
 /**
- * Start Lightpanda browser and connect Puppeteer
+ * Wait for CDP server to be ready
+ */
+async function waitForCDP(host, port, maxAttempts = 30) {
+  const url = `http://${host}:${port}/json/version`;
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        return true;
+      }
+    } catch (e) {
+      // CDP server not ready yet
+    }
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
+  throw new Error(`CDP server not ready after ${maxAttempts} attempts`);
+}
+
+/**
+ * Start browser (Chrome or Lightpanda) and connect Puppeteer
  */
 async function startBrowser() {
+  if (CONFIG.useChrome) {
+    // Use regular Puppeteer with Chrome
+    const puppeteerFull = await import('puppeteer');
+    const browser = await puppeteerFull.default.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        // WebRTC support in headless mode
+        '--use-fake-ui-for-media-stream',
+        '--use-fake-device-for-media-stream',
+        '--disable-web-security',
+        '--allow-running-insecure-content',
+      ],
+    });
+    return { browser, proc: null };
+  }
+
+  // Use Lightpanda (faster but limited canvas support)
   const lpdopts = {
     host: CONFIG.lightpandaHost,
     port: CONFIG.lightpandaPort,
@@ -114,9 +159,28 @@ async function startBrowser() {
 
   const proc = await lightpanda.serve(lpdopts);
 
-  const browser = await puppeteer.connect({
-    browserWSEndpoint: `ws://${CONFIG.lightpandaHost}:${CONFIG.lightpandaPort}`,
-  });
+  // Wait for CDP server to be ready
+  await waitForCDP(CONFIG.lightpandaHost, CONFIG.lightpandaPort);
+
+  // Connect with retry logic
+  let browser;
+  let lastError;
+  for (let i = 0; i < 5; i++) {
+    try {
+      browser = await puppeteer.connect({
+        browserWSEndpoint: `ws://${CONFIG.lightpandaHost}:${CONFIG.lightpandaPort}`,
+      });
+      break;
+    } catch (e) {
+      lastError = e;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+
+  if (!browser) {
+    proc.kill();
+    throw new Error(`Failed to connect to Lightpanda: ${lastError?.message || 'unknown error'}`);
+  }
 
   return { browser, proc };
 }
@@ -130,12 +194,19 @@ export async function setup() {
   const serverProc = await startServer();
   console.log(`Server running on port ${CONFIG.serverPort}`);
 
-  console.log('Starting Lightpanda browser...');
+  const browserType = CONFIG.useChrome ? 'Chrome' : 'Lightpanda';
+  console.log(`Starting ${browserType} browser...`);
   const { browser, proc: lightpandaProc } = await startBrowser();
   console.log('Browser ready');
 
-  const context = await browser.createBrowserContext();
-  const page = await context.newPage();
+  // Create page (Chrome uses pages directly, Lightpanda uses contexts)
+  let page;
+  if (CONFIG.useChrome) {
+    page = await browser.newPage();
+  } else {
+    const context = await browser.createBrowserContext();
+    page = await context.newPage();
+  }
 
   return new TestContext(browser, page, serverProc, lightpandaProc);
 }
@@ -165,6 +236,11 @@ export async function runTests(tests) {
   let ctx;
   const results = [];
 
+  // Handle unhandled rejections gracefully
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection:', reason);
+  });
+
   try {
     ctx = await setup();
 
@@ -172,6 +248,12 @@ export async function runTests(tests) {
       const result = await runTest(name, () => fn(ctx));
       results.push(result);
     }
+  } catch (setupError) {
+    console.error('Setup failed:', setupError.message);
+    if (ctx) {
+      await ctx.close();
+    }
+    process.exit(1);
   } finally {
     if (ctx) {
       await ctx.close();

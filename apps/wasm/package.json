@@ -16,6 +16,7 @@
   "devDependencies": {
     "@lightpanda/browser": "^1.0.1",
     "esbuild": "^0.24.2",
+    "puppeteer": "^24.34.0",
     "puppeteer-core": "^24.34.0",
     "typescript": "^5.7.2"
   }

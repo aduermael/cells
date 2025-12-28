@@ -123,6 +123,11 @@ export async function clickCell(page, cellRef) {
   const { x, y } = cellToPixel(col, row, canvasInfo);
 
   await page.mouse.click(x, y);
+  // Ensure canvas has focus for keyboard events
+  await page.evaluate(() => {
+    const canvas = document.getElementById('grid');
+    if (canvas) canvas.focus();
+  });
   // Wait for cell selection to update
   await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 100)));
 }
@@ -145,7 +150,8 @@ export async function doubleClickCell(page, cellRef) {
  */
 export async function typeInCell(page, text) {
   // The cell editor should be active after clicking
-  await page.keyboard.type(text);
+  // Use delay between key presses to ensure all characters are captured
+  await page.keyboard.type(text, { delay: 50 });
 }
 
 /**
@@ -170,7 +176,11 @@ export async function cancelEdit(page) {
  */
 export async function setCellValue(page, cellRef, value) {
   await clickCell(page, cellRef);
+  // Small delay to ensure cell is selected and ready for input
+  await sleep(100);
   await typeInCell(page, value);
+  // Small delay before confirming to ensure all characters are processed
+  await sleep(100);
   await confirmEdit(page);
 }
 

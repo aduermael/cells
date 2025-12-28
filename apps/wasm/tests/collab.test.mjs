@@ -1,5 +1,12 @@
 // Collaboration test for Cells spreadsheet application
 // Tests that two browser contexts can sync changes via WebRTC
+//
+// NOTE: These tests are experimental and may not pass in headless Chrome.
+// WebRTC peer connections between browser contexts in the same Chrome instance
+// have limitations. For reliable collaboration testing, consider:
+// - Using separate browser processes (not contexts)
+// - Running with headed Chrome (headless: false)
+// - Using a real network loopback setup
 
 import { setup, runTest, TestContext } from './harness.mjs';
 import {
@@ -26,8 +33,8 @@ async function joinRoom(page, baseUrl, roomId) {
   const url = `${baseUrl}/?room=${roomId}`;
   await page.goto(url);
   await waitForAppReady(page);
-  // Give extra time for WebRTC connection
-  await sleep(1000);
+  // Give extra time for WebRTC connection setup
+  await sleep(2000);
 }
 
 /**
@@ -92,6 +99,7 @@ async function runCollabTests() {
     }));
 
     // Test 2: Changes sync between peers
+    // NOTE: This test may fail in headless Chrome due to WebRTC limitations
     results.push(await runTest('Cell changes sync between peers', async () => {
       const roomId = generateRoomId();
 
@@ -99,14 +107,14 @@ async function runCollabTests() {
       await joinRoom(ctx.page, ctx.baseUrl, roomId);
       await joinRoom(page2, ctx.baseUrl, roomId);
 
-      // Wait for WebRTC connection
-      await sleep(3000);
+      // Wait for WebRTC connection and data channel establishment
+      await sleep(5000);
 
       // First peer enters a value
       await setCellValue(ctx.page, 'A1', 'Sync Test');
 
-      // Wait for sync
-      await sleep(2000);
+      // Wait for sync (CRDT operation broadcast and apply)
+      await sleep(3000);
 
       // Second peer checks the value
       await clickCell(page2, 'A1');
@@ -124,16 +132,16 @@ async function runCollabTests() {
       await joinRoom(ctx.page, ctx.baseUrl, roomId);
       await joinRoom(page2, ctx.baseUrl, roomId);
 
-      // Wait for WebRTC connection
-      await sleep(3000);
+      // Wait for WebRTC connection and data channel establishment
+      await sleep(5000);
 
       // First peer enters values and formula
       await setCellValue(ctx.page, 'A1', '100');
       await setCellValue(ctx.page, 'A2', '200');
       await setCellValue(ctx.page, 'A3', '=A1+A2');
 
-      // Wait for sync
-      await sleep(2000);
+      // Wait for sync (CRDT operation broadcast and apply)
+      await sleep(3000);
 
       // Second peer checks the formula
       await clickCell(page2, 'A3');
@@ -151,16 +159,16 @@ async function runCollabTests() {
       await joinRoom(ctx.page, ctx.baseUrl, roomId);
       await joinRoom(page2, ctx.baseUrl, roomId);
 
-      // Wait for WebRTC connection
-      await sleep(3000);
+      // Wait for WebRTC connection and data channel establishment
+      await sleep(5000);
 
       // First peer enters value in A1
       await setCellValue(ctx.page, 'A1', 'From Peer 1');
-      await sleep(1500);
+      await sleep(3000);
 
       // Second peer enters value in B1
       await setCellValue(page2, 'B1', 'From Peer 2');
-      await sleep(1500);
+      await sleep(3000);
 
       // Check first peer sees both values
       await clickCell(ctx.page, 'A1');
