@@ -102,6 +102,7 @@ private:
     HandleMessageResult handleSyncRequest(const ID& peerId, const std::string& json);
     HandleMessageResult handleSyncResponse(const ID& peerId, const std::string& json);
     HandleMessageResult handleOperations(const ID& peerId, const std::string& json);
+    HandleMessageResult handleAck(const ID& peerId, const std::string& json);
 
     // Create hello message for sending to new peer
     [[nodiscard]] std::string makeHelloMessage() const;

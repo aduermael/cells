@@ -203,8 +203,9 @@ TEST_F(SyncManagerTest, HandleOperationsBatch) {
 
     auto result = sync_b->handleMessage(node_a, opsBatch);
 
-    // No response needed
-    EXPECT_EQ(result.messages.size(), 0);
+    // Should return an ACK message
+    EXPECT_EQ(result.messages.size(), 1);
+    EXPECT_NE(result.messages[0].json.find("\"type\":\"ack\""), std::string::npos);
     // Data WAS modified (operations applied)
     EXPECT_TRUE(result.dataModified);
 
@@ -273,6 +274,41 @@ TEST_F(SyncManagerTest, QueueOperationsBroadcast) {
     EXPECT_TRUE(messages[0].isBroadcast());
     EXPECT_NE(messages[0].json.find("\"type\":\"operations\""), std::string::npos);
     EXPECT_NE(messages[0].json.find("\"batch\":"), std::string::npos);
+}
+
+TEST_F(SyncManagerTest, AckUpdatesLastSyncedHLC) {
+    // A adds B as peer
+    sync_a->addPeer(node_b);
+    sync_a->getOutgoingMessages();  // Clear hello
+
+    // Create an operation on A
+    Operation op = makeCellSetValueOp(*workbook_a, cell_id, R"({"type":"n","value":"100"})");
+    applyOperation(*workbook_a, op);
+
+    // A broadcasts to B
+    sync_a->queueOperationsBroadcast();
+    auto ops_msg = sync_a->getOutgoingMessages();
+    ASSERT_EQ(ops_msg.size(), 1);
+
+    // Before ACK, A's view of B's lastSyncedHLC should still be low
+    const auto* peerState = sync_a->getPeerSyncState(node_b);
+    ASSERT_NE(peerState, nullptr);
+    HLC beforeAck = peerState->lastSyncedHLC;
+
+    // B receives operations and sends ACK
+    sync_b->addPeer(node_a);
+    sync_b->getOutgoingMessages();  // Clear hello
+    auto result = sync_b->handleMessage(node_a, ops_msg[0].json);
+    ASSERT_EQ(result.messages.size(), 1);  // ACK message
+
+    // A receives ACK from B
+    auto ackResult = sync_a->handleMessage(node_b, result.messages[0].json);
+    EXPECT_FALSE(ackResult.dataModified);  // ACK doesn't modify data
+
+    // After ACK, A's view of B's lastSyncedHLC should be updated
+    peerState = sync_a->getPeerSyncState(node_b);
+    ASSERT_NE(peerState, nullptr);
+    EXPECT_GT(peerState->lastSyncedHLC, beforeAck);
 }
 
 TEST_F(SyncManagerTest, NullPeerIdIgnored) {

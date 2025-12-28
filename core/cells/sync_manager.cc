@@ -220,6 +220,9 @@ HandleMessageResult SyncManager::handleMessage(const ID& peerId, const std::stri
     if (type == "operations") {
         return handleOperations(peerId, json);
     }
+    if (type == "ack") {
+        return handleAck(peerId, json);
+    }
 
     // Unknown message type - no response, no changes
     return {};
@@ -267,23 +270,11 @@ void SyncManager::queueOperationsBroadcast() {
     const std::string msg = makeOperationsMessage(minHLC);
     if (!msg.empty()) {
         queueBroadcast(msg);
-
-        // After broadcasting, update all peers' lastSyncedHLC to our current HLC
-        // This prevents re-sending the same operations on subsequent broadcasts
-        const HLC currentHLC = oplog->getCurrentHLC();
-        for (auto& pair : _peers) {
-            if (pair.second.lastSyncedHLC < currentHLC) {
-                LOG_DEBUG(
-                    "[Sync] queueOperationsBroadcast: updating peer %s lastSyncedHLC %s -> %s",
-                    pair.first.toString().c_str(), pair.second.lastSyncedHLC.toString().c_str(),
-                    currentHLC.toString().c_str());
-                pair.second.lastSyncedHLC = currentHLC;
-            }
-        }
-
-        // Prune oplog now that all peers have been updated - this keeps oplog
-        // size bounded by pruning operations that all peers have seen
-        pruneOpLog();
+        // Note: We do NOT update lastSyncedHLC here optimistically.
+        // Instead, peers send an ACK when they receive operations, and we
+        // update lastSyncedHLC when we receive the ACK. This ensures we don't
+        // prune operations that peers haven't actually received yet.
+        // If a peer doesn't ACK, we'll keep re-sending on the next broadcast.
     }
 }
 
@@ -465,6 +456,7 @@ HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::s
     std::vector<Operation> ops = extractJSONOperations(json, "batch");
 
     bool dataModified = false;
+    std::vector<OutgoingMessage> response;
 
     // Apply operations to workbook
     if (!ops.empty()) {
@@ -475,7 +467,12 @@ HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::s
         newOps.reserve(ops.size());
         size_t duplicates = 0;
 
+        // Track max HLC for ACK
+        HLC maxHLC;
         for (const auto& op : ops) {
+            if (op.hlc > maxHLC) {
+                maxHLC = op.hlc;
+            }
             if (!oplog->hasOperation(op.hlc)) {
                 newOps.push_back(op);
             } else {
@@ -496,13 +493,41 @@ HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::s
                       peerId.toString().c_str(), ops.size(), newOps.size(), applied);
         }
 
-        // Note: We do NOT update lastSyncedHLC here.
-        // lastSyncedHLC tracks what we've SENT to the peer, not what they've sent us.
-        // It gets updated in queueOperationsBroadcast() after we send ops.
+        // Send ACK with the max HLC we received
+        // This tells the sender we have all ops up to this HLC
+        std::ostringstream ack;
+        ack << "{\"type\":\"ack\",\"hlc\":\"" << maxHLC.toString() << "\"}";
+        response.emplace_back(peerId, ack.str());
+        LOG_DEBUG("[Sync] handleOperations: sending ACK to %s for HLC %s",
+                  peerId.toString().c_str(), maxHLC.toString().c_str());
     }
 
     // Return operations for delegate notification
-    return {{}, std::move(ops), dataModified};
+    return {std::move(response), std::move(ops), dataModified};
+}
+
+// Handle ACK from peer - confirms they received our operations
+// No data modification - just updates peer sync state
+HandleMessageResult SyncManager::handleAck(const ID& peerId, const std::string& json) {
+    // Parse: {"type":"ack","hlc":"..."}
+    const std::string hlcStr = extractJSONString(json, "hlc");
+    const HLC ackedHLC = HLC::fromString(hlcStr);
+
+    // Update peer's lastSyncedHLC - they've confirmed receipt up to this HLC
+    auto it = _peers.find(peerId);
+    if (it != _peers.end()) {
+        if (ackedHLC > it->second.lastSyncedHLC) {
+            LOG_DEBUG("[Sync] handleAck: peer %s ACKed HLC %s (was %s)", peerId.toString().c_str(),
+                      ackedHLC.toString().c_str(), it->second.lastSyncedHLC.toString().c_str());
+            it->second.lastSyncedHLC = ackedHLC;
+
+            // Now that peer has confirmed receipt, try to prune old operations
+            pruneOpLog();
+        }
+    }
+
+    // ACK doesn't modify data
+    return {};
 }
 
 std::string SyncManager::makeHelloMessage() const {

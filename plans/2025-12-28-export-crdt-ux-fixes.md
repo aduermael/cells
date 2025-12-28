@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2025-12-28 06:49 UTC
-Updated At: 2025-12-28 17:58 UTC
+Updated At: 2025-12-28 18:15 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Export, CRDT Operations, and UX Fixes
@@ -229,6 +229,13 @@ Current sync_manager.cc:241-262 shows `queueOperationsBroadcast()` finds minimum
    - Added `oplogSize` to `getSyncState()` C++ method
    - Added `oplogSize` to `SyncStats` TypeScript interface
    - Updated collab-ui.ts to display oplog size in stats row
+
+7. **Added ACK system for safe pruning**:
+   - When peer receives `operations`, they reply with `{"type":"ack","hlc":"..."}`
+   - The ACK contains the max HLC from received operations
+   - Sender updates peer's `lastSyncedHLC` only when ACK is received
+   - Pruning only happens after ACK confirms peer received ops
+   - If peer doesn't ACK, operations are re-sent on next broadcast (safe)
 
 ---
 
