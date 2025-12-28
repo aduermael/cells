@@ -296,11 +296,11 @@ export class WasmDataSource {
   async exportAs(format: "csv" | "xlsx" | "zcd"): Promise<ExportResult> {
     const result = await this._client.exportAs(format);
     const blob = new Blob([result.data], { type: getMimeType(format) });
-    // Use snake_case for the filename
+    // Always use snake_case for the filename (ignore worker's filename)
     const snakeCaseName = toSnakeCase(this._workbookName) || "untitled";
     return {
       blob,
-      filename: result.filename || `${snakeCaseName}.${format}`,
+      filename: `${snakeCaseName}.${format}`,
     };
   }
 }

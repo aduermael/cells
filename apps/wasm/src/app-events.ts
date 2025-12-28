@@ -1267,6 +1267,17 @@ export class AppEventManager {
       return;
     }
 
+    // Ignore keyboard events when focus is on other editable elements
+    // (like the workbook title or other inputs outside the grid)
+    const activeEl = document.activeElement;
+    if (activeEl && activeEl !== canvas) {
+      const tagName = activeEl.tagName.toLowerCase();
+      const isContentEditable = (activeEl as HTMLElement).isContentEditable;
+      if (tagName === "input" || tagName === "textarea" || isContentEditable) {
+        return;
+      }
+    }
+
     const selectedCell = getSelectedCell();
     const sheetInfo = getSheetInfo();
     if (!selectedCell || !sheetInfo) return;
