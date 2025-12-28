@@ -2,6 +2,8 @@
 // Provides a reusable context menu that can be shown at any position
 // with context-dependent menu items.
 
+import { getMenuStateManager } from "./menu-state";
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -74,6 +76,12 @@ export class ContextMenuManager {
     this.boundHandleClickOutside = this.handleClickOutside.bind(this);
     this.boundHandleKeydown = this.handleKeydown.bind(this);
     this.boundHandleScroll = this.hide.bind(this);
+
+    // Register with menu state manager
+    const menuState = getMenuStateManager();
+    menuState.registerMenu("context", () => {
+      this.hide();
+    });
   }
 
   // =========================================================================
@@ -95,6 +103,10 @@ export class ContextMenuManager {
    * Show context menu at the specified position
    */
   show(x: number, y: number, items: ContextMenuEntry[]): void {
+    // Notify menu state manager (closes other menus)
+    const menuState = getMenuStateManager();
+    menuState.openMenu("context");
+
     // Hide any existing menu first
     this.hide();
 
@@ -139,6 +151,10 @@ export class ContextMenuManager {
       this.menuElement = null;
     }
     this.isVisible = false;
+
+    // Notify menu state manager
+    const menuState = getMenuStateManager();
+    menuState.closeMenu("context");
 
     // Remove event listeners
     document.removeEventListener("click", this.boundHandleClickOutside);

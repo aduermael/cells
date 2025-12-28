@@ -1,9 +1,9 @@
 # UX/UI Quality of Life Improvements
 
 ```
-Status: IN_PROGRESS
+Status: COMPLETE
 Created At: 2025-12-26 21:41 UTC
-Updated At: 2025-12-27 00:15 UTC
+Updated At: 2025-12-27 04:30 UTC
 Following plan management guidelines defined in AGENTS.md
 ```
 
@@ -189,13 +189,13 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 
 ### Tasks
 
-- [ ] 7a: Create `menu-state.ts` with `MenuStateManager` singleton tracking which menu is open
-- [ ] 7b: Refactor Export dropdown to use shared menu state (close when Collaborate opens)
-- [ ] 7c: Refactor Collaborate panel to use shared menu state (close when Export opens)
-- [ ] 7d: Remove the `▼` arrow from Export button to match Collaborate button style
-- [ ] 7e: Unify CSS: ensure `.dropdown-menu` and `.collab-status-details` share same margins, paddings, border-radius
-- [ ] 7f: Add transition animations matching between menus
-- [ ] 7g: Test opening one menu closes the other
+- [x] 7a: Create `menu-state.ts` with `MenuStateManager` singleton tracking which menu is open
+- [x] 7b: Refactor Export dropdown to use shared menu state (close when Collaborate opens)
+- [x] 7c: Refactor Collaborate panel to use shared menu state (close when Export opens)
+- [x] 7d: Remove the `▼` arrow from Export button to match Collaborate button style
+- [x] 7e: Unify CSS: ensure `.dropdown-menu` and `.collab-status-details` share same margins, paddings, border-radius
+- [x] 7f: Add transition animations matching between menus
+- [x] 7g: Context menu also integrated with menu state manager for consistency
 
 ### UI Checkpoint 7
 - [ ] **USER APPROVAL REQUIRED:** Verify menus look consistent, only one opens at a time, Export has no arrow

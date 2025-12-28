@@ -449,13 +449,13 @@ canvas {
     min-width: 140px;
     background: #fff;
     border: 1px solid #dee2e6;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     z-index: 1000;
     opacity: 0;
     visibility: hidden;
     transform: translateY(-4px);
-    transition: all 0.15s ease;
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
 }
 
 .dropdown.open .dropdown-menu {
@@ -479,15 +479,15 @@ canvas {
 }
 
 .dropdown-item:first-child {
-    border-radius: 5px 5px 0 0;
+    border-radius: 6px 6px 0 0;
 }
 
 .dropdown-item:last-child {
-    border-radius: 0 0 5px 5px;
+    border-radius: 0 0 6px 6px;
 }
 
 .dropdown-item:only-child {
-    border-radius: 5px;
+    border-radius: 6px;
 }
 
 .dropdown-item:hover {
@@ -743,7 +743,7 @@ canvas {
     opacity: 0;
     visibility: hidden;
     transform: translateY(-4px);
-    transition: all 0.15s ease;
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
     padding: 16px;
 }
 

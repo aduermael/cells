@@ -5,6 +5,7 @@
 // The CppSyncAdapter exports CollabState for backwards compatibility
 import { CollabState } from "./cpp-sync-adapter";
 import { generateRandomName } from "./presence";
+import { getMenuStateManager } from "./menu-state";
 import type { SyncStateType, PeerPresence, RoomId, SyncStats } from "./types";
 
 // ============================================================================
@@ -124,6 +125,17 @@ export class CollabUI {
 
     this._createElements();
     this._setupEventListeners();
+    this._registerWithMenuState();
+  }
+
+  /**
+   * Register with the global menu state manager
+   */
+  private _registerWithMenuState(): void {
+    const menuState = getMenuStateManager();
+    menuState.registerMenu("collaborate", () => {
+      this._hideDetails();
+    });
   }
 
   /**
@@ -801,6 +813,8 @@ export class CollabUI {
    * Show the details panel
    */
   private _showDetails(): void {
+    const menuState = getMenuStateManager();
+    menuState.openMenu("collaborate"); // This closes other menus
     this._showingDetails = true;
     this._collaborateBtn?.classList.add("show-details");
     this._updatePeerCount();
@@ -814,6 +828,8 @@ export class CollabUI {
   private _hideDetails(): void {
     this._showingDetails = false;
     this._collaborateBtn?.classList.remove("show-details");
+    const menuState = getMenuStateManager();
+    menuState.closeMenu("collaborate");
   }
 
   /**
@@ -867,5 +883,8 @@ export class CollabUI {
     if (this._shareTooltip?.parentNode) {
       this._shareTooltip.parentNode.removeChild(this._shareTooltip);
     }
+    // Unregister from menu state manager
+    const menuState = getMenuStateManager();
+    menuState.unregisterMenu("collaborate");
   }
 }

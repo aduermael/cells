@@ -5,6 +5,7 @@
 import { CellsClient } from "./client";
 import { WasmDataSource, type DataChangeType } from "./wasm-data-source";
 import { detectFormat, getBaseName, downloadBlob } from "./utils";
+import { getMenuStateManager } from "./menu-state";
 import type { FileFormat } from "./types";
 
 // =============================================================================
@@ -452,16 +453,32 @@ export class FileLoader {
 
     if (!exportDropdown || !exportBtn) return;
 
+    const menuState = getMenuStateManager();
+
+    // Register with menu state manager
+    menuState.registerMenu("export", () => {
+      exportDropdown.classList.remove("open");
+    });
+
     exportBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if ((exportBtn as HTMLButtonElement).disabled) return;
-      exportDropdown.classList.toggle("open");
+
+      const isOpen = exportDropdown.classList.contains("open");
+      if (isOpen) {
+        exportDropdown.classList.remove("open");
+        menuState.closeMenu("export");
+      } else {
+        menuState.openMenu("export"); // This closes other menus
+        exportDropdown.classList.add("open");
+      }
     });
 
     // Close dropdown when clicking outside
     document.addEventListener("click", (e) => {
       if (!exportDropdown.contains(e.target as Node)) {
         exportDropdown.classList.remove("open");
+        menuState.closeMenu("export");
       }
     });
 
@@ -469,6 +486,7 @@ export class FileLoader {
     exportDropdown.querySelectorAll(".dropdown-item").forEach((item) => {
       item.addEventListener("click", () => {
         exportDropdown.classList.remove("open");
+        menuState.closeMenu("export");
       });
     });
   }
