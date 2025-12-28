@@ -277,6 +277,17 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "large_file_test",
+    srcs = ["large_file_test.cc"],
+    data = ["//testdata/xlsx:sample_xlsx_files"],
+    deps = [
+        ":quadtree",
+        ":xlsx_reader",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "xlsx_writer",
     srcs = ["xlsx_writer.cc"],
