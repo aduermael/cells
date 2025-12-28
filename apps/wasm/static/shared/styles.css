@@ -449,7 +449,7 @@ canvas {
     min-width: 140px;
     background: #fff;
     border: 1px solid #dee2e6;
-    border-radius: 8px;
+    border-radius: 4px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     z-index: 1000;
     opacity: 0;
@@ -479,15 +479,15 @@ canvas {
 }
 
 .dropdown-item:first-child {
-    border-radius: 6px 6px 0 0;
+    border-radius: 3px 3px 0 0;
 }
 
 .dropdown-item:last-child {
-    border-radius: 0 0 6px 6px;
+    border-radius: 0 0 3px 3px;
 }
 
 .dropdown-item:only-child {
-    border-radius: 6px;
+    border-radius: 3px;
 }
 
 .dropdown-item:hover {
@@ -737,7 +737,7 @@ canvas {
     width: 260px;
     background: #fff;
     border: 1px solid #dee2e6;
-    border-radius: 8px;
+    border-radius: 4px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     z-index: 1000;
     opacity: 0;
@@ -1260,7 +1260,7 @@ canvas {
     min-width: 160px;
     background: #fff;
     border: 1px solid #dee2e6;
-    border-radius: 8px;
+    border-radius: 4px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
     z-index: 2000;
     padding: 4px 0;
@@ -1318,15 +1318,15 @@ canvas {
 }
 
 .context-menu-item.first {
-    border-radius: 6px 6px 0 0;
+    border-radius: 3px 3px 0 0;
 }
 
 .context-menu-item.last {
-    border-radius: 0 0 6px 6px;
+    border-radius: 0 0 3px 3px;
 }
 
 .context-menu-item.first.last {
-    border-radius: 6px;
+    border-radius: 3px;
 }
 
 .context-menu-icon {
