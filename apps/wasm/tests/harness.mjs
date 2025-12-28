@@ -208,8 +208,6 @@ export async function setup() {
   let page;
   if (CONFIG.useChrome) {
     page = await browser.newPage();
-    // Set viewport to a reasonable size
-    await page.setViewport({ width: 1280, height: 800 });
   } else {
     const context = await browser.createBrowserContext();
     page = await context.newPage();

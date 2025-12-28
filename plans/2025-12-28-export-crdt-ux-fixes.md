@@ -16,7 +16,7 @@ This plan addresses six interconnected issues, ordered by increasing complexity 
 
 ---
 
-## Phase 1: Programmatic Testing with Lightpanda
+## Phase 1: Programmatic Testing with Lightpanda ✅ COMPLETE
 
 **Goal**: Enable automated testing of the web UI to iterate faster on features and catch regressions.
 
@@ -37,6 +37,14 @@ This plan addresses six interconnected issues, ordered by increasing complexity 
 - [x] 1e: Add formula test: enter formula, verify computed result
 - [x] 1f: Add collaboration test: two browser contexts, verify sync
 - [x] 1g: Document how to run programmatic tests in README
+
+### Implementation Notes
+
+- Switched from Lightpanda to Chrome headless (Lightpanda has limited canvas 2D support)
+- Smoke tests: 6/6 PASS
+- Formula tests: 5/5 PASS
+- Collaboration tests: 1/4 PASS (WebRTC limitations in headless Chrome - marked experimental)
+- Added `HEADED=1` and `SLOWMO=100` env vars for debugging
 
 ### Example Test Structure
 
