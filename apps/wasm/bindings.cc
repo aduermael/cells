@@ -2175,10 +2175,19 @@ public:
     }
 
     // Get current sync state as a JSON object.
-    // Returns: { state, peerId, roomId, peerCount, peers: [...] }
+    // Returns: { state, peerId, roomId, peerCount, oplogSize, peers: [...] }
     std::string getSyncState() {
         if (!_syncClient) {
-            return "{\"state\":\"offline\",\"peerId\":\"\",\"roomId\":\"\",\"peerCount\":0,\"peers\":[]}";
+            return "{\"state\":\"offline\",\"peerId\":\"\",\"roomId\":\"\",\"peerCount\":0,\"oplogSize\":0,\"peers\":[]}";
+        }
+
+        // Get oplog size
+        size_t oplogSize = 0;
+        if (_workbook) {
+            OpLog* oplog = _workbook->getOpLog();
+            if (oplog) {
+                oplogSize = oplog->size();
+            }
         }
 
         std::ostringstream json;
@@ -2187,6 +2196,7 @@ public:
         json << "\"peerId\":\"" << _syncClient->getPeerId() << "\",";
         json << "\"roomId\":\"" << _syncClient->getRoomId() << "\",";
         json << "\"peerCount\":" << _syncClient->getPeerCount() << ",";
+        json << "\"oplogSize\":" << oplogSize << ",";
         json << "\"peers\":[";
 
         auto peers = _syncClient->getPeers();

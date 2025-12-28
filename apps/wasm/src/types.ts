@@ -280,12 +280,14 @@ export interface SyncStats {
   operationsReceived: number;
   operationsApplied: number;
   operationsDuplicate: number;
+  oplogSize: number;
 }
 
 /** C++ sync state response */
 export interface CppSyncState {
   state: string;
   peers?: CppPeerInfo[];
+  oplogSize?: number;
 }
 
 /** C++ peer info from sync state */

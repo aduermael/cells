@@ -7,6 +7,7 @@
 #include "core/cells/model.h"
 #include "core/cells/operation.h"
 #include "core/cells/oplog.h"
+#include "core/log/include/Logger.h"
 
 namespace cells {
 
@@ -254,10 +255,35 @@ void SyncManager::queueOperationsBroadcast() {
         }
     }
 
+    const OpLog* oplog = _workbook->getOpLog();
+    const size_t totalOps = oplog->size();
+    const std::vector<Operation> opsToSend = oplog->getOperationsSince(minHLC);
+
+    LOG_DEBUG(
+        "[Sync] queueOperationsBroadcast: peers=%zu oplog_size=%zu min_hlc=%s ops_to_send=%zu",
+        _peers.size(), totalOps, minHLC.toString().c_str(), opsToSend.size());
+
     // Create and queue the operations message
     const std::string msg = makeOperationsMessage(minHLC);
     if (!msg.empty()) {
         queueBroadcast(msg);
+
+        // After broadcasting, update all peers' lastSyncedHLC to our current HLC
+        // This prevents re-sending the same operations on subsequent broadcasts
+        const HLC currentHLC = oplog->getCurrentHLC();
+        for (auto& pair : _peers) {
+            if (pair.second.lastSyncedHLC < currentHLC) {
+                LOG_DEBUG(
+                    "[Sync] queueOperationsBroadcast: updating peer %s lastSyncedHLC %s -> %s",
+                    pair.first.toString().c_str(), pair.second.lastSyncedHLC.toString().c_str(),
+                    currentHLC.toString().c_str());
+                pair.second.lastSyncedHLC = currentHLC;
+            }
+        }
+
+        // Prune oplog now that all peers have been updated - this keeps oplog
+        // size bounded by pruning operations that all peers have seen
+        pruneOpLog();
     }
 }
 
@@ -271,10 +297,16 @@ size_t SyncManager::pruneOpLog() {
         return 0;
     }
 
+    const size_t sizeBefore = oplog->size();
+
     if (_peers.empty()) {
         // No peers - prune everything (use current HLC as threshold)
         const HLC currentHLC = oplog->getCurrentHLC();
-        return oplog->pruneOperationsBefore(currentHLC);
+        const size_t pruned = oplog->pruneOperationsBefore(currentHLC);
+        if (pruned > 0) {
+            LOG_DEBUG("[Sync] pruneOpLog: no peers, pruned %zu ops (was %zu)", pruned, sizeBefore);
+        }
+        return pruned;
     }
 
     // Find the minimum HLC that all peers have synced
@@ -289,10 +321,16 @@ size_t SyncManager::pruneOpLog() {
 
     // If minHLC is zero (no synced operations), don't prune anything
     if (minHLC.wall_time == 0 && minHLC.logical == 0) {
+        LOG_DEBUG("[Sync] pruneOpLog: min_hlc is zero, not pruning (oplog_size=%zu)", sizeBefore);
         return 0;
     }
 
-    return oplog->pruneOperationsBefore(minHLC);
+    const size_t pruned = oplog->pruneOperationsBefore(minHLC);
+    if (pruned > 0) {
+        LOG_DEBUG("[Sync] pruneOpLog: pruned %zu ops (was %zu, now %zu) threshold=%s", pruned,
+                  sizeBefore, oplog->size(), minHLC.toString().c_str());
+    }
+    return pruned;
 }
 
 // Handle hello message from peer
@@ -322,15 +360,24 @@ HandleMessageResult SyncManager::handleHello(const ID& peerId, const std::string
     const OpLog* oplog = _workbook->getOpLog();
     const size_t localOpCount = oplog->size();
 
+    LOG_DEBUG("[Sync] handleHello: peer=%s peer_hlc=%s peer_ops=%lld local_ops=%zu",
+              peerId.toString().c_str(), peerHLC.toString().c_str(), opCount, localOpCount);
+
     if (static_cast<size_t>(opCount) > localOpCount) {
         // They have more operations - request sync
         const HLC localHLC = oplog->getCurrentHLC();
+        LOG_DEBUG("[Sync] handleHello: peer has more ops, requesting sync from %s",
+                  localHLC.toString().c_str());
         response.emplace_back(peerId, makeSyncRequestMessage(localHLC));
     } else if (static_cast<size_t>(opCount) < localOpCount) {
         // We have more operations - send sync response
+        LOG_DEBUG("[Sync] handleHello: we have more ops, sending sync response since %s",
+                  peerHLC.toString().c_str());
         response.emplace_back(peerId, makeSyncResponseMessage(peerHLC));
     } else {
         // Same op count - mark as synced
+        LOG_DEBUG("[Sync] handleHello: same op count, marking peer %s as synced",
+                  peerId.toString().c_str());
         it->second.isSynced = true;
     }
 
@@ -364,17 +411,48 @@ HandleMessageResult SyncManager::handleSyncResponse(const ID& peerId, const std:
 
     // Apply operations to workbook
     if (!ops.empty()) {
-        const size_t applied = applyOperations(*_workbook, ops);
-        dataModified = (applied > 0);
+        // Filter out operations we already have (deduplication)
+        const OpLog* oplog = _workbook->getOpLog();
+        std::vector<Operation> newOps;
+        newOps.reserve(ops.size());
+        size_t duplicates = 0;
+
+        for (const auto& op : ops) {
+            if (!oplog->hasOperation(op.hlc)) {
+                newOps.push_back(op);
+            } else {
+                duplicates++;
+            }
+        }
+
+        if (duplicates > 0) {
+            LOG_DEBUG("[Sync] handleSyncResponse: from=%s skipped %zu duplicate ops",
+                      peerId.toString().c_str(), duplicates);
+        }
+
+        if (!newOps.empty()) {
+            const size_t applied = applyOperations(*_workbook, newOps);
+            dataModified = (applied > 0);
+            LOG_DEBUG("[Sync] handleSyncResponse: from=%s received=%zu new=%zu applied=%zu",
+                      peerId.toString().c_str(), ops.size(), newOps.size(), applied);
+        }
     }
 
     // Update peer sync state
     auto it = _peers.find(peerId);
     if (it != _peers.end()) {
+        const HLC oldHLC = it->second.lastSyncedHLC;
         // Update their lastSyncedHLC to our current HLC
         it->second.lastSyncedHLC = _workbook->getOpLog()->getCurrentHLC();
         it->second.isSynced = true;
+        LOG_DEBUG("[Sync] handleSyncResponse: peer %s marked synced, HLC %s -> %s",
+                  peerId.toString().c_str(), oldHLC.toString().c_str(),
+                  it->second.lastSyncedHLC.toString().c_str());
     }
+
+    // Prune oplog now that peer is synced - this helps keep oplog size manageable
+    // when multiple peers are syncing simultaneously
+    pruneOpLog();
 
     // Return operations for delegate notification
     return {{}, std::move(ops), dataModified};
@@ -390,18 +468,37 @@ HandleMessageResult SyncManager::handleOperations(const ID& peerId, const std::s
 
     // Apply operations to workbook
     if (!ops.empty()) {
-        const size_t applied = applyOperations(*_workbook, ops);
-        dataModified = (applied > 0);
+        // Filter out operations we already have (deduplication)
+        // This is a safety check - normally we shouldn't receive duplicates
+        const OpLog* oplog = _workbook->getOpLog();
+        std::vector<Operation> newOps;
+        newOps.reserve(ops.size());
+        size_t duplicates = 0;
 
-        // Update peer sync state with the latest HLC from received operations
-        auto it = _peers.find(peerId);
-        if (it != _peers.end()) {
-            for (const auto& op : ops) {
-                if (op.hlc > it->second.lastSyncedHLC) {
-                    it->second.lastSyncedHLC = op.hlc;
-                }
+        for (const auto& op : ops) {
+            if (!oplog->hasOperation(op.hlc)) {
+                newOps.push_back(op);
+            } else {
+                duplicates++;
             }
         }
+
+        if (duplicates > 0) {
+            LOG_DEBUG("[Sync] handleOperations: from=%s skipped %zu duplicate ops",
+                      peerId.toString().c_str(), duplicates);
+        }
+
+        if (!newOps.empty()) {
+            const size_t applied = applyOperations(*_workbook, newOps);
+            dataModified = (applied > 0);
+
+            LOG_DEBUG("[Sync] handleOperations: from=%s received=%zu new=%zu applied=%zu",
+                      peerId.toString().c_str(), ops.size(), newOps.size(), applied);
+        }
+
+        // Note: We do NOT update lastSyncedHLC here.
+        // lastSyncedHLC tracks what we've SENT to the peer, not what they've sent us.
+        // It gets updated in queueOperationsBroadcast() after we send ops.
     }
 
     // Return operations for delegate notification

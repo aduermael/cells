@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2025-12-28 06:49 UTC
-Updated At: 2025-12-28 14:35 UTC
+Updated At: 2025-12-28 17:58 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Export, CRDT Operations, and UX Fixes
@@ -185,7 +185,7 @@ The xlsx_writer already used RefConverter.formulaToA1() to convert UUID-based fo
 
 ---
 
-## Phase 4: Fix Collaboration Lag (Operation Pruning)
+## Phase 4: Fix Collaboration Lag (Operation Pruning) ✅ COMPLETE
 
 **Goal**: Ensure operations don't pile up during collaboration, implement efficient sync.
 
@@ -199,11 +199,36 @@ Current sync_manager.cc:241-262 shows `queueOperationsBroadcast()` finds minimum
 
 ### Tasks
 
-- [ ] 4a: Add debug logging for operation counts and HLC values during sync
-- [ ] 4b: Verify lastSyncedHLC updates correctly in handleOperations (line 396-404)
-- [ ] 4c: Call pruneOpLog more aggressively after sync-response received
-- [ ] 4d: Add operation deduplication check before broadcast (skip if peer already has op based on HLC)
-- [ ] 4e: Add sync status indicator in UI (show "synced" vs "X pending ops")
+- [x] 4a: Add debug logging for operation counts and HLC values during sync
+- [x] 4b: Verify lastSyncedHLC updates correctly in handleOperations (line 396-404)
+- [x] 4c: Call pruneOpLog more aggressively after sync-response received
+- [x] 4d: Add operation deduplication check before broadcast (skip if peer already has op based on HLC)
+- [x] 4e: Add sync status indicator in UI (show "synced" vs "X pending ops")
+
+### Implementation Notes
+
+**Key fixes to sync_manager.cc:**
+
+1. **Fixed HLC tracking after broadcast** (4b): `queueOperationsBroadcast()` now updates all peers' `lastSyncedHLC` to current HLC after queuing broadcast. Previously, HLC was only updated when *receiving* ops, causing duplicate broadcasts.
+
+2. **Removed incorrect HLC update in handleOperations** (4b): The old code updated `lastSyncedHLC` based on received operation HLCs, but those are the sender's timestamps, not acknowledgments of our ops. `lastSyncedHLC` should track "what we've sent to the peer".
+
+3. **Added aggressive pruning** (4c):
+   - `pruneOpLog()` now called after `queueOperationsBroadcast()` when HLCs are updated
+   - `pruneOpLog()` now called after `handleSyncResponse()` when peer is marked synced
+
+4. **Added deduplication in handleOperations/handleSyncResponse** (4d): Operations are filtered through `oplog->hasOperation(op.hlc)` before applying to skip duplicates.
+
+5. **Added debug logging** (4a): LOG_DEBUG statements throughout sync flow to track:
+   - Operation counts and HLC values in queueOperationsBroadcast
+   - Prune operations in pruneOpLog
+   - Received/applied counts in handleOperations and handleSyncResponse
+   - HLC updates for peers
+
+6. **UI sync status indicator** (4e):
+   - Added `oplogSize` to `getSyncState()` C++ method
+   - Added `oplogSize` to `SyncStats` TypeScript interface
+   - Updated collab-ui.ts to display oplog size in stats row
 
 ---
 

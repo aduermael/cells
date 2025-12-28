@@ -179,6 +179,7 @@ export class CppSyncAdapter {
       operationsReceived: 0,
       operationsApplied: 0,
       operationsDuplicate: 0,
+      oplogSize: 0,
     };
 
     // Latency tracking (from C++ PeerInfo)
@@ -474,6 +475,11 @@ export class CppSyncAdapter {
       const newState = this._mapState(state.state);
       if (newState !== this._state) {
         this._setState(newState);
+      }
+
+      // Update oplog size in stats
+      if (state.oplogSize !== undefined) {
+        this._stats.oplogSize = state.oplogSize;
       }
 
       // Update peer latencies

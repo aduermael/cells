@@ -185,8 +185,9 @@ TEST_F(SyncManagerTest, HandleSyncResponse) {
     // Data WAS modified (operations applied)
     EXPECT_TRUE(result.dataModified);
 
-    // B should now have the operation
-    EXPECT_EQ(workbook_b->getOpLog()->size(), 1);
+    // B applied the operation (oplog is pruned after sync because peer A is now synced)
+    // The cell value should be correctly updated
+    EXPECT_EQ(workbook_b->getSheet(sheet_id)->getCell(cell_id)->value.raw, "99");
 }
 
 TEST_F(SyncManagerTest, HandleOperationsBatch) {
@@ -326,8 +327,9 @@ TEST_F(SyncManagerTest, FullSyncFlow) {
     auto final_result = sync_b->handleMessage(node_a, result_from_a.messages[0].json);
     EXPECT_TRUE(final_result.dataModified);  // Sync-response DOES modify data
 
-    // B should now have all operations
-    EXPECT_EQ(workbook_b->getOpLog()->size(), 2);
+    // B applied all operations (oplog is pruned after sync because peer A is now synced)
+    // Verify the cell has the final value from op2
+    EXPECT_EQ(workbook_b->getSheet(sheet_id)->getCell(cell_id)->value.raw, "20");
 }
 
 }  // namespace

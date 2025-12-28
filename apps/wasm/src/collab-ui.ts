@@ -743,7 +743,9 @@ export class CollabUI {
 
     if (stats && this._currentState === CollabState.ONLINE) {
       statsRow.style.display = "";
-      statsValue.textContent = `${stats.operationsSent} sent / ${stats.operationsReceived} recv`;
+      // Show sent/received and oplog size (for debugging sync issues)
+      const oplogInfo = stats.oplogSize > 0 ? ` (${stats.oplogSize} ops)` : "";
+      statsValue.textContent = `${stats.operationsSent}↑ ${stats.operationsReceived}↓${oplogInfo}`;
     } else {
       statsRow.style.display = "none";
     }

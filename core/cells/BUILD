@@ -118,6 +118,7 @@ cc_library(
         ":operation",
         ":oplog",
         ":types",
+        "//core/log",
     ],
 )
 
