@@ -13,27 +13,27 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Language | Lines |
 |----------|------:|
-| C++ | 20,137 |
-| TypeScript | 8,150 |
-| HTML | 3,420 |
+| C++ | 32,662 |
+| TypeScript | 17,360 |
+| Starlark | 1,402 |
+| CSS | 1,347 |
 | Objective-C++ | 1,171 |
-| CSS | 1,025 |
-| Starlark | 1,024 |
-| Markdown | 873 |
-| Shell | 647 |
+| Markdown | 926 |
+| Shell | 698 |
 | Go | 643 |
+| HTML | 581 |
 | JavaScript | 177 |
 
 ### Test Code
 
 | Language | Lines |
 |----------|------:|
-| C++ | 8,642 |
+| C++ | 22,581 |
 | Go | 410 |
 
-- **Commits**: 408
-- **WASM Module**: 729 KB
-- **Total Web Bundle**: 1.36 MB
+- **Commits**: 563
+- **WASM Module**: 1.04 MB
+- **Total Web Bundle**: 2.65 MB
 
 <sub>Generated with `./scripts/generate-stats.sh`</sub>
 
@@ -221,7 +221,7 @@ make wasm-dist
 ```
 
 The distribution package includes:
-- `cells_wasm_bin.wasm` - WASM binary (~729KB)
+- `cells_wasm_bin.wasm` - WASM binary (~1.04MB)
 - `cells_wasm_bin.js` - Emscripten JS glue
 - `cells.d.ts` - TypeScript definitions for WASM API
 - `index.html` - Full spreadsheet UI
