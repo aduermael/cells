@@ -371,6 +371,21 @@ export class FileLoader {
       return;
     }
     try {
+      // Warn when exporting to CSV if workbook contains formulas
+      if (format === "csv") {
+        const hasFormulas = await dataSource.hasFormulas();
+        if (hasFormulas) {
+          const proceed = confirm(
+            "This workbook contains formulas. CSV format only saves computed values, not the formulas themselves.\n\n" +
+            "Use ZCD or XLSX format to preserve formulas.\n\n" +
+            "Continue with CSV export?"
+          );
+          if (!proceed) {
+            return;
+          }
+        }
+      }
+
       const result = await dataSource.exportAs(format);
       downloadBlob(result.blob, result.filename);
     } catch (e) {

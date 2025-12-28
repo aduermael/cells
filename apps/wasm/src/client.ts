@@ -378,6 +378,11 @@ export class CellsClient {
 
   // ========== Export API ==========
 
+  async hasFormulas(): Promise<boolean> {
+    const response = await this._send("hasFormulas");
+    return response.hasFormulas as boolean;
+  }
+
   async exportAs(format: FileFormat): Promise<ExportResult> {
     const response = await this._send("export", { format });
     return { data: response.data as ArrayBuffer, filename: response.filename as string };

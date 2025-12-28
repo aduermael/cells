@@ -95,7 +95,7 @@ Looking at `serializer.cc:192-202`, formulas ARE serialized correctly with `cell
 
 - [x] 2a: Add test case to verify formula round-trip (export ZCD → parse → verify formula preserved)
 - [x] 2b: Fix formula text preservation in CellValue when formula is evaluated (ensure raw keeps formula text, not computed result)
-- [ ] 2c: Add CSV export warning in UI when workbook contains formulas
+- [x] 2c: Add CSV export warning in UI when workbook contains formulas
 - [ ] 2d: Verify XLSX formula export uses formula text (not computed value) via RefConverter
 
 ### Implementation Notes (2a, 2b)
@@ -115,6 +115,15 @@ Key changes:
 5. `csv_writer.cc`: Handle all FORMULA_* types for value output
 6. `model.cc`: Updated `asNumber()`/`asBoolean()` to accept FORMULA_* types
 7. Test added in `serializer_test.cc`: FormulaRoundtripTest.FormulaPreservedAfterEvaluation
+
+### Implementation Notes (2c)
+
+Added `hasFormulas()` method to check if workbook contains any formula cells:
+1. `bindings.cc`: Added `hasFormulas()` method that iterates all sheets/cells checking `cell->isFormula()`
+2. `worker.ts`: Added `hasFormulas()` to CellsEngine interface and message handler
+3. `client.ts`: Added `hasFormulas()` client method
+4. `wasm-data-source.ts`: Added `hasFormulas()` wrapper method
+5. `file-loader.ts`: Updated `exportAs()` to show confirmation dialog when exporting CSV with formulas
 
 ---
 

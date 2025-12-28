@@ -68,6 +68,7 @@ interface CellsEngine {
   exportToCells(): string;
   exportToCSV(): string;
   exportToXLSX(): string;
+  hasFormulas(): boolean;
 
   // Workbook management
   getWorkbookName(): string;
@@ -666,6 +667,12 @@ function handleMessage(msg: WorkerRequest): void {
         } else {
           respond({ type: "rowDeleted", success: true });
         }
+        break;
+      }
+
+      case "hasFormulas": {
+        const hasFormulas = engine.hasFormulas();
+        respond({ type: "hasFormulas", hasFormulas });
         break;
       }
 

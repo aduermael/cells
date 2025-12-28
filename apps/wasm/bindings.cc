@@ -1609,6 +1609,25 @@ public:
         return data;
     }
 
+    // Check if workbook contains any formula cells
+    // Returns true if any cell in any sheet has a formula
+    bool hasFormulas() {
+        if (!_workbook) {
+            return false;
+        }
+        for (size_t i = 0; i < _workbook->sheetCount(); ++i) {
+            auto* sheet = _workbook->getSheetByIndex(i);
+            if (sheet) {
+                for (const auto& [cellId, cell] : sheet->cells) {
+                    if (cell->isFormula()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     // ========================================================================
     // Workbook name
     // ========================================================================
@@ -3223,6 +3242,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("exportToCells", &cells::wasm::CellsEngine::exportToCells)
         .function("exportToCSV", &cells::wasm::CellsEngine::exportToCSV)
         .function("exportToXLSX", &cells::wasm::CellsEngine::exportToXLSX)
+        .function("hasFormulas", &cells::wasm::CellsEngine::hasFormulas)
         // Workbook management
         .function("getWorkbookName", &cells::wasm::CellsEngine::getWorkbookName)
         .function("setWorkbookName", &cells::wasm::CellsEngine::setWorkbookName)

@@ -287,6 +287,11 @@ export class WasmDataSource {
   // Export
   // ==========================================================================
 
+  /** Check if the workbook contains any formula cells */
+  async hasFormulas(): Promise<boolean> {
+    return this._client.hasFormulas();
+  }
+
   /** Export workbook to specified format */
   async exportAs(format: "csv" | "xlsx" | "zcd"): Promise<ExportResult> {
     const result = await this._client.exportAs(format);
