@@ -245,29 +245,35 @@ python3 -m http.server 8080 --directory dist
 # Open http://localhost:8080/
 ```
 
-**Run e2e tests (Lightpanda):**
+**Run e2e tests:**
 
-The web app includes e2e tests using [Lightpanda](https://lightpanda.io/) browser (10x faster than Chrome headless):
+The web app includes e2e tests using Chrome headless via Puppeteer:
 
 ```bash
 # Build distribution first
 make wasm-dist
 
 # Run all e2e tests
-cd apps/wasm && npm test:all
+cd apps/wasm && npm run test:all
 
 # Or run specific test suites
-npm test:smoke    # Basic UI functionality
-npm test:formula  # Formula entry and computation
-npm test:collab   # Two-peer collaboration sync
+npm run test:smoke    # Basic UI functionality
+npm run test:formula  # Formula entry and computation
+npm run test:collab   # Two-peer collaboration sync (experimental)
+
+# Watch tests run in a visible browser window
+HEADED=1 npm run test:smoke
+
+# Slow down for debugging (100ms between actions)
+HEADED=1 SLOWMO=100 npm run test:smoke
 ```
 
 Test files are in `apps/wasm/tests/`:
-- `harness.mjs` - Test harness (starts server + Lightpanda)
+- `harness.mjs` - Test harness (starts server + Chrome)
 - `helpers.mjs` - Helper functions (clickCell, setCellValue, etc.)
 - `smoke.test.mjs` - Basic UI tests
 - `formula.test.mjs` - Formula tests
-- `collab.test.mjs` - Collaboration tests
+- `collab.test.mjs` - Collaboration tests (experimental)
 
 **Deploy to static hosting:**
 - Upload contents of `dist/` to any static host (GitHub Pages, Netlify, Vercel, etc.)

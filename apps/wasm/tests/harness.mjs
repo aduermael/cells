@@ -21,6 +21,10 @@ const CONFIG = {
   timeout: 30000,
   // Use Chrome instead of Lightpanda (Lightpanda has limited canvas support)
   useChrome: process.env.USE_CHROME === '1' || true, // Default to Chrome for canvas-based app
+  // Run Chrome in headed mode to see what's happening (set HEADED=1)
+  headed: process.env.HEADED === '1',
+  // Slow down actions for debugging (set SLOWMO=100 for 100ms delay)
+  slowMo: parseInt(process.env.SLOWMO || '0', 10),
 };
 
 /**
@@ -137,7 +141,8 @@ async function startBrowser() {
     // Use regular Puppeteer with Chrome
     const puppeteerFull = await import('puppeteer');
     const browser = await puppeteerFull.default.launch({
-      headless: true,
+      headless: !CONFIG.headed,
+      slowMo: CONFIG.slowMo,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
