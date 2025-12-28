@@ -189,7 +189,13 @@ void Serializer::serializeCellValue(const CellValue& value, const Cell& cell,
             out << "\"" << escapeString(value.raw) << "\"";
             break;
 
+        // All formula types serialize the same way - output the formula text
         case CellValueType::FORMULA:
+        case CellValueType::FORMULA_NUMBER:
+        case CellValueType::FORMULA_STRING:
+        case CellValueType::FORMULA_BOOLEAN:
+        case CellValueType::FORMULA_ERROR:
+        case CellValueType::FORMULA_EMPTY:
             // Shared formula subscriber: write =@masterUUID reference
             if (cell.sharedFormulaRef != nullptr) {
                 out << "\"=@" << cell.sharedFormulaRef->id.toString() << "\"";

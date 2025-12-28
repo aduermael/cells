@@ -3,7 +3,10 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 
+#include "core/cells/formula_eval.h"
+#include "core/cells/formula_recalc.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/parser.h"
@@ -638,6 +641,87 @@ X xSubscrb cA1bC2dE rA1bC2dE f "=@NOTEXIST"
     EXPECT_FALSE(result.ok());
     EXPECT_TRUE(result.error.has_value());
     EXPECT_NE(result.error->message.find("master not found"), std::string::npos);
+}
+
+// --- Formula Evaluation Roundtrip Test ---
+// Verifies that formulas are preserved after evaluation (not just initial creation)
+
+TEST(FormulaRoundtripTest, FormulaPreservedAfterEvaluation) {
+    // Create a workbook with a formula cell
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+
+    // Create column A at position 0
+    auto colA = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    colA->position = 0;
+
+    // Create rows 0 and 1
+    auto row0 = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row0->position = 0;
+    auto row1 = std::make_unique<Axis>(ID("rB3dE4fG"), false);
+    row1->position = 1;
+
+    // Cell A1 with value 10
+    auto cellA1 = std::make_unique<Cell>(ID("xCellA1a"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cellA1->value = CellValue(10.0);
+
+    // Cell A2 with formula =10+5 (simple arithmetic)
+    auto cellA2 = std::make_unique<Cell>(ID("xCellA2a"), ID("cA1bC2dE"), ID("rB3dE4fG"));
+    auto* formula = new Formula("=10+5");
+    formula->parse();
+    cellA2->setFormula(formula);
+
+    // Add everything to sheet
+    Sheet* sheetPtr = sheet.get();
+    sheet->addColumn(std::move(colA));
+    sheet->addRow(std::move(row0));
+    sheet->addRow(std::move(row1));
+    sheet->addCell(std::move(cellA1));
+    sheet->addCell(std::move(cellA2));
+    wb->addSheet(std::move(sheet));
+
+    // Verify cell has formula type BEFORE evaluation
+    Cell* formulaCell = sheetPtr->getCell(ID("xCellA2a"));
+    ASSERT_NE(formulaCell, nullptr);
+    EXPECT_EQ(formulaCell->value.type, CellValueType::FORMULA);
+    EXPECT_TRUE(formulaCell->isFormula());
+
+    // Serialize BEFORE evaluation - should work
+    const std::string outputBefore = serialize(*wb);
+    EXPECT_NE(outputBefore.find("f \"=10+5\""), std::string::npos)
+        << "Formula should be serialized before evaluation";
+
+    // Now evaluate the formula using the recalculation engine
+    // This uses the evaluateCell function from formula_recalc.cc
+    EvalResult result = evaluateCell(sheetPtr, formulaCell);
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), 15.0);
+
+    // After evaluation, the cell should still have a formula type
+    // (The fix in formula_recalc.cc uses FORMULA_* result types)
+    EXPECT_TRUE(isFormulaType(formulaCell->value.type))
+        << "Cell type should be a formula type after evaluation";
+    EXPECT_EQ(formulaCell->value.type, CellValueType::FORMULA_NUMBER)
+        << "Formula evaluating to number should have FORMULA_NUMBER type";
+    EXPECT_TRUE(formulaCell->isFormula());
+
+    // Serialize AFTER evaluation - formula text should be preserved
+    const std::string outputAfter = serialize(*wb);
+    EXPECT_NE(outputAfter.find("f \"=10+5\""), std::string::npos)
+        << "Formula should be serialized after evaluation";
+
+    // Parse back and verify formula is preserved
+    ParseResult parsed = parse(outputAfter);
+    ASSERT_TRUE(parsed.ok()) << (parsed.error ? parsed.error->toString() : "");
+
+    Sheet* parsedSheet = parsed.workbook->getSheetByIndex(0);
+    ASSERT_NE(parsedSheet, nullptr);
+
+    Cell* parsedCell = parsedSheet->getCell(ID("xCellA2a"));
+    ASSERT_NE(parsedCell, nullptr);
+    EXPECT_TRUE(parsedCell->isFormula());
+    EXPECT_NE(parsedCell->formula, nullptr);
+    EXPECT_STREQ(parsedCell->formula->text, "=10+5");
 }
 
 }  // namespace

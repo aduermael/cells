@@ -192,6 +192,8 @@ cc_test(
     srcs = ["serializer_test.cc"],
     data = ["//testdata:sample_zcd_files"],
     deps = [
+        ":formula_eval",
+        ":formula_recalc",
         ":id",
         ":model",
         ":parser",

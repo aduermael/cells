@@ -99,15 +99,40 @@ struct std::hash<cells::ID> {
 namespace cells {
 
 // Cell value types - stored as single char in file format
+// Formula result types (FORMULA_*) indicate both "this is a formula" AND "the computed result type"
 enum class CellValueType : std::uint8_t {
     NUMBER,     // 'n' - numeric value (42, 3.14, -100)
     STRING,     // 's' - quoted string ("Hello")
-    FORMULA,    // 'f' - formula with ID-based refs ("=$cA$r1+10")
+    FORMULA,    // 'f' - formula (unevaluated or pre-evaluation)
     BOOLEAN,    // 'b' - true or false
     ERROR,      // 'e' - error value (#DIV/0!, #REF!, etc.)
     DATE,       // 'd' - ISO 8601 date (2024-01-15)
     DATE_TIME,  // 't' - ISO 8601 datetime (2024-01-15T10:30:00Z)
+
+    // Formula result types - formula that has been evaluated
+    // These are never serialized to file (serializer outputs 'f' for all)
+    // but allow code to know both "it's a formula" and "the result type"
+    FORMULA_NUMBER,   // Formula that evaluates to a number
+    FORMULA_STRING,   // Formula that evaluates to a string
+    FORMULA_BOOLEAN,  // Formula that evaluates to a boolean
+    FORMULA_ERROR,    // Formula that evaluates to an error
+    FORMULA_EMPTY,    // Formula that evaluates to empty
 };
+
+// Check if a type represents a formula (either unevaluated or with result)
+inline bool isFormulaType(CellValueType type) {
+    switch (type) {
+        case CellValueType::FORMULA:
+        case CellValueType::FORMULA_NUMBER:
+        case CellValueType::FORMULA_STRING:
+        case CellValueType::FORMULA_BOOLEAN:
+        case CellValueType::FORMULA_ERROR:
+        case CellValueType::FORMULA_EMPTY:
+            return true;
+        default:
+            return false;
+    }
+}
 
 // Convert file format char to CellValueType
 inline CellValueType charToValueType(char c) {
@@ -139,7 +164,12 @@ inline char valueTypeToChar(CellValueType type) {
         case CellValueType::STRING:
             return 's';
         case CellValueType::FORMULA:
-            return 'f';
+        case CellValueType::FORMULA_NUMBER:
+        case CellValueType::FORMULA_STRING:
+        case CellValueType::FORMULA_BOOLEAN:
+        case CellValueType::FORMULA_ERROR:
+        case CellValueType::FORMULA_EMPTY:
+            return 'f';  // All formula types serialize as 'f'
         case CellValueType::BOOLEAN:
             return 'b';
         case CellValueType::ERROR:

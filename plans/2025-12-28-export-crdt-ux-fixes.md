@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2025-12-28 06:49 UTC
-Updated At: 2025-12-28 11:00 UTC
+Updated At: 2025-12-28 13:50 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Export, CRDT Operations, and UX Fixes
@@ -93,10 +93,28 @@ Looking at `serializer.cc:192-202`, formulas ARE serialized correctly with `cell
 
 ### Tasks
 
-- [ ] 2a: Add test case to verify formula round-trip (export ZCD → parse → verify formula preserved)
-- [ ] 2b: Fix formula text preservation in CellValue when formula is evaluated (ensure raw keeps formula text, not computed result)
+- [x] 2a: Add test case to verify formula round-trip (export ZCD → parse → verify formula preserved)
+- [x] 2b: Fix formula text preservation in CellValue when formula is evaluated (ensure raw keeps formula text, not computed result)
 - [ ] 2c: Add CSV export warning in UI when workbook contains formulas
 - [ ] 2d: Verify XLSX formula export uses formula text (not computed value) via RefConverter
+
+### Implementation Notes (2a, 2b)
+
+Introduced FORMULA_* result types in CellValueType enum to preserve formula identity after evaluation:
+- `FORMULA_NUMBER` - formula that evaluates to a number
+- `FORMULA_STRING` - formula that evaluates to a string
+- `FORMULA_BOOLEAN` - formula that evaluates to a boolean
+- `FORMULA_ERROR` - formula that evaluates to an error
+- `FORMULA_EMPTY` - formula that evaluates to empty
+
+Key changes:
+1. `types.h`: Added new enum values and `isFormulaType()` helper
+2. `formula_recalc.cc`: Set appropriate FORMULA_* type after evaluation
+3. `formula_eval.cc`: Same fix for evaluate() function
+4. `serializer.cc`: All FORMULA_* types serialize as 'f' with formula text
+5. `csv_writer.cc`: Handle all FORMULA_* types for value output
+6. `model.cc`: Updated `asNumber()`/`asBoolean()` to accept FORMULA_* types
+7. Test added in `serializer_test.cc`: FormulaRoundtripTest.FormulaPreservedAfterEvaluation
 
 ---
 

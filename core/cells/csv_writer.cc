@@ -52,9 +52,11 @@ std::vector<ID> CSVWriter::getOrderedRows(const Sheet& sheet) const {
 std::string CSVWriter::formatValue(const CellValue& value) const {
     switch (value.type) {
         case CellValueType::BOOLEAN:
+        case CellValueType::FORMULA_BOOLEAN:
             return value.raw == "1" || value.raw == "true" ? "true" : "false";
 
         case CellValueType::ERROR:
+        case CellValueType::FORMULA_ERROR:
             return errorToString(value.error);
 
         case CellValueType::NUMBER:
@@ -62,6 +64,9 @@ std::string CSVWriter::formatValue(const CellValue& value) const {
         case CellValueType::DATE_TIME:
         case CellValueType::STRING:
         case CellValueType::FORMULA:
+        case CellValueType::FORMULA_NUMBER:
+        case CellValueType::FORMULA_STRING:
+        case CellValueType::FORMULA_EMPTY:
             // For formulas, output the cached computed value (stored in raw)
             return value.raw;
     }

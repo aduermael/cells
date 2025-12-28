@@ -51,21 +51,27 @@ static std::vector<ID> getDependentsWithRanges(Sheet* sheet, const ID& cellId) {
 static EvalResult cellValueToEvalResult(const CellValue& value) {
     switch (value.type) {
         case CellValueType::NUMBER:
-            return EvalResult::Number(value.asNumber());
+        case CellValueType::FORMULA_NUMBER:
+            return EvalResult::Number(std::strtod(value.raw.c_str(), nullptr));
         case CellValueType::STRING:
+        case CellValueType::FORMULA_STRING:
             if (value.raw.empty()) {
                 return EvalResult::Empty();
             }
             return EvalResult::String(value.asString());
         case CellValueType::BOOLEAN:
-            return EvalResult::Boolean(value.asBoolean());
+        case CellValueType::FORMULA_BOOLEAN:
+            return EvalResult::Boolean(value.raw == "true");
         case CellValueType::ERROR:
+        case CellValueType::FORMULA_ERROR:
             return EvalResult::Error(value.error);
         case CellValueType::DATE:
         case CellValueType::DATE_TIME:
-            return EvalResult::Number(value.asNumber());
+            return EvalResult::Number(std::strtod(value.raw.c_str(), nullptr));
+        case CellValueType::FORMULA_EMPTY:
+            return EvalResult::Empty();
         case CellValueType::FORMULA:
-            // Formula type but no AST means unparsed or error
+            // Unevaluated formula - parse raw value
             if (value.error != CellError::NONE) {
                 return EvalResult::Error(value.error);
             }
@@ -119,20 +125,29 @@ EvalResult evaluateCell(Sheet* sheet, Cell* cell) {
     // Evaluate the formula
     EvalResult result = evaluate(formula->ast, ctx);
 
-    // Store the result in the cell's value
+    // Store the result in the cell's value using FORMULA_* result types
+    // This preserves the formula nature while indicating the computed result type.
+    // Using specific types (FORMULA_NUMBER, etc.) allows code to know both
+    // "it's a formula" AND "what type the result is" without additional fields.
     if (result.isError()) {
         cell->value = CellValue(result.getError());
+        cell->value.type = CellValueType::FORMULA_ERROR;
     } else if (result.isNumber()) {
         cell->value = CellValue(result.getNumber());
+        cell->value.type = CellValueType::FORMULA_NUMBER;
     } else if (result.isString()) {
         cell->value = CellValue(result.getString());
+        cell->value.type = CellValueType::FORMULA_STRING;
     } else if (result.isBoolean()) {
         cell->value = CellValue(result.getBoolean());
+        cell->value.type = CellValueType::FORMULA_BOOLEAN;
     } else if (result.isEmpty()) {
         cell->value = CellValue("");
+        cell->value.type = CellValueType::FORMULA_EMPTY;
     } else {
         // Range or other type - shouldn't happen for cell result
         cell->value = CellValue(CellError::VALUE);
+        cell->value.type = CellValueType::FORMULA_ERROR;
         result = EvalResult::Error(CellError::VALUE);
     }
 

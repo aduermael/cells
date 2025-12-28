@@ -95,13 +95,15 @@ protected:
         return cell->value.asNumber();
     }
 
-    // Check if cell has error
+    // Check if cell has error (either standalone ERROR or FORMULA_ERROR)
     bool cellHasError(uint32_t col, uint32_t row, CellError expectedError) {
         Cell* cell = sheet->getCellAt(colIds[col], rowIds[row]);
         if (!cell) {
             return false;
         }
-        return cell->value.type == CellValueType::ERROR && cell->value.error == expectedError;
+        const bool isError = cell->value.type == CellValueType::ERROR ||
+                             cell->value.type == CellValueType::FORMULA_ERROR;
+        return isError && cell->value.error == expectedError;
     }
 
     std::unique_ptr<Workbook> workbook;

@@ -28,20 +28,25 @@ static EvalResult evaluateFunctionCall(const FunctionCallNode* node, EvalContext
 static EvalResult cellValueToEvalResult(const CellValue& value) {
     switch (value.type) {
         case CellValueType::NUMBER:
-            return EvalResult::Number(value.asNumber());
+        case CellValueType::FORMULA_NUMBER:
+            return EvalResult::Number(std::strtod(value.raw.c_str(), nullptr));
         case CellValueType::STRING:
+        case CellValueType::FORMULA_STRING:
             // Empty string is treated as empty cell (returns 0 in numeric context)
             if (value.raw.empty()) {
                 return EvalResult::Empty();
             }
             return EvalResult::String(value.asString());
         case CellValueType::BOOLEAN:
-            return EvalResult::Boolean(value.asBoolean());
+        case CellValueType::FORMULA_BOOLEAN:
+            return EvalResult::Boolean(value.raw == "true");
         case CellValueType::ERROR:
+        case CellValueType::FORMULA_ERROR:
             return EvalResult::Error(value.error);
+        case CellValueType::FORMULA_EMPTY:
+            return EvalResult::Empty();
         case CellValueType::FORMULA:
-            // Formula cells should have their value evaluated
-            // This case handles the cached result
+            // Unevaluated formula - parse raw value
             if (value.error != CellError::NONE) {
                 return EvalResult::Error(value.error);
             }
@@ -63,7 +68,7 @@ static EvalResult cellValueToEvalResult(const CellValue& value) {
         case CellValueType::DATE:
         case CellValueType::DATE_TIME:
             // Dates are stored as serial numbers (days since epoch)
-            return EvalResult::Number(value.asNumber());
+            return EvalResult::Number(std::strtod(value.raw.c_str(), nullptr));
     }
     return EvalResult::Empty();
 }
@@ -131,17 +136,23 @@ static EvalResult evaluateCellRef(const CellRefNode* node, EvalContext& ctx) {
 
         EvalResult result = evaluate(formula->ast, subCtx);
 
-        // Store result in cell value
+        // Store result in cell value using FORMULA_* result types
+        // This preserves the formula nature while indicating the computed result type.
         if (result.isError()) {
             cell->value = CellValue(result.getError());
+            cell->value.type = CellValueType::FORMULA_ERROR;
         } else if (result.isNumber()) {
             cell->value = CellValue(result.getNumber());
+            cell->value.type = CellValueType::FORMULA_NUMBER;
         } else if (result.isString()) {
             cell->value = CellValue(result.getString());
+            cell->value.type = CellValueType::FORMULA_STRING;
         } else if (result.isBoolean()) {
             cell->value = CellValue(result.getBoolean());
+            cell->value.type = CellValueType::FORMULA_BOOLEAN;
         } else {
             cell->value = CellValue("");  // Empty
+            cell->value.type = CellValueType::FORMULA_EMPTY;
         }
 
         // Mark as clean

@@ -130,14 +130,16 @@ CellValue::CellValue(CellError err)
     : raw(errorToString(err)), type(CellValueType::ERROR), error(err) {}
 
 double CellValue::asNumber() const {
-    if (type != CellValueType::NUMBER) {
+    // Allow reading numbers from NUMBER and formula number types
+    if (type != CellValueType::NUMBER && type != CellValueType::FORMULA_NUMBER) {
         return 0.0;
     }
     return std::strtod(raw.c_str(), nullptr);
 }
 
 bool CellValue::asBoolean() const {
-    if (type != CellValueType::BOOLEAN) {
+    // Allow reading booleans from BOOLEAN and formula boolean types
+    if (type != CellValueType::BOOLEAN && type != CellValueType::FORMULA_BOOLEAN) {
         return false;
     }
     return raw == "true";
