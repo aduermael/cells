@@ -155,6 +155,26 @@ public:
         _workbook = std::move(result.workbook);
         _activeSheetIndex = 0;
         rebuildQuadtree();
+
+        // Evaluate all formulas in all sheets after loading
+        // This computes the cached values that get displayed in cells
+        for (size_t i = 0; i < _workbook->sheetCount(); ++i) {
+            auto* sheet = _workbook->getSheetByIndex(i);
+            if (sheet) {
+                // Collect all formula cells
+                std::vector<ID> formulaCells;
+                for (const auto& [cellId, cell] : sheet->cells) {
+                    if (cell->isFormula()) {
+                        formulaCells.push_back(cellId);
+                    }
+                }
+                // Recalculate them in dependency order
+                if (!formulaCells.empty()) {
+                    cells::recalculate(sheet, formulaCells);
+                }
+            }
+        }
+
         notifyListeners(ChangeType::DATA_LOADED);
         return "{\"success\":true,\"sheetCount\":" + std::to_string(_workbook->sheetCount()) + "}";
     }
@@ -187,6 +207,26 @@ public:
         _workbook = std::move(result.workbook);
         _activeSheetIndex = 0;
         rebuildQuadtree();
+
+        // Evaluate all formulas in all sheets after loading
+        // This computes the cached values that get displayed in cells
+        for (size_t i = 0; i < _workbook->sheetCount(); ++i) {
+            auto* sheet = _workbook->getSheetByIndex(i);
+            if (sheet) {
+                // Collect all formula cells
+                std::vector<ID> formulaCells;
+                for (const auto& [cellId, cell] : sheet->cells) {
+                    if (cell->isFormula()) {
+                        formulaCells.push_back(cellId);
+                    }
+                }
+                // Recalculate them in dependency order
+                if (!formulaCells.empty()) {
+                    cells::recalculate(sheet, formulaCells);
+                }
+            }
+        }
+
         notifyListeners(ChangeType::DATA_LOADED);
         return "{\"success\":true,\"sheetCount\":" + std::to_string(_workbook->sheetCount()) + "}";
     }
