@@ -198,7 +198,7 @@ This plan addresses seven UX/UI improvements for the Cells web application. Each
 - [x] 7g: Context menu also integrated with menu state manager for consistency
 
 ### UI Checkpoint 7
-- [ ] **USER APPROVAL REQUIRED:** Verify menus look consistent, only one opens at a time, Export has no arrow
+- [x] **USER APPROVED:** Menus look consistent, only one opens at a time, Export has no arrow
 
 ---
 
