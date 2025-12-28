@@ -820,6 +820,163 @@ TEST(XLSXWriterTest, WriteFormulaWithSpecialChars) {
     EXPECT_TRUE(readResult.ok());
 }
 
+// Test that FORMULA_* result types are handled correctly when exporting
+// This simulates a formula that has been evaluated (type changes from FORMULA to FORMULA_NUMBER
+// etc.)
+TEST(XLSXWriterTest, WriteFormulasWithEvaluatedTypes) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "EvaluatedFormulas");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Create 2 columns, 4 rows
+    std::vector<ID> colIds;
+    for (int i = 0; i < 2; ++i) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        colIds.push_back(col->id);
+        sheet->addColumn(std::move(col));
+    }
+
+    std::vector<ID> rowIds;
+    for (int i = 0; i < 4; ++i) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet->addRow(std::move(row));
+    }
+
+    // A1 = 10 (value cell)
+    auto cell1 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[0]);
+    cell1->value = CellValue(10.0);
+    sheet->addCell(std::move(cell1));
+
+    // B1 = formula with FORMULA_NUMBER result type (simulating evaluated formula)
+    auto cell2 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[0]);
+    cell2->value.raw = "20";
+    cell2->value.type = CellValueType::FORMULA_NUMBER;  // Evaluated result type
+    cell2->setFormula(new Formula("=A1*2"));
+    sheet->addCell(std::move(cell2));
+
+    // A2 = "Hello" (value cell)
+    auto cell3 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[1]);
+    cell3->value = CellValue("Hello");
+    sheet->addCell(std::move(cell3));
+
+    // B2 = formula with FORMULA_STRING result type
+    auto cell4 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[1]);
+    cell4->value.raw = "Hello World";
+    cell4->value.type = CellValueType::FORMULA_STRING;
+    cell4->setFormula(new Formula("=CONCAT(A2,\" World\")"));
+    sheet->addCell(std::move(cell4));
+
+    // A3 = true (value cell)
+    auto cell5 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[2]);
+    cell5->value = CellValue(true);
+    sheet->addCell(std::move(cell5));
+
+    // B3 = formula with FORMULA_BOOLEAN result type
+    auto cell6 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[2]);
+    cell6->value.raw = "true";
+    cell6->value.type = CellValueType::FORMULA_BOOLEAN;
+    cell6->setFormula(new Formula("=A3"));
+    sheet->addCell(std::move(cell6));
+
+    // A4 = 0 (for division by zero)
+    auto cell7 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[3]);
+    cell7->value = CellValue(0.0);
+    sheet->addCell(std::move(cell7));
+
+    // B4 = formula with FORMULA_ERROR result type
+    auto cell8 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[3]);
+    cell8->value.raw = "#DIV/0!";
+    cell8->value.type = CellValueType::FORMULA_ERROR;
+    cell8->setFormula(new Formula("=1/A4"));
+    sheet->addCell(std::move(cell8));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("evaluated_formulas.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+
+    // Read back and verify formulas are present with values
+    XLSXReadOptions readOptions;
+    readOptions.readFormulas = true;
+    readOptions.readFormulaText = true;
+
+    auto readResult = readXLSX(path, readOptions);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Count formula cells - should have 4 formula cells
+    int formulaCount = 0;
+    for (const auto& [id, c] : readSheet->cells) {
+        if (c->isFormula()) {
+            formulaCount++;
+        }
+    }
+
+    EXPECT_GE(formulaCount, 3) << "Expected at least 3 formula cells";
+}
+
+// Test that formula cells with multiple types are exported correctly when writeFormulas=false
+// This verifies that number, string, and boolean formula cells all export their cached values
+TEST(XLSXWriterTest, WriteFormulasDisabledWithDifferentTypes) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "ValuesOnly");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Create column
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    // Create row
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    // Cell with formula - should only export value when writeFormulas=false
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue(42.0);  // Cached result
+    cell->setFormula(new Formula("=21*2"));
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("values_only_simple.xlsx");
+    TempFileGuard guard(path);
+
+    XLSXWriteOptions options;
+    options.writeFormulas = false;
+
+    auto result = writeXLSX(*workbook, path, options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+
+    // Read back - should have value but no formula
+    XLSXReadOptions readOptions;
+    readOptions.readFormulas = true;
+
+    auto readResult = readXLSX(path, readOptions);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Verify no formulas but values are present
+    for (const auto& [id, c] : readSheet->cells) {
+        EXPECT_FALSE(c->isFormula()) << "Cell should not have formula when writeFormulas=false";
+        EXPECT_EQ(c->value.type, CellValueType::NUMBER);
+        EXPECT_DOUBLE_EQ(c->value.asNumber(), 42.0);
+    }
+}
+
 TEST(XLSXWriterTest, SkipFormulasWhenDisabled) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "NoFormulas");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");

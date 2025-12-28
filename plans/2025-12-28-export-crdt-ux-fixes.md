@@ -96,7 +96,7 @@ Looking at `serializer.cc:192-202`, formulas ARE serialized correctly with `cell
 - [x] 2a: Add test case to verify formula round-trip (export ZCD → parse → verify formula preserved)
 - [x] 2b: Fix formula text preservation in CellValue when formula is evaluated (ensure raw keeps formula text, not computed result)
 - [x] 2c: Add CSV export warning in UI when workbook contains formulas
-- [ ] 2d: Verify XLSX formula export uses formula text (not computed value) via RefConverter
+- [x] 2d: Verify XLSX formula export uses formula text (not computed value) via RefConverter
 
 ### Implementation Notes (2a, 2b)
 
@@ -124,6 +124,17 @@ Added `hasFormulas()` method to check if workbook contains any formula cells:
 3. `client.ts`: Added `hasFormulas()` client method
 4. `wasm-data-source.ts`: Added `hasFormulas()` wrapper method
 5. `file-loader.ts`: Updated `exportAs()` to show confirmation dialog when exporting CSV with formulas
+
+### Implementation Notes (2d)
+
+Verified and fixed XLSX formula export to handle FORMULA_* result types:
+1. `xlsx_writer.cc`: Updated cached value writing to handle FORMULA_NUMBER, FORMULA_STRING, FORMULA_BOOLEAN, FORMULA_ERROR types
+2. `xlsx_writer.cc`: Updated value cell branch (when writeFormulas=false) to handle FORMULA_* types
+3. Added tests:
+   - `WriteFormulasWithEvaluatedTypes`: Tests formula cells with FORMULA_* types export correctly with formula text and cached values
+   - `WriteFormulasDisabledWithDifferentTypes`: Tests that when writeFormulas=false, only cached values are exported (no formulas)
+
+The xlsx_writer already used RefConverter.formulaToA1() to convert UUID-based formula references to A1 notation - verified this is working correctly.
 
 ---
 

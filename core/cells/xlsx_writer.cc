@@ -369,22 +369,31 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
                 }
 
                 // Write cached value if available
-                if (value.type == cells::CellValueType::NUMBER) {
+                // Check for both regular types and FORMULA_* result types
+                if (value.type == cells::CellValueType::NUMBER ||
+                    value.type == cells::CellValueType::FORMULA_NUMBER) {
                     xml << "        <v>" << value.raw << "</v>\n";
-                } else if (value.type == cells::CellValueType::STRING && !value.raw.empty()) {
+                } else if (value.type == cells::CellValueType::BOOLEAN ||
+                           value.type == cells::CellValueType::FORMULA_BOOLEAN) {
+                    xml << "        <v>" << (value.raw == "true" || value.raw == "1" ? "1" : "0")
+                        << "</v>\n";
+                } else if (!value.raw.empty()) {
+                    // String, error, and other types - escape XML special characters
                     xml << "        <v>" << escapeXml(value.raw) << "</v>\n";
                 }
                 xml << "      </c>\n";
             } else {
-                // Value cell
+                // Value cell (or formula cell when writeFormulas is false)
                 switch (value.type) {
                     case cells::CellValueType::NUMBER:
+                    case cells::CellValueType::FORMULA_NUMBER:
                         xml << ">\n";
                         xml << "        <v>" << value.raw << "</v>\n";
                         xml << "      </c>\n";
                         break;
 
                     case cells::CellValueType::STRING:
+                    case cells::CellValueType::FORMULA_STRING:
                         if (!value.raw.empty()) {
                             const size_t sstIndex = sst.getOrAdd(value.raw);
                             xml << " t=\"s\">\n";
@@ -396,6 +405,7 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
                         break;
 
                     case cells::CellValueType::BOOLEAN:
+                    case cells::CellValueType::FORMULA_BOOLEAN:
                         xml << " t=\"b\">\n";
                         xml << "        <v>"
                             << (value.raw == "true" || value.raw == "1" ? "1" : "0") << "</v>\n";
@@ -403,6 +413,7 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
                         break;
 
                     case cells::CellValueType::ERROR:
+                    case cells::CellValueType::FORMULA_ERROR:
                         xml << " t=\"e\">\n";
                         xml << "        <v>" << escapeXml(value.raw) << "</v>\n";
                         xml << "      </c>\n";
