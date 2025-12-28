@@ -97,6 +97,8 @@ When executing a plan, each subtask gets its own commit named by phase and subta
 
 **Stop at the end of each phase** to let the user review the commits before proceeding to the next phase. Do not continue to the next phase until the user gives approval.
 
+**Integration tests must pass at the end of each phase.** Before completing a phase, run `cd apps/wasm && npm run test:stable` to verify all stable E2E tests pass. Do not introduce regressions in passing tests.
+
 ### Working Style
 
 - **One commit per sub-task:** Each lettered subtask (a, b, c...) gets its own commit
@@ -125,7 +127,15 @@ testdata/                   # Sample .zcd files for testing
 ```
 
 ### Testing
+
+**Unit tests (C++):**
 - Each module should have corresponding tests
 - Test files named `<module>_test.cc` (colocated with source)
 - Sample data files in `testdata/`
 - Run tests with `bazel test //core/...`
+
+**E2E tests (Puppeteer):**
+- Test files in `apps/wasm/tests/`
+- Run stable tests: `cd apps/wasm && npm run test:stable`
+- Stable suites: `smoke`, `formula`
+- Experimental suites: `collab` (may fail, excluded from `test:stable`)

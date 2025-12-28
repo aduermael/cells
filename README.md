@@ -253,13 +253,16 @@ The web app includes e2e tests using Chrome headless via Puppeteer:
 # Build distribution first
 make wasm-dist
 
-# Run all e2e tests
-cd apps/wasm && npm run test:all
+# Run all stable e2e tests (recommended)
+cd apps/wasm && npm run test:stable
 
-# Or run specific test suites
+# Run all e2e tests (including experimental)
+npm run test:all
+
+# Run specific test suites
 npm run test:smoke    # Basic UI functionality
 npm run test:formula  # Formula entry and computation
-npm run test:collab   # Two-peer collaboration sync (experimental)
+npm run test:collab   # Two-peer collaboration sync (experimental, may fail)
 
 # Watch tests run in a visible browser window
 HEADED=1 npm run test:smoke
