@@ -1112,6 +1112,11 @@ export function initApp(): AppContext {
 
       app.collaborationInitialized = true;
       app.collaborationInitializing = false;
+
+      // Expose sync adapter on window for e2e testing
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any)._syncAdapter = app.syncAdapter;
+
       console.log(
         "Collaboration initialized successfully, peer ID:",
         app.syncAdapter.peerId

@@ -54,11 +54,31 @@ export class TestContext {
     if (this.lightpandaProc) {
       this.lightpandaProc.stdout?.destroy();
       this.lightpandaProc.stderr?.destroy();
-      this.lightpandaProc.kill();
+      this.lightpandaProc.kill('SIGKILL');
     }
     if (this.serverProc) {
-      this.serverProc.kill();
+      this.serverProc.kill('SIGKILL');
+      // Wait a bit for the port to be released
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
+  }
+}
+
+/**
+ * Kill any process using a specific port
+ */
+async function killProcessOnPort(port) {
+  try {
+    const { execSync } = await import('child_process');
+    // Try to find and kill the process
+    const pid = execSync(`lsof -ti :${port} 2>/dev/null || true`, { encoding: 'utf8' }).trim();
+    if (pid) {
+      execSync(`kill -9 ${pid} 2>/dev/null || true`);
+      // Wait for port to be released
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  } catch (e) {
+    // Ignore errors - port might not be in use
   }
 }
 
@@ -89,6 +109,9 @@ async function startServer() {
   if (!existsSync(CONFIG.distDir)) {
     throw new Error(`dist/ directory not found. Run 'make wasm-dist' first.`);
   }
+
+  // Kill any existing process on the port
+  await killProcessOnPort(CONFIG.serverPort);
 
   const serverProc = spawn('go', [
     'run', '.',

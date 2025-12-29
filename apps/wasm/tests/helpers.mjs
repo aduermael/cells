@@ -286,6 +286,154 @@ export function sleep(ms) {
 }
 
 /**
+ * Get the collaboration sync state from the page
+ * Returns 'offline', 'connecting', 'syncing', or 'online'
+ */
+export async function getCollabState(page) {
+  return await page.evaluate(() => {
+    // Access the global sync adapter state (exposed via window for testing)
+    if (window._syncAdapter) {
+      return window._syncAdapter.state;
+    }
+    // Fallback: check the UI status dot class
+    const statusDot = document.querySelector('.collab-status-dot');
+    if (statusDot) {
+      if (statusDot.classList.contains('online')) return 'online';
+      if (statusDot.classList.contains('syncing')) return 'syncing';
+      if (statusDot.classList.contains('connecting')) return 'connecting';
+    }
+    return 'offline';
+  });
+}
+
+/**
+ * Wait for collaboration to initialize (window._syncAdapter to be set)
+ * @param {import('puppeteer').Page} page
+ * @param {number} timeout - Maximum time to wait in ms (default 10000)
+ * @returns {Promise<boolean>} - true if initialized, false if timeout
+ */
+export async function waitForCollabInitialized(page, timeout = 10000) {
+  const start = Date.now();
+
+  while (Date.now() - start < timeout) {
+    const hasAdapter = await page.evaluate(() => !!window._syncAdapter);
+    if (hasAdapter) {
+      return true;
+    }
+    await sleep(100);
+  }
+
+  console.warn('[Collab] Timeout waiting for collaboration to initialize');
+  return false;
+}
+
+/**
+ * Wait for collaboration to be ready (data channel open)
+ * This waits for the sync state to reach 'online' or 'syncing' status
+ * @param {import('puppeteer').Page} page
+ * @param {number} timeout - Maximum time to wait in ms (default 15000)
+ * @returns {Promise<boolean>} - true if connected, false if timeout
+ */
+export async function waitForCollabReady(page, timeout = 15000) {
+  const start = Date.now();
+  let lastState = null;
+
+  // First wait for collaboration to initialize (adapter to be set)
+  const initialized = await waitForCollabInitialized(page, Math.min(timeout / 2, 5000));
+  if (!initialized) {
+    console.warn('[Collab] Collaboration never initialized');
+    return false;
+  }
+
+  while (Date.now() - start < timeout) {
+    const state = await getCollabState(page);
+    if (state !== lastState) {
+      lastState = state;
+      if (process.env.DEBUG) {
+        console.log(`[Collab] State: ${state}`);
+      }
+    }
+
+    // 'online' means data channel is established and ready
+    // 'syncing' means initial sync is in progress but channel is open
+    if (state === 'online' || state === 'syncing') {
+      // Give a small buffer for the connection to stabilize
+      await sleep(200);
+      return true;
+    }
+
+    await sleep(100);
+  }
+
+  console.warn(`[Collab] Timeout waiting for ready state (last state: ${lastState})`);
+  return false;
+}
+
+/**
+ * Wait for peer connection (at least one remote peer)
+ * @param {import('puppeteer').Page} page
+ * @param {number} timeout - Maximum time to wait in ms (default 15000)
+ * @returns {Promise<boolean>} - true if peer connected, false if timeout
+ */
+export async function waitForPeerConnection(page, timeout = 15000) {
+  const start = Date.now();
+
+  while (Date.now() - start < timeout) {
+    const peerCount = await page.evaluate(() => {
+      // Access the global sync adapter (exposed via window for testing)
+      if (window._syncAdapter) {
+        return window._syncAdapter.getConnectedPeerCount?.() ?? 0;
+      }
+      // Fallback: check the peers display in the UI
+      const peersEl = document.querySelector('#collab-detail-peers');
+      return peersEl ? parseInt(peersEl.textContent, 10) : 0;
+    });
+
+    if (peerCount > 0) {
+      return true;
+    }
+
+    await sleep(200);
+  }
+
+  console.warn('[Collab] Timeout waiting for peer connection');
+  return false;
+}
+
+/**
+ * Retry an assertion multiple times with exponential backoff
+ * Useful for flaky assertions that depend on async operations
+ * @param {Function} assertFn - The assertion function to run (should throw on failure)
+ * @param {Object} options - Options
+ * @param {number} options.retries - Number of retries (default 3)
+ * @param {number} options.initialDelay - Initial delay in ms (default 500)
+ * @param {number} options.maxDelay - Maximum delay in ms (default 2000)
+ * @returns {Promise<void>}
+ */
+export async function assertWithRetry(assertFn, { retries = 3, initialDelay = 500, maxDelay = 2000 } = {}) {
+  let lastError;
+  let delay = initialDelay;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await assertFn();
+      return; // Success
+    } catch (err) {
+      lastError = err;
+      if (attempt < retries) {
+        if (process.env.DEBUG) {
+          console.log(`[Retry] Attempt ${attempt} failed, retrying in ${delay}ms...`);
+        }
+        await sleep(delay);
+        delay = Math.min(delay * 2, maxDelay);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+/**
  * Load a file from testdata directory by setting up file input
  * @param {import('puppeteer').Page} page
  * @param {string} filename - Name of file in testdata directory
