@@ -278,12 +278,18 @@ Created `large_file_test.cc` with comprehensive tests for stress_test.xlsx:
 - ✅ Viewport queries work correctly at all positions (top, middle, bottom)
 - ✅ Cell access by position works across all 65,536 rows
 
-**Bug Fix - getSheetInfo:**
-The original "empty rows on scroll" issue was caused by `getSheetInfo()` in bindings.cc iterating through the rows map to find max position, which wasn't reliable. Fixed by using `sheet->rowCount()` directly which returns `rows.size()`.
+**Bug Fix - Two Issues Identified and Fixed:**
+
+1. **getSheetInfo was unreliable**: Changed to use `sheet->rowCount()` directly instead of iterating through the rows map.
+
+2. **Scroll limits used discoveredRows instead of actual row count**: The wheel handler in app-events.ts calculated `maxScrollY` using `discoveredRows` (which starts at 100 and expands slowly) instead of `sheetInfo.rowCount`. This prevented scrolling beyond ~200 rows initially. Fixed by using `Math.max(sheetInfo.rowCount, discoveredRows)` for scroll limits.
 
 **Additional Fixes:**
 - Fixed try/catch blocks in formula_eval.cc and formula_recalc.cc to use strtod instead of std::stod (WASM exceptions compatibility)
-- Added debug logging to getSheetInfo to help diagnose issues
+
+**Test Results:**
+- Puppeteer test confirms scrolling to row 400+ works correctly
+- All 38 C++ tests pass
 
 ---
 

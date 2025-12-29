@@ -329,21 +329,26 @@ export class AppEventManager {
       sheetInfo.colCount * DEFAULT_COL_WIDTH - canvas.clientWidth + HEADER_WIDTH
     );
 
-    // Use discovered rows for virtual scrolling (expands as user scrolls down)
-    let discoveredRows = getDiscoveredRows();
+    // Calculate max scroll based on actual sheet size (not just discovered rows)
+    // This allows scrolling through the entire file immediately
     const viewportHeight = canvas.clientHeight - HEADER_HEIGHT;
     const newScrollY = getScrollY() + e.deltaY;
 
-    // Expand discovered rows when scrolling near bottom
+    // Use the larger of sheetInfo.rowCount or discoveredRows for scroll limits
+    // This ensures we can scroll through all data rows
+    const effectiveRowCount = Math.max(sheetInfo.rowCount, getDiscoveredRows());
+
+    // Update discoveredRows to match where the user is scrolling
     const visibleBottomRow = Math.ceil((newScrollY + viewportHeight) / DEFAULT_ROW_HEIGHT);
-    if (visibleBottomRow + 50 > discoveredRows && discoveredRows < 1_000_000) {
-      discoveredRows = Math.min(1_000_000, discoveredRows + 100);
-      setDiscoveredRows(discoveredRows);
+    if (visibleBottomRow > getDiscoveredRows()) {
+      // Expand discoveredRows to at least cover visible area plus buffer
+      const newDiscovered = Math.min(1_000_000, Math.max(visibleBottomRow + 100, sheetInfo.rowCount));
+      setDiscoveredRows(newDiscovered);
     }
 
     const maxScrollY = Math.max(
       0,
-      discoveredRows * DEFAULT_ROW_HEIGHT - viewportHeight
+      effectiveRowCount * DEFAULT_ROW_HEIGHT - viewportHeight
     );
 
     setScrollX(Math.max(0, Math.min(maxScrollX, getScrollX() + e.deltaX)));

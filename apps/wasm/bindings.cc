@@ -256,11 +256,6 @@ public:
         uint32_t colCount = std::max(MIN_COLS, static_cast<uint32_t>(sheet->columnCount()));
         uint32_t rowCount = std::max(MIN_ROWS, static_cast<uint32_t>(sheet->rowCount()));
 
-        // Debug logging
-        LOG_INFO("[getSheetInfo] sheet->rowCount()=%zu, sheet->columnCount()=%zu, "
-                 "returning rowCount=%u, colCount=%u",
-                 sheet->rowCount(), sheet->columnCount(), rowCount, colCount);
-
         std::ostringstream json;
         json << "{";
         json << "\"name\":\"" << jsonEscape(sheet->name) << "\",";
