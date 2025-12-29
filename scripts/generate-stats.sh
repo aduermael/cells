@@ -42,7 +42,7 @@ count_source_lines() {
     for pattern in $patterns; do
         count=$(find "$PROJECT_ROOT" -type f -name "$pattern" 2>/dev/null | \
             grep -vE "$EXCLUDE_PATTERN" | \
-            grep -vE "_test\.(cc|cpp|go|js|ts)$|\.test\.(js|ts)$|\.spec\.(js|ts)$|test_.*\.(cc|cpp)$" | \
+            grep -vE "_test\.(cc|cpp|go|js|mjs|ts)$|\.test\.(js|mjs|ts)$|\.spec\.(js|mjs|ts)$|test_.*\.(cc|cpp|js)$|/tests/" | \
             xargs cat 2>/dev/null | wc -l | tr -d ' ')
         total=$((total + count))
     done
@@ -57,7 +57,7 @@ count_test_lines() {
     for pattern in $patterns; do
         count=$(find "$PROJECT_ROOT" -type f -name "$pattern" 2>/dev/null | \
             grep -vE "$EXCLUDE_PATTERN" | \
-            grep -E "_test\.(cc|cpp|go|js|ts)$|\.test\.(js|ts)$|\.spec\.(js|ts)$|test_.*\.(cc|cpp)$" | \
+            grep -E "_test\.(cc|cpp|go|js|mjs|ts)$|\.test\.(js|mjs|ts)$|\.spec\.(js|mjs|ts)$|test_.*\.(cc|cpp|js)$|/tests/" | \
             xargs cat 2>/dev/null | wc -l | tr -d ' ')
         total=$((total + count))
     done
@@ -66,7 +66,7 @@ count_test_lines() {
 
 # Count source lines for each language (excluding tests)
 cpp_lines=$(count_source_lines "*.cc *.cpp *.h")
-js_lines=$(count_source_lines "*.js")
+js_lines=$(count_source_lines "*.js *.mjs")
 ts_lines=$(count_source_lines "*.ts")
 html_lines=$(count_source_lines "*.html")
 css_lines=$(count_source_lines "*.css")
@@ -82,7 +82,7 @@ bzl_lines=$(find "$PROJECT_ROOT" -type f \( -name "BUILD" -o -name "*.bzl" -o -n
 # Count test lines for each language
 cpp_test_lines=$(count_test_lines "*.cc *.cpp")
 objcpp_test_lines=$(count_test_lines "*.mm")
-js_test_lines=$(count_test_lines "*.js")
+js_test_lines=$(count_test_lines "*.js *.mjs")
 ts_test_lines=$(count_test_lines "*.ts")
 go_test_lines=$(count_test_lines "*.go")
 
