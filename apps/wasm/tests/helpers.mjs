@@ -2,6 +2,11 @@
 // These helpers abstract common operations like clicking cells, entering values, etc.
 
 import { CONFIG } from './harness.mjs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * Wait for the application to be fully loaded
@@ -209,7 +214,7 @@ export async function getFormulaBarContent(page) {
  */
 export async function getWorkbookName(page) {
   return await page.evaluate(() => {
-    const el = document.getElementById('sheet-name');
+    const el = document.getElementById('workbook-title');
     return el ? el.textContent : null;
   });
 }
@@ -278,4 +283,27 @@ export function assertTrue(value, message) {
  */
 export function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Load a file from testdata directory by setting up file input
+ * @param {import('puppeteer').Page} page
+ * @param {string} filename - Name of file in testdata directory
+ */
+export async function loadTestFile(page, filename) {
+  // Compute path to testdata relative to project root
+  // The server serves from dist/, but we need the testdata path for the file chooser
+  const testdataPath = join(__dirname, '..', '..', '..', 'testdata', filename);
+
+  // Trigger file input
+  const fileInput = await page.$('#file-input');
+  if (!fileInput) {
+    throw new Error('File input not found');
+  }
+
+  // Upload the file through the hidden file input
+  await fileInput.uploadFile(testdataPath);
+
+  // Wait for file to load
+  await waitForAppReady(page);
 }

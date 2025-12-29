@@ -10,6 +10,7 @@ import {
   getCurrentCellRef,
   getFormulaBarContent,
   getWorkbookName,
+  loadTestFile,
   assertEqual,
   assertTrue,
   sleep,
@@ -99,6 +100,19 @@ const tests = {
 
     cellRef = await getCurrentCellRef(ctx.page);
     assertEqual(cellRef, 'B2', 'Should move to B2 after down arrow');
+  },
+
+  'ZCD file uses workbook name from D line': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Load budget.zcd which has "Budget 2024" as the workbook name
+    await loadTestFile(ctx.page, 'budget.zcd');
+    await sleep(500);
+
+    // Verify workbook name is extracted from D line, not filename
+    const name = await getWorkbookName(ctx.page);
+    assertEqual(name, 'Budget 2024', 'Workbook name should be extracted from D line');
   },
 };
 

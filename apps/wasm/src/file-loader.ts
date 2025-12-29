@@ -188,7 +188,16 @@ export class FileLoader {
     }
 
     const dataSource = new WasmDataSource(client);
-    dataSource.setWorkbookName(baseName);
+
+    // For ZCD format, use the workbook name from the D line if available
+    let workbookName = baseName;
+    if (format === "zcd") {
+      const parsedName = await client.getWorkbookName();
+      if (parsedName && parsedName.trim()) {
+        workbookName = parsedName;
+      }
+    }
+    dataSource.setWorkbookName(workbookName);
     dataSource.setOnChange(onDataChanged);
     this.hasFileLoaded = true;
 
