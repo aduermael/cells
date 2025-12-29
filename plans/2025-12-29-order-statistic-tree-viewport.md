@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2025-12-29 21:08 UTC
-Updated At: 2025-12-30 06:00 UTC
+Updated At: 2025-12-30 06:07 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Replace Quadtree with Order-Statistic Tree for Viewport Queries
@@ -126,14 +126,14 @@ Note: The infrastructure for O(1) pixel offset lookups is now in place. The view
 includes pre-computed `pixelOffset` for each column/row, and utility functions are available.
 Gradual migration of rendering code to use these functions can be done incrementally.
 
-### Phase 6: Cleanup and Documentation
+### Phase 6: Cleanup and Documentation ✅
 
 Remove quadtree code and document new architecture.
 
-- [ ] 6a: Remove `core/cells/quadtree.h`, `quadtree.cc`, `quadtree_test.cc`
-- [ ] 6b: Update BUILD file to remove quadtree targets
-- [ ] 6c: Update `docs/rendering.md` with new viewport indexing architecture
-- [ ] 6d: Final test pass: `bazel test //core/...` and `npm run test:stable`
+- [x] 6a: Remove `core/cells/quadtree.h`, `quadtree.cc`, `quadtree_test.cc`
+- [x] 6b: Update BUILD file to remove quadtree targets
+- [x] 6c: Update `docs/rendering.md` with new viewport indexing architecture
+- [x] 6d: Final test pass: `bazel test //core/...` and `npm run test:stable`
 
 ### Phase 7: Incremental Update Optimization
 

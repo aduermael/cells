@@ -255,3 +255,85 @@ const COLORS = {
 - **Frozen panes** - Not supported
 - **Zoom** - Not supported
 - **Smooth scrolling easing** - Direct scroll position updates
+
+---
+
+## Viewport Indexing Architecture
+
+The viewport query system uses Order-Statistic Trees (augmented red-black trees) for O(log n) spatial lookups, replacing the previous quadtree implementation.
+
+### Components
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    ViewportIndex                                 │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │ Column AxisIndex│  │ Row AxisIndex   │  │ Cell HashMap    │  │
+│  │ (OS Tree)       │  │ (OS Tree)       │  │ (by cellId)     │  │
+│  └────────┬────────┘  └────────┬────────┘  └─────────────────┘  │
+│           │                    │                                 │
+│           ▼                    ▼                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │              Order-Statistic Tree (OSTree)                  ││
+│  │  - Red-black tree with subtree_total augmentation           ││
+│  │  - O(log n) insert, delete, lookup by pixel offset          ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Operations
+
+| Operation | Complexity | Description |
+|-----------|------------|-------------|
+| `queryViewport(x1, y1, x2, y2)` | O(log n + k) | Find all cells in pixel rectangle (k = result size) |
+| `pixelToAxis(offset)` | O(log n) | Find column/row containing pixel offset |
+| `axisToPixel(axisId)` | O(log n) | Get pixel offset of column/row start |
+| `resize(axisId, newSize)` | O(log n) | Update column/row size |
+| `insert(axisId, position, size)` | O(log n) | Insert new column/row |
+| `remove(axisId)` | O(log n) | Remove column/row |
+
+### Order-Statistic Tree
+
+Each node stores:
+- `id`: Axis UUID (column or row)
+- `size`: Pixel width/height of this axis
+- `subtree_total`: Sum of sizes in this subtree (used for O(log n) offset lookups)
+- `position`: Logical position (for ordering)
+- Red-black tree pointers (left, right, parent) and color
+
+The `subtree_total` augmentation enables O(log n) pixel-to-axis lookups by walking down the tree and tracking cumulative offsets.
+
+### Integration with TypeScript
+
+The WASM module exposes viewport queries via pixel coordinates:
+
+```typescript
+// Query cells visible in pixel rectangle
+const cells = queryViewport(scrollX, scrollY, scrollX + width, scrollY + height);
+
+// Get pixel offset for column/row (for rendering)
+const colX = getColumnPixelOffset(colPosition);
+const rowY = getRowPixelOffset(rowPosition);
+
+// Get total dimensions
+const totalWidth = getTotalWidth();
+const totalHeight = getTotalHeight();
+```
+
+### Performance
+
+- Build: O(n log n) where n = max(columns, rows)
+- Query: O(log n + k) where k = cells in viewport
+- Single update: O(log n)
+
+Memory per axis: ~48 bytes (UUID + size + subtree_total + pointers + balance)
+- 1M rows: ~48 MB
+- 16K columns: ~768 KB
+
+### Files
+
+| File | Description |
+|------|-------------|
+| `core/cells/ostree.h/cc` | Generic Order-Statistic Tree implementation |
+| `core/cells/axis_index.h/cc` | AxisIndex wrapping OSTree for column/row indexing |
+| `core/cells/viewport_index.h/cc` | ViewportIndex combining two AxisIndexes + cell HashMap |

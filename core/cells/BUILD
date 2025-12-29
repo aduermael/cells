@@ -282,7 +282,7 @@ cc_test(
     srcs = ["large_file_test.cc"],
     data = ["//testdata/xlsx:sample_xlsx_files"],
     deps = [
-        ":quadtree",
+        ":viewport_index",
         ":xlsx_reader",
         "@googletest//:gtest_main",
     ],
@@ -333,26 +333,6 @@ cc_test(
     ],
 )
 
-cc_library(
-    name = "quadtree",
-    srcs = ["quadtree.cc"],
-    hdrs = ["quadtree.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":model",
-        ":types",
-    ],
-)
-
-cc_test(
-    name = "quadtree_test",
-    srcs = ["quadtree_test.cc"],
-    deps = [
-        ":id",
-        ":quadtree",
-        "@googletest//:gtest_main",
-    ],
-)
 
 cc_library(
     name = "ostree",
