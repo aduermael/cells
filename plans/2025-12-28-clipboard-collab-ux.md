@@ -90,14 +90,14 @@ For clipboard, use a custom MIME type + text fallback:
 
 ### Tasks
 
-- [ ] 3a: Create `clipboard.ts` module with ClipboardManager class
-- [ ] 3b: Implement `copy()` - serialize selected cells to clipboard formats
-- [ ] 3c: Implement `cut()` - copy + delete selected cells
-- [ ] 3d: Implement `paste()` - read clipboard, insert cells at selection
-- [ ] 3e: Add keyboard shortcuts (Cmd/Ctrl+C/V/X) in app-events.ts
-- [ ] 3f: Enable and connect context menu items to clipboard operations
-- [ ] 3g: Handle multi-cell selection for copy/paste (rectangular regions)
-- [ ] 3h: Add paste from external sources (parse tab-separated text)
+- [x] 3a: Create `clipboard.ts` module with ClipboardManager class
+- [x] 3b: Implement `copy()` - serialize selected cells to clipboard formats
+- [x] 3c: Implement `cut()` - copy + delete selected cells
+- [x] 3d: Implement `paste()` - read clipboard, insert cells at selection
+- [x] 3e: Add keyboard shortcuts (Cmd/Ctrl+C/V/X) in app-events.ts
+- [x] 3f: Enable and connect context menu items to clipboard operations
+- [x] 3g: Handle multi-cell selection for copy/paste (rectangular regions)
+- [x] 3h: Add paste from external sources (parse tab-separated text)
 
 ### Implementation Notes
 

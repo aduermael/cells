@@ -27,10 +27,10 @@ import {
 import type { CellEditor } from "./cell-editor";
 import type { ColumnHeaderEditor, FormulaBarEditor } from "./header-editor";
 import type { PresenceBroadcaster } from "./presence-broadcast";
+import type { ClipboardManager } from "./clipboard";
 import { colToLetter } from "./grid-utils";
 import {
   showContextMenu,
-  hideContextMenu,
   type ContextMenuEntry,
   type ContextType,
 } from "./context-menu";
@@ -47,6 +47,7 @@ export interface AppEventManagerConfig {
   columnHeaderEditor: ColumnHeaderEditor;
   formulaBarEditor: FormulaBarEditor;
   presenceBroadcaster: PresenceBroadcaster;
+  clipboardManager: ClipboardManager;
   formulaInput: HTMLInputElement;
 
   // State accessors
@@ -1009,8 +1010,6 @@ export class AppEventManager {
       getScrollY,
       getColWidths,
       getRowHeights,
-      getColumns,
-      getRows,
     } = this.config;
 
     const sheetInfo = getSheetInfo();
@@ -1147,7 +1146,7 @@ export class AppEventManager {
           label: "Delete column",
           action: async () => {
             const ds = getDataSource();
-            if (!ds) return;
+            if (!ds || !context.colId) return;
             await ds.deleteColumnById(context.colId);
             fetchViewportNow();
             render();
@@ -1183,7 +1182,7 @@ export class AppEventManager {
           label: "Delete row",
           action: async () => {
             const ds = getDataSource();
-            if (!ds) return;
+            if (!ds || !context.rowId) return;
             await ds.deleteRowById(context.rowId);
             fetchViewportNow();
             render();
@@ -1192,30 +1191,44 @@ export class AppEventManager {
         });
         break;
 
-      case "cell":
-        // Cell context menu - basic items for now
+      case "cell": {
+        // Cell context menu with clipboard operations
+        const { clipboardManager, setSelectedCell, setSelectionStart, setSelectionEnd } = this.config;
+
+        // Select the cell that was right-clicked
+        const selectCell = () => {
+          setSelectedCell({ col: context.col, row: context.row });
+          setSelectionStart({ col: context.col, row: context.row });
+          setSelectionEnd({ col: context.col, row: context.row });
+          render();
+        };
+
         items.push({
           label: "Cut",
+          shortcut: "⌘X",
           action: () => {
-            console.log("Cut cell:", context.col, context.row);
+            selectCell();
+            clipboardManager.cut();
           },
-          disabled: true,
         });
         items.push({
           label: "Copy",
+          shortcut: "⌘C",
           action: () => {
-            console.log("Copy cell:", context.col, context.row);
+            selectCell();
+            clipboardManager.copy();
           },
-          disabled: true,
         });
         items.push({
           label: "Paste",
+          shortcut: "⌘V",
           action: () => {
-            console.log("Paste at:", context.col, context.row);
+            selectCell();
+            clipboardManager.paste();
           },
-          disabled: true,
         });
         break;
+      }
 
       case "corner":
         // Select all - placeholder
@@ -1262,6 +1275,32 @@ export class AppEventManager {
       e.preventDefault();
       toggleAstDebugPanel();
       return;
+    }
+
+    // Clipboard shortcuts (Cmd/Ctrl+C/V/X) - only when NOT editing
+    // These must be checked before the editing state check below
+    const isMod = e.metaKey || e.ctrlKey;
+    if (
+      isMod &&
+      !cellEditor.isEditing() &&
+      !uiStateMachine.isInState("FORMULA_BAR_EDITING") &&
+      !uiStateMachine.isInState("COLUMN_HEADER_EDITING")
+    ) {
+      const { clipboardManager } = this.config;
+      switch (e.key.toLowerCase()) {
+        case "c":
+          e.preventDefault();
+          clipboardManager.copy();
+          return;
+        case "x":
+          e.preventDefault();
+          clipboardManager.cut();
+          return;
+        case "v":
+          e.preventDefault();
+          clipboardManager.paste();
+          return;
+      }
     }
 
     if (

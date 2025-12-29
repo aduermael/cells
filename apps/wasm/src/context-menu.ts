@@ -18,6 +18,8 @@ export interface ContextMenuItem {
   action: () => void;
   /** Optional icon (emoji or text) */
   icon?: string;
+  /** Optional keyboard shortcut display (e.g., "⌘C") */
+  shortcut?: string;
   /** Whether the item is disabled */
   disabled?: boolean;
   /** Whether this is a destructive/danger action (shown in red) */
@@ -37,9 +39,9 @@ export type ContextMenuEntry = ContextMenuItem | ContextMenuSeparator;
  * Context types for determining what was right-clicked
  */
 export type ContextType =
-  | { type: "cell"; col: number; row: number; colId: string; rowId: string }
-  | { type: "column-header"; col: number; colId: string }
-  | { type: "row-header"; row: number; rowId: string }
+  | { type: "cell"; col: number; row: number; colId: string | null; rowId: string | null }
+  | { type: "column-header"; col: number; colId: string | null }
+  | { type: "row-header"; row: number; rowId: string | null }
   | { type: "corner" }
   | { type: "empty" };
 
@@ -214,6 +216,14 @@ export class ContextMenuManager {
       labelSpan.className = "context-menu-label";
       labelSpan.textContent = menuItem.label;
       button.appendChild(labelSpan);
+
+      // Shortcut (if provided)
+      if (menuItem.shortcut) {
+        const shortcutSpan = document.createElement("span");
+        shortcutSpan.className = "context-menu-shortcut";
+        shortcutSpan.textContent = menuItem.shortcut;
+        button.appendChild(shortcutSpan);
+      }
 
       // Click handler
       button.addEventListener("click", (e) => {

@@ -1373,6 +1373,14 @@ canvas {
     flex: 1;
 }
 
+.context-menu-shortcut {
+    margin-left: 16px;
+    color: #868e96;
+    font-size: 12px;
+    font-weight: 400;
+    opacity: 0.8;
+}
+
 .context-menu-separator {
     height: 1px;
     background: #e9ecef;

@@ -22,6 +22,7 @@ import {
   getNormalizedRange,
   hasRangeSelection,
 } from "./grid-utils";
+import { ClipboardManager } from "./clipboard";
 import {
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -870,6 +871,19 @@ export function initApp(): AppContext {
   });
 
   // =========================================================================
+  // Create ClipboardManager
+  // =========================================================================
+
+  const clipboardManager = new ClipboardManager({
+    getSelectionStart: () => app.selectionStart,
+    getSelectionEnd: () => app.selectionEnd,
+    getSelectedCell: () => app.selectedCell,
+    getCells: () => app.cells,
+    onFetchViewport: fetchViewportNow,
+    onRender: render,
+  });
+
+  // =========================================================================
   // Create SheetTabsManager
   // =========================================================================
 
@@ -917,6 +931,7 @@ export function initApp(): AppContext {
       formulaBarEditor.setDataSource(dataSource);
       sheetTabsManager.setDataSource(dataSource);
       workbookTitleEditor.setDataSource(dataSource);
+      clipboardManager.setDataSource(dataSource);
       // Update the title display from the workbook name
       workbookTitleEditor.setTitle(dataSource.workbookName);
     },
@@ -958,6 +973,7 @@ export function initApp(): AppContext {
     columnHeaderEditor,
     formulaBarEditor,
     presenceBroadcaster,
+    clipboardManager,
     formulaInput: elements.formulaInput,
 
     getSheetInfo: () => app.sheetInfo,
