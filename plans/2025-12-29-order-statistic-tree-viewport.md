@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2025-12-29 21:08 UTC
-Updated At: 2025-12-30 00:05 UTC
+Updated At: 2025-12-30 01:15 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Replace Quadtree with Order-Statistic Tree for Viewport Queries
@@ -101,16 +101,16 @@ Create ViewportIndex that uses two AxisIndex instances (cols, rows) plus cell Ha
 - [x] 3f: Create `core/cells/viewport_index_test.cc` with unit tests
 - [x] 3g: Verify tests pass: `bazel test //core/cells:viewport_index_test`
 
-### Phase 4: Integrate into WASM Bindings
+### Phase 4: Integrate into WASM Bindings ✅
 
 Replace quadtree usage in bindings.cc with ViewportIndex.
 
-- [ ] 4a: Replace `Quadtree _quadtree` with `ViewportIndex _viewportIndex`
-- [ ] 4b: Update `queryViewport()` to use pixel coordinates
-- [ ] 4c: Replace `rebuildQuadtree()` calls with incremental updates where possible
-- [ ] 4d: Keep `rebuildViewportIndex()` for full rebuilds (file load, sheet switch)
-- [ ] 4e: Update WASM API to expose axis pixel queries (for TypeScript)
-- [ ] 4f: Verify WASM builds: `bazel build //apps/wasm:cells_wasm`
+- [x] 4a: Replace `Quadtree _quadtree` with `ViewportIndex _viewportIndex`
+- [x] 4b: Update `queryViewport()` to use pixel coordinates (converts logical positions to pixels internally)
+- [x] 4c: Replace `rebuildQuadtree()` calls with incremental updates where possible (kept full rebuilds for now, incremental optimization deferred)
+- [x] 4d: Keep `rebuildViewportIndex()` for full rebuilds (file load, sheet switch)
+- [x] 4e: Update WASM API to expose axis pixel queries (for TypeScript): `getColumnPixelOffset`, `getRowPixelOffset`, `getTotalWidth`, `getTotalHeight`
+- [x] 4f: Verify WASM builds: `bazel build --config=wasm //apps/wasm:cells_wasm`
 
 ### Phase 5: Update TypeScript Rendering
 

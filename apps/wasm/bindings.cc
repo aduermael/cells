@@ -30,7 +30,7 @@
 #include "core/cells/operation.h"
 #include "core/cells/oplog.h"
 #include "core/cells/parser.h"
-#include "core/cells/quadtree.h"
+#include "core/cells/viewport_index.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/serializer.h"
 #include "core/cells/sync_manager.h"
@@ -154,7 +154,7 @@ public:
         }
         _workbook = std::move(result.workbook);
         _activeSheetIndex = 0;
-        rebuildQuadtree();
+        rebuildViewportIndex();
 
         // Parse and evaluate all formulas in all sheets after loading
         // Step 1: Parse formula text into ASTs (formulas are stored as UUID-format text)
@@ -193,7 +193,7 @@ public:
         }
         _workbook = std::move(result.workbook);
         _activeSheetIndex = 0;
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::DATA_LOADED);
         return "{\"success\":true,\"sheetCount\":" + std::to_string(_workbook->sheetCount()) + "}";
     }
@@ -209,7 +209,7 @@ public:
         }
         _workbook = std::move(result.workbook);
         _activeSheetIndex = 0;
-        rebuildQuadtree();
+        rebuildViewportIndex();
 
         // Parse and evaluate all formulas in all sheets after loading
         // Step 1: Parse formula text into ASTs (formulas are stored as UUID-format text)
@@ -280,7 +280,7 @@ public:
     void setActiveSheet(int index) {
         if (_workbook && index >= 0 && static_cast<size_t>(index) < _workbook->sheetCount()) {
             _activeSheetIndex = static_cast<size_t>(index);
-            rebuildQuadtree();
+            rebuildViewportIndex();
             notifyListeners(ChangeType::SHEET_CHANGED);
         }
     }
@@ -375,7 +375,7 @@ public:
             }
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::SHEET_CHANGED);
 
         std::ostringstream json;
@@ -473,15 +473,69 @@ public:
     // ========================================================================
 
     // Query cells in the visible viewport area.
+    // Parameters are logical column/row positions (not pixel coordinates).
     // Returns pending values if available (pending > committed priority).
     // The "pending" field indicates if the value is from a pending operation.
-    std::string queryViewport(uint32_t x1, uint32_t y1, uint32_t x2, uint32_t y2) {
+    std::string queryViewport(uint32_t col1, uint32_t row1, uint32_t col2, uint32_t row2) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return "{\"error\":\"No sheet available\"}";
         }
 
-        auto entries = _quadtree.query(x1, y1, x2, y2);
         auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        // Convert position range to pixel range for ViewportIndex query
+        // We need to find the pixel bounds for the given column/row position range
+        uint32_t pixelX1 = 0;
+        uint32_t pixelY1 = 0;
+        uint32_t pixelX2 = 0;
+        uint32_t pixelY2 = 0;
+
+        // Get pixel start of first column
+        if (auto colId = _viewportIndex.getColumnAt(col1)) {
+            if (auto pixel = _viewportIndex.columnToPixel(*colId)) {
+                pixelX1 = *pixel;
+            }
+        }
+
+        // Get pixel end of last column (start of col2, or total width if col2 is beyond)
+        if (col2 > 0) {
+            if (auto colId = _viewportIndex.getColumnAt(col2 - 1)) {
+                if (auto pixel = _viewportIndex.columnToPixel(*colId)) {
+                    if (auto width = _viewportIndex.getColumnWidth(*colId)) {
+                        pixelX2 = *pixel + *width;
+                    }
+                }
+            }
+        }
+        if (pixelX2 == 0) {
+            pixelX2 = _viewportIndex.totalWidth();
+        }
+
+        // Get pixel start of first row
+        if (auto rowId = _viewportIndex.getRowAt(row1)) {
+            if (auto pixel = _viewportIndex.rowToPixel(*rowId)) {
+                pixelY1 = *pixel;
+            }
+        }
+
+        // Get pixel end of last row
+        if (row2 > 0) {
+            if (auto rowId = _viewportIndex.getRowAt(row2 - 1)) {
+                if (auto pixel = _viewportIndex.rowToPixel(*rowId)) {
+                    if (auto height = _viewportIndex.getRowHeight(*rowId)) {
+                        pixelY2 = *pixel + *height;
+                    }
+                }
+            }
+        }
+        if (pixelY2 == 0) {
+            pixelY2 = _viewportIndex.totalHeight();
+        }
+
+        auto entries = _viewportIndex.queryViewport(pixelX1, pixelY1, pixelX2, pixelY2);
 
         std::ostringstream json;
         json << "{\"cells\":[";
@@ -493,10 +547,22 @@ public:
             }
             firstCell = false;
 
+            // Get logical column/row positions from the sheet's axes
+            uint32_t colPos = 0;
+            uint32_t rowPos = 0;
+            auto colIt = sheet->columns.find(entry.cell->colId);
+            if (colIt != sheet->columns.end()) {
+                colPos = colIt->second->position;
+            }
+            auto rowIt = sheet->rows.find(entry.cell->rowId);
+            if (rowIt != sheet->rows.end()) {
+                rowPos = rowIt->second->position;
+            }
+
             json << "{";
             json << "\"id\":\"" << entry.cell->id.toString() << "\",";
-            json << "\"col\":" << entry.x << ",";
-            json << "\"row\":" << entry.y << ",";
+            json << "\"col\":" << colPos << ",";
+            json << "\"row\":" << rowPos << ",";
 
             if (entry.cell->isFormula()) {
                 json << "\"type\":\"f\",";
@@ -556,7 +622,7 @@ public:
         // Include column info for the viewport
         bool firstCol = true;
         for (const auto& [id, col] : sheet->columns) {
-            if (col->position >= x1 && col->position < x2) {
+            if (col->position >= col1 && col->position < col2) {
                 if (!firstCol) {
                     json << ",";
                 }
@@ -575,7 +641,7 @@ public:
         // Include row info for the viewport
         bool firstRow = true;
         for (const auto& [id, row] : sheet->rows) {
-            if (row->position >= y1 && row->position < y2) {
+            if (row->position >= row1 && row->position < row2) {
                 if (!firstRow) {
                     json << ",";
                 }
@@ -593,6 +659,40 @@ public:
 
         return json.str();
     }
+
+    // Get the pixel X offset for a column at the given position
+    // Returns -1 if position is out of range
+    int32_t getColumnPixelOffset(uint32_t position) {
+        auto colId = _viewportIndex.getColumnAt(position);
+        if (!colId) {
+            return -1;
+        }
+        auto pixel = _viewportIndex.columnToPixel(*colId);
+        if (!pixel) {
+            return -1;
+        }
+        return static_cast<int32_t>(*pixel);
+    }
+
+    // Get the pixel Y offset for a row at the given position
+    // Returns -1 if position is out of range
+    int32_t getRowPixelOffset(uint32_t position) {
+        auto rowId = _viewportIndex.getRowAt(position);
+        if (!rowId) {
+            return -1;
+        }
+        auto pixel = _viewportIndex.rowToPixel(*rowId);
+        if (!pixel) {
+            return -1;
+        }
+        return static_cast<int32_t>(*pixel);
+    }
+
+    // Get the total pixel width of all columns
+    uint32_t getTotalWidth() { return _viewportIndex.totalWidth(); }
+
+    // Get the total pixel height of all rows
+    uint32_t getTotalHeight() { return _viewportIndex.totalHeight(); }
 
     // ========================================================================
     // Cell operations
@@ -673,7 +773,7 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
 
         // Trigger recalculation: mark dependents dirty and recalculate
         // This ensures formulas that depend on this cell get updated
@@ -772,7 +872,7 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
 
         // Trigger recalculation for the new cell and its dependents
         markDirty(sheet, cellId);
@@ -882,7 +982,7 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::CELL_CHANGED);
 
         std::ostringstream json;
@@ -920,7 +1020,7 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::CELL_CHANGED);
 
         return "{\"success\":true}";
@@ -979,7 +1079,7 @@ public:
                     _syncManager->pruneOpLog();
                 }
 
-                rebuildQuadtree();
+                rebuildViewportIndex();
                 notifyListeners(ChangeType::CELL_CHANGED);
                 return "{\"success\":true,\"deleted\":true}";
             }
@@ -1301,7 +1401,7 @@ public:
             }
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
@@ -1336,7 +1436,7 @@ public:
             }
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
@@ -1377,7 +1477,7 @@ public:
         }
 
         LOG_INFO("[FORMULA_DEBUG] moveColumn: colId=%s to targetPos=%u", colIdStr.c_str(), targetPos);
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
@@ -1418,7 +1518,7 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
@@ -1449,7 +1549,7 @@ public:
             return "{\"error\":\"Failed to insert column\"}";
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true,\"id\":\"" + newCol->id.toString() + "\",\"position\":" +
@@ -1477,7 +1577,7 @@ public:
             return "{\"error\":\"Failed to insert row\"}";
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true,\"id\":\"" + newRow->id.toString() + "\",\"position\":" +
@@ -1504,7 +1604,7 @@ public:
             return "{\"error\":\"Column not found\"}";
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
@@ -1530,7 +1630,7 @@ public:
             return "{\"error\":\"Row not found\"}";
         }
 
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
@@ -1644,7 +1744,7 @@ public:
         auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
         _workbook->addSheet(std::move(sheet));
         _activeSheetIndex = 0;
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::DATA_LOADED);
         LOG_INFO("Created empty workbook with id=%s", _workbook->id.toString().c_str());
     }
@@ -1754,7 +1854,7 @@ public:
             case ApplyResult::SUCCESS:
                 resultStr = "success";
                 // Rebuild quadtree and notify listeners for successful operations
-                rebuildQuadtree();
+                rebuildViewportIndex();
                 notifyListeners(ChangeType::CELL_CHANGED);
                 break;
             case ApplyResult::ALREADY_APPLIED:
@@ -1771,7 +1871,7 @@ public:
                 break;
             case ApplyResult::RESURRECTED:
                 resultStr = "resurrected";
-                rebuildQuadtree();
+                rebuildViewportIndex();
                 notifyListeners(ChangeType::CELL_CHANGED);
                 break;
         }
@@ -1861,7 +1961,7 @@ public:
         size_t applied = applyOperations(*_workbook, ops);
 
         if (applied > 0) {
-            rebuildQuadtree();
+            rebuildViewportIndex();
             notifyListeners(ChangeType::CELL_CHANGED);
         }
 
@@ -1990,7 +2090,7 @@ public:
 
         // Only rebuild/notify when data actually changed
         if (result.dataModified) {
-            rebuildQuadtree();
+            rebuildViewportIndex();
             notifyListeners(ChangeType::CELL_CHANGED);
         }
 
@@ -2385,7 +2485,7 @@ public:
 
     void syncClientDataDidChange(cells::net::SyncClient& /*client*/) override {
         // Remote operations modified data - rebuild quadtree and notify
-        rebuildQuadtree();
+        rebuildViewportIndex();
         notifyListeners(ChangeType::CELL_CHANGED);
     }
 
@@ -2679,7 +2779,7 @@ public:
 
         // Rebuild RefConverter to include any newly created cells
         // This ensures formulaToUuid can find them when the formula is committed
-        rebuildQuadtree();
+        rebuildViewportIndex();
 
         // Extract references with positions
         std::vector<ReferenceInfo> refs = resolver.extractReferences(ast.get());
@@ -3078,7 +3178,7 @@ public:
     }
 
 private:
-    void rebuildQuadtree() {
+    void rebuildViewportIndex() {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
             return;
         }
@@ -3088,8 +3188,8 @@ private:
             return;
         }
 
-        _quadtree.clear();
-        _quadtree.build(*sheet);
+        _viewportIndex.clear();
+        _viewportIndex.build(*sheet);
         _refConverter.setContext(*sheet);
 
         // Debug: log column positions after rebuild
@@ -3098,11 +3198,11 @@ private:
             if (!colInfo.empty()) colInfo += ", ";
             colInfo += col->name + "@" + std::to_string(col->position);
         }
-        LOG_INFO("[FORMULA_DEBUG] rebuildQuadtree: columns=[%s]", colInfo.c_str());
+        LOG_INFO("[FORMULA_DEBUG] rebuildViewportIndex: columns=[%s]", colInfo.c_str());
     }
 
     // Notify the registered listener of a data change
-    // Called after rebuildQuadtree() completes
+    // Called after rebuildViewportIndex() completes
     void notifyListeners(ChangeType type) {
         if (_listener.isNull() || _listener.isUndefined()) {
             return;
@@ -3182,7 +3282,7 @@ private:
 
     std::unique_ptr<Workbook> _workbook;
     size_t _activeSheetIndex;
-    Quadtree _quadtree;
+    ViewportIndex _viewportIndex;
     RefConverter _refConverter;
     val _listener;  // JavaScript callback for change notifications
     std::unique_ptr<SyncManager> _syncManager;  // CRDT sync manager (for JS-based sync)
@@ -3217,6 +3317,10 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("moveSheet", &cells::wasm::CellsEngine::moveSheet)
         // Viewport
         .function("queryViewport", &cells::wasm::CellsEngine::queryViewport)
+        .function("getColumnPixelOffset", &cells::wasm::CellsEngine::getColumnPixelOffset)
+        .function("getRowPixelOffset", &cells::wasm::CellsEngine::getRowPixelOffset)
+        .function("getTotalWidth", &cells::wasm::CellsEngine::getTotalWidth)
+        .function("getTotalHeight", &cells::wasm::CellsEngine::getTotalHeight)
         // Cell operations
         .function("updateCell", &cells::wasm::CellsEngine::updateCell)
         .function("createCell", &cells::wasm::CellsEngine::createCell)

@@ -56,7 +56,7 @@ cc_binary(
         "//core/cells:operation",
         "//core/cells:oplog",
         "//core/cells:parser",
-        "//core/cells:quadtree",
+        "//core/cells:viewport_index",
         "//core/cells:ref_converter",
         "//core/cells:serializer",
         "//core/cells:sync_manager",
