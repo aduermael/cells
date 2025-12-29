@@ -217,6 +217,32 @@ TEST(LargeFileTest, CellAccessByPosition) {
         std::cout << "Cell A1 value type: " << static_cast<int>(cellA1->value.type) << "\n";
     }
 
+    // Debug: Print first few rows and rows around 122-127 to verify mapping
+    std::cout << "\n=== Row value mapping (column A) ===\n";
+    std::cout << "First rows:\n";
+    for (uint32_t r = 0; r <= 5; r++) {
+        Axis* row = sheet->getRowByPosition(r);
+        if (!row)
+            continue;
+        Cell* cell = sheet->getCellAt(col0->id, row->id);
+        if (cell) {
+            std::cout << "  Position " << r << " (header " << (r + 1) << "): raw=\""
+                      << cell->value.raw << "\"\n";
+        }
+    }
+
+    std::cout << "Rows around 120-130:\n";
+    for (uint32_t r = 120; r <= 130; r++) {
+        Axis* row = sheet->getRowByPosition(r);
+        if (!row)
+            continue;
+        Cell* cell = sheet->getCellAt(col0->id, row->id);
+        if (cell) {
+            std::cout << "  Position " << r << " (header " << (r + 1) << "): raw=\""
+                      << cell->value.raw << "\"\n";
+        }
+    }
+
     // Access last row cells
     Axis* lastRow = sheet->getRowByPosition(65535);
     ASSERT_NE(lastRow, nullptr) << "Row 65535 should exist";

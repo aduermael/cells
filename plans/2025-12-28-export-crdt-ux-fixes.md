@@ -277,9 +277,13 @@ Created `large_file_test.cc` with comprehensive tests for stress_test.xlsx:
 - ✅ All cells are properly indexed in quadtree
 - ✅ Viewport queries work correctly at all positions (top, middle, bottom)
 - ✅ Cell access by position works across all 65,536 rows
-- ✅ No data loading/indexing issues identified
 
-The original concern about "empty rows on scroll" appears to be a UI rendering issue rather than a data loading issue, as all underlying data operations work correctly
+**Bug Fix - getSheetInfo:**
+The original "empty rows on scroll" issue was caused by `getSheetInfo()` in bindings.cc iterating through the rows map to find max position, which wasn't reliable. Fixed by using `sheet->rowCount()` directly which returns `rows.size()`.
+
+**Additional Fixes:**
+- Fixed try/catch blocks in formula_eval.cc and formula_recalc.cc to use strtod instead of std::stod (WASM exceptions compatibility)
+- Added debug logging to getSheetInfo to help diagnose issues
 
 ---
 

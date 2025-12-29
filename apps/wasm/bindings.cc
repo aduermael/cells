@@ -248,28 +248,24 @@ public:
 
         auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
 
-        // Calculate actual dimensions (min 26 cols, 100 rows like Excel)
+        // Use sheet's actual row/column counts, with minimums like Excel
+        // The sheet already tracks all rows/columns, so rowCount() is accurate
         constexpr uint32_t MIN_COLS = 26;
         constexpr uint32_t MIN_ROWS = 100;
-        uint32_t maxCol = MIN_COLS;
-        uint32_t maxRow = MIN_ROWS;
 
-        for (const auto& [id, col] : sheet->columns) {
-            if (col->position >= maxCol) {
-                maxCol = col->position + 1;
-            }
-        }
-        for (const auto& [id, row] : sheet->rows) {
-            if (row->position >= maxRow) {
-                maxRow = row->position + 1;
-            }
-        }
+        uint32_t colCount = std::max(MIN_COLS, static_cast<uint32_t>(sheet->columnCount()));
+        uint32_t rowCount = std::max(MIN_ROWS, static_cast<uint32_t>(sheet->rowCount()));
+
+        // Debug logging
+        LOG_INFO("[getSheetInfo] sheet->rowCount()=%zu, sheet->columnCount()=%zu, "
+                 "returning rowCount=%u, colCount=%u",
+                 sheet->rowCount(), sheet->columnCount(), rowCount, colCount);
 
         std::ostringstream json;
         json << "{";
         json << "\"name\":\"" << jsonEscape(sheet->name) << "\",";
-        json << "\"rowCount\":" << maxRow << ",";
-        json << "\"colCount\":" << maxCol << ",";
+        json << "\"rowCount\":" << rowCount << ",";
+        json << "\"colCount\":" << colCount << ",";
         json << "\"defaultColWidth\":" << DEFAULT_COLUMN_WIDTH << ",";
         json << "\"defaultRowHeight\":" << DEFAULT_ROW_HEIGHT;
         json << "}";

@@ -1,6 +1,7 @@
 #include "core/cells/formula_eval.h"
 
 #include <cmath>
+#include <cstdlib>
 
 #include <algorithm>
 #include <string>
@@ -50,17 +51,13 @@ static EvalResult cellValueToEvalResult(const CellValue& value) {
             if (value.error != CellError::NONE) {
                 return EvalResult::Error(value.error);
             }
-            // Try to parse as number first
+            // Try to parse as number first (using strtod to avoid exceptions in WASM)
             if (!value.raw.empty()) {
-                try {
-                    size_t pos = 0;
-                    const double val = std::stod(value.raw, &pos);
-                    if (pos == value.raw.size()) {
-                        return EvalResult::Number(val);
-                    }
-                } catch (...) {
-                    // Not a number, fall through to return as string
-                    (void)0;  // Suppress bugprone-empty-catch
+                char* endPtr = nullptr;  // NOLINT(misc-const-correctness)
+                const double val = std::strtod(value.raw.c_str(), &endPtr);
+                // Check if entire string was consumed (successful number parse)
+                if (endPtr != nullptr && *endPtr == '\0') {
+                    return EvalResult::Number(val);
                 }
                 return EvalResult::String(value.raw);
             }
