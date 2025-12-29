@@ -396,6 +396,28 @@ cc_test(
 )
 
 cc_library(
+    name = "viewport_index",
+    srcs = ["viewport_index.cc"],
+    hdrs = ["viewport_index.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":axis_index",
+        ":model",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "viewport_index_test",
+    srcs = ["viewport_index_test.cc"],
+    deps = [
+        ":id",
+        ":viewport_index",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "formula_lexer",
     srcs = ["formula_lexer.cc"],
     hdrs = ["formula_lexer.h"],

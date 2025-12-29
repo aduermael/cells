@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2025-12-29 21:08 UTC
-Updated At: 2025-12-29 23:15 UTC
+Updated At: 2025-12-30 00:05 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Replace Quadtree with Order-Statistic Tree for Viewport Queries
@@ -89,17 +89,17 @@ Create AxisIndex class that wraps the OS tree for column/row indexing.
 - [x] 2g: Implement `move(axisId, newPosition)` - reorder axis
 - [x] 2h: Create `core/cells/axis_index_test.cc` with unit tests
 
-### Phase 3: ViewportIndex Replacing Quadtree
+### Phase 3: ViewportIndex Replacing Quadtree ✅
 
 Create ViewportIndex that uses two AxisIndex instances (cols, rows) plus cell HashMap.
 
-- [ ] 3a: Create `core/cells/viewport_index.h` with ViewportIndex class
-- [ ] 3b: Implement `build(sheet)` - populate from sheet data
-- [ ] 3c: Implement `queryViewport(x1, y1, x2, y2)` using pixel coordinates
-- [ ] 3d: Implement incremental `onCellAdded/Removed/Changed`
-- [ ] 3e: Implement incremental `onAxisInserted/Deleted/Resized/Moved`
-- [ ] 3f: Create `core/cells/viewport_index_test.cc` with unit tests
-- [ ] 3g: Verify tests pass: `bazel test //core/cells:viewport_index_test`
+- [x] 3a: Create `core/cells/viewport_index.h` with ViewportIndex class
+- [x] 3b: Implement `build(sheet)` - populate from sheet data
+- [x] 3c: Implement `queryViewport(x1, y1, x2, y2)` using pixel coordinates
+- [x] 3d: Implement incremental `onCellAdded/Removed/Changed`
+- [x] 3e: Implement incremental `onAxisInserted/Deleted/Resized/Moved`
+- [x] 3f: Create `core/cells/viewport_index_test.cc` with unit tests
+- [x] 3g: Verify tests pass: `bazel test //core/cells:viewport_index_test`
 
 ### Phase 4: Integrate into WASM Bindings
 

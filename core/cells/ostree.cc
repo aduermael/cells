@@ -103,8 +103,9 @@ bool OSTree::remove(const ID& id) {
 }
 
 void OSTree::removeNode(OSNode* node) {
-    if (node == nullptr)
+    if (node == nullptr) {
         return;
+    }
 
     // Remove from index
     _nodeIndex.erase(node->id);
@@ -273,8 +274,9 @@ size_t OSTree::getPosition(const OSNode* node) const {
 // ============================================================================
 
 void OSTree::updateSize(OSNode* node, uint32_t newSize) {
-    if (node == nullptr)
+    if (node == nullptr) {
         return;
+    }
 
     node->size = newSize;
     updateSubtreeTotal(node);
@@ -333,8 +335,9 @@ OSNode* OSTree::last() const {
 }
 
 OSNode* OSTree::next(const OSNode* node) {
-    if (node == nullptr)
+    if (node == nullptr) {
         return nullptr;
+    }
 
     // If there's a right subtree, return its minimum
     if (node->right != nullptr) {
@@ -353,8 +356,9 @@ OSNode* OSTree::next(const OSNode* node) {
 }
 
 OSNode* OSTree::prev(const OSNode* node) {
-    if (node == nullptr)
+    if (node == nullptr) {
         return nullptr;
+    }
 
     // If there's a left subtree, return its maximum
     if (node->left != nullptr) {
@@ -537,8 +541,9 @@ void OSTree::fixInsert(OSNode* node) {
 
 void OSTree::fixDelete(OSNode* node, OSNode* parent) {
     while (node != _root && (node == nullptr || node->color == NodeColor::BLACK)) {
-        if (parent == nullptr)
+        if (parent == nullptr) {
             break;
+        }
 
         if (node == parent->left) {
             OSNode* sibling = parent->right;
@@ -670,8 +675,9 @@ OSNode* OSTree::maximum(OSNode* node) {
 }
 
 void OSTree::updateSubtreeTotal(OSNode* node) {
-    if (node == nullptr)
+    if (node == nullptr) {
         return;
+    }
 
     node->subtree_total = node->size;
     if (node->left != nullptr) {
@@ -690,8 +696,9 @@ void OSTree::propagateSubtreeTotal(OSNode* node) {
 }
 
 void OSTree::deleteSubtree(OSNode* node) {
-    if (node == nullptr)
+    if (node == nullptr) {
         return;
+    }
     deleteSubtree(node->left);
     deleteSubtree(node->right);
     delete node;

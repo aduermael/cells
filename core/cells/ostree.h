@@ -70,22 +70,25 @@ struct OSNode {
 
     // Get sibling node (nullptr if none)
     [[nodiscard]] OSNode* sibling() const {
-        if (parent == nullptr)
+        if (parent == nullptr) {
             return nullptr;
+        }
         return isLeftChild() ? parent->right : parent->left;
     }
 
     // Get uncle node (parent's sibling, nullptr if none)
     [[nodiscard]] OSNode* uncle() const {
-        if (parent == nullptr)
+        if (parent == nullptr) {
             return nullptr;
+        }
         return parent->sibling();
     }
 
     // Get grandparent node (nullptr if none)
     [[nodiscard]] OSNode* grandparent() const {
-        if (parent == nullptr)
+        if (parent == nullptr) {
             return nullptr;
+        }
         return parent->parent;
     }
 };
