@@ -1,6 +1,6 @@
-Status: READY
+Status: IN_PROGRESS
 Created At: 2025-12-29 21:08 UTC
-Updated At: 2025-12-29 21:08 UTC
+Updated At: 2025-12-29 22:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Replace Quadtree with Order-Statistic Tree for Viewport Queries
@@ -64,17 +64,17 @@ AFTER:
 
 ## Phases
 
-### Phase 1: Core Order-Statistic Tree Implementation
+### Phase 1: Core Order-Statistic Tree Implementation ✅
 
 Implement the generic augmented red-black tree in C++.
 
-- [ ] 1a: Create `core/cells/ostree.h` with node struct and tree class declaration
-- [ ] 1b: Implement red-black tree insertion with subtree_total maintenance
-- [ ] 1c: Implement red-black tree deletion with subtree_total maintenance
-- [ ] 1d: Implement `findByOffset(pixel)` → returns node containing that pixel offset
-- [ ] 1e: Implement `getOffset(node)` → returns pixel offset of node's start
-- [ ] 1f: Implement `updateSize(node, newSize)` → update size and bubble up totals
-- [ ] 1g: Create `core/cells/ostree_test.cc` with comprehensive unit tests
+- [x] 1a: Create `core/cells/ostree.h` with node struct and tree class declaration
+- [x] 1b: Implement red-black tree insertion with subtree_total maintenance
+- [x] 1c: Implement red-black tree deletion with subtree_total maintenance
+- [x] 1d: Implement `findByOffset(pixel)` → returns node containing that pixel offset
+- [x] 1e: Implement `getOffset(node)` → returns pixel offset of node's start
+- [x] 1f: Implement `updateSize(node, newSize)` → update size and bubble up totals
+- [x] 1g: Create `core/cells/ostree_test.cc` with comprehensive unit tests
 
 ### Phase 2: Axis Index Using Order-Statistic Tree
 

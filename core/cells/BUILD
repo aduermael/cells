@@ -355,6 +355,26 @@ cc_test(
 )
 
 cc_library(
+    name = "ostree",
+    srcs = ["ostree.cc"],
+    hdrs = ["ostree.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "ostree_test",
+    srcs = ["ostree_test.cc"],
+    deps = [
+        ":id",
+        ":ostree",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "formula_lexer",
     srcs = ["formula_lexer.cc"],
     hdrs = ["formula_lexer.h"],
