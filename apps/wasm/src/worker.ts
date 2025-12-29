@@ -126,6 +126,12 @@ interface CellsEngine {
   // Debug/Development
   debugParseFormula(formulaText: string): string;
 
+  // Viewport pixel queries (Phase 5)
+  getColumnPixelOffset(position: number): number;
+  getRowPixelOffset(position: number): number;
+  getTotalWidth(): number;
+  getTotalHeight(): number;
+
   // Formula API (Phase 7)
   validateFormula(formulaText: string): string;
   getFormulaDisplay(cellId: string): string;
@@ -1009,6 +1015,36 @@ function handleMessage(msg: WorkerRequest): void {
         const { formulaText } = params as { formulaText: string };
         const result = engine.debugParseFormula(formulaText);
         respond({ type: "formulaParsed", result });
+        break;
+      }
+
+      // ================================================================
+      // Viewport pixel queries (Phase 5)
+      // ================================================================
+
+      case "getColumnPixelOffset": {
+        const { position } = params as { position: number };
+        const offset = engine.getColumnPixelOffset(position);
+        respond({ type: "pixelOffset", offset });
+        break;
+      }
+
+      case "getRowPixelOffset": {
+        const { position } = params as { position: number };
+        const offset = engine.getRowPixelOffset(position);
+        respond({ type: "pixelOffset", offset });
+        break;
+      }
+
+      case "getTotalWidth": {
+        const width = engine.getTotalWidth();
+        respond({ type: "totalSize", size: width });
+        break;
+      }
+
+      case "getTotalHeight": {
+        const height = engine.getTotalHeight();
+        respond({ type: "totalSize", size: height });
         break;
       }
 

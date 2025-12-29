@@ -210,6 +210,12 @@ export class App {
   /** Row heights (position -> height) */
   rowHeights: Map<number, number> = new Map();
 
+  /** Column pixel offsets (position -> X pixel offset) - pre-computed by WASM ViewportIndex */
+  colPixelOffsets: Map<number, number> = new Map();
+
+  /** Row pixel offsets (position -> Y pixel offset) - pre-computed by WASM ViewportIndex */
+  rowPixelOffsets: Map<number, number> = new Map();
+
   /** Column names cache (position -> custom name) */
   colNames: Map<number, string> = new Map();
 
@@ -364,6 +370,8 @@ export class App {
     this.rows = [];
     this.colWidths.clear();
     this.rowHeights.clear();
+    this.colPixelOffsets.clear();
+    this.rowPixelOffsets.clear();
     this.colNames.clear();
     this.scrollX = 0;
     this.scrollY = 0;

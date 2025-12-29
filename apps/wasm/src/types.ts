@@ -79,6 +79,7 @@ export interface ColumnInfo {
   id: string;
   pos: number;
   width: number;
+  pixelOffset: number; // Pre-computed X pixel offset (O(log n) from ViewportIndex)
   name: string;
 }
 
@@ -87,6 +88,7 @@ export interface RowInfo {
   id: string;
   pos: number;
   height: number;
+  pixelOffset: number; // Pre-computed Y pixel offset (O(log n) from ViewportIndex)
   name: string;
 }
 

@@ -26,6 +26,7 @@ export const DRAG_THRESHOLD = 5;
 
 /**
  * Get the column index at a screen X coordinate
+ * Uses O(n) linear scan - prefer getColAtXFast with pixel offsets when available
  * @param x Screen X coordinate
  * @param scrollX Current horizontal scroll offset
  * @param colWidths Map of column positions to widths
@@ -51,6 +52,7 @@ export function getColAtX(
 
 /**
  * Get the row index at a screen Y coordinate
+ * Uses O(n) linear scan - prefer getRowAtYFast with pixel offsets when available
  * @param y Screen Y coordinate
  * @param scrollY Current vertical scroll offset
  * @param rowHeights Map of row positions to heights
@@ -72,6 +74,56 @@ export function getRowAtY(
     row++;
   }
   return row;
+}
+
+// =============================================================================
+// Fast Coordinate Conversion (using pre-computed pixel offsets)
+// =============================================================================
+
+/**
+ * Get the X pixel offset for a column position.
+ * O(1) lookup using pre-computed pixel offsets from WASM ViewportIndex.
+ * Falls back to O(n) loop if offset not cached.
+ */
+export function getColPixelX(
+  col: number,
+  scrollX: number,
+  colPixelOffsets: Map<number, number>,
+  colWidths: Map<number, number>
+): number {
+  const cachedOffset = colPixelOffsets.get(col);
+  if (cachedOffset !== undefined) {
+    return HEADER_WIDTH + cachedOffset - scrollX;
+  }
+  // Fallback to O(n) calculation if not in cache
+  let x = HEADER_WIDTH - scrollX;
+  for (let i = 0; i < col; i++) {
+    x += colWidths.get(i) ?? DEFAULT_COL_WIDTH;
+  }
+  return x;
+}
+
+/**
+ * Get the Y pixel offset for a row position.
+ * O(1) lookup using pre-computed pixel offsets from WASM ViewportIndex.
+ * Falls back to O(n) loop if offset not cached.
+ */
+export function getRowPixelY(
+  row: number,
+  scrollY: number,
+  rowPixelOffsets: Map<number, number>,
+  rowHeights: Map<number, number>
+): number {
+  const cachedOffset = rowPixelOffsets.get(row);
+  if (cachedOffset !== undefined) {
+    return HEADER_HEIGHT + cachedOffset - scrollY;
+  }
+  // Fallback to O(n) calculation if not in cache
+  let y = HEADER_HEIGHT - scrollY;
+  for (let i = 0; i < row; i++) {
+    y += rowHeights.get(i) ?? DEFAULT_ROW_HEIGHT;
+  }
+  return y;
 }
 
 /**

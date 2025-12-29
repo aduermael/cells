@@ -636,21 +636,25 @@ export function initApp(): AppContext {
       // Clear caches for viewport range before repopulating
       for (let col = startCol; col < endCol; col++) {
         app.colWidths.delete(col);
+        app.colPixelOffsets.delete(col);
         app.colNames.delete(col);
       }
       for (let row = startRow; row < endRow; row++) {
         app.rowHeights.delete(row);
+        app.rowPixelOffsets.delete(row);
       }
 
-      // Repopulate from Workbook
+      // Repopulate from Workbook (including pre-computed pixel offsets)
       for (const col of app.columns) {
         app.colWidths.set(col.pos, col.width || DEFAULT_COL_WIDTH);
+        app.colPixelOffsets.set(col.pos, col.pixelOffset);
         if (col.name) {
           app.colNames.set(col.pos, col.name);
         }
       }
       for (const row of app.rows) {
         app.rowHeights.set(row.pos, row.height || DEFAULT_ROW_HEIGHT);
+        app.rowPixelOffsets.set(row.pos, row.pixelOffset);
       }
     } catch (e) {
       console.error("Error fetching viewport:", e);

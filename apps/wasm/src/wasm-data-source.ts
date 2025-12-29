@@ -284,6 +284,30 @@ export class WasmDataSource {
   }
 
   // ==========================================================================
+  // Viewport Pixel Queries (Phase 5)
+  // ==========================================================================
+
+  /** Get pixel offset of column at given position */
+  async getColumnPixelOffset(position: number): Promise<number> {
+    return this._client.getColumnPixelOffset(position);
+  }
+
+  /** Get pixel offset of row at given position */
+  async getRowPixelOffset(position: number): Promise<number> {
+    return this._client.getRowPixelOffset(position);
+  }
+
+  /** Get total width of all columns in pixels */
+  async getTotalWidth(): Promise<number> {
+    return this._client.getTotalWidth();
+  }
+
+  /** Get total height of all rows in pixels */
+  async getTotalHeight(): Promise<number> {
+    return this._client.getTotalHeight();
+  }
+
+  // ==========================================================================
   // Export
   // ==========================================================================
 

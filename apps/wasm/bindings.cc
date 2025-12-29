@@ -619,7 +619,7 @@ public:
 
         json << "],\"columns\":[";
 
-        // Include column info for the viewport
+        // Include column info for the viewport (with pixel offsets)
         bool firstCol = true;
         for (const auto& [id, col] : sheet->columns) {
             if (col->position >= col1 && col->position < col2) {
@@ -631,6 +631,9 @@ public:
                 json << "\"id\":\"" << id.toString() << "\",";
                 json << "\"pos\":" << col->position << ",";
                 json << "\"width\":" << col->size << ",";
+                // Include pixel offset (O(log n) lookup via ViewportIndex)
+                auto pixelOffset = _viewportIndex.columnToPixel(id);
+                json << "\"pixelOffset\":" << (pixelOffset ? *pixelOffset : 0) << ",";
                 json << "\"name\":\"" << jsonEscape(col->name) << "\"";
                 json << "}";
             }
@@ -638,7 +641,7 @@ public:
 
         json << "],\"rows\":[";
 
-        // Include row info for the viewport
+        // Include row info for the viewport (with pixel offsets)
         bool firstRow = true;
         for (const auto& [id, row] : sheet->rows) {
             if (row->position >= row1 && row->position < row2) {
@@ -650,6 +653,9 @@ public:
                 json << "\"id\":\"" << id.toString() << "\",";
                 json << "\"pos\":" << row->position << ",";
                 json << "\"height\":" << row->size << ",";
+                // Include pixel offset (O(log n) lookup via ViewportIndex)
+                auto pixelOffset = _viewportIndex.rowToPixel(id);
+                json << "\"pixelOffset\":" << (pixelOffset ? *pixelOffset : 0) << ",";
                 json << "\"name\":\"" << jsonEscape(row->name) << "\"";
                 json << "}";
             }

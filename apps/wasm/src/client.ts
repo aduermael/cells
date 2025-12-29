@@ -587,6 +587,28 @@ export class CellsClient {
     return JSON.parse(response.result as string) as FormulaParseResult;
   }
 
+  // ========== Viewport Pixel Queries (Phase 5) ==========
+
+  async getColumnPixelOffset(position: number): Promise<number> {
+    const response = await this._send("getColumnPixelOffset", { position });
+    return response.offset as number;
+  }
+
+  async getRowPixelOffset(position: number): Promise<number> {
+    const response = await this._send("getRowPixelOffset", { position });
+    return response.offset as number;
+  }
+
+  async getTotalWidth(): Promise<number> {
+    const response = await this._send("getTotalWidth");
+    return response.size as number;
+  }
+
+  async getTotalHeight(): Promise<number> {
+    const response = await this._send("getTotalHeight");
+    return response.size as number;
+  }
+
   // ========== Formula API (Phase 7) ==========
 
   async validateFormula(formulaText: string): Promise<ValidateFormulaResult> {
