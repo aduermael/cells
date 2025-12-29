@@ -29,18 +29,15 @@ namespace cells {
 // tree structure), not by ID. Nodes are positioned left-to-right in order.
 
 // Node color for red-black tree
-enum class NodeColor : uint8_t {
-    RED,
-    BLACK
-};
+enum class NodeColor : uint8_t { RED, BLACK };
 
 // Forward declaration
 class OSTree;
 
 // Tree node
 struct OSNode {
-    ID id;                // Unique identifier
-    uint32_t size;        // Size of this node (width/height in pixels)
+    ID id;                   // Unique identifier
+    uint32_t size;           // Size of this node (width/height in pixels)
     uint32_t subtree_total;  // Sum of sizes in this subtree (including this node)
 
     NodeColor color;
@@ -49,38 +46,46 @@ struct OSNode {
     OSNode* right;
 
     OSNode()
-        : size(0), subtree_total(0), color(NodeColor::RED),
-          parent(nullptr), left(nullptr), right(nullptr) {}
+        : size(0),
+          subtree_total(0),
+          color(NodeColor::RED),
+          parent(nullptr),
+          left(nullptr),
+          right(nullptr) {}
 
     explicit OSNode(const ID& id, uint32_t size = 0)
-        : id(id), size(size), subtree_total(size), color(NodeColor::RED),
-          parent(nullptr), left(nullptr), right(nullptr) {}
+        : id(id),
+          size(size),
+          subtree_total(size),
+          color(NodeColor::RED),
+          parent(nullptr),
+          left(nullptr),
+          right(nullptr) {}
 
     // Check if this node is a left child
-    [[nodiscard]] bool isLeftChild() const {
-        return parent != nullptr && parent->left == this;
-    }
+    [[nodiscard]] bool isLeftChild() const { return parent != nullptr && parent->left == this; }
 
     // Check if this node is a right child
-    [[nodiscard]] bool isRightChild() const {
-        return parent != nullptr && parent->right == this;
-    }
+    [[nodiscard]] bool isRightChild() const { return parent != nullptr && parent->right == this; }
 
     // Get sibling node (nullptr if none)
     [[nodiscard]] OSNode* sibling() const {
-        if (parent == nullptr) return nullptr;
+        if (parent == nullptr)
+            return nullptr;
         return isLeftChild() ? parent->right : parent->left;
     }
 
     // Get uncle node (parent's sibling, nullptr if none)
     [[nodiscard]] OSNode* uncle() const {
-        if (parent == nullptr) return nullptr;
+        if (parent == nullptr)
+            return nullptr;
         return parent->sibling();
     }
 
     // Get grandparent node (nullptr if none)
     [[nodiscard]] OSNode* grandparent() const {
-        if (parent == nullptr) return nullptr;
+        if (parent == nullptr)
+            return nullptr;
         return parent->parent;
     }
 };
@@ -91,8 +96,7 @@ struct FindResult {
     uint32_t offsetInNode;  // Offset from the start of this node
 
     FindResult() : node(nullptr), offsetInNode(0) {}
-    FindResult(OSNode* node, uint32_t offsetInNode)
-        : node(node), offsetInNode(offsetInNode) {}
+    FindResult(OSNode* node, uint32_t offsetInNode) : node(node), offsetInNode(offsetInNode) {}
 
     [[nodiscard]] bool found() const { return node != nullptr; }
 };
@@ -205,8 +209,8 @@ public:
     [[nodiscard]] bool verify() const;
 
 private:
-    OSNode* _root;
-    size_t _count;
+    OSNode* _root{nullptr};
+    size_t _count{0};
 
     // ID -> Node lookup for O(1) find by ID
     std::unordered_map<ID, OSNode*, IDHash> _nodeIndex;
@@ -216,8 +220,8 @@ private:
     // ========================================================================
 
     // Rotations (also update subtree_total)
-    void rotateLeft(OSNode* node);
-    void rotateRight(OSNode* node);
+    void rotateLeft(OSNode* x);
+    void rotateRight(OSNode* y);
 
     // Fix red-black properties after insertion
     void fixInsert(OSNode* node);

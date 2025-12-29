@@ -1,7 +1,8 @@
 #include "core/cells/ostree.h"
 
-#include <algorithm>
 #include <cassert>
+
+#include <algorithm>
 
 namespace cells {
 
@@ -9,16 +10,14 @@ namespace cells {
 // Constructor / Destructor
 // ============================================================================
 
-OSTree::OSTree() : _root(nullptr), _count(0) {}
+OSTree::OSTree() = default;
 
 OSTree::~OSTree() {
     clear();
 }
 
 OSTree::OSTree(OSTree&& other) noexcept
-    : _root(other._root),
-      _count(other._count),
-      _nodeIndex(std::move(other._nodeIndex)) {
+    : _root(other._root), _count(other._count), _nodeIndex(std::move(other._nodeIndex)) {
     other._root = nullptr;
     other._count = 0;
 }
@@ -104,12 +103,13 @@ bool OSTree::remove(const ID& id) {
 }
 
 void OSTree::removeNode(OSNode* node) {
-    if (node == nullptr) return;
+    if (node == nullptr)
+        return;
 
     // Remove from index
     _nodeIndex.erase(node->id);
 
-    OSNode* toDelete = node;
+    const OSNode* toDelete = node;
     OSNode* replacement = nullptr;
     OSNode* fixupParent = nullptr;
     NodeColor originalColor = node->color;
@@ -203,14 +203,14 @@ FindResult OSTree::findByOffset(uint32_t offset) const {
 
     while (current != nullptr) {
         // Calculate left subtree total
-        uint32_t leftTotal = current->left != nullptr ? current->left->subtree_total : 0;
+        const uint32_t leftTotal = current->left != nullptr ? current->left->subtree_total : 0;
 
         if (offset < accumulatedOffset + leftTotal) {
             // Target is in left subtree
             current = current->left;
         } else if (offset < accumulatedOffset + leftTotal + current->size) {
             // Target is in this node
-            uint32_t offsetInNode = offset - (accumulatedOffset + leftTotal);
+            const uint32_t offsetInNode = offset - (accumulatedOffset + leftTotal);
             return {current, offsetInNode};
         } else {
             // Target is in right subtree
@@ -273,7 +273,8 @@ size_t OSTree::getPosition(const OSNode* node) const {
 // ============================================================================
 
 void OSTree::updateSize(OSNode* node, uint32_t newSize) {
-    if (node == nullptr) return;
+    if (node == nullptr)
+        return;
 
     node->size = newSize;
     updateSubtreeTotal(node);
@@ -285,14 +286,14 @@ bool OSTree::move(OSNode* node, size_t newPosition) {
         return false;
     }
 
-    size_t currentPos = getPosition(node);
+    const size_t currentPos = getPosition(node);
     if (currentPos == newPosition) {
         return true;  // Already at target position
     }
 
     // Store node data
-    ID id = node->id;
-    uint32_t size = node->size;
+    const ID id = node->id;
+    const uint32_t size = node->size;
 
     // Remove from current position
     removeNode(node);
@@ -332,7 +333,8 @@ OSNode* OSTree::last() const {
 }
 
 OSNode* OSTree::next(const OSNode* node) {
-    if (node == nullptr) return nullptr;
+    if (node == nullptr)
+        return nullptr;
 
     // If there's a right subtree, return its minimum
     if (node->right != nullptr) {
@@ -351,7 +353,8 @@ OSNode* OSTree::next(const OSNode* node) {
 }
 
 OSNode* OSTree::prev(const OSNode* node) {
-    if (node == nullptr) return nullptr;
+    if (node == nullptr)
+        return nullptr;
 
     // If there's a left subtree, return its maximum
     if (node->left != nullptr) {
@@ -394,7 +397,7 @@ bool OSTree::verify() const {
 
     // Verify subtree and count black height
     uint32_t computedTotal = 0;
-    int blackHeight = verifySubtree(_root, computedTotal);
+    const int blackHeight = verifySubtree(_root, computedTotal);
 
     if (blackHeight < 0) {
         return false;
@@ -534,7 +537,8 @@ void OSTree::fixInsert(OSNode* node) {
 
 void OSTree::fixDelete(OSNode* node, OSNode* parent) {
     while (node != _root && (node == nullptr || node->color == NodeColor::BLACK)) {
-        if (parent == nullptr) break;
+        if (parent == nullptr)
+            break;
 
         if (node == parent->left) {
             OSNode* sibling = parent->right;
@@ -547,10 +551,10 @@ void OSTree::fixDelete(OSNode* node, OSNode* parent) {
                 sibling = parent->right;
             }
 
-            bool siblingLeftBlack = sibling == nullptr || sibling->left == nullptr ||
-                                    sibling->left->color == NodeColor::BLACK;
-            bool siblingRightBlack = sibling == nullptr || sibling->right == nullptr ||
-                                     sibling->right->color == NodeColor::BLACK;
+            const bool siblingLeftBlack = sibling == nullptr || sibling->left == nullptr ||
+                                          sibling->left->color == NodeColor::BLACK;
+            const bool siblingRightBlack = sibling == nullptr || sibling->right == nullptr ||
+                                           sibling->right->color == NodeColor::BLACK;
 
             if (siblingLeftBlack && siblingRightBlack) {
                 // Case 2: Sibling's children are both black
@@ -595,10 +599,10 @@ void OSTree::fixDelete(OSNode* node, OSNode* parent) {
                 sibling = parent->left;
             }
 
-            bool siblingLeftBlack = sibling == nullptr || sibling->left == nullptr ||
-                                    sibling->left->color == NodeColor::BLACK;
-            bool siblingRightBlack = sibling == nullptr || sibling->right == nullptr ||
-                                     sibling->right->color == NodeColor::BLACK;
+            const bool siblingLeftBlack = sibling == nullptr || sibling->left == nullptr ||
+                                          sibling->left->color == NodeColor::BLACK;
+            const bool siblingRightBlack = sibling == nullptr || sibling->right == nullptr ||
+                                           sibling->right->color == NodeColor::BLACK;
 
             if (siblingLeftBlack && siblingRightBlack) {
                 if (sibling != nullptr) {
@@ -666,7 +670,8 @@ OSNode* OSTree::maximum(OSNode* node) {
 }
 
 void OSTree::updateSubtreeTotal(OSNode* node) {
-    if (node == nullptr) return;
+    if (node == nullptr)
+        return;
 
     node->subtree_total = node->size;
     if (node->left != nullptr) {
@@ -685,7 +690,8 @@ void OSTree::propagateSubtreeTotal(OSNode* node) {
 }
 
 void OSTree::deleteSubtree(OSNode* node) {
-    if (node == nullptr) return;
+    if (node == nullptr)
+        return;
     deleteSubtree(node->left);
     deleteSubtree(node->right);
     delete node;
@@ -694,7 +700,7 @@ void OSTree::deleteSubtree(OSNode* node) {
 OSNode* OSTree::nodeAtPosition(size_t position) const {
     // Use in-order traversal to find node at position
     // This could be optimized with subtree counts, but keeping it simple for now
-    OSNode* node = first();
+    OSNode* node = first();  // NOLINT(misc-const-correctness)
     size_t current = 0;
 
     while (node != nullptr && current < position) {
@@ -712,7 +718,7 @@ size_t OSTree::leftSubtreeCount(const OSNode* node) {
 
     // Count nodes in left subtree
     size_t count = 0;
-    OSNode* current = minimum(node->left);
+    const OSNode* current = minimum(node->left);
     while (current != nullptr && current != node) {
         count++;
         current = next(current);
@@ -745,8 +751,8 @@ int OSTree::verifySubtree(const OSNode* node, uint32_t& computedTotal) const {
     // Recursively verify children
     uint32_t leftTotal = 0;
     uint32_t rightTotal = 0;
-    int leftBlackHeight = verifySubtree(node->left, leftTotal);
-    int rightBlackHeight = verifySubtree(node->right, rightTotal);
+    const int leftBlackHeight = verifySubtree(node->left, leftTotal);
+    const int rightBlackHeight = verifySubtree(node->right, rightTotal);
 
     if (leftBlackHeight < 0 || rightBlackHeight < 0) {
         return -1;

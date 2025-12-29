@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2025-12-29 21:08 UTC
-Updated At: 2025-12-29 22:30 UTC
+Updated At: 2025-12-29 23:15 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Replace Quadtree with Order-Statistic Tree for Viewport Queries
@@ -76,18 +76,18 @@ Implement the generic augmented red-black tree in C++.
 - [x] 1f: Implement `updateSize(node, newSize)` → update size and bubble up totals
 - [x] 1g: Create `core/cells/ostree_test.cc` with comprehensive unit tests
 
-### Phase 2: Axis Index Using Order-Statistic Tree
+### Phase 2: Axis Index Using Order-Statistic Tree ✅
 
 Create AxisIndex class that wraps the OS tree for column/row indexing.
 
-- [ ] 2a: Create `core/cells/axis_index.h` with AxisIndex class
-- [ ] 2b: Implement `insert(axisId, position, size)` - maintains order by position
-- [ ] 2c: Implement `remove(axisId)`
-- [ ] 2d: Implement `pixelToAxis(offset)` → returns (axisId, offsetWithinAxis)
-- [ ] 2e: Implement `axisToPixel(axisId)` → returns pixel offset of axis start
-- [ ] 2f: Implement `resize(axisId, newSize)`
-- [ ] 2g: Implement `move(axisId, newPosition)` - reorder axis
-- [ ] 2h: Create `core/cells/axis_index_test.cc` with unit tests
+- [x] 2a: Create `core/cells/axis_index.h` with AxisIndex class
+- [x] 2b: Implement `insert(axisId, position, size)` - maintains order by position
+- [x] 2c: Implement `remove(axisId)`
+- [x] 2d: Implement `pixelToAxis(offset)` → returns (axisId, offsetWithinAxis)
+- [x] 2e: Implement `axisToPixel(axisId)` → returns pixel offset of axis start
+- [x] 2f: Implement `resize(axisId, newSize)`
+- [x] 2g: Implement `move(axisId, newPosition)` - reorder axis
+- [x] 2h: Create `core/cells/axis_index_test.cc` with unit tests
 
 ### Phase 3: ViewportIndex Replacing Quadtree
 

@@ -15,9 +15,7 @@ namespace {
 class OSTreeTest : public ::testing::Test {
 protected:
     // Helper to generate unique IDs
-    ID makeId(int n) {
-        return generate_id();
-    }
+    ID makeId(int n) { return generate_id(); }
 
     // Helper to verify tree invariants
     void verifyTree(const OSTree& tree) {

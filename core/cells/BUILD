@@ -375,6 +375,27 @@ cc_test(
 )
 
 cc_library(
+    name = "axis_index",
+    srcs = ["axis_index.cc"],
+    hdrs = ["axis_index.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":ostree",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "axis_index_test",
+    srcs = ["axis_index_test.cc"],
+    deps = [
+        ":axis_index",
+        ":id",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "formula_lexer",
     srcs = ["formula_lexer.cc"],
     hdrs = ["formula_lexer.h"],
