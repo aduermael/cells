@@ -107,7 +107,7 @@ Replace quadtree usage in bindings.cc with ViewportIndex.
 
 - [x] 4a: Replace `Quadtree _quadtree` with `ViewportIndex _viewportIndex`
 - [x] 4b: Update `queryViewport()` to use pixel coordinates (converts logical positions to pixels internally)
-- [x] 4c: Replace `rebuildQuadtree()` calls with incremental updates where possible (kept full rebuilds for now, incremental optimization deferred)
+- [x] 4c: Rename `rebuildQuadtree()` to `rebuildViewportIndex()` (incremental optimization deferred to Phase 7)
 - [x] 4d: Keep `rebuildViewportIndex()` for full rebuilds (file load, sheet switch)
 - [x] 4e: Update WASM API to expose axis pixel queries (for TypeScript): `getColumnPixelOffset`, `getRowPixelOffset`, `getTotalWidth`, `getTotalHeight`
 - [x] 4f: Verify WASM builds: `bazel build --config=wasm //apps/wasm:cells_wasm`
@@ -131,6 +131,31 @@ Remove quadtree code and document new architecture.
 - [ ] 6b: Update BUILD file to remove quadtree targets
 - [ ] 6c: Update `docs/rendering.md` with new viewport indexing architecture
 - [ ] 6d: Final test pass: `bazel test //core/...` and `npm run test:stable`
+
+### Phase 7: Incremental Update Optimization
+
+Replace full `rebuildViewportIndex()` calls with incremental O(log n) updates where possible.
+
+Currently all modifications trigger a full rebuild. This phase converts single-entity operations to use incremental updates:
+
+- [ ] 7a: Cell operations - use `onCellAdded()`/`onCellRemoved()` instead of full rebuild
+  - `createCellAt()` → `onCellAdded()`
+  - `deleteCellAt()` → `onCellRemoved()`
+  - `updateCell()` → no spatial update needed (values don't affect position)
+- [ ] 7b: Axis resize operations - use `onAxisResized()` instead of full rebuild
+  - `resizeColumn()` → `onAxisResized(colId, true, newWidth)`
+  - `resizeRow()` → `onAxisResized(rowId, false, newHeight)`
+- [ ] 7c: Axis insert/delete - use `onAxisInserted()`/`onAxisDeleted()` instead of full rebuild
+  - `insertColumnAt()` → `onAxisInserted()`
+  - `insertRowAt()` → `onAxisInserted()`
+  - `deleteColumnById()` → `onAxisDeleted()`
+  - `deleteRowById()` → `onAxisDeleted()`
+- [ ] 7d: Axis move operations - use `onAxisMoved()` instead of full rebuild
+  - `moveColumn()` → `onAxisMoved()`
+  - `moveRow()` → `onAxisMoved()`
+- [ ] 7e: Keep full rebuild for bulk operations (file load, sheet switch, remote sync batch)
+- [ ] 7f: Add performance benchmark comparing full rebuild vs incremental updates
+- [ ] 7g: Verify all tests pass: `make test` and `npm run test:stable`
 
 ## Design Decisions
 
