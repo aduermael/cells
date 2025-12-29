@@ -331,7 +331,62 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
     return ApplyResult::SUCCESS;
 }
 
-// Apply DIM_INSERT_AXIS operation
+// Apply COL_INSERT operation
+// Payload: {"pos":0,"size":100}
+ApplyResult applyColInsert(Workbook& workbook, const Operation& op) {
+    const int pos = extractJSONInt(op.payload, "pos", -1);
+    const int size = extractJSONInt(op.payload, "size", -1);
+
+    if (pos < 0 || size < 0) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    if (workbook.sheets.empty()) {
+        return ApplyResult::INVALID_TARGET;
+    }
+    Sheet* sheet = workbook.sheets[0].get();
+
+    if (sheet->getColumn(op.target_id) != nullptr) {
+        return ApplyResult::ALREADY_APPLIED;
+    }
+
+    auto newAxis = std::make_unique<Axis>(op.target_id, true);
+    newAxis->position = static_cast<uint32_t>(pos);
+    newAxis->size = static_cast<uint32_t>(size);
+    sheet->addColumn(std::move(newAxis));
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply ROW_INSERT operation
+// Payload: {"pos":0,"size":25}
+ApplyResult applyRowInsert(Workbook& workbook, const Operation& op) {
+    const int pos = extractJSONInt(op.payload, "pos", -1);
+    const int size = extractJSONInt(op.payload, "size", -1);
+
+    if (pos < 0 || size < 0) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    if (workbook.sheets.empty()) {
+        return ApplyResult::INVALID_TARGET;
+    }
+    Sheet* sheet = workbook.sheets[0].get();
+
+    if (sheet->getRow(op.target_id) != nullptr) {
+        return ApplyResult::ALREADY_APPLIED;
+    }
+
+    auto newAxis = std::make_unique<Axis>(op.target_id, false);
+    newAxis->position = static_cast<uint32_t>(pos);
+    newAxis->size = static_cast<uint32_t>(size);
+    sheet->addRow(std::move(newAxis));
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply DIM_INSERT_AXIS operation (legacy, backwards compatibility)
+// Payload: {"pos":0,"size":100,"isCol":true}
 ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op) {
     // Parse payload: {"pos":0,"size":100,"isCol":true}
     const int pos = extractJSONInt(op.payload, "pos", -1);
@@ -417,7 +472,351 @@ ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
     return ApplyResult::SUCCESS;
 }
 
-// Apply DIM_RESIZE_AXIS operation
+// Helper to extract size from payload (handles both string and numeric formats)
+std::string extractSizePayload(const std::string& payload) {
+    std::string size_str = extractJSONString(payload, "size");
+    if (size_str.empty()) {
+        // Try numeric format
+        size_t pos = payload.find("\"size\":");
+        if (pos != std::string::npos) {
+            pos += 7;  // Skip "size":
+            while (pos < payload.size() && (payload[pos] == ' ' || payload[pos] == '\t')) {
+                pos++;
+            }
+            size_t end = pos;
+            while (end < payload.size() && payload[end] >= '0' && payload[end] <= '9') {
+                end++;
+            }
+            size_str = payload.substr(pos, end - pos);
+        }
+    }
+    return size_str;
+}
+
+// Apply COL_DELETE operation
+ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
+    Sheet* targetSheet = nullptr;
+    const Axis* axis = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        axis = s->getColumn(op.target_id);
+        if (axis != nullptr) {
+            targetSheet = s.get();
+            break;
+        }
+    }
+
+    if (targetSheet == nullptr || axis == nullptr) {
+        // Column doesn't exist - already deleted or never existed
+        return ApplyResult::SUCCESS;
+    }
+
+    // Check for newer operations that resurrect the column
+    const OpLog* oplog = workbook.getOpLog();
+    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    if (!latest.isNull() && latest.hlc > op.hlc) {
+        if (latest.type == OpType::COL_INSERT || latest.type == OpType::COL_RENAME ||
+            latest.type == OpType::COL_RESIZE) {
+            return ApplyResult::RESURRECTED;
+        }
+    }
+
+    // Delete all cells in this column
+    std::vector<ID> cellsToRemove;
+    for (const auto& [cellId, cell] : targetSheet->cells) {
+        if (cell->colId == op.target_id) {
+            cellsToRemove.push_back(cellId);
+        }
+    }
+    for (const auto& cellId : cellsToRemove) {
+        targetSheet->cells.erase(cellId);
+    }
+
+    // Remove the column
+    targetSheet->columns.erase(op.target_id);
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply ROW_DELETE operation
+ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
+    Sheet* targetSheet = nullptr;
+    const Axis* axis = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        axis = s->getRow(op.target_id);
+        if (axis != nullptr) {
+            targetSheet = s.get();
+            break;
+        }
+    }
+
+    if (targetSheet == nullptr || axis == nullptr) {
+        // Row doesn't exist - already deleted or never existed
+        return ApplyResult::SUCCESS;
+    }
+
+    // Check for newer operations that resurrect the row
+    const OpLog* oplog = workbook.getOpLog();
+    const Operation latest = oplog->getLatestOperationForEntity(op.target_id);
+    if (!latest.isNull() && latest.hlc > op.hlc) {
+        if (latest.type == OpType::ROW_INSERT || latest.type == OpType::ROW_RESIZE) {
+            return ApplyResult::RESURRECTED;
+        }
+    }
+
+    // Delete all cells in this row
+    std::vector<ID> cellsToRemove;
+    for (const auto& [cellId, cell] : targetSheet->cells) {
+        if (cell->rowId == op.target_id) {
+            cellsToRemove.push_back(cellId);
+        }
+    }
+    for (const auto& cellId : cellsToRemove) {
+        targetSheet->cells.erase(cellId);
+    }
+
+    // Remove the row
+    targetSheet->rows.erase(op.target_id);
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply COL_RESIZE operation
+// Payload: {"size":150}
+ApplyResult applyColResize(Workbook& workbook, const Operation& op) {
+    Axis* axis = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        axis = s->getColumn(op.target_id);
+        if (axis != nullptr) {
+            break;
+        }
+    }
+
+    if (axis == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer resize operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if ((existing.type == OpType::COL_RESIZE || existing.type == OpType::DIM_RESIZE_AXIS) &&
+            existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    const std::string size_str = extractSizePayload(op.payload);
+    if (size_str.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    const auto new_size = static_cast<uint32_t>(std::stoul(size_str));
+    axis->size = new_size;
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply ROW_RESIZE operation
+// Payload: {"size":25}
+ApplyResult applyRowResize(Workbook& workbook, const Operation& op) {
+    Axis* axis = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        axis = s->getRow(op.target_id);
+        if (axis != nullptr) {
+            break;
+        }
+    }
+
+    if (axis == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer resize operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if ((existing.type == OpType::ROW_RESIZE || existing.type == OpType::DIM_RESIZE_AXIS) &&
+            existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    const std::string size_str = extractSizePayload(op.payload);
+    if (size_str.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    const auto new_size = static_cast<uint32_t>(std::stoul(size_str));
+    axis->size = new_size;
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply COL_MOVE operation
+// Payload: {"targetPos":5}
+ApplyResult applyColMove(Workbook& workbook, const Operation& op) {
+    Axis* axis = nullptr;
+    Sheet* targetSheet = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        axis = s->getColumn(op.target_id);
+        if (axis != nullptr) {
+            targetSheet = s.get();
+            break;
+        }
+    }
+
+    if (axis == nullptr || targetSheet == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer move operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if ((existing.type == OpType::COL_MOVE || existing.type == OpType::DIM_MOVE_AXIS) &&
+            existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    const int targetPos = extractJSONInt(op.payload, "targetPos", -1);
+    if (targetPos < 0) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    const uint32_t currentPos = axis->position;
+    auto newPos = static_cast<uint32_t>(targetPos);
+
+    if (newPos == currentPos || newPos == currentPos + 1) {
+        return ApplyResult::SUCCESS;
+    }
+
+    if (newPos > currentPos) {
+        newPos = newPos - 1;
+    }
+
+    // Update other columns' positions
+    for (auto& [id, ax] : targetSheet->columns) {
+        if (id == op.target_id) {
+            continue;
+        }
+        if (currentPos < newPos) {
+            if (ax->position > currentPos && ax->position <= newPos) {
+                ax->position--;
+            }
+        } else {
+            if (ax->position >= newPos && ax->position < currentPos) {
+                ax->position++;
+            }
+        }
+    }
+
+    axis->position = newPos;
+    return ApplyResult::SUCCESS;
+}
+
+// Apply ROW_MOVE operation
+// Payload: {"targetPos":5}
+ApplyResult applyRowMove(Workbook& workbook, const Operation& op) {
+    Axis* axis = nullptr;
+    Sheet* targetSheet = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        axis = s->getRow(op.target_id);
+        if (axis != nullptr) {
+            targetSheet = s.get();
+            break;
+        }
+    }
+
+    if (axis == nullptr || targetSheet == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer move operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if ((existing.type == OpType::ROW_MOVE || existing.type == OpType::DIM_MOVE_AXIS) &&
+            existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    const int targetPos = extractJSONInt(op.payload, "targetPos", -1);
+    if (targetPos < 0) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    const uint32_t currentPos = axis->position;
+    auto newPos = static_cast<uint32_t>(targetPos);
+
+    if (newPos == currentPos || newPos == currentPos + 1) {
+        return ApplyResult::SUCCESS;
+    }
+
+    if (newPos > currentPos) {
+        newPos = newPos - 1;
+    }
+
+    // Update other rows' positions
+    for (auto& [id, ax] : targetSheet->rows) {
+        if (id == op.target_id) {
+            continue;
+        }
+        if (currentPos < newPos) {
+            if (ax->position > currentPos && ax->position <= newPos) {
+                ax->position--;
+            }
+        } else {
+            if (ax->position >= newPos && ax->position < currentPos) {
+                ax->position++;
+            }
+        }
+    }
+
+    axis->position = newPos;
+    return ApplyResult::SUCCESS;
+}
+
+// Apply COL_RENAME operation
+// Payload: {"name":"NewName"}
+ApplyResult applyColRename(Workbook& workbook, const Operation& op) {
+    Axis* axis = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        axis = s->getColumn(op.target_id);
+        if (axis != nullptr) {
+            break;
+        }
+    }
+
+    if (axis == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer rename operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if ((existing.type == OpType::COL_RENAME || existing.type == OpType::DIM_RENAME_AXIS) &&
+            existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    const std::string name = extractJSONString(op.payload, "name");
+    axis->name = name;
+
+    return ApplyResult::SUCCESS;
+}
+
+// Apply DIM_RESIZE_AXIS operation (legacy, backwards compatibility)
 ApplyResult applyDimResizeAxis(Workbook& workbook, const Operation& op) {
     Axis* axis = nullptr;
 
@@ -444,24 +843,7 @@ ApplyResult applyDimResizeAxis(Workbook& workbook, const Operation& op) {
         }
     }
 
-    // Parse payload: {"size":150}
-    std::string size_str = extractJSONString(op.payload, "size");  // NOLINT(misc-const-correctness)
-    if (size_str.empty()) {
-        // Try numeric format
-        size_t pos = op.payload.find("\"size\":");
-        if (pos != std::string::npos) {
-            pos += 7;  // Skip "size":
-            while (pos < op.payload.size() && (op.payload[pos] == ' ' || op.payload[pos] == '\t')) {
-                pos++;
-            }
-            size_t end = pos;
-            while (end < op.payload.size() && op.payload[end] >= '0' && op.payload[end] <= '9') {
-                end++;
-            }
-            size_str = op.payload.substr(pos, end - pos);
-        }
-    }
-
+    const std::string size_str = extractSizePayload(op.payload);
     if (size_str.empty()) {
         return ApplyResult::INVALID_PAYLOAD;
     }
@@ -651,30 +1033,31 @@ ApplyResult applyDimMoveAxis(Workbook& workbook, const Operation& op) {
     return ApplyResult::SUCCESS;
 }
 
-// Apply DIM_RENAME_AXIS operation
+// Apply DIM_RENAME_AXIS operation (legacy, backwards compatibility)
+// Only handles columns - rows cannot be renamed.
 // Payload: {"name":"NewName"}
 ApplyResult applyDimRenameAxis(Workbook& workbook, const Operation& op) {
     Axis* axis = nullptr;
 
+    // Only look for columns - rows cannot be renamed
     for (auto& s : workbook.sheets) {
         axis = s->getColumn(op.target_id);
-        if (axis == nullptr) {
-            axis = s->getRow(op.target_id);
-        }
         if (axis != nullptr) {
             break;
         }
     }
 
     if (axis == nullptr) {
-        return ApplyResult::INVALID_TARGET;
+        // Could be a row ID from old data - silently accept for backwards compat
+        return ApplyResult::SUCCESS;
     }
 
     // Check for newer rename operations
     const OpLog* oplog = workbook.getOpLog();
     auto ops = oplog->getOperationsForEntity(op.target_id);
     for (const auto& existing : ops) {
-        if (existing.type == OpType::DIM_RENAME_AXIS && existing.hlc > op.hlc) {
+        if ((existing.type == OpType::DIM_RENAME_AXIS || existing.type == OpType::COL_RENAME) &&
+            existing.hlc > op.hlc) {
             return ApplyResult::SUPERSEDED;
         }
     }
@@ -710,13 +1093,56 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             break;
 
         case OpType::CELL_SET_STYLE:
-        case OpType::DIM_DELETE_AXIS:
             // Not fully implemented yet - just accept it
             result = ApplyResult::SUCCESS;
             break;
 
+        // Column operations
+        case OpType::COL_INSERT:
+            result = applyColInsert(workbook, op);
+            break;
+
+        case OpType::COL_DELETE:
+            result = applyColDelete(workbook, op);
+            break;
+
+        case OpType::COL_MOVE:
+            result = applyColMove(workbook, op);
+            break;
+
+        case OpType::COL_RESIZE:
+            result = applyColResize(workbook, op);
+            break;
+
+        case OpType::COL_RENAME:
+            result = applyColRename(workbook, op);
+            break;
+
+        // Row operations
+        case OpType::ROW_INSERT:
+            result = applyRowInsert(workbook, op);
+            break;
+
+        case OpType::ROW_DELETE:
+            result = applyRowDelete(workbook, op);
+            break;
+
+        case OpType::ROW_MOVE:
+            result = applyRowMove(workbook, op);
+            break;
+
+        case OpType::ROW_RESIZE:
+            result = applyRowResize(workbook, op);
+            break;
+
+        // Legacy DIM_* operations (backwards compatibility)
         case OpType::DIM_INSERT_AXIS:
             result = applyDimInsertAxis(workbook, op);
+            break;
+
+        case OpType::DIM_DELETE_AXIS:
+            // Legacy: Not fully implemented - just accept it
+            result = ApplyResult::SUCCESS;
             break;
 
         case OpType::DIM_RESIZE_AXIS:
@@ -814,6 +1240,52 @@ Operation makeDimRenameAxisOp(Workbook& workbook, const ID& axisId, const std::s
     return {hlc, OpType::DIM_RENAME_AXIS, axisId, payload};
 }
 
+// New COL_*/ROW_* operation makers (no isCol in payload)
+Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::COL_INSERT, axisId, payload};
+}
+
+Operation makeColDeleteOp(Workbook& workbook, const ID& axisId) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::COL_DELETE, axisId, "{}"};
+}
+
+Operation makeColResizeOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::COL_RESIZE, axisId, payload};
+}
+
+Operation makeColMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::COL_MOVE, axisId, payload};
+}
+
+Operation makeColRenameOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::COL_RENAME, axisId, payload};
+}
+
+Operation makeRowInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::ROW_INSERT, axisId, payload};
+}
+
+Operation makeRowDeleteOp(Workbook& workbook, const ID& axisId) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::ROW_DELETE, axisId, "{}"};
+}
+
+Operation makeRowResizeOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::ROW_RESIZE, axisId, payload};
+}
+
+Operation makeRowMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::ROW_MOVE, axisId, payload};
+}
+
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::SHEET_CREATE, sheetId, payload};
@@ -852,12 +1324,11 @@ size_t bootstrapOpLog(Workbook& workbook) {
         std::sort(columns.begin(), columns.end(),
                   [](const auto& a, const auto& b) { return a.first < b.first; });
 
-        // Generate DIM_INSERT_AXIS operations for columns (in position order)
+        // Generate COL_INSERT operations for columns (in position order)
         for (const auto& [pos, axis] : columns) {
-            const std::string payload = "{\"pos\":" + std::to_string(pos) +
-                                        ",\"size\":" + std::to_string(axis->size) +
-                                        ",\"isCol\":\"true\"}";
-            const Operation op = makeDimInsertAxisOp(workbook, axis->id, payload);
+            const std::string payload =
+                "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(axis->size) + "}";
+            const Operation op = makeColInsertOp(workbook, axis->id, payload);
             oplog->addOperation(op);
             count++;
         }
@@ -870,12 +1341,11 @@ size_t bootstrapOpLog(Workbook& workbook) {
         std::sort(rows.begin(), rows.end(),
                   [](const auto& a, const auto& b) { return a.first < b.first; });
 
-        // Generate DIM_INSERT_AXIS operations for rows (in position order)
+        // Generate ROW_INSERT operations for rows (in position order)
         for (const auto& [pos, axis] : rows) {
-            const std::string payload = "{\"pos\":" + std::to_string(pos) +
-                                        ",\"size\":" + std::to_string(axis->size) +
-                                        ",\"isCol\":\"false\"}";
-            const Operation op = makeDimInsertAxisOp(workbook, axis->id, payload);
+            const std::string payload =
+                "{\"pos\":" + std::to_string(pos) + ",\"size\":" + std::to_string(axis->size) + "}";
+            const Operation op = makeRowInsertOp(workbook, axis->id, payload);
             oplog->addOperation(op);
             count++;
         }

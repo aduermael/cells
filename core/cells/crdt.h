@@ -57,7 +57,22 @@ Operation makeDimResizeAxisOp(Workbook& workbook, const ID& axisId, const std::s
 Operation makeDimMoveAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
 
 // Generate a DIM_RENAME_AXIS operation for renaming a column or row.
+// DEPRECATED: Use makeColRenameOp instead (rows cannot be renamed).
 Operation makeDimRenameAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+
+// Column operations (preferred over DIM_* operations)
+Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+Operation makeColDeleteOp(Workbook& workbook, const ID& axisId);
+Operation makeColResizeOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+Operation makeColMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+Operation makeColRenameOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+
+// Row operations
+Operation makeRowInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+Operation makeRowDeleteOp(Workbook& workbook, const ID& axisId);
+Operation makeRowResizeOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+Operation makeRowMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+// Note: No makeRowRenameOp - rows cannot be renamed
 
 // Generate a SHEET_CREATE operation.
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload);

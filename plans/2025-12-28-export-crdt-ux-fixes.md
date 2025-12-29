@@ -1,6 +1,6 @@
-Status: IN_PROGRESS
+Status: COMPLETE
 Created At: 2025-12-28 06:49 UTC
-Updated At: 2025-12-28 18:15 UTC
+Updated At: 2025-12-29 06:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Export, CRDT Operations, and UX Fixes
@@ -288,51 +288,42 @@ Created `large_file_test.cc` with comprehensive tests for stress_test.xlsx:
 
 ---
 
-## Phase 6: Split Axis Operations (Remove isCol)
+## Phase 6: Split Axis Operations (Remove isCol) ✅ COMPLETE
 
 **Goal**: Replace generic DIM_* operations with specific COL_* and ROW_* operations.
 
-### Current State
+### Implementation Notes
 
-```cpp
-enum class OpType : uint8_t {
-    DIM_INSERT_AXIS = 10,  // Uses isCol in payload
-    DIM_DELETE_AXIS = 11,
-    DIM_MOVE_AXIS = 12,
-    DIM_RESIZE_AXIS = 13,
-    DIM_RENAME_AXIS = 14,
-}
-```
+**New OpType enum values:**
+- `COL_INSERT = 10`, `COL_DELETE = 11`, `COL_MOVE = 12`, `COL_RESIZE = 13`, `COL_RENAME = 14`
+- `ROW_INSERT = 15`, `ROW_DELETE = 16`, `ROW_MOVE = 17`, `ROW_RESIZE = 18`
+- `ROW_RENAME` intentionally omitted - rows cannot be renamed
+- DIM_* operations moved to 100+ range for backwards compatibility
 
-### Target State
+**Key changes:**
+1. `operation.h`: Updated OpType enum with new COL_*/ROW_* constants, moved DIM_* to 100+
+2. `operation.cc`: Added stringToOpType mappings for COL_*/ROW_* operations
+3. `crdt.cc`: Created separate apply functions (applyColInsert, applyRowInsert, etc.) and updated dispatcher
+4. `crdt.h`: Added make*Op declarations for new operations (makeColInsertOp, makeRowInsertOp, etc.)
+5. `bindings.cc`: Updated all operation generation to use COL_*/ROW_* instead of DIM_*
+6. Payload format: New operations use `{"pos":N,"size":N}` without `isCol` field
 
-```cpp
-enum class OpType : uint8_t {
-    COL_INSERT = 10,
-    COL_DELETE = 11,
-    COL_MOVE = 12,
-    COL_RESIZE = 13,
-    COL_RENAME = 14,
-
-    ROW_INSERT = 15,
-    ROW_DELETE = 16,
-    ROW_MOVE = 17,
-    ROW_RESIZE = 18,
-    // Note: ROW_RENAME intentionally omitted - rows cannot be renamed
-}
-```
+**Backwards compatibility:**
+- DIM_* operations still parsed and applied (for old files/sync)
+- applyDimInsertAxis checks `isCol` in payload to route to correct axis type
+- applyDimRenameAxis only handles columns (rows cannot be renamed)
 
 ### Tasks
 
-- [ ] 6a: Update OpType enum with new COL_* and ROW_* constants (keep DIM_* for backwards compatibility parsing)
-- [ ] 6b: Add new opTypeToString/stringToOpType mappings for COL_*/ROW_* operations
-- [ ] 6c: Create separate apply functions: applyColInsert, applyRowInsert, applyColDelete, applyRowDelete, etc. (no applyRowRename - rows cannot be renamed)
-- [ ] 6d: Update CRDT dispatcher to route COL_* and ROW_* operations to appropriate handlers
-- [ ] 6e: Update bindings.cc to generate COL_*/ROW_* operations instead of DIM_*
-- [ ] 6f: Update bootstrapOpLog to generate COL_*/ROW_* operations
-- [ ] 6g: Add backwards compatibility: parse old DIM_* operations and convert based on isCol payload
-- [ ] 6h: Update serializer to use new operation types (remove isCol from payload)
-- [ ] 6i: Remove any row rename logic from applyDimRenameAxis (verify it only handles columns)
+- [x] 6a: Update OpType enum with new COL_* and ROW_* constants (keep DIM_* for backwards compatibility parsing)
+- [x] 6b: Add new opTypeToString/stringToOpType mappings for COL_*/ROW_* operations
+- [x] 6c: Create separate apply functions: applyColInsert, applyRowInsert, applyColDelete, applyRowDelete, etc. (no applyRowRename - rows cannot be renamed)
+- [x] 6d: Update CRDT dispatcher to route COL_* and ROW_* operations to appropriate handlers
+- [x] 6e: Update bindings.cc to generate COL_*/ROW_* operations instead of DIM_*
+- [x] 6f: Update bootstrapOpLog to generate COL_*/ROW_* operations
+- [x] 6g: Add backwards compatibility: parse old DIM_* operations and convert based on isCol payload
+- [x] 6h: Update serializer to use new operation types (remove isCol from payload)
+- [x] 6i: Remove any row rename logic from applyDimRenameAxis (verify it only handles columns)
 
 ---
 

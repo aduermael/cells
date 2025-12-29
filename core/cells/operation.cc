@@ -14,6 +14,37 @@ const char* opTypeToString(OpType type) {
             return "CELL_CLEAR";
         case OpType::CELL_SET_STYLE:
             return "CELL_SET_STYLE";
+        // Column operations
+        case OpType::COL_INSERT:
+            return "COL_INSERT";
+        case OpType::COL_DELETE:
+            return "COL_DELETE";
+        case OpType::COL_MOVE:
+            return "COL_MOVE";
+        case OpType::COL_RESIZE:
+            return "COL_RESIZE";
+        case OpType::COL_RENAME:
+            return "COL_RENAME";
+        // Row operations
+        case OpType::ROW_INSERT:
+            return "ROW_INSERT";
+        case OpType::ROW_DELETE:
+            return "ROW_DELETE";
+        case OpType::ROW_MOVE:
+            return "ROW_MOVE";
+        case OpType::ROW_RESIZE:
+            return "ROW_RESIZE";
+        // Sheet operations
+        case OpType::SHEET_CREATE:
+            return "SHEET_CREATE";
+        case OpType::SHEET_DELETE:
+            return "SHEET_DELETE";
+        case OpType::SHEET_RENAME:
+            return "SHEET_RENAME";
+        // Workbook operations
+        case OpType::WORKBOOK_RENAME:
+            return "WORKBOOK_RENAME";
+        // Legacy DIM_* operations (deprecated)
         case OpType::DIM_INSERT_AXIS:
             return "DIM_INSERT_AXIS";
         case OpType::DIM_DELETE_AXIS:
@@ -24,14 +55,6 @@ const char* opTypeToString(OpType type) {
             return "DIM_RESIZE_AXIS";
         case OpType::DIM_RENAME_AXIS:
             return "DIM_RENAME_AXIS";
-        case OpType::SHEET_CREATE:
-            return "SHEET_CREATE";
-        case OpType::SHEET_DELETE:
-            return "SHEET_DELETE";
-        case OpType::SHEET_RENAME:
-            return "SHEET_RENAME";
-        case OpType::WORKBOOK_RENAME:
-            return "WORKBOOK_RENAME";
     }
     return "CELL_SET_VALUE";
 }
@@ -72,6 +95,35 @@ OpType stringToOpType(const std::string& str) {
     }
     if (str == "WORKBOOK_RENAME") {
         return OpType::WORKBOOK_RENAME;
+    }
+    // Column operations
+    if (str == "COL_INSERT") {
+        return OpType::COL_INSERT;
+    }
+    if (str == "COL_DELETE") {
+        return OpType::COL_DELETE;
+    }
+    if (str == "COL_MOVE") {
+        return OpType::COL_MOVE;
+    }
+    if (str == "COL_RESIZE") {
+        return OpType::COL_RESIZE;
+    }
+    if (str == "COL_RENAME") {
+        return OpType::COL_RENAME;
+    }
+    // Row operations
+    if (str == "ROW_INSERT") {
+        return OpType::ROW_INSERT;
+    }
+    if (str == "ROW_DELETE") {
+        return OpType::ROW_DELETE;
+    }
+    if (str == "ROW_MOVE") {
+        return OpType::ROW_MOVE;
+    }
+    if (str == "ROW_RESIZE") {
+        return OpType::ROW_RESIZE;
     }
     return OpType::CELL_SET_VALUE;  // Default
 }

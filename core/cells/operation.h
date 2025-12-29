@@ -18,12 +18,19 @@ enum class OpType : uint8_t {
     CELL_CLEAR = 1,      // Clear cell contents
     CELL_SET_STYLE = 2,  // Set cell style properties
 
-    // Axis (column/row) operations
-    DIM_INSERT_AXIS = 10,  // Insert new column or row
-    DIM_DELETE_AXIS = 11,  // Delete column or row
-    DIM_MOVE_AXIS = 12,    // Move column or row to new position
-    DIM_RESIZE_AXIS = 13,  // Resize column width or row height
-    DIM_RENAME_AXIS = 14,  // Rename column or row
+    // Column operations (preferred over DIM_* operations)
+    COL_INSERT = 10,  // Insert new column
+    COL_DELETE = 11,  // Delete column
+    COL_MOVE = 12,    // Move column to new position
+    COL_RESIZE = 13,  // Resize column width
+    COL_RENAME = 14,  // Rename column (set name like "A", "Revenue", etc.)
+
+    // Row operations
+    ROW_INSERT = 15,  // Insert new row
+    ROW_DELETE = 16,  // Delete row
+    ROW_MOVE = 17,    // Move row to new position
+    ROW_RESIZE = 18,  // Resize row height
+    // Note: ROW_RENAME intentionally omitted - rows cannot be renamed
 
     // Sheet operations
     SHEET_CREATE = 20,  // Create new sheet
@@ -32,6 +39,14 @@ enum class OpType : uint8_t {
 
     // Workbook operations
     WORKBOOK_RENAME = 30,  // Rename workbook
+
+    // Legacy operations (deprecated, kept for backwards compatibility parsing)
+    // These map to COL_* or ROW_* based on isCol payload field
+    DIM_INSERT_AXIS = 100,  // Use COL_INSERT or ROW_INSERT instead
+    DIM_DELETE_AXIS = 101,  // Use COL_DELETE or ROW_DELETE instead
+    DIM_MOVE_AXIS = 102,    // Use COL_MOVE or ROW_MOVE instead
+    DIM_RESIZE_AXIS = 103,  // Use COL_RESIZE or ROW_RESIZE instead
+    DIM_RENAME_AXIS = 104,  // Use COL_RENAME instead (rows cannot be renamed)
 };
 
 // Convert OpType to string for serialization

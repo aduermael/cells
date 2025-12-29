@@ -713,9 +713,8 @@ public:
         if (colId.isNull()) {
             colId = generate_id();
             std::string colPayload = "{\"pos\":" + std::to_string(col) +
-                                     ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) +
-                                     ",\"isCol\":\"true\"}";
-            Operation colOp = makeDimInsertAxisOp(*_workbook, colId, colPayload);
+                                     ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+            Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
             applyOperation(*_workbook, colOp);
         }
 
@@ -730,9 +729,8 @@ public:
         if (rowId.isNull()) {
             rowId = generate_id();
             std::string rowPayload = "{\"pos\":" + std::to_string(row) +
-                                     ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) +
-                                     ",\"isCol\":\"false\"}";
-            Operation rowOp = makeDimInsertAxisOp(*_workbook, rowId, rowPayload);
+                                     ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+            Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
             applyOperation(*_workbook, rowOp);
         }
 
@@ -818,9 +816,8 @@ public:
         if (colId.isNull()) {
             colId = generate_id();
             std::string colPayload = "{\"pos\":" + std::to_string(col) +
-                                     ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) +
-                                     ",\"isCol\":\"true\"}";
-            Operation colOp = makeDimInsertAxisOp(*_workbook, colId, colPayload);
+                                     ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+            Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
             applyOperation(*_workbook, colOp);
         }
 
@@ -835,9 +832,8 @@ public:
         if (rowId.isNull()) {
             rowId = generate_id();
             std::string rowPayload = "{\"pos\":" + std::to_string(row) +
-                                     ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) +
-                                     ",\"isCol\":\"false\"}";
-            Operation rowOp = makeDimInsertAxisOp(*_workbook, rowId, rowPayload);
+                                     ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+            Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
             applyOperation(*_workbook, rowOp);
         }
 
@@ -1024,7 +1020,7 @@ public:
         if (width > 1000) width = 1000;
 
         std::string payload = "{\"size\":" + std::to_string(width) + "}";
-        Operation op = makeDimResizeAxisOp(*_workbook, colId, payload);
+        Operation op = makeColResizeOp(*_workbook, colId, payload);
         applyOperation(*_workbook, op);
 
         // Prune old operations
@@ -1065,14 +1061,13 @@ public:
         if (!column) {
             colId = generate_id();
             std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
-                                        ",\"size\":" + std::to_string(width) +
-                                        ",\"isCol\":\"true\"}";
-            Operation insertOp = makeDimInsertAxisOp(*_workbook, colId, insertPayload);
+                                        ",\"size\":" + std::to_string(width) + "}";
+            Operation insertOp = makeColInsertOp(*_workbook, colId, insertPayload);
             applyOperation(*_workbook, insertOp);
             column = sheet->getColumn(colId);
         } else {
             std::string resizePayload = "{\"size\":" + std::to_string(width) + "}";
-            Operation resizeOp = makeDimResizeAxisOp(*_workbook, colId, resizePayload);
+            Operation resizeOp = makeColResizeOp(*_workbook, colId, resizePayload);
             applyOperation(*_workbook, resizeOp);
         }
 
@@ -1114,7 +1109,7 @@ public:
         if (height > 500) height = 500;
 
         std::string payload = "{\"size\":" + std::to_string(height) + "}";
-        Operation op = makeDimResizeAxisOp(*_workbook, rowId, payload);
+        Operation op = makeRowResizeOp(*_workbook, rowId, payload);
         applyOperation(*_workbook, op);
 
         // Prune old operations
@@ -1155,14 +1150,13 @@ public:
         if (!row) {
             rowId = generate_id();
             std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
-                                        ",\"size\":" + std::to_string(height) +
-                                        ",\"isCol\":\"false\"}";
-            Operation insertOp = makeDimInsertAxisOp(*_workbook, rowId, insertPayload);
+                                        ",\"size\":" + std::to_string(height) + "}";
+            Operation insertOp = makeRowInsertOp(*_workbook, rowId, insertPayload);
             applyOperation(*_workbook, insertOp);
             row = sheet->getRow(rowId);
         } else {
             std::string resizePayload = "{\"size\":" + std::to_string(height) + "}";
-            Operation resizeOp = makeDimResizeAxisOp(*_workbook, rowId, resizePayload);
+            Operation resizeOp = makeRowResizeOp(*_workbook, rowId, resizePayload);
             applyOperation(*_workbook, resizeOp);
         }
 
@@ -1203,7 +1197,7 @@ public:
         }
 
         std::string payload = "{\"name\":\"" + jsonEscape(name) + "\"}";
-        Operation op = makeDimRenameAxisOp(*_workbook, colId, payload);
+        Operation op = makeColRenameOp(*_workbook, colId, payload);
         applyOperation(*_workbook, op);
 
         // Prune old operations
@@ -1238,22 +1232,21 @@ public:
 
         if (!column) {
             colId = generate_id();
-            // Create DIM_INSERT_AXIS operation for new column
+            // Create COL_INSERT operation for new column
             std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
-                                       ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) +
-                                       ",\"isCol\":\"true\"}";
-            Operation insertOp = makeDimInsertAxisOp(*_workbook, colId, insertPayload);
+                                       ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+            Operation insertOp = makeColInsertOp(*_workbook, colId, insertPayload);
             applyOperation(*_workbook, insertOp);
 
             // Now rename it
             std::string renamePayload = "{\"name\":\"" + jsonEscape(name) + "\"}";
-            Operation renameOp = makeDimRenameAxisOp(*_workbook, colId, renamePayload);
+            Operation renameOp = makeColRenameOp(*_workbook, colId, renamePayload);
             applyOperation(*_workbook, renameOp);
 
             column = sheet->getColumn(colId);
         } else {
             std::string payload = "{\"name\":\"" + jsonEscape(name) + "\"}";
-            Operation op = makeDimRenameAxisOp(*_workbook, colId, payload);
+            Operation op = makeColRenameOp(*_workbook, colId, payload);
             applyOperation(*_workbook, op);
         }
 
@@ -1375,7 +1368,7 @@ public:
         }
 
         std::string payload = "{\"targetPos\":" + std::to_string(targetPos) + "}";
-        Operation op = makeDimMoveAxisOp(*_workbook, colId, payload);
+        Operation op = makeColMoveOp(*_workbook, colId, payload);
         applyOperation(*_workbook, op);
 
         // Prune old operations
@@ -1417,7 +1410,7 @@ public:
         }
 
         std::string payload = "{\"targetPos\":" + std::to_string(targetPos) + "}";
-        Operation op = makeDimMoveAxisOp(*_workbook, rowId, payload);
+        Operation op = makeRowMoveOp(*_workbook, rowId, payload);
         applyOperation(*_workbook, op);
 
         // Prune old operations
@@ -2640,26 +2633,24 @@ public:
         // Generate operations for newly created columns, rows, and cells
         // This ensures they sync to other peers when in collaboration mode
         if (_workbook->isCollaborating()) {
-            // Generate DIM_INSERT_AXIS operations for new columns
+            // Generate COL_INSERT operations for new columns
             for (const auto& [id, col] : sheet->columns) {
                 if (existingColumns.find(id) == existingColumns.end()) {
                     std::string payload = "{\"pos\":" + std::to_string(col->position) +
-                                          ",\"size\":" + std::to_string(col->size) +
-                                          ",\"isCol\":\"true\"}";
-                    Operation op = makeDimInsertAxisOp(*_workbook, id, payload);
+                                          ",\"size\":" + std::to_string(col->size) + "}";
+                    Operation op = makeColInsertOp(*_workbook, id, payload);
                     _workbook->getOpLog()->addOperation(op);
                     LOG_INFO("[FORMULA_DEBUG] Created column operation for %s at pos %u",
                              id.toString().c_str(), col->position);
                 }
             }
 
-            // Generate DIM_INSERT_AXIS operations for new rows
+            // Generate ROW_INSERT operations for new rows
             for (const auto& [id, row] : sheet->rows) {
                 if (existingRows.find(id) == existingRows.end()) {
                     std::string payload = "{\"pos\":" + std::to_string(row->position) +
-                                          ",\"size\":" + std::to_string(row->size) +
-                                          ",\"isCol\":\"false\"}";
-                    Operation op = makeDimInsertAxisOp(*_workbook, id, payload);
+                                          ",\"size\":" + std::to_string(row->size) + "}";
+                    Operation op = makeRowInsertOp(*_workbook, id, payload);
                     _workbook->getOpLog()->addOperation(op);
                     LOG_INFO("[FORMULA_DEBUG] Created row operation for %s at pos %u",
                              id.toString().c_str(), row->position);
