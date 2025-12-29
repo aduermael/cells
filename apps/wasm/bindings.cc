@@ -839,7 +839,7 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        rebuildViewportIndex();
+        // Note: No viewport index update needed - cell value changes don't affect spatial position
 
         // Trigger recalculation: mark dependents dirty and recalculate
         // This ensures formulas that depend on this cell get updated
@@ -870,6 +870,7 @@ public:
 
         // Find or create column at position
         ID colId;
+        bool colCreated = false;
         for (const auto& [id, axis] : sheet->columns) {
             if (axis->position == col) {
                 colId = id;
@@ -878,6 +879,7 @@ public:
         }
         if (colId.isNull()) {
             colId = generate_id();
+            colCreated = true;
             std::string colPayload = "{\"pos\":" + std::to_string(col) +
                                      ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
             Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
@@ -886,6 +888,7 @@ public:
 
         // Find or create row at position
         ID rowId;
+        bool rowCreated = false;
         for (const auto& [id, axis] : sheet->rows) {
             if (axis->position == row) {
                 rowId = id;
@@ -894,6 +897,7 @@ public:
         }
         if (rowId.isNull()) {
             rowId = generate_id();
+            rowCreated = true;
             std::string rowPayload = "{\"pos\":" + std::to_string(row) +
                                      ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
             Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
@@ -938,7 +942,17 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        rebuildViewportIndex();
+        // Incremental viewport index updates for created axes and cell
+        if (colCreated) {
+            _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
+        }
+        if (rowCreated) {
+            _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
+        }
+        Cell* newCell = sheet->getCell(cellId);
+        if (newCell) {
+            _viewportIndex.onCellAdded(newCell);
+        }
 
         // Trigger recalculation for the new cell and its dependents
         markDirty(sheet, cellId);
@@ -973,6 +987,7 @@ public:
 
         // Find or create column at position
         ID colId;
+        bool colCreated = false;
         for (const auto& [id, axis] : sheet->columns) {
             if (axis->position == col) {
                 colId = id;
@@ -981,6 +996,7 @@ public:
         }
         if (colId.isNull()) {
             colId = generate_id();
+            colCreated = true;
             std::string colPayload = "{\"pos\":" + std::to_string(col) +
                                      ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
             Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
@@ -989,6 +1005,7 @@ public:
 
         // Find or create row at position
         ID rowId;
+        bool rowCreated = false;
         for (const auto& [id, axis] : sheet->rows) {
             if (axis->position == row) {
                 rowId = id;
@@ -997,6 +1014,7 @@ public:
         }
         if (rowId.isNull()) {
             rowId = generate_id();
+            rowCreated = true;
             std::string rowPayload = "{\"pos\":" + std::to_string(row) +
                                      ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
             Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
@@ -1010,6 +1028,14 @@ public:
                 // Prune operations before returning
                 if (_syncManager) {
                     _syncManager->pruneOpLog();
+                }
+
+                // Incremental updates for any axes we created while searching
+                if (colCreated) {
+                    _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
+                }
+                if (rowCreated) {
+                    _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
                 }
 
                 std::ostringstream json;
@@ -1048,7 +1074,17 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        rebuildViewportIndex();
+        // Incremental viewport index updates for created axes and cell
+        if (colCreated) {
+            _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
+        }
+        if (rowCreated) {
+            _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
+        }
+        Cell* newCell = sheet->getCell(cellId);
+        if (newCell) {
+            _viewportIndex.onCellAdded(newCell);
+        }
         notifyListeners(ChangeType::CELL_CHANGED);
 
         std::ostringstream json;
@@ -1076,6 +1112,9 @@ public:
             return "{\"error\":\"Cell not found\"}";
         }
 
+        // Get cell pointer before deletion for incremental update
+        Cell* cellPtr = it->second.get();
+
         // Create and apply CELL_CLEAR operation via CRDT system
         Operation op = makeCellClearOp(*_workbook, cellId);
         applyOperation(*_workbook, op);
@@ -1086,7 +1125,8 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        rebuildViewportIndex();
+        // Incremental viewport index update - remove cell
+        _viewportIndex.onCellRemoved(cellPtr);
         notifyListeners(ChangeType::CELL_CHANGED);
 
         return "{\"success\":true}";
@@ -1135,6 +1175,9 @@ public:
         // Find cell at this position
         for (const auto& [id, cell] : sheet->cells) {
             if (cell->colId == colId && cell->rowId == rowId) {
+                // Get cell pointer before deletion for incremental update
+                Cell* cellPtr = cell.get();
+
                 // Create and apply CELL_CLEAR operation via CRDT system
                 Operation op = makeCellClearOp(*_workbook, id);
                 applyOperation(*_workbook, op);
@@ -1145,7 +1188,8 @@ public:
                     _syncManager->pruneOpLog();
                 }
 
-                rebuildViewportIndex();
+                // Incremental viewport index update - remove cell
+                _viewportIndex.onCellRemoved(cellPtr);
                 notifyListeners(ChangeType::CELL_CHANGED);
                 return "{\"success\":true,\"deleted\":true}";
             }
@@ -1194,6 +1238,8 @@ public:
             _syncManager->pruneOpLog();
         }
 
+        // Incremental viewport index update
+        _viewportIndex.onAxisResized(colId, true, width);
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
@@ -1224,8 +1270,10 @@ public:
             }
         }
 
+        bool colCreated = false;
         if (!column) {
             colId = generate_id();
+            colCreated = true;
             std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
                                         ",\"size\":" + std::to_string(width) + "}";
             Operation insertOp = makeColInsertOp(*_workbook, colId, insertPayload);
@@ -1242,6 +1290,12 @@ public:
             _syncManager->pruneOpLog();
         }
 
+        // Incremental viewport index update
+        if (colCreated) {
+            _viewportIndex.onAxisInserted(colId, true, pos, width);
+        } else {
+            _viewportIndex.onAxisResized(colId, true, width);
+        }
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         std::ostringstream json;
@@ -1283,6 +1337,8 @@ public:
             _syncManager->pruneOpLog();
         }
 
+        // Incremental viewport index update
+        _viewportIndex.onAxisResized(rowId, false, height);
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
     }
@@ -1313,8 +1369,10 @@ public:
             }
         }
 
+        bool rowCreated = false;
         if (!row) {
             rowId = generate_id();
+            rowCreated = true;
             std::string insertPayload = "{\"pos\":" + std::to_string(pos) +
                                         ",\"size\":" + std::to_string(height) + "}";
             Operation insertOp = makeRowInsertOp(*_workbook, rowId, insertPayload);
@@ -1331,6 +1389,12 @@ public:
             _syncManager->pruneOpLog();
         }
 
+        // Incremental viewport index update
+        if (rowCreated) {
+            _viewportIndex.onAxisInserted(rowId, false, pos, height);
+        } else {
+            _viewportIndex.onAxisResized(rowId, false, height);
+        }
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         std::ostringstream json;
@@ -1467,6 +1531,8 @@ public:
             }
         }
 
+        // Full rebuild needed - this operation shifts multiple axes at once
+        // Individual onAxisMoved calls would be O(n log n) anyway
         rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
@@ -1502,6 +1568,8 @@ public:
             }
         }
 
+        // Full rebuild needed - this operation shifts multiple axes at once
+        // Individual onAxisMoved calls would be O(n log n) anyway
         rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
         return "{\"success\":true}";
@@ -1543,7 +1611,8 @@ public:
         }
 
         LOG_INFO("[FORMULA_DEBUG] moveColumn: colId=%s to targetPos=%u", colIdStr.c_str(), targetPos);
-        rebuildViewportIndex();
+        // Incremental viewport index update
+        _viewportIndex.onAxisMoved(colId, true, targetPos > currentPos ? targetPos - 1 : targetPos);
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
@@ -1584,7 +1653,8 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        rebuildViewportIndex();
+        // Incremental viewport index update
+        _viewportIndex.onAxisMoved(rowId, false, targetPos > currentPos ? targetPos - 1 : targetPos);
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
@@ -1615,7 +1685,8 @@ public:
             return "{\"error\":\"Failed to insert column\"}";
         }
 
-        rebuildViewportIndex();
+        // Incremental viewport index update
+        _viewportIndex.onAxisInserted(newCol->id, true, newCol->position, newCol->size);
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true,\"id\":\"" + newCol->id.toString() + "\",\"position\":" +
@@ -1643,7 +1714,8 @@ public:
             return "{\"error\":\"Failed to insert row\"}";
         }
 
-        rebuildViewportIndex();
+        // Incremental viewport index update
+        _viewportIndex.onAxisInserted(newRow->id, false, newRow->position, newRow->size);
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true,\"id\":\"" + newRow->id.toString() + "\",\"position\":" +
@@ -1666,11 +1738,14 @@ public:
         }
         ID colId(colIdStr);
 
+        // Incremental viewport index update - must be called before deletion
+        // This removes the axis and any cells in that column from the index
+        _viewportIndex.onAxisDeleted(colId, true);
+
         if (!sheet->deleteColumn(colId)) {
             return "{\"error\":\"Column not found\"}";
         }
 
-        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
@@ -1692,11 +1767,14 @@ public:
         }
         ID rowId(rowIdStr);
 
+        // Incremental viewport index update - must be called before deletion
+        // This removes the axis and any cells in that row from the index
+        _viewportIndex.onAxisDeleted(rowId, false);
+
         if (!sheet->deleteRow(rowId)) {
             return "{\"error\":\"Row not found\"}";
         }
 
-        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";

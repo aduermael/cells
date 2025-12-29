@@ -129,8 +129,8 @@ TEST(LargeFileTest, ViewportQueryBottomRows) {
         auto end = std::chrono::steady_clock::now();
         auto queryTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-        std::cout << "Top-left viewport (0,0)-(" << vi.totalWidth() << "," << y2 << "): "
-                  << entries.size() << " cells, " << queryTime.count() << " us\n";
+        std::cout << "Top-left viewport (0,0)-(" << vi.totalWidth() << "," << y2
+                  << "): " << entries.size() << " cells, " << queryTime.count() << " us\n";
 
         // Should find cells in this region
         EXPECT_GT(entries.size(), 0u) << "Should find cells in top-left viewport";
@@ -196,8 +196,8 @@ TEST(LargeFileTest, ViewportQueryBottomRows) {
         auto end = std::chrono::steady_clock::now();
         auto queryTime = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
-        std::cout << "Middle viewport (0," << y1 << ")-(" << vi.totalWidth() << "," << y2 << "): "
-                  << entries.size() << " cells, " << queryTime.count() << " us\n";
+        std::cout << "Middle viewport (0," << y1 << ")-(" << vi.totalWidth() << "," << y2
+                  << "): " << entries.size() << " cells, " << queryTime.count() << " us\n";
 
         // Should find cells in the middle region
         EXPECT_GT(entries.size(), 0u) << "Should find cells in middle viewport";

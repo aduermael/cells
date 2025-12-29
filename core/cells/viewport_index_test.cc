@@ -1,5 +1,7 @@
 #include "core/cells/viewport_index.h"
 
+#include <chrono>
+#include <iostream>
 #include <memory>
 #include <vector>
 
@@ -853,6 +855,132 @@ TEST_F(ViewportIndexTest, ManyResizeOperations) {
         index.onAxisResized(colIds_[colIdx], true, newWidth);
     }
 
+    verifyIndex(index);
+}
+
+// ============================================================================
+// Performance benchmark tests
+// ============================================================================
+
+TEST_F(ViewportIndexTest, BenchmarkFullRebuildVsIncremental) {
+    // Create a reasonably large sheet
+    const size_t numCols = 100;
+    const size_t numRows = 1000;
+
+    addColumns(numCols, 100);
+    addRows(numRows, 24);
+
+    // Add some initial cells
+    for (size_t i = 0; i < 500; i++) {
+        addCell(i % numCols, i % numRows);
+    }
+
+    ViewportIndex index;
+    index.build(*sheet_);
+
+    // Benchmark full rebuild
+    auto startRebuild = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 100; i++) {
+        index.build(*sheet_);
+    }
+    auto endRebuild = std::chrono::high_resolution_clock::now();
+    auto rebuildDuration =
+        std::chrono::duration_cast<std::chrono::microseconds>(endRebuild - startRebuild).count();
+
+    // Benchmark incremental cell add/remove
+    auto startIncremental = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 100; i++) {
+        Cell* cell =
+            addCell(static_cast<size_t>(i % numCols), static_cast<size_t>((i + 500) % numRows));
+        index.onCellAdded(cell);
+        index.onCellRemoved(cell);
+    }
+    auto endIncremental = std::chrono::high_resolution_clock::now();
+    auto incrementalDuration =
+        std::chrono::duration_cast<std::chrono::microseconds>(endIncremental - startIncremental)
+            .count();
+
+    // Benchmark incremental axis resize
+    auto startResize = std::chrono::high_resolution_clock::now();
+    for (int i = 0; i < 100; i++) {
+        index.onAxisResized(colIds_[i % numCols], true, 100 + (i % 50));
+    }
+    auto endResize = std::chrono::high_resolution_clock::now();
+    auto resizeDuration =
+        std::chrono::duration_cast<std::chrono::microseconds>(endResize - startResize).count();
+
+    // Log results (viewable in test output)
+    std::cout << "\n=== ViewportIndex Performance Benchmark ===" << std::endl;
+    std::cout << "Sheet size: " << numCols << " columns x " << numRows << " rows" << std::endl;
+    std::cout << "100 full rebuilds: " << rebuildDuration << " µs (" << rebuildDuration / 100
+              << " µs/rebuild)" << std::endl;
+    std::cout << "100 incremental cell add/remove: " << incrementalDuration << " µs ("
+              << incrementalDuration / 100 << " µs/op)" << std::endl;
+    std::cout << "100 incremental axis resizes: " << resizeDuration << " µs ("
+              << resizeDuration / 100 << " µs/resize)" << std::endl;
+
+    // Incremental should be significantly faster than full rebuild
+    // Note: This is a soft assertion - actual speedup depends on implementation
+    EXPECT_LT(incrementalDuration, rebuildDuration)
+        << "Incremental updates should be faster than full rebuilds";
+    EXPECT_LT(resizeDuration, rebuildDuration)
+        << "Incremental resizes should be faster than full rebuilds";
+
+    verifyIndex(index);
+}
+
+TEST_F(ViewportIndexTest, BenchmarkLargeSheetIncrementalUpdates) {
+    // Create a large sheet (simulating 1000x10000)
+    const size_t numCols = 1000;
+    const size_t numRows = 10000;
+
+    addColumns(numCols, 80);
+    addRows(numRows, 20);
+
+    ViewportIndex index;
+
+    // Time initial build
+    auto startBuild = std::chrono::high_resolution_clock::now();
+    index.build(*sheet_);
+    auto endBuild = std::chrono::high_resolution_clock::now();
+    auto buildDuration =
+        std::chrono::duration_cast<std::chrono::microseconds>(endBuild - startBuild).count();
+
+    std::cout << "\n=== Large Sheet Performance ===" << std::endl;
+    std::cout << "Sheet size: " << numCols << " columns x " << numRows << " rows" << std::endl;
+    std::cout << "Initial build: " << buildDuration << " µs" << std::endl;
+
+    // Time incremental operations
+    auto startOps = std::chrono::high_resolution_clock::now();
+
+    // Add 1000 cells incrementally
+    for (size_t i = 0; i < 1000; i++) {
+        Cell* cell = addCell(i % numCols, i % numRows);
+        index.onCellAdded(cell);
+    }
+
+    // Resize 100 columns
+    for (size_t i = 0; i < 100; i++) {
+        index.onAxisResized(colIds_[i], true, 100);
+    }
+
+    // Resize 100 rows
+    for (size_t i = 0; i < 100; i++) {
+        index.onAxisResized(rowIds_[i], false, 25);
+    }
+
+    auto endOps = std::chrono::high_resolution_clock::now();
+    auto opsDuration =
+        std::chrono::duration_cast<std::chrono::microseconds>(endOps - startOps).count();
+
+    std::cout << "1000 cell adds + 100 col resizes + 100 row resizes: " << opsDuration << " µs"
+              << std::endl;
+
+    // The batch of incremental operations should be faster than a full rebuild
+    EXPECT_LT(opsDuration, buildDuration)
+        << "Batch of incremental ops should be faster than full rebuild";
+
+    EXPECT_EQ(index.cellCount(), 1000u);
     verifyIndex(index);
 }
 

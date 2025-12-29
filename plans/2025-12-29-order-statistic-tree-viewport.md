@@ -1,6 +1,6 @@
-Status: IN_PROGRESS
+Status: COMPLETED
 Created At: 2025-12-29 21:08 UTC
-Updated At: 2025-12-30 06:07 UTC
+Updated At: 2025-12-30 06:35 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Replace Quadtree with Order-Statistic Tree for Viewport Queries
@@ -135,30 +135,30 @@ Remove quadtree code and document new architecture.
 - [x] 6c: Update `docs/rendering.md` with new viewport indexing architecture
 - [x] 6d: Final test pass: `bazel test //core/...` and `npm run test:stable`
 
-### Phase 7: Incremental Update Optimization
+### Phase 7: Incremental Update Optimization ✅
 
 Replace full `rebuildViewportIndex()` calls with incremental O(log n) updates where possible.
 
 Currently all modifications trigger a full rebuild. This phase converts single-entity operations to use incremental updates:
 
-- [ ] 7a: Cell operations - use `onCellAdded()`/`onCellRemoved()` instead of full rebuild
+- [x] 7a: Cell operations - use `onCellAdded()`/`onCellRemoved()` instead of full rebuild
   - `createCellAt()` → `onCellAdded()`
   - `deleteCellAt()` → `onCellRemoved()`
   - `updateCell()` → no spatial update needed (values don't affect position)
-- [ ] 7b: Axis resize operations - use `onAxisResized()` instead of full rebuild
+- [x] 7b: Axis resize operations - use `onAxisResized()` instead of full rebuild
   - `resizeColumn()` → `onAxisResized(colId, true, newWidth)`
   - `resizeRow()` → `onAxisResized(rowId, false, newHeight)`
-- [ ] 7c: Axis insert/delete - use `onAxisInserted()`/`onAxisDeleted()` instead of full rebuild
+- [x] 7c: Axis insert/delete - use `onAxisInserted()`/`onAxisDeleted()` instead of full rebuild
   - `insertColumnAt()` → `onAxisInserted()`
   - `insertRowAt()` → `onAxisInserted()`
   - `deleteColumnById()` → `onAxisDeleted()`
   - `deleteRowById()` → `onAxisDeleted()`
-- [ ] 7d: Axis move operations - use `onAxisMoved()` instead of full rebuild
+- [x] 7d: Axis move operations - use `onAxisMoved()` instead of full rebuild
   - `moveColumn()` → `onAxisMoved()`
   - `moveRow()` → `onAxisMoved()`
-- [ ] 7e: Keep full rebuild for bulk operations (file load, sheet switch, remote sync batch)
-- [ ] 7f: Add performance benchmark comparing full rebuild vs incremental updates
-- [ ] 7g: Verify all tests pass: `make test` and `npm run test:stable`
+- [x] 7e: Keep full rebuild for bulk operations (file load, sheet switch, remote sync batch)
+- [x] 7f: Add performance benchmark comparing full rebuild vs incremental updates
+- [x] 7g: Verify all tests pass: `make test` and `npm run test:stable`
 
 ## Design Decisions
 
