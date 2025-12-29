@@ -210,6 +210,32 @@ export async function getFormulaBarContent(page) {
 }
 
 /**
+ * Get the displayed value of a cell (the computed result, not the formula)
+ * This reads directly from the engine via the app's data cache
+ */
+export async function getCellDisplayValue(page, cellRef) {
+  const { col, row } = parseCellRef(cellRef);
+  return await page.evaluate(({ col, row }) => {
+    // Access the app's cell cache
+    // The app stores cells from the viewport in an array
+    if (window._appContext && window._appContext.app && window._appContext.app.cells) {
+      const cells = window._appContext.app.cells;
+      for (const cell of cells) {
+        if (cell.col === col && cell.row === row) {
+          // For formula cells, use display (computed value)
+          // For value cells, use value
+          if (cell.formula) {
+            return cell.display || '';
+          }
+          return cell.value || '';
+        }
+      }
+    }
+    return null;
+  }, { col, row });
+}
+
+/**
  * Get workbook name from header
  */
 export async function getWorkbookName(page) {

@@ -158,16 +158,46 @@ public:
 
         // Parse and evaluate all formulas in all sheets after loading
         // Step 1: Parse formula text into ASTs (formulas are stored as UUID-format text)
-        // Step 2: Recalculate to compute the display values
+        // Step 2: Add formulas to dependency graph for reactive updates
+        // Step 3: Recalculate to compute the display values
         for (size_t i = 0; i < _workbook->sheetCount(); ++i) {
             auto* sheet = _workbook->getSheetByIndex(i);
             if (sheet) {
                 std::vector<ID> formulaCells;
+                DependencyGraph* depGraph = sheet->getDependencyGraph();
+
+                // Create position resolver for this sheet
+                auto positionResolver = [sheet](const ID& cellId) -> std::pair<int32_t, int32_t> {
+                    if (sheet == nullptr) return {-1, -1};
+                    const Cell* c = sheet->getCell(cellId);
+                    if (c == nullptr) {
+                        // Maybe it's a column or row ID
+                        const Axis* col = sheet->getColumn(cellId);
+                        if (col != nullptr) return {static_cast<int32_t>(col->position), -1};
+                        const Axis* row = sheet->getRow(cellId);
+                        if (row != nullptr) return {-1, static_cast<int32_t>(row->position)};
+                        return {-1, -1};
+                    }
+                    const Axis* col = sheet->getColumn(c->colId);
+                    const Axis* row = sheet->getRow(c->rowId);
+                    if (col == nullptr || row == nullptr) return {-1, -1};
+                    return {static_cast<int32_t>(col->position), static_cast<int32_t>(row->position)};
+                };
+
                 for (const auto& [cellId, cell] : sheet->cells) {
                     if (cell->isFormula() && cell->formula != nullptr) {
                         // Parse the formula text (UUID format) into AST
                         // This is required for evaluation
-                        cell->formula->parse();
+                        if (cell->formula->parse()) {
+                            // Add to dependency graph for reactive updates
+                            if (depGraph != nullptr && cell->formula->ast != nullptr) {
+                                depGraph->addFormula(cell->id, cell->formula->ast, positionResolver);
+                                // Track volatile functions
+                                if (cell->formula->hasVolatile()) {
+                                    depGraph->markVolatile(cell->id);
+                                }
+                            }
+                        }
                         formulaCells.push_back(cellId);
                     }
                 }
@@ -213,16 +243,46 @@ public:
 
         // Parse and evaluate all formulas in all sheets after loading
         // Step 1: Parse formula text into ASTs (formulas are stored as UUID-format text)
-        // Step 2: Recalculate to compute the display values
+        // Step 2: Add formulas to dependency graph for reactive updates
+        // Step 3: Recalculate to compute the display values
         for (size_t i = 0; i < _workbook->sheetCount(); ++i) {
             auto* sheet = _workbook->getSheetByIndex(i);
             if (sheet) {
                 std::vector<ID> formulaCells;
+                DependencyGraph* depGraph = sheet->getDependencyGraph();
+
+                // Create position resolver for this sheet
+                auto positionResolver = [sheet](const ID& cellId) -> std::pair<int32_t, int32_t> {
+                    if (sheet == nullptr) return {-1, -1};
+                    const Cell* c = sheet->getCell(cellId);
+                    if (c == nullptr) {
+                        // Maybe it's a column or row ID
+                        const Axis* col = sheet->getColumn(cellId);
+                        if (col != nullptr) return {static_cast<int32_t>(col->position), -1};
+                        const Axis* row = sheet->getRow(cellId);
+                        if (row != nullptr) return {-1, static_cast<int32_t>(row->position)};
+                        return {-1, -1};
+                    }
+                    const Axis* col = sheet->getColumn(c->colId);
+                    const Axis* row = sheet->getRow(c->rowId);
+                    if (col == nullptr || row == nullptr) return {-1, -1};
+                    return {static_cast<int32_t>(col->position), static_cast<int32_t>(row->position)};
+                };
+
                 for (const auto& [cellId, cell] : sheet->cells) {
                     if (cell->isFormula() && cell->formula != nullptr) {
                         // Parse the formula text (UUID format) into AST
                         // This is required for evaluation
-                        cell->formula->parse();
+                        if (cell->formula->parse()) {
+                            // Add to dependency graph for reactive updates
+                            if (depGraph != nullptr && cell->formula->ast != nullptr) {
+                                depGraph->addFormula(cell->id, cell->formula->ast, positionResolver);
+                                // Track volatile functions
+                                if (cell->formula->hasVolatile()) {
+                                    depGraph->markVolatile(cell->id);
+                                }
+                            }
+                        }
                         formulaCells.push_back(cellId);
                     }
                 }

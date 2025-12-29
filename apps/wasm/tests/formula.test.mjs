@@ -8,6 +8,7 @@ import {
   setCellValue,
   getCurrentCellRef,
   getFormulaBarContent,
+  getCellDisplayValue,
   assertEqual,
   assertTrue,
   sleep,
@@ -107,6 +108,77 @@ const tests = {
       content.includes('IF') && content.includes('A1>50'),
       'Formula bar should contain IF formula'
     );
+  },
+
+  'Formula dependency updates when referenced cell changes': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Step 1: Set initial value in A1
+    await setCellValue(ctx.page, 'A1', '10');
+    await sleep(200);
+
+    // Step 2: Set formula =A1 in B1
+    await setCellValue(ctx.page, 'B1', '=A1');
+    await sleep(200);
+
+    // Step 3: Click B1 to ensure viewport cache is refreshed
+    await clickCell(ctx.page, 'B1');
+    await sleep(200);
+
+    // Step 4: Verify B1 shows the computed value (should be 10)
+    let b1Value = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(b1Value, '10', 'B1 should initially show 10 (computed from =A1)');
+
+    // Step 5: Modify A1 to a new value
+    await setCellValue(ctx.page, 'A1', '42');
+    await sleep(300);
+
+    // Step 6: Click B1 again to see if it was updated
+    await clickCell(ctx.page, 'B1');
+    await sleep(200);
+
+    // Step 7: Verify B1 is automatically updated with the new value
+    // This is the critical test - B1 should now show 42
+    b1Value = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(b1Value, '42', 'B1 should be updated to 42 after A1 changes');
+  },
+
+  'Chained formula dependencies update correctly': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Create a chain: A1 -> B1 -> C1
+    await setCellValue(ctx.page, 'A1', '5');
+    await sleep(100);
+    await setCellValue(ctx.page, 'B1', '=A1*2');  // B1 = 10
+    await sleep(100);
+    await setCellValue(ctx.page, 'C1', '=B1+3');  // C1 = 13
+    await sleep(200);
+
+    // Click on cells to ensure viewport is refreshed
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Verify initial chain values
+    let b1Value = await getCellDisplayValue(ctx.page, 'B1');
+    let c1Value = await getCellDisplayValue(ctx.page, 'C1');
+    assertEqual(b1Value, '10', 'B1 should be 10 (=A1*2 where A1=5)');
+    assertEqual(c1Value, '13', 'C1 should be 13 (=B1+3 where B1=10)');
+
+    // Change A1 - should cascade through B1 to C1
+    await setCellValue(ctx.page, 'A1', '100');
+    await sleep(300);
+
+    // Click to refresh viewport
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Verify chain updated correctly
+    b1Value = await getCellDisplayValue(ctx.page, 'B1');
+    c1Value = await getCellDisplayValue(ctx.page, 'C1');
+    assertEqual(b1Value, '200', 'B1 should update to 200 (=A1*2 where A1=100)');
+    assertEqual(c1Value, '203', 'C1 should update to 203 (=B1+3 where B1=200)');
   },
 };
 
