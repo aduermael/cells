@@ -239,9 +239,11 @@ Current sync_manager.cc:241-262 shows `queueOperationsBroadcast()` finds minimum
 
 ---
 
-## Phase 5: Fix XLSX Stress Test Loading ✅ COMPLETE
+## Phase 5: Fix XLSX Stress Test Loading ⏸️ DEFERRED
 
 **Goal**: Ensure stress_test.xlsx (4.1MB) loads and displays correctly with proper scrolling.
+
+**Status**: Deferred - requires architectural review of virtualization/scrolling system.
 
 ### Analysis
 
@@ -255,13 +257,13 @@ The file exists at `testdata/xlsx/stress_test.xlsx`. Issues could be:
 - [x] 5a: Add CLI test to load stress_test.xlsx and print statistics (row count, cell count, memory)
 - [x] 5b: Verify quadtree contains all cells after loading large XLSX
 - [x] 5c: Add viewport query test for bottom rows of large spreadsheet
-- [x] 5d: Fix any identified issues with large file handling
+- [ ] 5d: Fix any identified issues with large file handling (DEFERRED)
 
 ### Implementation Notes
 
 Created `large_file_test.cc` with comprehensive tests for stress_test.xlsx:
 
-**Test Results:**
+**Test Results (C++ layer - all working):**
 - **Load time**: 1.1 seconds for 4.1MB file
 - **Dimensions**: 8 columns × 65,536 rows = 524,288 cells
 - **Formulas**: 458,745 formulas + 65,543 values
@@ -273,23 +275,16 @@ Created `large_file_test.cc` with comprehensive tests for stress_test.xlsx:
   - Middle (0,30000)-(8,30050): 400 cells in 15µs
 
 **Findings:**
-- ✅ XLSX loading works correctly for large files
+- ✅ XLSX loading works correctly for large files (C++ layer)
 - ✅ All cells are properly indexed in quadtree
 - ✅ Viewport queries work correctly at all positions (top, middle, bottom)
 - ✅ Cell access by position works across all 65,536 rows
+- ✅ getSheetInfo returns correct rowCount=65536
+- ❌ UI scroll/rendering still limited - needs deeper architectural review
 
-**Bug Fix - Two Issues Identified and Fixed:**
-
-1. **getSheetInfo was unreliable**: Changed to use `sheet->rowCount()` directly instead of iterating through the rows map.
-
-2. **Scroll limits used discoveredRows instead of actual row count**: The wheel handler in app-events.ts calculated `maxScrollY` using `discoveredRows` (which starts at 100 and expands slowly) instead of `sheetInfo.rowCount`. This prevented scrolling beyond ~200 rows initially. Fixed by using `Math.max(sheetInfo.rowCount, discoveredRows)` for scroll limits.
-
-**Additional Fixes:**
+**Additional Fixes (kept):**
 - Fixed try/catch blocks in formula_eval.cc and formula_recalc.cc to use strtod instead of std::stod (WASM exceptions compatibility)
-
-**Test Results:**
-- Puppeteer test confirms scrolling to row 400+ works correctly
-- All 38 C++ tests pass
+- Simplified getSheetInfo to use sheet->rowCount() directly
 
 ---
 
