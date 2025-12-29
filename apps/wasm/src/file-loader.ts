@@ -6,6 +6,7 @@ import { CellsClient } from "./client";
 import { WasmDataSource, type DataChangeType } from "./wasm-data-source";
 import { detectFormat, getBaseName, downloadBlob } from "./utils";
 import { getMenuStateManager } from "./menu-state";
+import { showConfirm } from "./modal";
 import type { FileFormat } from "./types";
 
 // =============================================================================
@@ -384,11 +385,15 @@ export class FileLoader {
       if (format === "csv") {
         const hasFormulas = await dataSource.hasFormulas();
         if (hasFormulas) {
-          const proceed = confirm(
-            "This workbook contains formulas. CSV format only saves computed values, not the formulas themselves.\n\n" +
-            "Use ZCD or XLSX format to preserve formulas.\n\n" +
-            "Continue with CSV export?"
-          );
+          const proceed = await showConfirm({
+            title: "Export to CSV",
+            body:
+              "This workbook contains formulas. CSV format only saves computed values, not the formulas themselves.<br><br>" +
+              "Use <strong>ZCD</strong> or <strong>XLSX</strong> format to preserve formulas.",
+            primaryLabel: "Export Anyway",
+            secondaryLabel: "Cancel",
+            warning: true,
+          });
           if (!proceed) {
             return;
           }

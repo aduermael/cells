@@ -54,11 +54,11 @@ Need to create a reusable modal component matching the app's visual style (dark 
 
 ### Tasks
 
-- [ ] 2a: Create `modal.ts` module with Modal class (show/hide, backdrop, close handlers)
-- [ ] 2b: Add CSS styles for modal (overlay, content box, buttons) in styles.css
-- [ ] 2c: Create `confirm()` helper that returns a Promise<boolean>
-- [ ] 2d: Replace native `confirm()` in exportAs with styled modal
-- [ ] 2e: Add keyboard support (Enter to confirm, Escape to cancel)
+- [x] 2a: Create `modal.ts` module with Modal class (show/hide, backdrop, close handlers)
+- [x] 2b: Add CSS styles for modal (overlay, content box, buttons) in styles.css
+- [x] 2c: Create `confirm()` helper that returns a Promise<boolean>
+- [x] 2d: Replace native `confirm()` in exportAs with styled modal
+- [x] 2e: Add keyboard support (Enter to confirm, Escape to cancel)
 
 ### Design
 
