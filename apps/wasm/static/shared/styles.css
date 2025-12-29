@@ -106,7 +106,7 @@ html, body {
     align-items: center;
 }
 
-/* Buttons */
+/* Buttons - Unified System */
 .btn {
     padding: 4px 12px;
     font-size: 12px;
@@ -133,24 +133,60 @@ html, body {
     cursor: not-allowed;
 }
 
-.btn-primary {
-    padding: 10px 24px;
-    font-size: 14px;
-    font-weight: 500;
-    border: none;
-    border-radius: 6px;
+.btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.2);
+}
+
+/* Primary variant */
+.btn.btn-primary {
     background: var(--color-primary);
     color: #fff;
-    cursor: pointer;
-    transition: all 0.15s ease;
+    border-color: var(--color-primary);
 }
 
-.btn-primary:hover {
+.btn.btn-primary:hover {
     background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
 }
 
-.btn-primary:active {
+.btn.btn-primary:active {
     background: var(--color-primary-active);
+    border-color: var(--color-primary-active);
+}
+
+/* Danger variant */
+.btn.btn-danger {
+    color: #dc3545;
+    border-color: #f5c6cb;
+}
+
+.btn.btn-danger:hover {
+    background: #fff5f5;
+    border-color: #dc3545;
+}
+
+/* Size modifiers */
+.btn.btn-sm {
+    padding: 6px 10px;
+    font-size: 11px;
+}
+
+.btn.btn-lg {
+    padding: 10px 24px;
+    font-size: 14px;
+    border-radius: 6px;
+}
+
+/* Layout modifiers */
+.btn.btn-icon {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn.btn-block {
+    width: 100%;
 }
 
 /* Canvas Container */
@@ -436,41 +472,13 @@ canvas {
     display: inline-block;
 }
 
-.dropdown-btn {
-    padding: 4px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    background: #fff;
-    color: #495057;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.dropdown-btn:hover {
-    background: #e9ecef;
-    border-color: #adb5bd;
-}
-
-.dropdown-btn:active {
-    background: #dee2e6;
-}
-
-.dropdown-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.dropdown-btn .arrow {
+/* Dropdown arrow animation */
+.dropdown .btn .arrow {
     font-size: 8px;
     transition: transform 0.15s ease;
 }
 
-.dropdown.open .dropdown-btn .arrow {
+.dropdown.open .btn .arrow {
     transform: rotate(180deg);
 }
 
@@ -833,30 +841,9 @@ canvas {
     flex: 1;
 }
 
-/* Collaborate button */
+/* Collaborate button - extends .btn.btn-icon */
 .collab-collaborate-btn {
-    padding: 4px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    background: #fff;
-    color: #495057;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    display: flex;
-    align-items: center;
-    gap: 6px;
     position: relative;
-}
-
-.collab-collaborate-btn:hover {
-    background: #e9ecef;
-    border-color: #adb5bd;
-}
-
-.collab-collaborate-btn:active {
-    background: #dee2e6;
 }
 
 /* Status dot inside collaborate button */
@@ -911,33 +898,7 @@ canvas {
     text-align: center;
 }
 
-.collab-copy-link-btn {
-    width: 100%;
-    padding: 10px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #fff;
-    background: var(--color-primary);
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.collab-copy-link-btn:hover {
-    background: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
-}
-
-.collab-copy-link-btn:active {
-    background: var(--color-primary-active);
-    border-color: var(--color-primary-active);
-}
-
-.collab-copy-link-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
+/* Copy link button uses .btn.btn-primary.btn-block.btn-lg */
 
 /* Divider */
 .collab-status-details-divider {
@@ -1032,24 +993,7 @@ canvas {
     border-top: 1px solid #e9ecef;
 }
 
-.collab-status-details-actions .reconnect-btn {
-    width: 100%;
-    padding: var(--spacing-sm) var(--spacing-md);
-    font-size: 12px;
-    font-weight: 500;
-    color: #495057;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.collab-status-details-actions .reconnect-btn:hover {
-    background: #f8f9fa;
-    border-color: #adb5bd;
-    color: #212529;
-}
+/* Reconnect button uses .btn.btn-block */
 
 /* Debug section in status details */
 .collab-status-details-debug {
@@ -1088,33 +1032,7 @@ canvas {
     margin-top: var(--spacing-sm);
 }
 
-.collab-status-details-debug .debug-btn {
-    width: 100%;
-    padding: 6px 10px;
-    font-size: 11px;
-    font-weight: 500;
-    color: #495057;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.collab-status-details-debug .debug-btn:hover {
-    background: #f8f9fa;
-    border-color: #adb5bd;
-}
-
-.collab-status-details-debug .debug-btn.danger {
-    color: #dc3545;
-    border-color: #f5c6cb;
-}
-
-.collab-status-details-debug .debug-btn.danger:hover {
-    background: #fff5f5;
-    border-color: #dc3545;
-}
+/* Debug buttons use .btn.btn-sm.btn-block (and .btn-danger for danger variant) */
 
 /* ============================================================================
    AST Debug Panel (for formula parser visualization)
@@ -1463,67 +1381,29 @@ canvas {
     padding: 0 24px 20px;
 }
 
-.modal-btn {
+/* Modal buttons use .btn and .btn.btn-primary with padding/font override */
+.modal-footer .btn {
     padding: 8px 16px;
     font-size: 13px;
-    font-weight: 500;
     border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.modal-btn-secondary {
-    background: #fff;
-    color: #495057;
-    border: 1px solid #dee2e6;
-}
-
-.modal-btn-secondary:hover {
-    background: #f8f9fa;
-    border-color: #adb5bd;
-}
-
-.modal-btn-secondary:active {
-    background: #e9ecef;
-}
-
-.modal-btn-primary {
-    background: var(--color-primary);
-    color: #fff;
-    border: 1px solid var(--color-primary);
-}
-
-.modal-btn-primary:hover {
-    background: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
-}
-
-.modal-btn-primary:active {
-    background: var(--color-primary-active);
-    border-color: var(--color-primary-active);
-}
-
-.modal-btn:focus {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.2);
 }
 
 /* Warning modal variant */
-.modal.modal-warning .modal-btn-primary {
+.modal.modal-warning .btn.btn-primary {
     background: #f59e0b;
     border-color: #f59e0b;
 }
 
-.modal.modal-warning .modal-btn-primary:hover {
+.modal.modal-warning .btn.btn-primary:hover {
     background: #d97706;
     border-color: #d97706;
 }
 
-.modal.modal-warning .modal-btn-primary:active {
+.modal.modal-warning .btn.btn-primary:active {
     background: #b45309;
     border-color: #b45309;
 }
 
-.modal.modal-warning .modal-btn:focus {
+.modal.modal-warning .btn:focus {
     box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
 }

@@ -95,7 +95,7 @@ export class ModalManager {
       // Focus the primary button
       requestAnimationFrame(() => {
         const primaryBtn = this.modalElement?.querySelector(
-          ".modal-btn-primary"
+          ".btn.btn-primary"
         ) as HTMLButtonElement;
         primaryBtn?.focus();
       });
@@ -174,14 +174,14 @@ export class ModalManager {
       </div>
       <div class="modal-body">${body}</div>
       <div class="modal-footer">
-        <button class="modal-btn modal-btn-secondary" type="button">${secondaryLabel}</button>
-        <button class="modal-btn modal-btn-primary" type="button">${primaryLabel}</button>
+        <button class="btn" type="button">${secondaryLabel}</button>
+        <button class="btn btn-primary" type="button">${primaryLabel}</button>
       </div>
     `;
 
     // Add click handlers for buttons
-    const secondaryBtn = this.modalElement.querySelector(".modal-btn-secondary");
-    const primaryBtn = this.modalElement.querySelector(".modal-btn-primary");
+    const secondaryBtn = this.modalElement.querySelector(".modal-footer .btn:not(.btn-primary)");
+    const primaryBtn = this.modalElement.querySelector(".modal-footer .btn.btn-primary");
 
     secondaryBtn?.addEventListener("click", () => this.close(false));
     primaryBtn?.addEventListener("click", () => this.close(true));

@@ -24,7 +24,7 @@
             <div id="toolbar">
                 <div id="collab-ui-container"></div>
                 <div class="dropdown" id="export-dropdown">
-                    <button class="dropdown-btn" id="export-btn" disabled>
+                    <button class="btn btn-icon" id="export-btn" disabled>
                         Export
                     </button>
                     <div class="dropdown-menu">
@@ -86,6 +86,9 @@
         window.openFile = () => ctx.openFile();
         window.newFile = () => ctx.newFile();
         window.exportAs = (format) => ctx.exportAs(format);
+
+        // Expose app context for e2e testing
+        window._appContext = ctx;
 
         // Start the application
         ctx.init();

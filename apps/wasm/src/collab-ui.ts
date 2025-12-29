@@ -177,7 +177,7 @@ export class CollabUI {
   private _createElements(): void {
     // Create "Collaborate" button with integrated status dot
     this._collaborateBtn = document.createElement("button");
-    this._collaborateBtn.className = "collab-collaborate-btn";
+    this._collaborateBtn.className = "btn btn-icon collab-collaborate-btn";
     this._collaborateBtn.innerHTML = `
             <span>Collaborate</span>
             <span class="collab-status-dot" style="display: none;"></span>
@@ -192,7 +192,7 @@ export class CollabUI {
             <div class="collab-status-details-header">Collaborate</div>
             <div class="collab-status-share-section">
                 <p class="collab-share-description">Share this link to collaborate in real-time:</p>
-                <button class="collab-copy-link-btn" id="collab-copy-link-btn">Copy Link</button>
+                <button class="btn btn-primary btn-block btn-lg" id="collab-copy-link-btn">Copy Link</button>
             </div>
             <div class="collab-status-details-divider"></div>
             <div class="collab-status-details-row name-row">
@@ -220,7 +220,7 @@ export class CollabUI {
             </div>
             <div class="collab-status-details-peers" id="collab-peers-list" style="display: none;"></div>
             <div class="collab-status-details-actions" id="collab-actions" style="display: none;">
-                <button class="reconnect-btn" id="collab-reconnect-btn">Force Reconnect</button>
+                <button class="btn btn-block" id="collab-reconnect-btn">Force Reconnect</button>
             </div>
             <div class="collab-status-details-debug" id="collab-debug-section">
                 <div class="debug-toggle">
@@ -230,8 +230,8 @@ export class CollabUI {
                     </label>
                 </div>
                 <div class="debug-actions" id="collab-debug-actions" style="display: none;">
-                    <button class="debug-btn" id="collab-export-debug">Export Debug Data</button>
-                    <button class="debug-btn danger" id="collab-reset-sync">Reset Sync State</button>
+                    <button class="btn btn-sm btn-block" id="collab-export-debug">Export Debug Data</button>
+                    <button class="btn btn-sm btn-block btn-danger" id="collab-reset-sync">Reset Sync State</button>
                 </div>
             </div>
         `;
