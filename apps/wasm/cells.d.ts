@@ -182,6 +182,16 @@ declare module 'cells-wasm' {
   }
 
   /**
+   * Response from executeScript (Luau scripting)
+   */
+  interface ScriptResult {
+    success: boolean;
+    output?: string;       // Script output if success
+    error?: string;        // Error message if !success
+    instructions: number;  // Number of instructions executed
+  }
+
+  /**
    * Sheet information
    */
   interface SheetInfo {
@@ -633,6 +643,19 @@ declare module 'cells-wasm' {
      */
     debugParseFormula(formulaText: string): string;
 
+    // ========================================================================
+    // Scripting (Luau)
+    // ========================================================================
+
+    /**
+     * Execute a Luau script in the sandboxed environment
+     * Scripts can use cells API functions like cellGet(), cellSet(), etc.
+     * Scripts starting with '/' prefix are meant to be entered in the formula bar
+     * @param script - Luau script code to execute
+     * @returns JSON string with ScriptResult
+     */
+    executeScript(script: string): string;
+
     /**
      * Delete the CellsEngine instance and free memory
      */
@@ -717,5 +740,7 @@ declare module 'cells-wasm' {
     RecalculateResult,
     MarkDirtyResult,
     DirtyCellsResult,
+    // Scripting types (Luau)
+    ScriptResult,
   };
 }

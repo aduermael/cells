@@ -1,6 +1,6 @@
 Status: IN-PROGRESS
 Created At: 2025-12-30 22:40 UTC
-Updated At: 2025-12-31 03:05 UTC
+Updated At: 2025-12-30 23:38 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Luau Scripting Integration
@@ -50,10 +50,10 @@ Expose spreadsheet operations to Luau scripts. All use A1 notation (converted vi
 
 ## Phase 4: WASM Bindings
 
-- [ ] 4a: Add LuauSandbox member to CellsEngine class
-- [ ] 4b: Implement executeScript(script) method in bindings.cc
-- [ ] 4c: Register executeScript in EMSCRIPTEN_BINDINGS
-- [ ] 4d: Add WASM deps and verify build
+- [x] 4a: Add LuauSandbox member to CellsEngine class
+- [x] 4b: Implement executeScript(script) method in bindings.cc
+- [x] 4c: Register executeScript in EMSCRIPTEN_BINDINGS
+- [x] 4d: Add WASM deps and verify build
 
 **Files:**
 - `apps/wasm/bindings.cc` - Add _luauSandbox member and executeScript method

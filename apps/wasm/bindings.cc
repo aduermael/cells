@@ -36,6 +36,7 @@
 #include "core/cells/sync_manager.h"
 #include "core/cells/xlsx_reader.h"
 #include "core/cells/xlsx_writer.h"
+#include "core/cells/luau_sandbox.h"
 #include "core/log/include/Logger.h"
 #include "core/net/include/SyncClient.h"
 
@@ -3327,6 +3328,51 @@ public:
         return json.str();
     }
 
+    // ========================================================================
+    // Scripting API (Luau)
+    // ========================================================================
+
+    // Execute a Luau script in the sandboxed environment
+    // Returns JSON: {"success":true,"output":"..."} or {"success":false,"error":"..."}
+    std::string executeScript(const std::string& script) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return R"({"success":false,"error":"No workbook loaded"})";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (sheet == nullptr) {
+            return R"({"success":false,"error":"Invalid sheet"})";
+        }
+
+        // Set the context for API functions
+        _luauSandbox.setContext(_workbook.get(), sheet);
+
+        // Execute the script
+        ScriptResult result = _luauSandbox.execute(script);
+
+        // Build JSON response
+        std::ostringstream json;
+        json << "{\"success\":" << (result.success ? "true" : "false");
+
+        if (result.success) {
+            json << ",\"output\":\"" << jsonEscape(result.output) << "\"";
+        } else {
+            json << ",\"error\":\"" << jsonEscape(result.error) << "\"";
+        }
+
+        json << ",\"instructions\":" << result.instructions;
+        json << "}";
+
+        // If script modified data, rebuild viewport index and notify listeners
+        // Note: We always rebuild after script execution since scripts may modify cells
+        if (result.success) {
+            rebuildViewportIndex();
+            notifyListeners(ChangeType::CELL_CHANGED);
+        }
+
+        return json.str();
+    }
+
 private:
     void rebuildViewportIndex() {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
@@ -3445,6 +3491,7 @@ private:
     val _listener;  // JavaScript callback for change notifications
     std::unique_ptr<SyncManager> _syncManager;  // CRDT sync manager (for JS-based sync)
     std::unique_ptr<cells::net::SyncClient> _syncClient;  // C++ sync client (for WebRTC P2P)
+    LuauSandbox _luauSandbox;  // Sandboxed Luau scripting engine
 };
 
 }  // namespace cells::wasm
@@ -3571,7 +3618,9 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("markCellDirty", &cells::wasm::CellsEngine::markCellDirty)
         .function("getDirtyCellIds", &cells::wasm::CellsEngine::getDirtyCellIds)
         // Debug/Development
-        .function("debugParseFormula", &cells::wasm::CellsEngine::debugParseFormula);
+        .function("debugParseFormula", &cells::wasm::CellsEngine::debugParseFormula)
+        // Scripting (Luau)
+        .function("executeScript", &cells::wasm::CellsEngine::executeScript);
 
     // Logger bindings - control logging from JavaScript
     enum_<cells::log::Level>("LogLevel")
