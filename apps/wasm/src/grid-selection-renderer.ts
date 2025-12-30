@@ -7,7 +7,7 @@ import {
   HEADER_WIDTH,
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
-  COLORS,
+  getGridColors,
   type NormalizedRange,
 } from "./grid-constants.js";
 
@@ -63,6 +63,9 @@ export function drawRangeSelection(
     rangeH += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
   }
 
+  // Get theme-aware colors
+  const colors = getGridColors();
+
   // Draw range fill
   if (
     rangeX + rangeW > HEADER_WIDTH &&
@@ -70,7 +73,7 @@ export function drawRangeSelection(
     rangeY + rangeH > HEADER_HEIGHT &&
     rangeY < viewHeight
   ) {
-    ctx.fillStyle = COLORS.selectionBg;
+    ctx.fillStyle = colors.selectionBg;
     ctx.fillRect(
       Math.max(HEADER_WIDTH, rangeX),
       Math.max(HEADER_HEIGHT, rangeY),
@@ -79,7 +82,7 @@ export function drawRangeSelection(
     );
 
     // Draw range border (thinner than anchor cell)
-    ctx.strokeStyle = COLORS.selectionBorder;
+    ctx.strokeStyle = colors.selectionBorder;
     ctx.lineWidth = 1;
     ctx.strokeRect(
       Math.max(HEADER_WIDTH, rangeX) + 0.5,
@@ -105,7 +108,7 @@ export function drawRangeSelection(
     const anchorH =
       state.rowHeights.get(state.selectionStart.row) || DEFAULT_ROW_HEIGHT;
 
-    // Draw anchor cell with white background and thicker border
+    // Draw anchor cell with white background, glow, and border
     if (
       anchorX + anchorW > HEADER_WIDTH &&
       anchorX < viewWidth &&
@@ -117,12 +120,17 @@ export function drawRangeSelection(
       const clipW = Math.min(anchorW, anchorX + anchorW - clipX);
       const clipH = Math.min(anchorH, anchorY + anchorH - clipY);
 
-      // White background
-      ctx.fillStyle = "#ffffff";
+      // Draw glow effect (2px spread shadow like formula bar)
+      ctx.strokeStyle = "rgba(5, 134, 1, 0.15)";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(clipX - 1, clipY - 1, clipW + 2, clipH + 2);
+
+      // Cell background
+      ctx.fillStyle = colors.cellBg;
       ctx.fillRect(clipX + 1, clipY + 1, clipW - 2, clipH - 2);
 
-      // Regular border for anchor cell
-      ctx.strokeStyle = COLORS.selectionBorder;
+      // Main border for anchor cell
+      ctx.strokeStyle = colors.selectionBorder;
       ctx.lineWidth = 2;
       ctx.strokeRect(clipX + 1, clipY + 1, clipW - 2, clipH - 2);
     }
@@ -157,9 +165,19 @@ export function drawSingleCellSelection(
     selY + selH > HEADER_HEIGHT &&
     selY < viewHeight
   ) {
-    ctx.fillStyle = COLORS.selectionBg;
+    const colors = getGridColors();
+
+    // Draw glow effect (2px spread shadow like formula bar)
+    ctx.strokeStyle = "rgba(5, 134, 1, 0.15)";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(selX - 1, selY - 1, selW + 2, selH + 2);
+
+    // Draw selection fill
+    ctx.fillStyle = colors.selectionBg;
     ctx.fillRect(selX, selY, selW, selH);
-    ctx.strokeStyle = COLORS.selectionBorder;
+
+    // Draw main border
+    ctx.strokeStyle = colors.selectionBorder;
     ctx.lineWidth = 2;
     ctx.strokeRect(selX + 1, selY + 1, selW - 2, selH - 2);
   }
@@ -183,7 +201,8 @@ export function drawColumnSelection(
   const selW = colWidths.get(selectedColumn) || DEFAULT_COL_WIDTH;
 
   if (selX + selW > HEADER_WIDTH && selX < viewWidth) {
-    ctx.fillStyle = COLORS.selectionBg;
+    const colors = getGridColors();
+    ctx.fillStyle = colors.selectionBg;
     ctx.fillRect(
       Math.max(HEADER_WIDTH, selX),
       HEADER_HEIGHT,
@@ -211,7 +230,8 @@ export function drawRowSelection(
   const selH = rowHeights.get(selectedRow) || DEFAULT_ROW_HEIGHT;
 
   if (selY + selH > HEADER_HEIGHT && selY < viewHeight) {
-    ctx.fillStyle = COLORS.selectionBg;
+    const colors = getGridColors();
+    ctx.fillStyle = colors.selectionBg;
     ctx.fillRect(
       HEADER_WIDTH,
       Math.max(HEADER_HEIGHT, selY),

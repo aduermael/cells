@@ -23,7 +23,7 @@ struct XLSXReadOptions {
     bool readDimensions{true};   // Read column widths and row heights
     std::string sheetName{};     // Specific sheet to read (empty = all sheets)
     XLSXProgressCallback progressCallback{};  // Optional progress callback
-    size_t progressInterval{500};  // Call progress callback every N cells
+    size_t progressInterval{500};             // Call progress callback every N cells
 
     XLSXReadOptions() = default;
 };

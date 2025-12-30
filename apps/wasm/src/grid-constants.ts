@@ -22,6 +22,7 @@ export const CELL_PADDING = 4;
 export const PRIMARY_COLOR = "#058601";
 export const SECONDARY_COLOR = "#50AA4D";
 
+// Static color constants (used as fallback)
 export const COLORS = {
   gridLine: "#f0f0f0", // Subtle grid lines
   headerBg: "#f8f9fa",
@@ -29,10 +30,67 @@ export const COLORS = {
   headerSeparator: "rgba(0, 0, 0, 0.06)", // Very subtle separators between header cells
   headerText: "#495057",
   cellText: "#212529",
+  cellBg: "#ffffff",
   selectionBorder: PRIMARY_COLOR,
   selectionBg: "rgba(5, 134, 1, 0.1)",
   cornerBg: "#e9ecef",
 } as const;
+
+/** Grid colors that can change with theme */
+export interface GridColors {
+  gridLine: string;
+  headerBg: string;
+  headerBorder: string;
+  headerSeparator: string;
+  headerText: string;
+  cellText: string;
+  cellBg: string;
+  selectionBorder: string;
+  selectionBg: string;
+  cornerBg: string;
+}
+
+/** Cache for computed grid colors */
+let cachedColors: GridColors | null = null;
+let lastTheme: string | null = null;
+
+/**
+ * Get grid colors from CSS variables.
+ * Colors are cached and only recomputed when theme changes.
+ */
+export function getGridColors(): GridColors {
+  const currentTheme = document.documentElement.getAttribute("data-theme") || "light";
+
+  if (cachedColors && lastTheme === currentTheme) {
+    return cachedColors;
+  }
+
+  const styles = getComputedStyle(document.documentElement);
+
+  cachedColors = {
+    gridLine: styles.getPropertyValue("--grid-line").trim() || COLORS.gridLine,
+    headerBg: styles.getPropertyValue("--grid-header-bg").trim() || COLORS.headerBg,
+    headerBorder: styles.getPropertyValue("--grid-header-border").trim() || COLORS.headerBorder,
+    headerSeparator: styles.getPropertyValue("--grid-header-separator").trim() || COLORS.headerSeparator,
+    headerText: styles.getPropertyValue("--grid-header-text").trim() || COLORS.headerText,
+    cellText: styles.getPropertyValue("--grid-cell-text").trim() || COLORS.cellText,
+    cellBg: styles.getPropertyValue("--grid-cell-bg").trim() || COLORS.cellBg,
+    selectionBorder: styles.getPropertyValue("--color-primary").trim() || PRIMARY_COLOR,
+    selectionBg: "rgba(5, 134, 1, 0.1)", // Keep this as-is, green selection works in both modes
+    cornerBg: styles.getPropertyValue("--grid-corner-bg").trim() || COLORS.cornerBg,
+  };
+
+  lastTheme = currentTheme;
+  return cachedColors;
+}
+
+/**
+ * Clear the cached colors (call when theme changes)
+ */
+export function clearGridColorsCache(): void {
+  cachedColors = null;
+  lastTheme = null;
+}
 
 // Formula reference highlight colors (like Numbers/Excel)
 // Each reference in a formula gets a unique color for visual identification

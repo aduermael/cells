@@ -20,7 +20,7 @@ export interface FileLoaderConfig {
   error: HTMLElement;
   canvas: HTMLCanvasElement;
   formulaBar: HTMLElement;
-  sheetTabs: HTMLElement;
+  bottomBar: HTMLElement;
   emptyState: HTMLElement;
   fileInput: HTMLInputElement;
   dropZone: HTMLElement;
@@ -191,7 +191,7 @@ export class FileLoader {
     const {
       canvas,
       formulaBar,
-      sheetTabs,
+      bottomBar,
       emptyState,
       onDataSourceCreated,
       onDataChanged,
@@ -242,10 +242,10 @@ export class FileLoader {
     if (exportBtn) exportBtn.disabled = false;
     if (newBtn) newBtn.style.display = "";
 
-    // Show the canvas, formula bar, and sheet tabs (hide empty state)
+    // Show the canvas, formula bar, and bottom bar (hide empty state)
     canvas.style.display = "block";
     formulaBar.classList.remove("hidden");
-    sheetTabs.classList.remove("hidden");
+    bottomBar.classList.remove("hidden");
     emptyState.classList.add("hidden");
     resizeCanvas();
 
@@ -343,7 +343,7 @@ export class FileLoader {
     const {
       canvas,
       formulaBar,
-      sheetTabs,
+      bottomBar,
       emptyState,
       onDataSourceCreated,
       onDataChanged,
@@ -377,10 +377,10 @@ export class FileLoader {
     if (exportBtn) exportBtn.disabled = false;
     if (newBtn) newBtn.style.display = "";
 
-    // Show the canvas, formula bar, and sheet tabs (hide empty state)
+    // Show the canvas, formula bar, and bottom bar (hide empty state)
     canvas.style.display = "block";
     formulaBar.classList.remove("hidden");
-    sheetTabs.classList.remove("hidden");
+    bottomBar.classList.remove("hidden");
     emptyState.classList.add("hidden");
     resizeCanvas();
 

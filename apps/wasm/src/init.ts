@@ -35,6 +35,7 @@ import { colorizeFormula } from "./formula-colorizer.js";
 import { ScrollbarManager, calculateContentDimensions, calculateDiscoveredRows } from "./scrollbar.js";
 import { FocusManager } from "./focus-manager";
 import { WorkbookTitleEditor } from "./workbook-title-editor";
+import { initTheme } from "./theme";
 
 // =============================================================================
 // Types
@@ -72,6 +73,12 @@ export interface AppContext {
  * @returns AppContext with all modules and exposed methods
  */
 export function initApp(): AppContext {
+  // =========================================================================
+  // Initialize theme (must be early to avoid flash of wrong theme)
+  // =========================================================================
+
+  initTheme();
+
   // =========================================================================
   // Create App and core state
   // =========================================================================
@@ -949,7 +956,7 @@ export function initApp(): AppContext {
     error: elements.error,
     canvas: elements.canvas,
     formulaBar: elements.formulaBar,
-    sheetTabs: elements.sheetTabs,
+    bottomBar: elements.bottomBar,
     emptyState: elements.emptyState,
     fileInput: elements.fileInput,
     dropZone: elements.dropZone,
@@ -1209,6 +1216,11 @@ export function initApp(): AppContext {
       console.log("Popstate: leaving room (no room in URL)");
       app.roomManager!.leaveRoom();
     }
+  });
+
+  // Re-render grid when theme changes
+  window.addEventListener("themechange", () => {
+    app.renderer.render();
   });
 
   // =========================================================================

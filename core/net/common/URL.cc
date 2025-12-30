@@ -60,7 +60,7 @@ std::optional<URL> URL::parse(const std::string& url_string) {
             if (close_bracket != std::string::npos && colon > close_bracket) {
                 url.host_ = host_port.substr(0, colon);
                 const std::string port_str = host_port.substr(colon + 1);
-                char* endptr = nullptr;
+                char* endptr = nullptr;  // NOLINT(misc-const-correctness)
                 const unsigned long port_val = strtoul(port_str.c_str(), &endptr, 10);
                 if (endptr == port_str.c_str() || *endptr != '\0' || port_val > 65535) {
                     return std::nullopt;
@@ -73,7 +73,7 @@ std::optional<URL> URL::parse(const std::string& url_string) {
             // Regular host:port
             url.host_ = host_port.substr(0, colon);
             const std::string port_str = host_port.substr(colon + 1);
-            char* endptr = nullptr;
+            char* endptr = nullptr;  // NOLINT(misc-const-correctness)
             const unsigned long port_val = strtoul(port_str.c_str(), &endptr, 10);
             if (endptr == port_str.c_str() || *endptr != '\0' || port_val > 65535) {
                 return std::nullopt;
@@ -235,7 +235,7 @@ std::string urlDecode(const std::string& str) {
         if (str[i] == '%' && i + 2 < str.size()) {
             // Parse hex value without exceptions
             char hex[3] = {str[i + 1], str[i + 2], '\0'};
-            char* endptr = nullptr;
+            char* endptr = nullptr;  // NOLINT(misc-const-correctness)
             const long value = strtol(hex, &endptr, 16);
             if (endptr == hex + 2 && value >= 0 && value <= 255) {
                 result += static_cast<char>(value);

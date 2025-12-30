@@ -9,6 +9,8 @@ import {
   DEFAULT_ROW_HEIGHT,
   CELL_PADDING,
   COLORS,
+  getGridColors,
+  type GridColors,
   type NormalizedRange,
   type RemotePresenceRender,
   type GridRendererState,
@@ -42,8 +44,10 @@ export {
   PRIMARY_COLOR,
   SECONDARY_COLOR,
   COLORS,
+  getGridColors,
   FORMULA_REF_COLORS,
   FORMULA_ERROR_COLOR,
+  type GridColors,
   type NormalizedRange,
   type RemotePresenceRender,
   type GridRendererState,
@@ -99,6 +103,9 @@ export class GridRenderer {
 
   // Virtual scrolling: discovered row count (for drawing rows beyond sheetInfo.rowCount)
   discoveredRows = 100;
+
+  // Theme-aware colors (updated on each render)
+  colors: GridColors = getGridColors();
 
   // Formula reference highlights state
   formulaHighlights: FormulaHighlight[] = [];
@@ -201,6 +208,9 @@ export class GridRenderer {
     const container = this.canvas.parentElement;
     if (!container) return;
 
+    // Refresh theme colors at start of each render
+    this.colors = getGridColors();
+
     const viewWidth = container.clientWidth;
     const viewHeight = container.clientHeight;
     const ctx = this.ctx;
@@ -275,10 +285,10 @@ export class GridRenderer {
     drawRowHeaders(ctx, headerState, viewHeight, rowHasMoved, range);
 
     // Corner and header borders
-    ctx.fillStyle = COLORS.cornerBg;
+    ctx.fillStyle = this.colors.cornerBg;
     ctx.fillRect(0, 0, HEADER_WIDTH, HEADER_HEIGHT);
 
-    ctx.strokeStyle = COLORS.headerBorder;
+    ctx.strokeStyle = this.colors.headerBorder;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, HEADER_HEIGHT + 0.5);
@@ -299,7 +309,7 @@ export class GridRenderer {
   ): void {
     if (!this.sheetInfo) return;
 
-    ctx.strokeStyle = COLORS.gridLine;
+    ctx.strokeStyle = this.colors.gridLine;
     ctx.lineWidth = 1;
 
     // Calculate visible column range (approximate, then refine)
@@ -351,7 +361,7 @@ export class GridRenderer {
     rowHasMoved: boolean,
     headerState: HeaderRendererState
   ): void {
-    ctx.fillStyle = COLORS.cellText;
+    ctx.fillStyle = this.colors.cellText;
     ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
@@ -388,7 +398,7 @@ export class GridRenderer {
     const ctx = this.ctx;
 
     ctx.save();
-    ctx.strokeStyle = COLORS.selectionBorder;
+    ctx.strokeStyle = this.colors.selectionBorder;
     ctx.lineWidth = 2;
     ctx.setLineDash([4, 4]);
 
@@ -441,7 +451,7 @@ export class GridRenderer {
     const colW = this.colWidths.get(this.dragSourceIndex) || DEFAULT_COL_WIDTH;
     const ghostX = this.dragMouseX - colW / 2;
 
-    ctx.fillStyle = COLORS.selectionBorder;
+    ctx.fillStyle = this.colors.selectionBorder;
     ctx.fillRect(ghostX, 0, colW, HEADER_HEIGHT);
 
     ctx.fillStyle = "#fff";
@@ -450,10 +460,10 @@ export class GridRenderer {
     ctx.textBaseline = "middle";
     ctx.fillText(this.getColumnHeaderText(this.dragSourceIndex), ghostX + colW / 2, HEADER_HEIGHT / 2);
 
-    ctx.fillStyle = COLORS.selectionBg;
+    ctx.fillStyle = this.colors.selectionBg;
     ctx.fillRect(ghostX, HEADER_HEIGHT, colW, viewHeight - HEADER_HEIGHT);
 
-    ctx.strokeStyle = COLORS.selectionBorder;
+    ctx.strokeStyle = this.colors.selectionBorder;
     ctx.lineWidth = 2;
     ctx.strokeRect(ghostX, 0, colW, viewHeight);
   }
@@ -466,7 +476,7 @@ export class GridRenderer {
     const rowH = this.rowHeights.get(this.dragSourceIndex) || DEFAULT_ROW_HEIGHT;
     const ghostY = this.dragMouseY - rowH / 2;
 
-    ctx.fillStyle = COLORS.selectionBorder;
+    ctx.fillStyle = this.colors.selectionBorder;
     ctx.fillRect(0, ghostY, HEADER_WIDTH, rowH);
 
     ctx.fillStyle = "#fff";
@@ -475,10 +485,10 @@ export class GridRenderer {
     ctx.textBaseline = "middle";
     ctx.fillText(String(this.dragSourceIndex + 1), HEADER_WIDTH / 2, ghostY + rowH / 2);
 
-    ctx.fillStyle = COLORS.selectionBg;
+    ctx.fillStyle = this.colors.selectionBg;
     ctx.fillRect(HEADER_WIDTH, ghostY, viewWidth - HEADER_WIDTH, rowH);
 
-    ctx.strokeStyle = COLORS.selectionBorder;
+    ctx.strokeStyle = this.colors.selectionBorder;
     ctx.lineWidth = 2;
     ctx.strokeRect(0, ghostY, viewWidth, rowH);
   }

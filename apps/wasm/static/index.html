@@ -14,9 +14,19 @@
     <div id="container">
         <div id="header">
             <div id="header-left">
-                <img src="icon.svg" alt="Cells" id="header-logo">
+                <svg id="header-logo" viewBox="0 0 643 563" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M293.771 277.677L290.865 281.885L290.854 281.875L293.771 277.677ZM0.895996 561.364H98.0418L216.417 389.781L167.781 319.697L0.895996 561.364ZM157.896 560.895H255.042L295.177 503.27L246.781 433.541L157.896 560.895ZM642.896 0.416138H546.479L400.021 210.416L370.323 167.395L485.906 0.884888H389.49L322.083 97.5307L255.042 0.416138H157.896L273.406 167.343L243.031 210.875L98.0418 0.884888H0.895996L194.615 280.833L243.167 351L388.729 561.375H485.146L290.865 281.875L290.854 281.864L293.771 277.677L321.813 237.281L545.75 560.895H642.156L447.844 281.395L642.896 0.416138Z"/>
+                </svg>
                 <button class="btn" onclick="openFile()">Open</button>
                 <button class="btn" id="new-btn" onclick="newFile()" style="display: none;">New</button>
+                <div class="dropdown" id="export-dropdown">
+                    <button class="btn" id="export-btn" disabled>Export</button>
+                    <div class="dropdown-menu">
+                        <button class="dropdown-item" onclick="exportAs('csv')">CSV</button>
+                        <button class="dropdown-item" onclick="exportAs('xlsx')">XLSX</button>
+                        <button class="dropdown-item" onclick="exportAs('zcd')">ZCD</button>
+                    </div>
+                </div>
                 <input type="file" id="file-input" accept=".zcd,.csv,.tsv,.xlsx" />
             </div>
             <div id="workbook-title-container">
@@ -24,17 +34,23 @@
             </div>
             <span id="sheet-name" style="display: none;"></span>
             <div id="toolbar">
+                <button class="btn btn-icon" id="theme-toggle" title="Toggle theme">
+                    <svg id="theme-icon-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg id="theme-icon-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
                 <div id="collab-ui-container"></div>
-                <div class="dropdown" id="export-dropdown">
-                    <button class="btn btn-icon" id="export-btn" disabled>
-                        Export
-                    </button>
-                    <div class="dropdown-menu">
-                        <button class="dropdown-item" onclick="exportAs('csv')">CSV</button>
-                        <button class="dropdown-item" onclick="exportAs('xlsx')">XLSX</button>
-                        <button class="dropdown-item" onclick="exportAs('zcd')">ZCD</button>
-                    </div>
-                </div>
             </div>
         </div>
         <div id="formula-bar" class="hidden">
@@ -73,9 +89,30 @@
                 <!-- don't display anything on empty state -->
             </div>
         </div>
-        <div id="sheet-tabs" class="hidden">
+        <div id="bottom-bar" class="hidden">
             <div id="sheet-tabs-container"></div>
             <button id="add-sheet-btn" class="sheet-tab-add" title="Add sheet">+</button>
+            <div class="bottom-bar-spacer"></div>
+            <button id="chat-open-btn" class="chat-open-btn hidden" title="Open chat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+            </button>
+        </div>
+        <div id="chat-panel">
+            <button id="chat-minimize-btn" class="chat-minimize-btn" title="Minimize chat">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+            </button>
+            <div id="chat-input-area">
+                <textarea id="chat-input" placeholder="Ask AI or send a message..." rows="1"></textarea>
+                <button id="chat-send" class="chat-send" title="Send">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 19V5M5 12l7-7 7 7"/>
+                    </svg>
+                </button>
+            </div>
         </div>
     </div>
 
@@ -94,6 +131,41 @@
 
         // Start the application
         ctx.init();
+
+        // Chat panel toggle functionality
+        const chatPanel = document.getElementById('chat-panel');
+        const chatOpenBtn = document.getElementById('chat-open-btn');
+        const chatMinimizeBtn = document.getElementById('chat-minimize-btn');
+        const chatInput = document.getElementById('chat-input');
+
+        // Open chat panel
+        chatOpenBtn?.addEventListener('click', () => {
+            chatPanel?.classList.remove('hidden');
+            chatOpenBtn?.classList.add('hidden');
+            chatInput?.focus();
+        });
+
+        // Minimize chat panel
+        chatMinimizeBtn?.addEventListener('click', () => {
+            chatPanel?.classList.add('hidden');
+            chatOpenBtn?.classList.remove('hidden');
+        });
+
+        // Auto-resize textarea
+        chatInput?.addEventListener('input', () => {
+            chatInput.style.height = 'auto';
+            const maxHeight = window.innerHeight * 0.6;
+            chatInput.style.height = Math.min(chatInput.scrollHeight, maxHeight) + 'px';
+        });
+
+        // Send on Enter (Shift+Enter for newline)
+        chatInput?.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                // TODO: Wire up send functionality
+                console.log('Send:', chatInput.value);
+            }
+        });
     </script>
 </body>
 </html>

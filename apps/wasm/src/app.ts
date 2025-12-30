@@ -71,7 +71,7 @@ export interface DOMElements {
   cellReference: HTMLElement;
   formulaInput: HTMLInputElement;
   formulaDisplay: HTMLElement;
-  sheetTabs: HTMLElement;
+  bottomBar: HTMLElement;
   sheetTabsContainer: HTMLElement;
   addSheetBtn: HTMLButtonElement;
   astDebugPanel: HTMLElement;
@@ -421,7 +421,7 @@ export function createApp(): App {
     cellReference: getElement("cell-reference"),
     formulaInput: getElement<HTMLInputElement>("formula-input"),
     formulaDisplay: getElement("formula-display"),
-    sheetTabs: getElement("sheet-tabs"),
+    bottomBar: getElement("bottom-bar"),
     sheetTabsContainer: getElement("sheet-tabs-container"),
     addSheetBtn: getElement<HTMLButtonElement>("add-sheet-btn"),
     astDebugPanel: getElement("ast-debug-panel"),

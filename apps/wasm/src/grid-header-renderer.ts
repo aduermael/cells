@@ -7,7 +7,7 @@ import {
   HEADER_WIDTH,
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
-  COLORS,
+  getGridColors,
   type NormalizedRange,
 } from "./grid-constants.js";
 
@@ -172,7 +172,8 @@ export function drawColumnHeaders(
 ): void {
   if (!state.sheetInfo) return;
 
-  ctx.fillStyle = COLORS.headerBg;
+  const colors = getGridColors();
+  ctx.fillStyle = colors.headerBg;
   ctx.fillRect(HEADER_WIDTH, 0, viewWidth - HEADER_WIDTH, HEADER_HEIGHT);
 
   // Calculate visible column range - only iterate through visible columns
@@ -202,16 +203,16 @@ export function drawColumnHeaders(
     }
 
     if (isSelected && !state.isDraggingColumn) {
-      ctx.fillStyle = COLORS.selectionBorder;
+      ctx.fillStyle = colors.selectionBorder;
       ctx.fillRect(
         Math.max(HEADER_WIDTH, headerX),
         0,
         Math.min(colW, headerX + colW - HEADER_WIDTH),
         HEADER_HEIGHT
       );
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = colors.cellBg;
     } else {
-      ctx.fillStyle = COLORS.headerText;
+      ctx.fillStyle = colors.headerText;
     }
     // Skip drawing header text if this column is being edited (editor covers it)
     if (col !== state.editingColumnIndex) {
@@ -224,7 +225,7 @@ export function drawColumnHeaders(
   }
 
   // Column header separators (vertical lines between A, B, C...)
-  ctx.strokeStyle = COLORS.headerSeparator;
+  ctx.strokeStyle = colors.headerSeparator;
   ctx.lineWidth = 1;
   for (let col = startCol; col < endCol; col++) {
     if (colHasMoved && col === state.dragSourceIndex) continue;
@@ -250,7 +251,8 @@ export function drawRowHeaders(
 ): void {
   if (!state.sheetInfo) return;
 
-  ctx.fillStyle = COLORS.headerBg;
+  const colors = getGridColors();
+  ctx.fillStyle = colors.headerBg;
   ctx.fillRect(0, HEADER_HEIGHT, HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
 
   // Use discoveredRows for virtual scrolling
@@ -283,22 +285,22 @@ export function drawRowHeaders(
     }
 
     if (isSelected && !state.isDraggingRow) {
-      ctx.fillStyle = COLORS.selectionBorder;
+      ctx.fillStyle = colors.selectionBorder;
       ctx.fillRect(
         0,
         Math.max(HEADER_HEIGHT, headerY),
         HEADER_WIDTH,
         Math.min(rowH, headerY + rowH - HEADER_HEIGHT)
       );
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = colors.cellBg;
     } else {
-      ctx.fillStyle = COLORS.headerText;
+      ctx.fillStyle = colors.headerText;
     }
     ctx.fillText(String(row + 1), HEADER_WIDTH / 2, headerY + rowH / 2);
   }
 
   // Row header separators (horizontal lines between 1, 2, 3...)
-  ctx.strokeStyle = COLORS.headerSeparator;
+  ctx.strokeStyle = colors.headerSeparator;
   ctx.lineWidth = 1;
   for (let row = startRow; row < endRow; row++) {
     if (rowHasMoved && row === state.dragSourceIndex) continue;
