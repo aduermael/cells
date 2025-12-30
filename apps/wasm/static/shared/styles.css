@@ -346,8 +346,31 @@ body {
     gap: 6px;
 }
 
+.btn.btn-icon .btn-icon-svg {
+    flex-shrink: 0;
+}
+
 .btn.btn-block {
     width: 100%;
+}
+
+/* Responsive: icon-only buttons on narrow screens */
+@media (max-width: 600px) {
+    .btn.btn-icon .btn-label {
+        display: none;
+    }
+
+    .btn.btn-icon {
+        padding: 0 var(--spacing-sm);
+    }
+
+    #workbook-title {
+        max-width: 120px;
+    }
+
+    #header-left {
+        gap: var(--spacing-xs);
+    }
 }
 
 /* Canvas Container */

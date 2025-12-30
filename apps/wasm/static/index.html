@@ -17,10 +17,30 @@
                 <svg id="header-logo" viewBox="0 0 643 563" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                     <path d="M293.771 277.677L290.865 281.885L290.854 281.875L293.771 277.677ZM0.895996 561.364H98.0418L216.417 389.781L167.781 319.697L0.895996 561.364ZM157.896 560.895H255.042L295.177 503.27L246.781 433.541L157.896 560.895ZM642.896 0.416138H546.479L400.021 210.416L370.323 167.395L485.906 0.884888H389.49L322.083 97.5307L255.042 0.416138H157.896L273.406 167.343L243.031 210.875L98.0418 0.884888H0.895996L194.615 280.833L243.167 351L388.729 561.375H485.146L290.865 281.875L290.854 281.864L293.771 277.677L321.813 237.281L545.75 560.895H642.156L447.844 281.395L642.896 0.416138Z"/>
                 </svg>
-                <button class="btn" onclick="openFile()">Open</button>
-                <button class="btn" id="new-btn" onclick="newFile()" style="display: none;">New</button>
+                <button class="btn btn-icon" onclick="openFile()" title="Open file">
+                    <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span class="btn-label">Open</span>
+                </button>
+                <button class="btn btn-icon" id="new-btn" onclick="newFile()" title="New file" style="display: none;">
+                    <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="18" x2="12" y2="12"/>
+                        <line x1="9" y1="15" x2="15" y2="15"/>
+                    </svg>
+                    <span class="btn-label">New</span>
+                </button>
                 <div class="dropdown" id="export-dropdown">
-                    <button class="btn" id="export-btn" disabled>Export</button>
+                    <button class="btn btn-icon" id="export-btn" title="Export file" disabled>
+                        <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span class="btn-label">Export</span>
+                    </button>
                     <div class="dropdown-menu">
                         <button class="dropdown-item" onclick="exportAs('csv')">CSV</button>
                         <button class="dropdown-item" onclick="exportAs('xlsx')">XLSX</button>
@@ -35,7 +55,7 @@
             <span id="sheet-name" style="display: none;"></span>
             <div id="toolbar">
                 <button class="btn btn-icon" id="theme-toggle" title="Toggle theme">
-                    <svg id="theme-icon-light" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg id="theme-icon-light" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="5"></circle>
                         <line x1="12" y1="1" x2="12" y2="3"></line>
                         <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -46,7 +66,7 @@
                         <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
                         <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
                     </svg>
-                    <svg id="theme-icon-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg id="theme-icon-dark" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
                     </svg>
                 </button>
