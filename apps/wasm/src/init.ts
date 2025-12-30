@@ -911,6 +911,16 @@ export function initApp(): AppContext {
     isEditing: () => cellEditor.isEditing(),
     onPositionCellEditor: positionCellEditor,
     onFocusCanvas: focusCanvas,
+    onExecuteScript: async (script: string) => {
+      if (!app.dataSource) {
+        return {
+          success: false,
+          error: "No data source available",
+          instructions: 0,
+        };
+      }
+      return app.dataSource.executeScript(script);
+    },
   });
 
   // =========================================================================

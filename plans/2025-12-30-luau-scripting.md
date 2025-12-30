@@ -1,6 +1,6 @@
-Status: IN-PROGRESS
+Status: COMPLETED
 Created At: 2025-12-30 22:40 UTC
-Updated At: 2025-12-30 23:38 UTC
+Updated At: 2025-12-31 00:20 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Luau Scripting Integration
@@ -74,14 +74,17 @@ Expose spreadsheet operations to Luau scripts. All use A1 notation (converted vi
 
 ## Phase 6: Formula Bar Integration
 
-- [ ] 6a: Add isScriptMode() to header-editor.ts (detects `/` prefix)
-- [ ] 6b: Modify commitFormulaBarEdit() to execute scripts instead of cell update
-- [ ] 6c: Add visual feedback for script mode and execution results
-- [ ] 6d: Add E2E tests for script execution via formula bar
+- [x] 6a: Add isScriptMode() to header-editor.ts (detects `/` prefix)
+- [x] 6b: Modify commitFormulaBarEdit() to execute scripts instead of cell update
+- [x] 6c: Add visual feedback for script mode and execution results
+- [x] 6d: Add E2E tests for script execution via formula bar
 
 **Files:**
 - `apps/wasm/src/header-editor.ts` - Script mode detection and execution
+- `apps/wasm/src/init.ts` - Added onExecuteScript callback
+- `apps/wasm/static/shared/styles.css` - Script mode styling
 - `apps/wasm/tests/script.test.mjs` (new) - E2E tests
+- `apps/wasm/package.json` - Added test:script command
 
 ---
 

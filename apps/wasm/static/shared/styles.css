@@ -561,6 +561,22 @@ canvas {
     box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.1);
 }
 
+/* Script mode styling - when formula starts with '/' */
+#formula-input-container.script-mode {
+    background: var(--color-bg-secondary);
+    border-color: var(--color-text-secondary);
+}
+
+#formula-input-container.script-mode:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.15);
+}
+
+#formula-input-container.script-mode #formula-display {
+    font-family: var(--font-mono);
+    font-size: var(--font-size-sm);
+}
+
 /* Hidden input for form submission and IME support */
 #formula-input {
     position: absolute;
