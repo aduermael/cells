@@ -260,9 +260,11 @@ cd apps/wasm && npm run test:stable
 npm run test:all
 
 # Run specific test suites
-npm run test:smoke    # Basic UI functionality
-npm run test:formula  # Formula entry and computation
-npm run test:collab   # Two-peer collaboration sync (experimental, may fail)
+npm run test:smoke        # Basic UI functionality
+npm run test:formula      # Formula entry and computation
+npm run test:editing      # Cell editing operations
+npm run test:column-move  # Column/row operations
+npm run test:collab       # Two-peer collaboration sync (experimental, may fail)
 
 # Watch tests run in a visible browser window
 HEADED=1 npm run test:smoke
@@ -274,9 +276,11 @@ HEADED=1 SLOWMO=100 npm run test:smoke
 Test files are in `apps/wasm/tests/`:
 - `harness.mjs` - Test harness (starts server + Chrome)
 - `helpers.mjs` - Helper functions (clickCell, setCellValue, etc.)
-- `smoke.test.mjs` - Basic UI tests
-- `formula.test.mjs` - Formula tests
-- `collab.test.mjs` - Collaboration tests (experimental)
+- `smoke.test.mjs` - Basic UI tests (page load, cell selection, value entry)
+- `formula.test.mjs` - Formula tests (entry, computation, dependencies)
+- `editing.test.mjs` - Cell editing (delete, overwrite, Tab/Enter navigation)
+- `column-move.test.mjs` - Column/row operations (sparse columns, drag to reorder)
+- `collab.test.mjs` - Collaboration tests (experimental, may fail)
 
 **Deploy to static hosting:**
 - Upload contents of `dist/` to any static host (GitHub Pages, Netlify, Vercel, etc.)
