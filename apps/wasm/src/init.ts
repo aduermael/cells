@@ -52,6 +52,7 @@ export interface AppContext {
   eventManager: AppEventManager;
   astDebugPanel: AstDebugPanel;
   workbookTitleEditor: WorkbookTitleEditor;
+  clipboardManager: ClipboardManager;
 
   // Methods exposed for index.html onclick handlers
   openFile: () => void;
@@ -1274,6 +1275,7 @@ export function initApp(): AppContext {
     eventManager,
     astDebugPanel,
     workbookTitleEditor,
+    clipboardManager,
 
     openFile: () => fileLoader.openFile(),
     newFile: () => fileLoader.newFile(),

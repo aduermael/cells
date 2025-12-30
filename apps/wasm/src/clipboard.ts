@@ -319,10 +319,11 @@ export class ClipboardManager {
 
     // Fill in the values
     for (const cell of data.cells) {
-      // Use display value (computed result for formulas)
+      // Use formula if present, otherwise use display value
+      // Formula is stored with "=" prefix from WASM, so use as-is
       const row = grid[cell.row];
       if (row) {
-        row[cell.col] = cell.value;
+        row[cell.col] = cell.formula || cell.value;
       }
     }
 
@@ -381,7 +382,8 @@ export class ClipboardManager {
       // Determine what value to set
       // If the cell had a formula and we're pasting from our own app, use the formula
       // Otherwise use the display value
-      const valueToSet = cell.formula ? `=${cell.formula}` : cell.value;
+      // Note: formula is stored with "=" prefix from WASM, so use as-is
+      const valueToSet = cell.formula || cell.value;
 
       if (valueToSet) {
         try {

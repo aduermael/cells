@@ -230,7 +230,20 @@ export async function setup() {
   // Create page (Chrome uses pages directly, Lightpanda uses contexts)
   let page;
   if (CONFIG.useChrome) {
-    page = await browser.newPage();
+    // Create a context with clipboard permissions for tests
+    const context = await browser.createBrowserContext();
+    await context.overridePermissions(`http://localhost:${CONFIG.serverPort}`, [
+      'clipboard-read',
+      'clipboard-write',
+    ]);
+    page = await context.newPage();
+
+    // Grant clipboard permissions via CDP as well
+    const client = await page.createCDPSession();
+    await client.send('Browser.grantPermissions', {
+      origin: `http://localhost:${CONFIG.serverPort}`,
+      permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'],
+    });
   } else {
     const context = await browser.createBrowserContext();
     page = await context.newPage();

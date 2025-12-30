@@ -15,8 +15,9 @@
     "test:collab": "node tests/collab.test.mjs",
     "test:collab-demo": "node tests/collab-demo.test.mjs",
     "test:initial-sync": "node tests/initial-sync.test.mjs",
-    "test:all": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs && node tests/collab.test.mjs && node tests/initial-sync.test.mjs",
-    "test:stable": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs"
+    "test:clipboard": "node tests/clipboard.test.mjs",
+    "test:all": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs && node tests/clipboard.test.mjs && node tests/collab.test.mjs && node tests/initial-sync.test.mjs",
+    "test:stable": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs && node tests/clipboard.test.mjs"
   },
   "devDependencies": {
     "@lightpanda/browser": "^1.0.1",
