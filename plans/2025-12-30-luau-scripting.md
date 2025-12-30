@@ -1,6 +1,6 @@
 Status: IN-PROGRESS
 Created At: 2025-12-30 22:40 UTC
-Updated At: 2025-12-30 22:54 UTC
+Updated At: 2025-12-31 00:25 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Luau Scripting Integration
@@ -19,16 +19,17 @@ Integrate Luau (typed/optimized Lua from Roblox) as a sandboxed scripting engine
 
 ## Phase 2: Luau Sandbox Core
 
-- [ ] 2a: Create luau_sandbox.h with LuauSandbox class interface
-- [ ] 2b: Implement sandbox initialization with luaL_sandbox
-- [ ] 2c: Add instruction limit/timeout via interrupt callback
-- [ ] 2d: Add BUILD target linking @luau and add unit tests
+- [x] 2a: Create luau_sandbox.h with LuauSandbox class interface
+- [x] 2b: Implement sandbox initialization with luaL_sandbox
+- [x] 2c: Add instruction limit/timeout via interrupt callback
+- [x] 2d: Add BUILD target linking @luau and add unit tests
 
 **Files:**
 - `core/cells/luau_sandbox.h` (new)
 - `core/cells/luau_sandbox.cc` (new)
 - `core/cells/luau_sandbox_test.cc` (new)
 - `core/cells/BUILD` - Add luau_sandbox cc_library
+- `scripts/lint.sh` - Add Luau include paths for clang-tidy
 
 ## Phase 3: Cells API Functions
 

@@ -37,10 +37,18 @@ fi
 # Get Bazel external directory for third-party includes
 BAZEL_OUTPUT_BASE=$(bazel info output_base 2>/dev/null || bazelisk info output_base 2>/dev/null || echo "")
 PUGIXML_INCLUDE=""
+LUAU_INCLUDE=""
 if [ -n "$BAZEL_OUTPUT_BASE" ]; then
     PUGIXML_DIR=$(find "$BAZEL_OUTPUT_BASE/external" -name "pugixml.hpp" -type f 2>/dev/null | grep -v openxlsx | head -1 | xargs dirname 2>/dev/null || echo "")
     if [ -n "$PUGIXML_DIR" ]; then
         PUGIXML_INCLUDE="-I$PUGIXML_DIR"
+    fi
+    # Find Luau headers (VM, Compiler, Ast)
+    # First find the VM/include directory, then go up two levels to get the luau root
+    LUAU_VM_INC=$(find "$BAZEL_OUTPUT_BASE/external" -path "*luau*/VM/include" -type d 2>/dev/null | head -1 || echo "")
+    if [ -n "$LUAU_VM_INC" ]; then
+        LUAU_DIR=$(dirname "$(dirname "$LUAU_VM_INC")")
+        LUAU_INCLUDE="-I$LUAU_DIR/VM/include -I$LUAU_DIR/Compiler/include -I$LUAU_DIR/Ast/include -I$LUAU_DIR/Common/include"
     fi
 fi
 
@@ -104,6 +112,9 @@ trap "rm -rf $TMPDIR" EXIT
 EXTRA_ARGS="-std=c++17 -I$PROJECT_ROOT -I$PROJECT_ROOT/third_party/miniz"
 if [ -n "${PUGIXML_INCLUDE:-}" ]; then
     EXTRA_ARGS="$EXTRA_ARGS $PUGIXML_INCLUDE"
+fi
+if [ -n "${LUAU_INCLUDE:-}" ]; then
+    EXTRA_ARGS="$EXTRA_ARGS $LUAU_INCLUDE"
 fi
 
 # Function to lint a single file (exported for xargs)

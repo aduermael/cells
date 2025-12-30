@@ -687,3 +687,22 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "luau_sandbox",
+    srcs = ["luau_sandbox.cc"],
+    hdrs = ["luau_sandbox.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@luau//:luau",
+    ],
+)
+
+cc_test(
+    name = "luau_sandbox_test",
+    srcs = ["luau_sandbox_test.cc"],
+    deps = [
+        ":luau_sandbox",
+        "@googletest//:gtest_main",
+    ],
+)

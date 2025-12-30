@@ -1,0 +1,104 @@
+#ifndef CELLS_LUAU_SANDBOX_H_
+#define CELLS_LUAU_SANDBOX_H_
+
+#include <cstddef>
+#include <cstdint>
+
+#include <memory>
+#include <string>
+
+// Forward declarations for Luau types
+struct lua_State;
+
+namespace cells {
+
+// Forward declarations
+struct Workbook;
+struct Sheet;
+
+// Result of script execution
+struct ScriptResult {
+    bool success{false};
+    std::string error;        // Error message if !success
+    std::string output;       // Script output (if any)
+    int64_t instructions{0};  // Number of instructions executed
+};
+
+// Configuration for the sandbox
+struct SandboxConfig {
+    int64_t maxInstructions{1'000'000};  // Instruction limit (default 1M)
+    bool enableDebug{false};             // Enable debug library
+};
+
+// LuauSandbox - sandboxed Luau scripting environment for cells
+//
+// Provides a safe execution environment for user scripts with:
+// - Instruction limits to prevent infinite loops
+// - Restricted standard library (no IO, network, process spawning)
+// - Cells API functions (cellGet, cellSet, etc.)
+//
+// Usage:
+//   LuauSandbox sandbox;
+//   sandbox.setContext(workbook, &sheet);
+//   auto result = sandbox.execute("cellSet('A1', 100)");
+//
+class LuauSandbox {
+public:
+    LuauSandbox();
+    explicit LuauSandbox(const SandboxConfig& config);
+    ~LuauSandbox();
+
+    // Non-copyable
+    LuauSandbox(const LuauSandbox&) = delete;
+    LuauSandbox& operator=(const LuauSandbox&) = delete;
+
+    // Movable
+    LuauSandbox(LuauSandbox&& other) noexcept;
+    LuauSandbox& operator=(LuauSandbox&& other) noexcept;
+
+    // Set the workbook/sheet context for API functions
+    // Must be called before execute() if using cells API
+    void setContext(Workbook* workbook, Sheet* sheet);
+
+    // Clear the context
+    void clearContext();
+
+    // Execute a Luau script
+    // Returns result with success status and any output/error
+    [[nodiscard]] ScriptResult execute(const std::string& script);
+
+    // Get current configuration
+    [[nodiscard]] const SandboxConfig& config() const { return config_; }
+
+    // Set instruction limit (for runtime adjustment)
+    void setMaxInstructions(int64_t limit);
+
+private:
+    // Initialize Lua state with sandboxing
+    void initState();
+
+    // Register cells API functions
+    void registerCellsAPI();
+
+    // Compile script to bytecode
+    // Returns empty string on success, error message on failure
+    [[nodiscard]] std::string compile(const std::string& source, std::string& bytecodeOut) const;
+
+    // Interrupt callback for instruction limiting
+    static void interruptCallback(lua_State* L, int gc);
+
+    lua_State* L_{nullptr};
+    SandboxConfig config_;
+
+    // Context for API functions (stored in Lua registry for callbacks)
+    Workbook* workbook_{nullptr};
+    Sheet* sheet_{nullptr};
+
+    // Instruction counter for current execution
+    int64_t instructionCount_{0};
+    bool interrupted_{false};
+};
+
+}  // namespace cells
+
+#endif  // CELLS_LUAU_SANDBOX_H_
