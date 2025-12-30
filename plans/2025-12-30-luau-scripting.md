@@ -1,6 +1,6 @@
 Status: IN-PROGRESS
 Created At: 2025-12-30 22:40 UTC
-Updated At: 2025-12-30 22:53 UTC
+Updated At: 2025-12-30 22:54 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Luau Scripting Integration
@@ -85,11 +85,35 @@ Expose spreadsheet operations to Luau scripts. All use A1 notation (converted vi
 
 ## API Reference
 
-Scripts use A1 notation for all cell/range references:
+Scripts use A1 notation for input, but cells are internally identified by UUID.
+
+### Cell Object Identity (Critical)
+
+`cellGet` returns a **cell object** (Lua table), not a raw value. The sandbox maintains
+a **weak reference table** keyed by cell UUID to ensure object identity:
 
 ```lua
--- Cell access
-cellGet("A1")              -- Returns value (number, string, boolean, or nil)
+a = cellGet("A1")
+b = cellGet("A1")
+-- a == b (same table reference, not just equal content)
+
+c = cellGet("A2")
+-- a ~= c (different cells, different objects)
+```
+
+**Important:** A1 notation resolves to UUID at call time. If a cell moves:
+```lua
+a = cellGet("A1")      -- Gets cell with UUID "abc12345"
+columnMove("A", 1)     -- A1 is now at B1
+b = cellGet("A1")      -- Gets whatever cell is now at A1 (different UUID)
+-- a ~= b (different cells, a is still "abc12345" even though it moved)
+```
+
+### Functions
+
+```lua
+-- Cell access (returns cell object, use cell.value for raw value)
+cellGet("A1")              -- Returns cell object {id, value, formula, ...}
 cellSet("A1", 100)         -- Set cell value
 
 -- Document
@@ -122,3 +146,33 @@ rangeDelete("A1", "C3")    -- Delete cells in range
 - `core/cells/ref_converter.h` - A1 to UUID conversion (already exists)
 - `core/cells/crdt.h` - makeCellSetValueOp, applyOperation
 - `apps/wasm/bindings.cc` - CellsEngine class pattern
+
+## Implementation Notes
+
+### Cell Object Cache (Weak Table)
+
+The sandbox maintains a Lua weak table to cache cell objects by UUID:
+
+```lua
+-- Internal: cellCache with weak values
+setmetatable(cellCache, {__mode = "v"})
+
+-- cellGet implementation:
+function cellGet(ref)
+    local uuid = resolveA1ToUUID(ref)
+    if not uuid then return nil end
+
+    if cellCache[uuid] then
+        return cellCache[uuid]  -- Return existing object
+    end
+
+    local cell = createCellObject(uuid)
+    cellCache[uuid] = cell
+    return cell
+end
+```
+
+This ensures:
+1. Same cell UUID → same Lua table reference
+2. Garbage collection works (weak refs don't prevent collection)
+3. A1 resolution happens at call time (reflects current grid state)
