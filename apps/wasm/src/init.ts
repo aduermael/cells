@@ -667,23 +667,45 @@ export function initApp(): AppContext {
   }
 
   let fetchInFlight = false;
-  let fetchPending = false;
+  let fetchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const FETCH_DEBOUNCE_MS = 16; // ~1 frame, responsive but prevents flooding
 
-  async function fetchViewportNow(): Promise<void> {
+  /**
+   * Request a viewport fetch with debouncing.
+   * - Debounces rapid scroll events to prevent flooding the WASM worker
+   * - If a fetch is in flight, waits for it to complete then fetches again
+   * - Uses current scroll position at fetch time (not when queued)
+   */
+  function fetchViewportNow(): void {
+    // Clear any pending debounce timer
+    if (fetchDebounceTimer !== null) {
+      clearTimeout(fetchDebounceTimer);
+    }
+
+    // Debounce: wait a short time for scroll to settle
+    fetchDebounceTimer = setTimeout(() => {
+      fetchDebounceTimer = null;
+      doFetchViewport();
+    }, FETCH_DEBOUNCE_MS);
+  }
+
+  async function doFetchViewport(): Promise<void> {
     if (fetchInFlight) {
-      fetchPending = true;
+      // A fetch is in progress - schedule another after it completes
+      // The next fetch will use the current scroll position
+      fetchDebounceTimer = setTimeout(() => {
+        fetchDebounceTimer = null;
+        doFetchViewport();
+      }, FETCH_DEBOUNCE_MS);
       return;
     }
+
     fetchInFlight = true;
     try {
       await fetchViewport();
       render();
     } finally {
       fetchInFlight = false;
-      if (fetchPending) {
-        fetchPending = false;
-        fetchViewportNow();
-      }
     }
   }
 
