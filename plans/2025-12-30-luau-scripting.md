@@ -1,6 +1,6 @@
-Status: READY
+Status: IN-PROGRESS
 Created At: 2025-12-30 22:40 UTC
-Updated At: 2025-12-30 22:40 UTC
+Updated At: 2025-12-30 22:53 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Luau Scripting Integration
@@ -9,9 +9,9 @@ Integrate Luau (typed/optimized Lua from Roblox) as a sandboxed scripting engine
 
 ## Phase 1: Luau Library Integration
 
-- [ ] 1a: Add Luau git_repository to MODULE.bazel
-- [ ] 1b: Create third_party/luau/BUILD.luau with cc_library targets
-- [ ] 1c: Verify WASM compilation with `bazel build --config=wasm //third_party/luau:luau`
+- [x] 1a: Add Luau git_repository to MODULE.bazel
+- [x] 1b: Create third_party/luau/BUILD.luau with cc_library targets
+- [x] 1c: Verify WASM compilation with `bazel build --config=wasm //third_party/luau:luau`
 
 **Files:**
 - `MODULE.bazel` - Add git_repository for https://github.com/luau-lang/luau
