@@ -694,6 +694,10 @@ cc_library(
     hdrs = ["luau_sandbox.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":crdt",
+        ":id",
+        ":model",
+        ":ref_converter",
         "@luau//:luau",
     ],
 )
@@ -702,7 +706,9 @@ cc_test(
     name = "luau_sandbox_test",
     srcs = ["luau_sandbox_test.cc"],
     deps = [
+        ":id",
         ":luau_sandbox",
+        ":model",
         "@googletest//:gtest_main",
     ],
 )

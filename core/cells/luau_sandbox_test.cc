@@ -2,8 +2,51 @@
 
 #include <gtest/gtest.h>
 
+#include "core/cells/id.h"
+#include "core/cells/model.h"
+
 namespace cells {
 namespace {
+
+// Helper to create a test workbook with one sheet containing some cells
+std::unique_ptr<Workbook> createTestWorkbook() {
+    ID wbId = generate_id();
+    auto workbook = std::make_unique<Workbook>(wbId, "TestWorkbook");
+
+    ID sheetId = generate_id();
+    auto sheet = std::make_unique<Sheet>(sheetId, "Sheet1");
+
+    // Create columns A, B, C (positions 0, 1, 2)
+    for (uint32_t i = 0; i < 3; i++) {
+        ID colId = generate_id();
+        auto col = std::make_unique<Axis>(colId, true);
+        col->position = i;
+        col->size = 100;
+        sheet->addColumn(std::move(col));
+    }
+
+    // Create rows 1, 2, 3 (positions 0, 1, 2)
+    for (uint32_t i = 0; i < 3; i++) {
+        ID rowId = generate_id();
+        auto row = std::make_unique<Axis>(rowId, false);
+        row->position = i;
+        row->size = 24;
+        sheet->addRow(std::move(row));
+    }
+
+    // Create cell A1 with value 42
+    Axis* colA = sheet->getColumnByPosition(0);
+    Axis* row1 = sheet->getRowByPosition(0);
+    if (colA != nullptr && row1 != nullptr) {
+        ID cellId = generate_id();
+        auto cell = std::make_unique<Cell>(cellId, colA->id, row1->id);
+        cell->value = CellValue(42.0);
+        sheet->addCell(std::move(cell));
+    }
+
+    workbook->addSheet(std::move(sheet));
+    return workbook;
+}
 
 TEST(LuauSandboxTest, BasicExecution) {
     LuauSandbox sandbox;
@@ -220,6 +263,197 @@ TEST(LuauSandboxTest, Closures) {
 
     EXPECT_TRUE(result.success);
     EXPECT_EQ(result.output, "3");
+}
+
+// ============================================================================
+// Cells API Tests
+// ============================================================================
+
+TEST(LuauSandboxTest, CellGetReturnsNilForEmptyCell) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // B2 doesn't exist
+    auto result = sandbox.execute("return cellGet('B2')");
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(result.output.empty());  // nil has no output
+}
+
+TEST(LuauSandboxTest, CellGetReturnsExistingCell) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // A1 exists with value 42
+    auto result = sandbox.execute("local c = cellGet('A1'); return c.value");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "42");
+}
+
+TEST(LuauSandboxTest, CellGetWithCreate) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // D4 doesn't exist, but create=true should create it
+    auto result = sandbox.execute(R"(
+        local c = cellGet('D4', {create = true})
+        return type(c)
+    )");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "table");
+}
+
+TEST(LuauSandboxTest, CellSetNumber) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        cellSet('B2', 100)
+        local c = cellGet('B2')
+        return c.value
+    )");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "100");
+}
+
+TEST(LuauSandboxTest, CellSetString) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        cellSet('B2', 'Hello')
+        local c = cellGet('B2')
+        return c.value
+    )");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "Hello");
+}
+
+TEST(LuauSandboxTest, CellSetBoolean) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        cellSet('B2', true)
+        local c = cellGet('B2')
+        return c.value
+    )");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "true");
+}
+
+TEST(LuauSandboxTest, CellObjectIdentity) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Getting the same cell twice should return same object
+    auto result = sandbox.execute(R"(
+        local a = cellGet('A1')
+        local b = cellGet('A1')
+        return a == b
+    )");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "true");
+}
+
+TEST(LuauSandboxTest, CellGetRef) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local c = cellGet('A1')
+        return c:getRef()
+    )");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "A1");
+}
+
+TEST(LuauSandboxTest, SheetGetName) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute("return sheetGetName(0)");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "Sheet1");
+}
+
+TEST(LuauSandboxTest, NoContextError) {
+    LuauSandbox sandbox;
+    // Don't set context
+
+    auto result = sandbox.execute("cellGet('A1')");
+    EXPECT_FALSE(result.success);
+    EXPECT_TRUE(result.error.find("no context") != std::string::npos);
+}
+
+TEST(LuauSandboxTest, InvalidReferenceError) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute("cellGet('invalid')");
+    EXPECT_FALSE(result.success);
+    EXPECT_TRUE(result.error.find("invalid reference") != std::string::npos);
+}
+
+TEST(LuauSandboxTest, RangeDelete) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // First set some values
+    auto setup = sandbox.execute(R"(
+        cellSet('A1', 1)
+        cellSet('A2', 2)
+        cellSet('B1', 3)
+        cellSet('B2', 4)
+    )");
+    EXPECT_TRUE(setup.success);
+
+    // Verify values are set
+    auto before = sandbox.execute("return cellGet('A1').value");
+    EXPECT_TRUE(before.success);
+    EXPECT_EQ(before.output, "1");
+
+    // Delete range A1:B2
+    auto del = sandbox.execute("rangeDelete({from = 'A1', to = 'B2'})");
+    EXPECT_TRUE(del.success);
+
+    // Verify cells are cleared
+    auto after = sandbox.execute("return cellGet('A1')");
+    EXPECT_TRUE(after.success);
+    // Cell should be nil after deletion
+    EXPECT_TRUE(after.output.empty());
 }
 
 }  // namespace

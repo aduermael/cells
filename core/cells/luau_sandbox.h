@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 // Forward declarations for Luau types
 struct lua_State;
@@ -15,6 +16,8 @@ namespace cells {
 // Forward declarations
 struct Workbook;
 struct Sheet;
+struct Cell;
+struct ID;
 
 // Result of script execution
 struct ScriptResult {
@@ -97,6 +100,45 @@ private:
     // Instruction counter for current execution
     int64_t instructionCount_{0};
     bool interrupted_{false};
+
+    // ========================================================================
+    // Cells API function implementations (called from Lua)
+    // ========================================================================
+
+    // Cell operations
+    static int luaCellGet(lua_State* L);
+    static int luaCellSet(lua_State* L);
+
+    // Document operations
+    static int luaDocumentSetTitle(lua_State* L);
+
+    // Axis operations
+    static int luaColumnSetWidth(lua_State* L);
+    static int luaRowSetHeight(lua_State* L);
+    static int luaColumnMove(lua_State* L);
+
+    // Sheet operations
+    static int luaSheetSelect(lua_State* L);
+    static int luaSheetSetName(lua_State* L);
+    static int luaSheetGetName(lua_State* L);
+
+    // Range operations
+    static int luaRangeSelect(lua_State* L);
+    static int luaRangeDelete(lua_State* L);
+
+    // Cell object methods (called on cell tables via __index)
+    static int luaCellGetRef(lua_State* L);
+
+    // Helper: Get context from registry
+    static Workbook* getWorkbook(lua_State* L);
+    static Sheet* getSheet(lua_State* L);
+
+    // Helper: Create a cell Lua object and cache it
+    void pushCellObject(lua_State* L, Cell* cell);
+
+    // Cell object cache (UUID string -> Lua registry reference)
+    // Uses weak table in Lua to allow garbage collection
+    int cellCacheRef_{-1};  // -1 = LUA_NOREF
 };
 
 }  // namespace cells

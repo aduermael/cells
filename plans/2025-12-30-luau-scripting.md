@@ -1,6 +1,6 @@
 Status: IN-PROGRESS
 Created At: 2025-12-30 22:40 UTC
-Updated At: 2025-12-31 00:25 UTC
+Updated At: 2025-12-31 03:05 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Luau Scripting Integration
@@ -35,17 +35,18 @@ Integrate Luau (typed/optimized Lua from Roblox) as a sandboxed scripting engine
 
 Expose spreadsheet operations to Luau scripts. All use A1 notation (converted via RefConverter).
 
-- [ ] 3a: Implement cellGet(ref) and cellSet(ref, value)
-- [ ] 3b: Implement documentSetTitle(title)
-- [ ] 3c: Implement columnSetWidth(col, width) and rowSetHeight(row, height)
-- [ ] 3d: Implement sheetSelect(index), sheetSetName(index, name), sheetGetName(index)
-- [ ] 3e: Implement rangeSelect(start, end) and rangeDelete(start, end)
-- [ ] 3f: Implement columnMove(fromCol, toPos)
-- [ ] 3g: Add unit tests for all API functions
+- [x] 3a: Implement cellGet(ref) and cellSet(ref, value)
+- [x] 3b: Implement documentSetTitle(title)
+- [x] 3c: Implement columnSetWidth(col, width) and rowSetHeight(row, height)
+- [x] 3d: Implement sheetSelect(index), sheetSetName(index, name), sheetGetName(index)
+- [x] 3e: Implement rangeSelect(start, end) and rangeDelete(start, end)
+- [x] 3f: Implement columnMove(fromCol, toPos)
+- [x] 3g: Add unit tests for all API functions
 
 **Files:**
 - `core/cells/luau_sandbox.cc` - Add API function implementations
 - `core/cells/luau_sandbox_test.cc` - Add API tests
+- `core/cells/BUILD` - Add dependencies for luau_sandbox
 
 ## Phase 4: WASM Bindings
 
