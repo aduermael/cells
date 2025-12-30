@@ -111,27 +111,37 @@ b = cellGet("A1")      -- Gets whatever cell is now at A1 (different UUID)
 
 ### Functions
 
+Prefer typed single-parameter options tables over multiple positional arguments.
+
 ```lua
--- Cell access (returns cell object, use cell.value for raw value)
-cellGet("A1")              -- Returns cell object {id, value, formula, ...}
-cellSet("A1", 100)         -- Set cell value
+-- Cell access
+cellGet("A1")                          -- Returns cell object or nil if empty
+cellGet("A1", {create = true})         -- Creates cell if empty, never returns nil
+cellSet("A1", 100)                     -- Set cell value (creates if needed)
+
+-- Cell object structure (returned by cellGet)
+type Cell = {
+    id: string,        -- UUID (8 chars)
+    value: any,        -- number | string | boolean | nil
+    formula: string?,  -- formula text if cell has formula
+}
 
 -- Document
-documentSetTitle("Budget") -- Set workbook title
+documentSetTitle("Budget")
 
--- Structure
-columnSetWidth("A", 150)   -- Set column width in pixels
-rowSetHeight(1, 30)        -- Set row height in pixels
-columnMove("B", 0)         -- Move column B to position 0 (before A)
+-- Structure (use options table for multiple params)
+columnSetWidth("A", {width = 150})
+rowSetHeight(1, {height = 30})
+columnMove("A", {to = 2})              -- Move column A to position 2
 
 -- Sheets
-sheetSelect(1)             -- Switch to sheet at index 1
-sheetSetName(0, "Data")    -- Rename sheet 0
-sheetGetName(0)            -- Get sheet name
+sheetSelect(1)
+sheetSetName(0, {name = "Data"})
+sheetGetName(0)                        -- Returns string
 
--- Ranges
-rangeSelect("A1", "C3")    -- Select range (UI feedback)
-rangeDelete("A1", "C3")    -- Delete cells in range
+-- Ranges (options table for range bounds)
+rangeSelect({from = "A1", to = "C3"})
+rangeDelete({from = "A1", to = "C3"})
 ```
 
 ## Security
