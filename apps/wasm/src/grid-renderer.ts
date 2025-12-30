@@ -65,6 +65,10 @@ export class GridRenderer {
   colWidths: Map<number, number> = new Map();
   rowHeights: Map<number, number> = new Map();
   colNames: Map<number, string> = new Map();
+  /** Pre-computed column pixel offsets for O(1) lookups */
+  colPixelOffsets: Map<number, number> = new Map();
+  /** Pre-computed row pixel offsets for O(1) lookups */
+  rowPixelOffsets: Map<number, number> = new Map();
   scrollX = 0;
   scrollY = 0;
   selectedCell: Position | null = null;
@@ -166,6 +170,8 @@ export class GridRenderer {
       colWidths: this.colWidths,
       rowHeights: this.rowHeights,
       colNames: this.colNames,
+      colPixelOffsets: this.colPixelOffsets,
+      rowPixelOffsets: this.rowPixelOffsets,
       selectedColumn: this.selectedColumn,
       selectedRow: this.selectedRow,
       selectedCell: this.selectedCell,

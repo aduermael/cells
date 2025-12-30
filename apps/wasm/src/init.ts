@@ -116,6 +116,8 @@ export function initApp(): AppContext {
       colWidths: app.colWidths,
       rowHeights: app.rowHeights,
       colNames: app.colNames,
+      colPixelOffsets: app.colPixelOffsets,
+      rowPixelOffsets: app.rowPixelOffsets,
       scrollX: app.scrollX,
       scrollY: app.scrollY,
       selectedCell: app.selectedCell,

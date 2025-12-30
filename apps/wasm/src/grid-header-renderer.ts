@@ -19,6 +19,10 @@ export interface HeaderRendererState {
   colWidths: Map<number, number>;
   rowHeights: Map<number, number>;
   colNames: Map<number, string>;
+  /** Pre-computed column pixel offsets for O(1) lookups */
+  colPixelOffsets: Map<number, number>;
+  /** Pre-computed row pixel offsets for O(1) lookups */
+  rowPixelOffsets: Map<number, number>;
   selectedColumn: number | null;
   selectedRow: number | null;
   selectedCell: Position | null;
@@ -58,6 +62,7 @@ export function getColumnHeaderText(
 
 /**
  * Get the visual X position for a column during drag operations.
+ * Uses O(1) lookup via pre-computed pixel offsets when not dragging.
  */
 export function getDragAdjustedColX(
   col: number,
@@ -69,6 +74,12 @@ export function getDragAdjustedColX(
     state.dragTargetIndex !== state.dragSourceIndex + 1;
 
   if (!colHasMoved) {
+    // Fast path: use pre-computed pixel offset if available (O(1))
+    const cachedOffset = state.colPixelOffsets.get(col);
+    if (cachedOffset !== undefined) {
+      return HEADER_WIDTH + cachedOffset - state.scrollX;
+    }
+    // Fallback: calculate from scratch (O(n))
     let x = HEADER_WIDTH - state.scrollX;
     for (let i = 0; i < col; i++) {
       x += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
@@ -101,6 +112,7 @@ export function getDragAdjustedColX(
 
 /**
  * Get the visual Y position for a row during drag operations.
+ * Uses O(1) lookup via pre-computed pixel offsets when not dragging.
  */
 export function getDragAdjustedRowY(
   row: number,
@@ -112,6 +124,12 @@ export function getDragAdjustedRowY(
     state.dragTargetIndex !== state.dragSourceIndex + 1;
 
   if (!rowHasMoved) {
+    // Fast path: use pre-computed pixel offset if available (O(1))
+    const cachedOffset = state.rowPixelOffsets.get(row);
+    if (cachedOffset !== undefined) {
+      return HEADER_HEIGHT + cachedOffset - state.scrollY;
+    }
+    // Fallback: calculate from scratch (O(n))
     let y = HEADER_HEIGHT - state.scrollY;
     for (let i = 0; i < row; i++) {
       y += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
