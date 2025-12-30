@@ -2380,6 +2380,15 @@ public:
             _syncClient.reset();
         }
 
+        // Switch to collaboration mode and bootstrap OpLog if not already collaborating.
+        // This generates operations for all existing content (columns, rows, cells)
+        // so that joining peers can receive the full document state.
+        size_t bootstrappedOps = 0;
+        if (!_workbook->isCollaborating()) {
+            _workbook->startCollaboration();
+            bootstrappedOps = bootstrapOpLog(*_workbook);
+        }
+
         // Configure sync client
         cells::net::SyncClientConfig config;
         config.signaling_url = url;
@@ -2392,7 +2401,8 @@ public:
         _syncClient->startSync(roomId, peerId);
 
         std::ostringstream json;
-        json << "{\"success\":true,\"peerId\":\"" << _syncClient->getPeerId() << "\"}";
+        json << "{\"success\":true,\"peerId\":\"" << _syncClient->getPeerId()
+             << "\",\"bootstrapped\":" << bootstrappedOps << "}";
         return json.str();
     }
 
