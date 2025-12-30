@@ -1,0 +1,2 @@
+# This directory contains the BUILD file for the external @luau repository.
+# See BUILD.luau for the actual build targets.
