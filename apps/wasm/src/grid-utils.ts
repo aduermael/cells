@@ -77,36 +77,15 @@ export function getRowAtY(
 }
 
 // =============================================================================
-// Fast Coordinate Conversion (using pre-computed pixel offsets)
+// Fast Coordinate Conversion (using pre-computed pixel offsets with smart caching)
 // =============================================================================
 
 /**
- * Get the X pixel offset for a column position.
- * O(1) lookup using pre-computed pixel offsets from WASM ViewportIndex.
- * Falls back to O(n) loop if offset not cached.
- */
-export function getColPixelX(
-  col: number,
-  scrollX: number,
-  colPixelOffsets: Map<number, number>,
-  colWidths: Map<number, number>
-): number {
-  const cachedOffset = colPixelOffsets.get(col);
-  if (cachedOffset !== undefined) {
-    return HEADER_WIDTH + cachedOffset - scrollX;
-  }
-  // Fallback to O(n) calculation if not in cache
-  let x = HEADER_WIDTH - scrollX;
-  for (let i = 0; i < col; i++) {
-    x += colWidths.get(i) ?? DEFAULT_COL_WIDTH;
-  }
-  return x;
-}
-
-/**
  * Get the Y pixel offset for a row position.
- * O(1) lookup using pre-computed pixel offsets from WASM ViewportIndex.
- * Falls back to O(n) loop if offset not cached.
+ * Uses smart caching:
+ * - O(1) if row offset is already cached
+ * - O(delta) by starting from nearest cached row below target
+ * - Caches computed offsets for future lookups
  */
 export function getRowPixelY(
   row: number,
@@ -114,16 +93,81 @@ export function getRowPixelY(
   rowPixelOffsets: Map<number, number>,
   rowHeights: Map<number, number>
 ): number {
+  // Fast path: already cached
   const cachedOffset = rowPixelOffsets.get(row);
   if (cachedOffset !== undefined) {
     return HEADER_HEIGHT + cachedOffset - scrollY;
   }
-  // Fallback to O(n) calculation if not in cache
-  let y = HEADER_HEIGHT - scrollY;
-  for (let i = 0; i < row; i++) {
-    y += rowHeights.get(i) ?? DEFAULT_ROW_HEIGHT;
+
+  // Find nearest cached row below target to start from
+  let startRow = 0;
+  let startOffset = 0;
+
+  // Check a few candidates (row-1, row-10, row-100, etc.) for a cache hit
+  // This avoids scanning the entire map while still finding nearby cached values
+  for (const delta of [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]) {
+    const candidate = row - delta;
+    if (candidate >= 0) {
+      const offset = rowPixelOffsets.get(candidate);
+      if (offset !== undefined) {
+        startRow = candidate;
+        startOffset = offset;
+        break;
+      }
+    }
   }
-  return y;
+
+  // Compute from startRow to target row, caching intermediate results
+  let offset = startOffset;
+  for (let i = startRow; i < row; i++) {
+    offset += rowHeights.get(i) ?? DEFAULT_ROW_HEIGHT;
+    // Cache this intermediate result for future lookups
+    rowPixelOffsets.set(i + 1, offset);
+  }
+
+  return HEADER_HEIGHT + offset - scrollY;
+}
+
+/**
+ * Get the X pixel offset for a column position.
+ * Uses smart caching (same approach as getRowPixelY).
+ */
+export function getColPixelX(
+  col: number,
+  scrollX: number,
+  colPixelOffsets: Map<number, number>,
+  colWidths: Map<number, number>
+): number {
+  // Fast path: already cached
+  const cachedOffset = colPixelOffsets.get(col);
+  if (cachedOffset !== undefined) {
+    return HEADER_WIDTH + cachedOffset - scrollX;
+  }
+
+  // Find nearest cached column below target
+  let startCol = 0;
+  let startOffset = 0;
+
+  for (const delta of [1, 2, 5, 10, 20, 50, 100]) {
+    const candidate = col - delta;
+    if (candidate >= 0) {
+      const offset = colPixelOffsets.get(candidate);
+      if (offset !== undefined) {
+        startCol = candidate;
+        startOffset = offset;
+        break;
+      }
+    }
+  }
+
+  // Compute from startCol to target, caching intermediate results
+  let offset = startOffset;
+  for (let i = startCol; i < col; i++) {
+    offset += colWidths.get(i) ?? DEFAULT_COL_WIDTH;
+    colPixelOffsets.set(i + 1, offset);
+  }
+
+  return HEADER_WIDTH + offset - scrollX;
 }
 
 /**

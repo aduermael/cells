@@ -10,6 +10,7 @@ import {
   FORMULA_ERROR_COLOR,
   type FormulaHighlight,
 } from "./grid-constants.js";
+import { getColPixelX, getRowPixelY } from "./grid-utils.js";
 
 /** State needed for formula highlight rendering */
 export interface FormulaHighlightRendererState {
@@ -17,6 +18,8 @@ export interface FormulaHighlightRendererState {
   scrollY: number;
   colWidths: Map<number, number>;
   rowHeights: Map<number, number>;
+  colPixelOffsets: Map<number, number>;
+  rowPixelOffsets: Map<number, number>;
   formulaHighlights: FormulaHighlight[];
 }
 
@@ -38,36 +41,6 @@ function getHighlightColor(
 }
 
 /**
- * Calculate X position for a column
- */
-function getColX(
-  col: number,
-  scrollX: number,
-  colWidths: Map<number, number>
-): number {
-  let x = HEADER_WIDTH - scrollX;
-  for (let i = 0; i < col; i++) {
-    x += colWidths.get(i) || DEFAULT_COL_WIDTH;
-  }
-  return x;
-}
-
-/**
- * Calculate Y position for a row
- */
-function getRowY(
-  row: number,
-  scrollY: number,
-  rowHeights: Map<number, number>
-): number {
-  let y = HEADER_HEIGHT - scrollY;
-  for (let i = 0; i < row; i++) {
-    y += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-  }
-  return y;
-}
-
-/**
  * Draw a single cell highlight
  */
 function drawCellHighlight(
@@ -75,17 +48,14 @@ function drawCellHighlight(
   col: number,
   row: number,
   color: { border: string; bg: string },
-  scrollX: number,
-  scrollY: number,
-  colWidths: Map<number, number>,
-  rowHeights: Map<number, number>,
+  state: FormulaHighlightRendererState,
   viewWidth: number,
   viewHeight: number
 ): void {
-  const cellX = getColX(col, scrollX, colWidths);
-  const cellY = getRowY(row, scrollY, rowHeights);
-  const cellW = colWidths.get(col) || DEFAULT_COL_WIDTH;
-  const cellH = rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+  const cellX = getColPixelX(col, state.scrollX, state.colPixelOffsets, state.colWidths);
+  const cellY = getRowPixelY(row, state.scrollY, state.rowPixelOffsets, state.rowHeights);
+  const cellW = state.colWidths.get(col) || DEFAULT_COL_WIDTH;
+  const cellH = state.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
 
   // Check if cell is visible
   if (
@@ -123,10 +93,7 @@ function drawRangeHighlight(
   endCol: number,
   endRow: number,
   color: { border: string; bg: string },
-  scrollX: number,
-  scrollY: number,
-  colWidths: Map<number, number>,
-  rowHeights: Map<number, number>,
+  state: FormulaHighlightRendererState,
   viewWidth: number,
   viewHeight: number
 ): void {
@@ -137,17 +104,17 @@ function drawRangeHighlight(
   const maxRow = Math.max(startRow, endRow);
 
   // Calculate range bounds
-  const rangeX = getColX(minCol, scrollX, colWidths);
-  const rangeY = getRowY(minRow, scrollY, rowHeights);
+  const rangeX = getColPixelX(minCol, state.scrollX, state.colPixelOffsets, state.colWidths);
+  const rangeY = getRowPixelY(minRow, state.scrollY, state.rowPixelOffsets, state.rowHeights);
 
   // Calculate total width and height
   let rangeW = 0;
   for (let i = minCol; i <= maxCol; i++) {
-    rangeW += colWidths.get(i) || DEFAULT_COL_WIDTH;
+    rangeW += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
   }
   let rangeH = 0;
   for (let i = minRow; i <= maxRow; i++) {
-    rangeH += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    rangeH += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
   }
 
   // Check if range is visible
@@ -202,10 +169,7 @@ export function drawFormulaHighlights(
             highlight.col,
             highlight.row,
             color,
-            state.scrollX,
-            state.scrollY,
-            state.colWidths,
-            state.rowHeights,
+            state,
             viewWidth,
             viewHeight
           );
@@ -226,10 +190,7 @@ export function drawFormulaHighlights(
             highlight.endCol,
             highlight.endRow,
             color,
-            state.scrollX,
-            state.scrollY,
-            state.colWidths,
-            state.rowHeights,
+            state,
             viewWidth,
             viewHeight
           );
@@ -239,7 +200,7 @@ export function drawFormulaHighlights(
       case "column":
         // Draw entire column highlight (from visible top to bottom)
         if (highlight.col !== undefined) {
-          const colX = getColX(highlight.col, state.scrollX, state.colWidths);
+          const colX = getColPixelX(highlight.col, state.scrollX, state.colPixelOffsets, state.colWidths);
           const colW = state.colWidths.get(highlight.col) || DEFAULT_COL_WIDTH;
 
           if (colX + colW > HEADER_WIDTH && colX < viewWidth) {
@@ -264,7 +225,7 @@ export function drawFormulaHighlights(
       case "row":
         // Draw entire row highlight (from visible left to right)
         if (highlight.row !== undefined) {
-          const rowY = getRowY(highlight.row, state.scrollY, state.rowHeights);
+          const rowY = getRowPixelY(highlight.row, state.scrollY, state.rowPixelOffsets, state.rowHeights);
           const rowH = state.rowHeights.get(highlight.row) || DEFAULT_ROW_HEIGHT;
 
           if (rowY + rowH > HEADER_HEIGHT && rowY < viewHeight) {

@@ -236,6 +236,8 @@ export class GridRenderer {
         scrollY: this.scrollY,
         colWidths: this.colWidths,
         rowHeights: this.rowHeights,
+        colPixelOffsets: this.colPixelOffsets,
+        rowPixelOffsets: this.rowPixelOffsets,
         formulaHighlights: this.formulaHighlights,
       };
       drawFormulaHighlights(ctx, formulaState, viewWidth, viewHeight);
