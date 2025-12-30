@@ -48,10 +48,15 @@ export class WorkbookTitleEditor {
 
   /** Set up event listeners for the title element */
   private setupEventListeners(): void {
-    // Focus event - save original value
+    // Focus event - save original value and place cursor at end
     this.titleElement.addEventListener("focus", () => {
       this.originalValue = this.getTitle();
-      // Select all text on focus for easy replacement
+      // Single click places cursor at end
+      this.placeCursorAtEnd();
+    });
+
+    // Double-click selects all text
+    this.titleElement.addEventListener("dblclick", () => {
       this.selectAll();
     });
 
@@ -94,6 +99,17 @@ export class WorkbookTitleEditor {
     if (!selection) return;
     const range = document.createRange();
     range.selectNodeContents(this.titleElement);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  /** Place cursor at the end of the title element */
+  private placeCursorAtEnd(): void {
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(this.titleElement);
+    range.collapse(false); // false = collapse to end
     selection.removeAllRanges();
     selection.addRange(range);
   }

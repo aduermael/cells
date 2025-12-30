@@ -13,10 +13,12 @@
 <body>
     <div id="container">
         <div id="header">
-            <img src="icon.svg" alt="Cells" id="header-logo">
-            <button class="btn" onclick="openFile()">Open</button>
-            <button class="btn" id="new-btn" onclick="newFile()" style="display: none;">New</button>
-            <input type="file" id="file-input" accept=".zcd,.csv,.tsv,.xlsx" />
+            <div id="header-left">
+                <img src="icon.svg" alt="Cells" id="header-logo">
+                <button class="btn" onclick="openFile()">Open</button>
+                <button class="btn" id="new-btn" onclick="newFile()" style="display: none;">New</button>
+                <input type="file" id="file-input" accept=".zcd,.csv,.tsv,.xlsx" />
+            </div>
             <div id="workbook-title-container">
                 <span id="workbook-title" contenteditable="true" spellcheck="false">Untitled</span>
             </div>
