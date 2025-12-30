@@ -235,12 +235,31 @@ void ViewportIndex::onCellChanged(Cell* /*cell*/) {
 // Incremental axis updates
 // ============================================================================
 
-void ViewportIndex::onAxisInserted(const ID& axisId, bool isColumn, size_t position,
+void ViewportIndex::onAxisInserted(const ID& axisId, bool isColumn, size_t sheetPosition,
                                    uint32_t size) {
+    // The 'sheetPosition' parameter is the axis's position in the Sheet model,
+    // NOT the tree position. We need to compute the correct tree position by
+    // counting how many existing axes have positions less than sheetPosition.
     if (isColumn) {
-        _columns.insert(axisId, position, size);
+        size_t treePos = 0;
+        if (_sheet != nullptr) {
+            for (const auto& [id, col] : _sheet->columns) {
+                if (id != axisId && col->position < sheetPosition) {
+                    treePos++;
+                }
+            }
+        }
+        _columns.insert(axisId, treePos, size);
     } else {
-        _rows.insert(axisId, position, size);
+        size_t treePos = 0;
+        if (_sheet != nullptr) {
+            for (const auto& [id, row] : _sheet->rows) {
+                if (id != axisId && row->position < sheetPosition) {
+                    treePos++;
+                }
+            }
+        }
+        _rows.insert(axisId, treePos, size);
     }
 }
 
@@ -281,6 +300,9 @@ void ViewportIndex::onAxisResized(const ID& axisId, bool isColumn, uint32_t newS
 }
 
 void ViewportIndex::onAxisMoved(const ID& axisId, bool isColumn, size_t newPosition) {
+    // NOTE: newPosition is expected to be a tree position, not a Sheet position.
+    // Callers that have Sheet positions should either compute the tree position
+    // or use rebuildViewportIndex() instead.
     if (isColumn) {
         _columns.move(axisId, newPosition);
     } else {

@@ -180,6 +180,11 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     XLSXReadResult result;
     auto start = std::chrono::steady_clock::now();
 
+    // Progress tracking
+    size_t cellsLoaded = 0;
+    size_t totalCellEstimate = 0;
+    size_t lastProgressReport = 0;
+
     // Helper lambda to add warnings
     auto addWarning = [&warnings](const std::string& msg) { warnings.push_back(msg); };
 
@@ -351,11 +356,21 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             }
         }
         sheet->reserveCells(cellCount);
+        totalCellEstimate += cellCount;
 
         // Track shared formulas: si index -> master cell
         std::unordered_map<int, Cell*> sharedFormulaMasters;
         // Track subscribers that need to be linked: si index -> list of subscriber cells
         std::unordered_map<int, std::vector<Cell*>> sharedFormulaSubscribers;
+
+        // Progress reporting helper
+        auto reportProgress = [&]() {
+            if (options.progressCallback &&
+                cellsLoaded - lastProgressReport >= options.progressInterval) {
+                options.progressCallback(cellsLoaded, totalCellEstimate);
+                lastProgressReport = cellsLoaded;
+            }
+        };
 
         for (auto row : sheetData.children("row")) {
             for (auto cellNode : row.children("c")) {
@@ -440,6 +455,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                                     Cell* rawPtr = cell.get();
                                     sheet->addCell(std::move(cell));
                                     sharedFormulaMasters[si] = rawPtr;
+                                    cellsLoaded++;
+                                    reportProgress();
                                     continue;
                                 }
                                 // Subscriber cell has only si attribute (rawPtr used for
@@ -447,6 +464,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                                 Cell* rawPtr = cell.get();  // NOLINT(misc-const-correctness)
                                 sheet->addCell(std::move(cell));
                                 sharedFormulaSubscribers[si].push_back(rawPtr);
+                                cellsLoaded++;
+                                reportProgress();
                                 continue;
                             }
                         }
@@ -462,6 +481,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 }
 
                 sheet->addCell(std::move(cell));
+                cellsLoaded++;
+                reportProgress();
             }
         }
 
@@ -487,6 +508,11 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     if (!options.sheetName.empty() && workbook->sheets.empty()) {
         result.error = XLSXReadError("Sheet \"" + options.sheetName + "\" not found");
         return result;
+    }
+
+    // Final progress report (100% complete)
+    if (options.progressCallback && cellsLoaded > lastProgressReport) {
+        options.progressCallback(cellsLoaded, cellsLoaded);
     }
 
     logTiming("TOTAL", totalStart);

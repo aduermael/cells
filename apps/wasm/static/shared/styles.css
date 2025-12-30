@@ -221,6 +221,10 @@ canvas {
     font-size: 14px;
     color: #6c757d;
     display: none;
+    background: white;
+    padding: 12px 20px;
+    border-radius: var(--border-radius);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* Loading Spinner */

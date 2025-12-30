@@ -460,6 +460,57 @@ export async function assertWithRetry(assertFn, { retries = 3, initialDelay = 50
 }
 
 /**
+ * Calculate pixel position for a column header
+ * @param {number} col - Column index (0-based)
+ * @param {object} canvasInfo - Canvas bounding rect info
+ */
+export function colHeaderToPixel(col, canvasInfo) {
+  const HEADER_WIDTH = 50;
+  const HEADER_HEIGHT = 24;
+  const DEFAULT_COL_WIDTH = 100;
+
+  // Position in the middle of the column header
+  const x = HEADER_WIDTH + col * DEFAULT_COL_WIDTH + DEFAULT_COL_WIDTH / 2;
+  const y = HEADER_HEIGHT / 2; // Middle of header
+
+  return {
+    x: canvasInfo.left + x,
+    y: canvasInfo.top + y,
+  };
+}
+
+/**
+ * Drag a column to a new position
+ * @param {import('puppeteer').Page} page
+ * @param {string} sourceCol - Source column letter (e.g., "B")
+ * @param {string} targetCol - Target column letter to drop before (e.g., "D")
+ */
+export async function dragColumn(page, sourceCol, targetCol) {
+  const sourceColIndex = sourceCol.toUpperCase().charCodeAt(0) - 65;
+  const targetColIndex = targetCol.toUpperCase().charCodeAt(0) - 65;
+
+  const canvasInfo = await getCanvasInfo(page);
+  const source = colHeaderToPixel(sourceColIndex, canvasInfo);
+  const target = colHeaderToPixel(targetColIndex, canvasInfo);
+
+  // Start drag on the column header
+  await page.mouse.move(source.x, source.y);
+  await page.mouse.down();
+
+  // Move to trigger drag threshold (need to move at least 5px)
+  await page.mouse.move(source.x + 10, source.y, { steps: 5 });
+
+  // Move to target position
+  await page.mouse.move(target.x, target.y, { steps: 10 });
+
+  // Release
+  await page.mouse.up();
+
+  // Wait for the move operation to complete
+  await sleep(300);
+}
+
+/**
  * Load a file from testdata directory by setting up file input
  * @param {import('puppeteer').Page} page
  * @param {string} filename - Name of file in testdata directory

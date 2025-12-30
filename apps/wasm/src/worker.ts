@@ -19,8 +19,8 @@ interface CellsModule {
 
 /** CellsEngine WASM class interface */
 interface CellsEngine {
-  // Listener
-  setListener(callback: (changeType: string) => void): void;
+  // Listener - callback receives (changeType, data?) where data is optional
+  setListener(callback: (changeType: string, data?: string) => void): void;
 
   // File loading
   loadFromCells(content: string): string;
@@ -200,11 +200,22 @@ async function initModule(): Promise<void> {
 
     // Register listener for change notifications from WASM
     // This sends unsolicited messages to the main thread when data changes
-    engine.setListener((changeType: string) => {
-      workerSelf.postMessage({
-        type: "dataChanged",
-        changeType: changeType, // 'cell', 'structure', 'sheet', or 'loaded'
-      });
+    // The callback receives (changeType, data?) where data is optional extra info
+    engine.setListener((changeType: string, data?: string) => {
+      if (changeType === "load_progress" && data) {
+        // Parse progress data: "cellsLoaded:totalEstimate"
+        const [loaded, total] = data.split(":").map(Number);
+        workerSelf.postMessage({
+          type: "loadProgress",
+          cellsLoaded: loaded,
+          totalEstimate: total,
+        });
+      } else {
+        workerSelf.postMessage({
+          type: "dataChanged",
+          changeType: changeType, // 'cell', 'structure', 'sheet', or 'loaded'
+        });
+      }
     });
 
     isReady = true;

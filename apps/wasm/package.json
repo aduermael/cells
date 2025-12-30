@@ -10,9 +10,10 @@
     "test": "node tests/smoke.test.mjs",
     "test:smoke": "node tests/smoke.test.mjs",
     "test:formula": "node tests/formula.test.mjs",
+    "test:column-move": "node tests/column-move.test.mjs",
     "test:collab": "node tests/collab.test.mjs",
-    "test:all": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/collab.test.mjs",
-    "test:stable": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/collab.test.mjs"
+    "test:all": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/column-move.test.mjs && node tests/collab.test.mjs",
+    "test:stable": "node tests/smoke.test.mjs && node tests/formula.test.mjs"
   },
   "devDependencies": {
     "@lightpanda/browser": "^1.0.1",

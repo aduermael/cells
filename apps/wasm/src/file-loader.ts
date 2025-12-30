@@ -127,6 +127,31 @@ export class FileLoader {
     error.style.display = "none";
     emptyState.classList.add("hidden");
 
+    // Set up progress callback to update loading indicator with cell count
+    const client = await this.ensureWasmClient();
+    const fileName = file.name;
+    client.setOnLoadProgress((cellsLoaded: number, totalEstimate: number) => {
+      const cellsText = cellsLoaded.toLocaleString();
+      if (totalEstimate > 0 && cellsLoaded < totalEstimate) {
+        const pct = Math.round((cellsLoaded / totalEstimate) * 100);
+        loading.innerHTML =
+          '<span class="spinner"></span>Loading ' +
+          fileName +
+          "... " +
+          cellsText +
+          " cells (" +
+          pct +
+          "%)";
+      } else {
+        loading.innerHTML =
+          '<span class="spinner"></span>Loading ' +
+          fileName +
+          "... " +
+          cellsText +
+          " cells";
+      }
+    });
+
     try {
       const data = await file.arrayBuffer();
       const format = detectFormat(file.name, data);
@@ -149,6 +174,9 @@ export class FileLoader {
       loading.style.display = "none";
       error.textContent = "Failed to load: " + (e as Error).message;
       error.style.display = "block";
+    } finally {
+      // Remove progress callback
+      client.removeOnLoadProgress();
     }
   }
 
@@ -247,9 +275,37 @@ export class FileLoader {
     const meta = loadFileMeta();
     if (!meta) return false;
 
+    // Set up progress callback to update loading indicator with cell count
+    const client = await this.ensureWasmClient();
+    const fileName = meta.name;
+    client.setOnLoadProgress((cellsLoaded: number, totalEstimate: number) => {
+      const cellsText = cellsLoaded.toLocaleString();
+      if (totalEstimate > 0 && cellsLoaded < totalEstimate) {
+        const pct = Math.round((cellsLoaded / totalEstimate) * 100);
+        loading.innerHTML =
+          '<span class="spinner"></span>Restoring ' +
+          fileName +
+          "... " +
+          cellsText +
+          " cells (" +
+          pct +
+          "%)";
+      } else {
+        loading.innerHTML =
+          '<span class="spinner"></span>Restoring ' +
+          fileName +
+          "... " +
+          cellsText +
+          " cells";
+      }
+    });
+
     try {
       const data = await loadFileFromIndexedDB();
-      if (!data) return false;
+      if (!data) {
+        client.removeOnLoadProgress();
+        return false;
+      }
 
       loading.textContent = "";
       loading.innerHTML =
@@ -271,6 +327,8 @@ export class FileLoader {
         console.warn("Failed to clear corrupted persistence:", clearErr);
       }
       return false;
+    } finally {
+      client.removeOnLoadProgress();
     }
   }
 

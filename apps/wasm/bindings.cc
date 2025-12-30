@@ -52,6 +52,7 @@ enum class ChangeType {
     STRUCTURE_CHANGED,  // Rows/columns added, removed, resized, moved
     SHEET_CHANGED,      // Active sheet changed, sheet added/deleted/renamed/moved
     DATA_LOADED,        // New file loaded or workbook created
+    LOAD_PROGRESS,      // File loading progress update (includes cell count)
     SYNC_STATE_CHANGED, // Sync connection state changed
     PEER_JOINED,        // A peer joined the sync session
     PEER_LEFT,          // A peer left the sync session
@@ -232,7 +233,14 @@ public:
     // This avoids UTF-8 encoding issues that occur with string parameters
     std::string loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
         const char* data = reinterpret_cast<const char*>(ptr);
-        auto result = readXLSXFromMemory(data, size);
+
+        // Set up options with progress callback
+        XLSXReadOptions options;
+        options.progressCallback = [this](size_t cellsLoaded, size_t totalEstimate) {
+            notifyLoadProgress(cellsLoaded, totalEstimate);
+        };
+
+        auto result = readXLSXFromMemory(data, size, options);
 
         if (!result.ok()) {
             return "{\"error\":\"" + jsonEscape(result.error->message) + "\"}";
@@ -630,7 +638,6 @@ public:
                 std::string a1Formula;
                 if (formula != nullptr && formula->text != nullptr) {
                     a1Formula = _refConverter.formulaToA1(formula->text);
-                    LOG_INFO("[FORMULA_DEBUG] queryViewport: UUID='%s' -> A1='%s'", formula->text, a1Formula.c_str());
                     json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
                 }
 
@@ -818,7 +825,6 @@ public:
         std::string payload;
         if (typeChar == 'f') {
             std::string uuidFormula = _refConverter.formulaToUuid(value);
-            LOG_INFO("[FORMULA_DEBUG] setCellValue: A1='%s' -> UUID='%s'", value.c_str(), uuidFormula.c_str());
             payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\",\"display\":\"" + jsonEscape(value) + "\"" + idSuffix;
         } else if (typeChar == 'b') {
             payload = "{\"type\":\"b\",\"value\":\"" + std::string(value == "TRUE" || value == "true" ? "true" : "false") + "\"" + idSuffix;
@@ -1610,9 +1616,10 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        LOG_INFO("[FORMULA_DEBUG] moveColumn: colId=%s to targetPos=%u", colIdStr.c_str(), targetPos);
-        // Incremental viewport index update
-        _viewportIndex.onAxisMoved(colId, true, targetPos > currentPos ? targetPos - 1 : targetPos);
+        // Full viewport rebuild - the incremental onAxisMoved expects tree positions,
+        // not Sheet positions, and the Sheet allows sparse positions while the tree
+        // stores columns contiguously. A full rebuild is simpler and correct.
+        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
@@ -1653,8 +1660,8 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        // Incremental viewport index update
-        _viewportIndex.onAxisMoved(rowId, false, targetPos > currentPos ? targetPos - 1 : targetPos);
+        // Full viewport rebuild (same reason as moveColumn)
+        rebuildViewportIndex();
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
@@ -1981,15 +1988,10 @@ public:
             return "{\"error\":\"No workbook\",\"result\":\"error\"}";
         }
 
-        LOG_INFO("[FORMULA_DEBUG] applyRemoteOperation: received opJson=%s", opJson.c_str());
-
         Operation op = Operation::fromJSON(opJson);
         if (op.isNull()) {
             return "{\"error\":\"Invalid operation JSON\",\"result\":\"error\"}";
         }
-
-        LOG_INFO("[FORMULA_DEBUG] applyRemoteOperation: parsed op type=%d target=%s payload=%s",
-                 static_cast<int>(op.type), op.target_id.toString().c_str(), op.payload.c_str());
 
         ApplyResult result = applyOperation(*_workbook, op);
 
@@ -2884,8 +2886,6 @@ public:
                                           ",\"size\":" + std::to_string(col->size) + "}";
                     Operation op = makeColInsertOp(*_workbook, id, payload);
                     _workbook->getOpLog()->addOperation(op);
-                    LOG_INFO("[FORMULA_DEBUG] Created column operation for %s at pos %u",
-                             id.toString().c_str(), col->position);
                 }
             }
 
@@ -2896,8 +2896,6 @@ public:
                                           ",\"size\":" + std::to_string(row->size) + "}";
                     Operation op = makeRowInsertOp(*_workbook, id, payload);
                     _workbook->getOpLog()->addOperation(op);
-                    LOG_INFO("[FORMULA_DEBUG] Created row operation for %s at pos %u",
-                             id.toString().c_str(), row->position);
                 }
             }
 
@@ -2910,8 +2908,6 @@ public:
                                           cell->rowId.toString() + "\"}";
                     Operation op = makeCellSetValueOp(*_workbook, id, payload);
                     _workbook->getOpLog()->addOperation(op);
-                    LOG_INFO("[FORMULA_DEBUG] Created cell operation for %s",
-                             id.toString().c_str());
                 }
             }
 
@@ -3335,14 +3331,6 @@ private:
         _viewportIndex.clear();
         _viewportIndex.build(*sheet);
         _refConverter.setContext(*sheet);
-
-        // Debug: log column positions after rebuild
-        std::string colInfo;
-        for (const auto& [id, col] : sheet->columns) {
-            if (!colInfo.empty()) colInfo += ", ";
-            colInfo += col->name + "@" + std::to_string(col->position);
-        }
-        LOG_INFO("[FORMULA_DEBUG] rebuildViewportIndex: columns=[%s]", colInfo.c_str());
     }
 
     // Notify the registered listener of a data change
@@ -3366,6 +3354,9 @@ private:
                 break;
             case ChangeType::DATA_LOADED:
                 typeStr = "loaded";
+                break;
+            case ChangeType::LOAD_PROGRESS:
+                typeStr = "load_progress";
                 break;
             case ChangeType::SYNC_STATE_CHANGED:
                 typeStr = "sync_state";
@@ -3406,6 +3397,9 @@ private:
             case ChangeType::DATA_LOADED:
                 typeStr = "loaded";
                 break;
+            case ChangeType::LOAD_PROGRESS:
+                typeStr = "load_progress";
+                break;
             case ChangeType::SYNC_STATE_CHANGED:
                 typeStr = "sync_state";
                 break;
@@ -3422,6 +3416,16 @@ private:
 
         // Call the JavaScript callback with the change type and data
         _listener(std::string(typeStr), data);
+    }
+
+    // Notify listener of loading progress
+    void notifyLoadProgress(size_t cellsLoaded, size_t totalEstimate) {
+        if (_listener.isNull() || _listener.isUndefined()) {
+            return;
+        }
+        std::ostringstream data;
+        data << cellsLoaded << ":" << totalEstimate;
+        _listener(std::string("load_progress"), data.str());
     }
 
     std::unique_ptr<Workbook> _workbook;

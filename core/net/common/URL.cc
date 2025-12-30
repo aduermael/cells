@@ -3,6 +3,7 @@
 #include "core/net/include/URL.h"
 
 #include <cctype>
+#include <cstdlib>
 
 #include <algorithm>
 #include <iomanip>
@@ -58,22 +59,26 @@ std::optional<URL> URL::parse(const std::string& url_string) {
             const size_t close_bracket = host_port.find(']');
             if (close_bracket != std::string::npos && colon > close_bracket) {
                 url.host_ = host_port.substr(0, colon);
-                try {
-                    url.port_ = static_cast<uint16_t>(std::stoul(host_port.substr(colon + 1)));
-                } catch (...) {
+                const std::string port_str = host_port.substr(colon + 1);
+                char* endptr = nullptr;
+                const unsigned long port_val = strtoul(port_str.c_str(), &endptr, 10);
+                if (endptr == port_str.c_str() || *endptr != '\0' || port_val > 65535) {
                     return std::nullopt;
                 }
+                url.port_ = static_cast<uint16_t>(port_val);
             } else {
                 url.host_ = host_port;
             }
         } else {
             // Regular host:port
             url.host_ = host_port.substr(0, colon);
-            try {
-                url.port_ = static_cast<uint16_t>(std::stoul(host_port.substr(colon + 1)));
-            } catch (...) {
+            const std::string port_str = host_port.substr(colon + 1);
+            char* endptr = nullptr;
+            const unsigned long port_val = strtoul(port_str.c_str(), &endptr, 10);
+            if (endptr == port_str.c_str() || *endptr != '\0' || port_val > 65535) {
                 return std::nullopt;
             }
+            url.port_ = static_cast<uint16_t>(port_val);
         }
     } else {
         url.host_ = host_port;
@@ -228,11 +233,14 @@ std::string urlDecode(const std::string& str) {
 
     for (size_t i = 0; i < str.size(); ++i) {
         if (str[i] == '%' && i + 2 < str.size()) {
-            try {
-                const int value = std::stoi(str.substr(i + 1, 2), nullptr, 16);
+            // Parse hex value without exceptions
+            char hex[3] = {str[i + 1], str[i + 2], '\0'};
+            char* endptr = nullptr;
+            const long value = strtol(hex, &endptr, 16);
+            if (endptr == hex + 2 && value >= 0 && value <= 255) {
                 result += static_cast<char>(value);
                 i += 2;
-            } catch (...) {
+            } else {
                 result += str[i];
             }
         } else if (str[i] == '+') {

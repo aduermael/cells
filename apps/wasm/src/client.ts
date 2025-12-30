@@ -61,6 +61,7 @@ export class CellsClient {
   private _readyPromise: Promise<void>;
   private _readyResolve: (() => void) | null;
   private _onDataChanged: ((changeType: "cell" | "structure" | "sheet" | "loaded") => void) | null;
+  private _onLoadProgress: ((cellsLoaded: number, totalEstimate: number) => void) | null;
   private _rtcProxy: RTCProxy | null;
 
   constructor(workerPath: string = "./worker.js") {
@@ -70,6 +71,7 @@ export class CellsClient {
     this._isReady = false;
     this._readyResolve = null;
     this._onDataChanged = null;
+    this._onLoadProgress = null;
     this._rtcProxy = null;
 
     this._initRTCProxy();
@@ -119,6 +121,13 @@ export class CellsClient {
     if (msg.type === "dataChanged") {
       if (this._onDataChanged) {
         this._onDataChanged(msg.changeType as "cell" | "structure" | "sheet" | "loaded");
+      }
+      return;
+    }
+
+    if (msg.type === "loadProgress") {
+      if (this._onLoadProgress) {
+        this._onLoadProgress(msg.cellsLoaded as number, msg.totalEstimate as number);
       }
       return;
     }
@@ -186,6 +195,14 @@ export class CellsClient {
 
   removeOnDataChanged(): void {
     this._onDataChanged = null;
+  }
+
+  setOnLoadProgress(callback: (cellsLoaded: number, totalEstimate: number) => void): void {
+    this._onLoadProgress = callback;
+  }
+
+  removeOnLoadProgress(): void {
+    this._onLoadProgress = null;
   }
 
   // ========== File Loading API ==========

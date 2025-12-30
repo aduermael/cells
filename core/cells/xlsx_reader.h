@@ -1,6 +1,7 @@
 #ifndef CELLS_XLSX_READER_H_
 #define CELLS_XLSX_READER_H_
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -10,6 +11,10 @@
 
 namespace cells {
 
+// Progress callback for XLSX parsing
+// Parameters: cellsLoaded (current count), totalEstimate (0 if unknown)
+using XLSXProgressCallback = std::function<void(size_t cellsLoaded, size_t totalEstimate)>;
+
 // Options for XLSX parsing
 struct XLSXReadOptions {
     bool readFormulas{true};     // Detect formulas (mark cells as formula type)
@@ -17,6 +22,8 @@ struct XLSXReadOptions {
     bool readStyles{true};       // Read cell styles (bold, colors, etc.)
     bool readDimensions{true};   // Read column widths and row heights
     std::string sheetName{};     // Specific sheet to read (empty = all sheets)
+    XLSXProgressCallback progressCallback{};  // Optional progress callback
+    size_t progressInterval{500};  // Call progress callback every N cells
 
     XLSXReadOptions() = default;
 };

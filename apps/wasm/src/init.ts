@@ -651,17 +651,19 @@ export function initApp(): AppContext {
         app.rowPixelOffsets.delete(row);
       }
 
-      // Repopulate from Workbook (including pre-computed pixel offsets)
+      // Repopulate from Workbook
+      // NOTE: We only cache widths/heights, NOT pixel offsets. The pixel offsets
+      // from the viewport query are tree-based (dense) which is wrong for sparse
+      // columns/rows. The rendering code has fallback logic to compute sparse
+      // offsets correctly based on position and default widths.
       for (const col of app.columns) {
         app.colWidths.set(col.pos, col.width || DEFAULT_COL_WIDTH);
-        app.colPixelOffsets.set(col.pos, col.pixelOffset);
         if (col.name) {
           app.colNames.set(col.pos, col.name);
         }
       }
       for (const row of app.rows) {
         app.rowHeights.set(row.pos, row.height || DEFAULT_ROW_HEIGHT);
-        app.rowPixelOffsets.set(row.pos, row.pixelOffset);
       }
     } catch (e) {
       console.error("Error fetching viewport:", e);
