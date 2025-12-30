@@ -85,29 +85,33 @@ Expose spreadsheet operations to Luau scripts. All use A1 notation (converted vi
 
 ## API Reference
 
-Scripts use A1 notation for input, but cells are internally identified by UUID.
+Scripts use A1 notation exclusively. Internal details (UUIDs) are never exposed.
 
 ### Cell Object Identity (Critical)
 
-`cellGet` returns a **cell object** (Lua table), not a raw value. The sandbox maintains
-a **weak reference table** keyed by cell UUID to ensure object identity:
+`cellGet` returns a **cell object** (Lua table), not a raw value. Object identity
+allows comparing if two references point to the same cell:
 
 ```lua
 a = cellGet("A1")
 b = cellGet("A1")
--- a == b (same table reference, not just equal content)
+-- a == b (same cell, same object)
 
 c = cellGet("A2")
--- a ~= c (different cells, different objects)
+-- a ~= c (different cells)
 ```
 
-**Important:** A1 notation resolves to UUID at call time. If a cell moves:
+**A1 resolves at call time.** If a cell moves, the reference tracks it:
 ```lua
-a = cellGet("A1")      -- Gets cell with UUID "abc12345"
-columnMove("A", 1)     -- A1 is now at B1
-b = cellGet("A1")      -- Gets whatever cell is now at A1 (different UUID)
--- a ~= b (different cells, a is still "abc12345" even though it moved)
+a = cellGet("A1")      -- Gets the cell currently at A1
+columnMove("A", 1)     -- Column A moves to position 1 (now B)
+a:getRef()             -- Returns "B1" (cell moved with its column)
+b = cellGet("A1")      -- Gets whatever cell is now at A1
+-- a ~= b (different cells, a moved to B1)
 ```
+
+**Internal note:** Sandbox uses weak table keyed by cell UUID internally,
+but UUIDs are never exposed to scripts. Scripts only see A1 notation.
 
 ### Functions
 
@@ -121,9 +125,9 @@ cellSet("A1", 100)                     -- Set cell value (creates if needed)
 
 -- Cell object structure (returned by cellGet)
 type Cell = {
-    id: string,        -- UUID (8 chars)
     value: any,        -- number | string | boolean | nil
     formula: string?,  -- formula text if cell has formula
+    getRef: () -> string,  -- Returns current A1 position (e.g., "B1")
 }
 
 -- Document
@@ -159,30 +163,18 @@ rangeDelete({from = "A1", to = "C3"})
 
 ## Implementation Notes
 
-### Cell Object Cache (Weak Table)
+### Cell Object Cache (Internal)
 
-The sandbox maintains a Lua weak table to cache cell objects by UUID:
+The sandbox maintains a weak table keyed by internal cell UUID to ensure object identity.
+UUIDs are never exposed to scripts - only used internally for cache lookup.
 
-```lua
--- Internal: cellCache with weak values
-setmetatable(cellCache, {__mode = "v"})
-
--- cellGet implementation:
-function cellGet(ref)
-    local uuid = resolveA1ToUUID(ref)
-    if not uuid then return nil end
-
-    if cellCache[uuid] then
-        return cellCache[uuid]  -- Return existing object
-    end
-
-    local cell = createCellObject(uuid)
-    cellCache[uuid] = cell
-    return cell
-end
+```cpp
+// C++ side: resolve A1 to UUID, check cache, return or create cell object
+// Lua side: scripts only see Cell table with value, formula, getRef()
 ```
 
 This ensures:
-1. Same cell UUID → same Lua table reference
+1. Same cell → same Lua table reference (object identity)
 2. Garbage collection works (weak refs don't prevent collection)
 3. A1 resolution happens at call time (reflects current grid state)
+4. `cell:getRef()` always returns current position (recomputed from UUID)
