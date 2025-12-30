@@ -326,7 +326,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         for (int c = 0; c < maxCol; ++c) {
             auto col = std::make_unique<Axis>(generate_id(), true);
             col->position = static_cast<uint32_t>(c);
-            col->size = 64;
+            col->size = DEFAULT_COLUMN_WIDTH;
             columnIds.push_back(col->id);
             sheet->addColumn(std::move(col));
         }
@@ -334,7 +334,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         for (int r = 0; r < maxRow; ++r) {
             auto row = std::make_unique<Axis>(generate_id(), false);
             row->position = static_cast<uint32_t>(r);
-            row->size = 20;
+            row->size = DEFAULT_ROW_HEIGHT;
             rowIds.push_back(row->id);
             sheet->addRow(std::move(row));
         }

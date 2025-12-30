@@ -597,6 +597,11 @@ export function initApp(): AppContext {
     try {
       app.sheetInfo = await app.dataSource.getSheetInfo();
       elements.sheetName.textContent = app.sheetInfo.name;
+      // Ensure discoveredRows is at least as large as the actual row count
+      // This is critical for correct scroll height calculation when loading files
+      if (app.sheetInfo.rowCount > app.discoveredRows) {
+        app.discoveredRows = app.sheetInfo.rowCount;
+      }
     } catch (e) {
       console.error("Error fetching sheet info:", e);
       throw e;
