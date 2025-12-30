@@ -13,7 +13,9 @@
     "test:editing": "node tests/editing.test.mjs",
     "test:column-move": "node tests/column-move.test.mjs",
     "test:collab": "node tests/collab.test.mjs",
-    "test:all": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs && node tests/collab.test.mjs",
+    "test:collab-demo": "node tests/collab-demo.test.mjs",
+    "test:initial-sync": "node tests/initial-sync.test.mjs",
+    "test:all": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs && node tests/collab.test.mjs && node tests/initial-sync.test.mjs",
     "test:stable": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs"
   },
   "devDependencies": {
