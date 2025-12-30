@@ -4,7 +4,7 @@
 :root {
     /* Primary brand colors */
     --color-primary: #058601;
-    --color-secondary: #50AA4D;
+    --color-secondary: #50aa4d;
     --color-primary-hover: #046e01;
     --color-primary-active: #035d01;
 
@@ -12,6 +12,10 @@
     --spacing-xs: 4px;
     --spacing-sm: 8px;
     --spacing-md: 12px;
+
+    --border-radius: 6px;
+    --border-radius-top: 6px 6px 0 0;
+    --border-radius-smaller: 5px;
 }
 
 /* Reset */
@@ -21,11 +25,14 @@
     box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+        sans-serif;
 }
 
 /* Container */
@@ -63,7 +70,7 @@ html, body {
     font-weight: 600;
     color: #212529;
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     border: 1px solid transparent;
     outline: none;
     cursor: text;
@@ -72,7 +79,9 @@ html, body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    transition: border-color 0.15s ease, background-color 0.15s ease;
+    transition:
+        border-color 0.15s ease,
+        background-color 0.15s ease;
 }
 
 #workbook-title:hover {
@@ -112,7 +121,7 @@ html, body {
     font-size: 12px;
     font-weight: 500;
     border: 1px solid #dee2e6;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     background: #fff;
     color: #495057;
     cursor: pointer;
@@ -175,7 +184,7 @@ html, body {
 .btn.btn-lg {
     padding: 10px 24px;
     font-size: 14px;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
 }
 
 /* Layout modifiers */
@@ -228,7 +237,9 @@ canvas {
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Error State */
@@ -266,7 +277,7 @@ canvas {
     text-align: center;
     padding: 40px;
     background: white;
-    border-radius: 12px;
+    border-radius: var(--border-radius);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
@@ -335,9 +346,9 @@ canvas {
     padding: 4px 12px;
     font-size: 12px;
     font-weight: 500;
-    font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+    font-family: "SF Mono", "Monaco", "Menlo", "Consolas", monospace;
     border: 1px solid #dee2e6;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     background: #fff;
     color: #495057;
     cursor: pointer;
@@ -362,13 +373,17 @@ canvas {
     display: flex;
     align-items: center;
     background: #fff;
-    border-radius: 4px;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    border-radius: var(--border-radius);
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.06),
+        0 1px 2px rgba(0, 0, 0, 0.04);
     transition: box-shadow 0.15s ease;
 }
 
 #formula-input-container:focus-within {
-    box-shadow: 0 0 0 1px rgba(5, 134, 1, 0.4), 0 0 0 3px rgba(5, 134, 1, 0.1);
+    box-shadow:
+        0 0 0 1px rgba(5, 134, 1, 0.4),
+        0 0 0 3px rgba(5, 134, 1, 0.1);
 }
 
 /* Hidden input for form submission and IME support */
@@ -383,7 +398,9 @@ canvas {
 /* Contenteditable for colored formula display */
 #formula-display {
     flex: 1;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+        sans-serif;
     font-size: 13px;
     color: #212529;
     background: transparent;
@@ -429,7 +446,8 @@ canvas {
 #cell-display {
     width: 100%;
     height: 100%;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 13px;
     color: #212529;
     background: transparent;
@@ -451,7 +469,8 @@ canvas {
     display: none;
     border: 2px solid var(--color-primary);
     background: #fff;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 12px;
     font-weight: 500;
     padding: 2px 4px;
@@ -490,13 +509,16 @@ canvas {
     min-width: 140px;
     background: #fff;
     border: 1px solid #dee2e6;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     z-index: 1000;
     opacity: 0;
     visibility: hidden;
     transform: translateY(-4px);
-    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+    transition:
+        opacity 0.15s ease,
+        transform 0.15s ease,
+        visibility 0.15s ease;
 }
 
 .dropdown.open .dropdown-menu {
@@ -519,16 +541,8 @@ canvas {
     transition: background 0.1s ease;
 }
 
-.dropdown-item:first-child {
-    border-radius: 3px 3px 0 0;
-}
-
-.dropdown-item:last-child {
-    border-radius: 0 0 3px 3px;
-}
-
-.dropdown-item:only-child {
-    border-radius: 3px;
+.dropdown-item {
+    border-radius: var(--border-radius-smaller);
 }
 
 .dropdown-item:hover {
@@ -589,7 +603,7 @@ canvas {
     background: transparent;
     border: 1px solid transparent;
     border-bottom: none;
-    border-radius: 4px 4px 0 0;
+    border-radius: var(--border-radius-top);
     cursor: pointer;
     white-space: nowrap;
     transition: all 0.15s ease;
@@ -625,7 +639,7 @@ canvas {
     color: #6c757d;
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     cursor: pointer;
     transition: all 0.15s ease;
     flex-shrink: 0;
@@ -647,7 +661,7 @@ canvas {
     min-width: 120px;
     background: #fff;
     border: 1px solid #dee2e6;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 2000;
     padding: 4px 0;
@@ -691,7 +705,7 @@ canvas {
     color: #212529;
     background: #fff;
     border: 2px solid var(--color-primary);
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     outline: none;
     min-width: 60px;
     max-width: 200px;
@@ -765,8 +779,13 @@ canvas {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.4;
+    }
 }
 
 /* Connection details popup */
@@ -778,13 +797,16 @@ canvas {
     width: 260px;
     background: #fff;
     border: 1px solid #dee2e6;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     z-index: 1000;
     opacity: 0;
     visibility: hidden;
     transform: translateY(-4px);
-    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+    transition:
+        opacity 0.15s ease,
+        transform 0.15s ease,
+        visibility 0.15s ease;
     padding: 16px;
 }
 
@@ -874,8 +896,13 @@ canvas {
 }
 
 @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.4;
+    }
 }
 
 /* Show details panel from collaborate button */
@@ -932,9 +959,11 @@ canvas {
     color: #212529;
     background: #fff;
     border: 1px solid #dee2e6;
-    border-radius: 4px;
+    border-radius: var(--border-radius);
     outline: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
 }
 
 .collab-name-edit-inline input:focus {
@@ -954,12 +983,14 @@ canvas {
     font-weight: 500;
     color: #fff;
     background: #212529;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     z-index: 2000;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.2s ease, visibility 0.2s ease;
+    transition:
+        opacity 0.2s ease,
+        visibility 0.2s ease;
     pointer-events: none;
 }
 
@@ -969,7 +1000,7 @@ canvas {
 }
 
 .collab-share-tooltip::after {
-    content: '';
+    content: "";
     position: absolute;
     top: -6px;
     left: 50%;
@@ -978,7 +1009,6 @@ canvas {
     border-style: solid;
     border-color: transparent transparent #212529 transparent;
 }
-
 
 /* Latency warning style */
 .collab-status-details-row .value.poor {
@@ -1041,7 +1071,7 @@ canvas {
 #ast-debug-panel {
     background: #1e1e1e;
     color: #d4d4d4;
-    font-family: 'SF Mono', Menlo, Monaco, 'Courier New', monospace;
+    font-family: "SF Mono", Menlo, Monaco, "Courier New", monospace;
     font-size: 12px;
     max-height: 300px;
     overflow: auto;
@@ -1163,7 +1193,7 @@ canvas {
 .scrollbar-thumb {
     position: absolute;
     background: #c4c4c4;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     transition: background 0.15s ease;
     cursor: pointer;
 }
@@ -1211,14 +1241,19 @@ canvas {
     min-width: 160px;
     background: #fff;
     border: 1px solid #dee2e6;
-    border-radius: 4px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+    border-radius: var(--border-radius);
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.12),
+        0 1px 3px rgba(0, 0, 0, 0.08);
     z-index: 2000;
     padding: 4px 0;
     opacity: 0;
     visibility: hidden;
     transform: translateY(-4px) scale(0.98);
-    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+    transition:
+        opacity 0.15s ease,
+        transform 0.15s ease,
+        visibility 0.15s ease;
 }
 
 .context-menu.visible {
@@ -1268,16 +1303,8 @@ canvas {
     background: #fff5f5;
 }
 
-.context-menu-item.first {
-    border-radius: 3px 3px 0 0;
-}
-
-.context-menu-item.last {
-    border-radius: 0 0 3px 3px;
-}
-
-.context-menu-item.first.last {
-    border-radius: 3px;
+.context-menu-item {
+    border-radius: var(--border-radius-smaller);
 }
 
 .context-menu-icon {
@@ -1322,7 +1349,9 @@ canvas {
     z-index: 3000;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.15s ease, visibility 0.15s ease;
+    transition:
+        opacity 0.15s ease,
+        visibility 0.15s ease;
 }
 
 .modal-overlay.visible {
@@ -1332,8 +1361,10 @@ canvas {
 
 .modal {
     background: #fff;
-    border-radius: 8px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: var(--border-radius);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.2),
+        0 2px 8px rgba(0, 0, 0, 0.1);
     max-width: 420px;
     width: calc(100% - 32px);
     transform: translateY(-8px) scale(0.98);
@@ -1385,7 +1416,7 @@ canvas {
 .modal-footer .btn {
     padding: 8px 16px;
     font-size: 13px;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
 }
 
 /* Warning modal variant */
