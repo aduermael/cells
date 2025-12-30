@@ -57,3 +57,12 @@ git_repository(
     recursive_init_submodules = True,
     build_file = "//third_party/libdatachannel:BUILD.libdatachannel",
 )
+
+# Luau - Fast, safe, gradually typed scripting language from Roblox
+# https://github.com/luau-lang/luau - MIT License
+git_repository(
+    name = "luau",
+    remote = "https://github.com/luau-lang/luau.git",
+    tag = "0.703",
+    build_file = "//third_party/luau:BUILD.luau",
+)
