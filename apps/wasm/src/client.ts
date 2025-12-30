@@ -28,6 +28,7 @@ import type {
   VolatileCellsResult,
   CellDependenciesResult,
   CellDependentsResult,
+  ScriptResult,
 } from "./client-types";
 
 // Re-export types for external consumers
@@ -42,6 +43,7 @@ export type {
   CellDependentsResult,
   ReferenceInfo,
   RefType,
+  ScriptResult,
 } from "./client-types";
 
 /**
@@ -666,5 +668,12 @@ export class CellsClient {
   async getVolatileCells(): Promise<VolatileCellsResult> {
     const response = await this._send("getVolatileCells");
     return JSON.parse(response.result as string) as VolatileCellsResult;
+  }
+
+  // ========== Scripting API (Luau) ==========
+
+  async executeScript(script: string): Promise<ScriptResult> {
+    const response = await this._send("executeScript", { script });
+    return JSON.parse(response.result as string) as ScriptResult;
   }
 }

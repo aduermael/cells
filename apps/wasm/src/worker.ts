@@ -126,6 +126,9 @@ interface CellsEngine {
   // Debug/Development
   debugParseFormula(formulaText: string): string;
 
+  // Scripting (Luau)
+  executeScript(script: string): string;
+
   // Viewport pixel queries (Phase 5)
   getColumnPixelOffset(position: number): number;
   getRowPixelOffset(position: number): number;
@@ -1115,6 +1118,17 @@ function handleMessage(msg: WorkerRequest): void {
       case "getVolatileCells": {
         const result = engine.getVolatileCells();
         respond({ type: "volatileCells", result });
+        break;
+      }
+
+      // ================================================================
+      // Scripting (Luau)
+      // ================================================================
+
+      case "executeScript": {
+        const { script } = params as { script: string };
+        const result = engine.executeScript(script);
+        respond({ type: "scriptExecuted", result });
         break;
       }
 

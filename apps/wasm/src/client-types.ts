@@ -204,3 +204,15 @@ export interface CellDependentsResult {
   dependents: string[]; // Array of cell IDs
   error?: string;
 }
+
+// ============================================================================
+// Scripting Types (Luau)
+// ============================================================================
+
+/** Response from executeScript */
+export interface ScriptResult {
+  success: boolean;
+  output?: string; // Script output if success
+  error?: string; // Error message if !success
+  instructions: number; // Number of instructions executed
+}

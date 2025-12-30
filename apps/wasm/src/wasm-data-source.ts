@@ -327,4 +327,21 @@ export class WasmDataSource {
       filename: `${snakeCaseName}.${format}`,
     };
   }
+
+  // ==========================================================================
+  // Scripting (Luau)
+  // ==========================================================================
+
+  /**
+   * Execute a Luau script in the sandboxed environment
+   * Scripts can use cells API functions like cellGet(), cellSet(), etc.
+   */
+  async executeScript(script: string): Promise<{
+    success: boolean;
+    output?: string;
+    error?: string;
+    instructions: number;
+  }> {
+    return this._client.executeScript(script);
+  }
 }

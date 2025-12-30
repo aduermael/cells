@@ -62,9 +62,9 @@ Expose spreadsheet operations to Luau scripts. All use A1 notation (converted vi
 
 ## Phase 5: TypeScript Client Layer
 
-- [ ] 5a: Add executeScript handler to worker.ts
-- [ ] 5b: Add executeScript method to client.ts with ScriptResult type
-- [ ] 5c: Add executeScript to WasmDataSource
+- [x] 5a: Add executeScript handler to worker.ts
+- [x] 5b: Add executeScript method to client.ts with ScriptResult type
+- [x] 5c: Add executeScript to WasmDataSource
 
 **Files:**
 - `apps/wasm/src/worker.ts` - Add message handler
