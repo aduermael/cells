@@ -1,6 +1,6 @@
 /* Cells Shared Styles */
 
-/* Color palette */
+/* Design System Variables */
 :root {
     /* Primary brand colors */
     --color-primary: #058601;
@@ -8,14 +8,52 @@
     --color-primary-hover: #046e01;
     --color-primary-active: #035d01;
 
+    /* Neutral palette */
+    --color-bg-secondary: #f8f9fa;
+    --color-bg-hover: #e9ecef;
+    --color-bg-active: #dee2e6;
+    --color-border: #dee2e6;
+    --color-border-hover: #adb5bd;
+    --color-text-primary: #212529;
+    --color-text-secondary: #495057;
+    --color-text-muted: #6c757d;
+    --color-text-placeholder: #adb5bd;
+
     /* Spacing scale */
     --spacing-xs: 4px;
     --spacing-sm: 8px;
     --spacing-md: 12px;
+    --spacing-lg: 16px;
 
+    /* Border radius */
     --border-radius: 6px;
     --border-radius-top: 6px 6px 0 0;
     --border-radius-smaller: 5px;
+
+    /* Typography */
+    --font-size-xs: 11px;
+    --font-size-sm: 12px;
+    --font-size-md: 13px;
+    --font-size-lg: 14px;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-mono: "SF Mono", "Monaco", "Menlo", "Consolas", monospace;
+
+    /* Toolbar/Bar design tokens */
+    --bar-height: 36px;
+    --bar-padding-x: var(--spacing-md);
+    --bar-padding-y: 6px;
+    --bar-gap: var(--spacing-sm);
+    --bar-bg: var(--color-bg-secondary);
+
+    /* Control heights (buttons, inputs, badges) */
+    --control-height: 28px;
+    --control-padding-x: var(--spacing-md);
+    --control-font-size: var(--font-size-sm);
+
+    /* Transitions */
+    --transition-fast: 0.15s ease;
 }
 
 /* Reset */
@@ -45,17 +83,19 @@ body {
 
 /* Header */
 #header {
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: #f8f9fa;
+    min-height: var(--bar-height);
+    padding: var(--bar-padding-y) var(--bar-padding-x);
+    background: var(--bar-bg);
     border-bottom: none;
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: var(--bar-gap);
 }
 
 #header-logo {
-    height: 20px;
+    height: 22px;
     width: auto;
+    flex-shrink: 0;
 }
 
 /* Workbook Title */
@@ -66,10 +106,11 @@ body {
 }
 
 #workbook-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #212529;
-    padding: 2px 6px;
+    height: var(--control-height);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+    padding: 0 var(--spacing-sm);
     border-radius: var(--border-radius);
     border: 1px solid transparent;
     outline: none;
@@ -79,14 +120,15 @@ body {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: calc(var(--control-height) - 2px);
     transition:
-        border-color 0.15s ease,
-        background-color 0.15s ease;
+        border-color var(--transition-fast),
+        background-color var(--transition-fast);
 }
 
 #workbook-title:hover {
-    background: #e9ecef;
-    border-color: #dee2e6;
+    background: var(--color-bg-hover);
+    border-color: var(--color-border);
 }
 
 #workbook-title:focus {
@@ -97,44 +139,47 @@ body {
 
 #workbook-title:empty::before {
     content: "Untitled";
-    color: #adb5bd;
+    color: var(--color-text-placeholder);
 }
 
 /* Toolbar */
 #toolbar {
     margin-left: auto;
     display: flex;
-    gap: var(--spacing-sm);
+    gap: var(--bar-gap);
     align-items: center;
 }
 
 /* Collaboration UI Container */
 #collab-ui-container {
     display: flex;
-    gap: var(--spacing-sm);
+    gap: var(--bar-gap);
     align-items: center;
 }
 
 /* Buttons - Unified System */
 .btn {
-    padding: 4px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    border: 1px solid #dee2e6;
+    height: var(--control-height);
+    padding: 0 var(--control-padding-x);
+    font-size: var(--control-font-size);
+    font-weight: var(--font-weight-medium);
+    border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     background: #fff;
-    color: #495057;
+    color: var(--color-text-secondary);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all var(--transition-fast);
+    line-height: calc(var(--control-height) - 2px);
+    white-space: nowrap;
 }
 
 .btn:hover {
-    background: #e9ecef;
-    border-color: #adb5bd;
+    background: var(--color-bg-hover);
+    border-color: var(--color-border-hover);
 }
 
 .btn:active {
-    background: #dee2e6;
+    background: var(--color-bg-active);
 }
 
 .btn:disabled {
@@ -177,19 +222,23 @@ body {
 
 /* Size modifiers */
 .btn.btn-sm {
-    padding: 6px 10px;
-    font-size: 11px;
+    height: 24px;
+    padding: 0 var(--spacing-sm);
+    font-size: var(--font-size-xs);
+    line-height: 22px;
 }
 
 .btn.btn-lg {
-    padding: 10px 24px;
-    font-size: 14px;
+    height: 36px;
+    padding: 0 var(--spacing-lg);
+    font-size: var(--font-size-lg);
+    line-height: 34px;
     border-radius: var(--border-radius);
 }
 
 /* Layout modifiers */
 .btn.btn-icon {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
 }
@@ -334,12 +383,13 @@ canvas {
 
 /* Formula Bar */
 #formula-bar {
+    min-height: var(--bar-height);
     display: flex;
     align-items: center;
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
-    gap: var(--spacing-sm);
+    padding: var(--bar-padding-y) var(--bar-padding-x);
+    background: var(--bar-bg);
+    border-bottom: 1px solid var(--color-border);
+    gap: var(--bar-gap);
 }
 
 #formula-bar.hidden {
@@ -347,47 +397,42 @@ canvas {
 }
 
 #cell-reference {
-    padding: 4px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    font-family: "SF Mono", "Monaco", "Menlo", "Consolas", monospace;
-    border: 1px solid #dee2e6;
+    height: var(--control-height);
+    padding: 0 var(--control-padding-x);
+    font-size: var(--control-font-size);
+    font-weight: var(--font-weight-medium);
+    font-family: var(--font-mono);
+    border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     background: #fff;
-    color: #495057;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    min-width: 90px;
-    max-width: 120px;
+    color: var(--color-text-secondary);
+    cursor: default;
+    transition: all var(--transition-fast);
+    min-width: 70px;
+    max-width: 100px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: center;
-}
-
-#cell-reference:hover {
-    background: #e9ecef;
-    border-color: #adb5bd;
+    line-height: calc(var(--control-height) - 2px);
 }
 
 /* Formula Input Container - wrapper for contenteditable and hidden input */
 #formula-input-container {
     flex: 1;
+    height: var(--control-height);
     position: relative;
     display: flex;
     align-items: center;
     background: #fff;
+    border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
-    box-shadow:
-        0 0 0 1px rgba(0, 0, 0, 0.06),
-        0 1px 2px rgba(0, 0, 0, 0.04);
-    transition: box-shadow 0.15s ease;
+    transition: all var(--transition-fast);
 }
 
 #formula-input-container:focus-within {
-    box-shadow:
-        0 0 0 1px rgba(5, 134, 1, 0.4),
-        0 0 0 3px rgba(5, 134, 1, 0.1);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.1);
 }
 
 /* Hidden input for form submission and IME support */
@@ -402,29 +447,29 @@ canvas {
 /* Contenteditable for colored formula display */
 #formula-display {
     flex: 1;
+    height: 100%;
     font-family:
         -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
         sans-serif;
-    font-size: 13px;
-    color: #212529;
+    font-size: var(--font-size-md);
+    color: var(--color-text-primary);
     background: transparent;
     border: none;
-    padding: 5px 10px;
+    padding: 0 var(--spacing-sm);
     outline: none;
     white-space: pre;
     overflow: hidden;
-    min-height: 24px;
-    line-height: 1.4;
+    line-height: calc(var(--control-height) - 2px);
 }
 
 #formula-display:empty::before {
     content: attr(data-placeholder);
-    color: #adb5bd;
+    color: var(--color-text-placeholder);
 }
 
 /* Formula reference colors in text */
 #formula-display .formula-ref {
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
 }
 
 /* Cell Editor Container - wrapper for contenteditable and hidden input */
@@ -510,9 +555,10 @@ canvas {
     top: 100%;
     right: 0;
     margin-top: var(--spacing-xs);
-    min-width: 140px;
+    min-width: 120px;
+    padding: var(--spacing-xs);
     background: #fff;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
     z-index: 1000;
@@ -520,9 +566,9 @@ canvas {
     visibility: hidden;
     transform: translateY(-4px);
     transition:
-        opacity 0.15s ease,
-        transform 0.15s ease,
-        visibility 0.15s ease;
+        opacity var(--transition-fast),
+        transform var(--transition-fast),
+        visibility var(--transition-fast);
 }
 
 .dropdown.open .dropdown-menu {
@@ -534,31 +580,28 @@ canvas {
 .dropdown-item {
     display: block;
     width: 100%;
-    padding: 8px 14px;
-    font-size: 13px;
-    font-weight: 400;
-    color: #212529;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-normal);
+    color: var(--color-text-primary);
     background: none;
     border: none;
     text-align: left;
     cursor: pointer;
     transition: background 0.1s ease;
-}
-
-.dropdown-item {
     border-radius: var(--border-radius-smaller);
 }
 
 .dropdown-item:hover {
-    background: #f8f9fa;
+    background: var(--color-bg-secondary);
 }
 
 .dropdown-item:active {
-    background: #e9ecef;
+    background: var(--color-bg-hover);
 }
 
 .dropdown-item:disabled {
-    color: #adb5bd;
+    color: var(--color-text-placeholder);
     cursor: not-allowed;
 }
 
@@ -570,9 +613,9 @@ canvas {
 #sheet-tabs {
     display: flex;
     align-items: center;
-    padding: 4px 8px;
-    background: #f8f9fa;
-    border-top: 1px solid #dee2e6;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--bar-bg);
+    border-top: 1px solid var(--color-border);
     gap: 2px;
     min-height: 32px;
 }
@@ -600,30 +643,30 @@ canvas {
 }
 
 .sheet-tab {
-    padding: 4px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #6c757d;
+    padding: var(--spacing-xs) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-muted);
     background: transparent;
     border: 1px solid transparent;
     border-bottom: none;
     border-radius: var(--border-radius-top);
     cursor: pointer;
     white-space: nowrap;
-    transition: all 0.15s ease;
+    transition: all var(--transition-fast);
     position: relative;
     user-select: none;
 }
 
 .sheet-tab:hover {
-    background: #e9ecef;
-    color: #495057;
+    background: var(--color-bg-hover);
+    color: var(--color-text-secondary);
 }
 
 .sheet-tab.active {
     background: #fff;
-    color: #212529;
-    border-color: #dee2e6;
+    color: var(--color-text-primary);
+    border-color: var(--color-border);
     border-bottom-color: #fff;
     margin-bottom: -1px;
     padding-bottom: 5px;
@@ -638,25 +681,25 @@ canvas {
     height: 24px;
     padding: 0;
     font-size: 16px;
-    font-weight: 400;
+    font-weight: var(--font-weight-normal);
     line-height: 22px;
-    color: #6c757d;
+    color: var(--color-text-muted);
     background: transparent;
     border: 1px solid transparent;
     border-radius: var(--border-radius);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all var(--transition-fast);
     flex-shrink: 0;
 }
 
 .sheet-tab-add:hover {
-    background: #e9ecef;
-    color: #495057;
-    border-color: #dee2e6;
+    background: var(--color-bg-hover);
+    color: var(--color-text-secondary);
+    border-color: var(--color-border);
 }
 
 .sheet-tab-add:active {
-    background: #dee2e6;
+    background: var(--color-bg-active);
 }
 
 /* Sheet Tab Context Menu */
@@ -664,33 +707,34 @@ canvas {
     position: fixed;
     min-width: 120px;
     background: #fff;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 2000;
-    padding: 4px 0;
+    padding: var(--spacing-xs);
 }
 
 .sheet-tab-context-menu-item {
     display: block;
     width: 100%;
-    padding: 8px 14px;
-    font-size: 13px;
-    font-weight: 400;
-    color: #212529;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-normal);
+    color: var(--color-text-primary);
     background: none;
     border: none;
+    border-radius: var(--border-radius-smaller);
     text-align: left;
     cursor: pointer;
     transition: background 0.1s ease;
 }
 
 .sheet-tab-context-menu-item:hover {
-    background: #f8f9fa;
+    background: var(--color-bg-secondary);
 }
 
 .sheet-tab-context-menu-item:active {
-    background: #e9ecef;
+    background: var(--color-bg-hover);
 }
 
 .sheet-tab-context-menu-item.danger {
@@ -703,10 +747,10 @@ canvas {
 
 /* Sheet Tab Inline Editor */
 .sheet-tab-editor {
-    padding: 3px 8px;
-    font-size: 12px;
-    font-weight: 500;
-    color: #212529;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-primary);
     background: #fff;
     border: 2px solid var(--color-primary);
     border-radius: var(--border-radius);
@@ -717,23 +761,24 @@ canvas {
 
 /* Collaboration Status Badge */
 .collab-status-badge {
-    display: flex;
+    height: var(--control-height);
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
+    padding: 0 var(--control-padding-x);
+    font-size: var(--control-font-size);
+    font-weight: var(--font-weight-medium);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
     background: #fff;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all var(--transition-fast);
     position: relative;
 }
 
 .collab-status-badge:hover {
-    background: #f8f9fa;
-    border-color: #adb5bd;
+    background: var(--color-bg-secondary);
+    border-color: var(--color-border-hover);
 }
 
 .collab-status-badge .status-dot {
@@ -1244,20 +1289,20 @@ canvas {
     position: fixed;
     min-width: 160px;
     background: #fff;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     box-shadow:
         0 4px 16px rgba(0, 0, 0, 0.12),
         0 1px 3px rgba(0, 0, 0, 0.08);
     z-index: 2000;
-    padding: 4px 0;
+    padding: var(--spacing-xs);
     opacity: 0;
     visibility: hidden;
     transform: translateY(-4px) scale(0.98);
     transition:
-        opacity 0.15s ease,
-        transform 0.15s ease,
-        visibility 0.15s ease;
+        opacity var(--transition-fast),
+        transform var(--transition-fast),
+        visibility var(--transition-fast);
 }
 
 .context-menu.visible {
@@ -1270,28 +1315,29 @@ canvas {
     display: flex;
     align-items: center;
     width: 100%;
-    padding: 8px 14px;
-    font-size: 13px;
-    font-weight: 400;
-    color: #212529;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-normal);
+    color: var(--color-text-primary);
     background: none;
     border: none;
     text-align: left;
     cursor: pointer;
     transition: background 0.1s ease;
-    gap: 8px;
+    gap: var(--spacing-sm);
+    border-radius: var(--border-radius-smaller);
 }
 
 .context-menu-item:hover {
-    background: #f8f9fa;
+    background: var(--color-bg-secondary);
 }
 
 .context-menu-item:active {
-    background: #e9ecef;
+    background: var(--color-bg-hover);
 }
 
 .context-menu-item.disabled {
-    color: #adb5bd;
+    color: var(--color-text-placeholder);
     cursor: not-allowed;
 }
 
@@ -1307,10 +1353,6 @@ canvas {
     background: #fff5f5;
 }
 
-.context-menu-item {
-    border-radius: var(--border-radius-smaller);
-}
-
 .context-menu-icon {
     font-size: 14px;
     width: 18px;
@@ -1323,17 +1365,17 @@ canvas {
 }
 
 .context-menu-shortcut {
-    margin-left: 16px;
-    color: #868e96;
-    font-size: 12px;
-    font-weight: 400;
+    margin-left: var(--spacing-lg);
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
     opacity: 0.8;
 }
 
 .context-menu-separator {
     height: 1px;
-    background: #e9ecef;
-    margin: 4px 0;
+    background: var(--color-bg-hover);
+    margin: var(--spacing-xs) 0;
 }
 
 /* ============================================================================
