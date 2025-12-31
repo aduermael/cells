@@ -248,7 +248,7 @@ export class ScriptPanel {
 
     document.addEventListener("mousemove", (e) => {
       if (!this.isResizing) return;
-      const deltaY = this.startY - e.clientY;
+      const deltaY = e.clientY - this.startY;
       const newHeight = Math.min(
         Math.max(this.startHeight + deltaY, 150),
         window.innerHeight * 0.5
