@@ -569,6 +569,37 @@ export async function dragColumn(page, sourceCol, targetCol) {
 }
 
 /**
+ * Drag the fill handle from the current selection to a target cell
+ * @param {import('puppeteer').Page} page
+ * @param {string} fromCellRef - Cell at bottom-right of current selection (where fill handle is)
+ * @param {string} toCellRef - Target cell to drag to
+ */
+export async function dragFillHandle(page, fromCellRef, toCellRef) {
+  const from = parseCellRef(fromCellRef);
+  const to = parseCellRef(toCellRef);
+  const canvasInfo = await getCanvasInfo(page);
+
+  // Get fill handle position (bottom-right corner of the from cell)
+  const { x: startX, y: startY } = cellFillHandlePosition(from.col, from.row, canvasInfo);
+
+  // Get center of target cell
+  const { x: endX, y: endY } = cellToPixel(to.col, to.row, canvasInfo);
+
+  // Start at fill handle
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+
+  // Move to target
+  await page.mouse.move(endX, endY, { steps: 10 });
+
+  // Release
+  await page.mouse.up();
+
+  // Wait for the operation to complete
+  await sleep(100);
+}
+
+/**
  * Select a range of cells by clicking start and shift-clicking end
  * @param {import('puppeteer').Page} page
  * @param {string} startRef - Start cell reference (e.g., "A1")

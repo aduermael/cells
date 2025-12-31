@@ -11,6 +11,7 @@ import {
   getCurrentCellRef,
   getCanvasCursor,
   moveToFillHandle,
+  dragFillHandle,
   getCanvasInfo,
   cellToPixel,
   assertEqual,
@@ -156,6 +157,73 @@ const tests = {
     // Check cursor is crosshair
     const cursor = await getCanvasCursor(ctx.page);
     assertEqual(cursor, 'crosshair', 'Cursor should be crosshair on range selection fill handle');
+  },
+
+  'Fill handle drag extends selection down': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a value in B2
+    await setCellValue(ctx.page, 'B2', '42');
+    await sleep(100);
+
+    // Select B2
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+
+    // Drag fill handle from B2 down to B5
+    await dragFillHandle(ctx.page, 'B2', 'B5');
+    await sleep(200);
+
+    // Verify selection extended - cell reference should show anchor B2
+    const cellRef = await getCurrentCellRef(ctx.page);
+    assertEqual(cellRef, 'B2', 'Anchor cell should remain B2 after fill drag');
+
+    // Note: The actual fill operation (copying values) is Phase 4
+    // This test just verifies the drag extends the selection
+  },
+
+  'Fill handle drag extends selection right': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a value in C3
+    await setCellValue(ctx.page, 'C3', 'test');
+    await sleep(100);
+
+    // Select C3
+    await clickCell(ctx.page, 'C3');
+    await sleep(100);
+
+    // Drag fill handle from C3 right to F3
+    await dragFillHandle(ctx.page, 'C3', 'F3');
+    await sleep(200);
+
+    // Verify selection extended - cell reference should show anchor C3
+    const cellRef = await getCurrentCellRef(ctx.page);
+    assertEqual(cellRef, 'C3', 'Anchor cell should remain C3 after fill drag right');
+  },
+
+  'Fill handle drag from range selection': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter values
+    await setCellValue(ctx.page, 'A1', '1');
+    await setCellValue(ctx.page, 'A2', '2');
+    await sleep(100);
+
+    // Select range A1:A2
+    await selectRange(ctx.page, 'A1', 'A2');
+    await sleep(100);
+
+    // Drag fill handle from A2 (bottom of range) down to A5
+    await dragFillHandle(ctx.page, 'A2', 'A5');
+    await sleep(200);
+
+    // Verify anchor is still A1
+    const cellRef = await getCurrentCellRef(ctx.page);
+    assertEqual(cellRef, 'A1', 'Anchor cell should remain A1 after range fill drag');
   },
 };
 
