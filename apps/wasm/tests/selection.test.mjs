@@ -346,6 +346,229 @@ const tests = {
     content = await getFormulaBarContent(ctx.page);
     assertEqual(content, '40', 'D1 should be 40');
   },
+
+  'Fill formula adjusts relative references down': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter value in A1 and formula in B1 that references A1
+    await setCellValue(ctx.page, 'A1', '10');
+    await setCellValue(ctx.page, 'A2', '20');
+    await setCellValue(ctx.page, 'A3', '30');
+    await setCellValue(ctx.page, 'B1', '=A1');
+    await sleep(200);
+
+    // Select B1
+    await clickCell(ctx.page, 'B1');
+    await sleep(100);
+
+    // Drag fill handle from B1 down to B3
+    await dragFillHandle(ctx.page, 'B1', 'B3');
+    await sleep(300);
+
+    // Verify formula references were adjusted:
+    // B1 should have =A1 (unchanged)
+    // B2 should have =A2
+    // B3 should have =A3
+    await clickCell(ctx.page, 'B1');
+    await sleep(100);
+    let content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=A1', 'B1 formula should be =A1');
+
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=A2', 'B2 formula should be =A2 (adjusted)');
+
+    await clickCell(ctx.page, 'B3');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=A3', 'B3 formula should be =A3 (adjusted)');
+  },
+
+  'Fill formula adjusts relative references right': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter values in row 1 and formula in A2 that references A1
+    await setCellValue(ctx.page, 'A1', '100');
+    await setCellValue(ctx.page, 'B1', '200');
+    await setCellValue(ctx.page, 'C1', '300');
+    await setCellValue(ctx.page, 'A2', '=A1');
+    await sleep(200);
+
+    // Select A2
+    await clickCell(ctx.page, 'A2');
+    await sleep(100);
+
+    // Drag fill handle from A2 right to C2
+    await dragFillHandle(ctx.page, 'A2', 'C2');
+    await sleep(300);
+
+    // Verify formula references were adjusted:
+    // A2=A1, B2=B1, C2=C1
+    await clickCell(ctx.page, 'A2');
+    await sleep(100);
+    let content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=A1', 'A2 formula should be =A1');
+
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=B1', 'B2 formula should be =B1 (adjusted)');
+
+    await clickCell(ctx.page, 'C2');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=C1', 'C2 formula should be =C1 (adjusted)');
+  },
+
+  'Fill preserves absolute column reference ($A1)': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter values and a formula with absolute column
+    await setCellValue(ctx.page, 'A1', '10');
+    await setCellValue(ctx.page, 'B1', '=$A1');
+    await sleep(200);
+
+    // Select B1
+    await clickCell(ctx.page, 'B1');
+    await sleep(100);
+
+    // Drag fill handle from B1 right to D1
+    await dragFillHandle(ctx.page, 'B1', 'D1');
+    await sleep(300);
+
+    // Verify: $A column stays fixed, row would adjust if we dragged down
+    // B1=$A1, C1=$A1, D1=$A1 (column stays A because $A is absolute)
+    await clickCell(ctx.page, 'C1');
+    await sleep(100);
+    let content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=$A1', 'C1 formula should be =$A1 (column absolute)');
+
+    await clickCell(ctx.page, 'D1');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=$A1', 'D1 formula should be =$A1 (column absolute)');
+  },
+
+  'Fill preserves absolute row reference (A$1)': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter values and a formula with absolute row
+    await setCellValue(ctx.page, 'A1', '10');
+    await setCellValue(ctx.page, 'B1', '=A$1');
+    await sleep(200);
+
+    // Select B1
+    await clickCell(ctx.page, 'B1');
+    await sleep(100);
+
+    // Drag fill handle from B1 down to B3
+    await dragFillHandle(ctx.page, 'B1', 'B3');
+    await sleep(300);
+
+    // Verify: row stays fixed at 1, column would adjust if we dragged right
+    // B1=A$1, B2=A$1, B3=A$1 (row stays 1 because $1 is absolute)
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    let content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=A$1', 'B2 formula should be =A$1 (row absolute)');
+
+    await clickCell(ctx.page, 'B3');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=A$1', 'B3 formula should be =A$1 (row absolute)');
+  },
+
+  'Fill preserves fully absolute reference ($A$1)': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter values and a formula with fully absolute reference
+    await setCellValue(ctx.page, 'A1', '999');
+    await setCellValue(ctx.page, 'B1', '=$A$1');
+    await sleep(200);
+
+    // Select B1
+    await clickCell(ctx.page, 'B1');
+    await sleep(100);
+
+    // Drag fill handle from B1 to C3 (diagonal)
+    await dragFillHandle(ctx.page, 'B1', 'C3');
+    await sleep(300);
+
+    // Verify: all cells should have =$A$1 (both column and row absolute)
+    await clickCell(ctx.page, 'C1');
+    await sleep(100);
+    let content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=$A$1', 'C1 formula should be =$A$1 (fully absolute)');
+
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=$A$1', 'B2 formula should be =$A$1 (fully absolute)');
+
+    await clickCell(ctx.page, 'C3');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=$A$1', 'C3 formula should be =$A$1 (fully absolute)');
+  },
+
+  'Fill formula with complex expression': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter values and a formula with multiple references
+    await setCellValue(ctx.page, 'A1', '1');
+    await setCellValue(ctx.page, 'B1', '2');
+    await setCellValue(ctx.page, 'A2', '3');
+    await setCellValue(ctx.page, 'B2', '4');
+    await setCellValue(ctx.page, 'C1', '=A1+B1');
+    await sleep(200);
+
+    // Select C1
+    await clickCell(ctx.page, 'C1');
+    await sleep(100);
+
+    // Drag fill handle from C1 down to C2
+    await dragFillHandle(ctx.page, 'C1', 'C2');
+    await sleep(300);
+
+    // Verify: C1=A1+B1, C2=A2+B2
+    await clickCell(ctx.page, 'C2');
+    await sleep(100);
+    const content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=A2+B2', 'C2 formula should be =A2+B2 (both refs adjusted)');
+  },
+
+  'Fill formula with mixed absolute and relative': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter values and formula: =A1+$B$1 (A1 relative, B1 fully absolute)
+    await setCellValue(ctx.page, 'A1', '10');
+    await setCellValue(ctx.page, 'B1', '100');
+    await setCellValue(ctx.page, 'A2', '20');
+    await setCellValue(ctx.page, 'C1', '=A1+$B$1');
+    await sleep(200);
+
+    // Select C1
+    await clickCell(ctx.page, 'C1');
+    await sleep(100);
+
+    // Drag fill handle from C1 down to C2
+    await dragFillHandle(ctx.page, 'C1', 'C2');
+    await sleep(300);
+
+    // Verify: C2=A2+$B$1 (A1 adjusted to A2, $B$1 unchanged)
+    await clickCell(ctx.page, 'C2');
+    await sleep(100);
+    const content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=A2+$B$1', 'C2 formula should be =A2+$B$1 (mixed adjustment)');
+  },
 };
 
 // Run all tests

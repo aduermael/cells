@@ -89,8 +89,8 @@ Core fill logic in C++ for Luau scripting access:
 - [x] 5b: Add formula reference adjuster to offset relative references
 - [x] 5c: Apply reference adjustment in fill operations
 - [x] 5d: Apply reference adjustment in copy/paste operations
-- [ ] 5e: Add E2E tests for formula fill (=A1 filled down becomes =A2, =A3)
-- [ ] 5f: Add E2E tests for absolute reference preservation (=$A$1 stays =$A$1)
+- [x] 5e: Add E2E tests for formula fill (=A1 filled down becomes =A2, =A3)
+- [x] 5f: Add E2E tests for absolute reference preservation (=$A$1 stays =$A$1)
 
 ---
 
