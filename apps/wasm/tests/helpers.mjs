@@ -582,15 +582,23 @@ export async function dragFillHandle(page, fromCellRef, toCellRef) {
   // Get fill handle position (bottom-right corner of the from cell)
   const { x: startX, y: startY } = cellFillHandlePosition(from.col, from.row, canvasInfo);
 
-  // Get center of target cell
-  const { x: endX, y: endY } = cellToPixel(to.col, to.row, canvasInfo);
+  // Get target fill handle position (bottom-right corner of target cell)
+  // This ensures the drag direction is clearly vertical or horizontal
+  const { x: endX, y: endY } = cellFillHandlePosition(to.col, to.row, canvasInfo);
 
   // Start at fill handle
   await page.mouse.move(startX, startY);
   await page.mouse.down();
 
-  // Move to target
-  await page.mouse.move(endX, endY, { steps: 10 });
+  // Move to target - but constrain to single axis for clarity
+  // If rows differ more than cols, keep X fixed (vertical drag)
+  // If cols differ more than rows, keep Y fixed (horizontal drag)
+  const rowDiff = Math.abs(to.row - from.row);
+  const colDiff = Math.abs(to.col - from.col);
+  const targetX = colDiff > rowDiff ? endX : startX;
+  const targetY = rowDiff >= colDiff ? endY : startY;
+
+  await page.mouse.move(targetX, targetY, { steps: 10 });
 
   // Release
   await page.mouse.up();

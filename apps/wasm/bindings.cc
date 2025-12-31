@@ -16,6 +16,7 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/csv_reader.h"
+#include "core/cells/fill_range.h"
 #include "core/cells/csv_writer.h"
 #include "core/cells/dependency_graph.h"
 #include "core/cells/formula_ast.h"
@@ -1789,6 +1790,41 @@ public:
         notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
         return "{\"success\":true}";
+    }
+
+    // Fill a range with extrapolated values from source range
+    // sourceMinCol/Row, sourceMaxCol/Row: the original selection with values (0-indexed)
+    // targetMinCol/Row, targetMaxCol/Row: the range to fill (includes source, 0-indexed)
+    std::string fillRange(int sourceMinCol, int sourceMinRow,
+                          int sourceMaxCol, int sourceMaxRow,
+                          int targetMinCol, int targetMinRow,
+                          int targetMaxCol, int targetMaxRow) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        // Call the core fill function
+        FillResult result = cells::fillRange(
+            _workbook.get(), sheet,
+            sourceMinCol, sourceMinRow, sourceMaxCol, sourceMaxRow,
+            targetMinCol, targetMinRow, targetMaxCol, targetMaxRow);
+
+        if (!result.success) {
+            return "{\"error\":\"" + jsonEscape(result.error) + "\"}";
+        }
+
+        // Rebuild viewport index for the affected cells
+        rebuildViewportIndex();
+
+        // Notify listeners
+        notifyListeners(ChangeType::CELL_CHANGED);
+
+        return "{\"success\":true,\"cellsFilled\":" + std::to_string(result.cellsFilled) + "}";
     }
 
     // ========================================================================
@@ -3649,6 +3685,8 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("insertRowAt", &cells::wasm::CellsEngine::insertRowAt)
         .function("deleteColumnById", &cells::wasm::CellsEngine::deleteColumnById)
         .function("deleteRowById", &cells::wasm::CellsEngine::deleteRowById)
+        // Fill range
+        .function("fillRange", &cells::wasm::CellsEngine::fillRange)
         // Export
         .function("exportToCells", &cells::wasm::CellsEngine::exportToCells)
         .function("exportToCSV", &cells::wasm::CellsEngine::exportToCSV)

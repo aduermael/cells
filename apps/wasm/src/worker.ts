@@ -63,6 +63,12 @@ interface CellsEngine {
   insertRowAt(position: number, insertBefore: boolean): string;
   deleteColumnById(colId: string): string;
   deleteRowById(rowId: string): string;
+  fillRange(
+    sourceMinCol: number, sourceMinRow: number,
+    sourceMaxCol: number, sourceMaxRow: number,
+    targetMinCol: number, targetMinRow: number,
+    targetMaxCol: number, targetMaxRow: number
+  ): string;
 
   // Export
   exportToCells(): string;
@@ -687,6 +693,26 @@ function handleMessage(msg: WorkerRequest): void {
           respond({ type: "error", error: result.error });
         } else {
           respond({ type: "rowDeleted", success: true });
+        }
+        break;
+      }
+
+      case "fillRange": {
+        const { sourceMinCol, sourceMinRow, sourceMaxCol, sourceMaxRow,
+                targetMinCol, targetMinRow, targetMaxCol, targetMaxRow } = params as {
+          sourceMinCol: number; sourceMinRow: number;
+          sourceMaxCol: number; sourceMaxRow: number;
+          targetMinCol: number; targetMinRow: number;
+          targetMaxCol: number; targetMaxRow: number;
+        };
+        const result = JSON.parse(engine.fillRange(
+          sourceMinCol, sourceMinRow, sourceMaxCol, sourceMaxRow,
+          targetMinCol, targetMinRow, targetMaxCol, targetMaxRow
+        )) as JsonResult & { cellsFilled?: number };
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({ type: "rangeFilled", success: true, cellsFilled: result.cellsFilled ?? 0 });
         }
         break;
       }

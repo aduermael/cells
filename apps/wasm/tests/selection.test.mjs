@@ -225,6 +225,127 @@ const tests = {
     const cellRef = await getCurrentCellRef(ctx.page);
     assertEqual(cellRef, 'A1', 'Anchor cell should remain A1 after range fill drag');
   },
+
+  'Fill creates linear sequence from two values': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter values to establish a pattern: 1, 2
+    await setCellValue(ctx.page, 'A1', '1');
+    await setCellValue(ctx.page, 'A2', '2');
+    await sleep(200);
+
+    // Select range A1:A2 (the source pattern)
+    await selectRange(ctx.page, 'A1', 'A2');
+    await sleep(100);
+
+    // Drag fill handle from A2 down to A5 to extend the sequence
+    await dragFillHandle(ctx.page, 'A2', 'A5');
+    await sleep(300); // Wait for fill operation
+
+    // Verify the sequence was filled: A3=3, A4=4, A5=5
+    // Click on each cell and check the formula bar value
+    await clickCell(ctx.page, 'A3');
+    await sleep(100);
+    let content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '3', 'A3 should be 3');
+
+    await clickCell(ctx.page, 'A4');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '4', 'A4 should be 4');
+
+    await clickCell(ctx.page, 'A5');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '5', 'A5 should be 5');
+  },
+
+  'Fill repeats single value': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a single value
+    await setCellValue(ctx.page, 'B1', '42');
+    await sleep(200);
+
+    // Select B1
+    await clickCell(ctx.page, 'B1');
+    await sleep(100);
+
+    // Drag fill handle from B1 down to B3
+    await dragFillHandle(ctx.page, 'B1', 'B3');
+    await sleep(300);
+
+    // Verify the value was repeated
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    let content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '42', 'B2 should be 42 (repeated)');
+
+    await clickCell(ctx.page, 'B3');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '42', 'B3 should be 42 (repeated)');
+  },
+
+  'Fill creates sequence with step 5': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter values: 5, 10 (step of 5)
+    await setCellValue(ctx.page, 'C1', '5');
+    await setCellValue(ctx.page, 'C2', '10');
+    await sleep(200);
+
+    // Select C1:C2
+    await selectRange(ctx.page, 'C1', 'C2');
+    await sleep(100);
+
+    // Drag to C4
+    await dragFillHandle(ctx.page, 'C2', 'C4');
+    await sleep(300);
+
+    // Verify: C3=15, C4=20
+    await clickCell(ctx.page, 'C3');
+    await sleep(100);
+    let content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '15', 'C3 should be 15');
+
+    await clickCell(ctx.page, 'C4');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '20', 'C4 should be 20');
+  },
+
+  'Fill horizontal sequence': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter values: A1=10, B1=20
+    await setCellValue(ctx.page, 'A1', '10');
+    await setCellValue(ctx.page, 'B1', '20');
+    await sleep(200);
+
+    // Select A1:B1
+    await selectRange(ctx.page, 'A1', 'B1');
+    await sleep(100);
+
+    // Drag right to D1
+    await dragFillHandle(ctx.page, 'B1', 'D1');
+    await sleep(300);
+
+    // Verify: C1=30, D1=40
+    await clickCell(ctx.page, 'C1');
+    await sleep(100);
+    let content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '30', 'C1 should be 30');
+
+    await clickCell(ctx.page, 'D1');
+    await sleep(100);
+    content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '40', 'D1 should be 40');
+  },
 };
 
 // Run all tests

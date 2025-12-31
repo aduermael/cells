@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "core/cells/crdt.h"
+#include "core/cells/fill_range.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/ref_converter.h"
@@ -704,6 +705,104 @@ int LuauSandbox::luaRangeDelete(lua_State* L) {
 }
 
 // ============================================================================
+// Cells API: rangeFill(options)
+// options.from: string (start cell ref of source range)
+// options.to: string (end cell ref of source range)
+// options.targetFrom: string (start cell ref of target range)
+// options.targetTo: string (end cell ref of target range)
+// Returns: {success: boolean, cellsFilled: number, error?: string}
+// ============================================================================
+int LuauSandbox::luaRangeFill(lua_State* L) {
+    luaL_checktype(L, 1, LUA_TTABLE);
+
+    // Get source range (from, to)
+    lua_getfield(L, 1, "from");
+    if (lua_isstring(L, -1) == 0) {
+        luaL_error(L, "rangeFill: options.from required");
+    }
+    const char* fromRef = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    lua_getfield(L, 1, "to");
+    if (lua_isstring(L, -1) == 0) {
+        luaL_error(L, "rangeFill: options.to required");
+    }
+    const char* toRef = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    // Get target range (targetFrom, targetTo)
+    lua_getfield(L, 1, "targetFrom");
+    if (lua_isstring(L, -1) == 0) {
+        luaL_error(L, "rangeFill: options.targetFrom required");
+    }
+    const char* targetFromRef = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    lua_getfield(L, 1, "targetTo");
+    if (lua_isstring(L, -1) == 0) {
+        luaL_error(L, "rangeFill: options.targetTo required");
+    }
+    const char* targetToRef = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    Sheet* sheet = getSheet(L);
+    Workbook* workbook = getWorkbook(L);
+    if (sheet == nullptr || workbook == nullptr) {
+        luaL_error(L, "rangeFill: no context set");
+    }
+
+    // Parse source range references
+    int fromCol = 0;
+    int fromRow = 0;
+    int toCol = 0;
+    int toRow = 0;
+    if (!parseA1Ref(fromRef, &fromCol, &fromRow) || !parseA1Ref(toRef, &toCol, &toRow)) {
+        luaL_error(L, "rangeFill: invalid source range");
+    }
+
+    // Parse target range references
+    int targetFromCol = 0;
+    int targetFromRow = 0;
+    int targetToCol = 0;
+    int targetToRow = 0;
+    if (!parseA1Ref(targetFromRef, &targetFromCol, &targetFromRow) ||
+        !parseA1Ref(targetToRef, &targetToCol, &targetToRow)) {
+        luaL_error(L, "rangeFill: invalid target range");
+    }
+
+    // Normalize ranges (ensure from <= to)
+    if (fromCol > toCol) {
+        std::swap(fromCol, toCol);
+    }
+    if (fromRow > toRow) {
+        std::swap(fromRow, toRow);
+    }
+    if (targetFromCol > targetToCol) {
+        std::swap(targetFromCol, targetToCol);
+    }
+    if (targetFromRow > targetToRow) {
+        std::swap(targetFromRow, targetToRow);
+    }
+
+    // Call the fill function
+    const FillResult result = fillRange(workbook, sheet, fromCol, fromRow, toCol, toRow,
+                                        targetFromCol, targetFromRow, targetToCol, targetToRow);
+
+    // Return result table
+    lua_newtable(L);
+    lua_pushboolean(L, result.success ? 1 : 0);
+    lua_setfield(L, -2, "success");
+    lua_pushnumber(L, result.cellsFilled);
+    lua_setfield(L, -2, "cellsFilled");
+    if (!result.error.empty()) {
+        lua_pushstring(L, result.error.c_str());
+        lua_setfield(L, -2, "error");
+    }
+
+    return 1;
+}
+
+// ============================================================================
 // Cell object method: getRef()
 // Returns the current A1 reference for the cell
 // ============================================================================
@@ -902,6 +1001,9 @@ void LuauSandbox::registerCellsAPI() {
 
     lua_pushcfunction(L_, &LuauSandbox::luaRangeDelete, "rangeDelete");
     lua_setglobal(L_, "rangeDelete");
+
+    lua_pushcfunction(L_, &LuauSandbox::luaRangeFill, "rangeFill");
+    lua_setglobal(L_, "rangeFill");
 }
 
 void LuauSandbox::setContext(Workbook* workbook, Sheet* sheet) {

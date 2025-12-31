@@ -388,6 +388,19 @@ export class CellsClient {
     return { success: true };
   }
 
+  async fillRange(
+    sourceMinCol: number, sourceMinRow: number,
+    sourceMaxCol: number, sourceMaxRow: number,
+    targetMinCol: number, targetMinRow: number,
+    targetMaxCol: number, targetMaxRow: number
+  ): Promise<{ success: boolean; cellsFilled: number }> {
+    const result = await this._send("fillRange", {
+      sourceMinCol, sourceMinRow, sourceMaxCol, sourceMaxRow,
+      targetMinCol, targetMinRow, targetMaxCol, targetMaxRow
+    });
+    return { success: true, cellsFilled: result.cellsFilled as number };
+  }
+
   async renameColumn(colId: string, name: string): Promise<{ success: boolean }> {
     await this._send("renameColumn", { colId, name });
     return { success: true };

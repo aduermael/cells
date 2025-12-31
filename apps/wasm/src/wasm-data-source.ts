@@ -244,6 +244,19 @@ export class WasmDataSource {
     return this._client.deleteRowById(rowId);
   }
 
+  /** Fill a range with extrapolated values from a source range */
+  async fillRange(
+    sourceMinCol: number, sourceMinRow: number,
+    sourceMaxCol: number, sourceMaxRow: number,
+    targetMinCol: number, targetMinRow: number,
+    targetMaxCol: number, targetMaxRow: number
+  ): Promise<{ success: boolean; cellsFilled: number }> {
+    return this._client.fillRange(
+      sourceMinCol, sourceMinRow, sourceMaxCol, sourceMaxRow,
+      targetMinCol, targetMinRow, targetMaxCol, targetMaxRow
+    );
+  }
+
   // ==========================================================================
   // Sheet Management
   // ==========================================================================

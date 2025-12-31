@@ -125,6 +125,7 @@ private:
     // Range operations
     static int luaRangeSelect(lua_State* L);
     static int luaRangeDelete(lua_State* L);
+    static int luaRangeFill(lua_State* L);
 
     // Cell object methods (called on cell tables via __index)
     static int luaCellGetRef(lua_State* L);

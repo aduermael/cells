@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2025-12-31 06:19 UTC
-Updated At: 2025-12-31 08:50 UTC
+Updated At: 2025-12-31 09:25 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Grid Selection & Fill Features
@@ -76,12 +76,12 @@ The fill handle and auto-fill functionality are not implemented. Need to add:
 
 Core fill logic in C++ for Luau scripting access:
 
-- [ ] 4a: Add `fillRange()` function in core/cells (detect patterns, extrapolate sequences)
-- [ ] 4b: Expose fill to Luau API via `rangeFill({from, to, target})` in luau_sandbox.cc
-- [ ] 4c: Expose fill to WASM via `CellsEngine::fillRange()` in bindings.cc
-- [ ] 4d: Connect TypeScript mouseup handler to call fillRange via WASM
-- [ ] 4e: Add C++ unit tests for fill pattern detection
-- [ ] 4f: Add E2E test for numeric sequence fill (1, 2 → 3, 4, 5)
+- [x] 4a: Add `fillRange()` function in core/cells (detect patterns, extrapolate sequences)
+- [x] 4b: Expose fill to Luau API via `rangeFill({from, to, target})` in luau_sandbox.cc
+- [x] 4c: Expose fill to WASM via `CellsEngine::fillRange()` in bindings.cc
+- [x] 4d: Connect TypeScript mouseup handler to call fillRange via WASM
+- [x] 4e: Add C++ unit tests for fill pattern detection
+- [x] 4f: Add E2E test for numeric sequence fill (1, 2 → 3, 4, 5)
 
 ## Phase 5: Implement Formula Reference Adjustment
 

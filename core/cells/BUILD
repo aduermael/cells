@@ -689,12 +689,37 @@ cc_test(
 )
 
 cc_library(
+    name = "fill_range",
+    srcs = ["fill_range.cc"],
+    hdrs = ["fill_range.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":crdt",
+        ":id",
+        ":model",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "fill_range_test",
+    srcs = ["fill_range_test.cc"],
+    deps = [
+        ":fill_range",
+        ":id",
+        ":model",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "luau_sandbox",
     srcs = ["luau_sandbox.cc"],
     hdrs = ["luau_sandbox.h"],
     visibility = ["//visibility:public"],
     deps = [
         ":crdt",
+        ":fill_range",
         ":id",
         ":model",
         ":ref_converter",

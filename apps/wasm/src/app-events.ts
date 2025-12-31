@@ -1126,12 +1126,32 @@ export class AppEventManager {
 
         // End fill handle drag (if active)
         const { getIsFillDragging, setIsFillDragging, getFillPreviewRange, setFillPreviewRange, setSelectionStart, setSelectionEnd } = this.config;
-        if (getIsFillDragging()) {
-            // Apply the fill preview to the actual selection
+        if (getIsFillDragging() && dataSource) {
+            // Get the original selection bounds (source) and the preview range (target)
+            const original = this.fillDragOriginalBounds;
             const preview = getFillPreviewRange();
-            if (preview) {
-                setSelectionStart({ col: preview.minCol, row: preview.minRow });
-                setSelectionEnd({ col: preview.maxCol, row: preview.maxRow });
+            if (original && preview) {
+                // Capture preview values before clearing state
+                const targetMinCol = preview.minCol;
+                const targetMinRow = preview.minRow;
+                const targetMaxCol = preview.maxCol;
+                const targetMaxRow = preview.maxRow;
+
+                // Call fillRange to extrapolate values from source to target
+                dataSource.fillRange(
+                    original.minCol, original.minRow,
+                    original.maxCol, original.maxRow,
+                    targetMinCol, targetMinRow,
+                    targetMaxCol, targetMaxRow
+                ).then(() => {
+                    // Update selection to the filled range
+                    setSelectionStart({ col: targetMinCol, row: targetMinRow });
+                    setSelectionEnd({ col: targetMaxCol, row: targetMaxRow });
+                    render();
+                    updateFormulaBar();
+                }).catch((err) => {
+                    console.error("Error filling range:", err);
+                });
             }
             // Clear fill drag state
             setIsFillDragging(false);
