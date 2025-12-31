@@ -180,7 +180,8 @@ protected:
 
     void _cancel() override { cancelTask(); }
 
-    // Called by delegate when data is received
+public:
+    // Called by delegate when data is received (must be public for ObjC delegate)
     void didReceiveData(NSData* data) {
         if (data != nil && data.length > 0) {
             onStreamData(static_cast<const uint8_t*>(data.bytes), data.length);
@@ -211,7 +212,7 @@ protected:
         }
     }
 
-private:
+private:  // Member variables
     NSURLSessionDataTask* task_ = nil;
     NSURLSession* streamingSession_ = nil;
     StreamingSessionDelegate* streamingDelegate_ = nil;
