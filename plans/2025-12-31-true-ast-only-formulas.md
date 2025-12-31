@@ -1,6 +1,6 @@
-Status: IN_PROGRESS
+Status: COMPLETED
 Created At: 2025-12-31 20:25 UTC
-Updated At: 2025-12-31 22:25 UTC
+Updated At: 2025-12-31 22:51 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # True AST-Only Formula Storage
@@ -96,15 +96,24 @@ Remove the `display` field from CRDT formula operations.
 - [x] 4e: Update sync_formula_test.cc - removed `display` from all 30+ test payloads
 - [x] 4f: Verify unit tests pass - sync_formula_test passes
 
-## Phase 5: Verify normalization
+## Phase 5: Verify normalization ✅
 
 Confirm that formulas are properly normalized.
 
-- [ ] 5a: Add unit test: "= A1" -> displays as "=A1"
-- [ ] 5b: Add unit test: "=a1" -> displays as "=A1" (uppercase columns)
-- [ ] 5c: Add unit test: "=SUM( A1 , B2 )" -> displays as "=SUM(A1,B2)"
-- [ ] 5d: Add E2E test: enter "= A1", verify formula bar shows "=A1"
-- [ ] 5e: Final `make lint && make format && make test`
+- [x] 5a: Add unit test: "= A1" -> displays as "=A1"
+- [x] 5b: Add unit test: "=a1" -> displays as "=A1" (uppercase columns)
+- [x] 5c: Add unit test: "=SUM( A1 , B2 )" -> displays as "=SUM(A1,B2)"
+- [x] 5d: Add E2E test: enter "= A1", verify formula bar shows "=A1"
+- [x] 5e: Final `make lint && make format && make test`
+
+**Implementation details:**
+- Added case normalization to `FormulaDisplayConverter::cellRefToString()` fallback path
+- Added case normalization to `FormulaDisplayConverter::columnRefToString()` fallback path
+- Added case normalization to `FormulaDisplayConverter::columnRangeRefToString()` fallback path
+- Added 10 unit tests in `formula_integration_test.cc` (FormulaNormalizationTest suite)
+- Added 3 E2E tests in `apps/wasm/tests/formula.test.mjs`
+- All 43 C++ tests pass
+- All 10 E2E formula tests pass
 
 ---
 

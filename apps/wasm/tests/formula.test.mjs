@@ -180,6 +180,77 @@ const tests = {
     assertEqual(b1Value, '200', 'B1 should update to 200 (=A1*2 where A1=100)');
     assertEqual(c1Value, '203', 'C1 should update to 203 (=B1+3 where B1=200)');
   },
+
+  // ============================================================================
+  // Formula Normalization Tests (Phase 5)
+  // ============================================================================
+
+  'Formula with whitespace after equals is normalized': async (ctx) => {
+    // Entering "= A1" should display as "=A1" in formula bar
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // First, put a value in A1 so the formula has something to reference
+    await setCellValue(ctx.page, 'A1', '42');
+    await sleep(100);
+
+    // Enter formula with extra whitespace: "= A1"
+    await setCellValue(ctx.page, 'B1', '= A1');
+    await sleep(200);
+
+    // Click B1 to verify
+    await clickCell(ctx.page, 'B1');
+    await sleep(200);
+
+    // Formula bar should show normalized formula "=A1" (no whitespace)
+    const content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=A1', 'Formula bar should show "=A1" (whitespace normalized)');
+  },
+
+  'Lowercase cell reference is normalized to uppercase': async (ctx) => {
+    // Entering "=a1" should display as "=A1" in formula bar
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // First, put a value in A1 so the formula has something to reference
+    await setCellValue(ctx.page, 'A1', '100');
+    await sleep(100);
+
+    // Enter formula with lowercase: "=a1"
+    await setCellValue(ctx.page, 'B1', '=a1');
+    await sleep(200);
+
+    // Click B1 to verify
+    await clickCell(ctx.page, 'B1');
+    await sleep(200);
+
+    // Formula bar should show normalized formula "=A1" (uppercase)
+    const content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=A1', 'Formula bar should show "=A1" (lowercase normalized to uppercase)');
+  },
+
+  'Function arguments whitespace is normalized': async (ctx) => {
+    // Entering "=SUM( A1 , B1 )" should display as "=SUM(A1,B1)"
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Set up values
+    await setCellValue(ctx.page, 'A1', '10');
+    await setCellValue(ctx.page, 'B1', '20');
+    await sleep(100);
+
+    // Enter formula with extra whitespace in function args
+    await setCellValue(ctx.page, 'C1', '=SUM( A1 , B1 )');
+    await sleep(200);
+
+    // Click C1 to verify
+    await clickCell(ctx.page, 'C1');
+    await sleep(200);
+
+    // Formula bar should show normalized formula
+    const content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=SUM(A1,B1)', 'Formula bar should show "=SUM(A1,B1)" (whitespace normalized)');
+  },
 };
 
 // Run all tests

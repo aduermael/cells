@@ -1,5 +1,8 @@
 #include "core/cells/formula_display.h"
 
+#include <cctype>
+
+#include <algorithm>
 #include <sstream>
 
 #include "core/cells/model.h"
@@ -100,11 +103,14 @@ std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) co
         }
     }
 
-    // Fall back to original column/row
+    // Fall back to original column/row (uppercase column for normalization)
     if (node->colAbsolute) {
         result += "$";
     }
-    result += node->column;
+    std::string upperColumn = node->column;
+    std::transform(upperColumn.begin(), upperColumn.end(), upperColumn.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    result += upperColumn;
     if (node->rowAbsolute) {
         result += "$";
     }
@@ -141,11 +147,14 @@ std::string FormulaDisplayConverter::columnRefToString(const ColumnRefNode* node
         }
     }
 
-    // Fall back to original
+    // Fall back to original (uppercase column for normalization)
     if (node->absolute) {
         result += "$";
     }
-    result += node->column + ":" + node->column;
+    std::string upperColumn = node->column;
+    std::transform(upperColumn.begin(), upperColumn.end(), upperColumn.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    result += upperColumn + ":" + upperColumn;
 
     return result;
 }
@@ -216,6 +225,12 @@ std::string FormulaDisplayConverter::columnRangeRefToString(const ColumnRangeRef
             }
         }
     }
+
+    // Normalize column names to uppercase (resolved lookups already uppercase)
+    std::transform(startCol.begin(), startCol.end(), startCol.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+    std::transform(endCol.begin(), endCol.end(), endCol.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
 
     if (node->startAbsolute) {
         result += "$";
