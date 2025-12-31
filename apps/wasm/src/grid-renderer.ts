@@ -222,6 +222,10 @@ export class GridRenderer {
     ctx.rect(HEADER_WIDTH, HEADER_HEIGHT, viewWidth - HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
     ctx.clip();
 
+    // Fill cell background explicitly (ensures correct theme color on theme switch)
+    ctx.fillStyle = this.colors.cellBg;
+    ctx.fillRect(HEADER_WIDTH, HEADER_HEIGHT, viewWidth - HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
+
     const headerState = this._getHeaderState();
     const colHasMoved =
       this.isDraggingColumn &&
