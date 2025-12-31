@@ -92,7 +92,10 @@
                 <span id="script-panel-status"></span>
             </div>
             <div id="script-panel-content">
-                <textarea id="script-editor" placeholder="-- Write Luau script here&#10;-- Example: cellSet('A1', 42)" spellcheck="false"></textarea>
+                <div id="script-editor-container">
+                    <pre id="script-editor-backdrop"><code id="script-editor-highlight"></code></pre>
+                    <textarea id="script-editor" placeholder="-- Write Luau script here&#10;-- Example: cellSet('A1', 42)" spellcheck="false"></textarea>
+                </div>
             </div>
             <div id="script-panel-footer">
                 <div id="script-output"></div>

@@ -67,11 +67,11 @@ Replace textarea with a custom editor that overlays syntax highlighting.
 Approach: Use a transparent textarea over a `<pre><code>` element that displays
 the highlighted code. This is a lightweight alternative to CodeMirror/Monaco.
 
-- [ ] 3a: Create HTML structure with textarea + highlighted backdrop
-- [ ] 3b: Add CSS for highlighting spans (keyword, string, number, comment, etc.)
-- [ ] 3c: Create SyntaxHighlighter class that tokenizes and renders highlighted HTML
-- [ ] 3d: Update ScriptPanel to sync textarea with highlighted display
-- [ ] 3e: Handle scroll sync between textarea and backdrop
+- [x] 3a: Create HTML structure with textarea + highlighted backdrop
+- [x] 3b: Add CSS for highlighting spans (keyword, string, number, comment, etc.)
+- [x] 3c: Create SyntaxHighlighter class that tokenizes and renders highlighted HTML
+- [x] 3d: Update ScriptPanel to sync textarea with highlighted display
+- [x] 3e: Handle scroll sync between textarea and backdrop
 
 Color scheme (dark theme, similar to VS Code):
 - Keywords: `#569cd6` (blue)

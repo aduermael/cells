@@ -74,6 +74,8 @@ export interface DOMElements {
   scriptPanelBtn: HTMLElement;
   scriptPanel: HTMLElement;
   scriptEditor: HTMLTextAreaElement;
+  scriptEditorBackdrop: HTMLPreElement;
+  scriptEditorHighlight: HTMLElement;
   scriptRunBtn: HTMLElement;
   scriptPanelStatus: HTMLElement;
   scriptOutput: HTMLElement;
@@ -431,6 +433,8 @@ export function createApp(): App {
     scriptPanelBtn: getElement("script-panel-btn"),
     scriptPanel: getElement("script-panel"),
     scriptEditor: getElement<HTMLTextAreaElement>("script-editor"),
+    scriptEditorBackdrop: getElement<HTMLPreElement>("script-editor-backdrop"),
+    scriptEditorHighlight: getElement("script-editor-highlight"),
     scriptRunBtn: getElement("script-run-btn"),
     scriptPanelStatus: getElement("script-panel-status"),
     scriptOutput: getElement("script-output"),

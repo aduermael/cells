@@ -1552,11 +1552,51 @@ canvas {
     min-height: 0;
 }
 
-#script-editor {
+#script-editor-container {
     flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+#script-editor-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
     padding: 12px;
     background: #1e1e1e;
+    overflow: auto;
+    pointer-events: none;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    tab-size: 2;
+}
+
+#script-editor-highlight {
+    display: block;
     color: #d4d4d4;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+}
+
+#script-editor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    padding: 12px;
+    background: transparent;
+    color: transparent;
+    caret-color: #d4d4d4;
     border: none;
     outline: none;
     resize: none;
@@ -1564,31 +1604,41 @@ canvas {
     font-size: 13px;
     line-height: 1.5;
     tab-size: 2;
+    overflow: auto;
 }
 
 #script-editor::placeholder {
     color: #5a5a5a;
 }
 
-/* Lua syntax highlighting classes (for future enhancement) */
-#script-editor .lua-keyword {
+/* Luau syntax highlighting tokens */
+.luau-keyword {
     color: #569cd6;
 }
 
-#script-editor .lua-string {
+.luau-string {
     color: #ce9178;
 }
 
-#script-editor .lua-number {
+.luau-number {
     color: #b5cea8;
 }
 
-#script-editor .lua-comment {
+.luau-comment {
     color: #6a9955;
 }
 
-#script-editor .lua-function {
-    color: #dcdcaa;
+.luau-name {
+    color: #9cdcfe;
+}
+
+.luau-operator {
+    color: #d4d4d4;
+}
+
+.luau-error {
+    color: #f44747;
+    text-decoration: wavy underline #f44747;
 }
 
 #script-panel-footer {

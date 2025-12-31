@@ -113,6 +113,8 @@ export function initApp(): AppContext {
     panel: elements.scriptPanel,
     toggleBtn: elements.scriptPanelBtn,
     editor: elements.scriptEditor,
+    backdrop: elements.scriptEditorBackdrop,
+    highlight: elements.scriptEditorHighlight,
     runBtn: elements.scriptRunBtn,
     statusEl: elements.scriptPanelStatus,
     outputEl: elements.scriptOutput,
@@ -130,6 +132,12 @@ export function initApp(): AppContext {
     onScriptExecuted: () => {
       // Refresh viewport to show any changes made by the script
       fetchViewportNow();
+    },
+    tokenize: async (source: string) => {
+      if (!app.dataSource) {
+        return [];
+      }
+      return app.dataSource.tokenizeLuau(source);
     },
   });
 

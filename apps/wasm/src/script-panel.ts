@@ -1,6 +1,8 @@
 // Script Panel - Luau scripting interface
 // Provides a dedicated panel for writing and executing Luau scripts.
 
+import { SyntaxHighlighter, type TokenizeFunction } from "./syntax-highlighter";
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -34,6 +36,8 @@ export class ScriptPanel {
   private panel: HTMLElement;
   private toggleBtn: HTMLElement;
   private editor: HTMLTextAreaElement;
+  private backdrop: HTMLPreElement;
+  private highlight: HTMLElement;
   private runBtn: HTMLElement;
   private statusEl: HTMLElement;
   private outputEl: HTMLElement;
@@ -59,22 +63,38 @@ export class ScriptPanel {
     panel: HTMLElement;
     toggleBtn: HTMLElement;
     editor: HTMLTextAreaElement;
+    backdrop: HTMLPreElement;
+    highlight: HTMLElement;
     runBtn: HTMLElement;
     statusEl: HTMLElement;
     outputEl: HTMLElement;
     resizeHandle: HTMLElement;
     executeScript: (script: string) => Promise<ScriptResult>;
     onScriptExecuted: () => void;
+    tokenize?: TokenizeFunction;
   }) {
     this.panel = config.panel;
     this.toggleBtn = config.toggleBtn;
     this.editor = config.editor;
+    this.backdrop = config.backdrop;
+    this.highlight = config.highlight;
     this.runBtn = config.runBtn;
     this.statusEl = config.statusEl;
     this.outputEl = config.outputEl;
     this.resizeHandle = config.resizeHandle;
     this.executeScript = config.executeScript;
     this.onScriptExecuted = config.onScriptExecuted;
+
+    // Initialize syntax highlighting if tokenize function provided
+    if (config.tokenize) {
+      // SyntaxHighlighter sets up its own event listeners
+      new SyntaxHighlighter({
+        textarea: this.editor,
+        backdrop: this.backdrop,
+        highlight: this.highlight,
+        tokenize: config.tokenize,
+      });
+    }
 
     this.setupEventListeners();
   }
@@ -222,6 +242,8 @@ export class ScriptPanel {
         const value = this.editor.value;
         this.editor.value = value.substring(0, start) + "  " + value.substring(end);
         this.editor.selectionStart = this.editor.selectionEnd = start + 2;
+        // Trigger input event to update syntax highlighting
+        this.editor.dispatchEvent(new Event("input", { bubbles: true }));
       }
     });
 
