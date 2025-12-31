@@ -181,3 +181,23 @@ testdata/                   # Sample .zcd files for testing
 
 - **Stable suites:** smoke, formula, editing, column-move, clipboard, selection
 - **Experimental suites:** collab, initial-sync, collab-demo (may fail)
+
+## Common Mistakes to Avoid
+
+❌ **Wrong:** `bazel build //apps/cli:cells`
+✅ **Right:** `make cli`
+
+❌ **Wrong:** `bazel test //core/...`
+✅ **Right:** `make test`
+
+❌ **Wrong:** `node tests/smoke.test.mjs && node tests/formula.test.mjs`
+✅ **Right:** `cd apps/wasm && npm run test:parallel -- stable`
+
+❌ **Wrong:** `bazel build --config=wasm //apps/wasm:cells_wasm`
+✅ **Right:** `make wasm-dist`
+
+**Why use Makefile targets?**
+- Include correct flags and configurations
+- Handle file copying and setup
+- Are tested and reliable
+- Are documented and consistent
