@@ -88,24 +88,16 @@ Color scheme (dark theme, similar to VS Code):
 - `apps/wasm/src/syntax-highlighter.ts` (new) - SyntaxHighlighter class
 - `apps/wasm/src/script-panel.ts` - Integrate syntax highlighting
 
-## Phase 4: Auto-Indent
+## Phase 4: Tab Indent/Dedent
 
-Add smart indentation when pressing Enter in the script editor.
+Simple indentation using Tab key (no auto-indent on Enter - let users type freely).
 
-Rules:
-- After `then`, `do`, `function`, `else`, `elseif`, `repeat`: increase indent
-- After `end`, `until`: decrease indent (already on same line)
-- Maintain current indent level otherwise
-- Use 2 spaces for indentation (consistent with Tab behavior)
-
-Implementation: Use the lexer to find the last significant token on the current line.
-
-- [x] 4a: Add getIndentForNewLine method to ScriptPanel
-- [x] 4b: Handle Enter key to insert newline with proper indentation
-- [x] 4c: Test indentation with various code patterns
+- [x] 4a: Tab inserts `\t` at cursor when no selection
+- [x] 4b: Tab indents all selected lines with `\t` when there's a selection
+- [x] 4c: Shift+Tab dedents selected lines (removes leading tab or up to 4 spaces)
 
 **Files:**
-- `apps/wasm/src/script-panel.ts` - Add auto-indent logic
+- `apps/wasm/src/script-panel.ts` - Add tab indent/dedent logic
 
 ## Implementation Notes
 

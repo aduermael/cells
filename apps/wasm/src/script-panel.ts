@@ -2,7 +2,6 @@
 // Provides a dedicated panel for writing and executing Luau scripts.
 
 import { SyntaxHighlighter, type TokenizeFunction } from "./syntax-highlighter";
-import type { LuauToken } from "./client-types";
 
 // =============================================================================
 // Types
@@ -46,7 +45,6 @@ export class ScriptPanel {
 
   private executeScript: (script: string) => Promise<ScriptResult>;
   private onScriptExecuted: () => void;
-  private tokenize?: TokenizeFunction;
 
   // =========================================================================
   // State
@@ -87,9 +85,8 @@ export class ScriptPanel {
     this.executeScript = config.executeScript;
     this.onScriptExecuted = config.onScriptExecuted;
 
-    // Initialize syntax highlighting and auto-indent if tokenize function provided
+    // Initialize syntax highlighting if tokenize function provided
     if (config.tokenize) {
-      this.tokenize = config.tokenize;
       // SyntaxHighlighter sets up its own event listeners
       new SyntaxHighlighter({
         textarea: this.editor,
@@ -233,28 +230,23 @@ export class ScriptPanel {
         this.run();
         return;
       }
-      // Enter without modifier: auto-indent
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        this.handleAutoIndent();
-        return;
-      }
       // Escape to hide panel
       if (e.key === "Escape") {
         e.preventDefault();
         this.hide();
         return;
       }
-      // Tab to insert spaces
-      if (e.key === "Tab") {
+      // Tab: indent selection or insert tab
+      if (e.key === "Tab" && !e.shiftKey) {
         e.preventDefault();
-        const start = this.editor.selectionStart;
-        const end = this.editor.selectionEnd;
-        const value = this.editor.value;
-        this.editor.value = value.substring(0, start) + "  " + value.substring(end);
-        this.editor.selectionStart = this.editor.selectionEnd = start + 2;
-        // Trigger input event to update syntax highlighting
-        this.editor.dispatchEvent(new Event("input", { bubbles: true }));
+        this.handleTabIndent();
+        return;
+      }
+      // Shift+Tab: dedent selection
+      if (e.key === "Tab" && e.shiftKey) {
+        e.preventDefault();
+        this.handleTabDedent();
+        return;
       }
     });
 
@@ -288,138 +280,88 @@ export class ScriptPanel {
   }
 
   // =========================================================================
-  // Auto-Indent
+  // Tab Indent/Dedent
   // =========================================================================
 
-  // Keywords that increase indent on next line
-  private static readonly INDENT_INCREASE_KEYWORDS = new Set([
-    "then",
-    "do",
-    "else",
-    "repeat",
-  ]);
-
-  // "function" increases indent when followed by params (not immediately by end)
-  private static readonly FUNCTION_KEYWORD = "function";
-
-  // Keywords that decrease indent (when typed, the line itself should dedent)
-  // Note: Currently unused - future enhancement for auto-dedent on typing "end"
-  // private static readonly INDENT_DECREASE_KEYWORDS = new Set([
-  //   "end",
-  //   "else",
-  //   "elseif",
-  //   "until",
-  // ]);
-
   /**
-   * Calculate the indent level for a new line based on the current line's content.
-   *
-   * @param lineText - The text of the current line
-   * @param tokens - Tokens for the current line only
-   * @returns The indent string to use for the new line
+   * Handle Tab key: indent selected lines or insert tab at cursor.
    */
-  getIndentForNewLine(lineText: string, tokens: LuauToken[]): string {
-    // Get current line's leading whitespace
-    const leadingMatch = lineText.match(/^(\s*)/);
-    const currentIndent = leadingMatch?.[1] ?? "";
+  private handleTabIndent(): void {
+    const start = this.editor.selectionStart;
+    const end = this.editor.selectionEnd;
+    const value = this.editor.value;
 
-    // Find the last significant token (keyword/operator, ignoring comments)
-    let lastSignificant: LuauToken | null = null;
-    let hasFunctionKeyword = false;
-
-    for (const token of tokens) {
-      if (token.type === "comment") continue;
-
-      if (token.type === "keyword") {
-        if (token.text === ScriptPanel.FUNCTION_KEYWORD) {
-          hasFunctionKeyword = true;
-        }
-        lastSignificant = token;
-      } else if (token.type === "operator" || token.type === "name") {
-        lastSignificant = token;
-      }
+    // If no selection, just insert a tab
+    if (start === end) {
+      this.editor.value = value.substring(0, start) + "\t" + value.substring(end);
+      this.editor.selectionStart = this.editor.selectionEnd = start + 1;
+      this.editor.dispatchEvent(new Event("input", { bubbles: true }));
+      return;
     }
 
-    // Check if we should increase indent
-    if (lastSignificant && lastSignificant.type === "keyword") {
-      const kw = lastSignificant.text;
+    // Find line boundaries for selection
+    const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+    const lineEnd = value.indexOf("\n", end - 1);
+    const actualEnd = lineEnd === -1 ? value.length : lineEnd;
 
-      // "function ... )" pattern - increase indent after closing paren
-      // But check if the last token indicates we should increase
-      if (hasFunctionKeyword) {
-        // Find the very last non-comment token
-        let lastToken: LuauToken | null = null;
-        for (const token of tokens) {
-          if (token.type !== "comment") {
-            lastToken = token;
-          }
-        }
-        // After function(...) line, increase indent
-        if (lastToken && lastToken.type === "operator" && lastToken.text === ")") {
-          return currentIndent + "  ";
-        }
-      }
+    // Get the selected lines
+    const selectedText = value.substring(lineStart, actualEnd);
+    const lines = selectedText.split("\n");
 
-      if (ScriptPanel.INDENT_INCREASE_KEYWORDS.has(kw)) {
-        return currentIndent + "  ";
-      }
-    }
+    // Indent each line
+    const indentedLines = lines.map((line) => "\t" + line);
+    const newText = indentedLines.join("\n");
 
-    // Check for function definition ending with )
-    if (hasFunctionKeyword) {
-      let lastToken: LuauToken | null = null;
-      for (const token of tokens) {
-        if (token.type !== "comment") {
-          lastToken = token;
-        }
-      }
-      if (lastToken && lastToken.type === "operator" && lastToken.text === ")") {
-        return currentIndent + "  ";
-      }
-    }
+    // Replace the text
+    this.editor.value =
+      value.substring(0, lineStart) + newText + value.substring(actualEnd);
 
-    // Default: maintain current indent
-    return currentIndent;
+    // Adjust selection to cover all indented lines
+    this.editor.selectionStart = lineStart;
+    this.editor.selectionEnd = lineStart + newText.length;
+
+    this.editor.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
   /**
-   * Handle Enter key press to insert newline with auto-indent.
-   * Returns true if handled, false otherwise.
+   * Handle Shift+Tab: dedent selected lines.
    */
-  private async handleAutoIndent(): Promise<boolean> {
-    if (!this.tokenize) {
-      return false;
-    }
-
+  private handleTabDedent(): void {
     const start = this.editor.selectionStart;
+    const end = this.editor.selectionEnd;
     const value = this.editor.value;
 
-    // Find the current line
+    // Find line boundaries for selection (or cursor line if no selection)
     const lineStart = value.lastIndexOf("\n", start - 1) + 1;
-    const textBeforeCursor = value.substring(lineStart, start);
+    const lineEnd = value.indexOf("\n", end - 1);
+    const actualEnd = lineEnd === -1 ? value.length : lineEnd;
 
-    try {
-      // Tokenize just the text up to the cursor on the current line
-      const tokens = await this.tokenize(textBeforeCursor);
+    // Get the selected lines
+    const selectedText = value.substring(lineStart, actualEnd);
+    const lines = selectedText.split("\n");
 
-      // Calculate the indent for the new line
-      const newIndent = this.getIndentForNewLine(textBeforeCursor, tokens);
+    // Dedent each line (remove leading tab or spaces)
+    const dedentedLines = lines.map((line) => {
+      if (line.startsWith("\t")) {
+        return line.substring(1);
+      }
+      // Also handle spaces (remove up to 4 leading spaces)
+      const match = line.match(/^( {1,4})/);
+      if (match?.[1]) {
+        return line.substring(match[1].length);
+      }
+      return line;
+    });
+    const newText = dedentedLines.join("\n");
 
-      // Insert newline with indent
-      const before = value.substring(0, start);
-      const after = value.substring(start);
-      this.editor.value = before + "\n" + newIndent + after;
+    // Replace the text
+    this.editor.value =
+      value.substring(0, lineStart) + newText + value.substring(actualEnd);
 
-      // Position cursor after the indent
-      const newPos = start + 1 + newIndent.length;
-      this.editor.selectionStart = this.editor.selectionEnd = newPos;
+    // Adjust selection to cover all dedented lines
+    this.editor.selectionStart = lineStart;
+    this.editor.selectionEnd = lineStart + newText.length;
 
-      // Trigger input event to update syntax highlighting
-      this.editor.dispatchEvent(new Event("input", { bubbles: true }));
-
-      return true;
-    } catch {
-      return false;
-    }
+    this.editor.dispatchEvent(new Event("input", { bubbles: true }));
   }
 }
