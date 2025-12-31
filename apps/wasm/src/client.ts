@@ -367,12 +367,12 @@ export class CellsClient {
 
   async insertColumnAt(position: number, insertBefore: boolean): Promise<{ id: string; position: number }> {
     const response = await this._send("insertColumnAt", { position, insertBefore });
-    return { id: response.id as string, position: response.position as number };
+    return { id: response.id as unknown as string, position: response.position as number };
   }
 
   async insertRowAt(position: number, insertBefore: boolean): Promise<{ id: string; position: number }> {
     const response = await this._send("insertRowAt", { position, insertBefore });
-    return { id: response.id as string, position: response.position as number };
+    return { id: response.id as unknown as string, position: response.position as number };
   }
 
   async deleteColumnById(colId: string): Promise<{ success: boolean }> {

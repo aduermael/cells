@@ -8,7 +8,6 @@ import {
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
   CELL_PADDING,
-  COLORS,
   getGridColors,
   type GridColors,
   type NormalizedRange,

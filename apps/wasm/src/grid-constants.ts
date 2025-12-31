@@ -164,6 +164,8 @@ export interface GridRendererState {
   colWidths?: Map<number, number>;
   rowHeights?: Map<number, number>;
   colNames?: Map<number, string>;
+  colPixelOffsets?: Map<number, number>;
+  rowPixelOffsets?: Map<number, number>;
   scrollX?: number;
   scrollY?: number;
   selectedCell?: Position | null;

@@ -57,7 +57,7 @@ export class ClipboardManager {
   private getCells: () => CellData[];
 
   // Callbacks
-  private onFetchViewport: () => Promise<void>;
+  private onFetchViewport: () => void | Promise<void>;
   private onRender: () => void;
 
   constructor(config: {
@@ -65,7 +65,7 @@ export class ClipboardManager {
     getSelectionEnd: () => Position | null;
     getSelectedCell: () => Position | null;
     getCells: () => CellData[];
-    onFetchViewport: () => Promise<void>;
+    onFetchViewport: () => void | Promise<void>;
     onRender: () => void;
   }) {
     this.getSelectionStart = config.getSelectionStart;
