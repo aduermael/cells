@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2025-12-31 20:25 UTC
-Updated At: 2025-12-31 22:05 UTC
+Updated At: 2025-12-31 22:25 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # True AST-Only Formula Storage
@@ -85,16 +85,16 @@ The only special case is file parsing (`parser.cc:480, 593`) which temporarily u
 - [x] 3c: N/A - Code already uses FormulaDisplayConverter for formula text
 - [x] 3d: N/A - No changes needed
 
-## Phase 4: Clean up CRDT payload
+## Phase 4: Clean up CRDT payload ✅
 
 Remove the `display` field from CRDT formula operations.
 
-- [ ] 4a: Update `updateCell()` in bindings.cc to not include `display` field
-- [ ] 4b: Update `createCell()` in bindings.cc similarly
-- [ ] 4c: Update CRDT serialization (for oplog/sync) to not include `display`
-- [ ] 4d: Update CRDT apply to not expect `display` field (backward compat: ignore if present)
-- [ ] 4e: Verify sync between peers still works (UUID formula syncs, display generated locally)
-- [ ] 4f: Verify unit tests pass
+- [x] 4a: Update `updateCell()` in bindings.cc to not include `display` field
+- [x] 4b: Update `createCell()` in bindings.cc similarly
+- [x] 4c: Update fill_range.cc buildFormulaPayload() - removed `display` field
+- [x] 4d: Update CRDT apply - ALREADY ignores `display` field (backward compat preserved)
+- [x] 4e: Update sync_formula_test.cc - removed `display` from all 30+ test payloads
+- [x] 4f: Verify unit tests pass - sync_formula_test passes
 
 ## Phase 5: Verify normalization
 

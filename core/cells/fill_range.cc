@@ -136,11 +136,10 @@ FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, i
 // Helper to build formula payload (similar to buildCellPayload but for formulas)
 std::string buildFormulaPayload(const std::string& formula, const cells::ID& colId,
                                 const cells::ID& rowId) {
-    // Formula payload format includes both value and display
+    // Note: display field omitted - peers generate display strings from AST locally
     std::ostringstream ss;
-    ss << "{\"type\":\"f\",\"value\":\"" << jsonEscape(formula) << "\",\"display\":\""
-       << jsonEscape(formula) << "\",\"col_id\":\"" << colId.toString() << "\",\"row_id\":\""
-       << rowId.toString() << "\"}";
+    ss << "{\"type\":\"f\",\"value\":\"" << jsonEscape(formula) << "\",\"col_id\":\""
+       << colId.toString() << "\",\"row_id\":\"" << rowId.toString() << "\"}";
     return ss.str();
 }
 

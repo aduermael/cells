@@ -127,10 +127,10 @@ protected:
 
     // Helper: Create a formula cell operation with proper UUID format
     // Uses JSON escaping to handle quotes and special chars in formula text
-    std::string makeFormulaPayload(const ID& colId, const ID& rowId, const std::string& uuidFormula,
-                                   const std::string& displayFormula) {
+    // Note: display field is omitted - peers generate display strings from AST locally
+    std::string makeFormulaPayload(const ID& colId, const ID& rowId,
+                                   const std::string& uuidFormula) {
         std::string payload = "{\"type\":\"f\",\"value\":\"" + testJsonEscape(uuidFormula) +
-                              "\",\"display\":\"" + testJsonEscape(displayFormula) +
                               "\",\"col_id\":\"" + colId.toString() + "\",\"row_id\":\"" +
                               rowId.toString() + "\"}";
         return payload;
@@ -154,10 +154,9 @@ TEST_F(SyncFormulaTest, SimpleFormulaDisplaysCorrectlyAfterSync) {
     // Formula is stored as UUID format: =CellB111 (the ID of cell B1)
 
     std::string uuidFormula = sharedCellB1_.toString();  // Just the cell ID for relative ref
-    std::string displayFormula = "=B1";
 
     // Create the operation as Client A would
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
 
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
@@ -201,9 +200,8 @@ TEST_F(SyncFormulaTest, FormulaWithSumDisplaysCorrectlyAfterSync) {
 
     std::string uuidFormula =
         "SUM(~~" + sharedCellA1_.toString() + ":~~" + sharedCellB2_.toString() + ")";
-    std::string displayFormula = "=SUM(A1:B2)";
 
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
     applyOperation(*workbookA_, op);
@@ -226,9 +224,8 @@ TEST_F(SyncFormulaTest, AbsoluteReferenceDisplaysCorrectlyAfterSync) {
     // Absolute reference format: $$cellId
 
     std::string uuidFormula = "$$" + sharedCellA1_.toString();
-    std::string displayFormula = "=$A$1";
 
-    std::string payload = makeFormulaPayload(sharedColB_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColB_, sharedRow2_, uuidFormula);
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellB2_, payload);
 
     applyOperation(*workbookA_, op);
@@ -254,7 +251,7 @@ TEST_F(SyncFormulaTest, MixedReferenceDisplaysCorrectlyAfterSync) {
 
     // Test column absolute
     {
-        std::string payload = makeFormulaPayload(sharedColB_, sharedRow1_, uuidColAbs, "=$A1");
+        std::string payload = makeFormulaPayload(sharedColB_, sharedRow1_, uuidColAbs);
         Operation op = makeCellSetValueOp(*workbookA_, sharedCellB1_, payload);
         applyOperation(*workbookB_, op);
 
@@ -270,9 +267,8 @@ TEST_F(SyncFormulaTest, ComplexFormulaDisplaysCorrectlyAfterSync) {
     std::string uuidFormula = "IF(" + sharedCellA1_.toString() + ">0," + sharedCellB1_.toString() +
                               "*2," + sharedCellA2_.toString() + "+" + sharedCellB2_.toString() +
                               ")";
-    std::string displayFormula = "=IF(A1>0,B1*2,A2+B2)";
 
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
     applyOperation(*workbookA_, op);
@@ -322,9 +318,8 @@ TEST_F(SyncFormulaTest, FormulaReferencingNewCellDisplaysCorrectly) {
 
     // Now enter formula =C1 in cell A2
     std::string uuidFormula = newCellC1.toString();
-    std::string displayFormula = "=C1";
 
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
     applyOperation(*workbookA_, op);
@@ -385,9 +380,8 @@ TEST_F(SyncFormulaTest, DependencyGraphUpdatedOnRemoteFormulaSync) {
 
     // Client A enters formula =B1 in cell A2
     std::string uuidFormula = "~~" + sharedCellB1_.toString();
-    std::string displayFormula = "=B1";
 
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
     // Apply to workbook B (remote operation)
@@ -414,8 +408,7 @@ TEST_F(SyncFormulaTest, DependencyGraphClearedWhenFormulaReplacedWithValue) {
 
     // First, set a formula
     std::string uuidFormula = "~~" + sharedCellB1_.toString();
-    std::string displayFormula = "=B1";
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation op1 = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
     applyOperation(*workbookB_, op1);
 
@@ -450,8 +443,7 @@ TEST_F(SyncFormulaTest, VolatileFunctionTrackedOnRemoteSync) {
 
     // Sync a formula with NOW()
     std::string uuidFormula = "NOW()";
-    std::string displayFormula = "=NOW()";
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
     applyOperation(*workbookB_, op);
 
@@ -479,8 +471,7 @@ TEST_F(SyncFormulaTest, FormulaOperationRoundTrip) {
     // through JSON (network) and string (file) formats
 
     std::string uuidFormula = "~~" + sharedCellB1_.toString();
-    std::string displayFormula = "=B1";
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
 
     Operation original = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
@@ -518,9 +509,8 @@ TEST_F(SyncFormulaTest, ComplexFormulaWithSpecialCharsRoundTrip) {
     // In UUID format, string literals are preserved
     std::string uuidFormula =
         "IF(" + sharedCellA1_.toString() + "=\"test\"," + sharedCellB1_.toString() + ",0)";
-    std::string displayFormula = "=IF(A1=\"test\",B1,0)";
 
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation original = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
     // Verify the payload contains escaped quotes
@@ -550,9 +540,8 @@ TEST_F(SyncFormulaTest, FormulaWithMathOperatorsRoundTrip) {
     // Test formula with all math operators: =A1+B1-A2*B2/2
     std::string uuidFormula = sharedCellA1_.toString() + "+" + sharedCellB1_.toString() + "-" +
                               sharedCellA2_.toString() + "*" + sharedCellB2_.toString() + "/2";
-    std::string displayFormula = "=A1+B1-A2*B2/2";
 
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation original = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
     // Test round-trip
@@ -579,9 +568,8 @@ TEST_F(SyncFormulaTest, NestedFunctionFormulaRoundTrip) {
     std::string uuidFormula = "SUM(IF(~~" + sharedCellA1_.toString() + ">0,~~" +
                               sharedCellA1_.toString() + ":~~" + sharedCellB1_.toString() + ",~~" +
                               sharedCellA2_.toString() + ":~~" + sharedCellB2_.toString() + "))";
-    std::string displayFormula = "=SUM(IF(A1>0,A1:B1,A2:B2))";
 
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation original = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
     // Round-trip through JSON
@@ -609,9 +597,8 @@ TEST_F(SyncFormulaTest, SimpleCellReferenceRoundTrip) {
     // Test the simplest case: =A1
     // For relative references, just use the bare 8-char cell ID
     std::string uuidFormula = sharedCellA1_.toString();
-    std::string displayFormula = "=A1";
 
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
     // Apply to both workbooks
@@ -635,9 +622,8 @@ TEST_F(SyncFormulaTest, RangeReferenceRoundTrip) {
     // Relative references need ~~ prefix in UUID format
     std::string uuidFormula =
         "SUM(~~" + sharedCellA1_.toString() + ":~~" + sharedCellB2_.toString() + ")";
-    std::string displayFormula = "=SUM(A1:B2)";
 
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
     applyOperation(*workbookA_, op);
@@ -657,7 +643,7 @@ TEST_F(SyncFormulaTest, AllAbsoluteReferenceTypesRoundTrip) {
     // Test =$A$1 (fully absolute)
     {
         std::string uuidFormula = "$$" + sharedCellA1_.toString();
-        std::string payload = makeFormulaPayload(sharedColB_, sharedRow2_, uuidFormula, "=$A$1");
+        std::string payload = makeFormulaPayload(sharedColB_, sharedRow2_, uuidFormula);
         Operation op = makeCellSetValueOp(*workbookA_, sharedCellB2_, payload);
         applyOperation(*workbookB_, op);
 
@@ -670,7 +656,7 @@ TEST_F(SyncFormulaTest, AllAbsoluteReferenceTypesRoundTrip) {
     // Test $A1 (column absolute)
     {
         std::string uuidFormula = "$~" + sharedCellA1_.toString();
-        std::string payload = makeFormulaPayload(sharedColB_, sharedRow1_, uuidFormula, "=$A1");
+        std::string payload = makeFormulaPayload(sharedColB_, sharedRow1_, uuidFormula);
         Operation op = makeCellSetValueOp(*workbookA_, sharedCellB1_, payload);
         applyOperation(*workbookB_, op);
 
@@ -684,7 +670,7 @@ TEST_F(SyncFormulaTest, AllAbsoluteReferenceTypesRoundTrip) {
     {
         // Clear and reset to test row absolute
         std::string uuidFormula = "~$" + sharedCellA1_.toString();
-        std::string payload = makeFormulaPayload(sharedColA_, sharedRow1_, uuidFormula, "=A$1");
+        std::string payload = makeFormulaPayload(sharedColA_, sharedRow1_, uuidFormula);
         Operation op = makeCellSetValueOp(*workbookA_, sharedCellA1_, payload);
         applyOperation(*workbookB_, op);
 
@@ -700,9 +686,8 @@ TEST_F(SyncFormulaTest, ConditionalFormulaRoundTrip) {
     // Relative cell references need ~~ prefix in UUID format
     std::string uuidFormula = "IF(~~" + sharedCellA1_.toString() + ">0,~~" +
                               sharedCellB1_.toString() + ",~~" + sharedCellA2_.toString() + ")";
-    std::string displayFormula = "=IF(A1>0,B1,A2)";
 
-    std::string payload = makeFormulaPayload(sharedColB_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColB_, sharedRow2_, uuidFormula);
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellB2_, payload);
 
     applyOperation(*workbookA_, op);
@@ -721,9 +706,8 @@ TEST_F(SyncFormulaTest, MultipleRangesFormulaRoundTrip) {
     std::string uuidFormula = "SUM(~~" + sharedCellA1_.toString() + ":~~" +
                               sharedCellA2_.toString() + ",~~" + sharedCellB1_.toString() + ":~~" +
                               sharedCellB2_.toString() + ")";
-    std::string displayFormula = "=SUM(A1:A2,B1:B2)";
 
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
     applyOperation(*workbookA_, op);
@@ -740,9 +724,8 @@ TEST_F(SyncFormulaTest, TextConcatenationFormulaRoundTrip) {
     // Test formula with string concatenation: =A1&B1
     // Relative cell references need ~~ prefix in UUID format
     std::string uuidFormula = "~~" + sharedCellA1_.toString() + "&~~" + sharedCellB1_.toString();
-    std::string displayFormula = "=A1&B1";
 
-    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation op = makeCellSetValueOp(*workbookA_, sharedCellA2_, payload);
 
     applyOperation(*workbookA_, op);
@@ -774,7 +757,7 @@ TEST_F(SyncFormulaTest, TwoClientsConcurrentValueAndFormula) {
     HLC hlcB = workbookB_->getCurrentHLC();
     // Bare cell ID for relative reference
     std::string uuidFormula = sharedCellB1_.toString();
-    std::string formulaPayload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, "=B1");
+    std::string formulaPayload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation opB(hlcB, OpType::CELL_SET_VALUE, sharedCellA2_, formulaPayload);
 
     // Apply both operations to both workbooks
@@ -819,7 +802,7 @@ TEST_F(SyncFormulaTest, TwoClientsConcurrentEditSameCell) {
     HLC hlcB = workbookB_->getCurrentHLC();
     // Bare cell ID for relative reference
     std::string uuidFormula = sharedCellB1_.toString();
-    std::string formulaPayload = makeFormulaPayload(sharedColA_, sharedRow1_, uuidFormula, "=B1");
+    std::string formulaPayload = makeFormulaPayload(sharedColA_, sharedRow1_, uuidFormula);
     Operation opB(hlcB, OpType::CELL_SET_VALUE, sharedCellA1_, formulaPayload);
 
     // Apply both operations to both workbooks (order shouldn't matter due to LWW)
@@ -844,7 +827,7 @@ TEST_F(SyncFormulaTest, FormulaCreatedBeforeReferencedCellValue) {
     // Client A sets formula =B1 in A2
     // Bare cell ID for relative reference
     std::string uuidFormula = sharedCellB1_.toString();
-    std::string formulaPayload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, "=B1");
+    std::string formulaPayload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula);
     Operation opFormula = makeCellSetValueOp(*workbookA_, sharedCellA2_, formulaPayload);
 
     // Apply formula to workbook B
@@ -885,12 +868,12 @@ TEST_F(SyncFormulaTest, ChainedFormulasSync) {
 
     // Set B1 = A1+1 (use ~~ prefix for formula parser to track dependencies)
     std::string uuidB1 = "~~" + sharedCellA1_.toString() + "+1";
-    std::string payloadB1 = makeFormulaPayload(sharedColB_, sharedRow1_, uuidB1, "=A1+1");
+    std::string payloadB1 = makeFormulaPayload(sharedColB_, sharedRow1_, uuidB1);
     Operation opB1 = makeCellSetValueOp(*workbookA_, sharedCellB1_, payloadB1);
 
     // Set A2 = B1*2 (use ~~ prefix for formula parser to track dependencies)
     std::string uuidA2 = "~~" + sharedCellB1_.toString() + "*2";
-    std::string payloadA2 = makeFormulaPayload(sharedColA_, sharedRow2_, uuidA2, "=B1*2");
+    std::string payloadA2 = makeFormulaPayload(sharedColA_, sharedRow2_, uuidA2);
     Operation opA2 = makeCellSetValueOp(*workbookA_, sharedCellA2_, payloadA2);
 
     // Apply all to workbook B
@@ -1084,9 +1067,9 @@ TEST_F(SyncFormulaTest, DeletedCellReferenceShowsRefError) {
     workbookA_->getSheetByIndex(0)->addCell(std::move(cellA2));
 
     // Formula =B1 (references sharedCellB1_)
+    // Note: display field omitted - peers generate display strings from AST locally
     std::string uuidFormula = sharedCellB1_.toString();
-    std::string payload =
-        "{\"type\":\"f\",\"value\":\"" + testJsonEscape(uuidFormula) + "\",\"display\":\"B1\"}";
+    std::string payload = makeFormulaPayload(colA->id, row2->id, uuidFormula);
     Operation setFormulaOp(workbookA_->getCurrentHLC(), OpType::CELL_SET_VALUE, formulaCellA2,
                            payload);
     applyOperation(*workbookA_, setFormulaOp);
@@ -1137,8 +1120,7 @@ TEST_F(SyncFormulaTest, DeletedCellRemovesFromDependencyGraph) {
 
     // Set formula =A1 (use ~~ prefix for cell reference in UUID format)
     std::string uuidFormula = "~~" + sharedCellA1_.toString();
-    std::string displayFormula = "=A1";
-    std::string payload = makeFormulaPayload(colA->id, row3->id, uuidFormula, displayFormula);
+    std::string payload = makeFormulaPayload(colA->id, row3->id, uuidFormula);
     Operation setFormulaOp(workbookA_->getCurrentHLC(), OpType::CELL_SET_VALUE, formulaCell,
                            payload);
     applyOperation(*workbookA_, setFormulaOp);
@@ -1172,7 +1154,8 @@ TEST_F(SyncFormulaTest, DeletedVolatileCellUnmarkedFromDependencyGraph) {
     sheet->addCell(std::move(cell));
 
     // Set formula =NOW() (volatile)
-    std::string payload = "{\"type\":\"f\",\"value\":\"NOW()\",\"display\":\"NOW()\"}";
+    // Note: display field omitted - peers generate display strings from AST locally
+    std::string payload = makeFormulaPayload(colA->id, row4->id, "NOW()");
     Operation setFormulaOp(workbookA_->getCurrentHLC(), OpType::CELL_SET_VALUE, volatileCell,
                            payload);
     applyOperation(*workbookA_, setFormulaOp);

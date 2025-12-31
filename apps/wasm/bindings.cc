@@ -25,6 +25,7 @@
 #include "core/cells/formula_eval.h"
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_resolver.h"
+#include "core/cells/formula_serializer.h"
 #include "core/cells/hlc.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
@@ -192,16 +193,13 @@ public:
 
                 for (const auto& [cellId, cell] : sheet->cells) {
                     if (cell->isFormula() && cell->formula != nullptr) {
-                        // Parse the formula text (UUID format) into AST
-                        // This is required for evaluation
-                        if (cell->formula->parse()) {
-                            // Add to dependency graph for reactive updates
-                            if (depGraph != nullptr && cell->formula->ast != nullptr) {
-                                depGraph->addFormula(cell->id, cell->formula->ast, positionResolver);
-                                // Track volatile functions
-                                if (cell->formula->hasVolatile()) {
-                                    depGraph->markVolatile(cell->id);
-                                }
+                        // AST is already parsed (stored directly in formula)
+                        // Add to dependency graph for reactive updates
+                        if (depGraph != nullptr && cell->formula->ast != nullptr) {
+                            depGraph->addFormula(cell->id, cell->formula->ast, positionResolver);
+                            // Track volatile functions
+                            if (cell->formula->hasVolatile()) {
+                                depGraph->markVolatile(cell->id);
                             }
                         }
                         formulaCells.push_back(cellId);
@@ -284,16 +282,13 @@ public:
 
                 for (const auto& [cellId, cell] : sheet->cells) {
                     if (cell->isFormula() && cell->formula != nullptr) {
-                        // Parse the formula text (UUID format) into AST
-                        // This is required for evaluation
-                        if (cell->formula->parse()) {
-                            // Add to dependency graph for reactive updates
-                            if (depGraph != nullptr && cell->formula->ast != nullptr) {
-                                depGraph->addFormula(cell->id, cell->formula->ast, positionResolver);
-                                // Track volatile functions
-                                if (cell->formula->hasVolatile()) {
-                                    depGraph->markVolatile(cell->id);
-                                }
+                        // AST is already parsed (stored directly in formula)
+                        // Add to dependency graph for reactive updates
+                        if (depGraph != nullptr && cell->formula->ast != nullptr) {
+                            depGraph->addFormula(cell->id, cell->formula->ast, positionResolver);
+                            // Track volatile functions
+                            if (cell->formula->hasVolatile()) {
+                                depGraph->markVolatile(cell->id);
                             }
                         }
                         formulaCells.push_back(cellId);
@@ -641,8 +636,10 @@ public:
                 json << "\"type\":\"f\",";
                 Formula* formula = entry.cell->getFormula();
                 std::string a1Formula;
-                if (formula != nullptr && formula->text != nullptr) {
-                    a1Formula = _refConverter.formulaToA1(formula->text);
+                if (formula != nullptr && formula->ast != nullptr) {
+                    // Generate UUID formula from AST, then convert to A1 for display
+                    const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
+                    a1Formula = _refConverter.formulaToA1(uuidFormula);
                     json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
                 }
 
@@ -830,7 +827,8 @@ public:
         std::string payload;
         if (typeChar == 'f') {
             std::string uuidFormula = _refConverter.formulaToUuid(value);
-            payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\",\"display\":\"" + jsonEscape(value) + "\"" + idSuffix;
+            // Note: display field omitted - peers generate display strings from AST locally
+            payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
         } else if (typeChar == 'b') {
             payload = "{\"type\":\"b\",\"value\":\"" + std::string(value == "TRUE" || value == "true" ? "true" : "false") + "\"" + idSuffix;
         } else if (typeChar == 'n') {
@@ -926,7 +924,8 @@ public:
         std::string payload;
         if (!value.empty() && value[0] == '=') {
             std::string uuidFormula = _refConverter.formulaToUuid(value);
-            payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\",\"display\":\"" + jsonEscape(value) + "\"" + idSuffix;
+            // Note: display field omitted - peers generate display strings from AST locally
+            payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
         } else if (value == "TRUE" || value == "true") {
             payload = "{\"type\":\"b\",\"value\":\"true\"" + idSuffix;
         } else if (value == "FALSE" || value == "false") {
@@ -1055,8 +1054,9 @@ public:
                 // Include value/formula
                 if (cell->isFormula()) {
                     Formula* formula = cell->getFormula();
-                    if (formula != nullptr && formula->text != nullptr) {
-                        std::string a1Formula = _refConverter.formulaToA1(formula->text);
+                    if (formula != nullptr && formula->ast != nullptr) {
+                        const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
+                        std::string a1Formula = _refConverter.formulaToA1(uuidFormula);
                         json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
                     }
                     json << "\"value\":\"" << jsonEscape(cell->value.raw) << "\"";
@@ -2781,10 +2781,11 @@ public:
         if (!cell || !cell->isFormula()) return "";
 
         Formula* formula = cell->getFormula();
-        if (!formula || !formula->text) return "";
+        if (!formula || !formula->ast) return "";
 
-        // Convert UUID format to A1 notation
-        return _refConverter.formulaToA1(formula->text);
+        // Generate UUID formula from AST, then convert to A1 notation
+        const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
+        return _refConverter.formulaToA1(uuidFormula);
     }
 
     // Get dependencies for a cell's formula (what cells this formula reads from).
