@@ -2,6 +2,7 @@
 // Provides a dedicated panel for writing and executing Luau scripts.
 
 import { SyntaxHighlighter, type TokenizeFunction } from "./syntax-highlighter";
+import type { LuauToken } from "./client-types";
 
 // =============================================================================
 // Types
@@ -45,6 +46,7 @@ export class ScriptPanel {
 
   private executeScript: (script: string) => Promise<ScriptResult>;
   private onScriptExecuted: () => void;
+  private tokenize?: TokenizeFunction;
 
   // =========================================================================
   // State
@@ -85,8 +87,9 @@ export class ScriptPanel {
     this.executeScript = config.executeScript;
     this.onScriptExecuted = config.onScriptExecuted;
 
-    // Initialize syntax highlighting if tokenize function provided
+    // Initialize syntax highlighting and smart indent if tokenize function provided
     if (config.tokenize) {
+      this.tokenize = config.tokenize;
       // SyntaxHighlighter sets up its own event listeners
       new SyntaxHighlighter({
         textarea: this.editor,
@@ -283,8 +286,24 @@ export class ScriptPanel {
   // Tab Indent/Dedent
   // =========================================================================
 
+  // Keywords that increase indent for the next line
+  private static readonly INDENT_INCREASE = new Set([
+    "then",
+    "do",
+    "else",
+    "repeat",
+  ]);
+
+  // Keywords that decrease indent for the current line
+  private static readonly INDENT_DECREASE = new Set([
+    "end",
+    "else",
+    "elseif",
+    "until",
+  ]);
+
   /**
-   * Handle Tab key: indent selected lines or insert tab at cursor.
+   * Handle Tab key: insert tab at cursor, or smart-indent selection.
    */
   private handleTabIndent(): void {
     const start = this.editor.selectionStart;
@@ -299,69 +318,193 @@ export class ScriptPanel {
       return;
     }
 
-    // Find line boundaries for selection
-    const lineStart = value.lastIndexOf("\n", start - 1) + 1;
-    const lineEnd = value.indexOf("\n", end - 1);
-    const actualEnd = lineEnd === -1 ? value.length : lineEnd;
-
-    // Get the selected lines
-    const selectedText = value.substring(lineStart, actualEnd);
-    const lines = selectedText.split("\n");
-
-    // Indent each line
-    const indentedLines = lines.map((line) => "\t" + line);
-    const newText = indentedLines.join("\n");
-
-    // Replace the text
-    this.editor.value =
-      value.substring(0, lineStart) + newText + value.substring(actualEnd);
-
-    // Adjust selection to cover all indented lines
-    this.editor.selectionStart = lineStart;
-    this.editor.selectionEnd = lineStart + newText.length;
-
-    this.editor.dispatchEvent(new Event("input", { bubbles: true }));
+    // With selection: smart re-indent
+    this.smartIndentSelection();
   }
 
   /**
-   * Handle Shift+Tab: dedent selected lines.
+   * Handle Shift+Tab: dedent current line, or smart-indent selection.
    */
   private handleTabDedent(): void {
     const start = this.editor.selectionStart;
     const end = this.editor.selectionEnd;
     const value = this.editor.value;
 
-    // Find line boundaries for selection (or cursor line if no selection)
+    // If there's a selection, do smart re-indent (same as Tab)
+    if (start !== end) {
+      this.smartIndentSelection();
+      return;
+    }
+
+    // No selection: dedent current line, keep cursor position
     const lineStart = value.lastIndexOf("\n", start - 1) + 1;
-    const lineEnd = value.indexOf("\n", end - 1);
+    const lineEnd = value.indexOf("\n", start);
     const actualEnd = lineEnd === -1 ? value.length : lineEnd;
+    const line = value.substring(lineStart, actualEnd);
 
-    // Get the selected lines
-    const selectedText = value.substring(lineStart, actualEnd);
-    const lines = selectedText.split("\n");
+    let newLine = line;
+    let removed = 0;
 
-    // Dedent each line (remove leading tab or spaces)
-    const dedentedLines = lines.map((line) => {
-      if (line.startsWith("\t")) {
-        return line.substring(1);
-      }
-      // Also handle spaces (remove up to 4 leading spaces)
+    if (line.startsWith("\t")) {
+      newLine = line.substring(1);
+      removed = 1;
+    } else {
       const match = line.match(/^( {1,4})/);
       if (match?.[1]) {
-        return line.substring(match[1].length);
+        newLine = line.substring(match[1].length);
+        removed = match[1].length;
       }
-      return line;
-    });
-    const newText = dedentedLines.join("\n");
+    }
+
+    if (removed > 0) {
+      this.editor.value =
+        value.substring(0, lineStart) + newLine + value.substring(actualEnd);
+      // Adjust cursor position
+      const newCursor = Math.max(lineStart, start - removed);
+      this.editor.selectionStart = this.editor.selectionEnd = newCursor;
+      this.editor.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+  }
+
+  /**
+   * Smart re-indent selected lines based on code block hierarchy.
+   * Uses the tokenizer to analyze code structure.
+   */
+  private async smartIndentSelection(): Promise<void> {
+    const start = this.editor.selectionStart;
+    const end = this.editor.selectionEnd;
+    const value = this.editor.value;
+
+    // Find line boundaries for selection
+    const selLineStart = value.lastIndexOf("\n", start - 1) + 1;
+    const selLineEnd = value.indexOf("\n", end - 1);
+    const actualEnd = selLineEnd === -1 ? value.length : selLineEnd;
+
+    // Get the text before selection to determine starting indent level
+    const textBefore = value.substring(0, selLineStart);
+
+    // Get selected lines
+    const selectedText = value.substring(selLineStart, actualEnd);
+    const lines = selectedText.split("\n");
+
+    // Calculate base indent from context before selection
+    let baseIndent = 0;
+    if (this.tokenize && textBefore) {
+      try {
+        const tokens = await this.tokenize(textBefore);
+        baseIndent = this.calculateIndentLevel(tokens);
+      } catch {
+        // Fallback: no base indent
+      }
+    }
+
+    // Re-indent each line based on its content
+    const reindentedLines: string[] = [];
+    let currentIndent = baseIndent;
+
+    for (const line of lines) {
+      // Strip existing leading whitespace
+      const stripped = line.replace(/^[\t ]*/, "");
+
+      if (!stripped) {
+        // Empty line: keep empty
+        reindentedLines.push("");
+        continue;
+      }
+
+      // Check if this line starts with a dedent keyword
+      let lineIndent = currentIndent;
+      const firstWord = stripped.match(/^(\w+)/)?.[1];
+      if (firstWord && ScriptPanel.INDENT_DECREASE.has(firstWord)) {
+        lineIndent = Math.max(0, currentIndent - 1);
+      }
+
+      // Apply indent
+      const tabs = "\t".repeat(lineIndent);
+      reindentedLines.push(tabs + stripped);
+
+      // Update indent for next line based on this line's content
+      if (this.tokenize) {
+        try {
+          const lineTokens = await this.tokenize(stripped);
+          currentIndent = lineIndent + this.getIndentDelta(lineTokens);
+        } catch {
+          // Keep current indent on error
+        }
+      }
+    }
+
+    const newText = reindentedLines.join("\n");
 
     // Replace the text
     this.editor.value =
-      value.substring(0, lineStart) + newText + value.substring(actualEnd);
+      value.substring(0, selLineStart) + newText + value.substring(actualEnd);
 
-    // Adjust selection to cover all dedented lines
-    this.editor.selectionStart = lineStart;
-    this.editor.selectionEnd = lineStart + newText.length;
+    // Keep selection on the re-indented lines
+    this.editor.selectionStart = selLineStart;
+    this.editor.selectionEnd = selLineStart + newText.length;
 
     this.editor.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  /**
+   * Calculate current indent level from tokens.
+   * Counts net nesting from block openers/closers.
+   */
+  private calculateIndentLevel(tokens: LuauToken[]): number {
+    let level = 0;
+
+    for (const token of tokens) {
+      if (token.type !== "keyword") continue;
+
+      if (ScriptPanel.INDENT_INCREASE.has(token.text)) {
+        level++;
+      } else if (token.text === "function") {
+        // function increases indent (will be followed by params and body)
+        level++;
+      } else if (ScriptPanel.INDENT_DECREASE.has(token.text)) {
+        level = Math.max(0, level - 1);
+      }
+    }
+
+    return level;
+  }
+
+  /**
+   * Get indent delta for next line based on line's tokens.
+   * Returns +1 if line ends with block opener, -1 if it's a closer, 0 otherwise.
+   */
+  private getIndentDelta(tokens: LuauToken[]): number {
+    // Find last significant keyword
+    let lastKeyword: string | null = null;
+    let hasFunction = false;
+    let lastToken: LuauToken | null = null;
+
+    for (const token of tokens) {
+      if (token.type === "comment") continue;
+      lastToken = token;
+      if (token.type === "keyword") {
+        lastKeyword = token.text;
+        if (token.text === "function") {
+          hasFunction = true;
+        }
+      }
+    }
+
+    // Check for function definition ending with )
+    if (hasFunction && lastToken?.type === "operator" && lastToken.text === ")") {
+      return 1;
+    }
+
+    // Check last keyword
+    if (lastKeyword) {
+      if (ScriptPanel.INDENT_INCREASE.has(lastKeyword)) {
+        return 1;
+      }
+      // end/until on their own line means next line stays same level
+      // (the dedent was already applied to this line)
+    }
+
+    return 0;
   }
 }

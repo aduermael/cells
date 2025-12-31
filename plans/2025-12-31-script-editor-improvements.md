@@ -90,14 +90,16 @@ Color scheme (dark theme, similar to VS Code):
 
 ## Phase 4: Tab Indent/Dedent
 
-Simple indentation using Tab key (no auto-indent on Enter - let users type freely).
+Smart indentation using Tab key (no auto-indent on Enter - let users type freely).
 
 - [x] 4a: Tab inserts `\t` at cursor when no selection
-- [x] 4b: Tab indents all selected lines with `\t` when there's a selection
-- [x] 4c: Shift+Tab dedents selected lines (removes leading tab or up to 4 spaces)
+- [x] 4b: Tab/Shift+Tab with selection: smart re-indent based on code block hierarchy
+- [x] 4c: Shift+Tab without selection: dedent current line (keep cursor position)
+- [x] 4d: Increase syntax highlighting debounce to 150ms for smoother typing
 
 **Files:**
-- `apps/wasm/src/script-panel.ts` - Add tab indent/dedent logic
+- `apps/wasm/src/script-panel.ts` - Add smart indent logic using tokenizer
+- `apps/wasm/src/syntax-highlighter.ts` - Increase debounce timeout
 
 ## Implementation Notes
 

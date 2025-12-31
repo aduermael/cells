@@ -148,7 +148,7 @@ export class SyntaxHighlighter {
     }
     this.debounceTimeout = setTimeout(() => {
       this.update();
-    }, 50); // 50ms debounce for smooth typing
+    }, 150); // 150ms debounce - balance between responsiveness and performance
   }
 
   /**
