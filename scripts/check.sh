@@ -35,79 +35,105 @@ for arg in "$@"; do
 done
 
 FAILED=0
+SCRIPT_START=$(date +%s)
+
+# Timing helper
+time_cmd() {
+    local start=$(date +%s)
+    "$@"
+    local status=$?
+    local end=$(date +%s)
+    local elapsed=$((end - start))
+    echo -e "${BOLD}Time: ${elapsed}s${NC}"
+    return $status
+}
 
 # 1. Unit tests (C++)
 echo -e "${BOLD}=== Unit Tests (C++) ===${NC}"
-if command -v bazel &> /dev/null; then
-    if ! bazel test //core/...; then
-        FAILED=1
+unit_test_cmd() {
+    if command -v bazel &> /dev/null; then
+        bazel test //core/...
+    elif command -v bazelisk &> /dev/null; then
+        bazelisk test //core/...
+    else
+        echo -e "${YELLOW}Bazel not found, skipping unit tests${NC}"
+        return 0
     fi
-elif command -v bazelisk &> /dev/null; then
-    if ! bazelisk test //core/...; then
-        FAILED=1
-    fi
-else
-    echo -e "${YELLOW}Bazel not found, skipping unit tests${NC}"
+}
+if ! time_cmd unit_test_cmd; then
+    FAILED=1
 fi
 
 echo ""
 
 # 2. Lint
 echo -e "${BOLD}=== Lint Check ($JOBS parallel) ===${NC}"
-if $FIX_MODE; then
-    if ! "$SCRIPT_DIR/lint.sh" --fix; then
-        FAILED=1
+lint_cmd() {
+    if $FIX_MODE; then
+        "$SCRIPT_DIR/lint.sh" --fix
+    else
+        "$SCRIPT_DIR/lint.sh"
     fi
-else
-    if ! "$SCRIPT_DIR/lint.sh"; then
-        FAILED=1
-    fi
+}
+if ! time_cmd lint_cmd; then
+    FAILED=1
 fi
 
 echo ""
 
 # 3. Type checks (TypeScript)
 echo -e "${BOLD}=== Type Check (TypeScript) ===${NC}"
-if [ -f "$PROJECT_ROOT/apps/wasm/package.json" ]; then
-    if ! (cd "$PROJECT_ROOT/apps/wasm" && npm run check-types); then
-        FAILED=1
+typecheck_cmd() {
+    if [ -f "$PROJECT_ROOT/apps/wasm/package.json" ]; then
+        (cd "$PROJECT_ROOT/apps/wasm" && npm run check-types)
+    else
+        echo -e "${YELLOW}apps/wasm not found, skipping type checks${NC}"
+        return 0
     fi
-else
-    echo -e "${YELLOW}apps/wasm not found, skipping type checks${NC}"
+}
+if ! time_cmd typecheck_cmd; then
+    FAILED=1
 fi
 
 echo ""
 
 # 4. Integration tests (E2E)
 echo -e "${BOLD}=== Integration Tests (E2E, $JOBS parallel) ===${NC}"
-if [ -f "$PROJECT_ROOT/apps/wasm/tests/run-parallel.mjs" ]; then
-    if ! (cd "$PROJECT_ROOT/apps/wasm" && npm run test:parallel -- --concurrency "$JOBS" stable); then
-        FAILED=1
+e2e_cmd() {
+    if [ -f "$PROJECT_ROOT/apps/wasm/tests/run-parallel.mjs" ]; then
+        (cd "$PROJECT_ROOT/apps/wasm" && npm run test:parallel -- --concurrency "$JOBS" stable)
+    else
+        echo -e "${YELLOW}E2E test runner not found, skipping integration tests${NC}"
+        return 0
     fi
-else
-    echo -e "${YELLOW}E2E test runner not found, skipping integration tests${NC}"
+}
+if ! time_cmd e2e_cmd; then
+    FAILED=1
 fi
 
 echo ""
 
 # 5. Format check (last, easiest to fix)
 echo -e "${BOLD}=== Format Check ($JOBS parallel) ===${NC}"
-if $FIX_MODE; then
-    if ! "$SCRIPT_DIR/format.sh"; then
-        FAILED=1
+format_cmd() {
+    if $FIX_MODE; then
+        "$SCRIPT_DIR/format.sh"
+    else
+        "$SCRIPT_DIR/format.sh" --check
     fi
-else
-    if ! "$SCRIPT_DIR/format.sh" --check; then
-        FAILED=1
-    fi
+}
+if ! time_cmd format_cmd; then
+    FAILED=1
 fi
 
 echo ""
 
 # Summary
+SCRIPT_END=$(date +%s)
+TOTAL_TIME=$((SCRIPT_END - SCRIPT_START))
 if [ $FAILED -ne 0 ]; then
-    echo -e "${RED}${BOLD}Some checks failed!${NC}"
+    echo -e "${RED}${BOLD}Some checks failed!${NC} (total: ${TOTAL_TIME}s)"
     exit 1
 else
-    echo -e "${GREEN}${BOLD}All checks passed!${NC}"
+    echo -e "${GREEN}${BOLD}All checks passed!${NC} (total: ${TOTAL_TIME}s)"
 fi

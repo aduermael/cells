@@ -60,7 +60,11 @@ cc_library(
         "Compiler/include",
         "Compiler/src",
     ],
-    copts = ["-std=c++17"],
+    copts = [
+        "-std=c++17",
+        # Suppress warnings in upstream Luau code we don't control
+        "-Wno-unused-but-set-variable",
+    ],
     deps = [":luau_ast"],
 )
 
