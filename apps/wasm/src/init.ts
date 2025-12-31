@@ -186,6 +186,8 @@ export function initApp(): AppContext {
         : -1,
       formulaHighlights: app.formulaHighlights,
       discoveredRows: app.discoveredRows,
+      isFillDragging: app.isFillDragging,
+      fillPreviewRange: app.fillPreviewRange,
     });
   }
 
@@ -1107,6 +1109,11 @@ export function initApp(): AppContext {
 
     getDiscoveredRows: () => app.discoveredRows,
     setDiscoveredRows: (v) => { app.discoveredRows = v; },
+
+    getIsFillDragging: () => app.isFillDragging,
+    setIsFillDragging: (v) => { app.isFillDragging = v; },
+    getFillPreviewRange: () => app.fillPreviewRange,
+    setFillPreviewRange: (v) => { app.fillPreviewRange = v; },
 
     render,
     updateFormulaBar,

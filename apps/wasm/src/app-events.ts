@@ -127,6 +127,12 @@ export interface AppEventManagerConfig {
     getDiscoveredRows: () => number;
     setDiscoveredRows: (v: number) => void;
 
+    // Fill drag state accessors/mutators
+    getIsFillDragging: () => boolean;
+    setIsFillDragging: (v: boolean) => void;
+    getFillPreviewRange: () => { minCol: number; maxCol: number; minRow: number; maxRow: number } | null;
+    setFillPreviewRange: (v: { minCol: number; maxCol: number; minRow: number; maxRow: number } | null) => void;
+
     // Callbacks
     render: () => void;
     updateFormulaBar: () => void;
@@ -170,9 +176,6 @@ export class AppEventManager {
 
     /** Start position for drag-selecting a range during formula editing */
     private formulaDragStart: Position | null = null;
-
-    /** Whether we're currently dragging the fill handle */
-    private isFillDragging = false;
 
     /** Original selection bounds when fill drag started (to preserve dimensions on non-dragged axis) */
     private fillDragOriginalBounds: {
@@ -675,10 +678,10 @@ export class AppEventManager {
         // Fill handle click - start fill drag
         if (this.isPointInFillHandle(x, y)) {
             const selStart = getSelectionStart();
-            const { getSelectionEnd } = this.config;
+            const { getSelectionEnd, setIsFillDragging } = this.config;
             const selEnd = getSelectionEnd();
             if (selStart && selEnd) {
-                this.isFillDragging = true;
+                setIsFillDragging(true);
                 // Store original selection bounds to preserve dimensions on non-dragged axis
                 this.fillDragOriginalBounds = {
                     minCol: Math.min(selStart.col, selEnd.col),
@@ -814,8 +817,9 @@ export class AppEventManager {
         const colWidths = getColWidths();
         const rowHeights = getRowHeights();
 
-        // Handle fill handle drag (extend selection on single axis, dynamic axis based on delta)
-        if (this.isFillDragging && this.fillDragOriginalBounds) {
+        // Handle fill handle drag (show preview on single axis, dynamic axis based on delta)
+        const { getIsFillDragging, getFillPreviewRange, setFillPreviewRange } = this.config;
+        if (getIsFillDragging() && this.fillDragOriginalBounds) {
             const discoveredRows = this.config.getDiscoveredRows();
             const maxRows = Math.max(sheetInfo.rowCount, discoveredRows);
             const bounds = this.fillDragOriginalBounds;
@@ -829,19 +833,15 @@ export class AppEventManager {
                 // Determine axis based on which delta is currently larger
                 const axis = dx > dy ? "x" : "y";
 
-                // Get current selection to check if update needed
-                const { getSelectionEnd } = this.config;
-                const currentEnd = getSelectionEnd();
-
-                let newStartCol: number,
-                    newEndCol: number,
-                    newStartRow: number,
-                    newEndRow: number;
+                let newMinCol: number,
+                    newMaxCol: number,
+                    newMinRow: number,
+                    newMaxRow: number;
 
                 if (axis === "x") {
                     // Horizontal drag - preserve original row bounds, extend/shrink columns
-                    newStartRow = bounds.minRow;
-                    newEndRow = bounds.maxRow;
+                    newMinRow = bounds.minRow;
+                    newMaxRow = bounds.maxRow;
 
                     // Find target column using midpoint snapping
                     const targetCol = this.getColAtXMidpoint(
@@ -853,18 +853,18 @@ export class AppEventManager {
 
                     // Determine direction based on target position relative to original bounds
                     if (targetCol < bounds.minCol) {
-                        // Extending/shrinking left from minCol
-                        newStartCol = targetCol;
-                        newEndCol = bounds.maxCol;
+                        // Extending left from minCol
+                        newMinCol = targetCol;
+                        newMaxCol = bounds.maxCol;
                     } else {
-                        // Extending/shrinking right from maxCol (can shrink within original)
-                        newStartCol = bounds.minCol;
-                        newEndCol = Math.max(bounds.minCol, targetCol); // At least keep minCol
+                        // Extending right from maxCol
+                        newMinCol = bounds.minCol;
+                        newMaxCol = Math.max(bounds.maxCol, targetCol);
                     }
                 } else {
                     // Vertical drag - preserve original column bounds, extend/shrink rows
-                    newStartCol = bounds.minCol;
-                    newEndCol = bounds.maxCol;
+                    newMinCol = bounds.minCol;
+                    newMaxCol = bounds.maxCol;
 
                     // Find target row using midpoint snapping
                     const targetRow = this.getRowAtYMidpoint(
@@ -876,27 +876,31 @@ export class AppEventManager {
 
                     // Determine direction based on target position relative to original bounds
                     if (targetRow < bounds.minRow) {
-                        // Extending/shrinking up from minRow
-                        newStartRow = targetRow;
-                        newEndRow = bounds.maxRow;
+                        // Extending up from minRow
+                        newMinRow = targetRow;
+                        newMaxRow = bounds.maxRow;
                     } else {
-                        // Extending/shrinking down from maxRow (can shrink within original)
-                        newStartRow = bounds.minRow;
-                        newEndRow = Math.max(bounds.minRow, targetRow); // At least keep minRow
+                        // Extending down from maxRow
+                        newMinRow = bounds.minRow;
+                        newMaxRow = Math.max(bounds.maxRow, targetRow);
                     }
                 }
 
-                // Only update if actually changed
-                const { setSelectionStart } = this.config;
+                // Only update preview if actually changed
+                const currentPreview = getFillPreviewRange();
                 if (
-                    !currentEnd ||
-                    newStartCol !== bounds.minCol ||
-                    newEndCol !== currentEnd.col ||
-                    newStartRow !== bounds.minRow ||
-                    newEndRow !== currentEnd.row
+                    !currentPreview ||
+                    newMinCol !== currentPreview.minCol ||
+                    newMaxCol !== currentPreview.maxCol ||
+                    newMinRow !== currentPreview.minRow ||
+                    newMaxRow !== currentPreview.maxRow
                 ) {
-                    setSelectionStart({ col: newStartCol, row: newStartRow });
-                    setSelectionEnd({ col: newEndCol, row: newEndRow });
+                    setFillPreviewRange({
+                        minCol: newMinCol,
+                        maxCol: newMaxCol,
+                        minRow: newMinRow,
+                        maxRow: newMaxRow,
+                    });
                     render();
                 }
             }
@@ -1121,11 +1125,20 @@ export class AppEventManager {
         const rowHeights = getRowHeights();
 
         // End fill handle drag (if active)
-        if (this.isFillDragging) {
-            this.isFillDragging = false;
+        const { getIsFillDragging, setIsFillDragging, getFillPreviewRange, setFillPreviewRange, setSelectionStart, setSelectionEnd } = this.config;
+        if (getIsFillDragging()) {
+            // Apply the fill preview to the actual selection
+            const preview = getFillPreviewRange();
+            if (preview) {
+                setSelectionStart({ col: preview.minCol, row: preview.minRow });
+                setSelectionEnd({ col: preview.maxCol, row: preview.maxRow });
+            }
+            // Clear fill drag state
+            setIsFillDragging(false);
+            setFillPreviewRange(null);
             this.fillDragOriginalBounds = null;
             canvas.style.cursor = "default";
-            // Selection is already updated during drag, just need to update formula bar
+            render();
             updateFormulaBar();
         }
 
@@ -1302,11 +1315,15 @@ export class AppEventManager {
             setSelectedCell,
             render,
             updateFormulaBar,
+            getIsFillDragging,
+            setIsFillDragging,
+            setFillPreviewRange,
         } = this.config;
 
         // Clear fill drag state
-        if (this.isFillDragging) {
-            this.isFillDragging = false;
+        if (getIsFillDragging()) {
+            setIsFillDragging(false);
+            setFillPreviewRange(null);
             this.fillDragOriginalBounds = null;
             canvas.style.cursor = "default";
         }

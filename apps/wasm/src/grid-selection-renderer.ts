@@ -356,3 +356,69 @@ export function isPointInFillHandle(
     point.row <= y + height + padding
   );
 }
+
+/** Fill preview range type */
+export interface FillPreviewRange {
+  minCol: number;
+  maxCol: number;
+  minRow: number;
+  maxRow: number;
+}
+
+/**
+ * Draw the fill preview (dashed border showing target range during fill drag)
+ * This shows the area that will be filled when the user releases the mouse.
+ */
+export function drawFillPreview(
+  ctx: CanvasRenderingContext2D,
+  state: SelectionRendererState,
+  previewRange: FillPreviewRange,
+  viewWidth: number,
+  viewHeight: number
+): void {
+  // Calculate preview bounds
+  let previewX = HEADER_WIDTH - state.scrollX;
+  for (let i = 0; i < previewRange.minCol; i++) {
+    previewX += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+  }
+  let previewY = HEADER_HEIGHT - state.scrollY;
+  for (let i = 0; i < previewRange.minRow; i++) {
+    previewY += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+  }
+
+  // Calculate total width and height of preview
+  let previewW = 0;
+  for (let i = previewRange.minCol; i <= previewRange.maxCol; i++) {
+    previewW += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+  }
+  let previewH = 0;
+  for (let i = previewRange.minRow; i <= previewRange.maxRow; i++) {
+    previewH += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+  }
+
+  // Check if preview is visible
+  if (
+    previewX + previewW <= HEADER_WIDTH ||
+    previewX >= viewWidth ||
+    previewY + previewH <= HEADER_HEIGHT ||
+    previewY >= viewHeight
+  ) {
+    return;
+  }
+
+  // Clip to data area
+  const clipX = Math.max(HEADER_WIDTH, previewX);
+  const clipY = Math.max(HEADER_HEIGHT, previewY);
+  const clipW = Math.min(previewW, previewX + previewW - clipX);
+  const clipH = Math.min(previewH, previewY + previewH - clipY);
+
+  const colors = getGridColors();
+
+  // Draw dashed border
+  ctx.save();
+  ctx.strokeStyle = colors.selectionBorder;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 4]); // 4px dash, 4px gap
+  ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW - 1, clipH - 1);
+  ctx.restore();
+}

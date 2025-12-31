@@ -22,6 +22,7 @@ import {
   drawColumnSelection,
   drawRowSelection,
   drawFillHandle,
+  drawFillPreview,
   type FillHandleBounds,
 } from "./grid-selection-renderer.js";
 import {
@@ -113,6 +114,10 @@ export class GridRenderer {
 
   // Fill handle bounds (for hit testing in grid events)
   fillHandleBounds: FillHandleBounds | null = null;
+
+  // Fill handle drag state
+  isFillDragging = false;
+  fillPreviewRange: { minCol: number; maxCol: number; minRow: number; maxRow: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -282,12 +287,27 @@ export class GridRenderer {
     };
     if (range) {
       drawRangeSelection(ctx, selState, range, viewWidth, viewHeight);
-      this.fillHandleBounds = drawFillHandle(ctx, selState, range, viewWidth, viewHeight);
+      // Don't show fill handle during fill drag (it's being dragged)
+      if (!this.isFillDragging) {
+        this.fillHandleBounds = drawFillHandle(ctx, selState, range, viewWidth, viewHeight);
+      } else {
+        this.fillHandleBounds = null;
+      }
     } else if (this.selectedCell) {
       drawSingleCellSelection(ctx, selState, viewWidth, viewHeight);
-      this.fillHandleBounds = drawFillHandle(ctx, selState, undefined, viewWidth, viewHeight);
+      // Don't show fill handle during fill drag
+      if (!this.isFillDragging) {
+        this.fillHandleBounds = drawFillHandle(ctx, selState, undefined, viewWidth, viewHeight);
+      } else {
+        this.fillHandleBounds = null;
+      }
     } else {
       this.fillHandleBounds = null;
+    }
+
+    // Draw fill preview (dashed border during fill handle drag)
+    if (this.isFillDragging && this.fillPreviewRange) {
+      drawFillPreview(ctx, selState, this.fillPreviewRange, viewWidth, viewHeight);
     }
 
     ctx.restore();

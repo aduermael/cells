@@ -188,4 +188,8 @@ export interface GridRendererState {
   formulaHighlights?: FormulaHighlight[];
   /** Virtual scrolling: discovered row count (expands as user scrolls down) */
   discoveredRows?: number;
+  /** Whether currently dragging the fill handle */
+  isFillDragging?: boolean;
+  /** Fill preview range (shown with dashed border during fill drag) */
+  fillPreviewRange?: { minCol: number; maxCol: number; minRow: number; maxRow: number } | null;
 }

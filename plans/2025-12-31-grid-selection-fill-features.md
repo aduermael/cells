@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2025-12-31 06:19 UTC
-Updated At: 2025-12-31 08:05 UTC
+Updated At: 2025-12-31 08:36 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Grid Selection & Fill Features
@@ -69,7 +69,7 @@ The fill handle and auto-fill functionality are not implemented. Need to add:
 - [x] 3a: Add fill drag state (isFillDragging, fillDragStart, fillDragEnd)
 - [x] 3b: Handle mousedown on fill handle to start drag
 - [x] 3c: Handle mousemove to update fill preview range
-- [x] 3d: Render fill preview (selection extends in real-time during drag)
+- [x] 3d: Render fill preview (dashed border showing target range)
 - [x] 3e: Add E2E test for fill handle drag preview
 
 ## Phase 4: Implement Numeric Sequence Auto-Fill
