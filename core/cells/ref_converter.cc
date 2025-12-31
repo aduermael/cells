@@ -738,4 +738,222 @@ std::string RefConverter::adjustSingleRef(const CellRef& ref, int colOffset, int
     return formatA1Ref(adjusted);
 }
 
+// ============================================================================
+// AST-Based Reference Adjustment
+// ============================================================================
+
+// Helper to adjust a CellRefNode and return a new node (either adjusted CellRefNode or ErrorNode)
+static std::unique_ptr<ASTNode> adjustCellRefNode(const CellRefNode* node, int colOffset,
+                                                  int rowOffset) {
+    // Clone the node first
+    auto cloned = std::unique_ptr<CellRefNode>(static_cast<CellRefNode*>(node->clone().release()));
+
+    // Adjust column if relative
+    if (!node->colAbsolute) {
+        const int colIndex = RefConverter::columnLetterToIndex(node->column);
+        if (colIndex < 0) {
+            // Invalid column, return error
+            return std::make_unique<ErrorNode>("#REF!", node->position);
+        }
+        const int newColIndex = colIndex + colOffset;
+        if (newColIndex < 0) {
+            return std::make_unique<ErrorNode>("#REF!", node->position);
+        }
+        cloned->column = RefConverter::columnIndexToLetter(static_cast<size_t>(newColIndex));
+    }
+
+    // Adjust row if relative
+    if (!node->rowAbsolute) {
+        const int newRow = node->row + rowOffset;
+        if (newRow < 1) {
+            return std::make_unique<ErrorNode>("#REF!", node->position);
+        }
+        cloned->row = newRow;
+    }
+
+    // Clear cellId since it's no longer valid after adjustment
+    cloned->cellId.clear();
+
+    return cloned;
+}
+
+std::unique_ptr<ASTNode> RefConverter::adjustASTReferences(const ASTNode* ast, int colOffset,
+                                                           int rowOffset) {
+    if (ast == nullptr) {
+        return nullptr;
+    }
+
+    switch (ast->type) {
+        case ASTNodeType::CELL_REF: {
+            const auto* cellRef = static_cast<const CellRefNode*>(ast);
+            return adjustCellRefNode(cellRef, colOffset, rowOffset);
+        }
+
+        case ASTNodeType::RANGE_REF: {
+            const auto* rangeRef = static_cast<const RangeRefNode*>(ast);
+            auto adjustedTopLeft = adjustCellRefNode(rangeRef->topLeft.get(), colOffset, rowOffset);
+            auto adjustedBottomRight =
+                adjustCellRefNode(rangeRef->bottomRight.get(), colOffset, rowOffset);
+
+            // If either becomes an error, return an error node
+            if (adjustedTopLeft->type == ASTNodeType::ERROR_NODE ||
+                adjustedBottomRight->type == ASTNodeType::ERROR_NODE) {
+                return std::make_unique<ErrorNode>("#REF!", ast->position);
+            }
+
+            // Both are valid CellRefNodes
+            auto newRange = std::make_unique<RangeRefNode>(
+                std::unique_ptr<CellRefNode>(static_cast<CellRefNode*>(adjustedTopLeft.release())),
+                std::unique_ptr<CellRefNode>(
+                    static_cast<CellRefNode*>(adjustedBottomRight.release())),
+                ast->position);
+            return newRange;
+        }
+
+        case ASTNodeType::COLUMN_REF: {
+            const auto* colRef = static_cast<const ColumnRefNode*>(ast);
+            auto cloned = std::unique_ptr<ColumnRefNode>(
+                static_cast<ColumnRefNode*>(colRef->clone().release()));
+
+            // Adjust column if relative
+            if (!colRef->absolute) {
+                const int colIndex = columnLetterToIndex(colRef->column);
+                if (colIndex < 0) {
+                    return std::make_unique<ErrorNode>("#REF!", ast->position);
+                }
+                const int newColIndex = colIndex + colOffset;
+                if (newColIndex < 0) {
+                    return std::make_unique<ErrorNode>("#REF!", ast->position);
+                }
+                cloned->column = columnIndexToLetter(static_cast<size_t>(newColIndex));
+                cloned->columnId.clear();
+            }
+
+            return cloned;
+        }
+
+        case ASTNodeType::ROW_REF: {
+            const auto* rowRef = static_cast<const RowRefNode*>(ast);
+            auto cloned =
+                std::unique_ptr<RowRefNode>(static_cast<RowRefNode*>(rowRef->clone().release()));
+
+            // Adjust row if relative
+            if (!rowRef->absolute) {
+                const int newRow = rowRef->row + rowOffset;
+                if (newRow < 1) {
+                    return std::make_unique<ErrorNode>("#REF!", ast->position);
+                }
+                cloned->row = newRow;
+                cloned->rowId.clear();
+            }
+
+            return cloned;
+        }
+
+        case ASTNodeType::COLUMN_RANGE_REF: {
+            const auto* colRangeRef = static_cast<const ColumnRangeRefNode*>(ast);
+            auto cloned = std::unique_ptr<ColumnRangeRefNode>(
+                static_cast<ColumnRangeRefNode*>(colRangeRef->clone().release()));
+
+            // Adjust start column if relative
+            if (!colRangeRef->startAbsolute) {
+                const int startIndex = columnLetterToIndex(colRangeRef->startColumn);
+                if (startIndex < 0) {
+                    return std::make_unique<ErrorNode>("#REF!", ast->position);
+                }
+                const int newStartIndex = startIndex + colOffset;
+                if (newStartIndex < 0) {
+                    return std::make_unique<ErrorNode>("#REF!", ast->position);
+                }
+                cloned->startColumn = columnIndexToLetter(static_cast<size_t>(newStartIndex));
+                cloned->startColumnId.clear();
+            }
+
+            // Adjust end column if relative
+            if (!colRangeRef->endAbsolute) {
+                const int endIndex = columnLetterToIndex(colRangeRef->endColumn);
+                if (endIndex < 0) {
+                    return std::make_unique<ErrorNode>("#REF!", ast->position);
+                }
+                const int newEndIndex = endIndex + colOffset;
+                if (newEndIndex < 0) {
+                    return std::make_unique<ErrorNode>("#REF!", ast->position);
+                }
+                cloned->endColumn = columnIndexToLetter(static_cast<size_t>(newEndIndex));
+                cloned->endColumnId.clear();
+            }
+
+            return cloned;
+        }
+
+        case ASTNodeType::ROW_RANGE_REF: {
+            const auto* rowRangeRef = static_cast<const RowRangeRefNode*>(ast);
+            auto cloned = std::unique_ptr<RowRangeRefNode>(
+                static_cast<RowRangeRefNode*>(rowRangeRef->clone().release()));
+
+            // Adjust start row if relative
+            if (!rowRangeRef->startAbsolute) {
+                const int newStartRow = rowRangeRef->startRow + rowOffset;
+                if (newStartRow < 1) {
+                    return std::make_unique<ErrorNode>("#REF!", ast->position);
+                }
+                cloned->startRow = newStartRow;
+                cloned->startRowId.clear();
+            }
+
+            // Adjust end row if relative
+            if (!rowRangeRef->endAbsolute) {
+                const int newEndRow = rowRangeRef->endRow + rowOffset;
+                if (newEndRow < 1) {
+                    return std::make_unique<ErrorNode>("#REF!", ast->position);
+                }
+                cloned->endRow = newEndRow;
+                cloned->endRowId.clear();
+            }
+
+            return cloned;
+        }
+
+        case ASTNodeType::BINARY_OP: {
+            const auto* binOp = static_cast<const BinaryOpNode*>(ast);
+            auto newLeft = adjustASTReferences(binOp->left.get(), colOffset, rowOffset);
+            auto newRight = adjustASTReferences(binOp->right.get(), colOffset, rowOffset);
+            auto newNode =
+                std::make_unique<BinaryOpNode>(binOp->op, std::move(newLeft), std::move(newRight));
+            newNode->position = ast->position;
+            return newNode;
+        }
+
+        case ASTNodeType::UNARY_OP: {
+            const auto* unaryOp = static_cast<const UnaryOpNode*>(ast);
+            auto newOperand = adjustASTReferences(unaryOp->operand.get(), colOffset, rowOffset);
+            auto newNode = std::make_unique<UnaryOpNode>(unaryOp->op, std::move(newOperand));
+            newNode->position = ast->position;
+            return newNode;
+        }
+
+        case ASTNodeType::FUNCTION_CALL: {
+            const auto* funcCall = static_cast<const FunctionCallNode*>(ast);
+            auto newNode = std::make_unique<FunctionCallNode>(funcCall->name);
+            newNode->position = ast->position;
+            newNode->isVolatile = funcCall->isVolatile;
+            for (const auto& arg : funcCall->args) {
+                newNode->args.push_back(adjustASTReferences(arg.get(), colOffset, rowOffset));
+            }
+            return newNode;
+        }
+
+        // Nodes that don't contain references - just clone
+        case ASTNodeType::NUMBER_LITERAL:
+        case ASTNodeType::STRING_LITERAL:
+        case ASTNodeType::BOOLEAN_LITERAL:
+        case ASTNodeType::NAMED_REF:
+        case ASTNodeType::ERROR_NODE:
+            return ast->clone();
+    }
+
+    // Unreachable, but return clone as fallback
+    return ast->clone();
+}
+
 }  // namespace cells

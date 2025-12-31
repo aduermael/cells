@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include "core/cells/formula_display.h"
+#include "core/cells/formula_parser.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 
@@ -760,6 +762,147 @@ TEST(RefConverterTest, AdjustFormulaReferencesLargeOffset) {
     EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", 0, 99), "=A100");
     EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", 25, 0), "=Z1");
     EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", 26, 0), "=AA1");
+}
+
+// ============================================================================
+// adjustASTReferences Tests
+// ============================================================================
+
+// Helper function to parse a formula and convert AST back to display string
+// Uses an empty sheet since adjusted AST has cellId cleared, forcing fallback to column/row
+std::string adjustAndDisplay(const std::string& formula, int colOffset, int rowOffset) {
+    FormulaParser parser(formula);
+    auto ast = parser.parse();
+    if (!ast || parser.hasErrors()) {
+        return "PARSE_ERROR";
+    }
+
+    auto adjusted = RefConverter::adjustASTReferences(ast.get(), colOffset, rowOffset);
+    if (!adjusted) {
+        return "NULL";
+    }
+
+    // Create an empty sheet for display conversion
+    Sheet sheet(generate_id(), "Test");
+    FormulaDisplayConverter converter(sheet);
+    return converter.toDisplayString(adjusted.get());
+}
+
+TEST(RefConverterTest, AdjustASTReferencesBasic) {
+    // Basic relative reference adjustment
+    EXPECT_EQ(adjustAndDisplay("=A1", 1, 1), "=B2");
+    EXPECT_EQ(adjustAndDisplay("=A1", 0, 1), "=A2");
+    EXPECT_EQ(adjustAndDisplay("=A1", 1, 0), "=B1");
+    EXPECT_EQ(adjustAndDisplay("=A1", 2, 3), "=C4");
+}
+
+TEST(RefConverterTest, AdjustASTReferencesAbsolute) {
+    // Absolute references should not be adjusted
+    EXPECT_EQ(adjustAndDisplay("=$A$1", 1, 1), "=$A$1");
+    EXPECT_EQ(adjustAndDisplay("=$A$1", 5, 10), "=$A$1");
+}
+
+TEST(RefConverterTest, AdjustASTReferencesMixed) {
+    // Mixed absolute/relative references
+    EXPECT_EQ(adjustAndDisplay("=$A1", 1, 1), "=$A2");  // Col absolute
+    EXPECT_EQ(adjustAndDisplay("=A$1", 1, 1), "=B$1");  // Row absolute
+    EXPECT_EQ(adjustAndDisplay("=$A1+B$2", 1, 1), "=$A2+C$2");
+}
+
+TEST(RefConverterTest, AdjustASTReferencesComplex) {
+    // Complex formulas with multiple references
+    EXPECT_EQ(adjustAndDisplay("=A1+B2", 1, 1), "=B2+C3");
+    EXPECT_EQ(adjustAndDisplay("=SUM(A1,B2,C3)", 1, 0), "=SUM(B1,C2,D3)");
+    EXPECT_EQ(adjustAndDisplay("=IF(A1>0,B1,C1)", 0, 1), "=IF(A2>0,B2,C2)");
+}
+
+TEST(RefConverterTest, AdjustASTReferencesRange) {
+    // Range references
+    EXPECT_EQ(adjustAndDisplay("=SUM(A1:B2)", 1, 1), "=SUM(B2:C3)");
+    EXPECT_EQ(adjustAndDisplay("=SUM($A$1:B2)", 1, 1), "=SUM($A$1:C3)");
+    EXPECT_EQ(adjustAndDisplay("=SUM(A1:$B$2)", 1, 1), "=SUM(B2:$B$2)");
+}
+
+TEST(RefConverterTest, AdjustASTReferencesNegativeOffset) {
+    // Negative offsets (for filling upward/leftward)
+    EXPECT_EQ(adjustAndDisplay("=B2", -1, -1), "=A1");
+    EXPECT_EQ(adjustAndDisplay("=C3", -2, -2), "=A1");
+}
+
+TEST(RefConverterTest, AdjustASTReferencesInvalidRef) {
+    // References that would become invalid (negative index) produce ErrorNode
+    // ErrorNode displays as #ERROR!
+    EXPECT_EQ(adjustAndDisplay("=A1", -1, 0), "=#ERROR!");
+    EXPECT_EQ(adjustAndDisplay("=A1", 0, -1), "=#ERROR!");
+
+    // Mixed: one ref becomes error, one stays valid
+    // In complex formulas, individual refs become errors
+    std::string result = adjustAndDisplay("=A1+B2", -1, 0);
+    EXPECT_NE(result.find("#ERROR!"), std::string::npos);
+}
+
+TEST(RefConverterTest, AdjustASTReferencesPreservesStrings) {
+    // String literals should not be modified
+    EXPECT_EQ(adjustAndDisplay("=\"A1\"", 1, 1), "=\"A1\"");
+    // CONCAT function with string and ref
+    EXPECT_EQ(adjustAndDisplay("=CONCAT(\"test\",B2)", 1, 1), "=CONCAT(\"test\",C3)");
+}
+
+TEST(RefConverterTest, AdjustASTReferencesLiterals) {
+    // Numeric and boolean literals preserved
+    EXPECT_EQ(adjustAndDisplay("=1+2", 1, 1), "=1+2");
+    EXPECT_EQ(adjustAndDisplay("=TRUE", 1, 1), "=TRUE");
+    EXPECT_EQ(adjustAndDisplay("=A1+100", 1, 1), "=B2+100");
+}
+
+TEST(RefConverterTest, AdjustASTReferencesUnaryOp) {
+    // Unary operator
+    EXPECT_EQ(adjustAndDisplay("=-A1", 1, 1), "=-B2");
+    EXPECT_EQ(adjustAndDisplay("=+A1", 1, 0), "=+B1");
+}
+
+TEST(RefConverterTest, AdjustASTReferencesLargeOffset) {
+    // Large offsets
+    EXPECT_EQ(adjustAndDisplay("=A1", 0, 99), "=A100");
+    EXPECT_EQ(adjustAndDisplay("=A1", 25, 0), "=Z1");
+    EXPECT_EQ(adjustAndDisplay("=A1", 26, 0), "=AA1");
+}
+
+TEST(RefConverterTest, AdjustASTReferencesNullAST) {
+    // Null input should return nullptr
+    auto result = RefConverter::adjustASTReferences(nullptr, 1, 1);
+    EXPECT_EQ(result, nullptr);
+}
+
+TEST(RefConverterTest, AdjustASTReferencesPreservesOriginal) {
+    // Verify that the original AST is not modified
+    FormulaParser parser("=A1+B2");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    // Get original values
+    ASSERT_EQ(ast->type, ASTNodeType::BINARY_OP);
+    auto* binOp = static_cast<BinaryOpNode*>(ast.get());
+    ASSERT_EQ(binOp->left->type, ASTNodeType::CELL_REF);
+    auto* leftRef = static_cast<CellRefNode*>(binOp->left.get());
+    std::string originalColumn = leftRef->column;
+    int originalRow = leftRef->row;
+
+    // Adjust references
+    auto adjusted = RefConverter::adjustASTReferences(ast.get(), 5, 5);
+    ASSERT_NE(adjusted, nullptr);
+
+    // Verify original is unchanged
+    EXPECT_EQ(leftRef->column, originalColumn);
+    EXPECT_EQ(leftRef->row, originalRow);
+
+    // Verify adjusted is different
+    ASSERT_EQ(adjusted->type, ASTNodeType::BINARY_OP);
+    auto* adjustedBinOp = static_cast<BinaryOpNode*>(adjusted.get());
+    ASSERT_EQ(adjustedBinOp->left->type, ASTNodeType::CELL_REF);
+    auto* adjustedLeftRef = static_cast<CellRefNode*>(adjustedBinOp->left.get());
+    EXPECT_NE(adjustedLeftRef->column, originalColumn);
+    EXPECT_EQ(adjustedLeftRef->row, originalRow + 5);
 }
 
 }  // namespace

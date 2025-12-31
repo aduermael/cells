@@ -327,6 +327,8 @@ cc_test(
     name = "ref_converter_test",
     srcs = ["ref_converter_test.cc"],
     deps = [
+        ":formula_display",
+        ":formula_parser",
         ":id",
         ":ref_converter",
         "@googletest//:gtest_main",

@@ -1,6 +1,6 @@
-Status: READY
+Status: IN_PROGRESS
 Created At: 2025-12-31 18:06 UTC
-Updated At: 2025-12-31 18:06 UTC
+Updated At: 2025-12-31 19:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # AST-First Formula Storage
@@ -65,14 +65,14 @@ The following functions will need modification:
 
 ---
 
-## Phase 1: AST Reference Adjustment
+## Phase 1: AST Reference Adjustment ✅
 
 Add AST-based reference adjustment alongside existing string-based approach.
 
-- [ ] 1a: Add `ASTNode::clone()` method to deep-copy AST nodes
-- [ ] 1b: Add `adjustASTReferences(ASTNode*, colOffset, rowOffset)` function
-- [ ] 1c: Add unit tests for AST reference adjustment
-- [ ] 1d: Verify existing adjustFormulaReferences tests still pass
+- [x] 1a: Add `ASTNode::clone()` method to deep-copy AST nodes (already existed)
+- [x] 1b: Add `adjustASTReferences(ASTNode*, colOffset, rowOffset)` function
+- [x] 1c: Add unit tests for AST reference adjustment
+- [x] 1d: Verify existing adjustFormulaReferences tests still pass
 
 ## Phase 2: Update Fill Operations to Use AST
 

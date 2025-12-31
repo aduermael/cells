@@ -3,10 +3,12 @@
 
 #include <cstddef>
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+#include "core/cells/formula_ast.h"
 #include "core/cells/model.h"
 #include "core/cells/types.h"
 
@@ -135,6 +137,27 @@ public:
     //   adjustFormulaReferences("=A1", -1, 0)       -> "=#REF!" (column would be negative)
     [[nodiscard]] static std::string adjustFormulaReferences(const std::string& formula,
                                                              int colOffset, int rowOffset);
+
+    // ============================================================================
+    // AST-Based Reference Adjustment (preferred over string-based)
+    // ============================================================================
+
+    // Adjust cell references in an AST by the given row and column offsets.
+    // Only relative references are adjusted; absolute references are preserved.
+    // This is more efficient than the string-based version as it avoids re-parsing.
+    //
+    // Parameters:
+    //   ast - The AST to adjust (will be cloned, original is not modified)
+    //   colOffset - Number of columns to shift relative column references
+    //   rowOffset - Number of rows to shift relative row references
+    //
+    // Returns a new AST with adjusted references.
+    // If a reference would become invalid (negative row/col), the node becomes an ErrorNode.
+    //
+    // Note: Unlike adjustFormulaReferences, this works on the column/row fields of
+    // CellRefNode directly, not on the display string.
+    [[nodiscard]] static std::unique_ptr<ASTNode> adjustASTReferences(const ASTNode* ast,
+                                                                      int colOffset, int rowOffset);
 
 private:
     // Column ID to position mapping
