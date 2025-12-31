@@ -120,19 +120,15 @@ export function drawRangeSelection(
       const clipW = Math.min(anchorW, anchorX + anchorW - clipX);
       const clipH = Math.min(anchorH, anchorY + anchorH - clipY);
 
-      // Draw glow effect (2px spread shadow like formula bar)
+      // Draw glow effect (subtle shadow)
       ctx.strokeStyle = "rgba(5, 134, 1, 0.15)";
-      ctx.lineWidth = 4;
-      ctx.strokeRect(clipX - 1, clipY - 1, clipW + 2, clipH + 2);
+      ctx.lineWidth = 3;
+      ctx.strokeRect(clipX - 0.5, clipY - 0.5, clipW + 1, clipH + 1);
 
-      // Cell background
-      ctx.fillStyle = colors.cellBg;
-      ctx.fillRect(clipX + 1, clipY + 1, clipW - 2, clipH - 2);
-
-      // Main border for anchor cell
+      // Main border for anchor cell (1px to match range border)
       ctx.strokeStyle = colors.selectionBorder;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(clipX + 1, clipY + 1, clipW - 2, clipH - 2);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW - 1, clipH - 1);
     }
   }
 }

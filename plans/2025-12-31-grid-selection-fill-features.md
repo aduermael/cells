@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2025-12-31 06:19 UTC
-Updated At: 2025-12-31 06:19 UTC
+Updated At: 2025-12-31 06:45 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Grid Selection & Fill Features
@@ -53,9 +53,9 @@ The fill handle and auto-fill functionality are not implemented. Need to add:
 
 ## Phase 1: Fix Selection Rendering Bugs
 
-- [ ] 1a: Remove anchor cell background fill (fix hidden value)
-- [ ] 1b: Change anchor cell border to 1px (match range border)
-- [ ] 1c: Add E2E test for range selection visibility
+- [x] 1a: Remove anchor cell background fill (fix hidden value)
+- [x] 1b: Change anchor cell border to 1px (match range border)
+- [x] 1c: Add E2E test for range selection visibility
 
 ## Phase 2: Add Fill Handle Rendering
 

@@ -511,6 +511,28 @@ export async function dragColumn(page, sourceCol, targetCol) {
 }
 
 /**
+ * Select a range of cells by clicking start and shift-clicking end
+ * @param {import('puppeteer').Page} page
+ * @param {string} startRef - Start cell reference (e.g., "A1")
+ * @param {string} endRef - End cell reference (e.g., "C3")
+ */
+export async function selectRange(page, startRef, endRef) {
+  // Click start cell
+  await clickCell(page, startRef);
+  await sleep(100);
+
+  // Shift-click end cell to create range
+  const { col, row } = parseCellRef(endRef);
+  const canvasInfo = await getCanvasInfo(page);
+  const { x, y } = cellToPixel(col, row, canvasInfo);
+
+  await page.keyboard.down('Shift');
+  await page.mouse.click(x, y);
+  await page.keyboard.up('Shift');
+  await sleep(100);
+}
+
+/**
  * Load a file from testdata directory by setting up file input
  * @param {import('puppeteer').Page} page
  * @param {string} filename - Name of file in testdata directory
