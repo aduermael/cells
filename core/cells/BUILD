@@ -698,6 +698,8 @@ cc_library(
     deps = [
         ":crdt",
         ":formula_display",
+        ":formula_resolver",
+        ":formula_serializer",
         ":id",
         ":model",
         ":ref_converter",
@@ -710,6 +712,9 @@ cc_test(
     srcs = ["fill_range_test.cc"],
     deps = [
         ":fill_range",
+        ":formula_display",
+        ":formula_parser",
+        ":formula_resolver",
         ":id",
         ":model",
         "@googletest//:gtest_main",

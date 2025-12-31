@@ -6,6 +6,8 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/formula_display.h"
+#include "core/cells/formula_resolver.h"
+#include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/ref_converter.h"
@@ -72,7 +74,7 @@ struct FillCellInfo {
 
 // Helper function to determine what value to fill into a cell for STRING and FORMULA patterns
 FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, int colOffset,
-                                    int rowOffset, const Sheet* sheet) {
+                                    int rowOffset, Workbook* workbook, Sheet* sheet) {
     FillCellInfo info;
     info.skip = false;
 
@@ -115,9 +117,23 @@ FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, i
             // For index=1, offset = colOffset*1 or rowOffset*1, etc.
             auto adjustedAST = RefConverter::adjustASTReferences(sourceAST.get(), colOffset * index,
                                                                  rowOffset * index);
-            // Convert adjusted AST to display string (toDisplayString includes the '=' prefix)
-            const FormulaDisplayConverter converter(*sheet);
-            info.value = converter.toDisplayString(adjustedAST.get());
+
+            // Check if adjustment resulted in an error (e.g., #REF!)
+            if (adjustedAST->type == ASTNodeType::ERROR_NODE) {
+                // Use display converter for error formulas
+                const FormulaDisplayConverter converter(*sheet);
+                info.value = converter.toDisplayString(adjustedAST.get());
+                info.typeChar = "f";
+                return info;
+            }
+
+            // Resolve the adjusted AST to populate cellId fields
+            // This converts A1 references to UUID references
+            FormulaResolver resolver(*workbook, *sheet);
+            resolver.resolve(adjustedAST.get());
+
+            // Serialize to UUID format for CRDT storage
+            info.value = FormulaSerializer::serialize(adjustedAST.get());
             info.typeChar = "f";
             return info;
         }
@@ -190,6 +206,17 @@ DetectedPattern detectPattern(Sheet* sheet, int minCol, int minRow, int maxCol, 
             }
 
             const Cell* cell = sheet->getCellAt(colAxis->id, rowAxis->id);
+
+            // Check if cell is a formula first (formula cells may have empty value.raw)
+            if (cell != nullptr && cell->isFormula()) {
+                allEmpty = false;
+                hasFormula = true;
+                allNumeric = false;
+                formulaASTs.push_back(getFormulaASTClone(cell));
+                stringValues.push_back(cell->value.raw);
+                continue;
+            }
+
             if (!cell || cell->value.raw.empty()) {
                 // Empty cell
                 stringValues.emplace_back("");
@@ -199,13 +226,7 @@ DetectedPattern detectPattern(Sheet* sheet, int minCol, int minRow, int maxCol, 
 
             allEmpty = false;
 
-            // Check if cell is a formula
-            if (cell->isFormula()) {
-                hasFormula = true;
-                allNumeric = false;
-                formulaASTs.push_back(getFormulaASTClone(cell));
-                stringValues.push_back(cell->value.raw);
-            } else if (cell->value.type == CellValueType::NUMBER) {
+            if (cell->value.type == CellValueType::NUMBER) {
                 const double val = cell->value.asNumber();
                 numericValues.push_back(val);
                 stringValues.push_back(cell->value.raw);
@@ -226,6 +247,17 @@ DetectedPattern detectPattern(Sheet* sheet, int minCol, int minRow, int maxCol, 
             }
 
             const Cell* cell = sheet->getCellAt(colAxis->id, rowAxis->id);
+
+            // Check if cell is a formula first (formula cells may have empty value.raw)
+            if (cell != nullptr && cell->isFormula()) {
+                allEmpty = false;
+                hasFormula = true;
+                allNumeric = false;
+                formulaASTs.push_back(getFormulaASTClone(cell));
+                stringValues.push_back(cell->value.raw);
+                continue;
+            }
+
             if (!cell || cell->value.raw.empty()) {
                 stringValues.emplace_back("");
                 formulaASTs.push_back(nullptr);
@@ -234,13 +266,7 @@ DetectedPattern detectPattern(Sheet* sheet, int minCol, int minRow, int maxCol, 
 
             allEmpty = false;
 
-            // Check if cell is a formula
-            if (cell->isFormula()) {
-                hasFormula = true;
-                allNumeric = false;
-                formulaASTs.push_back(getFormulaASTClone(cell));
-                stringValues.push_back(cell->value.raw);
-            } else if (cell->value.type == CellValueType::NUMBER) {
+            if (cell->value.type == CellValueType::NUMBER) {
                 const double val = cell->value.asNumber();
                 numericValues.push_back(val);
                 stringValues.push_back(cell->value.raw);
@@ -380,7 +406,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 } else if (colPattern.type == PatternType::FORMULA) {
                     // Get fill value for formula (adjusts references)
                     const FillCellInfo fillInfo =
-                        getFillValueNonNumeric(colPattern, index, 0, 1, sheet);
+                        getFillValueNonNumeric(colPattern, index, 0, 1, workbook, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
@@ -459,7 +485,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     // Get fill value for formula (adjusts references)
                     // For UP direction, row offset is negative
                     const FillCellInfo fillInfo =
-                        getFillValueNonNumeric(colPattern, index, 0, -1, sheet);
+                        getFillValueNonNumeric(colPattern, index, 0, -1, workbook, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
@@ -527,7 +553,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     // Get fill value for formula (adjusts references)
                     // For RIGHT direction, col offset is +1 per step
                     const FillCellInfo fillInfo =
-                        getFillValueNonNumeric(rowPattern, index, 1, 0, sheet);
+                        getFillValueNonNumeric(rowPattern, index, 1, 0, workbook, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
@@ -603,7 +629,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     // Get fill value for formula (adjusts references)
                     // For LEFT direction, col offset is -1 per step
                     const FillCellInfo fillInfo =
-                        getFillValueNonNumeric(rowPattern, index, -1, 0, sheet);
+                        getFillValueNonNumeric(rowPattern, index, -1, 0, workbook, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
