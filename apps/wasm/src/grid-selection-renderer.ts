@@ -11,6 +11,9 @@ import {
   type NormalizedRange,
 } from "./grid-constants.js";
 
+// Fill handle size in pixels
+const FILL_HANDLE_SIZE = 6;
+
 /** State needed for selection rendering */
 export interface SelectionRendererState {
   scrollX: number;
@@ -20,6 +23,14 @@ export interface SelectionRendererState {
   selectionStart: Position | null;
   selectionEnd: Position | null;
   selectedCell: Position | null;
+}
+
+/** Position and bounds of the fill handle for hit testing */
+export interface FillHandleBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 /**
@@ -235,4 +246,113 @@ export function drawRowSelection(
       Math.min(selH, selY + selH - HEADER_HEIGHT)
     );
   }
+}
+
+/**
+ * Calculate the bounds of the selection for fill handle positioning
+ */
+export function getSelectionBounds(
+  state: SelectionRendererState,
+  range?: NormalizedRange
+): { x: number; y: number; width: number; height: number } | null {
+  let minCol: number, maxCol: number, minRow: number, maxRow: number;
+
+  if (range) {
+    minCol = range.minCol;
+    maxCol = range.maxCol;
+    minRow = range.minRow;
+    maxRow = range.maxRow;
+  } else if (state.selectedCell) {
+    minCol = maxCol = state.selectedCell.col;
+    minRow = maxRow = state.selectedCell.row;
+  } else {
+    return null;
+  }
+
+  // Calculate position
+  let x = HEADER_WIDTH - state.scrollX;
+  for (let i = 0; i < minCol; i++) {
+    x += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+  }
+  let y = HEADER_HEIGHT - state.scrollY;
+  for (let i = 0; i < minRow; i++) {
+    y += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+  }
+
+  // Calculate size
+  let width = 0;
+  for (let i = minCol; i <= maxCol; i++) {
+    width += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+  }
+  let height = 0;
+  for (let i = minRow; i <= maxRow; i++) {
+    height += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+  }
+
+  return { x, y, width, height };
+}
+
+/**
+ * Draw the fill handle (small square at bottom-right of selection)
+ * Returns the bounds for hit testing, or null if not visible
+ */
+export function drawFillHandle(
+  ctx: CanvasRenderingContext2D,
+  state: SelectionRendererState,
+  range?: NormalizedRange,
+  viewWidth?: number,
+  viewHeight?: number
+): FillHandleBounds | null {
+  const bounds = getSelectionBounds(state, range);
+  if (!bounds) return null;
+
+  const { x, y, width, height } = bounds;
+
+  // Calculate fill handle position (bottom-right corner)
+  const handleX = x + width - FILL_HANDLE_SIZE / 2;
+  const handleY = y + height - FILL_HANDLE_SIZE / 2;
+
+  // Check if fill handle is visible (within viewport and not in header)
+  const vw = viewWidth ?? ctx.canvas.width;
+  const vh = viewHeight ?? ctx.canvas.height;
+
+  if (
+    handleX + FILL_HANDLE_SIZE < HEADER_WIDTH ||
+    handleX > vw ||
+    handleY + FILL_HANDLE_SIZE < HEADER_HEIGHT ||
+    handleY > vh
+  ) {
+    return null;
+  }
+
+  // Draw fill handle
+  const colors = getGridColors();
+  ctx.fillStyle = colors.selectionBorder;
+  ctx.fillRect(handleX, handleY, FILL_HANDLE_SIZE, FILL_HANDLE_SIZE);
+
+  return {
+    x: handleX,
+    y: handleY,
+    width: FILL_HANDLE_SIZE,
+    height: FILL_HANDLE_SIZE,
+  };
+}
+
+/**
+ * Check if a point is within the fill handle bounds
+ */
+export function isPointInFillHandle(
+  point: Position,
+  fillHandleBounds: FillHandleBounds | null
+): boolean {
+  if (!fillHandleBounds) return false;
+  const { x, y, width, height } = fillHandleBounds;
+  // Add some padding for easier targeting
+  const padding = 3;
+  return (
+    point.col >= x - padding &&
+    point.col <= x + width + padding &&
+    point.row >= y - padding &&
+    point.row <= y + height + padding
+  );
 }

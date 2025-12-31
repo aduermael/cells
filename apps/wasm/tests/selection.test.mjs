@@ -9,6 +9,10 @@ import {
   selectRange,
   getFormulaBarContent,
   getCurrentCellRef,
+  getCanvasCursor,
+  moveToFillHandle,
+  getCanvasInfo,
+  cellToPixel,
   assertEqual,
   assertTrue,
   sleep,
@@ -99,7 +103,8 @@ const tests = {
 
     // Verify we can still see the formula bar (anchor cell data)
     // If we enter a value, it should go in the anchor cell
-    await ctx.page.keyboard.type('test');
+    // Use delay between characters to allow cell editor to start
+    await ctx.page.keyboard.type('test', { delay: 20 });
     await ctx.page.keyboard.press('Enter');
     await sleep(200);
 
@@ -107,6 +112,50 @@ const tests = {
     await sleep(100);
     const val = await getFormulaBarContent(ctx.page);
     assertEqual(val, 'test', 'Value should be in anchor cell B2');
+  },
+
+  'Fill handle shows crosshair cursor': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Select a cell
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+
+    // Move to fill handle position (bottom-right corner of selection)
+    await moveToFillHandle(ctx.page, 'B2');
+    await sleep(100);
+
+    // Check cursor is crosshair
+    const cursor = await getCanvasCursor(ctx.page);
+    assertEqual(cursor, 'crosshair', 'Cursor should be crosshair when hovering fill handle');
+
+    // Move away from fill handle (to center of another cell)
+    const canvasInfo = await getCanvasInfo(ctx.page);
+    const { x, y } = cellToPixel(3, 3, canvasInfo);
+    await ctx.page.mouse.move(x, y);
+    await sleep(100);
+
+    // Cursor should be default now
+    const cursor2 = await getCanvasCursor(ctx.page);
+    assertEqual(cursor2, 'default', 'Cursor should be default when not on fill handle');
+  },
+
+  'Fill handle visible on range selection': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Select a range
+    await selectRange(ctx.page, 'A1', 'C3');
+    await sleep(100);
+
+    // Move to fill handle position (bottom-right corner of range = C3)
+    await moveToFillHandle(ctx.page, 'C3');
+    await sleep(100);
+
+    // Check cursor is crosshair
+    const cursor = await getCanvasCursor(ctx.page);
+    assertEqual(cursor, 'crosshair', 'Cursor should be crosshair on range selection fill handle');
   },
 };
 

@@ -1878,6 +1878,15 @@ export class AppEventManager {
                 // Single printable character (not control keys, not with Ctrl/Meta)
                 if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
                     e.preventDefault();
+                    // For range selections, collapse to anchor cell before editing
+                    // (like Excel - typing replaces anchor cell content)
+                    const selStart = getSelectionStart();
+                    if (selStart && hasRangeSelection(selStart, getSelectionEnd())) {
+                        setSelectedCell(selStart);
+                        setSelectionStart(selStart);
+                        setSelectionEnd(selStart);
+                        render();
+                    }
                     cellEditor.startEditing({
                         mode: "replace",
                         initialChar: e.key,
@@ -1899,7 +1908,8 @@ export class AppEventManager {
                 setSelectionStart(selStart);
             }
             setSelectionEnd({ col: newCol, row: newRow });
-            setSelectedCell({ col: newCol, row: newRow });
+            // Keep selectedCell at anchor (not end) so typing edits the anchor cell
+            setSelectedCell({ col: selStart.col, row: selStart.row });
         } else {
             // Move selection: collapse to single cell
             setSelectedCell({ col: newCol, row: newRow });

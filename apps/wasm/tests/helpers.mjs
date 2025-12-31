@@ -312,6 +312,64 @@ export function sleep(ms) {
 }
 
 /**
+ * Calculate the fill handle position for a cell
+ * The fill handle is a 6x6px square positioned at the bottom-right corner of the selection.
+ * Its position is: x = selectionRight - 3, y = selectionBottom - 3
+ * So to hit the center, we go to selectionRight and selectionBottom (corner of the cell)
+ */
+export function cellFillHandlePosition(col, row, canvasInfo) {
+  const HEADER_WIDTH = 50;
+  const HEADER_HEIGHT = 24;
+  const DEFAULT_COL_WIDTH = 100;
+  const DEFAULT_ROW_HEIGHT = 24;
+
+  // Calculate bottom-right corner of the cell (where the fill handle center is)
+  const cellRightX = HEADER_WIDTH + (col + 1) * DEFAULT_COL_WIDTH;
+  const cellBottomY = HEADER_HEIGHT + (row + 1) * DEFAULT_ROW_HEIGHT;
+
+  return {
+    x: canvasInfo.left + cellRightX,
+    y: canvasInfo.top + cellBottomY,
+  };
+}
+
+/**
+ * Get the canvas cursor style
+ */
+export async function getCanvasCursor(page) {
+  return await page.evaluate(() => {
+    const canvas = document.getElementById('grid');
+    return canvas ? canvas.style.cursor : null;
+  });
+}
+
+/**
+ * Move mouse to the fill handle position of a cell
+ * Uses dispatchEvent for more reliable canvas event handling in tests
+ */
+export async function moveToFillHandle(page, cellRef) {
+  const { col, row } = parseCellRef(cellRef);
+  const canvasInfo = await getCanvasInfo(page);
+  const { x, y } = cellFillHandlePosition(col, row, canvasInfo);
+
+  // Dispatch a mousemove event directly on the canvas
+  // This is more reliable than page.mouse.move() for canvas-based apps
+  await page.evaluate(({ canvasX, canvasY }) => {
+    const canvas = document.getElementById('grid');
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const event = new MouseEvent('mousemove', {
+      bubbles: true,
+      clientX: rect.left + canvasX,
+      clientY: rect.top + canvasY,
+    });
+    canvas.dispatchEvent(event);
+  }, { canvasX: x - canvasInfo.left, canvasY: y - canvasInfo.top });
+
+  await sleep(50);
+}
+
+/**
  * Get the collaboration sync state from the page
  * Returns 'offline', 'connecting', 'syncing', or 'online'
  */

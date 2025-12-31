@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2025-12-31 06:19 UTC
-Updated At: 2025-12-31 06:45 UTC
+Updated At: 2025-12-31 06:46 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Grid Selection & Fill Features
@@ -59,10 +59,10 @@ The fill handle and auto-fill functionality are not implemented. Need to add:
 
 ## Phase 2: Add Fill Handle Rendering
 
-- [ ] 2a: Add fill handle state to SelectionRendererState
-- [ ] 2b: Render fill handle square at selection bottom-right corner
-- [ ] 2c: Add fill handle hover cursor detection in grid-events.ts
-- [ ] 2d: Add E2E test for fill handle visibility
+- [x] 2a: Add fill handle state to SelectionRendererState
+- [x] 2b: Render fill handle square at selection bottom-right corner
+- [x] 2c: Add fill handle hover cursor detection in app-events.ts
+- [x] 2d: Add E2E test for fill handle visibility
 
 ## Phase 3: Implement Fill Handle Drag Interaction
 

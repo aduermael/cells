@@ -300,21 +300,11 @@ export function initApp(): AppContext {
     // Don't overwrite formula bar while user is actively editing
     if (cellEditor.isEditing() || formulaBarEditor.isEditingFormulaBar()) {
       if (app.selectedCell) {
-        if (hasRangeSelection(app.selectionStart, app.selectionEnd)) {
-          const range = getNormalizedRange(
-            app.selectionStart,
-            app.selectionEnd
-          );
-          if (range) {
-            const startRef = colToLetter(range.minCol) + (range.minRow + 1);
-            const endRef = colToLetter(range.maxCol) + (range.maxRow + 1);
-            elements.cellReference.textContent = startRef + ":" + endRef;
-          }
-        } else {
-          const ref =
-            colToLetter(app.selectedCell.col) + (app.selectedCell.row + 1);
-          elements.cellReference.textContent = ref;
-        }
+        // Always show anchor cell reference (like Excel/Sheets)
+        // For range selection, anchor is selectionStart; otherwise use selectedCell
+        const anchor = app.selectionStart || app.selectedCell;
+        const ref = colToLetter(anchor.col) + (anchor.row + 1);
+        elements.cellReference.textContent = ref;
       }
       return;
     }
@@ -329,11 +319,10 @@ export function initApp(): AppContext {
     }
 
     if (hasRangeSelection(app.selectionStart, app.selectionEnd)) {
-      const range = getNormalizedRange(app.selectionStart, app.selectionEnd);
-      if (range && app.selectionStart) {
-        const startRef = colToLetter(range.minCol) + (range.minRow + 1);
-        const endRef = colToLetter(range.maxCol) + (range.maxRow + 1);
-        elements.cellReference.textContent = startRef + ":" + endRef;
+      if (app.selectionStart) {
+        // Show anchor cell reference (like Excel/Sheets)
+        const ref = colToLetter(app.selectionStart.col) + (app.selectionStart.row + 1);
+        elements.cellReference.textContent = ref;
         const anchorCell = getCellAt(
           app.selectionStart.col,
           app.selectionStart.row,
@@ -1070,6 +1059,7 @@ export function initApp(): AppContext {
     getRows: () => app.rows,
     getDataSource: () => app.dataSource,
     getSyncAdapter: () => app.syncAdapter,
+    getFillHandleBounds: () => app.renderer.fillHandleBounds,
 
     getResizeColIndex: () => app.resizeColIndex,
     setResizeColIndex: (v) => { app.resizeColIndex = v; },

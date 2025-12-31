@@ -21,6 +21,8 @@ import {
   drawSingleCellSelection,
   drawColumnSelection,
   drawRowSelection,
+  drawFillHandle,
+  type FillHandleBounds,
 } from "./grid-selection-renderer.js";
 import {
   drawColumnHeaders,
@@ -108,6 +110,9 @@ export class GridRenderer {
 
   // Formula reference highlights state
   formulaHighlights: FormulaHighlight[] = [];
+
+  // Fill handle bounds (for hit testing in grid events)
+  fillHandleBounds: FillHandleBounds | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -277,8 +282,12 @@ export class GridRenderer {
     };
     if (range) {
       drawRangeSelection(ctx, selState, range, viewWidth, viewHeight);
+      this.fillHandleBounds = drawFillHandle(ctx, selState, range, viewWidth, viewHeight);
     } else if (this.selectedCell) {
       drawSingleCellSelection(ctx, selState, viewWidth, viewHeight);
+      this.fillHandleBounds = drawFillHandle(ctx, selState, undefined, viewWidth, viewHeight);
+    } else {
+      this.fillHandleBounds = null;
     }
 
     ctx.restore();
