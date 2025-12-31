@@ -113,6 +113,22 @@ When executing a plan, each subtask gets its own commit named by phase and subta
 - Tests: Google Test or Catch2
 - Build: Bazel (fastest incremental builds, hermetic, scales well)
 
+### Building
+
+**Native (CLI):**
+```bash
+bazel build //apps/cli:cells    # Build CLI app
+bazel test //core/...           # Run all C++ tests
+```
+
+**WASM (Web app):**
+```bash
+make wasm-dist                  # Build WASM and package for web
+make wasm-serve                 # Serve locally at http://localhost:8081
+```
+
+Note: Always use `make wasm-dist` to build WASM, not `bazel build` directly.
+
 ### Directory Structure
 ```
 WORKSPACE                   # Bazel workspace root
