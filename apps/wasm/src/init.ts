@@ -1047,6 +1047,7 @@ export function initApp(): AppContext {
     formulaBarEditor,
     presenceBroadcaster,
     clipboardManager,
+    scriptPanel,
     formulaInput: elements.formulaInput,
 
     getSheetInfo: () => app.sheetInfo,

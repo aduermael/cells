@@ -17,7 +17,7 @@ Note: Cmd/Ctrl+Enter already works (implemented in script-panel.ts:201-204).
 The issue: Global keyboard handler in `app-events.ts:1283-1304` intercepts Cmd+C/V/X
 when not in cell editing mode, but doesn't check if script editor has focus.
 
-- [ ] 1a: Add script editor focus check to clipboard shortcut handling
+- [x] 1a: Add script editor focus check to clipboard shortcut handling
 - [ ] 1b: Test copy/paste works in script editor
 
 **Files:**

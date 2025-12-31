@@ -28,6 +28,7 @@ import type { CellEditor } from "./cell-editor";
 import type { ColumnHeaderEditor, FormulaBarEditor } from "./header-editor";
 import type { PresenceBroadcaster } from "./presence-broadcast";
 import type { ClipboardManager } from "./clipboard";
+import type { ScriptPanel } from "./script-panel";
 import { colToLetter } from "./grid-utils";
 import {
   showContextMenu,
@@ -48,6 +49,7 @@ export interface AppEventManagerConfig {
   formulaBarEditor: FormulaBarEditor;
   presenceBroadcaster: PresenceBroadcaster;
   clipboardManager: ClipboardManager;
+  scriptPanel: ScriptPanel;
   formulaInput: HTMLInputElement;
 
   // State accessors
@@ -1280,11 +1282,13 @@ export class AppEventManager {
     // Clipboard shortcuts (Cmd/Ctrl+C/V/X) - only when NOT editing
     // These must be checked before the editing state check below
     const isMod = e.metaKey || e.ctrlKey;
+    const { scriptPanel } = this.config;
     if (
       isMod &&
       !cellEditor.isEditing() &&
       !uiStateMachine.isInState("FORMULA_BAR_EDITING") &&
-      !uiStateMachine.isInState("COLUMN_HEADER_EDITING")
+      !uiStateMachine.isInState("COLUMN_HEADER_EDITING") &&
+      !scriptPanel.isEditorFocused()
     ) {
       const { clipboardManager } = this.config;
       switch (e.key.toLowerCase()) {

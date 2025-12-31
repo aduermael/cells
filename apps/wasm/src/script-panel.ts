@@ -91,6 +91,13 @@ export class ScriptPanel {
   }
 
   /**
+   * Check if the script editor textarea has focus
+   */
+  isEditorFocused(): boolean {
+    return document.activeElement === this.editor;
+  }
+
+  /**
    * Toggle the panel visibility
    */
   toggle(): void {
