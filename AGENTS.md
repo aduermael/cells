@@ -125,22 +125,6 @@ When executing a plan, each subtask gets its own commit named by phase and subta
 - Tests: Google Test or Catch2
 - Build: Bazel (fastest incremental builds, hermetic, scales well)
 
-### Building
-
-**Native (CLI):**
-```bash
-bazel build //apps/cli:cells    # Build CLI app
-bazel test //core/...           # Run all C++ tests
-```
-
-**WASM (Web app):**
-```bash
-make wasm-dist                  # Build WASM and package for web
-make wasm-serve                 # Serve locally at http://localhost:8081
-```
-
-Note: Always use `make wasm-dist` to build WASM, not `bazel build` directly.
-
 ### Directory Structure
 ```
 WORKSPACE                   # Bazel workspace root
@@ -154,16 +138,46 @@ core/
 testdata/                   # Sample .zcd files for testing
 ```
 
-### Testing
+## Build & Test Commands
 
-**Unit tests (C++):**
-- Each module should have corresponding tests
-- Test files named `<module>_test.cc` (colocated with source)
-- Sample data files in `testdata/`
-- Run tests with `bazel test //core/...`
+**IMPORTANT:** Always use Makefile targets or npm scripts. Never run raw `bazel` or `node` commands directly.
 
-**E2E tests (Puppeteer):**
-- Test files in `apps/wasm/tests/`
-- Run stable tests: `cd apps/wasm && npm run test:stable`
-- Stable suites: `smoke`, `formula`
-- Experimental suites: `collab` (may fail, excluded from `test:stable`)
+### Core Engine (C++)
+
+| Task | Command |
+|------|---------|
+| Build all | `make build` |
+| Build CLI | `make cli` |
+| Build CLI (optimized) | `make cli-release` |
+| Run unit tests | `make test` |
+| Format code | `make format` |
+| Check format | `make format-check` |
+| Lint | `make lint` |
+| Lint + fix | `make lint-fix` |
+| Full check (format + lint + build) | `make check` |
+| Generate compile_commands.json | `make compile-db` |
+| Clean | `make clean` |
+
+### WASM / Web App
+
+| Task | Command |
+|------|---------|
+| Build WASM + dist | `make wasm-dist` |
+| Build debug WASM | `make wasm-debug-dist` |
+| Serve locally | `make wasm-serve` |
+| TypeScript check | `make check-types` |
+
+### E2E Tests (apps/wasm)
+
+| Task | Command |
+|------|---------|
+| All tests (parallel) | `cd apps/wasm && npm run test:parallel` |
+| Stable tests (parallel) | `cd apps/wasm && npm run test:parallel -- stable` |
+| Collab tests (parallel) | `cd apps/wasm && npm run test:parallel -- collab` |
+| Single suite | `cd apps/wasm && npm run test:smoke` |
+| Headed mode (debug) | `HEADED=1 npm run test:smoke` |
+
+### Test Suites
+
+- **Stable suites:** smoke, formula, editing, column-move, clipboard, selection
+- **Experimental suites:** collab, initial-sync, collab-demo (may fail)

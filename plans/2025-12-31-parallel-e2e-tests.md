@@ -63,7 +63,7 @@ npm run test:parallel -- --concurrency 5 stable
 ## Phase 3: Update AGENTS.md with Build/Test Guidelines
 
 - [x] 3a: Add mandatory "Commands" section to plan header template
-- [ ] 3b: Add comprehensive "Build & Test Commands" reference section
+- [x] 3b: Add comprehensive "Build & Test Commands" reference section
 - [ ] 3c: Add "Common Mistakes" section warning against raw bazel/node commands
 
 ---
