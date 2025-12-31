@@ -17,6 +17,10 @@ export interface ClipboardData {
   cols: number;
   /** Cell data relative to top-left of selection */
   cells: ClipboardCell[];
+  /** Source top-left column (0-indexed, for formula reference adjustment) */
+  sourceCol?: number;
+  /** Source top-left row (0-indexed, for formula reference adjustment) */
+  sourceRow?: number;
 }
 
 /** Cell entry in clipboard data */
@@ -300,7 +304,14 @@ export class ClipboardManager {
       }
     }
 
-    return { rows, cols, cells: clipboardCells };
+    // Store source position for formula reference adjustment on paste
+    return {
+      rows,
+      cols,
+      cells: clipboardCells,
+      sourceCol: range.minCol,
+      sourceRow: range.minRow,
+    };
   }
 
   /**
@@ -375,15 +386,36 @@ export class ClipboardManager {
   ): Promise<void> {
     if (!this.dataSource) return;
 
+    // Calculate offset for formula reference adjustment
+    // If we have source position info, use it to compute the offset
+    const colOffset =
+      data.sourceCol !== undefined ? targetPos.col - data.sourceCol : 0;
+    const rowOffset =
+      data.sourceRow !== undefined ? targetPos.row - data.sourceRow : 0;
+
     for (const cell of data.cells) {
       const targetCol = targetPos.col + cell.col;
       const targetRow = targetPos.row + cell.row;
 
       // Determine what value to set
-      // If the cell had a formula and we're pasting from our own app, use the formula
-      // Otherwise use the display value
-      // Note: formula is stored with "=" prefix from WASM, so use as-is
-      const valueToSet = cell.formula || cell.value;
+      let valueToSet: string;
+
+      if (cell.formula) {
+        // For formula cells, adjust references based on paste offset
+        // Only adjust if there's actually an offset
+        if (colOffset !== 0 || rowOffset !== 0) {
+          valueToSet = adjustFormulaReferences(
+            cell.formula,
+            colOffset,
+            rowOffset
+          );
+        } else {
+          valueToSet = cell.formula;
+        }
+      } else {
+        // For non-formula cells, use the value as-is
+        valueToSet = cell.value;
+      }
 
       if (valueToSet) {
         try {
@@ -499,4 +531,326 @@ function inferCellType(value: string): CellData["type"] {
 
   // Default to string
   return "s";
+}
+
+// =============================================================================
+// Formula Reference Adjustment
+// =============================================================================
+
+/**
+ * Convert column index (0-based) to Excel letter (A, B, ..., Z, AA, AB, ...)
+ */
+function columnIndexToLetter(index: number): string {
+  let result = "";
+  let n = index + 1; // Convert to 1-based (A=1, not A=0)
+  while (n > 0) {
+    n--; // Adjust back for 0-based letter calculation
+    result = String.fromCharCode("A".charCodeAt(0) + (n % 26)) + result;
+    n = Math.floor(n / 26);
+  }
+  return result;
+}
+
+/**
+ * Convert Excel column letter to index (0-based)
+ * Returns -1 if invalid
+ */
+function columnLetterToIndex(letter: string): number {
+  if (!letter) return -1;
+
+  let result = 0;
+  for (const c of letter.toUpperCase()) {
+    if (c >= "A" && c <= "Z") {
+      result = result * 26 + (c.charCodeAt(0) - "A".charCodeAt(0) + 1);
+    } else {
+      return -1; // Invalid character
+    }
+  }
+  return result - 1; // Convert to 0-based
+}
+
+/** Parsed cell reference */
+interface CellRef {
+  colIndex: number;
+  rowIndex: number;
+  colAbsolute: boolean;
+  rowAbsolute: boolean;
+  valid: boolean;
+}
+
+/**
+ * Parse a cell reference string (e.g., "A1", "$B$2")
+ */
+function parseA1Ref(ref: string): CellRef {
+  const result: CellRef = {
+    colIndex: 0,
+    rowIndex: 0,
+    colAbsolute: false,
+    rowAbsolute: false,
+    valid: false,
+  };
+
+  if (!ref) return result;
+
+  let pos = 0;
+
+  // Check for absolute column marker
+  if (pos < ref.length && ref[pos] === "$") {
+    result.colAbsolute = true;
+    pos++;
+  }
+
+  // Parse column letters
+  let colLetters = "";
+  while (pos < ref.length && /[A-Za-z]/.test(ref[pos]!)) {
+    colLetters += ref[pos]!.toUpperCase();
+    pos++;
+  }
+
+  if (!colLetters) return result; // No column letters found
+
+  // Check for absolute row marker
+  if (pos < ref.length && ref[pos] === "$") {
+    result.rowAbsolute = true;
+    pos++;
+  }
+
+  // Parse row number
+  let rowDigits = "";
+  while (pos < ref.length && /[0-9]/.test(ref[pos]!)) {
+    rowDigits += ref[pos];
+    pos++;
+  }
+
+  if (!rowDigits) return result; // No row number found
+
+  // Convert to indices
+  const colIdx = columnLetterToIndex(colLetters);
+  if (colIdx < 0) return result;
+
+  const rowNum = parseInt(rowDigits, 10);
+  if (rowNum < 1) return result; // Excel rows are 1-based
+
+  result.colIndex = colIdx;
+  result.rowIndex = rowNum - 1; // Convert to 0-based
+  result.valid = true;
+
+  return result;
+}
+
+/**
+ * Format a CellRef back to A1 notation
+ */
+function formatA1Ref(ref: CellRef): string {
+  if (!ref.valid) return "";
+
+  let result = "";
+
+  // Add absolute column marker if needed
+  if (ref.colAbsolute) {
+    result += "$";
+  }
+
+  // Add column letter
+  result += columnIndexToLetter(ref.colIndex);
+
+  // Add absolute row marker if needed
+  if (ref.rowAbsolute) {
+    result += "$";
+  }
+
+  // Add row number (1-based)
+  result += (ref.rowIndex + 1).toString();
+
+  return result;
+}
+
+/**
+ * Adjust a single cell reference by the given offsets
+ * Returns the adjusted A1 notation, or "#REF!" if the adjustment would be invalid
+ */
+function adjustSingleRef(
+  ref: CellRef,
+  colOffset: number,
+  rowOffset: number
+): string {
+  // Start with the original ref
+  const adjusted = { ...ref };
+
+  // Adjust column if relative
+  if (!ref.colAbsolute) {
+    const newCol = ref.colIndex + colOffset;
+    if (newCol < 0) {
+      return "#REF!";
+    }
+    adjusted.colIndex = newCol;
+  }
+
+  // Adjust row if relative
+  if (!ref.rowAbsolute) {
+    const newRow = ref.rowIndex + rowOffset;
+    if (newRow < 0) {
+      return "#REF!";
+    }
+    adjusted.rowIndex = newRow;
+  }
+
+  return formatA1Ref(adjusted);
+}
+
+/**
+ * Check if character is a column letter
+ */
+function isColumnChar(c: string): boolean {
+  return (c >= "A" && c <= "Z") || (c >= "a" && c <= "z");
+}
+
+/**
+ * Check if we're at the start of an A1 ref pattern
+ */
+function isA1RefStart(formula: string, pos: number): boolean {
+  if (pos >= formula.length) return false;
+  const c = formula[pos];
+  return c === "$" || isColumnChar(c!);
+}
+
+/**
+ * Extract A1 ref at position, returns [length consumed, CellRef]
+ */
+function extractA1Ref(formula: string, pos: number): [number, CellRef] {
+  const start = pos;
+  const ref: CellRef = {
+    colIndex: 0,
+    rowIndex: 0,
+    colAbsolute: false,
+    rowAbsolute: false,
+    valid: false,
+  };
+
+  // Check for absolute column marker
+  if (pos < formula.length && formula[pos] === "$") {
+    ref.colAbsolute = true;
+    pos++;
+  }
+
+  // Parse column letters
+  let colLetters = "";
+  while (pos < formula.length && isColumnChar(formula[pos]!)) {
+    colLetters += formula[pos]!.toUpperCase();
+    pos++;
+  }
+
+  if (!colLetters) return [0, ref]; // No column letters found
+
+  // Check for absolute row marker
+  if (pos < formula.length && formula[pos] === "$") {
+    ref.rowAbsolute = true;
+    pos++;
+  }
+
+  // Parse row number
+  let rowDigits = "";
+  while (pos < formula.length && /[0-9]/.test(formula[pos]!)) {
+    rowDigits += formula[pos];
+    pos++;
+  }
+
+  if (!rowDigits) return [0, ref]; // No row number found - not a valid cell ref
+
+  // Convert to indices
+  const colIdx = columnLetterToIndex(colLetters);
+  if (colIdx < 0) return [0, ref];
+
+  const rowNum = parseInt(rowDigits, 10);
+  if (rowNum < 1) return [0, ref];
+
+  ref.colIndex = colIdx;
+  ref.rowIndex = rowNum - 1;
+  ref.valid = true;
+
+  return [pos - start, ref];
+}
+
+/**
+ * Adjust cell references in a formula by the given row and column offsets.
+ * Only relative references are adjusted; absolute references ($A$1) are preserved.
+ * The formula should be in A1 notation (e.g., "=A1+B2", "=$A$1+B2").
+ *
+ * @param formula - The formula string in A1 notation (with leading '=')
+ * @param colOffset - Number of columns to shift relative column references
+ * @param rowOffset - Number of rows to shift relative row references
+ * @returns The adjusted formula string
+ *
+ * Examples:
+ *   adjustFormulaReferences("=A1+B2", 1, 1)     -> "=B2+C3"
+ *   adjustFormulaReferences("=$A$1+B2", 1, 1)   -> "=$A$1+C3"
+ *   adjustFormulaReferences("=$A1+B$2", 1, 1)   -> "=$A2+C$2"
+ *   adjustFormulaReferences("=A1", -1, 0)       -> "=#REF!" (column would be negative)
+ */
+export function adjustFormulaReferences(
+  formula: string,
+  colOffset: number,
+  rowOffset: number
+): string {
+  if (!formula) return formula;
+
+  let result = "";
+  let i = 0;
+
+  while (i < formula.length) {
+    // Skip if we're in a string literal
+    if (formula[i] === '"') {
+      result += formula[i++];
+      while (i < formula.length && formula[i] !== '"') {
+        if (formula[i] === "\\" && i + 1 < formula.length) {
+          result += formula[i++];
+        }
+        result += formula[i++];
+      }
+      if (i < formula.length) {
+        result += formula[i++]; // Closing quote
+      }
+      continue;
+    }
+
+    // Check for A1 reference
+    // An A1 ref should not be preceded by an alphanumeric character
+    const canStartRef = i === 0 || !/[a-zA-Z0-9]/.test(formula[i - 1]!);
+
+    if (canStartRef && isA1RefStart(formula, i)) {
+      const [len, ref] = extractA1Ref(formula, i);
+
+      if (len > 0 && ref.valid) {
+        // Check if we're parsing a range (next char is ':')
+        if (i + len < formula.length && formula[i + len] === ":") {
+          // Range reference - adjust both parts
+          const startRefStr = adjustSingleRef(ref, colOffset, rowOffset);
+
+          // Parse the end of the range
+          const [endLen, endRef] = extractA1Ref(formula, i + len + 1);
+
+          if (endLen > 0 && endRef.valid) {
+            const endRefStr = adjustSingleRef(endRef, colOffset, rowOffset);
+            result += startRefStr;
+            result += ":";
+            result += endRefStr;
+            i += len + 1 + endLen;
+            continue;
+          }
+        }
+
+        // Single cell reference - adjust it
+        const adjustedRef = adjustSingleRef(ref, colOffset, rowOffset);
+        result += adjustedRef;
+        i += len;
+        continue;
+      }
+    }
+
+    // Not a reference, copy character as-is
+    result += formula[i];
+    i++;
+  }
+
+  return result;
 }
