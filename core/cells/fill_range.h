@@ -44,10 +44,10 @@ enum class PatternType : std::uint8_t {
 // Pattern detection result
 struct DetectedPattern {
     PatternType type{PatternType::CONSTANT};
-    double start{0.0};                                       // First value (for numeric)
-    double step{0.0};                                        // Increment (for linear patterns)
-    std::vector<std::string> stringValues;                   // For string/constant patterns
-    std::vector<std::unique_ptr<ASTNode>> formulaASTs;       // For formula patterns (AST nodes)
+    double start{0.0};                                  // First value (for numeric)
+    double step{0.0};                                   // Increment (for linear patterns)
+    std::vector<std::string> stringValues;              // For string/constant patterns
+    std::vector<std::unique_ptr<ASTNode>> formulaASTs;  // For formula patterns (AST nodes)
 };
 
 // Detect pattern from source cells

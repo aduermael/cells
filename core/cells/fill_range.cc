@@ -113,8 +113,8 @@ FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, i
             }
             // Adjust formula references using AST-based adjustment
             // For index=1, offset = colOffset*1 or rowOffset*1, etc.
-            auto adjustedAST =
-                RefConverter::adjustASTReferences(sourceAST.get(), colOffset * index, rowOffset * index);
+            auto adjustedAST = RefConverter::adjustASTReferences(sourceAST.get(), colOffset * index,
+                                                                 rowOffset * index);
             // Convert adjusted AST to display string (toDisplayString includes the '=' prefix)
             const FormulaDisplayConverter converter(*sheet);
             info.value = converter.toDisplayString(adjustedAST.get());
@@ -380,7 +380,8 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     }
                 } else if (colPattern.type == PatternType::FORMULA) {
                     // Get fill value for formula (adjusts references)
-                    const FillCellInfo fillInfo = getFillValueNonNumeric(colPattern, index, 0, 1, sheet);
+                    const FillCellInfo fillInfo =
+                        getFillValueNonNumeric(colPattern, index, 0, 1, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
@@ -396,7 +397,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 }
 
                 // Get or create cell
-                Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
+                const Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
                 if (!cell) {
                     continue;
                 }
@@ -458,7 +459,8 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 } else if (colPattern.type == PatternType::FORMULA) {
                     // Get fill value for formula (adjusts references)
                     // For UP direction, row offset is negative
-                    const FillCellInfo fillInfo = getFillValueNonNumeric(colPattern, index, 0, -1, sheet);
+                    const FillCellInfo fillInfo =
+                        getFillValueNonNumeric(colPattern, index, 0, -1, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
@@ -473,7 +475,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     typeChar = "n";
                 }
 
-                Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
+                const Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
                 if (!cell) {
                     continue;
                 }
@@ -525,7 +527,8 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 } else if (rowPattern.type == PatternType::FORMULA) {
                     // Get fill value for formula (adjusts references)
                     // For RIGHT direction, col offset is +1 per step
-                    const FillCellInfo fillInfo = getFillValueNonNumeric(rowPattern, index, 1, 0, sheet);
+                    const FillCellInfo fillInfo =
+                        getFillValueNonNumeric(rowPattern, index, 1, 0, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
@@ -540,7 +543,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     typeChar = "n";
                 }
 
-                Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
+                const Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
                 if (!cell) {
                     continue;
                 }
@@ -600,7 +603,8 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 } else if (rowPattern.type == PatternType::FORMULA) {
                     // Get fill value for formula (adjusts references)
                     // For LEFT direction, col offset is -1 per step
-                    const FillCellInfo fillInfo = getFillValueNonNumeric(rowPattern, index, -1, 0, sheet);
+                    const FillCellInfo fillInfo =
+                        getFillValueNonNumeric(rowPattern, index, -1, 0, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
@@ -615,7 +619,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     typeChar = "n";
                 }
 
-                Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
+                const Cell* cell = sheet->getOrCreateCellAt(colAxis->id, rowAxis->id);
                 if (!cell) {
                     continue;
                 }

@@ -82,15 +82,15 @@ Add AST-based reference adjustment alongside existing string-based approach.
 - [x] 1c: Add unit tests for AST reference adjustment
 - [x] 1d: Verify existing adjustFormulaReferences tests still pass
 
-## Phase 2: Update Fill Operations to Use AST
+## Phase 2: Update Fill Operations to Use AST ✅
 
 Modify fill_range.cc to use AST-based adjustment.
 
 - [x] 2a: Store AST pointers in DetectedPattern instead of formula strings
 - [x] 2b: Use adjustASTReferences + FormulaDisplayConverter in fill
-- [ ] 2c: Remove direct mutation path - always use CRDT operations (no isCollaborating check)
-- [ ] 2d: Remove any remaining string-based formula paths in fill_range.cc
-- [ ] 2e: Build with `make wasm-dist` and verify unit tests pass
+- [x] 2c: Remove direct mutation path - always use CRDT operations (no isCollaborating check)
+- [x] 2d: Remove any remaining string-based formula paths in fill_range.cc
+- [x] 2e: Build with `make wasm-dist` and verify unit tests pass
 
 ## Phase 3: Simplify Formula Storage
 
