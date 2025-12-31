@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2025-12-31 20:25 UTC
-Updated At: 2025-12-31 21:50 UTC
+Updated At: 2025-12-31 22:05 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # True AST-Only Formula Storage
@@ -66,14 +66,24 @@ Formula struct should only contain AST.
 - [x] 2g: Fix all compilation errors - N/A
 - [x] 2h: Verify unit tests pass - DONE (fixed 14 sync_formula_test cases with wrong UUID format/expectations)
 
-## Phase 3: Remove cell->value.raw for formulas
+## Phase 3: Audit cell->value.raw for formulas ✅
 
-Display string should not be stored on Cell.
+**NOTE**: Audit revealed `cell->value.raw` is already used correctly:
 
-- [ ] 3a: Audit all usages of `cell->value.raw` for formula cells
-- [ ] 3b: Update CRDT apply to not set `cell->value.raw` for formulas
-- [ ] 3c: Update any code reading `cell->value.raw` for formulas to use FormulaDisplayConverter
-- [ ] 3d: Verify unit tests pass
+**Finding**: For formula cells, `cell->value.raw` stores the **COMPUTED RESULT** (e.g., "42" for `=40+2`), NOT the formula text. This is the correct behavior.
+
+Implementation details:
+- `crdt.cc:318` - Sets `cell->value.raw = ""` initially for formula cells (result stored later via evaluation)
+- `formula_recalc.cc:131-144` - Stores computed result via `CellValue(42.0)` which sets `raw = "42"`
+- `model.cc:104-115` - `CellValue` constructor formats numbers, stripping trailing zeros
+- Formula TEXT is generated on-demand from `cell->formula->ast` via `FormulaDisplayConverter`
+
+The only special case is file parsing (`parser.cc:480, 593`) which temporarily uses `value.raw` to hold formula text during deserialization before parsing it to AST. This is an internal implementation detail, not long-term storage.
+
+- [x] 3a: Audit all usages of `cell->value.raw` for formula cells - IMPLEMENTATION IS CORRECT
+- [x] 3b: N/A - `cell->value.raw` stores computed result, not formula text
+- [x] 3c: N/A - Code already uses FormulaDisplayConverter for formula text
+- [x] 3d: N/A - No changes needed
 
 ## Phase 4: Clean up CRDT payload
 
