@@ -65,6 +65,112 @@ std::unique_ptr<ASTNode> getFormulaASTClone(const Cell* cell) {
     return formula->ast->clone();
 }
 
+// Helper to populate A1 notation (column/row) in AST nodes from UUID cellIds
+// This is needed because UUID-based formulas store cellId but have empty column/row
+void populateA1FromUuid(ASTNode* node, Sheet* sheet) {
+    if (!node || !sheet) {
+        return;
+    }
+
+    switch (node->type) {
+        case ASTNodeType::CELL_REF: {
+            auto* cellRef = static_cast<CellRefNode*>(node);
+            // If we have a cellId but no column, look up the position
+            if (!cellRef->cellId.empty() && cellRef->column.empty()) {
+                const Cell* cell = sheet->getCell(ID(cellRef->cellId));
+                if (cell) {
+                    const Axis* col = sheet->getColumn(cell->colId);
+                    const Axis* row = sheet->getRow(cell->rowId);
+                    if (col && row) {
+                        cellRef->column = Sheet::positionToColumnName(col->position);
+                        cellRef->row = static_cast<int>(row->position + 1);  // 1-based
+                    }
+                }
+            }
+            break;
+        }
+        case ASTNodeType::RANGE_REF: {
+            auto* rangeRef = static_cast<RangeRefNode*>(node);
+            populateA1FromUuid(rangeRef->topLeft.get(), sheet);
+            populateA1FromUuid(rangeRef->bottomRight.get(), sheet);
+            break;
+        }
+        case ASTNodeType::COLUMN_REF: {
+            auto* colRef = static_cast<ColumnRefNode*>(node);
+            if (!colRef->columnId.empty() && colRef->column.empty()) {
+                const Axis* col = sheet->getColumn(ID(colRef->columnId));
+                if (col) {
+                    colRef->column = Sheet::positionToColumnName(col->position);
+                }
+            }
+            break;
+        }
+        case ASTNodeType::ROW_REF: {
+            auto* rowRef = static_cast<RowRefNode*>(node);
+            if (!rowRef->rowId.empty() && rowRef->row == 0) {
+                const Axis* row = sheet->getRow(ID(rowRef->rowId));
+                if (row) {
+                    rowRef->row = static_cast<int>(row->position + 1);  // 1-based
+                }
+            }
+            break;
+        }
+        case ASTNodeType::COLUMN_RANGE_REF: {
+            auto* colRangeRef = static_cast<ColumnRangeRefNode*>(node);
+            if (!colRangeRef->startColumnId.empty() && colRangeRef->startColumn.empty()) {
+                const Axis* col = sheet->getColumn(ID(colRangeRef->startColumnId));
+                if (col) {
+                    colRangeRef->startColumn = Sheet::positionToColumnName(col->position);
+                }
+            }
+            if (!colRangeRef->endColumnId.empty() && colRangeRef->endColumn.empty()) {
+                const Axis* col = sheet->getColumn(ID(colRangeRef->endColumnId));
+                if (col) {
+                    colRangeRef->endColumn = Sheet::positionToColumnName(col->position);
+                }
+            }
+            break;
+        }
+        case ASTNodeType::ROW_RANGE_REF: {
+            auto* rowRangeRef = static_cast<RowRangeRefNode*>(node);
+            if (!rowRangeRef->startRowId.empty() && rowRangeRef->startRow == 0) {
+                const Axis* row = sheet->getRow(ID(rowRangeRef->startRowId));
+                if (row) {
+                    rowRangeRef->startRow = static_cast<int>(row->position + 1);
+                }
+            }
+            if (!rowRangeRef->endRowId.empty() && rowRangeRef->endRow == 0) {
+                const Axis* row = sheet->getRow(ID(rowRangeRef->endRowId));
+                if (row) {
+                    rowRangeRef->endRow = static_cast<int>(row->position + 1);
+                }
+            }
+            break;
+        }
+        case ASTNodeType::BINARY_OP: {
+            auto* binOp = static_cast<BinaryOpNode*>(node);
+            populateA1FromUuid(binOp->left.get(), sheet);
+            populateA1FromUuid(binOp->right.get(), sheet);
+            break;
+        }
+        case ASTNodeType::UNARY_OP: {
+            auto* unaryOp = static_cast<UnaryOpNode*>(node);
+            populateA1FromUuid(unaryOp->operand.get(), sheet);
+            break;
+        }
+        case ASTNodeType::FUNCTION_CALL: {
+            auto* funcCall = static_cast<FunctionCallNode*>(node);
+            for (auto& arg : funcCall->args) {
+                populateA1FromUuid(arg.get(), sheet);
+            }
+            break;
+        }
+        default:
+            // Literals, named refs, errors - nothing to do
+            break;
+    }
+}
+
 // Helper struct to hold fill cell info
 struct FillCellInfo {
     std::string value;
@@ -113,9 +219,15 @@ FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, i
                 }
                 return info;
             }
+
+            // Clone the source AST and populate A1 notation from UUID refs
+            // This is needed because UUID-based formulas have empty column/row fields
+            auto clonedAST = sourceAST->clone();
+            populateA1FromUuid(clonedAST.get(), sheet);
+
             // Adjust formula references using AST-based adjustment
             // For index=1, offset = colOffset*1 or rowOffset*1, etc.
-            auto adjustedAST = RefConverter::adjustASTReferences(sourceAST.get(), colOffset * index,
+            auto adjustedAST = RefConverter::adjustASTReferences(clonedAST.get(), colOffset * index,
                                                                  rowOffset * index);
 
             // Check if adjustment resulted in an error (e.g., #REF!)
