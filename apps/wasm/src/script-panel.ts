@@ -2,6 +2,7 @@
 // Provides a dedicated panel for writing and executing Luau scripts.
 
 import { SyntaxHighlighter, type TokenizeFunction } from "./syntax-highlighter";
+import type { LuauToken } from "./client-types";
 
 // =============================================================================
 // Types
@@ -45,6 +46,7 @@ export class ScriptPanel {
 
   private executeScript: (script: string) => Promise<ScriptResult>;
   private onScriptExecuted: () => void;
+  private tokenize?: TokenizeFunction;
 
   // =========================================================================
   // State
@@ -85,8 +87,9 @@ export class ScriptPanel {
     this.executeScript = config.executeScript;
     this.onScriptExecuted = config.onScriptExecuted;
 
-    // Initialize syntax highlighting if tokenize function provided
+    // Initialize syntax highlighting and auto-indent if tokenize function provided
     if (config.tokenize) {
+      this.tokenize = config.tokenize;
       // SyntaxHighlighter sets up its own event listeners
       new SyntaxHighlighter({
         textarea: this.editor,
@@ -228,11 +231,19 @@ export class ScriptPanel {
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         this.run();
+        return;
+      }
+      // Enter without modifier: auto-indent
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        this.handleAutoIndent();
+        return;
       }
       // Escape to hide panel
       if (e.key === "Escape") {
         e.preventDefault();
         this.hide();
+        return;
       }
       // Tab to insert spaces
       if (e.key === "Tab") {
@@ -274,5 +285,141 @@ export class ScriptPanel {
         document.body.style.userSelect = "";
       }
     });
+  }
+
+  // =========================================================================
+  // Auto-Indent
+  // =========================================================================
+
+  // Keywords that increase indent on next line
+  private static readonly INDENT_INCREASE_KEYWORDS = new Set([
+    "then",
+    "do",
+    "else",
+    "repeat",
+  ]);
+
+  // "function" increases indent when followed by params (not immediately by end)
+  private static readonly FUNCTION_KEYWORD = "function";
+
+  // Keywords that decrease indent (when typed, the line itself should dedent)
+  // Note: Currently unused - future enhancement for auto-dedent on typing "end"
+  // private static readonly INDENT_DECREASE_KEYWORDS = new Set([
+  //   "end",
+  //   "else",
+  //   "elseif",
+  //   "until",
+  // ]);
+
+  /**
+   * Calculate the indent level for a new line based on the current line's content.
+   *
+   * @param lineText - The text of the current line
+   * @param tokens - Tokens for the current line only
+   * @returns The indent string to use for the new line
+   */
+  getIndentForNewLine(lineText: string, tokens: LuauToken[]): string {
+    // Get current line's leading whitespace
+    const leadingMatch = lineText.match(/^(\s*)/);
+    const currentIndent = leadingMatch?.[1] ?? "";
+
+    // Find the last significant token (keyword/operator, ignoring comments)
+    let lastSignificant: LuauToken | null = null;
+    let hasFunctionKeyword = false;
+
+    for (const token of tokens) {
+      if (token.type === "comment") continue;
+
+      if (token.type === "keyword") {
+        if (token.text === ScriptPanel.FUNCTION_KEYWORD) {
+          hasFunctionKeyword = true;
+        }
+        lastSignificant = token;
+      } else if (token.type === "operator" || token.type === "name") {
+        lastSignificant = token;
+      }
+    }
+
+    // Check if we should increase indent
+    if (lastSignificant && lastSignificant.type === "keyword") {
+      const kw = lastSignificant.text;
+
+      // "function ... )" pattern - increase indent after closing paren
+      // But check if the last token indicates we should increase
+      if (hasFunctionKeyword) {
+        // Find the very last non-comment token
+        let lastToken: LuauToken | null = null;
+        for (const token of tokens) {
+          if (token.type !== "comment") {
+            lastToken = token;
+          }
+        }
+        // After function(...) line, increase indent
+        if (lastToken && lastToken.type === "operator" && lastToken.text === ")") {
+          return currentIndent + "  ";
+        }
+      }
+
+      if (ScriptPanel.INDENT_INCREASE_KEYWORDS.has(kw)) {
+        return currentIndent + "  ";
+      }
+    }
+
+    // Check for function definition ending with )
+    if (hasFunctionKeyword) {
+      let lastToken: LuauToken | null = null;
+      for (const token of tokens) {
+        if (token.type !== "comment") {
+          lastToken = token;
+        }
+      }
+      if (lastToken && lastToken.type === "operator" && lastToken.text === ")") {
+        return currentIndent + "  ";
+      }
+    }
+
+    // Default: maintain current indent
+    return currentIndent;
+  }
+
+  /**
+   * Handle Enter key press to insert newline with auto-indent.
+   * Returns true if handled, false otherwise.
+   */
+  private async handleAutoIndent(): Promise<boolean> {
+    if (!this.tokenize) {
+      return false;
+    }
+
+    const start = this.editor.selectionStart;
+    const value = this.editor.value;
+
+    // Find the current line
+    const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+    const textBeforeCursor = value.substring(lineStart, start);
+
+    try {
+      // Tokenize just the text up to the cursor on the current line
+      const tokens = await this.tokenize(textBeforeCursor);
+
+      // Calculate the indent for the new line
+      const newIndent = this.getIndentForNewLine(textBeforeCursor, tokens);
+
+      // Insert newline with indent
+      const before = value.substring(0, start);
+      const after = value.substring(start);
+      this.editor.value = before + "\n" + newIndent + after;
+
+      // Position cursor after the indent
+      const newPos = start + 1 + newIndent.length;
+      this.editor.selectionStart = this.editor.selectionEnd = newPos;
+
+      // Trigger input event to update syntax highlighting
+      this.editor.dispatchEvent(new Event("input", { bubbles: true }));
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

@@ -1,6 +1,6 @@
-Status: IN_PROGRESS
+Status: COMPLETE
 Created At: 2025-12-31 00:31 UTC
-Updated At: 2025-12-31 00:31 UTC
+Updated At: 2025-12-31 01:00 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Script Editor Improvements
@@ -100,9 +100,9 @@ Rules:
 
 Implementation: Use the lexer to find the last significant token on the current line.
 
-- [ ] 4a: Add getIndentForLine method to ScriptPanel
-- [ ] 4b: Handle Enter key to insert newline with proper indentation
-- [ ] 4c: Test indentation with various code patterns
+- [x] 4a: Add getIndentForNewLine method to ScriptPanel
+- [x] 4b: Handle Enter key to insert newline with proper indentation
+- [x] 4c: Test indentation with various code patterns
 
 **Files:**
 - `apps/wasm/src/script-panel.ts` - Add auto-indent logic
