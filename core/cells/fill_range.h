@@ -35,15 +35,17 @@ enum class PatternType : std::uint8_t {
     CONSTANT,  // Single value or all same values (repeat)
     LINEAR,    // Arithmetic sequence (1, 2, 3... or 5, 10, 15...)
     STRING,    // String values (always constant/repeat)
+    FORMULA,   // Formula values (adjust references)
     EMPTY      // Empty cells (repeat empty)
 };
 
 // Pattern detection result
 struct DetectedPattern {
     PatternType type{PatternType::CONSTANT};
-    double start{0.0};                      // First value (for numeric)
-    double step{0.0};                       // Increment (for linear patterns)
-    std::vector<std::string> stringValues;  // For string/constant patterns
+    double start{0.0};                       // First value (for numeric)
+    double step{0.0};                        // Increment (for linear patterns)
+    std::vector<std::string> stringValues;   // For string/constant patterns
+    std::vector<std::string> formulaValues;  // For formula patterns (A1 notation formulas)
 };
 
 // Detect pattern from source cells

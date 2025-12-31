@@ -687,5 +687,80 @@ TEST(RefConverterTest, FormulaWithNumbers) {
     EXPECT_EQ(backToA1, formula);
 }
 
+// ============================================================================
+// adjustFormulaReferences Tests
+// ============================================================================
+
+TEST(RefConverterTest, AdjustFormulaReferencesBasic) {
+    // Basic relative reference adjustment
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", 1, 1), "=B2");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", 0, 1), "=A2");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", 1, 0), "=B1");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", 2, 3), "=C4");
+}
+
+TEST(RefConverterTest, AdjustFormulaReferencesAbsolute) {
+    // Absolute references should not be adjusted
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=$A$1", 1, 1), "=$A$1");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=$A$1", 5, 10), "=$A$1");
+}
+
+TEST(RefConverterTest, AdjustFormulaReferencesMixed) {
+    // Mixed absolute/relative references
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=$A1", 1, 1), "=$A2");  // Col absolute
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A$1", 1, 1), "=B$1");  // Row absolute
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=$A1+B$2", 1, 1), "=$A2+C$2");
+}
+
+TEST(RefConverterTest, AdjustFormulaReferencesComplex) {
+    // Complex formulas with multiple references
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1+B2", 1, 1), "=B2+C3");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=SUM(A1,B2,C3)", 1, 0), "=SUM(B1,C2,D3)");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=IF(A1>0,B1,C1)", 0, 1), "=IF(A2>0,B2,C2)");
+}
+
+TEST(RefConverterTest, AdjustFormulaReferencesRange) {
+    // Range references
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=SUM(A1:B2)", 1, 1), "=SUM(B2:C3)");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=SUM($A$1:B2)", 1, 1), "=SUM($A$1:C3)");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=SUM(A1:$B$2)", 1, 1), "=SUM(B2:$B$2)");
+}
+
+TEST(RefConverterTest, AdjustFormulaReferencesNegativeOffset) {
+    // Negative offsets (for filling upward/leftward)
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=B2", -1, -1), "=A1");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=C3", -2, -2), "=A1");
+}
+
+TEST(RefConverterTest, AdjustFormulaReferencesInvalidRef) {
+    // References that would become invalid (negative index)
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", -1, 0), "=#REF!");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", 0, -1), "=#REF!");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1+B2", -1, 0), "=#REF!+A2");
+    // Absolute refs are preserved even with negative offset
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=$A$1", -1, -1), "=$A$1");
+}
+
+TEST(RefConverterTest, AdjustFormulaReferencesPreservesStrings) {
+    // String literals should not be modified
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=\"A1\"", 1, 1), "=\"A1\"");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=CONCAT(\"A1\",B2)", 1, 1),
+              "=CONCAT(\"A1\",C3)");
+}
+
+TEST(RefConverterTest, AdjustFormulaReferencesEmpty) {
+    // Edge cases
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("", 1, 1), "");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=1+2", 1, 1), "=1+2");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=\"hello\"", 1, 1), "=\"hello\"");
+}
+
+TEST(RefConverterTest, AdjustFormulaReferencesLargeOffset) {
+    // Large offsets (filling many rows/columns)
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", 0, 99), "=A100");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", 25, 0), "=Z1");
+    EXPECT_EQ(RefConverter::adjustFormulaReferences("=A1", 26, 0), "=AA1");
+}
+
 }  // namespace
 }  // namespace cells

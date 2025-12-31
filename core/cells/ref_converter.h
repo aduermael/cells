@@ -112,6 +112,30 @@ public:
     // Output: $$cellId, $~cellId, ~$cellId, or cellId based on ref.type
     [[nodiscard]] std::string formatUuidRef(const CellRef& ref) const;
 
+    // ============================================================================
+    // Formula Reference Adjustment (for fill/copy-paste)
+    // ============================================================================
+
+    // Adjust cell references in a formula by the given row and column offsets.
+    // Only relative references are adjusted; absolute references ($A$1) are preserved.
+    // The formula should be in A1 notation (e.g., "=A1+B2", "=$A$1+B2").
+    //
+    // Parameters:
+    //   formula - The formula string in A1 notation (with leading '=')
+    //   colOffset - Number of columns to shift relative column references
+    //   rowOffset - Number of rows to shift relative row references
+    //
+    // Returns the adjusted formula string.
+    // If a reference would become invalid (negative row/col), returns #REF! for that reference.
+    //
+    // Examples:
+    //   adjustFormulaReferences("=A1+B2", 1, 1)     -> "=B2+C3"
+    //   adjustFormulaReferences("=$A$1+B2", 1, 1)   -> "=$A$1+C3"
+    //   adjustFormulaReferences("=$A1+B$2", 1, 1)   -> "=$A2+C$2"
+    //   adjustFormulaReferences("=A1", -1, 0)       -> "=#REF!" (column would be negative)
+    [[nodiscard]] static std::string adjustFormulaReferences(const std::string& formula,
+                                                             int colOffset, int rowOffset);
+
 private:
     // Column ID to position mapping
     std::unordered_map<std::string, size_t> colIdToIndex_;
@@ -153,6 +177,11 @@ private:
 
     // Extract A1 ref at position, returns length consumed (0 if not valid)
     [[nodiscard]] static size_t extractA1Ref(const std::string& formula, size_t pos, CellRef& ref);
+
+    // Adjust a single cell reference by the given offsets
+    // Returns the adjusted A1 notation, or "#REF!" if the adjustment would be invalid
+    [[nodiscard]] static std::string adjustSingleRef(const CellRef& ref, int colOffset,
+                                                     int rowOffset);
 };
 
 }  // namespace cells

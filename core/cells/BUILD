@@ -695,8 +695,10 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":crdt",
+        ":formula_display",
         ":id",
         ":model",
+        ":ref_converter",
         ":types",
     ],
 )
