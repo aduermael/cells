@@ -49,6 +49,14 @@ void HttpRequest::sendAsync() {
     _sendAsync();
 }
 
+void HttpRequest::sendAsyncStreaming() {
+    if (status_ != HttpRequestStatus::WAITING) {
+        return;  // Already sent or completed
+    }
+    status_ = HttpRequestStatus::STREAMING;
+    _sendAsyncStreaming();
+}
+
 void HttpRequest::sendSync() {
     if (status_ != HttpRequestStatus::WAITING) {
         return;
@@ -99,6 +107,19 @@ void HttpRequest::completeWithSuccess() {
 void HttpRequest::completeWithError(const std::string& error) {
     error_ = error;
     status_ = HttpRequestStatus::FAILED;
+    if (callback_) {
+        callback_(*this);
+    }
+}
+
+void HttpRequest::onStreamData(const uint8_t* data, size_t len) {
+    if (stream_callback_) {
+        stream_callback_(data, len);
+    }
+}
+
+void HttpRequest::onStreamEnd() {
+    status_ = HttpRequestStatus::DONE;
     if (callback_) {
         callback_(*this);
     }

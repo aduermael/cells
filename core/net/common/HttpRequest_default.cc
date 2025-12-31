@@ -20,6 +20,11 @@ protected:
         completeWithError("HTTP not implemented for this platform");
     }
 
+    void _sendAsyncStreaming() override {
+        // No network implementation for this platform
+        completeWithError("HTTP streaming not implemented for this platform");
+    }
+
     void _cancel() override {
         // Nothing to cancel
     }

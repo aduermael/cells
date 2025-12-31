@@ -23,6 +23,7 @@ enum class HttpMethod : std::uint8_t { GET, POST, PUT, DELETE, PATCH, HEAD };
 enum class HttpRequestStatus : std::uint8_t {
     WAITING,     // Created but not sent
     PROCESSING,  // Request in progress
+    STREAMING,   // Streaming response in progress
     DONE,        // Completed successfully
     FAILED,      // Request failed (network error, timeout, etc.)
     CANCELLED    // Cancelled by user
@@ -33,6 +34,9 @@ class HttpRequest;
 
 // Callback for async requests
 using HttpRequestCallback = std::function<void(HttpRequest& request)>;
+
+// Callback for streaming data (called per chunk)
+using HttpStreamCallback = std::function<void(const uint8_t* data, size_t len)>;
 
 // HTTP request with async/sync execution
 // Platform-specific implementations in web/HttpRequest_web.cc and
@@ -61,10 +65,14 @@ public:
     // Callback for async completion
     void setCallback(HttpRequestCallback callback) { callback_ = std::move(callback); }
 
+    // Callback for streaming data (called per chunk during streaming)
+    void setStreamCallback(HttpStreamCallback callback) { stream_callback_ = std::move(callback); }
+
     // Execute request
-    void sendAsync();  // Non-blocking, calls callback on completion
-    void sendSync();   // Blocking, returns when complete
-    void cancel();     // Cancel in-progress request
+    void sendAsync();           // Non-blocking, calls callback on completion
+    void sendAsyncStreaming();  // Non-blocking streaming, calls stream callback per chunk
+    void sendSync();            // Blocking, returns when complete
+    void cancel();              // Cancel in-progress request
 
     // Status and response
     [[nodiscard]] HttpRequestStatus getStatus() const { return status_; }
@@ -86,11 +94,16 @@ protected:
 
     // Platform-specific hooks (implemented per platform)
     virtual void _sendAsync() = 0;
+    virtual void _sendAsyncStreaming() = 0;
     virtual void _cancel() = 0;
 
     // Called by platform implementation when request completes
     void completeWithSuccess();
     void completeWithError(const std::string& error);
+
+    // Called by platform implementation for streaming data
+    void onStreamData(const uint8_t* data, size_t len);
+    void onStreamEnd();
 
     // Request parameters
     HttpMethod method_;
@@ -108,8 +121,9 @@ protected:
     HttpRequestStatus status_ = HttpRequestStatus::WAITING;
     std::string error_;
 
-    // Callback
+    // Callbacks
     HttpRequestCallback callback_;
+    HttpStreamCallback stream_callback_;
 };
 
 // Convert HttpMethod to string (for logging/debugging)
