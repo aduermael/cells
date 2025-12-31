@@ -51,28 +51,60 @@ if [ ${#FILES[@]} -eq 0 ]; then
     exit 0
 fi
 
-# Format or check files
-FAILED=0
+# Determine parallelism (JOBS env var > CPU cores > fallback to 4)
+NPROCS=${JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)}
 
-for file in "${FILES[@]}"; do
+# Create temp directory for tracking results
+TMPDIR=$(mktemp -d)
+trap "rm -rf $TMPDIR" EXIT
+
+# Function to format/check a single file
+format_one_file() {
+    local file="$1"
+    local tmpdir="$2"
+    local check_mode="$3"
+
     if [ ! -f "$file" ]; then
-        continue
+        return 0
     fi
 
-    if $CHECK_MODE; then
+    local exitfile="$tmpdir/$(echo "$file" | tr '/' '_').exit"
+
+    if [ "$check_mode" = "true" ]; then
         # Check mode: verify formatting without changes
         if ! clang-format --dry-run --Werror "$file" 2>/dev/null; then
-            echo -e "${RED}✗${NC} $file"
-            FAILED=1
-        else
-            echo -e "${GREEN}✓${NC} $file"
+            echo "FAIL:$file"
+            echo "1" > "$exitfile"
         fi
     else
         # Format mode: apply changes
         clang-format -i "$file"
+        echo "OK:$file"
+    fi
+}
+export -f format_one_file
+
+# Run formatting in parallel
+echo -e "${GREEN}Processing ${#FILES[@]} files with $NPROCS parallel jobs...${NC}"
+
+OUTPUT=$(printf '%s\n' "${FILES[@]}" | xargs -P "$NPROCS" -I {} bash -c \
+    'format_one_file "$1" "$2" "$3"' _ {} "$TMPDIR" "$CHECK_MODE")
+
+# Process output
+FAILED=0
+while IFS= read -r line; do
+    if [ -z "$line" ]; then
+        continue
+    fi
+    if [[ "$line" == FAIL:* ]]; then
+        file="${line#FAIL:}"
+        echo -e "${RED}✗${NC} $file"
+        FAILED=1
+    elif [[ "$line" == OK:* ]]; then
+        file="${line#OK:}"
         echo -e "${GREEN}Formatted:${NC} $file"
     fi
-done
+done <<< "$OUTPUT"
 
 if [ $FAILED -ne 0 ]; then
     echo ""

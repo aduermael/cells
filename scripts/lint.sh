@@ -97,8 +97,8 @@ if $FIX_MODE; then
     TIDY_CMD+=(--fix)
 fi
 
-# Determine parallelism (use number of CPU cores, or fall back to 4)
-NPROCS=$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+# Determine parallelism (JOBS env var > CPU cores > fallback to 4)
+NPROCS=${JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc 2>/dev/null || echo 4)}
 
 # Run clang-tidy
 echo -e "${GREEN}Running clang-tidy on ${#FILES[@]} files with $NPROCS parallel jobs...${NC}"

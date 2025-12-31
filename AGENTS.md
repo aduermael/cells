@@ -109,7 +109,20 @@ When executing a plan, each subtask gets its own commit named by phase and subta
 
 **Stop at the end of each phase** to let the user review the commits before proceeding to the next phase. Do not continue to the next phase until the user gives approval.
 
-**Integration tests must pass at the end of each phase.** Before completing a phase, run `cd apps/wasm && npm run test:stable` to verify all stable E2E tests pass. Do not introduce regressions in passing tests.
+**All checks must pass at the end of each phase.** Run:
+
+```bash
+make check
+```
+
+This runs all verification steps in sequence with 16 parallel jobs:
+1. Unit tests (C++)
+2. Linter
+3. Type checks (TypeScript)
+4. Integration tests (E2E stable suite)
+5. Formatter check
+
+**If any step fails:** Fix the issue before proceeding. Do not introduce regressions.
 
 ### Working Style
 
@@ -184,20 +197,11 @@ testdata/                   # Sample .zcd files for testing
 
 ## Common Mistakes to Avoid
 
-❌ **Wrong:** `bazel build //apps/cli:cells`
-✅ **Right:** `make cli`
+| Wrong | Right |
+|-------|-------|
+| `bazel build //apps/cli:cells` | `make cli` |
+| `bazel test //core/...` | `make test` |
+| `node tests/smoke.test.mjs && node tests/formula.test.mjs` | `cd apps/wasm && npm run test:parallel -- stable` |
+| `bazel build --config=wasm //apps/wasm:cells_wasm` | `make wasm-dist` |
 
-❌ **Wrong:** `bazel test //core/...`
-✅ **Right:** `make test`
-
-❌ **Wrong:** `node tests/smoke.test.mjs && node tests/formula.test.mjs`
-✅ **Right:** `cd apps/wasm && npm run test:parallel -- stable`
-
-❌ **Wrong:** `bazel build --config=wasm //apps/wasm:cells_wasm`
-✅ **Right:** `make wasm-dist`
-
-**Why use Makefile targets?**
-- Include correct flags and configurations
-- Handle file copying and setup
-- Are tested and reliable
-- Are documented and consistent
+**Why use Makefile targets?** They include correct flags, handle file copying, and are tested and documented.
