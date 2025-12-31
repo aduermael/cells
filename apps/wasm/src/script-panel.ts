@@ -39,6 +39,7 @@ export class ScriptPanel {
   private editor: HTMLTextAreaElement;
   private backdrop: HTMLPreElement;
   private highlight: HTMLElement;
+  private lineNumbers: HTMLElement;
   private runBtn: HTMLElement;
   private statusEl: HTMLElement;
   private resizeHandle: HTMLElement;
@@ -66,6 +67,7 @@ export class ScriptPanel {
     editor: HTMLTextAreaElement;
     backdrop: HTMLPreElement;
     highlight: HTMLElement;
+    lineNumbers: HTMLElement;
     runBtn: HTMLElement;
     statusEl: HTMLElement;
     resizeHandle: HTMLElement;
@@ -78,6 +80,7 @@ export class ScriptPanel {
     this.editor = config.editor;
     this.backdrop = config.backdrop;
     this.highlight = config.highlight;
+    this.lineNumbers = config.lineNumbers;
     this.runBtn = config.runBtn;
     this.statusEl = config.statusEl;
     this.resizeHandle = config.resizeHandle;
@@ -92,6 +95,7 @@ export class ScriptPanel {
         textarea: this.editor,
         backdrop: this.backdrop,
         highlight: this.highlight,
+        lineNumbers: this.lineNumbers,
         tokenize: config.tokenize,
       });
     }

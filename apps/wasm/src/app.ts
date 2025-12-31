@@ -73,6 +73,7 @@ export interface DOMElements {
   formulaDisplay: HTMLElement;
   scriptPanelBtn: HTMLElement;
   scriptPanel: HTMLElement;
+  scriptLineNumbers: HTMLElement;
   scriptEditor: HTMLTextAreaElement;
   scriptEditorBackdrop: HTMLPreElement;
   scriptEditorHighlight: HTMLElement;
@@ -431,6 +432,7 @@ export function createApp(): App {
     formulaDisplay: getElement("formula-display"),
     scriptPanelBtn: getElement("script-panel-btn"),
     scriptPanel: getElement("script-panel"),
+    scriptLineNumbers: getElement("script-line-numbers"),
     scriptEditor: getElement<HTMLTextAreaElement>("script-editor"),
     scriptEditorBackdrop: getElement<HTMLPreElement>("script-editor-backdrop"),
     scriptEditorHighlight: getElement("script-editor-highlight"),

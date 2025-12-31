@@ -28,8 +28,10 @@ export class SyntaxHighlighter {
   private backdrop: HTMLPreElement;
   private highlight: HTMLElement;
   private tokenize: TokenizeFunction;
+  private lineNumbers: HTMLElement | null;
 
   private lastSource: string = "";
+  private lastLineCount: number = 0;
   private debounceTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor(config: {
@@ -37,11 +39,13 @@ export class SyntaxHighlighter {
     backdrop: HTMLPreElement;
     highlight: HTMLElement;
     tokenize: TokenizeFunction;
+    lineNumbers?: HTMLElement;
   }) {
     this.textarea = config.textarea;
     this.backdrop = config.backdrop;
     this.highlight = config.highlight;
     this.tokenize = config.tokenize;
+    this.lineNumbers = config.lineNumbers ?? null;
 
     this.setupEventListeners();
   }
@@ -56,7 +60,10 @@ export class SyntaxHighlighter {
   async update(): Promise<void> {
     const source = this.textarea.value;
 
-    // Skip if content hasn't changed
+    // Update line numbers regardless of content change (for empty state)
+    this.updateLineNumbers(source);
+
+    // Skip syntax highlighting if content hasn't changed
     if (source === this.lastSource) {
       return;
     }
@@ -152,11 +159,36 @@ export class SyntaxHighlighter {
   }
 
   /**
-   * Sync scroll position from textarea to backdrop
+   * Update line numbers display
+   */
+  private updateLineNumbers(source: string): void {
+    if (!this.lineNumbers) return;
+
+    const lineCount = source ? source.split("\n").length : 1;
+
+    // Only update DOM if line count changed
+    if (lineCount === this.lastLineCount) return;
+    this.lastLineCount = lineCount;
+
+    // Generate line numbers
+    const lines: string[] = [];
+    for (let i = 1; i <= lineCount; i++) {
+      lines.push(String(i));
+    }
+    this.lineNumbers.textContent = lines.join("\n");
+  }
+
+  /**
+   * Sync scroll position from textarea to backdrop (and line numbers)
    */
   private syncScroll(): void {
     this.backdrop.scrollTop = this.textarea.scrollTop;
     this.backdrop.scrollLeft = this.textarea.scrollLeft;
+
+    // Sync line numbers scroll (vertical only)
+    if (this.lineNumbers) {
+      this.lineNumbers.scrollTop = this.textarea.scrollTop;
+    }
   }
 
   /**

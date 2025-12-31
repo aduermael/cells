@@ -115,6 +115,7 @@ export function initApp(): AppContext {
     editor: elements.scriptEditor,
     backdrop: elements.scriptEditorBackdrop,
     highlight: elements.scriptEditorHighlight,
+    lineNumbers: elements.scriptLineNumbers,
     runBtn: elements.scriptRunBtn,
     statusEl: elements.scriptStatus,
     resizeHandle: elements.scriptPanelResizeHandle,

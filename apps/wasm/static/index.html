@@ -88,6 +88,7 @@
         </div>
         <div id="script-panel" class="hidden">
             <div id="script-panel-content">
+                <div id="script-line-numbers">1</div>
                 <div id="script-editor-container">
                     <pre id="script-editor-backdrop"><code id="script-editor-highlight"></code></pre>
                     <textarea id="script-editor" placeholder="-- Write Luau script here&#10;-- Example: cellSet('A1', 42)" spellcheck="false"></textarea>
@@ -95,7 +96,7 @@
             </div>
             <div id="script-panel-footer">
                 <span id="script-status"></span>
-                <button class="btn btn-primary" id="script-run-btn">Run Script</button>
+                <button class="btn btn-primary" id="script-run-btn">Run<span class="btn-shortcut">⌘⏎</span></button>
             </div>
             <div id="script-panel-resize-handle"></div>
         </div>
