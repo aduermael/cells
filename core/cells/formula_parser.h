@@ -41,6 +41,7 @@ public:
 
 private:
     FormulaLexer lexer_;
+    std::string source_;  // Original formula text for error node rawText
     Token current_;
     std::vector<std::string> errors_;
 

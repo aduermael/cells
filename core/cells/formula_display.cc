@@ -318,7 +318,15 @@ std::string FormulaDisplayConverter::functionCallToString(const FunctionCallNode
 }
 
 std::string FormulaDisplayConverter::errorNodeToString(const ErrorNode* node) const {
-    // For error nodes, try to reconstruct what we can from partial children
+    // If rawText is available, return it (without leading "=" since toDisplayString adds it)
+    if (!node->rawText.empty()) {
+        // Strip leading "=" if present since toDisplayString adds it
+        if (node->rawText[0] == '=') {
+            return node->rawText.substr(1);
+        }
+        return node->rawText;
+    }
+    // For error nodes without rawText, try to reconstruct what we can from partial children
     std::string result = "#ERROR!";
     for (const auto& child : node->partialChildren) {
         result += nodeToString(child.get());

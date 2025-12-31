@@ -440,6 +440,7 @@ struct FunctionCallNode : public ASTNode {
 // Contains partial children that were parsed before the error
 struct ErrorNode : public ASTNode {
     std::string message;
+    std::string rawText;  // Original unparseable text (for editing)
     std::vector<std::unique_ptr<ASTNode>> partialChildren;
 
     explicit ErrorNode(std::string msg)
@@ -451,6 +452,7 @@ struct ErrorNode : public ASTNode {
     [[nodiscard]] std::unique_ptr<ASTNode> clone() const override {
         auto n = std::make_unique<ErrorNode>(message);
         n->position = position;
+        n->rawText = rawText;
         for (const auto& child : partialChildren) {
             n->partialChildren.push_back(child->clone());
         }

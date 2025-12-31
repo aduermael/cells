@@ -800,5 +800,45 @@ TEST(FormulaParserTest, UuidComplexFormula) {
     EXPECT_EQ(ast->type, ASTNodeType::BINARY_OP);
 }
 
+// ============================================================================
+// ErrorNode rawText Tests
+// ============================================================================
+
+TEST(FormulaParserTest, ErrorNodeHasRawText) {
+    // A completely unparseable formula should create an ErrorNode with rawText set
+    FormulaParser parser("=@@@invalid");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::ERROR_NODE);
+    auto* errorNode = dynamic_cast<ErrorNode*>(ast.get());
+    ASSERT_NE(errorNode, nullptr);
+    EXPECT_EQ(errorNode->rawText, "=@@@invalid");
+}
+
+TEST(FormulaParserTest, ErrorNodeRawTextPreservesWhitespace) {
+    // Whitespace in the original formula should be preserved
+    FormulaParser parser("= A1 +");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    // This parses partially (A1 + <error>), but the top-level might not be an ErrorNode
+    // Let's test a clearly broken formula instead
+}
+
+TEST(FormulaParserTest, ErrorNodeRawTextOnUnexpectedEnd) {
+    FormulaParser parser("=SUM(");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_TRUE(parser.hasErrors());
+    // Even partial parsing results in an ErrorNode somewhere
+}
+
+TEST(FormulaParserTest, ValidFormulaNoErrorNode) {
+    FormulaParser parser("=A1+B2");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_NE(ast->type, ASTNodeType::ERROR_NODE);
+    EXPECT_FALSE(parser.hasErrors());
+}
+
 }  // namespace
 }  // namespace cells

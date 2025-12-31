@@ -478,6 +478,39 @@ TEST(FormulaASTTest, ErrorNodeToJson) {
     EXPECT_NE(json.find("\"partialChildren\":["), std::string::npos);
 }
 
+TEST(FormulaASTTest, ErrorNodeToJsonWithRawText) {
+    ErrorNode node("Parse error");
+    node.rawText = "=INVALID(syntax";
+    std::string json = node.toJson();
+    EXPECT_NE(json.find("\"type\":\"Error\""), std::string::npos);
+    EXPECT_NE(json.find("\"rawText\":\"=INVALID(syntax\""), std::string::npos);
+}
+
+TEST(FormulaASTTest, ErrorNodeToJsonWithoutRawText) {
+    ErrorNode node("Parse error");
+    // rawText is empty by default
+    std::string json = node.toJson();
+    EXPECT_NE(json.find("\"type\":\"Error\""), std::string::npos);
+    EXPECT_EQ(json.find("\"rawText\""), std::string::npos);  // Should not have rawText
+}
+
+// ============================================================================
+// ErrorNode rawText Tests
+// ============================================================================
+
+TEST(FormulaASTTest, ErrorNodeRawTextPreservedAfterClone) {
+    ErrorNode original("Parse error");
+    original.rawText = "=broken formula";
+    auto cloned = original.clone();
+    auto* errClone = static_cast<ErrorNode*>(cloned.get());
+    EXPECT_EQ(errClone->rawText, "=broken formula");
+}
+
+TEST(FormulaASTTest, ErrorNodeRawTextEmptyByDefault) {
+    ErrorNode node("Some error");
+    EXPECT_TRUE(node.rawText.empty());
+}
+
 // ============================================================================
 // hasError() Tests
 // ============================================================================

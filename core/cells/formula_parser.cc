@@ -6,12 +6,18 @@
 
 namespace cells {
 
-FormulaParser::FormulaParser(std::string_view source) : lexer_(source) {
+FormulaParser::FormulaParser(std::string_view source) : lexer_(source), source_(source) {
     advance();
 }
 
 std::unique_ptr<ASTNode> FormulaParser::parse() {
-    return formula();
+    auto result = formula();
+    // If the result is an ErrorNode, populate rawText with the original formula
+    if (result && result->type == ASTNodeType::ERROR_NODE) {
+        auto* errorNodePtr = static_cast<ErrorNode*>(result.get());
+        errorNodePtr->rawText = source_;
+    }
+    return result;
 }
 
 // ============================================================================

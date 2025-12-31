@@ -274,8 +274,11 @@ std::string FunctionCallNode::toJson() const {
 
 std::string ErrorNode::toJson() const {
     std::ostringstream oss;
-    oss << R"({"type":"Error","message":")" << escapeJsonString(message)
-        << R"(","partialChildren":[)";
+    oss << R"({"type":"Error","message":")" << escapeJsonString(message) << R"(")";
+    if (!rawText.empty()) {
+        oss << R"(,"rawText":")" << escapeJsonString(rawText) << R"(")";
+    }
+    oss << R"(,"partialChildren":[)";
     for (size_t i = 0; i < partialChildren.size(); ++i) {
         if (i > 0) {
             oss << ",";
