@@ -168,12 +168,20 @@ export class ScriptPanel {
     this.showStatus("Running...", "");
     this.runBtn.setAttribute("disabled", "true");
 
+    const startTime = performance.now();
+
     try {
       const result = await this.executeScript(script);
+      const elapsed = performance.now() - startTime;
 
       if (result.success) {
-        // Show output if any, otherwise just "Success"
-        this.showStatus(result.output || "Success", "success");
+        // Format time: use ms if < 1000ms, otherwise seconds
+        const timeStr = elapsed < 1000
+          ? `${Math.round(elapsed)}ms`
+          : `${(elapsed / 1000).toFixed(2)}s`;
+        // Show output if any, otherwise just "Success", with execution time
+        const message = result.output || "Success";
+        this.showStatus(`${message} (${timeStr})`, "success");
         // Refresh the grid to show any changes
         this.onScriptExecuted();
       } else {
