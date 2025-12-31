@@ -120,6 +120,15 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
+# SSE (Server-Sent Events) parser
+cc_library(
+    name = "sse_parser",
+    srcs = ["common/SSEParser.cc"],
+    hdrs = ["include/SSEParser.h"],
+    includes = ["."],
+    visibility = ["//visibility:public"],
+)
+
 # HTTP request - common base implementation
 cc_library(
     name = "http_request_common",
@@ -257,6 +266,15 @@ cc_test(
     srcs = ["http_response_test.cc"],
     deps = [
         ":http_response",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "sse_parser_test",
+    srcs = ["sse_parser_test.cc"],
+    deps = [
+        ":sse_parser",
         "@googletest//:gtest_main",
     ],
 )
