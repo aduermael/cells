@@ -1499,6 +1499,157 @@ canvas {
 }
 
 /* ============================================================================
+   Script Panel (Luau scripting interface)
+   ============================================================================ */
+
+#script-panel {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    min-height: 150px;
+    max-height: 50vh;
+    height: 200px;
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid #333;
+    position: relative;
+}
+
+#script-panel.hidden {
+    display: none;
+}
+
+#script-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #252526;
+    border-bottom: 1px solid #333;
+    color: #cccccc;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+#script-panel-status {
+    color: #808080;
+    font-size: 11px;
+}
+
+#script-panel-status.success {
+    color: #4ec9b0;
+}
+
+#script-panel-status.error {
+    color: #f48771;
+}
+
+#script-panel-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+}
+
+#script-editor {
+    flex: 1;
+    padding: 12px;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    tab-size: 2;
+}
+
+#script-editor::placeholder {
+    color: #5a5a5a;
+}
+
+/* Lua syntax highlighting classes (for future enhancement) */
+#script-editor .lua-keyword {
+    color: #569cd6;
+}
+
+#script-editor .lua-string {
+    color: #ce9178;
+}
+
+#script-editor .lua-number {
+    color: #b5cea8;
+}
+
+#script-editor .lua-comment {
+    color: #6a9955;
+}
+
+#script-editor .lua-function {
+    color: #dcdcaa;
+}
+
+#script-panel-footer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    background: #252526;
+    border-top: 1px solid #333;
+    flex-shrink: 0;
+}
+
+#script-output {
+    flex: 1;
+    font-size: 11px;
+    color: #808080;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#script-output.success {
+    color: #4ec9b0;
+}
+
+#script-output.error {
+    color: #f48771;
+}
+
+#script-run-btn {
+    flex-shrink: 0;
+}
+
+/* Resize handle */
+#script-panel-resize-handle {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    cursor: ns-resize;
+    background: transparent;
+}
+
+#script-panel-resize-handle:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+#script-panel-resize-handle:active {
+    background: var(--color-primary);
+}
+
+/* Script panel button active state */
+#script-panel-btn.active {
+    background: var(--color-bg-active);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* ============================================================================
    Custom Scrollbars (virtual scrolling)
    ============================================================================ */
 

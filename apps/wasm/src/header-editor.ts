@@ -307,12 +307,6 @@ export class FormulaBarEditor {
   private isEditing: () => boolean;
   private onPositionCellEditor: (cell: Position) => void;
   private onFocusCanvas: () => void;
-  private onExecuteScript: (script: string) => Promise<{
-    success: boolean;
-    output?: string;
-    error?: string;
-    instructions: number;
-  }>;
 
   // =========================================================================
   // Constructor
@@ -340,12 +334,6 @@ export class FormulaBarEditor {
     isEditing: () => boolean;
     onPositionCellEditor: (cell: Position) => void;
     onFocusCanvas: () => void;
-    onExecuteScript: (script: string) => Promise<{
-      success: boolean;
-      output?: string;
-      error?: string;
-      instructions: number;
-    }>;
   }) {
     this.uiStateMachine = config.uiStateMachine;
     this.formulaInput = config.formulaInput;
@@ -368,7 +356,6 @@ export class FormulaBarEditor {
     this.isEditing = config.isEditing;
     this.onPositionCellEditor = config.onPositionCellEditor;
     this.onFocusCanvas = config.onFocusCanvas;
-    this.onExecuteScript = config.onExecuteScript;
 
     this.setupEventListeners();
   }
@@ -399,28 +386,6 @@ export class FormulaBarEditor {
   isFormulaMode(): boolean {
     if (!this.isEditingFormulaBar()) return false;
     return this.getValue().startsWith("=");
-  }
-
-  /**
-   * Check if currently in script mode (value starts with '/')
-   * Scripts are executed via Luau sandbox instead of cell update
-   */
-  isScriptMode(): boolean {
-    return this.getValue().startsWith("/");
-  }
-
-  /**
-   * Update the visual styling for script mode
-   */
-  private updateScriptModeStyle(): void {
-    const container = this.formulaDisplay.parentElement;
-    if (!container) return;
-
-    if (this.isScriptMode()) {
-      container.classList.add("script-mode");
-    } else {
-      container.classList.remove("script-mode");
-    }
   }
 
   /**
@@ -585,31 +550,6 @@ export class FormulaBarEditor {
 
     const newValue = this.getValue();
 
-    // Check if this is a script (starts with '/')
-    if (this.isScriptMode()) {
-      // Execute script instead of cell update
-      const script = newValue.slice(1); // Remove leading '/'
-      try {
-        const result = await this.onExecuteScript(script);
-        if (result.success) {
-          // Refresh viewport to show any changes made by the script
-          await this.onFetchViewport();
-          this.onRender();
-          console.log(
-            `Script executed (${result.instructions} instructions)`,
-            result.output || ""
-          );
-        } else {
-          console.error("Script error:", result.error);
-        }
-      } catch (e) {
-        console.error("Error executing script:", e);
-      }
-      // Cleanup and exit (same as below, but no cell update)
-      this.cleanupAfterEdit();
-      return;
-    }
-
     const cells = this.getCells();
     let cell = getCellAt(editCell.col, editCell.row, cells);
 
@@ -647,7 +587,7 @@ export class FormulaBarEditor {
   }
 
   /**
-   * Cleanup formula bar state after edit (shared by normal edit and script execution)
+   * Cleanup formula bar state after edit
    */
   private cleanupAfterEdit(): void {
     this.uiStateMachine.transition(UIEvent.COMMIT_FORMULA_EDIT);
@@ -661,11 +601,6 @@ export class FormulaBarEditor {
     this.formulaInput.value = "";
     // Clear formula highlights
     this.onUpdateFormulaHighlights("");
-    // Clear script mode styling
-    const formulaContainer = this.formulaDisplay.parentElement;
-    if (formulaContainer) {
-      formulaContainer.classList.remove("script-mode");
-    }
     // Clear ephemeral editing state
     if (this.syncAdapter) {
       this.syncAdapter.clearEditing();
@@ -687,11 +622,6 @@ export class FormulaBarEditor {
     this.cellDisplay.innerHTML = "";
     // Clear formula highlights
     this.onUpdateFormulaHighlights("");
-    // Clear script mode styling
-    const formulaContainer = this.formulaDisplay.parentElement;
-    if (formulaContainer) {
-      formulaContainer.classList.remove("script-mode");
-    }
     // Clear ephemeral editing state
     if (this.syncAdapter) {
       this.syncAdapter.clearEditing();
@@ -873,9 +803,6 @@ export class FormulaBarEditor {
 
       // Update formula reference highlights live as user types
       this.onUpdateFormulaHighlights(value);
-
-      // Update script mode visual styling
-      this.updateScriptModeStyle();
 
       if (!this.isEditingFormulaBar()) return;
 

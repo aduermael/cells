@@ -14,6 +14,7 @@ import { AppEventManager } from "./app-events";
 import { FileLoader } from "./file-loader";
 import { persistence } from "./persistence";
 import { AstDebugPanel } from "./ast-debug";
+import { ScriptPanel } from "./script-panel";
 import { CppSyncAdapter } from "./cpp-sync-adapter";
 import { RoomManager, getRoomIdFromUrl, clearRoomIdFromUrl } from "./room-url";
 import {
@@ -52,6 +53,7 @@ export interface AppContext {
   presenceBroadcaster: PresenceBroadcaster;
   eventManager: AppEventManager;
   astDebugPanel: AstDebugPanel;
+  scriptPanel: ScriptPanel;
   workbookTitleEditor: WorkbookTitleEditor;
   clipboardManager: ClipboardManager;
 
@@ -101,6 +103,34 @@ export function initApp(): AppContext {
     errorsEl: elements.astErrors,
     treeEl: elements.astTree,
     ensureWasmClient: async () => fileLoader.ensureWasmClient(),
+  });
+
+  // =========================================================================
+  // Create Script Panel
+  // =========================================================================
+
+  const scriptPanel = new ScriptPanel({
+    panel: elements.scriptPanel,
+    toggleBtn: elements.scriptPanelBtn,
+    editor: elements.scriptEditor,
+    runBtn: elements.scriptRunBtn,
+    statusEl: elements.scriptPanelStatus,
+    outputEl: elements.scriptOutput,
+    resizeHandle: elements.scriptPanelResizeHandle,
+    executeScript: async (script: string) => {
+      if (!app.dataSource) {
+        return {
+          success: false,
+          error: "No data source available",
+          instructions: 0,
+        };
+      }
+      return app.dataSource.executeScript(script);
+    },
+    onScriptExecuted: () => {
+      // Refresh viewport to show any changes made by the script
+      fetchViewportNow();
+    },
   });
 
   // =========================================================================
@@ -911,16 +941,6 @@ export function initApp(): AppContext {
     isEditing: () => cellEditor.isEditing(),
     onPositionCellEditor: positionCellEditor,
     onFocusCanvas: focusCanvas,
-    onExecuteScript: async (script: string) => {
-      if (!app.dataSource) {
-        return {
-          success: false,
-          error: "No data source available",
-          instructions: 0,
-        };
-      }
-      return app.dataSource.executeScript(script);
-    },
   });
 
   // =========================================================================
@@ -1296,6 +1316,7 @@ export function initApp(): AppContext {
     presenceBroadcaster,
     eventManager,
     astDebugPanel,
+    scriptPanel,
     workbookTitleEditor,
     clipboardManager,
 

@@ -71,6 +71,13 @@ export interface DOMElements {
   cellReference: HTMLElement;
   formulaInput: HTMLInputElement;
   formulaDisplay: HTMLElement;
+  scriptPanelBtn: HTMLElement;
+  scriptPanel: HTMLElement;
+  scriptEditor: HTMLTextAreaElement;
+  scriptRunBtn: HTMLElement;
+  scriptPanelStatus: HTMLElement;
+  scriptOutput: HTMLElement;
+  scriptPanelResizeHandle: HTMLElement;
   bottomBar: HTMLElement;
   sheetTabsContainer: HTMLElement;
   addSheetBtn: HTMLButtonElement;
@@ -421,6 +428,13 @@ export function createApp(): App {
     cellReference: getElement("cell-reference"),
     formulaInput: getElement<HTMLInputElement>("formula-input"),
     formulaDisplay: getElement("formula-display"),
+    scriptPanelBtn: getElement("script-panel-btn"),
+    scriptPanel: getElement("script-panel"),
+    scriptEditor: getElement<HTMLTextAreaElement>("script-editor"),
+    scriptRunBtn: getElement("script-run-btn"),
+    scriptPanelStatus: getElement("script-panel-status"),
+    scriptOutput: getElement("script-output"),
+    scriptPanelResizeHandle: getElement("script-panel-resize-handle"),
     bottomBar: getElement("bottom-bar"),
     sheetTabsContainer: getElement("sheet-tabs-container"),
     addSheetBtn: getElement<HTMLButtonElement>("add-sheet-btn"),

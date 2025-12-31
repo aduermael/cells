@@ -79,6 +79,26 @@
                 <input type="text" id="formula-input" />
                 <div id="formula-display" contenteditable="true" data-placeholder="Select a cell to view or edit its value"></div>
             </div>
+            <button class="btn btn-icon" id="script-panel-btn" title="Open script panel (Lua scripting)">
+                <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="16 18 22 12 16 6"></polyline>
+                    <polyline points="8 6 2 12 8 18"></polyline>
+                </svg>
+            </button>
+        </div>
+        <div id="script-panel" class="hidden">
+            <div id="script-panel-header">
+                <span>Luau Script</span>
+                <span id="script-panel-status"></span>
+            </div>
+            <div id="script-panel-content">
+                <textarea id="script-editor" placeholder="-- Write Luau script here&#10;-- Example: cellSet('A1', 42)" spellcheck="false"></textarea>
+            </div>
+            <div id="script-panel-footer">
+                <div id="script-output"></div>
+                <button class="btn btn-primary" id="script-run-btn">Run Script</button>
+            </div>
+            <div id="script-panel-resize-handle"></div>
         </div>
         <div id="ast-debug-panel" class="hidden">
             <div id="ast-debug-header">
