@@ -1,4 +1,4 @@
-Status: IN_PROGRESS
+Status: COMPLETED
 Created At: 2025-12-31 18:06 UTC
 Updated At: 2025-12-31 22:45 UTC
 Following plan management guidelines defined in AGENTS.md
@@ -131,11 +131,11 @@ Future improvement (not in scope for this phase):
 - [x] 3d: CRDT operations already use the AST-generated text ✅
 - [x] 3e: Verify all formula tests pass (43 tests pass)
 
-## Phase 4: Deprecate String-Based adjustFormulaReferences
+## Phase 4: Deprecate String-Based adjustFormulaReferences ✅
 
-- [ ] 4a: Update any remaining callers to use AST version
-- [ ] 4b: Remove `RefConverter::adjustFormulaReferences(string)`
-- [ ] 4c: Final test pass to ensure no regressions
+- [x] 4a: clipboard.ts uses its own TS implementation (appropriate for browser clipboard API input)
+- [x] 4b: Removed `RefConverter::adjustFormulaReferences(string)` and `adjustSingleRef` from C++
+- [x] 4c: Final test pass to ensure no regressions
 
 ---
 

@@ -115,36 +115,12 @@ public:
     [[nodiscard]] std::string formatUuidRef(const CellRef& ref) const;
 
     // ============================================================================
-    // Formula Reference Adjustment (for fill/copy-paste)
-    // ============================================================================
-
-    // Adjust cell references in a formula by the given row and column offsets.
-    // Only relative references are adjusted; absolute references ($A$1) are preserved.
-    // The formula should be in A1 notation (e.g., "=A1+B2", "=$A$1+B2").
-    //
-    // Parameters:
-    //   formula - The formula string in A1 notation (with leading '=')
-    //   colOffset - Number of columns to shift relative column references
-    //   rowOffset - Number of rows to shift relative row references
-    //
-    // Returns the adjusted formula string.
-    // If a reference would become invalid (negative row/col), returns #REF! for that reference.
-    //
-    // Examples:
-    //   adjustFormulaReferences("=A1+B2", 1, 1)     -> "=B2+C3"
-    //   adjustFormulaReferences("=$A$1+B2", 1, 1)   -> "=$A$1+C3"
-    //   adjustFormulaReferences("=$A1+B$2", 1, 1)   -> "=$A2+C$2"
-    //   adjustFormulaReferences("=A1", -1, 0)       -> "=#REF!" (column would be negative)
-    [[nodiscard]] static std::string adjustFormulaReferences(const std::string& formula,
-                                                             int colOffset, int rowOffset);
-
-    // ============================================================================
-    // AST-Based Reference Adjustment (preferred over string-based)
+    // AST-Based Reference Adjustment
     // ============================================================================
 
     // Adjust cell references in an AST by the given row and column offsets.
     // Only relative references are adjusted; absolute references are preserved.
-    // This is more efficient than the string-based version as it avoids re-parsing.
+    // This is efficient as it works directly on the AST without re-parsing.
     //
     // Parameters:
     //   ast - The AST to adjust (will be cloned, original is not modified)
@@ -153,9 +129,6 @@ public:
     //
     // Returns a new AST with adjusted references.
     // If a reference would become invalid (negative row/col), the node becomes an ErrorNode.
-    //
-    // Note: Unlike adjustFormulaReferences, this works on the column/row fields of
-    // CellRefNode directly, not on the display string.
     [[nodiscard]] static std::unique_ptr<ASTNode> adjustASTReferences(const ASTNode* ast,
                                                                       int colOffset, int rowOffset);
 
@@ -200,11 +173,6 @@ private:
 
     // Extract A1 ref at position, returns length consumed (0 if not valid)
     [[nodiscard]] static size_t extractA1Ref(const std::string& formula, size_t pos, CellRef& ref);
-
-    // Adjust a single cell reference by the given offsets
-    // Returns the adjusted A1 notation, or "#REF!" if the adjustment would be invalid
-    [[nodiscard]] static std::string adjustSingleRef(const CellRef& ref, int colOffset,
-                                                     int rowOffset);
 };
 
 }  // namespace cells
