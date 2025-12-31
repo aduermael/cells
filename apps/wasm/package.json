@@ -19,7 +19,8 @@
     "test:selection": "node tests/selection.test.mjs",
     "test:script": "node tests/script.test.mjs",
     "test:all": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs && node tests/clipboard.test.mjs && node tests/script.test.mjs && node tests/collab.test.mjs && node tests/initial-sync.test.mjs",
-    "test:stable": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs && node tests/clipboard.test.mjs && node tests/selection.test.mjs"
+    "test:stable": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs && node tests/clipboard.test.mjs && node tests/selection.test.mjs",
+    "test:parallel": "node tests/run-parallel.mjs"
   },
   "devDependencies": {
     "@lightpanda/browser": "^1.0.1",

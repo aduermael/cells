@@ -14,7 +14,7 @@ const projectRoot = join(__dirname, '..', '..', '..');
 
 // Configuration
 const CONFIG = {
-  serverPort: 8082, // Use different port from dev server to avoid conflicts
+  serverPort: parseInt(process.env.TEST_PORT || '8082', 10), // Use TEST_PORT for parallel tests
   lightpandaPort: 9222,
   lightpandaHost: '127.0.0.1',
   distDir: join(projectRoot, 'dist'),

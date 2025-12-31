@@ -255,11 +255,15 @@ The web app includes e2e tests using Chrome headless via Puppeteer:
 # Build distribution first
 make wasm-dist
 
-# Run all stable e2e tests (recommended)
-cd apps/wasm && npm run test:stable
+# Run tests in parallel (recommended - much faster)
+cd apps/wasm && npm run test:parallel              # All tests
+npm run test:parallel -- stable                    # Stable tests only
+npm run test:parallel -- collab                    # Collaboration tests
+npm run test:parallel -- --concurrency 5 stable    # Limit concurrency
 
-# Run all e2e tests (including experimental)
-npm run test:all
+# Run tests sequentially (legacy)
+npm run test:stable   # Stable tests
+npm run test:all      # All tests
 
 # Run specific test suites
 npm run test:smoke        # Basic UI functionality
