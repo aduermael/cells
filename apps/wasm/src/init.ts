@@ -20,7 +20,6 @@ import { RoomManager, getRoomIdFromUrl, clearRoomIdFromUrl } from "./room-url";
 import {
   getCellAt,
   colToLetter,
-  getNormalizedRange,
   hasRangeSelection,
 } from "./grid-utils";
 import { ClipboardManager } from "./clipboard";

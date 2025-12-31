@@ -579,66 +579,6 @@ interface CellRef {
 }
 
 /**
- * Parse a cell reference string (e.g., "A1", "$B$2")
- */
-function parseA1Ref(ref: string): CellRef {
-  const result: CellRef = {
-    colIndex: 0,
-    rowIndex: 0,
-    colAbsolute: false,
-    rowAbsolute: false,
-    valid: false,
-  };
-
-  if (!ref) return result;
-
-  let pos = 0;
-
-  // Check for absolute column marker
-  if (pos < ref.length && ref[pos] === "$") {
-    result.colAbsolute = true;
-    pos++;
-  }
-
-  // Parse column letters
-  let colLetters = "";
-  while (pos < ref.length && /[A-Za-z]/.test(ref[pos]!)) {
-    colLetters += ref[pos]!.toUpperCase();
-    pos++;
-  }
-
-  if (!colLetters) return result; // No column letters found
-
-  // Check for absolute row marker
-  if (pos < ref.length && ref[pos] === "$") {
-    result.rowAbsolute = true;
-    pos++;
-  }
-
-  // Parse row number
-  let rowDigits = "";
-  while (pos < ref.length && /[0-9]/.test(ref[pos]!)) {
-    rowDigits += ref[pos];
-    pos++;
-  }
-
-  if (!rowDigits) return result; // No row number found
-
-  // Convert to indices
-  const colIdx = columnLetterToIndex(colLetters);
-  if (colIdx < 0) return result;
-
-  const rowNum = parseInt(rowDigits, 10);
-  if (rowNum < 1) return result; // Excel rows are 1-based
-
-  result.colIndex = colIdx;
-  result.rowIndex = rowNum - 1; // Convert to 0-based
-  result.valid = true;
-
-  return result;
-}
-
-/**
  * Format a CellRef back to A1 notation
  */
 function formatA1Ref(ref: CellRef): string {
