@@ -116,8 +116,7 @@ export function initApp(): AppContext {
     backdrop: elements.scriptEditorBackdrop,
     highlight: elements.scriptEditorHighlight,
     runBtn: elements.scriptRunBtn,
-    statusEl: elements.scriptPanelStatus,
-    outputEl: elements.scriptOutput,
+    statusEl: elements.scriptStatus,
     resizeHandle: elements.scriptPanelResizeHandle,
     executeScript: async (script: string) => {
       if (!app.dataSource) {

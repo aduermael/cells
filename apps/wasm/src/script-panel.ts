@@ -41,7 +41,6 @@ export class ScriptPanel {
   private highlight: HTMLElement;
   private runBtn: HTMLElement;
   private statusEl: HTMLElement;
-  private outputEl: HTMLElement;
   private resizeHandle: HTMLElement;
 
   private executeScript: (script: string) => Promise<ScriptResult>;
@@ -69,7 +68,6 @@ export class ScriptPanel {
     highlight: HTMLElement;
     runBtn: HTMLElement;
     statusEl: HTMLElement;
-    outputEl: HTMLElement;
     resizeHandle: HTMLElement;
     executeScript: (script: string) => Promise<ScriptResult>;
     onScriptExecuted: () => void;
@@ -82,7 +80,6 @@ export class ScriptPanel {
     this.highlight = config.highlight;
     this.runBtn = config.runBtn;
     this.statusEl = config.statusEl;
-    this.outputEl = config.outputEl;
     this.resizeHandle = config.resizeHandle;
     this.executeScript = config.executeScript;
     this.onScriptExecuted = config.onScriptExecuted;
@@ -160,32 +157,26 @@ export class ScriptPanel {
   async run(): Promise<void> {
     const script = this.editor.value.trim();
     if (!script) {
-      this.showOutput("No script to run", "error");
+      this.showStatus("No script to run", "error");
       return;
     }
 
     this.showStatus("Running...", "");
-    this.showOutput("", "");
     this.runBtn.setAttribute("disabled", "true");
 
     try {
       const result = await this.executeScript(script);
 
       if (result.success) {
-        const msg = result.output
-          ? `${result.output} (${result.instructions} instructions)`
-          : `Done (${result.instructions} instructions)`;
-        this.showStatus("Success", "success");
-        this.showOutput(msg, "success");
+        // Show output if any, otherwise just "Success"
+        this.showStatus(result.output || "Success", "success");
         // Refresh the grid to show any changes
         this.onScriptExecuted();
       } else {
-        this.showStatus("Error", "error");
-        this.showOutput(result.error || "Unknown error", "error");
+        this.showStatus(result.error || "Unknown error", "error");
       }
     } catch (e) {
-      this.showStatus("Error", "error");
-      this.showOutput((e as Error).message, "error");
+      this.showStatus((e as Error).message, "error");
     } finally {
       this.runBtn.removeAttribute("disabled");
     }
@@ -196,19 +187,11 @@ export class ScriptPanel {
   // =========================================================================
 
   /**
-   * Show status in the header
+   * Show status message in the footer
    */
   private showStatus(text: string, state: "success" | "error" | ""): void {
     this.statusEl.textContent = text;
     this.statusEl.className = state;
-  }
-
-  /**
-   * Show output in the footer
-   */
-  private showOutput(text: string, state: "success" | "error" | ""): void {
-    this.outputEl.textContent = text;
-    this.outputEl.className = state;
   }
 
   /**

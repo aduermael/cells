@@ -1520,30 +1520,6 @@ canvas {
     display: none;
 }
 
-#script-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 12px;
-    background: #252526;
-    border-bottom: 1px solid #333;
-    color: #cccccc;
-    font-size: 11px;
-    flex-shrink: 0;
-}
-
-#script-panel-status {
-    color: #808080;
-    font-size: 11px;
-}
-
-#script-panel-status.success {
-    color: #4ec9b0;
-}
-
-#script-panel-status.error {
-    color: #f48771;
-}
 
 #script-panel-content {
     flex: 1;
@@ -1652,7 +1628,7 @@ canvas {
     flex-shrink: 0;
 }
 
-#script-output {
+#script-status {
     flex: 1;
     font-size: 11px;
     color: #808080;
@@ -1661,11 +1637,11 @@ canvas {
     white-space: nowrap;
 }
 
-#script-output.success {
+#script-status.success {
     color: #4ec9b0;
 }
 
-#script-output.error {
+#script-status.error {
     color: #f48771;
 }
 
