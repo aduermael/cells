@@ -148,7 +148,7 @@ export class SyntaxHighlighter {
     }
     this.debounceTimeout = setTimeout(() => {
       this.update();
-    }, 150); // 150ms debounce - balance between responsiveness and performance
+    }, 16); // 16ms debounce (~1 frame) - tokenizer is fast
   }
 
   /**
