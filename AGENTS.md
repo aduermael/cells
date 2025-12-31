@@ -31,6 +31,16 @@ Status: IN-PROGRESS
 Created At: YYYY-MM-DD HH:mm UTC
 Updated At: YYYY-MM-DD HH:mm UTC
 Following plan management guidelines defined in AGENTS.md
+
+## Commands
+
+| Task | Command |
+|------|---------|
+| Build | `make build` |
+| Unit tests | `make test` |
+| E2E tests | `cd apps/wasm && npm run test:parallel -- stable` |
+| Lint | `make lint` |
+| Format | `make format` |
 ```
 
 All timestamps must be in **UTC timezone**. To get the current UTC time, run:
@@ -39,6 +49,8 @@ date -u '+%Y-%m-%d %H:%M'
 ```
 
 It's important to always include the "Following plan management guidelines defined in AGENTS.md" mention.
+
+The **Commands** section is **mandatory** and should list all commands needed to build, test, and verify the work in this plan. Adjust commands based on what the plan touches (e.g., omit E2E tests if the plan is pure C++ backend work).
 
 **STATUS values:**
 
