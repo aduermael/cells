@@ -216,3 +216,21 @@ export interface ScriptResult {
   error?: string; // Error message if !success
   instructions: number; // Number of instructions executed
 }
+
+/** Token type from Luau lexer */
+export type LuauTokenType =
+  | "keyword"
+  | "string"
+  | "number"
+  | "comment"
+  | "name"
+  | "operator"
+  | "error";
+
+/** Token from Luau lexer */
+export interface LuauToken {
+  type: LuauTokenType;
+  text: string;
+  start: number; // Byte offset in source
+  end: number; // Byte offset in source (exclusive)
+}

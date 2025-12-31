@@ -18,7 +18,7 @@ The issue: Global keyboard handler in `app-events.ts:1283-1304` intercepts Cmd+C
 when not in cell editing mode, but doesn't check if script editor has focus.
 
 - [x] 1a: Add script editor focus check to clipboard shortcut handling
-- [ ] 1b: Test copy/paste works in script editor
+- [x] 1b: Test copy/paste works in script editor
 
 **Files:**
 - `apps/wasm/src/app-events.ts` - Add condition to check script editor focus
@@ -28,10 +28,10 @@ when not in cell editing mode, but doesn't check if script editor has focus.
 
 Create C++ bindings to expose Luau's lexer for syntax highlighting and auto-indent.
 
-- [ ] 2a: Add tokenize function to bindings.cc that returns JSON array of tokens
-- [ ] 2b: Add TypeScript types for Token interface
-- [ ] 2c: Add worker message handler for tokenize
-- [ ] 2d: Add client method for tokenize
+- [x] 2a: Add tokenize function to bindings.cc that returns JSON array of tokens
+- [x] 2b: Add TypeScript types for Token interface
+- [x] 2c: Add worker message handler for tokenize
+- [x] 2d: Add client method for tokenize
 
 Token JSON format:
 ```json

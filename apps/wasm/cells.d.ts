@@ -192,6 +192,21 @@ declare module 'cells-wasm' {
   }
 
   /**
+   * Token type from Luau lexer
+   */
+  type LuauTokenType = 'keyword' | 'string' | 'number' | 'comment' | 'name' | 'operator' | 'error';
+
+  /**
+   * Token from Luau lexer
+   */
+  interface LuauToken {
+    type: LuauTokenType;
+    text: string;
+    start: number;  // Byte offset in source
+    end: number;    // Byte offset in source (exclusive)
+  }
+
+  /**
    * Sheet information
    */
   interface SheetInfo {
@@ -657,6 +672,14 @@ declare module 'cells-wasm' {
     executeScript(script: string): string;
 
     /**
+     * Tokenize a Luau script using the Luau lexer
+     * Returns an array of tokens for syntax highlighting
+     * @param source - Luau source code to tokenize
+     * @returns JSON string with array of LuauToken
+     */
+    tokenizeLuau(source: string): string;
+
+    /**
      * Delete the CellsEngine instance and free memory
      */
     delete(): void;
@@ -742,5 +765,7 @@ declare module 'cells-wasm' {
     DirtyCellsResult,
     // Scripting types (Luau)
     ScriptResult,
+    LuauTokenType,
+    LuauToken,
   };
 }

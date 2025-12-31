@@ -29,6 +29,7 @@ import type {
   CellDependenciesResult,
   CellDependentsResult,
   ScriptResult,
+  LuauToken,
 } from "./client-types";
 
 // Re-export types for external consumers
@@ -44,6 +45,8 @@ export type {
   ReferenceInfo,
   RefType,
   ScriptResult,
+  LuauToken,
+  LuauTokenType,
 } from "./client-types";
 
 /**
@@ -675,5 +678,10 @@ export class CellsClient {
   async executeScript(script: string): Promise<ScriptResult> {
     const response = await this._send("executeScript", { script });
     return JSON.parse(response.result as string) as ScriptResult;
+  }
+
+  async tokenizeLuau(source: string): Promise<LuauToken[]> {
+    const response = await this._send("tokenizeLuau", { source });
+    return JSON.parse(response.result as string) as LuauToken[];
   }
 }

@@ -128,6 +128,7 @@ interface CellsEngine {
 
   // Scripting (Luau)
   executeScript(script: string): string;
+  tokenizeLuau(source: string): string;
 
   // Viewport pixel queries (Phase 5)
   getColumnPixelOffset(position: number): number;
@@ -1129,6 +1130,13 @@ function handleMessage(msg: WorkerRequest): void {
         const { script } = params as { script: string };
         const result = engine.executeScript(script);
         respond({ type: "scriptExecuted", result });
+        break;
+      }
+
+      case "tokenizeLuau": {
+        const { source } = params as { source: string };
+        const result = engine.tokenizeLuau(source);
+        respond({ type: "tokenized", result });
         break;
       }
 

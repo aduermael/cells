@@ -37,6 +37,9 @@
 #include "core/cells/xlsx_reader.h"
 #include "core/cells/xlsx_writer.h"
 #include "core/cells/luau_sandbox.h"
+#include "Luau/Allocator.h"
+#include "Luau/Ast.h"
+#include "Luau/Lexer.h"
 #include "core/log/include/Logger.h"
 #include "core/net/include/SyncClient.h"
 
@@ -3373,6 +3376,102 @@ public:
         return json.str();
     }
 
+    // Tokenize a Luau script using the Luau lexer
+    // Returns JSON array of tokens: [{"type":"keyword","text":"local","start":0,"end":5},...]
+    // Token types: keyword, string, number, comment, name, operator, error
+    std::string tokenizeLuau(const std::string& source) {
+        Luau::Allocator allocator;
+        Luau::AstNameTable names(allocator);
+        Luau::Lexer lexer(source.data(), source.size(), names);
+        lexer.setSkipComments(false);  // We want to capture comments for highlighting
+
+        std::ostringstream json;
+        json << "[";
+        bool first = true;
+
+        while (true) {
+            const Luau::Lexeme& lexeme = lexer.next();
+            if (lexeme.type == Luau::Lexeme::Eof) {
+                break;
+            }
+
+            if (!first) {
+                json << ",";
+            }
+            first = false;
+
+            // Determine token type category
+            const char* tokenType = "operator";
+            if (lexeme.type >= Luau::Lexeme::Reserved_BEGIN &&
+                lexeme.type < Luau::Lexeme::Reserved_END) {
+                tokenType = "keyword";
+            } else if (lexeme.type == Luau::Lexeme::QuotedString ||
+                       lexeme.type == Luau::Lexeme::RawString ||
+                       lexeme.type == Luau::Lexeme::InterpStringBegin ||
+                       lexeme.type == Luau::Lexeme::InterpStringMid ||
+                       lexeme.type == Luau::Lexeme::InterpStringEnd ||
+                       lexeme.type == Luau::Lexeme::InterpStringSimple) {
+                tokenType = "string";
+            } else if (lexeme.type == Luau::Lexeme::Number) {
+                tokenType = "number";
+            } else if (lexeme.type == Luau::Lexeme::Comment ||
+                       lexeme.type == Luau::Lexeme::BlockComment) {
+                tokenType = "comment";
+            } else if (lexeme.type == Luau::Lexeme::Name) {
+                tokenType = "name";
+            } else if (lexeme.type == Luau::Lexeme::BrokenString ||
+                       lexeme.type == Luau::Lexeme::BrokenComment ||
+                       lexeme.type == Luau::Lexeme::BrokenUnicode ||
+                       lexeme.type == Luau::Lexeme::BrokenInterpDoubleBrace ||
+                       lexeme.type == Luau::Lexeme::Error) {
+                tokenType = "error";
+            }
+
+            // Calculate byte offsets from location
+            // Location stores line (0-indexed) and column (0-indexed)
+            // We need to convert to byte offsets in the source string
+            unsigned int startOffset = 0;
+            unsigned int endOffset = 0;
+            unsigned int currentOffset = 0;
+            unsigned int currentLine = 0;
+
+            for (size_t i = 0; i < source.size(); ++i) {
+                if (currentLine == lexeme.location.begin.line &&
+                    currentOffset == lexeme.location.begin.column) {
+                    startOffset = static_cast<unsigned int>(i);
+                }
+                if (currentLine == lexeme.location.end.line &&
+                    currentOffset == lexeme.location.end.column) {
+                    endOffset = static_cast<unsigned int>(i);
+                    break;
+                }
+                if (source[i] == '\n') {
+                    ++currentLine;
+                    currentOffset = 0;
+                } else {
+                    ++currentOffset;
+                }
+            }
+
+            // If we hit end of source before finding end position, set to source size
+            if (endOffset == 0 && startOffset > 0) {
+                endOffset = static_cast<unsigned int>(source.size());
+            }
+
+            // Extract the text from source (more accurate than using lexeme.toString())
+            std::string text = source.substr(startOffset, endOffset - startOffset);
+
+            // Build JSON object for this token
+            json << "{\"type\":\"" << tokenType << "\","
+                 << "\"text\":\"" << jsonEscape(text) << "\","
+                 << "\"start\":" << startOffset << ","
+                 << "\"end\":" << endOffset << "}";
+        }
+
+        json << "]";
+        return json.str();
+    }
+
 private:
     void rebuildViewportIndex() {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
@@ -3620,7 +3719,8 @@ EMSCRIPTEN_BINDINGS(cells) {
         // Debug/Development
         .function("debugParseFormula", &cells::wasm::CellsEngine::debugParseFormula)
         // Scripting (Luau)
-        .function("executeScript", &cells::wasm::CellsEngine::executeScript);
+        .function("executeScript", &cells::wasm::CellsEngine::executeScript)
+        .function("tokenizeLuau", &cells::wasm::CellsEngine::tokenizeLuau);
 
     // Logger bindings - control logging from JavaScript
     enum_<cells::log::Level>("LogLevel")
