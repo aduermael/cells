@@ -42,7 +42,7 @@ count_source_lines() {
     for pattern in $patterns; do
         count=$(find "$PROJECT_ROOT" -type f -name "$pattern" 2>/dev/null | \
             grep -vE "$EXCLUDE_PATTERN" | \
-            grep -vE "_test\.(cc|cpp|go|js|mjs|ts)$|\.test\.(js|mjs|ts)$|\.spec\.(js|mjs|ts)$|test_.*\.(cc|cpp|js)$|/tests/" | \
+            grep -vE "_test\.(cc|cpp|go|js|mjs|ts|luau|lua)$|\.test\.(js|mjs|ts|luau|lua)$|\.spec\.(js|mjs|ts|luau|lua)$|test_.*\.(cc|cpp|js|luau|lua)$|/tests/" | \
             xargs cat 2>/dev/null | wc -l | tr -d ' ')
         total=$((total + count))
     done
@@ -57,7 +57,7 @@ count_test_lines() {
     for pattern in $patterns; do
         count=$(find "$PROJECT_ROOT" -type f -name "$pattern" 2>/dev/null | \
             grep -vE "$EXCLUDE_PATTERN" | \
-            grep -E "_test\.(cc|cpp|go|js|mjs|ts)$|\.test\.(js|mjs|ts)$|\.spec\.(js|mjs|ts)$|test_.*\.(cc|cpp|js)$|/tests/" | \
+            grep -E "_test\.(cc|cpp|go|js|mjs|ts|luau|lua)$|\.test\.(js|mjs|ts|luau|lua)$|\.spec\.(js|mjs|ts|luau|lua)$|test_.*\.(cc|cpp|js|luau|lua)$|/tests/" | \
             xargs cat 2>/dev/null | wc -l | tr -d ' ')
         total=$((total + count))
     done
@@ -71,6 +71,7 @@ ts_lines=$(count_source_lines "*.ts")
 html_lines=$(count_source_lines "*.html")
 css_lines=$(count_source_lines "*.css")
 go_lines=$(count_source_lines "*.go")
+luau_lines=$(count_source_lines "*.luau *.lua")
 objcpp_lines=$(count_source_lines "*.mm")
 md_lines=$(count_source_lines "*.md")
 sh_lines=$(count_source_lines "*.sh")
@@ -85,6 +86,7 @@ objcpp_test_lines=$(count_test_lines "*.mm")
 js_test_lines=$(count_test_lines "*.js *.mjs")
 ts_test_lines=$(count_test_lines "*.ts")
 go_test_lines=$(count_test_lines "*.go")
+luau_test_lines=$(count_test_lines "*.luau *.lua")
 
 # Create temp files for sorting
 TEMP_FILE=$(mktemp)
@@ -98,6 +100,7 @@ trap "rm -f $TEMP_FILE $TEMP_TEST_FILE" EXIT
 [ "$html_lines" -gt 0 ] && echo "$html_lines HTML" >> "$TEMP_FILE"
 [ "$css_lines" -gt 0 ] && echo "$css_lines CSS" >> "$TEMP_FILE"
 [ "$go_lines" -gt 0 ] && echo "$go_lines Go" >> "$TEMP_FILE"
+[ "$luau_lines" -gt 0 ] && echo "$luau_lines Luau" >> "$TEMP_FILE"
 [ "$objcpp_lines" -gt 0 ] && echo "$objcpp_lines Objective-C++" >> "$TEMP_FILE"
 [ "$md_lines" -gt 0 ] && echo "$md_lines Markdown" >> "$TEMP_FILE"
 [ "$bzl_lines" -gt 0 ] && echo "$bzl_lines Starlark" >> "$TEMP_FILE"
@@ -109,6 +112,7 @@ trap "rm -f $TEMP_FILE $TEMP_TEST_FILE" EXIT
 [ "$js_test_lines" -gt 0 ] && echo "$js_test_lines JavaScript" >> "$TEMP_TEST_FILE"
 [ "$ts_test_lines" -gt 0 ] && echo "$ts_test_lines TypeScript" >> "$TEMP_TEST_FILE"
 [ "$go_test_lines" -gt 0 ] && echo "$go_test_lines Go" >> "$TEMP_TEST_FILE"
+[ "$luau_test_lines" -gt 0 ] && echo "$luau_test_lines Luau" >> "$TEMP_TEST_FILE"
 
 echo "### Source Code"
 echo ""
