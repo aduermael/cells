@@ -5,6 +5,8 @@
 #include <sstream>
 #include <vector>
 
+#include "core/cells/formula_serializer.h"
+
 namespace cells {
 
 // --- String escaping ---
@@ -200,11 +202,13 @@ void Serializer::serializeCellValue(const CellValue& value, const Cell& cell,
             if (cell.sharedFormulaRef != nullptr) {
                 out << "\"=@" << cell.sharedFormulaRef->id.toString() << "\"";
             }
-            // Master or regular formula: write actual formula text
-            else if (cell.formula != nullptr && cell.formula->text != nullptr) {
-                out << "\"" << escapeString(cell.formula->text) << "\"";
+            // Master or regular formula: generate text from AST
+            else if (cell.formula != nullptr && cell.formula->ast != nullptr) {
+                out << "\"" << escapeString(FormulaSerializer::serialize(cell.formula->ast))
+                    << "\"";
             } else {
-                out << "\"" << escapeString(value.raw) << "\"";
+                // Fallback for cells without AST (shouldn't happen)
+                out << "\"=\"";
             }
             break;
 

@@ -8,6 +8,8 @@
 
 #include "core/cells/csv_reader.h"
 #include "core/cells/csv_writer.h"
+#include "core/cells/formula_parser.h"
+#include "core/cells/formula_serializer.h"
 #include "core/cells/parser.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/serializer.h"
@@ -420,8 +422,9 @@ void Converter::convertFormulasToUuid(Workbook& workbook) {
 
         // Convert formulas in each cell
         for (auto& [id, cell] : sheet->cells) {
-            if (cell->formula != nullptr && cell->formula->text != nullptr) {
-                std::string formula_text = cell->formula->text;
+            if (cell->formula != nullptr && cell->formula->ast != nullptr) {
+                // Generate current formula text from AST
+                std::string formula_text = FormulaSerializer::serialize(cell->formula->ast);
 
                 // Skip if formula doesn't look like it has A1 refs
                 // (Already in UUID format or no refs)
@@ -432,7 +435,13 @@ void Converter::convertFormulasToUuid(Workbook& workbook) {
                 // Convert A1 refs to UUID refs
                 std::string converted = converter.formulaToUuid(formula_text);
                 if (converted != formula_text) {
-                    cell->setFormula(new Formula(converted.c_str()));
+                    // Re-parse the converted formula to create new AST
+                    FormulaParser parser(converted);
+                    std::unique_ptr<ASTNode> ast = parser.parse();
+                    auto* formula = new Formula();
+                    formula->ast = ast.release();
+                    formula->dirty = true;
+                    cell->setFormula(formula);
                 }
             }
         }

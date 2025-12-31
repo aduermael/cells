@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "core/cells/formula_serializer.h"
+
 #include "gtest/gtest.h"
 
 namespace cells {
@@ -130,8 +132,11 @@ TEST(XLSXReaderTest, ReadFormulas) {
     for (const auto& [id, cell] : sheet->cells) {
         if (cell->isFormula()) {
             formulaCount++;
-            // Formula should start with '='
-            EXPECT_EQ(cell->formula->text[0], '=');
+            // Formula should have AST
+            EXPECT_NE(cell->formula->ast, nullptr);
+            // Serialized formula should start with '='
+            std::string formula = FormulaSerializer::serialize(cell->formula->ast);
+            EXPECT_EQ(formula[0], '=');
         }
     }
     EXPECT_GT(formulaCount, 0) << "Expected to find formula cells";
@@ -148,8 +153,8 @@ TEST(XLSXReaderTest, FormulaContainsExcelNotation) {
     // Look for formulas with A1 notation (e.g., "A1+B1", "SUM(A1:A3)")
     bool foundA1Reference = false;
     for (const auto& [id, cell] : sheet->cells) {
-        if (cell->isFormula() && cell->formula->text != nullptr) {
-            std::string formula(cell->formula->text);
+        if (cell->isFormula() && cell->formula->ast != nullptr) {
+            std::string formula = FormulaSerializer::serialize(cell->formula->ast);
             // Check for cell reference patterns
             if (formula.find("A1") != std::string::npos ||
                 formula.find("B1") != std::string::npos ||

@@ -291,7 +291,7 @@ export function assert(condition, message) {
  */
 export function assertEqual(actual, expected, message) {
   if (actual !== expected) {
-    throw new Error(message || `Expected ${expected}, got ${actual}`);
+    throw new Error(`${message || 'Assertion failed'}: expected "${expected}", got "${actual}"`);
   }
 }
 

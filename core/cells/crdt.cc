@@ -5,6 +5,8 @@
 #include <algorithm>
 
 #include "core/cells/dependency_graph.h"
+#include "core/cells/formula_parser.h"
+#include "core/cells/formula_serializer.h"
 
 namespace cells {
 
@@ -277,8 +279,8 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
     cell->value.error = CellError::NONE;
 
     if (type == CellValueType::FORMULA) {
-        // For formulas: value_str contains UUID formula, display contains A1 formula
-        const std::string display_str = extractJSONString(op.payload, "display");
+        // For formulas: value_str contains UUID formula, display contains A1 formula (ignored)
+        // Note: display field is ignored - we generate display strings from AST
 
         // Clear old formula dependencies before setting new formula
         if (targetSheet != nullptr) {
@@ -288,30 +290,32 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
             }
         }
 
-        // Create the formula object using UUID formula
-        auto* formula = new Formula(value_str.c_str());
+        // Parse the UUID formula text to create the AST
+        FormulaParser parser(value_str);
+        std::unique_ptr<ASTNode> ast = parser.parse();
 
-        // Parse the formula to create the AST
-        // This is needed for dependency tracking and reference highlighting
-        if (formula->parse()) {
-            // Add to dependency graph for recalculation tracking
-            if (targetSheet != nullptr) {
-                DependencyGraph* depGraph = targetSheet->getDependencyGraph();
-                if (depGraph != nullptr) {
-                    depGraph->addFormula(cell->id, formula->ast, makePositionResolver(targetSheet));
+        // Create the formula object with AST
+        auto* formula = new Formula();
+        formula->ast = ast.release();
+        formula->dirty = true;
 
-                    // Track volatile functions
-                    if (formula->hasVolatile()) {
-                        depGraph->markVolatile(cell->id);
-                    }
+        // Add to dependency graph for recalculation tracking if we have valid AST
+        if (formula->ast != nullptr && targetSheet != nullptr) {
+            DependencyGraph* depGraph = targetSheet->getDependencyGraph();
+            if (depGraph != nullptr) {
+                depGraph->addFormula(cell->id, formula->ast, makePositionResolver(targetSheet));
+
+                // Track volatile functions
+                if (formula->hasVolatile()) {
+                    depGraph->markVolatile(cell->id);
                 }
             }
         }
 
         cell->setFormula(formula);
 
-        // Store display formula in raw for UI display
-        cell->value.raw = display_str.empty() ? value_str : display_str;
+        // Store result value in raw for display (not the formula text)
+        cell->value.raw = "";
     } else {
         // Clear formula if it was a formula cell
         if (cell->formula != nullptr) {
@@ -1372,10 +1376,12 @@ size_t bootstrapOpLog(Workbook& workbook) {
             std::string payload;
             if (cell->isFormula()) {
                 const Formula* formula = cell->getFormula();
-                if (formula != nullptr && formula->text != nullptr) {
-                    payload = "{\"type\":\"f\",\"value\":\"" +
-                              jsonEscape(std::string(formula->text)) + "\",\"display\":\"" +
-                              jsonEscape(cell->value.raw) + "\"" + idSuffix;
+                if (formula != nullptr && formula->ast != nullptr) {
+                    // Generate UUID formula text from AST
+                    const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
+                    // Note: display field is omitted - peers generate display from AST locally
+                    payload =
+                        "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
                 } else {
                     continue;  // Skip cells with invalid formulas
                 }

@@ -4,6 +4,8 @@
 #include <sstream>
 #include <string>
 
+#include "core/cells/formula_serializer.h"
+
 #include "gtest/gtest.h"
 
 namespace cells {
@@ -210,7 +212,7 @@ X dE2fG3hJ pQ7rS8tW xY9zA1bC f "=SUM(A1:B2)"
         ASSERT_NE(cell, nullptr);
         EXPECT_TRUE(cell->isFormula());
         ASSERT_NE(cell->formula, nullptr);
-        EXPECT_STREQ(cell->formula->text, "=SUM(A1:B2)");
+        EXPECT_EQ(FormulaSerializer::serialize(cell->formula->ast), "=SUM(A1:B2)");
     }
 }
 

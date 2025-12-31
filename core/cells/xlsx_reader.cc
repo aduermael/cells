@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "core/cells/formula_parser.h"
 #include "core/cells/id.h"
 #include "core/cells/types.h"
 
@@ -447,10 +448,20 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                                 if (ref && ref[0] != '\0' && formulaText &&
                                     formulaText[0] != '\0') {
                                     if (options.readFormulaText) {
-                                        cell->setFormula(
-                                            new Formula(("=" + std::string(formulaText)).c_str()));
+                                        // Parse formula text to create AST
+                                        const std::string fullFormula =
+                                            "=" + std::string(formulaText);
+                                        cells::FormulaParser parser(fullFormula);
+                                        std::unique_ptr<cells::ASTNode> ast = parser.parse();
+                                        auto* formula = new cells::Formula();
+                                        formula->ast = ast.release();
+                                        formula->dirty = true;
+                                        cell->setFormula(formula);
                                     } else {
-                                        cell->setFormula(new Formula("="));
+                                        // Empty formula placeholder
+                                        auto* formula = new cells::Formula();
+                                        formula->dirty = true;
+                                        cell->setFormula(formula);
                                     }
                                     Cell* rawPtr = cell.get();
                                     sheet->addCell(std::move(cell));
@@ -472,10 +483,19 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
                         // Regular formula (not shared)
                         if (options.readFormulaText) {
-                            const std::string formulaText = fNode.text().get();
-                            cell->setFormula(new Formula(("=" + formulaText).c_str()));
+                            const std::string formulaTextStr = fNode.text().get();
+                            const std::string fullFormula = "=" + formulaTextStr;
+                            cells::FormulaParser parser(fullFormula);
+                            std::unique_ptr<cells::ASTNode> ast = parser.parse();
+                            auto* formula = new cells::Formula();
+                            formula->ast = ast.release();
+                            formula->dirty = true;
+                            cell->setFormula(formula);
                         } else {
-                            cell->setFormula(new Formula("="));
+                            // Empty formula placeholder
+                            auto* formula = new cells::Formula();
+                            formula->dirty = true;
+                            cell->setFormula(formula);
                         }
                     }
                 }

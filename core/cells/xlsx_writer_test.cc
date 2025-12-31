@@ -5,6 +5,8 @@
 #include <filesystem>
 #include <string>
 
+#include "core/cells/formula_parser.h"
+#include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/xlsx_reader.h"
 
@@ -12,6 +14,16 @@
 
 namespace cells {
 namespace {
+
+// Helper to create a Formula from text (parses the formula to AST)
+Formula* createFormula(const std::string& text) {
+    FormulaParser parser(text);
+    std::unique_ptr<ASTNode> ast = parser.parse();
+    auto* formula = new Formula();
+    formula->ast = ast.release();
+    formula->dirty = true;
+    return formula;
+}
 
 // Counter for unique file paths
 static int gFileCounter = 0;
@@ -660,7 +672,7 @@ TEST(XLSXWriterTest, WriteFormulas) {
     // A2 = formula "=A1+B1" (result 30)
     auto cell3 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[1]);
     cell3->value = CellValue(30.0);  // Cached result
-    cell3->setFormula(new Formula("=A1+B1"));
+    cell3->setFormula(createFormula("=A1+B1"));
     sheet->addCell(std::move(cell3));
 
     workbook->addSheet(std::move(sheet));
@@ -690,9 +702,9 @@ TEST(XLSXWriterTest, WriteFormulas) {
             foundFormula = true;
             const Formula* f = c->getFormula();
             ASSERT_NE(f, nullptr);
-            ASSERT_NE(f->text, nullptr);
+            ASSERT_NE(f->ast, nullptr);
             // Formula should contain A1+B1 (possibly with = prefix)
-            std::string formulaText = f->text;
+            std::string formulaText = FormulaSerializer::serialize(f->ast);
             EXPECT_TRUE(formulaText.find("A1") != std::string::npos)
                 << "Formula should reference A1: " << formulaText;
             EXPECT_TRUE(formulaText.find("B1") != std::string::npos)
@@ -733,7 +745,7 @@ TEST(XLSXWriterTest, WriteSharedFormulas) {
     // B1 = formula "=A1*2" (master, result 20)
     auto masterCell = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[0]);
     masterCell->value = CellValue(20.0);
-    masterCell->setFormula(new Formula("=A1*2"));
+    masterCell->setFormula(createFormula("=A1*2"));
     Cell* masterPtr = masterCell.get();
     sheet->addCell(std::move(masterCell));
 
@@ -804,7 +816,7 @@ TEST(XLSXWriterTest, WriteFormulaWithSpecialChars) {
     // Formula with special characters that need XML escaping
     auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
     cell->value = CellValue("Test");
-    cell->setFormula(new Formula("=IF(A1<10,\"Less\",\"More\")"));
+    cell->setFormula(createFormula("=IF(A1<10,\"Less\",\"More\")"));
     sheet->addCell(std::move(cell));
 
     workbook->addSheet(std::move(sheet));
@@ -853,7 +865,7 @@ TEST(XLSXWriterTest, WriteFormulasWithEvaluatedTypes) {
     auto cell2 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[0]);
     cell2->value.raw = "20";
     cell2->value.type = CellValueType::FORMULA_NUMBER;  // Evaluated result type
-    cell2->setFormula(new Formula("=A1*2"));
+    cell2->setFormula(createFormula("=A1*2"));
     sheet->addCell(std::move(cell2));
 
     // A2 = "Hello" (value cell)
@@ -865,7 +877,7 @@ TEST(XLSXWriterTest, WriteFormulasWithEvaluatedTypes) {
     auto cell4 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[1]);
     cell4->value.raw = "Hello World";
     cell4->value.type = CellValueType::FORMULA_STRING;
-    cell4->setFormula(new Formula("=CONCAT(A2,\" World\")"));
+    cell4->setFormula(createFormula("=CONCAT(A2,\" World\")"));
     sheet->addCell(std::move(cell4));
 
     // A3 = true (value cell)
@@ -877,7 +889,7 @@ TEST(XLSXWriterTest, WriteFormulasWithEvaluatedTypes) {
     auto cell6 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[2]);
     cell6->value.raw = "true";
     cell6->value.type = CellValueType::FORMULA_BOOLEAN;
-    cell6->setFormula(new Formula("=A3"));
+    cell6->setFormula(createFormula("=A3"));
     sheet->addCell(std::move(cell6));
 
     // A4 = 0 (for division by zero)
@@ -889,7 +901,7 @@ TEST(XLSXWriterTest, WriteFormulasWithEvaluatedTypes) {
     auto cell8 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[3]);
     cell8->value.raw = "#DIV/0!";
     cell8->value.type = CellValueType::FORMULA_ERROR;
-    cell8->setFormula(new Formula("=1/A4"));
+    cell8->setFormula(createFormula("=1/A4"));
     sheet->addCell(std::move(cell8));
 
     workbook->addSheet(std::move(sheet));
@@ -944,7 +956,7 @@ TEST(XLSXWriterTest, WriteFormulasDisabledWithDifferentTypes) {
     // Cell with formula - should only export value when writeFormulas=false
     auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
     cell->value = CellValue(42.0);  // Cached result
-    cell->setFormula(new Formula("=21*2"));
+    cell->setFormula(createFormula("=21*2"));
     sheet->addCell(std::move(cell));
 
     workbook->addSheet(std::move(sheet));
@@ -993,7 +1005,7 @@ TEST(XLSXWriterTest, SkipFormulasWhenDisabled) {
 
     auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
     cell->value = CellValue(42.0);  // Cached result
-    cell->setFormula(new Formula("=21*2"));
+    cell->setFormula(createFormula("=21*2"));
     sheet->addCell(std::move(cell));
 
     workbook->addSheet(std::move(sheet));

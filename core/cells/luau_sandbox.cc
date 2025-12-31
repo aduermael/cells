@@ -5,6 +5,7 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/fill_range.h"
+#include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/ref_converter.h"
@@ -881,11 +882,12 @@ void LuauSandbox::pushCellObject(lua_State* L, Cell* cell) {
             // Update formula field
             if (cell->isFormula()) {
                 const Formula* f = cell->getFormula();
-                if (f != nullptr && f->text != nullptr) {
-                    // Convert formula to A1 notation for display
+                if (f != nullptr && f->ast != nullptr) {
+                    // Generate UUID formula from AST, then convert to A1 notation for display
                     RefConverter conv;
                     conv.setContext(*sheet_);
-                    const std::string a1Formula = conv.formulaToA1(f->text);
+                    const std::string uuidFormula = FormulaSerializer::serialize(f->ast);
+                    const std::string a1Formula = conv.formulaToA1(uuidFormula);
                     lua_pushstring(L, a1Formula.c_str());
                 } else {
                     lua_pushnil(L);
@@ -928,10 +930,11 @@ void LuauSandbox::pushCellObject(lua_State* L, Cell* cell) {
     // Set formula
     if (cell->isFormula()) {
         const Formula* f = cell->getFormula();
-        if (f != nullptr && f->text != nullptr) {
+        if (f != nullptr && f->ast != nullptr) {
             RefConverter conv;
             conv.setContext(*sheet_);
-            const std::string a1Formula = conv.formulaToA1(f->text);
+            const std::string uuidFormula = FormulaSerializer::serialize(f->ast);
+            const std::string a1Formula = conv.formulaToA1(uuidFormula);
             lua_pushstring(L, a1Formula.c_str());
         } else {
             lua_pushnil(L);

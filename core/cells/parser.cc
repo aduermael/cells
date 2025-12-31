@@ -5,6 +5,8 @@
 #include <charconv>
 #include <sstream>
 
+#include "core/cells/formula_parser.h"
+
 namespace cells {
 
 // --- ParseError ---
@@ -600,8 +602,13 @@ bool Parser::parseCell(std::string_view line) {
                 return setError("Invalid shared formula reference: " + formulaText);
             }
         } else {
-            // Regular formula
-            cell->setFormula(new Formula(formulaText.c_str()));
+            // Regular formula - parse to create AST
+            FormulaParser parser(formulaText);
+            std::unique_ptr<ASTNode> ast = parser.parse();
+            auto* formula = new Formula();
+            formula->ast = ast.release();
+            formula->dirty = true;
+            cell->setFormula(formula);
         }
     }
 

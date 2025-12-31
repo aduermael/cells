@@ -6,7 +6,9 @@
 #include <unordered_set>
 
 #include "core/cells/formula_eval.h"
+#include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
+#include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/parser.h"
@@ -15,6 +17,16 @@
 
 namespace cells {
 namespace {
+
+// Helper to create a Formula from text (parses the formula to AST)
+Formula* createFormula(const std::string& text) {
+    FormulaParser parser(text);
+    std::unique_ptr<ASTNode> ast = parser.parse();
+    auto* formula = new Formula();
+    formula->ast = ast.release();
+    formula->dirty = true;
+    return formula;
+}
 
 // Helper to create a minimal workbook for testing
 std::unique_ptr<Workbook> createMinimalWorkbook() {
@@ -158,7 +170,7 @@ TEST(SerializerTest, SerializeFormulaCell) {
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
 
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
-    cell->setFormula(new Formula("=SUM(A1:B2)"));
+    cell->setFormula(createFormula("=SUM(A1:B2)"));
 
     sheet->addColumn(std::move(col));
     sheet->addRow(std::move(row));
@@ -476,7 +488,7 @@ TEST(SharedFormulaTest, SerializeSharedFormulaMaster) {
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
 
     auto masterCell = std::make_unique<Cell>(ID("xMaster01"), ID("cA1bC2dE"), ID("rA1bC2dE"));
-    masterCell->setFormula(new Formula("=SUM(A1:A10)"));
+    masterCell->setFormula(createFormula("=SUM(A1:A10)"));
 
     sheet->addColumn(std::move(col));
     sheet->addRow(std::move(row));
@@ -501,7 +513,7 @@ TEST(SharedFormulaTest, SerializeSharedFormulaSubscriber) {
 
     // Master cell (first alphabetically: xAMaster)
     auto masterCell = std::make_unique<Cell>(ID("xAMaster"), ID("cA1bC2dE"), ID("rA1bC2dE"));
-    masterCell->setFormula(new Formula("=SUM(A1:A10)"));
+    masterCell->setFormula(createFormula("=SUM(A1:A10)"));
     Cell* masterPtr = masterCell.get();
 
     // Subscriber cell (second alphabetically: xBSubscr)
@@ -537,7 +549,7 @@ TEST(SharedFormulaTest, RoundtripSharedFormulas) {
 
     // Master cell
     auto masterCell = std::make_unique<Cell>(ID("xAMaster"), ID("cA1bC2dE"), ID("rA1bC2dE"));
-    masterCell->setFormula(new Formula("=A1+B1"));
+    masterCell->setFormula(createFormula("=A1+B1"));
     Cell* masterPtr = masterCell.get();
 
     // Two subscriber cells
@@ -585,7 +597,7 @@ TEST(SharedFormulaTest, RoundtripSharedFormulas) {
     EXPECT_TRUE(parsedMaster->isFormula());
     EXPECT_FALSE(parsedMaster->isSharedFormula());
     EXPECT_NE(parsedMaster->formula, nullptr);
-    EXPECT_STREQ(parsedMaster->formula->text, "=A1+B1");
+    EXPECT_EQ(FormulaSerializer::serialize(parsedMaster->formula->ast), "=A1+B1");
 
     // Verify subscribers reference master
     EXPECT_TRUE(parsedSub1->isFormula());
@@ -667,9 +679,7 @@ TEST(FormulaRoundtripTest, FormulaPreservedAfterEvaluation) {
 
     // Cell A2 with formula =10+5 (simple arithmetic)
     auto cellA2 = std::make_unique<Cell>(ID("xCellA2a"), ID("cA1bC2dE"), ID("rB3dE4fG"));
-    auto* formula = new Formula("=10+5");
-    formula->parse();
-    cellA2->setFormula(formula);
+    cellA2->setFormula(createFormula("=10+5"));
 
     // Add everything to sheet
     Sheet* sheetPtr = sheet.get();
@@ -721,7 +731,7 @@ TEST(FormulaRoundtripTest, FormulaPreservedAfterEvaluation) {
     ASSERT_NE(parsedCell, nullptr);
     EXPECT_TRUE(parsedCell->isFormula());
     EXPECT_NE(parsedCell->formula, nullptr);
-    EXPECT_STREQ(parsedCell->formula->text, "=10+5");
+    EXPECT_EQ(FormulaSerializer::serialize(parsedCell->formula->ast), "=10+5");
 }
 
 }  // namespace
