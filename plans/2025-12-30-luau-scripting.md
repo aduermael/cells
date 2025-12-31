@@ -1,11 +1,11 @@
 Status: COMPLETED
 Created At: 2025-12-30 22:40 UTC
-Updated At: 2025-12-31 00:20 UTC
+Updated At: 2025-12-31 00:05 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # Luau Scripting Integration
 
-Integrate Luau (typed/optimized Lua from Roblox) as a sandboxed scripting engine. Users can execute scripts via `/` prefix in the formula bar. The API also supports multi-line scripts for future AI agent use.
+Integrate Luau (typed/optimized Lua from Roblox) as a sandboxed scripting engine. Users can write and execute multi-line scripts via a dedicated script panel (accessible via the code icon button on the formula bar). The API also supports programmatic script execution for AI agent use.
 
 ## Phase 1: Luau Library Integration
 
@@ -72,19 +72,29 @@ Expose spreadsheet operations to Luau scripts. All use A1 notation (converted vi
 - `apps/wasm/src/client-types.ts` - Add ScriptResult type
 - `apps/wasm/src/wasm-data-source.ts` - Add wrapper method
 
-## Phase 6: Formula Bar Integration
+## Phase 6: Script Panel UI
 
-- [x] 6a: Add isScriptMode() to header-editor.ts (detects `/` prefix)
-- [x] 6b: Modify commitFormulaBarEdit() to execute scripts instead of cell update
-- [x] 6c: Add visual feedback for script mode and execution results
-- [x] 6d: Add E2E tests for script execution via formula bar
+Dedicated script panel (replaces earlier formula bar `/` prefix approach).
+
+- [x] 6a: Add script panel button (code icon) to formula bar
+- [x] 6b: Create collapsible script panel with textarea editor
+- [x] 6c: Add run button and keyboard shortcuts (Cmd/Ctrl+Enter to run, Escape to close)
+- [x] 6d: Add execution status and output display
+- [x] 6e: Make panel resizable (drag bottom edge)
 
 **Files:**
-- `apps/wasm/src/header-editor.ts` - Script mode detection and execution
-- `apps/wasm/src/init.ts` - Added onExecuteScript callback
-- `apps/wasm/static/shared/styles.css` - Script mode styling
-- `apps/wasm/tests/script.test.mjs` (new) - E2E tests
-- `apps/wasm/package.json` - Added test:script command
+- `apps/wasm/static/index.html` - Script panel HTML structure
+- `apps/wasm/static/shared/styles.css` - Script panel styling
+- `apps/wasm/src/script-panel.ts` (new) - ScriptPanel class
+- `apps/wasm/src/app.ts` - Added script panel DOM elements
+- `apps/wasm/src/init.ts` - Wire up script panel
+
+## Future Enhancements
+
+- [ ] Fix copy/paste in script editor (currently not working)
+- [ ] Lua syntax highlighting in script editor (e.g., using CodeMirror or Monaco)
+- [ ] Script history/persistence
+- [ ] Multiple script tabs
 
 ---
 
