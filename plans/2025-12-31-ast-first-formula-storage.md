@@ -1,9 +1,17 @@
 Status: IN_PROGRESS
 Created At: 2025-12-31 18:06 UTC
-Updated At: 2025-12-31 19:30 UTC
+Updated At: 2025-12-31 22:00 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # AST-First Formula Storage
+
+## Key Clarifications
+
+1. **AST is the ONLY source of truth** - UI formula display issues will be resolved deterministically later; skip E2E tests failing due to UI display
+2. **No collab/offline distinction** - Always apply CRDT operations to update the workbook (remove `isCollaborating()` checks)
+3. **Build commands**: Use `make wasm-dist` to build, `make wasm-serve` to test in browser
+4. **Focus on core contract**, not E2E tests in early phases
+5. **Consider storing formulas in Operations in AST form** (future optimization)
 
 ## Overview
 
@@ -78,10 +86,11 @@ Add AST-based reference adjustment alongside existing string-based approach.
 
 Modify fill_range.cc to use AST-based adjustment.
 
-- [ ] 2a: Store AST pointers in DetectedPattern instead of formula strings
-- [ ] 2b: Use adjustASTReferences + FormulaDisplayConverter in fill
-- [ ] 2c: Remove string-based path in fill_range.cc
-- [ ] 2d: Verify fill E2E tests pass
+- [x] 2a: Store AST pointers in DetectedPattern instead of formula strings
+- [x] 2b: Use adjustASTReferences + FormulaDisplayConverter in fill
+- [ ] 2c: Remove direct mutation path - always use CRDT operations (no isCollaborating check)
+- [ ] 2d: Remove any remaining string-based formula paths in fill_range.cc
+- [ ] 2e: Build with `make wasm-dist` and verify unit tests pass
 
 ## Phase 3: Simplify Formula Storage
 

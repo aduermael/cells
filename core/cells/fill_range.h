@@ -3,9 +3,11 @@
 
 #include <cstdint>
 
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "core/cells/formula_ast.h"
 #include "core/cells/types.h"
 
 namespace cells {
@@ -42,10 +44,10 @@ enum class PatternType : std::uint8_t {
 // Pattern detection result
 struct DetectedPattern {
     PatternType type{PatternType::CONSTANT};
-    double start{0.0};                       // First value (for numeric)
-    double step{0.0};                        // Increment (for linear patterns)
-    std::vector<std::string> stringValues;   // For string/constant patterns
-    std::vector<std::string> formulaValues;  // For formula patterns (A1 notation formulas)
+    double start{0.0};                                       // First value (for numeric)
+    double step{0.0};                                        // Increment (for linear patterns)
+    std::vector<std::string> stringValues;                   // For string/constant patterns
+    std::vector<std::unique_ptr<ASTNode>> formulaASTs;       // For formula patterns (AST nodes)
 };
 
 // Detect pattern from source cells

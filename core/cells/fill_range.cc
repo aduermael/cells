@@ -51,17 +51,16 @@ std::string jsonEscape(const std::string& str) {
     return result;
 }
 
-// Helper function to get formula display string (A1 notation)
-std::string getFormulaDisplayString(const Sheet* sheet, const Cell* cell) {
+// Helper function to get formula AST (cloned)
+std::unique_ptr<ASTNode> getFormulaASTClone(const Cell* cell) {
     if (!cell || !cell->isFormula()) {
-        return "";
+        return nullptr;
     }
     const Formula* formula = cell->getFormula();
     if (!formula || !formula->ast) {
-        return "";
+        return nullptr;
     }
-    const FormulaDisplayConverter converter(*sheet);
-    return "=" + converter.toDisplayString(formula->ast);
+    return formula->ast->clone();
 }
 
 // Helper struct to hold fill cell info
@@ -73,7 +72,7 @@ struct FillCellInfo {
 
 // Helper function to determine what value to fill into a cell for STRING and FORMULA patterns
 FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, int colOffset,
-                                    int rowOffset) {
+                                    int rowOffset, const Sheet* sheet) {
     FillCellInfo info;
     info.skip = false;
 
@@ -94,16 +93,17 @@ FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, i
         }
 
         case PatternType::FORMULA: {
-            if (pattern.formulaValues.empty()) {
+            if (pattern.formulaASTs.empty()) {
                 info.skip = true;
                 return info;
             }
-            // Get the source formula to adjust
-            const int srcIdx = (index - 1) % static_cast<int>(pattern.formulaValues.size());
-            const std::string& sourceFormula = pattern.formulaValues[srcIdx];
-            if (sourceFormula.empty()) {
+            // Get the source AST to adjust
+            const int srcIdx = (index - 1) % static_cast<int>(pattern.formulaASTs.size());
+            const auto& sourceAST = pattern.formulaASTs[srcIdx];
+            if (!sourceAST) {
                 // Not a formula in this slot, use string value instead
-                if (!pattern.stringValues.empty()) {
+                if (!pattern.stringValues.empty() &&
+                    srcIdx < static_cast<int>(pattern.stringValues.size())) {
                     info.value = pattern.stringValues[srcIdx];
                     info.typeChar = "s";
                 } else {
@@ -111,10 +111,13 @@ FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, i
                 }
                 return info;
             }
-            // Adjust formula references based on fill direction
+            // Adjust formula references using AST-based adjustment
             // For index=1, offset = colOffset*1 or rowOffset*1, etc.
-            info.value = RefConverter::adjustFormulaReferences(sourceFormula, colOffset * index,
-                                                               rowOffset * index);
+            auto adjustedAST =
+                RefConverter::adjustASTReferences(sourceAST.get(), colOffset * index, rowOffset * index);
+            // Convert adjusted AST to display string (toDisplayString includes the '=' prefix)
+            const FormulaDisplayConverter converter(*sheet);
+            info.value = converter.toDisplayString(adjustedAST.get());
             info.typeChar = "f";
             return info;
         }
@@ -171,7 +174,7 @@ DetectedPattern detectPattern(Sheet* sheet, int minCol, int minRow, int maxCol, 
     // Collect values along the fill axis
     std::vector<double> numericValues;
     std::vector<std::string> stringValues;
-    std::vector<std::string> formulaValues;  // Store A1 notation formulas
+    std::vector<std::unique_ptr<ASTNode>> formulaASTs;  // Store AST pointers
     bool allNumeric = true;
     bool allEmpty = true;
     bool hasFormula = false;
@@ -191,7 +194,7 @@ DetectedPattern detectPattern(Sheet* sheet, int minCol, int minRow, int maxCol, 
             if (!cell || cell->value.raw.empty()) {
                 // Empty cell
                 stringValues.emplace_back("");
-                formulaValues.emplace_back("");
+                formulaASTs.push_back(nullptr);
                 continue;
             }
 
@@ -201,18 +204,17 @@ DetectedPattern detectPattern(Sheet* sheet, int minCol, int minRow, int maxCol, 
             if (cell->isFormula()) {
                 hasFormula = true;
                 allNumeric = false;
-                const std::string formulaStr = getFormulaDisplayString(sheet, cell);
-                formulaValues.push_back(formulaStr);
+                formulaASTs.push_back(getFormulaASTClone(cell));
                 stringValues.push_back(cell->value.raw);
             } else if (cell->value.type == CellValueType::NUMBER) {
                 const double val = cell->value.asNumber();
                 numericValues.push_back(val);
                 stringValues.push_back(cell->value.raw);
-                formulaValues.emplace_back("");
+                formulaASTs.push_back(nullptr);
             } else {
                 allNumeric = false;
                 stringValues.push_back(cell->value.raw);
-                formulaValues.emplace_back("");
+                formulaASTs.push_back(nullptr);
             }
         }
     } else {
@@ -227,7 +229,7 @@ DetectedPattern detectPattern(Sheet* sheet, int minCol, int minRow, int maxCol, 
             const Cell* cell = sheet->getCellAt(colAxis->id, rowAxis->id);
             if (!cell || cell->value.raw.empty()) {
                 stringValues.emplace_back("");
-                formulaValues.emplace_back("");
+                formulaASTs.push_back(nullptr);
                 continue;
             }
 
@@ -237,18 +239,17 @@ DetectedPattern detectPattern(Sheet* sheet, int minCol, int minRow, int maxCol, 
             if (cell->isFormula()) {
                 hasFormula = true;
                 allNumeric = false;
-                const std::string formulaStr = getFormulaDisplayString(sheet, cell);
-                formulaValues.push_back(formulaStr);
+                formulaASTs.push_back(getFormulaASTClone(cell));
                 stringValues.push_back(cell->value.raw);
             } else if (cell->value.type == CellValueType::NUMBER) {
                 const double val = cell->value.asNumber();
                 numericValues.push_back(val);
                 stringValues.push_back(cell->value.raw);
-                formulaValues.emplace_back("");
+                formulaASTs.push_back(nullptr);
             } else {
                 allNumeric = false;
                 stringValues.push_back(cell->value.raw);
-                formulaValues.emplace_back("");
+                formulaASTs.push_back(nullptr);
             }
         }
     }
@@ -262,7 +263,7 @@ DetectedPattern detectPattern(Sheet* sheet, int minCol, int minRow, int maxCol, 
     // Formula pattern takes priority - if any cell is a formula, fill with formulas
     if (hasFormula) {
         pattern.type = PatternType::FORMULA;
-        pattern.formulaValues = formulaValues;
+        pattern.formulaASTs = std::move(formulaASTs);
         pattern.stringValues = stringValues;
         return pattern;
     }
@@ -379,7 +380,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     }
                 } else if (colPattern.type == PatternType::FORMULA) {
                     // Get fill value for formula (adjusts references)
-                    const FillCellInfo fillInfo = getFillValueNonNumeric(colPattern, index, 0, 1);
+                    const FillCellInfo fillInfo = getFillValueNonNumeric(colPattern, index, 0, 1, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
@@ -408,20 +409,9 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     payload = buildCellPayload(typeChar, valueStr, colAxis->id, rowAxis->id);
                 }
 
-                if (workbook->isCollaborating()) {
-                    const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
-                    applyOperation(*workbook, op);
-                } else {
-                    // Direct mutation for offline mode
-                    if (typeChar == "n") {
-                        cell->value = CellValue(std::stod(valueStr));
-                    } else if (typeChar == "f") {
-                        cell->value = CellValue(valueStr);
-                        cell->value.type = CellValueType::FORMULA;
-                    } else {
-                        cell->value = CellValue(valueStr);
-                    }
-                }
+                // Always use CRDT operations
+                const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
+                applyOperation(*workbook, op);
 
                 cellsFilled++;
             }
@@ -468,7 +458,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 } else if (colPattern.type == PatternType::FORMULA) {
                     // Get fill value for formula (adjusts references)
                     // For UP direction, row offset is negative
-                    const FillCellInfo fillInfo = getFillValueNonNumeric(colPattern, index, 0, -1);
+                    const FillCellInfo fillInfo = getFillValueNonNumeric(colPattern, index, 0, -1, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
@@ -496,19 +486,9 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     payload = buildCellPayload(typeChar, valueStr, colAxis->id, rowAxis->id);
                 }
 
-                if (workbook->isCollaborating()) {
-                    const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
-                    applyOperation(*workbook, op);
-                } else {
-                    if (typeChar == "n") {
-                        cell->value = CellValue(std::stod(valueStr));
-                    } else if (typeChar == "f") {
-                        cell->value = CellValue(valueStr);
-                        cell->value.type = CellValueType::FORMULA;
-                    } else {
-                        cell->value = CellValue(valueStr);
-                    }
-                }
+                // Always use CRDT operations
+                const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
+                applyOperation(*workbook, op);
 
                 cellsFilled++;
             }
@@ -545,7 +525,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 } else if (rowPattern.type == PatternType::FORMULA) {
                     // Get fill value for formula (adjusts references)
                     // For RIGHT direction, col offset is +1 per step
-                    const FillCellInfo fillInfo = getFillValueNonNumeric(rowPattern, index, 1, 0);
+                    const FillCellInfo fillInfo = getFillValueNonNumeric(rowPattern, index, 1, 0, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
@@ -573,19 +553,9 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     payload = buildCellPayload(typeChar, valueStr, colAxis->id, rowAxis->id);
                 }
 
-                if (workbook->isCollaborating()) {
-                    const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
-                    applyOperation(*workbook, op);
-                } else {
-                    if (typeChar == "n") {
-                        cell->value = CellValue(std::stod(valueStr));
-                    } else if (typeChar == "f") {
-                        cell->value = CellValue(valueStr);
-                        cell->value.type = CellValueType::FORMULA;
-                    } else {
-                        cell->value = CellValue(valueStr);
-                    }
-                }
+                // Always use CRDT operations
+                const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
+                applyOperation(*workbook, op);
 
                 cellsFilled++;
             }
@@ -630,7 +600,7 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                 } else if (rowPattern.type == PatternType::FORMULA) {
                     // Get fill value for formula (adjusts references)
                     // For LEFT direction, col offset is -1 per step
-                    const FillCellInfo fillInfo = getFillValueNonNumeric(rowPattern, index, -1, 0);
+                    const FillCellInfo fillInfo = getFillValueNonNumeric(rowPattern, index, -1, 0, sheet);
                     if (fillInfo.skip) {
                         continue;
                     }
@@ -658,19 +628,9 @@ FillResult fillRange(Workbook* workbook, Sheet* sheet, int sourceMinCol, int sou
                     payload = buildCellPayload(typeChar, valueStr, colAxis->id, rowAxis->id);
                 }
 
-                if (workbook->isCollaborating()) {
-                    const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
-                    applyOperation(*workbook, op);
-                } else {
-                    if (typeChar == "n") {
-                        cell->value = CellValue(std::stod(valueStr));
-                    } else if (typeChar == "f") {
-                        cell->value = CellValue(valueStr);
-                        cell->value.type = CellValueType::FORMULA;
-                    } else {
-                        cell->value = CellValue(valueStr);
-                    }
-                }
+                // Always use CRDT operations
+                const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
+                applyOperation(*workbook, op);
 
                 cellsFilled++;
             }
