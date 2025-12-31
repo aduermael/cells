@@ -853,13 +853,13 @@ export class AppEventManager {
 
                     // Determine direction based on target position relative to original bounds
                     if (targetCol < bounds.minCol) {
-                        // Extending left from minCol
+                        // Extending/shrinking left from minCol
                         newMinCol = targetCol;
                         newMaxCol = bounds.maxCol;
                     } else {
-                        // Extending right from maxCol
+                        // Extending/shrinking right from maxCol (can shrink within original)
                         newMinCol = bounds.minCol;
-                        newMaxCol = Math.max(bounds.maxCol, targetCol);
+                        newMaxCol = Math.max(bounds.minCol, targetCol); // At least keep minCol
                     }
                 } else {
                     // Vertical drag - preserve original column bounds, extend/shrink rows
@@ -876,13 +876,13 @@ export class AppEventManager {
 
                     // Determine direction based on target position relative to original bounds
                     if (targetRow < bounds.minRow) {
-                        // Extending up from minRow
+                        // Extending/shrinking up from minRow
                         newMinRow = targetRow;
                         newMaxRow = bounds.maxRow;
                     } else {
-                        // Extending down from maxRow
+                        // Extending/shrinking down from maxRow (can shrink within original)
                         newMinRow = bounds.minRow;
-                        newMaxRow = Math.max(bounds.maxRow, targetRow);
+                        newMaxRow = Math.max(bounds.minRow, targetRow); // At least keep minRow
                     }
                 }
 
