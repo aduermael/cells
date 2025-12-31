@@ -70,15 +70,14 @@ struct CellValue {
     [[nodiscard]] const std::string& asString() const;
 };
 
-// Formula - contains source text and parsed AST
+// Formula - contains parsed AST (source of truth)
+// Text is generated on-demand from AST via FormulaSerializer
 // Owned by Cell, cleaned up in Cell destructor
 struct Formula {
-    char* text;           // Formula source with UUID refs (e.g., "=$cK7mXp2Q$rFp3nW9x+10"), owned
-    struct ASTNode* ast;  // Parsed AST, null if not parsed, owned
-    bool dirty;           // Needs recalculation?
+    struct ASTNode* ast{nullptr};  // Parsed AST, null if not parsed, owned
+    bool dirty{true};              // Needs recalculation?
 
     Formula();
-    explicit Formula(const char* text);
     ~Formula();
 
     // Non-copyable (owns resources)
@@ -89,11 +88,6 @@ struct Formula {
     Formula(Formula&& other) noexcept;
     Formula& operator=(Formula&& other) noexcept;
 
-    // Parse the formula text into an AST
-    // Returns true if parsing succeeded (AST will be set)
-    // Note: Success doesn't mean the formula is valid - check isValid() for that
-    bool parse();
-
     // Check if the AST is valid (no ErrorNodes)
     // Returns false if AST is null or contains errors
     [[nodiscard]] bool isValid() const;
@@ -101,9 +95,6 @@ struct Formula {
     // Check if the formula contains volatile functions (NOW, RAND, TODAY, etc.)
     // Returns false if AST is null
     [[nodiscard]] bool hasVolatile() const;
-
-    // Get the formula text (for display)
-    [[nodiscard]] const char* getText() const { return text; }
 };
 
 // Cell - fundamental unit of data

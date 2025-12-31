@@ -8,6 +8,7 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/dependency_graph.h"
+#include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/ref_converter.h"
@@ -16,6 +17,14 @@
 
 namespace cells {
 namespace {
+
+// Helper to get formula text from cell (generates from AST)
+std::string getFormulaText(const Cell* cell) {
+    if (!cell || !cell->getFormula() || !cell->getFormula()->ast) {
+        return "";
+    }
+    return FormulaSerializer::serialize(cell->getFormula()->ast);
+}
 
 // Simple JSON string escaping for test payloads
 std::string testJsonEscape(const std::string& str) {
@@ -169,28 +178,29 @@ TEST_F(SyncFormulaTest, SimpleFormulaDisplaysCorrectlyAfterSync) {
     EXPECT_TRUE(cellA->isFormula());
     EXPECT_TRUE(cellB->isFormula());
 
-    // The formula text should be the UUID format
-    EXPECT_STREQ(cellA->getFormula()->text, uuidFormula.c_str());
-    EXPECT_STREQ(cellB->getFormula()->text, uuidFormula.c_str());
+    // The formula text should be the UUID format (with = prefix since it's a formula)
+    std::string expectedUuidFormula = "=" + uuidFormula;
+    EXPECT_EQ(getFormulaText(cellA), expectedUuidFormula);
+    EXPECT_EQ(getFormulaText(cellB), expectedUuidFormula);
 
     // Now test that RefConverter can convert back to A1 notation
     RefConverter refConverterB;
     refConverterB.setContext(*workbookB_->getSheetByIndex(0));
 
-    std::string convertedA = refConverterA_.formulaToA1(cellA->getFormula()->text);
-    std::string convertedB = refConverterB.formulaToA1(cellB->getFormula()->text);
+    std::string convertedA = refConverterA_.formulaToA1(getFormulaText(cellA).c_str());
+    std::string convertedB = refConverterB.formulaToA1(getFormulaText(cellB).c_str());
 
     // Both should display as "B1" (without the = sign, which is part of value.raw)
-    EXPECT_EQ(convertedA, "B1");
-    EXPECT_EQ(convertedB, "B1");
+    EXPECT_EQ(convertedA, "=B1");
+    EXPECT_EQ(convertedB, "=B1");
 }
 
 TEST_F(SyncFormulaTest, FormulaWithSumDisplaysCorrectlyAfterSync) {
     // Client A enters formula =SUM(A1:B2) in cell A2
-    // Range A1:B2 becomes cellA1:cellB2 in UUID format
+    // Range A1:B2 becomes ~~cellA1:~~cellB2 in UUID format (relative references need ~~ prefix)
 
     std::string uuidFormula =
-        "SUM(" + sharedCellA1_.toString() + ":" + sharedCellB2_.toString() + ")";
+        "SUM(~~" + sharedCellA1_.toString() + ":~~" + sharedCellB2_.toString() + ")";
     std::string displayFormula = "=SUM(A1:B2)";
 
     std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
@@ -207,8 +217,8 @@ TEST_F(SyncFormulaTest, FormulaWithSumDisplaysCorrectlyAfterSync) {
     RefConverter refConverterB;
     refConverterB.setContext(*workbookB_->getSheetByIndex(0));
 
-    std::string converted = refConverterB.formulaToA1(cellB->getFormula()->text);
-    EXPECT_EQ(converted, "SUM(A1:B2)");
+    std::string converted = refConverterB.formulaToA1(getFormulaText(cellB).c_str());
+    EXPECT_EQ(converted, "=SUM(A1:B2)");
 }
 
 TEST_F(SyncFormulaTest, AbsoluteReferenceDisplaysCorrectlyAfterSync) {
@@ -230,8 +240,8 @@ TEST_F(SyncFormulaTest, AbsoluteReferenceDisplaysCorrectlyAfterSync) {
     RefConverter refConverterB;
     refConverterB.setContext(*workbookB_->getSheetByIndex(0));
 
-    std::string converted = refConverterB.formulaToA1(cellB->getFormula()->text);
-    EXPECT_EQ(converted, "$A$1");
+    std::string converted = refConverterB.formulaToA1(getFormulaText(cellB).c_str());
+    EXPECT_EQ(converted, "=$A$1");
 }
 
 TEST_F(SyncFormulaTest, MixedReferenceDisplaysCorrectlyAfterSync) {
@@ -251,7 +261,7 @@ TEST_F(SyncFormulaTest, MixedReferenceDisplaysCorrectlyAfterSync) {
         Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellB1_);
         RefConverter conv;
         conv.setContext(*workbookB_->getSheetByIndex(0));
-        EXPECT_EQ(conv.formulaToA1(cell->getFormula()->text), "$A1");
+        EXPECT_EQ(conv.formulaToA1(getFormulaText(cell)), "=$A1");
     }
 }
 
@@ -272,8 +282,8 @@ TEST_F(SyncFormulaTest, ComplexFormulaDisplaysCorrectlyAfterSync) {
     RefConverter refConverterB;
     refConverterB.setContext(*workbookB_->getSheetByIndex(0));
 
-    std::string converted = refConverterB.formulaToA1(cellB->getFormula()->text);
-    EXPECT_EQ(converted, "IF(A1>0,B1*2,A2+B2)");
+    std::string converted = refConverterB.formulaToA1(getFormulaText(cellB).c_str());
+    EXPECT_EQ(converted, "=IF(A1>0,B1*2,A2+B2)");
 }
 
 // ============================================================================
@@ -328,8 +338,8 @@ TEST_F(SyncFormulaTest, FormulaReferencingNewCellDisplaysCorrectly) {
     ASSERT_NE(cellB, nullptr);
     ASSERT_TRUE(cellB->isFormula());
 
-    std::string converted = refConverterB.formulaToA1(cellB->getFormula()->text);
-    EXPECT_EQ(converted, "C1");
+    std::string converted = refConverterB.formulaToA1(getFormulaText(cellB).c_str());
+    EXPECT_EQ(converted, "=C1");
 }
 
 // ============================================================================
@@ -351,6 +361,7 @@ TEST_F(SyncFormulaTest, ConversionFailsGracefullyWithoutContext) {
 
     // After proper context setup, it should work
     emptyConverter.setContext(*workbookB_->getSheetByIndex(0));
+    // Note: uuidFormula is just the cell ID without "=", so the result is also without "="
     converted = emptyConverter.formulaToA1(uuidFormula);
     EXPECT_EQ(converted, "B1");
 }
@@ -496,7 +507,8 @@ TEST_F(SyncFormulaTest, FormulaOperationRoundTrip) {
     Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellA2_);
     ASSERT_NE(cell, nullptr);
     ASSERT_TRUE(cell->isFormula());
-    EXPECT_STREQ(cell->getFormula()->text, uuidFormula.c_str());
+    // Formula text should include = prefix
+    EXPECT_EQ(getFormulaText(cell), "=" + uuidFormula);
 }
 
 TEST_F(SyncFormulaTest, ComplexFormulaWithSpecialCharsRoundTrip) {
@@ -529,7 +541,7 @@ TEST_F(SyncFormulaTest, ComplexFormulaWithSpecialCharsRoundTrip) {
     ASSERT_TRUE(cell->isFormula());
 
     // The formula text should have unescaped quotes
-    std::string formulaText = cell->getFormula()->text;
+    std::string formulaText = getFormulaText(cell);
     EXPECT_NE(formulaText.find("\"test\""), std::string::npos)
         << "Formula should contain unescaped quotes after parsing";
 }
@@ -557,15 +569,16 @@ TEST_F(SyncFormulaTest, FormulaWithMathOperatorsRoundTrip) {
     // Verify display formula is correct
     RefConverter conv;
     conv.setContext(*workbookB_->getSheetByIndex(0));
-    std::string converted = conv.formulaToA1(cell->getFormula()->text);
-    EXPECT_EQ(converted, "A1+B1-A2*B2/2");
+    std::string converted = conv.formulaToA1(getFormulaText(cell));
+    EXPECT_EQ(converted, "=A1+B1-A2*B2/2");
 }
 
 TEST_F(SyncFormulaTest, NestedFunctionFormulaRoundTrip) {
     // Test nested functions: =SUM(IF(A1>0,A1:B1,A2:B2))
-    std::string uuidFormula = "SUM(IF(" + sharedCellA1_.toString() + ">0," +
-                              sharedCellA1_.toString() + ":" + sharedCellB1_.toString() + "," +
-                              sharedCellA2_.toString() + ":" + sharedCellB2_.toString() + "))";
+    // All cell refs need ~~ prefix for relative references
+    std::string uuidFormula = "SUM(IF(~~" + sharedCellA1_.toString() + ">0,~~" +
+                              sharedCellA1_.toString() + ":~~" + sharedCellB1_.toString() + ",~~" +
+                              sharedCellA2_.toString() + ":~~" + sharedCellB2_.toString() + "))";
     std::string displayFormula = "=SUM(IF(A1>0,A1:B1,A2:B2))";
 
     std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
@@ -584,8 +597,8 @@ TEST_F(SyncFormulaTest, NestedFunctionFormulaRoundTrip) {
 
     RefConverter conv;
     conv.setContext(*workbookB_->getSheetByIndex(0));
-    std::string converted = conv.formulaToA1(cell->getFormula()->text);
-    EXPECT_EQ(converted, "SUM(IF(A1>0,A1:B1,A2:B2))");
+    std::string converted = conv.formulaToA1(getFormulaText(cell));
+    EXPECT_EQ(converted, "=SUM(IF(A1>0,A1:B1,A2:B2))");
 }
 
 // ============================================================================
@@ -613,14 +626,15 @@ TEST_F(SyncFormulaTest, SimpleCellReferenceRoundTrip) {
     Cell* cellA = workbookA_->getSheetByIndex(0)->getCell(sharedCellA2_);
     Cell* cellB = workbookB_->getSheetByIndex(0)->getCell(sharedCellA2_);
 
-    EXPECT_EQ(convA.formulaToA1(cellA->getFormula()->text), "A1");
-    EXPECT_EQ(convB.formulaToA1(cellB->getFormula()->text), "A1");
+    EXPECT_EQ(convA.formulaToA1(getFormulaText(cellA).c_str()), "=A1");
+    EXPECT_EQ(convB.formulaToA1(getFormulaText(cellB).c_str()), "=A1");
 }
 
 TEST_F(SyncFormulaTest, RangeReferenceRoundTrip) {
     // Test range: =SUM(A1:B2)
+    // Relative references need ~~ prefix in UUID format
     std::string uuidFormula =
-        "SUM(" + sharedCellA1_.toString() + ":" + sharedCellB2_.toString() + ")";
+        "SUM(~~" + sharedCellA1_.toString() + ":~~" + sharedCellB2_.toString() + ")";
     std::string displayFormula = "=SUM(A1:B2)";
 
     std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
@@ -633,7 +647,7 @@ TEST_F(SyncFormulaTest, RangeReferenceRoundTrip) {
     conv.setContext(*workbookB_->getSheetByIndex(0));
     Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellA2_);
 
-    EXPECT_EQ(conv.formulaToA1(cell->getFormula()->text), "SUM(A1:B2)");
+    EXPECT_EQ(conv.formulaToA1(getFormulaText(cell)), "=SUM(A1:B2)");
 }
 
 TEST_F(SyncFormulaTest, AllAbsoluteReferenceTypesRoundTrip) {
@@ -650,7 +664,7 @@ TEST_F(SyncFormulaTest, AllAbsoluteReferenceTypesRoundTrip) {
         RefConverter conv;
         conv.setContext(*workbookB_->getSheetByIndex(0));
         Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellB2_);
-        EXPECT_EQ(conv.formulaToA1(cell->getFormula()->text), "$A$1");
+        EXPECT_EQ(conv.formulaToA1(getFormulaText(cell)), "=$A$1");
     }
 
     // Test $A1 (column absolute)
@@ -663,7 +677,7 @@ TEST_F(SyncFormulaTest, AllAbsoluteReferenceTypesRoundTrip) {
         RefConverter conv;
         conv.setContext(*workbookB_->getSheetByIndex(0));
         Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellB1_);
-        EXPECT_EQ(conv.formulaToA1(cell->getFormula()->text), "$A1");
+        EXPECT_EQ(conv.formulaToA1(getFormulaText(cell)), "=$A1");
     }
 
     // Test A$1 (row absolute)
@@ -677,15 +691,15 @@ TEST_F(SyncFormulaTest, AllAbsoluteReferenceTypesRoundTrip) {
         RefConverter conv;
         conv.setContext(*workbookB_->getSheetByIndex(0));
         Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellA1_);
-        EXPECT_EQ(conv.formulaToA1(cell->getFormula()->text), "A$1");
+        EXPECT_EQ(conv.formulaToA1(getFormulaText(cell)), "=A$1");
     }
 }
 
 TEST_F(SyncFormulaTest, ConditionalFormulaRoundTrip) {
     // Test =IF(A1>0,B1,C1) - but we only have A1,B1,A2,B2 so use =IF(A1>0,B1,A2)
-    // Bare cell IDs for relative references
-    std::string uuidFormula = "IF(" + sharedCellA1_.toString() + ">0," + sharedCellB1_.toString() +
-                              "," + sharedCellA2_.toString() + ")";
+    // Relative cell references need ~~ prefix in UUID format
+    std::string uuidFormula = "IF(~~" + sharedCellA1_.toString() + ">0,~~" +
+                              sharedCellB1_.toString() + ",~~" + sharedCellA2_.toString() + ")";
     std::string displayFormula = "=IF(A1>0,B1,A2)";
 
     std::string payload = makeFormulaPayload(sharedColB_, sharedRow2_, uuidFormula, displayFormula);
@@ -698,13 +712,15 @@ TEST_F(SyncFormulaTest, ConditionalFormulaRoundTrip) {
     conv.setContext(*workbookB_->getSheetByIndex(0));
     Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellB2_);
 
-    EXPECT_EQ(conv.formulaToA1(cell->getFormula()->text), "IF(A1>0,B1,A2)");
+    EXPECT_EQ(conv.formulaToA1(getFormulaText(cell)), "=IF(A1>0,B1,A2)");
 }
 
 TEST_F(SyncFormulaTest, MultipleRangesFormulaRoundTrip) {
     // Test formula with multiple ranges: =SUM(A1:A2,B1:B2)
-    std::string uuidFormula = "SUM(" + sharedCellA1_.toString() + ":" + sharedCellA2_.toString() +
-                              "," + sharedCellB1_.toString() + ":" + sharedCellB2_.toString() + ")";
+    // Relative references need ~~ prefix in UUID format
+    std::string uuidFormula = "SUM(~~" + sharedCellA1_.toString() + ":~~" +
+                              sharedCellA2_.toString() + ",~~" + sharedCellB1_.toString() + ":~~" +
+                              sharedCellB2_.toString() + ")";
     std::string displayFormula = "=SUM(A1:A2,B1:B2)";
 
     std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
@@ -717,13 +733,13 @@ TEST_F(SyncFormulaTest, MultipleRangesFormulaRoundTrip) {
     conv.setContext(*workbookB_->getSheetByIndex(0));
     Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellA2_);
 
-    EXPECT_EQ(conv.formulaToA1(cell->getFormula()->text), "SUM(A1:A2,B1:B2)");
+    EXPECT_EQ(conv.formulaToA1(getFormulaText(cell)), "=SUM(A1:A2,B1:B2)");
 }
 
 TEST_F(SyncFormulaTest, TextConcatenationFormulaRoundTrip) {
     // Test formula with string concatenation: =A1&B1
-    // Bare cell IDs for relative references
-    std::string uuidFormula = sharedCellA1_.toString() + "&" + sharedCellB1_.toString();
+    // Relative cell references need ~~ prefix in UUID format
+    std::string uuidFormula = "~~" + sharedCellA1_.toString() + "&~~" + sharedCellB1_.toString();
     std::string displayFormula = "=A1&B1";
 
     std::string payload = makeFormulaPayload(sharedColA_, sharedRow2_, uuidFormula, displayFormula);
@@ -736,7 +752,7 @@ TEST_F(SyncFormulaTest, TextConcatenationFormulaRoundTrip) {
     conv.setContext(*workbookB_->getSheetByIndex(0));
     Cell* cell = workbookB_->getSheetByIndex(0)->getCell(sharedCellA2_);
 
-    EXPECT_EQ(conv.formulaToA1(cell->getFormula()->text), "A1&B1");
+    EXPECT_EQ(conv.formulaToA1(getFormulaText(cell)), "=A1&B1");
 }
 
 // ============================================================================
@@ -783,8 +799,8 @@ TEST_F(SyncFormulaTest, TwoClientsConcurrentValueAndFormula) {
     convA.setContext(*workbookA_->getSheetByIndex(0));
     convB.setContext(*workbookB_->getSheetByIndex(0));
 
-    EXPECT_EQ(convA.formulaToA1(cellA2_A->getFormula()->text), "B1");
-    EXPECT_EQ(convB.formulaToA1(cellA2_B->getFormula()->text), "B1");
+    EXPECT_EQ(convA.formulaToA1(getFormulaText(cellA2_A)), "=B1");
+    EXPECT_EQ(convB.formulaToA1(getFormulaText(cellA2_B)), "=B1");
 }
 
 TEST_F(SyncFormulaTest, TwoClientsConcurrentEditSameCell) {
@@ -850,7 +866,7 @@ TEST_F(SyncFormulaTest, FormulaCreatedBeforeReferencedCellValue) {
 
     RefConverter conv;
     conv.setContext(*workbookB_->getSheetByIndex(0));
-    EXPECT_EQ(conv.formulaToA1(cellA2->getFormula()->text), "B1");
+    EXPECT_EQ(conv.formulaToA1(getFormulaText(cellA2)), "=B1");
 
     // B1 should have the new value
     Cell* cellB1 = workbookB_->getSheetByIndex(0)->getCell(sharedCellB1_);
@@ -929,9 +945,10 @@ TEST_F(SyncFormulaTest, RefConverterWithMissingCellInRange) {
     conv.setContext(*workbookB_->getSheetByIndex(0));
 
     // Create a range reference where the end cell doesn't exist
+    // Input needs = prefix to match expected output
     ID nonExistentCell("NoSuchCl");
     std::string uuidFormula =
-        "SUM(" + sharedCellA1_.toString() + ":" + nonExistentCell.toString() + ")";
+        "=SUM(" + sharedCellA1_.toString() + ":" + nonExistentCell.toString() + ")";
 
     std::string converted = conv.formulaToA1(uuidFormula);
 
@@ -940,7 +957,7 @@ TEST_F(SyncFormulaTest, RefConverterWithMissingCellInRange) {
     EXPECT_TRUE(converted.find("SUM(") != std::string::npos);
     EXPECT_TRUE(converted.find("A1:") != std::string::npos);
     EXPECT_TRUE(converted.find("#REF!") != std::string::npos);
-    EXPECT_EQ(converted, "SUM(A1:#REF!)");
+    EXPECT_EQ(converted, "=SUM(A1:#REF!)");
 }
 
 TEST_F(SyncFormulaTest, RefConverterEmptyFormula) {
@@ -955,22 +972,24 @@ TEST_F(SyncFormulaTest, RefConverterEmptyFormula) {
 
 TEST_F(SyncFormulaTest, RefConverterPureNumberFormula) {
     // Test formula that's just a number (no cell refs)
+    // RefConverter just passes through non-ref content, so = is preserved if present
 
     RefConverter conv;
     conv.setContext(*workbookB_->getSheetByIndex(0));
 
-    std::string converted = conv.formulaToA1("42");
-    EXPECT_EQ(converted, "42");
+    std::string converted = conv.formulaToA1("=42");
+    EXPECT_EQ(converted, "=42");
 }
 
 TEST_F(SyncFormulaTest, RefConverterPureFunctionFormula) {
     // Test formula with function but no cell refs
+    // RefConverter passes through non-ref content, so = is preserved if present
 
     RefConverter conv;
     conv.setContext(*workbookB_->getSheetByIndex(0));
 
-    std::string converted = conv.formulaToA1("NOW()");
-    EXPECT_EQ(converted, "NOW()");
+    std::string converted = conv.formulaToA1("=NOW()");
+    EXPECT_EQ(converted, "=NOW()");
 
     std::string converted2 = conv.formulaToA1("PI()");
     EXPECT_EQ(converted2, "PI()");
@@ -983,8 +1002,9 @@ TEST_F(SyncFormulaTest, RefConverterRebuildAfterNewCell) {
     conv.setContext(*workbookB_->getSheetByIndex(0));
 
     // Verify we can convert known cells (bare cell ID for relative reference)
-    std::string formula1 = sharedCellA1_.toString();
-    EXPECT_EQ(conv.formulaToA1(formula1), "A1");
+    // Input needs = prefix since expected output has =
+    std::string formula1 = "=" + sharedCellA1_.toString();
+    EXPECT_EQ(conv.formulaToA1(formula1), "=A1");
 
     // Add a new column and cell
     ID newColC("ColCCCCC");
@@ -999,7 +1019,8 @@ TEST_F(SyncFormulaTest, RefConverterRebuildAfterNewCell) {
     workbookB_->getSheetByIndex(0)->addCell(std::move(cellC1));
 
     // Old context doesn't know about C1 (bare cell ID for relative reference)
-    std::string formula2 = newCellC1.toString();
+    // Input needs = prefix since expected output has =
+    std::string formula2 = "=" + newCellC1.toString();
     std::string converted = conv.formulaToA1(formula2);
     // May or may not work depending on implementation
     // The important thing is it doesn't crash
@@ -1009,7 +1030,7 @@ TEST_F(SyncFormulaTest, RefConverterRebuildAfterNewCell) {
 
     // Now it should work
     converted = conv.formulaToA1(formula2);
-    EXPECT_EQ(converted, "C1");
+    EXPECT_EQ(converted, "=C1");
 }
 
 TEST_F(SyncFormulaTest, RefConverterMalformedUUID) {
@@ -1026,10 +1047,9 @@ TEST_F(SyncFormulaTest, RefConverterMalformedUUID) {
     std::string converted2 = conv.formulaToA1("!@#$%^&*");
     EXPECT_EQ(converted2, "!@#$%^&*");
 
-    // Valid 8-char ID but with invalid prefix $$ followed by wrong ID
-    // Actually, let's just test with a valid cell ID - this should work
-    std::string converted3 = conv.formulaToA1(sharedCellA1_.toString());
-    EXPECT_EQ(converted3, "A1");
+    // Valid 8-char ID - this should work, add = prefix for expected output
+    std::string converted3 = conv.formulaToA1("=" + sharedCellA1_.toString());
+    EXPECT_EQ(converted3, "=A1");
 }
 
 TEST_F(SyncFormulaTest, RefConverterLargeFormula) {
@@ -1039,12 +1059,12 @@ TEST_F(SyncFormulaTest, RefConverterLargeFormula) {
     conv.setContext(*workbookB_->getSheetByIndex(0));
 
     // Build a formula summing all four cells: =A1+B1+A2+B2
-    // Using bare cell IDs for relative references
-    std::string uuidFormula = sharedCellA1_.toString() + "+" + sharedCellB1_.toString() + "+" +
-                              sharedCellA2_.toString() + "+" + sharedCellB2_.toString();
+    // Using bare cell IDs for relative references, input needs = prefix
+    std::string uuidFormula = "=" + sharedCellA1_.toString() + "+" + sharedCellB1_.toString() +
+                              "+" + sharedCellA2_.toString() + "+" + sharedCellB2_.toString();
 
     std::string converted = conv.formulaToA1(uuidFormula);
-    EXPECT_EQ(converted, "A1+B1+A2+B2");
+    EXPECT_EQ(converted, "=A1+B1+A2+B2");
 }
 
 // ============================================================================
@@ -1077,8 +1097,10 @@ TEST_F(SyncFormulaTest, DeletedCellReferenceShowsRefError) {
     Cell* cell = workbookA_->getSheetByIndex(0)->getCell(formulaCellA2);
     ASSERT_NE(cell, nullptr);
     ASSERT_NE(cell->formula, nullptr);
-    std::string converted = conv.formulaToA1(cell->formula->text);
-    EXPECT_EQ(converted, "B1");
+    ASSERT_NE(cell->formula->ast, nullptr);
+    std::string serializedFormula = FormulaSerializer::serialize(cell->formula->ast);
+    std::string converted = conv.formulaToA1(serializedFormula);
+    EXPECT_EQ(converted, "=B1");
 
     // Now delete B1 (the referenced cell)
     Operation clearOp(workbookA_->getCurrentHLC(), OpType::CELL_CLEAR, sharedCellB1_, "{}");
@@ -1092,8 +1114,10 @@ TEST_F(SyncFormulaTest, DeletedCellReferenceShowsRefError) {
     conv.setContext(*workbookA_->getSheetByIndex(0));
 
     // Now the formula should show #REF! since B1 no longer exists
-    converted = conv.formulaToA1(cell->formula->text);
-    EXPECT_EQ(converted, "#REF!");
+    // FormulaSerializer::serialize adds = prefix, so output is =#REF!
+    serializedFormula = FormulaSerializer::serialize(cell->formula->ast);
+    converted = conv.formulaToA1(serializedFormula);
+    EXPECT_EQ(converted, "=#REF!");
 }
 
 TEST_F(SyncFormulaTest, DeletedCellRemovesFromDependencyGraph) {

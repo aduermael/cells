@@ -6,6 +6,7 @@
 #include <sstream>
 #include <unordered_map>
 
+#include "core/cells/formula_serializer.h"
 #include "core/cells/ref_converter.h"
 
 #include "miniz.h"
@@ -332,9 +333,14 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
             xml << "      <c r=\"" << cellRef << "\"";
 
             // Handle formula cells
-            if (writeFormulas && formula != nullptr && formula->text != nullptr &&
-                std::strlen(formula->text) > 1) {
+            if (writeFormulas && formula != nullptr && formula->ast != nullptr) {
                 xml << ">\n";
+
+                // Generate UUID-format formula text from AST, then convert to A1
+                const std::string uuidFormula = cells::FormulaSerializer::serialize(formula->ast);
+                // Skip the leading '=' for refConverter
+                const std::string uuidBody = uuidFormula.empty() ? "" : uuidFormula.substr(1);
+                const std::string a1Formula = refConverter.formulaToA1(uuidBody);
 
                 // Check if this is a shared formula
                 auto masterIt = masterToSi.find(cell);
@@ -344,14 +350,6 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
                     // This is a shared formula master - calculate the range
                     // For now, just use the master cell as the ref (Excel accepts this)
                     const int si = masterIt->second;
-
-                    // Skip the leading '=' in formula text
-                    const char* formulaText = formula->text;
-                    if (formulaText[0] == '=') {
-                        formulaText++;
-                    }
-                    const std::string a1Formula = refConverter.formulaToA1(formulaText);
-
                     xml << "        <f t=\"shared\" ref=\"" << cellRef << "\" si=\"" << si << "\">"
                         << escapeXml(a1Formula) << "</f>\n";
                 } else if (subscriberIt != subscriberToSi.end()) {
@@ -360,11 +358,6 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
                     xml << "        <f t=\"shared\" si=\"" << si << "\"/>\n";
                 } else {
                     // Regular formula (not shared)
-                    const char* formulaText = formula->text;
-                    if (formulaText[0] == '=') {
-                        formulaText++;
-                    }
-                    const std::string a1Formula = refConverter.formulaToA1(formulaText);
                     xml << "        <f>" << escapeXml(a1Formula) << "</f>\n";
                 }
 

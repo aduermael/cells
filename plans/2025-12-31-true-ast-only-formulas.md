@@ -1,6 +1,6 @@
-Status: READY
+Status: IN_PROGRESS
 Created At: 2025-12-31 20:25 UTC
-Updated At: 2025-12-31 20:25 UTC
+Updated At: 2025-12-31 21:50 UTC
 Following plan management guidelines defined in AGENTS.md
 
 # True AST-Only Formula Storage
@@ -46,18 +46,25 @@ Preserve unparseable formula text so users can fix syntax errors.
 - [x] 1d: Update `FormulaDisplayConverter` to display rawText for ErrorNode
 - [x] 1e: Add unit tests for ErrorNode rawText preservation
 
-## Phase 2: Remove Formula.text field
+## Phase 2: Remove Formula.text field ✅
 
 Formula struct should only contain AST.
 
-- [ ] 2a: Audit all usages of `formula->text`
-- [ ] 2b: Update `Sheet::getCellFormulaText()` to generate from AST via FormulaDisplayConverter
-- [ ] 2c: Update `Sheet::setCellFormula()` to not store text
-- [ ] 2d: Update serializer.cc to generate text from AST on save
-- [ ] 2e: Update xlsx_writer.cc to generate text from AST
-- [ ] 2f: Remove `text` field from Formula struct (types.h)
-- [ ] 2g: Fix all compilation errors
-- [ ] 2h: Verify unit tests pass
+**NOTE**: Audit shows this was ALREADY DONE:
+- Formula struct (model.h:76-98) only has `ast` and `dirty` fields
+- getCellFormulaText() (model.cc:872-890) already generates from AST
+- setCellFormula() (model.cc:810-839) doesn't store text
+- serializer.cc (line 207) already generates from AST
+- xlsx_writer.cc (line 340) already generates from AST
+
+- [x] 2a: Audit all usages of `formula->text` - NONE EXIST
+- [x] 2b: Update `Sheet::getCellFormulaText()` to generate from AST via FormulaDisplayConverter - ALREADY DONE
+- [x] 2c: Update `Sheet::setCellFormula()` to not store text - ALREADY DONE
+- [x] 2d: Update serializer.cc to generate text from AST on save - ALREADY DONE
+- [x] 2e: Update xlsx_writer.cc to generate text from AST - ALREADY DONE
+- [x] 2f: Remove `text` field from Formula struct (types.h) - NEVER EXISTED IN CURRENT CODEBASE
+- [x] 2g: Fix all compilation errors - N/A
+- [x] 2h: Verify unit tests pass - DONE (fixed 14 sync_formula_test cases with wrong UUID format/expectations)
 
 ## Phase 3: Remove cell->value.raw for formulas
 

@@ -153,55 +153,24 @@ const std::string& CellValue::asString() const {
 // Formula
 // ============================================================================
 
-Formula::Formula() : text(nullptr), ast(nullptr), dirty(true) {}
-
-Formula::Formula(const char* text) : text(nullptr), ast(nullptr), dirty(true) {
-    if (text) {
-        size_t const len = std::strlen(text);
-        this->text = new char[len + 1];
-        std::memcpy(this->text, text, len + 1);
-    }
-}
+Formula::Formula() = default;
 
 Formula::~Formula() {
-    delete[] text;
     delete ast;
 }
 
-Formula::Formula(Formula&& other) noexcept : text(other.text), ast(other.ast), dirty(other.dirty) {
-    other.text = nullptr;
+Formula::Formula(Formula&& other) noexcept : ast(other.ast), dirty(other.dirty) {
     other.ast = nullptr;
 }
 
 Formula& Formula::operator=(Formula&& other) noexcept {
     if (this != &other) {
-        delete[] text;
         delete ast;
-        text = other.text;
         ast = other.ast;
         dirty = other.dirty;
-        other.text = nullptr;
         other.ast = nullptr;
     }
     return *this;
-}
-
-bool Formula::parse() {
-    // Delete any existing AST
-    delete ast;
-    ast = nullptr;
-
-    if (text == nullptr || text[0] == '\0') {
-        return false;
-    }
-
-    FormulaParser parser(text);
-    std::unique_ptr<ASTNode> parsed = parser.parse();
-    if (parsed) {
-        ast = parsed.release();
-        return true;
-    }
-    return false;
 }
 
 bool Formula::isValid() const {
@@ -387,7 +356,11 @@ Cell* SharedFormulaGroup::promoteMaster() {
 
     // Clone formula from old master to new master
     if (master != nullptr && master->formula != nullptr) {
-        newMaster->formula = new Formula(master->formula->text);
+        newMaster->formula = new Formula();
+        if (master->formula->ast != nullptr) {
+            newMaster->formula->ast = master->formula->ast->clone().release();
+        }
+        newMaster->formula->dirty = master->formula->dirty;
         newMaster->sharedFormulaRef = nullptr;
     }
 
@@ -847,15 +820,8 @@ FormulaResult Sheet::setCellFormula(const ID& cellId, const std::string& /* form
     // Clear existing formula and dependencies
     clearCellFormula(cellId);
 
-    // Serialize the AST to UUID format for storage
-    // This is the key change for move stability: we store UUID refs, not A1 refs
-    std::string uuidFormula;
-    if (ast != nullptr) {
-        uuidFormula = FormulaSerializer::serialize(ast);
-    }
-
-    // Create the formula with UUID-format text (not the original A1 input)
-    auto* formula = new Formula(uuidFormula.c_str());
+    // Create the formula - AST is the only storage, no text field
+    auto* formula = new Formula();
     formula->ast = ast;  // Transfer ownership
     formula->dirty = true;
     cell->setFormula(formula);
@@ -893,8 +859,8 @@ FormulaResult Sheet::setCellFormulaUnresolved(const ID& cellId, const std::strin
     FormulaParser parser(formulaText);
     std::unique_ptr<ASTNode> ast = parser.parse();
 
-    // Create the formula
-    auto* formula = new Formula(formulaText.c_str());
+    // Create the formula - AST is the only storage
+    auto* formula = new Formula();
     formula->ast = ast.release();
     formula->dirty = true;
     cell->setFormula(formula);
@@ -917,11 +883,12 @@ std::string Sheet::getCellFormulaText(const ID& cellId) const {
     }
 
     const Formula* formula = cell->getFormula();
-    if (formula == nullptr || formula->text == nullptr) {
+    if (formula == nullptr || formula->ast == nullptr) {
         return "";
     }
 
-    return formula->text;
+    // Generate UUID-format text from AST
+    return FormulaSerializer::serialize(formula->ast);
 }
 
 void Sheet::clearCellFormula(const ID& cellId) {
