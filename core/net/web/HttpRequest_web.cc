@@ -55,6 +55,83 @@ protected:
         }
 
         // Build URL
+        url_ = buildUrl();
+
+        // Start fetch
+        fetch_ = emscripten_fetch(&attr, url_.c_str());
+    }
+
+    void _sendAsyncStreaming() override {
+        emscripten_fetch_attr_t attr;
+        emscripten_fetch_attr_init(&attr);
+
+        // Set method
+        const char* method_str = httpMethodToString(method_);
+        strncpy(attr.requestMethod, method_str, sizeof(attr.requestMethod) - 1);
+        attr.requestMethod[sizeof(attr.requestMethod) - 1] = '\0';
+
+        // Configure for streaming: don't load to memory, stream chunks via onprogress
+        attr.attributes = EMSCRIPTEN_FETCH_STREAM_DATA;
+        attr.onsuccess = &WebHttpRequest::onStreamingSuccess;
+        attr.onerror = &WebHttpRequest::onError;
+        attr.onprogress = &WebHttpRequest::onProgress;
+        attr.userData = this;
+
+        // Set timeout
+        attr.timeoutMSecs = timeout_ms_;
+
+        // Set headers
+        buildHeaderArray();
+        if (!header_array_.empty()) {
+            attr.requestHeaders = header_array_.data();
+        }
+
+        // Set body
+        if (!body_.empty()) {
+            attr.requestData = reinterpret_cast<const char*>(body_.data());
+            attr.requestDataSize = body_.size();
+        }
+
+        // Build URL
+        url_ = buildUrl();
+
+        // Track bytes processed for incremental streaming
+        last_data_offset_ = 0;
+
+        // Start fetch
+        fetch_ = emscripten_fetch(&attr, url_.c_str());
+    }
+
+    void _cancel() override {
+        if (fetch_ != nullptr) {
+            emscripten_fetch_close(fetch_);
+            fetch_ = nullptr;
+        }
+    }
+
+private:
+    emscripten_fetch_t* fetch_ = nullptr;
+    std::string url_;
+    std::vector<const char*> header_array_;
+    std::vector<std::string> header_strings_;  // Keep strings alive
+    size_t last_data_offset_ = 0;              // For incremental streaming
+
+    void buildHeaderArray() {
+        header_strings_.clear();
+        header_array_.clear();
+
+        for (const auto& [key, value] : headers_) {
+            header_strings_.push_back(key);
+            header_strings_.push_back(value);
+        }
+
+        for (const auto& str : header_strings_) {
+            header_array_.push_back(str.c_str());
+        }
+        header_array_.push_back(nullptr);  // Null terminator
+    }
+
+    std::string buildUrl() {
         std::ostringstream url_stream;
         url_stream << (secure_ ? "https" : "http") << "://" << host_;
         if ((secure_ && port_ != 443) || (!secure_ && port_ != 80)) {
@@ -74,38 +151,7 @@ protected:
                 url_stream << key << "=" << value;
             }
         }
-        url_ = url_stream.str();
-
-        // Start fetch
-        fetch_ = emscripten_fetch(&attr, url_.c_str());
-    }
-
-    void _cancel() override {
-        if (fetch_ != nullptr) {
-            emscripten_fetch_close(fetch_);
-            fetch_ = nullptr;
-        }
-    }
-
-private:
-    emscripten_fetch_t* fetch_ = nullptr;
-    std::string url_;
-    std::vector<const char*> header_array_;
-    std::vector<std::string> header_strings_;  // Keep strings alive
-
-    void buildHeaderArray() {
-        header_strings_.clear();
-        header_array_.clear();
-
-        for (const auto& [key, value] : headers_) {
-            header_strings_.push_back(key);
-            header_strings_.push_back(value);
-        }
-
-        for (const auto& str : header_strings_) {
-            header_array_.push_back(str.c_str());
-        }
-        header_array_.push_back(nullptr);  // Null terminator
+        return url_stream.str();
     }
 
     static void onSuccess(emscripten_fetch_t* fetch) {
@@ -151,6 +197,52 @@ private:
         request->fetch_ = nullptr;
         emscripten_fetch_close(fetch);
         request->completeWithError(error);
+    }
+
+    // Called during streaming as chunks arrive
+    static void onProgress(emscripten_fetch_t* fetch) {
+        auto* request = static_cast<WebHttpRequest*>(fetch->userData);
+        if (request == nullptr) {
+            return;
+        }
+
+        // Set response status on first progress callback
+        if (request->response_.getStatusCode() == 0 && fetch->status != 0) {
+            request->response_.setStatusCode(static_cast<int>(fetch->status));
+        }
+
+        // Forward new data since last callback
+        if (fetch->data != nullptr && fetch->numBytes > request->last_data_offset_) {
+            size_t new_bytes = fetch->numBytes - request->last_data_offset_;
+            const auto* new_data =
+                reinterpret_cast<const uint8_t*>(fetch->data) + request->last_data_offset_;
+            request->onStreamData(new_data, new_bytes);
+            request->last_data_offset_ = fetch->numBytes;
+        }
+    }
+
+    // Called when streaming completes successfully
+    static void onStreamingSuccess(emscripten_fetch_t* fetch) {
+        auto* request = static_cast<WebHttpRequest*>(fetch->userData);
+        if (request == nullptr) {
+            emscripten_fetch_close(fetch);
+            return;
+        }
+
+        // Set final response status
+        request->response_.setStatusCode(static_cast<int>(fetch->status));
+
+        // Process any remaining data
+        if (fetch->data != nullptr && fetch->numBytes > request->last_data_offset_) {
+            size_t new_bytes = fetch->numBytes - request->last_data_offset_;
+            const auto* new_data =
+                reinterpret_cast<const uint8_t*>(fetch->data) + request->last_data_offset_;
+            request->onStreamData(new_data, new_bytes);
+        }
+
+        request->fetch_ = nullptr;
+        emscripten_fetch_close(fetch);
+        request->onStreamEnd();
     }
 };
 
