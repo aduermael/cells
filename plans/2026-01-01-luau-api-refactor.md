@@ -59,7 +59,7 @@ Rename functions that don't require structural changes.
 - [x] 1c: Rename `columnSetWidth` → `setColumnWidth`, `rowSetHeight` → `setRowHeight`
 - [x] 1d: Rename `columnMove` → `moveColumn`
 - [x] 1e: Rename `rangeSelect` → `selectRange`, `rangeDelete` → `deleteRange`, `rangeFill` → `fillRange`
-- [ ] 1f: Update all unit tests to use new names
+- [x] 1f: Update all unit tests to use new names
 
 **Files:**
 - `core/cells/luau_sandbox.cc` - Rename functions in `registerCellsAPI()`

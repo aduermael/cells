@@ -277,7 +277,7 @@ static bool parseA1Range(const char* range, int* fromCol, int* fromRow, int* toC
 
     // Range reference (e.g., "A1:B2")
     // Parse the first part
-    std::string firstPart(range, colon - range);
+    const std::string firstPart(range, colon - range);
     if (!parseA1Ref(firstPart.c_str(), fromCol, fromRow)) {
         return false;
     }
