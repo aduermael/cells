@@ -446,7 +446,7 @@ TEST(LuauSandboxTest, RangeDelete) {
     EXPECT_EQ(before.output, "1");
 
     // Delete range A1:B2
-    auto del = sandbox.execute("rangeDelete({from = 'A1', to = 'B2'})");
+    auto del = sandbox.execute("deleteRange({from = 'A1', to = 'B2'})");
     EXPECT_TRUE(del.success);
 
     // Verify cells are cleared

@@ -58,7 +58,7 @@ Rename functions that don't require structural changes.
 - [x] 1b: Rename `documentSetTitle` → `setDocumentTitle`
 - [x] 1c: Rename `columnSetWidth` → `setColumnWidth`, `rowSetHeight` → `setRowHeight`
 - [x] 1d: Rename `columnMove` → `moveColumn`
-- [ ] 1e: Rename `rangeSelect` → `selectRange`, `rangeDelete` → `deleteRange`, `rangeFill` → `fillRange`
+- [x] 1e: Rename `rangeSelect` → `selectRange`, `rangeDelete` → `deleteRange`, `rangeFill` → `fillRange`
 - [ ] 1f: Update all unit tests to use new names
 
 **Files:**

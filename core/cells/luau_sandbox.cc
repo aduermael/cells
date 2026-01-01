@@ -644,7 +644,7 @@ int LuauSandbox::luaSheetGetName(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: rangeSelect(options)
+// Cells API: selectRange(options)
 // options.from: string (start cell ref)
 // options.to: string (end cell ref)
 // ============================================================================
@@ -653,14 +653,14 @@ int LuauSandbox::luaRangeSelect(lua_State* L) {
 
     lua_getfield(L, 1, "from");
     if (lua_isstring(L, -1) == 0) {
-        luaL_error(L, "rangeSelect: options.from required");
+        luaL_error(L, "selectRange: options.from required");
     }
     // const char* fromRef = lua_tostring(L, -1);
     lua_pop(L, 1);
 
     lua_getfield(L, 1, "to");
     if (lua_isstring(L, -1) == 0) {
-        luaL_error(L, "rangeSelect: options.to required");
+        luaL_error(L, "selectRange: options.to required");
     }
     // const char* toRef = lua_tostring(L, -1);
     lua_pop(L, 1);
@@ -674,7 +674,7 @@ int LuauSandbox::luaRangeSelect(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: rangeDelete(options)
+// Cells API: deleteRange(options)
 // options.from: string (start cell ref)
 // options.to: string (end cell ref)
 // ============================================================================
@@ -683,14 +683,14 @@ int LuauSandbox::luaRangeDelete(lua_State* L) {
 
     lua_getfield(L, 1, "from");
     if (lua_isstring(L, -1) == 0) {
-        luaL_error(L, "rangeDelete: options.from required");
+        luaL_error(L, "deleteRange: options.from required");
     }
     const char* fromRef = lua_tostring(L, -1);
     lua_pop(L, 1);
 
     lua_getfield(L, 1, "to");
     if (lua_isstring(L, -1) == 0) {
-        luaL_error(L, "rangeDelete: options.to required");
+        luaL_error(L, "deleteRange: options.to required");
     }
     const char* toRef = lua_tostring(L, -1);
     lua_pop(L, 1);
@@ -698,7 +698,7 @@ int LuauSandbox::luaRangeDelete(lua_State* L) {
     Sheet* sheet = getSheet(L);
     Workbook* workbook = getWorkbook(L);
     if (sheet == nullptr || workbook == nullptr) {
-        luaL_error(L, "rangeDelete: no context set");
+        luaL_error(L, "deleteRange: no context set");
     }
 
     // Parse range references
@@ -707,7 +707,7 @@ int LuauSandbox::luaRangeDelete(lua_State* L) {
     int toCol = 0;
     int toRow = 0;
     if (!parseA1Ref(fromRef, &fromCol, &fromRow) || !parseA1Ref(toRef, &toCol, &toRow)) {
-        luaL_error(L, "rangeDelete: invalid range");
+        luaL_error(L, "deleteRange: invalid range");
     }
 
     // Normalize range (ensure from <= to)
@@ -741,7 +741,7 @@ int LuauSandbox::luaRangeDelete(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: rangeFill(options)
+// Cells API: fillRange(options)
 // options.from: string (source range, e.g., "A1:A2" or "A1" for single cell)
 // options.to: string (full target range including source, e.g., "A1:A10")
 // Returns: {success: boolean, cellsFilled: number, error?: string}
@@ -752,7 +752,7 @@ int LuauSandbox::luaRangeFill(lua_State* L) {
     // Get source range (from)
     lua_getfield(L, 1, "from");
     if (lua_isstring(L, -1) == 0) {
-        luaL_error(L, "rangeFill: options.from required");
+        luaL_error(L, "fillRange: options.from required");
     }
     const char* fromRange = lua_tostring(L, -1);
     lua_pop(L, 1);
@@ -760,7 +760,7 @@ int LuauSandbox::luaRangeFill(lua_State* L) {
     // Get target range (to)
     lua_getfield(L, 1, "to");
     if (lua_isstring(L, -1) == 0) {
-        luaL_error(L, "rangeFill: options.to required");
+        luaL_error(L, "fillRange: options.to required");
     }
     const char* toRange = lua_tostring(L, -1);
     lua_pop(L, 1);
@@ -768,7 +768,7 @@ int LuauSandbox::luaRangeFill(lua_State* L) {
     Sheet* sheet = getSheet(L);
     Workbook* workbook = getWorkbook(L);
     if (sheet == nullptr || workbook == nullptr) {
-        luaL_error(L, "rangeFill: no context set");
+        luaL_error(L, "fillRange: no context set");
     }
 
     // Parse source range (e.g., "A1:A2" or "A1")
@@ -777,7 +777,7 @@ int LuauSandbox::luaRangeFill(lua_State* L) {
     int toCol = 0;
     int toRow = 0;
     if (!parseA1Range(fromRange, &fromCol, &fromRow, &toCol, &toRow)) {
-        luaL_error(L, "rangeFill: invalid source range '%s'", fromRange);
+        luaL_error(L, "fillRange: invalid source range '%s'", fromRange);
     }
 
     // Parse target range (e.g., "A1:A10")
@@ -786,7 +786,7 @@ int LuauSandbox::luaRangeFill(lua_State* L) {
     int targetToCol = 0;
     int targetToRow = 0;
     if (!parseA1Range(toRange, &targetFromCol, &targetFromRow, &targetToCol, &targetToRow)) {
-        luaL_error(L, "rangeFill: invalid target range '%s'", toRange);
+        luaL_error(L, "fillRange: invalid target range '%s'", toRange);
     }
 
     // Normalize ranges (ensure from <= to)
@@ -1017,14 +1017,14 @@ void LuauSandbox::registerCellsAPI() {
     lua_pushcfunction(L_, &LuauSandbox::luaSheetGetName, "sheetGetName");
     lua_setglobal(L_, "sheetGetName");
 
-    lua_pushcfunction(L_, &LuauSandbox::luaRangeSelect, "rangeSelect");
-    lua_setglobal(L_, "rangeSelect");
+    lua_pushcfunction(L_, &LuauSandbox::luaRangeSelect, "selectRange");
+    lua_setglobal(L_, "selectRange");
 
-    lua_pushcfunction(L_, &LuauSandbox::luaRangeDelete, "rangeDelete");
-    lua_setglobal(L_, "rangeDelete");
+    lua_pushcfunction(L_, &LuauSandbox::luaRangeDelete, "deleteRange");
+    lua_setglobal(L_, "deleteRange");
 
-    lua_pushcfunction(L_, &LuauSandbox::luaRangeFill, "rangeFill");
-    lua_setglobal(L_, "rangeFill");
+    lua_pushcfunction(L_, &LuauSandbox::luaRangeFill, "fillRange");
+    lua_setglobal(L_, "fillRange");
 }
 
 void LuauSandbox::setContext(Workbook* workbook, Sheet* sheet) {
