@@ -822,7 +822,61 @@ int LuauSandbox::luaRangeFill(lua_State* L) {
 }
 
 // ============================================================================
-// Cell object method: getRef()
+// Cell __index metamethod: handles property access (e.g., cell.ref)
+// ============================================================================
+int LuauSandbox::luaCellIndex(lua_State* L) {
+    // Stack: [1] = cell table, [2] = key (string)
+    const char* key = lua_tostring(L, 2);
+    if (key == nullptr) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    // Handle .ref property
+    if (strcmp(key, "ref") == 0) {
+        // Get the cell UUID from the table
+        lua_getfield(L, 1, "_uuid");
+        if (lua_isstring(L, -1) == 0) {
+            luaL_error(L, "ref: invalid cell object");
+        }
+        const char* uuidStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        // NOLINTBEGIN(misc-const-correctness) - Sheet methods not const-correct
+        Sheet* sheet = getSheet(L);
+        if (sheet == nullptr) {
+            luaL_error(L, "ref: no context set");
+        }
+
+        const ID cellId(uuidStr);
+        Cell* cell = sheet->getCell(cellId);
+        if (cell == nullptr) {
+            luaL_error(L, "ref: cell not found");
+        }
+
+        // Get the cell's current position
+        Axis* col = sheet->getColumn(cell->colId);
+        Axis* row = sheet->getRow(cell->rowId);
+        // NOLINTEND(misc-const-correctness)
+        if (col == nullptr || row == nullptr) {
+            luaL_error(L, "ref: cell position not found");
+        }
+
+        // Convert to A1 notation
+        const std::string a1Ref =
+            RefConverter::columnIndexToLetter(col->position) + std::to_string(row->position + 1);
+        lua_pushstring(L, a1Ref.c_str());
+        return 1;
+    }
+
+    // For other keys, look up in the table itself
+    lua_rawget(L, 1);
+    return 1;
+}
+
+// ============================================================================
+// Cell object method: getRef() - DEPRECATED, use .ref property
+// Kept for backward compatibility during transition
 // Returns the current A1 reference for the cell
 // ============================================================================
 int LuauSandbox::luaCellGetRef(lua_State* L) {
@@ -966,9 +1020,11 @@ void LuauSandbox::pushCellObject(lua_State* L, Cell* cell) {
     lua_pushstring(L, cellUuid.c_str());
     lua_setfield(L, -2, "_uuid");
 
-    // Set getRef method
-    lua_pushcfunction(L, &LuauSandbox::luaCellGetRef, "Cell.getRef");
-    lua_setfield(L, -2, "getRef");
+    // Apply Cell metatable for .ref property access
+    if (cellMetatableRef_ != -1) {
+        lua_rawgeti(L, LUA_REGISTRYINDEX, cellMetatableRef_);  // Get Cell metatable
+        lua_setmetatable(L, -2);                               // setmetatable(cell, Cell)
+    }
 
     // Cache the object (if cache exists)
     if (cellCacheRef_ != -1) {
@@ -988,6 +1044,12 @@ void LuauSandbox::registerCellsAPI() {
     lua_setmetatable(L_, -2);         // setmetatable(cache, metatable)
     cellCacheRef_ = lua_ref(L_, -1);  // Store in registry (ref pops the value)
     // lua_ref pops the value from stack, so we don't need to pop
+
+    // Create Cell metatable with __index for property access (e.g., cell.ref)
+    lua_newtable(L_);  // Cell metatable
+    lua_pushcfunction(L_, &LuauSandbox::luaCellIndex, "Cell.__index");
+    lua_setfield(L_, -2, "__index");
+    cellMetatableRef_ = lua_ref(L_, -1);  // Store in registry
 
     // Register global API functions
     lua_pushcfunction(L_, &LuauSandbox::luaCellGet, "getCell");

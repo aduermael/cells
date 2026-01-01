@@ -71,10 +71,10 @@ Rename functions that don't require structural changes.
 
 Change `cell:getRef()` method to `cell.ref` property using Lua metatables.
 
-- [ ] 2a: Create Cell metatable with `__index` metamethod
-- [ ] 2b: Implement `__index` to handle `.ref` property (calls `luaCellGetRef` internally)
-- [ ] 2c: Update `pushCellObject` to use metatable instead of direct method assignment
-- [ ] 2d: Update unit tests to use `cell.ref` instead of `cell:getRef()`
+- [x] 2a: Create Cell metatable with `__index` metamethod
+- [x] 2b: Implement `__index` to handle `.ref` property (calls `luaCellGetRef` internally)
+- [x] 2c: Update `pushCellObject` to use metatable instead of direct method assignment
+- [x] 2d: Update unit tests to use `cell.ref` instead of `cell:getRef()`
 
 **Files:**
 - `core/cells/luau_sandbox.cc` - Add metatable setup, modify `pushCellObject`

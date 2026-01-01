@@ -140,6 +140,12 @@ private:
     // Cell object cache (UUID string -> Lua registry reference)
     // Uses weak table in Lua to allow garbage collection
     int cellCacheRef_{-1};  // -1 = LUA_NOREF
+
+    // Cell metatable reference for __index access to .ref property
+    int cellMetatableRef_{-1};
+
+    // Cell __index metamethod (handles .ref property access)
+    static int luaCellIndex(lua_State* L);
 };
 
 }  // namespace cells

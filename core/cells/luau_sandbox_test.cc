@@ -376,7 +376,7 @@ TEST(LuauSandboxTest, CellObjectIdentity) {
     EXPECT_EQ(result.output, "true");
 }
 
-TEST(LuauSandboxTest, CellGetRef) {
+TEST(LuauSandboxTest, CellRefProperty) {
     auto workbook = createTestWorkbook();
     Sheet* sheet = workbook->getSheetByIndex(0);
 
@@ -385,7 +385,7 @@ TEST(LuauSandboxTest, CellGetRef) {
 
     auto result = sandbox.execute(R"(
         local c = getCell('A1')
-        return c:getRef()
+        return c.ref
     )");
     EXPECT_TRUE(result.success);
     EXPECT_EQ(result.output, "A1");
