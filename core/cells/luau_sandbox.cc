@@ -448,7 +448,7 @@ int LuauSandbox::luaDocumentSetTitle(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: columnSetWidth(col, options)
+// Cells API: setColumnWidth(col, options)
 // options.width: number (pixels)
 // ============================================================================
 int LuauSandbox::luaColumnSetWidth(lua_State* L) {
@@ -457,7 +457,7 @@ int LuauSandbox::luaColumnSetWidth(lua_State* L) {
 
     lua_getfield(L, 2, "width");
     if (lua_isnumber(L, -1) == 0) {
-        luaL_error(L, "columnSetWidth: options.width required");
+        luaL_error(L, "setColumnWidth: options.width required");
     }
     const int width = static_cast<int>(lua_tonumber(L, -1));
     lua_pop(L, 1);
@@ -465,18 +465,18 @@ int LuauSandbox::luaColumnSetWidth(lua_State* L) {
     Sheet* sheet = getSheet(L);
     Workbook* workbook = getWorkbook(L);
     if (sheet == nullptr || workbook == nullptr) {
-        luaL_error(L, "columnSetWidth: no context set");
+        luaL_error(L, "setColumnWidth: no context set");
     }
 
     // Parse column reference (just the letter part)
     const int colIdx = parseColumnLetter(colRef, nullptr);
     if (colIdx < 0) {
-        luaL_error(L, "columnSetWidth: invalid column '%s'", colRef);
+        luaL_error(L, "setColumnWidth: invalid column '%s'", colRef);
     }
 
     const Axis* col = sheet->getColumnByPosition(static_cast<uint32_t>(colIdx));
     if (col == nullptr) {
-        luaL_error(L, "columnSetWidth: column '%s' not found", colRef);
+        luaL_error(L, "setColumnWidth: column '%s' not found", colRef);
     }
 
     const std::string payload = R"({"size":)" + std::to_string(width) + "}";
@@ -487,7 +487,7 @@ int LuauSandbox::luaColumnSetWidth(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: rowSetHeight(row, options)
+// Cells API: setRowHeight(row, options)
 // options.height: number (pixels)
 // ============================================================================
 int LuauSandbox::luaRowSetHeight(lua_State* L) {
@@ -496,7 +496,7 @@ int LuauSandbox::luaRowSetHeight(lua_State* L) {
 
     lua_getfield(L, 2, "height");
     if (lua_isnumber(L, -1) == 0) {
-        luaL_error(L, "rowSetHeight: options.height required");
+        luaL_error(L, "setRowHeight: options.height required");
     }
     const int height = static_cast<int>(lua_tonumber(L, -1));
     lua_pop(L, 1);
@@ -504,17 +504,17 @@ int LuauSandbox::luaRowSetHeight(lua_State* L) {
     Sheet* sheet = getSheet(L);
     Workbook* workbook = getWorkbook(L);
     if (sheet == nullptr || workbook == nullptr) {
-        luaL_error(L, "rowSetHeight: no context set");
+        luaL_error(L, "setRowHeight: no context set");
     }
 
     const int rowIdx = rowNum - 1;  // Convert 1-based to 0-based
     if (rowIdx < 0) {
-        luaL_error(L, "rowSetHeight: invalid row number %d", rowNum);
+        luaL_error(L, "setRowHeight: invalid row number %d", rowNum);
     }
 
     const Axis* row = sheet->getRowByPosition(static_cast<uint32_t>(rowIdx));
     if (row == nullptr) {
-        luaL_error(L, "rowSetHeight: row %d not found", rowNum);
+        luaL_error(L, "setRowHeight: row %d not found", rowNum);
     }
 
     const std::string payload = R"({"size":)" + std::to_string(height) + "}";
@@ -999,11 +999,11 @@ void LuauSandbox::registerCellsAPI() {
     lua_pushcfunction(L_, &LuauSandbox::luaDocumentSetTitle, "setDocumentTitle");
     lua_setglobal(L_, "setDocumentTitle");
 
-    lua_pushcfunction(L_, &LuauSandbox::luaColumnSetWidth, "columnSetWidth");
-    lua_setglobal(L_, "columnSetWidth");
+    lua_pushcfunction(L_, &LuauSandbox::luaColumnSetWidth, "setColumnWidth");
+    lua_setglobal(L_, "setColumnWidth");
 
-    lua_pushcfunction(L_, &LuauSandbox::luaRowSetHeight, "rowSetHeight");
-    lua_setglobal(L_, "rowSetHeight");
+    lua_pushcfunction(L_, &LuauSandbox::luaRowSetHeight, "setRowHeight");
+    lua_setglobal(L_, "setRowHeight");
 
     lua_pushcfunction(L_, &LuauSandbox::luaColumnMove, "columnMove");
     lua_setglobal(L_, "columnMove");
