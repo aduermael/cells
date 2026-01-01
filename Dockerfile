@@ -31,11 +31,11 @@ COPY apps/wasm/static/shared/ dist/shared/
 # Shared assets (favicons, icons)
 COPY apps/shared/favicons/ dist/favicons/
 COPY apps/shared/icon.svg dist/
-# Built JS files from apps/wasm/dist/
-COPY apps/wasm/dist/main.js dist/
-COPY apps/wasm/dist/cells_wasm_bin.js dist/
-COPY apps/wasm/dist/cells_wasm_bin.wasm dist/
-COPY apps/wasm/dist/worker.js dist/
+# Built files from dist/ (output of make wasm-dist)
+COPY dist/main.js dist/
+COPY dist/cells_wasm_bin.js dist/
+COPY dist/cells_wasm_bin.wasm dist/
+COPY dist/worker.js dist/
 
 # Expose the port
 EXPOSE 8080
