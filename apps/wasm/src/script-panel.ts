@@ -611,12 +611,14 @@ export class ScriptPanel {
 
     try {
       const result = await this.getAutocomplete(source, line, column);
+      console.log("[autocomplete]", { line, column, result });
       if (result.suggestions.length > 0) {
         this.showAutocomplete(result.suggestions);
       } else {
         this.hideAutocomplete();
       }
-    } catch {
+    } catch (e) {
+      console.error("[autocomplete error]", e);
       this.hideAutocomplete();
     }
   }

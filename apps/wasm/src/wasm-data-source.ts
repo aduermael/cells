@@ -4,7 +4,7 @@
 
 import type { CellsClient } from "./client";
 import type { SheetInfo, CellData, ColumnInfo, RowInfo } from "./types";
-import type { LuauToken } from "./client-types";
+import type { LuauToken, AutocompleteResult } from "./client-types";
 import { getMimeType, toSnakeCase } from "./utils";
 
 /** Change notification types */
@@ -364,5 +364,12 @@ export class WasmDataSource {
    */
   async tokenizeLuau(source: string): Promise<LuauToken[]> {
     return this._client.tokenizeLuau(source);
+  }
+
+  /**
+   * Get autocomplete suggestions for Luau source code
+   */
+  async getAutocomplete(source: string, line: number, column: number): Promise<AutocompleteResult> {
+    return this._client.getAutocomplete(source, line, column);
   }
 }
