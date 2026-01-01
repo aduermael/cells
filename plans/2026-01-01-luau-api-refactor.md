@@ -86,12 +86,12 @@ Change `cell:getRef()` method to `cell.ref` property using Lua metatables.
 
 Replace `sheetSelect`, `sheetSetName`, `sheetGetName` with sheet object API.
 
-- [ ] 3a: Create Sheet metatable with `__index`/`__newindex` for `.name` property
-- [ ] 3b: Implement `getSheet({name = ...})` and `getSheet({index = ...})`
-- [ ] 3c: Implement `selectSheet(sheet|name|index)` - accepts sheet object, string name, or number index
-- [ ] 3d: Implement `addSheet(name?)` - creates new sheet
-- [ ] 3e: Remove old `sheetSetName`, `sheetGetName`, `sheetSelect` functions
-- [ ] 3f: Update unit tests for new sheet API
+- [x] 3a: Create Sheet metatable with `__index`/`__newindex` for `.name` property
+- [x] 3b: Implement `getSheet({name = ...})` and `getSheet({index = ...})`
+- [x] 3c: Implement `selectSheet(sheet|name|index)` - accepts sheet object, string name, or number index
+- [x] 3d: Implement `addSheet(name?)` - creates new sheet
+- [x] 3e: Remove old `sheetSetName`, `sheetGetName`, `sheetSelect` functions
+- [x] 3f: Update unit tests for new sheet API
 
 **Files:**
 - `core/cells/luau_sandbox.h` - Add Sheet object helper declarations

@@ -118,9 +118,9 @@ private:
     static int luaColumnMove(lua_State* L);
 
     // Sheet operations
-    static int luaSheetSelect(lua_State* L);
-    static int luaSheetSetName(lua_State* L);
-    static int luaSheetGetName(lua_State* L);
+    static int luaSelectSheet(lua_State* L);  // selectSheet(sheet|name|index)
+    static int luaGetSheet(lua_State* L);     // getSheet({name=...}) or getSheet({index=...})
+    static int luaAddSheet(lua_State* L);     // addSheet(name?)
 
     // Range operations
     static int luaRangeSelect(lua_State* L);
@@ -146,6 +146,16 @@ private:
 
     // Cell __index metamethod (handles .ref property access)
     static int luaCellIndex(lua_State* L);
+
+    // Sheet object support
+    int sheetMetatableRef_{-1};  // Sheet metatable for __index/__newindex
+
+    // Sheet object metamethods
+    static int luaSheetIndex(lua_State* L);     // Get sheet.name
+    static int luaSheetNewIndex(lua_State* L);  // Set sheet.name = "..."
+
+    // Helper: Create a sheet Lua object
+    void pushSheetObject(lua_State* L, Sheet* sheet) const;
 };
 
 }  // namespace cells

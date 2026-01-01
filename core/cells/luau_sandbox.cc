@@ -564,22 +564,48 @@ int LuauSandbox::luaColumnMove(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: sheetSelect(index)
-// index: 0-based sheet index
+// Cells API: selectSheet(sheet|name|index)
+// Accepts: sheet object, name string, or 0-based index number
 // ============================================================================
-int LuauSandbox::luaSheetSelect(lua_State* L) {
-    const int index = static_cast<int>(luaL_checknumber(L, 1));
-
+int LuauSandbox::luaSelectSheet(lua_State* L) {
     Workbook* workbook = getWorkbook(L);
     if (workbook == nullptr) {
-        luaL_error(L, "sheetSelect: no context set");
+        luaL_error(L, "selectSheet: no context set");
     }
 
-    if (index < 0 || static_cast<size_t>(index) >= workbook->sheetCount()) {
-        luaL_error(L, "sheetSelect: index %d out of range", index);
-    }
+    Sheet* newSheet = nullptr;
 
-    Sheet* newSheet = workbook->getSheetByIndex(static_cast<size_t>(index));
+    if (lua_isnumber(L, 1) != 0) {
+        // Select by index
+        const int index = static_cast<int>(lua_tonumber(L, 1));
+        if (index < 0 || static_cast<size_t>(index) >= workbook->sheetCount()) {
+            luaL_error(L, "selectSheet: index %d out of range", index);
+        }
+        newSheet = workbook->getSheetByIndex(static_cast<size_t>(index));
+    } else if (lua_isstring(L, 1) != 0) {
+        // Select by name
+        const char* name = lua_tostring(L, 1);
+        newSheet = workbook->getSheetByName(name);
+        if (newSheet == nullptr) {
+            luaL_error(L, "selectSheet: sheet '%s' not found", name);
+        }
+    } else if (lua_istable(L, 1) != 0) {
+        // Select by sheet object
+        lua_getfield(L, 1, "_uuid");
+        if (lua_isstring(L, -1) == 0) {
+            luaL_error(L, "selectSheet: invalid sheet object");
+        }
+        const char* uuidStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        const ID sheetId(uuidStr);
+        newSheet = workbook->getSheet(sheetId);
+        if (newSheet == nullptr) {
+            luaL_error(L, "selectSheet: sheet not found");
+        }
+    } else {
+        luaL_error(L, "selectSheet: expected sheet object, name string, or index number");
+    }
 
     // Update the context
     LuauSandbox* sandbox = getSandbox(L);
@@ -591,55 +617,108 @@ int LuauSandbox::luaSheetSelect(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: sheetSetName(index, options)
-// options.name: string
+// Cells API: getSheet(options)
+// options.index: 0-based sheet index
+// options.name: sheet name string
+// Returns: sheet object or nil if not found
 // ============================================================================
-int LuauSandbox::luaSheetSetName(lua_State* L) {
-    const int index = static_cast<int>(luaL_checknumber(L, 1));
-    luaL_checktype(L, 2, LUA_TTABLE);
-
-    lua_getfield(L, 2, "name");
-    if (lua_isstring(L, -1) == 0) {
-        luaL_error(L, "sheetSetName: options.name required");
-    }
-    const char* name = lua_tostring(L, -1);
-    lua_pop(L, 1);
+int LuauSandbox::luaGetSheet(lua_State* L) {
+    luaL_checktype(L, 1, LUA_TTABLE);
 
     Workbook* workbook = getWorkbook(L);
     if (workbook == nullptr) {
-        luaL_error(L, "sheetSetName: no context set");
+        luaL_error(L, "getSheet: no context set");
     }
 
-    if (index < 0 || static_cast<size_t>(index) >= workbook->sheetCount()) {
-        luaL_error(L, "sheetSetName: index %d out of range", index);
+    // NOLINTBEGIN(misc-const-correctness) - Sheet lookup returns non-const
+    Sheet* sheet = nullptr;
+
+    // Check for index parameter
+    lua_getfield(L, 1, "index");
+    if (lua_isnumber(L, -1) != 0) {
+        const int index = static_cast<int>(lua_tonumber(L, -1));
+        lua_pop(L, 1);
+
+        if (index < 0 || static_cast<size_t>(index) >= workbook->sheetCount()) {
+            lua_pushnil(L);
+            return 1;
+        }
+        sheet = workbook->getSheetByIndex(static_cast<size_t>(index));
+    } else {
+        lua_pop(L, 1);
+
+        // Check for name parameter
+        lua_getfield(L, 1, "name");
+        if (lua_isstring(L, -1) != 0) {
+            const char* name = lua_tostring(L, -1);
+            lua_pop(L, 1);
+
+            sheet = workbook->getSheetByName(name);
+        } else {
+            lua_pop(L, 1);
+            luaL_error(L, "getSheet: requires {index = N} or {name = \"...\"}");
+        }
+    }
+    // NOLINTEND(misc-const-correctness)
+
+    if (sheet == nullptr) {
+        lua_pushnil(L);
+        return 1;
     }
 
-    const Sheet* sheet = workbook->getSheetByIndex(static_cast<size_t>(index));
-    const std::string payload = R"({"name":")" + jsonEscape(name) + R"("})";
-    const Operation op = makeSheetRenameOp(*workbook, sheet->id, payload);
-    applyOperation(*workbook, op);
+    // Get sandbox to push sheet object
+    const LuauSandbox* sandbox = getSandbox(L);
+    if (sandbox == nullptr) {
+        luaL_error(L, "getSheet: sandbox not found");
+    }
 
-    return 0;
+    sandbox->pushSheetObject(L, sheet);
+    return 1;
 }
 
 // ============================================================================
-// Cells API: sheetGetName(index)
-// Returns: string (sheet name)
+// Cells API: addSheet(name?)
+// Creates a new sheet, optionally with a name
+// Returns: sheet object
 // ============================================================================
-int LuauSandbox::luaSheetGetName(lua_State* L) {
-    const int index = static_cast<int>(luaL_checknumber(L, 1));
-
+int LuauSandbox::luaAddSheet(lua_State* L) {
     Workbook* workbook = getWorkbook(L);
     if (workbook == nullptr) {
-        luaL_error(L, "sheetGetName: no context set");
+        luaL_error(L, "addSheet: no context set");
     }
 
-    if (index < 0 || static_cast<size_t>(index) >= workbook->sheetCount()) {
-        luaL_error(L, "sheetGetName: index %d out of range", index);
+    // Get name argument (optional)
+    std::string sheetName;
+    if (lua_isstring(L, 1) != 0) {
+        sheetName = lua_tostring(L, 1);
+    } else {
+        // Generate default name: "Sheet" + (count + 1)
+        sheetName = "Sheet" + std::to_string(workbook->sheetCount() + 1);
     }
 
-    const Sheet* sheet = workbook->getSheetByIndex(static_cast<size_t>(index));
-    lua_pushstring(L, sheet->name.c_str());
+    // Generate a new ID for the sheet
+    const ID sheetId = generate_id();
+
+    // Create the sheet operation payload
+    const std::string payload = R"({"name":")" + jsonEscape(sheetName) + R"("})";
+
+    // Apply the operation
+    const Operation op = makeSheetCreateOp(*workbook, sheetId, payload);
+    applyOperation(*workbook, op);
+
+    // Get the created sheet and return it
+    Sheet* sheet = workbook->getSheet(sheetId);
+    if (sheet == nullptr) {
+        luaL_error(L, "addSheet: failed to create sheet");
+    }
+
+    // Get sandbox to push sheet object
+    const LuauSandbox* sandbox = getSandbox(L);
+    if (sandbox == nullptr) {
+        luaL_error(L, "addSheet: sandbox not found");
+    }
+
+    sandbox->pushSheetObject(L, sheet);
     return 1;
 }
 
@@ -875,6 +954,121 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
 }
 
 // ============================================================================
+// Sheet __index metamethod: handles property access (e.g., sheet.name)
+// ============================================================================
+int LuauSandbox::luaSheetIndex(lua_State* L) {
+    // Stack: [1] = sheet table, [2] = key (string)
+    const char* key = lua_tostring(L, 2);
+    if (key == nullptr) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    // Handle .name property
+    if (strcmp(key, "name") == 0) {
+        // Get the sheet UUID from the table
+        lua_getfield(L, 1, "_uuid");
+        if (lua_isstring(L, -1) == 0) {
+            luaL_error(L, "name: invalid sheet object");
+        }
+        const char* uuidStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        Workbook* workbook = getWorkbook(L);
+        if (workbook == nullptr) {
+            luaL_error(L, "name: no context set");
+        }
+
+        const ID sheetId(uuidStr);
+        const Sheet* sheet = workbook->getSheet(sheetId);
+        if (sheet == nullptr) {
+            luaL_error(L, "name: sheet not found");
+        }
+
+        lua_pushstring(L, sheet->name.c_str());
+        return 1;
+    }
+
+    // For other keys, look up in the table itself
+    lua_rawget(L, 1);
+    return 1;
+}
+
+// ============================================================================
+// Sheet __newindex metamethod: handles property assignment (e.g., sheet.name = "x")
+// ============================================================================
+int LuauSandbox::luaSheetNewIndex(lua_State* L) {
+    // Stack: [1] = sheet table, [2] = key (string), [3] = value
+    const char* key = lua_tostring(L, 2);
+    if (key == nullptr) {
+        luaL_error(L, "invalid property name");
+    }
+
+    // Handle .name = "x" assignment
+    if (strcmp(key, "name") == 0) {
+        if (lua_isstring(L, 3) == 0) {
+            luaL_error(L, "sheet.name must be a string");
+        }
+        const char* newName = lua_tostring(L, 3);
+
+        // Get the sheet UUID from the table
+        lua_getfield(L, 1, "_uuid");
+        if (lua_isstring(L, -1) == 0) {
+            luaL_error(L, "name: invalid sheet object");
+        }
+        const char* uuidStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        Workbook* workbook = getWorkbook(L);
+        if (workbook == nullptr) {
+            luaL_error(L, "name: no context set");
+        }
+
+        const ID sheetId(uuidStr);
+        const Sheet* sheet = workbook->getSheet(sheetId);
+        if (sheet == nullptr) {
+            luaL_error(L, "name: sheet not found");
+        }
+
+        // Apply rename operation
+        const std::string payload = R"({"name":")" + jsonEscape(newName) + R"("})";
+        const Operation op = makeSheetRenameOp(*workbook, sheet->id, payload);
+        applyOperation(*workbook, op);
+
+        return 0;
+    }
+
+    // For other keys, set in the table itself
+    lua_rawset(L, 1);
+    return 0;
+}
+
+// ============================================================================
+// Helper: Create and push a sheet object
+// ============================================================================
+void LuauSandbox::pushSheetObject(lua_State* L, Sheet* sheet) const {
+    if (sheet == nullptr) {
+        lua_pushnil(L);
+        return;
+    }
+
+    const std::string sheetUuid = sheet->id.toString();
+
+    // Create new sheet object table
+    lua_newtable(L);
+
+    // Store UUID for identity tracking (hidden field)
+    lua_pushstring(L, sheetUuid.c_str());
+    lua_setfield(L, -2, "_uuid");
+
+    // Apply Sheet metatable for .name property access
+    if (sheetMetatableRef_ != -1) {
+        lua_rawgeti(L, LUA_REGISTRYINDEX, sheetMetatableRef_);  // Get Sheet metatable
+        lua_setmetatable(L, -2);                                // setmetatable(sheet, Sheet)
+    }
+}
+
+// ============================================================================
 // Cell object method: getRef() - DEPRECATED, use .ref property
 // Kept for backward compatibility during transition
 // Returns the current A1 reference for the cell
@@ -1051,6 +1245,14 @@ void LuauSandbox::registerCellsAPI() {
     lua_setfield(L_, -2, "__index");
     cellMetatableRef_ = lua_ref(L_, -1);  // Store in registry
 
+    // Create Sheet metatable with __index/__newindex for property access (e.g., sheet.name)
+    lua_newtable(L_);  // Sheet metatable
+    lua_pushcfunction(L_, &LuauSandbox::luaSheetIndex, "Sheet.__index");
+    lua_setfield(L_, -2, "__index");
+    lua_pushcfunction(L_, &LuauSandbox::luaSheetNewIndex, "Sheet.__newindex");
+    lua_setfield(L_, -2, "__newindex");
+    sheetMetatableRef_ = lua_ref(L_, -1);  // Store in registry
+
     // Register global API functions
     lua_pushcfunction(L_, &LuauSandbox::luaCellGet, "getCell");
     lua_setglobal(L_, "getCell");
@@ -1070,14 +1272,14 @@ void LuauSandbox::registerCellsAPI() {
     lua_pushcfunction(L_, &LuauSandbox::luaColumnMove, "moveColumn");
     lua_setglobal(L_, "moveColumn");
 
-    lua_pushcfunction(L_, &LuauSandbox::luaSheetSelect, "sheetSelect");
-    lua_setglobal(L_, "sheetSelect");
+    lua_pushcfunction(L_, &LuauSandbox::luaSelectSheet, "selectSheet");
+    lua_setglobal(L_, "selectSheet");
 
-    lua_pushcfunction(L_, &LuauSandbox::luaSheetSetName, "sheetSetName");
-    lua_setglobal(L_, "sheetSetName");
+    lua_pushcfunction(L_, &LuauSandbox::luaGetSheet, "getSheet");
+    lua_setglobal(L_, "getSheet");
 
-    lua_pushcfunction(L_, &LuauSandbox::luaSheetGetName, "sheetGetName");
-    lua_setglobal(L_, "sheetGetName");
+    lua_pushcfunction(L_, &LuauSandbox::luaAddSheet, "addSheet");
+    lua_setglobal(L_, "addSheet");
 
     lua_pushcfunction(L_, &LuauSandbox::luaRangeSelect, "selectRange");
     lua_setglobal(L_, "selectRange");

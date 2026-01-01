@@ -391,16 +391,156 @@ TEST(LuauSandboxTest, CellRefProperty) {
     EXPECT_EQ(result.output, "A1");
 }
 
-TEST(LuauSandboxTest, SheetGetName) {
+TEST(LuauSandboxTest, GetSheetByIndex) {
     auto workbook = createTestWorkbook();
     Sheet* sheet = workbook->getSheetByIndex(0);
 
     LuauSandbox sandbox;
     sandbox.setContext(workbook.get(), sheet);
 
-    auto result = sandbox.execute("return sheetGetName(0)");
-    EXPECT_TRUE(result.success);
+    auto result = sandbox.execute(R"(
+        local s = getSheet({index = 0})
+        return s.name
+    )");
+    EXPECT_TRUE(result.success) << result.error;
     EXPECT_EQ(result.output, "Sheet1");
+}
+
+TEST(LuauSandboxTest, GetSheetByName) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local s = getSheet({name = "Sheet1"})
+        return s.name
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Sheet1");
+}
+
+TEST(LuauSandboxTest, SheetNameProperty) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set sheet name via property
+    auto set = sandbox.execute(R"(
+        local s = getSheet({index = 0})
+        s.name = "RenamedSheet"
+    )");
+    EXPECT_TRUE(set.success) << set.error;
+
+    // Read back the name
+    auto get = sandbox.execute(R"(
+        local s = getSheet({index = 0})
+        return s.name
+    )");
+    EXPECT_TRUE(get.success) << get.error;
+    EXPECT_EQ(get.output, "RenamedSheet");
+}
+
+TEST(LuauSandboxTest, SelectSheetByIndex) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Add another sheet
+    auto add = sandbox.execute("addSheet('SecondSheet')");
+    EXPECT_TRUE(add.success) << add.error;
+
+    // Add data to sheet 0
+    sandbox.execute("setCell('A1', 100)");
+
+    // Select sheet 1 (SecondSheet) and add data
+    sandbox.execute("selectSheet(1)");
+    sandbox.execute("setCell('A1', 200)");
+
+    // Select back to sheet 0 and verify
+    sandbox.execute("selectSheet(0)");
+    auto verify = sandbox.execute("return getCell('A1').value");
+    EXPECT_TRUE(verify.success) << verify.error;
+    EXPECT_EQ(verify.output, "100");
+}
+
+TEST(LuauSandboxTest, SelectSheetByName) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Add another sheet
+    auto add = sandbox.execute("addSheet('MySheet')");
+    EXPECT_TRUE(add.success) << add.error;
+
+    // Switch using name
+    auto sel = sandbox.execute("selectSheet('MySheet')");
+    EXPECT_TRUE(sel.success) << sel.error;
+
+    // Verify we're on MySheet by adding data and checking the sheet
+    sandbox.execute("setCell('A1', 999)");
+
+    // Switch back to Sheet1 and verify A1 is empty
+    sandbox.execute("selectSheet('Sheet1')");
+    auto verify = sandbox.execute("return getCell('A1')");
+    EXPECT_TRUE(verify.success) << verify.error;
+    EXPECT_TRUE(verify.output.empty());  // nil
+}
+
+TEST(LuauSandboxTest, SelectSheetByObject) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local s = getSheet({index = 0})
+        selectSheet(s)
+        return "ok"
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "ok");
+}
+
+TEST(LuauSandboxTest, AddSheetWithName) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local s = addSheet("MyNewSheet")
+        return s.name
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "MyNewSheet");
+
+    // Verify sheet was actually created
+    EXPECT_EQ(workbook->sheetCount(), 2);
+}
+
+TEST(LuauSandboxTest, AddSheetWithDefaultName) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local s = addSheet()
+        return s.name
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Sheet2");  // Default name: Sheet + (count + 1)
 }
 
 TEST(LuauSandboxTest, NoContextError) {
