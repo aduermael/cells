@@ -119,6 +119,47 @@ cc_library(
     deps = [":luau_common"],
 )
 
+# Configuration (required for Analysis)
+cc_library(
+    name = "luau_config",
+    srcs = [
+        "Config/src/Config.cpp",
+        "Config/src/LinterConfig.cpp",
+        "Config/src/LuauConfig.cpp",
+    ],
+    hdrs = glob(["Config/include/Luau/*.h"]),
+    includes = ["Config/include"],
+    copts = ["-std=c++17"],
+    deps = [
+        ":luau_ast",
+        ":luau_compiler",
+        ":luau_vm",
+    ],
+)
+
+# Analysis: type checking, linting, and autocomplete
+cc_library(
+    name = "luau_analysis",
+    srcs = glob([
+        "Analysis/src/*.cpp",
+        "Analysis/src/*.h",
+    ]),
+    hdrs = glob(["Analysis/include/Luau/*.h"]),
+    includes = ["Analysis/include"],
+    copts = [
+        "-std=c++17",
+        # Suppress warnings in upstream Luau code we don't control
+        "-Wno-unused-variable",
+        "-Wno-unused-but-set-variable",
+    ],
+    deps = [
+        ":luau_ast",
+        ":luau_compiler",
+        ":luau_config",
+        ":luau_vm",
+    ],
+)
+
 # Combined target for easy linking: VM + Compiler + AST
 # This provides everything needed to compile and execute Luau scripts
 cc_library(

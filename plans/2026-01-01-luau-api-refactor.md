@@ -119,7 +119,7 @@ Make `setCell('A1', '=B1+1')` parse as formula instead of literal string.
 
 Research and prototype autocomplete support using Luau's Analysis library.
 
-- [ ] 5a: Add Luau Analysis library to `third_party/luau/BUILD.luau`
+- [x] 5a: Add Luau Analysis library to `third_party/luau/BUILD.luau`
 - [ ] 5b: Create `luau_autocomplete.h/cc` wrapper exposing `getCompletions(source, position)`
 - [ ] 5c: Add WASM binding for `getCompletions`
 - [ ] 5d: Add TypeScript types and client method for autocomplete
