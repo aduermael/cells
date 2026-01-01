@@ -54,7 +54,7 @@ Refactor the Luau scripting API for better naming conventions, add missing featu
 
 Rename functions that don't require structural changes.
 
-- [ ] 1a: Rename `cellGet` → `getCell`, `cellSet` → `setCell`
+- [x] 1a: Rename `cellGet` → `getCell`, `cellSet` → `setCell`
 - [ ] 1b: Rename `documentSetTitle` → `setDocumentTitle`
 - [ ] 1c: Rename `columnSetWidth` → `setColumnWidth`, `rowSetHeight` → `setRowHeight`
 - [ ] 1d: Rename `columnMove` → `moveColumn`

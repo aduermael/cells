@@ -277,7 +277,7 @@ TEST(LuauSandboxTest, CellGetReturnsNilForEmptyCell) {
     sandbox.setContext(workbook.get(), sheet);
 
     // B2 doesn't exist
-    auto result = sandbox.execute("return cellGet('B2')");
+    auto result = sandbox.execute("return getCell('B2')");
     EXPECT_TRUE(result.success);
     EXPECT_TRUE(result.output.empty());  // nil has no output
 }
@@ -290,7 +290,7 @@ TEST(LuauSandboxTest, CellGetReturnsExistingCell) {
     sandbox.setContext(workbook.get(), sheet);
 
     // A1 exists with value 42
-    auto result = sandbox.execute("local c = cellGet('A1'); return c.value");
+    auto result = sandbox.execute("local c = getCell('A1'); return c.value");
     EXPECT_TRUE(result.success);
     EXPECT_EQ(result.output, "42");
 }
@@ -304,7 +304,7 @@ TEST(LuauSandboxTest, CellGetWithCreate) {
 
     // D4 doesn't exist, but create=true should create it
     auto result = sandbox.execute(R"(
-        local c = cellGet('D4', {create = true})
+        local c = getCell('D4', {create = true})
         return type(c)
     )");
     EXPECT_TRUE(result.success);
@@ -319,8 +319,8 @@ TEST(LuauSandboxTest, CellSetNumber) {
     sandbox.setContext(workbook.get(), sheet);
 
     auto result = sandbox.execute(R"(
-        cellSet('B2', 100)
-        local c = cellGet('B2')
+        setCell('B2', 100)
+        local c = getCell('B2')
         return c.value
     )");
     EXPECT_TRUE(result.success);
@@ -335,8 +335,8 @@ TEST(LuauSandboxTest, CellSetString) {
     sandbox.setContext(workbook.get(), sheet);
 
     auto result = sandbox.execute(R"(
-        cellSet('B2', 'Hello')
-        local c = cellGet('B2')
+        setCell('B2', 'Hello')
+        local c = getCell('B2')
         return c.value
     )");
     EXPECT_TRUE(result.success);
@@ -351,8 +351,8 @@ TEST(LuauSandboxTest, CellSetBoolean) {
     sandbox.setContext(workbook.get(), sheet);
 
     auto result = sandbox.execute(R"(
-        cellSet('B2', true)
-        local c = cellGet('B2')
+        setCell('B2', true)
+        local c = getCell('B2')
         return c.value
     )");
     EXPECT_TRUE(result.success);
@@ -368,8 +368,8 @@ TEST(LuauSandboxTest, CellObjectIdentity) {
 
     // Getting the same cell twice should return same object
     auto result = sandbox.execute(R"(
-        local a = cellGet('A1')
-        local b = cellGet('A1')
+        local a = getCell('A1')
+        local b = getCell('A1')
         return a == b
     )");
     EXPECT_TRUE(result.success);
@@ -384,7 +384,7 @@ TEST(LuauSandboxTest, CellGetRef) {
     sandbox.setContext(workbook.get(), sheet);
 
     auto result = sandbox.execute(R"(
-        local c = cellGet('A1')
+        local c = getCell('A1')
         return c:getRef()
     )");
     EXPECT_TRUE(result.success);
@@ -407,7 +407,7 @@ TEST(LuauSandboxTest, NoContextError) {
     LuauSandbox sandbox;
     // Don't set context
 
-    auto result = sandbox.execute("cellGet('A1')");
+    auto result = sandbox.execute("getCell('A1')");
     EXPECT_FALSE(result.success);
     EXPECT_TRUE(result.error.find("no context") != std::string::npos);
 }
@@ -419,7 +419,7 @@ TEST(LuauSandboxTest, InvalidReferenceError) {
     LuauSandbox sandbox;
     sandbox.setContext(workbook.get(), sheet);
 
-    auto result = sandbox.execute("cellGet('invalid')");
+    auto result = sandbox.execute("getCell('invalid')");
     EXPECT_FALSE(result.success);
     EXPECT_TRUE(result.error.find("invalid reference") != std::string::npos);
 }
@@ -433,15 +433,15 @@ TEST(LuauSandboxTest, RangeDelete) {
 
     // First set some values
     auto setup = sandbox.execute(R"(
-        cellSet('A1', 1)
-        cellSet('A2', 2)
-        cellSet('B1', 3)
-        cellSet('B2', 4)
+        setCell('A1', 1)
+        setCell('A2', 2)
+        setCell('B1', 3)
+        setCell('B2', 4)
     )");
     EXPECT_TRUE(setup.success);
 
     // Verify values are set
-    auto before = sandbox.execute("return cellGet('A1').value");
+    auto before = sandbox.execute("return getCell('A1').value");
     EXPECT_TRUE(before.success);
     EXPECT_EQ(before.output, "1");
 
@@ -450,7 +450,7 @@ TEST(LuauSandboxTest, RangeDelete) {
     EXPECT_TRUE(del.success);
 
     // Verify cells are cleared
-    auto after = sandbox.execute("return cellGet('A1')");
+    auto after = sandbox.execute("return getCell('A1')");
     EXPECT_TRUE(after.success);
     // Cell should be nil after deletion
     EXPECT_TRUE(after.output.empty());

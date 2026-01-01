@@ -291,7 +291,7 @@ static bool parseA1Range(const char* range, int* fromCol, int* fromRow, int* toC
 }
 
 // ============================================================================
-// Cells API: cellGet(ref, options?)
+// Cells API: getCell(ref, options?)
 // Returns cell object or nil if empty
 // ============================================================================
 int LuauSandbox::luaCellGet(lua_State* L) {
@@ -311,14 +311,14 @@ int LuauSandbox::luaCellGet(lua_State* L) {
     // Get context
     Sheet* sheet = getSheet(L);
     if (sheet == nullptr || getWorkbook(L) == nullptr) {
-        luaL_error(L, "cellGet: no context set");
+        luaL_error(L, "getCell: no context set");
     }
 
     // Parse A1 reference
     int colIdx = 0;
     int rowIdx = 0;
     if (!parseA1Ref(ref, &colIdx, &rowIdx)) {
-        luaL_error(L, "cellGet: invalid reference '%s'", ref);
+        luaL_error(L, "getCell: invalid reference '%s'", ref);
     }
 
     // Get or create the column and row
@@ -358,7 +358,7 @@ int LuauSandbox::luaCellGet(lua_State* L) {
     // Get sandbox to push cell object
     LuauSandbox* sandbox = getSandbox(L);
     if (sandbox == nullptr) {
-        luaL_error(L, "cellGet: sandbox not found");
+        luaL_error(L, "getCell: sandbox not found");
     }
 
     sandbox->pushCellObject(L, cell);
@@ -366,7 +366,7 @@ int LuauSandbox::luaCellGet(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: cellSet(ref, value)
+// Cells API: setCell(ref, value)
 // Sets cell value (creates cell if needed)
 // ============================================================================
 int LuauSandbox::luaCellSet(lua_State* L) {
@@ -377,14 +377,14 @@ int LuauSandbox::luaCellSet(lua_State* L) {
     Sheet* sheet = getSheet(L);
     Workbook* workbook = getWorkbook(L);
     if (sheet == nullptr || workbook == nullptr) {
-        luaL_error(L, "cellSet: no context set");
+        luaL_error(L, "setCell: no context set");
     }
 
     // Parse A1 reference
     int colIdx = 0;
     int rowIdx = 0;
     if (!parseA1Ref(ref, &colIdx, &rowIdx)) {
-        luaL_error(L, "cellSet: invalid reference '%s'", ref);
+        luaL_error(L, "setCell: invalid reference '%s'", ref);
     }
 
     // Get or create the column and row
@@ -419,7 +419,7 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         applyOperation(*workbook, op);
         return 0;
     } else {
-        luaL_error(L, "cellSet: unsupported value type");
+        luaL_error(L, "setCell: unsupported value type");
     }
 
     // Apply the operation via CRDT
@@ -990,11 +990,11 @@ void LuauSandbox::registerCellsAPI() {
     // lua_ref pops the value from stack, so we don't need to pop
 
     // Register global API functions
-    lua_pushcfunction(L_, &LuauSandbox::luaCellGet, "cellGet");
-    lua_setglobal(L_, "cellGet");
+    lua_pushcfunction(L_, &LuauSandbox::luaCellGet, "getCell");
+    lua_setglobal(L_, "getCell");
 
-    lua_pushcfunction(L_, &LuauSandbox::luaCellSet, "cellSet");
-    lua_setglobal(L_, "cellSet");
+    lua_pushcfunction(L_, &LuauSandbox::luaCellSet, "setCell");
+    lua_setglobal(L_, "setCell");
 
     lua_pushcfunction(L_, &LuauSandbox::luaDocumentSetTitle, "documentSetTitle");
     lua_setglobal(L_, "documentSetTitle");
