@@ -54,6 +54,7 @@ export class ScriptPanel {
   private autocompleteItems: AutocompleteSuggestion[] = [];
   private autocompleteSelectedIndex: number = 0;
   private autocompleteVisible: boolean = false;
+  private autocompleteDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   // =========================================================================
   // State
@@ -241,13 +242,6 @@ export class ScriptPanel {
         return;
       }
 
-      // Ctrl+Space to trigger autocomplete
-      if (e.key === " " && e.ctrlKey) {
-        e.preventDefault();
-        this.triggerAutocomplete();
-        return;
-      }
-
       // Cmd/Ctrl + Enter to run
       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -280,16 +274,9 @@ export class ScriptPanel {
       }
     });
 
-    // Trigger autocomplete after typing '.' or ':'
-    this.editor.addEventListener("input", (e) => {
-      const inputEvent = e as InputEvent;
-      if (inputEvent.data === "." || inputEvent.data === ":") {
-        // Small delay to let the character be inserted
-        setTimeout(() => this.triggerAutocomplete(), 10);
-      } else if (this.autocompleteVisible) {
-        // Re-trigger autocomplete as user types to filter suggestions
-        this.triggerAutocomplete();
-      }
+    // Trigger autocomplete as user types (debounced)
+    this.editor.addEventListener("input", () => {
+      this.triggerAutocompleteDebounced();
     });
 
     // Hide autocomplete when editor loses focus
@@ -632,6 +619,23 @@ export class ScriptPanel {
     } catch {
       this.hideAutocomplete();
     }
+  }
+
+  /**
+   * Trigger autocomplete with debouncing (100ms delay)
+   */
+  private triggerAutocompleteDebounced(): void {
+    if (!this.getAutocomplete) return;
+
+    // Cancel any pending request
+    if (this.autocompleteDebounceTimer) {
+      clearTimeout(this.autocompleteDebounceTimer);
+    }
+
+    this.autocompleteDebounceTimer = setTimeout(() => {
+      this.autocompleteDebounceTimer = null;
+      this.triggerAutocomplete();
+    }, 100);
   }
 
   /**
