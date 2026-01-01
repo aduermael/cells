@@ -91,7 +91,7 @@
                 <div id="script-line-numbers">1</div>
                 <div id="script-editor-container">
                     <pre id="script-editor-backdrop"><code id="script-editor-highlight"></code></pre>
-                    <textarea id="script-editor" placeholder="-- Write Luau script here&#10;-- Example: cellSet('A1', 42)" spellcheck="false"></textarea>
+                    <textarea id="script-editor" placeholder="-- set value: cellSet('A1', 100)&#10;-- get value: cellSet('B1', cellGet('A1') * 2)&#10;-- loop: for i = 1, 10 do cellSet('A'..i, i) end&#10;-- fill range: rangeFill({from='A1', to='A1', targetFrom='A2', targetTo='A10'})" spellcheck="false"></textarea>
                 </div>
             </div>
             <div id="script-panel-footer">
