@@ -39,6 +39,7 @@
 #include "core/cells/xlsx_reader.h"
 #include "core/cells/xlsx_writer.h"
 #include "core/cells/luau_sandbox.h"
+#include "core/cells/luau_autocomplete.h"
 #include "Luau/Allocator.h"
 #include "Luau/Ast.h"
 #include "Luau/Lexer.h"
@@ -3509,6 +3510,33 @@ public:
         return json.str();
     }
 
+    // Get autocomplete suggestions for a Luau script at a given position
+    // Returns JSON: {"context":"statement","suggestions":[{"label":"getCell","kind":"variable","detail":"..."},...]}}
+    std::string getAutocomplete(const std::string& source, unsigned line, unsigned column) {
+        auto result = _luauAutocomplete.getCompletions(source, line, column);
+
+        std::ostringstream json;
+        json << "{\"context\":\"" << jsonEscape(result.context) << "\",";
+        json << "\"suggestions\":[";
+
+        bool first = true;
+        for (const auto& suggestion : result.suggestions) {
+            if (!first) {
+                json << ",";
+            }
+            first = false;
+
+            json << "{\"label\":\"" << jsonEscape(suggestion.label) << "\",";
+            json << "\"insertText\":\"" << jsonEscape(suggestion.insertText) << "\",";
+            json << "\"kind\":\"" << jsonEscape(suggestion.kind) << "\",";
+            json << "\"detail\":\"" << jsonEscape(suggestion.detail) << "\",";
+            json << "\"deprecated\":" << (suggestion.deprecated ? "true" : "false") << "}";
+        }
+
+        json << "]}";
+        return json.str();
+    }
+
 private:
     void rebuildViewportIndex() {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
@@ -3628,6 +3656,7 @@ private:
     std::unique_ptr<SyncManager> _syncManager;  // CRDT sync manager (for JS-based sync)
     std::unique_ptr<cells::net::SyncClient> _syncClient;  // C++ sync client (for WebRTC P2P)
     LuauSandbox _luauSandbox;  // Sandboxed Luau scripting engine
+    LuauAutocomplete _luauAutocomplete;  // Luau autocomplete engine
 };
 
 }  // namespace cells::wasm
@@ -3759,7 +3788,8 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("debugParseFormula", &cells::wasm::CellsEngine::debugParseFormula)
         // Scripting (Luau)
         .function("executeScript", &cells::wasm::CellsEngine::executeScript)
-        .function("tokenizeLuau", &cells::wasm::CellsEngine::tokenizeLuau);
+        .function("tokenizeLuau", &cells::wasm::CellsEngine::tokenizeLuau)
+        .function("getAutocomplete", &cells::wasm::CellsEngine::getAutocomplete);
 
     // Logger bindings - control logging from JavaScript
     enum_<cells::log::Level>("LogLevel")

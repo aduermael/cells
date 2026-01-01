@@ -121,7 +121,7 @@ Research and prototype autocomplete support using Luau's Analysis library.
 
 - [x] 5a: Add Luau Analysis library to `third_party/luau/BUILD.luau`
 - [x] 5b: Create `luau_autocomplete.h/cc` wrapper exposing `getCompletions(source, position)`
-- [ ] 5c: Add WASM binding for `getCompletions`
+- [x] 5c: Add WASM binding for `getCompletions`
 - [ ] 5d: Add TypeScript types and client method for autocomplete
 - [ ] 5e: Basic integration in script editor (show popup on Ctrl+Space or after `.`)
 

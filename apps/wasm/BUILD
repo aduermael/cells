@@ -53,6 +53,7 @@ cc_binary(
         "//core/cells:formula_resolver",
         "//core/cells:hlc",
         "//core/cells:id",
+        "//core/cells:luau_autocomplete",
         "//core/cells:luau_sandbox",
         "//core/cells:model",
         "//core/cells:operation",
