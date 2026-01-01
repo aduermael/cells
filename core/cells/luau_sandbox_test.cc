@@ -596,5 +596,144 @@ TEST(LuauSandboxTest, RangeDelete) {
     EXPECT_TRUE(after.output.empty());
 }
 
+// ============================================================================
+// Formula Detection Tests
+// ============================================================================
+
+TEST(LuauSandboxTest, SetCellFormulaSimple) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set B1 to a number
+    auto setup = sandbox.execute("setCell('B1', 100)");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // Set A1 to a formula referencing B1
+    auto setFormula = sandbox.execute("setCell('A1', '=B1')");
+    EXPECT_TRUE(setFormula.success) << setFormula.error;
+
+    // Verify the cell has a formula
+    auto checkFormula = sandbox.execute(R"(
+        local c = getCell('A1')
+        return c.formula
+    )");
+    EXPECT_TRUE(checkFormula.success) << checkFormula.error;
+    EXPECT_EQ(checkFormula.output, "=B1");
+}
+
+TEST(LuauSandboxTest, SetCellFormulaWithArithmetic) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set source cells
+    auto setup = sandbox.execute(R"(
+        setCell('B1', 10)
+        setCell('C1', 20)
+    )");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // Set A1 to formula =B1+C1
+    auto setFormula = sandbox.execute("setCell('A1', '=B1+C1')");
+    EXPECT_TRUE(setFormula.success) << setFormula.error;
+
+    // Verify the formula text
+    auto checkFormula = sandbox.execute("return getCell('A1').formula");
+    EXPECT_TRUE(checkFormula.success) << checkFormula.error;
+    EXPECT_EQ(checkFormula.output, "=B1+C1");
+}
+
+TEST(LuauSandboxTest, SetCellLiteralStringNotFormula) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set A1 to a literal string that doesn't start with =
+    auto setString = sandbox.execute("setCell('A1', 'hello world')");
+    EXPECT_TRUE(setString.success) << setString.error;
+
+    // Verify it's NOT a formula
+    auto checkFormula = sandbox.execute(R"(
+        local c = getCell('A1')
+        if c.formula then return 'has formula' else return 'no formula' end
+    )");
+    EXPECT_TRUE(checkFormula.success) << checkFormula.error;
+    EXPECT_EQ(checkFormula.output, "no formula");
+
+    // Verify the value is the string
+    auto checkValue = sandbox.execute("return getCell('A1').value");
+    EXPECT_TRUE(checkValue.success) << checkValue.error;
+    EXPECT_EQ(checkValue.output, "hello world");
+}
+
+TEST(LuauSandboxTest, SetCellEmptyString) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set A1 to an empty string (shouldn't be treated as formula)
+    auto setString = sandbox.execute("setCell('A1', '')");
+    EXPECT_TRUE(setString.success) << setString.error;
+
+    // Verify it's not a formula
+    auto checkFormula = sandbox.execute(R"(
+        local c = getCell('A1')
+        if c.formula then return 'has formula' else return 'no formula' end
+    )");
+    EXPECT_TRUE(checkFormula.success) << checkFormula.error;
+    EXPECT_EQ(checkFormula.output, "no formula");
+}
+
+TEST(LuauSandboxTest, SetCellFormulaWithAbsoluteRef) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set source cell
+    auto setup = sandbox.execute("setCell('B1', 50)");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // Set A1 to formula with absolute reference
+    auto setFormula = sandbox.execute("setCell('A1', '=$B$1')");
+    EXPECT_TRUE(setFormula.success) << setFormula.error;
+
+    // Verify the formula text includes $ signs
+    auto checkFormula = sandbox.execute("return getCell('A1').formula");
+    EXPECT_TRUE(checkFormula.success) << checkFormula.error;
+    EXPECT_EQ(checkFormula.output, "=$B$1");
+}
+
+TEST(LuauSandboxTest, SetCellFormulaJustEquals) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set A1 to just "=" (edge case - still treated as formula)
+    auto setFormula = sandbox.execute("setCell('A1', '=')");
+    EXPECT_TRUE(setFormula.success) << setFormula.error;
+
+    // The formula should still be set (even if empty/invalid)
+    auto checkFormula = sandbox.execute(R"(
+        local c = getCell('A1')
+        if c.formula then return 'has formula' else return 'no formula' end
+    )");
+    EXPECT_TRUE(checkFormula.success) << checkFormula.error;
+    // Even "=" is treated as a formula (will be empty formula)
+    EXPECT_EQ(checkFormula.output, "has formula");
+}
+
 }  // namespace
 }  // namespace cells

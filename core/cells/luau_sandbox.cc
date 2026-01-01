@@ -407,8 +407,19 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                   R"(","row":")" + rowIdStr + R"("})";
     } else if (lua_isstring(L, 2) != 0) {
         const char* str = lua_tostring(L, 2);
-        payload = R"({"type":"s","value":")" + jsonEscape(str) + R"(","col":")" + colIdStr +
-                  R"(","row":")" + rowIdStr + R"("})";
+        if (str[0] == '=') {
+            // Parse as formula - convert A1 refs to UUID format
+            RefConverter conv;
+            conv.setContext(*sheet);
+            const std::string uuidFormula = conv.formulaToUuid(str);
+            // Formula payload uses col_id/row_id instead of col/row
+            payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) + R"(","col_id":")" +
+                      colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+        } else {
+            // Literal string
+            payload = R"({"type":"s","value":")" + jsonEscape(str) + R"(","col":")" + colIdStr +
+                      R"(","row":")" + rowIdStr + R"("})";
+        }
     } else if (lua_isboolean(L, 2) != 0) {
         const bool val = lua_toboolean(L, 2) != 0;
         payload = R"({"type":"b","value":")" + std::string(val ? "true" : "false") +

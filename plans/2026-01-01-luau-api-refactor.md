@@ -1,6 +1,6 @@
-Status: READY
+Status: IN_PROGRESS
 Created At: 2026-01-01 21:04 UTC
-Updated At: 2026-01-01 21:04 UTC
+Updated At: 2026-01-01 21:32 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -104,10 +104,10 @@ Replace `sheetSelect`, `sheetSetName`, `sheetGetName` with sheet object API.
 
 Make `setCell('A1', '=B1+1')` parse as formula instead of literal string.
 
-- [ ] 4a: In `luaCellSet`, detect strings starting with `=` and parse as formula
-- [ ] 4b: Use existing formula parsing infrastructure (RefConverter, FormulaParser)
-- [ ] 4c: Generate `makeCellSetFormulaOp` for formula strings, `makeCellSetValueOp` for literals
-- [ ] 4d: Add unit tests for formula detection (`setCell("A1", "=B1")` vs `setCell("A1", "hello")`)
+- [x] 4a: In `luaCellSet`, detect strings starting with `=` and parse as formula
+- [x] 4b: Use existing formula parsing infrastructure (RefConverter, FormulaParser)
+- [x] 4c: Generate formula payload for formula strings, `makeCellSetValueOp` for literals
+- [x] 4d: Add unit tests for formula detection (`setCell("A1", "=B1")` vs `setCell("A1", "hello")`)
 
 **Files:**
 - `core/cells/luau_sandbox.cc` - Modify `luaCellSet` to detect and handle formulas
