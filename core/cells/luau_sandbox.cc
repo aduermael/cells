@@ -525,7 +525,7 @@ int LuauSandbox::luaRowSetHeight(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: columnMove(col, options)
+// Cells API: moveColumn(col, options)
 // options.to: number (target position, 0-based)
 // ============================================================================
 int LuauSandbox::luaColumnMove(lua_State* L) {
@@ -534,7 +534,7 @@ int LuauSandbox::luaColumnMove(lua_State* L) {
 
     lua_getfield(L, 2, "to");
     if (lua_isnumber(L, -1) == 0) {
-        luaL_error(L, "columnMove: options.to required");
+        luaL_error(L, "moveColumn: options.to required");
     }
     const int toPos = static_cast<int>(lua_tonumber(L, -1));
     lua_pop(L, 1);
@@ -542,18 +542,18 @@ int LuauSandbox::luaColumnMove(lua_State* L) {
     Sheet* sheet = getSheet(L);
     Workbook* workbook = getWorkbook(L);
     if (sheet == nullptr || workbook == nullptr) {
-        luaL_error(L, "columnMove: no context set");
+        luaL_error(L, "moveColumn: no context set");
     }
 
     // Parse column reference
     const int colIdx = parseColumnLetter(colRef, nullptr);
     if (colIdx < 0) {
-        luaL_error(L, "columnMove: invalid column '%s'", colRef);
+        luaL_error(L, "moveColumn: invalid column '%s'", colRef);
     }
 
     const Axis* col = sheet->getColumnByPosition(static_cast<uint32_t>(colIdx));
     if (col == nullptr) {
-        luaL_error(L, "columnMove: column '%s' not found", colRef);
+        luaL_error(L, "moveColumn: column '%s' not found", colRef);
     }
 
     const std::string payload = R"({"position":)" + std::to_string(toPos) + "}";
@@ -1005,8 +1005,8 @@ void LuauSandbox::registerCellsAPI() {
     lua_pushcfunction(L_, &LuauSandbox::luaRowSetHeight, "setRowHeight");
     lua_setglobal(L_, "setRowHeight");
 
-    lua_pushcfunction(L_, &LuauSandbox::luaColumnMove, "columnMove");
-    lua_setglobal(L_, "columnMove");
+    lua_pushcfunction(L_, &LuauSandbox::luaColumnMove, "moveColumn");
+    lua_setglobal(L_, "moveColumn");
 
     lua_pushcfunction(L_, &LuauSandbox::luaSheetSelect, "sheetSelect");
     lua_setglobal(L_, "sheetSelect");
