@@ -255,6 +255,41 @@ static bool parseA1Ref(const char* ref, int* colIdx, int* rowIdx) {
     return true;
 }
 
+// Helper: Parse an A1 range string like "A1:B2" or "A1" (single cell)
+// Returns true if valid, sets fromCol, fromRow, toCol, toRow (all 0-based)
+static bool parseA1Range(const char* range, int* fromCol, int* fromRow, int* toCol, int* toRow) {
+    if (range == nullptr || range[0] == '\0') {
+        return false;
+    }
+
+    // Find the colon separator
+    const char* colon = strchr(range, ':');
+
+    if (colon == nullptr) {
+        // Single cell reference (e.g., "A1")
+        if (!parseA1Ref(range, fromCol, fromRow)) {
+            return false;
+        }
+        *toCol = *fromCol;
+        *toRow = *fromRow;
+        return true;
+    }
+
+    // Range reference (e.g., "A1:B2")
+    // Parse the first part
+    std::string firstPart(range, colon - range);
+    if (!parseA1Ref(firstPart.c_str(), fromCol, fromRow)) {
+        return false;
+    }
+
+    // Parse the second part (after the colon)
+    if (!parseA1Ref(colon + 1, toCol, toRow)) {
+        return false;
+    }
+
+    return true;
+}
+
 // ============================================================================
 // Cells API: cellGet(ref, options?)
 // Returns cell object or nil if empty
@@ -707,43 +742,27 @@ int LuauSandbox::luaRangeDelete(lua_State* L) {
 
 // ============================================================================
 // Cells API: rangeFill(options)
-// options.from: string (start cell ref of source range)
-// options.to: string (end cell ref of source range)
-// options.targetFrom: string (start cell ref of target range)
-// options.targetTo: string (end cell ref of target range)
+// options.from: string (source range, e.g., "A1:A2" or "A1" for single cell)
+// options.to: string (full target range including source, e.g., "A1:A10")
 // Returns: {success: boolean, cellsFilled: number, error?: string}
 // ============================================================================
 int LuauSandbox::luaRangeFill(lua_State* L) {
     luaL_checktype(L, 1, LUA_TTABLE);
 
-    // Get source range (from, to)
+    // Get source range (from)
     lua_getfield(L, 1, "from");
     if (lua_isstring(L, -1) == 0) {
         luaL_error(L, "rangeFill: options.from required");
     }
-    const char* fromRef = lua_tostring(L, -1);
+    const char* fromRange = lua_tostring(L, -1);
     lua_pop(L, 1);
 
+    // Get target range (to)
     lua_getfield(L, 1, "to");
     if (lua_isstring(L, -1) == 0) {
         luaL_error(L, "rangeFill: options.to required");
     }
-    const char* toRef = lua_tostring(L, -1);
-    lua_pop(L, 1);
-
-    // Get target range (targetFrom, targetTo)
-    lua_getfield(L, 1, "targetFrom");
-    if (lua_isstring(L, -1) == 0) {
-        luaL_error(L, "rangeFill: options.targetFrom required");
-    }
-    const char* targetFromRef = lua_tostring(L, -1);
-    lua_pop(L, 1);
-
-    lua_getfield(L, 1, "targetTo");
-    if (lua_isstring(L, -1) == 0) {
-        luaL_error(L, "rangeFill: options.targetTo required");
-    }
-    const char* targetToRef = lua_tostring(L, -1);
+    const char* toRange = lua_tostring(L, -1);
     lua_pop(L, 1);
 
     Sheet* sheet = getSheet(L);
@@ -752,23 +771,22 @@ int LuauSandbox::luaRangeFill(lua_State* L) {
         luaL_error(L, "rangeFill: no context set");
     }
 
-    // Parse source range references
+    // Parse source range (e.g., "A1:A2" or "A1")
     int fromCol = 0;
     int fromRow = 0;
     int toCol = 0;
     int toRow = 0;
-    if (!parseA1Ref(fromRef, &fromCol, &fromRow) || !parseA1Ref(toRef, &toCol, &toRow)) {
-        luaL_error(L, "rangeFill: invalid source range");
+    if (!parseA1Range(fromRange, &fromCol, &fromRow, &toCol, &toRow)) {
+        luaL_error(L, "rangeFill: invalid source range '%s'", fromRange);
     }
 
-    // Parse target range references
+    // Parse target range (e.g., "A1:A10")
     int targetFromCol = 0;
     int targetFromRow = 0;
     int targetToCol = 0;
     int targetToRow = 0;
-    if (!parseA1Ref(targetFromRef, &targetFromCol, &targetFromRow) ||
-        !parseA1Ref(targetToRef, &targetToCol, &targetToRow)) {
-        luaL_error(L, "rangeFill: invalid target range");
+    if (!parseA1Range(toRange, &targetFromCol, &targetFromRow, &targetToCol, &targetToRow)) {
+        luaL_error(L, "rangeFill: invalid target range '%s'", toRange);
     }
 
     // Normalize ranges (ensure from <= to)
