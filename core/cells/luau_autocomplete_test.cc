@@ -1,8 +1,7 @@
 #include "luau_autocomplete.h"
 
-#include <gtest/gtest.h>
-
 #include <algorithm>
+#include <gtest/gtest.h>
 
 namespace cells {
 namespace {
@@ -21,16 +20,16 @@ TEST_F(LuauAutocompleteTest, EmptySource_ReturnsGlobalSuggestions) {
 
     // Luau built-in globals should be present (table, math, etc.)
     auto hasTable = std::any_of(result.suggestions.begin(), result.suggestions.end(),
-                                 [](const auto& s) { return s.label == "table"; });
+                                [](const auto& s) { return s.label == "table"; });
     EXPECT_TRUE(hasTable) << "Expected 'table' in suggestions";
 
     // Should suggest our Cells API functions
     auto hasGetCell = std::any_of(result.suggestions.begin(), result.suggestions.end(),
-                                   [](const auto& s) { return s.label == "getCell"; });
+                                  [](const auto& s) { return s.label == "getCell"; });
     EXPECT_TRUE(hasGetCell) << "Expected 'getCell' in suggestions";
 
     auto hasSetCell = std::any_of(result.suggestions.begin(), result.suggestions.end(),
-                                   [](const auto& s) { return s.label == "setCell"; });
+                                  [](const auto& s) { return s.label == "setCell"; });
     EXPECT_TRUE(hasSetCell) << "Expected 'setCell' in suggestions";
 }
 
@@ -39,9 +38,9 @@ TEST_F(LuauAutocompleteTest, PartialFunction_FiltersSuggestions) {
     auto result = autocomplete.getCompletions("get", 0, 3);
 
     auto hasGetCell = std::any_of(result.suggestions.begin(), result.suggestions.end(),
-                                   [](const auto& s) { return s.label == "getCell"; });
+                                  [](const auto& s) { return s.label == "getCell"; });
     auto hasGetSheet = std::any_of(result.suggestions.begin(), result.suggestions.end(),
-                                    [](const auto& s) { return s.label == "getSheet"; });
+                                   [](const auto& s) { return s.label == "getSheet"; });
 
     EXPECT_TRUE(hasGetCell || hasGetSheet) << "Expected 'getCell' or 'getSheet' in suggestions";
 }
@@ -66,11 +65,11 @@ end
 
     // Should suggest cell properties: value, formula, ref
     auto hasValue = std::any_of(result.suggestions.begin(), result.suggestions.end(),
-                                 [](const auto& s) { return s.label == "value"; });
+                                [](const auto& s) { return s.label == "value"; });
     auto hasFormula = std::any_of(result.suggestions.begin(), result.suggestions.end(),
-                                   [](const auto& s) { return s.label == "formula"; });
+                                  [](const auto& s) { return s.label == "formula"; });
     auto hasRef = std::any_of(result.suggestions.begin(), result.suggestions.end(),
-                               [](const auto& s) { return s.label == "ref"; });
+                              [](const auto& s) { return s.label == "ref"; });
 
     // At least one should be present if type inference is working
     bool hasAnyProperty = hasValue || hasFormula || hasRef;
@@ -92,7 +91,7 @@ end
     auto result = autocomplete.getCompletions(source, 3, 10);
 
     auto hasName = std::any_of(result.suggestions.begin(), result.suggestions.end(),
-                                [](const auto& s) { return s.label == "name"; });
+                               [](const auto& s) { return s.label == "name"; });
 
     // Sheet should have a 'name' property
     if (!hasName && !result.suggestions.empty()) {
@@ -106,13 +105,13 @@ TEST_F(LuauAutocompleteTest, AllCellsApiFunctions_AreSuggested) {
     auto result = autocomplete.getCompletions(" ", 0, 1);
 
     std::vector<std::string> expectedFunctions = {
-        "getCell", "setCell", "setDocumentTitle", "setColumnWidth", "setRowHeight",
-        "moveColumn", "selectSheet", "getSheet", "addSheet", "selectRange",
-        "deleteRange", "fillRange"};
+        "getCell",      "setCell",     "setDocumentTitle", "setColumnWidth",
+        "setRowHeight", "moveColumn",  "selectSheet",      "getSheet",
+        "addSheet",     "selectRange", "deleteRange",      "fillRange"};
 
     for (const auto& funcName : expectedFunctions) {
         auto found = std::any_of(result.suggestions.begin(), result.suggestions.end(),
-                                  [&](const auto& s) { return s.label == funcName; });
+                                 [&](const auto& s) { return s.label == funcName; });
         EXPECT_TRUE(found) << "Expected '" << funcName << "' in global suggestions";
     }
 }
@@ -123,11 +122,12 @@ TEST_F(LuauAutocompleteTest, Keywords_AreSuggested) {
     // Should suggest Lua keywords that are valid at statement level
     // Note: "then" and "end" are not standalone keywords - they're only valid
     // in specific contexts (after "if" or at the end of blocks)
-    std::vector<std::string> expectedKeywords = {"local", "function", "if", "for", "while", "return"};
+    std::vector<std::string> expectedKeywords = {"local", "function", "if",
+                                                 "for",   "while",    "return"};
 
     for (const auto& keyword : expectedKeywords) {
         auto found = std::any_of(result.suggestions.begin(), result.suggestions.end(),
-                                  [&](const auto& s) { return s.label == keyword; });
+                                 [&](const auto& s) { return s.label == keyword; });
         EXPECT_TRUE(found) << "Expected keyword '" << keyword << "' in suggestions";
     }
 }

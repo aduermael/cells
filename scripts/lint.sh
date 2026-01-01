@@ -43,12 +43,12 @@ if [ -n "$BAZEL_OUTPUT_BASE" ]; then
     if [ -n "$PUGIXML_DIR" ]; then
         PUGIXML_INCLUDE="-I$PUGIXML_DIR"
     fi
-    # Find Luau headers (VM, Compiler, Ast)
+    # Find Luau headers (VM, Compiler, Ast, Analysis, Config)
     # First find the VM/include directory, then go up two levels to get the luau root
     LUAU_VM_INC=$(find "$BAZEL_OUTPUT_BASE/external" -path "*luau*/VM/include" -type d 2>/dev/null | head -1 || echo "")
     if [ -n "$LUAU_VM_INC" ]; then
         LUAU_DIR=$(dirname "$(dirname "$LUAU_VM_INC")")
-        LUAU_INCLUDE="-I$LUAU_DIR/VM/include -I$LUAU_DIR/Compiler/include -I$LUAU_DIR/Ast/include -I$LUAU_DIR/Common/include"
+        LUAU_INCLUDE="-I$LUAU_DIR/VM/include -I$LUAU_DIR/Compiler/include -I$LUAU_DIR/Ast/include -I$LUAU_DIR/Common/include -I$LUAU_DIR/Analysis/include -I$LUAU_DIR/Config/include"
     fi
 fi
 

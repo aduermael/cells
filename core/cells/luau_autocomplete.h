@@ -9,11 +9,11 @@ namespace cells {
 
 // A single autocomplete suggestion
 struct AutocompleteSuggestion {
-    std::string label;        // Display text
-    std::string insertText;   // Text to insert (may differ from label)
-    std::string kind;         // "function", "property", "keyword", "variable", etc.
-    std::string detail;       // Additional info (e.g., type signature)
-    bool deprecated{false};   // Whether this suggestion is deprecated
+    std::string label;       // Display text
+    std::string insertText;  // Text to insert (may differ from label)
+    std::string kind;        // "function", "property", "keyword", "variable", etc.
+    std::string detail;      // Additional info (e.g., type signature)
+    bool deprecated{false};  // Whether this suggestion is deprecated
 };
 
 // Result of autocomplete request
@@ -47,8 +47,7 @@ public:
     // Get autocomplete suggestions at the given position
     // line: 0-indexed line number
     // column: 0-indexed column number
-    [[nodiscard]] AutocompleteResult getCompletions(const std::string& source,
-                                                    unsigned line,
+    [[nodiscard]] AutocompleteResult getCompletions(const std::string& source, unsigned line,
                                                     unsigned column);
 
 private:

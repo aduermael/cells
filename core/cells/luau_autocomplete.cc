@@ -6,7 +6,6 @@
 #include <Luau/FileResolver.h>
 #include <Luau/Frontend.h>
 #include <Luau/ToString.h>
-
 #include <optional>
 #include <unordered_map>
 
@@ -115,25 +114,22 @@ public:
         frontend_ = std::make_unique<Luau::Frontend>(&fileResolver_, &configResolver_, options);
 
         // Register built-in types for both type checking and autocomplete
-        Luau::registerBuiltinGlobals(*frontend_, frontend_->globals, /* typeCheckForAutocomplete= */ false);
-        Luau::registerBuiltinGlobals(*frontend_, frontend_->globalsForAutocomplete, /* typeCheckForAutocomplete= */ true);
+        Luau::registerBuiltinGlobals(*frontend_, frontend_->globals,
+                                     /* typeCheckForAutocomplete= */ false);
+        Luau::registerBuiltinGlobals(*frontend_, frontend_->globalsForAutocomplete,
+                                     /* typeCheckForAutocomplete= */ true);
 
         // Load our custom Cells API type definitions into both globals
-        frontend_->loadDefinitionFile(
-            frontend_->globals,
-            frontend_->globals.globalScope,
-            kCellsApiTypes,
-            "@cells",
-            /* captureComments= */ false,
-            /* typeCheckForAutocomplete= */ false);
+        frontend_->loadDefinitionFile(frontend_->globals, frontend_->globals.globalScope,
+                                      kCellsApiTypes, "@cells",
+                                      /* captureComments= */ false,
+                                      /* typeCheckForAutocomplete= */ false);
 
-        frontend_->loadDefinitionFile(
-            frontend_->globalsForAutocomplete,
-            frontend_->globalsForAutocomplete.globalScope,
-            kCellsApiTypes,
-            "@cells",
-            /* captureComments= */ false,
-            /* typeCheckForAutocomplete= */ true);
+        frontend_->loadDefinitionFile(frontend_->globalsForAutocomplete,
+                                      frontend_->globalsForAutocomplete.globalScope, kCellsApiTypes,
+                                      "@cells",
+                                      /* captureComments= */ false,
+                                      /* typeCheckForAutocomplete= */ true);
 
         // Freeze the global types so they can't be modified
         Luau::freeze(frontend_->globals.globalTypes);
@@ -155,7 +151,7 @@ public:
         frontend_->check(kMainModule, checkOpts);
 
         // Get autocomplete suggestions
-        Luau::Position pos{line, column};
+        const Luau::Position pos{line, column};
         auto ac = Luau::autocomplete(*frontend_, kMainModule, pos, nullCallback);
 
         // Convert context
@@ -225,9 +221,8 @@ public:
 
 private:
     static std::optional<Luau::AutocompleteEntryMap> nullCallback(
-        std::string /*tag*/,
-        std::optional<const Luau::ExternType*> /*externType*/,
-        std::optional<std::string> /*contents*/) {
+        const std::string& /*tag*/, std::optional<const Luau::ExternType*> /*externType*/,
+        const std::optional<std::string>& /*contents*/) {
         return std::nullopt;
     }
 
@@ -246,8 +241,7 @@ LuauAutocomplete::LuauAutocomplete(LuauAutocomplete&& other) noexcept = default;
 
 LuauAutocomplete& LuauAutocomplete::operator=(LuauAutocomplete&& other) noexcept = default;
 
-AutocompleteResult LuauAutocomplete::getCompletions(const std::string& source,
-                                                    unsigned line,
+AutocompleteResult LuauAutocomplete::getCompletions(const std::string& source, unsigned line,
                                                     unsigned column) {
     return impl_->getCompletions(source, line, column);
 }
