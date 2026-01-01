@@ -138,6 +138,12 @@ export function initApp(): AppContext {
       }
       return app.dataSource.tokenizeLuau(source);
     },
+    getAutocomplete: async (source: string, line: number, column: number) => {
+      if (!app.dataSource) {
+        return { context: "unknown" as const, suggestions: [] };
+      }
+      return app.dataSource.getAutocomplete(source, line, column);
+    },
   });
 
   // =========================================================================

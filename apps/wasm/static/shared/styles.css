@@ -2022,3 +2022,77 @@ canvas {
 .modal.modal-warning .btn:focus {
     box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
 }
+
+/* ============================================================================
+   Autocomplete Popup (script editor)
+   ============================================================================ */
+
+.autocomplete-popup {
+    position: absolute;
+    min-width: 200px;
+    max-width: 400px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 16px var(--color-shadow);
+    z-index: 1000;
+    padding: var(--spacing-xs);
+}
+
+.autocomplete-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    border-radius: var(--border-radius-smaller);
+    transition: background 0.1s ease;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.selected {
+    background: var(--color-bg-secondary);
+}
+
+.autocomplete-item.selected {
+    background: var(--color-bg-hover);
+}
+
+.autocomplete-icon {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+.autocomplete-label {
+    flex: 1;
+    font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.autocomplete-label.deprecated {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+.autocomplete-detail {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    margin-left: auto;
+    padding-left: var(--spacing-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
