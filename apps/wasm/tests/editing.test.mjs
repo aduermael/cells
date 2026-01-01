@@ -11,6 +11,7 @@ import {
   getCurrentCellRef,
   assertEqual,
   sleep,
+  selectRange,
 } from './helpers.mjs';
 
 const tests = {
@@ -185,6 +186,77 @@ const tests = {
     await sleep(200);
     val = await getFormulaBarContent(ctx.page);
     assertEqual(val, '', 'Another unvisited cell should be empty');
+  },
+
+  'Can delete range of cells with Backspace': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Create a 2x2 range of cells with values
+    await setCellValue(ctx.page, 'B2', 'one');
+    await setCellValue(ctx.page, 'B3', 'two');
+    await setCellValue(ctx.page, 'C2', 'three');
+    await setCellValue(ctx.page, 'C3', 'four');
+    await sleep(200);
+
+    // Verify all values are set
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    assertEqual(await getFormulaBarContent(ctx.page), 'one', 'B2 should have value before delete');
+
+    // Select the range B2:C3
+    await selectRange(ctx.page, 'B2', 'C3');
+    await sleep(200);
+
+    // Press Backspace to delete all cells in range
+    await ctx.page.keyboard.press('Backspace');
+    await sleep(300);
+
+    // Verify all cells are now empty
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    assertEqual(await getFormulaBarContent(ctx.page), '', 'B2 should be empty after Backspace');
+
+    await clickCell(ctx.page, 'B3');
+    await sleep(100);
+    assertEqual(await getFormulaBarContent(ctx.page), '', 'B3 should be empty after Backspace');
+
+    await clickCell(ctx.page, 'C2');
+    await sleep(100);
+    assertEqual(await getFormulaBarContent(ctx.page), '', 'C2 should be empty after Backspace');
+
+    await clickCell(ctx.page, 'C3');
+    await sleep(100);
+    assertEqual(await getFormulaBarContent(ctx.page), '', 'C3 should be empty after Backspace');
+  },
+
+  'Can delete range of cells with Delete key': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Create a 2x2 range of cells with values
+    await setCellValue(ctx.page, 'D2', 'alpha');
+    await setCellValue(ctx.page, 'D3', 'beta');
+    await setCellValue(ctx.page, 'E2', 'gamma');
+    await setCellValue(ctx.page, 'E3', 'delta');
+    await sleep(200);
+
+    // Select the range D2:E3
+    await selectRange(ctx.page, 'D2', 'E3');
+    await sleep(200);
+
+    // Press Delete to delete all cells in range
+    await ctx.page.keyboard.press('Delete');
+    await sleep(300);
+
+    // Verify all cells are now empty
+    await clickCell(ctx.page, 'D2');
+    await sleep(100);
+    assertEqual(await getFormulaBarContent(ctx.page), '', 'D2 should be empty after Delete');
+
+    await clickCell(ctx.page, 'E3');
+    await sleep(100);
+    assertEqual(await getFormulaBarContent(ctx.page), '', 'E3 should be empty after Delete');
   },
 };
 

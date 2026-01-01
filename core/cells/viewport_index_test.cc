@@ -464,6 +464,29 @@ TEST_F(ViewportIndexTest, OnCellRemoved) {
     verifyIndex(index);
 }
 
+TEST_F(ViewportIndexTest, OnCellRemovedByIds) {
+    addColumns(3, 100);
+    addRows(3, 50);
+    Cell* cell = addCell(1, 1, "B2");
+
+    // Save IDs before removal
+    const ID colId = cell->colId;
+    const ID rowId = cell->rowId;
+
+    ViewportIndex index;
+    index.build(*sheet_);
+    EXPECT_EQ(index.cellCount(), 1u);
+
+    // Use ID-based removal (simulates deletion after cell freed)
+    index.onCellRemoved(colId, rowId);
+
+    EXPECT_EQ(index.cellCount(), 0u);
+
+    auto results = index.queryViewport(0, 0, 300, 150);
+    EXPECT_TRUE(results.empty());
+    verifyIndex(index);
+}
+
 TEST_F(ViewportIndexTest, OnCellChanged) {
     addColumns(3, 100);
     addRows(3, 50);

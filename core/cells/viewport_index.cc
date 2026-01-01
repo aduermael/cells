@@ -226,6 +226,11 @@ void ViewportIndex::onCellRemoved(Cell* cell) {
     _cells.erase(key);
 }
 
+void ViewportIndex::onCellRemoved(const ID& colId, const ID& rowId) {
+    const std::string key = makeCellKey(colId, rowId);
+    _cells.erase(key);
+}
+
 void ViewportIndex::onCellChanged(Cell* /*cell*/) {
     // No-op: we don't index by value, only by position
     // The cell's bounding box doesn't change when its value changes

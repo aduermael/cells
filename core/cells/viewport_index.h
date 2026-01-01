@@ -144,6 +144,10 @@ public:
     // Called when a cell is removed from the sheet
     void onCellRemoved(Cell* cell);
 
+    // Called when a cell is removed - use when cell pointer may be invalid
+    // This overload is safe to call after the cell has been deleted
+    void onCellRemoved(const ID& colId, const ID& rowId);
+
     // Called when a cell's value/formula changes (no spatial update needed)
     // This is a no-op since we don't index by value, but included for API completeness
     void onCellChanged(Cell* cell);

@@ -1123,8 +1123,9 @@ public:
             return "{\"error\":\"Cell not found\"}";
         }
 
-        // Get cell pointer before deletion for incremental update
-        Cell* cellPtr = it->second.get();
+        // Save IDs before deletion (applyOperation will free the cell)
+        const ID colId = it->second->colId;
+        const ID rowId = it->second->rowId;
 
         // Create and apply CELL_CLEAR operation via CRDT system
         Operation op = makeCellClearOp(*_workbook, cellId);
@@ -1136,8 +1137,8 @@ public:
             _syncManager->pruneOpLog();
         }
 
-        // Incremental viewport index update - remove cell
-        _viewportIndex.onCellRemoved(cellPtr);
+        // Incremental viewport index update - remove cell (using saved IDs)
+        _viewportIndex.onCellRemoved(colId, rowId);
         notifyListeners(ChangeType::CELL_CHANGED);
 
         return "{\"success\":true}";
@@ -1186,10 +1187,9 @@ public:
         // Find cell at this position
         for (const auto& [id, cell] : sheet->cells) {
             if (cell->colId == colId && cell->rowId == rowId) {
-                // Get cell pointer before deletion for incremental update
-                Cell* cellPtr = cell.get();
-
                 // Create and apply CELL_CLEAR operation via CRDT system
+                // Note: applyOperation will free the cell, so we use colId/rowId
+                // that we already have (not from the cell pointer)
                 Operation op = makeCellClearOp(*_workbook, id);
                 applyOperation(*_workbook, op);
 
@@ -1199,8 +1199,8 @@ public:
                     _syncManager->pruneOpLog();
                 }
 
-                // Incremental viewport index update - remove cell
-                _viewportIndex.onCellRemoved(cellPtr);
+                // Incremental viewport index update - remove cell (using saved IDs)
+                _viewportIndex.onCellRemoved(colId, rowId);
                 notifyListeners(ChangeType::CELL_CHANGED);
                 return "{\"success\":true,\"deleted\":true}";
             }
