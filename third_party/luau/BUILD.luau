@@ -11,6 +11,7 @@ cc_library(
     name = "luau_common",
     srcs = [
         "Common/src/StringUtils.cpp",
+        "Common/src/TimeTrace.cpp",
     ],
     hdrs = glob(["Common/include/Luau/*.h"]),
     includes = ["Common/include"],

@@ -746,3 +746,22 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "luau_autocomplete",
+    srcs = ["luau_autocomplete.cc"],
+    hdrs = ["luau_autocomplete.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@luau//:luau_analysis",
+    ],
+)
+
+cc_test(
+    name = "luau_autocomplete_test",
+    srcs = ["luau_autocomplete_test.cc"],
+    deps = [
+        ":luau_autocomplete",
+        "@googletest//:gtest_main",
+    ],
+)
