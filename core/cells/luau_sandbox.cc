@@ -430,14 +430,14 @@ int LuauSandbox::luaCellSet(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: documentSetTitle(title)
+// Cells API: setDocumentTitle(title)
 // ============================================================================
 int LuauSandbox::luaDocumentSetTitle(lua_State* L) {
     const char* title = luaL_checkstring(L, 1);
 
     Workbook* workbook = getWorkbook(L);
     if (workbook == nullptr) {
-        luaL_error(L, "documentSetTitle: no context set");
+        luaL_error(L, "setDocumentTitle: no context set");
     }
 
     const std::string payload = R"({"name":")" + jsonEscape(title) + R"("})";
@@ -996,8 +996,8 @@ void LuauSandbox::registerCellsAPI() {
     lua_pushcfunction(L_, &LuauSandbox::luaCellSet, "setCell");
     lua_setglobal(L_, "setCell");
 
-    lua_pushcfunction(L_, &LuauSandbox::luaDocumentSetTitle, "documentSetTitle");
-    lua_setglobal(L_, "documentSetTitle");
+    lua_pushcfunction(L_, &LuauSandbox::luaDocumentSetTitle, "setDocumentTitle");
+    lua_setglobal(L_, "setDocumentTitle");
 
     lua_pushcfunction(L_, &LuauSandbox::luaColumnSetWidth, "columnSetWidth");
     lua_setglobal(L_, "columnSetWidth");
