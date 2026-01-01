@@ -25,16 +25,17 @@ RUN apk --no-cache add ca-certificates
 COPY --from=builder /build/server .
 
 # Copy the WASM distribution files (only the web assets, not source code)
-COPY dist/index.html dist/
-COPY dist/main.js dist/
-COPY dist/cells_wasm_bin.js dist/
-COPY dist/cells_wasm_bin.wasm dist/
-COPY dist/worker.js dist/
-COPY dist/client.js dist/
-COPY dist/cells.d.ts dist/
-COPY dist/shared/ dist/shared/
-COPY dist/favicons/ dist/favicons/
-COPY dist/icon.svg dist/
+# Static files from apps/wasm/static/
+COPY apps/wasm/static/index.html dist/
+COPY apps/wasm/static/shared/ dist/shared/
+# Shared assets (favicons, icons)
+COPY apps/shared/favicons/ dist/favicons/
+COPY apps/shared/icon.svg dist/
+# Built JS files from apps/wasm/dist/
+COPY apps/wasm/dist/main.js dist/
+COPY apps/wasm/dist/cells_wasm_bin.js dist/
+COPY apps/wasm/dist/cells_wasm_bin.wasm dist/
+COPY apps/wasm/dist/worker.js dist/
 
 # Expose the port
 EXPOSE 8080

@@ -12,8 +12,15 @@ bazel-*
 *.swp
 *.swo
 
-# Build artifacts (we only need dist/)
-apps/
+# Build artifacts (we only need specific files)
+# Keep apps/wasm/static, apps/wasm/dist, and apps/shared for the web app
+apps/cli/
+apps/wasm/src/
+apps/wasm/tests/
+apps/wasm/node_modules/
+apps/wasm/*.html
+apps/wasm/*.json
+apps/wasm/*.mjs
 core/
 docs/
 scripts/
