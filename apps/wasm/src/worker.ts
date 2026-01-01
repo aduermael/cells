@@ -135,6 +135,7 @@ interface CellsEngine {
   // Scripting (Luau)
   executeScript(script: string): string;
   tokenizeLuau(source: string): string;
+  getAutocomplete(source: string, line: number, column: number): string;
 
   // Viewport pixel queries (Phase 5)
   getColumnPixelOffset(position: number): number;
@@ -1163,6 +1164,13 @@ function handleMessage(msg: WorkerRequest): void {
         const { source } = params as { source: string };
         const result = engine.tokenizeLuau(source);
         respond({ type: "tokenized", result });
+        break;
+      }
+
+      case "getAutocomplete": {
+        const { source, line, column } = params as { source: string; line: number; column: number };
+        const result = engine.getAutocomplete(source, line, column);
+        respond({ type: "autocomplete", result });
         break;
       }
 

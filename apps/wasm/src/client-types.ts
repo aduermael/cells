@@ -234,3 +234,40 @@ export interface LuauToken {
   start: number; // Byte offset in source
   end: number; // Byte offset in source (exclusive)
 }
+
+/** Autocomplete suggestion kind */
+export type AutocompleteSuggestionKind =
+  | "property"
+  | "variable"
+  | "keyword"
+  | "string"
+  | "type"
+  | "module"
+  | "function"
+  | "path"
+  | "text";
+
+/** Single autocomplete suggestion */
+export interface AutocompleteSuggestion {
+  label: string; // Display text
+  insertText: string; // Text to insert (may differ from label)
+  kind: AutocompleteSuggestionKind;
+  detail: string; // Additional info (e.g., type signature)
+  deprecated: boolean; // Whether this suggestion is deprecated
+}
+
+/** Autocomplete context type */
+export type AutocompleteContext =
+  | "statement"
+  | "expression"
+  | "property"
+  | "type"
+  | "keyword"
+  | "string"
+  | "unknown";
+
+/** Response from getAutocomplete */
+export interface AutocompleteResult {
+  context: AutocompleteContext;
+  suggestions: AutocompleteSuggestion[];
+}

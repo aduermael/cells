@@ -207,6 +207,35 @@ declare module 'cells-wasm' {
   }
 
   /**
+   * Autocomplete suggestion kind
+   */
+  type AutocompleteSuggestionKind = 'property' | 'variable' | 'keyword' | 'string' | 'type' | 'module' | 'function' | 'path' | 'text';
+
+  /**
+   * Single autocomplete suggestion
+   */
+  interface AutocompleteSuggestion {
+    label: string;         // Display text
+    insertText: string;    // Text to insert (may differ from label)
+    kind: AutocompleteSuggestionKind;
+    detail: string;        // Additional info (e.g., type signature)
+    deprecated: boolean;   // Whether this suggestion is deprecated
+  }
+
+  /**
+   * Autocomplete context type
+   */
+  type AutocompleteContext = 'statement' | 'expression' | 'property' | 'type' | 'keyword' | 'string' | 'unknown';
+
+  /**
+   * Response from getAutocomplete
+   */
+  interface AutocompleteResult {
+    context: AutocompleteContext;
+    suggestions: AutocompleteSuggestion[];
+  }
+
+  /**
    * Sheet information
    */
   interface SheetInfo {
@@ -678,6 +707,15 @@ declare module 'cells-wasm' {
      * @returns JSON string with array of LuauToken
      */
     tokenizeLuau(source: string): string;
+
+    /**
+     * Get autocomplete suggestions for a Luau script at a given position
+     * @param source - Luau source code
+     * @param line - 0-indexed line number
+     * @param column - 0-indexed column number
+     * @returns JSON string with AutocompleteResult
+     */
+    getAutocomplete(source: string, line: number, column: number): string;
 
     /**
      * Delete the CellsEngine instance and free memory

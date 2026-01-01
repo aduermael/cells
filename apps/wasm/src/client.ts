@@ -30,6 +30,7 @@ import type {
   CellDependentsResult,
   ScriptResult,
   LuauToken,
+  AutocompleteResult,
 } from "./client-types";
 
 // Re-export types for external consumers
@@ -47,6 +48,10 @@ export type {
   ScriptResult,
   LuauToken,
   LuauTokenType,
+  AutocompleteResult,
+  AutocompleteSuggestion,
+  AutocompleteSuggestionKind,
+  AutocompleteContext,
 } from "./client-types";
 
 /**
@@ -696,5 +701,10 @@ export class CellsClient {
   async tokenizeLuau(source: string): Promise<LuauToken[]> {
     const response = await this._send("tokenizeLuau", { source });
     return JSON.parse(response.result as string) as LuauToken[];
+  }
+
+  async getAutocomplete(source: string, line: number, column: number): Promise<AutocompleteResult> {
+    const response = await this._send("getAutocomplete", { source, line, column });
+    return JSON.parse(response.result as string) as AutocompleteResult;
   }
 }
