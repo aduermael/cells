@@ -1326,6 +1326,10 @@ void LuauSandbox::registerCellsAPI() {
 
     lua_pushcfunction(L_, &LuauSandbox::luaRangeFill, "fillRange");
     lua_setglobal(L_, "fillRange");
+
+    // Register print() for console output
+    lua_pushcfunction(L_, &LuauSandbox::luaPrint, "print");
+    lua_setglobal(L_, "print");
 }
 
 void LuauSandbox::setContext(Workbook* workbook, Sheet* sheet) {
@@ -1410,9 +1414,10 @@ ScriptResult LuauSandbox::execute(const std::string& script) {
         return result;
     }
 
-    // Reset instruction counter
+    // Reset instruction counter and print buffer
     instructionCount_ = 0;
     interrupted_ = false;
+    printBuffer_.clear();
 
     // Set up interrupt callback for instruction limiting
     lua_callbacks(L_)->interrupt = &LuauSandbox::interruptCallback;
@@ -1445,14 +1450,26 @@ ScriptResult LuauSandbox::execute(const std::string& script) {
 
     if (status == LUA_OK || status == LUA_YIELD) {
         result.success = true;
-        // Check for return value
+
+        // Include print buffer output
+        result.output = printBuffer_;
+
+        // Append return value if any
         if (lua_gettop(T) > 0 && (lua_isnil(T, 1) == 0)) {
+            std::string returnValue;
             if (lua_isstring(T, 1) != 0) {
-                result.output = lua_tostring(T, 1);
+                returnValue = lua_tostring(T, 1);
             } else if (lua_isnumber(T, 1) != 0) {
-                result.output = std::to_string(lua_tonumber(T, 1));
+                returnValue = std::to_string(lua_tonumber(T, 1));
             } else if (lua_isboolean(T, 1) != 0) {
-                result.output = (lua_toboolean(T, 1) != 0) ? "true" : "false";
+                returnValue = (lua_toboolean(T, 1) != 0) ? "true" : "false";
+            }
+            if (!returnValue.empty()) {
+                if (!result.output.empty()) {
+                    result.output += "=> " + returnValue;
+                } else {
+                    result.output = returnValue;
+                }
             }
         }
     } else {
