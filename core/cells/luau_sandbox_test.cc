@@ -311,6 +311,22 @@ TEST(LuauSandboxTest, CellGetWithCreate) {
     EXPECT_EQ(result.output, "table");
 }
 
+TEST(LuauSandboxTest, EmptyCellValueIsNil) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Create an empty cell and verify that .value returns nil
+    auto result = sandbox.execute(R"(
+        local c = getCell('E5', {create = true})
+        return type(c.value)
+    )");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "nil");
+}
+
 TEST(LuauSandboxTest, CellSetNumber) {
     auto workbook = createTestWorkbook();
     Sheet* sheet = workbook->getSheetByIndex(0);

@@ -1008,7 +1008,12 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
                 break;
             case CellValueType::STRING:
             case CellValueType::FORMULA_STRING:
-                lua_pushstring(L, value.asString().c_str());
+                // Empty string is treated as empty cell (returns nil)
+                if (value.raw.empty()) {
+                    lua_pushnil(L);
+                } else {
+                    lua_pushstring(L, value.asString().c_str());
+                }
                 break;
             case CellValueType::BOOLEAN:
             case CellValueType::FORMULA_BOOLEAN:

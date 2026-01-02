@@ -126,20 +126,21 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
 
 ---
 
-## Phase 4: Verify empty cell value prints nil
+## Phase 4: Verify empty cell value prints nil ✅
 
 Verify that `print(getCell('A1').value)` correctly prints `nil` for empty/missing cells.
 
-- [ ] 4a: Add unit test to confirm existing behavior
-- [ ] 4b: If needed, adjust `pushCellObject` to push nil for empty value types
+- [x] 4a: Add unit test to confirm existing behavior
+- [x] 4b: Fix `luaCellIndex` to push nil for empty string values
 
 **Analysis:**
-- Looking at `pushCellObject` lines 1214-1231, the default case already pushes nil
-- `CellValueType::EMPTY` should fall through to default and push nil
-- Just need to verify with a test
+- The default `CellValue` constructor sets `type` to `STRING` with empty `raw`
+- Modified `luaCellIndex` to check for empty `raw` when type is `STRING` or `FORMULA_STRING`
+- Empty string cells now correctly return `nil` in Luau
 
 **Files:**
-- `core/cells/luau_sandbox_test.cc` - Add test for empty cell value
+- `core/cells/luau_sandbox_test.cc` - Added `EmptyCellValueIsNil` test
+- `core/cells/luau_sandbox.cc` - Fixed `.value` property to return nil for empty cells
 
 ---
 
