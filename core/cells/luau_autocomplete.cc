@@ -154,6 +154,7 @@ export type Cell = {
     value: number | string | boolean | nil,
     formula: string?,
     ref: string,
+    dependents: {Cell},
 }
 
 -- Sheet object returned by getSheet()

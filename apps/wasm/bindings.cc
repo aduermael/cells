@@ -827,6 +827,8 @@ public:
         // Build the payload for the CRDT operation
         std::string payload;
         if (typeChar == 'f') {
+            // Update ref converter to include any newly created cells
+            _refConverter.setContext(*sheet);
             std::string uuidFormula = _refConverter.formulaToUuid(value);
             // Note: display field omitted - peers generate display strings from AST locally
             payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
@@ -924,6 +926,8 @@ public:
         // Determine type and build payload
         std::string payload;
         if (!value.empty() && value[0] == '=') {
+            // Update ref converter to include any newly created cells
+            _refConverter.setContext(*sheet);
             std::string uuidFormula = _refConverter.formulaToUuid(value);
             // Note: display field omitted - peers generate display strings from AST locally
             payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
