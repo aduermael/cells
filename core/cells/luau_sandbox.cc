@@ -356,7 +356,7 @@ int LuauSandbox::luaCellGet(lua_State* L) {
     // NOLINTEND(misc-const-correctness)
 
     // Get sandbox to push cell object
-    LuauSandbox* sandbox = getSandbox(L);
+    const LuauSandbox* sandbox = getSandbox(L);
     if (sandbox == nullptr) {
         luaL_error(L, "getCell: sandbox not found");
     }
@@ -951,7 +951,8 @@ int LuauSandbox::luaPrint(lua_State* L) {
 }
 
 // ============================================================================
-// Cell __index metamethod: handles property access (e.g., cell.ref)
+// Cell __index metamethod: handles property access (e.g., cell.ref, cell.value)
+// All properties are fetched dynamically from the Workbook (source of truth)
 // ============================================================================
 int LuauSandbox::luaCellIndex(lua_State* L) {
     // Stack: [1] = cell table, [2] = key (string)
@@ -961,46 +962,177 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
         return 1;
     }
 
+    // Get the cell UUID from the table (always needed for property access)
+    lua_getfield(L, 1, "_uuid");
+    if (lua_isstring(L, -1) == 0) {
+        lua_pop(L, 1);
+        // Not a cell object, fall back to raw table access
+        lua_rawget(L, 1);
+        return 1;
+    }
+    const char* uuidStr = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    // Get context
+    Sheet* sheet = getSheet(L);
+    if (sheet == nullptr) {
+        luaL_error(L, "%s: no context set", key);
+    }
+
+    const ID cellId(uuidStr);
+    const Cell* cell = sheet->getCell(cellId);
+    if (cell == nullptr) {
+        luaL_error(L, "%s: cell not found", key);
+    }
+
     // Handle .ref property
     if (strcmp(key, "ref") == 0) {
-        // Get the cell UUID from the table
-        lua_getfield(L, 1, "_uuid");
-        if (lua_isstring(L, -1) == 0) {
-            luaL_error(L, "ref: invalid cell object");
-        }
-        const char* uuidStr = lua_tostring(L, -1);
-        lua_pop(L, 1);
-
-        // NOLINTBEGIN(misc-const-correctness) - Sheet methods not const-correct
-        Sheet* sheet = getSheet(L);
-        if (sheet == nullptr) {
-            luaL_error(L, "ref: no context set");
-        }
-
-        const ID cellId(uuidStr);
-        Cell* cell = sheet->getCell(cellId);
-        if (cell == nullptr) {
-            luaL_error(L, "ref: cell not found");
-        }
-
-        // Get the cell's current position
-        Axis* col = sheet->getColumn(cell->colId);
-        Axis* row = sheet->getRow(cell->rowId);
-        // NOLINTEND(misc-const-correctness)
+        const Axis* col = sheet->getColumn(cell->colId);
+        const Axis* row = sheet->getRow(cell->rowId);
         if (col == nullptr || row == nullptr) {
             luaL_error(L, "ref: cell position not found");
         }
-
-        // Convert to A1 notation
         const std::string a1Ref =
             RefConverter::columnIndexToLetter(col->position) + std::to_string(row->position + 1);
         lua_pushstring(L, a1Ref.c_str());
         return 1;
     }
 
+    // Handle .value property - always fetch from model
+    if (strcmp(key, "value") == 0) {
+        const CellValue& value = cell->value;
+        switch (value.type) {
+            case CellValueType::NUMBER:
+            case CellValueType::FORMULA_NUMBER:
+                lua_pushnumber(L, value.asNumber());
+                break;
+            case CellValueType::STRING:
+            case CellValueType::FORMULA_STRING:
+                lua_pushstring(L, value.asString().c_str());
+                break;
+            case CellValueType::BOOLEAN:
+            case CellValueType::FORMULA_BOOLEAN:
+                lua_pushboolean(L, value.asBoolean() ? 1 : 0);
+                break;
+            default:
+                lua_pushnil(L);
+        }
+        return 1;
+    }
+
+    // Handle .formula property - always fetch from model
+    if (strcmp(key, "formula") == 0) {
+        if (cell->isFormula()) {
+            const Formula* f = cell->getFormula();
+            if (f != nullptr && f->ast != nullptr) {
+                RefConverter conv;
+                conv.setContext(*sheet);
+                const std::string uuidFormula = FormulaSerializer::serialize(f->ast);
+                const std::string a1Formula = conv.formulaToA1(uuidFormula);
+                lua_pushstring(L, a1Formula.c_str());
+                return 1;
+            }
+        }
+        lua_pushnil(L);
+        return 1;
+    }
+
     // For other keys, look up in the table itself
     lua_rawget(L, 1);
     return 1;
+}
+
+// ============================================================================
+// Cell __newindex metamethod: handles property assignment (e.g., cell.value = x)
+// ============================================================================
+int LuauSandbox::luaCellNewIndex(lua_State* L) {
+    // Stack: [1] = cell table, [2] = key (string), [3] = value
+    const char* key = lua_tostring(L, 2);
+    if (key == nullptr) {
+        luaL_error(L, "invalid property name");
+    }
+
+    // Handle cell.value = x assignment
+    if (strcmp(key, "value") == 0) {
+        // Get the cell UUID from the table
+        lua_getfield(L, 1, "_uuid");
+        if (lua_isstring(L, -1) == 0) {
+            luaL_error(L, "value: invalid cell object");
+        }
+        const char* uuidStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        // Get context
+        Sheet* sheet = getSheet(L);
+        Workbook* workbook = getWorkbook(L);
+        if (sheet == nullptr || workbook == nullptr) {
+            luaL_error(L, "value: no context set");
+        }
+
+        const ID cellId(uuidStr);
+        const Cell* cell = sheet->getCell(cellId);
+        if (cell == nullptr) {
+            luaL_error(L, "value: cell not found");
+        }
+
+        // Get col/row IDs for the payload
+        const std::string colIdStr = cell->colId.toString();
+        const std::string rowIdStr = cell->rowId.toString();
+
+        // Build payload based on value type (same logic as luaCellSet)
+        std::string payload;
+        if (lua_isnumber(L, 3) != 0) {
+            const double num = lua_tonumber(L, 3);
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%.15g", num);
+            payload = R"({"type":"n","value":")" + std::string(buf) + R"(","col":")" + colIdStr +
+                      R"(","row":")" + rowIdStr + R"("})";
+        } else if (lua_isstring(L, 3) != 0) {
+            const char* str = lua_tostring(L, 3);
+            if (str[0] == '=') {
+                // Parse as formula
+                RefConverter conv;
+                conv.setContext(*sheet);
+                const std::string uuidFormula = conv.formulaToUuid(str);
+                payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) + R"(","col_id":")" +
+                          colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+            } else {
+                // Literal string
+                payload = R"({"type":"s","value":")" + jsonEscape(str) + R"(","col":")" + colIdStr +
+                          R"(","row":")" + rowIdStr + R"("})";
+            }
+        } else if (lua_isboolean(L, 3) != 0) {
+            const bool val = lua_toboolean(L, 3) != 0;
+            payload = R"({"type":"b","value":")" + std::string(val ? "true" : "false") +
+                      R"(","col":")" + colIdStr + R"(","row":")" + rowIdStr + R"("})";
+        } else if (lua_isnil(L, 3) != 0) {
+            // Clear the cell
+            const Operation op = makeCellClearOp(*workbook, cell->id);
+            applyOperation(*workbook, op);
+            return 0;
+        } else {
+            luaL_error(L, "cell.value: unsupported value type");
+        }
+
+        // Apply the operation via CRDT
+        const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
+        applyOperation(*workbook, op);
+        return 0;
+    }
+
+    // Handle cell.ref = x (read-only)
+    if (strcmp(key, "ref") == 0) {
+        luaL_error(L, "cell.ref is read-only");
+    }
+
+    // Handle cell.formula = x (read-only)
+    if (strcmp(key, "formula") == 0) {
+        luaL_error(L, "cell.formula is read-only (use setCell with = prefix)");
+    }
+
+    // For other keys, set in the table itself
+    lua_rawset(L, 1);
+    return 0;
 }
 
 // ============================================================================
@@ -1161,8 +1293,10 @@ int LuauSandbox::luaCellGetRef(lua_State* L) {
 
 // ============================================================================
 // Helper: Create and push a cell object
+// Cell objects only store _uuid - all properties (value, formula, ref) are
+// fetched dynamically from the Workbook via __index metamethod
 // ============================================================================
-void LuauSandbox::pushCellObject(lua_State* L, Cell* cell) {
+void LuauSandbox::pushCellObject(lua_State* L, Cell* cell) const {
     if (cell == nullptr) {
         lua_pushnil(L);
         return;
@@ -1170,51 +1304,13 @@ void LuauSandbox::pushCellObject(lua_State* L, Cell* cell) {
 
     const std::string cellUuid = cell->id.toString();
 
-    // Check if we have a cached object
+    // Check if we have a cached object (for identity: a == b)
     if (cellCacheRef_ != -1) {
         lua_rawgeti(L, LUA_REGISTRYINDEX, cellCacheRef_);  // Get cache table
         lua_getfield(L, -1, cellUuid.c_str());             // Get cached object
         if (lua_istable(L, -1) != 0) {
-            // Update the cached object's value field
-            const CellValue& value = cell->value;
-            switch (value.type) {
-                case CellValueType::NUMBER:
-                case CellValueType::FORMULA_NUMBER:
-                    lua_pushnumber(L, value.asNumber());
-                    break;
-                case CellValueType::STRING:
-                case CellValueType::FORMULA_STRING:
-                    lua_pushstring(L, value.asString().c_str());
-                    break;
-                case CellValueType::BOOLEAN:
-                case CellValueType::FORMULA_BOOLEAN:
-                    lua_pushboolean(L, value.asBoolean() ? 1 : 0);
-                    break;
-                default:
-                    lua_pushnil(L);
-            }
-            lua_setfield(L, -2, "value");
-
-            // Update formula field
-            if (cell->isFormula()) {
-                const Formula* f = cell->getFormula();
-                if (f != nullptr && f->ast != nullptr) {
-                    // Generate UUID formula from AST, then convert to A1 notation for display
-                    RefConverter conv;
-                    conv.setContext(*sheet_);
-                    const std::string uuidFormula = FormulaSerializer::serialize(f->ast);
-                    const std::string a1Formula = conv.formulaToA1(uuidFormula);
-                    lua_pushstring(L, a1Formula.c_str());
-                } else {
-                    lua_pushnil(L);
-                }
-            } else {
-                lua_pushnil(L);
-            }
-            lua_setfield(L, -2, "formula");
-
-            // Remove cache table from stack, keep cell object
-            lua_remove(L, -2);
+            // Return cached object (properties fetched dynamically via __index)
+            lua_remove(L, -2);  // Remove cache table, keep cell object
             return;
         }
         lua_pop(L, 2);  // Pop nil and cache table
@@ -1223,54 +1319,17 @@ void LuauSandbox::pushCellObject(lua_State* L, Cell* cell) {
     // Create new cell object table
     lua_newtable(L);
 
-    // Set value
-    const CellValue& value = cell->value;
-    switch (value.type) {
-        case CellValueType::NUMBER:
-        case CellValueType::FORMULA_NUMBER:
-            lua_pushnumber(L, value.asNumber());
-            break;
-        case CellValueType::STRING:
-        case CellValueType::FORMULA_STRING:
-            lua_pushstring(L, value.asString().c_str());
-            break;
-        case CellValueType::BOOLEAN:
-        case CellValueType::FORMULA_BOOLEAN:
-            lua_pushboolean(L, value.asBoolean() ? 1 : 0);
-            break;
-        default:
-            lua_pushnil(L);
-    }
-    lua_setfield(L, -2, "value");
-
-    // Set formula
-    if (cell->isFormula()) {
-        const Formula* f = cell->getFormula();
-        if (f != nullptr && f->ast != nullptr) {
-            RefConverter conv;
-            conv.setContext(*sheet_);
-            const std::string uuidFormula = FormulaSerializer::serialize(f->ast);
-            const std::string a1Formula = conv.formulaToA1(uuidFormula);
-            lua_pushstring(L, a1Formula.c_str());
-        } else {
-            lua_pushnil(L);
-        }
-    } else {
-        lua_pushnil(L);
-    }
-    lua_setfield(L, -2, "formula");
-
-    // Store UUID for identity tracking (hidden field)
+    // Store UUID for identity tracking (only persistent field)
     lua_pushstring(L, cellUuid.c_str());
     lua_setfield(L, -2, "_uuid");
 
-    // Apply Cell metatable for .ref property access
+    // Apply Cell metatable for property access via __index/__newindex
     if (cellMetatableRef_ != -1) {
         lua_rawgeti(L, LUA_REGISTRYINDEX, cellMetatableRef_);  // Get Cell metatable
         lua_setmetatable(L, -2);                               // setmetatable(cell, Cell)
     }
 
-    // Cache the object (if cache exists)
+    // Cache the object for identity (if cache exists)
     if (cellCacheRef_ != -1) {
         lua_rawgeti(L, LUA_REGISTRYINDEX, cellCacheRef_);  // Get cache table
         lua_pushvalue(L, -2);                              // Copy cell object
@@ -1289,10 +1348,12 @@ void LuauSandbox::registerCellsAPI() {
     cellCacheRef_ = lua_ref(L_, -1);  // Store in registry (ref pops the value)
     // lua_ref pops the value from stack, so we don't need to pop
 
-    // Create Cell metatable with __index for property access (e.g., cell.ref)
+    // Create Cell metatable with __index/__newindex for property access
     lua_newtable(L_);  // Cell metatable
     lua_pushcfunction(L_, &LuauSandbox::luaCellIndex, "Cell.__index");
     lua_setfield(L_, -2, "__index");
+    lua_pushcfunction(L_, &LuauSandbox::luaCellNewIndex, "Cell.__newindex");
+    lua_setfield(L_, -2, "__newindex");
     cellMetatableRef_ = lua_ref(L_, -1);  // Store in registry
 
     // Create Sheet metatable with __index/__newindex for property access (e.g., sheet.name)

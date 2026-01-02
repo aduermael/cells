@@ -142,7 +142,7 @@ private:
     static Sheet* getSheet(lua_State* L);
 
     // Helper: Create a cell Lua object and cache it
-    void pushCellObject(lua_State* L, Cell* cell);
+    void pushCellObject(lua_State* L, Cell* cell) const;
 
     // Cell object cache (UUID string -> Lua registry reference)
     // Uses weak table in Lua to allow garbage collection
@@ -153,6 +153,9 @@ private:
 
     // Cell __index metamethod (handles .ref property access)
     static int luaCellIndex(lua_State* L);
+
+    // Cell __newindex metamethod (handles cell.value = x assignment)
+    static int luaCellNewIndex(lua_State* L);
 
     // Sheet object support
     int sheetMetatableRef_{-1};  // Sheet metatable for __index/__newindex

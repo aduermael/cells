@@ -873,5 +873,155 @@ TEST(LuauSandboxTest, SetAndGetDocumentTitleRoundTrip) {
     EXPECT_EQ(workbook->name, "Budget 2025");
 }
 
+// ============================================================================
+// Cell Value Assignment Tests (cell.value = x via __newindex)
+// ============================================================================
+
+TEST(LuauSandboxTest, CellValueAssignmentNumber) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1', {create = true})
+        c.value = 123
+        return getCell('A1').value
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "123");
+}
+
+TEST(LuauSandboxTest, CellValueAssignmentString) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local c = getCell('B1', {create = true})
+        c.value = "Hello World"
+        return getCell('B1').value
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Hello World");
+}
+
+TEST(LuauSandboxTest, CellValueAssignmentBoolean) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local c = getCell('B1', {create = true})
+        c.value = true
+        return getCell('B1').value
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "true");
+}
+
+TEST(LuauSandboxTest, CellValueAssignmentFormula) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set B1 to a number first
+    auto setup = sandbox.execute("setCell('B1', 100)");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1', {create = true})
+        c.value = "=B1"
+        return getCell('A1').formula
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "=B1");
+}
+
+TEST(LuauSandboxTest, CellValueAssignmentNilClearsCell) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // A1 starts with value 42
+    auto before = sandbox.execute("return getCell('A1').value");
+    EXPECT_TRUE(before.success) << before.error;
+    EXPECT_EQ(before.output, "42");
+
+    // Clear cell by setting value to nil
+    auto clear = sandbox.execute(R"(
+        local c = getCell('A1')
+        c.value = nil
+    )");
+    EXPECT_TRUE(clear.success) << clear.error;
+
+    // Cell should now be empty (nil)
+    auto after = sandbox.execute(R"(
+        local c = getCell('A1')
+        if c == nil then return 'nil' end
+        if c.value == nil then return 'value is nil' end
+        return c.value
+    )");
+    EXPECT_TRUE(after.success) << after.error;
+    // After clearing, the cell may still exist but its value should be nil
+    EXPECT_TRUE(after.output == "nil" || after.output == "value is nil");
+}
+
+TEST(LuauSandboxTest, CellRefPropertyIsReadOnly) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1')
+        c.ref = "B1"
+    )");
+    EXPECT_FALSE(result.success);
+    EXPECT_TRUE(result.error.find("read-only") != std::string::npos);
+}
+
+TEST(LuauSandboxTest, CellFormulaPropertyIsReadOnly) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1')
+        c.formula = "=B1"
+    )");
+    EXPECT_FALSE(result.success);
+    EXPECT_TRUE(result.error.find("read-only") != std::string::npos);
+}
+
+TEST(LuauSandboxTest, CellCustomPropertyAllowed) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Custom properties should be allowed
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1')
+        c.myCustomProp = "test"
+        return c.myCustomProp
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "test");
+}
+
 }  // namespace
 }  // namespace cells

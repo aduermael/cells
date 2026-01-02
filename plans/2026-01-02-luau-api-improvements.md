@@ -86,16 +86,21 @@ int LuauSandbox::luaDocumentGetTitle(lua_State* L) {
 
 ---
 
-## Phase 3: Cell __newindex for value assignment
+## Phase 3: Cell __newindex for value assignment ✅
 
 Enable `getCell('A1').value = 42` to actually set the cell value.
 
-- [ ] 3a: Add `luaCellNewIndex` metamethod to handle property assignment
-- [ ] 3b: Handle `value` assignment by calling the existing cell-set logic
-- [ ] 3c: Make `ref` assignment error ("ref is read-only")
-- [ ] 3d: Make `formula` assignment error ("formula is read-only, use setCell with = prefix")
-- [ ] 3e: Register `__newindex` in Cell metatable
-- [ ] 3f: Add unit tests for value assignment and read-only property errors
+- [x] 3a: Add `luaCellNewIndex` metamethod to handle property assignment
+- [x] 3b: Handle `value` assignment by calling the existing cell-set logic
+- [x] 3c: Make `ref` assignment error ("ref is read-only")
+- [x] 3d: Make `formula` assignment error ("formula is read-only, use setCell with = prefix")
+- [x] 3e: Register `__newindex` in Cell metatable
+- [x] 3f: Add unit tests for value assignment and read-only property errors
+
+**Implementation Notes:**
+- Cell properties (`value`, `formula`, `ref`) are now always fetched dynamically via `__index` metamethod
+- The Workbook is the source of truth - no caching of values in Lua tables
+- Cell objects only store `_uuid` for identity; cache is still used for `a == b` identity checks
 
 **Implementation:**
 ```cpp
