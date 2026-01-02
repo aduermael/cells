@@ -76,7 +76,7 @@ After:
 ## Phase 3: Console Interactivity
 
 - [x] 3a: Implement horizontal resize handle between editor and console
-- [ ] 3b: Implement close button and auto-show on new output
+- [x] 3b: Implement close button and auto-show on new output
 - [ ] 3c: Add clear button and keyboard shortcut (Escape to close console)
 
 ---

@@ -420,6 +420,11 @@ export class ScriptPanel {
       );
       this.consoleEl.style.width = newWidth + "px";
     });
+
+    // Console close button
+    this.consoleCloseBtn.addEventListener("click", () => {
+      this.hideConsole();
+    });
   }
 
   // =========================================================================
