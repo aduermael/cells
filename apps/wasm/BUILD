@@ -41,6 +41,7 @@ cc_binary(
         "-s FETCH=1",  # HTTP fetch support for networking
     ],
     deps = [
+        "//core/cells:agent_client",
         "//core/cells:crdt",
         "//core/cells:csv_reader",
         "//core/cells:csv_writer",

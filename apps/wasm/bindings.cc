@@ -40,6 +40,7 @@
 #include "core/cells/xlsx_writer.h"
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/luau_autocomplete.h"
+#include "core/cells/agent_client.h"
 #include "Luau/Allocator.h"
 #include "Luau/Ast.h"
 #include "Luau/Lexer.h"
@@ -134,9 +135,9 @@ std::string extractPayloadField(const std::string& payload, const std::string& k
 // CellsEngine - main wrapper class exposing the spreadsheet engine to JS
 // ============================================================================
 
-class CellsEngine : public cells::net::SyncClientDelegate {
+class CellsEngine : public cells::net::SyncClientDelegate, public cells::AgentClientDelegate {
 public:
-    CellsEngine() : _workbook(nullptr), _activeSheetIndex(0), _listener(val::null()) {}
+    CellsEngine() : _workbook(nullptr), _activeSheetIndex(0), _listener(val::null()), _agentListener(val::null()) {}
     ~CellsEngine() override { disableSync(); }
 
     // ========================================================================
@@ -2713,6 +2714,135 @@ public:
     }
 
     // ========================================================================
+    // AgentClientDelegate implementation
+    // ========================================================================
+
+    void onAgentText(const std::string& text) override {
+        if (!_agentListener.isNull() && !_agentListener.isUndefined()) {
+            _agentListener(std::string("text"), text);
+        }
+    }
+
+    void onAgentToolUse(const std::string& toolId, const std::string& name,
+                        const std::string& inputJson) override {
+        if (!_agentListener.isNull() && !_agentListener.isUndefined()) {
+            std::ostringstream json;
+            json << "{\"id\":\"" << jsonEscape(toolId) << "\",";
+            json << "\"name\":\"" << jsonEscape(name) << "\",";
+            json << "\"input\":" << inputJson << "}";
+            _agentListener(std::string("tool_use"), json.str());
+        }
+    }
+
+    void onAgentToolResultNeeded(const std::string& toolUseId) override {
+        if (!_agentListener.isNull() && !_agentListener.isUndefined()) {
+            _agentListener(std::string("tool_result_needed"), toolUseId);
+        }
+    }
+
+    void onAgentComplete(const std::string& stopReason,
+                         const std::string& conversationId) override {
+        if (!_agentListener.isNull() && !_agentListener.isUndefined()) {
+            std::ostringstream json;
+            json << "{\"stop_reason\":\"" << jsonEscape(stopReason) << "\",";
+            json << "\"conversation_id\":\"" << jsonEscape(conversationId) << "\"}";
+            _agentListener(std::string("done"), json.str());
+        }
+    }
+
+    void onAgentError(const std::string& message) override {
+        if (!_agentListener.isNull() && !_agentListener.isUndefined()) {
+            _agentListener(std::string("error"), message);
+        }
+    }
+
+    // ========================================================================
+    // Agent API methods
+    // ========================================================================
+
+    // Set the JavaScript callback for agent events
+    // Callback receives (eventType, data) where eventType is:
+    //   "text" - streaming text from assistant, data is the text
+    //   "tool_use" - tool execution requested, data is JSON {id, name, input}
+    //   "tool_result_needed" - result needed for tool, data is tool_use_id
+    //   "done" - message complete, data is JSON {stop_reason, conversation_id}
+    //   "error" - error occurred, data is error message
+    void setAgentListener(val callback) { _agentListener = callback; }
+
+    // Remove the agent listener
+    void removeAgentListener() { _agentListener = val::null(); }
+
+    // Initialize the agent client with a server URL
+    void initAgent(const std::string& serverUrl) {
+        AgentClientConfig config;
+        config.serverUrl = serverUrl;
+        config.autoExecuteTools = true;
+
+        _agentClient = std::make_unique<AgentClient>(config, this);
+
+        // Set context if workbook exists
+        if (_workbook && _activeSheetIndex < _workbook->sheetCount()) {
+            auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+            if (sheet) {
+                _agentClient->setContext(_workbook.get(), sheet, &_luauSandbox);
+            }
+        }
+    }
+
+    // Check if agent is initialized
+    bool isAgentInitialized() const {
+        return _agentClient != nullptr;
+    }
+
+    // Send a message to the agent
+    // conversationId is optional; empty string starts a new conversation
+    void sendAgentMessage(const std::string& prompt, const std::string& conversationId) {
+        if (!_agentClient) {
+            if (!_agentListener.isNull() && !_agentListener.isUndefined()) {
+                _agentListener(std::string("error"), std::string("Agent not initialized"));
+            }
+            return;
+        }
+
+        // Ensure context is up-to-date
+        if (_workbook && _activeSheetIndex < _workbook->sheetCount()) {
+            auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+            if (sheet) {
+                _agentClient->setContext(_workbook.get(), sheet, &_luauSandbox);
+            }
+        }
+
+        _agentClient->sendMessage(prompt, conversationId);
+    }
+
+    // Get the current conversation ID
+    std::string getAgentConversationId() const {
+        if (!_agentClient) {
+            return "";
+        }
+        return _agentClient->getConversationId();
+    }
+
+    // Clear the current agent conversation
+    void clearAgentConversation() {
+        if (_agentClient) {
+            _agentClient->clearConversation();
+        }
+    }
+
+    // Cancel any in-progress agent request
+    void cancelAgent() {
+        if (_agentClient) {
+            _agentClient->cancel();
+        }
+    }
+
+    // Check if agent is processing a request
+    bool isAgentProcessing() const {
+        return _agentClient && _agentClient->isProcessing();
+    }
+
+    // ========================================================================
     // Formula API methods (Phase 7)
     // ========================================================================
 
@@ -3662,6 +3792,8 @@ private:
     std::unique_ptr<cells::net::SyncClient> _syncClient;  // C++ sync client (for WebRTC P2P)
     LuauSandbox _luauSandbox;  // Sandboxed Luau scripting engine
     LuauAutocomplete _luauAutocomplete;  // Luau autocomplete engine
+    val _agentListener;  // JavaScript callback for agent events
+    std::unique_ptr<AgentClient> _agentClient;  // AI agent client
 };
 
 }  // namespace cells::wasm
@@ -3794,7 +3926,17 @@ EMSCRIPTEN_BINDINGS(cells) {
         // Scripting (Luau)
         .function("executeScript", &cells::wasm::CellsEngine::executeScript)
         .function("tokenizeLuau", &cells::wasm::CellsEngine::tokenizeLuau)
-        .function("getAutocomplete", &cells::wasm::CellsEngine::getAutocomplete);
+        .function("getAutocomplete", &cells::wasm::CellsEngine::getAutocomplete)
+        // AI Agent
+        .function("setAgentListener", &cells::wasm::CellsEngine::setAgentListener)
+        .function("removeAgentListener", &cells::wasm::CellsEngine::removeAgentListener)
+        .function("initAgent", &cells::wasm::CellsEngine::initAgent)
+        .function("isAgentInitialized", &cells::wasm::CellsEngine::isAgentInitialized)
+        .function("sendAgentMessage", &cells::wasm::CellsEngine::sendAgentMessage)
+        .function("getAgentConversationId", &cells::wasm::CellsEngine::getAgentConversationId)
+        .function("clearAgentConversation", &cells::wasm::CellsEngine::clearAgentConversation)
+        .function("cancelAgent", &cells::wasm::CellsEngine::cancelAgent)
+        .function("isAgentProcessing", &cells::wasm::CellsEngine::isAgentProcessing);
 
     // Logger bindings - control logging from JavaScript
     enum_<cells::log::Level>("LogLevel")
