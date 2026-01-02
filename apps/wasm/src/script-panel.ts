@@ -391,6 +391,34 @@ export class ScriptPanel {
         document.body.style.cursor = "";
         document.body.style.userSelect = "";
       }
+      if (this.isConsoleResizing) {
+        this.isConsoleResizing = false;
+        this.consoleResizeHandle.classList.remove("dragging");
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    });
+
+    // Console horizontal resize handling
+    this.consoleResizeHandle.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      this.isConsoleResizing = true;
+      this.consoleStartX = e.clientX;
+      this.consoleStartWidth = this.consoleEl.offsetWidth;
+      this.consoleResizeHandle.classList.add("dragging");
+      document.body.style.cursor = "ew-resize";
+      document.body.style.userSelect = "none";
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (!this.isConsoleResizing) return;
+      // Moving left increases console width, moving right decreases it
+      const deltaX = this.consoleStartX - e.clientX;
+      const newWidth = Math.min(
+        Math.max(this.consoleStartWidth + deltaX, 150), // min 150px
+        this.panel.offsetWidth * 0.5 // max 50% of panel
+      );
+      this.consoleEl.style.width = newWidth + "px";
     });
   }
 
