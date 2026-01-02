@@ -265,6 +265,13 @@ if (strcmp(key, "dependents") == 0) {
 **Files:**
 - `core/cells/luau_sandbox.cc` - Add `dependents` handling in `luaCellIndex`
 - `core/cells/luau_sandbox_test.cc` - Add tests with formula dependencies
+- `core/cells/luau_autocomplete.cc` - Add `dependents: {Cell}` to Cell type
+- `apps/wasm/bindings.cc` - Fix `_refConverter` not updated before formula conversion
+
+**Bugfix:** The dependency graph wasn't being populated when formulas were entered
+through the UI because `_refConverter` wasn't updated when new cells were created.
+Fixed by calling `_refConverter.setContext(*sheet)` before `formulaToUuid()` in
+both `updateCell()` and `createCell()` methods.
 
 ---
 
