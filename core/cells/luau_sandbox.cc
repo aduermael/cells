@@ -589,7 +589,7 @@ int LuauSandbox::luaColumnMove(lua_State* L) {
 
 // ============================================================================
 // Cells API: selectSheet(sheet|name|index)
-// Accepts: sheet object, name string, or 0-based index number
+// Accepts: sheet object, name string, or 1-based index number
 // ============================================================================
 int LuauSandbox::luaSelectSheet(lua_State* L) {
     Workbook* workbook = getWorkbook(L);
@@ -600,10 +600,11 @@ int LuauSandbox::luaSelectSheet(lua_State* L) {
     Sheet* newSheet = nullptr;
 
     if (lua_isnumber(L, 1) != 0) {
-        // Select by index
-        const int index = static_cast<int>(lua_tonumber(L, 1));
+        // Select by index (1-based)
+        const int index = static_cast<int>(lua_tonumber(L, 1)) - 1;  // Convert to 0-based
         if (index < 0 || static_cast<size_t>(index) >= workbook->sheetCount()) {
-            luaL_error(L, "selectSheet: index %d out of range", index);
+            luaL_error(L, "selectSheet: index %d out of range",
+                       static_cast<int>(lua_tonumber(L, 1)));
         }
         newSheet = workbook->getSheetByIndex(static_cast<size_t>(index));
     } else if (lua_isstring(L, 1) != 0) {
@@ -641,14 +642,11 @@ int LuauSandbox::luaSelectSheet(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: getSheet(options)
-// options.index: 0-based sheet index
-// options.name: sheet name string
+// Cells API: getSheet(arg)
+// Accepts: number (1-based index), string (name), or table {index=N, name="..."}
 // Returns: sheet object or nil if not found
 // ============================================================================
 int LuauSandbox::luaGetSheet(lua_State* L) {
-    luaL_checktype(L, 1, LUA_TTABLE);
-
     Workbook* workbook = getWorkbook(L);
     if (workbook == nullptr) {
         luaL_error(L, "getSheet: no context set");
@@ -657,31 +655,47 @@ int LuauSandbox::luaGetSheet(lua_State* L) {
     // NOLINTBEGIN(misc-const-correctness) - Sheet lookup returns non-const
     Sheet* sheet = nullptr;
 
-    // Check for index parameter
-    lua_getfield(L, 1, "index");
-    if (lua_isnumber(L, -1) != 0) {
-        const int index = static_cast<int>(lua_tonumber(L, -1));
-        lua_pop(L, 1);
-
+    if (lua_isnumber(L, 1) != 0) {
+        // getSheet(1) - direct number, 1-based
+        const int index = static_cast<int>(lua_tonumber(L, 1)) - 1;  // Convert to 0-based
         if (index < 0 || static_cast<size_t>(index) >= workbook->sheetCount()) {
             lua_pushnil(L);
             return 1;
         }
         sheet = workbook->getSheetByIndex(static_cast<size_t>(index));
-    } else {
-        lua_pop(L, 1);
-
-        // Check for name parameter
-        lua_getfield(L, 1, "name");
-        if (lua_isstring(L, -1) != 0) {
-            const char* name = lua_tostring(L, -1);
+    } else if (lua_isstring(L, 1) != 0) {
+        // getSheet("Sheet1") - direct name
+        const char* name = lua_tostring(L, 1);
+        sheet = workbook->getSheetByName(name);
+    } else if (lua_istable(L, 1) != 0) {
+        // getSheet({index = 1}) or getSheet({name = "Sheet1"})
+        lua_getfield(L, 1, "index");
+        if (lua_isnumber(L, -1) != 0) {
+            const int index = static_cast<int>(lua_tonumber(L, -1)) - 1;  // 1-based to 0-based
             lua_pop(L, 1);
 
-            sheet = workbook->getSheetByName(name);
+            if (index < 0 || static_cast<size_t>(index) >= workbook->sheetCount()) {
+                lua_pushnil(L);
+                return 1;
+            }
+            sheet = workbook->getSheetByIndex(static_cast<size_t>(index));
         } else {
             lua_pop(L, 1);
-            luaL_error(L, "getSheet: requires {index = N} or {name = \"...\"}");
+
+            // Check for name parameter
+            lua_getfield(L, 1, "name");
+            if (lua_isstring(L, -1) != 0) {
+                const char* name = lua_tostring(L, -1);
+                lua_pop(L, 1);
+
+                sheet = workbook->getSheetByName(name);
+            } else {
+                lua_pop(L, 1);
+                luaL_error(L, "getSheet: requires index, name, {index = N}, or {name = \"...\"}");
+            }
         }
+    } else {
+        luaL_error(L, "getSheet: requires index, name, {index = N}, or {name = \"...\"}");
     }
     // NOLINTEND(misc-const-correctness)
 

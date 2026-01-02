@@ -166,10 +166,10 @@ export type GetCellOptions = {
     create: boolean?,
 }
 
--- Options for getSheet
+-- Options for getSheet (index is 1-based)
 export type GetSheetOptions = {
     name: string?,
-    index: number?,
+    index: number?,  -- 1-based index
 }
 
 -- Options for setColumnWidth/setRowHeight
@@ -202,8 +202,8 @@ declare function setColumnWidth(col: string, opts: SizeOptions): ()
 declare function setRowHeight(row: number, opts: SizeOptions): ()
 declare function moveColumn(col: string, opts: MoveOptions): ()
 
--- Sheets
-declare function getSheet(opts: GetSheetOptions): Sheet?
+-- Sheets (index is 1-based)
+declare function getSheet(opts: GetSheetOptions | string | number): Sheet?
 declare function selectSheet(sheet: Sheet | string | number): ()
 declare function addSheet(name: string?): Sheet
 

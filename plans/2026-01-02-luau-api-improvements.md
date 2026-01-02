@@ -144,16 +144,16 @@ Verify that `print(getCell('A1').value)` correctly prints `nil` for empty/missin
 
 ---
 
-## Phase 5: 1-based sheet indexing and shorthand syntax
+## Phase 5: 1-based sheet indexing and shorthand syntax ✅
 
 Change `getSheet` to use 1-based indexing (Lua convention) and accept shorthand arguments.
 
-- [ ] 5a: Modify `luaGetSheet` to accept number directly: `getSheet(1)` → first sheet
-- [ ] 5b: Modify `luaGetSheet` to accept string directly: `getSheet("Sheet1")` → sheet by name
-- [ ] 5c: Change index to 1-based: `{index = 1}` → first sheet (was 0-based)
-- [ ] 5d: Update `selectSheet(index)` to use 1-based indexing as well
-- [ ] 5e: Update all unit tests to use 1-based indexing
-- [ ] 5f: Update autocomplete type definitions
+- [x] 5a: Modify `luaGetSheet` to accept number directly: `getSheet(1)` → first sheet
+- [x] 5b: Modify `luaGetSheet` to accept string directly: `getSheet("Sheet1")` → sheet by name
+- [x] 5c: Change index to 1-based: `{index = 1}` → first sheet (was 0-based)
+- [x] 5d: Update `selectSheet(index)` to use 1-based indexing as well
+- [x] 5e: Update all unit tests to use 1-based indexing
+- [x] 5f: Update autocomplete type definitions
 
 **Implementation:**
 ```cpp

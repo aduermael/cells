@@ -415,7 +415,39 @@ TEST(LuauSandboxTest, GetSheetByIndex) {
     sandbox.setContext(workbook.get(), sheet);
 
     auto result = sandbox.execute(R"(
-        local s = getSheet({index = 0})
+        local s = getSheet({index = 1})
+        return s.name
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Sheet1");
+}
+
+TEST(LuauSandboxTest, GetSheetByDirectIndex) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // getSheet(1) shorthand - 1-based index
+    auto result = sandbox.execute(R"(
+        local s = getSheet(1)
+        return s.name
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Sheet1");
+}
+
+TEST(LuauSandboxTest, GetSheetByDirectName) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // getSheet("name") shorthand
+    auto result = sandbox.execute(R"(
+        local s = getSheet("Sheet1")
         return s.name
     )");
     EXPECT_TRUE(result.success) << result.error;
@@ -446,14 +478,14 @@ TEST(LuauSandboxTest, SheetNameProperty) {
 
     // Set sheet name via property
     auto set = sandbox.execute(R"(
-        local s = getSheet({index = 0})
+        local s = getSheet({index = 1})
         s.name = "RenamedSheet"
     )");
     EXPECT_TRUE(set.success) << set.error;
 
     // Read back the name
     auto get = sandbox.execute(R"(
-        local s = getSheet({index = 0})
+        local s = getSheet({index = 1})
         return s.name
     )");
     EXPECT_TRUE(get.success) << get.error;
@@ -471,15 +503,15 @@ TEST(LuauSandboxTest, SelectSheetByIndex) {
     auto add = sandbox.execute("addSheet('SecondSheet')");
     EXPECT_TRUE(add.success) << add.error;
 
-    // Add data to sheet 0
+    // Add data to sheet 1 (first sheet, 1-based)
     sandbox.execute("setCell('A1', 100)");
 
-    // Select sheet 1 (SecondSheet) and add data
-    sandbox.execute("selectSheet(1)");
+    // Select sheet 2 (SecondSheet, 1-based) and add data
+    sandbox.execute("selectSheet(2)");
     sandbox.execute("setCell('A1', 200)");
 
-    // Select back to sheet 0 and verify
-    sandbox.execute("selectSheet(0)");
+    // Select back to sheet 1 (first sheet, 1-based) and verify
+    sandbox.execute("selectSheet(1)");
     auto verify = sandbox.execute("return getCell('A1').value");
     EXPECT_TRUE(verify.success) << verify.error;
     EXPECT_EQ(verify.output, "100");
@@ -518,7 +550,7 @@ TEST(LuauSandboxTest, SelectSheetByObject) {
     sandbox.setContext(workbook.get(), sheet);
 
     auto result = sandbox.execute(R"(
-        local s = getSheet({index = 0})
+        local s = getSheet({index = 1})
         selectSheet(s)
         return "ok"
     )");
