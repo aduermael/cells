@@ -164,6 +164,10 @@ private:
     static int luaSheetIndex(lua_State* L);     // Get sheet.name
     static int luaSheetNewIndex(lua_State* L);  // Set sheet.name = "..."
 
+    // __tostring metamethods
+    static int luaCellToString(lua_State* L);   // print(cell) → "Cell<A1>"
+    static int luaSheetToString(lua_State* L);  // print(sheet) → "Sheet<Name>"
+
     // Helper: Create a sheet Lua object
     void pushSheetObject(lua_State* L, Sheet* sheet) const;
 };

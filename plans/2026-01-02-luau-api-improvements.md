@@ -184,14 +184,14 @@ int LuauSandbox::luaGetSheet(lua_State* L) {
 
 ---
 
-## Phase 6: __tostring for Cell and Sheet
+## Phase 6: __tostring for Cell and Sheet ✅
 
 Implement `__tostring` metamethods so `print(cell)` shows useful info.
 
-- [ ] 6a: Implement `luaCellToString` - returns `"Cell<A1>"` format
-- [ ] 6b: Implement `luaSheetToString` - returns `"Sheet<SheetName>"` format
-- [ ] 6c: Register `__tostring` in Cell and Sheet metatables
-- [ ] 6d: Add unit tests for tostring behavior
+- [x] 6a: Implement `luaCellToString` - returns `"Cell<A1>"` format
+- [x] 6b: Implement `luaSheetToString` - returns `"Sheet<SheetName>"` format
+- [x] 6c: Register `__tostring` in Cell and Sheet metatables
+- [x] 6d: Add unit tests for tostring behavior
 
 **Implementation:**
 ```cpp

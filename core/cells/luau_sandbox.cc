@@ -1155,6 +1155,83 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
 }
 
 // ============================================================================
+// Cell __tostring metamethod: returns "Cell<A1>" format
+// ============================================================================
+int LuauSandbox::luaCellToString(lua_State* L) {
+    // Stack: [1] = cell table
+    // Get the cell UUID from the table
+    lua_getfield(L, 1, "_uuid");
+    if (lua_isstring(L, -1) == 0) {
+        lua_pushstring(L, "Cell<invalid>");
+        return 1;
+    }
+    const char* uuidStr = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    // Get context
+    Sheet* sheet = getSheet(L);
+    if (sheet == nullptr) {
+        lua_pushstring(L, "Cell<no context>");
+        return 1;
+    }
+
+    const ID cellId(uuidStr);
+    const Cell* cell = sheet->getCell(cellId);
+    if (cell == nullptr) {
+        lua_pushstring(L, "Cell<not found>");
+        return 1;
+    }
+
+    // Get the cell's current position
+    const Axis* col = sheet->getColumn(cell->colId);
+    const Axis* row = sheet->getRow(cell->rowId);
+    if (col == nullptr || row == nullptr) {
+        lua_pushstring(L, "Cell<no position>");
+        return 1;
+    }
+
+    // Convert to A1 notation
+    const std::string a1Ref =
+        RefConverter::columnIndexToLetter(col->position) + std::to_string(row->position + 1);
+    const std::string result = "Cell<" + a1Ref + ">";
+    lua_pushstring(L, result.c_str());
+    return 1;
+}
+
+// ============================================================================
+// Sheet __tostring metamethod: returns "Sheet<SheetName>" format
+// ============================================================================
+int LuauSandbox::luaSheetToString(lua_State* L) {
+    // Stack: [1] = sheet table
+    // Get the sheet UUID from the table
+    lua_getfield(L, 1, "_uuid");
+    if (lua_isstring(L, -1) == 0) {
+        lua_pushstring(L, "Sheet<invalid>");
+        return 1;
+    }
+    const char* uuidStr = lua_tostring(L, -1);
+    lua_pop(L, 1);
+
+    // Get context
+    Workbook* workbook = getWorkbook(L);
+    if (workbook == nullptr) {
+        lua_pushstring(L, "Sheet<no context>");
+        return 1;
+    }
+
+    const ID sheetId(uuidStr);
+    const Sheet* sheet = workbook->getSheet(sheetId);
+    if (sheet == nullptr) {
+        lua_pushstring(L, "Sheet<not found>");
+        return 1;
+    }
+
+    const std::string result = "Sheet<" + sheet->name + ">";
+    lua_pushstring(L, result.c_str());
+    return 1;
+}
+
+// ============================================================================
 // Sheet __index metamethod: handles property access (e.g., sheet.name)
 // ============================================================================
 int LuauSandbox::luaSheetIndex(lua_State* L) {
@@ -1367,20 +1444,24 @@ void LuauSandbox::registerCellsAPI() {
     cellCacheRef_ = lua_ref(L_, -1);  // Store in registry (ref pops the value)
     // lua_ref pops the value from stack, so we don't need to pop
 
-    // Create Cell metatable with __index/__newindex for property access
+    // Create Cell metatable with __index/__newindex/__tostring for property access
     lua_newtable(L_);  // Cell metatable
     lua_pushcfunction(L_, &LuauSandbox::luaCellIndex, "Cell.__index");
     lua_setfield(L_, -2, "__index");
     lua_pushcfunction(L_, &LuauSandbox::luaCellNewIndex, "Cell.__newindex");
     lua_setfield(L_, -2, "__newindex");
+    lua_pushcfunction(L_, &LuauSandbox::luaCellToString, "Cell.__tostring");
+    lua_setfield(L_, -2, "__tostring");
     cellMetatableRef_ = lua_ref(L_, -1);  // Store in registry
 
-    // Create Sheet metatable with __index/__newindex for property access (e.g., sheet.name)
+    // Create Sheet metatable with __index/__newindex/__tostring for property access
     lua_newtable(L_);  // Sheet metatable
     lua_pushcfunction(L_, &LuauSandbox::luaSheetIndex, "Sheet.__index");
     lua_setfield(L_, -2, "__index");
     lua_pushcfunction(L_, &LuauSandbox::luaSheetNewIndex, "Sheet.__newindex");
     lua_setfield(L_, -2, "__newindex");
+    lua_pushcfunction(L_, &LuauSandbox::luaSheetToString, "Sheet.__tostring");
+    lua_setfield(L_, -2, "__tostring");
     sheetMetatableRef_ = lua_ref(L_, -1);  // Store in registry
 
     // Register global API functions

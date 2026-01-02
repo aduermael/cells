@@ -1071,5 +1071,120 @@ TEST(LuauSandboxTest, CellCustomPropertyAllowed) {
     EXPECT_EQ(result.output, "test");
 }
 
+// ============================================================================
+// __tostring Metamethod Tests
+// ============================================================================
+
+TEST(LuauSandboxTest, CellToStringShowsReference) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1')
+        return tostring(c)
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Cell<A1>");
+}
+
+TEST(LuauSandboxTest, CellToStringWithPrint) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // print() uses __tostring
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1')
+        print(c)
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Cell<A1>\n");
+}
+
+TEST(LuauSandboxTest, CellToStringDifferentPositions) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Create cells at different positions and verify tostring
+    auto result = sandbox.execute(R"(
+        local b2 = getCell('B2', {create = true})
+        local c3 = getCell('C3', {create = true})
+        return tostring(b2) .. " " .. tostring(c3)
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Cell<B2> Cell<C3>");
+}
+
+TEST(LuauSandboxTest, SheetToStringShowsName) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local s = getSheet(1)
+        return tostring(s)
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Sheet<Sheet1>");
+}
+
+TEST(LuauSandboxTest, SheetToStringWithPrint) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // print() uses __tostring
+    auto result = sandbox.execute(R"(
+        local s = getSheet(1)
+        print(s)
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Sheet<Sheet1>\n");
+}
+
+TEST(LuauSandboxTest, SheetToStringAfterRename) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // tostring should reflect the renamed name (fetched dynamically)
+    auto result = sandbox.execute(R"(
+        local s = getSheet(1)
+        s.name = "MyData"
+        return tostring(s)
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Sheet<MyData>");
+}
+
+TEST(LuauSandboxTest, NewSheetToString) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute(R"(
+        local s = addSheet("Budget")
+        return tostring(s)
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Sheet<Budget>");
+}
+
 }  // namespace
 }  // namespace cells
