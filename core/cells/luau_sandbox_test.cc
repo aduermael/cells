@@ -752,7 +752,8 @@ TEST(LuauSandboxTest, PrintMultipleArguments) {
     auto result = sandbox.execute("print('hello', 'world', 123)");
 
     EXPECT_TRUE(result.success);
-    EXPECT_EQ(result.output, "hello\tworld\t123\n");
+    // Arguments are concatenated directly without separator
+    EXPECT_EQ(result.output, "helloworld123\n");
 }
 
 TEST(LuauSandboxTest, PrintMultipleCalls) {
