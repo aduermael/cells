@@ -93,6 +93,17 @@ export interface DOMElements {
   astTree: HTMLElement;
   collabUIContainer: HTMLElement;
   canvasContainer: HTMLElement;
+  // Chat panel
+  chatPanel: HTMLElement;
+  chatHeader: HTMLElement;
+  chatTitle: HTMLElement;
+  chatClearBtn: HTMLButtonElement;
+  chatMinimizeBtn: HTMLButtonElement;
+  chatMessages: HTMLElement;
+  chatInputArea: HTMLElement;
+  chatInput: HTMLTextAreaElement;
+  chatSendBtn: HTMLButtonElement;
+  chatOpenBtn: HTMLButtonElement;
 }
 
 // =============================================================================
@@ -467,6 +478,17 @@ export function createApp(): App {
     astTree: getElement("ast-tree"),
     collabUIContainer: getElement("collab-ui-container"),
     canvasContainer: getElement("canvas-container"),
+    // Chat panel
+    chatPanel: getElement("chat-panel"),
+    chatHeader: getElement("chat-header"),
+    chatTitle: getElement("chat-title"),
+    chatClearBtn: getElement<HTMLButtonElement>("chat-clear-btn"),
+    chatMinimizeBtn: getElement<HTMLButtonElement>("chat-minimize-btn"),
+    chatMessages: getElement("chat-messages"),
+    chatInputArea: getElement("chat-input-area"),
+    chatInput: getElement<HTMLTextAreaElement>("chat-input"),
+    chatSendBtn: getElement<HTMLButtonElement>("chat-send"),
+    chatOpenBtn: getElement<HTMLButtonElement>("chat-open-btn"),
   };
 
   return new App(elements);

@@ -160,14 +160,25 @@
             </button>
         </div>
         <div id="chat-panel">
-            <button id="chat-minimize-btn" class="chat-minimize-btn" title="Minimize chat">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M6 9l6 6 6-6"/>
-                </svg>
-            </button>
+            <div id="chat-header">
+                <span id="chat-title">AI Assistant</span>
+                <div id="chat-header-actions">
+                    <button id="chat-clear-btn" class="chat-header-btn" title="Clear conversation">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
+                    <button id="chat-minimize-btn" class="chat-header-btn" title="Minimize chat">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="chat-messages"></div>
             <div id="chat-input-area">
-                <textarea id="chat-input" placeholder="Ask AI or send a message..." rows="1"></textarea>
-                <button id="chat-send" class="chat-send" title="Send">
+                <textarea id="chat-input" placeholder="Ask AI about your spreadsheet..." rows="1"></textarea>
+                <button id="chat-send" class="chat-send" title="Send" disabled>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 19V5M5 12l7-7 7 7"/>
                     </svg>
@@ -191,41 +202,6 @@
 
         // Start the application
         ctx.init();
-
-        // Chat panel toggle functionality
-        const chatPanel = document.getElementById('chat-panel');
-        const chatOpenBtn = document.getElementById('chat-open-btn');
-        const chatMinimizeBtn = document.getElementById('chat-minimize-btn');
-        const chatInput = document.getElementById('chat-input');
-
-        // Open chat panel
-        chatOpenBtn?.addEventListener('click', () => {
-            chatPanel?.classList.remove('hidden');
-            chatOpenBtn?.classList.add('hidden');
-            chatInput?.focus();
-        });
-
-        // Minimize chat panel
-        chatMinimizeBtn?.addEventListener('click', () => {
-            chatPanel?.classList.add('hidden');
-            chatOpenBtn?.classList.remove('hidden');
-        });
-
-        // Auto-resize textarea
-        chatInput?.addEventListener('input', () => {
-            chatInput.style.height = 'auto';
-            const maxHeight = window.innerHeight * 0.6;
-            chatInput.style.height = Math.min(chatInput.scrollHeight, maxHeight) + 'px';
-        });
-
-        // Send on Enter (Shift+Enter for newline)
-        chatInput?.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                // TODO: Wire up send functionality
-                console.log('Send:', chatInput.value);
-            }
-        });
     </script>
 </body>
 </html>

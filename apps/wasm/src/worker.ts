@@ -137,6 +137,17 @@ interface CellsEngine {
   tokenizeLuau(source: string): string;
   getAutocomplete(source: string, line: number, column: number): string;
 
+  // AI Agent
+  setAgentListener(callback: (type: string, data: string) => void): void;
+  removeAgentListener(): void;
+  initAgent(serverUrl: string): void;
+  isAgentInitialized(): boolean;
+  sendAgentMessage(prompt: string, conversationId: string): void;
+  getAgentConversationId(): string;
+  clearAgentConversation(): void;
+  cancelAgent(): void;
+  isAgentProcessing(): boolean;
+
   // Viewport pixel queries (Phase 5)
   getColumnPixelOffset(position: number): number;
   getRowPixelOffset(position: number): number;
@@ -227,6 +238,16 @@ async function initModule(): Promise<void> {
           changeType: changeType, // 'cell', 'structure', 'sheet', or 'loaded'
         });
       }
+    });
+
+    // Register agent listener for AI events
+    // The agent callback receives (eventType, data) where data is JSON or text
+    engine.setAgentListener((eventType: string, data: string) => {
+      workerSelf.postMessage({
+        type: "agentEvent",
+        eventType: eventType, // 'text', 'tool_use', 'tool_result_needed', 'done', 'error'
+        data: data,
+      });
     });
 
     isReady = true;
@@ -1171,6 +1192,54 @@ function handleMessage(msg: WorkerRequest): void {
         const { source, line, column } = params as { source: string; line: number; column: number };
         const result = engine.getAutocomplete(source, line, column);
         respond({ type: "autocomplete", result });
+        break;
+      }
+
+      // ================================================================
+      // AI Agent methods
+      // ================================================================
+
+      case "initAgent": {
+        const { serverUrl } = params as { serverUrl: string };
+        engine.initAgent(serverUrl);
+        respond({ type: "agentInitialized", success: true });
+        break;
+      }
+
+      case "isAgentInitialized": {
+        const initialized = engine.isAgentInitialized();
+        respond({ type: "agentStatus", initialized });
+        break;
+      }
+
+      case "sendAgentMessage": {
+        const { prompt, conversationId } = params as { prompt: string; conversationId: string };
+        engine.sendAgentMessage(prompt, conversationId || "");
+        respond({ type: "agentMessageSent", success: true });
+        break;
+      }
+
+      case "getAgentConversationId": {
+        const conversationId = engine.getAgentConversationId();
+        respond({ type: "agentConversationId", conversationId });
+        break;
+      }
+
+      case "clearAgentConversation": {
+        engine.clearAgentConversation();
+        respond({ type: "agentConversationCleared", success: true });
+        break;
+      }
+
+      case "cancelAgent": {
+        engine.cancelAgent();
+        respond({ type: "agentCancelled", success: true });
+        break;
+      }
+
+      case "isAgentProcessing": {
+        const processing = engine.isAgentProcessing();
+        respond({ type: "agentProcessing", processing });
         break;
       }
 

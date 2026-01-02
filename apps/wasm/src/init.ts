@@ -15,6 +15,7 @@ import { FileLoader } from "./file-loader";
 import { persistence } from "./persistence";
 import { AstDebugPanel } from "./ast-debug";
 import { ScriptPanel } from "./script-panel";
+import { AgentPanel } from "./agent-panel";
 import { CppSyncAdapter } from "./cpp-sync-adapter";
 import { RoomManager, getRoomIdFromUrl, clearRoomIdFromUrl } from "./room-url";
 import {
@@ -53,6 +54,7 @@ export interface AppContext {
   eventManager: AppEventManager;
   astDebugPanel: AstDebugPanel;
   scriptPanel: ScriptPanel;
+  agentPanel: AgentPanel;
   workbookTitleEditor: WorkbookTitleEditor;
   clipboardManager: ClipboardManager;
 
@@ -158,6 +160,32 @@ export function initApp(): AppContext {
       }
       return app.dataSource.getAutocomplete(source, line, column);
     },
+  });
+
+  // =========================================================================
+  // Create AgentPanel (AI chat interface)
+  // =========================================================================
+
+  // Agent server URL - can be configured via environment or defaults to local
+  const AGENT_SERVER_URL =
+    (typeof window !== "undefined" &&
+      (window as Window & { AGENT_SERVER_URL?: string }).AGENT_SERVER_URL) ||
+    "http://localhost:8081";
+
+  const agentPanel = new AgentPanel({
+    panel: elements.chatPanel,
+    header: elements.chatHeader,
+    title: elements.chatTitle,
+    clearBtn: elements.chatClearBtn,
+    minimizeBtn: elements.chatMinimizeBtn,
+    messages: elements.chatMessages,
+    inputArea: elements.chatInputArea,
+    input: elements.chatInput,
+    sendBtn: elements.chatSendBtn,
+    openBtn: elements.chatOpenBtn,
+    getClient: () => app.dataSource?.client ?? null,
+    getServerUrl: () => AGENT_SERVER_URL,
+    onViewportRefresh: () => fetchViewportNow(),
   });
 
   // =========================================================================
@@ -1342,6 +1370,7 @@ export function initApp(): AppContext {
     eventManager,
     astDebugPanel,
     scriptPanel,
+    agentPanel,
     workbookTitleEditor,
     clipboardManager,
 

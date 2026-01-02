@@ -275,3 +275,34 @@ export interface AutocompleteResult {
   context: AutocompleteContext;
   suggestions: AutocompleteSuggestion[];
 }
+
+// ============================================================================
+// AI Agent Types
+// ============================================================================
+
+/** Agent event type */
+export type AgentEventType =
+  | "text"
+  | "tool_use"
+  | "tool_result_needed"
+  | "done"
+  | "error";
+
+/** Tool use event data */
+export interface AgentToolUseData {
+  id: string;
+  name: string;
+  input: { code: string };
+}
+
+/** Done event data */
+export interface AgentDoneData {
+  stop_reason: string;
+  conversation_id: string;
+}
+
+/** Agent event callback */
+export type AgentEventCallback = (
+  eventType: AgentEventType,
+  data: string
+) => void;

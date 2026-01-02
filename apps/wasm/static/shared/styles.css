@@ -986,47 +986,207 @@ canvas {
     bottom: var(--spacing-sm);
     right: var(--spacing-sm);
     display: flex;
-    align-items: flex-end;
-    gap: var(--spacing-sm);
-    padding: var(--spacing-sm);
-    background: var(--color-bg-secondary);
+    flex-direction: column;
+    width: 380px;
+    max-width: calc(100vw - 32px);
+    max-height: 60vh;
+    background: var(--color-bg-primary);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
-    box-shadow: 0 2px 12px var(--color-shadow);
+    box-shadow: 0 4px 20px var(--color-shadow-lg);
     z-index: 100;
-    transition: all var(--transition-fast);
-    backdrop-filter: blur(8px);
+    overflow: hidden;
 }
 
 #chat-panel.hidden {
     display: none;
 }
 
-/* Minimize button inside panel */
-.chat-minimize-btn {
-    width: var(--control-height);
-    height: var(--control-height);
+/* Minimized state: only show input area */
+#chat-panel.minimized {
+    max-height: none;
+}
+
+#chat-panel.minimized #chat-header,
+#chat-panel.minimized #chat-messages {
+    display: none;
+}
+
+/* Chat header */
+#chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-bg-secondary);
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+}
+
+#chat-title {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+}
+
+#chat-header-actions {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+.chat-header-btn {
+    width: 24px;
+    height: 24px;
     padding: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--color-text-muted);
-    background: var(--color-bg-primary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
+    background: transparent;
+    border: none;
+    border-radius: var(--border-radius-smaller);
     cursor: pointer;
     transition: all var(--transition-fast);
-    flex-shrink: 0;
-    align-self: flex-end;
 }
 
-.chat-minimize-btn:hover {
+.chat-header-btn:hover {
     background: var(--color-bg-hover);
     color: var(--color-text-secondary);
 }
 
-.chat-minimize-btn:active {
+.chat-header-btn:active {
     background: var(--color-bg-active);
+}
+
+/* Messages area */
+#chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    min-height: 100px;
+    max-height: 400px;
+}
+
+#chat-messages:empty::before {
+    content: "Ask AI about your spreadsheet...";
+    color: var(--color-text-placeholder);
+    font-size: var(--font-size-sm);
+    text-align: center;
+    padding: var(--spacing-lg);
+}
+
+/* Message bubbles */
+.chat-message {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    max-width: 90%;
+}
+
+.chat-message.user {
+    align-self: flex-end;
+}
+
+.chat-message.assistant {
+    align-self: flex-start;
+}
+
+.chat-message-content {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.chat-message.user .chat-message-content {
+    background: var(--color-primary);
+    color: var(--color-bg-primary);
+}
+
+.chat-message.assistant .chat-message-content {
+    background: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+}
+
+/* Tool use block (code execution) */
+.chat-tool-use {
+    margin-top: var(--spacing-xs);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+}
+
+.chat-tool-header {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--color-bg-secondary);
+    border-bottom: 1px solid var(--color-border);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    cursor: pointer;
+}
+
+.chat-tool-header:hover {
+    background: var(--color-bg-hover);
+}
+
+.chat-tool-icon {
+    font-size: 10px;
+    transition: transform var(--transition-fast);
+}
+
+.chat-tool-use.collapsed .chat-tool-icon {
+    transform: rotate(-90deg);
+}
+
+.chat-tool-use.collapsed .chat-tool-code {
+    display: none;
+}
+
+.chat-tool-code {
+    padding: var(--spacing-sm);
+    background: var(--script-bg);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    color: var(--script-text);
+    overflow-x: auto;
+    white-space: pre-wrap;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.chat-tool-result {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    background: var(--color-bg-hover);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    border-top: 1px solid var(--color-border);
+}
+
+.chat-tool-result.error {
+    color: var(--color-danger);
+    background: var(--color-danger-bg);
+}
+
+/* Streaming indicator */
+.chat-message.streaming .chat-message-content::after {
+    content: "▌";
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
 }
 
 /* Input area container */
@@ -1034,34 +1194,33 @@ canvas {
     display: flex;
     align-items: flex-end;
     gap: var(--spacing-xs);
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-    padding: var(--spacing-xs);
-    min-width: 280px;
-    max-width: 360px;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-#chat-input-area:focus-within {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.1);
+    padding: var(--spacing-sm);
+    background: var(--color-bg-secondary);
+    border-top: 1px solid var(--color-border);
+    flex-shrink: 0;
 }
 
 /* Textarea */
 #chat-input {
     flex: 1;
-    min-height: 24px;
-    max-height: 60vh;
-    padding: var(--spacing-xs) var(--spacing-sm);
+    min-height: 36px;
+    max-height: 120px;
+    padding: var(--spacing-sm);
     font-family: inherit;
     font-size: var(--font-size-sm);
     color: var(--color-text-primary);
-    background: transparent;
-    border: none;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
     outline: none;
     resize: none;
     line-height: 1.4;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+#chat-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.1);
 }
 
 #chat-input::placeholder {
@@ -1070,8 +1229,8 @@ canvas {
 
 /* Send button */
 .chat-send {
-    width: var(--control-height);
-    height: var(--control-height);
+    width: 36px;
+    height: 36px;
     padding: 0;
     display: flex;
     align-items: center;
@@ -1085,11 +1244,11 @@ canvas {
     flex-shrink: 0;
 }
 
-.chat-send:hover {
+.chat-send:hover:not(:disabled) {
     background: var(--color-primary-hover);
 }
 
-.chat-send:active {
+.chat-send:active:not(:disabled) {
     background: var(--color-primary-active);
 }
 
@@ -1097,6 +1256,31 @@ canvas {
     background: var(--color-bg-active);
     color: var(--color-text-placeholder);
     cursor: not-allowed;
+}
+
+/* Loading state */
+#chat-panel.loading .chat-send svg {
+    display: none;
+}
+
+#chat-panel.loading .chat-send::after {
+    content: "";
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* Error message inline */
+.chat-error {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
+    font-size: var(--font-size-xs);
+    border-radius: var(--border-radius);
+    margin-top: var(--spacing-xs);
 }
 
 /* Collaboration Status Badge */
