@@ -923,6 +923,9 @@ int LuauSandbox::luaPrint(lua_State* L) {
 
     const int nargs = lua_gettop(L);
     for (int i = 1; i <= nargs; i++) {
+        if (i > 1) {
+            sandbox->printBuffer_ += " ";
+        }
         const char* s = luaL_tolstring(L, i, nullptr);
         if (s != nullptr) {
             sandbox->printBuffer_ += s;
