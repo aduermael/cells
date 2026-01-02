@@ -1186,5 +1186,141 @@ TEST(LuauSandboxTest, NewSheetToString) {
     EXPECT_EQ(result.output, "Sheet<Budget>");
 }
 
+// ============================================================================
+// cell.dependents property tests
+// ============================================================================
+
+TEST(LuauSandboxTest, CellDependentsEmptyForNonFormulaCell) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set A1 to a simple value (not a formula)
+    auto setup = sandbox.execute("setCell('A1', 42)");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // A1 has no dependents (no formula references it)
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1')
+        local deps = c.dependents
+        return #deps
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "0");
+}
+
+TEST(LuauSandboxTest, CellDependentsSingleDependent) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set A1 to a value, B1 to a formula referencing A1
+    auto setup = sandbox.execute(R"(
+        setCell('A1', 10)
+        setCell('B1', '=A1*2')
+    )");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // A1 should have B1 as a dependent
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1')
+        local deps = c.dependents
+        if #deps == 1 then
+            return deps[1].ref
+        else
+            return "wrong count: " .. #deps
+        end
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "B1");
+}
+
+TEST(LuauSandboxTest, CellDependentsMultipleDependents) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set A1 to a value, B1 and C1 to formulas referencing A1
+    auto setup = sandbox.execute(R"(
+        setCell('A1', 100)
+        setCell('B1', '=A1+1')
+        setCell('C1', '=A1+2')
+    )");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // A1 should have 2 dependents
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1')
+        local deps = c.dependents
+        return #deps
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "2");
+}
+
+TEST(LuauSandboxTest, CellDependentsAreFirstLevelOnly) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // A1 -> B1 -> C1 chain
+    auto setup = sandbox.execute(R"(
+        setCell('A1', 5)
+        setCell('B1', '=A1')
+        setCell('C1', '=B1')
+    )");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // A1 should only have B1 as direct dependent (not C1)
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1')
+        local deps = c.dependents
+        if #deps == 1 then
+            return deps[1].ref
+        else
+            return "wrong count: " .. #deps
+        end
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "B1");
+}
+
+TEST(LuauSandboxTest, CellDependentsReturnsIterable) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set up A1 with two dependents
+    auto setup = sandbox.execute(R"(
+        setCell('A1', 1)
+        setCell('B1', '=A1')
+        setCell('C1', '=A1')
+    )");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // Iterate over dependents and collect refs
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1')
+        local refs = {}
+        for i, dep in ipairs(c.dependents) do
+            table.insert(refs, dep.ref)
+        end
+        table.sort(refs)
+        return table.concat(refs, ",")
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "B1,C1");
+}
+
 }  // namespace
 }  // namespace cells

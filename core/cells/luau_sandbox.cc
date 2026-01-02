@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "core/cells/crdt.h"
+#include "core/cells/dependency_graph.h"
 #include "core/cells/fill_range.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
@@ -1053,6 +1054,40 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
             }
         }
         lua_pushnil(L);
+        return 1;
+    }
+
+    // Handle .dependents property - returns array of cells that depend on this cell
+    if (strcmp(key, "dependents") == 0) {
+        const Axis* col = sheet->getColumn(cell->colId);
+        const Axis* row = sheet->getRow(cell->rowId);
+        if (col == nullptr || row == nullptr) {
+            // Cell has no position, return empty array
+            lua_newtable(L);
+            return 1;
+        }
+
+        // Get dependency graph and query for dependents
+        const DependencyGraph* depGraph = sheet->getDependencyGraph();
+        if (depGraph == nullptr) {
+            lua_newtable(L);
+            return 1;
+        }
+
+        const std::vector<ID> dependentIds =
+            depGraph->getDependentsForCell(cellId, col->position, row->position);
+
+        // Create Lua array of cell objects
+        const LuauSandbox* sandbox = getSandbox(L);
+        lua_newtable(L);
+        int idx = 1;
+        for (const ID& depId : dependentIds) {
+            Cell* depCell = sheet->getCell(depId);
+            if (depCell != nullptr) {
+                sandbox->pushCellObject(L, depCell);
+                lua_rawseti(L, -2, idx++);
+            }
+        }
         return 1;
     }
 
