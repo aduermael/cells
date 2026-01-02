@@ -1731,6 +1731,119 @@ canvas {
     color: var(--color-primary);
 }
 
+/* Console Panel (inside script panel) */
+#script-console {
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+    max-width: 50%;
+    width: 250px;
+    background: var(--script-bg);
+    border-left: 1px solid var(--script-border);
+    flex-shrink: 0;
+}
+
+#script-console.hidden {
+    display: none;
+}
+
+#script-console-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    background: var(--script-bg-gutter);
+    border-bottom: 1px solid var(--script-border);
+    flex-shrink: 0;
+}
+
+#script-console-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--script-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+#script-console-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.script-console-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: var(--script-text-muted);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.script-console-btn:hover {
+    background: var(--color-bg-hover);
+    color: var(--script-text);
+}
+
+.script-console-btn:active {
+    background: var(--color-bg-active);
+}
+
+#script-console-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--script-text);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+#script-console-content:empty::before {
+    content: "Console output will appear here...";
+    color: var(--script-text-muted);
+    font-style: italic;
+}
+
+/* Console output lines */
+.console-line {
+    padding: 2px 0;
+}
+
+.console-line::before {
+    content: "> ";
+    color: var(--script-text-muted);
+}
+
+/* Horizontal resize handle between editor and console */
+#script-console-resize-handle {
+    width: 4px;
+    cursor: ew-resize;
+    background: transparent;
+    flex-shrink: 0;
+    transition: background var(--transition-fast);
+}
+
+#script-console-resize-handle.hidden {
+    display: none;
+}
+
+#script-console-resize-handle:hover {
+    background: var(--script-border);
+}
+
+#script-console-resize-handle:active,
+#script-console-resize-handle.dragging {
+    background: var(--color-primary);
+}
+
 /* ============================================================================
    Custom Scrollbars (virtual scrolling)
    ============================================================================ */

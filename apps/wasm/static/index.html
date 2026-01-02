@@ -93,6 +93,26 @@
                     <pre id="script-editor-backdrop"><code id="script-editor-highlight"></code></pre>
                     <textarea id="script-editor" placeholder="-- set value: setCell('A1', 100)&#10;-- get value: setCell('B1', getCell('A1') * 2)&#10;-- loop: for i = 1, 10 do setCell('A'..i, i) end&#10;-- fill range: fillRange({from='A1', to='A1:A10'})" spellcheck="false"></textarea>
                 </div>
+                <div id="script-console-resize-handle" class="hidden"></div>
+                <div id="script-console" class="hidden">
+                    <div id="script-console-header">
+                        <span id="script-console-title">Console</span>
+                        <div id="script-console-actions">
+                            <button id="script-console-clear-btn" class="script-console-btn" title="Clear console">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                                </svg>
+                            </button>
+                            <button id="script-console-close-btn" class="script-console-btn" title="Close console">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="script-console-content"></div>
+                </div>
             </div>
             <div id="script-panel-footer">
                 <span id="script-status"></span>
