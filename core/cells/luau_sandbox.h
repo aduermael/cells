@@ -114,6 +114,7 @@ private:
 
     // Document operations
     static int luaDocumentSetTitle(lua_State* L);
+    static int luaDocumentGetTitle(lua_State* L);
 
     // Axis operations
     static int luaColumnSetWidth(lua_State* L);

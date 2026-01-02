@@ -459,6 +459,19 @@ int LuauSandbox::luaDocumentSetTitle(lua_State* L) {
 }
 
 // ============================================================================
+// Cells API: getDocumentTitle()
+// Returns the current workbook name/title
+// ============================================================================
+int LuauSandbox::luaDocumentGetTitle(lua_State* L) {
+    const Workbook* workbook = getWorkbook(L);
+    if (workbook == nullptr) {
+        luaL_error(L, "getDocumentTitle: no context set");
+    }
+    lua_pushstring(L, workbook->name.c_str());
+    return 1;
+}
+
+// ============================================================================
 // Cells API: setColumnWidth(col, options)
 // options.width: number (pixels)
 // ============================================================================
@@ -1299,6 +1312,9 @@ void LuauSandbox::registerCellsAPI() {
 
     lua_pushcfunction(L_, &LuauSandbox::luaDocumentSetTitle, "setDocumentTitle");
     lua_setglobal(L_, "setDocumentTitle");
+
+    lua_pushcfunction(L_, &LuauSandbox::luaDocumentGetTitle, "getDocumentTitle");
+    lua_setglobal(L_, "getDocumentTitle");
 
     lua_pushcfunction(L_, &LuauSandbox::luaColumnSetWidth, "setColumnWidth");
     lua_setglobal(L_, "setColumnWidth");

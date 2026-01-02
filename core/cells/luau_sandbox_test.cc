@@ -828,6 +828,19 @@ TEST(LuauSandboxTest, PrintBufferClearedBetweenExecutions) {
 // Document Title Tests
 // ============================================================================
 
+TEST(LuauSandboxTest, GetDocumentTitleReturnsWorkbookName) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    workbook->name = "My Budget";
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute("print(getDocumentTitle())");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "My Budget\n");
+}
+
 TEST(LuauSandboxTest, SetDocumentTitleChangesWorkbookName) {
     auto workbook = createTestWorkbook();
     Sheet* sheet = workbook->getSheetByIndex(0);
@@ -841,6 +854,23 @@ TEST(LuauSandboxTest, SetDocumentTitleChangesWorkbookName) {
 
     // Verify the workbook name was actually changed
     EXPECT_EQ(workbook->name, "MyDocument");
+}
+
+TEST(LuauSandboxTest, SetAndGetDocumentTitleRoundTrip) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set the title and then get it back
+    auto result = sandbox.execute(R"(
+        setDocumentTitle('Budget 2025')
+        print(getDocumentTitle())
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "Budget 2025\n");
+    EXPECT_EQ(workbook->name, "Budget 2025");
 }
 
 }  // namespace

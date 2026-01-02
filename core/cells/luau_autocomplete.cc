@@ -195,6 +195,7 @@ declare function setCell(ref: string, value: number | string | boolean | nil): (
 
 -- Document
 declare function setDocumentTitle(title: string): ()
+declare function getDocumentTitle(): string
 
 -- Structure
 declare function setColumnWidth(col: string, opts: SizeOptions): ()

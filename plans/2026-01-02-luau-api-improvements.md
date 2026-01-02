@@ -56,15 +56,15 @@ A series of improvements to the Luau scripting API for better usability and cons
 
 ---
 
-## Phase 2: Add getDocumentTitle
+## Phase 2: Add getDocumentTitle ✅
 
 Add a new function to retrieve the current document title.
 
-- [ ] 2a: Implement `luaDocumentGetTitle` in `luau_sandbox.cc`
-- [ ] 2b: Register `getDocumentTitle` global function in `registerCellsAPI()`
-- [ ] 2c: Add declaration to `luau_sandbox.h`
-- [ ] 2d: Add unit tests for `getDocumentTitle`
-- [ ] 2e: Add type definition (Luau Autocomplete can suggest it)
+- [x] 2a: Implement `luaDocumentGetTitle` in `luau_sandbox.cc`
+- [x] 2b: Register `getDocumentTitle` global function in `registerCellsAPI()`
+- [x] 2c: Add declaration to `luau_sandbox.h`
+- [x] 2d: Add unit tests for `getDocumentTitle`
+- [x] 2e: Add type definition (Luau Autocomplete can suggest it)
 
 **Implementation:**
 ```cpp
