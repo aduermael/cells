@@ -90,14 +90,10 @@ end
     auto hasRef = std::any_of(result.suggestions.begin(), result.suggestions.end(),
                               [](const auto& s) { return s.label == "ref"; });
 
-    // At least one should be present if type inference is working
-    bool hasAnyProperty = hasValue || hasFormula || hasRef;
-    if (!hasAnyProperty && !result.suggestions.empty()) {
-        // Print what we got for debugging
-        for (const auto& s : result.suggestions) {
-            std::cout << "  Suggestion: " << s.label << " (" << s.kind << ")\n";
-        }
-    }
+    // Type inference should provide all Cell properties
+    EXPECT_TRUE(hasValue) << "Expected 'value' property on Cell";
+    EXPECT_TRUE(hasFormula) << "Expected 'formula' property on Cell";
+    EXPECT_TRUE(hasRef) << "Expected 'ref' property on Cell";
 }
 
 TEST_F(LuauAutocompleteTest, SheetProperty_SuggestsName) {
@@ -112,12 +108,8 @@ end
     auto hasName = std::any_of(result.suggestions.begin(), result.suggestions.end(),
                                [](const auto& s) { return s.label == "name"; });
 
-    // Sheet should have a 'name' property
-    if (!hasName && !result.suggestions.empty()) {
-        for (const auto& s : result.suggestions) {
-            std::cout << "  Sheet suggestion: " << s.label << " (" << s.kind << ")\n";
-        }
-    }
+    // Type inference should provide Sheet.name property
+    EXPECT_TRUE(hasName) << "Expected 'name' property on Sheet";
 }
 
 TEST_F(LuauAutocompleteTest, CellsApiFunctions_SuggestedByPrefix) {

@@ -29,8 +29,9 @@ inline bool isIdentifierChar(char c) {
 
 // Get the word being typed at the cursor position
 std::string getCurrentWord(const std::string& source, size_t cursorPos) {
-    if (cursorPos == 0)
+    if (cursorPos == 0) {
         return "";
+    }
 
     size_t wordStart = cursorPos;
     while (wordStart > 0 && isIdentifierChar(source[wordStart - 1])) {
@@ -60,15 +61,17 @@ std::string getPreviousWord(const std::string& source, size_t cursorPos) {
         pos--;
     }
 
-    if (prevEnd == pos)
+    if (prevEnd == pos) {
         return "";
+    }
     return source.substr(pos, prevEnd - pos);
 }
 
 // Check if cursor is right after a . or :
 bool isAfterDotOrColon(const std::string& source, size_t cursorPos) {
-    if (cursorPos == 0)
+    if (cursorPos == 0) {
         return false;
+    }
 
     // Look for . or : before any identifier characters
     size_t pos = cursorPos - 1;
@@ -97,8 +100,9 @@ bool isInsideString(const std::string& source, size_t cursorPos) {
         const char c = source[i];
         const bool escaped = (i > 0 && source[i - 1] == '\\');
 
-        if (escaped)
+        if (escaped) {
             continue;
+        }
 
         if (c == '"' && !inSingleQuote) {
             inDoubleQuote = !inDoubleQuote;
