@@ -52,7 +52,7 @@ export class ScriptPanel {
   private consoleResizeHandle: HTMLElement;
 
   private executeScript: (script: string) => Promise<ScriptResult>;
-  private onScriptExecuted: () => void;
+  private onScriptExecuted: () => void | Promise<void>;
   private tokenize?: TokenizeFunction;
   private getAutocomplete?: (source: string, line: number, column: number) => Promise<AutocompleteResult>;
 
@@ -99,7 +99,7 @@ export class ScriptPanel {
     consoleClearBtn: HTMLElement;
     consoleResizeHandle: HTMLElement;
     executeScript: (script: string) => Promise<ScriptResult>;
-    onScriptExecuted: () => void;
+    onScriptExecuted: () => void | Promise<void>;
     tokenize?: TokenizeFunction;
     getAutocomplete?: (source: string, line: number, column: number) => Promise<AutocompleteResult>;
   }) {

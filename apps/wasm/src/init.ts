@@ -133,9 +133,18 @@ export function initApp(): AppContext {
       }
       return app.dataSource.executeScript(script);
     },
-    onScriptExecuted: () => {
+    onScriptExecuted: async () => {
       // Refresh viewport to show any changes made by the script
       fetchViewportNow();
+
+      // Refresh workbook name in case setDocumentTitle was called
+      if (app.dataSource) {
+        const name = await app.dataSource.client.getWorkbookName();
+        if (name) {
+          app.dataSource.setWorkbookName(name);
+          workbookTitleEditor.setTitle(name);
+        }
+      }
     },
     tokenize: async (source: string) => {
       if (!app.dataSource) {

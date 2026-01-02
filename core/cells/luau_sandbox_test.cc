@@ -824,5 +824,24 @@ TEST(LuauSandboxTest, PrintBufferClearedBetweenExecutions) {
     EXPECT_EQ(result2.output, "second\n");
 }
 
+// ============================================================================
+// Document Title Tests
+// ============================================================================
+
+TEST(LuauSandboxTest, SetDocumentTitleChangesWorkbookName) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    EXPECT_EQ(workbook->name, "TestWorkbook");
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    auto result = sandbox.execute("setDocumentTitle('MyDocument')");
+    EXPECT_TRUE(result.success) << result.error;
+
+    // Verify the workbook name was actually changed
+    EXPECT_EQ(workbook->name, "MyDocument");
+}
+
 }  // namespace
 }  // namespace cells
