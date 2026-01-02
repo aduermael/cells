@@ -101,6 +101,9 @@ private:
     int64_t instructionCount_{0};
     bool interrupted_{false};
 
+    // Print buffer for capturing print() output
+    std::string printBuffer_;
+
     // ========================================================================
     // Cells API function implementations (called from Lua)
     // ========================================================================
@@ -126,6 +129,9 @@ private:
     static int luaRangeSelect(lua_State* L);
     static int luaRangeDelete(lua_State* L);
     static int luaRangeFill(lua_State* L);
+
+    // Output operations
+    static int luaPrint(lua_State* L);
 
     // Cell object methods (called on cell tables via __index)
     static int luaCellGetRef(lua_State* L);

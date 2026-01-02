@@ -912,6 +912,32 @@ int LuauSandbox::luaRangeFill(lua_State* L) {
 }
 
 // ============================================================================
+// Output API: print(...)
+// Captures output to printBuffer_ for display in console
+// ============================================================================
+int LuauSandbox::luaPrint(lua_State* L) {
+    LuauSandbox* sandbox = getSandbox(L);
+    if (sandbox == nullptr) {
+        return 0;
+    }
+
+    const int nargs = lua_gettop(L);
+    for (int i = 1; i <= nargs; i++) {
+        if (i > 1) {
+            sandbox->printBuffer_ += "\t";
+        }
+        const char* s = luaL_tolstring(L, i, nullptr);
+        if (s != nullptr) {
+            sandbox->printBuffer_ += s;
+        }
+        lua_pop(L, 1);  // Pop the string returned by luaL_tolstring
+    }
+    sandbox->printBuffer_ += "\n";
+
+    return 0;
+}
+
+// ============================================================================
 // Cell __index metamethod: handles property access (e.g., cell.ref)
 // ============================================================================
 int LuauSandbox::luaCellIndex(lua_State* L) {
