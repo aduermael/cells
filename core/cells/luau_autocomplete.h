@@ -9,11 +9,12 @@ namespace cells {
 
 // A single autocomplete suggestion
 struct AutocompleteSuggestion {
-    std::string label;       // Display text
-    std::string insertText;  // Text to insert (may differ from label)
-    std::string kind;        // "function", "property", "keyword", "variable", etc.
-    std::string detail;      // Additional info (e.g., type signature)
-    bool deprecated{false};  // Whether this suggestion is deprecated
+    std::string label;        // Display text
+    std::string insertText;   // Text to insert (may differ from label)
+    std::string kind;         // "function", "property", "keyword", "variable", etc.
+    std::string detail;       // Additional info (e.g., type signature)
+    bool deprecated{false};   // Whether this suggestion is deprecated
+    std::string typeCorrect;  // "correct", "correctFunctionResult", or "" (none)
 };
 
 // Result of autocomplete request

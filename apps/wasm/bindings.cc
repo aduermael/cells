@@ -3530,7 +3530,8 @@ public:
             json << "\"insertText\":\"" << jsonEscape(suggestion.insertText) << "\",";
             json << "\"kind\":\"" << jsonEscape(suggestion.kind) << "\",";
             json << "\"detail\":\"" << jsonEscape(suggestion.detail) << "\",";
-            json << "\"deprecated\":" << (suggestion.deprecated ? "true" : "false") << "}";
+            json << "\"deprecated\":" << (suggestion.deprecated ? "true" : "false") << ",";
+            json << "\"typeCorrect\":\"" << jsonEscape(suggestion.typeCorrect) << "\"}";
         }
 
         json << "]}";

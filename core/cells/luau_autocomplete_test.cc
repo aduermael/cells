@@ -259,5 +259,70 @@ TEST_F(LuauAutocompleteTest, SmartTrigger_AfterColon_TriggersImmediately) {
     EXPECT_NE(result.context, "filtered");
 }
 
+TEST_F(LuauAutocompleteTest, TypeCorrect_FunctionArgument_StringExpected) {
+    // When a function expects a string parameter, variables of type string should be marked as
+    // typeCorrect
+    std::string source = R"(
+local myRef = "A1"
+local myNum = 42
+setCell(my
+)";
+    // Position after "my" in "setCell(my"
+    auto result = autocomplete.getCompletions(source, 3, 10);
+
+    ASSERT_FALSE(result.suggestions.empty());
+
+    // Find myRef and myNum suggestions
+    const AutocompleteSuggestion* myRefSuggestion = nullptr;
+    const AutocompleteSuggestion* myNumSuggestion = nullptr;
+    for (const auto& s : result.suggestions) {
+        if (s.label == "myRef") {
+            myRefSuggestion = &s;
+        } else if (s.label == "myNum") {
+            myNumSuggestion = &s;
+        }
+    }
+
+    ASSERT_NE(myRefSuggestion, nullptr) << "Expected 'myRef' in suggestions";
+    ASSERT_NE(myNumSuggestion, nullptr) << "Expected 'myNum' in suggestions";
+
+    // myRef (string) should be marked as correct for first arg of setCell (expects string)
+    EXPECT_EQ(myRefSuggestion->typeCorrect, "correct")
+        << "Expected myRef to be typeCorrect='correct' since setCell expects string";
+
+    // myNum (number) should NOT be marked as correct
+    EXPECT_EQ(myNumSuggestion->typeCorrect, "")
+        << "Expected myNum to NOT be typeCorrect since setCell expects string, not number";
+}
+
+TEST_F(LuauAutocompleteTest, TypeCorrect_FunctionResult_ReturnsCorrect) {
+    // When a string is expected, a function returning string should be marked as
+    // correctFunctionResult
+    std::string source =
+        "local function getRef(): string\n"
+        "    return \"A1\"\n"
+        "end\n"
+        "setCell(ge";
+    // Position after "ge" in "setCell(ge" - line 3 (0-indexed), column 10
+    auto result = autocomplete.getCompletions(source, 3, 10);
+
+    ASSERT_FALSE(result.suggestions.empty())
+        << "Expected suggestions at setCell(ge, context: " << result.context;
+
+    // Find getRef suggestion
+    const AutocompleteSuggestion* getRefSuggestion = nullptr;
+    for (const auto& s : result.suggestions) {
+        if (s.label == "getRef") {
+            getRefSuggestion = &s;
+        }
+    }
+
+    ASSERT_NE(getRefSuggestion, nullptr) << "Expected 'getRef' in suggestions";
+
+    // getRef() returns string, so should be marked as correctFunctionResult
+    EXPECT_EQ(getRefSuggestion->typeCorrect, "correctFunctionResult")
+        << "Expected getRef to be typeCorrect='correctFunctionResult' since it returns string";
+}
+
 }  // namespace
 }  // namespace cells

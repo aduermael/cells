@@ -79,19 +79,26 @@ Current type definitions may be incomplete. Ensure all API functions have proper
 
 ---
 
-## Phase 3: Expose Expected Type Information
+## Phase 3: Expose Type Correctness Information
 
-The Luau Autocomplete API can provide `expectedType` information. Expose this to the UI.
+**Research findings:** Luau's `AutocompleteResult` doesn't have an `expectedType` field. Instead, each `AutocompleteEntry` has a `typeCorrect` field of type `TypeCorrectKind` that indicates whether the suggestion matches the expected type at that position:
+- `Correct` - Direct type match (e.g., string variable when string expected)
+- `CorrectFunctionResult` - Function returns matching type
+- `None` - No type match
 
-- [ ] 3a: Research Luau's `AutocompleteResult::expectedType` field
-- [ ] 3b: Include expected type info in autocomplete response JSON
-- [ ] 3c: Update TypeScript types for autocomplete response
-- [ ] 3d: Add C++ tests verifying expected type is returned for function arguments
+This per-suggestion approach is better for UI prioritization than a single expected type.
+
+- [x] 3a: Research Luau's `AutocompleteEntry::typeCorrect` field
+- [x] 3b: Include typeCorrect info in autocomplete response JSON
+- [x] 3c: Update TypeScript types for autocomplete response
+- [x] 3d: Add C++ tests verifying typeCorrect is returned for function arguments
 
 **Files:**
-- `core/cells/luau_autocomplete.cc` - Add expectedType to response
-- `core/cells/luau_autocomplete_test.cc` - Add expected type tests
-- `apps/wasm/src/client-types.ts` - Update AutocompleteResult type
+- `core/cells/luau_autocomplete.h` - Added typeCorrect field to AutocompleteSuggestion
+- `core/cells/luau_autocomplete.cc` - Populate typeCorrect from Luau entry
+- `core/cells/luau_autocomplete_test.cc` - Added 2 tests for type correctness
+- `apps/wasm/bindings.cc` - Include typeCorrect in JSON response
+- `apps/wasm/src/client-types.ts` - Added TypeCorrectKind type, updated AutocompleteSuggestion
 
 ---
 
@@ -126,8 +133,8 @@ When a string is expected in a cell context, provide smart completions.
 
 ## Resources
 
-- [Luau Autocomplete.h](https://github.com/luau-lang/luau/blob/master/Analysis/include/Luau/Autocomplete.h) - `AutocompleteResult` struct with `expectedType`
-- [Luau Autocomplete.test.cpp](https://github.com/luau-lang/luau/blob/master/tests/Autocomplete.test.cpp) - Test examples showing expected type usage
+- [Luau AutocompleteTypes.h](https://github.com/luau-lang/luau/blob/master/Analysis/include/Luau/AutocompleteTypes.h) - `AutocompleteEntry` struct with `typeCorrect` field
+- [Luau Autocomplete.test.cpp](https://github.com/luau-lang/luau/blob/master/tests/Autocomplete.test.cpp) - Test examples showing `TypeCorrectKind` usage
 - Current implementation: `core/cells/luau_autocomplete.cc`
 
 ---

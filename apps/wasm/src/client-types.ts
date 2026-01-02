@@ -247,6 +247,9 @@ export type AutocompleteSuggestionKind =
   | "path"
   | "text";
 
+/** Type correctness for autocomplete suggestions */
+export type TypeCorrectKind = "correct" | "correctFunctionResult" | "";
+
 /** Single autocomplete suggestion */
 export interface AutocompleteSuggestion {
   label: string; // Display text
@@ -254,6 +257,7 @@ export interface AutocompleteSuggestion {
   kind: AutocompleteSuggestionKind;
   detail: string; // Additional info (e.g., type signature)
   deprecated: boolean; // Whether this suggestion is deprecated
+  typeCorrect: TypeCorrectKind; // Whether this matches expected type at position
 }
 
 /** Autocomplete context type */

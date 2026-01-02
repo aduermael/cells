@@ -392,6 +392,20 @@ public:
                 suggestion.detail = Luau::toString(*entry.type);
             }
 
+            // Include type correctness info for prioritization
+            switch (entry.typeCorrect) {
+                case Luau::TypeCorrectKind::Correct:
+                    suggestion.typeCorrect = "correct";
+                    break;
+                case Luau::TypeCorrectKind::CorrectFunctionResult:
+                    suggestion.typeCorrect = "correctFunctionResult";
+                    break;
+                case Luau::TypeCorrectKind::None:
+                default:
+                    // Leave empty string (default)
+                    break;
+            }
+
             result.suggestions.push_back(std::move(suggestion));
         }
 
