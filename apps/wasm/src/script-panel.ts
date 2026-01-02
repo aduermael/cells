@@ -647,16 +647,25 @@ export class ScriptPanel {
   private showAutocomplete(suggestions: AutocompleteSuggestion[]): void {
     if (!this.autocompletePopup) return;
 
-    this.autocompleteItems = suggestions;
+    // Sort suggestions: type-correct first, then correctFunctionResult, then rest
+    const sortedSuggestions = this.sortSuggestionsByTypeCorrectness(suggestions);
+
+    this.autocompleteItems = sortedSuggestions;
     this.autocompleteSelectedIndex = 0;
     this.autocompleteVisible = true;
     this.autocompleteUserNavigated = false; // Reset navigation state for new suggestions
 
     // Build popup content
     this.autocompletePopup.innerHTML = "";
-    suggestions.forEach((suggestion, index) => {
+    sortedSuggestions.forEach((suggestion, index) => {
       const item = document.createElement("div");
       item.className = "autocomplete-item" + (index === 0 ? " selected" : "");
+      // Add type-correct class for visual highlighting
+      if (suggestion.typeCorrect === "correct") {
+        item.classList.add("type-correct");
+      } else if (suggestion.typeCorrect === "correctFunctionResult") {
+        item.classList.add("type-correct-fn");
+      }
       item.dataset.index = String(index);
 
       // Kind icon
@@ -680,6 +689,17 @@ export class ScriptPanel {
         detail.className = "autocomplete-detail";
         detail.textContent = suggestion.detail;
         item.appendChild(detail);
+      }
+
+      // Type correctness indicator
+      if (suggestion.typeCorrect === "correct" || suggestion.typeCorrect === "correctFunctionResult") {
+        const indicator = document.createElement("span");
+        indicator.className = "autocomplete-type-indicator";
+        indicator.textContent = "✓";
+        indicator.title = suggestion.typeCorrect === "correct"
+          ? "Matches expected type"
+          : "Returns expected type";
+        item.appendChild(indicator);
       }
 
       // Click handler
@@ -859,6 +879,32 @@ export class ScriptPanel {
       case "text": return "T";
       case "path": return "/";
       default: return "·";
+    }
+  }
+
+  /**
+   * Sort suggestions by type correctness (Phase 4b)
+   * Order: correct > correctFunctionResult > none
+   */
+  private sortSuggestionsByTypeCorrectness(
+    suggestions: AutocompleteSuggestion[]
+  ): AutocompleteSuggestion[] {
+    return [...suggestions].sort((a, b) => {
+      const scoreA = this.getTypeCorrectScore(a.typeCorrect);
+      const scoreB = this.getTypeCorrectScore(b.typeCorrect);
+      // Higher score first
+      return scoreB - scoreA;
+    });
+  }
+
+  /**
+   * Get numeric score for type correctness (for sorting)
+   */
+  private getTypeCorrectScore(typeCorrect: AutocompleteSuggestion["typeCorrect"]): number {
+    switch (typeCorrect) {
+      case "correct": return 2;
+      case "correctFunctionResult": return 1;
+      default: return 0;
     }
   }
 }

@@ -2096,3 +2096,34 @@ canvas {
     text-overflow: ellipsis;
     max-width: 150px;
 }
+
+/* Type correctness indicators */
+.autocomplete-item.type-correct {
+    background: color-mix(in srgb, var(--color-success) 10%, transparent);
+}
+
+.autocomplete-item.type-correct:hover,
+.autocomplete-item.type-correct.selected {
+    background: color-mix(in srgb, var(--color-success) 20%, transparent);
+}
+
+.autocomplete-item.type-correct-fn {
+    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+.autocomplete-item.type-correct-fn:hover,
+.autocomplete-item.type-correct-fn.selected {
+    background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+.autocomplete-type-indicator {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--color-success);
+    margin-left: var(--spacing-xs);
+}
