@@ -1817,11 +1817,6 @@ canvas {
     padding: 2px 0;
 }
 
-.console-line::before {
-    content: "> ";
-    color: var(--script-text-muted);
-}
-
 /* Horizontal resize handle between editor and console */
 #script-console-resize-handle {
     width: 4px;
