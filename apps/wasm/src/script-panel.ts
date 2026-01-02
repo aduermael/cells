@@ -55,6 +55,7 @@ export class ScriptPanel {
   private autocompleteSelectedIndex: number = 0;
   private autocompleteVisible: boolean = false;
   private autocompleteDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private autocompleteUserNavigated: boolean = false; // True if user navigated with arrows
 
   // =========================================================================
   // State
@@ -649,6 +650,7 @@ export class ScriptPanel {
     this.autocompleteItems = suggestions;
     this.autocompleteSelectedIndex = 0;
     this.autocompleteVisible = true;
+    this.autocompleteUserNavigated = false; // Reset navigation state for new suggestions
 
     // Build popup content
     this.autocompletePopup.innerHTML = "";
@@ -801,6 +803,7 @@ export class ScriptPanel {
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
+        this.autocompleteUserNavigated = true;
         this.selectAutocompleteItem(
           Math.min(this.autocompleteSelectedIndex + 1, this.autocompleteItems.length - 1)
         );
@@ -808,16 +811,29 @@ export class ScriptPanel {
 
       case "ArrowUp":
         e.preventDefault();
+        this.autocompleteUserNavigated = true;
         this.selectAutocompleteItem(
           Math.max(this.autocompleteSelectedIndex - 1, 0)
         );
         return true;
 
-      case "Enter":
       case "Tab":
+        // Tab always accepts (common IDE behavior)
         e.preventDefault();
         this.acceptAutocomplete();
         return true;
+
+      case "Enter":
+        // Enter only accepts if user has navigated with arrows
+        // Otherwise, let Enter insert a newline (fall through)
+        if (this.autocompleteUserNavigated) {
+          e.preventDefault();
+          this.acceptAutocomplete();
+          return true;
+        }
+        // Hide autocomplete but don't prevent Enter
+        this.hideAutocomplete();
+        return false;
 
       case "Escape":
         e.preventDefault();

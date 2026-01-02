@@ -8,6 +8,7 @@
 #include <Luau/ToString.h>
 #include <optional>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace cells {
 
@@ -15,6 +16,131 @@ namespace {
 
 // Module name for the user's script
 constexpr const char* kMainModule = "MainModule";
+
+// Keywords after which autocomplete should NOT trigger (followed by expression)
+const std::unordered_set<std::string> kNoAutocompleteAfter = {
+    "end", "then", "do", "else", "elseif", "until", "in", "and", "or", "not",
+};
+
+// Check if a character is part of an identifier
+inline bool isIdentifierChar(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_';
+}
+
+// Get the word being typed at the cursor position
+std::string getCurrentWord(const std::string& source, size_t cursorPos) {
+    if (cursorPos == 0)
+        return "";
+
+    size_t wordStart = cursorPos;
+    while (wordStart > 0 && isIdentifierChar(source[wordStart - 1])) {
+        wordStart--;
+    }
+    return source.substr(wordStart, cursorPos - wordStart);
+}
+
+// Get the previous word before the current word
+std::string getPreviousWord(const std::string& source, size_t cursorPos) {
+    // Find start of current word
+    size_t wordStart = cursorPos;
+    while (wordStart > 0 && isIdentifierChar(source[wordStart - 1])) {
+        wordStart--;
+    }
+
+    // Skip whitespace
+    size_t pos = wordStart;
+    while (pos > 0 &&
+           (source[pos - 1] == ' ' || source[pos - 1] == '\t' || source[pos - 1] == '\n')) {
+        pos--;
+    }
+
+    // Find the previous word
+    const size_t prevEnd = pos;
+    while (pos > 0 && isIdentifierChar(source[pos - 1])) {
+        pos--;
+    }
+
+    if (prevEnd == pos)
+        return "";
+    return source.substr(pos, prevEnd - pos);
+}
+
+// Check if cursor is right after a . or :
+bool isAfterDotOrColon(const std::string& source, size_t cursorPos) {
+    if (cursorPos == 0)
+        return false;
+
+    // Look for . or : before any identifier characters
+    size_t pos = cursorPos - 1;
+
+    // Skip identifier chars
+    while (pos > 0 && isIdentifierChar(source[pos])) {
+        pos--;
+    }
+
+    return source[pos] == '.' || source[pos] == ':';
+}
+
+// Check if cursor is inside a string (simple heuristic: count quotes on current line)
+bool isInsideString(const std::string& source, size_t cursorPos) {
+    // Find start of current line
+    size_t lineStart = cursorPos;
+    while (lineStart > 0 && source[lineStart - 1] != '\n') {
+        lineStart--;
+    }
+
+    // Count unescaped quotes up to cursor
+    bool inSingleQuote = false;
+    bool inDoubleQuote = false;
+
+    for (size_t i = lineStart; i < cursorPos; ++i) {
+        const char c = source[i];
+        const bool escaped = (i > 0 && source[i - 1] == '\\');
+
+        if (escaped)
+            continue;
+
+        if (c == '"' && !inSingleQuote) {
+            inDoubleQuote = !inDoubleQuote;
+        } else if (c == '\'' && !inDoubleQuote) {
+            inSingleQuote = !inSingleQuote;
+        }
+    }
+
+    return inSingleQuote || inDoubleQuote;
+}
+
+// Check if cursor is inside a comment (after -- on current line)
+bool isInsideComment(const std::string& source, size_t cursorPos) {
+    // Find start of current line
+    size_t lineStart = cursorPos;
+    while (lineStart > 0 && source[lineStart - 1] != '\n') {
+        lineStart--;
+    }
+
+    // Look for -- before cursor (not inside a string)
+    bool inString = false;
+    char stringChar = 0;
+
+    for (size_t i = lineStart; i < cursorPos; ++i) {
+        const char c = source[i];
+
+        if (!inString) {
+            if (c == '"' || c == '\'') {
+                inString = true;
+                stringChar = c;
+            } else if (c == '-' && i + 1 < cursorPos && source[i + 1] == '-') {
+                return true;  // Found comment start
+            }
+        } else {
+            if (c == stringChar && (i == 0 || source[i - 1] != '\\')) {
+                inString = false;
+            }
+        }
+    }
+
+    return false;
+}
 
 // Type definitions for Cells API
 // This defines the types that Luau's analysis will use for autocomplete
@@ -139,6 +265,49 @@ public:
     AutocompleteResult getCompletions(const std::string& source, unsigned line, unsigned column) {
         AutocompleteResult result;
 
+        // Calculate cursor position in source string
+        size_t cursorPos = 0;
+        unsigned currentLine = 0;
+        for (size_t i = 0; i < source.size() && currentLine < line; ++i) {
+            if (source[i] == '\n') {
+                currentLine++;
+            }
+            cursorPos = i + 1;
+        }
+        cursorPos += column;
+        if (cursorPos > source.size()) {
+            cursorPos = source.size();
+        }
+
+        // Check if inside string or comment first (fast reject)
+        if (isInsideString(source, cursorPos)) {
+            result.context = "string";
+            return result;  // Empty suggestions
+        }
+        if (isInsideComment(source, cursorPos)) {
+            result.context = "comment";
+            return result;  // Empty suggestions
+        }
+
+        // Smart trigger checks (before calling Luau's autocomplete)
+        const bool afterDotOrColon = isAfterDotOrColon(source, cursorPos);
+
+        if (!afterDotOrColon) {
+            // Check minimum character requirement (2+ chars unless after . or :)
+            const std::string currentWord = getCurrentWord(source, cursorPos);
+            if (currentWord.length() < 2) {
+                result.context = "filtered";
+                return result;  // Empty suggestions
+            }
+
+            // Check if after a keyword that doesn't expect completions
+            const std::string prevWord = getPreviousWord(source, cursorPos);
+            if (!prevWord.empty() && kNoAutocompleteAfter.count(prevWord) != 0u) {
+                result.context = "filtered";
+                return result;  // Empty suggestions
+            }
+        }
+
         // Update source in file resolver
         fileResolver_.setSource(source);
 
@@ -153,6 +322,12 @@ public:
         // Get autocomplete suggestions
         const Luau::Position pos{line, column};
         auto ac = Luau::autocomplete(*frontend_, kMainModule, pos, nullCallback);
+
+        // Don't show suggestions inside strings
+        if (ac.context == Luau::AutocompleteContext::String) {
+            result.context = "string";
+            return result;  // Empty suggestions
+        }
 
         // Convert context
         switch (ac.context) {
