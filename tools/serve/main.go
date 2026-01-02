@@ -49,6 +49,7 @@ var upgrader = websocket.Upgrader{
 }
 
 var roomManager *RoomManager
+var agentHandler *AgentHandler
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -289,6 +290,7 @@ func main() {
 	port := flag.Int("port", 8081, "Port to listen on")
 	dir := flag.String("dir", "dist", "Directory to serve")
 	enableCollab := flag.Bool("enable-collab", false, "Enable collaboration WebSocket endpoint")
+	enableAgent := flag.Bool("enable-agent", false, "Enable AI agent endpoint (requires ANTHROPIC_API_KEY)")
 	maxRoomSize := flag.Int("max-room-size", 10, "Maximum peers per room")
 	roomTimeout := flag.Duration("room-timeout", time.Hour, "Timeout for empty rooms")
 	flag.Parse()
@@ -300,6 +302,21 @@ func main() {
 		stop := make(chan struct{})
 		roomManager.StartCleanupRoutine(time.Minute, stop)
 		log.Println("Collaboration enabled with WebSocket signaling at /ws")
+	}
+
+	// Initialize agent handler if enabled
+	if *enableAgent {
+		conversationStore := NewConversationStore(50, time.Hour) // 50 messages max, 1 hour timeout
+		stop := make(chan struct{})
+		conversationStore.StartCleanupRoutine(5*time.Minute, stop)
+
+		var err error
+		agentHandler, err = NewAgentHandler(conversationStore)
+		if err != nil {
+			log.Printf("Warning: Agent not enabled: %v", err)
+		} else {
+			log.Println("AI agent enabled at /api/agent/*")
+		}
 	}
 
 	// Resolve directory path
@@ -350,12 +367,20 @@ func main() {
 	if *enableCollab {
 		mux.HandleFunc("/ws", handleWebSocket)
 	}
+	if agentHandler != nil {
+		mux.HandleFunc("/api/agent/message", agentHandler.HandleMessage)
+		mux.HandleFunc("/api/agent/tool-result", agentHandler.HandleToolResult)
+		mux.HandleFunc("/api/agent/clear", agentHandler.HandleClearConversation)
+	}
 	mux.Handle("/", fileHandler)
 
 	addr := fmt.Sprintf(":%d", *port)
 	fmt.Printf("Serving %s on http://localhost%s/\n", absDir, addr)
 	if *enableCollab {
 		fmt.Printf("WebSocket signaling at ws://localhost%s/ws\n", addr)
+	}
+	if agentHandler != nil {
+		fmt.Printf("AI agent API at http://localhost%s/api/agent/*\n", addr)
 	}
 	fmt.Println("Press Ctrl+C to stop")
 
