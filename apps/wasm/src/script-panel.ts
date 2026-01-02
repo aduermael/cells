@@ -324,11 +324,16 @@ export class ScriptPanel {
         this.run();
         return;
       }
-      // Escape to hide panel (also hides autocomplete)
+      // Escape: hide autocomplete first, then console, then panel
       if (e.key === "Escape") {
         if (this.autocompleteVisible) {
           e.preventDefault();
           this.hideAutocomplete();
+          return;
+        }
+        if (this.consoleVisible) {
+          e.preventDefault();
+          this.hideConsole();
           return;
         }
         e.preventDefault();
@@ -424,6 +429,20 @@ export class ScriptPanel {
     // Console close button
     this.consoleCloseBtn.addEventListener("click", () => {
       this.hideConsole();
+    });
+
+    // Console clear button
+    this.consoleClearBtn.addEventListener("click", () => {
+      this.clearConsole();
+    });
+
+    // Escape in console content area closes console
+    this.consoleEl.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        this.hideConsole();
+        this.editor.focus();
+      }
     });
   }
 
