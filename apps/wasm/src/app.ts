@@ -80,6 +80,11 @@ export interface DOMElements {
   scriptRunBtn: HTMLElement;
   scriptStatus: HTMLElement;
   scriptPanelResizeHandle: HTMLElement;
+  scriptConsole: HTMLElement;
+  scriptConsoleContent: HTMLElement;
+  scriptConsoleCloseBtn: HTMLElement;
+  scriptConsoleClearBtn: HTMLElement;
+  scriptConsoleResizeHandle: HTMLElement;
   bottomBar: HTMLElement;
   sheetTabsContainer: HTMLElement;
   addSheetBtn: HTMLButtonElement;
@@ -449,6 +454,11 @@ export function createApp(): App {
     scriptRunBtn: getElement("script-run-btn"),
     scriptStatus: getElement("script-status"),
     scriptPanelResizeHandle: getElement("script-panel-resize-handle"),
+    scriptConsole: getElement("script-console"),
+    scriptConsoleContent: getElement("script-console-content"),
+    scriptConsoleCloseBtn: getElement("script-console-close-btn"),
+    scriptConsoleClearBtn: getElement("script-console-clear-btn"),
+    scriptConsoleResizeHandle: getElement("script-console-resize-handle"),
     bottomBar: getElement("bottom-bar"),
     sheetTabsContainer: getElement("sheet-tabs-container"),
     addSheetBtn: getElement<HTMLButtonElement>("add-sheet-btn"),

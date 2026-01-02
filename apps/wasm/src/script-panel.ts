@@ -44,6 +44,13 @@ export class ScriptPanel {
   private statusEl: HTMLElement;
   private resizeHandle: HTMLElement;
 
+  // Console panel elements
+  private consoleEl: HTMLElement;
+  private consoleContentEl: HTMLElement;
+  private consoleCloseBtn: HTMLElement;
+  private consoleClearBtn: HTMLElement;
+  private consoleResizeHandle: HTMLElement;
+
   private executeScript: (script: string) => Promise<ScriptResult>;
   private onScriptExecuted: () => void;
   private tokenize?: TokenizeFunction;
@@ -66,6 +73,12 @@ export class ScriptPanel {
   private startY: number = 0;
   private startHeight: number = 0;
 
+  // Console panel state
+  private consoleVisible: boolean = false;
+  private isConsoleResizing: boolean = false;
+  private consoleStartX: number = 0;
+  private consoleStartWidth: number = 0;
+
   // =========================================================================
   // Constructor
   // =========================================================================
@@ -80,6 +93,11 @@ export class ScriptPanel {
     runBtn: HTMLElement;
     statusEl: HTMLElement;
     resizeHandle: HTMLElement;
+    consoleEl: HTMLElement;
+    consoleContentEl: HTMLElement;
+    consoleCloseBtn: HTMLElement;
+    consoleClearBtn: HTMLElement;
+    consoleResizeHandle: HTMLElement;
     executeScript: (script: string) => Promise<ScriptResult>;
     onScriptExecuted: () => void;
     tokenize?: TokenizeFunction;
@@ -94,6 +112,11 @@ export class ScriptPanel {
     this.runBtn = config.runBtn;
     this.statusEl = config.statusEl;
     this.resizeHandle = config.resizeHandle;
+    this.consoleEl = config.consoleEl;
+    this.consoleContentEl = config.consoleContentEl;
+    this.consoleCloseBtn = config.consoleCloseBtn;
+    this.consoleClearBtn = config.consoleClearBtn;
+    this.consoleResizeHandle = config.consoleResizeHandle;
     this.executeScript = config.executeScript;
     this.onScriptExecuted = config.onScriptExecuted;
 

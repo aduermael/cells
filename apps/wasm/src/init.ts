@@ -118,6 +118,11 @@ export function initApp(): AppContext {
     runBtn: elements.scriptRunBtn,
     statusEl: elements.scriptStatus,
     resizeHandle: elements.scriptPanelResizeHandle,
+    consoleEl: elements.scriptConsole,
+    consoleContentEl: elements.scriptConsoleContent,
+    consoleCloseBtn: elements.scriptConsoleCloseBtn,
+    consoleClearBtn: elements.scriptConsoleClearBtn,
+    consoleResizeHandle: elements.scriptConsoleResizeHandle,
     executeScript: async (script: string) => {
       if (!app.dataSource) {
         return {
