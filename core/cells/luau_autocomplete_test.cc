@@ -196,16 +196,22 @@ TEST_F(LuauAutocompleteTest, Context_IsSetCorrectly) {
     EXPECT_EQ(result.context, "expression");
 }
 
-TEST_F(LuauAutocompleteTest, SmartTrigger_FilteredWhenTooShort) {
-    // Single char should return "filtered" context (not enough chars)
-    auto result = autocomplete.getCompletions("g", 0, 1);
+TEST_F(LuauAutocompleteTest, SmartTrigger_FilteredWhenEmpty) {
+    // Empty input should be filtered (no char typed yet)
+    auto result = autocomplete.getCompletions("", 0, 0);
     EXPECT_EQ(result.context, "filtered");
     EXPECT_TRUE(result.suggestions.empty());
+}
 
-    // Empty should also be filtered
-    result = autocomplete.getCompletions("", 0, 0);
-    EXPECT_EQ(result.context, "filtered");
-    EXPECT_TRUE(result.suggestions.empty());
+TEST_F(LuauAutocompleteTest, SmartTrigger_SingleChar_ReturnsSuggestions) {
+    // Single char should now return matching suggestions (1-char minimum)
+    auto result = autocomplete.getCompletions("g", 0, 1);
+    EXPECT_NE(result.context, "filtered");
+    // Should have suggestions starting with 'g' like getCell, getSheet, etc.
+    EXPECT_FALSE(result.suggestions.empty());
+    for (const auto& s : result.suggestions) {
+        EXPECT_EQ(s.label[0], 'g') << "Expected suggestion starting with 'g', got: " << s.label;
+    }
 }
 
 TEST_F(LuauAutocompleteTest, SmartTrigger_AfterDotTriggersImmediately) {

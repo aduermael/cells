@@ -296,10 +296,12 @@ public:
         // Smart trigger checks (before calling Luau's autocomplete)
         const bool afterDotOrColon = isAfterDotOrColon(source, cursorPos);
 
+        // Get the prefix being typed (for filtering suggestions later)
+        const std::string prefix = getCurrentWord(source, cursorPos);
+
         if (!afterDotOrColon) {
-            // Check minimum character requirement (2+ chars unless after . or :)
-            const std::string currentWord = getCurrentWord(source, cursorPos);
-            if (currentWord.length() < 2) {
+            // Check minimum character requirement (1+ chars unless after . or :)
+            if (prefix.empty()) {
                 result.context = "filtered";
                 return result;  // Empty suggestions
             }
@@ -358,9 +360,15 @@ public:
                 break;
         }
 
-        // Convert suggestions
+        // Convert suggestions, filtering by prefix
         result.suggestions.reserve(ac.entryMap.size());
         for (const auto& [name, entry] : ac.entryMap) {
+            // Filter by prefix: only include suggestions that start with the typed text
+            // Use case-sensitive matching since Luau is case-sensitive
+            if (!prefix.empty() && name.substr(0, prefix.size()) != prefix) {
+                continue;  // Skip suggestions that don't match the prefix
+            }
+
             AutocompleteSuggestion suggestion;
             suggestion.label = name;
             suggestion.insertText = entry.insertText.value_or(name);
