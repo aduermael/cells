@@ -1322,5 +1322,126 @@ TEST(LuauSandboxTest, CellDependentsReturnsIterable) {
     EXPECT_EQ(result.output, "B1,C1");
 }
 
+// ============================================================================
+// cell.dependencies property tests
+// ============================================================================
+
+TEST(LuauSandboxTest, CellDependenciesEmptyForNonFormulaCell) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set A1 to a simple value (not a formula)
+    auto setup = sandbox.execute("setCell('A1', 42)");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // A1 has no dependencies (it's not a formula)
+    auto result = sandbox.execute(R"(
+        local c = getCell('A1')
+        local deps = c.dependencies
+        return #deps
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "0");
+}
+
+TEST(LuauSandboxTest, CellDependenciesSingleRef) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // A1 = 10, B1 = formula referencing A1
+    auto setup = sandbox.execute(R"(
+        setCell('A1', 10)
+        setCell('B1', '=A1*2')
+    )");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // B1 should have A1 as a dependency
+    auto result = sandbox.execute(R"(
+        local c = getCell('B1')
+        local deps = c.dependencies
+        if #deps == 1 then
+            return deps[1].ref
+        else
+            return "wrong count: " .. #deps
+        end
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "A1");
+}
+
+TEST(LuauSandboxTest, CellDependenciesMultipleRefs) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set up A1, B1, then C1 = formula referencing both
+    auto setup = sandbox.execute(R"(
+        setCell('A1', 10)
+        setCell('B1', 20)
+        setCell('C1', '=A1+B1')
+    )");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // C1 should have 2 dependencies (A1 and B1)
+    auto result = sandbox.execute(R"(
+        local c = getCell('C1')
+        local refs = {}
+        for i, dep in ipairs(c.dependencies) do
+            table.insert(refs, dep.ref)
+        end
+        table.sort(refs)
+        return table.concat(refs, ",")
+    )");
+    EXPECT_TRUE(result.success) << result.error;
+    EXPECT_EQ(result.output, "A1,B1");
+}
+
+TEST(LuauSandboxTest, CellDependentsAndDependenciesInverse) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // A1 = 10, B1 = =A1
+    auto setup = sandbox.execute(R"(
+        setCell('A1', 10)
+        setCell('B1', '=A1')
+    )");
+    EXPECT_TRUE(setup.success) << setup.error;
+
+    // A1's dependents should include B1
+    auto dependents = sandbox.execute(R"(
+        local c = getCell('A1')
+        if #c.dependents == 1 then
+            return c.dependents[1].ref
+        else
+            return "wrong: " .. #c.dependents
+        end
+    )");
+    EXPECT_TRUE(dependents.success) << dependents.error;
+    EXPECT_EQ(dependents.output, "B1");
+
+    // B1's dependencies should include A1
+    auto dependencies = sandbox.execute(R"(
+        local c = getCell('B1')
+        if #c.dependencies == 1 then
+            return c.dependencies[1].ref
+        else
+            return "wrong: " .. #c.dependencies
+        end
+    )");
+    EXPECT_TRUE(dependencies.success) << dependencies.error;
+    EXPECT_EQ(dependencies.output, "A1");
+}
+
 }  // namespace
 }  // namespace cells

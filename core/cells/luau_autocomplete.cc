@@ -155,6 +155,7 @@ export type Cell = {
     formula: string?,
     ref: string,
     dependents: {Cell},
+    dependencies: {Cell},
 }
 
 -- Sheet object returned by getSheet()

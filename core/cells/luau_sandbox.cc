@@ -1058,6 +1058,7 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
     }
 
     // Handle .dependents property - returns array of cells that depend on this cell
+    // (cells whose formulas reference this cell)
     if (strcmp(key, "dependents") == 0) {
         const Axis* col = sheet->getColumn(cell->colId);
         const Axis* row = sheet->getRow(cell->rowId);
@@ -1087,6 +1088,35 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
                 sandbox->pushCellObject(L, depCell);
                 lua_rawseti(L, -2, idx++);
             }
+        }
+        return 1;
+    }
+
+    // Handle .dependencies property - returns array of cells this cell's formula reads from
+    // (the cells highlighted in the UI when this cell is selected)
+    if (strcmp(key, "dependencies") == 0) {
+        // Get dependency graph and query for dependencies
+        const DependencyGraph* depGraph = sheet->getDependencyGraph();
+        if (depGraph == nullptr) {
+            lua_newtable(L);
+            return 1;
+        }
+
+        const std::vector<DependencyRef> deps = depGraph->getDependencies(cellId);
+
+        // Create Lua array of cell objects (only CELL type refs, not ranges)
+        const LuauSandbox* sandbox = getSandbox(L);
+        lua_newtable(L);
+        int idx = 1;
+        for (const DependencyRef& dep : deps) {
+            if (dep.type == DependencyRef::Type::CELL) {
+                Cell* depCell = sheet->getCell(dep.cellId);
+                if (depCell != nullptr) {
+                    sandbox->pushCellObject(L, depCell);
+                    lua_rawseti(L, -2, idx++);
+                }
+            }
+            // TODO: Could expand to handle RANGE refs by iterating cells in range
         }
         return 1;
     }
