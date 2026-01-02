@@ -191,6 +191,52 @@ export class ScriptPanel {
   }
 
   // =========================================================================
+  // Console Panel
+  // =========================================================================
+
+  /**
+   * Show the console panel
+   */
+  showConsole(): void {
+    this.consoleVisible = true;
+    this.consoleEl.classList.remove("hidden");
+    this.consoleResizeHandle.classList.remove("hidden");
+  }
+
+  /**
+   * Hide the console panel
+   */
+  hideConsole(): void {
+    this.consoleVisible = false;
+    this.consoleEl.classList.add("hidden");
+    this.consoleResizeHandle.classList.add("hidden");
+  }
+
+  /**
+   * Clear console content
+   */
+  clearConsole(): void {
+    this.consoleContentEl.innerHTML = "";
+  }
+
+  /**
+   * Append output to the console
+   */
+  appendToConsole(text: string): void {
+    // Split by newlines and create a line element for each
+    const lines = text.split("\n");
+    for (const line of lines) {
+      if (line.trim() === "") continue; // Skip empty lines
+      const lineEl = document.createElement("div");
+      lineEl.className = "console-line";
+      lineEl.textContent = line;
+      this.consoleContentEl.appendChild(lineEl);
+    }
+    // Scroll to bottom
+    this.consoleContentEl.scrollTop = this.consoleContentEl.scrollHeight;
+  }
+
+  // =========================================================================
   // Script Execution
   // =========================================================================
 
@@ -218,9 +264,15 @@ export class ScriptPanel {
         const timeStr = elapsed < 1000
           ? `${Math.round(elapsed)}ms`
           : `${(elapsed / 1000).toFixed(2)}s`;
-        // Show output if any, otherwise just "Success", with execution time
-        const message = result.output || "Success";
-        this.showStatus(`${message} (${timeStr})`, "success");
+
+        // If there's print output, show it in the console panel
+        if (result.output) {
+          this.showConsole();
+          this.appendToConsole(result.output);
+        }
+
+        // Status shows just time
+        this.showStatus(`Success (${timeStr})`, "success");
         // Refresh the grid to show any changes
         this.onScriptExecuted();
       } else {
