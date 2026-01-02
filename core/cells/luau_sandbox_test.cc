@@ -735,5 +735,93 @@ TEST(LuauSandboxTest, SetCellFormulaJustEquals) {
     EXPECT_EQ(checkFormula.output, "has formula");
 }
 
+// ============================================================================
+// Print Function Tests
+// ============================================================================
+
+TEST(LuauSandboxTest, PrintCapturesOutput) {
+    LuauSandbox sandbox;
+    auto result = sandbox.execute("print('hello')");
+
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "hello\n");
+}
+
+TEST(LuauSandboxTest, PrintMultipleArguments) {
+    LuauSandbox sandbox;
+    auto result = sandbox.execute("print('hello', 'world', 123)");
+
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "hello\tworld\t123\n");
+}
+
+TEST(LuauSandboxTest, PrintMultipleCalls) {
+    LuauSandbox sandbox;
+    auto result = sandbox.execute(R"(
+        print('line1')
+        print('line2')
+        print('line3')
+    )");
+
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "line1\nline2\nline3\n");
+}
+
+TEST(LuauSandboxTest, PrintWithReturnValue) {
+    LuauSandbox sandbox;
+    auto result = sandbox.execute(R"(
+        print('hello')
+        return 42
+    )");
+
+    EXPECT_TRUE(result.success);
+    // Print output followed by "=> " and return value
+    EXPECT_EQ(result.output, "hello\n=> 42");
+}
+
+TEST(LuauSandboxTest, PrintDifferentTypes) {
+    LuauSandbox sandbox;
+    auto result = sandbox.execute(R"(
+        print(nil)
+        print(true)
+        print(false)
+        print(3.14)
+    )");
+
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "nil\ntrue\nfalse\n3.14\n");
+}
+
+TEST(LuauSandboxTest, PrintEmptyCall) {
+    LuauSandbox sandbox;
+    auto result = sandbox.execute("print()");
+
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.output, "\n");  // Just a newline
+}
+
+TEST(LuauSandboxTest, PrintTable) {
+    LuauSandbox sandbox;
+    auto result = sandbox.execute("print({1, 2, 3})");
+
+    EXPECT_TRUE(result.success);
+    // Tables print as "table: 0x..." - just check it starts correctly
+    EXPECT_TRUE(result.output.find("table:") != std::string::npos);
+}
+
+TEST(LuauSandboxTest, PrintBufferClearedBetweenExecutions) {
+    LuauSandbox sandbox;
+
+    // First execution
+    auto result1 = sandbox.execute("print('first')");
+    EXPECT_TRUE(result1.success);
+    EXPECT_EQ(result1.output, "first\n");
+
+    // Second execution - buffer should be fresh
+    auto result2 = sandbox.execute("print('second')");
+    EXPECT_TRUE(result2.success);
+    EXPECT_EQ(result2.output, "second\n");
+}
+
 }  // namespace
 }  // namespace cells

@@ -65,7 +65,7 @@ After:
 
 - [x] 1a: Add printBuffer_ member and luaPrint static function to LuauSandbox
 - [x] 1b: Register print() global in initState(), copy buffer to result.output
-- [ ] 1c: Add unit test for print() capturing output
+- [x] 1c: Add unit test for print() capturing output
 
 ## Phase 2: TypeScript UI - Console Panel Structure
 
