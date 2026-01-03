@@ -543,10 +543,16 @@ EvalResult fn_HLOOKUP(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 }
 
 void registerLookupFunctions(FunctionRegistry& registry) {
-    registry.registerFunction("INDEX", fn_INDEX);
-    registry.registerFunction("MATCH", fn_MATCH);
-    registry.registerFunction("VLOOKUP", fn_VLOOKUP);
-    registry.registerFunction("HLOOKUP", fn_HLOOKUP);
+    registry.registerFunction("INDEX", fn_INDEX, "(array, row_num, [col_num])",
+                              "Returns a value at a position in a range", "Lookup");
+    registry.registerFunction("MATCH", fn_MATCH, "(lookup_value, lookup_array, [match_type])",
+                              "Returns the position of a value in a range", "Lookup");
+    registry.registerFunction("VLOOKUP", fn_VLOOKUP,
+                              "(lookup_value, table_array, col_index, [range_lookup])",
+                              "Vertical lookup in first column", "Lookup");
+    registry.registerFunction("HLOOKUP", fn_HLOOKUP,
+                              "(lookup_value, table_array, row_index, [range_lookup])",
+                              "Horizontal lookup in first row", "Lookup");
 }
 
 }  // namespace cells

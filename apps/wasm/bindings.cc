@@ -44,6 +44,7 @@
 #include "core/cells/number_format.h"
 #include "core/cells/number_formatter.h"
 #include "core/cells/input_parser.h"
+#include "core/cells/formula_functions.h"
 #include "core/net/include/SSEParser.h"
 #include "Luau/Allocator.h"
 #include "Luau/Ast.h"
@@ -1482,6 +1483,32 @@ public:
             ss << ",\"useThousandsSeparator\":" << (format.useThousandsSeparator ? "true" : "false");
             ss << ",\"currencySymbol\":\"" << jsonEscape(format.currencySymbol) << "\"";
             ss << ",\"isAccounting\":" << (format.isAccounting ? "true" : "false");
+            ss << "}";
+        }
+
+        ss << "]";
+        return ss.str();
+    }
+
+    // Get all registered formula functions with metadata.
+    // Returns JSON array of function info objects for autocomplete.
+    std::string getFormulaFunctions() {
+        std::ostringstream ss;
+        ss << "[";
+
+        const auto& functions = cells::FunctionRegistry::instance().getFunctionList();
+        bool first = true;
+        for (const auto& fn : functions) {
+            if (!first) {
+                ss << ",";
+            }
+            first = false;
+
+            ss << "{";
+            ss << "\"name\":\"" << jsonEscape(fn.name) << "\"";
+            ss << ",\"signature\":\"" << jsonEscape(fn.signature) << "\"";
+            ss << ",\"description\":\"" << jsonEscape(fn.description) << "\"";
+            ss << ",\"category\":\"" << jsonEscape(fn.category) << "\"";
             ss << "}";
         }
 
@@ -4487,6 +4514,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("setCellFormat", &cells::wasm::CellsEngine::setCellFormat)
         .function("setCellFormatAt", &cells::wasm::CellsEngine::setCellFormatAt)
         .function("getAvailableFormats", &cells::wasm::CellsEngine::getAvailableFormats)
+        .function("getFormulaFunctions", &cells::wasm::CellsEngine::getFormulaFunctions)
         .function("getCellFormatId", &cells::wasm::CellsEngine::getCellFormatId)
         .function("parseUserInputValue", &cells::wasm::CellsEngine::parseUserInputValue)
         .function("formatCellValue", &cells::wasm::CellsEngine::formatCellValue)

@@ -14,6 +14,18 @@ namespace cells {
 // Forward declaration
 struct ASTNode;
 
+// =============================================================================
+// Function metadata for autocomplete
+// =============================================================================
+
+// Information about a formula function for autocomplete display
+struct FunctionInfo {
+    std::string name;         // Function name, e.g., "SUM"
+    std::string signature;    // Arguments, e.g., "(number1, [number2], ...)"
+    std::string description;  // Brief description, e.g., "Adds all numbers in a range"
+    std::string category;     // Category, e.g., "Math", "Logic", "Text"
+};
+
 // Function signature for formula functions
 // Arguments are passed as AST nodes to allow lazy evaluation (for IF, AND, OR, etc.)
 using FormulaFunction =
@@ -29,6 +41,11 @@ public:
     // isVolatile: if true, cells using this function will recalculate on any sheet change
     void registerFunction(const std::string& name, FormulaFunction fn, bool isVolatile = false);
 
+    // Register a function with metadata for autocomplete
+    void registerFunction(const std::string& name, FormulaFunction fn, const std::string& signature,
+                          const std::string& description, const std::string& category,
+                          bool isVolatile = false);
+
     // Call a function by name with the given arguments
     // Returns NAME error if function doesn't exist
     EvalResult call(const std::string& name, const std::vector<const ASTNode*>& args,
@@ -43,6 +60,9 @@ public:
     // Get list of all registered function names
     [[nodiscard]] std::vector<std::string> getFunctionNames() const;
 
+    // Get list of all functions with metadata for autocomplete
+    [[nodiscard]] std::vector<FunctionInfo> getFunctionList() const;
+
     FunctionRegistry(const FunctionRegistry&) = delete;
     FunctionRegistry& operator=(const FunctionRegistry&) = delete;
 
@@ -54,6 +74,7 @@ private:
     static std::string toUpper(const std::string& s);
 
     std::unordered_map<std::string, FormulaFunction> functions_;
+    std::unordered_map<std::string, FunctionInfo> functionInfo_;
     std::unordered_set<std::string> volatileFunctions_;
 };
 

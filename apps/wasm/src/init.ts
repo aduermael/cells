@@ -1048,6 +1048,9 @@ export function initApp(): AppContext {
     onFocusCanvas: focusCanvas,
   });
 
+  // Set formula bar container for autocomplete positioning
+  formulaBarEditor.setFormulaBarContainer(elements.formulaBar);
+
   // =========================================================================
   // Create ClipboardManager
   // =========================================================================

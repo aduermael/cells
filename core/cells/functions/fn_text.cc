@@ -745,33 +745,47 @@ EvalResult fn_CODE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 
 void registerTextFunctions(FunctionRegistry& registry) {
     // Basic text functions
-    registry.registerFunction("LEN", fn_LEN);
-    registry.registerFunction("LEFT", fn_LEFT);
-    registry.registerFunction("RIGHT", fn_RIGHT);
-    registry.registerFunction("MID", fn_MID);
-    registry.registerFunction("TRIM", fn_TRIM);
+    registry.registerFunction("LEN", fn_LEN, "(text)", "Returns the number of characters", "Text");
+    registry.registerFunction("LEFT", fn_LEFT, "(text, [num_chars])", "Returns leftmost characters",
+                              "Text");
+    registry.registerFunction("RIGHT", fn_RIGHT, "(text, [num_chars])",
+                              "Returns rightmost characters", "Text");
+    registry.registerFunction("MID", fn_MID, "(text, start_num, num_chars)",
+                              "Returns characters from the middle", "Text");
+    registry.registerFunction("TRIM", fn_TRIM, "(text)", "Removes extra spaces from text", "Text");
 
     // Case functions
-    registry.registerFunction("UPPER", fn_UPPER);
-    registry.registerFunction("LOWER", fn_LOWER);
-    registry.registerFunction("PROPER", fn_PROPER);
+    registry.registerFunction("UPPER", fn_UPPER, "(text)", "Converts text to uppercase", "Text");
+    registry.registerFunction("LOWER", fn_LOWER, "(text)", "Converts text to lowercase", "Text");
+    registry.registerFunction("PROPER", fn_PROPER, "(text)",
+                              "Capitalizes first letter of each word", "Text");
 
     // Search and replace
-    registry.registerFunction("FIND", fn_FIND);
-    registry.registerFunction("SEARCH", fn_SEARCH);
-    registry.registerFunction("SUBSTITUTE", fn_SUBSTITUTE);
-    registry.registerFunction("REPLACE", fn_REPLACE);
+    registry.registerFunction("FIND", fn_FIND, "(find_text, within_text, [start_num])",
+                              "Case-sensitive text search", "Text");
+    registry.registerFunction("SEARCH", fn_SEARCH, "(find_text, within_text, [start_num])",
+                              "Case-insensitive text search", "Text");
+    registry.registerFunction("SUBSTITUTE", fn_SUBSTITUTE,
+                              "(text, old_text, new_text, [instance_num])",
+                              "Replaces text occurrences", "Text");
+    registry.registerFunction("REPLACE", fn_REPLACE, "(old_text, start_num, num_chars, new_text)",
+                              "Replaces characters by position", "Text");
 
     // Concatenation and conversion
-    registry.registerFunction("CONCAT", fn_CONCAT);
-    registry.registerFunction("CONCATENATE", fn_CONCATENATE);
-    registry.registerFunction("REPT", fn_REPT);
-    registry.registerFunction("TEXT", fn_TEXT);
-    registry.registerFunction("VALUE", fn_VALUE);
+    registry.registerFunction("CONCAT", fn_CONCAT, "(text1, [text2], ...)", "Joins text strings",
+                              "Text");
+    registry.registerFunction("CONCATENATE", fn_CONCATENATE, "(text1, [text2], ...)",
+                              "Joins text strings (legacy)", "Text");
+    registry.registerFunction("REPT", fn_REPT, "(text, number_times)", "Repeats text", "Text");
+    registry.registerFunction("TEXT", fn_TEXT, "(value, format_text)", "Formats number as text",
+                              "Text");
+    registry.registerFunction("VALUE", fn_VALUE, "(text)", "Converts text to number", "Text");
 
     // Character functions
-    registry.registerFunction("CHAR", fn_CHAR);
-    registry.registerFunction("CODE", fn_CODE);
+    registry.registerFunction("CHAR", fn_CHAR, "(number)", "Returns character for ASCII code",
+                              "Text");
+    registry.registerFunction("CODE", fn_CODE, "(text)", "Returns ASCII code of first character",
+                              "Text");
 }
 
 }  // namespace cells

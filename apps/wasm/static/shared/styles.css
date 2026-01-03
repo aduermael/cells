@@ -2482,6 +2482,14 @@ canvas {
     max-width: 150px;
 }
 
+.autocomplete-signature {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    margin-left: var(--spacing-xs);
+    white-space: nowrap;
+}
+
 /* Type correctness indicators */
 .autocomplete-item.type-correct {
     background: color-mix(in srgb, var(--color-success) 10%, transparent);

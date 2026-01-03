@@ -644,6 +644,12 @@ function handleMessage(msg: WorkerRequest): void {
         break;
       }
 
+      case "getFormulaFunctions": {
+        const functions = JSON.parse(engine.getFormulaFunctions());
+        respond({ type: "functions", functions });
+        break;
+      }
+
       case "getCellFormatId": {
         const { cellId } = params as { cellId: string };
         const result = JSON.parse(engine.getCellFormatId(cellId)) as JsonResult;

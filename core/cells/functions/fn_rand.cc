@@ -67,8 +67,10 @@ EvalResult fn_RANDBETWEEN(const std::vector<const ASTNode*>& args, EvalContext& 
 
 void registerRandFunctions(FunctionRegistry& registry) {
     // Register as volatile functions - they recalculate on every sheet change
-    registry.registerFunction("RAND", fn_RAND, true);
-    registry.registerFunction("RANDBETWEEN", fn_RANDBETWEEN, true);
+    registry.registerFunction("RAND", fn_RAND, "()", "Returns a random number between 0 and 1",
+                              "Math", true);
+    registry.registerFunction("RANDBETWEEN", fn_RANDBETWEEN, "(bottom, top)",
+                              "Returns a random integer in a range", "Math", true);
 }
 
 }  // namespace cells

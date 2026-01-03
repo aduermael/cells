@@ -20,6 +20,7 @@ import {
   setCursorPosition,
 } from "./formula-colorizer.js";
 import type { FocusManager } from "./focus-manager";
+import { FormulaAutocomplete } from "./formula-autocomplete";
 
 // =============================================================================
 // ColumnHeaderEditor Class
@@ -279,6 +280,10 @@ export class FormulaBarEditor {
   // Last known value - updated continuously while editing
   private lastKnownValue: string = "";
 
+  // Formula function autocomplete
+  private formulaAutocomplete: FormulaAutocomplete | null = null;
+  private formulaBarContainer: HTMLElement | null = null;
+
   // =========================================================================
   // State accessors (provided by App)
   // =========================================================================
@@ -366,10 +371,73 @@ export class FormulaBarEditor {
 
   setDataSource(dataSource: WasmDataSource | null): void {
     this.dataSource = dataSource;
+    // Initialize formula autocomplete when dataSource is available
+    this.initFormulaAutocomplete();
   }
 
   setSyncAdapter(adapter: CppSyncAdapter | null): void {
     this.syncAdapter = adapter;
+  }
+
+  /**
+   * Set the formula bar container element for autocomplete positioning.
+   * Must be called before autocomplete can work.
+   */
+  setFormulaBarContainer(container: HTMLElement): void {
+    this.formulaBarContainer = container;
+    this.initFormulaAutocomplete();
+  }
+
+  /**
+   * Initialize formula autocomplete if all dependencies are available.
+   */
+  private initFormulaAutocomplete(): void {
+    // Need both dataSource and container
+    if (!this.dataSource || !this.formulaBarContainer) return;
+    // Already initialized
+    if (this.formulaAutocomplete) return;
+
+    this.formulaAutocomplete = new FormulaAutocomplete(
+      this.formulaBarContainer,
+      this.dataSource,
+      (functionName: string) => this.insertFunctionName(functionName)
+    );
+    this.formulaAutocomplete.setInputElement(this.formulaInput);
+  }
+
+  /**
+   * Insert a function name at the current cursor position.
+   * Called when user selects a function from autocomplete.
+   */
+  private insertFunctionName(functionName: string): void {
+    const value = this.getValue();
+    const cursorPos = this.lastKnownCursorPos.start;
+
+    // Find the prefix we need to replace
+    const prefix = this.formulaAutocomplete?.getPrefix() || "";
+    const prefixStart = cursorPos - prefix.length;
+
+    // Build new value with function inserted
+    const before = value.substring(0, prefixStart);
+    const after = value.substring(cursorPos);
+    const newValue = before + functionName + "(" + after;
+
+    // Update value
+    this.formulaInput.value = newValue;
+    this.updateColoredDisplay();
+
+    // Position cursor inside parentheses
+    const newCursorPos = prefixStart + functionName.length + 1;
+    this.lastKnownCursorPos = { start: newCursorPos, end: newCursorPos };
+    this.lastKnownValue = newValue;
+
+    // Use setTimeout to ensure DOM updates before setting cursor
+    setTimeout(() => {
+      setCursorPosition(this.formulaDisplay, newCursorPos);
+      this.formulaDisplay.focus();
+      this.syncCellEditorDisplay();
+      this.onUpdateFormulaHighlights(newValue);
+    }, 0);
   }
 
   // =========================================================================
@@ -537,6 +605,9 @@ export class FormulaBarEditor {
    * Commit the current formula bar edit, saving changes
    */
   async commitFormulaBarEdit(): Promise<void> {
+    // Hide autocomplete
+    this.formulaAutocomplete?.hide();
+
     // Use anchor cell (selectionStart) for editing, not selectedCell
     const editCell = this.getSelectionStart() || this.getSelectedCell();
     if (!editCell || !this.dataSource) return;
@@ -614,6 +685,9 @@ export class FormulaBarEditor {
    * Cancel the current formula bar edit, discarding changes
    */
   cancelFormulaBarEdit(): void {
+    // Hide autocomplete
+    this.formulaAutocomplete?.hide();
+
     this.uiStateMachine.transition(UIEvent.CANCEL_FORMULA_EDIT);
     // Hide cell editor if it was showing during formula bar editing
     const container = this.cellEditorInput.parentElement;
@@ -757,6 +831,12 @@ export class FormulaBarEditor {
     // Keyboard events on contenteditable
     this.formulaDisplay.addEventListener("keydown", (e) => {
       e.stopPropagation();
+
+      // Let autocomplete handle navigation keys first
+      if (this.formulaAutocomplete?.handleKeyDown(e)) {
+        return;
+      }
+
       if (e.key === "Escape") {
         e.preventDefault();
         this.cancelFormulaBarEdit();
@@ -797,6 +877,11 @@ export class FormulaBarEditor {
       // Track value and cursor position continuously
       this.lastKnownValue = value;
       this.lastKnownCursorPos = getCursorPosition(this.formulaDisplay);
+
+      // Update formula autocomplete
+      if (this.formulaAutocomplete) {
+        this.formulaAutocomplete.update(value, this.lastKnownCursorPos.start);
+      }
 
       // Update AST debug panel live as user types
       this.onUpdateAstDebugPanel(value);

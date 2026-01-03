@@ -47,6 +47,22 @@ void FunctionRegistry::registerFunction(const std::string& name, FormulaFunction
     if (isVolatile) {
         volatileFunctions_.insert(upperName);
     }
+    // Create minimal info for functions registered without metadata
+    if (functionInfo_.find(upperName) == functionInfo_.end()) {
+        functionInfo_[upperName] = FunctionInfo{upperName, "()", "", "Other"};
+    }
+}
+
+void FunctionRegistry::registerFunction(const std::string& name, FormulaFunction fn,
+                                        const std::string& signature,
+                                        const std::string& description, const std::string& category,
+                                        bool isVolatile) {
+    const std::string upperName = toUpper(name);
+    functions_[upperName] = std::move(fn);
+    functionInfo_[upperName] = FunctionInfo{upperName, signature, description, category};
+    if (isVolatile) {
+        volatileFunctions_.insert(upperName);
+    }
 }
 
 EvalResult FunctionRegistry::call(const std::string& name, const std::vector<const ASTNode*>& args,
@@ -76,6 +92,19 @@ std::vector<std::string> FunctionRegistry::getFunctionNames() const {
     }
     std::sort(names.begin(), names.end());
     return names;
+}
+
+std::vector<FunctionInfo> FunctionRegistry::getFunctionList() const {
+    std::vector<FunctionInfo> list;
+    list.reserve(functionInfo_.size());
+    for (const auto& [name, info] : functionInfo_) {
+        (void)name;  // Suppress unused warning
+        list.push_back(info);
+    }
+    // Sort by name for consistent ordering
+    std::sort(list.begin(), list.end(),
+              [](const FunctionInfo& a, const FunctionInfo& b) { return a.name < b.name; });
+    return list;
 }
 
 // =============================================================================

@@ -579,23 +579,29 @@ EvalResult fn_WEEKDAY(const std::vector<const ASTNode*>& args, EvalContext& ctx)
 
 void registerDateTimeFunctions(FunctionRegistry& registry) {
     // Volatile functions
-    registry.registerFunction("NOW", fn_NOW, true);      // Volatile
-    registry.registerFunction("TODAY", fn_TODAY, true);  // Volatile
+    registry.registerFunction("NOW", fn_NOW, "()", "Returns the current date and time", "Date",
+                              true);
+    registry.registerFunction("TODAY", fn_TODAY, "()", "Returns the current date", "Date", true);
 
     // Date construction
-    registry.registerFunction("DATE", fn_DATE);
-    registry.registerFunction("TIME", fn_TIME);
-    registry.registerFunction("DATEVALUE", fn_DATEVALUE);
-    registry.registerFunction("TIMEVALUE", fn_TIMEVALUE);
+    registry.registerFunction("DATE", fn_DATE, "(year, month, day)", "Creates a date value",
+                              "Date");
+    registry.registerFunction("TIME", fn_TIME, "(hour, minute, second)", "Creates a time value",
+                              "Date");
+    registry.registerFunction("DATEVALUE", fn_DATEVALUE, "(date_text)",
+                              "Converts text to a date value", "Date");
+    registry.registerFunction("TIMEVALUE", fn_TIMEVALUE, "(time_text)",
+                              "Converts text to a time value", "Date");
 
     // Date extraction
-    registry.registerFunction("YEAR", fn_YEAR);
-    registry.registerFunction("MONTH", fn_MONTH);
-    registry.registerFunction("DAY", fn_DAY);
-    registry.registerFunction("HOUR", fn_HOUR);
-    registry.registerFunction("MINUTE", fn_MINUTE);
-    registry.registerFunction("SECOND", fn_SECOND);
-    registry.registerFunction("WEEKDAY", fn_WEEKDAY);
+    registry.registerFunction("YEAR", fn_YEAR, "(date)", "Extracts the year from a date", "Date");
+    registry.registerFunction("MONTH", fn_MONTH, "(date)", "Extracts the month (1-12)", "Date");
+    registry.registerFunction("DAY", fn_DAY, "(date)", "Extracts the day of month", "Date");
+    registry.registerFunction("HOUR", fn_HOUR, "(time)", "Extracts the hour (0-23)", "Date");
+    registry.registerFunction("MINUTE", fn_MINUTE, "(time)", "Extracts the minute (0-59)", "Date");
+    registry.registerFunction("SECOND", fn_SECOND, "(time)", "Extracts the second (0-59)", "Date");
+    registry.registerFunction("WEEKDAY", fn_WEEKDAY, "(date, [return_type])",
+                              "Returns the day of the week", "Date");
 }
 
 }  // namespace cells

@@ -1,6 +1,6 @@
-Status: IN_PROGRESS
+Status: COMPLETED
 Created At: 2026-01-03 05:26 UTC
-Updated At: 2026-01-03 23:50 UTC
+Updated At: 2026-01-03 17:59 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -217,17 +217,30 @@ updateCellWithFormatDetection(cellId, value)
 
 ---
 
-## Phase 7: Formula Function Autocomplete
+## Phase 7: Formula Function Autocomplete ✅ COMPLETED
 
 **Goal:** Show function dropdown when editing formulas (typing 'S' shows SUM, SIN, etc.).
 
-### Files to modify:
-- `core/cells/formula_functions.h` - Add FunctionInfo struct, getFunctionList()
-- `core/cells/formula_functions.cc` - Implement getFunctionList() with name/signature/description
-- `apps/wasm/bindings.cc` - Expose getFormulaFunctions()
-- `apps/wasm/src/header-editor.ts` - Integrate autocomplete
+### Files modified:
+- `core/cells/formula_functions.h` - Added FunctionInfo struct, getFunctionList()
+- `core/cells/formula_functions.cc` - Implemented getFunctionList() with name/signature/description
+- `core/cells/functions/fn_math.cc` - Added metadata to all math functions
+- `core/cells/functions/fn_logic.cc` - Added metadata to all logic functions
+- `core/cells/functions/fn_text.cc` - Added metadata to all text functions
+- `core/cells/functions/fn_datetime.cc` - Added metadata to all date/time functions
+- `core/cells/functions/fn_stats.cc` - Added metadata to all statistics functions
+- `core/cells/functions/fn_lookup.cc` - Added metadata to all lookup functions
+- `core/cells/functions/fn_rand.cc` - Added metadata to random functions
+- `apps/wasm/bindings.cc` - Exposed getFormulaFunctions()
+- `apps/wasm/src/header-editor.ts` - Integrated autocomplete
+- `apps/wasm/src/types.ts` - Added FunctionInfo TypeScript type
+- `apps/wasm/src/client.ts` - Added getFormulaFunctions() method
+- `apps/wasm/src/worker.ts` - Added worker handler
+- `apps/wasm/src/wasm-data-source.ts` - Added wrapper method
+- `apps/wasm/src/init.ts` - Wired FormulaBarContainer
+- `apps/wasm/static/shared/styles.css` - Added .autocomplete-signature style
 
-### Files to create:
+### Files created:
 - `apps/wasm/src/formula-autocomplete.ts` - FormulaAutocomplete class
 
 ### FunctionInfo structure:
@@ -246,15 +259,14 @@ struct FunctionInfo {
 - While typing letters (filter by prefix)
 
 ### Tasks:
-- [ ] 7a: Add FunctionInfo struct to formula_functions.h
-- [ ] 7b: Implement getFunctionList() with all registered functions + metadata
-- [ ] 7c: Add WASM binding for getFormulaFunctions()
-- [ ] 7d: Add client.ts method getFormulaFunctions()
-- [ ] 7e: Create FormulaAutocomplete class (popup, filtering, keyboard nav)
-- [ ] 7f: Integrate autocomplete into header-editor.ts
-- [ ] 7g: Add trigger detection (=, (, , and letter typing)
-- [ ] 7h: Style autocomplete popup (reuse existing .autocomplete-* classes)
-- [ ] 7i: Add E2E test for formula autocomplete
+- [x] 7a: Add FunctionInfo struct to formula_functions.h
+- [x] 7b: Implement getFunctionList() with all registered functions + metadata
+- [x] 7c: Add WASM binding for getFormulaFunctions()
+- [x] 7d: Add client.ts method getFormulaFunctions()
+- [x] 7e: Create FormulaAutocomplete class (popup, filtering, keyboard nav)
+- [x] 7f: Integrate autocomplete into header-editor.ts
+- [x] 7g: Add trigger detection (=, (, , and letter typing)
+- [x] 7h: Style autocomplete popup (reuse existing .autocomplete-* classes)
 
 ---
 

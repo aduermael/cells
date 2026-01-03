@@ -12,6 +12,7 @@ import type {
   ParsedInputResult,
   FormattedValueResult,
   CellFormatIdResult,
+  FunctionInfo,
 } from "./types";
 import type { LuauToken, AutocompleteResult } from "./client-types";
 import { getMimeType, toSnakeCase } from "./utils";
@@ -168,6 +169,11 @@ export class WasmDataSource {
   /** Get all available number formats */
   async getAvailableFormats(): Promise<NumberFormat[]> {
     return this._client.getAvailableFormats();
+  }
+
+  /** Get all registered formula functions with metadata for autocomplete */
+  async getFormulaFunctions(): Promise<FunctionInfo[]> {
+    return this._client.getFormulaFunctions();
   }
 
   /** Get cell format ID */

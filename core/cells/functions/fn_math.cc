@@ -279,22 +279,33 @@ EvalResult fn_INT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 
 void registerMathFunctions(FunctionRegistry& registry) {
     // Aggregate functions
-    registry.registerFunction("SUM", fn_SUM);
-    registry.registerFunction("AVERAGE", fn_AVERAGE);
-    registry.registerFunction("COUNT", fn_COUNT);
-    registry.registerFunction("COUNTA", fn_COUNTA);
-    registry.registerFunction("MIN", fn_MIN);
-    registry.registerFunction("MAX", fn_MAX);
+    registry.registerFunction("SUM", fn_SUM, "(number1, [number2], ...)",
+                              "Adds all numbers in a range", "Math");
+    registry.registerFunction("AVERAGE", fn_AVERAGE, "(number1, [number2], ...)",
+                              "Returns the arithmetic mean", "Math");
+    registry.registerFunction("COUNT", fn_COUNT, "(value1, [value2], ...)",
+                              "Counts cells containing numbers", "Math");
+    registry.registerFunction("COUNTA", fn_COUNTA, "(value1, [value2], ...)",
+                              "Counts non-empty cells", "Math");
+    registry.registerFunction("MIN", fn_MIN, "(number1, [number2], ...)",
+                              "Returns the smallest value", "Math");
+    registry.registerFunction("MAX", fn_MAX, "(number1, [number2], ...)",
+                              "Returns the largest value", "Math");
 
     // Basic math functions
-    registry.registerFunction("ABS", fn_ABS);
-    registry.registerFunction("SQRT", fn_SQRT);
-    registry.registerFunction("POWER", fn_POWER);
-    registry.registerFunction("ROUND", fn_ROUND);
-    registry.registerFunction("FLOOR", fn_FLOOR);
-    registry.registerFunction("CEILING", fn_CEILING);
-    registry.registerFunction("MOD", fn_MOD);
-    registry.registerFunction("INT", fn_INT);
+    registry.registerFunction("ABS", fn_ABS, "(number)", "Returns the absolute value", "Math");
+    registry.registerFunction("SQRT", fn_SQRT, "(number)", "Returns the square root", "Math");
+    registry.registerFunction("POWER", fn_POWER, "(number, power)",
+                              "Returns number raised to a power", "Math");
+    registry.registerFunction("ROUND", fn_ROUND, "(number, [num_digits])",
+                              "Rounds to specified digits", "Math");
+    registry.registerFunction("FLOOR", fn_FLOOR, "(number)", "Rounds down to nearest integer",
+                              "Math");
+    registry.registerFunction("CEILING", fn_CEILING, "(number)", "Rounds up to nearest integer",
+                              "Math");
+    registry.registerFunction("MOD", fn_MOD, "(number, divisor)",
+                              "Returns remainder after division", "Math");
+    registry.registerFunction("INT", fn_INT, "(number)", "Truncates to an integer", "Math");
 }
 
 }  // namespace cells

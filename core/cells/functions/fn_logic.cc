@@ -271,27 +271,39 @@ EvalResult fn_FALSE(const std::vector<const ASTNode*>& args, EvalContext& /*ctx*
 
 void registerLogicFunctions(FunctionRegistry& registry) {
     // Core logic functions
-    registry.registerFunction("IF", fn_IF);
-    registry.registerFunction("AND", fn_AND);
-    registry.registerFunction("OR", fn_OR);
-    registry.registerFunction("NOT", fn_NOT);
+    registry.registerFunction("IF", fn_IF, "(condition, value_if_true, [value_if_false])",
+                              "Returns one value if condition is true", "Logic");
+    registry.registerFunction("AND", fn_AND, "(logical1, [logical2], ...)",
+                              "Returns TRUE if all arguments are true", "Logic");
+    registry.registerFunction("OR", fn_OR, "(logical1, [logical2], ...)",
+                              "Returns TRUE if any argument is true", "Logic");
+    registry.registerFunction("NOT", fn_NOT, "(logical)", "Reverses the value of its argument",
+                              "Logic");
 
     // Error handling
-    registry.registerFunction("IFERROR", fn_IFERROR);
-    registry.registerFunction("IFNA", fn_IFNA);
+    registry.registerFunction("IFERROR", fn_IFERROR, "(value, value_if_error)",
+                              "Returns value_if_error if value is an error", "Logic");
+    registry.registerFunction("IFNA", fn_IFNA, "(value, value_if_na)",
+                              "Returns value_if_na if value is #N/A", "Logic");
 
     // Type checking
-    registry.registerFunction("EXACT", fn_EXACT);
-    registry.registerFunction("ISBLANK", fn_ISBLANK);
-    registry.registerFunction("ISNUMBER", fn_ISNUMBER);
-    registry.registerFunction("ISTEXT", fn_ISTEXT);
-    registry.registerFunction("ISERROR", fn_ISERROR);
-    registry.registerFunction("ISLOGICAL", fn_ISLOGICAL);
-    registry.registerFunction("ISNA", fn_ISNA);
+    registry.registerFunction("EXACT", fn_EXACT, "(text1, text2)",
+                              "Checks if two strings are identical", "Logic");
+    registry.registerFunction("ISBLANK", fn_ISBLANK, "(value)", "Returns TRUE if cell is empty",
+                              "Logic");
+    registry.registerFunction("ISNUMBER", fn_ISNUMBER, "(value)",
+                              "Returns TRUE if value is a number", "Logic");
+    registry.registerFunction("ISTEXT", fn_ISTEXT, "(value)", "Returns TRUE if value is text",
+                              "Logic");
+    registry.registerFunction("ISERROR", fn_ISERROR, "(value)",
+                              "Returns TRUE if value is any error", "Logic");
+    registry.registerFunction("ISLOGICAL", fn_ISLOGICAL, "(value)",
+                              "Returns TRUE if value is a boolean", "Logic");
+    registry.registerFunction("ISNA", fn_ISNA, "(value)", "Returns TRUE if value is #N/A", "Logic");
 
     // Boolean constants
-    registry.registerFunction("TRUE", fn_TRUE);
-    registry.registerFunction("FALSE", fn_FALSE);
+    registry.registerFunction("TRUE", fn_TRUE, "()", "Returns the logical value TRUE", "Logic");
+    registry.registerFunction("FALSE", fn_FALSE, "()", "Returns the logical value FALSE", "Logic");
 }
 
 }  // namespace cells

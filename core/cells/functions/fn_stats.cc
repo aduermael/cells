@@ -216,16 +216,26 @@ EvalResult fn_PERCENTILE_EXC(const std::vector<const ASTNode*>& args, EvalContex
 }
 
 void registerStatsFunctions(FunctionRegistry& registry) {
-    registry.registerFunction("MEDIAN", fn_MEDIAN);
-    registry.registerFunction("STDEV", fn_STDEV);
-    registry.registerFunction("STDEVS", fn_STDEV_S);  // STDEV.S alternative
-    registry.registerFunction("STDEVP", fn_STDEV_P);  // STDEV.P alternative
-    registry.registerFunction("VAR", fn_VAR);
-    registry.registerFunction("VARS", fn_VAR_S);  // VAR.S alternative
-    registry.registerFunction("VARP", fn_VAR_P);  // VAR.P alternative
-    registry.registerFunction("PERCENTILE", fn_PERCENTILE);
-    registry.registerFunction("PERCENTILEINC", fn_PERCENTILE_INC);  // PERCENTILE.INC alternative
-    registry.registerFunction("PERCENTILEEXC", fn_PERCENTILE_EXC);  // PERCENTILE.EXC alternative
+    registry.registerFunction("MEDIAN", fn_MEDIAN, "(number1, [number2], ...)",
+                              "Returns the median value", "Statistics");
+    registry.registerFunction("STDEV", fn_STDEV, "(number1, [number2], ...)",
+                              "Sample standard deviation", "Statistics");
+    registry.registerFunction("STDEVS", fn_STDEV_S, "(number1, [number2], ...)",
+                              "Sample standard deviation", "Statistics");
+    registry.registerFunction("STDEVP", fn_STDEV_P, "(number1, [number2], ...)",
+                              "Population standard deviation", "Statistics");
+    registry.registerFunction("VAR", fn_VAR, "(number1, [number2], ...)", "Sample variance",
+                              "Statistics");
+    registry.registerFunction("VARS", fn_VAR_S, "(number1, [number2], ...)", "Sample variance",
+                              "Statistics");
+    registry.registerFunction("VARP", fn_VAR_P, "(number1, [number2], ...)", "Population variance",
+                              "Statistics");
+    registry.registerFunction("PERCENTILE", fn_PERCENTILE, "(array, k)",
+                              "Returns the k-th percentile", "Statistics");
+    registry.registerFunction("PERCENTILEINC", fn_PERCENTILE_INC, "(array, k)",
+                              "Inclusive percentile", "Statistics");
+    registry.registerFunction("PERCENTILEEXC", fn_PERCENTILE_EXC, "(array, k)",
+                              "Exclusive percentile", "Statistics");
 }
 
 }  // namespace cells

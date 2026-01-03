@@ -127,6 +127,18 @@ export interface CellFormatIdResult {
   error?: string;
 }
 
+// ============================================================================
+// Formula Function Types
+// ============================================================================
+
+/** Formula function information for autocomplete */
+export interface FunctionInfo {
+  name: string; // Function name, e.g., "SUM"
+  signature: string; // Arguments, e.g., "(number1, [number2], ...)"
+  description: string; // Brief description
+  category: string; // Category, e.g., "Math", "Logic", "Text"
+}
+
 /** Column information */
 export interface ColumnInfo {
   id: string;

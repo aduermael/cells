@@ -9,6 +9,7 @@ import type {
   ParsedInputResult,
   FormattedValueResult,
   CellFormatIdResult,
+  FunctionInfo,
 } from "./types";
 import type {
   WorkerMessage,
@@ -394,6 +395,15 @@ export class CellsClient {
   async getAvailableFormats(): Promise<NumberFormat[]> {
     const response = await this._send("getAvailableFormats", {});
     return response as unknown as NumberFormat[];
+  }
+
+  /**
+   * Get all registered formula functions with metadata.
+   * Returns an array of FunctionInfo objects for autocomplete.
+   */
+  async getFormulaFunctions(): Promise<FunctionInfo[]> {
+    const response = await this._send("getFormulaFunctions", {});
+    return response as unknown as FunctionInfo[];
   }
 
   /**
