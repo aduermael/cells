@@ -278,6 +278,12 @@ export class App {
   /** Formula reference highlights for the grid */
   formulaHighlights: FormulaHighlight[] = [];
 
+  /** Index of hovered reference in formula bar (-1 = none) */
+  hoveredFormulaRefIndex: number = -1;
+
+  /** Index of hovered reference from grid highlight (-1 = none) */
+  hoveredGridRefIndex: number = -1;
+
   // =========================================================================
   // Constructor
   // =========================================================================
@@ -413,11 +419,15 @@ export class App {
     this.discoveredRows = 100;
     this.resetSelection();
     this.formulaHighlights = [];
+    this.hoveredFormulaRefIndex = -1;
+    this.hoveredGridRefIndex = -1;
   }
 
   /** Clear formula highlights (when editing stops) */
   clearFormulaHighlights(): void {
     this.formulaHighlights = [];
+    this.hoveredFormulaRefIndex = -1;
+    this.hoveredGridRefIndex = -1;
   }
 }
 
