@@ -403,7 +403,7 @@ export class CellsClient {
    */
   async getFormulaFunctions(): Promise<FunctionInfo[]> {
     const response = await this._send("getFormulaFunctions", {});
-    return response as unknown as FunctionInfo[];
+    return (response as unknown as { functions: FunctionInfo[] }).functions;
   }
 
   /**

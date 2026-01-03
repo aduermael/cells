@@ -402,7 +402,8 @@ export class FormulaBarEditor {
       this.dataSource,
       (functionName: string) => this.insertFunctionName(functionName)
     );
-    this.formulaAutocomplete.setInputElement(this.formulaInput);
+    // Use the contenteditable display for positioning, not the hidden input
+    this.formulaAutocomplete.setInputElement(this.formulaDisplay as HTMLInputElement);
   }
 
   /**

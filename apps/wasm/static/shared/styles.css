@@ -545,6 +545,7 @@ canvas {
 
 /* Formula Bar */
 #formula-bar {
+    position: relative; /* For autocomplete popup positioning */
     min-height: var(--bar-height);
     display: flex;
     align-items: center;

@@ -22,6 +22,7 @@ import {
   setCursorPosition,
 } from "./formula-colorizer.js";
 import type { FocusManager } from "./focus-manager";
+import { FormulaAutocomplete } from "./formula-autocomplete";
 
 // =============================================================================
 // Types
@@ -80,6 +81,9 @@ export class CellEditor {
   private lastKnownCursorPos: { start: number; end: number } = { start: 0, end: 0 };
   // Last known value - updated continuously while editing
   private lastKnownValue: string = "";
+
+  // Formula function autocomplete
+  private formulaAutocomplete: FormulaAutocomplete | null = null;
 
   // =========================================================================
   // State accessors (provided by App)
@@ -173,6 +177,58 @@ export class CellEditor {
 
   setDataSource(dataSource: WasmDataSource | null): void {
     this.dataSource = dataSource;
+    // Initialize formula autocomplete when dataSource is available
+    this.initFormulaAutocomplete();
+  }
+
+  /**
+   * Initialize formula autocomplete if dataSource is available.
+   */
+  private initFormulaAutocomplete(): void {
+    if (!this.dataSource) return;
+    if (this.formulaAutocomplete) return;
+
+    this.formulaAutocomplete = new FormulaAutocomplete(
+      this.cellEditorContainer,
+      this.dataSource,
+      (functionName: string) => this.insertFunctionName(functionName)
+    );
+    this.formulaAutocomplete.setInputElement(this.cellDisplay as HTMLInputElement);
+  }
+
+  /**
+   * Insert a function name at the current cursor position.
+   * Called when user selects a function from autocomplete.
+   */
+  private insertFunctionName(functionName: string): void {
+    const value = this.getValue();
+    const cursorPos = this.lastKnownCursorPos.start;
+
+    // Find the prefix we need to replace
+    const prefix = this.formulaAutocomplete?.getPrefix() || "";
+    const prefixStart = cursorPos - prefix.length;
+
+    // Build new value with function inserted
+    const before = value.substring(0, prefixStart);
+    const after = value.substring(cursorPos);
+    const newValue = before + functionName + "(" + after;
+
+    // Update value
+    this.cellEditorInput.value = newValue;
+    this.formulaInput.value = newValue;
+    this.updateColoredDisplay();
+
+    // Position cursor inside parentheses
+    const newCursorPos = prefixStart + functionName.length + 1;
+    this.lastKnownCursorPos = { start: newCursorPos, end: newCursorPos };
+    this.lastKnownValue = newValue;
+
+    // Use setTimeout to ensure DOM updates before setting cursor
+    setTimeout(() => {
+      setCursorPosition(this.cellDisplay, newCursorPos);
+      this.cellDisplay.focus();
+      this.onUpdateFormulaHighlights(newValue);
+    }, 0);
   }
 
   setSyncAdapter(adapter: CppSyncAdapter | null): void {
@@ -455,6 +511,9 @@ export class CellEditor {
    * Cancel the current cell edit, discarding changes
    */
   cancelEditing(): void {
+    // Hide autocomplete
+    this.formulaAutocomplete?.hide();
+
     if (!this.isEditing()) return;
     this.uiStateMachine.transition(UIEvent.CANCEL_CELL_EDIT);
     this.cellEditorContainer.style.display = "none";
@@ -475,6 +534,9 @@ export class CellEditor {
    * Commit the current cell edit, saving changes
    */
   async confirmEditing(): Promise<void> {
+    // Hide autocomplete
+    this.formulaAutocomplete?.hide();
+
     if (!this.isEditing() || !this.dataSource) return;
 
     // Get cellId from state machine context before transitioning
@@ -654,6 +716,12 @@ export class CellEditor {
     // Keyboard events on contenteditable
     this.cellDisplay.addEventListener("keydown", (e) => {
       e.stopPropagation();
+
+      // Let autocomplete handle navigation keys first
+      if (this.formulaAutocomplete?.handleKeyDown(e)) {
+        return;
+      }
+
       if (e.key === "Escape") {
         e.preventDefault();
         this.cancelEditing();
@@ -721,6 +789,11 @@ export class CellEditor {
         // Track value and cursor position continuously
         this.lastKnownValue = value;
         this.lastKnownCursorPos = getCursorPosition(this.cellDisplay);
+
+        // Update formula autocomplete
+        if (this.formulaAutocomplete) {
+          this.formulaAutocomplete.update(value, this.lastKnownCursorPos.start);
+        }
 
         // Update formula highlights for live feedback while typing formulas
         this.onUpdateFormulaHighlights(value);
