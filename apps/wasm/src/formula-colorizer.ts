@@ -91,6 +91,7 @@ function escapeHtml(text: string): string {
 /**
  * Generate HTML string with colored spans for formula text.
  * Each reference segment gets a colored span matching grid highlights.
+ * The data-ref-index attribute allows hover interaction with grid highlights.
  */
 export function colorizeFormula(
   formula: string,
@@ -98,12 +99,16 @@ export function colorizeFormula(
 ): string {
   const segments = getFormulaSegments(formula, highlights);
 
+  // Track which highlight index each colored segment corresponds to
+  let highlightIndex = 0;
+
   return segments
     .map((segment) => {
       const escapedText = escapeHtml(segment.text);
       if (segment.colorIndex !== undefined) {
         const color = getHighlightColor(segment.colorIndex, segment.isError);
-        return `<span class="formula-ref" style="color: ${color}; font-weight: 600;">${escapedText}</span>`;
+        const refIndex = highlightIndex++;
+        return `<span class="formula-ref" data-ref-index="${refIndex}" style="color: ${color}; font-weight: 600;">${escapedText}</span>`;
       }
       return escapedText;
     })

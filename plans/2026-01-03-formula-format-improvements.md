@@ -61,7 +61,7 @@ This plan implements five interconnected features to improve the formula editing
 - `apps/wasm/static/shared/styles.css` - Hover styles
 
 ### Tasks:
-- [ ] 2a: Add `data-ref-index` attribute to formula-ref spans in colorizeFormula()
+- [x] 2a: Add `data-ref-index` attribute to formula-ref spans in colorizeFormula()
 - [ ] 2b: Track hovered reference state in app.ts
 - [ ] 2c: Add mouseenter/mouseleave handlers to formula display for refs
 - [ ] 2d: Emphasize grid highlight when formula ref is hovered (thicker border)
