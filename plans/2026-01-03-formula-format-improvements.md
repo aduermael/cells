@@ -64,7 +64,7 @@ This plan implements five interconnected features to improve the formula editing
 - [x] 2a: Add `data-ref-index` attribute to formula-ref spans in colorizeFormula()
 - [x] 2b: Track hovered reference state in app.ts
 - [x] 2c: Add mouseenter/mouseleave handlers to formula display for refs
-- [ ] 2d: Emphasize grid highlight when formula ref is hovered (thicker border)
+- [x] 2d: Emphasize grid highlight when formula ref is hovered (thicker border)
 - [ ] 2e: Detect grid hover over formula highlights
 - [ ] 2f: Emphasize formula bar text when grid highlight is hovered
 - [ ] 2g: Add CSS transitions for smooth hover effects

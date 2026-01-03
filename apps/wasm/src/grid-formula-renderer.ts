@@ -21,6 +21,8 @@ export interface FormulaHighlightRendererState {
   colPixelOffsets: Map<number, number>;
   rowPixelOffsets: Map<number, number>;
   formulaHighlights: FormulaHighlight[];
+  /** Index of hovered formula reference (-1 = none) */
+  hoveredFormulaRefIndex: number;
 }
 
 // Default fallback color (blue)
@@ -50,7 +52,8 @@ function drawCellHighlight(
   color: { border: string; bg: string },
   state: FormulaHighlightRendererState,
   viewWidth: number,
-  viewHeight: number
+  viewHeight: number,
+  isHovered: boolean
 ): void {
   const cellX = getColPixelX(col, state.scrollX, state.colPixelOffsets, state.colWidths);
   const cellY = getRowPixelY(row, state.scrollY, state.rowPixelOffsets, state.rowHeights);
@@ -73,14 +76,15 @@ function drawCellHighlight(
   const clipW = Math.min(cellW, cellX + cellW - clipX);
   const clipH = Math.min(cellH, cellY + cellH - clipY);
 
-  // Draw fill
-  ctx.fillStyle = color.bg;
+  // Draw fill (more opaque when hovered)
+  ctx.fillStyle = isHovered ? color.bg.replace("0.15", "0.25") : color.bg;
   ctx.fillRect(clipX, clipY, clipW, clipH);
 
-  // Draw border
+  // Draw border (thicker when hovered)
   ctx.strokeStyle = color.border;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(clipX + 1, clipY + 1, clipW - 2, clipH - 2);
+  ctx.lineWidth = isHovered ? 3 : 2;
+  const inset = isHovered ? 1.5 : 1;
+  ctx.strokeRect(clipX + inset, clipY + inset, clipW - inset * 2, clipH - inset * 2);
 }
 
 /**
@@ -95,7 +99,8 @@ function drawRangeHighlight(
   color: { border: string; bg: string },
   state: FormulaHighlightRendererState,
   viewWidth: number,
-  viewHeight: number
+  viewHeight: number,
+  isHovered: boolean
 ): void {
   // Normalize range (ensure start <= end)
   const minCol = Math.min(startCol, endCol);
@@ -133,14 +138,15 @@ function drawRangeHighlight(
   const clipW = Math.min(rangeW, rangeX + rangeW - clipX);
   const clipH = Math.min(rangeH, rangeY + rangeH - clipY);
 
-  // Draw fill
-  ctx.fillStyle = color.bg;
+  // Draw fill (more opaque when hovered)
+  ctx.fillStyle = isHovered ? color.bg.replace("0.15", "0.25") : color.bg;
   ctx.fillRect(clipX, clipY, clipW, clipH);
 
-  // Draw border
+  // Draw border (thicker when hovered)
   ctx.strokeStyle = color.border;
-  ctx.lineWidth = 2;
-  ctx.strokeRect(clipX + 1, clipY + 1, clipW - 2, clipH - 2);
+  ctx.lineWidth = isHovered ? 3 : 2;
+  const inset = isHovered ? 1.5 : 1;
+  ctx.strokeRect(clipX + inset, clipY + inset, clipW - inset * 2, clipH - inset * 2);
 }
 
 /**
@@ -158,8 +164,13 @@ export function drawFormulaHighlights(
 
   ctx.save();
 
-  for (const highlight of state.formulaHighlights) {
+  const hoveredIdx = state.hoveredFormulaRefIndex;
+
+  for (let idx = 0; idx < state.formulaHighlights.length; idx++) {
+    const highlight = state.formulaHighlights[idx];
+    if (!highlight) continue;
     const color = getHighlightColor(highlight);
+    const isHovered = idx === hoveredIdx;
 
     switch (highlight.type) {
       case "cell":
@@ -171,7 +182,8 @@ export function drawFormulaHighlights(
             color,
             state,
             viewWidth,
-            viewHeight
+            viewHeight,
+            isHovered
           );
         }
         break;
@@ -192,7 +204,8 @@ export function drawFormulaHighlights(
             color,
             state,
             viewWidth,
-            viewHeight
+            viewHeight,
+            isHovered
           );
         }
         break;
@@ -207,16 +220,17 @@ export function drawFormulaHighlights(
             const clipX = Math.max(HEADER_WIDTH, colX);
             const clipW = Math.min(colW, colX + colW - clipX);
 
-            ctx.fillStyle = color.bg;
+            ctx.fillStyle = isHovered ? color.bg.replace("0.15", "0.25") : color.bg;
             ctx.fillRect(clipX, HEADER_HEIGHT, clipW, viewHeight - HEADER_HEIGHT);
 
             ctx.strokeStyle = color.border;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = isHovered ? 3 : 2;
+            const inset = isHovered ? 1.5 : 1;
             ctx.strokeRect(
-              clipX + 1,
-              HEADER_HEIGHT + 1,
-              clipW - 2,
-              viewHeight - HEADER_HEIGHT - 2
+              clipX + inset,
+              HEADER_HEIGHT + inset,
+              clipW - inset * 2,
+              viewHeight - HEADER_HEIGHT - inset * 2
             );
           }
         }
@@ -232,16 +246,17 @@ export function drawFormulaHighlights(
             const clipY = Math.max(HEADER_HEIGHT, rowY);
             const clipH = Math.min(rowH, rowY + rowH - clipY);
 
-            ctx.fillStyle = color.bg;
+            ctx.fillStyle = isHovered ? color.bg.replace("0.15", "0.25") : color.bg;
             ctx.fillRect(HEADER_WIDTH, clipY, viewWidth - HEADER_WIDTH, clipH);
 
             ctx.strokeStyle = color.border;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = isHovered ? 3 : 2;
+            const inset = isHovered ? 1.5 : 1;
             ctx.strokeRect(
-              HEADER_WIDTH + 1,
-              clipY + 1,
-              viewWidth - HEADER_WIDTH - 2,
-              clipH - 2
+              HEADER_WIDTH + inset,
+              clipY + inset,
+              viewWidth - HEADER_WIDTH - inset * 2,
+              clipH - inset * 2
             );
           }
         }

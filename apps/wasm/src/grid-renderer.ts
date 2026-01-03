@@ -112,6 +112,9 @@ export class GridRenderer {
   // Formula reference highlights state
   formulaHighlights: FormulaHighlight[] = [];
 
+  // Index of hovered formula reference (-1 = none)
+  hoveredFormulaRefIndex = -1;
+
   // Fill handle bounds (for hit testing in grid events)
   fillHandleBounds: FillHandleBounds | null = null;
 
@@ -262,6 +265,7 @@ export class GridRenderer {
         colPixelOffsets: this.colPixelOffsets,
         rowPixelOffsets: this.rowPixelOffsets,
         formulaHighlights: this.formulaHighlights,
+        hoveredFormulaRefIndex: this.hoveredFormulaRefIndex,
       };
       drawFormulaHighlights(ctx, formulaState, viewWidth, viewHeight);
     }

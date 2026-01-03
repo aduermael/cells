@@ -243,6 +243,7 @@ export function initApp(): AppContext {
         ? app.editingColumnIndex
         : -1,
       formulaHighlights: app.formulaHighlights,
+      hoveredFormulaRefIndex: app.hoveredFormulaRefIndex,
       discoveredRows: app.discoveredRows,
       isFillDragging: app.isFillDragging,
       fillPreviewRange: app.fillPreviewRange,

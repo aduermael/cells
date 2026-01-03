@@ -186,6 +186,8 @@ export interface GridRendererState {
   editingColumnIndex?: number;
   remotePresence?: RemotePresenceRender[];
   formulaHighlights?: FormulaHighlight[];
+  /** Index of hovered formula reference (-1 = none) */
+  hoveredFormulaRefIndex?: number;
   /** Virtual scrolling: discovered row count (expands as user scrolls down) */
   discoveredRows?: number;
   /** Whether currently dragging the fill handle */
