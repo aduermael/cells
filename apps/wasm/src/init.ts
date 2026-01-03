@@ -1210,6 +1210,12 @@ export function initApp(): AppContext {
     getFillPreviewRange: () => app.fillPreviewRange,
     setFillPreviewRange: (v) => { app.fillPreviewRange = v; },
 
+    getFormulaHighlights: () => app.formulaHighlights,
+    getHoveredGridRefIndex: () => app.hoveredGridRefIndex,
+    setHoveredGridRefIndex: (v) => { app.hoveredGridRefIndex = v; },
+    getColPixelOffsets: () => app.colPixelOffsets,
+    getRowPixelOffsets: () => app.rowPixelOffsets,
+
     render,
     updateFormulaBar,
     clearFormulaHighlights: () => { app.formulaHighlights = []; },

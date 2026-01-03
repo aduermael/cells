@@ -133,6 +133,13 @@ export interface AppEventManagerConfig {
     getFillPreviewRange: () => { minCol: number; maxCol: number; minRow: number; maxRow: number } | null;
     setFillPreviewRange: (v: { minCol: number; maxCol: number; minRow: number; maxRow: number } | null) => void;
 
+    // Formula highlight hover
+    getFormulaHighlights: () => import("./grid-constants").FormulaHighlight[];
+    getHoveredGridRefIndex: () => number;
+    setHoveredGridRefIndex: (v: number) => void;
+    getColPixelOffsets: () => Map<number, number>;
+    getRowPixelOffsets: () => Map<number, number>;
+
     // Callbacks
     render: () => void;
     updateFormulaBar: () => void;
@@ -1080,6 +1087,9 @@ export class AppEventManager {
             }
         }
 
+        // Check for formula highlight hover
+        this.checkFormulaHighlightHover(x, y);
+
         // Broadcast mouse position for collaboration (throttled)
         // Only broadcast when inside data area
         if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
@@ -2001,6 +2011,115 @@ export class AppEventManager {
 
     private handleKeyUp(e: KeyboardEvent): void {
         this.config.uiStateMachine.updateModifiersFromEvent(e);
+    }
+
+    // =========================================================================
+    // Formula Highlight Hover
+    // =========================================================================
+
+    /**
+     * Check if mouse is over a formula highlight and update hover state.
+     * Uses pixel bounds of each highlight to determine hit.
+     */
+    private checkFormulaHighlightHover(mouseX: number, mouseY: number): void {
+        const {
+            getFormulaHighlights,
+            getHoveredGridRefIndex,
+            setHoveredGridRefIndex,
+            getScrollX,
+            getScrollY,
+            getColWidths,
+            getRowHeights,
+            getColPixelOffsets,
+            getRowPixelOffsets,
+            render,
+        } = this.config;
+
+        const highlights = getFormulaHighlights();
+        if (highlights.length === 0) {
+            // No highlights - clear hover state if set
+            if (getHoveredGridRefIndex() !== -1) {
+                setHoveredGridRefIndex(-1);
+                render();
+            }
+            return;
+        }
+
+        const scrollX = getScrollX();
+        const scrollY = getScrollY();
+        const colWidths = getColWidths();
+        const rowHeights = getRowHeights();
+        const colPixelOffsets = getColPixelOffsets();
+        const rowPixelOffsets = getRowPixelOffsets();
+
+        // Helper to get pixel X for a column
+        const getColX = (col: number): number => {
+            const offset = colPixelOffsets.get(col);
+            if (offset !== undefined) return offset - scrollX + HEADER_WIDTH;
+            let x = HEADER_WIDTH - scrollX;
+            for (let i = 0; i < col; i++) {
+                x += colWidths.get(i) || DEFAULT_COL_WIDTH;
+            }
+            return x;
+        };
+
+        // Helper to get pixel Y for a row
+        const getRowY = (row: number): number => {
+            const offset = rowPixelOffsets.get(row);
+            if (offset !== undefined) return offset - scrollY + HEADER_HEIGHT;
+            let y = HEADER_HEIGHT - scrollY;
+            for (let i = 0; i < row; i++) {
+                y += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+            }
+            return y;
+        };
+
+        let hoveredIdx = -1;
+
+        for (let idx = 0; idx < highlights.length; idx++) {
+            const h = highlights[idx];
+            if (!h) continue;
+
+            let minX: number, minY: number, maxX: number, maxY: number;
+
+            if (h.type === "cell" && h.col !== undefined && h.row !== undefined) {
+                minX = getColX(h.col);
+                minY = getRowY(h.row);
+                maxX = minX + (colWidths.get(h.col) || DEFAULT_COL_WIDTH);
+                maxY = minY + (rowHeights.get(h.row) || DEFAULT_ROW_HEIGHT);
+            } else if (
+                h.type === "range" &&
+                h.startCol !== undefined &&
+                h.startRow !== undefined &&
+                h.endCol !== undefined &&
+                h.endRow !== undefined
+            ) {
+                const startCol = Math.min(h.startCol, h.endCol);
+                const endCol = Math.max(h.startCol, h.endCol);
+                const startRow = Math.min(h.startRow, h.endRow);
+                const endRow = Math.max(h.startRow, h.endRow);
+
+                minX = getColX(startCol);
+                minY = getRowY(startRow);
+                maxX = getColX(endCol) + (colWidths.get(endCol) || DEFAULT_COL_WIDTH);
+                maxY = getRowY(endRow) + (rowHeights.get(endRow) || DEFAULT_ROW_HEIGHT);
+            } else {
+                // Column/row highlights - skip for now (full column/row)
+                continue;
+            }
+
+            // Hit test
+            if (mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY) {
+                hoveredIdx = idx;
+                break; // First hit wins (highlights are drawn in order)
+            }
+        }
+
+        // Update state if changed
+        if (hoveredIdx !== getHoveredGridRefIndex()) {
+            setHoveredGridRefIndex(hoveredIdx);
+            render();
+        }
     }
 
     // =========================================================================
