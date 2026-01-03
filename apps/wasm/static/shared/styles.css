@@ -646,8 +646,21 @@ canvas {
 }
 
 /* Formula reference colors in text */
-#formula-display .formula-ref {
+#formula-display .formula-ref,
+#cell-display .formula-ref {
     font-weight: var(--font-weight-semibold);
+    transition: text-shadow 0.15s ease, transform 0.15s ease;
+    display: inline-block;
+    cursor: default;
+}
+
+/* Hover effect when mouse is over formula text (or corresponding grid highlight) */
+#formula-display .formula-ref:hover,
+#formula-display .formula-ref-hovered,
+#cell-display .formula-ref:hover,
+#cell-display .formula-ref-hovered {
+    text-shadow: 0 0 2px currentColor;
+    transform: scale(1.02);
 }
 
 /* Cell Editor Container - wrapper for contenteditable and hidden input */
@@ -684,11 +697,6 @@ canvas {
     white-space: pre;
     overflow: hidden;
     box-sizing: border-box;
-}
-
-/* Formula reference colors in cell editor */
-#cell-display .formula-ref {
-    font-weight: 600;
 }
 
 /* Column Header Editor */

@@ -49,7 +49,7 @@ This plan implements five interconnected features to improve the formula editing
 
 ---
 
-## Phase 2: Formula ↔ Grid Hover Interaction
+## Phase 2: Formula ↔ Grid Hover Interaction ✅ COMPLETED
 
 **Goal:** Hovering a cell ref in the formula bar emphasizes the grid frame; hovering grid frame emphasizes formula text.
 
@@ -67,7 +67,7 @@ This plan implements five interconnected features to improve the formula editing
 - [x] 2d: Emphasize grid highlight when formula ref is hovered (thicker border)
 - [x] 2e: Detect grid hover over formula highlights
 - [x] 2f: Emphasize formula bar text when grid highlight is hovered
-- [ ] 2g: Add CSS transitions for smooth hover effects
+- [x] 2g: Add CSS transitions for smooth hover effects
 
 ---
 
