@@ -291,6 +291,55 @@ TEST(FormulaParserTest, AbsoluteRange) {
     EXPECT_TRUE(range->bottomRight->rowAbsolute);
 }
 
+TEST(FormulaParserTest, RangeHasCorrectSourcePosition) {
+    // Test that range references have sourcePosition spanning from start to end
+    // Formula: "=A1:C3" - the range "A1:C3" spans positions 1-6 (after '=')
+    FormulaParser parser("=A1:C3");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::RANGE_REF);
+
+    auto* range = dynamic_cast<RangeRefNode*>(ast.get());
+    ASSERT_NE(range, nullptr);
+
+    // The range position should span from 'A' to end of 'C3'
+    // Position 1 is 'A', position 6 is end of '3' (exclusive)
+    EXPECT_EQ(range->position.start, 1u);
+    EXPECT_EQ(range->position.end, 6u);
+
+    // Verify the text can be extracted using these positions
+    const std::string formula = "=A1:C3";
+    const std::string rangeText =
+        formula.substr(range->position.start, range->position.end - range->position.start);
+    EXPECT_EQ(rangeText, "A1:C3");
+}
+
+TEST(FormulaParserTest, RangeInFunctionHasCorrectSourcePosition) {
+    // Test range inside a function: =SUM(B2:D5)
+    FormulaParser parser("=SUM(B2:D5)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::FUNCTION_CALL);
+
+    auto* func = dynamic_cast<FunctionCallNode*>(ast.get());
+    ASSERT_NE(func, nullptr);
+    ASSERT_EQ(func->args.size(), 1u);
+    EXPECT_EQ(func->args[0]->type, ASTNodeType::RANGE_REF);
+
+    auto* range = dynamic_cast<RangeRefNode*>(func->args[0].get());
+    ASSERT_NE(range, nullptr);
+
+    // Range B2:D5 starts at position 5 (after "=SUM("), ends at position 10
+    EXPECT_EQ(range->position.start, 5u);
+    EXPECT_EQ(range->position.end, 10u);
+
+    // Verify the text extraction
+    const std::string formula = "=SUM(B2:D5)";
+    const std::string rangeText =
+        formula.substr(range->position.start, range->position.end - range->position.start);
+    EXPECT_EQ(rangeText, "B2:D5");
+}
+
 // ============================================================================
 // Column/Row Reference Tests
 // ============================================================================

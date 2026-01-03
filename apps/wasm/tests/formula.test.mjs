@@ -251,6 +251,92 @@ const tests = {
     const content = await getFormulaBarContent(ctx.page);
     assertEqual(content, '=SUM(A1,B1)', 'Formula bar should show "=SUM(A1,B1)" (whitespace normalized)');
   },
+
+  // ============================================================================
+  // Range Reference Highlighting Tests
+  // ============================================================================
+
+  'Range reference is colored in formula bar': async (ctx) => {
+    // When a cell has a formula with a range reference (e.g., =SUM(A1:A3)),
+    // clicking on that cell should show the range reference colored in the formula bar
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter some values
+    await setCellValue(ctx.page, 'A1', '1');
+    await setCellValue(ctx.page, 'A2', '2');
+    await setCellValue(ctx.page, 'A3', '3');
+    await sleep(100);
+
+    // Enter a SUM formula with a range
+    await setCellValue(ctx.page, 'B1', '=SUM(A1:A3)');
+    await sleep(200);
+
+    // Click B1 to select it and trigger formula highlighting
+    await clickCell(ctx.page, 'B1');
+    await sleep(300);
+
+    // Check that the formula display contains a colored span for the range
+    // The range "A1:A3" should have a formula-ref span
+    const hasColoredRange = await ctx.page.evaluate(() => {
+      const formulaDisplay = document.getElementById('formula-display');
+      if (!formulaDisplay) return false;
+
+      // Look for a span with class 'formula-ref' that contains the range text
+      const spans = formulaDisplay.querySelectorAll('.formula-ref');
+      for (const span of spans) {
+        const text = span.textContent;
+        // The range could be "A1:A3" or split into parts
+        if (text === 'A1:A3' || text === 'A1' || text === 'A3') {
+          // Check that it has a color style
+          const style = span.getAttribute('style') || '';
+          if (style.includes('color:') || span.style.color) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+
+    assertTrue(hasColoredRange, 'Range reference should be colored in formula bar');
+  },
+
+  'Cell reference is colored in formula bar': async (ctx) => {
+    // Single cell references should also be colored
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a value
+    await setCellValue(ctx.page, 'A1', '42');
+    await sleep(100);
+
+    // Enter a formula referencing the cell
+    await setCellValue(ctx.page, 'B1', '=A1*2');
+    await sleep(200);
+
+    // Click B1 to select it and trigger formula highlighting
+    await clickCell(ctx.page, 'B1');
+    await sleep(300);
+
+    // Check that A1 reference is colored
+    const hasColoredRef = await ctx.page.evaluate(() => {
+      const formulaDisplay = document.getElementById('formula-display');
+      if (!formulaDisplay) return false;
+
+      const spans = formulaDisplay.querySelectorAll('.formula-ref');
+      for (const span of spans) {
+        if (span.textContent === 'A1') {
+          const style = span.getAttribute('style') || '';
+          if (style.includes('color:') || span.style.color) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+
+    assertTrue(hasColoredRef, 'Cell reference A1 should be colored in formula bar');
+  },
 };
 
 // Run all tests

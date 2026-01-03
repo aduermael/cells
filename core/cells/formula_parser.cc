@@ -352,12 +352,17 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
                         if (match(TokenType::COLON)) {
                             // Range like A$1:B$2
                             auto second = parseCellOrRangeRef("");
-                            if (dynamic_cast<CellRefNode*>(second.get()) != nullptr) {
+                            if (auto* secondCell = dynamic_cast<CellRefNode*>(second.get())) {
+                                // Compute position spanning from start of first cell to end of
+                                // second
+                                const SourcePosition rangePos{cellRef->position.start,
+                                                              secondCell->position.end};
                                 return std::make_unique<RangeRefNode>(
                                     std::unique_ptr<CellRefNode>(
                                         static_cast<CellRefNode*>(cellRef.release())),
                                     std::unique_ptr<CellRefNode>(
-                                        static_cast<CellRefNode*>(second.release())));
+                                        static_cast<CellRefNode*>(second.release())),
+                                    rangePos);
                             }
                         }
                         return cellRef;
@@ -413,10 +418,14 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
             // Check for range (A1:B2)
             if (match(TokenType::COLON)) {
                 auto second = parseCellOrRangeRef(sheetName);
-                if (dynamic_cast<CellRefNode*>(second.get()) != nullptr) {
+                if (auto* secondCell = dynamic_cast<CellRefNode*>(second.get())) {
+                    // Compute position spanning from start of first cell to end of second
+                    const SourcePosition rangePos{cellRef->position.start,
+                                                  secondCell->position.end};
                     return std::make_unique<RangeRefNode>(
                         std::move(cellRef),
-                        std::unique_ptr<CellRefNode>(static_cast<CellRefNode*>(second.release())));
+                        std::unique_ptr<CellRefNode>(static_cast<CellRefNode*>(second.release())),
+                        rangePos);
                 }
                 return errorNode("Invalid range reference");
             }
@@ -436,10 +445,15 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
                 // Check for range
                 if (match(TokenType::COLON)) {
                     auto second = parseCellOrRangeRef(sheetName);
-                    if (dynamic_cast<CellRefNode*>(second.get()) != nullptr) {
+                    if (auto* secondCell = dynamic_cast<CellRefNode*>(second.get())) {
+                        // Compute position spanning from start of first cell to end of second
+                        const SourcePosition rangePos{cellRef->position.start,
+                                                      secondCell->position.end};
                         return std::make_unique<RangeRefNode>(
-                            std::move(cellRef), std::unique_ptr<CellRefNode>(
-                                                    static_cast<CellRefNode*>(second.release())));
+                            std::move(cellRef),
+                            std::unique_ptr<CellRefNode>(
+                                static_cast<CellRefNode*>(second.release())),
+                            rangePos);
                     }
                 }
                 return cellRef;
@@ -524,7 +538,9 @@ std::unique_ptr<ASTNode> FormulaParser::parseCellOrRangeRef(const std::string& s
             secondComponents.rowAbsolute, secondComponents.position);
         secondCell->sheetName = sheetName;
 
-        return std::make_unique<RangeRefNode>(std::move(cellRef), std::move(secondCell));
+        // Compute position spanning from start of first cell to end of second
+        const SourcePosition rangePos{cellRef->position.start, secondCell->position.end};
+        return std::make_unique<RangeRefNode>(std::move(cellRef), std::move(secondCell), rangePos);
     }
 
     return cellRef;
@@ -662,10 +678,13 @@ std::unique_ptr<ASTNode> FormulaParser::parseUuidCellRef() {
     if (match(TokenType::COLON)) {
         if (check(TokenType::UUID_CELL_REF)) {
             auto secondNode = parseUuidCellRef();
-            if (dynamic_cast<CellRefNode*>(secondNode.get()) != nullptr) {
+            if (auto* secondCell = dynamic_cast<CellRefNode*>(secondNode.get())) {
+                // Compute position spanning from start of first cell to end of second
+                const SourcePosition rangePos{node->position.start, secondCell->position.end};
                 return std::make_unique<RangeRefNode>(
                     std::move(node),
-                    std::unique_ptr<CellRefNode>(static_cast<CellRefNode*>(secondNode.release())));
+                    std::unique_ptr<CellRefNode>(static_cast<CellRefNode*>(secondNode.release())),
+                    rangePos);
             }
         }
         return errorNode("Expected UUID cell reference after ':'");
