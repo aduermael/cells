@@ -450,19 +450,24 @@ bool Parser::parseRow(std::string_view line) {
     return true;
 }
 
-bool Parser::parseCellValue(std::string_view value, char type, CellValue& out) {
+bool Parser::parseCellValue(std::string_view value, char type, CellValue& out, size_t& consumed) {
+    consumed = 0;
     switch (type) {
         case 'n': {
-            // Number: 42, 3.14, -100
-            const double num = std::strtod(std::string(value).c_str(), nullptr);
+            // Number: 42, 3.14, -100 (ends at whitespace or end of string)
+            size_t end = value.find_first_of(" \t");
+            if (end == std::string_view::npos) {
+                end = value.size();
+            }
+            const double num = std::strtod(std::string(value.substr(0, end)).c_str(), nullptr);
             out = CellValue(num);
+            consumed = end;
             return true;
         }
 
         case 's': {
             // String: "Hello"
             std::string str;
-            size_t consumed = 0;
             if (!parseQuotedString(value, str, consumed)) {
                 return false;
             }
@@ -473,7 +478,6 @@ bool Parser::parseCellValue(std::string_view value, char type, CellValue& out) {
         case 'f': {
             // Formula: "=$cA$r1+10"
             std::string formula;
-            size_t consumed = 0;
             if (!parseQuotedString(value, formula, consumed)) {
                 return false;
             }
@@ -485,10 +489,12 @@ bool Parser::parseCellValue(std::string_view value, char type, CellValue& out) {
 
         case 'b': {
             // Boolean: true or false
-            if (value == "true") {
+            if (value.substr(0, 4) == "true") {
                 out = CellValue(true);
-            } else if (value == "false") {
+                consumed = 4;
+            } else if (value.substr(0, 5) == "false") {
                 out = CellValue(false);
+                consumed = 5;
             } else {
                 return false;
             }
@@ -496,32 +502,95 @@ bool Parser::parseCellValue(std::string_view value, char type, CellValue& out) {
         }
 
         case 'e': {
-            // Error: #DIV/0!, #REF!, etc.
+            // Error: #DIV/0!, #REF!, etc. (ends at whitespace or end of string)
+            size_t end = value.find_first_of(" \t");
+            if (end == std::string_view::npos) {
+                end = value.size();
+            }
             out.type = CellValueType::ERROR;
-            out.raw = std::string(value);
+            out.raw = std::string(value.substr(0, end));
             out.error = stringToError(out.raw);
+            consumed = end;
             return true;
         }
 
         case 'd': {
             // Date: 2024-01-15 (ISO 8601)
+            size_t end = value.find_first_of(" \t");
+            if (end == std::string_view::npos) {
+                end = value.size();
+            }
             out.type = CellValueType::DATE;
-            out.raw = std::string(value);
+            out.raw = std::string(value.substr(0, end));
             out.error = CellError::NONE;
+            consumed = end;
             return true;
         }
 
         case 't': {
             // DateTime: 2024-01-15T10:30:00Z (ISO 8601)
+            size_t end = value.find_first_of(" \t");
+            if (end == std::string_view::npos) {
+                end = value.size();
+            }
             out.type = CellValueType::DATE_TIME;
-            out.raw = std::string(value);
+            out.raw = std::string(value.substr(0, end));
             out.error = CellError::NONE;
+            consumed = end;
             return true;
         }
 
         default:
             return false;
     }
+}
+
+bool Parser::parseCellProps(std::string_view props, Cell& cell) {
+    // Parse optional properties: fmt:<formatId>
+    // Format: key:value pairs separated by space
+
+    while (!props.empty()) {
+        // Skip leading whitespace
+        const size_t start = props.find_first_not_of(" \t");
+        if (start == std::string_view::npos) {
+            break;
+        }
+        props = props.substr(start);
+
+        // Find key:value pair
+        const size_t colonPos = props.find(':');
+        if (colonPos == std::string_view::npos) {
+            break;
+        }
+
+        const std::string_view key = props.substr(0, colonPos);
+        props = props.substr(colonPos + 1);
+
+        if (props.empty()) {
+            break;
+        }
+
+        // Parse value based on key
+        if (key == "fmt") {
+            // Format ID: 8 characters
+            size_t end = props.find_first_of(" \t");
+            if (end == std::string_view::npos) {
+                end = props.size();
+            }
+            cell.formatId = ID(std::string(props.substr(0, end)));
+            props = (end < props.size()) ? props.substr(end) : "";
+        } else {
+            // Unknown property - skip value
+            const size_t endPos = props.find_first_of(" \t");
+            if (endPos == std::string_view::npos) {
+                props = "";
+            } else {
+                props = props.substr(endPos);
+            }
+        }
+    }
+
+    return true;
 }
 
 bool Parser::parseCell(std::string_view line) {
@@ -582,10 +651,17 @@ bool Parser::parseCell(std::string_view line) {
     auto cell = std::make_unique<Cell>(ID(std::string(tokens[0])), ID(std::string(tokens[1])),
                                        ID(std::string(tokens[2])));
 
-    // Parse value
-    const std::string_view valueStr = (valueStart < line.size()) ? line.substr(valueStart) : "";
-    if (!parseCellValue(valueStr, type, cell->value)) {
+    // Parse value (and consume it from valueStr)
+    std::string_view valueStr = (valueStart < line.size()) ? line.substr(valueStart) : "";
+    size_t valueConsumed = 0;
+    if (!parseCellValue(valueStr, type, cell->value, valueConsumed)) {
         return setError("Invalid cell value");
+    }
+
+    // After value, check for optional properties (e.g., fmt:FMT_C002)
+    if (valueConsumed > 0 && valueConsumed < valueStr.size()) {
+        std::string_view propsStr = valueStr.substr(valueConsumed);
+        parseCellProps(propsStr, *cell);
     }
 
     // If it's a formula, check for shared formula reference =@UUID

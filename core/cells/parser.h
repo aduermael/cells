@@ -83,7 +83,8 @@ private:
     // Helper parsers
     static bool parseQuotedString(std::string_view input, std::string& out, size_t& consumed);
     static bool parseAxisProps(std::string_view props, Axis& axis);
-    bool parseCellValue(std::string_view value, char type, CellValue& out);
+    static bool parseCellProps(std::string_view props, Cell& cell);
+    bool parseCellValue(std::string_view value, char type, CellValue& out, size_t& consumed);
 };
 
 // Convenience function for one-shot parsing
