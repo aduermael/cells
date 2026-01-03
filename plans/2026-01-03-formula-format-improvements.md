@@ -66,7 +66,7 @@ This plan implements five interconnected features to improve the formula editing
 - [x] 2c: Add mouseenter/mouseleave handlers to formula display for refs
 - [x] 2d: Emphasize grid highlight when formula ref is hovered (thicker border)
 - [x] 2e: Detect grid hover over formula highlights
-- [ ] 2f: Emphasize formula bar text when grid highlight is hovered
+- [x] 2f: Emphasize formula bar text when grid highlight is hovered
 - [ ] 2g: Add CSS transitions for smooth hover effects
 
 ---

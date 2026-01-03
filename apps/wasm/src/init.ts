@@ -605,7 +605,8 @@ export function initApp(): AppContext {
    * Called after highlights are computed.
    */
   function updateColoredDisplays(value: string): void {
-    const coloredHtml = colorizeFormula(value, app.formulaHighlights);
+    // Pass hoveredGridRefIndex to highlight formula text when grid highlight is hovered
+    const coloredHtml = colorizeFormula(value, app.formulaHighlights, app.hoveredGridRefIndex);
 
     // Update formula bar display - preserve cursor if focused
     if (document.activeElement === elements.formulaDisplay) {
@@ -1215,6 +1216,15 @@ export function initApp(): AppContext {
     setHoveredGridRefIndex: (v) => { app.hoveredGridRefIndex = v; },
     getColPixelOffsets: () => app.colPixelOffsets,
     getRowPixelOffsets: () => app.rowPixelOffsets,
+    updateFormulaBarHoverStyle: () => {
+      // Re-colorize the formula displays with current hover state
+      const value = elements.formulaInput.value;
+      if (value && app.formulaHighlights.length > 0) {
+        const coloredHtml = colorizeFormula(value, app.formulaHighlights, app.hoveredGridRefIndex);
+        elements.formulaDisplay.innerHTML = coloredHtml;
+        elements.cellDisplay.innerHTML = coloredHtml;
+      }
+    },
 
     render,
     updateFormulaBar,

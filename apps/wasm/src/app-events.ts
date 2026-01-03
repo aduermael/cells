@@ -139,6 +139,7 @@ export interface AppEventManagerConfig {
     setHoveredGridRefIndex: (v: number) => void;
     getColPixelOffsets: () => Map<number, number>;
     getRowPixelOffsets: () => Map<number, number>;
+    updateFormulaBarHoverStyle: () => void;
 
     // Callbacks
     render: () => void;
@@ -2119,6 +2120,7 @@ export class AppEventManager {
         if (hoveredIdx !== getHoveredGridRefIndex()) {
             setHoveredGridRefIndex(hoveredIdx);
             render();
+            this.config.updateFormulaBarHoverStyle();
         }
     }
 
