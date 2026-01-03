@@ -431,6 +431,44 @@ ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op) {
     return ApplyResult::SUCCESS;
 }
 
+// Apply CELL_SET_FORMAT operation
+// Payload: {"format_id":"FMT_C002"} or {"format_id":"~"} for null/default
+ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op) {
+    // Find the target cell across all sheets
+    Cell* cell = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        cell = s->getCell(op.target_id);
+        if (cell != nullptr) {
+            break;
+        }
+    }
+
+    if (cell == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer format operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if (existing.type == OpType::CELL_SET_FORMAT && existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    // Parse payload: {"format_id":"FMT_C002"}
+    const std::string formatIdStr = extractJSONString(op.payload, "format_id");
+    if (formatIdStr.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    // Set the format ID (null ID "~" means clear format / use default)
+    cell->formatId = ID(formatIdStr);
+
+    return ApplyResult::SUCCESS;
+}
+
 // Apply CELL_CLEAR operation
 ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
     Sheet* targetSheet = nullptr;
@@ -1101,6 +1139,10 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             result = ApplyResult::SUCCESS;
             break;
 
+        case OpType::CELL_SET_FORMAT:
+            result = applyCellSetFormat(workbook, op);
+            break;
+
         // Column operations
         case OpType::COL_INSERT:
             result = applyColInsert(workbook, op);
@@ -1217,6 +1259,11 @@ Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const std::st
 Operation makeCellClearOp(Workbook& workbook, const ID& cellId) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::CELL_CLEAR, cellId, "{}"};
+}
+
+Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::CELL_SET_FORMAT, cellId, payload};
 }
 
 Operation makeDimInsertAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {

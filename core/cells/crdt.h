@@ -44,6 +44,10 @@ Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const std::st
 // Generate a CELL_CLEAR operation for a cell.
 Operation makeCellClearOp(Workbook& workbook, const ID& cellId);
 
+// Generate a CELL_SET_FORMAT operation to set a cell's number format.
+// Payload: {"format_id":"FMT_C002"} or {"format_id":"~"} for default
+Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const std::string& payload);
+
 // Generate a DIM_INSERT_AXIS operation for inserting a column or row.
 Operation makeDimInsertAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
 

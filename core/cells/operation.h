@@ -14,9 +14,10 @@ namespace cells {
 // Each operation modifies a specific entity (cell, axis, or sheet).
 enum class OpType : uint8_t {
     // Cell operations
-    CELL_SET_VALUE = 0,  // Set cell value (number, string, boolean, formula)
-    CELL_CLEAR = 1,      // Clear cell contents
-    CELL_SET_STYLE = 2,  // Set cell style properties
+    CELL_SET_VALUE = 0,   // Set cell value (number, string, boolean, formula)
+    CELL_CLEAR = 1,       // Clear cell contents
+    CELL_SET_STYLE = 2,   // Set cell style properties
+    CELL_SET_FORMAT = 3,  // Set cell number format
 
     // Column operations (preferred over DIM_* operations)
     COL_INSERT = 10,  // Insert new column

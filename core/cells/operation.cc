@@ -14,6 +14,8 @@ const char* opTypeToString(OpType type) {
             return "CELL_CLEAR";
         case OpType::CELL_SET_STYLE:
             return "CELL_SET_STYLE";
+        case OpType::CELL_SET_FORMAT:
+            return "CELL_SET_FORMAT";
         // Column operations
         case OpType::COL_INSERT:
             return "COL_INSERT";
@@ -68,6 +70,9 @@ OpType stringToOpType(const std::string& str) {
     }
     if (str == "CELL_SET_STYLE") {
         return OpType::CELL_SET_STYLE;
+    }
+    if (str == "CELL_SET_FORMAT") {
+        return OpType::CELL_SET_FORMAT;
     }
     if (str == "DIM_INSERT_AXIS") {
         return OpType::DIM_INSERT_AXIS;
