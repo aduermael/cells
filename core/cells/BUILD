@@ -76,6 +76,28 @@ cc_test(
 )
 
 cc_library(
+    name = "number_formatter",
+    srcs = ["number_formatter.cc"],
+    hdrs = ["number_formatter.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":input_parser",
+        ":number_format",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "number_formatter_test",
+    srcs = ["number_formatter_test.cc"],
+    deps = [
+        ":input_parser",
+        ":number_formatter",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "operation",
     srcs = ["operation.cc"],
     hdrs = ["operation.h"],
