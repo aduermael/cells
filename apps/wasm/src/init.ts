@@ -166,11 +166,12 @@ export function initApp(): AppContext {
   // Create AgentPanel (AI chat interface)
   // =========================================================================
 
-  // Agent server URL - can be configured via environment or defaults to local
+  // Agent server URL - can be configured via window.AGENT_SERVER_URL
+  // Empty string means same origin (relative URLs)
   const AGENT_SERVER_URL =
     (typeof window !== "undefined" &&
       (window as Window & { AGENT_SERVER_URL?: string }).AGENT_SERVER_URL) ||
-    "http://localhost:8081";
+    "";
 
   const agentPanel = new AgentPanel({
     panel: elements.chatPanel,
