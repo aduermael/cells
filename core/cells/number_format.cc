@@ -235,8 +235,8 @@ void NumberFormatRegistry::initBuiltInFormats() {
         BuiltInFormats::DATETIME_SHORT, Cat::DATE_TIME, "m/d/yyyy h:mm AM/PM", 0, false, "", false);
 
     // Scientific
-    formats_[BuiltInFormats::SCIENTIFIC_2] =
-        NumberFormat(BuiltInFormats::SCIENTIFIC_2, Cat::SCIENTIFIC, "0.00E+00", 2, false, "", false);
+    formats_[BuiltInFormats::SCIENTIFIC_2] = NumberFormat(
+        BuiltInFormats::SCIENTIFIC_2, Cat::SCIENTIFIC, "0.00E+00", 2, false, "", false);
 
     // Text
     formats_[BuiltInFormats::TEXT] =

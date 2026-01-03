@@ -13,17 +13,17 @@ namespace cells {
 
 // Number format categories following Excel conventions
 enum class NumberFormatCategory : uint8_t {
-    GENERAL,      // Default format, displays as entered
-    NUMBER,       // Numeric with optional decimals and thousands separator
-    CURRENCY,     // Currency format ($1,234.56)
-    ACCOUNTING,   // Accounting format (aligned currency symbols, negatives in parens)
-    PERCENTAGE,   // Percentage (15% stored as 0.15)
-    DATE,         // Date only (1/15/2024)
-    TIME,         // Time only (12:30 PM)
-    DATE_TIME,    // Date and time combined
-    SCIENTIFIC,   // Scientific notation (1.5E+10)
-    FRACTION,     // Fractional display (1/4)
-    TEXT,         // Text format (numbers displayed as text)
+    GENERAL,     // Default format, displays as entered
+    NUMBER,      // Numeric with optional decimals and thousands separator
+    CURRENCY,    // Currency format ($1,234.56)
+    ACCOUNTING,  // Accounting format (aligned currency symbols, negatives in parens)
+    PERCENTAGE,  // Percentage (15% stored as 0.15)
+    DATE,        // Date only (1/15/2024)
+    TIME,        // Time only (12:30 PM)
+    DATE_TIME,   // Date and time combined
+    SCIENTIFIC,  // Scientific notation (1.5E+10)
+    FRACTION,    // Fractional display (1/4)
+    TEXT,        // Text format (numbers displayed as text)
 };
 
 // Convert NumberFormatCategory to string for serialization
@@ -35,13 +35,13 @@ NumberFormatCategory stringToFormatCategory(const std::string& str);
 // NumberFormat represents a cell's display format
 // Based on Excel's number format system
 struct NumberFormat {
-    ID id;                           // Unique identifier (8-char base62)
-    NumberFormatCategory category;   // Format category
-    std::string formatCode;          // Excel-style format code (e.g., "#,##0.00")
-    uint8_t decimalPlaces;           // Number of decimal places (0-15)
-    bool useThousandsSeparator;      // Whether to use thousand separators
-    std::string currencySymbol;      // Currency symbol (e.g., "$", "€", "£")
-    bool isAccounting;               // Accounting format (aligned symbols)
+    ID id;                          // Unique identifier (8-char base62)
+    NumberFormatCategory category;  // Format category
+    std::string formatCode;         // Excel-style format code (e.g., "#,##0.00")
+    uint8_t decimalPlaces;          // Number of decimal places (0-15)
+    bool useThousandsSeparator;     // Whether to use thousand separators
+    std::string currencySymbol;     // Currency symbol (e.g., "$", "€", "£")
+    bool isAccounting;              // Accounting format (aligned symbols)
 
     // Default constructor creates a GENERAL format
     NumberFormat();

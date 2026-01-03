@@ -652,7 +652,7 @@ bool Parser::parseCell(std::string_view line) {
                                        ID(std::string(tokens[2])));
 
     // Parse value (and consume it from valueStr)
-    std::string_view valueStr = (valueStart < line.size()) ? line.substr(valueStart) : "";
+    const std::string_view valueStr = (valueStart < line.size()) ? line.substr(valueStart) : "";
     size_t valueConsumed = 0;
     if (!parseCellValue(valueStr, type, cell->value, valueConsumed)) {
         return setError("Invalid cell value");
@@ -660,7 +660,7 @@ bool Parser::parseCell(std::string_view line) {
 
     // After value, check for optional properties (e.g., fmt:FMT_C002)
     if (valueConsumed > 0 && valueConsumed < valueStr.size()) {
-        std::string_view propsStr = valueStr.substr(valueConsumed);
+        const std::string_view propsStr = valueStr.substr(valueConsumed);
         parseCellProps(propsStr, *cell);
     }
 
