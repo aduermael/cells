@@ -186,7 +186,17 @@ export function initApp(): AppContext {
     openBtn: elements.chatOpenBtn,
     getClient: () => app.dataSource?.client ?? null,
     getServerUrl: () => AGENT_SERVER_URL,
-    onViewportRefresh: () => fetchViewportNow(),
+    onViewportRefresh: async () => {
+      fetchViewportNow();
+      // Refresh workbook name in case setDocumentTitle was called
+      if (app.dataSource) {
+        const name = await app.dataSource.client.getWorkbookName();
+        if (name) {
+          app.dataSource.setWorkbookName(name);
+          workbookTitleEditor.setTitle(name);
+        }
+      }
+    },
   });
 
   // =========================================================================
@@ -673,6 +683,42 @@ export function initApp(): AppContext {
     range.collapse(false);
     selection.removeAllRanges();
     selection.addRange(range);
+  }
+
+  // =========================================================================
+  // Formula Reference Hover Handlers
+  // =========================================================================
+
+  /**
+   * Set up hover handlers for formula reference spans in a container element.
+   * Uses event delegation since spans are created dynamically.
+   */
+  function setupFormulaRefHover(container: HTMLElement): void {
+    // Use mouseover/mouseout with delegation since spans change dynamically
+    container.addEventListener("mouseover", (e) => {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains("formula-ref")) {
+        const refIndex = parseInt(target.dataset.refIndex ?? "-1", 10);
+        if (refIndex >= 0 && app.hoveredFormulaRefIndex !== refIndex) {
+          app.hoveredFormulaRefIndex = refIndex;
+          render();
+        }
+      }
+    });
+
+    container.addEventListener("mouseout", (e) => {
+      const target = e.target as HTMLElement;
+      if (target.classList.contains("formula-ref")) {
+        // Check if we're leaving to another formula-ref (don't clear if so)
+        const related = e.relatedTarget as HTMLElement;
+        if (!related || !related.classList?.contains("formula-ref")) {
+          if (app.hoveredFormulaRefIndex !== -1) {
+            app.hoveredFormulaRefIndex = -1;
+            render();
+          }
+        }
+      }
+    });
   }
 
   // =========================================================================
@@ -1329,6 +1375,10 @@ export function initApp(): AppContext {
     fileLoader.setupFileInput();
     fileLoader.setupDragAndDrop();
     fileLoader.setupExportDropdown();
+
+    // Set up formula ref hover handlers (event delegation)
+    setupFormulaRefHover(elements.formulaDisplay);
+    setupFormulaRefHover(elements.cellDisplay);
 
     // Initialize scrollbars
     initScrollbars();
