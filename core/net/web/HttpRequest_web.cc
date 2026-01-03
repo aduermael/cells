@@ -184,8 +184,8 @@ private:
 
     static void onError(emscripten_fetch_t* fetch) {
         auto* request = static_cast<WebHttpRequest*>(fetch->userData);
-        printf("[HttpRequest] onError: status=%d, statusText=%s\n",
-               fetch->status, fetch->statusText);
+        printf("[HttpRequest] onError: status=%d, statusText=%s\n", fetch->status,
+               fetch->statusText);
 
         if (request == nullptr) {
             emscripten_fetch_close(fetch);
@@ -237,8 +237,8 @@ private:
     // Called when streaming completes successfully
     static void onStreamingSuccess(emscripten_fetch_t* fetch) {
         auto* request = static_cast<WebHttpRequest*>(fetch->userData);
-        printf("[HttpRequest] onStreamingSuccess: status=%d, numBytes=%llu\n",
-               fetch->status, fetch->numBytes);
+        printf("[HttpRequest] onStreamingSuccess: status=%d, numBytes=%llu\n", fetch->status,
+               fetch->numBytes);
 
         if (request == nullptr) {
             printf("[HttpRequest] onStreamingSuccess: request is null\n");

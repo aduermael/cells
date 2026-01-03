@@ -1,9 +1,10 @@
 #include "core/cells/input_parser.h"
 
-#include <algorithm>
 #include <cctype>
-#include <charconv>
 #include <cmath>
+
+#include <algorithm>
+#include <charconv>
 #include <regex>
 
 namespace cells {
@@ -37,11 +38,11 @@ ParsedInput ParsedInput::error(const std::string& message) {
 
 // Helper: trim whitespace
 static std::string trim(const std::string& str) {
-    size_t start = str.find_first_not_of(" \t\n\r");
+    const size_t start = str.find_first_not_of(" \t\n\r");
     if (start == std::string::npos) {
         return "";
     }
-    size_t end = str.find_last_not_of(" \t\n\r");
+    const size_t end = str.find_last_not_of(" \t\n\r");
     return str.substr(start, end - start + 1);
 }
 
@@ -49,7 +50,7 @@ static std::string trim(const std::string& str) {
 static std::string removeChar(const std::string& str, char c) {
     std::string result;
     result.reserve(str.size());
-    for (char ch : str) {
+    for (const char ch : str) {
         if (ch != c) {
             result += ch;
         }
@@ -59,19 +60,19 @@ static std::string removeChar(const std::string& str, char c) {
 
 // Helper: parse a double from string (handles commas)
 static bool parseDouble(const std::string& str, double& value) {
-    std::string clean = removeChar(str, ',');
+    const std::string clean = removeChar(str, ',');
     if (clean.empty()) {
         return false;
     }
 
     // Use std::from_chars for fast, locale-independent parsing
-    auto result = std::from_chars(clean.data(), clean.data() + clean.size(), value);
+    const auto result = std::from_chars(clean.data(), clean.data() + clean.size(), value);
     return result.ec == std::errc{} && result.ptr == clean.data() + clean.size();
 }
 
 // Parse percentage input (e.g., "15%" -> 0.15)
 ParsedInput parsePercentage(const std::string& input) {
-    std::string trimmed = trim(input);
+    const std::string trimmed = trim(input);
     if (trimmed.empty()) {
         return ParsedInput::error("Empty input");
     }
@@ -82,7 +83,7 @@ ParsedInput parsePercentage(const std::string& input) {
     }
 
     // Remove % and any trailing whitespace before it
-    std::string numPart = trim(trimmed.substr(0, trimmed.size() - 1));
+    const std::string numPart = trim(trimmed.substr(0, trimmed.size() - 1));
     if (numPart.empty()) {
         return ParsedInput::error("No number before %");
     }
@@ -96,15 +97,16 @@ ParsedInput parsePercentage(const std::string& input) {
     value /= 100.0;
 
     // Determine decimal places: "15%" -> PERCENTAGE_0, "15.5%" -> PERCENTAGE_2
-    bool hasDecimals = numPart.find('.') != std::string::npos;
-    ID formatId = hasDecimals ? BuiltInFormats::PERCENTAGE_2 : BuiltInFormats::PERCENTAGE_0;
+    const bool hasDecimals = numPart.find('.') != std::string::npos;
+    const ID formatId =
+        hasDecimals ? BuiltInFormats::PERCENTAGE_2 : BuiltInFormats::PERCENTAGE_0;
 
     return ParsedInput::number(value, formatId, NumberFormatCategory::PERCENTAGE);
 }
 
 // Parse currency input (e.g., "$1,234.56" -> 1234.56)
 ParsedInput parseCurrency(const std::string& input) {
-    std::string trimmed = trim(input);
+    const std::string trimmed = trim(input);
     if (trimmed.empty()) {
         return ParsedInput::error("Empty input");
     }
@@ -125,7 +127,7 @@ ParsedInput parseCurrency(const std::string& input) {
     // Check for currency symbol
     char currencySymbol = '\0';
     if (startIdx < trimmed.size()) {
-        char c = trimmed[startIdx];
+        const char c = trimmed[startIdx];
         if (c == '$') {
             currencySymbol = '$';
             startIdx++;
@@ -140,13 +142,10 @@ ParsedInput parseCurrency(const std::string& input) {
     }
 
     // Handle parentheses for negative: ($1,234)
-    bool hasParens = false;
     if (trimmed.front() == '(' && trimmed.back() == ')') {
-        hasParens = true;
-        isNegative = true;
         // Re-parse without parens
-        std::string inner = trimmed.substr(1, trimmed.size() - 2);
-        return parseCurrency((isNegative && !hasParens ? "-" : "") + inner);
+        const std::string inner = trimmed.substr(1, trimmed.size() - 2);
+        return parseCurrency("-" + inner);
     }
 
     if (currencySymbol == '\0') {
@@ -168,8 +167,8 @@ ParsedInput parseCurrency(const std::string& input) {
     }
 
     // Determine decimal places
-    bool hasDecimals = numPart.find('.') != std::string::npos;
-    ID formatId = hasDecimals ? BuiltInFormats::CURRENCY_2 : BuiltInFormats::CURRENCY_0;
+    const bool hasDecimals = numPart.find('.') != std::string::npos;
+    const ID formatId = hasDecimals ? BuiltInFormats::CURRENCY_2 : BuiltInFormats::CURRENCY_0;
 
     return ParsedInput::number(value, formatId, NumberFormatCategory::CURRENCY);
 }
@@ -257,7 +256,7 @@ double toFractionalDay(int hours, int minutes, int seconds) {
 }
 
 void fromFractionalDay(double fraction, int& hours, int& minutes, int& seconds) {
-    int totalSeconds = static_cast<int>(std::round(fraction * 86400.0));
+    const int totalSeconds = static_cast<int>(std::round(fraction * 86400.0));
     hours = totalSeconds / 3600;
     minutes = (totalSeconds % 3600) / 60;
     seconds = totalSeconds % 60;
@@ -267,7 +266,7 @@ void fromFractionalDay(double fraction, int& hours, int& minutes, int& seconds) 
 
 // Parse date input
 ParsedInput parseDate(const std::string& input) {
-    std::string trimmed = trim(input);
+    const std::string trimmed = trim(input);
     if (trimmed.empty()) {
         return ParsedInput::error("Empty input");
     }
@@ -275,7 +274,7 @@ ParsedInput parseDate(const std::string& input) {
     int year = 0, month = 0, day = 0;
 
     // Try MM/DD/YYYY or M/D/YYYY
-    std::regex slashDateRegex(R"((\d{1,2})/(\d{1,2})/(\d{4}))");
+    const std::regex slashDateRegex(R"((\d{1,2})/(\d{1,2})/(\d{4}))");
     std::smatch match;
     if (std::regex_match(trimmed, match, slashDateRegex)) {
         month = std::stoi(match[1].str());
@@ -284,7 +283,7 @@ ParsedInput parseDate(const std::string& input) {
     }
     // Try YYYY-MM-DD (ISO format)
     else {
-        std::regex isoDateRegex(R"((\d{4})-(\d{1,2})-(\d{1,2}))");
+        const std::regex isoDateRegex(R"((\d{4})-(\d{1,2})-(\d{1,2}))");
         if (std::regex_match(trimmed, match, isoDateRegex)) {
             year = std::stoi(match[1].str());
             month = std::stoi(match[2].str());
@@ -305,18 +304,18 @@ ParsedInput parseDate(const std::string& input) {
         return ParsedInput::error("Year out of range");
     }
 
-    double serial = DateUtils::toSerialDate(year, month, day);
+    const double serial = DateUtils::toSerialDate(year, month, day);
 
     // Choose format based on input style
-    ID formatId = trimmed.find('-') != std::string::npos ? BuiltInFormats::DATE_ISO
-                                                         : BuiltInFormats::DATE_SHORT;
+    const ID formatId = trimmed.find('-') != std::string::npos ? BuiltInFormats::DATE_ISO
+                                                               : BuiltInFormats::DATE_SHORT;
 
     return ParsedInput::number(serial, formatId, NumberFormatCategory::DATE);
 }
 
 // Parse time input
 ParsedInput parseTime(const std::string& input) {
-    std::string trimmed = trim(input);
+    const std::string trimmed = trim(input);
     if (trimmed.empty()) {
         return ParsedInput::error("Empty input");
     }
@@ -338,8 +337,8 @@ ParsedInput parseTime(const std::string& input) {
 
     // Remove AM/PM for parsing
     std::string timePart = trimmed;
-    auto amPos = upperInput.find("AM");
-    auto pmPos = upperInput.find("PM");
+    const auto amPos = upperInput.find("AM");
+    const auto pmPos = upperInput.find("PM");
     if (amPos != std::string::npos) {
         timePart = trim(trimmed.substr(0, amPos));
     } else if (pmPos != std::string::npos) {
@@ -347,7 +346,7 @@ ParsedInput parseTime(const std::string& input) {
     }
 
     // Try HH:MM:SS or HH:MM
-    std::regex timeRegex(R"((\d{1,2}):(\d{2})(?::(\d{2}))?)");
+    const std::regex timeRegex(R"((\d{1,2}):(\d{2})(?::(\d{2}))?)");
     std::smatch match;
     if (!std::regex_match(timePart, match, timeRegex)) {
         return ParsedInput::error("Unrecognized time format");
@@ -379,17 +378,17 @@ ParsedInput parseTime(const std::string& input) {
         return ParsedInput::error("Invalid seconds");
     }
 
-    double fraction = TimeUtils::toFractionalDay(hours, minutes, seconds);
+    const double fraction = TimeUtils::toFractionalDay(hours, minutes, seconds);
 
     // Choose format based on input style
-    ID formatId = is12Hour ? BuiltInFormats::TIME_12H : BuiltInFormats::TIME_24H;
+    const ID formatId = is12Hour ? BuiltInFormats::TIME_12H : BuiltInFormats::TIME_24H;
 
     return ParsedInput::number(fraction, formatId, NumberFormatCategory::TIME);
 }
 
 // Parse scientific notation
 ParsedInput parseScientific(const std::string& input) {
-    std::string trimmed = trim(input);
+    const std::string trimmed = trim(input);
     if (trimmed.empty()) {
         return ParsedInput::error("Empty input");
     }
@@ -398,7 +397,7 @@ ParsedInput parseScientific(const std::string& input) {
     std::string upperInput = trimmed;
     std::transform(upperInput.begin(), upperInput.end(), upperInput.begin(), ::toupper);
 
-    auto ePos = upperInput.find('E');
+    const auto ePos = upperInput.find('E');
     if (ePos == std::string::npos) {
         return ParsedInput::error("No exponent marker");
     }
@@ -413,12 +412,13 @@ ParsedInput parseScientific(const std::string& input) {
         return ParsedInput::error("Invalid number in scientific notation");
     }
 
-    return ParsedInput::number(value, BuiltInFormats::SCIENTIFIC_2, NumberFormatCategory::SCIENTIFIC);
+    return ParsedInput::number(value, BuiltInFormats::SCIENTIFIC_2,
+                               NumberFormatCategory::SCIENTIFIC);
 }
 
 // Parse plain number
 ParsedInput parseNumber(const std::string& input) {
-    std::string trimmed = trim(input);
+    const std::string trimmed = trim(input);
     if (trimmed.empty()) {
         return ParsedInput::error("Empty input");
     }
@@ -429,8 +429,8 @@ ParsedInput parseNumber(const std::string& input) {
     }
 
     // Determine format based on input characteristics
-    bool hasThousandsSeparator = trimmed.find(',') != std::string::npos;
-    bool hasDecimals = trimmed.find('.') != std::string::npos;
+    const bool hasThousandsSeparator = trimmed.find(',') != std::string::npos;
+    const bool hasDecimals = trimmed.find('.') != std::string::npos;
 
     ID formatId;
     if (hasThousandsSeparator && hasDecimals) {
@@ -448,7 +448,7 @@ ParsedInput parseNumber(const std::string& input) {
 
 // Main entry point: parse user input and auto-detect format
 ParsedInput parseUserInput(const std::string& input) {
-    std::string trimmed = trim(input);
+    const std::string trimmed = trim(input);
     if (trimmed.empty()) {
         return ParsedInput::text("");
     }
@@ -495,12 +495,8 @@ ParsedInput parseUserInput(const std::string& input) {
 
     // 5. Date (contains / or - in date patterns)
     // Check for date-like patterns
-    bool looksLikeDate = false;
-    std::regex datePattern(R"(\d{1,4}[/-]\d{1,2}[/-]\d{1,4})");
+    const std::regex datePattern(R"(\d{1,4}[/-]\d{1,2}[/-]\d{1,4})");
     if (std::regex_search(trimmed, datePattern)) {
-        looksLikeDate = true;
-    }
-    if (looksLikeDate) {
         ParsedInput result = parseDate(trimmed);
         if (result.success) {
             return result;

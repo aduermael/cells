@@ -249,14 +249,16 @@ async function initModule(): Promise<void> {
 
     // Register agent listener for AI events
     // The agent callback receives (eventType, data) where data is JSON or text
-    engine.setAgentListener((eventType: string, data: string) => {
+    // Note: engine is guaranteed non-null here since we're inside the init callback
+    const eng = engine!;
+    eng.setAgentListener((eventType: string, data: string) => {
       // Handle special event to send tool results
       if (eventType === "send_tool_result") {
         const toolResult = JSON.parse(data);
-        const serverUrl = engine.getAgentServerUrl();
+        const serverUrl = eng.getAgentServerUrl();
         if (serverUrl != null) {
           streamAgentMessage(serverUrl + "/api/agent/tool-result", {
-            conversation_id: engine.getAgentConversationId(),
+            conversation_id: eng.getAgentConversationId(),
             tool_use_id: toolResult.tool_use_id,
             result: toolResult.result,
             is_error: toolResult.is_error,
@@ -297,6 +299,8 @@ async function initModule(): Promise<void> {
 
 // Perform a streaming fetch to the agent server and feed chunks to C++
 async function streamAgentMessage(url: string, body: Record<string, unknown>): Promise<void> {
+  const isToolResult = url.includes("/tool-result");
+
   try {
     const response = await fetch(url, {
       method: "POST",
@@ -305,6 +309,23 @@ async function streamAgentMessage(url: string, body: Record<string, unknown>): P
     });
 
     if (!response.ok) {
+      // Provide more context for tool result failures
+      if (isToolResult) {
+        const convId = body.conversation_id || "unknown";
+        const toolId = body.tool_use_id || "unknown";
+        console.error(`[Agent] Tool result failed: HTTP ${response.status} for conversation=${convId}, tool=${toolId}`);
+
+        // Try to read error body for more details
+        let errorDetail = response.statusText;
+        try {
+          const errorText = await response.text();
+          if (errorText) errorDetail = errorText;
+        } catch {
+          // Ignore error reading body
+        }
+
+        throw new Error(`Failed to send tool result (${response.status}): ${errorDetail}. The AI session may have been lost - please try your request again.`);
+      }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
@@ -321,14 +342,15 @@ async function streamAgentMessage(url: string, body: Record<string, unknown>): P
 
       // Feed raw SSE data to C++ for parsing
       const chunk = decoder.decode(value, { stream: true });
-      engine.feedAgentStreamData(chunk);
+      engine?.feedAgentStreamData(chunk);
     }
 
     // Signal stream end
-    engine.endAgentStream();
+    engine?.endAgentStream();
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    engine.errorAgentStream(error);
+    console.error(`[Agent] Stream error (isToolResult=${isToolResult}):`, error);
+    engine?.errorAgentStream(error);
   }
 }
 

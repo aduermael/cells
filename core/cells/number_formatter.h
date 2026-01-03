@@ -16,7 +16,7 @@ class NumberFormatRegistry;
 struct FormatLocale {
     char decimalSeparator{'.'};
     char thousandsSeparator{','};
-    std::string dateFormat{"M/D/YYYY"};   // Short date format
+    std::string dateFormat{"M/D/YYYY"};    // Short date format
     std::string timeFormat12h{"h:mm AM"};  // 12-hour time format
     std::string timeFormat24h{"HH:mm"};    // 24-hour time format
     std::string currencySymbol{"$"};
@@ -31,8 +31,8 @@ struct FormatLocale {
 
 // Result of formatting a cell value
 struct FormattedValue {
-    std::string text;      // Formatted display string
-    bool isError{false};   // True if formatting failed
+    std::string text;     // Formatted display string
+    bool isError{false};  // True if formatting failed
     std::string errorMessage;
 
     static FormattedValue success(const std::string& text);

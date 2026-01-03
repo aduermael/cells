@@ -1,7 +1,8 @@
 #include "core/cells/number_formatter.h"
 
-#include <algorithm>
 #include <cmath>
+
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
@@ -53,12 +54,13 @@ FormattedValue FormattedValue::error(const std::string& message) {
 // Helper: Add thousands separators to a number string
 static std::string addThousandsSeparators(const std::string& intPart, char separator) {
     std::string result;
+    result.reserve(intPart.size() + intPart.size() / 3);
     int count = 0;
     for (auto it = intPart.rbegin(); it != intPart.rend(); ++it) {
         if (count > 0 && count % 3 == 0 && *it != '-') {
-            result = separator + result;
+            result.insert(result.begin(), separator);
         }
-        result = *it + result;
+        result.insert(result.begin(), *it);
         if (*it != '-') {
             count++;
         }
@@ -117,7 +119,7 @@ FormattedValue formatGeneral(double value, const FormatLocale& locale) {
 
     // Trim trailing zeros after decimal point
     if (result.find('.') != std::string::npos) {
-        size_t lastNonZero = result.find_last_not_of('0');
+        const size_t lastNonZero = result.find_last_not_of('0');
         if (lastNonZero != std::string::npos) {
             if (result[lastNonZero] == '.') {
                 result = result.substr(0, lastNonZero);
@@ -178,20 +180,22 @@ FormattedValue formatPercentage(double value, uint8_t decimalPlaces, const Forma
     }
 
     // Multiply by 100 to get percentage
-    double percentValue = value * 100.0;
-    std::string formatted = formatDecimal(percentValue, decimalPlaces, locale.decimalSeparator);
+    const double percentValue = value * 100.0;
+    const std::string formatted =
+        formatDecimal(percentValue, decimalPlaces, locale.decimalSeparator);
     return FormattedValue::success(formatted + "%");
 }
 
 // Format as currency
-FormattedValue formatCurrency(double value, uint8_t decimalPlaces, const std::string& currencySymbol,
-                              bool isAccounting, const FormatLocale& locale) {
+FormattedValue formatCurrency(double value, uint8_t decimalPlaces,
+                              const std::string& currencySymbol, bool isAccounting,
+                              const FormatLocale& locale) {
     if (std::isnan(value)) {
         return FormattedValue::error("NaN");
     }
 
-    bool isNegative = value < 0;
-    double absValue = std::abs(value);
+    const bool isNegative = value < 0;
+    const double absValue = std::abs(value);
 
     // Format the number part with thousands separators
     auto numberResult = formatPlainNumber(absValue, decimalPlaces, true, locale);
@@ -243,11 +247,12 @@ FormattedValue formatScientific(double value, uint8_t decimalPlaces, const Forma
     }
 
     // Calculate exponent
-    int exponent = static_cast<int>(std::floor(std::log10(std::abs(value))));
-    double mantissa = value / std::pow(10.0, exponent);
+    const int exponent = static_cast<int>(std::floor(std::log10(std::abs(value))));
+    const double mantissa = value / std::pow(10.0, exponent);
 
     // Format mantissa
-    std::string mantissaStr = formatDecimal(mantissa, decimalPlaces, locale.decimalSeparator);
+    const std::string mantissaStr =
+        formatDecimal(mantissa, decimalPlaces, locale.decimalSeparator);
 
     // Format exponent
     std::ostringstream expSs;
@@ -258,12 +263,13 @@ FormattedValue formatScientific(double value, uint8_t decimalPlaces, const Forma
 }
 
 // Helper: Month names
-static const char* const MONTH_NAMES[] = {"",        "January", "February",  "March",   "April",
-                                          "May",     "June",    "July",      "August",  "September",
+static const char* const MONTH_NAMES[] = {"",        "January",  "February", "March",  "April",
+                                          "May",     "June",     "July",     "August", "September",
                                           "October", "November", "December"};
 
 // Format as date
-FormattedValue formatDate(double serialDate, const ID& formatId, const FormatLocale& locale) {
+FormattedValue formatDate(double serialDate, const ID& formatId,
+                          const FormatLocale& /*locale*/) {
     if (std::isnan(serialDate) || serialDate < 1) {
         return FormattedValue::error("Invalid date");
     }
@@ -293,7 +299,8 @@ FormattedValue formatDate(double serialDate, const ID& formatId, const FormatLoc
 }
 
 // Format as time
-FormattedValue formatTime(double fractionalDay, const ID& formatId, const FormatLocale& locale) {
+FormattedValue formatTime(double fractionalDay, const ID& formatId,
+                          const FormatLocale& /*locale*/) {
     // Handle values outside 0-1 range (wrap around)
     fractionalDay = std::fmod(fractionalDay, 1.0);
     if (fractionalDay < 0) {
@@ -322,10 +329,10 @@ FormattedValue formatTime(double fractionalDay, const ID& formatId, const Format
 }
 
 // Format as date and time
-FormattedValue formatDateTime(double serialDateTime, const ID& formatId,
+FormattedValue formatDateTime(double serialDateTime, const ID& /*formatId*/,
                               const FormatLocale& locale) {
     double intPart = 0.0;
-    double fracPart = std::modf(serialDateTime, &intPart);
+    const double fracPart = std::modf(serialDateTime, &intPart);
 
     auto dateResult = formatDate(intPart, BuiltInFormats::DATE_SHORT, locale);
     auto timeResult = formatTime(fracPart, BuiltInFormats::TIME_12H, locale);
@@ -353,10 +360,10 @@ FormattedValue formatWithFormat(double value, const NumberFormat& format,
 
         case NumberFormatCategory::CURRENCY:
         case NumberFormatCategory::ACCOUNTING:
-            return formatCurrency(value, format.decimalPlaces,
-                                  format.currencySymbol.empty() ? locale.currencySymbol
-                                                                : format.currencySymbol,
-                                  format.isAccounting, locale);
+            return formatCurrency(
+                value, format.decimalPlaces,
+                format.currencySymbol.empty() ? locale.currencySymbol : format.currencySymbol,
+                format.isAccounting, locale);
 
         case NumberFormatCategory::PERCENTAGE:
             return formatPercentage(value, format.decimalPlaces, locale);
@@ -374,15 +381,13 @@ FormattedValue formatWithFormat(double value, const NumberFormat& format,
             return formatDateTime(value, format.id, locale);
 
         case NumberFormatCategory::FRACTION:
-            // TODO: Implement fraction formatting
-            return formatGeneral(value, locale);
-
         case NumberFormatCategory::TEXT:
-            // TEXT format: display number as-is
+            // FRACTION: TODO: Implement fraction formatting
+            // TEXT: display number as-is
             return formatGeneral(value, locale);
     }
-
-    return FormattedValue::error("Unknown format category");
+    // All cases handled above; this is unreachable but satisfies compiler
+    return formatGeneral(value, locale);
 }
 
 // Main formatting function with registry lookup

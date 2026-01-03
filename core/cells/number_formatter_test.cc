@@ -1,8 +1,8 @@
 #include "core/cells/number_formatter.h"
 
-#include <gtest/gtest.h>
-
 #include <cmath>
+
+#include <gtest/gtest.h>
 
 #include "core/cells/input_parser.h"
 
@@ -85,8 +85,7 @@ TEST(GeneralFormatTest, LargeNumber) {
     EXPECT_FALSE(result.isError);
     // Should use scientific notation for very large numbers
     EXPECT_TRUE(result.text.find('E') != std::string::npos ||
-                result.text.find("e") != std::string::npos ||
-                result.text == "1000000000000000");
+                result.text.find("e") != std::string::npos || result.text == "1000000000000000");
 }
 
 TEST(GeneralFormatTest, VerySmallNumber) {
