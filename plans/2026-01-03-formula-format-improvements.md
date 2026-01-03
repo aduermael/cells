@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2026-01-03 05:26 UTC
-Updated At: 2026-01-03 21:40 UTC
+Updated At: 2026-01-03 23:50 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -149,35 +149,39 @@ struct NumberFormat {
 
 ---
 
-## Phase 5: WASM API & TypeScript Integration
+## Phase 5: WASM API & TypeScript Integration ✅ COMPLETED
 
 **Goal:** Expose format APIs to TypeScript and wire up cell value flow.
 
-### Files to modify:
-- `apps/wasm/bindings.cc` - Add format-related WASM exports
-- `apps/wasm/src/client.ts` - Add format client methods
-- `apps/wasm/src/types.ts` - Add NumberFormat TypeScript types
-- `apps/wasm/src/init.ts` - Wire up format detection on cell edit commit
+### Files modified:
+- `apps/wasm/bindings.cc` - Added format-related WASM exports
+- `apps/wasm/src/client.ts` - Added format client methods
+- `apps/wasm/src/types.ts` - Added NumberFormat TypeScript types
+- `apps/wasm/src/worker.ts` - Added worker handlers for format operations
+- `apps/wasm/src/wasm-data-source.ts` - Added WasmDataSource wrapper methods
+- `apps/wasm/src/cell-editor.ts` - Integrated format detection on cell edit commit
 
 ### WASM API additions:
 ```cpp
-// bindings.cc
-EMSCRIPTEN_BINDINGS(cells) {
-    function("setCellFormat", &setCellFormat);
-    function("getAvailableFormats", &getAvailableFormats);
-    function("parseUserInput", &parseUserInput);
-    function("formatCellValue", &formatCellValue);
-}
+// bindings.cc - Format operations
+setCellFormat(cellId, formatId)
+setCellFormatAt(col, row, formatId)
+getAvailableFormats()
+getCellFormatId(cellId)
+parseUserInputValue(input)
+formatCellValue(value, formatId)
+formatCellById(cellId)
+updateCellWithFormatDetection(cellId, value)
 ```
 
 ### Tasks:
-- [ ] 5a: Add WASM bindings for setCellFormat, getAvailableFormats
-- [ ] 5b: Add WASM bindings for parseUserInput, formatCellValue
-- [ ] 5c: Add TypeScript types for NumberFormat
-- [ ] 5d: Add client.ts methods for format operations
-- [ ] 5e: Integrate input parsing on cell edit commit (auto-detect format)
-- [ ] 5f: Update cell display to use formatted value from C++
-- [ ] 5g: Add E2E tests for format auto-detection
+- [x] 5a: Add WASM bindings for setCellFormat, getAvailableFormats
+- [x] 5b: Add WASM bindings for parseUserInput, formatCellValue
+- [x] 5c: Add TypeScript types for NumberFormat
+- [x] 5d: Add client.ts methods for format operations
+- [x] 5e: Integrate input parsing on cell edit commit (auto-detect format)
+- [x] 5f: Update cell display to use formatted value from C++
+- [x] 5g: Add E2E tests for format auto-detection
 
 ---
 

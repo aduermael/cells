@@ -251,8 +251,7 @@ FormattedValue formatScientific(double value, uint8_t decimalPlaces, const Forma
     const double mantissa = value / std::pow(10.0, exponent);
 
     // Format mantissa
-    const std::string mantissaStr =
-        formatDecimal(mantissa, decimalPlaces, locale.decimalSeparator);
+    const std::string mantissaStr = formatDecimal(mantissa, decimalPlaces, locale.decimalSeparator);
 
     // Format exponent
     std::ostringstream expSs;
@@ -268,8 +267,7 @@ static const char* const MONTH_NAMES[] = {"",        "January",  "February", "Ma
                                           "October", "November", "December"};
 
 // Format as date
-FormattedValue formatDate(double serialDate, const ID& formatId,
-                          const FormatLocale& /*locale*/) {
+FormattedValue formatDate(double serialDate, const ID& formatId, const FormatLocale& /*locale*/) {
     if (std::isnan(serialDate) || serialDate < 1) {
         return FormattedValue::error("Invalid date");
     }

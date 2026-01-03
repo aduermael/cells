@@ -505,7 +505,8 @@ export class CellEditor {
         // Delete cell when content is completely cleared
         await this.dataSource.deleteCell(cellId);
       } else {
-        await this.dataSource.updateCell(cellId, newValue);
+        // Use format detection for user input (handles %, $, dates, etc.)
+        await this.dataSource.updateCellWithFormatDetection(cellId, newValue);
       }
       // Listener handles refresh automatically
     } catch (e) {

@@ -41,6 +41,9 @@
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/luau_autocomplete.h"
 #include "core/cells/agent_client.h"
+#include "core/cells/number_format.h"
+#include "core/cells/number_formatter.h"
+#include "core/cells/input_parser.h"
 #include "core/net/include/SSEParser.h"
 #include "Luau/Allocator.h"
 #include "Luau/Ast.h"
@@ -683,7 +686,28 @@ public:
             } else {
                 char typeChar = valueTypeToChar(entry.cell->value.type);
                 json << "\"type\":\"" << typeChar << "\",";
-                json << "\"value\":\"" << jsonEscape(entry.cell->value.raw) << "\"";
+
+                // Check if cell has a format and should display formatted value
+                bool useFormattedValue = false;
+                std::string displayValue;
+
+                if (!entry.cell->formatId.isNull() &&
+                    (entry.cell->value.type == CellValueType::NUMBER)) {
+                    // Format numeric value
+                    FormattedValue formatted = formatNumber(_formatRegistry, entry.cell->value.number, entry.cell->formatId);
+                    if (!formatted.isError) {
+                        displayValue = formatted.text;
+                        useFormattedValue = true;
+                    }
+                }
+
+                if (useFormattedValue) {
+                    // Output both raw value and formatted display
+                    json << "\"value\":\"" << jsonEscape(entry.cell->value.raw) << "\",";
+                    json << "\"display\":\"" << jsonEscape(displayValue) << "\"";
+                } else {
+                    json << "\"value\":\"" << jsonEscape(entry.cell->value.raw) << "\"";
+                }
             }
 
             json << "}";
@@ -867,6 +891,94 @@ public:
 
         notifyListeners(ChangeType::CELL_CHANGED);
         return "{\"success\":true}";
+    }
+
+    // Update a cell value with auto-format detection.
+    // Parses the input to detect format (%, $, date, etc.) and sets both value and format.
+    // For formulas (starting with =), no format detection is done.
+    // Returns JSON: {"success":true,"formatId":"..."} or {"error":"..."}
+    std::string updateCellWithFormatDetection(const std::string& cellIdStr, const std::string& value) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        if (cellIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid cell ID\"}";
+        }
+        ID cellId(cellIdStr);
+
+        Cell* cell = sheet->getCell(cellId);
+        if (!cell) {
+            return "{\"error\":\"Cell not found\"}";
+        }
+
+        // Get column and row IDs for operation payload
+        std::string colIdStr = cell->colId.toString();
+        std::string rowIdStr = cell->rowId.toString();
+        std::string idSuffix = ",\"col_id\":\"" + colIdStr + "\",\"row_id\":\"" + rowIdStr + "\"}";
+
+        std::string payload;
+        ID detectedFormatId;
+
+        // Handle formulas and booleans specially (no format detection)
+        if (!value.empty() && value[0] == '=') {
+            _refConverter.setContext(*sheet);
+            std::string uuidFormula = _refConverter.formulaToUuid(value);
+            payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+        } else if (value == "TRUE" || value == "true") {
+            payload = "{\"type\":\"b\",\"value\":\"true\"" + idSuffix;
+        } else if (value == "FALSE" || value == "false") {
+            payload = "{\"type\":\"b\",\"value\":\"false\"" + idSuffix;
+        } else if (value.empty()) {
+            payload = "{\"type\":\"s\",\"value\":\"\"" + idSuffix;
+        } else {
+            // Parse user input with format detection
+            ParsedInput parsed = parseUserInput(value);
+
+            if (parsed.success && parsed.valueType == CellValueType::NUMBER) {
+                // Use detected numeric value and format
+                std::ostringstream numStr;
+                numStr << std::setprecision(15) << parsed.numericValue;
+                payload = "{\"type\":\"n\",\"value\":\"" + numStr.str() + "\"" + idSuffix;
+                detectedFormatId = parsed.formatId;
+            } else {
+                // String or parse failure - use original value as string
+                payload = "{\"type\":\"s\",\"value\":\"" + jsonEscape(value) + "\"" + idSuffix;
+            }
+        }
+
+        // Apply CELL_SET_VALUE operation
+        Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
+        applyOperation(*_workbook, op);
+
+        // If format was detected and differs from current, apply CELL_SET_FORMAT
+        if (!detectedFormatId.isNull() && detectedFormatId != cell->formatId) {
+            std::string formatPayload = "{\"format_id\":\"" + detectedFormatId.toString() + "\"}";
+            Operation formatOp = makeCellSetFormatOp(*_workbook, cellId, formatPayload);
+            applyOperation(*_workbook, formatOp);
+        }
+
+        // Queue broadcast to sync with peers (if any) and prune old operations
+        if (_syncManager) {
+            _syncManager->queueOperationsBroadcast();
+            _syncManager->pruneOpLog();
+        }
+
+        // Trigger recalculation
+        markDirty(sheet, cellId);
+        std::vector<ID> changed = {cellId};
+        cells::recalculate(sheet, changed);
+        cells::recalculateVolatile(sheet);
+
+        notifyListeners(ChangeType::CELL_CHANGED);
+
+        std::string formatIdStr = detectedFormatId.isNull() ? "~" : detectedFormatId.toString();
+        return "{\"success\":true,\"formatId\":\"" + formatIdStr + "\"}";
     }
 
     // Create a new cell at the given position.
@@ -1215,6 +1327,315 @@ public:
 
         // No cell at this position
         return "{\"success\":true,\"deleted\":false}";
+    }
+
+    // ========================================================================
+    // Number format operations
+    // ========================================================================
+
+    // Set the number format for a cell by cell ID.
+    // formatId: ID of the format (use "~" for default/GENERAL format)
+    // Returns JSON: {"success":true} or {"error":"..."}
+    std::string setCellFormat(const std::string& cellIdStr, const std::string& formatIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        if (cellIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid cell ID\"}";
+        }
+        ID cellId(cellIdStr);
+
+        // Check cell exists
+        auto* cell = sheet->getCell(cellId);
+        if (!cell) {
+            return "{\"error\":\"Cell not found\"}";
+        }
+
+        // Validate format ID (must be registered or "~" for default)
+        ID formatId;
+        if (formatIdStr != "~" && !formatIdStr.empty()) {
+            if (formatIdStr.size() != ID_LENGTH) {
+                return "{\"error\":\"Invalid format ID\"}";
+            }
+            formatId = ID(formatIdStr);
+            if (!_formatRegistry.hasFormat(formatId)) {
+                return "{\"error\":\"Format not found\"}";
+            }
+        }
+
+        // Create CELL_SET_FORMAT operation
+        std::string payload = "{\"format_id\":\"" + formatIdStr + "\"}";
+        Operation op = makeCellSetFormatOp(*_workbook, cellId, payload);
+        applyOperation(*_workbook, op);
+
+        // Queue broadcast to sync with peers (if any) and prune old operations
+        if (_syncManager) {
+            _syncManager->queueOperationsBroadcast();
+            _syncManager->pruneOpLog();
+        }
+
+        notifyListeners(ChangeType::CELL_CHANGED);
+        return "{\"success\":true}";
+    }
+
+    // Set the number format for a cell by position.
+    // formatId: ID of the format (use "~" for default/GENERAL format)
+    // Returns JSON: {"success":true} or {"error":"..."}
+    std::string setCellFormatAt(uint32_t col, uint32_t row, const std::string& formatIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        // Find cell at position
+        ID cellId;
+        ID colId;
+        ID rowId;
+
+        for (const auto& [id, axis] : sheet->columns) {
+            if (axis->position == col) {
+                colId = id;
+                break;
+            }
+        }
+        if (colId.isNull()) {
+            return "{\"error\":\"Column not found\"}";
+        }
+
+        for (const auto& [id, axis] : sheet->rows) {
+            if (axis->position == row) {
+                rowId = id;
+                break;
+            }
+        }
+        if (rowId.isNull()) {
+            return "{\"error\":\"Row not found\"}";
+        }
+
+        // Find cell
+        for (const auto& [id, c] : sheet->cells) {
+            if (c->colId == colId && c->rowId == rowId) {
+                cellId = id;
+                break;
+            }
+        }
+        if (cellId.isNull()) {
+            return "{\"error\":\"Cell not found at position\"}";
+        }
+
+        // Validate format ID
+        ID formatId;
+        if (formatIdStr != "~" && !formatIdStr.empty()) {
+            if (formatIdStr.size() != ID_LENGTH) {
+                return "{\"error\":\"Invalid format ID\"}";
+            }
+            formatId = ID(formatIdStr);
+            if (!_formatRegistry.hasFormat(formatId)) {
+                return "{\"error\":\"Format not found\"}";
+            }
+        }
+
+        // Create CELL_SET_FORMAT operation
+        std::string payload = "{\"format_id\":\"" + formatIdStr + "\"}";
+        Operation op = makeCellSetFormatOp(*_workbook, cellId, payload);
+        applyOperation(*_workbook, op);
+
+        // Queue broadcast to sync with peers (if any) and prune old operations
+        if (_syncManager) {
+            _syncManager->queueOperationsBroadcast();
+            _syncManager->pruneOpLog();
+        }
+
+        notifyListeners(ChangeType::CELL_CHANGED);
+        return "{\"success\":true}";
+    }
+
+    // Get all available number formats.
+    // Returns JSON array of format objects.
+    std::string getAvailableFormats() {
+        std::ostringstream ss;
+        ss << "[";
+
+        const auto& allFormats = _formatRegistry.getAllFormats();
+        bool first = true;
+        for (const auto& [id, format] : allFormats) {
+            if (!first) {
+                ss << ",";
+            }
+            first = false;
+
+            ss << "{";
+            ss << "\"id\":\"" << id.toString() << "\"";
+            ss << ",\"category\":\"" << formatCategoryToString(format.category) << "\"";
+            ss << ",\"formatCode\":\"" << jsonEscape(format.formatCode) << "\"";
+            ss << ",\"decimalPlaces\":" << static_cast<int>(format.decimalPlaces);
+            ss << ",\"useThousandsSeparator\":" << (format.useThousandsSeparator ? "true" : "false");
+            ss << ",\"currencySymbol\":\"" << jsonEscape(format.currencySymbol) << "\"";
+            ss << ",\"isAccounting\":" << (format.isAccounting ? "true" : "false");
+            ss << "}";
+        }
+
+        ss << "]";
+        return ss.str();
+    }
+
+    // Get the format ID for a cell by cell ID.
+    // Returns JSON: {"formatId":"..."} or {"error":"..."}
+    std::string getCellFormatId(const std::string& cellIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        if (cellIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid cell ID\"}";
+        }
+        ID cellId(cellIdStr);
+
+        auto* cell = sheet->getCell(cellId);
+        if (!cell) {
+            return "{\"error\":\"Cell not found\"}";
+        }
+
+        std::string formatIdStr = cell->formatId.isNull() ? "~" : cell->formatId.toString();
+        return "{\"formatId\":\"" + formatIdStr + "\"}";
+    }
+
+    // Parse user input and auto-detect format.
+    // Input: raw user input string (e.g., "15%", "$1,234.56", "1/15/2024")
+    // Returns JSON: {
+    //   "success": true,
+    //   "type": "number"|"string",
+    //   "numericValue": 0.15,        // for number type
+    //   "stringValue": "hello",      // for string type
+    //   "formatId": "FMT_PCT0",      // suggested format ID (~ for GENERAL)
+    //   "category": "PERCENTAGE"     // format category
+    // }
+    std::string parseUserInputValue(const std::string& input) {
+        ParsedInput result = parseUserInput(input);
+
+        std::ostringstream ss;
+        ss << "{";
+        ss << "\"success\":" << (result.success ? "true" : "false");
+
+        if (result.success) {
+            if (result.valueType == CellValueType::NUMBER) {
+                ss << ",\"type\":\"number\"";
+                ss << ",\"numericValue\":" << std::setprecision(15) << result.numericValue;
+            } else {
+                ss << ",\"type\":\"string\"";
+                ss << ",\"stringValue\":\"" << jsonEscape(result.stringValue) << "\"";
+            }
+
+            std::string formatIdStr = result.formatId.isNull() ? "~" : result.formatId.toString();
+            ss << ",\"formatId\":\"" << formatIdStr << "\"";
+            ss << ",\"category\":\"" << formatCategoryToString(result.formatCategory) << "\"";
+        } else {
+            ss << ",\"error\":\"" << jsonEscape(result.errorMessage) << "\"";
+        }
+
+        ss << "}";
+        return ss.str();
+    }
+
+    // Format a numeric value according to a format ID.
+    // value: the numeric value to format
+    // formatId: ID of the format to use (~ or empty for GENERAL)
+    // Returns JSON: {"text":"15%"} or {"error":"..."}
+    std::string formatCellValue(double value, const std::string& formatIdStr) {
+        ID formatId;
+        if (formatIdStr != "~" && !formatIdStr.empty()) {
+            if (formatIdStr.size() != ID_LENGTH) {
+                return "{\"error\":\"Invalid format ID\"}";
+            }
+            formatId = ID(formatIdStr);
+        }
+
+        FormattedValue result = formatNumber(_formatRegistry, value, formatId);
+
+        std::ostringstream ss;
+        if (result.isError) {
+            ss << "{\"error\":\"" << jsonEscape(result.errorMessage) << "\"}";
+        } else {
+            ss << "{\"text\":\"" << jsonEscape(result.text) << "\"}";
+        }
+        return ss.str();
+    }
+
+    // Format a cell's value using its assigned format.
+    // Returns the formatted display string.
+    // For cells without a format, uses GENERAL formatting.
+    std::string formatCellById(const std::string& cellIdStr) {
+        if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+            return "{\"error\":\"No sheet available\"}";
+        }
+
+        auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+        if (!sheet) {
+            return "{\"error\":\"Sheet not found\"}";
+        }
+
+        if (cellIdStr.size() != ID_LENGTH) {
+            return "{\"error\":\"Invalid cell ID\"}";
+        }
+        ID cellId(cellIdStr);
+
+        auto* cell = sheet->getCell(cellId);
+        if (!cell) {
+            return "{\"error\":\"Cell not found\"}";
+        }
+
+        // Get the cell's raw value
+        double numericValue = 0.0;
+        bool isNumeric = false;
+
+        if (cell->value.type == CellValueType::NUMBER) {
+            numericValue = cell->value.number;
+            isNumeric = true;
+        } else if (cell->value.type == CellValueType::FORMULA_NUMBER) {
+            numericValue = cell->value.number;
+            isNumeric = true;
+        }
+
+        if (!isNumeric) {
+            // For non-numeric values, just return the string representation
+            std::string text;
+            if (cell->value.type == CellValueType::STRING || cell->value.type == CellValueType::FORMULA_STRING) {
+                text = cell->value.str;
+            } else if (cell->value.type == CellValueType::BOOLEAN || cell->value.type == CellValueType::FORMULA_BOOLEAN) {
+                text = cell->value.boolean ? "TRUE" : "FALSE";
+            } else if (cell->value.type == CellValueType::ERROR || cell->value.type == CellValueType::FORMULA_ERROR) {
+                text = cell->value.str.empty() ? "#ERROR!" : cell->value.str;
+            } else {
+                text = "";
+            }
+            return "{\"text\":\"" + jsonEscape(text) + "\"}";
+        }
+
+        // Format the numeric value using the cell's format
+        FormattedValue result = formatNumber(_formatRegistry, numericValue, cell->formatId);
+
+        std::ostringstream ss;
+        if (result.isError) {
+            ss << "{\"error\":\"" << jsonEscape(result.errorMessage) << "\"}";
+        } else {
+            ss << "{\"text\":\"" << jsonEscape(result.text) << "\"}";
+        }
+        return ss.str();
     }
 
     // ========================================================================
@@ -4010,6 +4431,7 @@ private:
     std::unique_ptr<cells::net::SyncClient> _syncClient;  // C++ sync client (for WebRTC P2P)
     LuauSandbox _luauSandbox;  // Sandboxed Luau scripting engine
     LuauAutocomplete _luauAutocomplete;  // Luau autocomplete engine
+    NumberFormatRegistry _formatRegistry;  // Number format registry (built-in + custom formats)
     val _agentListener;  // JavaScript callback for agent events
     std::unique_ptr<AgentClient> _agentClient;  // AI agent client
     std::string _agentServerUrl;  // Server URL for JS-based streaming
@@ -4056,10 +4478,19 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getTotalHeight", &cells::wasm::CellsEngine::getTotalHeight)
         // Cell operations
         .function("updateCell", &cells::wasm::CellsEngine::updateCell)
+        .function("updateCellWithFormatDetection", &cells::wasm::CellsEngine::updateCellWithFormatDetection)
         .function("createCell", &cells::wasm::CellsEngine::createCell)
         .function("getOrCreateCellAt", &cells::wasm::CellsEngine::getOrCreateCellAt)
         .function("deleteCell", &cells::wasm::CellsEngine::deleteCell)
         .function("deleteCellAt", &cells::wasm::CellsEngine::deleteCellAt)
+        // Number formats
+        .function("setCellFormat", &cells::wasm::CellsEngine::setCellFormat)
+        .function("setCellFormatAt", &cells::wasm::CellsEngine::setCellFormatAt)
+        .function("getAvailableFormats", &cells::wasm::CellsEngine::getAvailableFormats)
+        .function("getCellFormatId", &cells::wasm::CellsEngine::getCellFormatId)
+        .function("parseUserInputValue", &cells::wasm::CellsEngine::parseUserInputValue)
+        .function("formatCellValue", &cells::wasm::CellsEngine::formatCellValue)
+        .function("formatCellById", &cells::wasm::CellsEngine::formatCellById)
         // Column/row resize
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)
         .function("resizeColumnByPos", &cells::wasm::CellsEngine::resizeColumnByPos)

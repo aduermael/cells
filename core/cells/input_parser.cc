@@ -98,8 +98,7 @@ ParsedInput parsePercentage(const std::string& input) {
 
     // Determine decimal places: "15%" -> PERCENTAGE_0, "15.5%" -> PERCENTAGE_2
     const bool hasDecimals = numPart.find('.') != std::string::npos;
-    const ID formatId =
-        hasDecimals ? BuiltInFormats::PERCENTAGE_2 : BuiltInFormats::PERCENTAGE_0;
+    const ID formatId = hasDecimals ? BuiltInFormats::PERCENTAGE_2 : BuiltInFormats::PERCENTAGE_0;
 
     return ParsedInput::number(value, formatId, NumberFormatCategory::PERCENTAGE);
 }

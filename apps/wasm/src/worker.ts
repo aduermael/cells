@@ -546,6 +546,17 @@ function handleMessage(msg: WorkerRequest): void {
         break;
       }
 
+      case "updateCellWithFormatDetection": {
+        const { cellId, value } = params as { cellId: string; value: string };
+        const result = JSON.parse(engine.updateCellWithFormatDetection(cellId, value)) as JsonResult;
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({ type: "cellUpdated", success: true, formatId: result.formatId });
+        }
+        break;
+      }
+
       case "createCell": {
         const { col, row, value } = params as {
           col: number;
@@ -600,6 +611,75 @@ function handleMessage(msg: WorkerRequest): void {
           respond({ type: "error", error: result.error });
         } else {
           respond({ type: "cellDeleted", deleted: result.deleted });
+        }
+        break;
+      }
+
+      // Number format operations
+      case "setCellFormat": {
+        const { cellId, formatId } = params as { cellId: string; formatId: string };
+        const result = JSON.parse(engine.setCellFormat(cellId, formatId)) as JsonResult;
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({ type: "formatSet", success: true });
+        }
+        break;
+      }
+
+      case "setCellFormatAt": {
+        const { col, row, formatId } = params as { col: number; row: number; formatId: string };
+        const result = JSON.parse(engine.setCellFormatAt(col, row, formatId)) as JsonResult;
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({ type: "formatSet", success: true });
+        }
+        break;
+      }
+
+      case "getAvailableFormats": {
+        const formats = JSON.parse(engine.getAvailableFormats());
+        respond({ type: "formats", formats });
+        break;
+      }
+
+      case "getCellFormatId": {
+        const { cellId } = params as { cellId: string };
+        const result = JSON.parse(engine.getCellFormatId(cellId)) as JsonResult;
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({ type: "formatId", formatId: result.formatId });
+        }
+        break;
+      }
+
+      case "parseUserInputValue": {
+        const { input } = params as { input: string };
+        const result = JSON.parse(engine.parseUserInputValue(input));
+        respond({ type: "parsedInput", ...result });
+        break;
+      }
+
+      case "formatCellValue": {
+        const { value, formatId } = params as { value: number; formatId: string };
+        const result = JSON.parse(engine.formatCellValue(value, formatId)) as JsonResult;
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({ type: "formattedValue", text: result.text });
+        }
+        break;
+      }
+
+      case "formatCellById": {
+        const { cellId } = params as { cellId: string };
+        const result = JSON.parse(engine.formatCellById(cellId)) as JsonResult;
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({ type: "formattedValue", text: result.text });
         }
         break;
       }

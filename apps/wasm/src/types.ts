@@ -72,6 +72,59 @@ export interface CellData {
   value?: string; // For non-formula cells
   formula?: string; // For formula cells (A1 notation)
   display?: string; // For formula cells (computed value)
+  formatId?: string; // Number format ID (~ or empty for GENERAL)
+}
+
+// ============================================================================
+// Number Format Types
+// ============================================================================
+
+/** Number format category (matches C++ NumberFormatCategory) */
+export type NumberFormatCategory =
+  | "GENERAL"
+  | "NUMBER"
+  | "CURRENCY"
+  | "ACCOUNTING"
+  | "PERCENTAGE"
+  | "DATE"
+  | "TIME"
+  | "DATE_TIME"
+  | "SCIENTIFIC"
+  | "FRACTION"
+  | "TEXT";
+
+/** Number format definition */
+export interface NumberFormat {
+  id: string; // Format ID (8-char base62)
+  category: NumberFormatCategory;
+  formatCode: string; // Excel-style format code (e.g., "#,##0.00")
+  decimalPlaces: number;
+  useThousandsSeparator: boolean;
+  currencySymbol: string;
+  isAccounting: boolean;
+}
+
+/** Result from parseUserInputValue */
+export interface ParsedInputResult {
+  success: boolean;
+  type?: "number" | "string";
+  numericValue?: number;
+  stringValue?: string;
+  formatId?: string; // ~ for GENERAL
+  category?: NumberFormatCategory;
+  error?: string;
+}
+
+/** Result from formatCellValue */
+export interface FormattedValueResult {
+  text?: string;
+  error?: string;
+}
+
+/** Result from getCellFormatId */
+export interface CellFormatIdResult {
+  formatId?: string; // ~ for GENERAL
+  error?: string;
 }
 
 /** Column information */

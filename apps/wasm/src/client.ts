@@ -2,7 +2,14 @@
 // Provides a Promise-based API that matches the REST server semantics
 
 import { RTCProxy, type RTCMessagePayload } from "./rtc-proxy";
-import type { FileFormat, SheetInfo } from "./types";
+import type {
+  FileFormat,
+  SheetInfo,
+  NumberFormat,
+  ParsedInputResult,
+  FormattedValueResult,
+  CellFormatIdResult,
+} from "./types";
 import type {
   WorkerMessage,
   PendingRequest,
@@ -317,6 +324,21 @@ export class CellsClient {
     return { success: true };
   }
 
+  /**
+   * Update cell value with automatic format detection.
+   * Parses input like "15%", "$1,234.56", "1/15/2024" and sets both value and format.
+   * @param cellId Cell ID to update
+   * @param value Raw input string
+   * @returns Result with success status and detected format ID
+   */
+  async updateCellWithFormatDetection(
+    cellId: string,
+    value: string
+  ): Promise<{ success: boolean; formatId?: string }> {
+    const response = await this._send("updateCellWithFormatDetection", { cellId, value });
+    return { success: true, formatId: response.formatId as string | undefined };
+  }
+
   async createCell(col: number, row: number, value: string = ""): Promise<CreateCellResult> {
     const response = await this._send("createCell", { col, row, value });
     return { id: response.cellId as string };
@@ -340,6 +362,79 @@ export class CellsClient {
   async deleteCellAt(col: number, row: number): Promise<DeleteCellAtResult> {
     const response = await this._send("deleteCellAt", { col, row });
     return { deleted: response.deleted as boolean };
+  }
+
+  // ========== Number Format Operations API ==========
+
+  /**
+   * Set the number format for a cell by cell ID.
+   * @param cellId Cell ID
+   * @param formatId Format ID (use "~" for default/GENERAL format)
+   */
+  async setCellFormat(cellId: string, formatId: string): Promise<{ success: boolean }> {
+    await this._send("setCellFormat", { cellId, formatId });
+    return { success: true };
+  }
+
+  /**
+   * Set the number format for a cell by position.
+   * @param col Column position (0-indexed)
+   * @param row Row position (0-indexed)
+   * @param formatId Format ID (use "~" for default/GENERAL format)
+   */
+  async setCellFormatAt(col: number, row: number, formatId: string): Promise<{ success: boolean }> {
+    await this._send("setCellFormatAt", { col, row, formatId });
+    return { success: true };
+  }
+
+  /**
+   * Get all available number formats.
+   * Returns an array of NumberFormat objects.
+   */
+  async getAvailableFormats(): Promise<NumberFormat[]> {
+    const response = await this._send("getAvailableFormats", {});
+    return response as unknown as NumberFormat[];
+  }
+
+  /**
+   * Get the format ID for a cell by cell ID.
+   * @param cellId Cell ID
+   * @returns Format ID (~ for GENERAL)
+   */
+  async getCellFormatId(cellId: string): Promise<CellFormatIdResult> {
+    const response = await this._send("getCellFormatId", { cellId });
+    return response as CellFormatIdResult;
+  }
+
+  /**
+   * Parse user input and auto-detect format.
+   * @param input Raw user input string (e.g., "15%", "$1,234.56", "1/15/2024")
+   * @returns Parsed input result with detected value and suggested format
+   */
+  async parseUserInputValue(input: string): Promise<ParsedInputResult> {
+    const response = await this._send("parseUserInputValue", { input });
+    return response as ParsedInputResult;
+  }
+
+  /**
+   * Format a numeric value according to a format ID.
+   * @param value The numeric value to format
+   * @param formatId Format ID (use "~" or empty for GENERAL)
+   * @returns Formatted value result
+   */
+  async formatCellValue(value: number, formatId: string): Promise<FormattedValueResult> {
+    const response = await this._send("formatCellValue", { value, formatId });
+    return response as FormattedValueResult;
+  }
+
+  /**
+   * Format a cell's value using its assigned format.
+   * @param cellId Cell ID
+   * @returns Formatted value result
+   */
+  async formatCellById(cellId: string): Promise<FormattedValueResult> {
+    const response = await this._send("formatCellById", { cellId });
+    return response as FormattedValueResult;
   }
 
   // ========== Column/Row Operations API ==========

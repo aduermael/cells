@@ -3,7 +3,16 @@
 // through the CellsClient, handling workbook metadata and change notifications.
 
 import type { CellsClient } from "./client";
-import type { SheetInfo, CellData, ColumnInfo, RowInfo } from "./types";
+import type {
+  SheetInfo,
+  CellData,
+  ColumnInfo,
+  RowInfo,
+  NumberFormat,
+  ParsedInputResult,
+  FormattedValueResult,
+  CellFormatIdResult,
+} from "./types";
 import type { LuauToken, AutocompleteResult } from "./client-types";
 import { getMimeType, toSnakeCase } from "./utils";
 
@@ -128,10 +137,57 @@ export class WasmDataSource {
     return { success: true };
   }
 
+  /** Update cell value with automatic format detection */
+  async updateCellWithFormatDetection(
+    cellId: string,
+    value: string
+  ): Promise<{ success: boolean; formatId?: string }> {
+    return this._client.updateCellWithFormatDetection(cellId, value);
+  }
+
   /** Delete cell by ID */
   async deleteCell(cellId: string): Promise<{ success: true }> {
     await this._client.deleteCell(cellId);
     return { success: true };
+  }
+
+  // ==========================================================================
+  // Number Format Operations
+  // ==========================================================================
+
+  /** Set cell format by cell ID */
+  async setCellFormat(cellId: string, formatId: string): Promise<{ success: boolean }> {
+    return this._client.setCellFormat(cellId, formatId);
+  }
+
+  /** Set cell format by position */
+  async setCellFormatAt(col: number, row: number, formatId: string): Promise<{ success: boolean }> {
+    return this._client.setCellFormatAt(col, row, formatId);
+  }
+
+  /** Get all available number formats */
+  async getAvailableFormats(): Promise<NumberFormat[]> {
+    return this._client.getAvailableFormats();
+  }
+
+  /** Get cell format ID */
+  async getCellFormatId(cellId: string): Promise<CellFormatIdResult> {
+    return this._client.getCellFormatId(cellId);
+  }
+
+  /** Parse user input and auto-detect format */
+  async parseUserInputValue(input: string): Promise<ParsedInputResult> {
+    return this._client.parseUserInputValue(input);
+  }
+
+  /** Format a numeric value according to a format ID */
+  async formatCellValue(value: number, formatId: string): Promise<FormattedValueResult> {
+    return this._client.formatCellValue(value, formatId);
+  }
+
+  /** Format a cell's value using its assigned format */
+  async formatCellById(cellId: string): Promise<FormattedValueResult> {
+    return this._client.formatCellById(cellId);
   }
 
   // ==========================================================================
