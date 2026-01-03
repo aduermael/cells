@@ -160,11 +160,16 @@ void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out)
 }
 
 void Serializer::serializeCell(const Cell& cell, std::ostream& out) const {
-    // Format: X <id> <col> <row> <type> <value>
+    // Format: X <id> <col> <row> <type> <value> [fmt:<formatId>]
     out << "X " << cell.id.toString() << " " << cell.colId.toString() << " "
         << cell.rowId.toString() << " ";
 
     serializeCellValue(cell.value, cell, out);
+
+    // Optional format property (only if not null/default)
+    if (!cell.formatId.isNull()) {
+        out << " fmt:" << cell.formatId.toString();
+    }
 
     out << "\n";
 }
