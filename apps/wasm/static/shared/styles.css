@@ -558,6 +558,87 @@ canvas {
     display: none;
 }
 
+/* Format Controls in Formula Bar */
+#format-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+#format-controls .btn.btn-sm {
+    min-width: 28px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+}
+
+#format-dropdown {
+    position: relative;
+}
+
+#format-dropdown-btn {
+    min-width: 80px;
+    justify-content: space-between;
+}
+
+#format-dropdown-label {
+    flex: 1;
+    text-align: left;
+}
+
+.dropdown-arrow {
+    flex-shrink: 0;
+    opacity: 0.5;
+    transition: transform var(--transition-fast);
+}
+
+#format-dropdown.open .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.format-dropdown-menu {
+    left: 0;
+    right: auto;
+    min-width: 140px;
+}
+
+.format-separator {
+    width: 1px;
+    height: 16px;
+    background: var(--color-border);
+    margin: 0 var(--spacing-xs);
+}
+
+/* Active state for format buttons */
+#format-currency-btn.active,
+#format-percent-btn.active {
+    background: var(--color-primary);
+    color: var(--color-bg-primary);
+    border-color: var(--color-primary);
+}
+
+#format-currency-btn.active:hover,
+#format-percent-btn.active:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+}
+
+/* Checkmark for active format in dropdown */
+.dropdown-item.active {
+    color: var(--color-primary);
+    font-weight: var(--font-weight-semibold);
+}
+
+.dropdown-item.active::before {
+    content: "";
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    background: var(--color-primary);
+    border-radius: 50%;
+    margin-right: var(--spacing-sm);
+}
+
 #cell-reference {
     height: var(--control-height);
     padding: 0 var(--control-padding-x);

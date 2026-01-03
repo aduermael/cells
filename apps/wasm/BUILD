@@ -57,6 +57,8 @@ cc_binary(
         "//core/cells:luau_autocomplete",
         "//core/cells:luau_sandbox",
         "//core/cells:model",
+        "//core/cells:number_format",
+        "//core/cells:number_formatter",
         "//core/cells:operation",
         "//core/cells:oplog",
         "//core/cells:parser",

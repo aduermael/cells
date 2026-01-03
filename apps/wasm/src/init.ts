@@ -36,6 +36,7 @@ import { colorizeFormula } from "./formula-colorizer.js";
 import { ScrollbarManager, calculateContentDimensions, calculateDiscoveredRows } from "./scrollbar.js";
 import { FocusManager } from "./focus-manager";
 import { WorkbookTitleEditor } from "./workbook-title-editor";
+import { FormatControls } from "./format-controls";
 import { initTheme } from "./theme";
 
 // =============================================================================
@@ -57,6 +58,7 @@ export interface AppContext {
   agentPanel: AgentPanel;
   workbookTitleEditor: WorkbookTitleEditor;
   clipboardManager: ClipboardManager;
+  formatControls: FormatControls;
 
   // Methods exposed for index.html onclick handlers
   openFile: () => void;
@@ -88,6 +90,9 @@ export function initApp(): AppContext {
 
   const app = createApp();
   const elements = app.elements;
+
+  // Forward reference for formatControls (initialized later)
+  let formatControlsRef: FormatControls | null = null;
 
   // =========================================================================
   // Create PresenceBroadcaster
@@ -437,6 +442,11 @@ export function initApp(): AppContext {
           render();
         }
       }
+    }
+
+    // Update format controls to reflect current cell's format
+    if (formatControlsRef) {
+      formatControlsRef.updateForCurrentCell();
     }
   }
 
@@ -1052,6 +1062,33 @@ export function initApp(): AppContext {
   });
 
   // =========================================================================
+  // Create FormatControls
+  // =========================================================================
+
+  const formatControls = new FormatControls(
+    {
+      formatDropdown: elements.formatDropdown,
+      formatDropdownBtn: elements.formatDropdownBtn,
+      formatDropdownLabel: elements.formatDropdownLabel,
+      formatDropdownMenu: elements.formatDropdownMenu,
+      currencyBtn: elements.formatCurrencyBtn,
+      percentBtn: elements.formatPercentBtn,
+      decimalIncreaseBtn: elements.formatDecimalIncrease,
+      decimalDecreaseBtn: elements.formatDecimalDecrease,
+    },
+    {
+      getSelectedCell: () => app.selectedCell,
+      getSelectedCellData: () => {
+        if (!app.selectedCell) return null;
+        return getCellAt(app.selectedCell.col, app.selectedCell.row, app.cells) ?? null;
+      },
+      requestRender: render,
+      updateFormulaBar,
+    }
+  );
+  formatControlsRef = formatControls;
+
+  // =========================================================================
   // Create SheetTabsManager
   // =========================================================================
 
@@ -1100,6 +1137,7 @@ export function initApp(): AppContext {
       sheetTabsManager.setDataSource(dataSource);
       workbookTitleEditor.setDataSource(dataSource);
       clipboardManager.setDataSource(dataSource);
+      formatControls.setDataSource(dataSource);
       // Update the title display from the workbook name
       workbookTitleEditor.setTitle(dataSource.workbookName);
     },
@@ -1441,6 +1479,7 @@ export function initApp(): AppContext {
     agentPanel,
     workbookTitleEditor,
     clipboardManager,
+    formatControls,
 
     openFile: () => fileLoader.openFile(),
     newFile: () => fileLoader.newFile(),

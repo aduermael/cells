@@ -185,33 +185,35 @@ updateCellWithFormatDetection(cellId, value)
 
 ---
 
-## Phase 6: Formula Bar UI Redesign
+## Phase 6: Formula Bar UI Redesign ✅ COMPLETED
 
 **Goal:** Taller formula bar with format controls (dropdown, accounting toggle, decimal +/-).
 
-### Files to modify:
-- `apps/wasm/static/index.html` - New HTML structure
-- `apps/wasm/static/shared/styles.css` - Format controls styling
-
-### Files to create:
+### Files created:
 - `apps/wasm/src/format-controls.ts` - FormatControls class
 
-### New layout:
+### Files modified:
+- `apps/wasm/static/index.html` - Added format controls HTML structure
+- `apps/wasm/static/shared/styles.css` - Added format controls styling
+- `apps/wasm/src/app.ts` - Added format control DOM element references
+- `apps/wasm/src/init.ts` - Created and wired FormatControls instance
+
+### UI layout:
 ```
 +------------------------------------------------------------------+
-| A1  | [Format v] [$] [+] [-] |  =SUM(A1:A10)                  [<>]|
+| A1  | [Format v] [$] [%] | [+.0] [-.0] |  =SUM(A1:A10)        [<>]|
 +------------------------------------------------------------------+
 ```
 
 ### Tasks:
-- [ ] 6a: Add format-controls div with dropdown, accounting toggle, decimal buttons to HTML
-- [ ] 6b: Style format controls (dropdown menu, buttons)
-- [ ] 6c: Create FormatControls class in format-controls.ts
-- [ ] 6d: Wire FormatControls to cell selection (update dropdown on select)
-- [ ] 6e: Implement format change handler (apply format to selection)
-- [ ] 6f: Implement decimal +/- handlers
-- [ ] 6g: Show/hide accounting toggle based on currency selection
-- [ ] 6h: Add keyboard shortcuts for format controls
+- [x] 6a: Add format-controls div with dropdown, currency, percent, decimal buttons to HTML
+- [x] 6b: Style format controls (dropdown menu, buttons)
+- [x] 6c: Create FormatControls class in format-controls.ts
+- [x] 6d: Wire FormatControls to cell selection (update dropdown on select)
+- [x] 6e: Implement format change handler (apply format to selection)
+- [x] 6f: Implement decimal +/- handlers
+- [x] 6g: Show/hide accounting toggle based on currency selection (simplified - no toggle, just Currency button)
+- [x] 6h: Add keyboard shortcuts for format controls (Ctrl/Cmd+Shift+1-6)
 
 ---
 

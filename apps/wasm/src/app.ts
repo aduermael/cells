@@ -104,6 +104,16 @@ export interface DOMElements {
   chatInput: HTMLTextAreaElement;
   chatSendBtn: HTMLButtonElement;
   chatOpenBtn: HTMLButtonElement;
+  // Format controls
+  formatControls: HTMLElement;
+  formatDropdown: HTMLElement;
+  formatDropdownBtn: HTMLButtonElement;
+  formatDropdownLabel: HTMLElement;
+  formatDropdownMenu: HTMLElement;
+  formatCurrencyBtn: HTMLButtonElement;
+  formatPercentBtn: HTMLButtonElement;
+  formatDecimalIncrease: HTMLButtonElement;
+  formatDecimalDecrease: HTMLButtonElement;
 }
 
 // =============================================================================
@@ -499,6 +509,16 @@ export function createApp(): App {
     chatInput: getElement<HTMLTextAreaElement>("chat-input"),
     chatSendBtn: getElement<HTMLButtonElement>("chat-send"),
     chatOpenBtn: getElement<HTMLButtonElement>("chat-open-btn"),
+    // Format controls
+    formatControls: getElement("format-controls"),
+    formatDropdown: getElement("format-dropdown"),
+    formatDropdownBtn: getElement<HTMLButtonElement>("format-dropdown-btn"),
+    formatDropdownLabel: getElement("format-dropdown-label"),
+    formatDropdownMenu: document.querySelector("#format-dropdown .dropdown-menu") as HTMLElement,
+    formatCurrencyBtn: getElement<HTMLButtonElement>("format-currency-btn"),
+    formatPercentBtn: getElement<HTMLButtonElement>("format-percent-btn"),
+    formatDecimalIncrease: getElement<HTMLButtonElement>("format-decimal-increase"),
+    formatDecimalDecrease: getElement<HTMLButtonElement>("format-decimal-decrease"),
   };
 
   return new App(elements);

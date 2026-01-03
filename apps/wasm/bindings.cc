@@ -694,7 +694,7 @@ public:
                 if (!entry.cell->formatId.isNull() &&
                     (entry.cell->value.type == CellValueType::NUMBER)) {
                     // Format numeric value
-                    FormattedValue formatted = formatNumber(_formatRegistry, entry.cell->value.number, entry.cell->formatId);
+                    FormattedValue formatted = formatNumber(_formatRegistry, entry.cell->value.asNumber(), entry.cell->formatId);
                     if (!formatted.isError) {
                         displayValue = formatted.text;
                         useFormattedValue = true;
@@ -1604,10 +1604,10 @@ public:
         bool isNumeric = false;
 
         if (cell->value.type == CellValueType::NUMBER) {
-            numericValue = cell->value.number;
+            numericValue = cell->value.asNumber();
             isNumeric = true;
         } else if (cell->value.type == CellValueType::FORMULA_NUMBER) {
-            numericValue = cell->value.number;
+            numericValue = cell->value.asNumber();
             isNumeric = true;
         }
 
@@ -1615,11 +1615,11 @@ public:
             // For non-numeric values, just return the string representation
             std::string text;
             if (cell->value.type == CellValueType::STRING || cell->value.type == CellValueType::FORMULA_STRING) {
-                text = cell->value.str;
+                text = cell->value.asString();
             } else if (cell->value.type == CellValueType::BOOLEAN || cell->value.type == CellValueType::FORMULA_BOOLEAN) {
-                text = cell->value.boolean ? "TRUE" : "FALSE";
+                text = cell->value.asBoolean() ? "TRUE" : "FALSE";
             } else if (cell->value.type == CellValueType::ERROR || cell->value.type == CellValueType::FORMULA_ERROR) {
-                text = cell->value.str.empty() ? "#ERROR!" : cell->value.str;
+                text = cell->value.asString().empty() ? "#ERROR!" : cell->value.asString();
             } else {
                 text = "";
             }
