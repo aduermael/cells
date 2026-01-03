@@ -39,6 +39,23 @@ cc_test(
 )
 
 cc_library(
+    name = "number_format",
+    srcs = ["number_format.cc"],
+    hdrs = ["number_format.h"],
+    visibility = ["//visibility:public"],
+    deps = [":types"],
+)
+
+cc_test(
+    name = "number_format_test",
+    srcs = ["number_format_test.cc"],
+    deps = [
+        ":number_format",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "operation",
     srcs = ["operation.cc"],
     hdrs = ["operation.h"],
