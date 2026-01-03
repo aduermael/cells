@@ -734,5 +734,139 @@ TEST(FormulaRoundtripTest, FormulaPreservedAfterEvaluation) {
     EXPECT_EQ(FormulaSerializer::serialize(parsedCell->formula->ast), "=10+5");
 }
 
+// --- Cell Format Tests ---
+
+TEST(CellFormatTest, SerializeCellWithFormat) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+
+    auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell->value = CellValue(1234.56);
+    cell->formatId = ID("FMT_C002");  // Currency format
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+
+    // Should contain the format property
+    EXPECT_NE(output.find("fmt:FMT_C002"), std::string::npos);
+}
+
+TEST(CellFormatTest, SerializeCellWithoutFormat) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+
+    auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell->value = CellValue(42.0);
+    // No formatId set (defaults to null)
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+
+    // Should NOT contain fmt: property
+    EXPECT_EQ(output.find("fmt:"), std::string::npos);
+}
+
+TEST(CellFormatTest, RoundtripCellWithFormat) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+
+    auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell->value = CellValue(0.15);
+    cell->formatId = ID("FMT_P002");  // Percentage format
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    wb->addSheet(std::move(sheet));
+
+    // Serialize
+    const std::string serialized = serialize(*wb);
+    EXPECT_NE(serialized.find("fmt:FMT_P002"), std::string::npos);
+
+    // Parse back
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Verify format is preserved
+    Sheet* parsedSheet = result.workbook->getSheetByIndex(0);
+    Cell* parsedCell = parsedSheet->getCell(ID("xA1bC2dE"));
+    ASSERT_NE(parsedCell, nullptr);
+    EXPECT_EQ(parsedCell->formatId, ID("FMT_P002"));
+}
+
+TEST(CellFormatTest, ParseCellWithFormat) {
+    const std::string content = R"(
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+C cA1bC2dE 0
+R rA1bC2dE 0
+X xA1bC2dE cA1bC2dE rA1bC2dE n 1234.56 fmt:FMT_C002
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    Cell* cell = sheet->getCell(ID("xA1bC2dE"));
+    ASSERT_NE(cell, nullptr);
+
+    EXPECT_DOUBLE_EQ(cell->value.asNumber(), 1234.56);
+    EXPECT_EQ(cell->formatId, ID("FMT_C002"));
+}
+
+TEST(CellFormatTest, ParseCellWithStringValueAndFormat) {
+    const std::string content = R"(
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+C cA1bC2dE 0
+R rA1bC2dE 0
+X xA1bC2dE cA1bC2dE rA1bC2dE s "Hello" fmt:FMT_TEXT
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    Cell* cell = sheet->getCell(ID("xA1bC2dE"));
+    ASSERT_NE(cell, nullptr);
+
+    EXPECT_EQ(cell->value.asString(), "Hello");
+    EXPECT_EQ(cell->formatId, ID("FMT_TEXT"));
+}
+
+TEST(CellFormatTest, ParseCellWithFormulaAndFormat) {
+    const std::string content = R"(
+D aB3cD4eF "Test"
+S sH3eE4tB "Sheet"
+C cA1bC2dE 0
+R rA1bC2dE 0
+X xA1bC2dE cA1bC2dE rA1bC2dE f "=A1+A2" fmt:FMT_C002
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    Cell* cell = sheet->getCell(ID("xA1bC2dE"));
+    ASSERT_NE(cell, nullptr);
+
+    EXPECT_TRUE(cell->isFormula());
+    EXPECT_EQ(cell->formatId, ID("FMT_C002"));
+}
+
 }  // namespace
 }  // namespace cells

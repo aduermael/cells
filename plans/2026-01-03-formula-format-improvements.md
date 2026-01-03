@@ -111,7 +111,7 @@ struct NumberFormat {
 - [x] 3d: Add CELL_SET_FORMAT operation type and implementation
 - [x] 3e: Add T section serialization for formats (fmt:<id> property on cells)
 - [x] 3f: Add T section parsing (fmt:<id> property on cells)
-- [ ] 3g: Add unit tests for format operations and serialization
+- [x] 3g: Add unit tests for format operations and serialization
 
 ---
 
