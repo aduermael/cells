@@ -107,7 +107,7 @@ struct NumberFormat {
 ### Tasks:
 - [x] 3a: Create NumberFormat struct and NumberFormatCategory enum
 - [x] 3b: Create NumberFormatRegistry with built-in formats (General, Number, %, $, Date, etc.)
-- [ ] 3c: Add formatId field to Cell struct in model.h
+- [x] 3c: Add formatId field to Cell struct in model.h
 - [ ] 3d: Add CELL_SET_FORMAT operation type and implementation
 - [ ] 3e: Add T section serialization for formats
 - [ ] 3f: Add T section parsing

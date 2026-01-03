@@ -105,6 +105,7 @@ struct Cell {
     ID rowId;          // Row axis ID
     CellValue value;   // Direct value OR cached formula result
     Formula* formula;  // null = value cell, non-null = formula cell (owned)
+    ID formatId;       // Number format ID (null = use default/General format)
 
     // Shared formula support: if non-null, this cell uses master's formula
     // (does not own the formula - master owns it)
