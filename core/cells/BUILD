@@ -56,6 +56,26 @@ cc_test(
 )
 
 cc_library(
+    name = "input_parser",
+    srcs = ["input_parser.cc"],
+    hdrs = ["input_parser.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":number_format",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "input_parser_test",
+    srcs = ["input_parser_test.cc"],
+    deps = [
+        ":input_parser",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "operation",
     srcs = ["operation.cc"],
     hdrs = ["operation.h"],

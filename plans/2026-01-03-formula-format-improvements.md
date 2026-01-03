@@ -133,18 +133,18 @@ struct NumberFormat {
 - `1.5E+10` → value=15000000000, format=SCIENTIFIC
 
 ### Tasks:
-- [ ] 4a: Create input_parser.h with ParsedInput struct
-- [ ] 4b: Implement percentage parsing (15% → 0.15)
-- [ ] 4c: Implement currency parsing ($1,234.56)
-- [ ] 4d: Implement date parsing (multiple formats: MM/DD/YYYY, YYYY-MM-DD, etc.)
-- [ ] 4e: Implement time parsing (12:30 PM, 14:30)
-- [ ] 4f: Implement scientific notation detection
+- [x] 4a: Create input_parser.h with ParsedInput struct
+- [x] 4b: Implement percentage parsing (15% → 0.15)
+- [x] 4c: Implement currency parsing ($1,234.56)
+- [x] 4d: Implement date parsing (multiple formats: MM/DD/YYYY, YYYY-MM-DD, etc.)
+- [x] 4e: Implement time parsing (12:30 PM, 14:30)
+- [x] 4f: Implement scientific notation detection
 - [ ] 4g: Create number_formatter.h
 - [ ] 4h: Implement number formatting (decimal places, thousands separator)
 - [ ] 4i: Implement percentage display (0.15 → "15%")
 - [ ] 4j: Implement currency display ($1,234.56)
 - [ ] 4k: Implement date/time display with locale awareness
-- [ ] 4l: Add unit tests for input parsing
+- [x] 4l: Add unit tests for input parsing
 - [ ] 4m: Add unit tests for number formatting
 
 ---
