@@ -313,7 +313,9 @@ func main() {
 		var err error
 		agentHandler, err = NewAgentHandler(conversationStore)
 		if err != nil {
-			log.Printf("Warning: Agent not enabled: %v", err)
+			log.Printf("ERROR: Agent initialization failed: %v", err)
+			log.Println("  Set ANTHROPIC_API_KEY environment variable to enable the AI agent")
+			log.Println("  Example: ANTHROPIC_API_KEY=sk-ant-... make wasm-serve")
 		} else {
 			log.Println("AI agent enabled at /api/agent/*")
 		}
@@ -384,7 +386,47 @@ func main() {
 	}
 	fmt.Println("Press Ctrl+C to stop")
 
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	// Wrap mux with logging middleware
+	loggedMux := loggingMiddleware(mux)
+
+	if err := http.ListenAndServe(addr, loggedMux); err != nil {
 		log.Fatalf("Server error: %v", err)
+	}
+}
+
+// loggingMiddleware wraps an http.Handler to log all requests
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
+		// Wrap ResponseWriter to capture status code
+		lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+
+		// Call the next handler
+		next.ServeHTTP(lrw, r)
+
+		// Log the request (skip noisy static file requests)
+		path := r.URL.Path
+		if path == "/" || path == "/ws" || len(path) > 4 && path[:4] == "/api" {
+			log.Printf("[HTTP] %s %s %d %v", r.Method, r.URL.Path, lrw.statusCode, time.Since(start))
+		}
+	})
+}
+
+// loggingResponseWriter wraps http.ResponseWriter to capture the status code
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (lrw *loggingResponseWriter) WriteHeader(code int) {
+	lrw.statusCode = code
+	lrw.ResponseWriter.WriteHeader(code)
+}
+
+// Flush implements http.Flusher (needed for SSE streaming)
+func (lrw *loggingResponseWriter) Flush() {
+	if flusher, ok := lrw.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
 	}
 }

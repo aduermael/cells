@@ -70,6 +70,20 @@ export class AgentPanel {
   private _currentAssistantMessage: Message | null = null;
   private _currentMessageElement: HTMLElement | null = null;
   private _pendingToolUse: ToolUse | null = null;
+  private _needsNewBubble: boolean = false; // Start new bubble after tool execution
+
+  // Text animation queue for smooth streaming display
+  // Adaptive algorithm: at least 1 char per 16ms, but scales up to finish buffer in ≤500ms
+  private _textQueue: string = "";
+  private _displayedText: string = "";
+  private _animationFrameId: number | null = null;
+  private _lastAnimationTime: number = 0;
+  private static readonly MIN_FRAME_INTERVAL = 16; // Minimum 16ms between updates (~60fps)
+  private static readonly MAX_DISPLAY_TIME = 500; // Max time to display entire buffer
+  // Max frames available = 500/16 ≈ 31, so chars/frame = ceil(bufferSize/31)
+  private static readonly MAX_FRAMES = Math.floor(
+    AgentPanel.MAX_DISPLAY_TIME / AgentPanel.MIN_FRAME_INTERVAL
+  );
 
   constructor(options: AgentPanelOptions) {
     this._elements = {
@@ -102,7 +116,7 @@ export class AgentPanel {
     if (!client) return;
 
     const serverUrl = this._getServerUrl();
-    if (!serverUrl) {
+    if (serverUrl == null) {
       console.warn("No agent server URL configured");
       return;
     }
@@ -151,6 +165,7 @@ export class AgentPanel {
     this._currentAssistantMessage = null;
     this._currentMessageElement = null;
     this._pendingToolUse = null;
+    this._needsNewBubble = false;
     this._elements.messages.innerHTML = "";
   }
 
@@ -271,12 +286,92 @@ export class AgentPanel {
   }
 
   private _handleTextEvent(text: string): void {
+    // After tool execution, start a new bubble for the follow-up text
+    if (this._needsNewBubble) {
+      this._finishCurrentBubble();
+      this._needsNewBubble = false;
+    }
+
     if (!this._currentAssistantMessage) {
       this._startAssistantMessage();
     }
 
+    // Add to the full content (for data model)
     this._currentAssistantMessage!.content += text;
-    this._updateCurrentMessageContent();
+
+    // Add to animation queue (for smooth display)
+    this._textQueue += text;
+    this._startTextAnimation();
+  }
+
+  /** Finish current bubble without ending processing state */
+  private _finishCurrentBubble(): void {
+    this._flushTextAnimation();
+    if (this._currentMessageElement) {
+      this._currentMessageElement.classList.remove("streaming");
+    }
+    this._currentAssistantMessage = null;
+    this._currentMessageElement = null;
+  }
+
+  /** Start the text animation loop if not already running */
+  private _startTextAnimation(): void {
+    if (this._animationFrameId !== null) return;
+
+    const animate = (timestamp: number) => {
+      // Throttle to MIN_FRAME_INTERVAL (at least 16ms between updates)
+      if (timestamp - this._lastAnimationTime < AgentPanel.MIN_FRAME_INTERVAL) {
+        this._animationFrameId = requestAnimationFrame(animate);
+        return;
+      }
+      this._lastAnimationTime = timestamp;
+
+      if (this._textQueue.length === 0) {
+        // Nothing more to animate
+        this._animationFrameId = null;
+        return;
+      }
+
+      // Adaptive chars per frame: scale based on buffer size
+      // - Small buffer (<31 chars): 1 char/frame for smooth display
+      // - Large buffer: increase rate to finish within 500ms
+      // Formula: ceil(bufferSize / maxFrames) ensures we finish in time
+      const charsToShow = Math.max(1, Math.ceil(this._textQueue.length / AgentPanel.MAX_FRAMES));
+      this._displayedText += this._textQueue.slice(0, charsToShow);
+      this._textQueue = this._textQueue.slice(charsToShow);
+
+      // Update the displayed content
+      this._updateDisplayedContent();
+
+      // Continue animation
+      this._animationFrameId = requestAnimationFrame(animate);
+    };
+
+    this._animationFrameId = requestAnimationFrame(animate);
+  }
+
+  /** Update the message element with the currently displayed text */
+  private _updateDisplayedContent(): void {
+    if (!this._currentMessageElement) return;
+
+    const contentEl = this._currentMessageElement.querySelector(".chat-message-content");
+    if (contentEl) {
+      contentEl.textContent = this._displayedText;
+    }
+    this._scrollToBottom();
+  }
+
+  /** Flush remaining text immediately (for when message completes) */
+  private _flushTextAnimation(): void {
+    if (this._animationFrameId !== null) {
+      cancelAnimationFrame(this._animationFrameId);
+      this._animationFrameId = null;
+    }
+
+    // Show all remaining text immediately
+    this._displayedText += this._textQueue;
+    this._textQueue = "";
+    this._updateDisplayedContent();
   }
 
   private _handleToolUseEvent(dataJson: string): void {
@@ -286,6 +381,9 @@ export class AgentPanel {
       if (!this._currentAssistantMessage) {
         this._startAssistantMessage();
       }
+
+      // Flush any pending text before showing tool use
+      this._flushTextAnimation();
 
       const toolUse: ToolUse = {
         id: data.id,
@@ -309,6 +407,9 @@ export class AgentPanel {
       // Tool is being executed, we'll get the result or continuation soon
       // Refresh viewport in case the script modified cells
       this._onViewportRefresh();
+
+      // Next text after tool result should be a new bubble (new assistant turn)
+      this._needsNewBubble = true;
     }
   }
 
@@ -358,21 +459,19 @@ export class AgentPanel {
     this._currentAssistantMessage = { role: "assistant", content: "", toolUses: [] };
     this._messages.push(this._currentAssistantMessage);
 
+    // Reset animation state for new message
+    this._textQueue = "";
+    this._displayedText = "";
+    if (this._animationFrameId !== null) {
+      cancelAnimationFrame(this._animationFrameId);
+      this._animationFrameId = null;
+    }
+
     const el = document.createElement("div");
     el.className = "chat-message assistant streaming";
     el.innerHTML = `<div class="chat-message-content"></div>`;
     this._currentMessageElement = el;
     this._elements.messages.appendChild(el);
-    this._scrollToBottom();
-  }
-
-  private _updateCurrentMessageContent(): void {
-    if (!this._currentMessageElement || !this._currentAssistantMessage) return;
-
-    const contentEl = this._currentMessageElement.querySelector(".chat-message-content");
-    if (contentEl) {
-      contentEl.textContent = this._currentAssistantMessage.content;
-    }
     this._scrollToBottom();
   }
 
@@ -401,12 +500,16 @@ export class AgentPanel {
   }
 
   private _finishAssistantMessage(): void {
+    // Flush any remaining text in the queue
+    this._flushTextAnimation();
+
     if (this._currentMessageElement) {
       this._currentMessageElement.classList.remove("streaming");
     }
     this._currentAssistantMessage = null;
     this._currentMessageElement = null;
     this._pendingToolUse = null;
+    this._needsNewBubble = false;
   }
 
   private _showError(message: string): void {
@@ -415,9 +518,6 @@ export class AgentPanel {
     errorEl.textContent = message;
     this._elements.messages.appendChild(errorEl);
     this._scrollToBottom();
-
-    // Auto-remove after 5 seconds
-    setTimeout(() => errorEl.remove(), 5000);
   }
 
   private _scrollToBottom(): void {

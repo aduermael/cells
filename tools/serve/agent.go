@@ -147,6 +147,7 @@ func (s *ConversationStore) CleanupExpired() int {
 
 // TruncateOldMessages removes oldest messages if conversation exceeds max.
 // Returns true if messages were truncated.
+// This function ensures we don't break tool_use/tool_result pairing.
 func (s *ConversationStore) TruncateOldMessages(conv *Conversation) bool {
 	conv.mu.Lock()
 	defer conv.mu.Unlock()
@@ -155,8 +156,49 @@ func (s *ConversationStore) TruncateOldMessages(conv *Conversation) bool {
 		return false
 	}
 
-	// Keep the most recent messages
+	// Keep the most recent messages, but find a safe cut point
 	excess := len(conv.Messages) - s.maxMessages
+
+	// Find a safe cut point - never cut between an assistant message with tool_calls
+	// and its corresponding tool_result
+	for excess < len(conv.Messages) {
+		msgAtCut := conv.Messages[excess]
+
+		// If we're about to keep a tool_result, make sure its tool_use is also kept
+		if msgAtCut.Role == "tool_result" {
+			excess--
+			continue
+		}
+
+		// If we're about to discard an assistant message with tool_calls,
+		// make sure we also discard the following tool_results
+		if excess > 0 {
+			prevMsg := conv.Messages[excess-1]
+			if prevMsg.Role == "assistant" && len(prevMsg.ToolCalls) > 0 {
+				// Check if there are tool_results after it that we'd be keeping
+				// If so, we need to include this assistant message too
+				for i := excess; i < len(conv.Messages); i++ {
+					if conv.Messages[i].Role == "tool_result" {
+						// Found a tool_result we'd be keeping - need to keep the assistant too
+						excess--
+						break
+					}
+					if conv.Messages[i].Role == "assistant" || conv.Messages[i].Role == "user" {
+						// Hit another message boundary, no orphaned tool_results
+						break
+					}
+				}
+				continue
+			}
+		}
+
+		break
+	}
+
+	if excess <= 0 {
+		return false
+	}
+
 	conv.Messages = conv.Messages[excess:]
 	return true
 }
@@ -183,6 +225,52 @@ func generateConversationID() string {
 	bytes := make([]byte, 16)
 	rand.Read(bytes)
 	return "conv_" + hex.EncodeToString(bytes)
+}
+
+// getPendingToolUses returns tool_use IDs that don't have matching tool_results yet.
+// This checks if the last assistant message has tool calls without corresponding results.
+func getPendingToolUses(messages []Message) []string {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	// Find the last assistant message
+	var lastAssistantIdx int = -1
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "assistant" {
+			lastAssistantIdx = i
+			break
+		}
+	}
+
+	if lastAssistantIdx < 0 {
+		return nil
+	}
+
+	lastAssistant := messages[lastAssistantIdx]
+	if len(lastAssistant.ToolCalls) == 0 {
+		return nil
+	}
+
+	// Collect all tool_use IDs from the last assistant message
+	pendingIDs := make(map[string]bool)
+	for _, tc := range lastAssistant.ToolCalls {
+		pendingIDs[tc.ID] = true
+	}
+
+	// Remove IDs that have tool_results after the assistant message
+	for i := lastAssistantIdx + 1; i < len(messages); i++ {
+		if messages[i].Role == "tool_result" {
+			delete(pendingIDs, messages[i].ToolUseID)
+		}
+	}
+
+	// Convert remaining to slice
+	var pending []string
+	for id := range pendingIDs {
+		pending = append(pending, id)
+	}
+	return pending
 }
 
 // AgentHandler handles agent API requests.
@@ -255,12 +343,15 @@ func (s *SSEWriter) WriteEvent(event string, data interface{}) error {
 type SSEHandler struct {
 	writer   *SSEWriter
 	convID   string
+	conv     *Conversation // Reference to conversation for immediate saves
 	textBuf  string
 	toolUses []ToolCall
+	saved    bool // Whether we've already saved the assistant message
 }
 
 func (h *SSEHandler) OnText(text string) {
 	h.textBuf += text
+	log.Printf("[AGENT] SSE text event: %q", text)
 	h.writer.WriteEvent("text", map[string]string{"text": text})
 }
 
@@ -280,13 +371,27 @@ func (h *SSEHandler) OnToolUse(id, name string, input json.RawMessage) {
 		"input": inputMap,
 	})
 
-	// Signal that tool result is needed
+	// Signal that tool result is needed (include conversation_id for client to use)
 	h.writer.WriteEvent("tool_result_needed", map[string]string{
-		"tool_use_id": id,
+		"tool_use_id":     id,
+		"conversation_id": h.convID,
 	})
 }
 
 func (h *SSEHandler) OnComplete(stopReason string) {
+	// Save assistant message BEFORE sending done event to client
+	// This prevents race condition where client calls tool-result before message is saved
+	if !h.saved && (h.textBuf != "" || len(h.toolUses) > 0) {
+		h.conv.AddMessage(Message{
+			Role:      "assistant",
+			Content:   h.textBuf,
+			ToolCalls: h.toolUses,
+		})
+		h.saved = true
+		log.Printf("[AGENT] Saved assistant message (text=%d chars, tools=%d)", len(h.textBuf), len(h.toolUses))
+	}
+
+	log.Printf("[AGENT] SSE done event: stop_reason=%q, conversation_id=%q", stopReason, h.convID)
 	h.writer.WriteEvent("done", map[string]string{
 		"stop_reason":     stopReason,
 		"conversation_id": h.convID,
@@ -331,6 +436,17 @@ func (h *AgentHandler) HandleMessage(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Conversation not found", http.StatusNotFound)
 			return
 		}
+
+		// Check for pending tool calls that need results first
+		messages := conv.GetMessages()
+		if pending := getPendingToolUses(messages); len(pending) > 0 {
+			log.Printf("[AGENT] ERROR: Cannot add user message - %d pending tool_use(s) need tool_result first", len(pending))
+			for _, id := range pending {
+				log.Printf("[AGENT]   Pending tool_use_id: %s", id)
+			}
+			http.Error(w, fmt.Sprintf("Cannot send message: %d pending tool call(s) need results first", len(pending)), http.StatusConflict)
+			return
+		}
 	} else {
 		conv = h.store.Create()
 	}
@@ -357,6 +473,7 @@ func (h *AgentHandler) HandleMessage(w http.ResponseWriter, r *http.Request) {
 	sseHandler := &SSEHandler{
 		writer: sseWriter,
 		convID: conv.ID,
+		conv:   conv,
 	}
 
 	// Stream response from Anthropic
@@ -367,15 +484,7 @@ func (h *AgentHandler) HandleMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Save assistant message with any text and tool calls
-	if sseHandler.textBuf != "" || len(sseHandler.toolUses) > 0 {
-		conv.AddMessage(Message{
-			Role:      "assistant",
-			Content:   sseHandler.textBuf,
-			ToolCalls: sseHandler.toolUses,
-		})
-	}
-
+	// Assistant message is saved in OnComplete to prevent race conditions
 	log.Printf("[AGENT] Message stream complete for conversation %s", conv.ID)
 }
 
@@ -412,6 +521,44 @@ func (h *AgentHandler) HandleToolResult(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Validate: the tool_use_id must exist in the last assistant message
+	messages := conv.GetMessages()
+	if len(messages) == 0 {
+		http.Error(w, "No messages in conversation", http.StatusBadRequest)
+		return
+	}
+
+	// Find the last assistant message (skip any existing tool_results)
+	var lastAssistant *Message
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "assistant" {
+			lastAssistant = &messages[i]
+			break
+		}
+	}
+
+	if lastAssistant == nil {
+		http.Error(w, "No assistant message found for tool result", http.StatusBadRequest)
+		return
+	}
+
+	// Check if the tool_use_id exists in that assistant message
+	found := false
+	for _, tc := range lastAssistant.ToolCalls {
+		if tc.ID == req.ToolUseID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		log.Printf("[AGENT] ERROR: tool_use_id %s not found in last assistant message (has %d tool calls)", req.ToolUseID, len(lastAssistant.ToolCalls))
+		for i, tc := range lastAssistant.ToolCalls {
+			log.Printf("[AGENT]   ToolCall[%d]: id=%s name=%s", i, tc.ID, tc.Name)
+		}
+		http.Error(w, fmt.Sprintf("tool_use_id %s not found in assistant message", req.ToolUseID), http.StatusBadRequest)
+		return
+	}
+
 	// Add tool result message
 	conv.AddMessage(Message{
 		Role:       "tool_result",
@@ -431,6 +578,7 @@ func (h *AgentHandler) HandleToolResult(w http.ResponseWriter, r *http.Request) 
 	sseHandler := &SSEHandler{
 		writer: sseWriter,
 		convID: conv.ID,
+		conv:   conv,
 	}
 
 	// Continue streaming from Anthropic
@@ -441,15 +589,7 @@ func (h *AgentHandler) HandleToolResult(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Save assistant message with any text and tool calls
-	if sseHandler.textBuf != "" || len(sseHandler.toolUses) > 0 {
-		conv.AddMessage(Message{
-			Role:      "assistant",
-			Content:   sseHandler.textBuf,
-			ToolCalls: sseHandler.toolUses,
-		})
-	}
-
+	// Assistant message is saved in OnComplete to prevent race conditions
 	log.Printf("[AGENT] Tool result stream complete for conversation %s", conv.ID)
 }
 

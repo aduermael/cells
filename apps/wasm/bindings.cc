@@ -41,6 +41,7 @@
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/luau_autocomplete.h"
 #include "core/cells/agent_client.h"
+#include "core/net/include/SSEParser.h"
 #include "Luau/Allocator.h"
 #include "Luau/Ast.h"
 #include "Luau/Lexer.h"
@@ -2774,6 +2775,8 @@ public:
 
     // Initialize the agent client with a server URL
     void initAgent(const std::string& serverUrl) {
+        _agentServerUrl = serverUrl;
+
         AgentClientConfig config;
         config.serverUrl = serverUrl;
         config.autoExecuteTools = true;
@@ -2787,6 +2790,215 @@ public:
                 _agentClient->setContext(_workbook.get(), sheet, &_luauSandbox);
             }
         }
+    }
+
+    // Get the agent server URL (for JS-based streaming)
+    std::string getAgentServerUrl() const {
+        return _agentServerUrl;
+    }
+
+    // Feed raw SSE data from JavaScript streaming fetch
+    // This allows JS to handle HTTP streaming while C++ handles SSE parsing
+    void feedAgentStreamData(const std::string& data) {
+        if (!_agentSseParser) {
+            // Create parser on first data
+            _agentSseParser = std::make_unique<net::SSEParser>(
+                [this](const std::string& eventType, const std::string& eventData) {
+                    handleAgentSSEEvent(eventType, eventData);
+                });
+        }
+        _agentSseParser->feed(data);
+    }
+
+    // Signal that the agent stream has ended
+    void endAgentStream() {
+        _agentSseParser.reset();
+        _agentIsStreaming = false;
+    }
+
+    // Signal that the agent stream had an error
+    void errorAgentStream(const std::string& error) {
+        _agentSseParser.reset();
+        _agentIsStreaming = false;
+        onAgentError(error);
+    }
+
+    // Check if agent is currently streaming (for JS-based streaming)
+    bool isAgentStreaming() const {
+        return _agentIsStreaming;
+    }
+
+    // Set streaming state (called by JS before starting fetch)
+    void setAgentStreaming(bool streaming) {
+        _agentIsStreaming = streaming;
+    }
+
+    // Handle a parsed SSE event from the agent stream
+    void handleAgentSSEEvent(const std::string& eventType, const std::string& data) {
+        if (eventType == "text") {
+            // Parse text from JSON: {"text": "..."}
+            std::string text = parseAgentJsonString(data, "text");
+            onAgentText(text);
+        } else if (eventType == "tool_use") {
+            // Parse tool use
+            std::string toolId = parseAgentJsonString(data, "id");
+            std::string toolName = parseAgentJsonString(data, "name");
+            printf("[Agent] tool_use event: toolId=%s, toolName=%s\n", toolId.c_str(), toolName.c_str());
+
+            // Extract input object as raw JSON
+            size_t inputPos = data.find("\"input\":");
+            std::string inputJson = "{}";
+            if (inputPos != std::string::npos) {
+                size_t bracePos = data.find('{', inputPos);
+                if (bracePos != std::string::npos) {
+                    int depth = 1;
+                    size_t endPos = bracePos + 1;
+                    while (endPos < data.size() && depth > 0) {
+                        if (data[endPos] == '{') ++depth;
+                        else if (data[endPos] == '}') --depth;
+                        ++endPos;
+                    }
+                    inputJson = data.substr(bracePos, endPos - bracePos);
+                }
+            }
+
+            _pendingToolId = toolId;
+            _pendingToolName = toolName;
+            _pendingToolInput = inputJson;
+
+            onAgentToolUse(toolId, toolName, inputJson);
+        } else if (eventType == "tool_result_needed") {
+            std::string toolUseId = parseAgentJsonString(data, "tool_use_id");
+            // Get conversation_id from this event (server sends it here for tool result)
+            std::string convId = parseAgentJsonString(data, "conversation_id");
+            printf("[Agent] tool_result_needed: toolUseId=%s, pendingToolId=%s, convId=%s\n",
+                   toolUseId.c_str(), _pendingToolId.c_str(), convId.c_str());
+            if (!convId.empty()) {
+                _agentConversationId = convId;
+            }
+            onAgentToolResultNeeded(toolUseId);
+
+            // Mark that we need to execute tool after stream ends (don't execute during stream!)
+            _needsToolExecution = true;
+        } else if (eventType == "done") {
+            std::string stopReason = parseAgentJsonString(data, "stop_reason");
+            std::string convId = parseAgentJsonString(data, "conversation_id");
+            if (!convId.empty()) {
+                _agentConversationId = convId;
+            }
+
+            // Execute pending tool AFTER stream ends (before notifying completion)
+            if (_needsToolExecution && !_pendingToolId.empty() && _workbook) {
+                printf("[Agent] Executing tool after stream end (stop_reason=%s)\n", stopReason.c_str());
+                _needsToolExecution = false;
+                executeAgentTool();
+                // Don't clear pending state or notify completion - tool result will continue conversation
+                return;
+            }
+
+            onAgentComplete(stopReason, _agentConversationId);
+            _pendingToolId.clear();
+            _pendingToolName.clear();
+            _pendingToolInput.clear();
+            _needsToolExecution = false;
+        } else if (eventType == "error") {
+            std::string message = parseAgentJsonString(data, "message");
+            onAgentError(message);
+        }
+    }
+
+    // Execute the pending tool and send result back via JS
+    void executeAgentTool() {
+        printf("[Agent] executeAgentTool called: toolName=%s, toolId=%s\n",
+               _pendingToolName.c_str(), _pendingToolId.c_str());
+
+        if (_pendingToolName != "execute_code") {
+            // Notify JS to send error result
+            if (!_agentListener.isNull() && !_agentListener.isUndefined()) {
+                std::ostringstream json;
+                json << "{\"tool_use_id\":\"" << jsonEscape(_pendingToolId) << "\",";
+                json << "\"result\":\"Unknown tool: " << jsonEscape(_pendingToolName) << "\",";
+                json << "\"is_error\":true}";
+                _agentListener(std::string("send_tool_result"), json.str());
+            }
+            return;
+        }
+
+        // Parse code from input
+        std::string code = parseAgentJsonString(_pendingToolInput, "code");
+        printf("[Agent] Parsed code: %s\n", code.c_str());
+
+        if (code.empty()) {
+            printf("[Agent] ERROR: No code found in input: %s\n", _pendingToolInput.c_str());
+            if (!_agentListener.isNull() && !_agentListener.isUndefined()) {
+                std::ostringstream json;
+                json << "{\"tool_use_id\":\"" << jsonEscape(_pendingToolId) << "\",";
+                json << "\"result\":\"No code provided\",";
+                json << "\"is_error\":true}";
+                _agentListener(std::string("send_tool_result"), json.str());
+            }
+            return;
+        }
+
+        // Set context
+        printf("[Agent] Setting context: workbook=%p, sheetIndex=%zu\n",
+               (void*)_workbook.get(), _activeSheetIndex);
+        if (_workbook && _activeSheetIndex < _workbook->sheetCount()) {
+            auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+            printf("[Agent] Got sheet: %p\n", (void*)sheet);
+            if (sheet) {
+                _luauSandbox.setContext(_workbook.get(), sheet);
+            }
+        }
+
+        // Execute
+        printf("[Agent] Executing code...\n");
+        ScriptResult result = _luauSandbox.execute(code);
+        printf("[Agent] Execution result: success=%d, output=%s, error=%s\n",
+               result.success, result.output.c_str(), result.error.c_str());
+
+        // Rebuild viewport index after execution (cells may have been added/modified)
+        rebuildViewportIndex();
+
+        // Send result back via JS
+        if (!_agentListener.isNull() && !_agentListener.isUndefined()) {
+            std::ostringstream json;
+            json << "{\"tool_use_id\":\"" << jsonEscape(_pendingToolId) << "\",";
+            json << "\"result\":\"" << jsonEscape(result.success ? (result.output.empty() ? "(no output)" : result.output) : result.error) << "\",";
+            json << "\"is_error\":" << (result.success ? "false" : "true") << "}";
+            printf("[Agent] Sending tool result: tool_use_id=%s\n", _pendingToolId.c_str());
+            _agentListener(std::string("send_tool_result"), json.str());
+        }
+
+        // Notify data changed (triggers UI refresh)
+        notifyListeners(ChangeType::CELL_CHANGED);
+    }
+
+    // Helper to parse JSON string values
+    static std::string parseAgentJsonString(const std::string& json, const std::string& key) {
+        std::string searchKey = "\"" + key + "\":\"";
+        size_t pos = json.find(searchKey);
+        if (pos == std::string::npos) return "";
+        pos += searchKey.length();
+
+        std::string result;
+        while (pos < json.size() && json[pos] != '"') {
+            if (json[pos] == '\\' && pos + 1 < json.size()) {
+                ++pos;
+                switch (json[pos]) {
+                    case '"': result += '"'; break;
+                    case '\\': result += '\\'; break;
+                    case 'n': result += '\n'; break;
+                    case 'r': result += '\r'; break;
+                    case 't': result += '\t'; break;
+                    default: result += json[pos]; break;
+                }
+            } else {
+                result += json[pos];
+            }
+            ++pos;
+        }
+        return result;
     }
 
     // Check if agent is initialized
@@ -2817,14 +3029,20 @@ public:
 
     // Get the current conversation ID
     std::string getAgentConversationId() const {
-        if (!_agentClient) {
-            return "";
+        // When using JS streaming, use our stored conversation ID
+        if (!_agentConversationId.empty()) {
+            return _agentConversationId;
         }
-        return _agentClient->getConversationId();
+        // Fall back to AgentClient's conversation ID (for C++ HTTP streaming)
+        if (_agentClient) {
+            return _agentClient->getConversationId();
+        }
+        return "";
     }
 
     // Clear the current agent conversation
     void clearAgentConversation() {
+        _agentConversationId.clear();
         if (_agentClient) {
             _agentClient->clearConversation();
         }
@@ -3794,6 +4012,14 @@ private:
     LuauAutocomplete _luauAutocomplete;  // Luau autocomplete engine
     val _agentListener;  // JavaScript callback for agent events
     std::unique_ptr<AgentClient> _agentClient;  // AI agent client
+    std::string _agentServerUrl;  // Server URL for JS-based streaming
+    std::unique_ptr<net::SSEParser> _agentSseParser;  // SSE parser for JS-based streaming
+    bool _agentIsStreaming{false};  // Whether agent is currently streaming
+    std::string _agentConversationId;  // Current conversation ID
+    std::string _pendingToolId;  // Pending tool execution ID
+    std::string _pendingToolName;  // Pending tool name
+    std::string _pendingToolInput;  // Pending tool input JSON
+    bool _needsToolExecution{false};  // Whether to execute tool after stream ends
 };
 
 }  // namespace cells::wasm
@@ -3936,7 +4162,14 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getAgentConversationId", &cells::wasm::CellsEngine::getAgentConversationId)
         .function("clearAgentConversation", &cells::wasm::CellsEngine::clearAgentConversation)
         .function("cancelAgent", &cells::wasm::CellsEngine::cancelAgent)
-        .function("isAgentProcessing", &cells::wasm::CellsEngine::isAgentProcessing);
+        .function("isAgentProcessing", &cells::wasm::CellsEngine::isAgentProcessing)
+        // AI Agent - JS-based streaming
+        .function("getAgentServerUrl", &cells::wasm::CellsEngine::getAgentServerUrl)
+        .function("feedAgentStreamData", &cells::wasm::CellsEngine::feedAgentStreamData)
+        .function("endAgentStream", &cells::wasm::CellsEngine::endAgentStream)
+        .function("errorAgentStream", &cells::wasm::CellsEngine::errorAgentStream)
+        .function("isAgentStreaming", &cells::wasm::CellsEngine::isAgentStreaming)
+        .function("setAgentStreaming", &cells::wasm::CellsEngine::setAgentStreaming);
 
     // Logger bindings - control logging from JavaScript
     enum_<cells::log::Level>("LogLevel")

@@ -70,8 +70,9 @@ protected:
         strncpy(attr.requestMethod, method_str, sizeof(attr.requestMethod) - 1);
         attr.requestMethod[sizeof(attr.requestMethod) - 1] = '\0';
 
-        // Configure for streaming: don't load to memory, stream chunks via onprogress
-        attr.attributes = EMSCRIPTEN_FETCH_STREAM_DATA;
+        // Configure for streaming: load to memory AND stream chunks via onprogress
+        // Both flags are needed: LOAD_TO_MEMORY to access data, STREAM_DATA for progress callbacks
+        attr.attributes = EMSCRIPTEN_FETCH_LOAD_TO_MEMORY | EMSCRIPTEN_FETCH_STREAM_DATA;
         attr.onsuccess = &WebHttpRequest::onStreamingSuccess;
         attr.onerror = &WebHttpRequest::onError;
         attr.onprogress = &WebHttpRequest::onProgress;
@@ -95,11 +96,14 @@ protected:
         // Build URL
         url_ = buildUrl();
 
+        printf("[HttpRequest] _sendAsyncStreaming: %s %s\n", method_str, url_.c_str());
+
         // Track bytes processed for incremental streaming
         last_data_offset_ = 0;
 
         // Start fetch
         fetch_ = emscripten_fetch(&attr, url_.c_str());
+        printf("[HttpRequest] _sendAsyncStreaming: fetch started, fetch_=%p\n", (void*)fetch_);
     }
 
     void _cancel() override {
@@ -180,6 +184,9 @@ private:
 
     static void onError(emscripten_fetch_t* fetch) {
         auto* request = static_cast<WebHttpRequest*>(fetch->userData);
+        printf("[HttpRequest] onError: status=%d, statusText=%s\n",
+               fetch->status, fetch->statusText);
+
         if (request == nullptr) {
             emscripten_fetch_close(fetch);
             return;
@@ -194,6 +201,7 @@ private:
             error += fetch->statusText;
         }
 
+        printf("[HttpRequest] onError: %s\n", error.c_str());
         request->fetch_ = nullptr;
         emscripten_fetch_close(fetch);
         request->completeWithError(error);
@@ -203,8 +211,12 @@ private:
     static void onProgress(emscripten_fetch_t* fetch) {
         auto* request = static_cast<WebHttpRequest*>(fetch->userData);
         if (request == nullptr) {
+            printf("[HttpRequest] onProgress: request is null\n");
             return;
         }
+
+        printf("[HttpRequest] onProgress: status=%d, numBytes=%llu, lastOffset=%zu\n",
+               fetch->status, fetch->numBytes, request->last_data_offset_);
 
         // Set response status on first progress callback
         if (request->response_.getStatusCode() == 0 && fetch->status != 0) {
@@ -216,6 +228,7 @@ private:
             size_t new_bytes = fetch->numBytes - request->last_data_offset_;
             const auto* new_data =
                 reinterpret_cast<const uint8_t*>(fetch->data) + request->last_data_offset_;
+            printf("[HttpRequest] onProgress: forwarding %zu new bytes\n", new_bytes);
             request->onStreamData(new_data, new_bytes);
             request->last_data_offset_ = fetch->numBytes;
         }
@@ -224,7 +237,11 @@ private:
     // Called when streaming completes successfully
     static void onStreamingSuccess(emscripten_fetch_t* fetch) {
         auto* request = static_cast<WebHttpRequest*>(fetch->userData);
+        printf("[HttpRequest] onStreamingSuccess: status=%d, numBytes=%llu\n",
+               fetch->status, fetch->numBytes);
+
         if (request == nullptr) {
+            printf("[HttpRequest] onStreamingSuccess: request is null\n");
             emscripten_fetch_close(fetch);
             return;
         }
@@ -237,11 +254,13 @@ private:
             size_t new_bytes = fetch->numBytes - request->last_data_offset_;
             const auto* new_data =
                 reinterpret_cast<const uint8_t*>(fetch->data) + request->last_data_offset_;
+            printf("[HttpRequest] onStreamingSuccess: processing remaining %zu bytes\n", new_bytes);
             request->onStreamData(new_data, new_bytes);
         }
 
         request->fetch_ = nullptr;
         emscripten_fetch_close(fetch);
+        printf("[HttpRequest] onStreamingSuccess: calling onStreamEnd\n");
         request->onStreamEnd();
     }
 };

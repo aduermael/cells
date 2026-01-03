@@ -13,7 +13,10 @@ HttpRequest::HttpRequest(HttpMethod method, std::string host, uint16_t port, std
       path_(std::move(path)),
       secure_(secure) {
     // Set default headers
+    // Note: User-Agent cannot be set in browser XHR (security restriction)
+#ifndef __EMSCRIPTEN__
     headers_["User-Agent"] = "cells/1.0";
+#endif
     headers_["Accept"] = "*/*";
 }
 

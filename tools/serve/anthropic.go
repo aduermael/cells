@@ -8,10 +8,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
 )
+
+// truncateForLog truncates a string for logging purposes.
+func truncateForLog(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
 
 const (
 	anthropicAPIURL     = "https://api.anthropic.com/v1/messages"
@@ -139,6 +148,8 @@ Be concise and helpful. When you need to inspect or modify the spreadsheet, use 
 }
 
 // ConvertToAPIMessages converts internal messages to Anthropic API format.
+// This handles batching multiple tool_results into a single user message,
+// which is required by the Anthropic API.
 func ConvertToAPIMessages(messages []Message) []APIMessage {
 	var apiMessages []APIMessage
 	var currentBlocks []ContentBlock
@@ -151,6 +162,7 @@ func ConvertToAPIMessages(messages []Message) []APIMessage {
 				Content: currentBlocks,
 			})
 			currentBlocks = nil
+			currentRole = ""
 		}
 	}
 
@@ -187,15 +199,18 @@ func ConvertToAPIMessages(messages []Message) []APIMessage {
 
 		case "tool_result":
 			// Tool results must be in a user message
-			flushBlocks()
-			currentRole = "user"
+			// Multiple consecutive tool_results should be batched into one user message
+			if currentRole != "user" {
+				flushBlocks()
+				currentRole = "user"
+			}
 			currentBlocks = append(currentBlocks, ContentBlock{
 				Type:      "tool_result",
 				ToolUseID: msg.ToolUseID,
 				Content:   msg.ToolResult,
 				IsError:   msg.IsError,
 			})
-			flushBlocks()
+			// Don't flush yet - there might be more tool_results to batch
 		}
 	}
 
@@ -206,6 +221,27 @@ func ConvertToAPIMessages(messages []Message) []APIMessage {
 // StreamMessages sends a streaming request to the Anthropic API.
 func (c *AnthropicClient) StreamMessages(messages []Message, handler StreamEventHandler) error {
 	apiMessages := ConvertToAPIMessages(messages)
+
+	// Debug: log the message structure before sending
+	log.Printf("[ANTHROPIC] Sending %d API messages:", len(apiMessages))
+	for i, msg := range apiMessages {
+		switch content := msg.Content.(type) {
+		case string:
+			log.Printf("[ANTHROPIC]   [%d] role=%s content=%q", i, msg.Role, truncateForLog(content, 50))
+		case []ContentBlock:
+			log.Printf("[ANTHROPIC]   [%d] role=%s blocks=%d", i, msg.Role, len(content))
+			for j, block := range content {
+				switch block.Type {
+				case "text":
+					log.Printf("[ANTHROPIC]       [%d.%d] type=text text=%q", i, j, truncateForLog(block.Text, 50))
+				case "tool_use":
+					log.Printf("[ANTHROPIC]       [%d.%d] type=tool_use id=%s name=%s", i, j, block.ID, block.Name)
+				case "tool_result":
+					log.Printf("[ANTHROPIC]       [%d.%d] type=tool_result tool_use_id=%s", i, j, block.ToolUseID)
+				}
+			}
+		}
+	}
 
 	reqBody := MessagesRequest{
 		Model:     defaultModel,
@@ -281,6 +317,9 @@ func (c *AnthropicClient) handleEvent(
 	currentToolName *string,
 	currentToolInput *strings.Builder,
 ) error {
+	// Debug: log all events
+	log.Printf("[ANTHROPIC] SSE event: %s data=%s", event.Event, truncateForLog(event.Data, 100))
+
 	switch event.Event {
 	case "content_block_start":
 		var data struct {
@@ -291,11 +330,15 @@ func (c *AnthropicClient) handleEvent(
 			} `json:"content_block"`
 		}
 		if err := json.Unmarshal([]byte(event.Data), &data); err == nil {
+			log.Printf("[ANTHROPIC] content_block_start: type=%s id=%s name=%s", data.ContentBlock.Type, data.ContentBlock.ID, data.ContentBlock.Name)
 			if data.ContentBlock.Type == "tool_use" {
 				*currentToolID = data.ContentBlock.ID
 				*currentToolName = data.ContentBlock.Name
 				currentToolInput.Reset()
+				log.Printf("[ANTHROPIC] Started building tool_use: id=%s name=%s", *currentToolID, *currentToolName)
 			}
+		} else {
+			log.Printf("[ANTHROPIC] ERROR parsing content_block_start: %v", err)
 		}
 
 	case "content_block_delta":
@@ -317,8 +360,11 @@ func (c *AnthropicClient) handleEvent(
 
 	case "content_block_stop":
 		// If we were building a tool use, emit it now
+		log.Printf("[ANTHROPIC] content_block_stop: currentToolID=%q", *currentToolID)
 		if *currentToolID != "" {
-			handler.OnToolUse(*currentToolID, *currentToolName, json.RawMessage(currentToolInput.String()))
+			inputJSON := currentToolInput.String()
+			log.Printf("[ANTHROPIC] Emitting tool_use: id=%s name=%s input=%s", *currentToolID, *currentToolName, truncateForLog(inputJSON, 100))
+			handler.OnToolUse(*currentToolID, *currentToolName, json.RawMessage(inputJSON))
 			*currentToolID = ""
 			*currentToolName = ""
 			currentToolInput.Reset()

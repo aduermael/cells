@@ -1101,6 +1101,8 @@ canvas {
     line-height: 1.5;
     white-space: pre-wrap;
     word-wrap: break-word;
+    user-select: text;
+    cursor: text;
 }
 
 .chat-message.user .chat-message-content {
@@ -1161,6 +1163,8 @@ canvas {
     white-space: pre-wrap;
     max-height: 150px;
     overflow-y: auto;
+    user-select: text;
+    cursor: text;
 }
 
 .chat-tool-result {

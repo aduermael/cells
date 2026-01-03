@@ -1758,12 +1758,20 @@ export class AppEventManager {
         // These must be checked before the editing state check below
         const isMod = e.metaKey || e.ctrlKey;
         const { scriptPanel } = this.config;
+
+        // Check if there's text selected outside the canvas (e.g., in chat panel)
+        // If so, let the browser handle copy/cut natively
+        const selection = window.getSelection();
+        const hasTextSelection = selection && selection.toString().length > 0;
+        const selectionInCanvas = selection?.anchorNode?.parentElement?.closest("canvas");
+
         if (
             isMod &&
             !cellEditor.isEditing() &&
             !uiStateMachine.isInState("FORMULA_BAR_EDITING") &&
             !uiStateMachine.isInState("COLUMN_HEADER_EDITING") &&
-            !scriptPanel.isEditorFocused()
+            !scriptPanel.isEditorFocused() &&
+            !(hasTextSelection && !selectionInCanvas) // Let browser handle text selection copies
         ) {
             const { clipboardManager } = this.config;
             switch (e.key.toLowerCase()) {

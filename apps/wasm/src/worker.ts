@@ -147,6 +147,13 @@ interface CellsEngine {
   clearAgentConversation(): void;
   cancelAgent(): void;
   isAgentProcessing(): boolean;
+  // JS-based streaming
+  getAgentServerUrl(): string;
+  feedAgentStreamData(data: string): void;
+  endAgentStream(): void;
+  errorAgentStream(error: string): void;
+  isAgentStreaming(): boolean;
+  setAgentStreaming(streaming: boolean): void;
 
   // Viewport pixel queries (Phase 5)
   getColumnPixelOffset(position: number): number;
@@ -243,6 +250,21 @@ async function initModule(): Promise<void> {
     // Register agent listener for AI events
     // The agent callback receives (eventType, data) where data is JSON or text
     engine.setAgentListener((eventType: string, data: string) => {
+      // Handle special event to send tool results
+      if (eventType === "send_tool_result") {
+        const toolResult = JSON.parse(data);
+        const serverUrl = engine.getAgentServerUrl();
+        if (serverUrl != null) {
+          streamAgentMessage(serverUrl + "/api/agent/tool-result", {
+            conversation_id: engine.getAgentConversationId(),
+            tool_use_id: toolResult.tool_use_id,
+            result: toolResult.result,
+            is_error: toolResult.is_error,
+          });
+        }
+        return;
+      }
+
       workerSelf.postMessage({
         type: "agentEvent",
         eventType: eventType, // 'text', 'tool_use', 'tool_result_needed', 'done', 'error'
@@ -266,6 +288,47 @@ async function initModule(): Promise<void> {
       type: "error",
       error: "Failed to initialize WASM module: " + error,
     });
+  }
+}
+
+// ============================================================================
+// Agent Streaming Fetch
+// ============================================================================
+
+// Perform a streaming fetch to the agent server and feed chunks to C++
+async function streamAgentMessage(url: string, body: Record<string, unknown>): Promise<void> {
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("ReadableStream not supported");
+    }
+
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      // Feed raw SSE data to C++ for parsing
+      const chunk = decoder.decode(value, { stream: true });
+      engine.feedAgentStreamData(chunk);
+    }
+
+    // Signal stream end
+    engine.endAgentStream();
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    engine.errorAgentStream(error);
   }
 }
 
@@ -1214,8 +1277,47 @@ function handleMessage(msg: WorkerRequest): void {
 
       case "sendAgentMessage": {
         const { prompt, conversationId } = params as { prompt: string; conversationId: string };
-        engine.sendAgentMessage(prompt, conversationId || "");
+        // Use JavaScript streaming fetch for reliable SSE
+        const serverUrl = engine.getAgentServerUrl();
+        if (serverUrl == null) {
+          respond({ type: "error", error: "Agent server URL not set" });
+          break;
+        }
+
+        engine.setAgentStreaming(true);
         respond({ type: "agentMessageSent", success: true });
+
+        // Perform streaming fetch
+        streamAgentMessage(serverUrl + "/api/agent/message", {
+          prompt,
+          conversation_id: conversationId || undefined,
+        });
+        break;
+      }
+
+      case "sendAgentToolResult": {
+        const { conversationId: convId, toolUseId, result, isError } = params as {
+          conversationId: string;
+          toolUseId: string;
+          result: string;
+          isError: boolean;
+        };
+        const serverUrl = engine.getAgentServerUrl();
+        if (serverUrl == null) {
+          respond({ type: "error", error: "Agent server URL not set" });
+          break;
+        }
+
+        engine.setAgentStreaming(true);
+        respond({ type: "agentToolResultSent", success: true });
+
+        // Perform streaming fetch for tool result
+        streamAgentMessage(serverUrl + "/api/agent/tool-result", {
+          conversation_id: convId,
+          tool_use_id: toolUseId,
+          result,
+          is_error: isError,
+        });
         break;
       }
 

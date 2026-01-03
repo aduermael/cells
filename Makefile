@@ -118,7 +118,7 @@ wasm-serve:
 		print "  Install: brew install go"; \
 		exit 1 \
 	}}'
-	cd tools/serve && go run . -port 8081 -dir ../../dist -enable-collab
+	cd tools/serve && go run . -port 8081 -dir ../../dist -enable-collab -enable-agent
 
 # Test (when tests exist)
 test:
