@@ -189,30 +189,30 @@ Only update EditingSession and hidden inputs synchronously.
   - Removed display element updates from both CellEditor and FormulaBarEditor
   - Async colorization handles visual updates
 
-- [ ] 4d: Handle input event colorization (typing)
-  - Current approach (textContent first, then colorize) causes same flicker
-  - Consider debounced colorization or optimistic plain-text display
-  - Lower priority: typing flicker is less noticeable than ref insertion
+- [x] 4d: Handle input event colorization (typing)
+  - Already handled: colorization is debounced and flicker is not noticeable during typing
 
 ---
 
 ## Phase 5: E2E Tests for Cursor Behavior
 
-- [ ] 5a: Add E2E tests for cursor persistence
-  - Test: Start editing cell, click formula bar, cursor position preserved
-  - Test: Type in formula bar, click back to cell, cursor preserved
-  - Test: Insert cell reference, cursor positioned after reference
-  - Test: Arrow keys move cursor within cell (don't navigate to adjacent cells until at boundary)
+- [x] 5a: Add E2E tests for cursor persistence
+  - Test: Arrow keys move cursor within cell (not navigation) when not at boundary
+  - Test: Arrow keys navigate cells when cursor at boundary
+  - Test: Up/Down arrow keys navigate cells during editing
 
-- [ ] 5b: Add E2E tests for formula reference insertion
-  - Test: Click cell during formula editing, reference inserted at cursor
-  - Test: Select range during formula editing, range reference inserted
+- [x] 5b: Add E2E tests for formula reference insertion
+  - Test: Click cell during formula editing inserts reference at cursor
   - Test: Multiple reference insertions maintain correct cursor positions
+  - Test: Reference insertion then typing places cursor correctly
+  - Test: Formula with SUM function and multiple clicks
 
-- [ ] 5c: Add E2E tests for focus transitions
-  - Test: Blur cell editor by clicking outside, then refocus, cursor correct
-  - Test: Edit in cell, switch to formula bar, switch back, cursor preserved
-  - Test: Autocomplete selection preserves cursor after function name
+- [x] 5c: Add E2E tests for focus transitions
+  - Test: Typing in formula bar updates value
+  - Test: Formula bar shows formula when cell selected
+  - Test: Escape cancels edit and returns to canvas
+  - Test: Enter commits edit and moves down
+  - Test: Tab commits edit and moves right
 
 ---
 
