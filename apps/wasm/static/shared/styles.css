@@ -559,30 +559,42 @@ canvas {
     display: none;
 }
 
-/* Format Controls in Formula Bar - 2x2 grid layout */
+/* Format Controls in Formula Bar - two rows with flex */
 #format-controls {
-    display: grid;
-    grid-template-columns: auto auto;
+    display: flex;
+    flex-direction: column;
     gap: var(--spacing-xs);
     flex-shrink: 0;
 }
 
+/* Row 1: Format dropdown + Currency button */
+#format-controls-row1 {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+/* Row 2: Decimal buttons spanning full width */
+#format-controls-row2 {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
 #format-controls .btn.btn-sm {
-    min-width: 28px;
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-medium);
 }
 
-/* Currency button - center the $ sign */
+/* Currency button - center the $ sign, match dropdown width feel */
 #format-currency-btn {
     justify-content: center;
     text-align: center;
+    min-width: 36px;
 }
 
-/* Decimal buttons - equal width */
+/* Decimal buttons - equal width, fill row */
 #format-decimal-decrease,
 #format-decimal-increase {
-    width: 40px;
+    flex: 1;
     justify-content: center;
 }
 
