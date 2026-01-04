@@ -74,7 +74,13 @@
             </div>
         </div>
         <div id="formula-bar" class="hidden">
+            <!-- Left: Cell reference + Formula input -->
             <span id="cell-reference">A1</span>
+            <div id="formula-input-container">
+                <input type="text" id="formula-input" />
+                <div id="formula-display" contenteditable="true" data-placeholder="Select a cell to view or edit its value"></div>
+            </div>
+            <!-- Right: Format controls (2x2 grid) + Script button -->
             <div id="format-controls">
                 <div class="dropdown" id="format-dropdown">
                     <button class="btn btn-icon btn-sm" id="format-dropdown-btn" title="Number format">
@@ -95,25 +101,20 @@
                     </div>
                 </div>
                 <button class="btn btn-icon btn-sm" id="format-currency-btn" title="Currency ($)" data-format-category="CURRENCY">$</button>
-                <button class="btn btn-icon btn-sm" id="format-percent-btn" title="Percentage (%)" data-format-category="PERCENTAGE">%</button>
-                <div class="format-separator"></div>
-                <button class="btn btn-icon btn-sm" id="format-decimal-increase" title="Increase decimal places">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <text x="2" y="17" font-size="12" fill="currentColor" stroke="none">.0</text>
-                        <path d="M18 15l3-3-3-3M15 12h6"/>
-                    </svg>
-                </button>
                 <button class="btn btn-icon btn-sm" id="format-decimal-decrease" title="Decrease decimal places">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <text x="2" y="17" font-size="12" fill="currentColor" stroke="none">.0</text>
                         <path d="M21 15l-3-3 3-3M18 12h-6"/>
                     </svg>
                 </button>
+                <button class="btn btn-icon btn-sm" id="format-decimal-increase" title="Increase decimal places">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <text x="2" y="17" font-size="12" fill="currentColor" stroke="none">.0</text>
+                        <path d="M18 15l3-3-3-3M15 12h6"/>
+                    </svg>
+                </button>
             </div>
-            <div id="formula-input-container">
-                <input type="text" id="formula-input" />
-                <div id="formula-display" contenteditable="true" data-placeholder="Select a cell to view or edit its value"></div>
-            </div>
+            <div class="format-separator"></div>
             <button class="btn btn-icon" id="script-panel-btn" title="Open script panel (Lua scripting)">
                 <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="16 18 22 12 16 6"></polyline>

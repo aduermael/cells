@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2026-01-04 06:59 UTC
-Updated At: 2026-01-04 18:06 UTC
+Updated At: 2026-01-04 18:16 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -166,24 +166,25 @@ This is the most critical issue - formulas set via scripts don't update when dep
 
 ## Phase 4: Top Bar UI Redesign
 
-- [ ] 4a: Restructure formula bar HTML for two-line layout
-  - Line 1: Cell reference (left), Format dropdown + Currency/Percent (right)
-  - Line 2: Formula input (full width)
-  - Move decimal buttons below format dropdown
-  - Remove standalone % button (redundant with dropdown)
+- [x] 4a: Restructure formula bar HTML for single-row layout
+  - Left side: Cell reference (A1:A2), Formula input (flexible width)
+  - Right side: Format controls (2x2 grid) + Script button
+  - Removed % button (redundant with dropdown - select Percentage from dropdown)
+  - Format controls arranged: [Format dropdown][Currency $] / [Decimal-][Decimal+]
 
-- [ ] 4b: Update CSS for new layout
-  - Increase formula bar height for two lines
-  - Style the new arrangement
-  - Ensure responsive behavior
+- [x] 4b: Update CSS for new layout
+  - Formula bar uses single-row flexbox layout
+  - Format controls use CSS Grid (2x2: dropdown/$, decimal-/decimal+)
+  - Format separator between format controls and script button
 
-- [ ] 4c: Update TypeScript references
-  - Update element references in `init.ts` and `format-controls.ts`
-  - Ensure event handlers still work with new structure
+- [x] 4c: Update TypeScript references
+  - Removed formatPercentBtn from DOMElements interface and getter
+  - Removed percentBtn from FormatControls config
+  - All format E2E tests pass (12/12)
 
-- [ ] 4d: Update format-controls.ts for new layout
-  - Adjust element references for relocated buttons
-  - Test all format control functionality
+- [x] 4d: Update format-controls.ts for new layout
+  - Removed percentBtn member, event listener, and active state handling
+  - Currency button active state still highlights when currency format applied
 
 ## Phase 5: Comprehensive Testing
 

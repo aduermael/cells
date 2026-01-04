@@ -1145,7 +1145,6 @@ export function initApp(): AppContext {
       formatDropdownLabel: elements.formatDropdownLabel,
       formatDropdownMenu: elements.formatDropdownMenu,
       currencyBtn: elements.formatCurrencyBtn,
-      percentBtn: elements.formatPercentBtn,
       decimalIncreaseBtn: elements.formatDecimalIncrease,
       decimalDecreaseBtn: elements.formatDecimalDecrease,
     },

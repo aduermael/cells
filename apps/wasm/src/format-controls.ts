@@ -15,7 +15,6 @@ export interface FormatControlsConfig {
   formatDropdownLabel: HTMLElement;
   formatDropdownMenu: HTMLElement;
   currencyBtn: HTMLButtonElement;
-  percentBtn: HTMLButtonElement;
   decimalIncreaseBtn: HTMLButtonElement;
   decimalDecreaseBtn: HTMLButtonElement;
 }
@@ -55,7 +54,6 @@ export class FormatControls {
   private formatDropdownLabel: HTMLElement;
   private formatDropdownMenu: HTMLElement;
   private currencyBtn: HTMLButtonElement;
-  private percentBtn: HTMLButtonElement;
   private decimalIncreaseBtn: HTMLButtonElement;
   private decimalDecreaseBtn: HTMLButtonElement;
 
@@ -95,7 +93,6 @@ export class FormatControls {
     this.formatDropdownLabel = config.formatDropdownLabel;
     this.formatDropdownMenu = config.formatDropdownMenu;
     this.currencyBtn = config.currencyBtn;
-    this.percentBtn = config.percentBtn;
     this.decimalIncreaseBtn = config.decimalIncreaseBtn;
     this.decimalDecreaseBtn = config.decimalDecreaseBtn;
 
@@ -165,11 +162,6 @@ export class FormatControls {
     // Currency button
     this.currencyBtn.addEventListener("click", () => {
       this.handleCategorySelect("CURRENCY");
-    });
-
-    // Percent button
-    this.percentBtn.addEventListener("click", () => {
-      this.handleCategorySelect("PERCENTAGE");
     });
 
     // Decimal increase
@@ -316,7 +308,6 @@ export class FormatControls {
 
     // Update button active states
     this.currencyBtn.classList.toggle("active", category === "CURRENCY" || category === "ACCOUNTING");
-    this.percentBtn.classList.toggle("active", category === "PERCENTAGE");
 
     // Update dropdown active state if open
     if (this.isDropdownOpen) {

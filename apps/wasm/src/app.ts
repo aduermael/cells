@@ -111,7 +111,6 @@ export interface DOMElements {
   formatDropdownLabel: HTMLElement;
   formatDropdownMenu: HTMLElement;
   formatCurrencyBtn: HTMLButtonElement;
-  formatPercentBtn: HTMLButtonElement;
   formatDecimalIncrease: HTMLButtonElement;
   formatDecimalDecrease: HTMLButtonElement;
 }
@@ -516,7 +515,6 @@ export function createApp(): App {
     formatDropdownLabel: getElement("format-dropdown-label"),
     formatDropdownMenu: document.querySelector("#format-dropdown .dropdown-menu") as HTMLElement,
     formatCurrencyBtn: getElement<HTMLButtonElement>("format-currency-btn"),
-    formatPercentBtn: getElement<HTMLButtonElement>("format-percent-btn"),
     formatDecimalIncrease: getElement<HTMLButtonElement>("format-decimal-increase"),
     formatDecimalDecrease: getElement<HTMLButtonElement>("format-decimal-decrease"),
   };

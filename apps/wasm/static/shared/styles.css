@@ -543,7 +543,7 @@ canvas {
     display: none;
 }
 
-/* Formula Bar */
+/* Formula Bar - Single row layout */
 #formula-bar {
     position: relative; /* For autocomplete popup positioning */
     min-height: var(--bar-height);
@@ -559,10 +559,10 @@ canvas {
     display: none;
 }
 
-/* Format Controls in Formula Bar */
+/* Format Controls in Formula Bar - 2x2 grid layout */
 #format-controls {
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: auto auto;
     gap: var(--spacing-xs);
     flex-shrink: 0;
 }
@@ -611,15 +611,13 @@ canvas {
 }
 
 /* Active state for format buttons */
-#format-currency-btn.active,
-#format-percent-btn.active {
+#format-currency-btn.active {
     background: var(--color-primary);
     color: var(--color-bg-primary);
     border-color: var(--color-primary);
 }
 
-#format-currency-btn.active:hover,
-#format-percent-btn.active:hover {
+#format-currency-btn.active:hover {
     background: var(--color-primary-hover);
     border-color: var(--color-primary-hover);
 }
