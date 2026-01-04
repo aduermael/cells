@@ -42,20 +42,30 @@ Following plan management guidelines defined in AGENTS.md
 
 **Root Cause (Format)**: The viewport query returns cells, but we need to verify `formatId` is properly included in the viewport response and propagated to the UI.
 
-### Current Refresh Flow
-**Manual edit (updateCell):**
-1. Parse input, create operation
-2. `applyOperation()` - CRDT logic
-3. `markDirty()` + `recalculate()` - **triggers dependency recalc**
-4. `notifyListeners()` - notifies JS
+### Current Refresh Flow - Script Formula Issue
 
-**Script edit (setCell in Luau):**
-1. Create operation
-2. `applyOperation()` - CRDT logic only
-3. **NO recalculation!** - Bug!
-4. `notifyListeners()` after script completes
+**The Problem**: When `setCell("A1", "=SUM(B1:B3)")` is called via Luau script and B1:B3 don't exist:
 
-**Root Cause (Refresh)**: `setCell()` in `luau_sandbox.cc` bypasses the recalculation step. This is an architecture flaw where recalculation is tied to specific entry points rather than being triggered by operations.
+1. `luau_sandbox.cc` calls `RefConverter::formulaToUuid(str)` (line 415)
+2. `formulaToUuid()` tries to convert A1 refs to UUID refs
+3. `formatUuidRef()` looks up column/row positions in `indexToColId_`/`indexToRowId_` (lines 244-245)
+4. **If column/row doesn't exist, returns empty string** (line 247)
+5. When UUID ref is empty, **the A1 notation is preserved as-is** in the formula
+6. Formula is stored as `"=SUM(B1:B3)"` (A1 notation), not UUID format
+7. **No cells are created for B1, B2, B3**
+8. **No dependencies are registered** (dependencies require cell UUIDs)
+9. Evaluation fails with #REF! because cells don't exist
+10. Later creating B1, B2, B3 doesn't trigger recalculation (no dependency link)
+
+**Contrast with UI path (updateCell in bindings.cc)**:
+- Uses `FormulaResolver` which calls `getOrCreateColumnByPosition()` and `getOrCreateCellAt()`
+- **Creates cells at referenced positions** with permanent UUIDs
+- Dependencies ARE registered with those UUIDs
+- But still has the UUID-based dependency issue if cells are recreated
+
+**Root Cause (Refresh)**: Two issues:
+1. `RefConverter::formulaToUuid()` doesn't create cells for non-existent references (unlike `FormulaResolver`)
+2. Dependencies are tracked by cell UUID, not by position - so position-based A1 references don't create dependency links
 
 ---
 
@@ -82,14 +92,34 @@ Following plan management guidelines defined in AGENTS.md
 
 This is the most critical issue - formulas set via scripts don't update when dependencies change.
 
-- [ ] 1a: Add recalculation to LuauSandbox setCell()
-  - Modify `luau_sandbox.cc` `luaSetCell()` to call `markDirty()` and `cells::recalculate()` after `applyOperation()`
-  - This matches the behavior in `bindings.cc` `updateCell()`
-  - Add C++ unit test to verify script-set formulas trigger recalculation
+**The core problem**: `RefConverter::formulaToUuid()` doesn't create cells for non-existent references, so formulas with A1 notation are stored without UUID resolution, and no dependencies are registered.
 
-- [ ] 1b: Add E2E test for script-set formula refresh
-  - Create test that sets a formula via script, then changes a dependency, verifies formula updates
-  - Test both immediate script output and UI display
+**Solution**: Use `FormulaResolver` in Luau's setCell() instead of `RefConverter`, since FormulaResolver properly creates cells at referenced positions.
+
+- [ ] 1a: Refactor LuauSandbox setCell() to use FormulaResolver for formulas
+  - When value starts with '=', parse the formula with `parseFormula()`
+  - Use `FormulaResolver::resolve()` to convert A1 refs to UUIDs AND create cells
+  - This ensures referenced cells exist and have UUIDs for dependency tracking
+  - Serialize the resolved formula to UUID format for storage
+
+- [ ] 1b: Add recalculation after setCell() operations
+  - After `applyOperation()`, call `markDirty()` and `cells::recalculate()` for formula cells
+  - This matches the behavior in `bindings.cc` `updateCell()`
+  - For non-formula cells, also trigger recalc of dependents (if the cell is referenced by other formulas)
+
+- [ ] 1c: Add dependency graph update after formula operations
+  - After setting a formula, call `dependencyGraph.addFormula(cellId, ast)` to register dependencies
+  - This is currently done in `bindings.cc` but missing from Luau path
+
+- [ ] 1d: Add C++ unit tests for script formula resolution
+  - Test: `setCell("A1", "=B1+C1")` where B1, C1 don't exist → cells are created
+  - Test: After creation, `setCell("B1", 10)` → A1 recalculates
+  - Test: Dependency graph contains correct entries
+
+- [ ] 1e: Add E2E test for script-set formula refresh
+  - Script sets formula `=SUM(B1:B3)`, verifies #REF! doesn't appear
+  - Script then sets B1, B2, B3, verifies formula shows correct sum
+  - Verify UI updates reflect the recalculation
 
 ## Phase 2: Fix Format Selector Update
 
@@ -172,8 +202,9 @@ This is the most critical issue - formulas set via scripts don't update when dep
 ## Files to Modify
 
 ### C++ (Phase 1, 2a, 3a, 5a-b)
-- `core/cells/luau_sandbox.cc` - Add recalculation to setCell
-- `core/cells/luau_sandbox_test.cc` - Tests for script recalculation
+- `core/cells/luau_sandbox.cc` - Use FormulaResolver, add recalculation, add dependency registration
+- `core/cells/luau_sandbox.h` - May need to add FormulaResolver/DependencyGraph access
+- `core/cells/luau_sandbox_test.cc` - Tests for script formula resolution and recalculation
 - `core/cells/bindings.cc` - Verify viewport includes formatId
 - `core/cells/number_formatter_test.cc` - Format display tests
 - `core/cells/input_parser_test.cc` - Format detection tests
