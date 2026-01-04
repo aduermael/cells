@@ -788,6 +788,10 @@ cc_library(
     deps = [
         ":crdt",
         ":fill_range",
+        ":formula_parser",
+        ":formula_recalc",
+        ":formula_resolver",
+        ":formula_serializer",
         ":id",
         ":model",
         ":ref_converter",

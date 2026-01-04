@@ -6,6 +6,9 @@
 #include "core/cells/crdt.h"
 #include "core/cells/dependency_graph.h"
 #include "core/cells/fill_range.h"
+#include "core/cells/formula_parser.h"
+#include "core/cells/formula_recalc.h"
+#include "core/cells/formula_resolver.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
@@ -409,13 +412,65 @@ int LuauSandbox::luaCellSet(lua_State* L) {
     } else if (lua_isstring(L, 2) != 0) {
         const char* str = lua_tostring(L, 2);
         if (str[0] == '=') {
-            // Parse as formula - convert A1 refs to UUID format
-            RefConverter conv;
-            conv.setContext(*sheet);
-            const std::string uuidFormula = conv.formulaToUuid(str);
-            // Formula payload uses col_id/row_id instead of col/row
-            payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) + R"(","col_id":")" +
-                      colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+            // Parse formula with FormulaParser to get AST
+            FormulaParser parser(str);
+            auto ast = parser.parse();
+            if (ast == nullptr || parser.hasErrors()) {
+                // If parse fails, still store the formula as-is (it will show error on eval)
+                RefConverter conv;
+                conv.setContext(*sheet);
+                const std::string uuidFormula = conv.formulaToUuid(str);
+                payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) + R"(","col_id":")" +
+                          colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+            } else {
+                // Resolve the AST - this creates cells/axes for referenced positions
+                FormulaResolver resolver(*workbook, *sheet);
+                const ResolveResult resolveRes = resolver.resolve(ast.get());
+                if (!resolveRes.success) {
+                    // Resolution failed - use fallback
+                    RefConverter conv;
+                    conv.setContext(*sheet);
+                    const std::string uuidFormula = conv.formulaToUuid(str);
+                    payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) +
+                              R"(","col_id":")" + colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+                } else {
+                    // Serialize the resolved AST to UUID format
+                    const std::string uuidFormula = FormulaSerializer::serialize(ast.get());
+                    payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) +
+                              R"(","col_id":")" + colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+
+                    // Add dependencies to the dependency graph
+                    DependencyGraph* depGraph = sheet->getDependencyGraph();
+                    if (depGraph != nullptr) {
+                        // First remove any existing dependencies for this cell
+                        depGraph->removeFormula(cell->id);
+
+                        // Add new dependencies with position resolver
+                        depGraph->addFormula(cell->id, ast.get(), [sheet](const ID& cellIdArg) {
+                            const Cell* depCell = sheet->getCell(cellIdArg);
+                            if (depCell == nullptr) {
+                                return std::make_pair(static_cast<int32_t>(-1),
+                                                      static_cast<int32_t>(-1));
+                            }
+                            const Axis* depCol = sheet->getColumn(depCell->colId);
+                            const Axis* depRow = sheet->getRow(depCell->rowId);
+                            if (depCol == nullptr || depRow == nullptr) {
+                                return std::make_pair(static_cast<int32_t>(-1),
+                                                      static_cast<int32_t>(-1));
+                            }
+                            return std::make_pair(static_cast<int32_t>(depCol->position),
+                                                  static_cast<int32_t>(depRow->position));
+                        });
+
+                        // Mark as volatile if needed
+                        if (FormulaResolver::containsVolatileFunction(ast.get())) {
+                            depGraph->markVolatile(cell->id);
+                        } else {
+                            depGraph->unmarkVolatile(cell->id);
+                        }
+                    }
+                }
+            }
         } else {
             // Literal string
             payload = R"({"type":"s","value":")" + jsonEscape(str) + R"(","col":")" + colIdStr +
@@ -426,9 +481,21 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         payload = R"({"type":"b","value":")" + std::string(val ? "true" : "false") +
                   R"(","col":")" + colIdStr + R"(","row":")" + rowIdStr + R"("})";
     } else if (lua_isnil(L, 2) != 0) {
-        // Clear the cell
+        // Clear the cell - remove from dependency graph first
+        DependencyGraph* depGraph = sheet->getDependencyGraph();
+        if (depGraph != nullptr) {
+            depGraph->removeFormula(cell->id);
+            depGraph->unmarkVolatile(cell->id);
+        }
+
         const Operation op = makeCellClearOp(*workbook, cell->id);
         applyOperation(*workbook, op);
+
+        // Trigger recalculation for dependents
+        markDirty(sheet, cell->id);
+        const std::vector<ID> changed = {cell->id};
+        cells::recalculate(sheet, changed);
+        cells::recalculateVolatile(sheet);
         return 0;
     } else {
         luaL_error(L, "setCell: unsupported value type");
@@ -437,6 +504,13 @@ int LuauSandbox::luaCellSet(lua_State* L) {
     // Apply the operation via CRDT
     const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
     applyOperation(*workbook, op);
+
+    // Trigger recalculation: mark dependents dirty and recalculate
+    // This ensures formulas that depend on this cell get updated
+    markDirty(sheet, cell->id);
+    const std::vector<ID> changed = {cell->id};
+    cells::recalculate(sheet, changed);
+    cells::recalculateVolatile(sheet);
 
     return 0;
 }
@@ -1174,12 +1248,67 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
         } else if (lua_isstring(L, 3) != 0) {
             const char* str = lua_tostring(L, 3);
             if (str[0] == '=') {
-                // Parse as formula
-                RefConverter conv;
-                conv.setContext(*sheet);
-                const std::string uuidFormula = conv.formulaToUuid(str);
-                payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) + R"(","col_id":")" +
-                          colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+                // Parse formula with FormulaParser to get AST
+                FormulaParser parser(str);
+                auto ast = parser.parse();
+                if (ast == nullptr || parser.hasErrors()) {
+                    // If parse fails, still store the formula as-is
+                    RefConverter conv;
+                    conv.setContext(*sheet);
+                    const std::string uuidFormula = conv.formulaToUuid(str);
+                    payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) +
+                              R"(","col_id":")" + colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
+                } else {
+                    // Resolve the AST - this creates cells/axes for referenced positions
+                    FormulaResolver resolver(*workbook, *sheet);
+                    const ResolveResult resolveRes = resolver.resolve(ast.get());
+                    if (!resolveRes.success) {
+                        // Resolution failed - use fallback
+                        RefConverter conv;
+                        conv.setContext(*sheet);
+                        const std::string uuidFormula = conv.formulaToUuid(str);
+                        payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) +
+                                  R"(","col_id":")" + colIdStr + R"(","row_id":")" + rowIdStr +
+                                  R"("})";
+                    } else {
+                        // Serialize the resolved AST to UUID format
+                        const std::string uuidFormula = FormulaSerializer::serialize(ast.get());
+                        payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) +
+                                  R"(","col_id":")" + colIdStr + R"(","row_id":")" + rowIdStr +
+                                  R"("})";
+
+                        // Add dependencies to the dependency graph
+                        DependencyGraph* depGraph = sheet->getDependencyGraph();
+                        if (depGraph != nullptr) {
+                            // First remove any existing dependencies for this cell
+                            depGraph->removeFormula(cell->id);
+
+                            // Add new dependencies with position resolver
+                            depGraph->addFormula(cell->id, ast.get(), [sheet](const ID& cellIdArg) {
+                                const Cell* depCell = sheet->getCell(cellIdArg);
+                                if (depCell == nullptr) {
+                                    return std::make_pair(static_cast<int32_t>(-1),
+                                                          static_cast<int32_t>(-1));
+                                }
+                                const Axis* depCol = sheet->getColumn(depCell->colId);
+                                const Axis* depRow = sheet->getRow(depCell->rowId);
+                                if (depCol == nullptr || depRow == nullptr) {
+                                    return std::make_pair(static_cast<int32_t>(-1),
+                                                          static_cast<int32_t>(-1));
+                                }
+                                return std::make_pair(static_cast<int32_t>(depCol->position),
+                                                      static_cast<int32_t>(depRow->position));
+                            });
+
+                            // Mark as volatile if needed
+                            if (FormulaResolver::containsVolatileFunction(ast.get())) {
+                                depGraph->markVolatile(cell->id);
+                            } else {
+                                depGraph->unmarkVolatile(cell->id);
+                            }
+                        }
+                    }
+                }
             } else {
                 // Literal string
                 payload = R"({"type":"s","value":")" + jsonEscape(str) + R"(","col":")" + colIdStr +
@@ -1190,9 +1319,21 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
             payload = R"({"type":"b","value":")" + std::string(val ? "true" : "false") +
                       R"(","col":")" + colIdStr + R"(","row":")" + rowIdStr + R"("})";
         } else if (lua_isnil(L, 3) != 0) {
-            // Clear the cell
+            // Clear the cell - remove from dependency graph first
+            DependencyGraph* depGraph = sheet->getDependencyGraph();
+            if (depGraph != nullptr) {
+                depGraph->removeFormula(cell->id);
+                depGraph->unmarkVolatile(cell->id);
+            }
+
             const Operation op = makeCellClearOp(*workbook, cell->id);
             applyOperation(*workbook, op);
+
+            // Trigger recalculation for dependents
+            markDirty(sheet, cell->id);
+            const std::vector<ID> changed = {cell->id};
+            cells::recalculate(sheet, changed);
+            cells::recalculateVolatile(sheet);
             return 0;
         } else {
             luaL_error(L, "cell.value: unsupported value type");
@@ -1201,6 +1342,12 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
         // Apply the operation via CRDT
         const Operation op = makeCellSetValueOp(*workbook, cell->id, payload);
         applyOperation(*workbook, op);
+
+        // Trigger recalculation: mark dependents dirty and recalculate
+        markDirty(sheet, cell->id);
+        const std::vector<ID> changed = {cell->id};
+        cells::recalculate(sheet, changed);
+        cells::recalculateVolatile(sheet);
         return 0;
     }
 

@@ -1443,5 +1443,205 @@ TEST(LuauSandboxTest, CellDependentsAndDependenciesInverse) {
     EXPECT_EQ(dependencies.output, "A1");
 }
 
+// Test that setCell with formulas creates cells for referenced positions
+TEST(LuauSandboxTest, SetCellFormulaCreatesReferencedCells) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set a formula that references non-existent cells B2 and C3
+    // Before the fix, these cells wouldn't be created and the formula would fail
+    auto result = sandbox.execute("setCell('D4', '=B2+C3')");
+    EXPECT_TRUE(result.success) << result.error;
+
+    // Verify B2 and C3 were created
+    Axis* colB = sheet->getColumnByPosition(1);
+    Axis* colC = sheet->getColumnByPosition(2);
+    Axis* row2 = sheet->getRowByPosition(1);
+    Axis* row3 = sheet->getRowByPosition(2);
+    ASSERT_NE(colB, nullptr);
+    ASSERT_NE(colC, nullptr);
+    ASSERT_NE(row2, nullptr);
+    ASSERT_NE(row3, nullptr);
+
+    Cell* cellB2 = sheet->getCellAt(colB->id, row2->id);
+    Cell* cellC3 = sheet->getCellAt(colC->id, row3->id);
+    EXPECT_NE(cellB2, nullptr) << "Cell B2 should be created by formula resolution";
+    EXPECT_NE(cellC3, nullptr) << "Cell C3 should be created by formula resolution";
+}
+
+// Test that setting values triggers recalculation of dependent formulas
+TEST(LuauSandboxTest, SetCellTriggersRecalculation) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set a formula in B1 that depends on C1
+    auto result1 = sandbox.execute("setCell('B1', '=C1*2')");
+    EXPECT_TRUE(result1.success) << result1.error;
+
+    // Set C1 to 10
+    auto result2 = sandbox.execute("setCell('C1', 10)");
+    EXPECT_TRUE(result2.success) << result2.error;
+
+    // Verify B1 was recalculated to 20
+    auto result3 = sandbox.execute("return getCell('B1').value");
+    EXPECT_TRUE(result3.success) << result3.error;
+    EXPECT_EQ(result3.output, "20") << "B1 should be recalculated to C1*2 = 20";
+}
+
+// Test formula with range reference
+TEST(LuauSandboxTest, SetCellFormulaWithRange) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set values in B1, B2, B3
+    auto r1 = sandbox.execute("setCell('B1', 10)");
+    EXPECT_TRUE(r1.success) << r1.error;
+    auto r2 = sandbox.execute("setCell('B2', 20)");
+    EXPECT_TRUE(r2.success) << r2.error;
+    auto r3 = sandbox.execute("setCell('B3', 30)");
+    EXPECT_TRUE(r3.success) << r3.error;
+
+    // Set a SUM formula in A1
+    auto r4 = sandbox.execute("setCell('A1', '=SUM(B1:B3)')");
+    EXPECT_TRUE(r4.success) << r4.error;
+
+    // Verify A1 shows the sum
+    auto r5 = sandbox.execute("return getCell('A1').value");
+    EXPECT_TRUE(r5.success) << r5.error;
+    EXPECT_EQ(r5.output, "60") << "A1 should be SUM(10,20,30) = 60";
+
+    // Now change B2 and verify A1 is updated
+    auto r6 = sandbox.execute("setCell('B2', 100)");
+    EXPECT_TRUE(r6.success) << r6.error;
+
+    auto r7 = sandbox.execute("return getCell('A1').value");
+    EXPECT_TRUE(r7.success) << r7.error;
+    EXPECT_EQ(r7.output, "140") << "A1 should be SUM(10,100,30) = 140";
+}
+
+// Test chain of dependencies (A1 depends on B1, B1 depends on C1)
+TEST(LuauSandboxTest, SetCellChainedDependencies) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set C1 to 5
+    auto r1 = sandbox.execute("setCell('C1', 5)");
+    EXPECT_TRUE(r1.success) << r1.error;
+
+    // B1 = C1 * 2
+    auto r2 = sandbox.execute("setCell('B1', '=C1*2')");
+    EXPECT_TRUE(r2.success) << r2.error;
+
+    // A1 = B1 + 10
+    auto r3 = sandbox.execute("setCell('A1', '=B1+10')");
+    EXPECT_TRUE(r3.success) << r3.error;
+
+    // Verify initial values: C1=5, B1=10, A1=20
+    auto r4 = sandbox.execute("return getCell('A1').value");
+    EXPECT_TRUE(r4.success) << r4.error;
+    EXPECT_EQ(r4.output, "20") << "A1 should be B1+10 = 10+10 = 20";
+
+    // Change C1 to 10 - this should update B1 to 20 and A1 to 30
+    auto r5 = sandbox.execute("setCell('C1', 10)");
+    EXPECT_TRUE(r5.success) << r5.error;
+
+    auto r6 = sandbox.execute("return getCell('B1').value");
+    EXPECT_TRUE(r6.success) << r6.error;
+    EXPECT_EQ(r6.output, "20") << "B1 should be C1*2 = 20";
+
+    auto r7 = sandbox.execute("return getCell('A1').value");
+    EXPECT_TRUE(r7.success) << r7.error;
+    EXPECT_EQ(r7.output, "30") << "A1 should be B1+10 = 30";
+}
+
+// Test clearing a cell triggers recalculation
+TEST(LuauSandboxTest, ClearCellTriggersRecalculation) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set B1 to 100
+    auto r1 = sandbox.execute("setCell('B1', 100)");
+    EXPECT_TRUE(r1.success) << r1.error;
+
+    // Set A1 = B1 + 1
+    auto r2 = sandbox.execute("setCell('A1', '=B1+1')");
+    EXPECT_TRUE(r2.success) << r2.error;
+
+    // Verify A1 = 101
+    auto r3 = sandbox.execute("return getCell('A1').value");
+    EXPECT_TRUE(r3.success) << r3.error;
+    EXPECT_EQ(r3.output, "101");
+
+    // Clear B1 by setting to empty string (clears content but keeps cell)
+    auto r4 = sandbox.execute("setCell('B1', '')");
+    EXPECT_TRUE(r4.success) << r4.error;
+
+    // A1 should now show the result of formula with empty B1 (0+1 = 1)
+    auto r5 = sandbox.execute("return getCell('A1').value");
+    EXPECT_TRUE(r5.success) << r5.error;
+    EXPECT_EQ(r5.output, "1") << "A1 should be 0+1=1 after B1 cleared";
+}
+
+// Test cell.value assignment with formulas
+TEST(LuauSandboxTest, CellValueAssignmentWithFormula) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set B1 to 50 via cell.value
+    auto r1 = sandbox.execute(R"(
+        local cell = getCell('B1', {create=true})
+        cell.value = 50
+    )");
+    EXPECT_TRUE(r1.success) << r1.error;
+
+    // Set A1 = B1 * 2 via cell.value
+    auto r2 = sandbox.execute(R"(
+        local cell = getCell('A1', {create=true})
+        cell.value = '=B1*2'
+    )");
+    EXPECT_TRUE(r2.success) << r2.error;
+
+    // Verify A1 = 100
+    auto r3 = sandbox.execute("return getCell('A1').value");
+    EXPECT_TRUE(r3.success) << r3.error;
+    EXPECT_EQ(r3.output, "100");
+
+    // Change B1 via cell.value
+    auto r4 = sandbox.execute(R"(
+        local cell = getCell('B1')
+        cell.value = 25
+    )");
+    EXPECT_TRUE(r4.success) << r4.error;
+
+    // Verify A1 is updated to 50
+    auto r5 = sandbox.execute("return getCell('A1').value");
+    EXPECT_TRUE(r5.success) << r5.error;
+    EXPECT_EQ(r5.output, "50");
+}
+
 }  // namespace
 }  // namespace cells

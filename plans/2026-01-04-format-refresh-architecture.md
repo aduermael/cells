@@ -1,6 +1,6 @@
-Status: READY
+Status: IN_PROGRESS
 Created At: 2026-01-04 06:59 UTC
-Updated At: 2026-01-04 06:59 UTC
+Updated At: 2026-01-04 08:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -96,30 +96,31 @@ This is the most critical issue - formulas set via scripts don't update when dep
 
 **Solution**: Use `FormulaResolver` in Luau's setCell() instead of `RefConverter`, since FormulaResolver properly creates cells at referenced positions.
 
-- [ ] 1a: Refactor LuauSandbox setCell() to use FormulaResolver for formulas
+- [x] 1a: Refactor LuauSandbox setCell() to use FormulaResolver for formulas
   - When value starts with '=', parse the formula with `parseFormula()`
   - Use `FormulaResolver::resolve()` to convert A1 refs to UUIDs AND create cells
   - This ensures referenced cells exist and have UUIDs for dependency tracking
   - Serialize the resolved formula to UUID format for storage
 
-- [ ] 1b: Add recalculation after setCell() operations
+- [x] 1b: Add recalculation after setCell() operations
   - After `applyOperation()`, call `markDirty()` and `cells::recalculate()` for formula cells
   - This matches the behavior in `bindings.cc` `updateCell()`
   - For non-formula cells, also trigger recalc of dependents (if the cell is referenced by other formulas)
 
-- [ ] 1c: Add dependency graph update after formula operations
+- [x] 1c: Add dependency graph update after formula operations
   - After setting a formula, call `dependencyGraph.addFormula(cellId, ast)` to register dependencies
   - This is currently done in `bindings.cc` but missing from Luau path
 
-- [ ] 1d: Add C++ unit tests for script formula resolution
+- [x] 1d: Add C++ unit tests for script formula resolution
   - Test: `setCell("A1", "=B1+C1")` where B1, C1 don't exist → cells are created
   - Test: After creation, `setCell("B1", 10)` → A1 recalculates
   - Test: Dependency graph contains correct entries
 
-- [ ] 1e: Add E2E test for script-set formula refresh
+- [x] 1e: Add E2E test for script-set formula refresh
   - Script sets formula `=SUM(B1:B3)`, verifies #REF! doesn't appear
   - Script then sets B1, B2, B3, verifies formula shows correct sum
   - Verify UI updates reflect the recalculation
+  - Added tests/script-refresh.test.mjs with 7 tests
 
 ## Phase 2: Fix Format Selector Update
 
