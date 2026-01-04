@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2026-01-04 06:59 UTC
-Updated At: 2026-01-04 09:45 UTC
+Updated At: 2026-01-04 18:06 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -205,17 +205,42 @@ This is the most critical issue - formulas set via scripts don't update when dep
   - Test script edit refreshes dependents
   - Test chain of dependencies (A1 → B1 → C1)
 
+## Phase 6: Percentage Literals in Formulas
+
+Support percentage notation directly in formulas (e.g., `=1000*15%` evaluates to 150).
+
+- [ ] 6a: Update formula lexer to recognize percentage literals
+  - Add `PERCENT_LITERAL` token type for numbers followed by `%`
+  - `15%` should tokenize as a single token with value 0.15
+
+- [ ] 6b: Update formula parser to handle percentage literals
+  - Parse `PERCENT_LITERAL` as a number node with the decimal value
+  - `15%` → NumberNode(0.15)
+
+- [ ] 6c: Add unit tests for percentage in formulas
+  - Test `=15%` evaluates to 0.15
+  - Test `=100*15%` evaluates to 15
+  - Test `=A1+15%` where A1=100 evaluates to 100.15
+  - Test negative percentages: `=-15%` evaluates to -0.15
+
+- [ ] 6d: Add E2E tests for percentage formulas
+  - Enter `=1000*15%`, verify result is 150
+  - Enter `=50%+25%`, verify result is 0.75
+
 ---
 
 ## Files to Modify
 
-### C++ (Phase 1, 2a, 3a, 5a-b)
+### C++ (Phase 1, 2a, 3a, 5a-b, 6a-c)
 - `core/cells/luau_sandbox.cc` - Use FormulaResolver, add recalculation, add dependency registration
 - `core/cells/luau_sandbox.h` - May need to add FormulaResolver/DependencyGraph access
 - `core/cells/luau_sandbox_test.cc` - Tests for script formula resolution and recalculation
 - `core/cells/bindings.cc` - Verify viewport includes formatId
 - `core/cells/number_formatter_test.cc` - Format display tests
 - `core/cells/input_parser_test.cc` - Format detection tests
+- `core/cells/formula_lexer.cc` - Add percentage literal token (Phase 6)
+- `core/cells/formula_parser.cc` - Parse percentage literals (Phase 6)
+- `core/cells/formula_parser_test.cc` - Tests for percentage in formulas (Phase 6)
 
 ### TypeScript (Phase 2b, 3b-c, 4c-d)
 - `apps/wasm/src/init.ts` - Formula bar formatted display
@@ -250,3 +275,4 @@ This is the most critical issue - formulas set via scripts don't update when dep
 4. New two-line formula bar layout is clean and functional
 5. All existing tests continue to pass
 6. New tests provide coverage for the fixed behaviors
+7. Formulas support percentage literals (e.g., `=1000*15%` → 150)
