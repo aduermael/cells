@@ -573,6 +573,19 @@ canvas {
     font-weight: var(--font-weight-medium);
 }
 
+/* Currency button - center the $ sign */
+#format-currency-btn {
+    justify-content: center;
+    text-align: center;
+}
+
+/* Decimal buttons - equal width */
+#format-decimal-decrease,
+#format-decimal-increase {
+    width: 40px;
+    justify-content: center;
+}
+
 #format-dropdown {
     position: relative;
 }
@@ -605,9 +618,17 @@ canvas {
 
 .format-separator {
     width: 1px;
-    height: 16px;
+    height: 52px; /* Match height of 2x2 button grid */
     background: var(--color-border);
     margin: 0 var(--spacing-xs);
+    align-self: center;
+}
+
+/* Formula bar action buttons (settings + script) - vertical stack */
+#formula-bar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
 }
 
 /* Active state for format buttons */
@@ -638,8 +659,9 @@ canvas {
     margin-right: var(--spacing-sm);
 }
 
+/* Height to match 2x2 button grid (24px + 4px gap + 24px = 52px) */
 #cell-reference {
-    height: var(--control-height);
+    height: 52px;
     padding: 0 var(--control-padding-x);
     font-size: var(--control-font-size);
     font-weight: var(--font-weight-medium);
@@ -656,13 +678,16 @@ canvas {
     text-overflow: ellipsis;
     white-space: nowrap;
     text-align: center;
-    line-height: calc(var(--control-height) - 2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Formula Input Container - wrapper for contenteditable and hidden input */
+/* Height matches 2x2 button grid (24px + 4px gap + 24px = 52px) */
 #formula-input-container {
     flex: 1;
-    height: var(--control-height);
+    height: 52px;
     position: relative;
     display: flex;
     align-items: center;
@@ -717,7 +742,7 @@ canvas {
     outline: none;
     white-space: pre;
     overflow: hidden;
-    line-height: calc(var(--control-height) - 2px);
+    line-height: 50px; /* Match container height minus border */
 }
 
 #formula-display:empty::before {

@@ -113,6 +113,7 @@ export interface DOMElements {
   formatCurrencyBtn: HTMLButtonElement;
   formatDecimalIncrease: HTMLButtonElement;
   formatDecimalDecrease: HTMLButtonElement;
+  settingsBtn: HTMLButtonElement;
 }
 
 // =============================================================================
@@ -517,6 +518,7 @@ export function createApp(): App {
     formatCurrencyBtn: getElement<HTMLButtonElement>("format-currency-btn"),
     formatDecimalIncrease: getElement<HTMLButtonElement>("format-decimal-increase"),
     formatDecimalDecrease: getElement<HTMLButtonElement>("format-decimal-decrease"),
+    settingsBtn: getElement<HTMLButtonElement>("settings-btn"),
   };
 
   return new App(elements);

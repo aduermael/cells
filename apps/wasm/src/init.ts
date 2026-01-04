@@ -1161,6 +1161,14 @@ export function initApp(): AppContext {
   formatControlsRef = formatControls;
 
   // =========================================================================
+  // Settings Button (placeholder - coming soon)
+  // =========================================================================
+
+  elements.settingsBtn.addEventListener("click", () => {
+    alert("Settings - Coming Soon!");
+  });
+
+  // =========================================================================
   // Create SheetTabsManager
   // =========================================================================
 
