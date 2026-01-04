@@ -36,6 +36,7 @@ import { colorizeFormula } from "./formula-colorizer.js";
 import { ScrollbarManager, calculateContentDimensions, calculateDiscoveredRows } from "./scrollbar.js";
 import { FocusManager } from "./focus-manager";
 import { WorkbookTitleEditor } from "./workbook-title-editor";
+import { editingSession } from "./editing-session";
 import { FormatControls } from "./format-controls";
 import { initTheme } from "./theme";
 
@@ -616,66 +617,44 @@ export function initApp(): AppContext {
    * Update the colored formula displays with current highlights.
    * Called after highlights are computed.
    * @param value The formula text
-   * @param cursorPos Optional cursor position to restore (used when element not focused)
+   * @param cursorPos Optional cursor position to restore (overrides EditingSession)
    */
   function updateColoredDisplays(value: string, cursorPos?: number): void {
     // Pass hoveredGridRefIndex to highlight formula text when grid highlight is hovered
     const coloredHtml = colorizeFormula(value, app.formulaHighlights, app.hoveredGridRefIndex);
 
-    // Update formula bar display - preserve cursor
-    if (document.activeElement === elements.formulaDisplay) {
-      // Element is focused - get cursor from selection
-      const selection = window.getSelection();
-      let cursorOffset = 0;
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        cursorOffset = getTextOffsetInElement(elements.formulaDisplay, range);
-      }
-      elements.formulaDisplay.innerHTML = coloredHtml;
-      restoreCursorInElement(elements.formulaDisplay, cursorOffset);
-    } else if (cursorPos !== undefined) {
-      // Element not focused but cursor position provided (e.g., after inserting reference)
-      elements.formulaDisplay.innerHTML = coloredHtml;
-      restoreCursorInElement(elements.formulaDisplay, cursorPos);
-    } else {
-      elements.formulaDisplay.innerHTML = coloredHtml;
-    }
+    // Get cursor position: prefer explicit parameter, then EditingSession
+    const sessionCursor = editingSession.getSelection();
+    const targetCursor = cursorPos ?? sessionCursor.start;
 
-    // Update cell display - preserve cursor
-    if (document.activeElement === elements.cellDisplay) {
-      // Element is focused - get cursor from selection
-      const selection = window.getSelection();
-      let cursorOffset = 0;
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        cursorOffset = getTextOffsetInElement(elements.cellDisplay, range);
-      }
-      elements.cellDisplay.innerHTML = coloredHtml;
-      restoreCursorInElement(elements.cellDisplay, cursorOffset);
-    } else if (cursorPos !== undefined) {
-      // Element not focused but cursor position provided (e.g., after inserting reference)
-      elements.cellDisplay.innerHTML = coloredHtml;
-      restoreCursorInElement(elements.cellDisplay, cursorPos);
-    } else {
-      elements.cellDisplay.innerHTML = coloredHtml;
-    }
-  }
+    // Determine which element should have cursor restored based on EditingSession
+    const activeEditor = editingSession.getActiveEditor();
 
-  /**
-   * Get text offset from start of element to cursor position.
-   */
-  function getTextOffsetInElement(element: HTMLElement, range: Range): number {
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
-    let totalOffset = 0;
-    let current = walker.nextNode();
-    while (current) {
-      if (current === range.startContainer) {
-        return totalOffset + range.startOffset;
+    // Wrap innerHTML changes in selection suppression to prevent selectionchange
+    // from corrupting EditingSession cursor state
+    editingSession.withSuppressedSelectionChange(() => {
+      // Update formula bar display
+      elements.formulaDisplay.innerHTML = coloredHtml;
+
+      // Update cell display
+      elements.cellDisplay.innerHTML = coloredHtml;
+
+      // Focus the appropriate editor and restore cursor
+      // This is critical for reference insertion: the editor lost focus when
+      // user clicked on the canvas, so we must refocus before setting cursor.
+      if (editingSession.isActive()) {
+        const targetElement = activeEditor === "formula"
+          ? elements.formulaDisplay
+          : elements.cellDisplay;
+
+        // Use requestAnimationFrame to focus AFTER mouse events complete
+        // (click/mouseup can steal focus back to canvas)
+        requestAnimationFrame(() => {
+          targetElement.focus();
+          restoreCursorInElement(targetElement, targetCursor);
+        });
       }
-      totalOffset += current.textContent?.length ?? 0;
-      current = walker.nextNode();
-    }
-    return totalOffset;
+    });
   }
 
   /**
@@ -1275,8 +1254,23 @@ export function initApp(): AppContext {
       const value = elements.formulaInput.value;
       if (value && app.formulaHighlights.length > 0) {
         const coloredHtml = colorizeFormula(value, app.formulaHighlights, app.hoveredGridRefIndex);
-        elements.formulaDisplay.innerHTML = coloredHtml;
-        elements.cellDisplay.innerHTML = coloredHtml;
+
+        // Save cursor position from EditingSession before innerHTML change
+        const cursorPos = editingSession.getSelection().start;
+        const activeElement = document.activeElement;
+
+        // Suppress selectionchange to avoid corrupting session state
+        editingSession.withSuppressedSelectionChange(() => {
+          elements.formulaDisplay.innerHTML = coloredHtml;
+          elements.cellDisplay.innerHTML = coloredHtml;
+
+          // Restore cursor if one of our editors has focus
+          if (activeElement === elements.formulaDisplay) {
+            restoreCursorInElement(elements.formulaDisplay, cursorPos);
+          } else if (activeElement === elements.cellDisplay) {
+            restoreCursorInElement(elements.cellDisplay, cursorPos);
+          }
+        });
       }
     },
 

@@ -45,6 +45,25 @@ export class EditingSession {
   private state: EditingSessionState | null = null;
   private listeners: Set<EditingSessionListener> = new Set();
 
+  /**
+   * When true, selectionchange events should NOT update cursor position.
+   * Used during colorization when innerHTML changes trigger spurious selection events.
+   */
+  private _suppressSelectionChange: boolean = false;
+
+  /** Enable debug logging */
+  private debug: boolean = false;
+
+  private log(action: string, details?: Record<string, unknown>): void {
+    if (!this.debug) return;
+    const state = this.state;
+    console.log(
+      `[EditingSession] ${action}`,
+      details ? { ...details } : "",
+      state ? { value: state.value, cursor: `${state.cursorStart}-${state.cursorEnd}`, editor: state.activeEditor } : "(no session)"
+    );
+  }
+
   // ===========================================================================
   // Session Lifecycle
   // ===========================================================================
@@ -73,6 +92,7 @@ export class EditingSession {
       cursorEnd: initialValue.length,
       activeEditor,
     };
+    this.log("START", { sheetId, col, row, initialValue, activeEditor });
     this.notifyListeners();
   }
 
@@ -89,6 +109,7 @@ export class EditingSession {
    * Called when editing is committed or cancelled.
    */
   clear(): void {
+    this.log("CLEAR");
     this.state = null;
     this.notifyListeners();
   }
@@ -109,6 +130,31 @@ export class EditingSession {
   }
 
   // ===========================================================================
+  // Selection Change Suppression
+  // ===========================================================================
+
+  /**
+   * Check if selectionchange updates should be suppressed.
+   * Used by selectionchange handlers to avoid corrupting cursor state during colorization.
+   */
+  shouldSuppressSelectionChange(): boolean {
+    return this._suppressSelectionChange;
+  }
+
+  /**
+   * Run a callback with selectionchange suppression enabled.
+   * Use this when programmatically changing innerHTML to avoid spurious cursor updates.
+   */
+  withSuppressedSelectionChange(callback: () => void): void {
+    this._suppressSelectionChange = true;
+    try {
+      callback();
+    } finally {
+      this._suppressSelectionChange = false;
+    }
+  }
+
+  // ===========================================================================
   // Cursor Management
   // ===========================================================================
 
@@ -119,8 +165,15 @@ export class EditingSession {
    */
   setCursor(start: number, end?: number): void {
     if (!this.state) return;
-    this.state.cursorStart = Math.max(0, Math.min(start, this.state.value.length));
-    this.state.cursorEnd = Math.max(0, Math.min(end ?? start, this.state.value.length));
+    const newStart = Math.max(0, Math.min(start, this.state.value.length));
+    const newEnd = Math.max(0, Math.min(end ?? start, this.state.value.length));
+    // Skip if unchanged (selectionchange fires multiple times)
+    if (this.state.cursorStart === newStart && this.state.cursorEnd === newEnd) {
+      return;
+    }
+    this.state.cursorStart = newStart;
+    this.state.cursorEnd = newEnd;
+    this.log("SET_CURSOR", { requestedStart: start, requestedEnd: end });
     this.notifyListeners();
   }
 
@@ -156,6 +209,7 @@ export class EditingSession {
     // Clamp cursor to valid range
     this.state.cursorStart = Math.min(this.state.cursorStart, value.length);
     this.state.cursorEnd = Math.min(this.state.cursorEnd, value.length);
+    this.log("SET_VALUE", { newValue: value });
     this.notifyListeners();
   }
 
@@ -183,6 +237,7 @@ export class EditingSession {
     this.state.value = newValue;
     this.state.cursorStart = newCursorPos;
     this.state.cursorEnd = newCursorPos;
+    this.log("INSERT_AT", { position, text, newCursorPos });
     this.notifyListeners();
 
     return newCursorPos;
@@ -210,6 +265,7 @@ export class EditingSession {
     this.state.value = newValue;
     this.state.cursorStart = newCursorPos;
     this.state.cursorEnd = newCursorPos;
+    this.log("REPLACE_RANGE", { start, end, text, newCursorPos });
     this.notifyListeners();
 
     return newCursorPos;
@@ -223,6 +279,7 @@ export class EditingSession {
    */
   insertAtCursor(text: string): number {
     if (!this.state) return 0;
+    this.log("INSERT_AT_CURSOR", { text, cursorStart: this.state.cursorStart, cursorEnd: this.state.cursorEnd });
     return this.replaceRange(this.state.cursorStart, this.state.cursorEnd, text);
   }
 

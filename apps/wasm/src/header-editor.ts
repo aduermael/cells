@@ -479,19 +479,24 @@ export class FormulaBarEditor {
     const value = this.formulaInput.value;
     const highlights = this.getFormulaHighlights();
 
-    // Get cursor position before update
-    const cursorPos = getCursorPosition(this.formulaDisplay);
+    // Use EditingSession as source of truth for cursor position
+    const cursorPos = editingSession.getSelection();
 
-    // Apply colored HTML
-    this.formulaDisplay.innerHTML = colorizeFormula(value, highlights);
+    // Wrap innerHTML changes in selection suppression
+    editingSession.withSuppressedSelectionChange(() => {
+      // Apply colored HTML
+      this.formulaDisplay.innerHTML = colorizeFormula(value, highlights);
 
-    // Restore cursor position
-    setCursorPosition(this.formulaDisplay, cursorPos.start);
+      // Restore cursor position from session
+      if (document.activeElement === this.formulaDisplay) {
+        setCursorPosition(this.formulaDisplay, cursorPos.start);
+      }
 
-    // Also update cell display if visible
-    if (this.cellDisplay.parentElement?.style.display !== "none") {
-      this.cellDisplay.innerHTML = colorizeFormula(value, highlights);
-    }
+      // Also update cell display if visible
+      if (this.cellDisplay.parentElement?.style.display !== "none") {
+        this.cellDisplay.innerHTML = colorizeFormula(value, highlights);
+      }
+    });
   }
 
   /**
@@ -506,17 +511,15 @@ export class FormulaBarEditor {
     const newCursorPos = editingSession.insertAtCursor(ref);
     const newValue = editingSession.getValue();
 
-    // Update all DOM elements SYNCHRONOUSLY - don't rely on async highlights
+    // Only update hidden inputs - these don't cause visual changes
+    // DO NOT update display elements (formulaDisplay/cellDisplay) here!
+    // Async colorization will update them with properly colored HTML.
+    // This prevents flicker from plain text -> colored text transition.
     this.formulaInput.value = newValue;
-    this.formulaDisplay.textContent = newValue;
     this.cellEditorInput.value = newValue;
-    this.cellDisplay.textContent = newValue;
 
-    // Set cursor position immediately
-    setCursorPosition(this.formulaDisplay, newCursorPos);
-
-    // Update formula highlights (async, will add colors but content is already set)
-    // Pass cursor position so it can be restored after innerHTML update
+    // Update formula highlights (async) - this will update display elements
+    // with colored HTML and restore cursor position atomically
     this.onUpdateFormulaHighlights(newValue, newCursorPos);
 
     // Broadcast editing state
@@ -536,17 +539,13 @@ export class FormulaBarEditor {
     const newCursorPos = editingSession.replaceRange(startPos, endPos, newRef);
     const newValue = editingSession.getValue();
 
-    // Update all DOM elements synchronously
+    // Only update hidden inputs - these don't cause visual changes
+    // DO NOT update display elements here - let async colorization handle it
     this.formulaInput.value = newValue;
-    this.formulaDisplay.textContent = newValue;
     this.cellEditorInput.value = newValue;
-    this.cellDisplay.textContent = newValue;
 
-    // Set cursor position
-    setCursorPosition(this.formulaDisplay, newCursorPos);
-
-    // Update formula highlights
-    // Pass cursor position so it can be restored after innerHTML update
+    // Update formula highlights (async) - this will update display elements
+    // with colored HTML and restore cursor position atomically
     this.onUpdateFormulaHighlights(newValue, newCursorPos);
 
     // Broadcast editing state
@@ -945,6 +944,9 @@ export class FormulaBarEditor {
 
     // Track cursor position on selection changes (arrow keys, mouse clicks in editor)
     document.addEventListener("selectionchange", () => {
+      // Skip if suppressed (during colorization innerHTML changes)
+      if (editingSession.shouldSuppressSelectionChange()) return;
+
       if (this.isEditingFormulaBar() && document.activeElement === this.formulaDisplay) {
         const cursorPos = getCursorPosition(this.formulaDisplay);
         editingSession.setCursor(cursorPos.start, cursorPos.end);

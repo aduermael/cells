@@ -161,17 +161,38 @@ Create a centralized `EditingSession` state object that:
 
 ---
 
-## Phase 4: Update Formula Colorizer Integration
+## Phase 4: Fix Reference Insertion Flicker and Cursor
 
-- [ ] 4a: Simplify colorizer cursor handling
-  - Update `applyColorizedFormula()` to read cursor from session
-  - Remove cursor position parameters from colorizer callbacks
-  - Colorizer restores cursor from session after updating innerHTML
+Root cause: `insertReferenceAtCursor` sets `textContent` (plain text) immediately,
+then async colorization replaces it with `innerHTML` (colored). This causes:
+1. Visible flicker (plain → colored)
+2. Cursor position issues when element doesn't have focus
 
-- [ ] 4b: Update formula highlight updates
-  - `onUpdateFormulaHighlights()` reads cursor from session
-  - Remove cursor position parameters from async highlight functions
-  - Ensure highlights don't cause cursor jumps
+Solution: Don't update display elements until colorized HTML is ready.
+Only update EditingSession and hidden inputs synchronously.
+
+- [x] 4a: Refactor insertReferenceAtCursor to not update display elements
+  - Removed `cellDisplay.textContent` and `formulaDisplay.textContent` updates
+  - Only update `cellEditorInput.value` and `formulaInput.value` (hidden)
+  - Async colorization handles all visible DOM updates
+  - Cursor position passed to colorization for restoration
+  - Applied to both CellEditor (cell-editor.ts) and FormulaBarEditor (header-editor.ts)
+
+- [x] 4b: Ensure updateColoredDisplays handles unfocused elements correctly
+  - Changed updateColoredDisplays in init.ts to:
+    1. Update both innerHTML elements
+    2. Focus the appropriate editor (based on EditingSession.activeEditor)
+    3. Then restore cursor position
+  - This ensures cursor works even when element lost focus during click
+
+- [x] 4c: Apply same pattern to replaceReferenceAtPosition
+  - Removed display element updates from both CellEditor and FormulaBarEditor
+  - Async colorization handles visual updates
+
+- [ ] 4d: Handle input event colorization (typing)
+  - Current approach (textContent first, then colorize) causes same flicker
+  - Consider debounced colorization or optimistic plain-text display
+  - Lower priority: typing flicker is less noticeable than ref insertion
 
 ---
 
