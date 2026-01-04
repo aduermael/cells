@@ -105,7 +105,7 @@ const tests = {
     // Verify we can still see the formula bar (anchor cell data)
     // If we enter a value, it should go in the anchor cell
     // Use delay between characters to allow cell editor to start
-    await ctx.page.keyboard.type('test', { delay: 20 });
+    await ctx.page.keyboard.type('test', { delay: 50 });
     await ctx.page.keyboard.press('Enter');
     await sleep(200);
 

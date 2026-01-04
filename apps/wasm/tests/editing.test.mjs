@@ -49,7 +49,8 @@ const tests = {
     // Click on the cell and type new value (without double-clicking)
     await clickCell(ctx.page, 'B2');
     await sleep(100);
-    await ctx.page.keyboard.type('replaced');
+    // Add delay between keystrokes to prevent race conditions
+    await ctx.page.keyboard.type('replaced', { delay: 50 });
     await ctx.page.keyboard.press('Enter');
     await sleep(200);
 

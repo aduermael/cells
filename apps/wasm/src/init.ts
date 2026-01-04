@@ -620,6 +620,28 @@ export function initApp(): AppContext {
    * @param cursorPos Optional cursor position to restore (overrides EditingSession)
    */
   function updateColoredDisplays(value: string, cursorPos?: number): void {
+    // During normal typing (cursorPos undefined), skip innerHTML updates for non-formula text.
+    // The contenteditable already shows the typed text correctly.
+    // Only update innerHTML when:
+    // 1. It's a formula (needs colorization), OR
+    // 2. cursorPos is explicitly provided (reference insertion), OR
+    // 3. We need to sync formula bar (inactive element)
+    const isFormula = value.startsWith("=");
+    const needsUpdate = isFormula || cursorPos !== undefined;
+
+    if (!needsUpdate) {
+      // For non-formula typing, just sync the inactive display
+      const activeEditor = editingSession.getActiveEditor();
+      if (activeEditor === "formula") {
+        // Formula bar is active, sync cell display
+        elements.cellDisplay.textContent = value;
+      } else {
+        // Cell editor is active, sync formula bar
+        elements.formulaDisplay.textContent = value;
+      }
+      return;
+    }
+
     // Pass hoveredGridRefIndex to highlight formula text when grid highlight is hovered
     const coloredHtml = colorizeFormula(value, app.formulaHighlights, app.hoveredGridRefIndex);
 
@@ -642,7 +664,10 @@ export function initApp(): AppContext {
       // Focus the appropriate editor and restore cursor
       // This is critical for reference insertion: the editor lost focus when
       // user clicked on the canvas, so we must refocus before setting cursor.
-      if (editingSession.isActive()) {
+      // Only do this when cursorPos is explicitly provided (reference insertion),
+      // NOT during normal typing (when cursorPos is undefined).
+      // During typing, the editor already has focus and browser maintains cursor.
+      if (editingSession.isActive() && cursorPos !== undefined) {
         const targetElement = activeEditor === "formula"
           ? elements.formulaDisplay
           : elements.cellDisplay;
