@@ -563,7 +563,13 @@ export function initApp(): AppContext {
    * @param value The formula text
    * @param cursorPos Optional cursor position to restore after updating colored displays
    */
+  // Sequence number to prevent stale async results from overwriting newer content
+  let highlightUpdateSeq = 0;
+
   async function updateFormulaHighlights(value: string, cursorPos?: number): Promise<void> {
+    // Increment sequence number for this update
+    const thisSeq = ++highlightUpdateSeq;
+
     // Clear highlights if not editing or empty value
     if (!value || !value.startsWith("=")) {
       app.formulaHighlights = [];
@@ -582,6 +588,11 @@ export function initApp(): AppContext {
       // Get references from partial formula (handles incomplete formulas)
       // C++ creates any referenced cells and returns positions directly
       const result = await app.dataSource.client.getReferencesFromPartial(value);
+
+      // Skip if a newer update has started (prevents stale results from overwriting newer content)
+      if (thisSeq !== highlightUpdateSeq) {
+        return;
+      }
 
       if (result.error) {
         console.warn("Formula parse error:", result.error);
@@ -606,6 +617,10 @@ export function initApp(): AppContext {
       updateColoredDisplays(value, cursorPos);
       render();
     } catch (e) {
+      // Skip if a newer update has started
+      if (thisSeq !== highlightUpdateSeq) {
+        return;
+      }
       console.warn("Error updating formula highlights:", e);
       app.formulaHighlights = [];
       updateColoredDisplays(value, cursorPos);
@@ -661,23 +676,25 @@ export function initApp(): AppContext {
       // Update cell display
       elements.cellDisplay.innerHTML = coloredHtml;
 
-      // Focus the appropriate editor and restore cursor
-      // This is critical for reference insertion: the editor lost focus when
-      // user clicked on the canvas, so we must refocus before setting cursor.
-      // Only do this when cursorPos is explicitly provided (reference insertion),
-      // NOT during normal typing (when cursorPos is undefined).
-      // During typing, the editor already has focus and browser maintains cursor.
-      if (editingSession.isActive() && cursorPos !== undefined) {
+      // Restore cursor position after innerHTML change destroys it.
+      // Setting innerHTML always resets cursor to 0, so we must restore from EditingSession.
+      if (editingSession.isActive()) {
         const targetElement = activeEditor === "formula"
           ? elements.formulaDisplay
           : elements.cellDisplay;
 
-        // Use requestAnimationFrame to focus AFTER mouse events complete
-        // (click/mouseup can steal focus back to canvas)
-        requestAnimationFrame(() => {
-          targetElement.focus();
+        if (cursorPos !== undefined) {
+          // Reference insertion case: editor lost focus when user clicked canvas,
+          // so we must refocus before setting cursor. Use requestAnimationFrame
+          // to focus AFTER mouse events complete (click/mouseup can steal focus).
+          requestAnimationFrame(() => {
+            targetElement.focus();
+            restoreCursorInElement(targetElement, targetCursor);
+          });
+        } else if (document.activeElement === targetElement) {
+          // Normal typing: element already has focus, just restore cursor position
           restoreCursorInElement(targetElement, targetCursor);
-        });
+        }
       }
     });
   }

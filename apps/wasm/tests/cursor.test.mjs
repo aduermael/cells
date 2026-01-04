@@ -431,6 +431,61 @@ const tests = {
     const content = await getFormulaBarContent(ctx.page);
     assertEqual(content, 'TabTest', 'Value should be saved');
   },
+
+  // ===========================================================================
+  // Regression Tests
+  // ===========================================================================
+
+  'Typing = keeps cursor at end (not reset to 0)': async (ctx) => {
+    // Regression test: typing '=' triggered formula colorization which
+    // set innerHTML and reset cursor to position 0
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Click on cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Type '=' to start a formula
+    await ctx.page.keyboard.type('=', { delay: 50 });
+    await sleep(200);
+
+    // Get cursor position - should be at 1 (after the '=')
+    const cursorPos = await getActiveCursorPos(ctx.page);
+    assertEqual(cursorPos, 1, 'Cursor should be at position 1 after typing =');
+
+    // Continue typing to verify cursor works correctly
+    await ctx.page.keyboard.type('A1', { delay: 50 });
+    await sleep(100);
+
+    // Verify the formula is correct (not =A1 with cursor issues)
+    const content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=A1', 'Formula should be =A1');
+  },
+
+  'Typing formula maintains cursor position throughout': async (ctx) => {
+    // Verify cursor stays correct while typing entire formula
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Click on cell to select it
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+
+    // Type formula character by character, checking cursor
+    const formula = '=SUM(A1)';
+    for (let i = 0; i < formula.length; i++) {
+      await ctx.page.keyboard.type(formula[i], { delay: 30 });
+      await sleep(100);
+
+      const cursorPos = await getActiveCursorPos(ctx.page);
+      assertEqual(cursorPos, i + 1, `Cursor should be at position ${i + 1} after typing "${formula.slice(0, i + 1)}"`);
+    }
+
+    // Verify final formula
+    const content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, formula, `Formula should be ${formula}`);
+  },
 };
 
 // Run all tests
