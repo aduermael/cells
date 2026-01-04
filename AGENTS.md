@@ -138,6 +138,8 @@ This runs all verification steps in sequence with 16 parallel jobs:
 - Tests: Google Test or Catch2
 - Build: Bazel (fastest incremental builds, hermetic, scales well)
 
+**WASM constraint:** C++ exceptions are not supported in WASM builds. Never use `throw` or `try/catch` in core engine code. Use error codes or `std::optional`/`std::expected` instead.
+
 ### Directory Structure
 ```
 WORKSPACE                   # Bazel workspace root
