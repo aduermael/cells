@@ -142,10 +142,10 @@ Create a centralized `EditingSession` state object that:
   - Event subscription available in EditingSession for future use if needed
   - Cursor position preserved through EditingSession as single source of truth
 
-- [ ] 3c: Refactor focus/blur handling in FormulaBarEditor
-  - On blur: do NOT reset cursor, keep session state
-  - On focus: restore cursor position from session
-  - Remove redundant cursor tracking code
+- [x] 3c: Refactor focus/blur handling in FormulaBarEditor
+  - On blur with suppression: cursor stays in EditingSession (not reset)
+  - On focus: cursor position restored from session (setCursorPosition in focus handler)
+  - Removed redundant lastKnownCursorPos and lastKnownValue fields (done in 3a)
 
 ---
 
