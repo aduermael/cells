@@ -87,14 +87,14 @@ Create a centralized `EditingSession` state object that:
 
 ## Phase 1: Create EditingSession Module
 
-- [ ] 1a: Create `editing-session.ts` with core state interface and class
+- [x] 1a: Create `editing-session.ts` with core state interface and class
   - Define `EditingSessionState` interface
   - Create `EditingSession` class with state management
   - Implement `setCursor()`, `insertAt()`, `replaceRange()`, `getValue()`, `setValue()`, `getSelection()`
   - Add event emitter for state change notifications
   - Export singleton or factory function
 
-- [ ] 1b: Add TypeScript unit tests for EditingSession
+- [x] 1b: Add TypeScript unit tests for EditingSession
   - Test session creation with initial state
   - Test `setCursor()` updates both start and end
   - Test `insertAt()` inserts text and updates cursor correctly
