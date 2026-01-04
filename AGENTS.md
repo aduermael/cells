@@ -124,6 +124,8 @@ This runs all verification steps in sequence with 16 parallel jobs:
 
 **If any step fails:** Fix the issue before proceeding. Do not introduce regressions.
 
+**IMPORTANT: Fix ALL errors, including pre-existing ones.** When running tests, builds, or checks, you must fix every error that appears—not just errors you introduced. Pre-existing errors are not an excuse to leave a broken build. The codebase should always be in a passing state.
+
 ### Working Style
 
 - **One commit per sub-task:** Each lettered subtask (a, b, c...) gets its own commit

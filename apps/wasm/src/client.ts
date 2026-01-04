@@ -423,7 +423,7 @@ export class CellsClient {
    */
   async parseUserInputValue(input: string): Promise<ParsedInputResult> {
     const response = await this._send("parseUserInputValue", { input });
-    return response as ParsedInputResult;
+    return response as unknown as ParsedInputResult;
   }
 
   /**

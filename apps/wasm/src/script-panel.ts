@@ -698,7 +698,7 @@ export class ScriptPanel {
     const textBeforeCursor = value.substring(0, cursorPos);
     const lines = textBeforeCursor.split("\n");
     const line = lines.length - 1;
-    const column = lines[lines.length - 1].length;
+    const column = (lines[lines.length - 1] ?? "").length;
 
     return { line, column };
   }
@@ -714,7 +714,7 @@ export class ScriptPanel {
     const textBeforeCursor = value.substring(0, cursorPos);
     const lines = textBeforeCursor.split("\n");
     const lineIndex = lines.length - 1;
-    const column = lines[lines.length - 1].length;
+    const column = (lines[lines.length - 1] ?? "").length;
 
     // Approximate character dimensions (monospace font)
     const lineHeight = 19.5; // 13px * 1.5 line-height
@@ -916,7 +916,7 @@ export class ScriptPanel {
 
     // Find word start (go back until non-identifier char)
     let wordStart = cursorPos;
-    while (wordStart > 0 && /[a-zA-Z0-9_]/.test(value[wordStart - 1])) {
+    while (wordStart > 0 && /[a-zA-Z0-9_]/.test(value[wordStart - 1] ?? "")) {
       wordStart--;
     }
 

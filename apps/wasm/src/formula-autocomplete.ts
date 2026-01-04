@@ -296,6 +296,7 @@ export class FormulaAutocomplete {
     if (this.filteredFunctions.length === 0) return;
 
     const fn = this.filteredFunctions[this.selectedIndex];
+    if (!fn) return;
     this.onSelect(fn.name);
     this.hide();
   }

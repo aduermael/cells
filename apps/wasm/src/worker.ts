@@ -43,10 +43,21 @@ interface CellsEngine {
 
   // Cell operations
   updateCell(cellId: string, value: string): string;
+  updateCellWithFormatDetection(cellId: string, value: string): string;
   createCell(col: number, row: number, value: string): string;
   getOrCreateCellAt(col: number, row: number): string;
   deleteCell(cellId: string): string;
   deleteCellAt(col: number, row: number): string;
+
+  // Number format operations
+  setCellFormat(cellId: string, formatId: string): string;
+  setCellFormatAt(col: number, row: number, formatId: string): string;
+  getAvailableFormats(): string;
+  getFormulaFunctions(): string;
+  getCellFormatId(cellId: string): string;
+  parseUserInputValue(input: string): string;
+  formatCellValue(value: number, formatId: string): string;
+  formatCellById(cellId: string): string;
 
   // Column/row operations
   resizeColumn(colId: string, width: number): string;

@@ -244,6 +244,7 @@ export type AutocompleteSuggestionKind =
   | "type"
   | "module"
   | "function"
+  | "class"
   | "path"
   | "text";
 
