@@ -363,6 +363,22 @@ export function initApp(): AppContext {
   // Formula bar update
   // =========================================================================
 
+  /**
+   * Get the value to display in the formula bar for a cell.
+   * - Formula cells: show the formula (e.g., "=A1+B1")
+   * - Formatted cells: show the formatted value (e.g., "15%" for percentage)
+   * - Other cells: show the raw value
+   */
+  function getFormulaBarValue(cell: { formula?: string; value?: string; display?: string } | null | undefined): string {
+    if (!cell) return "";
+    // Formula cells: always show the formula
+    if (cell.formula) return cell.formula;
+    // Formatted cells: show the formatted display value (like Google Sheets)
+    if (cell.display) return cell.display;
+    // Default: show raw value
+    return cell.value || "";
+  }
+
   function updateFormulaBar(): void {
     // Don't overwrite formula bar while user is actively editing
     if (cellEditor.isEditing() || formulaBarEditor.isEditingFormulaBar()) {
@@ -395,14 +411,9 @@ export function initApp(): AppContext {
           app.selectionStart.row,
           app.cells
         );
-        if (anchorCell) {
-          const value = anchorCell.formula || anchorCell.value || "";
-          elements.formulaInput.value = value;
-          elements.formulaDisplay.textContent = value;
-        } else {
-          elements.formulaInput.value = "";
-          elements.formulaDisplay.textContent = "";
-        }
+        const value = getFormulaBarValue(anchorCell);
+        elements.formulaInput.value = value;
+        elements.formulaDisplay.textContent = value;
       }
     } else {
       const ref =
@@ -413,14 +424,9 @@ export function initApp(): AppContext {
         app.selectedCell.row,
         app.cells
       );
-      if (cell) {
-        const formulaValue = cell.formula || cell.value || "";
-        elements.formulaInput.value = formulaValue;
-        elements.formulaDisplay.textContent = formulaValue;
-      } else {
-        elements.formulaInput.value = "";
-        elements.formulaDisplay.textContent = "";
-      }
+      const value = getFormulaBarValue(cell);
+      elements.formulaInput.value = value;
+      elements.formulaDisplay.textContent = value;
     }
     elements.formulaDisplay.dataset.placeholder = "";
 

@@ -25,11 +25,11 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '15%', 'Cell should display 15%');
 
-    // Check the formula bar shows the raw value (0.15)
+    // Formula bar should show formatted value (like Google Sheets)
     await clickCell(ctx.page, 'A1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
-    assertEqual(formulaBar, '0.15', 'Formula bar should show raw value 0.15');
+    assertEqual(formulaBar, '15%', 'Formula bar should show formatted value 15%');
   },
 
   'Currency input auto-detects format': async (ctx) => {
@@ -44,11 +44,11 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'B1');
     assertEqual(display, '$1,234.56', 'Cell should display $1,234.56');
 
-    // Check the formula bar shows the raw value
+    // Formula bar should show formatted value (like Google Sheets)
     await clickCell(ctx.page, 'B1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
-    assertEqual(formulaBar, '1234.56', 'Formula bar should show raw value 1234.56');
+    assertEqual(formulaBar, '$1,234.56', 'Formula bar should show formatted value $1,234.56');
   },
 
   'Plain numbers are not auto-formatted': async (ctx) => {
@@ -101,11 +101,11 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'E1');
     assertEqual(display, '-25%', 'Cell should display -25%');
 
-    // Check the formula bar
+    // Formula bar should show formatted value
     await clickCell(ctx.page, 'E1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
-    assertEqual(formulaBar, '-0.25', 'Formula bar should show -0.25');
+    assertEqual(formulaBar, '-25%', 'Formula bar should show formatted value -25%');
   },
 
   'Currency without decimals works': async (ctx) => {
@@ -120,11 +120,11 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'F1');
     assertEqual(display, '$500', 'Cell should display $500');
 
-    // Check the formula bar
+    // Formula bar should show formatted value
     await clickCell(ctx.page, 'F1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
-    assertEqual(formulaBar, '500', 'Formula bar should show 500');
+    assertEqual(formulaBar, '$500', 'Formula bar should show formatted value $500');
   },
 
   'Percentage with decimals works': async (ctx) => {
@@ -139,11 +139,11 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'G1');
     assertEqual(display, '12.50%', 'Cell should display 12.50%');
 
-    // Check the formula bar
+    // Formula bar should show formatted value
     await clickCell(ctx.page, 'G1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
-    assertEqual(formulaBar, '0.125', 'Formula bar should show 0.125');
+    assertEqual(formulaBar, '12.50%', 'Formula bar should show formatted value 12.50%');
   },
 
   'Formula results are not auto-formatted': async (ctx) => {

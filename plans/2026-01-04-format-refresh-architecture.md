@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2026-01-04 06:59 UTC
-Updated At: 2026-01-04 08:30 UTC
+Updated At: 2026-01-04 09:45 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -144,22 +144,25 @@ This is the most critical issue - formulas set via scripts don't update when dep
 
 ## Phase 3: Formula Bar Shows Formatted Value
 
-- [ ] 3a: Add formatCellValue method to get formatted display
-  - The C++ `formatCellById()` method exists but may need adjustment
-  - Verify it returns "15%" for a cell with value 0.15 and PERCENTAGE format
+- [x] 3a: Add formatCellValue method to get formatted display
+  - The C++ `formatCellById()` method already exists and works
+  - Viewport response already includes `display` field for formatted cells
+  - Returns "15%" for a cell with value 0.15 and PERCENTAGE format
 
-- [ ] 3b: Update formula bar to show formatted value when not editing
-  - Modify `updateFormulaBar()` in `init.ts`
-  - When viewing (not editing), show formatted value
-  - When editing, show raw value (to allow precise editing)
+- [x] 3b: Update formula bar to show formatted value when not editing
+  - Added `getFormulaBarValue()` helper to `init.ts`
+  - When viewing (not editing), shows formatted value via `cell.display`
+  - Formula cells show formula, formatted cells show display, others show raw value
 
-- [ ] 3c: Handle formula cells specially
-  - For formula cells, continue showing the formula (e.g., "=A1*2")
-  - Only apply formatting to non-formula numeric cells
+- [x] 3c: Handle formula cells specially
+  - For formula cells, shows the formula (e.g., "=A1*2") via `cell.formula`
+  - Only formatted non-formula cells show display value
 
-- [ ] 3d: Add E2E test for formula bar formatted display
-  - Type "15%", press Enter, verify formula bar shows "15%"
-  - Type "=A1", press Enter, verify formula bar shows "=A1" (formula)
+- [x] 3d: Add E2E test for formula bar formatted display
+  - Updated existing format tests to verify formula bar shows formatted value
+  - Type "15%", press Enter → formula bar shows "15%"
+  - Type "=A1+A2", press Enter → formula bar shows "=A1+A2" (formula)
+  - All 12 format tests pass
 
 ## Phase 4: Top Bar UI Redesign
 
