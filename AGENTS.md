@@ -155,6 +155,10 @@ testdata/                   # Sample .zcd files for testing
 
 **IMPORTANT:** Always use Makefile targets or npm scripts. Never run raw `bazel` or `node` commands directly.
 
+**Which build command to use:**
+- `make build` - C++ core engine only (no WASM)
+- `make wasm` or `make wasm-dist` - TypeScript/WASM web app (use this for frontend work)
+
 ### Core Engine (C++)
 
 | Task | Command |

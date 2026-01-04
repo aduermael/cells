@@ -1,14 +1,14 @@
 Status: READY
 Created At: 2026-01-03 23:17 UTC
-Updated At: 2026-01-03 23:17 UTC
+Updated At: 2026-01-03 23:59 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
 
 | Task | Command |
 |------|---------|
-| Build | `make build` |
-| Unit tests | `make test` |
+| Build WASM | `make wasm-dist` |
+| Unit tests (C++) | `make test` |
 | TypeScript unit tests | `cd apps/wasm && npm test` |
 | E2E tests | `cd apps/wasm && npm run test:parallel -- stable` |
 | Lint | `make lint` |
