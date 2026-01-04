@@ -129,7 +129,7 @@ Create a centralized `EditingSession` state object that:
 
 ## Phase 3: Integrate EditingSession into FormulaBarEditor
 
-- [ ] 3a: Refactor FormulaBarEditor to use shared EditingSession
+- [x] 3a: Refactor FormulaBarEditor to use shared EditingSession
   - Remove `lastKnownCursorPos` and `lastKnownValue` from FormulaBarEditor
   - Use same EditingSession instance as CellEditor
   - Update focus handler to sync display from session
