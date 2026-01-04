@@ -170,35 +170,62 @@ function getTextOffset(
 }
 
 /**
- * Restore cursor to a text offset position in element.
+ * Find the node and local offset for a given text offset in an element.
  */
-function restoreCursor(element: HTMLElement, offset: number): void {
-  const selection = window.getSelection();
-  if (!selection) return;
-
+function findNodeAtOffset(element: HTMLElement, targetOffset: number): { node: Node; offset: number } | null {
   const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
   let totalOffset = 0;
-
   let current = walker.nextNode();
   while (current) {
     const nodeLength = current.textContent?.length ?? 0;
-    if (totalOffset + nodeLength >= offset) {
-      // Found the node containing our offset
-      const range = document.createRange();
-      range.setStart(current, offset - totalOffset);
-      range.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      return;
+    if (totalOffset + nodeLength >= targetOffset) {
+      return { node: current, offset: targetOffset - totalOffset };
     }
     totalOffset += nodeLength;
     current = walker.nextNode();
   }
+  return null;
+}
 
-  // Offset is beyond content, place cursor at end
+/**
+ * Restore cursor/selection to text offset position(s) in element.
+ * @param element The contenteditable element
+ * @param startOffset The start position of the cursor/selection
+ * @param endOffset Optional end position for selection range (defaults to startOffset)
+ */
+function restoreCursor(element: HTMLElement, startOffset: number, endOffset?: number): void {
+  const selection = window.getSelection();
+  if (!selection) return;
+
+  const effectiveEnd = endOffset ?? startOffset;
   const range = document.createRange();
-  range.selectNodeContents(element);
-  range.collapse(false);
+
+  // Find start position
+  const startPos = findNodeAtOffset(element, startOffset);
+  if (startPos) {
+    range.setStart(startPos.node, startPos.offset);
+  } else {
+    // Start offset beyond content, place at end
+    range.selectNodeContents(element);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+    return;
+  }
+
+  // Find end position (for selection range)
+  if (effectiveEnd !== startOffset) {
+    const endPos = findNodeAtOffset(element, effectiveEnd);
+    if (endPos) {
+      range.setEnd(endPos.node, endPos.offset);
+    } else {
+      // End offset beyond content, extend to end
+      range.setEndAfter(element.lastChild || element);
+    }
+  } else {
+    range.collapse(true);
+  }
+
   selection.removeAllRanges();
   selection.addRange(range);
 }
@@ -231,13 +258,15 @@ export function getCursorPosition(
 }
 
 /**
- * Set cursor position in a contenteditable element.
+ * Set cursor/selection position in a contenteditable element.
+ * @param element The contenteditable element
+ * @param start The start position of the cursor/selection
+ * @param end Optional end position for selection range (defaults to start)
  */
 export function setCursorPosition(
   element: HTMLElement,
   start: number,
-  _end?: number
+  end?: number
 ): void {
-  restoreCursor(element, start);
-  // TODO: Handle selection range (start !== end) if needed
+  restoreCursor(element, start, end);
 }

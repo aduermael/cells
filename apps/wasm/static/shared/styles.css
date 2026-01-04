@@ -731,8 +731,7 @@ canvas {
 #formula-display .formula-ref,
 #cell-display .formula-ref {
     font-weight: var(--font-weight-semibold);
-    transition: text-shadow 0.15s ease, transform 0.15s ease;
-    display: inline-block;
+    transition: text-shadow 0.15s ease;
     cursor: default;
 }
 
@@ -742,7 +741,6 @@ canvas {
 #cell-display .formula-ref:hover,
 #cell-display .formula-ref-hovered {
     text-shadow: 0 0 2px currentColor;
-    transform: scale(1.02);
 }
 
 /* Cell Editor Container - wrapper for contenteditable and hidden input */

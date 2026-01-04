@@ -278,9 +278,9 @@ export class CellEditor {
       // Apply colored HTML
       this.cellDisplay.innerHTML = colorizeFormula(value, highlights);
 
-      // Restore cursor position from session
+      // Restore cursor/selection position from session
       if (document.activeElement === this.cellDisplay) {
-        setCursorPosition(this.cellDisplay, cursorPos.start);
+        setCursorPosition(this.cellDisplay, cursorPos.start, cursorPos.end);
       }
 
       // Also update formula display

@@ -660,9 +660,10 @@ export function initApp(): AppContext {
     // Pass hoveredGridRefIndex to highlight formula text when grid highlight is hovered
     const coloredHtml = colorizeFormula(value, app.formulaHighlights, app.hoveredGridRefIndex);
 
-    // Get cursor position: prefer explicit parameter, then EditingSession
+    // Get cursor/selection position: prefer explicit parameter, then EditingSession
     const sessionCursor = editingSession.getSelection();
-    const targetCursor = cursorPos ?? sessionCursor.start;
+    const targetStart = cursorPos ?? sessionCursor.start;
+    const targetEnd = cursorPos ?? sessionCursor.end;
 
     // Determine which element should have cursor restored based on EditingSession
     const activeEditor = editingSession.getActiveEditor();
@@ -676,7 +677,7 @@ export function initApp(): AppContext {
       // Update cell display
       elements.cellDisplay.innerHTML = coloredHtml;
 
-      // Restore cursor position after innerHTML change destroys it.
+      // Restore cursor/selection position after innerHTML change destroys it.
       // Setting innerHTML always resets cursor to 0, so we must restore from EditingSession.
       if (editingSession.isActive()) {
         const targetElement = activeEditor === "formula"
@@ -689,44 +690,73 @@ export function initApp(): AppContext {
           // to focus AFTER mouse events complete (click/mouseup can steal focus).
           requestAnimationFrame(() => {
             targetElement.focus();
-            restoreCursorInElement(targetElement, targetCursor);
+            restoreCursorInElement(targetElement, targetStart, targetEnd);
           });
         } else if (document.activeElement === targetElement) {
-          // Normal typing: element already has focus, just restore cursor position
-          restoreCursorInElement(targetElement, targetCursor);
+          // Normal typing: element already has focus, just restore cursor/selection
+          restoreCursorInElement(targetElement, targetStart, targetEnd);
         }
       }
     });
   }
 
   /**
-   * Restore cursor to text offset position in element.
+   * Find the node and local offset for a given text offset in an element.
    */
-  function restoreCursorInElement(element: HTMLElement, offset: number): void {
-    const selection = window.getSelection();
-    if (!selection) return;
-
+  function findNodeAtOffset(element: HTMLElement, targetOffset: number): { node: Node; offset: number } | null {
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null);
     let totalOffset = 0;
     let current = walker.nextNode();
     while (current) {
       const nodeLength = current.textContent?.length ?? 0;
-      if (totalOffset + nodeLength >= offset) {
-        const range = document.createRange();
-        range.setStart(current, offset - totalOffset);
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        return;
+      if (totalOffset + nodeLength >= targetOffset) {
+        return { node: current, offset: targetOffset - totalOffset };
       }
       totalOffset += nodeLength;
       current = walker.nextNode();
     }
+    return null;
+  }
 
-    // Offset is beyond content, place cursor at end
+  /**
+   * Restore cursor/selection to text offset position(s) in element.
+   * @param element The contenteditable element
+   * @param startOffset The start position of the cursor/selection
+   * @param endOffset Optional end position for selection range (defaults to startOffset)
+   */
+  function restoreCursorInElement(element: HTMLElement, startOffset: number, endOffset?: number): void {
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    const effectiveEnd = endOffset ?? startOffset;
     const range = document.createRange();
-    range.selectNodeContents(element);
-    range.collapse(false);
+
+    // Find start position
+    const startPos = findNodeAtOffset(element, startOffset);
+    if (startPos) {
+      range.setStart(startPos.node, startPos.offset);
+    } else {
+      // Start offset beyond content, place at end
+      range.selectNodeContents(element);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return;
+    }
+
+    // Find end position (for selection range)
+    if (effectiveEnd !== startOffset) {
+      const endPos = findNodeAtOffset(element, effectiveEnd);
+      if (endPos) {
+        range.setEnd(endPos.node, endPos.offset);
+      } else {
+        // End offset beyond content, extend to end
+        range.setEndAfter(element.lastChild || element);
+      }
+    } else {
+      range.collapse(true);
+    }
+
     selection.removeAllRanges();
     selection.addRange(range);
   }
@@ -1297,8 +1327,8 @@ export function initApp(): AppContext {
       if (value && app.formulaHighlights.length > 0) {
         const coloredHtml = colorizeFormula(value, app.formulaHighlights, app.hoveredGridRefIndex);
 
-        // Save cursor position from EditingSession before innerHTML change
-        const cursorPos = editingSession.getSelection().start;
+        // Save cursor/selection position from EditingSession before innerHTML change
+        const cursor = editingSession.getSelection();
         const activeElement = document.activeElement;
 
         // Suppress selectionchange to avoid corrupting session state
@@ -1306,11 +1336,11 @@ export function initApp(): AppContext {
           elements.formulaDisplay.innerHTML = coloredHtml;
           elements.cellDisplay.innerHTML = coloredHtml;
 
-          // Restore cursor if one of our editors has focus
+          // Restore cursor/selection if one of our editors has focus
           if (activeElement === elements.formulaDisplay) {
-            restoreCursorInElement(elements.formulaDisplay, cursorPos);
+            restoreCursorInElement(elements.formulaDisplay, cursor.start, cursor.end);
           } else if (activeElement === elements.cellDisplay) {
-            restoreCursorInElement(elements.cellDisplay, cursorPos);
+            restoreCursorInElement(elements.cellDisplay, cursor.start, cursor.end);
           }
         });
       }

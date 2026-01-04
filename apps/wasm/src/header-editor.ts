@@ -487,9 +487,9 @@ export class FormulaBarEditor {
       // Apply colored HTML
       this.formulaDisplay.innerHTML = colorizeFormula(value, highlights);
 
-      // Restore cursor position from session
+      // Restore cursor/selection position from session
       if (document.activeElement === this.formulaDisplay) {
-        setCursorPosition(this.formulaDisplay, cursorPos.start);
+        setCursorPosition(this.formulaDisplay, cursorPos.start, cursorPos.end);
       }
 
       // Also update cell display if visible
