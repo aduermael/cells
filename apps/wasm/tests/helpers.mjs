@@ -222,12 +222,9 @@ export async function getCellDisplayValue(page, cellRef) {
       const cells = window._appContext.app.cells;
       for (const cell of cells) {
         if (cell.col === col && cell.row === row) {
-          // For formula cells, use display (computed value)
-          // For value cells, use value
-          if (cell.formula) {
-            return cell.display || '';
-          }
-          return cell.value || '';
+          // Prefer display (formatted value) if available,
+          // otherwise fall back to value (raw value)
+          return cell.display || cell.value || '';
         }
       }
     }

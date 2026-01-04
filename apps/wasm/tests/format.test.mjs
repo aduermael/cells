@@ -169,6 +169,78 @@ const tests = {
     const formulaBar = await getFormulaBarContent(ctx.page);
     assertEqual(formulaBar, '=A1+A2', 'Formula bar should show formula');
   },
+
+  // ============================================================================
+  // Format selector dropdown tests
+  // ============================================================================
+
+  'Format dropdown shows Percent for percentage input': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a percentage value
+    await setCellValue(ctx.page, 'A1', '15%');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Check the format dropdown shows "Percent"
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Percent', 'Format dropdown should show Percent');
+  },
+
+  'Format dropdown shows Currency for currency input': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a currency value
+    await setCellValue(ctx.page, 'A1', '$100');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Check the format dropdown shows "Currency"
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Currency', 'Format dropdown should show Currency');
+  },
+
+  'Format dropdown shows General for plain numbers': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a plain number
+    await setCellValue(ctx.page, 'A1', '42');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Check the format dropdown shows "General"
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'General', 'Format dropdown should show General');
+  },
+
+  'Format dropdown shows General for text': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter text
+    await setCellValue(ctx.page, 'A1', 'Hello');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Check the format dropdown shows "General"
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'General', 'Format dropdown should show General for text');
+  },
 };
 
 // Run all tests

@@ -394,7 +394,7 @@ export class CellsClient {
    */
   async getAvailableFormats(): Promise<NumberFormat[]> {
     const response = await this._send("getAvailableFormats", {});
-    return response as unknown as NumberFormat[];
+    return (response as unknown as { formats: NumberFormat[] }).formats;
   }
 
   /**

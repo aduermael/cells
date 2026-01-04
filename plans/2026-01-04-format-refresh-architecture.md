@@ -124,19 +124,23 @@ This is the most critical issue - formulas set via scripts don't update when dep
 
 ## Phase 2: Fix Format Selector Update
 
-- [ ] 2a: Verify formatId is included in viewport response
-  - Trace the viewport query path in `bindings.cc`
-  - Verify `ViewportCell` includes `formatId` field
-  - Add logging/test to confirm format ID propagates to JS
+- [x] 2a: Verify formatId is included in viewport response
+  - Added `formatId` field to viewport cell JSON output in `bindings.cc`
+  - Cells now include formatId when a format is applied (e.g., `"formatId":"FMT_P000"`)
 
-- [ ] 2b: Fix format selector to read formatId correctly
-  - Debug `updateForCurrentCell()` in `format-controls.ts`
-  - Ensure `cellData.formatId` is populated from viewport
-  - May need to ensure `getSelectedCellData()` returns fresh data after viewport fetch
+- [x] 2b: Fix format selector to read formatId correctly
+  - Fixed `client.ts` `getAvailableFormats()` to extract `.formats` array from response
+  - Fixed `format-controls.ts` to convert lowercase C++ categories to uppercase TypeScript types
+  - Fixed `getCategoryForFormatId()` and `getFormatIdForCategory()` for case-insensitive comparison
+  - Fixed `helpers.mjs` `getCellDisplayValue()` to prefer `display` over `value` for formatted cells
 
-- [ ] 2c: Add E2E test for format selector update
-  - Type "15%" in cell, verify format dropdown shows "Percentage"
-  - Type "$100" in cell, verify format dropdown shows "Currency"
+- [x] 2c: Add E2E test for format selector update
+  - Added 4 tests to `format.test.mjs`:
+    - Type "15%" → dropdown shows "Percent"
+    - Type "$100" → dropdown shows "Currency"
+    - Type "42" → dropdown shows "General"
+    - Type "Hello" → dropdown shows "General"
+  - All 12 format tests pass
 
 ## Phase 3: Formula Bar Shows Formatted Value
 

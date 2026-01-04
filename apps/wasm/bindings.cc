@@ -639,6 +639,11 @@ public:
             json << "\"col\":" << colPos << ",";
             json << "\"row\":" << rowPos << ",";
 
+            // Include formatId if cell has a format
+            if (!entry.cell->formatId.isNull()) {
+                json << "\"formatId\":\"" << entry.cell->formatId.toString() << "\",";
+            }
+
             if (entry.cell->isFormula()) {
                 json << "\"type\":\"f\",";
                 Formula* formula = entry.cell->getFormula();

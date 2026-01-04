@@ -112,9 +112,9 @@ export class FormatControls {
   // =========================================================================
 
   /** Set the data source after WASM initialization */
-  setDataSource(dataSource: WasmDataSource): void {
+  async setDataSource(dataSource: WasmDataSource): Promise<void> {
     this.dataSource = dataSource;
-    this.loadAvailableFormats();
+    await this.loadAvailableFormats();
   }
 
   /** Update the displayed format for the current cell selection */
@@ -283,7 +283,8 @@ export class FormatControls {
     // Look up in available formats
     const format = this.availableFormats.find((f) => f.id === formatId);
     if (format) {
-      return format.category;
+      // C++ returns lowercase categories, convert to uppercase for TypeScript
+      return format.category.toUpperCase() as NumberFormatCategory;
     }
 
     // Fallback: query from data source
@@ -291,7 +292,7 @@ export class FormatControls {
       const formats = await this.dataSource.getAvailableFormats();
       const found = formats.find((f) => f.id === formatId);
       if (found) {
-        return found.category;
+        return found.category.toUpperCase() as NumberFormatCategory;
       }
     }
 
@@ -300,7 +301,10 @@ export class FormatControls {
 
   private getFormatIdForCategory(category: NumberFormatCategory): string {
     // Return the first format of the given category
-    const format = this.availableFormats.find((f) => f.category === category);
+    // C++ returns lowercase, compare case-insensitively
+    const format = this.availableFormats.find(
+      (f) => f.category.toUpperCase() === category
+    );
     return format ? format.id : "~";
   }
 
