@@ -803,24 +803,25 @@ export class FormulaBarEditor {
         this.formulaInput.value = value;
         this.updateColoredDisplay();
       } else if (wasEditingCell) {
-        // Session not active but was editing cell - start new session
+        // Session not active but was editing cell - start new session as "formula"
+        // (this is a fallback case - normally session would already be active)
         const cellEditorValue = getPlainText(this.cellDisplay);
         const selectedCell = this.getSelectedCell();
         const sheetInfo = this.getSheetInfo();
         const sheetId = sheetInfo?.name ?? "default";
         if (selectedCell) {
-          editingSession.start(sheetId, selectedCell.col, selectedCell.row, cellEditorValue);
+          editingSession.start(sheetId, selectedCell.col, selectedCell.row, cellEditorValue, "formula");
         }
         this.formulaInput.value = cellEditorValue;
         this.updateColoredDisplay();
       } else {
-        // Starting fresh edit from formula bar - start new session
+        // Starting fresh edit from formula bar - start new session as "formula"
         const currentValue = this.formulaInput.value;
         const selectedCell = this.getSelectedCell();
         const sheetInfo = this.getSheetInfo();
         const sheetId = sheetInfo?.name ?? "default";
         if (selectedCell) {
-          editingSession.start(sheetId, selectedCell.col, selectedCell.row, currentValue);
+          editingSession.start(sheetId, selectedCell.col, selectedCell.row, currentValue, "formula");
         }
       }
 

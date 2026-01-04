@@ -5,6 +5,9 @@
 // Types
 // =============================================================================
 
+/** Which editor initiated the editing session */
+export type ActiveEditorType = "cell" | "formula";
+
 /** State of an active editing session */
 export interface EditingSessionState {
   /** Sheet ID being edited */
@@ -19,6 +22,8 @@ export interface EditingSessionState {
   cursorStart: number;
   /** Cursor end position (selection end, same as start when no selection) */
   cursorEnd: number;
+  /** Which editor initiated this session */
+  activeEditor: ActiveEditorType;
 }
 
 /** Listener callback for session state changes */
@@ -50,8 +55,15 @@ export class EditingSession {
    * @param col Column index of the cell
    * @param row Row index of the cell
    * @param initialValue Initial value/formula text
+   * @param activeEditor Which editor initiated this session ("cell" or "formula")
    */
-  start(sheetId: string, col: number, row: number, initialValue: string): void {
+  start(
+    sheetId: string,
+    col: number,
+    row: number,
+    initialValue: string,
+    activeEditor: ActiveEditorType = "cell"
+  ): void {
     this.state = {
       sheetId,
       col,
@@ -59,8 +71,17 @@ export class EditingSession {
       value: initialValue,
       cursorStart: initialValue.length,
       cursorEnd: initialValue.length,
+      activeEditor,
     };
     this.notifyListeners();
+  }
+
+  /**
+   * Get the active editor type for this session.
+   * Returns "cell" by default if no session is active.
+   */
+  getActiveEditor(): ActiveEditorType {
+    return this.state?.activeEditor ?? "cell";
   }
 
   /**

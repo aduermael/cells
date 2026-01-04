@@ -89,6 +89,24 @@ test('start() sets cursor to end of value', () => {
   assertEqual(state.cursorEnd, 4, 'cursorEnd at end');
 });
 
+test('start() defaults activeEditor to "cell"', () => {
+  const session = new EditingSession();
+  session.start('sheet1', 0, 0, 'Test');
+  assertEqual(session.getActiveEditor(), 'cell', 'Default is cell');
+  assertEqual(session.getState().activeEditor, 'cell', 'State has activeEditor');
+});
+
+test('start() accepts activeEditor parameter', () => {
+  const session = new EditingSession();
+  session.start('sheet1', 0, 0, 'Test', 'formula');
+  assertEqual(session.getActiveEditor(), 'formula', 'Set to formula');
+});
+
+test('getActiveEditor() returns "cell" when no session', () => {
+  const session = new EditingSession();
+  assertEqual(session.getActiveEditor(), 'cell', 'Default when no session');
+});
+
 test('clear() resets session', () => {
   const session = new EditingSession();
   session.start('sheet1', 0, 0, 'Hello');

@@ -35,6 +35,7 @@ import {
     type ContextMenuEntry,
     type ContextType,
 } from "./context-menu";
+import { editingSession } from "./editing-session";
 
 // =============================================================================
 // Types
@@ -254,15 +255,18 @@ export class AppEventManager {
     private insertFormulaReference(ref: string, position: Position): void {
         const { cellEditor, formulaBarEditor, render } = this.config;
 
-        // Get cursor position from the editor's tracking BEFORE insertion
-        let cursorStart = 0;
+        // Use EditingSession to determine which editor the user started in
+        // This is more reliable than checking isFormulaMode() because it persists
+        // even when state machine transitions occur due to focus changes
+        const activeEditor = editingSession.getActiveEditor();
+        const cursorStart = editingSession.getSelection().start;
 
-        if (cellEditor.isFormulaMode()) {
-            cursorStart = cellEditor.getLastKnownCursorPos().start;
+        if (activeEditor === "cell") {
+            // User started editing in cell editor - insert there and focus back
             cellEditor.insertReferenceAtCursor(ref);
             cellEditor.getDisplayElement().focus();
-        } else if (formulaBarEditor.isFormulaMode()) {
-            cursorStart = formulaBarEditor.getLastKnownCursorPos().start;
+        } else {
+            // User started editing in formula bar - insert there and focus back
             formulaBarEditor.insertReferenceAtCursor(ref);
             formulaBarEditor.getDisplayElement().focus();
         }
@@ -283,10 +287,13 @@ export class AppEventManager {
     private insertColumnOrRowReference(ref: string): void {
         const { cellEditor, formulaBarEditor, render } = this.config;
 
-        if (cellEditor.isFormulaMode()) {
+        // Use EditingSession to determine which editor the user started in
+        const activeEditor = editingSession.getActiveEditor();
+
+        if (activeEditor === "cell") {
             cellEditor.insertReferenceAtCursor(ref);
             cellEditor.getDisplayElement().focus();
-        } else if (formulaBarEditor.isFormulaMode()) {
+        } else {
             formulaBarEditor.insertReferenceAtCursor(ref);
             formulaBarEditor.getDisplayElement().focus();
         }
@@ -308,14 +315,16 @@ export class AppEventManager {
         const endRowNum = endRow + 1;
         const rangeRef = `${startCol}${startRow}:${endColLetter}${endRowNum}`;
 
-        // Use the editor's replaceReferenceAtPosition method which handles all updates
-        if (cellEditor.isFormulaMode()) {
+        // Use EditingSession to determine which editor the user started in
+        const activeEditor = editingSession.getActiveEditor();
+
+        if (activeEditor === "cell") {
             cellEditor.replaceReferenceAtPosition(
                 this.lastFormulaRef.cursorStart,
                 this.lastFormulaRef.cursorEnd,
                 rangeRef,
             );
-        } else if (formulaBarEditor.isFormulaMode()) {
+        } else {
             formulaBarEditor.replaceReferenceAtPosition(
                 this.lastFormulaRef.cursorStart,
                 this.lastFormulaRef.cursorEnd,

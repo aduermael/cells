@@ -1,7 +1,19 @@
-Status: READY
+Status: IN_PROGRESS
 Created At: 2026-01-03 23:17 UTC
-Updated At: 2026-01-03 23:59 UTC
+Updated At: 2026-01-04 04:17 UTC
 Following plan management guidelines defined in AGENTS.md
+
+## Bug Fixes (during Phase 3)
+
+Two bugs were discovered and fixed during Phase 3 testing:
+
+### Bug 1: Edition continues in formula bar instead of cell after reference insertion
+- **Cause**: When clicking canvas to insert reference, browser focus change could trigger formula bar's focus handler, changing state from CELL_EDITING to FORMULA_BAR_EDITING
+- **Fix**: Added `activeEditor` field to EditingSession to track which editor initiated the session. Reference insertion now uses this to determine where to insert.
+
+### Bug 2: Cursor resets to 0 when editing in formula bar and clicking to insert reference
+- **Cause**: Same root cause - state corruption from focus changes
+- **Fix**: Same fix - using EditingSession.activeEditor ensures cursor position from the correct editor is used
 
 ## Commands
 
