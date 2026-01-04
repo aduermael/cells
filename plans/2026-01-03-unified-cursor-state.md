@@ -135,11 +135,12 @@ Create a centralized `EditingSession` state object that:
   - Update focus handler to sync display from session
   - Update input handler to sync changes to session
 
-- [ ] 3b: Implement two-way sync between editors via session
-  - Subscribe FormulaBarEditor to session change events
-  - When session changes (from CellEditor), update formula bar display
-  - When formula bar changes, update session (CellEditor will auto-sync)
-  - Ensure cursor position is preserved during sync
+- [x] 3b: Implement two-way sync between editors via session
+  - Two-way sync already implemented via imperative approach:
+    - CellEditor input handler syncs to EditingSession AND updates formulaInput/formulaDisplay
+    - FormulaBarEditor input handler syncs to EditingSession AND updates cellEditorInput/cellDisplay
+  - Event subscription available in EditingSession for future use if needed
+  - Cursor position preserved through EditingSession as single source of truth
 
 - [ ] 3c: Refactor focus/blur handling in FormulaBarEditor
   - On blur: do NOT reset cursor, keep session state
