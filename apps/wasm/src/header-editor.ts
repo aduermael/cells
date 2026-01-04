@@ -308,7 +308,7 @@ export class FormulaBarEditor {
     end: Position
   ) => void;
   private onUpdateAstDebugPanel: (value: string) => void;
-  private onUpdateFormulaHighlights: (value: string) => void;
+  private onUpdateFormulaHighlights: (value: string, cursorPos?: number) => void;
   private isEditing: () => boolean;
   private onPositionCellEditor: (cell: Position) => void;
   private onFocusCanvas: () => void;
@@ -335,7 +335,7 @@ export class FormulaBarEditor {
     onUpdateFormulaBar: () => void;
     onSetSelection: (cell: Position, start: Position, end: Position) => void;
     onUpdateAstDebugPanel: (value: string) => void;
-    onUpdateFormulaHighlights: (value: string) => void;
+    onUpdateFormulaHighlights: (value: string, cursorPos?: number) => void;
     isEditing: () => boolean;
     onPositionCellEditor: (cell: Position) => void;
     onFocusCanvas: () => void;
@@ -436,7 +436,9 @@ export class FormulaBarEditor {
     setTimeout(() => {
       setCursorPosition(this.formulaDisplay, newCursorPos);
       this.formulaDisplay.focus();
-      this.syncCellEditorDisplay();
+      // Sync cell editor display
+      this.cellEditorInput.value = newValue;
+      this.cellDisplay.innerHTML = this.formulaDisplay.innerHTML;
       this.onUpdateFormulaHighlights(newValue);
     }, 0);
   }
@@ -526,7 +528,8 @@ export class FormulaBarEditor {
     setCursorPosition(this.formulaDisplay, newCursorPos);
 
     // Update formula highlights (async, will add colors)
-    this.onUpdateFormulaHighlights(newValue);
+    // Pass cursor position so it can be restored after innerHTML update
+    this.onUpdateFormulaHighlights(newValue, newCursorPos);
 
     // Broadcast editing state
     const editCell = this.getSelectionStart() || this.getSelectedCell();
@@ -561,7 +564,8 @@ export class FormulaBarEditor {
     setCursorPosition(this.formulaDisplay, newCursorPos);
 
     // Update formula highlights
-    this.onUpdateFormulaHighlights(newValue);
+    // Pass cursor position so it can be restored after innerHTML update
+    this.onUpdateFormulaHighlights(newValue, newCursorPos);
 
     // Broadcast editing state
     const editCell = this.getSelectionStart() || this.getSelectedCell();

@@ -559,12 +559,14 @@ export function initApp(): AppContext {
    * Update formula highlights based on formula text.
    * Called live as user types in formula bar.
    * C++ provides resolved positions directly, so no viewport lookup needed.
+   * @param value The formula text
+   * @param cursorPos Optional cursor position to restore after updating colored displays
    */
-  async function updateFormulaHighlights(value: string): Promise<void> {
+  async function updateFormulaHighlights(value: string, cursorPos?: number): Promise<void> {
     // Clear highlights if not editing or empty value
     if (!value || !value.startsWith("=")) {
       app.formulaHighlights = [];
-      updateColoredDisplays(value);
+      updateColoredDisplays(value, cursorPos);
       render();
       return;
     }
@@ -583,7 +585,7 @@ export function initApp(): AppContext {
       if (result.error) {
         console.warn("Formula parse error:", result.error);
         app.formulaHighlights = [];
-        updateColoredDisplays(value);
+        updateColoredDisplays(value, cursorPos);
         render();
         return;
       }
@@ -600,12 +602,12 @@ export function initApp(): AppContext {
       }
 
       app.formulaHighlights = highlights;
-      updateColoredDisplays(value);
+      updateColoredDisplays(value, cursorPos);
       render();
     } catch (e) {
       console.warn("Error updating formula highlights:", e);
       app.formulaHighlights = [];
-      updateColoredDisplays(value);
+      updateColoredDisplays(value, cursorPos);
       render();
     }
   }
@@ -613,14 +615,16 @@ export function initApp(): AppContext {
   /**
    * Update the colored formula displays with current highlights.
    * Called after highlights are computed.
+   * @param value The formula text
+   * @param cursorPos Optional cursor position to restore (used when element not focused)
    */
-  function updateColoredDisplays(value: string): void {
+  function updateColoredDisplays(value: string, cursorPos?: number): void {
     // Pass hoveredGridRefIndex to highlight formula text when grid highlight is hovered
     const coloredHtml = colorizeFormula(value, app.formulaHighlights, app.hoveredGridRefIndex);
 
-    // Update formula bar display - preserve cursor if focused
+    // Update formula bar display - preserve cursor
     if (document.activeElement === elements.formulaDisplay) {
-      // Save cursor position, update content, restore cursor
+      // Element is focused - get cursor from selection
       const selection = window.getSelection();
       let cursorOffset = 0;
       if (selection && selection.rangeCount > 0) {
@@ -629,12 +633,17 @@ export function initApp(): AppContext {
       }
       elements.formulaDisplay.innerHTML = coloredHtml;
       restoreCursorInElement(elements.formulaDisplay, cursorOffset);
+    } else if (cursorPos !== undefined) {
+      // Element not focused but cursor position provided (e.g., after inserting reference)
+      elements.formulaDisplay.innerHTML = coloredHtml;
+      restoreCursorInElement(elements.formulaDisplay, cursorPos);
     } else {
       elements.formulaDisplay.innerHTML = coloredHtml;
     }
 
-    // Update cell display - preserve cursor if focused
+    // Update cell display - preserve cursor
     if (document.activeElement === elements.cellDisplay) {
+      // Element is focused - get cursor from selection
       const selection = window.getSelection();
       let cursorOffset = 0;
       if (selection && selection.rangeCount > 0) {
@@ -643,6 +652,10 @@ export function initApp(): AppContext {
       }
       elements.cellDisplay.innerHTML = coloredHtml;
       restoreCursorInElement(elements.cellDisplay, cursorOffset);
+    } else if (cursorPos !== undefined) {
+      // Element not focused but cursor position provided (e.g., after inserting reference)
+      elements.cellDisplay.innerHTML = coloredHtml;
+      restoreCursorInElement(elements.cellDisplay, cursorPos);
     } else {
       elements.cellDisplay.innerHTML = coloredHtml;
     }

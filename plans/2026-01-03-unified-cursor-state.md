@@ -107,20 +107,20 @@ Create a centralized `EditingSession` state object that:
 
 ## Phase 2: Integrate EditingSession into CellEditor
 
-- [ ] 2a: Refactor CellEditor to use EditingSession
+- [x] 2a: Refactor CellEditor to use EditingSession
   - Remove `lastKnownCursorPos` and `lastKnownValue` from CellEditor
   - Import and use EditingSession
   - Update `startEditing()` to create/initialize session
   - Update `confirmEditing()` and `cancelEditing()` to clear session
   - Update `getValue()` and `setValue()` to delegate to session
 
-- [ ] 2b: Refactor cursor tracking in CellEditor
+- [x] 2b: Refactor cursor tracking in CellEditor
   - Update `input` event handler to sync cursor to session
   - Update `selectionchange` handler to sync cursor to session
   - Update `insertReferenceAtCursor()` to use session's `insertAt()`
   - Remove direct cursor position passing to colorizer callbacks
 
-- [ ] 2c: Refactor focus/blur handling in CellEditor
+- [x] 2c: Refactor focus/blur handling in CellEditor
   - On blur: do NOT reset cursor, keep session state
   - On focus: restore cursor position from session
   - Update `focusEditor()` to apply cursor from session after focusing
