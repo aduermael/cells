@@ -20,6 +20,19 @@ double Token::numberValue() const {
     return std::strtod(s.c_str(), nullptr);
 }
 
+double Token::percentValue() const {
+    if (type != TokenType::PERCENT_LITERAL) {
+        return 0.0;
+    }
+    // Parse the number from the text view (excluding trailing %)
+    // text is like "15%" or "12.5%"
+    std::string s(text);
+    if (!s.empty() && s.back() == '%') {
+        s.pop_back();
+    }
+    return std::strtod(s.c_str(), nullptr) / 100.0;
+}
+
 bool Token::booleanValue() const {
     if (type != TokenType::BOOLEAN) {
         return false;
@@ -96,6 +109,8 @@ const char* FormulaLexer::tokenTypeName(TokenType type) {
             return "END_OF_INPUT";
         case TokenType::NUMBER:
             return "NUMBER";
+        case TokenType::PERCENT_LITERAL:
+            return "PERCENT_LITERAL";
         case TokenType::STRING:
             return "STRING";
         case TokenType::BOOLEAN:
@@ -375,6 +390,12 @@ Token FormulaLexer::scanNumber() {
     if (pos_ == start) {
         advance();  // Consume the problematic character
         return makeErrorToken("Invalid number", start);
+    }
+
+    // Check for percentage suffix
+    if (peek() == '%') {
+        advance();  // Consume '%'
+        return makeToken(TokenType::PERCENT_LITERAL, start);
     }
 
     return makeToken(TokenType::NUMBER, start);

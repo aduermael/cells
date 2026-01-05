@@ -184,6 +184,67 @@ TEST_F(FormulaEvalTest, BooleanFalse) {
 }
 
 // =============================================================================
+// PERCENTAGE LITERAL TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, PercentLiteralSimple) {
+    // =15% evaluates to 0.15
+    EvalResult r = eval("=15%");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(0.15, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, PercentLiteralDecimal) {
+    // =12.5% evaluates to 0.125
+    EvalResult r = eval("=12.5%");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(0.125, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, PercentLiteralMultiplication) {
+    // =1000*15% evaluates to 150
+    EvalResult r = eval("=1000*15%");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(150.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, PercentLiteralAddition) {
+    // =50%+25% evaluates to 0.75
+    EvalResult r = eval("=50%+25%");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(0.75, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, PercentLiteralNegative) {
+    // =-15% evaluates to -0.15
+    EvalResult r = eval("=-15%");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(-0.15, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, PercentLiteralWithCellRef) {
+    // A1=100, =A1*15% evaluates to 15
+    setCellValue(0, 0, 100.0);
+    EvalResult r = eval("=A1*15%");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(15.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, PercentLiteralHundred) {
+    // =100% evaluates to 1.0
+    EvalResult r = eval("=100%");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(1.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, PercentLiteralZero) {
+    // =0% evaluates to 0.0
+    EvalResult r = eval("=0%");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(0.0, r.getNumber());
+}
+
+// =============================================================================
 // ARITHMETIC OPERATOR TESTS
 // =============================================================================
 

@@ -251,6 +251,11 @@ std::unique_ptr<ASTNode> FormulaParser::primary() {
         return parseUuidRowRef();
     }
 
+    // Percentage literal (15%, 12.5%)
+    if (match(TokenType::PERCENT_LITERAL)) {
+        return std::make_unique<NumberLiteralNode>(previous_.percentValue(), previous_.position);
+    }
+
     // Check for NUMBER followed by : (row reference)
     // Must check this BEFORE treating as number literal
     if (check(TokenType::NUMBER)) {

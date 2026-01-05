@@ -1,6 +1,6 @@
-Status: IN_PROGRESS
+Status: COMPLETED
 Created At: 2026-01-04 06:59 UTC
-Updated At: 2026-01-04 18:16 UTC
+Updated At: 2026-01-05 06:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -188,20 +188,21 @@ This is the most critical issue - formulas set via scripts don't update when dep
 
 ## Phase 5: Comprehensive Testing
 
-- [ ] 5a: Add format detection unit tests (C++)
-  - Test parsing "15%", "$100", "1.5E6", "12/25/2025", "1.234"
+- [x] 5a: Add format detection unit tests (C++)
+  - Already covered in `input_parser_test.cc` (tests for %, $, 1.5E6, dates, numbers)
   - Verify correct format IDs are assigned
 
-- [ ] 5b: Add format display unit tests (C++)
-  - Test formatting various values with different format IDs
+- [x] 5b: Add format display unit tests (C++)
+  - Already covered in `number_formatter_test.cc` (tests formatting various values)
   - Verify output strings match expectations
 
-- [ ] 5c: Add comprehensive E2E format tests
-  - Full workflow: type formatted value → verify grid display → verify formula bar → verify format selector
+- [x] 5c: Add comprehensive E2E format tests
+  - Already covered in `format.test.mjs` (full workflow tests)
   - Test switching formats via dropdown
   - Test decimal increase/decrease
 
-- [ ] 5d: Add E2E refresh tests
+- [x] 5d: Add E2E refresh tests
+  - Already covered in `script-refresh.test.mjs`
   - Test manual edit refreshes dependents
   - Test script edit refreshes dependents
   - Test chain of dependencies (A1 → B1 → C1)
@@ -210,23 +211,27 @@ This is the most critical issue - formulas set via scripts don't update when dep
 
 Support percentage notation directly in formulas (e.g., `=1000*15%` evaluates to 150).
 
-- [ ] 6a: Update formula lexer to recognize percentage literals
-  - Add `PERCENT_LITERAL` token type for numbers followed by `%`
-  - `15%` should tokenize as a single token with value 0.15
+- [x] 6a: Update formula lexer to recognize percentage literals
+  - Added `PERCENT_LITERAL` token type for numbers followed by `%`
+  - Added `percentValue()` method to Token class
+  - `15%` tokenizes as `PERCENT_LITERAL` with value 0.15
 
-- [ ] 6b: Update formula parser to handle percentage literals
+- [x] 6b: Update formula parser to handle percentage literals
   - Parse `PERCENT_LITERAL` as a number node with the decimal value
   - `15%` → NumberNode(0.15)
 
-- [ ] 6c: Add unit tests for percentage in formulas
-  - Test `=15%` evaluates to 0.15
-  - Test `=100*15%` evaluates to 15
-  - Test `=A1+15%` where A1=100 evaluates to 100.15
-  - Test negative percentages: `=-15%` evaluates to -0.15
+- [x] 6c: Add unit tests for percentage in formulas
+  - Added 9 lexer tests in `formula_lexer_test.cc`
+  - Added 6 parser tests in `formula_parser_test.cc`
+  - Added 8 evaluation tests in `formula_eval_test.cc`
+  - Tests cover: 15%, 12.5%, 100%, 0%, 1000*15%=150, 50%+25%=0.75, -15%, A1*15%
 
-- [ ] 6d: Add E2E tests for percentage formulas
+- [x] 6d: Add E2E tests for percentage formulas
+  - Added 4 tests to `format.test.mjs`:
   - Enter `=1000*15%`, verify result is 150
   - Enter `=50%+25%`, verify result is 0.75
+  - Enter `=15%`, verify result is 0.15
+  - Enter `=A1*15%` with A1=100, verify result is 15
 
 ---
 

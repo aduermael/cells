@@ -241,6 +241,66 @@ const tests = {
     const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
     assertEqual(formatLabel, 'General', 'Format dropdown should show General for text');
   },
+
+  // ============================================================================
+  // Percentage literal in formulas tests
+  // ============================================================================
+
+  'Percentage literal in formula: 1000*15% equals 150': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter formula with percentage literal
+    await setCellValue(ctx.page, 'A1', '=1000*15%');
+    await sleep(200);
+
+    // Verify result is 150
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '150', 'Formula =1000*15% should evaluate to 150');
+  },
+
+  'Percentage literal in formula: 50%+25% equals 0.75': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter formula with percentage addition
+    await setCellValue(ctx.page, 'A1', '=50%+25%');
+    await sleep(200);
+
+    // Verify result is 0.75
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '0.75', 'Formula =50%+25% should evaluate to 0.75');
+  },
+
+  'Percentage literal: 15% as standalone formula': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter standalone percentage formula
+    await setCellValue(ctx.page, 'A1', '=15%');
+    await sleep(200);
+
+    // Verify result is 0.15
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '0.15', 'Formula =15% should evaluate to 0.15');
+  },
+
+  'Percentage literal with cell reference: A1*15%': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Set A1 to 100
+    await setCellValue(ctx.page, 'A1', '100');
+    await sleep(100);
+
+    // Enter formula with percentage
+    await setCellValue(ctx.page, 'B1', '=A1*15%');
+    await sleep(200);
+
+    // Verify result is 15
+    const display = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(display, '15', 'Formula =A1*15% with A1=100 should evaluate to 15');
+  },
 };
 
 // Run all tests

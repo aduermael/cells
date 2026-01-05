@@ -67,6 +67,103 @@ TEST(FormulaParserTest, BooleanFalse) {
 }
 
 // ============================================================================
+// Percentage Literal Tests
+// ============================================================================
+
+TEST(FormulaParserTest, PercentLiteralSimple) {
+    // 15% should parse to 0.15
+    FormulaParser parser("15%");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::NUMBER_LITERAL);
+    auto* num = dynamic_cast<NumberLiteralNode*>(ast.get());
+    ASSERT_NE(num, nullptr);
+    EXPECT_DOUBLE_EQ(num->value, 0.15);
+}
+
+TEST(FormulaParserTest, PercentLiteralInFormula) {
+    // =15% should parse to 0.15
+    FormulaParser parser("=15%");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    auto* num = dynamic_cast<NumberLiteralNode*>(ast.get());
+    ASSERT_NE(num, nullptr);
+    EXPECT_DOUBLE_EQ(num->value, 0.15);
+}
+
+TEST(FormulaParserTest, PercentLiteralMultiplication) {
+    // =1000*15% should parse as 1000 * 0.15
+    FormulaParser parser("=1000*15%");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::BINARY_OP);
+
+    auto* binOp = dynamic_cast<BinaryOpNode*>(ast.get());
+    ASSERT_NE(binOp, nullptr);
+    EXPECT_EQ(binOp->op, BinaryOp::MULTIPLY);
+
+    // Left should be 1000
+    auto* left = dynamic_cast<NumberLiteralNode*>(binOp->left.get());
+    ASSERT_NE(left, nullptr);
+    EXPECT_DOUBLE_EQ(left->value, 1000.0);
+
+    // Right should be 0.15
+    auto* right = dynamic_cast<NumberLiteralNode*>(binOp->right.get());
+    ASSERT_NE(right, nullptr);
+    EXPECT_DOUBLE_EQ(right->value, 0.15);
+}
+
+TEST(FormulaParserTest, PercentLiteralAddition) {
+    // =50%+25% should parse as 0.5 + 0.25
+    FormulaParser parser("=50%+25%");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::BINARY_OP);
+
+    auto* binOp = dynamic_cast<BinaryOpNode*>(ast.get());
+    ASSERT_NE(binOp, nullptr);
+    EXPECT_EQ(binOp->op, BinaryOp::ADD);
+
+    auto* left = dynamic_cast<NumberLiteralNode*>(binOp->left.get());
+    ASSERT_NE(left, nullptr);
+    EXPECT_DOUBLE_EQ(left->value, 0.5);
+
+    auto* right = dynamic_cast<NumberLiteralNode*>(binOp->right.get());
+    ASSERT_NE(right, nullptr);
+    EXPECT_DOUBLE_EQ(right->value, 0.25);
+}
+
+TEST(FormulaParserTest, PercentLiteralDecimal) {
+    // =12.5% should parse to 0.125
+    FormulaParser parser("=12.5%");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    auto* num = dynamic_cast<NumberLiteralNode*>(ast.get());
+    ASSERT_NE(num, nullptr);
+    EXPECT_DOUBLE_EQ(num->value, 0.125);
+}
+
+TEST(FormulaParserTest, PercentLiteralInExpression) {
+    // =100+15% should work (100 + 0.15)
+    FormulaParser parser("=100+15%");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::BINARY_OP);
+
+    auto* binOp = dynamic_cast<BinaryOpNode*>(ast.get());
+    ASSERT_NE(binOp, nullptr);
+    EXPECT_EQ(binOp->op, BinaryOp::ADD);
+
+    auto* left = dynamic_cast<NumberLiteralNode*>(binOp->left.get());
+    ASSERT_NE(left, nullptr);
+    EXPECT_DOUBLE_EQ(left->value, 100.0);
+
+    auto* right = dynamic_cast<NumberLiteralNode*>(binOp->right.get());
+    ASSERT_NE(right, nullptr);
+    EXPECT_DOUBLE_EQ(right->value, 0.15);
+}
+
+// ============================================================================
 // Operator Precedence Tests
 // ============================================================================
 

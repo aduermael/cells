@@ -16,9 +16,10 @@ enum class TokenType : std::uint8_t {
     END_OF_INPUT,
 
     // Literals
-    NUMBER,   // 42, 3.14, 1.5e10, -100
-    STRING,   // "Hello", "with ""quotes"""
-    BOOLEAN,  // TRUE, FALSE (case-insensitive)
+    NUMBER,           // 42, 3.14, 1.5e10, -100
+    PERCENT_LITERAL,  // 15%, 12.5% (value is stored divided by 100)
+    STRING,           // "Hello", "with ""quotes"""
+    BOOLEAN,          // TRUE, FALSE (case-insensitive)
 
     // Identifiers and references
     IDENTIFIER,  // Function names, named ranges (SUM, myRange)
@@ -83,6 +84,10 @@ struct Token {
 
     // Get the numeric value (for NUMBER tokens)
     [[nodiscard]] double numberValue() const;
+
+    // Get the percentage value (for PERCENT_LITERAL tokens)
+    // Returns the value divided by 100 (e.g., "15%" returns 0.15)
+    [[nodiscard]] double percentValue() const;
 
     // Get the boolean value (for BOOLEAN tokens)
     [[nodiscard]] bool booleanValue() const;

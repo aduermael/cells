@@ -84,6 +84,83 @@ TEST(FormulaLexerTest, NumberLarge) {
 }
 
 // ============================================================================
+// Percentage Literal Token Tests
+// ============================================================================
+
+TEST(FormulaLexerTest, PercentLiteralInteger) {
+    FormulaLexer lexer("15%");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::PERCENT_LITERAL);
+    EXPECT_EQ(tok.text, "15%");
+    EXPECT_DOUBLE_EQ(tok.percentValue(), 0.15);
+}
+
+TEST(FormulaLexerTest, PercentLiteralDecimal) {
+    FormulaLexer lexer("12.5%");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::PERCENT_LITERAL);
+    EXPECT_EQ(tok.text, "12.5%");
+    EXPECT_DOUBLE_EQ(tok.percentValue(), 0.125);
+}
+
+TEST(FormulaLexerTest, PercentLiteralZero) {
+    FormulaLexer lexer("0%");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::PERCENT_LITERAL);
+    EXPECT_EQ(tok.text, "0%");
+    EXPECT_DOUBLE_EQ(tok.percentValue(), 0.0);
+}
+
+TEST(FormulaLexerTest, PercentLiteralHundred) {
+    FormulaLexer lexer("100%");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::PERCENT_LITERAL);
+    EXPECT_EQ(tok.text, "100%");
+    EXPECT_DOUBLE_EQ(tok.percentValue(), 1.0);
+}
+
+TEST(FormulaLexerTest, PercentLiteralOverHundred) {
+    FormulaLexer lexer("150%");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::PERCENT_LITERAL);
+    EXPECT_EQ(tok.text, "150%");
+    EXPECT_DOUBLE_EQ(tok.percentValue(), 1.5);
+}
+
+TEST(FormulaLexerTest, PercentLiteralSmall) {
+    FormulaLexer lexer("0.5%");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::PERCENT_LITERAL);
+    EXPECT_EQ(tok.text, "0.5%");
+    EXPECT_DOUBLE_EQ(tok.percentValue(), 0.005);
+}
+
+TEST(FormulaLexerTest, PercentInFormula) {
+    FormulaLexer lexer("=1000*15%");
+    auto tokens = lexer.tokenizeAll();
+    // =, 1000, *, 15%, END
+    ASSERT_EQ(tokens.size(), 5u);
+    EXPECT_EQ(tokens[0].type, TokenType::EQUAL);
+    EXPECT_EQ(tokens[1].type, TokenType::NUMBER);
+    EXPECT_DOUBLE_EQ(tokens[1].numberValue(), 1000.0);
+    EXPECT_EQ(tokens[2].type, TokenType::STAR);
+    EXPECT_EQ(tokens[3].type, TokenType::PERCENT_LITERAL);
+    EXPECT_DOUBLE_EQ(tokens[3].percentValue(), 0.15);
+}
+
+TEST(FormulaLexerTest, PercentAddition) {
+    FormulaLexer lexer("=50%+25%");
+    auto tokens = lexer.tokenizeAll();
+    // =, 50%, +, 25%, END
+    ASSERT_EQ(tokens.size(), 5u);
+    EXPECT_EQ(tokens[1].type, TokenType::PERCENT_LITERAL);
+    EXPECT_DOUBLE_EQ(tokens[1].percentValue(), 0.5);
+    EXPECT_EQ(tokens[2].type, TokenType::PLUS);
+    EXPECT_EQ(tokens[3].type, TokenType::PERCENT_LITERAL);
+    EXPECT_DOUBLE_EQ(tokens[3].percentValue(), 0.25);
+}
+
+// ============================================================================
 // String Token Tests
 // ============================================================================
 
@@ -619,6 +696,7 @@ TEST(FormulaLexerTest, MultiplePeeks) {
 
 TEST(FormulaLexerTest, TokenTypeName) {
     EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::NUMBER), "NUMBER");
+    EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::PERCENT_LITERAL), "PERCENT_LITERAL");
     EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::STRING), "STRING");
     EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::BOOLEAN), "BOOLEAN");
     EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::IDENTIFIER), "IDENTIFIER");
