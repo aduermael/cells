@@ -150,16 +150,16 @@ const tests = {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
-    // Enter percentage with 2 decimal places
-    await setCellValue(ctx.page, 'H1', '12.50%');
+    // Enter percentage with 2 decimal places (use A1 - within visible viewport)
+    await setCellValue(ctx.page, 'A1', '12.50%');
     await sleep(200);
 
     // Check the displayed value preserves 2 decimal places
-    const display = await getCellDisplayValue(ctx.page, 'H1');
+    const display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '12.50%', 'Cell should display 12.50% (preserving 2 decimals)');
 
     // Formula bar should show formatted value
-    await clickCell(ctx.page, 'H1');
+    await clickCell(ctx.page, 'A1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
     assertEqual(formulaBar, '12.50%', 'Formula bar should show 12.50%');
@@ -169,12 +169,12 @@ const tests = {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
-    // Enter currency with 1 decimal place
-    await setCellValue(ctx.page, 'I1', '$99.9');
+    // Enter currency with 1 decimal place (use A1 - within visible viewport)
+    await setCellValue(ctx.page, 'A1', '$99.9');
     await sleep(200);
 
     // Check the displayed value preserves 1 decimal place
-    const display = await getCellDisplayValue(ctx.page, 'I1');
+    const display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '$99.9', 'Cell should display $99.9 (preserving 1 decimal)');
   },
 
@@ -536,9 +536,9 @@ const tests = {
     await ctx.page.click('[data-format-category="CURRENCY"]');
     await sleep(300);
 
-    // Check the displayed value shows currency format (0 decimal places by default)
+    // Check the displayed value shows currency format (2 decimal places by default)
     display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '$1,234', 'Formula result should display as $1,234 (0 decimals, with separator)');
+    assertEqual(display, '$1,234.50', 'Formula result should display as $1,234.50 (2 decimals, with separator)');
   },
 };
 

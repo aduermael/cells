@@ -301,8 +301,24 @@ export class FormatControls {
       return "~";
     }
 
-    // Prefer format with 0 decimal places as the default for dropdown selection.
-    // This makes "15%" instead of "15.00%" when selecting Percent from dropdown.
+    // Currency is special - default to 2 decimal places (industry standard: $100.00)
+    if (category === "CURRENCY") {
+      const twoDecimal = matchingFormats.find((f) => f.decimalPlaces === 2);
+      if (twoDecimal) {
+        return twoDecimal.id;
+      }
+    }
+
+    // For other categories, prefer 0 decimal places without thousands separator.
+    // This makes "15%" instead of "15.00%" for Percent, and "1235" instead of "1,235" for Number.
+    const zeroDecimalNoSeparator = matchingFormats.find(
+      (f) => f.decimalPlaces === 0 && !f.useThousandsSeparator
+    );
+    if (zeroDecimalNoSeparator) {
+      return zeroDecimalNoSeparator.id;
+    }
+
+    // Fall back to 0 decimal places (with separator if that's all we have)
     const zeroDecimal = matchingFormats.find((f) => f.decimalPlaces === 0);
     if (zeroDecimal) {
       return zeroDecimal.id;
