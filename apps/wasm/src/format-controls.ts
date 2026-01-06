@@ -363,37 +363,40 @@ export class FormatControls {
     const currentFormatId = cellData?.formatId || "~";
 
     // Find current format's decimal places
+    // C++ returns lowercase categories, so compare case-insensitively
     let currentFormat = this.availableFormats.find((f) => f.id === currentFormatId);
     if (!currentFormat) {
       // Default to NUMBER with 2 decimal places if no format
-      currentFormat = this.availableFormats.find((f) => f.category === "NUMBER" && f.decimalPlaces === 2);
+      currentFormat = this.availableFormats.find(
+        (f) => f.category.toUpperCase() === "NUMBER" && f.decimalPlaces === 2
+      );
     }
 
     const currentDecimals = currentFormat?.decimalPlaces ?? 2;
-    const currentCategory = currentFormat?.category ?? "NUMBER";
+    const currentCategory = currentFormat?.category.toUpperCase() ?? "NUMBER";
     const newDecimals = Math.max(0, Math.min(10, currentDecimals + delta));
 
     // Find a format with the new decimal places in the same category
     let newFormat = this.availableFormats.find(
-      (f) => f.category === currentCategory && f.decimalPlaces === newDecimals
+      (f) => f.category.toUpperCase() === currentCategory && f.decimalPlaces === newDecimals
     );
 
     // If not found in same category, try NUMBER
     if (!newFormat) {
       newFormat = this.availableFormats.find(
-        (f) => f.category === "NUMBER" && f.decimalPlaces === newDecimals
+        (f) => f.category.toUpperCase() === "NUMBER" && f.decimalPlaces === newDecimals
       );
     }
 
     if (!newFormat) {
       // Fallback: if we can't find a matching format, just use the first NUMBER format
-      newFormat = this.availableFormats.find((f) => f.category === "NUMBER");
+      newFormat = this.availableFormats.find((f) => f.category.toUpperCase() === "NUMBER");
     }
 
     if (newFormat) {
       try {
         await this.dataSource.setCellFormatAt(position.col, position.row, newFormat.id);
-        this.setDisplayedFormat(newFormat.id, newFormat.category);
+        this.setDisplayedFormat(newFormat.id, newFormat.category.toUpperCase() as NumberFormatCategory);
         this.requestRender();
         this.updateFormulaBar();
       } catch (error) {

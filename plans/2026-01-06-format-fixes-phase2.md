@@ -83,7 +83,7 @@ CSS adjustment to make spacing consistent.
 
 The comparison in `handleDecimalChange()` uses exact string match against lowercase C++ categories.
 
-- [ ] 1a: Fix category comparison in handleDecimalChange to be case-insensitive
+- [x] 1a: Fix category comparison in handleDecimalChange to be case-insensitive
   - Convert `currentFormat.category` and `f.category` to uppercase before comparison
   - Same pattern as `getCategoryForFormatId()`
 
