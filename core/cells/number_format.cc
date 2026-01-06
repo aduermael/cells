@@ -119,11 +119,47 @@ const ID NUMBER_SEP2("FMT_NS02");
 const ID NUMBER_SEP3("FMT_NS03");
 const ID NUMBER_SEP4("FMT_NS04");
 
+// Legacy USD currency format IDs (for backward compatibility)
 const ID CURRENCY_0("FMT_C000");
 const ID CURRENCY_1("FMT_C001");
 const ID CURRENCY_2("FMT_C002");
 const ID CURRENCY_3("FMT_C003");
 const ID CURRENCY_4("FMT_C004");
+
+// USD currency formats (new naming, 8 chars: CUSD_0XX)
+const ID CURRENCY_USD_0("CUSD_000");
+const ID CURRENCY_USD_1("CUSD_001");
+const ID CURRENCY_USD_2("CUSD_002");
+const ID CURRENCY_USD_3("CUSD_003");
+const ID CURRENCY_USD_4("CUSD_004");
+
+// EUR currency formats (8 chars: CEUR_0XX)
+const ID CURRENCY_EUR_0("CEUR_000");
+const ID CURRENCY_EUR_1("CEUR_001");
+const ID CURRENCY_EUR_2("CEUR_002");
+const ID CURRENCY_EUR_3("CEUR_003");
+const ID CURRENCY_EUR_4("CEUR_004");
+
+// GBP currency formats (8 chars: CGBP_0XX)
+const ID CURRENCY_GBP_0("CGBP_000");
+const ID CURRENCY_GBP_1("CGBP_001");
+const ID CURRENCY_GBP_2("CGBP_002");
+const ID CURRENCY_GBP_3("CGBP_003");
+const ID CURRENCY_GBP_4("CGBP_004");
+
+// JPY currency formats (8 chars: CJPY_0XX)
+const ID CURRENCY_JPY_0("CJPY_000");
+const ID CURRENCY_JPY_1("CJPY_001");
+const ID CURRENCY_JPY_2("CJPY_002");
+const ID CURRENCY_JPY_3("CJPY_003");
+const ID CURRENCY_JPY_4("CJPY_004");
+
+// CNY currency formats (8 chars: CCNY_0XX)
+const ID CURRENCY_CNY_0("CCNY_000");
+const ID CURRENCY_CNY_1("CCNY_001");
+const ID CURRENCY_CNY_2("CCNY_002");
+const ID CURRENCY_CNY_3("CCNY_003");
+const ID CURRENCY_CNY_4("CCNY_004");
 
 const ID ACCOUNTING_0("FMT_A000");
 const ID ACCOUNTING_2("FMT_A002");
@@ -222,7 +258,7 @@ void NumberFormatRegistry::initBuiltInFormats() {
     formats_[BuiltInFormats::NUMBER_SEP4] =
         NumberFormat(BuiltInFormats::NUMBER_SEP4, Cat::NUMBER, "#,##0.0000", 4, true, "", false);
 
-    // Currency formats (0-4 decimal places)
+    // Currency formats - USD (legacy IDs for backward compatibility)
     formats_[BuiltInFormats::CURRENCY_0] =
         NumberFormat(BuiltInFormats::CURRENCY_0, Cat::CURRENCY, "$#,##0", 0, true, "$", false);
     formats_[BuiltInFormats::CURRENCY_1] =
@@ -233,6 +269,66 @@ void NumberFormatRegistry::initBuiltInFormats() {
         NumberFormat(BuiltInFormats::CURRENCY_3, Cat::CURRENCY, "$#,##0.000", 3, true, "$", false);
     formats_[BuiltInFormats::CURRENCY_4] =
         NumberFormat(BuiltInFormats::CURRENCY_4, Cat::CURRENCY, "$#,##0.0000", 4, true, "$", false);
+
+    // Currency formats - USD (new naming scheme)
+    formats_[BuiltInFormats::CURRENCY_USD_0] =
+        NumberFormat(BuiltInFormats::CURRENCY_USD_0, Cat::CURRENCY, "$#,##0", 0, true, "$", false);
+    formats_[BuiltInFormats::CURRENCY_USD_1] = NumberFormat(
+        BuiltInFormats::CURRENCY_USD_1, Cat::CURRENCY, "$#,##0.0", 1, true, "$", false);
+    formats_[BuiltInFormats::CURRENCY_USD_2] = NumberFormat(
+        BuiltInFormats::CURRENCY_USD_2, Cat::CURRENCY, "$#,##0.00", 2, true, "$", false);
+    formats_[BuiltInFormats::CURRENCY_USD_3] = NumberFormat(
+        BuiltInFormats::CURRENCY_USD_3, Cat::CURRENCY, "$#,##0.000", 3, true, "$", false);
+    formats_[BuiltInFormats::CURRENCY_USD_4] = NumberFormat(
+        BuiltInFormats::CURRENCY_USD_4, Cat::CURRENCY, "$#,##0.0000", 4, true, "$", false);
+
+    // Currency formats - EUR
+    formats_[BuiltInFormats::CURRENCY_EUR_0] =
+        NumberFormat(BuiltInFormats::CURRENCY_EUR_0, Cat::CURRENCY, "€#,##0", 0, true, "€", false);
+    formats_[BuiltInFormats::CURRENCY_EUR_1] = NumberFormat(
+        BuiltInFormats::CURRENCY_EUR_1, Cat::CURRENCY, "€#,##0.0", 1, true, "€", false);
+    formats_[BuiltInFormats::CURRENCY_EUR_2] = NumberFormat(
+        BuiltInFormats::CURRENCY_EUR_2, Cat::CURRENCY, "€#,##0.00", 2, true, "€", false);
+    formats_[BuiltInFormats::CURRENCY_EUR_3] = NumberFormat(
+        BuiltInFormats::CURRENCY_EUR_3, Cat::CURRENCY, "€#,##0.000", 3, true, "€", false);
+    formats_[BuiltInFormats::CURRENCY_EUR_4] = NumberFormat(
+        BuiltInFormats::CURRENCY_EUR_4, Cat::CURRENCY, "€#,##0.0000", 4, true, "€", false);
+
+    // Currency formats - GBP
+    formats_[BuiltInFormats::CURRENCY_GBP_0] =
+        NumberFormat(BuiltInFormats::CURRENCY_GBP_0, Cat::CURRENCY, "£#,##0", 0, true, "£", false);
+    formats_[BuiltInFormats::CURRENCY_GBP_1] = NumberFormat(
+        BuiltInFormats::CURRENCY_GBP_1, Cat::CURRENCY, "£#,##0.0", 1, true, "£", false);
+    formats_[BuiltInFormats::CURRENCY_GBP_2] = NumberFormat(
+        BuiltInFormats::CURRENCY_GBP_2, Cat::CURRENCY, "£#,##0.00", 2, true, "£", false);
+    formats_[BuiltInFormats::CURRENCY_GBP_3] = NumberFormat(
+        BuiltInFormats::CURRENCY_GBP_3, Cat::CURRENCY, "£#,##0.000", 3, true, "£", false);
+    formats_[BuiltInFormats::CURRENCY_GBP_4] = NumberFormat(
+        BuiltInFormats::CURRENCY_GBP_4, Cat::CURRENCY, "£#,##0.0000", 4, true, "£", false);
+
+    // Currency formats - JPY (typically 0 decimals for yen)
+    formats_[BuiltInFormats::CURRENCY_JPY_0] =
+        NumberFormat(BuiltInFormats::CURRENCY_JPY_0, Cat::CURRENCY, "¥#,##0", 0, true, "¥", false);
+    formats_[BuiltInFormats::CURRENCY_JPY_1] = NumberFormat(
+        BuiltInFormats::CURRENCY_JPY_1, Cat::CURRENCY, "¥#,##0.0", 1, true, "¥", false);
+    formats_[BuiltInFormats::CURRENCY_JPY_2] = NumberFormat(
+        BuiltInFormats::CURRENCY_JPY_2, Cat::CURRENCY, "¥#,##0.00", 2, true, "¥", false);
+    formats_[BuiltInFormats::CURRENCY_JPY_3] = NumberFormat(
+        BuiltInFormats::CURRENCY_JPY_3, Cat::CURRENCY, "¥#,##0.000", 3, true, "¥", false);
+    formats_[BuiltInFormats::CURRENCY_JPY_4] = NumberFormat(
+        BuiltInFormats::CURRENCY_JPY_4, Cat::CURRENCY, "¥#,##0.0000", 4, true, "¥", false);
+
+    // Currency formats - CNY (Chinese Yuan, uses same yen symbol)
+    formats_[BuiltInFormats::CURRENCY_CNY_0] =
+        NumberFormat(BuiltInFormats::CURRENCY_CNY_0, Cat::CURRENCY, "¥#,##0", 0, true, "¥", false);
+    formats_[BuiltInFormats::CURRENCY_CNY_1] = NumberFormat(
+        BuiltInFormats::CURRENCY_CNY_1, Cat::CURRENCY, "¥#,##0.0", 1, true, "¥", false);
+    formats_[BuiltInFormats::CURRENCY_CNY_2] = NumberFormat(
+        BuiltInFormats::CURRENCY_CNY_2, Cat::CURRENCY, "¥#,##0.00", 2, true, "¥", false);
+    formats_[BuiltInFormats::CURRENCY_CNY_3] = NumberFormat(
+        BuiltInFormats::CURRENCY_CNY_3, Cat::CURRENCY, "¥#,##0.000", 3, true, "¥", false);
+    formats_[BuiltInFormats::CURRENCY_CNY_4] = NumberFormat(
+        BuiltInFormats::CURRENCY_CNY_4, Cat::CURRENCY, "¥#,##0.0000", 4, true, "¥", false);
 
     // Accounting formats
     formats_[BuiltInFormats::ACCOUNTING_0] = NumberFormat(

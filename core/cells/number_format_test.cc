@@ -176,8 +176,9 @@ TEST(NumberFormatRegistryTest, CannotRegisterDuplicate) {
 TEST(NumberFormatRegistryTest, GetFormatsByCategory) {
     NumberFormatRegistry registry;
 
+    // Currency formats: 5 legacy USD + 5 USD + 5 EUR + 5 GBP + 5 JPY + 5 CNY = 30
     auto currencyFormats = registry.getFormatsByCategory(NumberFormatCategory::CURRENCY);
-    EXPECT_EQ(currencyFormats.size(), 5);  // CURRENCY_0 through CURRENCY_4 (0-4 decimal places)
+    EXPECT_EQ(currencyFormats.size(), 30);
 
     auto dateFormats = registry.getFormatsByCategory(NumberFormatCategory::DATE);
     EXPECT_EQ(dateFormats.size(), 3);  // DATE_SHORT, DATE_LONG, DATE_ISO
@@ -191,11 +192,11 @@ TEST(NumberFormatRegistryTest, GetAllFormats) {
     NumberFormatRegistry registry;
 
     const auto& allFormats = registry.getAllFormats();
-    // Should have all built-in formats (31 total)
+    // Should have all built-in formats (56 total)
     // 1 General + 5 Number (0-4 decimals) + 5 Number with separators (0-4 decimals) +
-    // 5 Currency (0-4 decimals) + 2 Accounting + 5 Percentage (0-4 decimals) +
-    // 3 Date + 2 Time + 1 DateTime + 1 Scientific + 1 Text
-    EXPECT_EQ(allFormats.size(), 31);
+    // 30 Currency (5 legacy + 5 USD + 5 EUR + 5 GBP + 5 JPY + 5 CNY) + 2 Accounting +
+    // 5 Percentage (0-4 decimals) + 3 Date + 2 Time + 1 DateTime + 1 Scientific + 1 Text
+    EXPECT_EQ(allFormats.size(), 56);
 }
 
 TEST(BuiltInFormatsTest, VerifyFormatCodes) {

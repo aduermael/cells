@@ -8,13 +8,25 @@ import type { NumberFormat, NumberFormatCategory, Position, CellData } from "./t
 // Types
 // =============================================================================
 
+/** Currency type identifiers */
+export type CurrencyType = "USD" | "EUR" | "GBP" | "JPY" | "CNY";
+
+/** Currency info */
+export interface CurrencyInfo {
+  type: CurrencyType;
+  symbol: string;
+}
+
 /** Format controls configuration */
 export interface FormatControlsConfig {
   formatDropdown: HTMLElement;
   formatDropdownBtn: HTMLButtonElement;
   formatDropdownLabel: HTMLElement;
   formatDropdownMenu: HTMLElement;
-  currencyBtn: HTMLButtonElement;
+  currencyDropdown: HTMLElement;
+  currencyDropdownBtn: HTMLButtonElement;
+  currencyDropdownLabel: HTMLElement;
+  currencyDropdownMenu: HTMLElement;
   decimalIncreaseBtn: HTMLButtonElement;
   decimalDecreaseBtn: HTMLButtonElement;
 }
@@ -53,7 +65,10 @@ export class FormatControls {
   private formatDropdownBtn: HTMLButtonElement;
   private formatDropdownLabel: HTMLElement;
   private formatDropdownMenu: HTMLElement;
-  private currencyBtn: HTMLButtonElement;
+  private currencyDropdown: HTMLElement;
+  private currencyDropdownBtn: HTMLButtonElement;
+  private currencyDropdownLabel: HTMLElement;
+  private currencyDropdownMenu: HTMLElement;
   private decimalIncreaseBtn: HTMLButtonElement;
   private decimalDecreaseBtn: HTMLButtonElement;
 
@@ -78,7 +93,9 @@ export class FormatControls {
 
   private availableFormats: NumberFormat[] = [];
   private currentCategory: NumberFormatCategory = "GENERAL";
+  private currentCurrency: CurrencyType = "USD";
   private isDropdownOpen = false;
+  private isCurrencyDropdownOpen = false;
 
   // =========================================================================
   // Constructor
@@ -92,7 +109,10 @@ export class FormatControls {
     this.formatDropdownBtn = config.formatDropdownBtn;
     this.formatDropdownLabel = config.formatDropdownLabel;
     this.formatDropdownMenu = config.formatDropdownMenu;
-    this.currencyBtn = config.currencyBtn;
+    this.currencyDropdown = config.currencyDropdown;
+    this.currencyDropdownBtn = config.currencyDropdownBtn;
+    this.currencyDropdownLabel = config.currencyDropdownLabel;
+    this.currencyDropdownMenu = config.currencyDropdownMenu;
     this.decimalIncreaseBtn = config.decimalIncreaseBtn;
     this.decimalDecreaseBtn = config.decimalDecreaseBtn;
 
@@ -157,11 +177,27 @@ export class FormatControls {
       if (this.isDropdownOpen && !this.formatDropdown.contains(e.target as Node)) {
         this.closeDropdown();
       }
+      if (this.isCurrencyDropdownOpen && !this.currencyDropdown.contains(e.target as Node)) {
+        this.closeCurrencyDropdown();
+      }
     });
 
-    // Currency button
-    this.currencyBtn.addEventListener("click", () => {
-      this.handleCategorySelect("CURRENCY");
+    // Currency dropdown toggle
+    this.currencyDropdownBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.toggleCurrencyDropdown();
+    });
+
+    // Currency item selection
+    this.currencyDropdownMenu.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const item = target.closest("[data-currency]") as HTMLElement;
+      if (item) {
+        const currency = item.dataset.currency as CurrencyType;
+        const symbol = item.dataset.symbol || "$";
+        this.handleCurrencySelect(currency, symbol);
+        this.closeCurrencyDropdown();
+      }
     });
 
     // Decimal increase
@@ -254,6 +290,64 @@ export class FormatControls {
   }
 
   // =========================================================================
+  // Private Methods - Currency Dropdown
+  // =========================================================================
+
+  private toggleCurrencyDropdown(): void {
+    if (this.isCurrencyDropdownOpen) {
+      this.closeCurrencyDropdown();
+    } else {
+      this.openCurrencyDropdown();
+    }
+  }
+
+  private openCurrencyDropdown(): void {
+    this.isCurrencyDropdownOpen = true;
+    this.currencyDropdown.classList.add("open");
+    this.updateCurrencyDropdownActiveState();
+  }
+
+  private closeCurrencyDropdown(): void {
+    this.isCurrencyDropdownOpen = false;
+    this.currencyDropdown.classList.remove("open");
+  }
+
+  private updateCurrencyDropdownActiveState(): void {
+    const items = this.currencyDropdownMenu.querySelectorAll("[data-currency]");
+    items.forEach((item) => {
+      const currency = (item as HTMLElement).dataset.currency;
+      item.classList.toggle("active", currency === this.currentCurrency);
+    });
+  }
+
+  private async handleCurrencySelect(currency: CurrencyType, symbol: string): Promise<void> {
+    const position = this.getSelectedCell();
+    if (!position || !this.dataSource) return;
+
+    // Get the format ID for this currency (with 2 decimal places, industry standard)
+    const formatId = this.getFormatIdForCurrency(currency, 2);
+
+    try {
+      await this.dataSource.setCellFormatAt(position.col, position.row, formatId);
+      this.currentCurrency = currency;
+      this.currencyDropdownLabel.textContent = symbol;
+      this.setDisplayedFormat(formatId, "CURRENCY");
+      this.currencyDropdown.classList.add("active");
+      this.requestRender();
+      this.updateFormulaBar();
+    } catch (error) {
+      console.error("Failed to set currency format:", error);
+    }
+  }
+
+  private getFormatIdForCurrency(currency: CurrencyType, decimalPlaces: number): string {
+    // Format ID pattern: C<CURRENCY>_0<DECIMAL_PLACES> (8 chars total)
+    // e.g., CUSD_002 for USD with 2 decimal places
+    const decStr = decimalPlaces.toString().padStart(2, "0");
+    return `C${currency}_0${decStr}`;
+  }
+
+  // =========================================================================
   // Private Methods - Format Operations
   // =========================================================================
 
@@ -334,19 +428,50 @@ export class FormatControls {
     return matchingFormats[0].id;
   }
 
-  private setDisplayedFormat(_formatId: string, category: NumberFormatCategory): void {
+  private setDisplayedFormat(formatId: string, category: NumberFormatCategory): void {
     this.currentCategory = category;
 
     // Update dropdown label
     this.formatDropdownLabel.textContent = this.getCategoryDisplayName(category);
 
-    // Update button active states
-    this.currencyBtn.classList.toggle("active", category === "CURRENCY" || category === "ACCOUNTING");
+    // Update currency dropdown active state
+    const isCurrency = category === "CURRENCY" || category === "ACCOUNTING";
+    this.currencyDropdown.classList.toggle("active", isCurrency);
+
+    // If this is a currency format, update the currency dropdown to show the right currency
+    // Format ID pattern: C<CURRENCY>_0XX (e.g., CUSD_002) or legacy FMT_C0XX
+    if (isCurrency) {
+      const match = formatId.match(/^C([A-Z]{3})_0\d{2}$/);
+      if (match) {
+        const currency = match[1] as CurrencyType;
+        this.currentCurrency = currency;
+        const symbol = this.getCurrencySymbol(currency);
+        this.currencyDropdownLabel.textContent = symbol;
+      } else if (formatId.startsWith("FMT_C")) {
+        // Legacy USD format
+        this.currentCurrency = "USD";
+        this.currencyDropdownLabel.textContent = "$";
+      }
+    }
 
     // Update dropdown active state if open
     if (this.isDropdownOpen) {
       this.updateDropdownActiveState();
     }
+    if (this.isCurrencyDropdownOpen) {
+      this.updateCurrencyDropdownActiveState();
+    }
+  }
+
+  private getCurrencySymbol(currency: CurrencyType): string {
+    const symbols: Record<CurrencyType, string> = {
+      USD: "$",
+      EUR: "€",
+      GBP: "£",
+      JPY: "¥",
+      CNY: "¥",
+    };
+    return symbols[currency] || "$";
   }
 
   private getCategoryDisplayName(category: NumberFormatCategory): string {

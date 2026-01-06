@@ -101,7 +101,21 @@
                             <button class="dropdown-item" data-format-category="TEXT">Text</button>
                         </div>
                     </div>
-                    <button class="btn btn-icon btn-sm" id="format-currency-btn" title="Currency ($)" data-format-category="CURRENCY">$</button>
+                    <div class="dropdown" id="currency-dropdown">
+                        <button class="btn btn-icon btn-sm" id="currency-dropdown-btn" title="Currency">
+                            <span id="currency-dropdown-label">$</span>
+                            <svg class="dropdown-arrow" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M6 9l6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div class="dropdown-menu currency-dropdown-menu">
+                            <button class="dropdown-item" data-currency="USD" data-symbol="$">$ USD</button>
+                            <button class="dropdown-item" data-currency="EUR" data-symbol="€">€ EUR</button>
+                            <button class="dropdown-item" data-currency="GBP" data-symbol="£">£ GBP</button>
+                            <button class="dropdown-item" data-currency="JPY" data-symbol="¥">¥ JPY</button>
+                            <button class="dropdown-item" data-currency="CNY" data-symbol="¥">¥ CNY</button>
+                        </div>
+                    </div>
                 </div>
                 <div id="format-controls-row2">
                     <button class="btn btn-icon btn-sm" id="format-decimal-decrease" title="Decrease decimal places">.0−</button>

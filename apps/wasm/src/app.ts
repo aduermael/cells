@@ -110,7 +110,10 @@ export interface DOMElements {
   formatDropdownBtn: HTMLButtonElement;
   formatDropdownLabel: HTMLElement;
   formatDropdownMenu: HTMLElement;
-  formatCurrencyBtn: HTMLButtonElement;
+  currencyDropdown: HTMLElement;
+  currencyDropdownBtn: HTMLButtonElement;
+  currencyDropdownLabel: HTMLElement;
+  currencyDropdownMenu: HTMLElement;
   formatDecimalIncrease: HTMLButtonElement;
   formatDecimalDecrease: HTMLButtonElement;
   settingsBtn: HTMLButtonElement;
@@ -515,7 +518,10 @@ export function createApp(): App {
     formatDropdownBtn: getElement<HTMLButtonElement>("format-dropdown-btn"),
     formatDropdownLabel: getElement("format-dropdown-label"),
     formatDropdownMenu: document.querySelector("#format-dropdown .dropdown-menu") as HTMLElement,
-    formatCurrencyBtn: getElement<HTMLButtonElement>("format-currency-btn"),
+    currencyDropdown: getElement("currency-dropdown"),
+    currencyDropdownBtn: getElement<HTMLButtonElement>("currency-dropdown-btn"),
+    currencyDropdownLabel: getElement("currency-dropdown-label"),
+    currencyDropdownMenu: document.querySelector("#currency-dropdown .dropdown-menu") as HTMLElement,
     formatDecimalIncrease: getElement<HTMLButtonElement>("format-decimal-increase"),
     formatDecimalDecrease: getElement<HTMLButtonElement>("format-decimal-decrease"),
     settingsBtn: getElement<HTMLButtonElement>("settings-btn"),

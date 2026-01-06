@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2026-01-06 01:03 UTC
-Updated At: 2026-01-06 03:08 UTC
+Updated At: 2026-01-06 04:20 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -166,32 +166,32 @@ Verify and fix format application to formula cells.
   - Added "Formula cell can have currency format applied" test
   - Both verify format changes display correctly while formula bar preserves the formula
 
-## Phase 5: Currency Dropdown
+## Phase 5: Currency Dropdown ✅
 
 Replace the $ button with a dropdown to select currency type.
 
-- [ ] 5a: Update HTML for currency dropdown
-  - Replace `<button>$</button>` with dropdown structure
+- [x] 5a: Update HTML for currency dropdown
+  - Replaced `<button>$</button>` with dropdown structure
   - Options: USD ($), EUR (€), GBP (£), JPY (¥), CNY (¥)
   - Show currently selected currency symbol on button
 
-- [ ] 5b: Add CSS for currency dropdown
+- [x] 5b: Add CSS for currency dropdown
   - Style similar to format dropdown
   - Compact dropdown menu with currency symbols
 
-- [ ] 5c: Update TypeScript for currency selection
-  - Add state for selected currency
-  - On selection, apply appropriate format (FMT_C_USD_002, FMT_C_EUR_002, etc.)
-  - Update button to show selected currency symbol
+- [x] 5c: Update TypeScript for currency selection
+  - Added state for selected currency
+  - On selection, applies appropriate format (CUSD_002, CEUR_002, etc.)
+  - Updates button to show selected currency symbol
 
-- [ ] 5d: Add format IDs for different currencies (C++)
-  - Register formats: USD_0-4, EUR_0-4, GBP_0-4, JPY_0-4, CNY_0-4
-  - Update `getAvailableFormats()` to include currency symbol info
+- [x] 5d: Add format IDs for different currencies (C++)
+  - Registered formats: USD_0-4, EUR_0-4, GBP_0-4, JPY_0-4, CNY_0-4
+  - Format ID pattern: C{CURRENCY}_0{DECIMALS} (8 chars, e.g., CUSD_002)
+  - Legacy USD formats (FMT_C0XX) remain for backward compatibility
 
-- [ ] 5e: Add E2E test for currency selection
-  - Select cell, choose EUR from currency dropdown
-  - Type "100", verify displays "€100.00"
-  - Choose GBP, verify displays "£100.00"
+- [x] 5e: Add E2E test for currency selection
+  - Tests for EUR, GBP, JPY currency selection
+  - Verifies correct formatting and symbol display
 
 ## Phase 6: UI Spacing Fix
 

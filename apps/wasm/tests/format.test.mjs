@@ -540,6 +540,95 @@ const tests = {
     display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '$1,234.50', 'Formula result should display as $1,234.50 (2 decimals, with separator)');
   },
+
+  // ============================================================================
+  // Currency dropdown selection tests
+  // ============================================================================
+
+  'Currency dropdown selects EUR format': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a number
+    await setCellValue(ctx.page, 'A1', '100');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open currency dropdown and select EUR
+    await ctx.page.click('#currency-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-currency="EUR"]');
+    await sleep(300);
+
+    // Check the displayed value shows EUR format
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '€100.00', 'Value should display as €100.00 with EUR currency');
+
+    // Check the format dropdown shows "Currency"
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Currency', 'Format dropdown should show Currency');
+
+    // Check the currency dropdown shows EUR symbol
+    const currencyLabel = await ctx.page.$eval('#currency-dropdown-label', el => el.textContent);
+    assertEqual(currencyLabel, '€', 'Currency dropdown should show € symbol');
+  },
+
+  'Currency dropdown selects GBP format': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a number
+    await setCellValue(ctx.page, 'A1', '100');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open currency dropdown and select GBP
+    await ctx.page.click('#currency-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-currency="GBP"]');
+    await sleep(300);
+
+    // Check the displayed value shows GBP format
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '£100.00', 'Value should display as £100.00 with GBP currency');
+
+    // Check the currency dropdown shows GBP symbol
+    const currencyLabel = await ctx.page.$eval('#currency-dropdown-label', el => el.textContent);
+    assertEqual(currencyLabel, '£', 'Currency dropdown should show £ symbol');
+  },
+
+  'Currency dropdown selects JPY format': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a number
+    await setCellValue(ctx.page, 'A1', '1000');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open currency dropdown and select JPY
+    await ctx.page.click('#currency-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-currency="JPY"]');
+    await sleep(300);
+
+    // Check the displayed value shows JPY format
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '¥1,000.00', 'Value should display as ¥1,000.00 with JPY currency');
+
+    // Check the currency dropdown shows JPY symbol
+    const currencyLabel = await ctx.page.$eval('#currency-dropdown-label', el => el.textContent);
+    assertEqual(currencyLabel, '¥', 'Currency dropdown should show ¥ symbol');
+  },
 };
 
 // Run all tests

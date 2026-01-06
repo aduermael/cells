@@ -643,14 +643,39 @@ canvas {
     gap: var(--spacing-xs);
 }
 
-/* Active state for format buttons */
-#format-currency-btn.active {
+/* Currency dropdown */
+#currency-dropdown {
+    position: relative;
+}
+
+#currency-dropdown-btn {
+    min-width: 44px;
+    justify-content: space-between;
+    gap: 2px;
+}
+
+#currency-dropdown-label {
+    font-weight: var(--font-weight-medium);
+}
+
+#currency-dropdown.open .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.currency-dropdown-menu {
+    left: 0;
+    right: auto;
+    min-width: 80px;
+}
+
+/* Active state for currency dropdown */
+#currency-dropdown.active #currency-dropdown-btn {
     background: var(--color-primary);
     color: var(--color-bg-primary);
     border-color: var(--color-primary);
 }
 
-#format-currency-btn.active:hover {
+#currency-dropdown.active #currency-dropdown-btn:hover {
     background: var(--color-primary-hover);
     border-color: var(--color-primary-hover);
 }

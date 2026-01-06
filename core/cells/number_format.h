@@ -74,12 +74,47 @@ extern const ID NUMBER_SEP2;  // Thousands separator, 2 decimals
 extern const ID NUMBER_SEP3;  // Thousands separator, 3 decimals
 extern const ID NUMBER_SEP4;  // Thousands separator, 4 decimals
 
-// Currency formats (0-4 decimal places)
-extern const ID CURRENCY_0;  // $1,234
-extern const ID CURRENCY_1;  // $1,234.5
-extern const ID CURRENCY_2;  // $1,234.56
-extern const ID CURRENCY_3;  // $1,234.567
-extern const ID CURRENCY_4;  // $1,234.5678
+// Currency formats - USD (0-4 decimal places)
+extern const ID CURRENCY_0;  // $1,234 (USD, 0 decimals) - legacy alias
+extern const ID CURRENCY_1;  // $1,234.5 (USD, 1 decimal) - legacy alias
+extern const ID CURRENCY_2;  // $1,234.56 (USD, 2 decimals) - legacy alias
+extern const ID CURRENCY_3;  // $1,234.567 (USD, 3 decimals) - legacy alias
+extern const ID CURRENCY_4;  // $1,234.5678 (USD, 4 decimals) - legacy alias
+
+// Currency formats - USD
+extern const ID CURRENCY_USD_0;  // $1,234
+extern const ID CURRENCY_USD_1;  // $1,234.5
+extern const ID CURRENCY_USD_2;  // $1,234.56
+extern const ID CURRENCY_USD_3;  // $1,234.567
+extern const ID CURRENCY_USD_4;  // $1,234.5678
+
+// Currency formats - EUR
+extern const ID CURRENCY_EUR_0;  // €1,234
+extern const ID CURRENCY_EUR_1;  // €1,234.5
+extern const ID CURRENCY_EUR_2;  // €1,234.56
+extern const ID CURRENCY_EUR_3;  // €1,234.567
+extern const ID CURRENCY_EUR_4;  // €1,234.5678
+
+// Currency formats - GBP
+extern const ID CURRENCY_GBP_0;  // £1,234
+extern const ID CURRENCY_GBP_1;  // £1,234.5
+extern const ID CURRENCY_GBP_2;  // £1,234.56
+extern const ID CURRENCY_GBP_3;  // £1,234.567
+extern const ID CURRENCY_GBP_4;  // £1,234.5678
+
+// Currency formats - JPY
+extern const ID CURRENCY_JPY_0;  // ¥1,234
+extern const ID CURRENCY_JPY_1;  // ¥1,234.5
+extern const ID CURRENCY_JPY_2;  // ¥1,234.56
+extern const ID CURRENCY_JPY_3;  // ¥1,234.567
+extern const ID CURRENCY_JPY_4;  // ¥1,234.5678
+
+// Currency formats - CNY
+extern const ID CURRENCY_CNY_0;  // ¥1,234
+extern const ID CURRENCY_CNY_1;  // ¥1,234.5
+extern const ID CURRENCY_CNY_2;  // ¥1,234.56
+extern const ID CURRENCY_CNY_3;  // ¥1,234.567
+extern const ID CURRENCY_CNY_4;  // ¥1,234.5678
 
 // Accounting formats
 extern const ID ACCOUNTING_0;  // Accounting, 0 decimals
