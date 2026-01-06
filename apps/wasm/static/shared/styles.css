@@ -632,7 +632,7 @@ canvas {
     width: 1px;
     height: 52px; /* Match height of 2x2 button grid */
     background: var(--color-border);
-    margin: 0 var(--spacing-xs);
+    /* No extra margin - bar gap (8px) provides consistent spacing */
     align-self: center;
 }
 
