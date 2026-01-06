@@ -160,8 +160,10 @@ TEST(NumberFormatRegistryTest, GetAllFormats) {
     NumberFormatRegistry registry;
 
     const auto& allFormats = registry.getAllFormats();
-    // Should have all built-in formats (19 total)
-    EXPECT_EQ(allFormats.size(), 19);
+    // Should have all built-in formats (22 total)
+    // 1 General + 7 Number (0-4 decimals + 2 with separators) + 2 Currency +
+    // 2 Accounting + 2 Percentage + 3 Date + 2 Time + 1 DateTime + 1 Scientific + 1 Text
+    EXPECT_EQ(allFormats.size(), 22);
 }
 
 TEST(BuiltInFormatsTest, VerifyFormatCodes) {

@@ -1392,6 +1392,7 @@ public:
 
     // Set the number format for a cell by position.
     // formatId: ID of the format (use "~" for default/GENERAL format)
+    // Creates column, row, and cell if they don't exist (for formatting empty cells).
     // Returns JSON: {"success":true} or {"error":"..."}
     std::string setCellFormatAt(uint32_t col, uint32_t row, const std::string& formatIdStr) {
         if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
@@ -1403,43 +1404,7 @@ public:
             return "{\"error\":\"Sheet not found\"}";
         }
 
-        // Find cell at position
-        ID cellId;
-        ID colId;
-        ID rowId;
-
-        for (const auto& [id, axis] : sheet->columns) {
-            if (axis->position == col) {
-                colId = id;
-                break;
-            }
-        }
-        if (colId.isNull()) {
-            return "{\"error\":\"Column not found\"}";
-        }
-
-        for (const auto& [id, axis] : sheet->rows) {
-            if (axis->position == row) {
-                rowId = id;
-                break;
-            }
-        }
-        if (rowId.isNull()) {
-            return "{\"error\":\"Row not found\"}";
-        }
-
-        // Find cell
-        for (const auto& [id, c] : sheet->cells) {
-            if (c->colId == colId && c->rowId == rowId) {
-                cellId = id;
-                break;
-            }
-        }
-        if (cellId.isNull()) {
-            return "{\"error\":\"Cell not found at position\"}";
-        }
-
-        // Validate format ID
+        // Validate format ID first (before creating anything)
         ID formatId;
         if (formatIdStr != "~" && !formatIdStr.empty()) {
             if (formatIdStr.size() != ID_LENGTH) {
@@ -1451,6 +1416,61 @@ public:
             }
         }
 
+        // Find or create column at position
+        ID colId;
+        bool colCreated = false;
+        for (const auto& [id, axis] : sheet->columns) {
+            if (axis->position == col) {
+                colId = id;
+                break;
+            }
+        }
+        if (colId.isNull()) {
+            colId = generate_id();
+            colCreated = true;
+            std::string colPayload = "{\"pos\":" + std::to_string(col) +
+                                     ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+            Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
+            applyOperation(*_workbook, colOp);
+        }
+
+        // Find or create row at position
+        ID rowId;
+        bool rowCreated = false;
+        for (const auto& [id, axis] : sheet->rows) {
+            if (axis->position == row) {
+                rowId = id;
+                break;
+            }
+        }
+        if (rowId.isNull()) {
+            rowId = generate_id();
+            rowCreated = true;
+            std::string rowPayload = "{\"pos\":" + std::to_string(row) +
+                                     ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+            Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
+            applyOperation(*_workbook, rowOp);
+        }
+
+        // Find or create cell at this position
+        ID cellId;
+        bool cellCreated = false;
+        for (const auto& [id, c] : sheet->cells) {
+            if (c->colId == colId && c->rowId == rowId) {
+                cellId = id;
+                break;
+            }
+        }
+        if (cellId.isNull()) {
+            // Create new empty cell via CELL_SET_VALUE operation
+            cellId = generate_id();
+            cellCreated = true;
+            std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
+                                      colId.toString() + "\",\"row_id\":\"" + rowId.toString() + "\"}";
+            Operation cellOp = makeCellSetValueOp(*_workbook, cellId, cellPayload);
+            applyOperation(*_workbook, cellOp);
+        }
+
         // Create CELL_SET_FORMAT operation
         std::string payload = "{\"format_id\":\"" + formatIdStr + "\"}";
         Operation op = makeCellSetFormatOp(*_workbook, cellId, payload);
@@ -1460,6 +1480,20 @@ public:
         if (_syncManager) {
             _syncManager->queueOperationsBroadcast();
             _syncManager->pruneOpLog();
+        }
+
+        // Incremental viewport index updates for created axes and cell
+        if (colCreated) {
+            _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
+        }
+        if (rowCreated) {
+            _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
+        }
+        if (cellCreated) {
+            Cell* newCell = sheet->getCell(cellId);
+            if (newCell) {
+                _viewportIndex.onCellAdded(newCell);
+            }
         }
 
         notifyListeners(ChangeType::CELL_CHANGED);

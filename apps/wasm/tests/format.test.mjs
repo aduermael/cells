@@ -407,6 +407,37 @@ const tests = {
     display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '1234.5678', 'After fourth increase should show 4 decimal places');
   },
+
+  // ============================================================================
+  // Empty cell format tests
+  // ============================================================================
+
+  'Empty cell can have format applied': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Click on empty cell B5 (where B and row 5 don't exist yet)
+    await clickCell(ctx.page, 'B5');
+    await sleep(100);
+
+    // Open format dropdown and select Currency format
+    await ctx.page.click('#format-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-format-category="CURRENCY"]');
+    await sleep(200);
+
+    // Verify the format dropdown shows "Currency"
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Currency', 'Format dropdown should show Currency after selection');
+
+    // Now type a value - it should be formatted as currency
+    await setCellValue(ctx.page, 'B5', '100');
+    await sleep(200);
+
+    // Check the displayed value shows currency format
+    const display = await getCellDisplayValue(ctx.page, 'B5');
+    assertEqual(display, '$100.00', 'Value entered after format selection should display as $100.00');
+  },
 };
 
 // Run all tests
