@@ -374,14 +374,35 @@ export class FormatControls {
 
     const currentDecimals = currentFormat?.decimalPlaces ?? 2;
     const currentCategory = currentFormat?.category.toUpperCase() ?? "NUMBER";
+    const currentHasSeparator = currentFormat?.useThousandsSeparator ?? false;
     const newDecimals = Math.max(0, Math.min(10, currentDecimals + delta));
 
-    // Find a format with the new decimal places in the same category
+    // Find a format with the new decimal places in the same category, preserving separator setting
     let newFormat = this.availableFormats.find(
-      (f) => f.category.toUpperCase() === currentCategory && f.decimalPlaces === newDecimals
+      (f) =>
+        f.category.toUpperCase() === currentCategory &&
+        f.decimalPlaces === newDecimals &&
+        f.useThousandsSeparator === currentHasSeparator
     );
 
-    // If not found in same category, try NUMBER
+    // If not found with same separator, try without separator preference
+    if (!newFormat) {
+      newFormat = this.availableFormats.find(
+        (f) => f.category.toUpperCase() === currentCategory && f.decimalPlaces === newDecimals
+      );
+    }
+
+    // If not found in same category, try NUMBER with same separator preference
+    if (!newFormat) {
+      newFormat = this.availableFormats.find(
+        (f) =>
+          f.category.toUpperCase() === "NUMBER" &&
+          f.decimalPlaces === newDecimals &&
+          f.useThousandsSeparator === currentHasSeparator
+      );
+    }
+
+    // If still not found, try NUMBER without separator preference
     if (!newFormat) {
       newFormat = this.availableFormats.find(
         (f) => f.category.toUpperCase() === "NUMBER" && f.decimalPlaces === newDecimals

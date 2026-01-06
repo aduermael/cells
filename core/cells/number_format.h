@@ -62,9 +62,12 @@ namespace BuiltInFormats {
 // General format (default)
 extern const ID GENERAL;
 
-// Number formats
+// Number formats (0-4 decimal places)
 extern const ID NUMBER_0;     // 0 decimal places
+extern const ID NUMBER_1;     // 1 decimal place
 extern const ID NUMBER_2;     // 2 decimal places
+extern const ID NUMBER_3;     // 3 decimal places
+extern const ID NUMBER_4;     // 4 decimal places
 extern const ID NUMBER_SEP;   // Thousands separator, 0 decimals
 extern const ID NUMBER_SEP2;  // Thousands separator, 2 decimals
 

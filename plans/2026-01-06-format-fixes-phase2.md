@@ -87,7 +87,7 @@ The comparison in `handleDecimalChange()` uses exact string match against lowerc
   - Convert `currentFormat.category` and `f.category` to uppercase before comparison
   - Same pattern as `getCategoryForFormatId()`
 
-- [ ] 1b: Add E2E test for decimal buttons
+- [x] 1b: Add E2E test for decimal buttons
   - Enter "1234.5678", select Number format
   - Click decimal decrease, verify "1234.568" (3 decimals)
   - Click decimal decrease again, verify "1234.57" (2 decimals)

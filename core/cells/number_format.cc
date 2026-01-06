@@ -109,7 +109,10 @@ namespace BuiltInFormats {
 const ID GENERAL("FMT_GEN0");
 
 const ID NUMBER_0("FMT_N000");
+const ID NUMBER_1("FMT_N001");
 const ID NUMBER_2("FMT_N002");
+const ID NUMBER_3("FMT_N003");
+const ID NUMBER_4("FMT_N004");
 const ID NUMBER_SEP("FMT_NS00");
 const ID NUMBER_SEP2("FMT_NS02");
 
@@ -188,11 +191,17 @@ void NumberFormatRegistry::initBuiltInFormats() {
     formats_[BuiltInFormats::GENERAL] =
         NumberFormat(BuiltInFormats::GENERAL, Cat::GENERAL, "General", 0, false, "", false);
 
-    // Number formats
+    // Number formats (0-4 decimal places)
     formats_[BuiltInFormats::NUMBER_0] =
         NumberFormat(BuiltInFormats::NUMBER_0, Cat::NUMBER, "0", 0, false, "", false);
+    formats_[BuiltInFormats::NUMBER_1] =
+        NumberFormat(BuiltInFormats::NUMBER_1, Cat::NUMBER, "0.0", 1, false, "", false);
     formats_[BuiltInFormats::NUMBER_2] =
         NumberFormat(BuiltInFormats::NUMBER_2, Cat::NUMBER, "0.00", 2, false, "", false);
+    formats_[BuiltInFormats::NUMBER_3] =
+        NumberFormat(BuiltInFormats::NUMBER_3, Cat::NUMBER, "0.000", 3, false, "", false);
+    formats_[BuiltInFormats::NUMBER_4] =
+        NumberFormat(BuiltInFormats::NUMBER_4, Cat::NUMBER, "0.0000", 4, false, "", false);
     formats_[BuiltInFormats::NUMBER_SEP] =
         NumberFormat(BuiltInFormats::NUMBER_SEP, Cat::NUMBER, "#,##0", 0, true, "", false);
     formats_[BuiltInFormats::NUMBER_SEP2] =
