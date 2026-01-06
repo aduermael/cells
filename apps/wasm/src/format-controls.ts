@@ -537,13 +537,36 @@ export class FormatControls {
     // Max 4 decimal places (matching available formats)
     const newDecimals = Math.max(0, Math.min(4, currentDecimals + delta));
 
-    // Find a format with the new decimal places in the same category, preserving separator setting
-    let newFormat = this.availableFormats.find(
-      (f) =>
-        f.category.toUpperCase() === currentCategory &&
-        f.decimalPlaces === newDecimals &&
-        f.useThousandsSeparator === currentHasSeparator
-    );
+    // For currency formats, preserve the specific currency (USD, EUR, etc.)
+    // Format ID pattern: C<CURRENCY>_0XX (e.g., CUSD_002, CEUR_003)
+    let newFormat: NumberFormat | undefined;
+
+    if (currentCategory === "CURRENCY") {
+      // Extract currency from current format ID
+      const currencyMatch = currentFormatId.match(/^C([A-Z]{3})_0\d{2}$/);
+      if (currencyMatch) {
+        const currency = currencyMatch[1];
+        // Build the exact format ID for this currency with new decimal places
+        const newFormatId = this.getFormatIdForCurrency(currency as CurrencyType, newDecimals);
+        newFormat = this.availableFormats.find((f) => f.id === newFormatId);
+      }
+      // Fallback for legacy FMT_C formats (USD only)
+      if (!newFormat && currentFormatId.startsWith("FMT_C")) {
+        const newFormatId = this.getFormatIdForCurrency("USD", newDecimals);
+        newFormat = this.availableFormats.find((f) => f.id === newFormatId);
+      }
+    }
+
+    // For non-currency formats, or if currency format wasn't found
+    if (!newFormat) {
+      // Find a format with the new decimal places in the same category, preserving separator setting
+      newFormat = this.availableFormats.find(
+        (f) =>
+          f.category.toUpperCase() === currentCategory &&
+          f.decimalPlaces === newDecimals &&
+          f.useThousandsSeparator === currentHasSeparator
+      );
+    }
 
     // If not found with same separator, try without separator preference
     if (!newFormat) {

@@ -629,6 +629,90 @@ const tests = {
     const currencyLabel = await ctx.page.$eval('#currency-dropdown-label', el => el.textContent);
     assertEqual(currencyLabel, '¥', 'Currency dropdown should show ¥ symbol');
   },
+
+  'Decimal change preserves currency type (EUR)': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a number
+    await setCellValue(ctx.page, 'A1', '100.5678');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open currency dropdown and select EUR
+    await ctx.page.click('#currency-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-currency="EUR"]');
+    await sleep(300);
+
+    // Check the displayed value shows EUR format with 2 decimals
+    let display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '€100.57', 'Value should display as €100.57 with EUR currency (2 decimals)');
+
+    // Click decimal increase to go to 3 decimals
+    await ctx.page.click('#format-decimal-increase');
+    await sleep(200);
+
+    // Verify it's still EUR with 3 decimals
+    display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '€100.568', 'After decimal increase, should still be EUR with 3 decimals');
+
+    // Check the currency dropdown still shows EUR symbol
+    let currencyLabel = await ctx.page.$eval('#currency-dropdown-label', el => el.textContent);
+    assertEqual(currencyLabel, '€', 'Currency dropdown should still show € symbol after decimal change');
+
+    // Click decimal decrease twice to go to 1 decimal
+    await ctx.page.click('#format-decimal-decrease');
+    await sleep(200);
+    await ctx.page.click('#format-decimal-decrease');
+    await sleep(200);
+
+    // Verify it's still EUR with 1 decimal
+    display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '€100.6', 'After decimal decrease, should still be EUR with 1 decimal');
+
+    // Check the currency dropdown still shows EUR symbol
+    currencyLabel = await ctx.page.$eval('#currency-dropdown-label', el => el.textContent);
+    assertEqual(currencyLabel, '€', 'Currency dropdown should still show € symbol');
+  },
+
+  'Decimal change preserves currency type (GBP)': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a number
+    await setCellValue(ctx.page, 'A1', '50.1234');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open currency dropdown and select GBP
+    await ctx.page.click('#currency-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-currency="GBP"]');
+    await sleep(300);
+
+    // Check the displayed value shows GBP format with 2 decimals
+    let display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '£50.12', 'Value should display as £50.12 with GBP currency');
+
+    // Click decimal decrease to go to 1 decimal
+    await ctx.page.click('#format-decimal-decrease');
+    await sleep(200);
+
+    // Verify it's still GBP with 1 decimal
+    display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '£50.1', 'After decimal decrease, should still be GBP with 1 decimal');
+
+    // Check the currency dropdown still shows GBP symbol
+    const currencyLabel = await ctx.page.$eval('#currency-dropdown-label', el => el.textContent);
+    assertEqual(currencyLabel, '£', 'Currency dropdown should still show £ symbol after decimal change');
+  },
 };
 
 // Run all tests
