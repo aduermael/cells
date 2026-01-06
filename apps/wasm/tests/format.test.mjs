@@ -127,23 +127,55 @@ const tests = {
     assertEqual(formulaBar, '$500', 'Formula bar should show formatted value $500');
   },
 
-  'Percentage with decimals works': async (ctx) => {
+  'Percentage with 1 decimal preserves format': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
-    // Enter percentage with decimals
+    // Enter percentage with 1 decimal place
     await setCellValue(ctx.page, 'G1', '12.5%');
     await sleep(200);
 
-    // Check the displayed value
+    // Check the displayed value preserves 1 decimal place
     const display = await getCellDisplayValue(ctx.page, 'G1');
-    assertEqual(display, '12.50%', 'Cell should display 12.50%');
+    assertEqual(display, '12.5%', 'Cell should display 12.5% (preserving 1 decimal)');
 
     // Formula bar should show formatted value
     await clickCell(ctx.page, 'G1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
-    assertEqual(formulaBar, '12.50%', 'Formula bar should show formatted value 12.50%');
+    assertEqual(formulaBar, '12.5%', 'Formula bar should show 12.5%');
+  },
+
+  'Percentage with 2 decimals preserves format': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter percentage with 2 decimal places
+    await setCellValue(ctx.page, 'H1', '12.50%');
+    await sleep(200);
+
+    // Check the displayed value preserves 2 decimal places
+    const display = await getCellDisplayValue(ctx.page, 'H1');
+    assertEqual(display, '12.50%', 'Cell should display 12.50% (preserving 2 decimals)');
+
+    // Formula bar should show formatted value
+    await clickCell(ctx.page, 'H1');
+    await sleep(100);
+    const formulaBar = await getFormulaBarContent(ctx.page);
+    assertEqual(formulaBar, '12.50%', 'Formula bar should show 12.50%');
+  },
+
+  'Currency with 1 decimal preserves format': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter currency with 1 decimal place
+    await setCellValue(ctx.page, 'I1', '$99.9');
+    await sleep(200);
+
+    // Check the displayed value preserves 1 decimal place
+    const display = await getCellDisplayValue(ctx.page, 'I1');
+    assertEqual(display, '$99.9', 'Cell should display $99.9 (preserving 1 decimal)');
   },
 
   'Formula results are not auto-formatted': async (ctx) => {

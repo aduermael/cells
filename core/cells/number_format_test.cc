@@ -76,22 +76,52 @@ TEST(NumberFormatRegistryTest, BuiltInFormatsExist) {
 
     // Check that all built-in formats exist
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::GENERAL));
+
+    // Number formats (0-4 decimal places)
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_0));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_1));
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_2));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_3));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_4));
+
+    // Number with separator formats (0-4 decimal places)
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_SEP));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_SEP1));
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_SEP2));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_SEP3));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_SEP4));
+
+    // Currency formats (0-4 decimal places)
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_0));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_1));
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_2));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_3));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_4));
+
+    // Accounting formats
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::ACCOUNTING_0));
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::ACCOUNTING_2));
+
+    // Percentage formats (0-4 decimal places)
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::PERCENTAGE_0));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::PERCENTAGE_1));
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::PERCENTAGE_2));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::PERCENTAGE_3));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::PERCENTAGE_4));
+
+    // Date formats
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::DATE_SHORT));
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::DATE_LONG));
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::DATE_ISO));
+
+    // Time formats
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::TIME_12H));
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::TIME_24H));
+
+    // DateTime formats
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::DATETIME_SHORT));
+
+    // Other formats
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::SCIENTIFIC_2));
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::TEXT));
 }
@@ -147,23 +177,25 @@ TEST(NumberFormatRegistryTest, GetFormatsByCategory) {
     NumberFormatRegistry registry;
 
     auto currencyFormats = registry.getFormatsByCategory(NumberFormatCategory::CURRENCY);
-    EXPECT_EQ(currencyFormats.size(), 2);  // CURRENCY_0 and CURRENCY_2
+    EXPECT_EQ(currencyFormats.size(), 5);  // CURRENCY_0 through CURRENCY_4 (0-4 decimal places)
 
     auto dateFormats = registry.getFormatsByCategory(NumberFormatCategory::DATE);
     EXPECT_EQ(dateFormats.size(), 3);  // DATE_SHORT, DATE_LONG, DATE_ISO
 
     auto percentageFormats = registry.getFormatsByCategory(NumberFormatCategory::PERCENTAGE);
-    EXPECT_EQ(percentageFormats.size(), 2);  // PERCENTAGE_0 and PERCENTAGE_2
+    EXPECT_EQ(percentageFormats.size(),
+              5);  // PERCENTAGE_0 through PERCENTAGE_4 (0-4 decimal places)
 }
 
 TEST(NumberFormatRegistryTest, GetAllFormats) {
     NumberFormatRegistry registry;
 
     const auto& allFormats = registry.getAllFormats();
-    // Should have all built-in formats (22 total)
-    // 1 General + 7 Number (0-4 decimals + 2 with separators) + 2 Currency +
-    // 2 Accounting + 2 Percentage + 3 Date + 2 Time + 1 DateTime + 1 Scientific + 1 Text
-    EXPECT_EQ(allFormats.size(), 22);
+    // Should have all built-in formats (31 total)
+    // 1 General + 5 Number (0-4 decimals) + 5 Number with separators (0-4 decimals) +
+    // 5 Currency (0-4 decimals) + 2 Accounting + 5 Percentage (0-4 decimals) +
+    // 3 Date + 2 Time + 1 DateTime + 1 Scientific + 1 Text
+    EXPECT_EQ(allFormats.size(), 31);
 }
 
 TEST(BuiltInFormatsTest, VerifyFormatCodes) {

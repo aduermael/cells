@@ -70,6 +70,53 @@ static bool parseDouble(const std::string& str, double& value) {
     return result.ec == std::errc{} && result.ptr == clean.data() + clean.size();
 }
 
+// Helper: count decimal places in a number string
+// "15" -> 0, "15.5" -> 1, "15.50" -> 2, "15.500" -> 3
+static uint8_t countDecimalPlaces(const std::string& str) {
+    const auto dotPos = str.find('.');
+    if (dotPos == std::string::npos) {
+        return 0;
+    }
+    // Count digits after decimal point
+    const size_t decimalDigits = str.size() - dotPos - 1;
+    // Cap at 4 decimal places
+    return static_cast<uint8_t>(std::min(decimalDigits, static_cast<size_t>(4)));
+}
+
+// Helper: get percentage format ID for given decimal places (0-4)
+static ID getPercentageFormatId(uint8_t decimals) {
+    switch (decimals) {
+        case 0:
+            return BuiltInFormats::PERCENTAGE_0;
+        case 1:
+            return BuiltInFormats::PERCENTAGE_1;
+        case 2:
+            return BuiltInFormats::PERCENTAGE_2;
+        case 3:
+            return BuiltInFormats::PERCENTAGE_3;
+        case 4:
+        default:
+            return BuiltInFormats::PERCENTAGE_4;
+    }
+}
+
+// Helper: get currency format ID for given decimal places (0-4)
+static ID getCurrencyFormatId(uint8_t decimals) {
+    switch (decimals) {
+        case 0:
+            return BuiltInFormats::CURRENCY_0;
+        case 1:
+            return BuiltInFormats::CURRENCY_1;
+        case 2:
+            return BuiltInFormats::CURRENCY_2;
+        case 3:
+            return BuiltInFormats::CURRENCY_3;
+        case 4:
+        default:
+            return BuiltInFormats::CURRENCY_4;
+    }
+}
+
 // Parse percentage input (e.g., "15%" -> 0.15)
 ParsedInput parsePercentage(const std::string& input) {
     const std::string trimmed = trim(input);
@@ -96,9 +143,10 @@ ParsedInput parsePercentage(const std::string& input) {
     // Convert percentage to decimal (15% -> 0.15)
     value /= 100.0;
 
-    // Determine decimal places: "15%" -> PERCENTAGE_0, "15.5%" -> PERCENTAGE_2
-    const bool hasDecimals = numPart.find('.') != std::string::npos;
-    const ID formatId = hasDecimals ? BuiltInFormats::PERCENTAGE_2 : BuiltInFormats::PERCENTAGE_0;
+    // Count exact decimal places and get matching format ID
+    // "15%" -> 0 decimals, "15.5%" -> 1 decimal, "15.50%" -> 2 decimals
+    const uint8_t decimals = countDecimalPlaces(numPart);
+    const ID formatId = getPercentageFormatId(decimals);
 
     return ParsedInput::number(value, formatId, NumberFormatCategory::PERCENTAGE);
 }
@@ -165,9 +213,10 @@ ParsedInput parseCurrency(const std::string& input) {
         value = -value;
     }
 
-    // Determine decimal places
-    const bool hasDecimals = numPart.find('.') != std::string::npos;
-    const ID formatId = hasDecimals ? BuiltInFormats::CURRENCY_2 : BuiltInFormats::CURRENCY_0;
+    // Count exact decimal places and get matching format ID
+    // "$100" -> 0 decimals, "$99.9" -> 1 decimal, "$99.99" -> 2 decimals
+    const uint8_t decimals = countDecimalPlaces(numPart);
+    const ID formatId = getCurrencyFormatId(decimals);
 
     return ParsedInput::number(value, formatId, NumberFormatCategory::CURRENCY);
 }

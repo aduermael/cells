@@ -375,7 +375,8 @@ export class FormatControls {
     const currentDecimals = currentFormat?.decimalPlaces ?? 2;
     const currentCategory = currentFormat?.category.toUpperCase() ?? "NUMBER";
     const currentHasSeparator = currentFormat?.useThousandsSeparator ?? false;
-    const newDecimals = Math.max(0, Math.min(10, currentDecimals + delta));
+    // Max 4 decimal places (matching available formats)
+    const newDecimals = Math.max(0, Math.min(4, currentDecimals + delta));
 
     // Find a format with the new decimal places in the same category, preserving separator setting
     let newFormat = this.availableFormats.find(

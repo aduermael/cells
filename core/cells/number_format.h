@@ -69,19 +69,28 @@ extern const ID NUMBER_2;     // 2 decimal places
 extern const ID NUMBER_3;     // 3 decimal places
 extern const ID NUMBER_4;     // 4 decimal places
 extern const ID NUMBER_SEP;   // Thousands separator, 0 decimals
+extern const ID NUMBER_SEP1;  // Thousands separator, 1 decimal
 extern const ID NUMBER_SEP2;  // Thousands separator, 2 decimals
+extern const ID NUMBER_SEP3;  // Thousands separator, 3 decimals
+extern const ID NUMBER_SEP4;  // Thousands separator, 4 decimals
 
-// Currency formats
+// Currency formats (0-4 decimal places)
 extern const ID CURRENCY_0;  // $1,234
+extern const ID CURRENCY_1;  // $1,234.5
 extern const ID CURRENCY_2;  // $1,234.56
+extern const ID CURRENCY_3;  // $1,234.567
+extern const ID CURRENCY_4;  // $1,234.5678
 
 // Accounting formats
 extern const ID ACCOUNTING_0;  // Accounting, 0 decimals
 extern const ID ACCOUNTING_2;  // Accounting, 2 decimals
 
-// Percentage formats
+// Percentage formats (0-4 decimal places)
 extern const ID PERCENTAGE_0;  // 15%
+extern const ID PERCENTAGE_1;  // 15.0%
 extern const ID PERCENTAGE_2;  // 15.00%
+extern const ID PERCENTAGE_3;  // 15.000%
+extern const ID PERCENTAGE_4;  // 15.0000%
 
 // Date formats
 extern const ID DATE_SHORT;  // 1/15/2024

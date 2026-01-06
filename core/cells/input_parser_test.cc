@@ -57,10 +57,27 @@ TEST(PercentageParsingTest, NegativePercentage) {
 }
 
 TEST(PercentageParsingTest, DecimalPercentage) {
+    // 15.5% has 1 decimal place, so should use PERCENTAGE_1
     auto result = parsePercentage("15.5%");
     EXPECT_TRUE(result.success);
     EXPECT_DOUBLE_EQ(result.numericValue, 0.155);
+    EXPECT_EQ(result.formatId, BuiltInFormats::PERCENTAGE_1);
+}
+
+TEST(PercentageParsingTest, TwoDecimalPercentage) {
+    // 15.50% has 2 decimal places, so should use PERCENTAGE_2
+    auto result = parsePercentage("15.50%");
+    EXPECT_TRUE(result.success);
+    EXPECT_DOUBLE_EQ(result.numericValue, 0.155);
     EXPECT_EQ(result.formatId, BuiltInFormats::PERCENTAGE_2);
+}
+
+TEST(PercentageParsingTest, ThreeDecimalPercentage) {
+    // 15.123% has 3 decimal places, so should use PERCENTAGE_3
+    auto result = parsePercentage("15.123%");
+    EXPECT_TRUE(result.success);
+    EXPECT_DOUBLE_EQ(result.numericValue, 0.15123);
+    EXPECT_EQ(result.formatId, BuiltInFormats::PERCENTAGE_3);
 }
 
 TEST(PercentageParsingTest, ZeroPercentage) {
@@ -120,6 +137,22 @@ TEST(CurrencyParsingTest, DollarNegative) {
 TEST(CurrencyParsingTest, NoCurrencySymbol) {
     auto result = parseCurrency("1234");
     EXPECT_FALSE(result.success);
+}
+
+TEST(CurrencyParsingTest, OneDecimalPlace) {
+    // $99.9 has 1 decimal place, so should use CURRENCY_1
+    auto result = parseCurrency("$99.9");
+    EXPECT_TRUE(result.success);
+    EXPECT_DOUBLE_EQ(result.numericValue, 99.9);
+    EXPECT_EQ(result.formatId, BuiltInFormats::CURRENCY_1);
+}
+
+TEST(CurrencyParsingTest, ThreeDecimalPlaces) {
+    // $99.999 has 3 decimal places, so should use CURRENCY_3
+    auto result = parseCurrency("$99.999");
+    EXPECT_TRUE(result.success);
+    EXPECT_DOUBLE_EQ(result.numericValue, 99.999);
+    EXPECT_EQ(result.formatId, BuiltInFormats::CURRENCY_3);
 }
 
 // =============================================================================

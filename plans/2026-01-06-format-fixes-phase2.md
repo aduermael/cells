@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2026-01-06 01:03 UTC
-Updated At: 2026-01-06 01:22 UTC
+Updated At: 2026-01-06 01:38 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -113,28 +113,44 @@ When selecting a format on an empty cell, the cell doesn't exist so the format c
   - Verify dropdown shows "Currency"
   - Type "100", verify displays as "$100.00"
 
-## Phase 3: Preserve Decimal Places from Input
+## Phase 3: Preserve Decimal Places from Input ✅
 
 When typing "15%", preserve the 0-decimal format. When typing "15.5%", use 1-decimal format.
 
-- [ ] 3a: Update input parser to detect decimal places from percentage input
-  - Parse "15%" → 0 decimals, "15.5%" → 1 decimal, "15.50%" → 2 decimals
-  - Select appropriate format ID: FMT_P000, FMT_P001, FMT_P002, etc.
+**Architecture Decision**: Rather than adding `decimalPlacesOverride` to Cell struct (which would require
+CRDT operation changes, serialization updates, etc.), we chose a simpler approach: add format variants for
+0-4 decimal places for each category that supports decimals (percentage, currency, number with separator).
 
-- [ ] 3b: Update input parser to detect decimal places from currency input
-  - Parse "$100" → 0 decimals, "$100.5" → 1 decimal, "$100.50" → 2 decimals
-  - Select appropriate format ID: FMT_C000, FMT_C001, FMT_C002, etc.
+Approach implemented:
+- Added format variants: PERCENTAGE_0-4, CURRENCY_0-4, NUMBER_SEP-SEP4
+- Input parser counts exact decimal places and returns matching format ID
+- Decimal +/- buttons cycle through available format IDs by decimal count
+- No changes needed to Cell struct, CRDT operations, or file format
 
-- [ ] 3c: Add unit tests for decimal place detection
-  - "15%" → FMT_P000, "15.5%" → FMT_P001, "15.50%" → FMT_P002
-  - "$100" → FMT_C000, "$100.5" → FMT_C001, "$100.50" → FMT_C002
-  - "1.5E6" → scientific with 1 decimal
+- [x] 3a: Add format variants for 0-4 decimal places
+  - Added PERCENTAGE_1, PERCENTAGE_3, PERCENTAGE_4
+  - Added CURRENCY_1, CURRENCY_3, CURRENCY_4
+  - Added NUMBER_SEP1, NUMBER_SEP3, NUMBER_SEP4
+  - Updated number_format.h and number_format.cc
 
-- [ ] 3d: Add E2E tests for preserved decimal places
-  - Type "15%", verify shows "15%" (not "15.00%")
-  - Type "15.5%", verify shows "15.5%"
-  - Type "$100", verify shows "$100" (not "$100.00")
-  - Type "$99.9", verify shows "$99.9" (not "$99.90")
+- [x] 3b: Update input parser to count exact decimal places
+  - Added `countDecimalPlaces()` helper function
+  - Added `getPercentageFormatId()` and `getCurrencyFormatId()` helpers
+  - Updated parsePercentage() and parseCurrency() to use exact decimal count
+
+- [x] 3c: Update decimal +/- buttons to cycle format IDs
+  - Format dropdown max decimal changed from 10 to 4
+  - handleDecimalChange() already searches for formats by category and decimal places
+
+- [x] 3d: Add unit tests for decimal place preservation
+  - Added tests for 1, 2, 3 decimal percentages
+  - Added tests for 1, 3 decimal currencies
+  - Updated format count expectations in number_format_test.cc
+
+- [x] 3e: Add E2E tests for preserved decimal places
+  - Updated "Percentage with decimals" test to expect 12.5% (not 12.50%)
+  - Added "Percentage with 2 decimals" test for 12.50%
+  - Added "Currency with 1 decimal" test for $99.9
 
 ## Phase 4: Formula Cell Format Selection
 
@@ -236,3 +252,25 @@ Deferred to future plan due to complexity.
 5. Currency dropdown allows selecting USD, EUR, GBP, JPY, CNY
 6. Formula bar spacing is consistent
 7. All existing tests continue to pass
+
+---
+
+## File Format Compatibility Requirements
+
+**Important**: All format changes must be correctly serialized and deserialized in both file formats:
+
+### Excel (.xlsx)
+- Number formats use Excel-style format codes (e.g., `"0.00%"`, `"$#,##0.00"`)
+- `decimalPlacesOverride` should generate appropriate format code on export
+- On import, parse format codes to extract decimal places and set override
+
+### ZCD (.zcd / .cells)
+- Add `decimalPlaces` field to cell serialization if override is set
+- Format: `F <cellId> <formatId> [decimalPlaces]`
+- Example: `F cA1b2c3d PERCENTAGE 3` (3 decimal places)
+- Backwards compatible: missing decimal places means use format default
+
+### Test Coverage
+- Round-trip tests: save file with custom decimal places, reload, verify preserved
+- Import tests: Excel files with various decimal formats should display correctly
+- Export tests: verify generated Excel files have correct format codes

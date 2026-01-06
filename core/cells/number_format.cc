@@ -114,16 +114,25 @@ const ID NUMBER_2("FMT_N002");
 const ID NUMBER_3("FMT_N003");
 const ID NUMBER_4("FMT_N004");
 const ID NUMBER_SEP("FMT_NS00");
+const ID NUMBER_SEP1("FMT_NS01");
 const ID NUMBER_SEP2("FMT_NS02");
+const ID NUMBER_SEP3("FMT_NS03");
+const ID NUMBER_SEP4("FMT_NS04");
 
 const ID CURRENCY_0("FMT_C000");
+const ID CURRENCY_1("FMT_C001");
 const ID CURRENCY_2("FMT_C002");
+const ID CURRENCY_3("FMT_C003");
+const ID CURRENCY_4("FMT_C004");
 
 const ID ACCOUNTING_0("FMT_A000");
 const ID ACCOUNTING_2("FMT_A002");
 
 const ID PERCENTAGE_0("FMT_P000");
+const ID PERCENTAGE_1("FMT_P001");
 const ID PERCENTAGE_2("FMT_P002");
+const ID PERCENTAGE_3("FMT_P003");
+const ID PERCENTAGE_4("FMT_P004");
 
 const ID DATE_SHORT("FMT_DSHT");
 const ID DATE_LONG("FMT_DLNG");
@@ -204,14 +213,26 @@ void NumberFormatRegistry::initBuiltInFormats() {
         NumberFormat(BuiltInFormats::NUMBER_4, Cat::NUMBER, "0.0000", 4, false, "", false);
     formats_[BuiltInFormats::NUMBER_SEP] =
         NumberFormat(BuiltInFormats::NUMBER_SEP, Cat::NUMBER, "#,##0", 0, true, "", false);
+    formats_[BuiltInFormats::NUMBER_SEP1] =
+        NumberFormat(BuiltInFormats::NUMBER_SEP1, Cat::NUMBER, "#,##0.0", 1, true, "", false);
     formats_[BuiltInFormats::NUMBER_SEP2] =
         NumberFormat(BuiltInFormats::NUMBER_SEP2, Cat::NUMBER, "#,##0.00", 2, true, "", false);
+    formats_[BuiltInFormats::NUMBER_SEP3] =
+        NumberFormat(BuiltInFormats::NUMBER_SEP3, Cat::NUMBER, "#,##0.000", 3, true, "", false);
+    formats_[BuiltInFormats::NUMBER_SEP4] =
+        NumberFormat(BuiltInFormats::NUMBER_SEP4, Cat::NUMBER, "#,##0.0000", 4, true, "", false);
 
-    // Currency formats
+    // Currency formats (0-4 decimal places)
     formats_[BuiltInFormats::CURRENCY_0] =
         NumberFormat(BuiltInFormats::CURRENCY_0, Cat::CURRENCY, "$#,##0", 0, true, "$", false);
+    formats_[BuiltInFormats::CURRENCY_1] =
+        NumberFormat(BuiltInFormats::CURRENCY_1, Cat::CURRENCY, "$#,##0.0", 1, true, "$", false);
     formats_[BuiltInFormats::CURRENCY_2] =
         NumberFormat(BuiltInFormats::CURRENCY_2, Cat::CURRENCY, "$#,##0.00", 2, true, "$", false);
+    formats_[BuiltInFormats::CURRENCY_3] =
+        NumberFormat(BuiltInFormats::CURRENCY_3, Cat::CURRENCY, "$#,##0.000", 3, true, "$", false);
+    formats_[BuiltInFormats::CURRENCY_4] =
+        NumberFormat(BuiltInFormats::CURRENCY_4, Cat::CURRENCY, "$#,##0.0000", 4, true, "$", false);
 
     // Accounting formats
     formats_[BuiltInFormats::ACCOUNTING_0] = NumberFormat(
@@ -219,11 +240,17 @@ void NumberFormatRegistry::initBuiltInFormats() {
     formats_[BuiltInFormats::ACCOUNTING_2] = NumberFormat(
         BuiltInFormats::ACCOUNTING_2, Cat::ACCOUNTING, "_($* #,##0.00_)", 2, true, "$", true);
 
-    // Percentage formats
+    // Percentage formats (0-4 decimal places)
     formats_[BuiltInFormats::PERCENTAGE_0] =
         NumberFormat(BuiltInFormats::PERCENTAGE_0, Cat::PERCENTAGE, "0%", 0, false, "", false);
+    formats_[BuiltInFormats::PERCENTAGE_1] =
+        NumberFormat(BuiltInFormats::PERCENTAGE_1, Cat::PERCENTAGE, "0.0%", 1, false, "", false);
     formats_[BuiltInFormats::PERCENTAGE_2] =
         NumberFormat(BuiltInFormats::PERCENTAGE_2, Cat::PERCENTAGE, "0.00%", 2, false, "", false);
+    formats_[BuiltInFormats::PERCENTAGE_3] =
+        NumberFormat(BuiltInFormats::PERCENTAGE_3, Cat::PERCENTAGE, "0.000%", 3, false, "", false);
+    formats_[BuiltInFormats::PERCENTAGE_4] =
+        NumberFormat(BuiltInFormats::PERCENTAGE_4, Cat::PERCENTAGE, "0.0000%", 4, false, "", false);
 
     // Date formats
     formats_[BuiltInFormats::DATE_SHORT] =
