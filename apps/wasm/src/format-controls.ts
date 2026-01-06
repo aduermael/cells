@@ -424,8 +424,8 @@ export class FormatControls {
       return twoDecimal.id;
     }
 
-    // Otherwise return the first matching format
-    return matchingFormats[0].id;
+    // Otherwise return the first matching format (array is non-empty due to check at line 394)
+    return matchingFormats[0]?.id ?? "~";
   }
 
   private setDisplayedFormat(formatId: string, category: NumberFormatCategory): void {
