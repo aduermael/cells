@@ -470,6 +470,76 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'B5');
     assertEqual(display, '$100.00', 'Value entered after format selection should display as $100.00');
   },
+
+  // ============================================================================
+  // Formula cell format tests
+  // ============================================================================
+
+  'Formula cell can have percentage format applied': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a formula that results in 0.15
+    await setCellValue(ctx.page, 'A1', '=0.15');
+    await sleep(200);
+
+    // Check initial display is unformatted
+    let display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '0.15', 'Formula result should initially display as 0.15');
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Check the format dropdown shows "General"
+    let formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'General', 'Format dropdown should initially show General');
+
+    // Open format dropdown and select Percent format
+    await ctx.page.click('#format-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-format-category="PERCENTAGE"]');
+    await sleep(300);
+
+    // Check format dropdown now shows "Percent"
+    formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Percent', 'Format dropdown should show Percent after selection');
+
+    // Check the displayed value shows percentage format
+    display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '15%', 'Formula result should display as 15% after format change');
+
+    // Verify formula bar still shows the formula
+    const formulaBar = await getFormulaBarContent(ctx.page);
+    assertEqual(formulaBar, '=0.15', 'Formula bar should still show =0.15');
+  },
+
+  'Formula cell can have currency format applied': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a formula that results in 1234.5
+    await setCellValue(ctx.page, 'A1', '=1000+234.5');
+    await sleep(200);
+
+    // Check initial display is unformatted
+    let display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '1234.5', 'Formula result should initially display as 1234.5');
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open format dropdown and select Currency format
+    await ctx.page.click('#format-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-format-category="CURRENCY"]');
+    await sleep(300);
+
+    // Check the displayed value shows currency format (0 decimal places by default)
+    display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '$1,234', 'Formula result should display as $1,234 (0 decimals, with separator)');
+  },
 };
 
 // Run all tests

@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2026-01-06 01:03 UTC
-Updated At: 2026-01-06 01:38 UTC
+Updated At: 2026-01-06 03:08 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -152,20 +152,19 @@ Approach implemented:
   - Added "Percentage with 2 decimals" test for 12.50%
   - Added "Currency with 1 decimal" test for $99.9
 
-## Phase 4: Formula Cell Format Selection
+## Phase 4: Formula Cell Format Selection ✅
 
 Verify and fix format application to formula cells.
 
-- [ ] 4a: Debug and fix formula cell format selection
-  - Test: enter "=0.5", select Percentage → should show "50%"
-  - Verify `setCellFormatAt()` works for formula cells
-  - Issue may be in UI not triggering or C++ not applying
+- [x] 4a: Debug and fix formula cell format selection
+  - Root cause: bindings.cc getCellsInRange() wasn't applying formatId to formula cell numeric results
+  - Fixed by checking entry.cell->formatId and calling formatNumber() in the result.isNumber() branch
+  - Also improved getFormatIdForCategory() to prefer 0-decimal formats as default for dropdown selection
 
-- [ ] 4b: Add E2E test for formula cell format
-  - Enter "=0.15" in A1
-  - Select Percentage from dropdown
-  - Verify A1 displays "15%" (or "15.00%" depending on selected format)
-  - Verify formula bar still shows "=0.15"
+- [x] 4b: Add E2E test for formula cell format
+  - Added "Formula cell can have percentage format applied" test
+  - Added "Formula cell can have currency format applied" test
+  - Both verify format changes display correctly while formula bar preserves the formula
 
 ## Phase 5: Currency Dropdown
 

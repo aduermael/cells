@@ -663,7 +663,18 @@ public:
                     json << "\"isError\":true,";
                 } else if (result.isNumber()) {
                     const double num = result.getNumber();
-                    if (std::floor(num) == num && std::abs(num) < 1e15) {
+                    // Check if cell has a format to apply to the numeric result
+                    if (!entry.cell->formatId.isNull()) {
+                        FormattedValue formatted = formatNumber(_formatRegistry, num, entry.cell->formatId);
+                        if (!formatted.isError) {
+                            displayValue = formatted.text;
+                        } else {
+                            // Fallback to default number formatting
+                            std::ostringstream numStr;
+                            numStr << std::setprecision(15) << num;
+                            displayValue = numStr.str();
+                        }
+                    } else if (std::floor(num) == num && std::abs(num) < 1e15) {
                         displayValue = std::to_string(static_cast<long long>(num));
                     } else {
                         std::ostringstream numStr;

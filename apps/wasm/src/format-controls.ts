@@ -292,12 +292,30 @@ export class FormatControls {
   }
 
   private getFormatIdForCategory(category: NumberFormatCategory): string {
-    // Return the first format of the given category
-    // C++ returns lowercase, compare case-insensitively
-    const format = this.availableFormats.find(
+    // Find formats matching the category (C++ returns lowercase)
+    const matchingFormats = this.availableFormats.filter(
       (f) => f.category.toUpperCase() === category
     );
-    return format ? format.id : "~";
+
+    if (matchingFormats.length === 0) {
+      return "~";
+    }
+
+    // Prefer format with 0 decimal places as the default for dropdown selection.
+    // This makes "15%" instead of "15.00%" when selecting Percent from dropdown.
+    const zeroDecimal = matchingFormats.find((f) => f.decimalPlaces === 0);
+    if (zeroDecimal) {
+      return zeroDecimal.id;
+    }
+
+    // Fall back to format with 2 decimal places (common default)
+    const twoDecimal = matchingFormats.find((f) => f.decimalPlaces === 2);
+    if (twoDecimal) {
+      return twoDecimal.id;
+    }
+
+    // Otherwise return the first matching format
+    return matchingFormats[0].id;
   }
 
   private setDisplayedFormat(_formatId: string, category: NumberFormatCategory): void {
