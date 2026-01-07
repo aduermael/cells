@@ -93,6 +93,9 @@ export class ClipboardManager {
   // Copy
   // =========================================================================
 
+  // Marker prefix for internal clipboard data (JSON embedded in text/plain)
+  private static readonly CLIPBOARD_MARKER = "CELLS_CLIPBOARD::";
+
   /**
    * Copy the current selection to clipboard
    * @returns true if copy succeeded
@@ -107,45 +110,17 @@ export class ClipboardManager {
     const tsvText = this.toTSV(clipboardData);
     const jsonText = JSON.stringify(clipboardData);
 
+    // Embed JSON in text/plain with a marker for reliable internal paste detection.
+    // Format: CELLS_CLIPBOARD::<json>\n\n<tsv>
+    // This ensures format preservation works even when custom MIME types fail.
+    const combinedText = `${ClipboardManager.CLIPBOARD_MARKER}${jsonText}\n\n${tsvText}`;
+
     try {
-      // Use the modern clipboard API with multiple formats
-      // Note: Custom MIME types require ClipboardItem API
-      const items: ClipboardItem[] = [];
-
-      // Try to write both formats
-      // Some browsers don't support custom MIME types, so we fall back to just text
-      try {
-        items.push(
-          new ClipboardItem({
-            "text/plain": new Blob([tsvText], { type: "text/plain" }),
-            // Store JSON in a web-custom format that we can read back
-            "web application/x-cells-clipboard": new Blob([jsonText], {
-              type: "application/json",
-            }),
-          })
-        );
-      } catch {
-        // Fallback: just use text/plain with JSON prefix for detection
-        items.push(
-          new ClipboardItem({
-            "text/plain": new Blob([tsvText], { type: "text/plain" }),
-          })
-        );
-      }
-
-      await navigator.clipboard.write(items);
+      await navigator.clipboard.writeText(combinedText);
       return true;
     } catch (err) {
       console.error("Failed to copy to clipboard:", err);
-
-      // Fallback: just write text
-      try {
-        await navigator.clipboard.writeText(tsvText);
-        return true;
-      } catch (fallbackErr) {
-        console.error("Fallback copy failed:", fallbackErr);
-        return false;
-      }
+      return false;
     }
   }
 
@@ -196,32 +171,38 @@ export class ClipboardManager {
     if (!targetPos) return false;
 
     try {
-      // Read clipboard
-      const clipboardItems = await navigator.clipboard.read();
+      const text = await navigator.clipboard.readText();
+      if (!text) return false;
 
       let clipboardData: ClipboardData | null = null;
 
-      // Try to find our custom format first
-      for (const item of clipboardItems) {
-        // Check for custom web format
-        if (item.types.includes("web application/x-cells-clipboard")) {
+      // Check for our internal format marker
+      if (text.startsWith(ClipboardManager.CLIPBOARD_MARKER)) {
+        // Internal paste: extract JSON from our format
+        // Format: CELLS_CLIPBOARD::<json>\n\n<tsv>
+        const jsonStart = ClipboardManager.CLIPBOARD_MARKER.length;
+        const jsonEnd = text.indexOf("\n\n");
+        if (jsonEnd > jsonStart) {
           try {
-            const blob = await item.getType("web application/x-cells-clipboard");
-            const text = await blob.text();
-            clipboardData = JSON.parse(text) as ClipboardData;
-            break;
+            const jsonText = text.substring(jsonStart, jsonEnd);
+            clipboardData = JSON.parse(jsonText) as ClipboardData;
           } catch {
-            // Ignore, try other formats
+            // JSON parse failed, fall back to TSV
           }
         }
       }
 
-      // Fall back to text/plain (parse as TSV)
+      // Fall back to TSV parsing (external paste or parse error)
       if (!clipboardData) {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          clipboardData = this.parseTSV(text);
+        // If our marker was present but JSON failed, extract TSV portion
+        let tsvText = text;
+        if (text.startsWith(ClipboardManager.CLIPBOARD_MARKER)) {
+          const tsvStart = text.indexOf("\n\n");
+          if (tsvStart > 0) {
+            tsvText = text.substring(tsvStart + 2);
+          }
         }
+        clipboardData = this.parseTSV(tsvText);
       }
 
       if (!clipboardData) return false;
@@ -231,21 +212,6 @@ export class ClipboardManager {
       return true;
     } catch (err) {
       console.error("Failed to paste from clipboard:", err);
-
-      // Fallback: try just reading text
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text) {
-          const clipboardData = this.parseTSV(text);
-          if (clipboardData) {
-            await this.pasteClipboardData(clipboardData, targetPos);
-            return true;
-          }
-        }
-      } catch (fallbackErr) {
-        console.error("Fallback paste failed:", fallbackErr);
-      }
-
       return false;
     }
   }
