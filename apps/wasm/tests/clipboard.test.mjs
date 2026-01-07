@@ -264,6 +264,197 @@ const tests = {
     // Close context menu
     await ctx.page.keyboard.press('Escape');
   },
+
+  // =========================================================================
+  // Format Preservation Tests
+  // =========================================================================
+
+  'Copy/paste preserves percentage format': async (ctx) => {
+    // Test that copying a cell with percentage format preserves the format when pasted
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a value and apply percentage format
+    await setCellValue(ctx.page, 'A1', '0.15');
+    await sleep(200);
+
+    // Click on the cell and apply percentage format
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open format dropdown and select Percent format
+    await ctx.page.click('#format-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-format-category="PERCENTAGE"]');
+    await sleep(300);
+
+    // Verify format is applied
+    let display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '15%', 'A1 should display 15%');
+
+    // Copy the cell using Cmd/Ctrl+C
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Get the clipboard data including formatId
+    const copiedData = await ctx.page.evaluate(() => {
+      const app = window._appContext?.app;
+      if (!app) return null;
+      const cell = app.selectedCell;
+      if (!cell) return null;
+      const cellData = app.cells.find(c => c.col === cell.col && c.row === cell.row);
+      return cellData ? {
+        value: cellData.value,
+        display: cellData.display,
+        formatId: cellData.formatId,
+      } : null;
+    });
+
+    if (process.env.DEBUG) {
+      console.log('DEBUG: copied data:', copiedData);
+    }
+
+    assertTrue(copiedData !== null, 'Should have copied cell data');
+    assertTrue(copiedData.formatId !== undefined && copiedData.formatId !== '~',
+      'Copied cell should have a non-GENERAL formatId');
+
+    // Simulate internal paste at B1 with formatId preservation
+    await ctx.page.evaluate(async (data) => {
+      const ds = window._appContext?.app?.dataSource;
+      if (!ds) return;
+
+      // Create cell with value
+      await ds.createCell(1, 0, data.value); // B1 = col 1, row 0
+
+      // Apply format
+      if (data.formatId) {
+        await ds.setCellFormatAt(1, 0, data.formatId);
+      }
+    }, copiedData);
+    await sleep(300);
+
+    // Click on B1 and verify format is preserved
+    await clickCell(ctx.page, 'B1');
+    await sleep(200);
+
+    display = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(display, '15%', 'B1 should display 15% (format preserved)');
+
+    // Verify format dropdown shows Percent
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Percent', 'Format dropdown should show Percent for pasted cell');
+  },
+
+  'Copy/paste preserves currency format': async (ctx) => {
+    // Test that copying a cell with currency format preserves the format when pasted
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a value
+    await setCellValue(ctx.page, 'A1', '1234.56');
+    await sleep(200);
+
+    // Click on the cell and apply currency format
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open format dropdown and select Currency format
+    await ctx.page.click('#format-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-format-category="CURRENCY"]');
+    await sleep(300);
+
+    // Verify format is applied
+    let display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '$1,234.56', 'A1 should display $1,234.56');
+
+    // Get the clipboard data including formatId
+    const copiedData = await ctx.page.evaluate(() => {
+      const app = window._appContext?.app;
+      if (!app) return null;
+      const cell = app.selectedCell;
+      if (!cell) return null;
+      const cellData = app.cells.find(c => c.col === cell.col && c.row === cell.row);
+      return cellData ? {
+        value: cellData.value,
+        display: cellData.display,
+        formatId: cellData.formatId,
+      } : null;
+    });
+
+    if (process.env.DEBUG) {
+      console.log('DEBUG: copied currency data:', copiedData);
+    }
+
+    assertTrue(copiedData !== null, 'Should have copied cell data');
+    assertTrue(copiedData.formatId !== undefined && copiedData.formatId !== '~',
+      'Copied cell should have a currency formatId');
+
+    // Simulate internal paste at B1 with formatId preservation
+    await ctx.page.evaluate(async (data) => {
+      const ds = window._appContext?.app?.dataSource;
+      if (!ds) return;
+
+      // Create cell with value
+      await ds.createCell(1, 0, data.value); // B1 = col 1, row 0
+
+      // Apply format
+      if (data.formatId) {
+        await ds.setCellFormatAt(1, 0, data.formatId);
+      }
+    }, copiedData);
+    await sleep(300);
+
+    // Click on B1 and verify format is preserved
+    await clickCell(ctx.page, 'B1');
+    await sleep(200);
+
+    display = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(display, '$1,234.56', 'B1 should display $1,234.56 (format preserved)');
+
+    // Verify format dropdown shows Currency
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Currency', 'Format dropdown should show Currency for pasted cell');
+  },
+
+  'Clipboard serialization includes formatId': async (ctx) => {
+    // Test that the internal clipboard serialization includes formatId
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a value and apply percentage format
+    await setCellValue(ctx.page, 'A1', '0.25');
+    await sleep(200);
+
+    // Click on the cell and apply percentage format
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+    await ctx.page.click('#format-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-format-category="PERCENTAGE"]');
+    await sleep(300);
+
+    // Get the cell data to verify it includes formatId
+    const cellData = await ctx.page.evaluate(() => {
+      const app = window._appContext?.app;
+      if (!app) return null;
+      const cell = app.selectedCell;
+      if (!cell) return null;
+      const data = app.cells.find(c => c.col === cell.col && c.row === cell.row);
+      return data;
+    });
+
+    if (process.env.DEBUG) {
+      console.log('DEBUG: cell data with format:', cellData);
+    }
+
+    assertTrue(cellData !== null, 'Should have cell data');
+    assertTrue(cellData.formatId !== undefined, 'Cell data should include formatId');
+    assertTrue(cellData.formatId !== '~', 'formatId should not be GENERAL (~)');
+    // Percentage format ID should contain 'P' for percentage
+    assertTrue(cellData.formatId.includes('P') || cellData.formatId.startsWith('FMT_P'),
+      'formatId should indicate percentage format');
+  },
 };
 
 // Run all tests

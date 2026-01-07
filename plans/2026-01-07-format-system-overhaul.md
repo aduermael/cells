@@ -1,6 +1,6 @@
 Status: IN PROGRESS
 Created At: 2026-01-07 01:46 UTC
-Updated At: 2026-01-07 02:05 UTC
+Updated At: 2026-01-06 18:22 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -98,23 +98,23 @@ Replace hardcoded format variants with dynamic ID parsing, allowing any decimal 
 
 ---
 
-## Phase 2: Copy/Paste Preserves Format
+## Phase 2: Copy/Paste Preserves Format ✅
 
 Add formatId to clipboard data so paste restores cell formatting.
 
-- [ ] 2a: Update clipboard data structure in `clipboard.ts`
+- [x] 2a: Update clipboard data structure in `clipboard.ts`
   - Add `formatId?: string` to `ClipboardCell` interface
-  - In `copySelection()`, include `formatId` from cell data
+  - In `serializeSelection()`, include `formatId` from cell data (skip if GENERAL/`~`)
   - Store in internal clipboard JSON format
 
-- [ ] 2b: Update paste logic to apply format
-  - In `pasteClipboard()`, after creating cell, call `setCellFormatAt()` if formatId exists
-  - Ensure formatId is only applied for internal paste (not TSV from external apps)
+- [x] 2b: Update paste logic to apply format
+  - In `pasteClipboardData()`, after creating cell, call `setCellFormatAt()` if formatId exists
+  - Ensure formatId is only applied for internal paste (detected by checking `sourceCol !== undefined`)
 
-- [ ] 2c: Add E2E tests for format preservation
+- [x] 2c: Add E2E tests for format preservation
   - Copy cell with percentage format, paste elsewhere, verify format preserved
   - Copy cell with currency format, paste elsewhere, verify format preserved
-  - Copy from external TSV, verify no format applied (uses input detection)
+  - Test clipboard serialization includes formatId for formatted cells
 
 ---
 

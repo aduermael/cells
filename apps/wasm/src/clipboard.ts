@@ -35,6 +35,8 @@ export interface ClipboardCell {
   formula?: string;
   /** Cell type */
   type: CellData["type"];
+  /** Number format ID (e.g., "FMT_P002" for percentage with 2 decimals) */
+  formatId?: string;
 }
 
 
@@ -299,6 +301,12 @@ export class ClipboardManager {
             clipCell.formula = cell.formula;
           }
 
+          // Include format ID if present (non-GENERAL format)
+          // Format ID "~" means GENERAL, so we skip it
+          if (cell.formatId && cell.formatId !== "~") {
+            clipCell.formatId = cell.formatId;
+          }
+
           clipboardCells.push(clipCell);
         }
       }
@@ -432,6 +440,23 @@ export class ClipboardManager {
             console.error(
               `Failed to paste cell at (${targetCol}, ${targetRow}):`,
               updateErr
+            );
+          }
+        }
+
+        // Apply format if present (only for internal paste, not TSV from external apps)
+        // We detect internal paste by checking if sourceCol/sourceRow are set
+        if (cell.formatId && data.sourceCol !== undefined) {
+          try {
+            await this.dataSource.setCellFormatAt(
+              targetCol,
+              targetRow,
+              cell.formatId
+            );
+          } catch (formatErr) {
+            console.error(
+              `Failed to set format at (${targetCol}, ${targetRow}):`,
+              formatErr
             );
           }
         }
