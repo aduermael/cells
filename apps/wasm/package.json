@@ -14,6 +14,7 @@
     "test:column-move": "node tests/column-move.test.mjs",
     "test:collab": "node tests/collab.test.mjs",
     "test:collab-demo": "node tests/collab-demo.test.mjs",
+    "test:custom-format": "node tests/custom-format.test.mjs",
     "test:initial-sync": "node tests/initial-sync.test.mjs",
     "test:clipboard": "node tests/clipboard.test.mjs",
     "test:selection": "node tests/selection.test.mjs",

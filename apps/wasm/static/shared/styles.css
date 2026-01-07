@@ -1097,27 +1097,29 @@ canvas {
     flex: 1;
 }
 
-/* Chat open button in bottom bar (shown when panel is minimized) */
+/* Chat open button in bottom bar - styled like a sheet tab for consistency */
 .chat-open-btn {
-    width: 24px;
-    height: 24px;
-    padding: 0;
+    padding: var(--spacing-xs) var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
     display: flex;
     align-items: center;
-    justify-content: center;
-    color: var(--color-primary);
-    background: var(--color-bg-primary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: var(--border-radius-top);
     cursor: pointer;
+    white-space: nowrap;
     transition: all var(--transition-fast);
     flex-shrink: 0;
-    margin-bottom: var(--spacing-xs);
 }
 
 .chat-open-btn:hover {
     background: var(--color-bg-hover);
-    border-color: var(--color-border-hover);
+    color: var(--color-text-secondary);
 }
 
 .chat-open-btn:active {

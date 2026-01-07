@@ -53,6 +53,7 @@ interface CellsEngine {
   setCellFormat(cellId: string, formatId: string): string;
   setCellFormatAt(col: number, row: number, formatId: string): string;
   getAvailableFormats(): string;
+  createCustomFormat(formatCode: string): string;
   getFormulaFunctions(): string;
   getCellFormatId(cellId: string): string;
   parseUserInputValue(input: string): string;
@@ -652,6 +653,17 @@ function handleMessage(msg: WorkerRequest): void {
       case "getAvailableFormats": {
         const formats = JSON.parse(engine.getAvailableFormats());
         respond({ type: "formats", formats });
+        break;
+      }
+
+      case "createCustomFormat": {
+        const { formatCode } = params as { formatCode: string };
+        const result = JSON.parse(engine.createCustomFormat(formatCode)) as { success?: boolean; formatId?: string; error?: string };
+        if (result.error) {
+          respond({ type: "error", error: result.error });
+        } else {
+          respond({ type: "formatCreated", formatId: result.formatId });
+        }
         break;
       }
 

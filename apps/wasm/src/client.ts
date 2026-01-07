@@ -398,6 +398,16 @@ export class CellsClient {
   }
 
   /**
+   * Create a custom number format from an Excel-style format code.
+   * @param formatCode Excel-style format code (e.g., "#,##0.00", "0.00%")
+   * @returns Object with formatId on success, error on failure
+   */
+  async createCustomFormat(formatCode: string): Promise<{ formatId?: string; error?: string }> {
+    const response = await this._send("createCustomFormat", { formatCode });
+    return response as { formatId?: string; error?: string };
+  }
+
+  /**
    * Get all registered formula functions with metadata.
    * Returns an array of FunctionInfo objects for autocomplete.
    */
