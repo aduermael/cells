@@ -13,29 +13,29 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Language | Lines |
 |----------|------:|
-| C++ | 36,351 |
-| TypeScript | 18,988 |
-| CSS | 1,774 |
-| Starlark | 1,484 |
-| Objective-C++ | 1,171 |
-| Markdown | 930 |
-| Shell | 713 |
-| HTML | 681 |
-| Go | 643 |
-| Luau | 127 |
+| C++ | 42,973 |
+| TypeScript | 24,802 |
+| CSS | 2,581 |
+| Go | 1,746 |
+| Starlark | 1,638 |
+| Objective-C++ | 1,314 |
+| Markdown | 1,010 |
+| Shell | 806 |
+| HTML | 749 |
+| Luau | 173 |
 | JavaScript | 72 |
 
 ### Test Code
 
 | Language | Lines |
 |----------|------:|
-| C++ | 25,552 |
-| JavaScript | 2,826 |
+| C++ | 29,768 |
+| JavaScript | 6,014 |
 | Go | 410 |
 
-- **Commits**: 612
-- **WASM Module**: 1.08 MB
-- **Total Web Bundle**: 2.80 MB
+- **Commits**: 802
+- **WASM Module**: 4.56 MB
+- **Total Web Bundle**: 6.04 MB
 
 <sub>Generated with `./scripts/generate-stats.sh`</sub>
 
