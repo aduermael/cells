@@ -41,6 +41,9 @@ enum class OpType : uint8_t {
     // Workbook operations
     WORKBOOK_RENAME = 30,  // Rename workbook
 
+    // Format operations
+    FORMAT_DEFINE = 40,  // Define a custom number format
+
     // Legacy operations (deprecated, kept for backwards compatibility parsing)
     // These map to COL_* or ROW_* based on isCol payload field
     DIM_INSERT_AXIS = 100,  // Use COL_INSERT or ROW_INSERT instead

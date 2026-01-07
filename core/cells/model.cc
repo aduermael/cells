@@ -1046,4 +1046,25 @@ const Sheet* Workbook::getSheetByName(const std::string& sheetName) const {
     return nullptr;
 }
 
+bool Workbook::registerCustomFormat(const ID& formatId, const std::string& formatCode) {
+    auto [it, inserted] = _customFormats.try_emplace(formatId, formatCode);
+    return inserted;
+}
+
+bool Workbook::hasCustomFormat(const ID& formatId) const {
+    return _customFormats.find(formatId) != _customFormats.end();
+}
+
+std::string Workbook::getCustomFormatCode(const ID& formatId) const {
+    auto it = _customFormats.find(formatId);
+    if (it != _customFormats.end()) {
+        return it->second;
+    }
+    return "";
+}
+
+const std::unordered_map<ID, std::string, IDHash>& Workbook::getCustomFormats() const {
+    return _customFormats;
+}
+
 }  // namespace cells

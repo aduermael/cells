@@ -51,8 +51,7 @@ struct NumberFormat {
     // Construct with specific properties
     NumberFormat(const ID& id, NumberFormatCategory category, std::string formatCode = "",
                  uint8_t decimalPlaces = 2, bool useThousandsSeparator = false,
-                 std::string currencySymbol = "", bool isAccounting = false,
-                 bool isCustom = false);
+                 std::string currencySymbol = "", bool isAccounting = false, bool isCustom = false);
 
     // Equality comparison
     bool operator==(const NumberFormat& other) const;
@@ -211,8 +210,8 @@ std::string getCurrencySymbol(const std::string& currencyCode);
  * Result of creating a custom format.
  */
 struct CreateCustomFormatResult {
-    ID id;                   // The ID of the created format (or existing if reused)
-    bool success{false};     // Whether creation succeeded
+    ID id;                     // The ID of the created format (or existing if reused)
+    bool success{false};       // Whether creation succeeded
     std::string errorMessage;  // Error message if failed
 
     static CreateCustomFormatResult ok(const ID& id) {

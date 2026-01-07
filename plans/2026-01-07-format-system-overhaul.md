@@ -161,10 +161,12 @@ Implement Excel-compatible format code strings.
   - Return new format ID for the custom format
   - Store custom formats in the workbook/CRDT
 
-- [ ] 3c-3: CRDT support for custom format definitions
+- [x] 3c-3: CRDT support for custom format definitions
   - Add new operation type `FORMAT_DEFINE` to persist custom formats
-  - Custom formats need to sync across peers
-  - Format ID generation for custom formats
+  - Custom formats stored in Workbook._customFormats and synced via CRDT
+  - Format ID is the target_id of the FORMAT_DEFINE operation
+  - bootstrapOpLog includes FORMAT_DEFINE operations for existing custom formats
+  - bindings.cc syncCustomFormatsFromWorkbook() registers peer formats locally
 
 ### Phase 3d: Custom Format UI
 

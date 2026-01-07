@@ -5,8 +5,10 @@
 #include <algorithm>
 
 #include "core/cells/dependency_graph.h"
+#include "core/cells/format_code_parser.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_serializer.h"
+#include "core/cells/number_format.h"
 
 namespace cells {
 
@@ -1113,6 +1115,33 @@ ApplyResult applyDimRenameAxis(Workbook& workbook, const Operation& op) {
     return ApplyResult::SUCCESS;
 }
 
+// Apply FORMAT_DEFINE operation
+// Payload: {"format_code":"#,##0.00"}
+// The format_id is the target_id of the operation
+ApplyResult applyFormatDefine(Workbook& workbook, const Operation& op) {
+    // Check if this format is already defined
+    if (workbook.hasCustomFormat(op.target_id)) {
+        return ApplyResult::ALREADY_APPLIED;
+    }
+
+    // Parse payload: {"format_code":"#,##0.00"}
+    const std::string formatCode = extractJSONString(op.payload, "format_code");
+    if (formatCode.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    // Validate the format code
+    auto validationError = validateFormatCode(formatCode);
+    if (validationError) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    // Register the custom format in the workbook
+    workbook.registerCustomFormat(op.target_id, formatCode);
+
+    return ApplyResult::SUCCESS;
+}
+
 }  // namespace
 
 ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
@@ -1217,6 +1246,10 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
 
         case OpType::WORKBOOK_RENAME:
             result = applyWorkbookRename(workbook, op);
+            break;
+
+        case OpType::FORMAT_DEFINE:
+            result = applyFormatDefine(workbook, op);
             break;
     }
 
@@ -1357,6 +1390,11 @@ Operation makeWorkbookRenameOp(Workbook& workbook, const std::string& payload) {
     return {hlc, OpType::WORKBOOK_RENAME, workbook.id, payload};
 }
 
+Operation makeFormatDefineOp(Workbook& workbook, const ID& formatId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::FORMAT_DEFINE, formatId, payload};
+}
+
 size_t bootstrapOpLog(Workbook& workbook) {
     size_t count = 0;
     OpLog* oplog = workbook.getOpLog();
@@ -1442,6 +1480,14 @@ size_t bootstrapOpLog(Workbook& workbook) {
             oplog->addOperation(op);
             count++;
         }
+    }
+
+    // Generate FORMAT_DEFINE operations for all custom formats
+    for (const auto& [formatId, formatCode] : workbook.getCustomFormats()) {
+        const std::string payload = "{\"format_code\":\"" + jsonEscape(formatCode) + "\"}";
+        const Operation op = makeFormatDefineOp(workbook, formatId, payload);
+        oplog->addOperation(op);
+        count++;
     }
 
     return count;

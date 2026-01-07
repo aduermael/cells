@@ -41,6 +41,7 @@
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/luau_autocomplete.h"
 #include "core/cells/agent_client.h"
+#include "core/cells/format_code_parser.h"
 #include "core/cells/number_format.h"
 #include "core/cells/number_formatter.h"
 #include "core/cells/input_parser.h"
@@ -1558,6 +1559,26 @@ public:
         if (!result.success) {
             return "{\"error\":\"" + jsonEscape(result.errorMessage) + "\"}";
         }
+
+        // Also register in workbook for CRDT sync
+        if (_workbook) {
+            // Only create CRDT operation if this is a new format (not reusing existing)
+            const bool isNew = _workbook->registerCustomFormat(result.id, formatCode);
+
+            // If in collaboration mode, emit FORMAT_DEFINE operation
+            if (isNew && _workbook->isCollaborating()) {
+                std::string payload = "{\"format_code\":\"" + jsonEscape(formatCode) + "\"}";
+                Operation op = makeFormatDefineOp(*_workbook, result.id, payload);
+                applyOperation(*_workbook, op);
+
+                // Queue broadcast to sync with peers
+                if (_syncManager) {
+                    _syncManager->queueOperationsBroadcast();
+                    _syncManager->pruneOpLog();
+                }
+            }
+        }
+
         return "{\"success\":true,\"formatId\":\"" + result.id.toString() + "\"}";
     }
 
@@ -3206,6 +3227,10 @@ public:
     }
 
     void syncClientDataDidChange(cells::net::SyncClient& /*client*/) override {
+        // Sync custom formats from workbook to local registry
+        // (formats defined by peers via FORMAT_DEFINE operations)
+        syncCustomFormatsFromWorkbook();
+
         // Remote operations modified data - rebuild quadtree and notify
         rebuildViewportIndex();
         notifyListeners(ChangeType::CELL_CHANGED);
@@ -4423,6 +4448,43 @@ private:
         _viewportIndex.clear();
         _viewportIndex.build(*sheet);
         _refConverter.setContext(*sheet);
+    }
+
+    // Sync custom formats from workbook to local registry.
+    // Called when remote operations are received that may include FORMAT_DEFINE.
+    void syncCustomFormatsFromWorkbook() {
+        if (!_workbook) {
+            return;
+        }
+
+        const auto& customFormats = _workbook->getCustomFormats();
+        for (const auto& [formatId, formatCode] : customFormats) {
+            // Only register if not already in local registry
+            if (!_formatRegistry.hasFormat(formatId)) {
+                // Parse the format code to create a NumberFormat
+                const ParsedFormatCode parsed = parseFormatCode(formatCode);
+                if (parsed.valid) {
+                    NumberFormatCategory category = NumberFormatCategory::NUMBER;
+                    if (parsed.hasPercent) {
+                        category = NumberFormatCategory::PERCENTAGE;
+                    } else if (!parsed.currencySymbol.empty()) {
+                        category = NumberFormatCategory::CURRENCY;
+                    }
+
+                    NumberFormat customFormat;
+                    customFormat.id = formatId;
+                    customFormat.category = category;
+                    customFormat.formatCode = formatCode;
+                    customFormat.decimalPlaces = parsed.decimalPlaces;
+                    customFormat.useThousandsSeparator = parsed.hasThousandsSeparator;
+                    customFormat.currencySymbol = parsed.currencySymbol;
+                    customFormat.isAccounting = false;
+                    customFormat.isCustom = true;
+
+                    _formatRegistry.registerFormat(customFormat);
+                }
+            }
+        }
     }
 
     // Notify the registered listener of a data change

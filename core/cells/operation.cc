@@ -46,6 +46,9 @@ const char* opTypeToString(OpType type) {
         // Workbook operations
         case OpType::WORKBOOK_RENAME:
             return "WORKBOOK_RENAME";
+        // Format operations
+        case OpType::FORMAT_DEFINE:
+            return "FORMAT_DEFINE";
         // Legacy DIM_* operations (deprecated)
         case OpType::DIM_INSERT_AXIS:
             return "DIM_INSERT_AXIS";
@@ -100,6 +103,10 @@ OpType stringToOpType(const std::string& str) {
     }
     if (str == "WORKBOOK_RENAME") {
         return OpType::WORKBOOK_RENAME;
+    }
+    // Format operations
+    if (str == "FORMAT_DEFINE") {
+        return OpType::FORMAT_DEFINE;
     }
     // Column operations
     if (str == "COL_INSERT") {

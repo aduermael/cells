@@ -368,6 +368,23 @@ struct Workbook {
     [[nodiscard]] Sheet* getSheetByName(const std::string& name);
     [[nodiscard]] const Sheet* getSheetByName(const std::string& name) const;
 
+    // ========================================================================
+    // Custom formats (CRDT-synced)
+    // ========================================================================
+
+    // Register a custom format definition (called by CRDT when applying FORMAT_DEFINE)
+    // Returns true if the format was newly added, false if it already existed
+    bool registerCustomFormat(const ID& formatId, const std::string& formatCode);
+
+    // Check if a custom format is defined
+    [[nodiscard]] bool hasCustomFormat(const ID& formatId) const;
+
+    // Get a custom format's code (returns empty string if not found)
+    [[nodiscard]] std::string getCustomFormatCode(const ID& formatId) const;
+
+    // Get all custom formats (for bootstrapOpLog and sync)
+    [[nodiscard]] const std::unordered_map<ID, std::string, IDHash>& getCustomFormats() const;
+
 private:
     // Sheet lookup by ID
     std::unordered_map<ID, Sheet*, IDHash> _sheetIndex;
@@ -386,6 +403,10 @@ private:
 
     // Collaboration mode (default: OFFLINE)
     CollabMode _collabMode{CollabMode::OFFLINE};
+
+    // Custom format definitions (format ID -> format code)
+    // Synced via FORMAT_DEFINE operations
+    std::unordered_map<ID, std::string, IDHash> _customFormats;
 };
 
 }  // namespace cells

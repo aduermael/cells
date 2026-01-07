@@ -562,7 +562,7 @@ CreateCustomFormatResult NumberFormatRegistry::createCustomFormat(const std::str
     }
 
     // Generate a new unique ID
-    ID newId = generate_id();
+    const ID newId = generate_id();
 
     // Create the custom format
     NumberFormat customFormat;

@@ -198,7 +198,9 @@ cc_library(
     hdrs = ["crdt.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":format_code_parser",
         ":model",
+        ":number_format",
         ":operation",
     ],
 )
