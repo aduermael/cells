@@ -2,7 +2,9 @@
 #define CELLS_NUMBER_FORMATTER_H_
 
 #include <string>
+#include <unordered_map>
 
+#include "core/cells/id.h"
 #include "core/cells/number_format.h"
 #include "core/cells/types.h"
 
@@ -40,11 +42,22 @@ struct FormattedValue {
 };
 
 // Format a numeric value according to a NumberFormat
-// registry: Format registry to look up format by ID
+// registry: Format registry to look up format by ID (built-in formats)
 // value: The numeric value to format
 // formatId: ID of the format to use (null ID = GENERAL)
 // locale: Locale settings for formatting
 FormattedValue formatNumber(const NumberFormatRegistry& registry, double value, const ID& formatId,
+                            const FormatLocale& locale = FormatLocale::US());
+
+// Format a numeric value, also checking workbook custom formats
+// registry: Format registry for built-in formats
+// customFormats: Custom format definitions from workbook (format ID -> format code)
+// value: The numeric value to format
+// formatId: ID of the format to use (null ID = GENERAL)
+// locale: Locale settings for formatting
+FormattedValue formatNumber(const NumberFormatRegistry& registry,
+                            const std::unordered_map<ID, std::string, IDHash>& customFormats,
+                            double value, const ID& formatId,
                             const FormatLocale& locale = FormatLocale::US());
 
 // Format a value using a specific format (without registry lookup)

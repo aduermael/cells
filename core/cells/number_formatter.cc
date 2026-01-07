@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "core/cells/format_code_formatter.h"
+#include "core/cells/format_code_parser.h"
 #include "core/cells/input_parser.h"
 
 namespace cells {
@@ -422,6 +423,57 @@ FormattedValue formatNumber(const NumberFormatRegistry& registry, double value, 
     }
 
     // Not found in registry - try parsing as a dynamic format ID
+    const std::string idStr = formatId.toString();
+    const ParsedFormatId parsed = parseFormatId(idStr);
+
+    if (parsed.valid) {
+        // Create a temporary NumberFormat from the parsed ID
+        NumberFormat dynamicFormat;
+        dynamicFormat.id = formatId;
+        dynamicFormat.category = parsed.category;
+        dynamicFormat.decimalPlaces = parsed.decimalPlaces;
+        dynamicFormat.useThousandsSeparator = parsed.useThousandsSeparator;
+        dynamicFormat.currencySymbol = parsed.currencySymbol;
+        dynamicFormat.formatCode = generateFormatCode(parsed);
+        dynamicFormat.isAccounting = false;
+
+        return formatWithFormat(value, dynamicFormat, locale);
+    }
+
+    // Unknown format ID, fall back to GENERAL
+    return formatGeneral(value, locale);
+}
+
+// Overload that also checks workbook custom formats
+FormattedValue formatNumber(const NumberFormatRegistry& registry,
+                            const std::unordered_map<ID, std::string, IDHash>& customFormats,
+                            double value, const ID& formatId, const FormatLocale& locale) {
+    // Null ID means GENERAL format
+    if (formatId.isNull()) {
+        return formatGeneral(value, locale);
+    }
+
+    // First, try looking up in the registry (built-in formats)
+    const NumberFormat* format = registry.getFormat(formatId);
+    if (format != nullptr) {
+        return formatWithFormat(value, *format, locale);
+    }
+
+    // Second, check workbook custom formats
+    auto it = customFormats.find(formatId);
+    if (it != customFormats.end()) {
+        // Use the format code formatter directly
+        FormatLocaleSettings localeSettings;
+        localeSettings.decimalSeparator = locale.decimalSeparator;
+        localeSettings.thousandsSeparator = locale.thousandsSeparator;
+        const FormatCodeResult result = formatWithCode(value, it->second, localeSettings);
+        if (result.success) {
+            return FormattedValue::success(result.text);
+        }
+        return FormattedValue::error(result.errorMessage);
+    }
+
+    // Third, try parsing as a dynamic format ID
     const std::string idStr = formatId.toString();
     const ParsedFormatId parsed = parseFormatId(idStr);
 

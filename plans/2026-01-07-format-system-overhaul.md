@@ -166,11 +166,15 @@ Implement Excel-compatible format code strings.
   - Custom formats stored in Workbook._customFormats and synced via CRDT
   - Format ID is the target_id of the FORMAT_DEFINE operation
   - bootstrapOpLog includes FORMAT_DEFINE operations for existing custom formats
-  - bindings.cc syncCustomFormatsFromWorkbook() registers peer formats locally
   - **File persistence**: Added `F <id> "<format-code>"` line prefix to .ZCD format
     - serializer.cc: serializeCustomFormats() outputs format definitions
     - parser.cc: parseFormat() reads format definitions back
     - Custom formats persisted to file and loaded on open
+  - **Single source of truth**: Workbook._customFormats is THE source
+    - Removed syncCustomFormatsFromWorkbook() - no more registry caching
+    - formatNumber() now has overload that checks workbook custom formats directly
+    - getAvailableFormats() combines registry (built-in) + workbook (custom)
+    - createCustomFormat() stores only in workbook, not in registry
 
 ### Phase 3d: Custom Format UI
 

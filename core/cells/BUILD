@@ -119,6 +119,8 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":format_code_formatter",
+        ":format_code_parser",
+        ":id",
         ":input_parser",
         ":number_format",
         ":types",

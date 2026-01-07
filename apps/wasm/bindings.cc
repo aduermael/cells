@@ -666,7 +666,7 @@ public:
                     const double num = result.getNumber();
                     // Check if cell has a format to apply to the numeric result
                     if (!entry.cell->formatId.isNull()) {
-                        FormattedValue formatted = formatNumber(_formatRegistry, num, entry.cell->formatId);
+                        FormattedValue formatted = formatNumber(_formatRegistry, _workbook->getCustomFormats(), num, entry.cell->formatId);
                         if (!formatted.isError) {
                             displayValue = formatted.text;
                         } else {
@@ -712,7 +712,7 @@ public:
                 if (!entry.cell->formatId.isNull() &&
                     (entry.cell->value.type == CellValueType::NUMBER)) {
                     // Format numeric value
-                    FormattedValue formatted = formatNumber(_formatRegistry, entry.cell->value.asNumber(), entry.cell->formatId);
+                    FormattedValue formatted = formatNumber(_formatRegistry, _workbook->getCustomFormats(), entry.cell->value.asNumber(), entry.cell->formatId);
                     if (!formatted.isError) {
                         displayValue = formatted.text;
                         useFormattedValue = true;
@@ -1522,13 +1522,15 @@ public:
     }
 
     // Get all available number formats.
-    // Returns JSON array of format objects.
+    // Returns JSON array of format objects (built-in + custom from workbook).
     std::string getAvailableFormats() {
         std::ostringstream ss;
         ss << "[";
 
-        const auto& allFormats = _formatRegistry.getAllFormats();
         bool first = true;
+
+        // First, include built-in formats from registry
+        const auto& allFormats = _formatRegistry.getAllFormats();
         for (const auto& [id, format] : allFormats) {
             if (!first) {
                 ss << ",";
@@ -1543,8 +1545,39 @@ public:
             ss << ",\"useThousandsSeparator\":" << (format.useThousandsSeparator ? "true" : "false");
             ss << ",\"currencySymbol\":\"" << jsonEscape(format.currencySymbol) << "\"";
             ss << ",\"isAccounting\":" << (format.isAccounting ? "true" : "false");
-            ss << ",\"isCustom\":" << (format.isCustom ? "true" : "false");
+            ss << ",\"isCustom\":false";
             ss << "}";
+        }
+
+        // Then, include custom formats from workbook
+        if (_workbook) {
+            const auto& customFormats = _workbook->getCustomFormats();
+            for (const auto& [formatId, formatCode] : customFormats) {
+                if (!first) {
+                    ss << ",";
+                }
+                first = false;
+
+                // Parse format code to determine category and properties
+                const ParsedFormatCode parsed = parseFormatCode(formatCode);
+                NumberFormatCategory category = NumberFormatCategory::NUMBER;
+                if (parsed.hasPercent) {
+                    category = NumberFormatCategory::PERCENTAGE;
+                } else if (!parsed.currencySymbol.empty()) {
+                    category = NumberFormatCategory::CURRENCY;
+                }
+
+                ss << "{";
+                ss << "\"id\":\"" << formatId.toString() << "\"";
+                ss << ",\"category\":\"" << formatCategoryToString(category) << "\"";
+                ss << ",\"formatCode\":\"" << jsonEscape(formatCode) << "\"";
+                ss << ",\"decimalPlaces\":" << static_cast<int>(parsed.decimalPlaces);
+                ss << ",\"useThousandsSeparator\":" << (parsed.hasThousandsSeparator ? "true" : "false");
+                ss << ",\"currencySymbol\":\"" << jsonEscape(parsed.currencySymbol) << "\"";
+                ss << ",\"isAccounting\":false";
+                ss << ",\"isCustom\":true";
+                ss << "}";
+            }
         }
 
         ss << "]";
@@ -1554,32 +1587,42 @@ public:
     // Create a custom number format from an Excel-style format code.
     // formatCode: Excel-style format code string (e.g., "#,##0.00", "0.00%", "$#,##0")
     // Returns JSON: {"success":true,"formatId":"..."} or {"error":"..."}
+    // Custom formats are stored ONLY in the Workbook (single source of truth).
     std::string createCustomFormat(const std::string& formatCode) {
-        auto result = _formatRegistry.createCustomFormat(formatCode);
-        if (!result.success) {
-            return "{\"error\":\"" + jsonEscape(result.errorMessage) + "\"}";
+        if (!_workbook) {
+            return "{\"error\":\"No workbook\"}";
         }
 
-        // Also register in workbook for CRDT sync
-        if (_workbook) {
-            // Only create CRDT operation if this is a new format (not reusing existing)
-            const bool isNew = _workbook->registerCustomFormat(result.id, formatCode);
+        // Validate the format code
+        auto validationError = validateFormatCode(formatCode);
+        if (validationError) {
+            return "{\"error\":\"" + jsonEscape(*validationError) + "\"}";
+        }
 
-            // If in collaboration mode, emit FORMAT_DEFINE operation
-            if (isNew && _workbook->isCollaborating()) {
-                std::string payload = "{\"format_code\":\"" + jsonEscape(formatCode) + "\"}";
-                Operation op = makeFormatDefineOp(*_workbook, result.id, payload);
-                applyOperation(*_workbook, op);
+        // Generate a new unique ID for this format
+        const ID formatId = generate_id();
 
-                // Queue broadcast to sync with peers
-                if (_syncManager) {
-                    _syncManager->queueOperationsBroadcast();
-                    _syncManager->pruneOpLog();
-                }
+        // Register in workbook (single source of truth)
+        const bool isNew = _workbook->registerCustomFormat(formatId, formatCode);
+        if (!isNew) {
+            // This shouldn't happen since we just generated a new ID
+            return "{\"error\":\"Format ID collision\"}";
+        }
+
+        // If in collaboration mode, emit FORMAT_DEFINE operation
+        if (_workbook->isCollaborating()) {
+            std::string payload = "{\"format_code\":\"" + jsonEscape(formatCode) + "\"}";
+            Operation op = makeFormatDefineOp(*_workbook, formatId, payload);
+            applyOperation(*_workbook, op);
+
+            // Queue broadcast to sync with peers
+            if (_syncManager) {
+                _syncManager->queueOperationsBroadcast();
+                _syncManager->pruneOpLog();
             }
         }
 
-        return "{\"success\":true,\"formatId\":\"" + result.id.toString() + "\"}";
+        return "{\"success\":true,\"formatId\":\"" + formatId.toString() + "\"}";
     }
 
     // Get all registered formula functions with metadata.
@@ -1684,7 +1727,8 @@ public:
             formatId = ID(formatIdStr);
         }
 
-        FormattedValue result = formatNumber(_formatRegistry, value, formatId);
+        const auto& customFormats = _workbook ? _workbook->getCustomFormats() : _emptyCustomFormats;
+        FormattedValue result = formatNumber(_formatRegistry, customFormats, value, formatId);
 
         std::ostringstream ss;
         if (result.isError) {
@@ -1746,7 +1790,7 @@ public:
         }
 
         // Format the numeric value using the cell's format
-        FormattedValue result = formatNumber(_formatRegistry, numericValue, cell->formatId);
+        FormattedValue result = formatNumber(_formatRegistry, _workbook->getCustomFormats(), numericValue, cell->formatId);
 
         std::ostringstream ss;
         if (result.isError) {
@@ -3227,11 +3271,8 @@ public:
     }
 
     void syncClientDataDidChange(cells::net::SyncClient& /*client*/) override {
-        // Sync custom formats from workbook to local registry
-        // (formats defined by peers via FORMAT_DEFINE operations)
-        syncCustomFormatsFromWorkbook();
-
         // Remote operations modified data - rebuild quadtree and notify
+        // Note: Custom formats are stored in workbook and looked up directly by formatNumber
         rebuildViewportIndex();
         notifyListeners(ChangeType::CELL_CHANGED);
     }
@@ -4450,43 +4491,6 @@ private:
         _refConverter.setContext(*sheet);
     }
 
-    // Sync custom formats from workbook to local registry.
-    // Called when remote operations are received that may include FORMAT_DEFINE.
-    void syncCustomFormatsFromWorkbook() {
-        if (!_workbook) {
-            return;
-        }
-
-        const auto& customFormats = _workbook->getCustomFormats();
-        for (const auto& [formatId, formatCode] : customFormats) {
-            // Only register if not already in local registry
-            if (!_formatRegistry.hasFormat(formatId)) {
-                // Parse the format code to create a NumberFormat
-                const ParsedFormatCode parsed = parseFormatCode(formatCode);
-                if (parsed.valid) {
-                    NumberFormatCategory category = NumberFormatCategory::NUMBER;
-                    if (parsed.hasPercent) {
-                        category = NumberFormatCategory::PERCENTAGE;
-                    } else if (!parsed.currencySymbol.empty()) {
-                        category = NumberFormatCategory::CURRENCY;
-                    }
-
-                    NumberFormat customFormat;
-                    customFormat.id = formatId;
-                    customFormat.category = category;
-                    customFormat.formatCode = formatCode;
-                    customFormat.decimalPlaces = parsed.decimalPlaces;
-                    customFormat.useThousandsSeparator = parsed.hasThousandsSeparator;
-                    customFormat.currencySymbol = parsed.currencySymbol;
-                    customFormat.isAccounting = false;
-                    customFormat.isCustom = true;
-
-                    _formatRegistry.registerFormat(customFormat);
-                }
-            }
-        }
-    }
-
     // Notify the registered listener of a data change
     // Called after rebuildViewportIndex() completes
     void notifyListeners(ChangeType type) {
@@ -4591,7 +4595,11 @@ private:
     std::unique_ptr<cells::net::SyncClient> _syncClient;  // C++ sync client (for WebRTC P2P)
     LuauSandbox _luauSandbox;  // Sandboxed Luau scripting engine
     LuauAutocomplete _luauAutocomplete;  // Luau autocomplete engine
-    NumberFormatRegistry _formatRegistry;  // Number format registry (built-in + custom formats)
+    NumberFormatRegistry _formatRegistry;  // Number format registry (built-in formats only)
+
+    // Empty map for when workbook is null (used by formatNumber overload)
+    static inline const std::unordered_map<ID, std::string, IDHash> _emptyCustomFormats{};
+
     val _agentListener;  // JavaScript callback for agent events
     std::unique_ptr<AgentClient> _agentClient;  // AI agent client
     std::string _agentServerUrl;  // Server URL for JS-based streaming
