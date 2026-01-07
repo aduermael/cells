@@ -48,6 +48,9 @@ Each axis knows its own position, making it simple to sort and serialize.
 #zcd v1
 D <doc-id> "<name>"
 
+#formats (optional, for custom number formats)
+F <format-id> "<format-code>"
+
 S <sheet-id> "<name>"
 
 #cols
@@ -100,6 +103,7 @@ X wK3nJ7pM vT5mK9xL yB9tX3wN f "=$kR7pN2wQ$jH4sW8nF+10"
 |--------|---------|--------|
 | `#zcd` | Format version | `#zcd v1` |
 | `D` | Document | `D <id> "<name>"` |
+| `F` | Custom format | `F <id> "<format-code>"` |
 | `S` | Sheet | `S <id> "<name>"` |
 | `C` | Column | `C <id> <position> [props...]` |
 | `R` | Row | `R <id> <position> [props...]` |

@@ -119,6 +119,9 @@ bool Parser::parseLine(std::string_view line) {
         case 'D':  // Document
             return parseDocument(line.substr(firstNonSpace));
 
+        case 'F':  // Custom format
+            return parseFormat(line.substr(firstNonSpace));
+
         case 'S':  // Sheet
             return parseSheet(line.substr(firstNonSpace));
 
@@ -171,6 +174,36 @@ bool Parser::parseDocument(std::string_view line) {
     }
 
     workbook_->name = std::move(name);
+    return true;
+}
+
+bool Parser::parseFormat(std::string_view line) {
+    // Format: F <id> "<format-code>"
+    if (line.size() < 2 || line[0] != 'F' || line[1] != ' ') {
+        return setError("Invalid format line");
+    }
+
+    line = line.substr(2);  // Skip "F "
+
+    // Parse ID (8 characters)
+    const size_t spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos || spacePos < 1) {
+        return setError("Missing format ID");
+    }
+
+    const std::string idStr(line.substr(0, spacePos));
+    const ID formatId(idStr);
+
+    // Parse quoted format code
+    line = line.substr(spacePos + 1);
+    std::string formatCode;
+    size_t consumed = 0;
+    if (!parseQuotedString(line, formatCode, consumed)) {
+        return setError("Invalid format code, expected quoted string");
+    }
+
+    // Register the custom format in the workbook
+    workbook_->registerCustomFormat(formatId, formatCode);
     return true;
 }
 

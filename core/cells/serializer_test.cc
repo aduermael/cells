@@ -868,5 +868,84 @@ X xA1bC2dE cA1bC2dE rA1bC2dE f "=A1+A2" fmt:FMT_C002
     EXPECT_EQ(cell->formatId, ID("FMT_C002"));
 }
 
+// --- Custom Format Tests ---
+
+TEST(CustomFormatTest, SerializeCustomFormats) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+
+    // Register some custom formats
+    wb->registerCustomFormat(ID("cF1aB2cD"), "#,##0.00");
+    wb->registerCustomFormat(ID("cF2eF3gH"), "0.00%");
+    wb->registerCustomFormat(ID("cF3iJ4kL"), "$#,##0.00");
+
+    const std::string serialized = serialize(*wb);
+
+    // Check that format lines are in the output
+    EXPECT_NE(serialized.find("F cF1aB2cD \"#,##0.00\""), std::string::npos);
+    EXPECT_NE(serialized.find("F cF2eF3gH \"0.00%\""), std::string::npos);
+    EXPECT_NE(serialized.find("F cF3iJ4kL \"$#,##0.00\""), std::string::npos);
+}
+
+TEST(CustomFormatTest, ParseCustomFormats) {
+    const std::string content = R"(
+D aB3cD4eF "Test"
+F cF1aB2cD "#,##0.00"
+F cF2eF3gH "0.00%"
+S sH3eE4tB "Sheet"
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Verify custom formats were parsed
+    EXPECT_TRUE(result.workbook->hasCustomFormat(ID("cF1aB2cD")));
+    EXPECT_TRUE(result.workbook->hasCustomFormat(ID("cF2eF3gH")));
+    EXPECT_EQ(result.workbook->getCustomFormatCode(ID("cF1aB2cD")), "#,##0.00");
+    EXPECT_EQ(result.workbook->getCustomFormatCode(ID("cF2eF3gH")), "0.00%");
+}
+
+TEST(CustomFormatTest, RoundtripCustomFormats) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    wb->addSheet(std::move(sheet));
+
+    // Register custom formats
+    wb->registerCustomFormat(ID("cF1aB2cD"), "#,##0.00");
+    wb->registerCustomFormat(ID("cF2eF3gH"), "0.00%");
+
+    // Serialize
+    const std::string serialized = serialize(*wb);
+
+    // Parse back
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Verify custom formats are preserved
+    EXPECT_TRUE(result.workbook->hasCustomFormat(ID("cF1aB2cD")));
+    EXPECT_TRUE(result.workbook->hasCustomFormat(ID("cF2eF3gH")));
+    EXPECT_EQ(result.workbook->getCustomFormatCode(ID("cF1aB2cD")), "#,##0.00");
+    EXPECT_EQ(result.workbook->getCustomFormatCode(ID("cF2eF3gH")), "0.00%");
+
+    // Verify formats can be retrieved
+    const auto& formats = result.workbook->getCustomFormats();
+    EXPECT_EQ(formats.size(), 2);
+}
+
+TEST(CustomFormatTest, ParseFormatWithSpecialChars) {
+    // Format codes can contain special characters that need escaping
+    const std::string content = R"(
+D aB3cD4eF "Test"
+F cF1aB2cD "[Red]#,##0.00;[Blue]-#,##0.00"
+S sH3eE4tB "Sheet"
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    EXPECT_TRUE(result.workbook->hasCustomFormat(ID("cF1aB2cD")));
+    EXPECT_EQ(result.workbook->getCustomFormatCode(ID("cF1aB2cD")),
+              "[Red]#,##0.00;[Blue]-#,##0.00");
+}
+
 }  // namespace
 }  // namespace cells

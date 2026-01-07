@@ -14,6 +14,7 @@ namespace cells {
 //
 // Produces output matching the format specification in docs/persistence.md:
 //   D <id> "<name>"
+//   F <id> "<format-code>"     (custom number format)
 //   S <id> "<name>"
 //   C <id> <position> [props...]
 //   R <id> <position> [props...]
@@ -32,6 +33,9 @@ public:
 private:
     // Serialize document header
     void serializeHeader(const Workbook& workbook, std::ostream& out) const;
+
+    // Serialize custom number formats
+    void serializeCustomFormats(const Workbook& workbook, std::ostream& out) const;
 
     // Serialize a single sheet
     void serializeSheet(const Sheet& sheet, std::ostream& out) const;

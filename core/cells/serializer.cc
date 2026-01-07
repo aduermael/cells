@@ -54,6 +54,9 @@ std::string Serializer::serialize(const Workbook& workbook) const {
 void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
     serializeHeader(workbook, out);
 
+    // Serialize custom formats (before sheets, as cells may reference them)
+    serializeCustomFormats(workbook, out);
+
     // Serialize each sheet
     for (const auto& sheet : workbook.sheets) {
         serializeSheet(*sheet, out);
@@ -69,6 +72,30 @@ void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
 void Serializer::serializeHeader(const Workbook& workbook, std::ostream& out) const {
     // Document ID and name
     out << "D " << workbook.id.toString() << " \"" << escapeString(workbook.name) << "\"\n";
+}
+
+void Serializer::serializeCustomFormats(const Workbook& workbook, std::ostream& out) const {
+    const auto& customFormats = workbook.getCustomFormats();
+    if (customFormats.empty()) {
+        return;
+    }
+
+    // Sort formats by ID for deterministic output
+    std::vector<std::pair<std::string, std::string>> ordered;
+    ordered.reserve(customFormats.size());
+
+    for (const auto& [formatId, formatCode] : customFormats) {
+        ordered.emplace_back(formatId.toString(), formatCode);
+    }
+
+    std::sort(ordered.begin(), ordered.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    // Output format definitions
+    // Format: F <format-id> "<format-code>"
+    for (const auto& [idStr, formatCode] : ordered) {
+        out << "F " << idStr << " \"" << escapeString(formatCode) << "\"\n";
+    }
 }
 
 void Serializer::serializeSheet(const Sheet& sheet, std::ostream& out) const {

@@ -167,6 +167,10 @@ Implement Excel-compatible format code strings.
   - Format ID is the target_id of the FORMAT_DEFINE operation
   - bootstrapOpLog includes FORMAT_DEFINE operations for existing custom formats
   - bindings.cc syncCustomFormatsFromWorkbook() registers peer formats locally
+  - **File persistence**: Added `F <id> "<format-code>"` line prefix to .ZCD format
+    - serializer.cc: serializeCustomFormats() outputs format definitions
+    - parser.cc: parseFormat() reads format definitions back
+    - Custom formats persisted to file and loaded on open
 
 ### Phase 3d: Custom Format UI
 
