@@ -217,5 +217,211 @@ TEST(BuiltInFormatsTest, VerifyFormatCodes) {
     EXPECT_EQ(dateISO->formatCode, "yyyy-mm-dd");
 }
 
+// --- Dynamic Format ID Parsing Tests ---
+
+TEST(ParseFormatIdTest, PercentageFormats) {
+    // FMT_P0XX - percentage with XX decimal places
+    auto parsed = parseFormatId("FMT_P000");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.category, NumberFormatCategory::PERCENTAGE);
+    EXPECT_EQ(parsed.decimalPlaces, 0);
+    EXPECT_FALSE(parsed.useThousandsSeparator);
+
+    parsed = parseFormatId("FMT_P007");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.category, NumberFormatCategory::PERCENTAGE);
+    EXPECT_EQ(parsed.decimalPlaces, 7);
+
+    parsed = parseFormatId("FMT_P015");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.decimalPlaces, 15);
+
+    // Invalid: too many decimals
+    parsed = parseFormatId("FMT_P016");
+    EXPECT_FALSE(parsed.valid);
+
+    // Invalid: wrong prefix
+    parsed = parseFormatId("FMT_X007");
+    EXPECT_FALSE(parsed.valid);
+}
+
+TEST(ParseFormatIdTest, NumberFormats) {
+    // FMT_N0XX - number with XX decimal places (no separator)
+    auto parsed = parseFormatId("FMT_N000");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.category, NumberFormatCategory::NUMBER);
+    EXPECT_EQ(parsed.decimalPlaces, 0);
+    EXPECT_FALSE(parsed.useThousandsSeparator);
+
+    parsed = parseFormatId("FMT_N012");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.decimalPlaces, 12);
+    EXPECT_FALSE(parsed.useThousandsSeparator);
+
+    parsed = parseFormatId("FMT_N015");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.decimalPlaces, 15);
+}
+
+TEST(ParseFormatIdTest, NumberWithSeparatorFormats) {
+    // FMT_NS0X - number with separator, X decimal places (0-9)
+    auto parsed = parseFormatId("FMT_NS00");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.category, NumberFormatCategory::NUMBER);
+    EXPECT_EQ(parsed.decimalPlaces, 0);
+    EXPECT_TRUE(parsed.useThousandsSeparator);
+
+    parsed = parseFormatId("FMT_NS05");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.decimalPlaces, 5);
+    EXPECT_TRUE(parsed.useThousandsSeparator);
+
+    parsed = parseFormatId("FMT_NS09");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.decimalPlaces, 9);
+}
+
+TEST(ParseFormatIdTest, CurrencyFormats) {
+    // CXXX_0YY - currency with 3-letter code and YY decimal places
+    auto parsed = parseFormatId("CUSD_002");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.category, NumberFormatCategory::CURRENCY);
+    EXPECT_EQ(parsed.decimalPlaces, 2);
+    EXPECT_TRUE(parsed.useThousandsSeparator);
+    EXPECT_EQ(parsed.currencyCode, "USD");
+    EXPECT_EQ(parsed.currencySymbol, "$");
+
+    parsed = parseFormatId("CEUR_008");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.decimalPlaces, 8);
+    EXPECT_EQ(parsed.currencyCode, "EUR");
+    EXPECT_EQ(parsed.currencySymbol, "€");
+
+    parsed = parseFormatId("CGBP_015");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.decimalPlaces, 15);
+    EXPECT_EQ(parsed.currencyCode, "GBP");
+    EXPECT_EQ(parsed.currencySymbol, "£");
+
+    parsed = parseFormatId("CJPY_000");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.decimalPlaces, 0);
+    EXPECT_EQ(parsed.currencyCode, "JPY");
+    EXPECT_EQ(parsed.currencySymbol, "¥");
+
+    parsed = parseFormatId("CCNY_004");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.currencyCode, "CNY");
+    EXPECT_EQ(parsed.currencySymbol, "¥");
+
+    // Invalid: unknown currency
+    parsed = parseFormatId("CXYZ_002");
+    EXPECT_FALSE(parsed.valid);
+
+    // Invalid: lowercase currency
+    parsed = parseFormatId("Cusd_002");
+    EXPECT_FALSE(parsed.valid);
+}
+
+TEST(ParseFormatIdTest, InvalidFormats) {
+    // Too short
+    auto parsed = parseFormatId("FMT_P0");
+    EXPECT_FALSE(parsed.valid);
+
+    // Empty
+    parsed = parseFormatId("");
+    EXPECT_FALSE(parsed.valid);
+
+    // Not a recognized pattern
+    parsed = parseFormatId("XXXXXXXX");
+    EXPECT_FALSE(parsed.valid);
+
+    // Legacy format (not parsed dynamically, should be looked up in registry)
+    parsed = parseFormatId("FMT_GEN0");
+    EXPECT_FALSE(parsed.valid);
+}
+
+TEST(GenerateFormatCodeTest, PercentageFormats) {
+    ParsedFormatId parsed;
+    parsed.valid = true;
+    parsed.category = NumberFormatCategory::PERCENTAGE;
+
+    parsed.decimalPlaces = 0;
+    EXPECT_EQ(generateFormatCode(parsed), "0%");
+
+    parsed.decimalPlaces = 2;
+    EXPECT_EQ(generateFormatCode(parsed), "0.00%");
+
+    parsed.decimalPlaces = 7;
+    EXPECT_EQ(generateFormatCode(parsed), "0.0000000%");
+
+    parsed.decimalPlaces = 15;
+    EXPECT_EQ(generateFormatCode(parsed), "0.000000000000000%");
+}
+
+TEST(GenerateFormatCodeTest, NumberFormats) {
+    ParsedFormatId parsed;
+    parsed.valid = true;
+    parsed.category = NumberFormatCategory::NUMBER;
+
+    // Without separator
+    parsed.useThousandsSeparator = false;
+    parsed.decimalPlaces = 0;
+    EXPECT_EQ(generateFormatCode(parsed), "0");
+
+    parsed.decimalPlaces = 3;
+    EXPECT_EQ(generateFormatCode(parsed), "0.000");
+
+    parsed.decimalPlaces = 12;
+    EXPECT_EQ(generateFormatCode(parsed), "0.000000000000");
+
+    // With separator
+    parsed.useThousandsSeparator = true;
+    parsed.decimalPlaces = 0;
+    EXPECT_EQ(generateFormatCode(parsed), "#,##0");
+
+    parsed.decimalPlaces = 5;
+    EXPECT_EQ(generateFormatCode(parsed), "#,##0.00000");
+}
+
+TEST(GenerateFormatCodeTest, CurrencyFormats) {
+    ParsedFormatId parsed;
+    parsed.valid = true;
+    parsed.category = NumberFormatCategory::CURRENCY;
+    parsed.useThousandsSeparator = true;
+
+    parsed.currencySymbol = "$";
+    parsed.decimalPlaces = 2;
+    EXPECT_EQ(generateFormatCode(parsed), "$#,##0.00");
+
+    parsed.currencySymbol = "€";
+    parsed.decimalPlaces = 8;
+    EXPECT_EQ(generateFormatCode(parsed), "€#,##0.00000000");
+
+    parsed.currencySymbol = "£";
+    parsed.decimalPlaces = 0;
+    EXPECT_EQ(generateFormatCode(parsed), "£#,##0");
+}
+
+TEST(GenerateFormatCodeTest, InvalidParsedFormat) {
+    ParsedFormatId parsed;
+    parsed.valid = false;
+    EXPECT_EQ(generateFormatCode(parsed), "");
+}
+
+TEST(GetCurrencySymbolTest, KnownCurrencies) {
+    EXPECT_EQ(getCurrencySymbol("USD"), "$");
+    EXPECT_EQ(getCurrencySymbol("EUR"), "€");
+    EXPECT_EQ(getCurrencySymbol("GBP"), "£");
+    EXPECT_EQ(getCurrencySymbol("JPY"), "¥");
+    EXPECT_EQ(getCurrencySymbol("CNY"), "¥");
+}
+
+TEST(GetCurrencySymbolTest, UnknownCurrencies) {
+    EXPECT_EQ(getCurrencySymbol("XYZ"), "");
+    EXPECT_EQ(getCurrencySymbol("ABC"), "");
+    EXPECT_EQ(getCurrencySymbol(""), "");
+}
+
 }  // namespace
 }  // namespace cells

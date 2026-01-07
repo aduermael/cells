@@ -521,91 +521,156 @@ export class FormatControls {
     const cellData = this.getSelectedCellData();
     const currentFormatId = cellData?.formatId || "~";
 
-    // Find current format's decimal places
-    // C++ returns lowercase categories, so compare case-insensitively
-    let currentFormat = this.availableFormats.find((f) => f.id === currentFormatId);
-    if (!currentFormat) {
-      // Default to NUMBER with 2 decimal places if no format
-      currentFormat = this.availableFormats.find(
-        (f) => f.category.toUpperCase() === "NUMBER" && f.decimalPlaces === 2
-      );
+    // Parse the current format to determine category, decimals, etc.
+    const parsed = this.parseCurrentFormat(currentFormatId);
+
+    // Calculate new decimals (0-15 range, dynamically generated)
+    const newDecimals = Math.max(0, Math.min(15, parsed.decimals + delta));
+
+    // Generate the new format ID dynamically based on category
+    const newFormatId = this.generateFormatId(
+      parsed.category,
+      newDecimals,
+      parsed.currency,
+      parsed.hasSeparator
+    );
+
+    try {
+      await this.dataSource.setCellFormatAt(position.col, position.row, newFormatId);
+      this.setDisplayedFormat(newFormatId, parsed.category);
+      this.requestRender();
+      this.updateFormulaBar();
+    } catch (error) {
+      console.error("Failed to change decimal places:", error);
     }
+  }
 
-    const currentDecimals = currentFormat?.decimalPlaces ?? 2;
-    const currentCategory = currentFormat?.category.toUpperCase() ?? "NUMBER";
-    const currentHasSeparator = currentFormat?.useThousandsSeparator ?? false;
-    // Max 4 decimal places (matching available formats)
-    const newDecimals = Math.max(0, Math.min(4, currentDecimals + delta));
-
-    // For currency formats, preserve the specific currency (USD, EUR, etc.)
-    // Format ID pattern: C<CURRENCY>_0XX (e.g., CUSD_002, CEUR_003)
-    let newFormat: NumberFormat | undefined;
-
-    if (currentCategory === "CURRENCY") {
-      // Extract currency from current format ID
-      const currencyMatch = currentFormatId.match(/^C([A-Z]{3})_0\d{2}$/);
+  /**
+   * Parse a format ID to extract category, decimals, currency, and separator settings.
+   */
+  private parseCurrentFormat(formatId: string): {
+    category: NumberFormatCategory;
+    decimals: number;
+    currency: CurrencyType | null;
+    hasSeparator: boolean;
+  } {
+    // Try to find in available formats first
+    const format = this.availableFormats.find((f) => f.id === formatId);
+    if (format) {
+      // Extract currency from format ID if applicable
+      let currency: CurrencyType | null = null;
+      const currencyMatch = formatId.match(/^C([A-Z]{3})_0\d{2}$/);
       if (currencyMatch) {
-        const currency = currencyMatch[1];
-        // Build the exact format ID for this currency with new decimal places
-        const newFormatId = this.getFormatIdForCurrency(currency as CurrencyType, newDecimals);
-        newFormat = this.availableFormats.find((f) => f.id === newFormatId);
+        currency = currencyMatch[1] as CurrencyType;
+      } else if (formatId.startsWith("FMT_C")) {
+        currency = "USD"; // Legacy USD format
       }
-      // Fallback for legacy FMT_C formats (USD only)
-      if (!newFormat && currentFormatId.startsWith("FMT_C")) {
-        const newFormatId = this.getFormatIdForCurrency("USD", newDecimals);
-        newFormat = this.availableFormats.find((f) => f.id === newFormatId);
-      }
+
+      return {
+        category: format.category.toUpperCase() as NumberFormatCategory,
+        decimals: format.decimalPlaces,
+        currency,
+        hasSeparator: format.useThousandsSeparator,
+      };
     }
 
-    // For non-currency formats, or if currency format wasn't found
-    if (!newFormat) {
-      // Find a format with the new decimal places in the same category, preserving separator setting
-      newFormat = this.availableFormats.find(
-        (f) =>
-          f.category.toUpperCase() === currentCategory &&
-          f.decimalPlaces === newDecimals &&
-          f.useThousandsSeparator === currentHasSeparator
-      );
+    // Try parsing dynamic format IDs directly
+    // Pattern: FMT_P0XX (percentage)
+    const pctMatch = formatId.match(/^FMT_P0(\d{2})$/);
+    if (pctMatch && pctMatch[1]) {
+      return {
+        category: "PERCENTAGE",
+        decimals: parseInt(pctMatch[1], 10),
+        currency: null,
+        hasSeparator: false,
+      };
     }
 
-    // If not found with same separator, try without separator preference
-    if (!newFormat) {
-      newFormat = this.availableFormats.find(
-        (f) => f.category.toUpperCase() === currentCategory && f.decimalPlaces === newDecimals
-      );
+    // Pattern: FMT_N0XX (number without separator)
+    const numMatch = formatId.match(/^FMT_N0(\d{2})$/);
+    if (numMatch && numMatch[1]) {
+      return {
+        category: "NUMBER",
+        decimals: parseInt(numMatch[1], 10),
+        currency: null,
+        hasSeparator: false,
+      };
     }
 
-    // If not found in same category, try NUMBER with same separator preference
-    if (!newFormat) {
-      newFormat = this.availableFormats.find(
-        (f) =>
-          f.category.toUpperCase() === "NUMBER" &&
-          f.decimalPlaces === newDecimals &&
-          f.useThousandsSeparator === currentHasSeparator
-      );
+    // Pattern: FMT_NS0X (number with separator, single digit)
+    const numSepMatch = formatId.match(/^FMT_NS0(\d)$/);
+    if (numSepMatch && numSepMatch[1]) {
+      return {
+        category: "NUMBER",
+        decimals: parseInt(numSepMatch[1], 10),
+        currency: null,
+        hasSeparator: true,
+      };
     }
 
-    // If still not found, try NUMBER without separator preference
-    if (!newFormat) {
-      newFormat = this.availableFormats.find(
-        (f) => f.category.toUpperCase() === "NUMBER" && f.decimalPlaces === newDecimals
-      );
+    // Pattern: CXXX_0YY (currency)
+    const currMatch = formatId.match(/^C([A-Z]{3})_0(\d{2})$/);
+    if (currMatch && currMatch[1] && currMatch[2]) {
+      return {
+        category: "CURRENCY",
+        decimals: parseInt(currMatch[2], 10),
+        currency: currMatch[1] as CurrencyType,
+        hasSeparator: true,
+      };
     }
 
-    if (!newFormat) {
-      // Fallback: if we can't find a matching format, just use the first NUMBER format
-      newFormat = this.availableFormats.find((f) => f.category.toUpperCase() === "NUMBER");
-    }
+    // Default to NUMBER with 2 decimals
+    return {
+      category: "NUMBER",
+      decimals: 2,
+      currency: null,
+      hasSeparator: false,
+    };
+  }
 
-    if (newFormat) {
-      try {
-        await this.dataSource.setCellFormatAt(position.col, position.row, newFormat.id);
-        this.setDisplayedFormat(newFormat.id, newFormat.category.toUpperCase() as NumberFormatCategory);
-        this.requestRender();
-        this.updateFormulaBar();
-      } catch (error) {
-        console.error("Failed to change decimal places:", error);
-      }
+  /**
+   * Generate a format ID dynamically based on category, decimals, and options.
+   *
+   * Format ID patterns (all 8 chars):
+   * - FMT_P0XX: Percentage with XX decimal places (00-15)
+   * - FMT_N0XX: Number with XX decimal places (00-15)
+   * - FMT_NS0X: Number with separator, X decimal places (0-9)
+   * - CXXX_0YY: Currency with 3-letter code and YY decimal places (00-15)
+   */
+  private generateFormatId(
+    category: NumberFormatCategory,
+    decimals: number,
+    currency: CurrencyType | null,
+    hasSeparator: boolean
+  ): string {
+    const dec2 = decimals.toString().padStart(2, "0");
+    const dec1 = decimals.toString();
+
+    switch (category) {
+      case "PERCENTAGE":
+        return `FMT_P0${dec2}`;
+
+      case "CURRENCY":
+        if (currency) {
+          return `C${currency}_0${dec2}`;
+        }
+        // Default to USD if no currency specified
+        return `CUSD_0${dec2}`;
+
+      case "NUMBER":
+        if (hasSeparator) {
+          // FMT_NS0X only supports single digit decimals (0-9)
+          // For 10-15 decimals with separator, fall back to without separator
+          if (decimals <= 9) {
+            return `FMT_NS0${dec1}`;
+          }
+          // Fall through to number without separator for >9 decimals
+        }
+        return `FMT_N0${dec2}`;
+
+      default:
+        // For other categories (DATE, TIME, etc.), just return NUMBER format
+        return `FMT_N0${dec2}`;
     }
   }
 }

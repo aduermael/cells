@@ -112,9 +112,9 @@ FormattedValue formatGeneral(double value, const FormatLocale& locale) {
         return formatScientific(value, 2, locale);
     }
 
-    // Otherwise, show up to 10 significant decimal places, trimming trailing zeros
+    // Otherwise, show up to 15 significant digits, trimming trailing zeros
     std::ostringstream ss;
-    ss << std::setprecision(10) << value;
+    ss << std::setprecision(15) << value;
     std::string result = ss.str();
 
     // Trim trailing zeros after decimal point
@@ -396,13 +396,32 @@ FormattedValue formatNumber(const NumberFormatRegistry& registry, double value, 
         return formatGeneral(value, locale);
     }
 
+    // First, try looking up in the registry
     const NumberFormat* format = registry.getFormat(formatId);
-    if (format == nullptr) {
-        // Unknown format ID, fall back to GENERAL
-        return formatGeneral(value, locale);
+    if (format != nullptr) {
+        return formatWithFormat(value, *format, locale);
     }
 
-    return formatWithFormat(value, *format, locale);
+    // Not found in registry - try parsing as a dynamic format ID
+    const std::string idStr = formatId.toString();
+    const ParsedFormatId parsed = parseFormatId(idStr);
+
+    if (parsed.valid) {
+        // Create a temporary NumberFormat from the parsed ID
+        NumberFormat dynamicFormat;
+        dynamicFormat.id = formatId;
+        dynamicFormat.category = parsed.category;
+        dynamicFormat.decimalPlaces = parsed.decimalPlaces;
+        dynamicFormat.useThousandsSeparator = parsed.useThousandsSeparator;
+        dynamicFormat.currencySymbol = parsed.currencySymbol;
+        dynamicFormat.formatCode = generateFormatCode(parsed);
+        dynamicFormat.isAccounting = false;
+
+        return formatWithFormat(value, dynamicFormat, locale);
+    }
+
+    // Unknown format ID, fall back to GENERAL
+    return formatGeneral(value, locale);
 }
 
 }  // namespace cells

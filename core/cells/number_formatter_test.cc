@@ -459,5 +459,77 @@ TEST(FormatNumberTest, PercentageWithDecimalsFromRegistry) {
     EXPECT_EQ(result.text, "15.50%");
 }
 
+// =============================================================================
+// Dynamic format ID tests (formats not in registry)
+// =============================================================================
+
+TEST(DynamicFormatTest, Percentage7Decimals) {
+    NumberFormatRegistry registry;
+    // FMT_P007 is not in registry, should be parsed dynamically
+    ID dynamicId("FMT_P007");
+    auto result = formatNumber(registry, 0.1234567, dynamicId);
+    EXPECT_FALSE(result.isError);
+    EXPECT_EQ(result.text, "12.3456700%");
+}
+
+TEST(DynamicFormatTest, Percentage15Decimals) {
+    NumberFormatRegistry registry;
+    ID dynamicId("FMT_P015");
+    auto result = formatNumber(registry, 0.123456789012345, dynamicId);
+    EXPECT_FALSE(result.isError);
+    // Should show up to 15 decimal places
+    EXPECT_TRUE(result.text.find("12.345678901234") != std::string::npos);
+    EXPECT_TRUE(result.text.back() == '%');
+}
+
+TEST(DynamicFormatTest, Number12Decimals) {
+    NumberFormatRegistry registry;
+    ID dynamicId("FMT_N012");
+    auto result = formatNumber(registry, 3.14159265358979, dynamicId);
+    EXPECT_FALSE(result.isError);
+    EXPECT_EQ(result.text, "3.141592653590");  // 12 decimal places
+}
+
+TEST(DynamicFormatTest, NumberWithSeparator5Decimals) {
+    NumberFormatRegistry registry;
+    ID dynamicId("FMT_NS05");
+    auto result = formatNumber(registry, 1234567.89123, dynamicId);
+    EXPECT_FALSE(result.isError);
+    EXPECT_EQ(result.text, "1,234,567.89123");
+}
+
+TEST(DynamicFormatTest, Currency8Decimals) {
+    NumberFormatRegistry registry;
+    ID dynamicId("CUSD_008");
+    auto result = formatNumber(registry, 1234.12345678, dynamicId);
+    EXPECT_FALSE(result.isError);
+    EXPECT_EQ(result.text, "$1,234.12345678");
+}
+
+TEST(DynamicFormatTest, EuroCurrency10Decimals) {
+    NumberFormatRegistry registry;
+    ID dynamicId("CEUR_010");
+    auto result = formatNumber(registry, 1234.1234567890, dynamicId);
+    EXPECT_FALSE(result.isError);
+    EXPECT_EQ(result.text, "€1,234.1234567890");
+}
+
+TEST(DynamicFormatTest, FallsBackToRegistryWhenAvailable) {
+    NumberFormatRegistry registry;
+    // CUSD_002 is in the registry, so it should use the registry entry
+    ID registeredId("CUSD_002");
+    auto result = formatNumber(registry, 1234.56, registeredId);
+    EXPECT_FALSE(result.isError);
+    EXPECT_EQ(result.text, "$1,234.56");
+}
+
+TEST(DynamicFormatTest, InvalidDynamicIdFallsBackToGeneral) {
+    NumberFormatRegistry registry;
+    ID invalidId("INVALID!");
+    auto result = formatNumber(registry, 42.5, invalidId);
+    EXPECT_FALSE(result.isError);
+    EXPECT_EQ(result.text, "42.5");  // General format
+}
+
 }  // namespace
 }  // namespace cells

@@ -1,5 +1,8 @@
 #include "core/cells/number_format.h"
 
+#include <cctype>
+#include <cstdlib>
+
 namespace cells {
 
 // --- Category string conversion ---
@@ -183,6 +186,145 @@ const ID SCIENTIFIC_2("FMT_SCI2");
 
 const ID TEXT("FMT_TEXT");
 }  // namespace BuiltInFormats
+
+// --- Dynamic Format ID Parsing ---
+
+std::string getCurrencySymbol(const std::string& currencyCode) {
+    if (currencyCode == "USD") {
+        return "$";
+    }
+    if (currencyCode == "EUR") {
+        return "€";
+    }
+    if (currencyCode == "GBP") {
+        return "£";
+    }
+    if (currencyCode == "JPY" || currencyCode == "CNY") {
+        return "¥";
+    }
+    return "";
+}
+
+ParsedFormatId parseFormatId(const std::string& id) {
+    ParsedFormatId result;
+
+    // Minimum length check
+    if (id.size() < 8) {
+        return result;
+    }
+
+    // Pattern: FMT_P0XX (percentage with XX decimal places)
+    // Example: FMT_P007 = 7 decimal places
+    if (id.size() == 8 && id.substr(0, 5) == "FMT_P" && id[5] == '0') {
+        if (std::isdigit(static_cast<unsigned char>(id[6])) != 0 &&
+            std::isdigit(static_cast<unsigned char>(id[7])) != 0) {
+            const int decimals = (id[6] - '0') * 10 + (id[7] - '0');
+            if (decimals <= 15) {
+                result.category = NumberFormatCategory::PERCENTAGE;
+                result.decimalPlaces = static_cast<uint8_t>(decimals);
+                result.useThousandsSeparator = false;
+                result.valid = true;
+                return result;
+            }
+        }
+    }
+
+    // Pattern: FMT_N0XX (number with XX decimal places, no separator)
+    // Example: FMT_N012 = 12 decimal places
+    if (id.size() == 8 && id.substr(0, 5) == "FMT_N" && id[5] == '0' &&
+        !(id[6] == 'S')) {  // Distinguish from FMT_NS0X
+        if (std::isdigit(static_cast<unsigned char>(id[6])) != 0 &&
+            std::isdigit(static_cast<unsigned char>(id[7])) != 0) {
+            const int decimals = (id[6] - '0') * 10 + (id[7] - '0');
+            if (decimals <= 15) {
+                result.category = NumberFormatCategory::NUMBER;
+                result.decimalPlaces = static_cast<uint8_t>(decimals);
+                result.useThousandsSeparator = false;
+                result.valid = true;
+                return result;
+            }
+        }
+    }
+
+    // Pattern: FMT_NS0X (number with separator, X decimal places)
+    // Example: FMT_NS05 = 5 decimal places with thousands separator
+    if (id.size() == 8 && id.substr(0, 6) == "FMT_NS" && id[6] == '0') {
+        if (std::isdigit(static_cast<unsigned char>(id[7])) != 0) {
+            const int decimals = id[7] - '0';
+            if (decimals <= 9) {
+                result.category = NumberFormatCategory::NUMBER;
+                result.decimalPlaces = static_cast<uint8_t>(decimals);
+                result.useThousandsSeparator = true;
+                result.valid = true;
+                return result;
+            }
+        }
+    }
+
+    // Pattern: CXXX_0YY (currency with 3-letter code and YY decimal places)
+    // Example: CUSD_008 = USD with 8 decimal places
+    if (id.size() == 8 && id[0] == 'C' && id[4] == '_' && id[5] == '0') {
+        // Extract currency code (3 uppercase letters)
+        const std::string currencyCode = id.substr(1, 3);
+        bool validCurrency = true;
+        for (const char c : currencyCode) {
+            if (std::isupper(static_cast<unsigned char>(c)) == 0) {
+                validCurrency = false;
+                break;
+            }
+        }
+
+        if (validCurrency && std::isdigit(static_cast<unsigned char>(id[6])) != 0 &&
+            std::isdigit(static_cast<unsigned char>(id[7])) != 0) {
+            const int decimals = (id[6] - '0') * 10 + (id[7] - '0');
+            const std::string symbol = getCurrencySymbol(currencyCode);
+
+            if (decimals <= 15 && !symbol.empty()) {
+                result.category = NumberFormatCategory::CURRENCY;
+                result.decimalPlaces = static_cast<uint8_t>(decimals);
+                result.useThousandsSeparator = true;  // Currency always has separator
+                result.currencyCode = currencyCode;
+                result.currencySymbol = symbol;
+                result.valid = true;
+                return result;
+            }
+        }
+    }
+
+    return result;
+}
+
+std::string generateFormatCode(const ParsedFormatId& parsed) {
+    if (!parsed.valid) {
+        return "";
+    }
+
+    std::string decimalPart;
+    if (parsed.decimalPlaces > 0) {
+        decimalPart = "." + std::string(parsed.decimalPlaces, '0');
+    }
+
+    switch (parsed.category) {
+        case NumberFormatCategory::PERCENTAGE:
+            // Format: 0.0000000%
+            return "0" + decimalPart + "%";
+
+        case NumberFormatCategory::NUMBER:
+            if (parsed.useThousandsSeparator) {
+                // Format: #,##0.00000
+                return "#,##0" + decimalPart;
+            }
+            // Format: 0.000000000000
+            return "0" + decimalPart;
+
+        case NumberFormatCategory::CURRENCY:
+            // Format: $#,##0.00000000
+            return parsed.currencySymbol + "#,##0" + decimalPart;
+
+        default:
+            return "";
+    }
+}
 
 // --- NumberFormatRegistry ---
 

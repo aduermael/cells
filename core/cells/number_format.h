@@ -3,6 +3,7 @@
 
 #include <cstdint>
 
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -145,6 +146,64 @@ extern const ID SCIENTIFIC_2;  // 1.50E+10
 // Text
 extern const ID TEXT;  // Display as text
 }  // namespace BuiltInFormats
+
+// =============================================================================
+// Dynamic Format ID Parsing
+// =============================================================================
+
+/**
+ * ParsedFormatId holds the parsed components of a dynamically-generated format ID.
+ *
+ * Format ID patterns supported:
+ * - FMT_P0XX (percentage with XX decimal places, 00-15)
+ * - FMT_N0XX (number with XX decimal places, 00-15)
+ * - FMT_NS0X (number with separator, 0X decimal places, 0-9)
+ * - C<CURRENCY>_0XX (currency with 3-letter code and XX decimal places)
+ *
+ * The parser extracts category, decimal places, currency code, etc. from the ID.
+ */
+struct ParsedFormatId {
+    NumberFormatCategory category{NumberFormatCategory::GENERAL};
+    uint8_t decimalPlaces{0};
+    bool useThousandsSeparator{false};
+    std::string currencyCode;    // e.g., "USD", "EUR"
+    std::string currencySymbol;  // e.g., "$", "€"
+    bool valid{false};           // True if parsing succeeded
+};
+
+/**
+ * Parse a format ID string into its components.
+ *
+ * Supported patterns:
+ * - FMT_P0XX: Percentage with XX decimal places (e.g., FMT_P007 = 7 decimals)
+ * - FMT_N0XX: Number with XX decimal places (e.g., FMT_N012 = 12 decimals)
+ * - FMT_NS0X: Number with separator, X decimal places (e.g., FMT_NS05)
+ * - CXXX_0YY: Currency (XXX = currency code, YY = decimals, e.g., CUSD_008)
+ *
+ * Returns ParsedFormatId with valid=false if the ID doesn't match any pattern.
+ */
+ParsedFormatId parseFormatId(const std::string& id);
+
+/**
+ * Generate an Excel-style format code from a parsed format ID.
+ *
+ * Examples:
+ * - Percentage with 7 decimals → "0.0000000%"
+ * - Number with 12 decimals → "0.000000000000"
+ * - Number with separator and 5 decimals → "#,##0.00000"
+ * - USD with 8 decimals → "$#,##0.00000000"
+ *
+ * Returns empty string if the parsed format is invalid.
+ */
+std::string generateFormatCode(const ParsedFormatId& parsed);
+
+/**
+ * Get the currency symbol for a currency code.
+ *
+ * Supported codes: USD ($), EUR (€), GBP (£), JPY (¥), CNY (¥)
+ * Returns empty string for unknown codes.
+ */
+std::string getCurrencySymbol(const std::string& currencyCode);
 
 // NumberFormatRegistry manages available formats
 // Contains built-in formats and user-defined custom formats
