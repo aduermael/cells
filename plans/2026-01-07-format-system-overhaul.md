@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2026-01-07 01:46 UTC
-Updated At: 2026-01-07 01:46 UTC
+Updated At: 2026-01-07 01:52 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -26,49 +26,76 @@ This plan addresses three interconnected issues with the cell formatting system:
 
 3. **No custom format support**: The current system only supports predefined format IDs. Excel-style custom format codes (e.g., `#,##0.00`, `0.00%`, `mm/dd/yy`) should be supported.
 
-## Architecture Decision: Format Codes as First-Class Citizens
+## Architecture Decision: Dynamic Format IDs + Format Codes
 
-Instead of hardcoded format variants with embedded decimal counts, we move to **format code strings** (Excel-compatible):
+### Key Insight: Dynamic Format ID Parsing
 
-**Current approach:**
-- Cell stores: `formatId = "CUSD_002"` (2 decimals, USD)
-- Registry has 25+ predefined variants
+Instead of pre-registering `PERCENTAGE_0` through `PERCENTAGE_15`, format IDs are **parsed dynamically**:
 
-**New approach:**
-- Cell stores: `formatId` (ID) + format has `formatCode` string
-- Format registry stores format codes: `"$#,##0.00"`, `"0.0000%"`, etc.
-- Built-in formats still exist but custom formats can be created
-- Decimal precision is encoded in the format code, not limited to 0-4
+```
+PERCENTAGE_7  → parse → { category: PERCENTAGE, decimals: 7 }  → code: "0.0000000%"
+NUMBER_12     → parse → { category: NUMBER, decimals: 12 }     → code: "0.000000000000"
+CUSD_008      → parse → { currency: USD, decimals: 8 }         → code: "$#,##0.00000000"
+```
+
+The registry lookup becomes:
+1. Check if it's a cached/known format
+2. If not, parse the ID pattern (e.g., `PERCENTAGE_(\d+)`, `C([A-Z]{3})_(\d+)`)
+3. Generate the format code on-the-fly
+4. Cache for future lookups
+
+This eliminates the need to pre-register variants and allows unlimited decimal precision.
+
+### Format Codes as First-Class Citizens
+
+For custom formats beyond the dynamic ID patterns, we support **format code strings** (Excel-compatible):
 
 **Excel format code syntax (subset to support):**
 - `0` - Digit placeholder (shows 0 if no digit)
 - `#` - Digit placeholder (omits leading zeros)
 - `.` - Decimal separator
-- `,` - Thousands separator
-- `%` - Percentage (multiplies by 100)
+- `,` - Thousands separator (when placed in integer portion, e.g., `#,##0`)
+- `%` - Percentage display (**multiplies stored value by 100**, so `0.15` → `15%`)
+- `"%"` - Literal percent sign (no multiplication, for displaying already-multiplied values)
 - `$`, `€`, `£`, `¥` - Currency symbols
 - `@` - Text placeholder
 - Sections: `positive;negative;zero;text`
 
+**Note on `%` behavior:** Per Excel convention, `%` in format codes means the stored value is the decimal (0.15 for 15%). The formatter multiplies by 100 for display. This matches our current implementation.
+
 ---
 
-## Phase 1: Increase Decimal Limit (Quick Win)
+## Phase 1: Dynamic Format ID Parsing (Unlimited Decimals)
 
-Immediate fix: extend the existing variant system from 0-4 to 0-15 decimals.
+Replace hardcoded format variants with dynamic ID parsing, allowing any decimal precision.
 
-- [ ] 1a: Add format variants for 5-15 decimals in `number_format.cc`
-  - Add `PERCENTAGE_5` through `PERCENTAGE_15`
-  - Add `CURRENCY_USD_5` through `CURRENCY_USD_15` (and other currencies)
-  - Add `NUMBER_5` through `NUMBER_15` variants
-  - Update `getFormatIdForCategory()` to support decimals 0-15
+- [ ] 1a: Implement dynamic format ID parser in `number_format.cc`
+  - Add `parseFormatId(id)` function that extracts category + decimals from ID pattern
+  - Support patterns: `PERCENTAGE_N`, `NUMBER_N`, `NUMBER_SEP_N`, `C{CURRENCY}_N`
+  - Return parsed struct: `{ category, decimals, currency?, hasThousandsSep? }`
+  - Fall back to existing hardcoded lookups for legacy IDs
 
-- [ ] 1b: Update UI decimal controls to allow 0-15 range
-  - Modify `format-controls.ts` `handleDecimalChange()` to cap at 15 instead of 4
-  - Update button labels/tooltips if needed
+- [ ] 1b: Generate format codes from parsed IDs
+  - Add `generateFormatCode(parsedId)` function
+  - `PERCENTAGE_7` → `"0.0000000%"`
+  - `NUMBER_12` → `"0.000000000000"`
+  - `NUMBER_SEP_5` → `"#,##0.00000"`
+  - `CUSD_008` → `"$#,##0.00000000"`
+  - Cache generated codes for performance
 
-- [ ] 1c: Update GENERAL format to show up to 15 significant decimals
-  - In `number_formatter.cc`, adjust `formatGeneral()` to show more precision
-  - Ensure trailing zeros are still trimmed for GENERAL
+- [ ] 1c: Update `formatNumber()` to use dynamic lookup
+  - First try cache, then parse ID, then generate code
+  - Use generated format code to format the value
+  - Add unit tests for decimals 0-15+
+
+- [ ] 1d: Update UI decimal controls for extended range
+  - Modify `format-controls.ts` `handleDecimalChange()` to allow 0-15 (or higher)
+  - Generate format ID dynamically: `PERCENTAGE_${decimals}`
+  - Remove hardcoded decimal limit
+
+- [ ] 1e: Update GENERAL format precision
+  - In `number_formatter.cc`, adjust `formatGeneral()` to show up to 15 significant digits
+  - Ensure trailing zeros are still trimmed
 
 ---
 
@@ -177,27 +204,32 @@ Implement Excel-compatible format code strings.
 
 ## File Changes Summary
 
-**New files:**
-- `core/cells/format_code_parser.h/.cc` - Parse Excel format codes
-- `core/cells/format_code_parser_test.cc` - Parser tests
-- `core/cells/format_code_formatter.h/.cc` - Format values using codes
-- `core/cells/format_code_formatter_test.cc` - Formatter tests
+**Phase 1 (modified files):**
+- `core/cells/number_format.h/.cc` - Add `parseFormatId()`, `generateFormatCode()`, caching
+- `core/cells/number_format_test.cc` - Tests for dynamic ID parsing
+- `core/cells/number_formatter.cc` - Use dynamic lookup, increase GENERAL precision
+- `apps/wasm/src/format-controls.ts` - Remove decimal limit, generate IDs dynamically
 
-**Modified files:**
-- `core/cells/number_format.h/.cc` - Add 5-15 decimal variants, custom format support
-- `core/cells/number_formatter.cc` - Use format code formatter
-- `core/cells/crdt.cc` - Add FORMAT_DEFINE operation
-- `apps/wasm/src/clipboard.ts` - Add formatId to clipboard
-- `apps/wasm/src/format-controls.ts` - Extend decimal range, add Custom UI
-- `apps/wasm/bindings.cc` - Expose new APIs
+**Phase 2 (modified files):**
+- `apps/wasm/src/clipboard.ts` - Add formatId to clipboard data
+- `apps/wasm/tests/clipboard.test.mjs` - E2E tests for format preservation
+
+**Phase 3 (new + modified files):**
+- `core/cells/format_code_parser.h/.cc` - Parse Excel format code strings (NEW)
+- `core/cells/format_code_parser_test.cc` - Parser tests (NEW)
+- `core/cells/format_code_formatter.h/.cc` - Format values using codes (NEW)
+- `core/cells/format_code_formatter_test.cc` - Formatter tests (NEW)
+- `core/cells/crdt.cc` - Add FORMAT_DEFINE operation for custom formats
+- `apps/wasm/src/format-controls.ts` - Add Custom format UI
+- `apps/wasm/bindings.cc` - Expose custom format APIs
 
 ---
 
 ## Dependencies
 
-- Phase 2 is independent and can be done in parallel with Phase 1
-- Phase 3 depends on Phase 1 being complete (decimal extension proves the need)
-- Phase 4 depends on Phase 3 being complete
+- **Phase 1 and Phase 2 are independent** - can be done in parallel
+- **Phase 3 depends on Phase 1** - dynamic ID system lays groundwork for format codes
+- **Phase 4 depends on Phase 3** - polish after custom formats work
 
 ## Risks
 
@@ -209,7 +241,8 @@ Implement Excel-compatible format code strings.
 
 ## Success Criteria
 
-1. Users can set decimal places from 0-15 (not just 0-4)
-2. Copy/paste preserves cell format
-3. Users can enter custom format codes like `#,##0.00` or `0.00%`
-4. Format system is extensible for future format types
+1. **Decimals**: Users can set decimal places from 0-15+ (not just 0-4) via UI controls
+2. **Copy/paste**: Pasting a cell preserves its format (percentage stays percentage, currency stays currency)
+3. **Custom formats**: Users can enter Excel-style format codes like `#,##0.00` or `0.00%`
+4. **Architecture**: Format IDs are parsed dynamically, no need to pre-register every variant
+5. **Backward compatibility**: Existing files with old format IDs continue to work
