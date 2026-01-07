@@ -22,7 +22,7 @@
     "test:script-refresh": "node tests/script-refresh.test.mjs",
     "test:unit": "node tests/unit/editing-session.test.mjs",
     "test:all": "node tests/unit/editing-session.test.mjs && node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs && node tests/clipboard.test.mjs && node tests/script.test.mjs && node tests/collab.test.mjs && node tests/initial-sync.test.mjs",
-    "test:stable": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs && node tests/clipboard.test.mjs && node tests/selection.test.mjs && node tests/cursor.test.mjs",
+    "test:stable": "node tests/smoke.test.mjs && node tests/formula.test.mjs && node tests/editing.test.mjs && node tests/column-move.test.mjs && node tests/clipboard.test.mjs && node tests/selection.test.mjs && node tests/cursor.test.mjs && node tests/collab.test.mjs",
     "test:parallel": "node tests/run-parallel.mjs"
   },
   "devDependencies": {
