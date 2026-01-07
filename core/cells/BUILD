@@ -56,6 +56,39 @@ cc_test(
 )
 
 cc_library(
+    name = "format_code_parser",
+    srcs = ["format_code_parser.cc"],
+    hdrs = ["format_code_parser.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "format_code_parser_test",
+    srcs = ["format_code_parser_test.cc"],
+    deps = [
+        ":format_code_parser",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "format_code_formatter",
+    srcs = ["format_code_formatter.cc"],
+    hdrs = ["format_code_formatter.h"],
+    visibility = ["//visibility:public"],
+    deps = [":format_code_parser"],
+)
+
+cc_test(
+    name = "format_code_formatter_test",
+    srcs = ["format_code_formatter_test.cc"],
+    deps = [
+        ":format_code_formatter",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "input_parser",
     srcs = ["input_parser.cc"],
     hdrs = ["input_parser.h"],

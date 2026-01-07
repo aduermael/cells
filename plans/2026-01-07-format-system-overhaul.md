@@ -118,32 +118,32 @@ Add formatId to clipboard data so paste restores cell formatting.
 
 ---
 
-## Phase 3: Custom Format Code Support
+## Phase 3: Custom Format Code Support ✅
 
 Implement Excel-compatible format code strings.
 
-### Phase 3a: Format Code Parser
+### Phase 3a: Format Code Parser ✅
 
-- [ ] 3a-1: Create `format_code_parser.h/.cc` with format code parsing
+- [x] 3a-1: Create `format_code_parser.h/.cc` with format code parsing
   - Parse Excel format code syntax: `#`, `0`, `.`, `,`, `%`, currency symbols
   - Support section separators (`;`) for positive/negative/zero/text
   - Return parsed structure with: decimal places, has thousands sep, has percent, currency symbol, etc.
 
-- [ ] 3a-2: Add unit tests for format code parser
+- [x] 3a-2: Add unit tests for format code parser
   - Test `0.00` → 2 decimals, no thousands
   - Test `#,##0.00` → 2 decimals, thousands separator
   - Test `0.00%` → 2 decimals, percentage
   - Test `$#,##0.00` → currency, 2 decimals, thousands
   - Test `#,##0.00;(#,##0.00)` → positive/negative sections
 
-### Phase 3b: Format Code Formatter
+### Phase 3b: Format Code Formatter ✅
 
-- [ ] 3b-1: Create `format_code_formatter.h/.cc` to render values using format codes
+- [x] 3b-1: Create `format_code_formatter.h/.cc` to render values using format codes
   - Take parsed format code + numeric value → formatted string
   - Handle positive/negative/zero sections
   - Support all placeholders: `#`, `0`, `.`, `,`, `%`, currency, `@`
 
-- [ ] 3b-2: Add unit tests for format code formatter
+- [x] 3b-2: Add unit tests for format code formatter
   - Test various inputs with different format codes
   - Test negative number formatting with sections
   - Test percentage multiplication
