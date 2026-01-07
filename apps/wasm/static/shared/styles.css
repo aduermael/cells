@@ -1097,7 +1097,7 @@ canvas {
     flex: 1;
 }
 
-/* Chat open button in bottom bar - styled like a sheet tab for consistency */
+/* Chat open button in bottom bar - styled like a sheet tab but with green accent */
 .chat-open-btn {
     padding: var(--spacing-xs) var(--spacing-md);
     padding-bottom: var(--spacing-sm);
@@ -1106,9 +1106,9 @@ canvas {
     gap: var(--spacing-xs);
     font-size: var(--font-size-sm);
     font-weight: var(--font-weight-medium);
-    color: var(--color-text-muted);
-    background: transparent;
-    border: 1px solid transparent;
+    color: var(--color-primary);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
     border-bottom: none;
     border-radius: var(--border-radius-top);
     cursor: pointer;
@@ -1119,7 +1119,6 @@ canvas {
 
 .chat-open-btn:hover {
     background: var(--color-bg-hover);
-    color: var(--color-text-secondary);
 }
 
 .chat-open-btn:active {

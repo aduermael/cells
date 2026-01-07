@@ -1375,15 +1375,15 @@ public:
             return "{\"error\":\"Cell not found\"}";
         }
 
-        // Validate format ID (must be registered, dynamically parseable, or "~" for default)
+        // Validate format ID (must be registered, custom in workbook, dynamically parseable, or "~" for default)
         ID formatId;
         if (formatIdStr != "~" && !formatIdStr.empty()) {
             if (formatIdStr.size() != ID_LENGTH) {
                 return "{\"error\":\"Invalid format ID\"}";
             }
             formatId = ID(formatIdStr);
-            // Allow if registered or if it's a dynamically-parseable format ID
-            if (!_formatRegistry.hasFormat(formatId)) {
+            // Allow if registered in registry, or custom in workbook, or dynamically-parseable format ID
+            if (!_formatRegistry.hasFormat(formatId) && !_workbook->hasCustomFormat(formatId)) {
                 const ParsedFormatId parsed = parseFormatId(formatIdStr);
                 if (!parsed.valid) {
                     return "{\"error\":\"Format not found\"}";
@@ -1421,15 +1421,15 @@ public:
         }
 
         // Validate format ID first (before creating anything)
-        // Must be registered, dynamically parseable, or "~" for default
+        // Must be registered, custom in workbook, dynamically parseable, or "~" for default
         ID formatId;
         if (formatIdStr != "~" && !formatIdStr.empty()) {
             if (formatIdStr.size() != ID_LENGTH) {
                 return "{\"error\":\"Invalid format ID\"}";
             }
             formatId = ID(formatIdStr);
-            // Allow if registered or if it's a dynamically-parseable format ID
-            if (!_formatRegistry.hasFormat(formatId)) {
+            // Allow if registered in registry, or custom in workbook, or dynamically-parseable format ID
+            if (!_formatRegistry.hasFormat(formatId) && !_workbook->hasCustomFormat(formatId)) {
                 const ParsedFormatId parsed = parseFormatId(formatIdStr);
                 if (!parsed.valid) {
                     return "{\"error\":\"Format not found\"}";
