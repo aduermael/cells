@@ -58,6 +58,7 @@ interface CellsEngine {
   getCellFormatId(cellId: string): string;
   parseUserInputValue(input: string): string;
   formatCellValue(value: number, formatId: string): string;
+  formatWithCode(value: number, formatCode: string): string;
   formatCellById(cellId: string): string;
 
   // Column/row operations
@@ -698,6 +699,17 @@ function handleMessage(msg: WorkerRequest): void {
           respond({ type: "error", error: result.error });
         } else {
           respond({ type: "formattedValue", text: result.text });
+        }
+        break;
+      }
+
+      case "formatWithCode": {
+        const { value, formatCode } = params as { value: number; formatCode: string };
+        const result = JSON.parse(engine.formatWithCode(value, formatCode)) as JsonResult;
+        if (result.error) {
+          respond({ type: "formatWithCode", error: result.error });
+        } else {
+          respond({ type: "formatWithCode", text: result.text });
         }
         break;
       }

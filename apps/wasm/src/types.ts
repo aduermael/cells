@@ -91,7 +91,8 @@ export type NumberFormatCategory =
   | "DATE_TIME"
   | "SCIENTIFIC"
   | "FRACTION"
-  | "TEXT";
+  | "TEXT"
+  | "CUSTOM";
 
 /** Number format definition */
 export interface NumberFormat {

@@ -696,6 +696,119 @@ canvas {
     margin-right: var(--spacing-sm);
 }
 
+/* Dropdown separator */
+.dropdown-separator {
+    height: 1px;
+    background: var(--color-border);
+    margin: var(--spacing-xs) 0;
+}
+
+/* Custom format panel */
+#custom-format-panel {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: var(--spacing-xs);
+    padding: var(--spacing-sm);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-dropdown);
+    min-width: 260px;
+    z-index: var(--z-dropdown);
+}
+
+#custom-format-panel.hidden {
+    display: none;
+}
+
+.custom-format-header {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--color-text-primary);
+    margin-bottom: var(--spacing-sm);
+}
+
+#custom-format-input {
+    width: 100%;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    font-family: var(--font-mono);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    box-sizing: border-box;
+}
+
+#custom-format-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.1);
+}
+
+#custom-format-preview {
+    margin-top: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    background: var(--color-bg-secondary);
+    border-radius: var(--border-radius);
+    font-family: var(--font-mono);
+}
+
+#custom-format-error {
+    margin-top: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-error);
+    background: rgba(244, 67, 54, 0.1);
+    border-radius: var(--border-radius);
+}
+
+#custom-format-error.hidden {
+    display: none;
+}
+
+.custom-format-templates {
+    margin-top: var(--spacing-sm);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+    align-items: center;
+}
+
+.template-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    margin-right: var(--spacing-xs);
+}
+
+.template-btn {
+    padding: 2px 6px;
+    font-size: var(--font-size-xs);
+    font-family: var(--font-mono);
+    color: var(--color-text-secondary);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.template-btn:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+    border-color: var(--color-primary);
+}
+
+.custom-format-actions {
+    margin-top: var(--spacing-sm);
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-xs);
+}
+
 /* Height to match 2x2 button grid (24px + 4px gap + 24px = 52px) */
 #cell-reference {
     height: 52px;

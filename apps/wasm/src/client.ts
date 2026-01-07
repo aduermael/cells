@@ -457,6 +457,18 @@ export class CellsClient {
     return response as FormattedValueResult;
   }
 
+  /**
+   * Format a numeric value directly with a format code string.
+   * Used for live preview in custom format UI.
+   * @param value The numeric value to format
+   * @param formatCode Excel-style format code (e.g., "#,##0.00")
+   * @returns Formatted value result with text or error
+   */
+  async formatWithCode(value: number, formatCode: string): Promise<FormattedValueResult> {
+    const response = await this._send("formatWithCode", { value, formatCode });
+    return response as FormattedValueResult;
+  }
+
   // ========== Column/Row Operations API ==========
 
   async resizeColumn(colId: string, width: number): Promise<{ success: boolean }> {

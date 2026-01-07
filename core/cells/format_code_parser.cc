@@ -69,7 +69,7 @@ static bool isColorName(const std::string& name) {
     if (lower.size() >= 6 && lower.substr(0, 5) == "color") {
         // Check if remaining characters are digits
         for (size_t i = 5; i < lower.size(); ++i) {
-            if (!std::isdigit(static_cast<unsigned char>(lower[i]))) {
+            if (std::isdigit(static_cast<unsigned char>(lower[i])) == 0) {
                 return false;
             }
         }

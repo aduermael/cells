@@ -1,6 +1,6 @@
 Status: IN PROGRESS
 Created At: 2026-01-07 01:46 UTC
-Updated At: 2026-01-06 18:22 UTC
+Updated At: 2026-01-07 23:52 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -176,22 +176,26 @@ Implement Excel-compatible format code strings.
     - getAvailableFormats() combines registry (built-in) + workbook (custom)
     - createCustomFormat() stores only in workbook, not in registry
 
-### Phase 3d: Custom Format UI
+### Phase 3d: Custom Format UI ✅
 
-- [ ] 3d-1: Add "Custom" category to format dropdown
+- [x] 3d-1: Add "Custom" category to format dropdown
   - When selected, show format code input field
   - Show live preview of current cell value with entered format code
   - Show common format code templates like Excel does
+  - Added "CUSTOM" to NumberFormatCategory type
+  - Added custom format panel HTML and CSS
+  - Added `formatWithCode` API for live preview
+  - Connected to FormatControls with template buttons (Number, Percent, Currency, Scientific)
 
-- [ ] 3d-2: Format code validation and error display
-  - Parse format code as user types
-  - Show validation errors inline
-  - Prevent applying invalid format codes
+- [x] 3d-2: Format code validation and error display
+  - Parse format code as user types (debounced preview)
+  - Show validation errors inline in custom format panel
+  - Prevent applying invalid format codes (apply button shows error)
 
-- [ ] 3d-3: Save and apply custom formats
-  - Call `createCustomFormat()` API
+- [x] 3d-3: Save and apply custom formats
+  - Call `createCustomFormat()` API when Apply button clicked
   - Apply returned format ID to selected cells
-  - Add to "recent custom formats" list
+  - Reload available formats after creating custom format
 
 ---
 

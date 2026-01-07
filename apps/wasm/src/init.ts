@@ -1150,6 +1150,12 @@ export function initApp(): AppContext {
       currencyDropdownMenu: elements.currencyDropdownMenu,
       decimalIncreaseBtn: elements.formatDecimalIncrease,
       decimalDecreaseBtn: elements.formatDecimalDecrease,
+      customFormatPanel: elements.customFormatPanel,
+      customFormatInput: elements.customFormatInput,
+      customFormatPreview: elements.customFormatPreview,
+      customFormatError: elements.customFormatError,
+      customFormatApplyBtn: elements.customFormatApplyBtn,
+      customFormatCancelBtn: elements.customFormatCancelBtn,
     },
     {
       getSelectedCell: () => app.selectedCell,

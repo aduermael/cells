@@ -29,6 +29,13 @@ export interface FormatControlsConfig {
   currencyDropdownMenu: HTMLElement;
   decimalIncreaseBtn: HTMLButtonElement;
   decimalDecreaseBtn: HTMLButtonElement;
+  // Custom format panel elements
+  customFormatPanel: HTMLElement;
+  customFormatInput: HTMLInputElement;
+  customFormatPreview: HTMLElement;
+  customFormatError: HTMLElement;
+  customFormatApplyBtn: HTMLButtonElement;
+  customFormatCancelBtn: HTMLButtonElement;
 }
 
 /** Callback signatures */
@@ -71,6 +78,12 @@ export class FormatControls {
   private currencyDropdownMenu: HTMLElement;
   private decimalIncreaseBtn: HTMLButtonElement;
   private decimalDecreaseBtn: HTMLButtonElement;
+  private customFormatPanel: HTMLElement;
+  private customFormatInput: HTMLInputElement;
+  private customFormatPreview: HTMLElement;
+  private customFormatError: HTMLElement;
+  private customFormatApplyBtn: HTMLButtonElement;
+  private customFormatCancelBtn: HTMLButtonElement;
 
   // =========================================================================
   // Dependencies
@@ -96,6 +109,8 @@ export class FormatControls {
   private currentCurrency: CurrencyType = "USD";
   private isDropdownOpen = false;
   private isCurrencyDropdownOpen = false;
+  private isCustomFormatPanelOpen = false;
+  private customFormatDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   // =========================================================================
   // Constructor
@@ -115,6 +130,12 @@ export class FormatControls {
     this.currencyDropdownMenu = config.currencyDropdownMenu;
     this.decimalIncreaseBtn = config.decimalIncreaseBtn;
     this.decimalDecreaseBtn = config.decimalDecreaseBtn;
+    this.customFormatPanel = config.customFormatPanel;
+    this.customFormatInput = config.customFormatInput;
+    this.customFormatPreview = config.customFormatPreview;
+    this.customFormatError = config.customFormatError;
+    this.customFormatApplyBtn = config.customFormatApplyBtn;
+    this.customFormatCancelBtn = config.customFormatCancelBtn;
 
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectedCellData = callbacks.getSelectedCellData;
@@ -172,13 +193,53 @@ export class FormatControls {
       }
     });
 
-    // Close dropdown on outside click
+    // Close dropdowns and custom panel on outside click
     document.addEventListener("click", (e) => {
-      if (this.isDropdownOpen && !this.formatDropdown.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (this.isDropdownOpen && !this.formatDropdown.contains(target)) {
         this.closeDropdown();
       }
-      if (this.isCurrencyDropdownOpen && !this.currencyDropdown.contains(e.target as Node)) {
+      if (this.isCurrencyDropdownOpen && !this.currencyDropdown.contains(target)) {
         this.closeCurrencyDropdown();
+      }
+      if (this.isCustomFormatPanelOpen && !this.customFormatPanel.contains(target) &&
+          !this.formatDropdown.contains(target)) {
+        this.closeCustomFormatPanel();
+      }
+    });
+
+    // Custom format panel events
+    this.customFormatInput.addEventListener("input", () => {
+      this.handleCustomFormatInputChange();
+    });
+
+    this.customFormatApplyBtn.addEventListener("click", () => {
+      this.handleCustomFormatApply();
+    });
+
+    this.customFormatCancelBtn.addEventListener("click", () => {
+      this.closeCustomFormatPanel();
+    });
+
+    // Template buttons
+    this.customFormatPanel.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const templateBtn = target.closest(".template-btn") as HTMLElement;
+      if (templateBtn && templateBtn.dataset.code) {
+        this.customFormatInput.value = templateBtn.dataset.code;
+        this.handleCustomFormatInputChange();
+        this.customFormatInput.focus();
+      }
+    });
+
+    // Enter key to apply custom format
+    this.customFormatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        this.handleCustomFormatApply();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        this.closeCustomFormatPanel();
       }
     });
 
@@ -348,6 +409,123 @@ export class FormatControls {
   }
 
   // =========================================================================
+  // Private Methods - Custom Format Panel
+  // =========================================================================
+
+  private openCustomFormatPanel(): void {
+    this.isCustomFormatPanelOpen = true;
+    this.customFormatPanel.classList.remove("hidden");
+    this.customFormatInput.value = "";
+    this.customFormatError.classList.add("hidden");
+    this.customFormatError.textContent = "";
+
+    // Initialize preview with current cell value
+    this.updateCustomFormatPreview("");
+
+    // Focus the input
+    setTimeout(() => this.customFormatInput.focus(), 0);
+  }
+
+  private closeCustomFormatPanel(): void {
+    this.isCustomFormatPanelOpen = false;
+    this.customFormatPanel.classList.add("hidden");
+    if (this.customFormatDebounceTimer) {
+      clearTimeout(this.customFormatDebounceTimer);
+      this.customFormatDebounceTimer = null;
+    }
+  }
+
+  private handleCustomFormatInputChange(): void {
+    // Debounce preview updates
+    if (this.customFormatDebounceTimer) {
+      clearTimeout(this.customFormatDebounceTimer);
+    }
+    this.customFormatDebounceTimer = setTimeout(() => {
+      const formatCode = this.customFormatInput.value.trim();
+      this.updateCustomFormatPreview(formatCode);
+    }, 150);
+  }
+
+  private async updateCustomFormatPreview(formatCode: string): Promise<void> {
+    const cellData = this.getSelectedCellData();
+
+    // Get a preview value (either from cell or use a default)
+    let previewValue = 1234.567;
+    if (cellData && cellData.value) {
+      const parsed = parseFloat(cellData.value);
+      if (!isNaN(parsed)) {
+        previewValue = parsed;
+      }
+    }
+
+    if (!formatCode) {
+      this.customFormatPreview.textContent = `Preview: ${previewValue}`;
+      this.customFormatError.classList.add("hidden");
+      return;
+    }
+
+    // Try to format the value with the given format code
+    if (this.dataSource) {
+      try {
+        const result = await this.dataSource.client.formatWithCode(previewValue, formatCode);
+        if (result.error) {
+          this.customFormatPreview.textContent = `Preview: --`;
+          this.customFormatError.textContent = result.error;
+          this.customFormatError.classList.remove("hidden");
+        } else {
+          this.customFormatPreview.textContent = `Preview: ${result.text || previewValue}`;
+          this.customFormatError.classList.add("hidden");
+        }
+      } catch {
+        this.customFormatPreview.textContent = `Preview: ${previewValue}`;
+        this.customFormatError.classList.add("hidden");
+      }
+    }
+  }
+
+  private async handleCustomFormatApply(): Promise<void> {
+    const formatCode = this.customFormatInput.value.trim();
+    if (!formatCode) {
+      this.closeCustomFormatPanel();
+      return;
+    }
+
+    const position = this.getSelectedCell();
+    if (!position || !this.dataSource) return;
+
+    try {
+      // Create the custom format and get its ID
+      const result = await this.dataSource.client.createCustomFormat(formatCode);
+      if (result.error) {
+        this.customFormatError.textContent = result.error;
+        this.customFormatError.classList.remove("hidden");
+        return;
+      }
+
+      if (result.formatId) {
+        // Apply the format to the cell
+        await this.dataSource.setCellFormatAt(position.col, position.row, result.formatId);
+
+        // Update display
+        this.setDisplayedFormat(result.formatId, "CUSTOM");
+
+        // Trigger re-render and formula bar update
+        this.requestRender();
+        this.updateFormulaBar();
+
+        // Reload available formats to include the new custom format
+        await this.loadAvailableFormats();
+      }
+
+      this.closeCustomFormatPanel();
+    } catch (error) {
+      console.error("Failed to create custom format:", error);
+      this.customFormatError.textContent = "Failed to create format";
+      this.customFormatError.classList.remove("hidden");
+    }
+  }
+
+  // =========================================================================
   // Private Methods - Format Operations
   // =========================================================================
 
@@ -487,6 +665,7 @@ export class FormatControls {
       SCIENTIFIC: "Scientific",
       FRACTION: "Fraction",
       TEXT: "Text",
+      CUSTOM: "Custom",
     };
     return names[category] || category;
   }
@@ -494,6 +673,12 @@ export class FormatControls {
   private async handleCategorySelect(category: NumberFormatCategory): Promise<void> {
     const position = this.getSelectedCell();
     if (!position || !this.dataSource) return;
+
+    // Handle custom format specially - open the panel instead
+    if (category === "CUSTOM") {
+      this.openCustomFormatPanel();
+      return;
+    }
 
     // Get the format ID for this category
     const formatId = this.getFormatIdForCategory(category);

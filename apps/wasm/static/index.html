@@ -99,6 +99,26 @@
                             <button class="dropdown-item" data-format-category="TIME">Time</button>
                             <button class="dropdown-item" data-format-category="SCIENTIFIC">Scientific</button>
                             <button class="dropdown-item" data-format-category="TEXT">Text</button>
+                            <div class="dropdown-separator"></div>
+                            <button class="dropdown-item" data-format-category="CUSTOM">Custom...</button>
+                        </div>
+                        <!-- Custom format input panel (shown when Custom is selected) -->
+                        <div id="custom-format-panel" class="hidden">
+                            <div class="custom-format-header">Custom Format</div>
+                            <input type="text" id="custom-format-input" placeholder="#,##0.00" spellcheck="false" />
+                            <div id="custom-format-preview">Preview: --</div>
+                            <div id="custom-format-error" class="hidden"></div>
+                            <div class="custom-format-templates">
+                                <span class="template-label">Examples:</span>
+                                <button class="template-btn" data-code="#,##0.00">Number</button>
+                                <button class="template-btn" data-code="0.00%">Percent</button>
+                                <button class="template-btn" data-code="$#,##0.00">Currency</button>
+                                <button class="template-btn" data-code="0.00E+00">Scientific</button>
+                            </div>
+                            <div class="custom-format-actions">
+                                <button class="btn btn-sm" id="custom-format-cancel">Cancel</button>
+                                <button class="btn btn-sm btn-primary" id="custom-format-apply">Apply</button>
+                            </div>
                         </div>
                     </div>
                     <div class="dropdown" id="currency-dropdown">

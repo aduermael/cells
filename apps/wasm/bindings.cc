@@ -42,6 +42,7 @@
 #include "core/cells/luau_autocomplete.h"
 #include "core/cells/agent_client.h"
 #include "core/cells/format_code_parser.h"
+#include "core/cells/format_code_formatter.h"
 #include "core/cells/number_format.h"
 #include "core/cells/number_formatter.h"
 #include "core/cells/input_parser.h"
@@ -1732,6 +1733,23 @@ public:
 
         std::ostringstream ss;
         if (result.isError) {
+            ss << "{\"error\":\"" << jsonEscape(result.errorMessage) << "\"}";
+        } else {
+            ss << "{\"text\":\"" << jsonEscape(result.text) << "\"}";
+        }
+        return ss.str();
+    }
+
+    // Format a numeric value directly with a format code string.
+    // This is used for live preview in the custom format UI.
+    // value: the numeric value to format
+    // formatCode: Excel-style format code string (e.g., "#,##0.00")
+    // Returns JSON: {"text":"1,234.57"} or {"error":"..."}
+    std::string formatWithCode(double value, const std::string& formatCode) {
+        FormatCodeResult result = cells::formatWithCode(value, formatCode);
+
+        std::ostringstream ss;
+        if (!result.success) {
             ss << "{\"error\":\"" << jsonEscape(result.errorMessage) << "\"}";
         } else {
             ss << "{\"text\":\"" << jsonEscape(result.text) << "\"}";
@@ -4660,6 +4678,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getCellFormatId", &cells::wasm::CellsEngine::getCellFormatId)
         .function("parseUserInputValue", &cells::wasm::CellsEngine::parseUserInputValue)
         .function("formatCellValue", &cells::wasm::CellsEngine::formatCellValue)
+        .function("formatWithCode", &cells::wasm::CellsEngine::formatWithCode)
         .function("formatCellById", &cells::wasm::CellsEngine::formatCellById)
         // Column/row resize
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)
