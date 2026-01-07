@@ -81,24 +81,27 @@ NumberFormat::NumberFormat()
       decimalPlaces(0),
       useThousandsSeparator(false),
       currencySymbol(),
-      isAccounting(false) {}
+      isAccounting(false),
+      isCustom(false) {}
 
 NumberFormat::NumberFormat(const ID& id, NumberFormatCategory category, std::string formatCode,
                            uint8_t decimalPlaces, bool useThousandsSeparator,
-                           std::string currencySymbol, bool isAccounting)
+                           std::string currencySymbol, bool isAccounting, bool isCustom)
     : id(id),
       category(category),
       formatCode(std::move(formatCode)),
       decimalPlaces(decimalPlaces),
       useThousandsSeparator(useThousandsSeparator),
       currencySymbol(std::move(currencySymbol)),
-      isAccounting(isAccounting) {}
+      isAccounting(isAccounting),
+      isCustom(isCustom) {}
 
 bool NumberFormat::operator==(const NumberFormat& other) const {
     return id == other.id && category == other.category && formatCode == other.formatCode &&
            decimalPlaces == other.decimalPlaces &&
            useThousandsSeparator == other.useThousandsSeparator &&
-           currencySymbol == other.currencySymbol && isAccounting == other.isAccounting;
+           currencySymbol == other.currencySymbol && isAccounting == other.isAccounting &&
+           isCustom == other.isCustom;
 }
 
 bool NumberFormat::operator!=(const NumberFormat& other) const {

@@ -151,7 +151,7 @@ Implement Excel-compatible format code strings.
 
 ### Phase 3c: Integrate Custom Formats into Registry
 
-- [ ] 3c-1: Update `NumberFormat` struct to use formatCode as primary
+- [x] 3c-1: Update `NumberFormat` struct to use formatCode as primary
   - Keep `decimalPlaces`, `useThousandsSeparator`, etc. as derived/cached
   - Add `isCustom` flag to distinguish from built-in formats
   - Update `formatNumber()` to use format code formatter

@@ -43,6 +43,7 @@ struct NumberFormat {
     bool useThousandsSeparator;     // Whether to use thousand separators
     std::string currencySymbol;     // Currency symbol (e.g., "$", "€", "£")
     bool isAccounting;              // Accounting format (aligned symbols)
+    bool isCustom;                  // True if this is a user-defined custom format
 
     // Default constructor creates a GENERAL format
     NumberFormat();
@@ -50,7 +51,8 @@ struct NumberFormat {
     // Construct with specific properties
     NumberFormat(const ID& id, NumberFormatCategory category, std::string formatCode = "",
                  uint8_t decimalPlaces = 2, bool useThousandsSeparator = false,
-                 std::string currencySymbol = "", bool isAccounting = false);
+                 std::string currencySymbol = "", bool isAccounting = false,
+                 bool isCustom = false);
 
     // Equality comparison
     bool operator==(const NumberFormat& other) const;

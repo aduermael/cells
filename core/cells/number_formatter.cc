@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <sstream>
 
+#include "core/cells/format_code_formatter.h"
 #include "core/cells/input_parser.h"
 
 namespace cells {
@@ -345,9 +346,27 @@ FormattedValue formatDateTime(double serialDateTime, const ID& /*formatId*/,
     return FormattedValue::success(dateResult.text + " " + timeResult.text);
 }
 
+// Helper: Convert FormatLocale to FormatLocaleSettings for format code formatter
+static FormatLocaleSettings toFormatLocaleSettings(const FormatLocale& locale) {
+    FormatLocaleSettings settings;
+    settings.decimalSeparator = locale.decimalSeparator;
+    settings.thousandsSeparator = locale.thousandsSeparator;
+    return settings;
+}
+
 // Format using a specific NumberFormat
 FormattedValue formatWithFormat(double value, const NumberFormat& format,
                                 const FormatLocale& locale) {
+    // For custom formats, use the format code formatter directly
+    if (format.isCustom && !format.formatCode.empty()) {
+        const FormatCodeResult result =
+            formatWithCode(value, format.formatCode, toFormatLocaleSettings(locale));
+        if (result.success) {
+            return FormattedValue::success(result.text);
+        }
+        return FormattedValue::error(result.errorMessage);
+    }
+
     switch (format.category) {
         case NumberFormatCategory::GENERAL:
             return formatGeneral(value, locale);

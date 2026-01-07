@@ -114,6 +114,7 @@ cc_library(
     hdrs = ["number_formatter.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":format_code_formatter",
         ":input_parser",
         ":number_format",
         ":types",
