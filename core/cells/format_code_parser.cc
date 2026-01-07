@@ -51,6 +51,34 @@ static std::vector<std::string> splitSections(const std::string& formatCode) {
     return sections;
 }
 
+// Known color names in Excel format codes (case-insensitive)
+static bool isColorName(const std::string& name) {
+    // Convert to lowercase for comparison
+    std::string lower = name;
+    for (char& ch : lower) {
+        ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    }
+
+    // Standard Excel color names
+    if (lower == "black" || lower == "blue" || lower == "cyan" || lower == "green" ||
+        lower == "magenta" || lower == "red" || lower == "white" || lower == "yellow") {
+        return true;
+    }
+
+    // Color index format: Color1 through Color56
+    if (lower.size() >= 6 && lower.substr(0, 5) == "color") {
+        // Check if remaining characters are digits
+        for (size_t i = 5; i < lower.size(); ++i) {
+            if (!std::isdigit(static_cast<unsigned char>(lower[i]))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    return false;
+}
+
 FormatCodeSection parseFormatCodeSection(const std::string& section) {
     FormatCodeSection result;
     result.code = section;
@@ -74,6 +102,26 @@ FormatCodeSection parseFormatCodeSection(const std::string& section) {
 
     for (size_t i = 0; i < section.size(); ++i) {
         const char ch = section[i];
+
+        // Handle bracketed expressions like [Red], [Color1], [$-409], etc.
+        if (ch == '[' && !inQuote) {
+            // Find the closing bracket
+            const size_t closeBracket = section.find(']', i + 1);
+            if (closeBracket != std::string::npos) {
+                const std::string bracketContent = section.substr(i + 1, closeBracket - i - 1);
+
+                // Check if it's a color code - skip it entirely
+                if (isColorName(bracketContent)) {
+                    i = closeBracket;  // Skip past the closing bracket
+                    continue;
+                }
+
+                // For other bracketed content (locale, conditions), skip for now
+                // TODO: Handle locale codes like [$-409] and conditions like [>100]
+                i = closeBracket;  // Skip past the closing bracket
+                continue;
+            }
+        }
 
         // Handle quoted strings
         if (ch == '"') {

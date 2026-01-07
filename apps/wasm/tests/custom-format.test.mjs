@@ -49,10 +49,36 @@ async function joinRoom(page, baseUrl, roomId) {
 async function createCustomFormat(page, formatCode) {
   return await page.evaluate(async (code) => {
     const ctx = window._appContext;
-    if (!ctx || !ctx.app || !ctx.app.dataSource) {
-      throw new Error('App context not available');
+    if (!ctx) {
+      throw new Error('_appContext is undefined');
     }
-    const result = await ctx.app.dataSource.client.createCustomFormat(code);
+    if (!ctx.app) {
+      throw new Error('_appContext.app is undefined');
+    }
+    if (!ctx.app.dataSource) {
+      throw new Error('_appContext.app.dataSource is undefined');
+    }
+
+    // Debug: check what's available on dataSource
+    const ds = ctx.app.dataSource;
+    console.log('[DEBUG] dataSource keys:', Object.keys(ds));
+    console.log('[DEBUG] dataSource.client:', ds.client);
+    console.log('[DEBUG] dataSource._client:', ds._client);
+
+    // Try accessing via _client (private property)
+    const client = ds.client || ds._client;
+    if (!client) {
+      throw new Error('No client found on dataSource. Keys: ' + Object.keys(ds).join(', '));
+    }
+
+    console.log('[DEBUG] client keys:', Object.keys(client));
+    console.log('[DEBUG] client.createCustomFormat:', typeof client.createCustomFormat);
+
+    if (typeof client.createCustomFormat !== 'function') {
+      throw new Error('createCustomFormat not a function. Client methods: ' + Object.getOwnPropertyNames(Object.getPrototypeOf(client)).join(', '));
+    }
+
+    const result = await client.createCustomFormat(code);
     if (result.error) {
       throw new Error(result.error);
     }
@@ -363,8 +389,8 @@ async function runCustomFormatTests() {
       await waitForPeerConnection(page2, 10000);
       await sleep(500);
 
-      // First peer creates a custom format
-      const formatId = await createCustomFormat(ctx.page, '0.0"%"');
+      // First peer creates a custom format (0.0% multiplies by 100)
+      const formatId = await createCustomFormat(ctx.page, '0.0%');
       await sleep(500);
 
       // First peer enters value and applies format
@@ -381,7 +407,12 @@ async function runCustomFormatTests() {
 
       // Second peer applies the SAME format (by ID) to their cell
       await page2.evaluate(async ({ formatId }) => {
-        window.cells.setCellFormat('A2', formatId);
+        const ctx = window._appContext;
+        if (!ctx || !ctx.app || !ctx.app.dataSource) {
+          throw new Error('App context not available on peer 2');
+        }
+        // A2 = column 0, row 1
+        await ctx.app.dataSource.client.setCellFormatAt(0, 1, formatId);
       }, { formatId });
       await sleep(500);
 
@@ -425,14 +456,14 @@ async function runCustomFormatTests() {
 
     // Cleanup
     if (page2) await page2.close();
-    if (ctx) await ctx.cleanup();
+    if (ctx) await ctx.close();
 
     process.exit(failed > 0 ? 1 : 0);
 
   } catch (error) {
     console.error('Test setup failed:', error);
     if (page2) await page2.close();
-    if (ctx) await ctx.cleanup();
+    if (ctx) await ctx.close();
     process.exit(1);
   }
 }
