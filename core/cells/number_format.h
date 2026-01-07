@@ -207,6 +207,29 @@ std::string generateFormatCode(const ParsedFormatId& parsed);
  */
 std::string getCurrencySymbol(const std::string& currencyCode);
 
+/**
+ * Result of creating a custom format.
+ */
+struct CreateCustomFormatResult {
+    ID id;                   // The ID of the created format (or existing if reused)
+    bool success{false};     // Whether creation succeeded
+    std::string errorMessage;  // Error message if failed
+
+    static CreateCustomFormatResult ok(const ID& id) {
+        CreateCustomFormatResult result;
+        result.id = id;
+        result.success = true;
+        return result;
+    }
+
+    static CreateCustomFormatResult error(const std::string& message) {
+        CreateCustomFormatResult result;
+        result.success = false;
+        result.errorMessage = message;
+        return result;
+    }
+};
+
 // NumberFormatRegistry manages available formats
 // Contains built-in formats and user-defined custom formats
 class NumberFormatRegistry {
@@ -222,6 +245,11 @@ public:
     // Register a custom format (returns false if ID already exists)
     bool registerFormat(const NumberFormat& format);
 
+    // Create a custom format from an Excel-style format code
+    // Parses the format code, validates it, generates a new ID, and registers it
+    // If an identical format code already exists, returns the existing format's ID
+    CreateCustomFormatResult createCustomFormat(const std::string& formatCode);
+
     // Get all registered formats
     [[nodiscard]] const std::unordered_map<ID, NumberFormat, IDHash>& getAllFormats() const;
 
@@ -231,6 +259,9 @@ public:
 
     // Check if a format ID exists
     [[nodiscard]] bool hasFormat(const ID& id) const;
+
+    // Find a format by format code (returns nullptr if not found)
+    [[nodiscard]] const NumberFormat* findByFormatCode(const std::string& formatCode) const;
 
 private:
     std::unordered_map<ID, NumberFormat, IDHash> formats_;

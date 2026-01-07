@@ -43,7 +43,11 @@ cc_library(
     srcs = ["number_format.cc"],
     hdrs = ["number_format.h"],
     visibility = ["//visibility:public"],
-    deps = [":types"],
+    deps = [
+        ":format_code_parser",
+        ":id",
+        ":types",
+    ],
 )
 
 cc_test(

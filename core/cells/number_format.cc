@@ -3,6 +3,9 @@
 #include <cctype>
 #include <cstdlib>
 
+#include "core/cells/format_code_parser.h"
+#include "core/cells/id.h"
+
 namespace cells {
 
 // --- Category string conversion ---
@@ -518,6 +521,64 @@ void NumberFormatRegistry::initBuiltInFormats() {
     // Text
     formats_[BuiltInFormats::TEXT] =
         NumberFormat(BuiltInFormats::TEXT, Cat::TEXT, "@", 0, false, "", false);
+}
+
+const NumberFormat* NumberFormatRegistry::findByFormatCode(const std::string& formatCode) const {
+    for (const auto& pair : formats_) {
+        if (pair.second.formatCode == formatCode) {
+            return &pair.second;
+        }
+    }
+    return nullptr;
+}
+
+CreateCustomFormatResult NumberFormatRegistry::createCustomFormat(const std::string& formatCode) {
+    // Validate the format code
+    auto validationError = validateFormatCode(formatCode);
+    if (validationError) {
+        return CreateCustomFormatResult::error(*validationError);
+    }
+
+    // Check if an identical format code already exists
+    const NumberFormat* existing = findByFormatCode(formatCode);
+    if (existing != nullptr) {
+        // Return the existing format's ID
+        return CreateCustomFormatResult::ok(existing->id);
+    }
+
+    // Parse the format code to extract properties
+    const ParsedFormatCode parsed = parseFormatCode(formatCode);
+    if (!parsed.valid) {
+        return CreateCustomFormatResult::error("Failed to parse format code: " +
+                                               parsed.errorMessage);
+    }
+
+    // Determine the category based on the parsed format code
+    NumberFormatCategory category = NumberFormatCategory::NUMBER;
+    if (parsed.hasPercent) {
+        category = NumberFormatCategory::PERCENTAGE;
+    } else if (!parsed.currencySymbol.empty()) {
+        category = NumberFormatCategory::CURRENCY;
+    }
+
+    // Generate a new unique ID
+    ID newId = generate_id();
+
+    // Create the custom format
+    NumberFormat customFormat;
+    customFormat.id = newId;
+    customFormat.category = category;
+    customFormat.formatCode = formatCode;
+    customFormat.decimalPlaces = parsed.decimalPlaces;
+    customFormat.useThousandsSeparator = parsed.hasThousandsSeparator;
+    customFormat.currencySymbol = parsed.currencySymbol;
+    customFormat.isAccounting = false;
+    customFormat.isCustom = true;
+
+    // Register the format
+    formats_[newId] = customFormat;
+
+    return CreateCustomFormatResult::ok(newId);
 }
 
 }  // namespace cells

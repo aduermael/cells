@@ -1374,15 +1374,19 @@ public:
             return "{\"error\":\"Cell not found\"}";
         }
 
-        // Validate format ID (must be registered or "~" for default)
+        // Validate format ID (must be registered, dynamically parseable, or "~" for default)
         ID formatId;
         if (formatIdStr != "~" && !formatIdStr.empty()) {
             if (formatIdStr.size() != ID_LENGTH) {
                 return "{\"error\":\"Invalid format ID\"}";
             }
             formatId = ID(formatIdStr);
+            // Allow if registered or if it's a dynamically-parseable format ID
             if (!_formatRegistry.hasFormat(formatId)) {
-                return "{\"error\":\"Format not found\"}";
+                const ParsedFormatId parsed = parseFormatId(formatIdStr);
+                if (!parsed.valid) {
+                    return "{\"error\":\"Format not found\"}";
+                }
             }
         }
 
@@ -1416,14 +1420,19 @@ public:
         }
 
         // Validate format ID first (before creating anything)
+        // Must be registered, dynamically parseable, or "~" for default
         ID formatId;
         if (formatIdStr != "~" && !formatIdStr.empty()) {
             if (formatIdStr.size() != ID_LENGTH) {
                 return "{\"error\":\"Invalid format ID\"}";
             }
             formatId = ID(formatIdStr);
+            // Allow if registered or if it's a dynamically-parseable format ID
             if (!_formatRegistry.hasFormat(formatId)) {
-                return "{\"error\":\"Format not found\"}";
+                const ParsedFormatId parsed = parseFormatId(formatIdStr);
+                if (!parsed.valid) {
+                    return "{\"error\":\"Format not found\"}";
+                }
             }
         }
 
@@ -1533,11 +1542,23 @@ public:
             ss << ",\"useThousandsSeparator\":" << (format.useThousandsSeparator ? "true" : "false");
             ss << ",\"currencySymbol\":\"" << jsonEscape(format.currencySymbol) << "\"";
             ss << ",\"isAccounting\":" << (format.isAccounting ? "true" : "false");
+            ss << ",\"isCustom\":" << (format.isCustom ? "true" : "false");
             ss << "}";
         }
 
         ss << "]";
         return ss.str();
+    }
+
+    // Create a custom number format from an Excel-style format code.
+    // formatCode: Excel-style format code string (e.g., "#,##0.00", "0.00%", "$#,##0")
+    // Returns JSON: {"success":true,"formatId":"..."} or {"error":"..."}
+    std::string createCustomFormat(const std::string& formatCode) {
+        auto result = _formatRegistry.createCustomFormat(formatCode);
+        if (!result.success) {
+            return "{\"error\":\"" + jsonEscape(result.errorMessage) + "\"}";
+        }
+        return "{\"success\":true,\"formatId\":\"" + result.id.toString() + "\"}";
     }
 
     // Get all registered formula functions with metadata.
@@ -4564,6 +4585,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("setCellFormat", &cells::wasm::CellsEngine::setCellFormat)
         .function("setCellFormatAt", &cells::wasm::CellsEngine::setCellFormatAt)
         .function("getAvailableFormats", &cells::wasm::CellsEngine::getAvailableFormats)
+        .function("createCustomFormat", &cells::wasm::CellsEngine::createCustomFormat)
         .function("getFormulaFunctions", &cells::wasm::CellsEngine::getFormulaFunctions)
         .function("getCellFormatId", &cells::wasm::CellsEngine::getCellFormatId)
         .function("parseUserInputValue", &cells::wasm::CellsEngine::parseUserInputValue)

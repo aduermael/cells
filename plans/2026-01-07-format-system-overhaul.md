@@ -156,7 +156,7 @@ Implement Excel-compatible format code strings.
   - Add `isCustom` flag to distinguish from built-in formats
   - Update `formatNumber()` to use format code formatter
 
-- [ ] 3c-2: Add API to create custom formats
+- [x] 3c-2: Add API to create custom formats
   - Add `createCustomFormat(formatCode)` to registry
   - Return new format ID for the custom format
   - Store custom formats in the workbook/CRDT
