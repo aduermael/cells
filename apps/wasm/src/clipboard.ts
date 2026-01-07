@@ -29,8 +29,10 @@ export interface ClipboardCell {
   row: number;
   /** Relative column within selection (0-indexed from top-left) */
   col: number;
-  /** Cell value (for non-formula cells) or display value (for formula cells) */
+  /** Raw cell value (for internal paste operations) */
   value: string;
+  /** Formatted display value (for TSV export to external apps) */
+  display?: string;
   /** Formula if this is a formula cell (without leading =) */
   formula?: string;
   /** Cell type */
@@ -292,9 +294,15 @@ export class ClipboardManager {
           const clipCell: ClipboardCell = {
             row: row - range.minRow,
             col: col - range.minCol,
-            value: cell.display || cell.value || "",
+            // Store raw value for internal paste operations
+            value: cell.value || "",
             type: cell.type,
           };
+
+          // Store formatted display value for TSV export (if different from raw)
+          if (cell.display && cell.display !== cell.value) {
+            clipCell.display = cell.display;
+          }
 
           // Include formula if present
           if (cell.formula) {
@@ -338,11 +346,11 @@ export class ClipboardManager {
 
     // Fill in the values
     for (const cell of data.cells) {
-      // Use formula if present, otherwise use display value
+      // Use formula if present, otherwise use display value (formatted) for external apps
       // Formula is stored with "=" prefix from WASM, so use as-is
       const row = grid[cell.row];
       if (row) {
-        row[cell.col] = cell.formula || cell.value;
+        row[cell.col] = cell.formula || cell.display || cell.value;
       }
     }
 
