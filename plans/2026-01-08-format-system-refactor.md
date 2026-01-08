@@ -1,6 +1,6 @@
-Status: COMPLETED
+Status: IN_PROGRESS
 Created At: 2026-01-08 01:09 UTC
-Updated At: 2026-01-08 06:00 UTC
+Updated At: 2026-01-08 06:15 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -163,9 +163,74 @@ Change the default NUMBER format (when user selects "Number" category) to show 2
 
 ---
 
+## Phase 7: Formula Format Inheritance
+
+When a formula is entered into a cell with GENERAL format, Excel automatically inherits the format from referenced cells. This is a one-time automatic change that happens only when the destination cell has GENERAL format.
+
+**Excel's behavior (from research):**
+- Only applies when destination cell has GENERAL format
+- Once changed from GENERAL to something else, it won't change again
+- If multiple cells with different formats are referenced, Excel uses priority rules
+- Numeric literals (like `*2`, `+100`) don't affect format inheritance - only cell references matter
+- Format inheritance happens at formula entry time, not on recalculation
+
+**Priority rules (when multiple formats conflict):**
+1. DATE/TIME formats have highest priority (dates are special)
+2. CURRENCY > PERCENTAGE > NUMBER_SEP > NUMBER
+3. More specific formats win over less specific (e.g., 4 decimals > 2 decimals)
+4. If all referenced cells have GENERAL, result stays GENERAL
+
+**Implementation approach:**
+
+- [ ] 7a: Add `inferFormatFromFormula(formula, sheet)` function in C++ that analyzes formula AST
+  - Walk the AST to find all cell references
+  - Look up each referenced cell's formatId
+  - Apply priority rules to determine "winning" format
+  - Return the format ID (or null/GENERAL if no format should be inherited)
+
+- [ ] 7b: Integrate format inference into cell value setting
+  - When `setCellValue()` is called with a formula (starts with `=`)
+  - AND the cell's current formatId is null/GENERAL
+  - Call `inferFormatFromFormula()` and apply the result
+  - This is a one-time change at formula entry time
+
+- [ ] 7c: Add unit tests for format inheritance
+  - Single cell reference: `=A1` inherits A1's format
+  - Multiple refs same format: `=A1+B1` (both currency) → currency
+  - Multiple refs different formats: `=A1+B1` (currency + percentage) → priority rules
+  - Literal with ref: `=A1*2` (A1 is currency) → currency (literal doesn't affect)
+  - Range references: `=SUM(A1:A5)` where A1:A5 have same format → inherit
+  - Mixed range: `=SUM(A1:A5)` with mixed formats → priority rules
+  - Nested formulas: `=A1+B1` where A1 contains `=C1` → use A1's format (not C1's)
+
+- [ ] 7d: Add E2E tests for format inheritance
+  - Enter currency in A1, enter `=A1*2` in B1, verify B1 shows currency format
+  - Enter percentage in A1, enter `=A1+0.1` in B1, verify B1 shows percentage format
+  - Enter currency in A1, format B1 as NUMBER, enter `=A1` in B1 → B1 stays NUMBER (not GENERAL)
+
+**Example scenarios:**
+
+| A1 Format | B1 Format | Formula in C1 | C1 Result Format |
+|-----------|-----------|---------------|------------------|
+| Currency  | GENERAL   | `=A1*2`       | Currency         |
+| GENERAL   | Currency  | `=A1+B1`      | Currency         |
+| Currency  | Percent   | `=A1+B1`      | Currency (higher priority) |
+| NUMBER(2) | NUMBER(4) | `=A1+B1`      | NUMBER(4) (more specific) |
+| Date      | Currency  | `=A1+B1`      | Date (highest priority) |
+| GENERAL   | GENERAL   | `=A1+B1`      | GENERAL          |
+
+**Important notes:**
+- This only affects cells with GENERAL format - explicit user formatting is never overridden
+- Format is inherited at formula entry time, not on recalc (matches Excel)
+- If referenced cells later change format, the formula cell's format does NOT update
+- This is purely a UX convenience feature - users can always manually change format
+
+---
+
 ## Summary of Changes
 
 1. `FMT_NS0X` pattern replaced with `FMT_NSXX` (no backwards compat needed - product not live)
 2. NUMBER format default changes from 0 to 2 decimals (matches Excel)
 3. Formula bar shows raw value instead of formatted display
 4. All format logic moves to C++ (TypeScript becomes pure UI)
+5. Formula cells with GENERAL format inherit format from referenced cells (Phase 7)
