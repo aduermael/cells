@@ -1,5 +1,26 @@
-// Collaboration UI Module
-// Manages the UI elements for collaboration status, share button, and peer indicators
+// =============================================================================
+// Collaboration UI
+// =============================================================================
+//
+// UI components for real-time collaboration: status indicator, share button,
+// peer avatars, and share link modal.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Status dot: shows connection state (connected/connecting/disconnected)
+// - Share button: opens share modal with room link
+// - Peer indicators: shows connected collaborators with color avatars
+// - Share modal: displays shareable link, allows name change
+// - Debug panel: shows sync stats, allows force reconnect
+//
+// Coordinates with:
+// - CppSyncAdapter: sync state, peer presence, connection control
+// - RoomManager: room creation and URL management
+// - PresenceBroadcaster: local cursor/selection broadcasting
+//
+// =============================================================================
 
 // Import CollabState from the new C++ adapter (with fallback to old collab-manager)
 // The CppSyncAdapter exports CollabState for backwards compatibility

@@ -1,10 +1,26 @@
-// C++ SyncClient Adapter
-// Provides a JS interface that wraps the C++ SyncClient for use with existing UI components.
-// This adapter replaces the JS-based CollabManager, SignalingClient, WebRTCManager, and PresenceManager.
+// =============================================================================
+// C++ Sync Adapter
+// =============================================================================
 //
-// Architecture: Uses polling (10-20 Hz) to fetch sync state and presence from C++.
-// Polling is intentional - C++ sync runs in WASM worker, and pushing events would require
-// additional infrastructure. The polling rate is fast enough for smooth UI updates.
+// JavaScript adapter that wraps the C++ SyncClient for use with UI components.
+// Replaces JS-based CollabManager, SignalingClient, WebRTCManager, and PresenceManager.
+//
+// This is a BRIDGE module. It adapts the C++ sync layer for TypeScript UI.
+//
+// Key responsibilities:
+// - Poll C++ sync state at 10-20 Hz for UI updates
+// - Emit events for state changes (connected, disconnected, peer join/leave)
+// - Manage local presence (name, cursor, selection, editing state)
+// - Map C++ state enums to TypeScript types
+// - Provide CollabUI with connection control (join, leave, reconnect)
+//
+// Architecture:
+// - Polling is intentional: C++ runs in WASM worker, push would need more infra
+// - Uses CellsClient methods for all sync operations
+// - Assigns consistent colors to peers based on peer ID hash
+// - Stores local name in localStorage for persistence
+//
+// =============================================================================
 
 import { generateRandomName, getColorForPeer } from "./presence";
 import type {

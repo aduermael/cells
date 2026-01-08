@@ -1,8 +1,29 @@
-// WebRTC Proxy - Runs on main thread, proxies RTCPeerConnection calls from worker
+// =============================================================================
+// WebRTC Proxy
+// =============================================================================
 //
-// The WASM module runs in a Web Worker, but RTCPeerConnection is only available
-// on the main thread. This proxy receives requests from the worker and manages
-// the actual WebRTC connections.
+// Main-thread proxy for WebRTC connections. The WASM module runs in a Web Worker
+// where RTCPeerConnection is not available, so this proxy bridges the gap.
+//
+// This is a BRIDGE module. It proxies WebRTC API calls from worker to main thread.
+//
+// Key responsibilities:
+// - Create/destroy RTCPeerConnection instances on behalf of worker
+// - Handle offer/answer exchange (SDP negotiation)
+// - Manage ICE candidates (gather and deliver)
+// - Create and manage RTCDataChannels for CRDT sync
+// - Forward data channel messages between worker and peer
+//
+// Message flow:
+// - Worker → RTCProxy: create connection, set description, add candidate
+// - RTCProxy → Worker: ICE candidates, connection state, data messages
+// - RTCProxy → Peer: WebRTC signaling and data channel messages
+//
+// Registry:
+// - Tracks peer connections and data channels by numeric registry ID
+// - IDs assigned by worker, used to route messages back
+//
+// =============================================================================
 
 // ============================================================================
 // Types
