@@ -1,6 +1,6 @@
-Status: READY
+Status: IN_PROGRESS
 Created At: 2026-01-08 18:07 UTC
-Updated At: 2026-01-08 18:07 UTC
+Updated At: 2026-01-08 19:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -95,14 +95,14 @@ The documentation should reflect these architectural truths:
 
 Update README.md and docs/ to reflect current architecture accurately.
 
-- [ ] 1a: Update README.md architecture diagram (remove native UI mentions, add OSTree layer)
-- [ ] 1b: Update README.md "Core Components" section (clarify CRDT-first, UUID source of truth)
-- [ ] 1c: Update README.md "Current Implementation Status" (remove "Not Yet Implemented" for native apps)
-- [ ] 1d: Update README.md "Design Decisions" (clarify C++ vs TS responsibilities)
-- [ ] 1e: Update docs/cross-platform.md (native builds for CLI only, no native UI planned)
-- [ ] 1f: Update docs/data-model.md (add OSTree explanation, clarify UUID source of truth)
-- [ ] 1g: Update docs/rendering.md (remove native backend mentions, focus on Canvas2D)
-- [ ] 1h: Review and update docs/crdt.md (clarify all ops must go through CRDT)
+- [x] 1a: Update README.md architecture diagram (remove native UI mentions, add OSTree layer)
+- [x] 1b: Update README.md "Core Components" section (clarify CRDT-first, UUID source of truth)
+- [x] 1c: Update README.md "Current Implementation Status" (remove "Not Yet Implemented" for native apps)
+- [x] 1d: Update README.md "Design Decisions" (clarify C++ vs TS responsibilities)
+- [x] 1e: Update docs/cross-platform.md (native builds for CLI only, no native UI planned)
+- [x] 1f: Update docs/data-model.md (add OSTree explanation, clarify UUID source of truth)
+- [x] 1g: Update docs/rendering.md (remove native backend mentions, focus on Canvas2D)
+- [x] 1h: Review and update docs/crdt.md (clarify all ops must go through CRDT)
 
 ## Phase 2: Add File Headers to C++ Core
 
