@@ -1,5 +1,32 @@
-// Agent client for AI-powered spreadsheet interactions
-// Communicates with the Go server via HTTP streaming (SSE)
+// =============================================================================
+// AI Agent Client
+// =============================================================================
+//
+// HTTP client for communicating with the AI agent server (Go backend).
+// Uses Server-Sent Events (SSE) for streaming responses.
+//
+// Key responsibilities:
+// - Send user prompts to the AI agent server
+// - Stream assistant responses via SSE
+// - Handle tool use requests (execute Luau code)
+// - Manage conversation state across multiple turns
+//
+// Delegate callbacks:
+// - onAgentText(): Streaming assistant text
+// - onAgentToolUse(): Tool invocation request
+// - onAgentComplete(): Message stream finished
+// - onAgentError(): Error occurred
+//
+// Tool execution flow:
+// 1. Server sends tool_use event with code
+// 2. Client executes code in LuauSandbox
+// 3. Client sends result back via sendToolResult()
+// 4. Server continues with next response
+//
+// Dependencies: net/http_request.h, net/sse_parser.h, luau_sandbox.h
+// Used by: bindings.cc (WASM AI integration)
+//
+// =============================================================================
 
 #ifndef CELLS_AGENT_CLIENT_H_
 #define CELLS_AGENT_CLIENT_H_

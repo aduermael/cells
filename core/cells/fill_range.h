@@ -1,3 +1,34 @@
+// =============================================================================
+// Fill Range (Auto-Fill)
+// =============================================================================
+//
+// Implements Excel-style fill-down/fill-right functionality.
+// Detects patterns in source cells and extrapolates to target range.
+//
+// Key responsibilities:
+// - Detect patterns: constant, linear (arithmetic), formula, string
+// - Extrapolate values: 1,2,3 -> 4,5,6 or A1,A2 -> A3,A4
+// - Adjust formula references during fill (relative refs shift)
+// - Work with CRDT operations in collaboration mode
+//
+// Pattern types:
+// - CONSTANT: Single value or all same values (repeat)
+// - LINEAR: Arithmetic sequence (1,2,3 or 5,10,15)
+// - FORMULA: Formulas with adjusted cell references
+// - STRING: Text values (always repeat)
+// - EMPTY: Empty cells (repeat empty)
+//
+// Fill directions:
+// - DOWN: Fill rows below source
+// - UP: Fill rows above source
+// - RIGHT: Fill columns to right of source
+// - LEFT: Fill columns to left of source
+//
+// Dependencies: formula_ast.h, types.h
+// Used by: bindings.cc (fill handle drag)
+//
+// =============================================================================
+
 #ifndef CELLS_FILL_RANGE_H_
 #define CELLS_FILL_RANGE_H_
 

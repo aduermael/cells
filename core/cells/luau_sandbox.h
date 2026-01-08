@@ -1,3 +1,35 @@
+// =============================================================================
+// Luau Scripting Sandbox
+// =============================================================================
+//
+// Provides a sandboxed Luau scripting environment for user automation scripts.
+// Luau is Roblox's fork of Lua with static typing and App Store compliance.
+//
+// Key responsibilities:
+// - Execute user Luau scripts in a safe sandbox
+// - Enforce instruction limits to prevent infinite loops
+// - Expose Cells API: cellGet, cellSet, columnMove, addSheet, etc.
+// - Capture script output and errors
+//
+// Security features:
+// - No file system access (no io library)
+// - No network access (no socket library)
+// - No process spawning (no os.execute)
+// - Instruction counting with configurable limits
+// - Restricted standard library
+//
+// Cells API exposed to scripts:
+// - cellGet(ref) / cellSet(ref, value): Read/write cell values
+// - getCell(ref, opts) / setCell(ref, opts, value): Advanced cell access
+// - addSheet(name), selectSheet(sheet): Sheet management
+// - columnMove(from, to), columnSetWidth(col, width): Axis operations
+// - print(...): Captured to script output
+//
+// Dependencies: Luau VM (external), model.h
+// Used by: bindings.cc (script execution), agent_client.h (AI tool execution)
+//
+// =============================================================================
+
 #ifndef CELLS_LUAU_SANDBOX_H_
 #define CELLS_LUAU_SANDBOX_H_
 

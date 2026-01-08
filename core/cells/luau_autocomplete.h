@@ -1,3 +1,33 @@
+// =============================================================================
+// Luau Autocomplete
+// =============================================================================
+//
+// Provides IDE-like autocomplete suggestions for Luau scripts.
+// Uses Luau's Analysis library for type-aware completions.
+//
+// Key responsibilities:
+// - Parse partial Luau code and determine cursor context
+// - Provide suggestions for Cells API functions and properties
+// - Support function signature hints and property documentation
+// - Handle keyword, variable, and method completions
+//
+// Suggestion types:
+// - "function": Callable functions (cellGet, print, etc.)
+// - "property": Object properties (cell.value, sheet.name)
+// - "keyword": Luau keywords (local, function, if, etc.)
+// - "variable": In-scope variable names
+//
+// Context types returned:
+// - "statement": Top-level statement context
+// - "expression": Expression context
+// - "property": After a dot (obj.xxx)
+// - "type": Type annotation context
+//
+// Dependencies: Luau Analysis library (external)
+// Used by: bindings.cc (script editor autocomplete)
+//
+// =============================================================================
+
 #ifndef CELLS_LUAU_AUTOCOMPLETE_H_
 #define CELLS_LUAU_AUTOCOMPLETE_H_
 
