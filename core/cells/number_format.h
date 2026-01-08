@@ -158,7 +158,7 @@ extern const ID TEXT;  // Display as text
  * Format ID patterns supported:
  * - FMT_P0XX (percentage with XX decimal places, 00-15)
  * - FMT_N0XX (number with XX decimal places, 00-15)
- * - FMT_NS0X (number with separator, 0X decimal places, 0-9)
+ * - FMT_NSXX (number with separator, XX decimal places, 00-15)
  * - C<CURRENCY>_0XX (currency with 3-letter code and XX decimal places)
  *
  * The parser extracts category, decimal places, currency code, etc. from the ID.
@@ -178,7 +178,7 @@ struct ParsedFormatId {
  * Supported patterns:
  * - FMT_P0XX: Percentage with XX decimal places (e.g., FMT_P007 = 7 decimals)
  * - FMT_N0XX: Number with XX decimal places (e.g., FMT_N012 = 12 decimals)
- * - FMT_NS0X: Number with separator, X decimal places (e.g., FMT_NS05)
+ * - FMT_NSXX: Number with separator, XX decimal places (e.g., FMT_NS05, FMT_NS12)
  * - CXXX_0YY: Currency (XXX = currency code, YY = decimals, e.g., CUSD_008)
  *
  * Returns ParsedFormatId with valid=false if the ID doesn't match any pattern.

@@ -238,7 +238,7 @@ ParsedFormatId parseFormatId(const std::string& id) {
     // Pattern: FMT_N0XX (number with XX decimal places, no separator)
     // Example: FMT_N012 = 12 decimal places
     if (id.size() == 8 && id.substr(0, 5) == "FMT_N" && id[5] == '0' &&
-        !(id[6] == 'S')) {  // Distinguish from FMT_NS0X
+        !(id[6] == 'S')) {  // Distinguish from FMT_NSXX
         if (std::isdigit(static_cast<unsigned char>(id[6])) != 0 &&
             std::isdigit(static_cast<unsigned char>(id[7])) != 0) {
             const int decimals = (id[6] - '0') * 10 + (id[7] - '0');
@@ -252,12 +252,13 @@ ParsedFormatId parseFormatId(const std::string& id) {
         }
     }
 
-    // Pattern: FMT_NS0X (number with separator, X decimal places)
-    // Example: FMT_NS05 = 5 decimal places with thousands separator
-    if (id.size() == 8 && id.substr(0, 6) == "FMT_NS" && id[6] == '0') {
-        if (std::isdigit(static_cast<unsigned char>(id[7])) != 0) {
-            const int decimals = id[7] - '0';
-            if (decimals <= 9) {
+    // Pattern: FMT_NSXX (number with separator, XX decimal places)
+    // Example: FMT_NS05 = 5 decimal places, FMT_NS12 = 12 decimal places with separator
+    if (id.size() == 8 && id.substr(0, 6) == "FMT_NS") {
+        if (std::isdigit(static_cast<unsigned char>(id[6])) != 0 &&
+            std::isdigit(static_cast<unsigned char>(id[7])) != 0) {
+            const int decimals = (id[6] - '0') * 10 + (id[7] - '0');
+            if (decimals <= 15) {
                 result.category = NumberFormatCategory::NUMBER;
                 result.decimalPlaces = static_cast<uint8_t>(decimals);
                 result.useThousandsSeparator = true;

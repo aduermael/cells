@@ -264,7 +264,7 @@ TEST(ParseFormatIdTest, NumberFormats) {
 }
 
 TEST(ParseFormatIdTest, NumberWithSeparatorFormats) {
-    // FMT_NS0X - number with separator, X decimal places (0-9)
+    // FMT_NSXX - number with separator, XX decimal places (00-15)
     auto parsed = parseFormatId("FMT_NS00");
     EXPECT_TRUE(parsed.valid);
     EXPECT_EQ(parsed.category, NumberFormatCategory::NUMBER);
@@ -279,6 +279,20 @@ TEST(ParseFormatIdTest, NumberWithSeparatorFormats) {
     parsed = parseFormatId("FMT_NS09");
     EXPECT_TRUE(parsed.valid);
     EXPECT_EQ(parsed.decimalPlaces, 9);
+
+    // Extended range (10-15 decimals) now supported
+    parsed = parseFormatId("FMT_NS12");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.decimalPlaces, 12);
+    EXPECT_TRUE(parsed.useThousandsSeparator);
+
+    parsed = parseFormatId("FMT_NS15");
+    EXPECT_TRUE(parsed.valid);
+    EXPECT_EQ(parsed.decimalPlaces, 15);
+
+    // Invalid: too many decimals (> 15)
+    parsed = parseFormatId("FMT_NS16");
+    EXPECT_FALSE(parsed.valid);
 }
 
 TEST(ParseFormatIdTest, CurrencyFormats) {

@@ -800,8 +800,8 @@ export class FormatControls {
       };
     }
 
-    // Pattern: FMT_NS0X (number with separator, single digit)
-    const numSepMatch = formatId.match(/^FMT_NS0(\d)$/);
+    // Pattern: FMT_NSXX (number with separator, 2-digit decimals)
+    const numSepMatch = formatId.match(/^FMT_NS(\d{2})$/);
     if (numSepMatch && numSepMatch[1]) {
       return {
         category: "NUMBER",
@@ -837,7 +837,7 @@ export class FormatControls {
    * Format ID patterns (all 8 chars):
    * - FMT_P0XX: Percentage with XX decimal places (00-15)
    * - FMT_N0XX: Number with XX decimal places (00-15)
-   * - FMT_NS0X: Number with separator, X decimal places (0-9)
+   * - FMT_NSXX: Number with separator, XX decimal places (00-15)
    * - CXXX_0YY: Currency with 3-letter code and YY decimal places (00-15)
    */
   private generateFormatId(
@@ -847,7 +847,6 @@ export class FormatControls {
     hasSeparator: boolean
   ): string {
     const dec2 = decimals.toString().padStart(2, "0");
-    const dec1 = decimals.toString();
 
     switch (category) {
       case "PERCENTAGE":
@@ -862,12 +861,7 @@ export class FormatControls {
 
       case "NUMBER":
         if (hasSeparator) {
-          // FMT_NS0X only supports single digit decimals (0-9)
-          // For 10-15 decimals with separator, fall back to without separator
-          if (decimals <= 9) {
-            return `FMT_NS0${dec1}`;
-          }
-          // Fall through to number without separator for >9 decimals
+          return `FMT_NS${dec2}`;
         }
         return `FMT_N0${dec2}`;
 
