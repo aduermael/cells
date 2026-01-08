@@ -1,3 +1,23 @@
+// =============================================================================
+// Text Functions
+// =============================================================================
+//
+// Text manipulation formula functions.
+// Includes LEN, LEFT, RIGHT, MID, TRIM, UPPER, LOWER, etc.
+//
+// Categories:
+// - Basic: LEN, LEFT, RIGHT, MID, TRIM
+// - Case: UPPER, LOWER, PROPER
+// - Search/Replace: FIND, SEARCH, SUBSTITUTE, REPLACE
+// - Concatenation: CONCAT, CONCATENATE, REPT
+// - Conversion: TEXT, VALUE
+// - Character: CHAR, CODE
+//
+// Dependencies: formula_eval.h
+// Used by: FunctionRegistry initialization
+//
+// =============================================================================
+
 #ifndef CELLS_FUNCTIONS_FN_TEXT_H_
 #define CELLS_FUNCTIONS_FN_TEXT_H_
 

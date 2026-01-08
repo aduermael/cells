@@ -1,3 +1,25 @@
+// =============================================================================
+// Date/Time Functions
+// =============================================================================
+//
+// Date and time formula functions using Excel serial date format.
+// Serial dates: days since 1899-12-30. Time: fractional day (0.5 = noon).
+//
+// Categories:
+// - Volatile: NOW, TODAY (recalculate on every change)
+// - Construction: DATE, TIME, DATEVALUE, TIMEVALUE
+// - Extraction: YEAR, MONTH, DAY, HOUR, MINUTE, SECOND, WEEKDAY
+//
+// Serial date format:
+// - 1 = 1900-01-01
+// - 44197 = 2021-01-01
+// - Fractional part is time (0.5 = 12:00 PM)
+//
+// Dependencies: formula_eval.h
+// Used by: FunctionRegistry initialization
+//
+// =============================================================================
+
 #ifndef CELLS_FUNCTIONS_FN_DATETIME_H_
 #define CELLS_FUNCTIONS_FN_DATETIME_H_
 

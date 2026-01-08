@@ -1,3 +1,26 @@
+// =============================================================================
+// Lookup Functions
+// =============================================================================
+//
+// Reference and lookup formula functions for data retrieval.
+// Includes INDEX, MATCH, VLOOKUP, HLOOKUP.
+//
+// Functions:
+// - INDEX(array, row, col): Return value at position
+// - MATCH(value, array, type): Find position of value
+// - VLOOKUP(value, table, col, range): Vertical lookup
+// - HLOOKUP(value, table, row, range): Horizontal lookup
+//
+// Match types:
+// - 1: Largest value <= lookup (sorted ascending)
+// - 0: Exact match
+// - -1: Smallest value >= lookup (sorted descending)
+//
+// Dependencies: formula_eval.h
+// Used by: FunctionRegistry initialization
+//
+// =============================================================================
+
 #ifndef CELLS_FUNCTIONS_FN_LOOKUP_H_
 #define CELLS_FUNCTIONS_FN_LOOKUP_H_
 

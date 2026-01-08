@@ -1,3 +1,22 @@
+// =============================================================================
+// Logic Functions
+// =============================================================================
+//
+// Logical and conditional formula functions.
+// Includes IF, AND, OR, NOT, IFERROR, type-checking functions.
+//
+// Categories:
+// - Core logic: IF, AND, OR, NOT
+// - Error handling: IFERROR, IFNA
+// - Type checking: ISBLANK, ISNUMBER, ISTEXT, ISERROR, ISLOGICAL, ISNA
+// - Boolean constants: TRUE, FALSE
+// - Comparison: EXACT
+//
+// Dependencies: formula_eval.h
+// Used by: FunctionRegistry initialization
+//
+// =============================================================================
+
 #ifndef CELLS_FUNCTIONS_FN_LOGIC_H_
 #define CELLS_FUNCTIONS_FN_LOGIC_H_
 

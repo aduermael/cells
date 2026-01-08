@@ -104,7 +104,7 @@ Update README.md and docs/ to reflect current architecture accurately.
 - [x] 1g: Update docs/rendering.md (remove native backend mentions, focus on Canvas2D)
 - [x] 1h: Review and update docs/crdt.md (clarify all ops must go through CRDT)
 
-## Phase 2: Add File Headers to C++ Core
+## Phase 2: Add File Headers to C++ Core (COMPLETED)
 
 Add 10-20 line documentation headers to all C++ files explaining what the module does.
 
@@ -137,7 +137,7 @@ Add 10-20 line documentation headers to all C++ files explaining what the module
 - [x] 2e: Add headers to core/cells/*.h (parser, serializer, xlsx_*, csv_*)
 - [x] 2f: Add headers to core/cells/*.h (number_format, format_code_*, input_parser)
 - [x] 2g: Add headers to core/cells/*.h (luau_*, agent_client, fill_range)
-- [ ] 2h: Add headers to core/cells/functions/*.h (fn_*)
+- [x] 2h: Add headers to core/cells/functions/*.h (fn_*)
 
 ## Phase 3: Add File Headers to TypeScript UI
 

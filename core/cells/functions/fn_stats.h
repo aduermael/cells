@@ -1,3 +1,21 @@
+// =============================================================================
+// Statistical Functions
+// =============================================================================
+//
+// Statistical formula functions for data analysis.
+// Includes MEDIAN, STDEV, VAR, PERCENTILE, etc.
+//
+// Functions:
+// - MEDIAN: Middle value of dataset
+// - STDEV, STDEV.S, STDEV.P: Standard deviation (sample/population)
+// - VAR, VAR.S, VAR.P: Variance (sample/population)
+// - PERCENTILE, PERCENTILE.INC, PERCENTILE.EXC: Percentile calculations
+//
+// Dependencies: formula_eval.h
+// Used by: FunctionRegistry initialization
+//
+// =============================================================================
+
 #ifndef CELLS_FUNCTIONS_FN_STATS_H_
 #define CELLS_FUNCTIONS_FN_STATS_H_
 

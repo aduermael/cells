@@ -1,3 +1,20 @@
+// =============================================================================
+// Math Functions
+// =============================================================================
+//
+// Basic mathematical and aggregate formula functions.
+// Includes SUM, AVERAGE, MIN, MAX, ABS, SQRT, ROUND, etc.
+//
+// Categories:
+// - Aggregate: SUM, AVERAGE, COUNT, COUNTA, MIN, MAX
+// - Basic math: ABS, SQRT, POWER, MOD, INT
+// - Rounding: ROUND, FLOOR, CEILING
+//
+// Dependencies: formula_eval.h
+// Used by: FunctionRegistry initialization
+//
+// =============================================================================
+
 #ifndef CELLS_FUNCTIONS_FN_MATH_H_
 #define CELLS_FUNCTIONS_FN_MATH_H_
 
