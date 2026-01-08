@@ -188,12 +188,12 @@ When a formula is entered into a cell with GENERAL format, Excel automatically i
   - Apply priority rules to determine "winning" format
   - Return the format ID (or empty string for GENERAL/no inheritance)
 
-- [ ] 7b: Integrate format inference into CRDT cell operations (`core/cells/crdt.cc`)
-  - When `setCellValue()` processes a formula (starts with `=`)
+- [x] 7b: Integrate format inference into CRDT cell operations (`core/cells/crdt.cc`)
+  - When `applyCellSetValue()` processes a formula (type == FORMULA)
   - AND the cell's current formatId is null/GENERAL
-  - Call `inferFormatFromFormula()` and apply the result as part of the same operation
-  - This is a one-time change at formula entry time
-  - No changes needed in TypeScript - the C++ layer handles this transparently
+  - Call `inferFormatFromFormula()` with sheet-based format lookup
+  - Apply the inherited format ID to the cell
+  - This happens automatically at formula entry time, transparent to UI
 
 - [ ] 7c: Add unit tests for format inheritance
   - Single cell reference: `=A1` inherits A1's format

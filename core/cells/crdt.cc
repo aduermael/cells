@@ -318,6 +318,29 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
 
         // Store result value in raw for display (not the formula text)
         cell->value.raw = "";
+
+        // Phase 7: Format inheritance
+        // If cell has GENERAL format, inherit format from referenced cells
+        const std::string currentFormat = cell->formatId.toString();
+        const bool isGeneralFormat =
+            currentFormat.empty() || currentFormat == "~" || currentFormat == "FMT_GEN0";
+
+        if (isGeneralFormat && formula->ast != nullptr && targetSheet != nullptr) {
+            // Create a format lookup for this sheet
+            FormatLookup formatLookup = [targetSheet](const std::string& cellIdStr) -> std::string {
+                const ID cellId(cellIdStr);
+                const Cell* refCell = targetSheet->getCell(cellId);
+                if (refCell == nullptr) {
+                    return "";
+                }
+                return refCell->formatId.toString();
+            };
+
+            const std::string inheritedFormat = inferFormatFromFormula(formula->ast, formatLookup);
+            if (!inheritedFormat.empty()) {
+                cell->formatId = ID(inheritedFormat);
+            }
+        }
     } else {
         // Clear formula if it was a formula cell
         if (cell->formula != nullptr) {
