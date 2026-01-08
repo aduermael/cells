@@ -4,7 +4,10 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include <vector>
+
 #include "core/cells/format_code_parser.h"
+#include "core/cells/formula_ast.h"
 #include "core/cells/id.h"
 
 namespace cells {
@@ -673,6 +676,195 @@ CreateCustomFormatResult NumberFormatRegistry::createCustomFormat(const std::str
     formats_[newId] = customFormat;
 
     return CreateCustomFormatResult::ok(newId);
+}
+
+// --- Format Inheritance ---
+
+int getFormatPriority(NumberFormatCategory category) {
+    switch (category) {
+        case NumberFormatCategory::DATE:
+        case NumberFormatCategory::TIME:
+        case NumberFormatCategory::DATE_TIME:
+            return 100;  // Highest priority - dates are special
+
+        case NumberFormatCategory::CURRENCY:
+        case NumberFormatCategory::ACCOUNTING:
+            return 80;  // Financial formats
+
+        case NumberFormatCategory::PERCENTAGE:
+            return 60;
+
+        case NumberFormatCategory::NUMBER:
+            return 40;
+
+        case NumberFormatCategory::SCIENTIFIC:
+            return 30;
+
+        case NumberFormatCategory::FRACTION:
+            return 20;
+
+        case NumberFormatCategory::GENERAL:
+        case NumberFormatCategory::TEXT:
+        default:
+            return 0;  // Lowest priority - no format
+    }
+}
+
+namespace {
+
+// Helper to collect all cell references from an AST
+void collectCellRefs(const ASTNode* node, std::vector<std::string>& cellIds) {
+    if (node == nullptr) {
+        return;
+    }
+
+    switch (node->type) {
+        case ASTNodeType::CELL_REF: {
+            const auto* cellRef = static_cast<const CellRefNode*>(node);
+            if (!cellRef->cellId.empty()) {
+                cellIds.push_back(cellRef->cellId);
+            }
+            break;
+        }
+
+        case ASTNodeType::RANGE_REF: {
+            // For ranges, we just collect the corner cells
+            // The format of the first cell in a range determines the format
+            const auto* rangeRef = static_cast<const RangeRefNode*>(node);
+            if (rangeRef->topLeft != nullptr && !rangeRef->topLeft->cellId.empty()) {
+                cellIds.push_back(rangeRef->topLeft->cellId);
+            }
+            if (rangeRef->bottomRight != nullptr && !rangeRef->bottomRight->cellId.empty()) {
+                cellIds.push_back(rangeRef->bottomRight->cellId);
+            }
+            break;
+        }
+
+        case ASTNodeType::BINARY_OP: {
+            const auto* binOp = static_cast<const BinaryOpNode*>(node);
+            collectCellRefs(binOp->left.get(), cellIds);
+            collectCellRefs(binOp->right.get(), cellIds);
+            break;
+        }
+
+        case ASTNodeType::UNARY_OP: {
+            const auto* unaryOp = static_cast<const UnaryOpNode*>(node);
+            collectCellRefs(unaryOp->operand.get(), cellIds);
+            break;
+        }
+
+        case ASTNodeType::FUNCTION_CALL: {
+            const auto* funcCall = static_cast<const FunctionCallNode*>(node);
+            for (const auto& arg : funcCall->args) {
+                collectCellRefs(arg.get(), cellIds);
+            }
+            break;
+        }
+
+        // Literals don't contribute to format inheritance
+        case ASTNodeType::NUMBER_LITERAL:
+        case ASTNodeType::STRING_LITERAL:
+        case ASTNodeType::BOOLEAN_LITERAL:
+        case ASTNodeType::NAMED_REF:
+        case ASTNodeType::COLUMN_REF:
+        case ASTNodeType::ROW_REF:
+        case ASTNodeType::COLUMN_RANGE_REF:
+        case ASTNodeType::ROW_RANGE_REF:
+        case ASTNodeType::ERROR_NODE:
+            break;
+    }
+}
+
+// Compare two format IDs: returns true if candidate is "more specific" than current
+// More specific means: higher priority category, or same category with more decimals
+bool isMoreSpecific(const std::string& candidateId, const std::string& currentId) {
+    if (candidateId.empty() || candidateId == "~" || candidateId == "FMT_GEN0") {
+        return false;  // GENERAL is never more specific
+    }
+    if (currentId.empty() || currentId == "~" || currentId == "FMT_GEN0") {
+        return true;  // Anything is more specific than GENERAL
+    }
+
+    // Parse both format IDs
+    const ParsedFormatId candidate = parseFormatId(candidateId);
+    const ParsedFormatId current = parseFormatId(currentId);
+
+    // If either fails to parse, fall back to built-in handling
+    if (!candidate.valid && !current.valid) {
+        // Both unparseable - compare by string (arbitrary but stable)
+        return candidateId > currentId;
+    }
+    if (!candidate.valid) {
+        // Candidate is unparseable (custom format?) - it wins if current is basic
+        return getFormatPriority(current.category) <
+               50;  // Custom formats beat basic NUMBER
+    }
+    if (!current.valid) {
+        // Current is unparseable - candidate must have higher priority to win
+        return getFormatPriority(candidate.category) >= 50;
+    }
+
+    // Both parsed successfully - compare by priority
+    const int candidatePriority = getFormatPriority(candidate.category);
+    const int currentPriority = getFormatPriority(current.category);
+
+    if (candidatePriority > currentPriority) {
+        return true;
+    }
+    if (candidatePriority < currentPriority) {
+        return false;
+    }
+
+    // Same priority (likely same category) - compare specificity
+    // More decimal places = more specific
+    if (candidate.decimalPlaces > current.decimalPlaces) {
+        return true;
+    }
+    if (candidate.decimalPlaces < current.decimalPlaces) {
+        return false;
+    }
+
+    // Same decimals - prefer separator over no separator
+    if (candidate.useThousandsSeparator && !current.useThousandsSeparator) {
+        return true;
+    }
+
+    return false;  // Current wins (or tie)
+}
+
+}  // namespace
+
+std::string inferFormatFromFormula(const ASTNode* ast, const FormatLookup& formatLookup) {
+    if (ast == nullptr) {
+        return "";  // No inference possible
+    }
+
+    // Collect all cell IDs referenced in the formula
+    std::vector<std::string> cellIds;
+    collectCellRefs(ast, cellIds);
+
+    if (cellIds.empty()) {
+        return "";  // No cell references - no format to inherit
+    }
+
+    // Find the "winning" format among all referenced cells
+    std::string winningFormatId;
+
+    for (const auto& cellIdStr : cellIds) {
+        const std::string cellFormatId = formatLookup(cellIdStr);
+
+        // Skip cells with GENERAL format
+        if (cellFormatId.empty() || cellFormatId == "~" || cellFormatId == "FMT_GEN0") {
+            continue;
+        }
+
+        // Check if this cell's format is more specific than current winner
+        if (winningFormatId.empty() || isMoreSpecific(cellFormatId, winningFormatId)) {
+            winningFormatId = cellFormatId;
+        }
+    }
+
+    return winningFormatId;
 }
 
 }  // namespace cells

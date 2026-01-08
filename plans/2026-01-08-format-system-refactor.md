@@ -182,11 +182,11 @@ When a formula is entered into a cell with GENERAL format, Excel automatically i
 
 **Implementation approach (all in C++):**
 
-- [ ] 7a: Add `inferFormatFromFormula(formula, sheet)` function in C++ (`core/cells/number_format.cc`)
+- [x] 7a: Add `inferFormatFromFormula(ast, formatLookup)` function in C++ (`core/cells/number_format.cc`)
   - Walk the AST to find all cell references
-  - Look up each referenced cell's formatId
+  - Look up each referenced cell's formatId via a lookup callback
   - Apply priority rules to determine "winning" format
-  - Return the format ID (or null/GENERAL if no format should be inherited)
+  - Return the format ID (or empty string for GENERAL/no inheritance)
 
 - [ ] 7b: Integrate format inference into CRDT cell operations (`core/cells/crdt.cc`)
   - When `setCellValue()` processes a formula (starts with `=`)

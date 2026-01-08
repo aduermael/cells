@@ -3,6 +3,7 @@
 
 #include <cstdint>
 
+#include <functional>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -232,6 +233,44 @@ std::string getFormatDetails(const std::string& formatId);
  */
 std::string makeFormatId(const std::string& category, int decimals, bool separator,
                          const std::string& currency);
+
+// Forward declarations for format inference
+struct ASTNode;
+
+/**
+ * Get the priority of a format category for format inheritance.
+ * Higher priority formats win when multiple references have different formats.
+ *
+ * Priority (highest to lowest):
+ * 1. DATE/TIME/DATE_TIME (most specific, dates are special)
+ * 2. CURRENCY/ACCOUNTING (financial formats)
+ * 3. PERCENTAGE
+ * 4. NUMBER (with separator > without)
+ * 5. GENERAL/TEXT (no format, lowest priority)
+ */
+int getFormatPriority(NumberFormatCategory category);
+
+// Type for looking up a cell's format ID by cell UUID string
+// Returns the format ID, or empty string for GENERAL/no format
+using FormatLookup = std::function<std::string(const std::string& cellId)>;
+
+/**
+ * Infer the format for a formula based on referenced cells.
+ *
+ * When a formula is entered into a cell with GENERAL format, Excel automatically
+ * inherits the format from referenced cells. This function implements that logic.
+ *
+ * Rules:
+ * - Only cell references contribute to format inheritance (literals don't)
+ * - Higher priority categories win (DATE > CURRENCY > PERCENTAGE > NUMBER)
+ * - For same category, more specific formats win (e.g., more decimals)
+ * - If all referenced cells are GENERAL, returns GENERAL
+ *
+ * @param ast The parsed formula AST (must be resolved with cell IDs)
+ * @param formatLookup Function to get a cell's format ID from its UUID
+ * @return The format ID to inherit, or empty string for GENERAL/no inheritance
+ */
+std::string inferFormatFromFormula(const ASTNode* ast, const FormatLookup& formatLookup);
 
 /**
  * Result of creating a custom format.

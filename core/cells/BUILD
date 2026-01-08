@@ -45,6 +45,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":format_code_parser",
+        ":formula_ast",
         ":id",
         ":types",
     ],
