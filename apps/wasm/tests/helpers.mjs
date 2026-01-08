@@ -359,16 +359,18 @@ export async function moveToFillHandle(page, cellRef) {
   const canvasInfo = await getCanvasInfo(page);
   const { x, y } = cellFillHandlePosition(col, row, canvasInfo);
 
-  // Dispatch a mousemove event directly on the canvas
-  // This is more reliable than page.mouse.move() for canvas-based apps
+  // Dispatch a pointermove event directly on the canvas
+  // Must use PointerEvent since canvas handlers listen for pointer events, not mouse events
   await page.evaluate(({ canvasX, canvasY }) => {
     const canvas = document.getElementById('grid');
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const event = new MouseEvent('mousemove', {
+    const event = new PointerEvent('pointermove', {
       bubbles: true,
       clientX: rect.left + canvasX,
       clientY: rect.top + canvasY,
+      pointerId: 1,
+      pointerType: 'mouse',
     });
     canvas.dispatchEvent(event);
   }, { canvasX: x - canvasInfo.left, canvasY: y - canvasInfo.top });
