@@ -180,19 +180,20 @@ When a formula is entered into a cell with GENERAL format, Excel automatically i
 3. More specific formats win over less specific (e.g., 4 decimals > 2 decimals)
 4. If all referenced cells have GENERAL, result stays GENERAL
 
-**Implementation approach:**
+**Implementation approach (all in C++):**
 
-- [ ] 7a: Add `inferFormatFromFormula(formula, sheet)` function in C++ that analyzes formula AST
+- [ ] 7a: Add `inferFormatFromFormula(formula, sheet)` function in C++ (`core/cells/number_format.cc`)
   - Walk the AST to find all cell references
   - Look up each referenced cell's formatId
   - Apply priority rules to determine "winning" format
   - Return the format ID (or null/GENERAL if no format should be inherited)
 
-- [ ] 7b: Integrate format inference into cell value setting
-  - When `setCellValue()` is called with a formula (starts with `=`)
+- [ ] 7b: Integrate format inference into CRDT cell operations (`core/cells/crdt.cc`)
+  - When `setCellValue()` processes a formula (starts with `=`)
   - AND the cell's current formatId is null/GENERAL
-  - Call `inferFormatFromFormula()` and apply the result
+  - Call `inferFormatFromFormula()` and apply the result as part of the same operation
   - This is a one-time change at formula entry time
+  - No changes needed in TypeScript - the C++ layer handles this transparently
 
 - [ ] 7c: Add unit tests for format inheritance
   - Single cell reference: `=A1` inherits A1's format
@@ -220,10 +221,12 @@ When a formula is entered into a cell with GENERAL format, Excel automatically i
 | GENERAL   | GENERAL   | `=A1+B1`      | GENERAL          |
 
 **Important notes:**
+- **All logic in C++** - Format inference happens in the core engine, not UI layer (consistent with Phase 5)
 - This only affects cells with GENERAL format - explicit user formatting is never overridden
 - Format is inherited at formula entry time, not on recalc (matches Excel)
 - If referenced cells later change format, the formula cell's format does NOT update
 - This is purely a UX convenience feature - users can always manually change format
+- UI (TypeScript) simply calls `setCellValue()` - the C++ layer handles format inference automatically
 
 ---
 
