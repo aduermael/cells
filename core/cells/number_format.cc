@@ -347,6 +347,36 @@ const NumberFormat* NumberFormatRegistry::getFormat(const ID& id) const {
     return nullptr;
 }
 
+const NumberFormat* NumberFormatRegistry::getOrCreateFormat(const ID& id) {
+    // First, check if already cached
+    auto it = formats_.find(id);
+    if (it != formats_.end()) {
+        return &it->second;
+    }
+
+    // Try to parse as a dynamic format ID
+    const std::string idStr = id.toString();
+    const ParsedFormatId parsed = parseFormatId(idStr);
+
+    if (!parsed.valid) {
+        return nullptr;
+    }
+
+    // Create and cache the format
+    NumberFormat format;
+    format.id = id;
+    format.category = parsed.category;
+    format.decimalPlaces = parsed.decimalPlaces;
+    format.useThousandsSeparator = parsed.useThousandsSeparator;
+    format.currencySymbol = parsed.currencySymbol;
+    format.formatCode = generateFormatCode(parsed);
+    format.isAccounting = false;
+    format.isCustom = false;
+
+    formats_[id] = format;
+    return &formats_[id];
+}
+
 const NumberFormat* NumberFormatRegistry::getDefaultFormat() const {
     return getFormat(BuiltInFormats::GENERAL);
 }
@@ -381,33 +411,27 @@ bool NumberFormatRegistry::hasFormat(const ID& id) const {
 void NumberFormatRegistry::initBuiltInFormats() {
     using Cat = NumberFormatCategory;
 
-    // General (default)
+    // General (default) - not parseable, must be registered manually
     formats_[BuiltInFormats::GENERAL] =
         NumberFormat(BuiltInFormats::GENERAL, Cat::GENERAL, "General", 0, false, "", false);
 
-    // Number formats (0-4 decimal places)
-    formats_[BuiltInFormats::NUMBER_0] =
-        NumberFormat(BuiltInFormats::NUMBER_0, Cat::NUMBER, "0", 0, false, "", false);
-    formats_[BuiltInFormats::NUMBER_1] =
-        NumberFormat(BuiltInFormats::NUMBER_1, Cat::NUMBER, "0.0", 1, false, "", false);
-    formats_[BuiltInFormats::NUMBER_2] =
-        NumberFormat(BuiltInFormats::NUMBER_2, Cat::NUMBER, "0.00", 2, false, "", false);
-    formats_[BuiltInFormats::NUMBER_3] =
-        NumberFormat(BuiltInFormats::NUMBER_3, Cat::NUMBER, "0.000", 3, false, "", false);
-    formats_[BuiltInFormats::NUMBER_4] =
-        NumberFormat(BuiltInFormats::NUMBER_4, Cat::NUMBER, "0.0000", 4, false, "", false);
-    formats_[BuiltInFormats::NUMBER_SEP] =
-        NumberFormat(BuiltInFormats::NUMBER_SEP, Cat::NUMBER, "#,##0", 0, true, "", false);
-    formats_[BuiltInFormats::NUMBER_SEP1] =
-        NumberFormat(BuiltInFormats::NUMBER_SEP1, Cat::NUMBER, "#,##0.0", 1, true, "", false);
-    formats_[BuiltInFormats::NUMBER_SEP2] =
-        NumberFormat(BuiltInFormats::NUMBER_SEP2, Cat::NUMBER, "#,##0.00", 2, true, "", false);
-    formats_[BuiltInFormats::NUMBER_SEP3] =
-        NumberFormat(BuiltInFormats::NUMBER_SEP3, Cat::NUMBER, "#,##0.000", 3, true, "", false);
-    formats_[BuiltInFormats::NUMBER_SEP4] =
-        NumberFormat(BuiltInFormats::NUMBER_SEP4, Cat::NUMBER, "#,##0.0000", 4, true, "", false);
+    // Number formats (0-4 decimal places) - use dynamic system
+    // FMT_N0XX pattern: number without separator
+    getOrCreateFormat(BuiltInFormats::NUMBER_0);
+    getOrCreateFormat(BuiltInFormats::NUMBER_1);
+    getOrCreateFormat(BuiltInFormats::NUMBER_2);
+    getOrCreateFormat(BuiltInFormats::NUMBER_3);
+    getOrCreateFormat(BuiltInFormats::NUMBER_4);
 
-    // Currency formats - USD (legacy IDs for backward compatibility)
+    // FMT_NSXX pattern: number with separator
+    getOrCreateFormat(BuiltInFormats::NUMBER_SEP);
+    getOrCreateFormat(BuiltInFormats::NUMBER_SEP1);
+    getOrCreateFormat(BuiltInFormats::NUMBER_SEP2);
+    getOrCreateFormat(BuiltInFormats::NUMBER_SEP3);
+    getOrCreateFormat(BuiltInFormats::NUMBER_SEP4);
+
+    // Legacy currency formats (FMT_C0XX) - must be registered manually as they
+    // don't follow the CXXX_0YY pattern
     formats_[BuiltInFormats::CURRENCY_0] =
         NumberFormat(BuiltInFormats::CURRENCY_0, Cat::CURRENCY, "$#,##0", 0, true, "$", false);
     formats_[BuiltInFormats::CURRENCY_1] =
@@ -419,85 +443,55 @@ void NumberFormatRegistry::initBuiltInFormats() {
     formats_[BuiltInFormats::CURRENCY_4] =
         NumberFormat(BuiltInFormats::CURRENCY_4, Cat::CURRENCY, "$#,##0.0000", 4, true, "$", false);
 
-    // Currency formats - USD (new naming scheme)
-    formats_[BuiltInFormats::CURRENCY_USD_0] =
-        NumberFormat(BuiltInFormats::CURRENCY_USD_0, Cat::CURRENCY, "$#,##0", 0, true, "$", false);
-    formats_[BuiltInFormats::CURRENCY_USD_1] = NumberFormat(
-        BuiltInFormats::CURRENCY_USD_1, Cat::CURRENCY, "$#,##0.0", 1, true, "$", false);
-    formats_[BuiltInFormats::CURRENCY_USD_2] = NumberFormat(
-        BuiltInFormats::CURRENCY_USD_2, Cat::CURRENCY, "$#,##0.00", 2, true, "$", false);
-    formats_[BuiltInFormats::CURRENCY_USD_3] = NumberFormat(
-        BuiltInFormats::CURRENCY_USD_3, Cat::CURRENCY, "$#,##0.000", 3, true, "$", false);
-    formats_[BuiltInFormats::CURRENCY_USD_4] = NumberFormat(
-        BuiltInFormats::CURRENCY_USD_4, Cat::CURRENCY, "$#,##0.0000", 4, true, "$", false);
+    // Currency formats - USD (CXXX_0YY pattern) - use dynamic system
+    getOrCreateFormat(BuiltInFormats::CURRENCY_USD_0);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_USD_1);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_USD_2);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_USD_3);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_USD_4);
 
     // Currency formats - EUR
-    formats_[BuiltInFormats::CURRENCY_EUR_0] =
-        NumberFormat(BuiltInFormats::CURRENCY_EUR_0, Cat::CURRENCY, "€#,##0", 0, true, "€", false);
-    formats_[BuiltInFormats::CURRENCY_EUR_1] = NumberFormat(
-        BuiltInFormats::CURRENCY_EUR_1, Cat::CURRENCY, "€#,##0.0", 1, true, "€", false);
-    formats_[BuiltInFormats::CURRENCY_EUR_2] = NumberFormat(
-        BuiltInFormats::CURRENCY_EUR_2, Cat::CURRENCY, "€#,##0.00", 2, true, "€", false);
-    formats_[BuiltInFormats::CURRENCY_EUR_3] = NumberFormat(
-        BuiltInFormats::CURRENCY_EUR_3, Cat::CURRENCY, "€#,##0.000", 3, true, "€", false);
-    formats_[BuiltInFormats::CURRENCY_EUR_4] = NumberFormat(
-        BuiltInFormats::CURRENCY_EUR_4, Cat::CURRENCY, "€#,##0.0000", 4, true, "€", false);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_EUR_0);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_EUR_1);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_EUR_2);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_EUR_3);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_EUR_4);
 
     // Currency formats - GBP
-    formats_[BuiltInFormats::CURRENCY_GBP_0] =
-        NumberFormat(BuiltInFormats::CURRENCY_GBP_0, Cat::CURRENCY, "£#,##0", 0, true, "£", false);
-    formats_[BuiltInFormats::CURRENCY_GBP_1] = NumberFormat(
-        BuiltInFormats::CURRENCY_GBP_1, Cat::CURRENCY, "£#,##0.0", 1, true, "£", false);
-    formats_[BuiltInFormats::CURRENCY_GBP_2] = NumberFormat(
-        BuiltInFormats::CURRENCY_GBP_2, Cat::CURRENCY, "£#,##0.00", 2, true, "£", false);
-    formats_[BuiltInFormats::CURRENCY_GBP_3] = NumberFormat(
-        BuiltInFormats::CURRENCY_GBP_3, Cat::CURRENCY, "£#,##0.000", 3, true, "£", false);
-    formats_[BuiltInFormats::CURRENCY_GBP_4] = NumberFormat(
-        BuiltInFormats::CURRENCY_GBP_4, Cat::CURRENCY, "£#,##0.0000", 4, true, "£", false);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_GBP_0);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_GBP_1);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_GBP_2);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_GBP_3);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_GBP_4);
 
-    // Currency formats - JPY (typically 0 decimals for yen)
-    formats_[BuiltInFormats::CURRENCY_JPY_0] =
-        NumberFormat(BuiltInFormats::CURRENCY_JPY_0, Cat::CURRENCY, "¥#,##0", 0, true, "¥", false);
-    formats_[BuiltInFormats::CURRENCY_JPY_1] = NumberFormat(
-        BuiltInFormats::CURRENCY_JPY_1, Cat::CURRENCY, "¥#,##0.0", 1, true, "¥", false);
-    formats_[BuiltInFormats::CURRENCY_JPY_2] = NumberFormat(
-        BuiltInFormats::CURRENCY_JPY_2, Cat::CURRENCY, "¥#,##0.00", 2, true, "¥", false);
-    formats_[BuiltInFormats::CURRENCY_JPY_3] = NumberFormat(
-        BuiltInFormats::CURRENCY_JPY_3, Cat::CURRENCY, "¥#,##0.000", 3, true, "¥", false);
-    formats_[BuiltInFormats::CURRENCY_JPY_4] = NumberFormat(
-        BuiltInFormats::CURRENCY_JPY_4, Cat::CURRENCY, "¥#,##0.0000", 4, true, "¥", false);
+    // Currency formats - JPY
+    getOrCreateFormat(BuiltInFormats::CURRENCY_JPY_0);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_JPY_1);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_JPY_2);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_JPY_3);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_JPY_4);
 
-    // Currency formats - CNY (Chinese Yuan, uses same yen symbol)
-    formats_[BuiltInFormats::CURRENCY_CNY_0] =
-        NumberFormat(BuiltInFormats::CURRENCY_CNY_0, Cat::CURRENCY, "¥#,##0", 0, true, "¥", false);
-    formats_[BuiltInFormats::CURRENCY_CNY_1] = NumberFormat(
-        BuiltInFormats::CURRENCY_CNY_1, Cat::CURRENCY, "¥#,##0.0", 1, true, "¥", false);
-    formats_[BuiltInFormats::CURRENCY_CNY_2] = NumberFormat(
-        BuiltInFormats::CURRENCY_CNY_2, Cat::CURRENCY, "¥#,##0.00", 2, true, "¥", false);
-    formats_[BuiltInFormats::CURRENCY_CNY_3] = NumberFormat(
-        BuiltInFormats::CURRENCY_CNY_3, Cat::CURRENCY, "¥#,##0.000", 3, true, "¥", false);
-    formats_[BuiltInFormats::CURRENCY_CNY_4] = NumberFormat(
-        BuiltInFormats::CURRENCY_CNY_4, Cat::CURRENCY, "¥#,##0.0000", 4, true, "¥", false);
+    // Currency formats - CNY
+    getOrCreateFormat(BuiltInFormats::CURRENCY_CNY_0);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_CNY_1);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_CNY_2);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_CNY_3);
+    getOrCreateFormat(BuiltInFormats::CURRENCY_CNY_4);
 
-    // Accounting formats
+    // Accounting formats - not parseable, must be registered manually
     formats_[BuiltInFormats::ACCOUNTING_0] = NumberFormat(
         BuiltInFormats::ACCOUNTING_0, Cat::ACCOUNTING, "_($* #,##0_)", 0, true, "$", true);
     formats_[BuiltInFormats::ACCOUNTING_2] = NumberFormat(
         BuiltInFormats::ACCOUNTING_2, Cat::ACCOUNTING, "_($* #,##0.00_)", 2, true, "$", true);
 
-    // Percentage formats (0-4 decimal places)
-    formats_[BuiltInFormats::PERCENTAGE_0] =
-        NumberFormat(BuiltInFormats::PERCENTAGE_0, Cat::PERCENTAGE, "0%", 0, false, "", false);
-    formats_[BuiltInFormats::PERCENTAGE_1] =
-        NumberFormat(BuiltInFormats::PERCENTAGE_1, Cat::PERCENTAGE, "0.0%", 1, false, "", false);
-    formats_[BuiltInFormats::PERCENTAGE_2] =
-        NumberFormat(BuiltInFormats::PERCENTAGE_2, Cat::PERCENTAGE, "0.00%", 2, false, "", false);
-    formats_[BuiltInFormats::PERCENTAGE_3] =
-        NumberFormat(BuiltInFormats::PERCENTAGE_3, Cat::PERCENTAGE, "0.000%", 3, false, "", false);
-    formats_[BuiltInFormats::PERCENTAGE_4] =
-        NumberFormat(BuiltInFormats::PERCENTAGE_4, Cat::PERCENTAGE, "0.0000%", 4, false, "", false);
+    // Percentage formats (0-4 decimal places) - use dynamic system (FMT_P0XX pattern)
+    getOrCreateFormat(BuiltInFormats::PERCENTAGE_0);
+    getOrCreateFormat(BuiltInFormats::PERCENTAGE_1);
+    getOrCreateFormat(BuiltInFormats::PERCENTAGE_2);
+    getOrCreateFormat(BuiltInFormats::PERCENTAGE_3);
+    getOrCreateFormat(BuiltInFormats::PERCENTAGE_4);
 
-    // Date formats
+    // Date formats - not parseable, must be registered manually
     formats_[BuiltInFormats::DATE_SHORT] =
         NumberFormat(BuiltInFormats::DATE_SHORT, Cat::DATE, "m/d/yyyy", 0, false, "", false);
     formats_[BuiltInFormats::DATE_LONG] =
@@ -505,21 +499,21 @@ void NumberFormatRegistry::initBuiltInFormats() {
     formats_[BuiltInFormats::DATE_ISO] =
         NumberFormat(BuiltInFormats::DATE_ISO, Cat::DATE, "yyyy-mm-dd", 0, false, "", false);
 
-    // Time formats
+    // Time formats - not parseable, must be registered manually
     formats_[BuiltInFormats::TIME_12H] =
         NumberFormat(BuiltInFormats::TIME_12H, Cat::TIME, "h:mm AM/PM", 0, false, "", false);
     formats_[BuiltInFormats::TIME_24H] =
         NumberFormat(BuiltInFormats::TIME_24H, Cat::TIME, "h:mm", 0, false, "", false);
 
-    // DateTime formats
+    // DateTime formats - not parseable, must be registered manually
     formats_[BuiltInFormats::DATETIME_SHORT] = NumberFormat(
         BuiltInFormats::DATETIME_SHORT, Cat::DATE_TIME, "m/d/yyyy h:mm AM/PM", 0, false, "", false);
 
-    // Scientific
+    // Scientific - not parseable, must be registered manually
     formats_[BuiltInFormats::SCIENTIFIC_2] = NumberFormat(
         BuiltInFormats::SCIENTIFIC_2, Cat::SCIENTIFIC, "0.00E+00", 2, false, "", false);
 
-    // Text
+    // Text - not parseable, must be registered manually
     formats_[BuiltInFormats::TEXT] =
         NumberFormat(BuiltInFormats::TEXT, Cat::TEXT, "@", 0, false, "", false);
 }

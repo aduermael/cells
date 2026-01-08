@@ -42,20 +42,20 @@ struct FormattedValue {
 };
 
 // Format a numeric value according to a NumberFormat
-// registry: Format registry to look up format by ID (built-in formats)
+// registry: Format registry to look up format by ID (may cache new dynamic formats)
 // value: The numeric value to format
 // formatId: ID of the format to use (null ID = GENERAL)
 // locale: Locale settings for formatting
-FormattedValue formatNumber(const NumberFormatRegistry& registry, double value, const ID& formatId,
+FormattedValue formatNumber(NumberFormatRegistry& registry, double value, const ID& formatId,
                             const FormatLocale& locale = FormatLocale::US());
 
 // Format a numeric value, also checking workbook custom formats
-// registry: Format registry for built-in formats
+// registry: Format registry (may cache new dynamic formats)
 // customFormats: Custom format definitions from workbook (format ID -> format code)
 // value: The numeric value to format
 // formatId: ID of the format to use (null ID = GENERAL)
 // locale: Locale settings for formatting
-FormattedValue formatNumber(const NumberFormatRegistry& registry,
+FormattedValue formatNumber(NumberFormatRegistry& registry,
                             const std::unordered_map<ID, std::string, IDHash>& customFormats,
                             double value, const ID& formatId,
                             const FormatLocale& locale = FormatLocale::US());

@@ -437,5 +437,94 @@ TEST(GetCurrencySymbolTest, UnknownCurrencies) {
     EXPECT_EQ(getCurrencySymbol(""), "");
 }
 
+// --- getOrCreateFormat Tests ---
+
+TEST(NumberFormatRegistryTest, GetOrCreateFormatCachesBuiltIn) {
+    NumberFormatRegistry registry;
+
+    // Built-in formats should already be cached
+    const NumberFormat* fmt = registry.getOrCreateFormat(BuiltInFormats::NUMBER_2);
+    ASSERT_NE(fmt, nullptr);
+    EXPECT_EQ(fmt->category, NumberFormatCategory::NUMBER);
+    EXPECT_EQ(fmt->decimalPlaces, 2);
+    EXPECT_EQ(fmt->formatCode, "0.00");
+}
+
+TEST(NumberFormatRegistryTest, GetOrCreateFormatCachesDynamic) {
+    NumberFormatRegistry registry;
+
+    // Dynamic format not initially in registry
+    ID dynamicId("FMT_N012");
+    EXPECT_FALSE(registry.hasFormat(dynamicId));
+
+    // First call should create and cache
+    const NumberFormat* fmt1 = registry.getOrCreateFormat(dynamicId);
+    ASSERT_NE(fmt1, nullptr);
+    EXPECT_EQ(fmt1->category, NumberFormatCategory::NUMBER);
+    EXPECT_EQ(fmt1->decimalPlaces, 12);
+    EXPECT_EQ(fmt1->formatCode, "0.000000000000");
+
+    // Should now be in registry
+    EXPECT_TRUE(registry.hasFormat(dynamicId));
+
+    // Second call should return cached
+    const NumberFormat* fmt2 = registry.getOrCreateFormat(dynamicId);
+    EXPECT_EQ(fmt1, fmt2);  // Same pointer
+}
+
+TEST(NumberFormatRegistryTest, GetOrCreateFormatReturnsNullForInvalid) {
+    NumberFormatRegistry registry;
+
+    // Invalid format ID
+    ID invalidId("INVALID!");
+    const NumberFormat* fmt = registry.getOrCreateFormat(invalidId);
+    EXPECT_EQ(fmt, nullptr);
+
+    // Non-parseable format ID
+    ID nonParseable("FMT_GEN1");  // Close to GENERAL but not valid
+    fmt = registry.getOrCreateFormat(nonParseable);
+    EXPECT_EQ(fmt, nullptr);
+}
+
+TEST(NumberFormatRegistryTest, GetOrCreateFormatDynamicCurrency) {
+    NumberFormatRegistry registry;
+
+    // Dynamic currency format with more than 4 decimals (not pre-registered)
+    ID dynamicCurrency("CUSD_010");
+    EXPECT_FALSE(registry.hasFormat(dynamicCurrency));
+
+    const NumberFormat* fmt = registry.getOrCreateFormat(dynamicCurrency);
+    ASSERT_NE(fmt, nullptr);
+    EXPECT_EQ(fmt->category, NumberFormatCategory::CURRENCY);
+    EXPECT_EQ(fmt->decimalPlaces, 10);
+    EXPECT_EQ(fmt->currencySymbol, "$");
+    EXPECT_EQ(fmt->formatCode, "$#,##0.0000000000");
+    EXPECT_TRUE(fmt->useThousandsSeparator);
+}
+
+TEST(NumberFormatRegistryTest, BuiltInFormatsUsesDynamicSystem) {
+    NumberFormatRegistry registry;
+
+    // Verify built-in NUMBER formats use dynamic system (same format code)
+    const NumberFormat* num2 = registry.getFormat(BuiltInFormats::NUMBER_2);
+    ASSERT_NE(num2, nullptr);
+    EXPECT_EQ(num2->formatCode, "0.00");
+
+    const NumberFormat* numSep2 = registry.getFormat(BuiltInFormats::NUMBER_SEP2);
+    ASSERT_NE(numSep2, nullptr);
+    EXPECT_EQ(numSep2->formatCode, "#,##0.00");
+
+    // Verify percentage formats
+    const NumberFormat* pct2 = registry.getFormat(BuiltInFormats::PERCENTAGE_2);
+    ASSERT_NE(pct2, nullptr);
+    EXPECT_EQ(pct2->formatCode, "0.00%");
+
+    // Verify currency formats (new naming scheme)
+    const NumberFormat* usd2 = registry.getFormat(BuiltInFormats::CURRENCY_USD_2);
+    ASSERT_NE(usd2, nullptr);
+    EXPECT_EQ(usd2->formatCode, "$#,##0.00");
+    EXPECT_EQ(usd2->currencySymbol, "$");
+}
+
 }  // namespace
 }  // namespace cells

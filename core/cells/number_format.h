@@ -262,6 +262,13 @@ public:
     // Find a format by format code (returns nullptr if not found)
     [[nodiscard]] const NumberFormat* findByFormatCode(const std::string& formatCode) const;
 
+    // Get or create a format by ID
+    // If the format exists in cache, returns it. Otherwise, attempts to parse
+    // the format ID as a dynamic pattern (FMT_P0XX, FMT_N0XX, FMT_NSXX, CXXX_0YY),
+    // creates the format, caches it, and returns it.
+    // Returns nullptr if the ID is not cached and cannot be parsed.
+    const NumberFormat* getOrCreateFormat(const ID& id);
+
 private:
     std::unordered_map<ID, NumberFormat, IDHash> formats_;
 

@@ -409,35 +409,17 @@ FormattedValue formatWithFormat(double value, const NumberFormat& format,
 }
 
 // Main formatting function with registry lookup
-FormattedValue formatNumber(const NumberFormatRegistry& registry, double value, const ID& formatId,
+FormattedValue formatNumber(NumberFormatRegistry& registry, double value, const ID& formatId,
                             const FormatLocale& locale) {
     // Null ID means GENERAL format
     if (formatId.isNull()) {
         return formatGeneral(value, locale);
     }
 
-    // First, try looking up in the registry
-    const NumberFormat* format = registry.getFormat(formatId);
+    // Use getOrCreateFormat which handles both cached and dynamic formats
+    const NumberFormat* format = registry.getOrCreateFormat(formatId);
     if (format != nullptr) {
         return formatWithFormat(value, *format, locale);
-    }
-
-    // Not found in registry - try parsing as a dynamic format ID
-    const std::string idStr = formatId.toString();
-    const ParsedFormatId parsed = parseFormatId(idStr);
-
-    if (parsed.valid) {
-        // Create a temporary NumberFormat from the parsed ID
-        NumberFormat dynamicFormat;
-        dynamicFormat.id = formatId;
-        dynamicFormat.category = parsed.category;
-        dynamicFormat.decimalPlaces = parsed.decimalPlaces;
-        dynamicFormat.useThousandsSeparator = parsed.useThousandsSeparator;
-        dynamicFormat.currencySymbol = parsed.currencySymbol;
-        dynamicFormat.formatCode = generateFormatCode(parsed);
-        dynamicFormat.isAccounting = false;
-
-        return formatWithFormat(value, dynamicFormat, locale);
     }
 
     // Unknown format ID, fall back to GENERAL
@@ -445,7 +427,7 @@ FormattedValue formatNumber(const NumberFormatRegistry& registry, double value, 
 }
 
 // Overload that also checks workbook custom formats
-FormattedValue formatNumber(const NumberFormatRegistry& registry,
+FormattedValue formatNumber(NumberFormatRegistry& registry,
                             const std::unordered_map<ID, std::string, IDHash>& customFormats,
                             double value, const ID& formatId, const FormatLocale& locale) {
     // Null ID means GENERAL format
@@ -453,8 +435,8 @@ FormattedValue formatNumber(const NumberFormatRegistry& registry,
         return formatGeneral(value, locale);
     }
 
-    // First, try looking up in the registry (built-in formats)
-    const NumberFormat* format = registry.getFormat(formatId);
+    // First, try looking up in the registry (handles both built-in and dynamic formats)
+    const NumberFormat* format = registry.getOrCreateFormat(formatId);
     if (format != nullptr) {
         return formatWithFormat(value, *format, locale);
     }
@@ -471,24 +453,6 @@ FormattedValue formatNumber(const NumberFormatRegistry& registry,
             return FormattedValue::success(result.text);
         }
         return FormattedValue::error(result.errorMessage);
-    }
-
-    // Third, try parsing as a dynamic format ID
-    const std::string idStr = formatId.toString();
-    const ParsedFormatId parsed = parseFormatId(idStr);
-
-    if (parsed.valid) {
-        // Create a temporary NumberFormat from the parsed ID
-        NumberFormat dynamicFormat;
-        dynamicFormat.id = formatId;
-        dynamicFormat.category = parsed.category;
-        dynamicFormat.decimalPlaces = parsed.decimalPlaces;
-        dynamicFormat.useThousandsSeparator = parsed.useThousandsSeparator;
-        dynamicFormat.currencySymbol = parsed.currencySymbol;
-        dynamicFormat.formatCode = generateFormatCode(parsed);
-        dynamicFormat.isAccounting = false;
-
-        return formatWithFormat(value, dynamicFormat, locale);
     }
 
     // Unknown format ID, fall back to GENERAL
