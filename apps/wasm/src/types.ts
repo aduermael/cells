@@ -128,6 +128,15 @@ export interface CellFormatIdResult {
   error?: string;
 }
 
+/** Details about a format ID from getFormatDetails */
+export interface FormatDetails {
+  category: string; // "number", "currency", "percentage", "general", etc.
+  decimals: number; // 0-15
+  separator: boolean; // whether thousands separator is used
+  currency: string | null; // currency code if applicable, null otherwise
+  error?: string; // set if format ID is not recognized
+}
+
 // ============================================================================
 // Formula Function Types
 // ============================================================================

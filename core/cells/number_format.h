@@ -207,6 +207,33 @@ std::string generateFormatCode(const ParsedFormatId& parsed);
 std::string getCurrencySymbol(const std::string& currencyCode);
 
 /**
+ * Get detailed information about a format ID.
+ *
+ * Returns JSON string with format details:
+ * - category: "number", "currency", "percentage", "general", etc.
+ * - decimals: number of decimal places (0-15)
+ * - separator: whether thousands separator is used
+ * - currency: currency code if applicable (null otherwise)
+ *
+ * Example output: {"category":"number","decimals":2,"separator":true,"currency":null}
+ * Returns {"error":"Unknown format"} if the format ID is not recognized.
+ */
+std::string getFormatDetails(const std::string& formatId);
+
+/**
+ * Generate a format ID for given parameters.
+ *
+ * @param category Format category: "number", "currency", "percentage"
+ * @param decimals Decimal places (0-15)
+ * @param separator Whether to use thousands separator (only for number category)
+ * @param currency Currency code (for currency category, e.g., "USD", "EUR")
+ * @return Format ID string (e.g., "FMT_N002", "FMT_NS02", "CUSD_002")
+ *         Returns empty string if parameters are invalid.
+ */
+std::string makeFormatId(const std::string& category, int decimals, bool separator,
+                         const std::string& currency);
+
+/**
  * Result of creating a custom format.
  */
 struct CreateCustomFormatResult {

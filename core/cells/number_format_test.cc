@@ -526,5 +526,118 @@ TEST(NumberFormatRegistryTest, BuiltInFormatsUsesDynamicSystem) {
     EXPECT_EQ(usd2->currencySymbol, "$");
 }
 
+// --- getFormatDetails Tests ---
+
+TEST(GetFormatDetailsTest, General) {
+    EXPECT_EQ(getFormatDetails("~"),
+              R"({"category":"general","decimals":0,"separator":false,"currency":null})");
+    EXPECT_EQ(getFormatDetails(""),
+              R"({"category":"general","decimals":0,"separator":false,"currency":null})");
+    EXPECT_EQ(getFormatDetails("FMT_GEN0"),
+              R"({"category":"general","decimals":0,"separator":false,"currency":null})");
+}
+
+TEST(GetFormatDetailsTest, Number) {
+    EXPECT_EQ(getFormatDetails("FMT_N000"),
+              R"({"category":"number","decimals":0,"separator":false,"currency":null})");
+    EXPECT_EQ(getFormatDetails("FMT_N002"),
+              R"({"category":"number","decimals":2,"separator":false,"currency":null})");
+    EXPECT_EQ(getFormatDetails("FMT_N012"),
+              R"({"category":"number","decimals":12,"separator":false,"currency":null})");
+}
+
+TEST(GetFormatDetailsTest, NumberWithSeparator) {
+    EXPECT_EQ(getFormatDetails("FMT_NS00"),
+              R"({"category":"number","decimals":0,"separator":true,"currency":null})");
+    EXPECT_EQ(getFormatDetails("FMT_NS02"),
+              R"({"category":"number","decimals":2,"separator":true,"currency":null})");
+}
+
+TEST(GetFormatDetailsTest, Percentage) {
+    EXPECT_EQ(getFormatDetails("FMT_P000"),
+              R"({"category":"percentage","decimals":0,"separator":false,"currency":null})");
+    EXPECT_EQ(getFormatDetails("FMT_P002"),
+              R"({"category":"percentage","decimals":2,"separator":false,"currency":null})");
+}
+
+TEST(GetFormatDetailsTest, Currency) {
+    EXPECT_EQ(getFormatDetails("CUSD_002"),
+              R"({"category":"currency","decimals":2,"separator":true,"currency":"USD"})");
+    EXPECT_EQ(getFormatDetails("CEUR_004"),
+              R"({"category":"currency","decimals":4,"separator":true,"currency":"EUR"})");
+}
+
+TEST(GetFormatDetailsTest, LegacyCurrency) {
+    EXPECT_EQ(getFormatDetails("FMT_C002"),
+              R"({"category":"currency","decimals":2,"separator":true,"currency":"USD"})");
+}
+
+TEST(GetFormatDetailsTest, BuiltInFormats) {
+    EXPECT_EQ(getFormatDetails("FMT_A002"),
+              R"({"category":"accounting","decimals":2,"separator":true,"currency":"USD"})");
+    EXPECT_EQ(getFormatDetails("FMT_DSHT"),
+              R"({"category":"date","decimals":0,"separator":false,"currency":null})");
+    EXPECT_EQ(getFormatDetails("FMT_T12H"),
+              R"({"category":"time","decimals":0,"separator":false,"currency":null})");
+    EXPECT_EQ(getFormatDetails("FMT_DTSH"),
+              R"({"category":"datetime","decimals":0,"separator":false,"currency":null})");
+    EXPECT_EQ(getFormatDetails("FMT_SCI2"),
+              R"({"category":"scientific","decimals":2,"separator":false,"currency":null})");
+    EXPECT_EQ(getFormatDetails("FMT_TEXT"),
+              R"({"category":"text","decimals":0,"separator":false,"currency":null})");
+}
+
+TEST(GetFormatDetailsTest, UnknownFormat) {
+    EXPECT_EQ(getFormatDetails("INVALID!"), R"({"error":"Unknown format"})");
+    EXPECT_EQ(getFormatDetails("XXXXXXXX"), R"({"error":"Unknown format"})");
+}
+
+// --- makeFormatId Tests ---
+
+TEST(MakeFormatIdTest, Number) {
+    EXPECT_EQ(makeFormatId("number", 0, false, ""), "FMT_N000");
+    EXPECT_EQ(makeFormatId("number", 2, false, ""), "FMT_N002");
+    EXPECT_EQ(makeFormatId("number", 12, false, ""), "FMT_N012");
+    EXPECT_EQ(makeFormatId("number", 15, false, ""), "FMT_N015");
+}
+
+TEST(MakeFormatIdTest, NumberWithSeparator) {
+    EXPECT_EQ(makeFormatId("number", 0, true, ""), "FMT_NS00");
+    EXPECT_EQ(makeFormatId("number", 2, true, ""), "FMT_NS02");
+    EXPECT_EQ(makeFormatId("number", 15, true, ""), "FMT_NS15");
+}
+
+TEST(MakeFormatIdTest, Percentage) {
+    EXPECT_EQ(makeFormatId("percentage", 0, false, ""), "FMT_P000");
+    EXPECT_EQ(makeFormatId("percentage", 2, false, ""), "FMT_P002");
+    EXPECT_EQ(makeFormatId("percentage", 15, false, ""), "FMT_P015");
+}
+
+TEST(MakeFormatIdTest, Currency) {
+    EXPECT_EQ(makeFormatId("currency", 2, true, "USD"), "CUSD_002");
+    EXPECT_EQ(makeFormatId("currency", 4, true, "EUR"), "CEUR_004");
+    EXPECT_EQ(makeFormatId("currency", 0, true, "GBP"), "CGBP_000");
+}
+
+TEST(MakeFormatIdTest, InvalidDecimals) {
+    EXPECT_EQ(makeFormatId("number", -1, false, ""), "");
+    EXPECT_EQ(makeFormatId("number", 16, false, ""), "");
+}
+
+TEST(MakeFormatIdTest, InvalidCurrency) {
+    // Wrong length
+    EXPECT_EQ(makeFormatId("currency", 2, true, "US"), "");
+    EXPECT_EQ(makeFormatId("currency", 2, true, "USDD"), "");
+    // Lowercase
+    EXPECT_EQ(makeFormatId("currency", 2, true, "usd"), "");
+}
+
+TEST(MakeFormatIdTest, UnsupportedCategory) {
+    // These categories don't have dynamic format IDs
+    EXPECT_EQ(makeFormatId("date", 0, false, ""), "");
+    EXPECT_EQ(makeFormatId("time", 0, false, ""), "");
+    EXPECT_EQ(makeFormatId("general", 0, false, ""), "");
+}
+
 }  // namespace
 }  // namespace cells

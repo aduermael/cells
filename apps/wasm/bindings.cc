@@ -1819,6 +1819,28 @@ public:
         return ss.str();
     }
 
+    // Get detailed information about a format ID.
+    // Returns JSON with category, decimals, separator, currency.
+    // Example: {"category":"number","decimals":2,"separator":true,"currency":null}
+    std::string getFormatDetails(const std::string& formatId) {
+        return cells::getFormatDetails(formatId);
+    }
+
+    // Generate a format ID for given parameters.
+    // category: "number", "currency", "percentage"
+    // decimals: 0-15
+    // separator: whether to use thousands separator (only for number)
+    // currency: currency code for currency category (e.g., "USD")
+    // Returns JSON: {"formatId":"FMT_N002"} or {"error":"..."}
+    std::string makeFormatId(const std::string& category, int decimals, bool separator,
+                             const std::string& currency) {
+        std::string result = cells::makeFormatId(category, decimals, separator, currency);
+        if (result.empty()) {
+            return "{\"error\":\"Invalid parameters\"}";
+        }
+        return "{\"formatId\":\"" + result + "\"}";
+    }
+
     // ========================================================================
     // Column/row resize operations
     // Always creates operations and applies them. Operations are pruned when no peers.
@@ -4680,6 +4702,8 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("formatCellValue", &cells::wasm::CellsEngine::formatCellValue)
         .function("formatWithCode", &cells::wasm::CellsEngine::formatWithCode)
         .function("formatCellById", &cells::wasm::CellsEngine::formatCellById)
+        .function("getFormatDetails", &cells::wasm::CellsEngine::getFormatDetails)
+        .function("makeFormatId", &cells::wasm::CellsEngine::makeFormatId)
         // Column/row resize
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)
         .function("resizeColumnByPos", &cells::wasm::CellsEngine::resizeColumnByPos)

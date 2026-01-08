@@ -60,6 +60,8 @@ interface CellsEngine {
   formatCellValue(value: number, formatId: string): string;
   formatWithCode(value: number, formatCode: string): string;
   formatCellById(cellId: string): string;
+  getFormatDetails(formatId: string): string;
+  makeFormatId(category: string, decimals: number, separator: boolean, currency: string): string;
 
   // Column/row operations
   resizeColumn(colId: string, width: number): string;
@@ -722,6 +724,25 @@ function handleMessage(msg: WorkerRequest): void {
         } else {
           respond({ type: "formattedValue", text: result.text });
         }
+        break;
+      }
+
+      case "getFormatDetails": {
+        const { formatId } = params as { formatId: string };
+        const result = JSON.parse(engine.getFormatDetails(formatId));
+        respond({ type: "formatDetails", ...result });
+        break;
+      }
+
+      case "makeFormatId": {
+        const { category, decimals, separator, currency } = params as {
+          category: string;
+          decimals: number;
+          separator: boolean;
+          currency: string;
+        };
+        const result = JSON.parse(engine.makeFormatId(category, decimals, separator, currency));
+        respond({ type: "formatIdGenerated", ...result });
         break;
       }
 

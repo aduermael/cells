@@ -1,6 +1,7 @@
 #include "core/cells/number_format.h"
 
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 
 #include "core/cells/format_code_parser.h"
@@ -208,6 +209,104 @@ std::string getCurrencySymbol(const std::string& currencyCode) {
     if (currencyCode == "JPY" || currencyCode == "CNY") {
         return "¥";
     }
+    return "";
+}
+
+std::string getFormatDetails(const std::string& formatId) {
+    // Handle special cases
+    if (formatId.empty() || formatId == "~" || formatId == "FMT_GEN0") {
+        return R"({"category":"general","decimals":0,"separator":false,"currency":null})";
+    }
+
+    // Try to parse as a dynamic format ID
+    const ParsedFormatId parsed = parseFormatId(formatId);
+    if (parsed.valid) {
+        const std::string categoryStr = formatCategoryToString(parsed.category);
+        const std::string currencyJson =
+            parsed.currencyCode.empty() ? "null" : "\"" + parsed.currencyCode + "\"";
+        return "{\"category\":\"" + categoryStr +
+               "\",\"decimals\":" + std::to_string(parsed.decimalPlaces) +
+               ",\"separator\":" + (parsed.useThousandsSeparator ? "true" : "false") +
+               ",\"currency\":" + currencyJson + "}";
+    }
+
+    // Handle legacy currency formats (FMT_C0XX)
+    if (formatId.size() == 8 && formatId.substr(0, 5) == "FMT_C" && formatId[5] == '0') {
+        if (std::isdigit(static_cast<unsigned char>(formatId[6])) != 0 &&
+            std::isdigit(static_cast<unsigned char>(formatId[7])) != 0) {
+            const int decimals = (formatId[6] - '0') * 10 + (formatId[7] - '0');
+            if (decimals <= 15) {
+                return "{\"category\":\"currency\",\"decimals\":" + std::to_string(decimals) +
+                       ",\"separator\":true,\"currency\":\"USD\"}";
+            }
+        }
+    }
+
+    // Handle non-parseable built-in formats
+    if (formatId == "FMT_A000" || formatId == "FMT_A002") {
+        const int decimals = (formatId == "FMT_A002") ? 2 : 0;
+        return "{\"category\":\"accounting\",\"decimals\":" + std::to_string(decimals) +
+               ",\"separator\":true,\"currency\":\"USD\"}";
+    }
+    if (formatId == "FMT_DSHT" || formatId == "FMT_DLNG" || formatId == "FMT_DISO") {
+        return R"({"category":"date","decimals":0,"separator":false,"currency":null})";
+    }
+    if (formatId == "FMT_T12H" || formatId == "FMT_T24H") {
+        return R"({"category":"time","decimals":0,"separator":false,"currency":null})";
+    }
+    if (formatId == "FMT_DTSH") {
+        return R"({"category":"datetime","decimals":0,"separator":false,"currency":null})";
+    }
+    if (formatId == "FMT_SCI2") {
+        return R"({"category":"scientific","decimals":2,"separator":false,"currency":null})";
+    }
+    if (formatId == "FMT_TEXT") {
+        return R"({"category":"text","decimals":0,"separator":false,"currency":null})";
+    }
+
+    return R"({"error":"Unknown format"})";
+}
+
+std::string makeFormatId(const std::string& category, int decimals, bool separator,
+                         const std::string& currency) {
+    // Validate decimals range
+    if (decimals < 0 || decimals > 15) {
+        return "";
+    }
+
+    // Format decimals as 2-digit string
+    char decStr[3];
+    std::snprintf(decStr, sizeof(decStr), "%02d", decimals);
+
+    if (category == "percentage") {
+        // FMT_P0XX
+        return std::string("FMT_P0") + decStr;
+    }
+
+    if (category == "number") {
+        if (separator) {
+            // FMT_NSXX
+            return std::string("FMT_NS") + decStr;
+        }
+        // FMT_N0XX
+        return std::string("FMT_N0") + decStr;
+    }
+
+    if (category == "currency") {
+        // Validate currency code
+        if (currency.size() != 3) {
+            return "";
+        }
+        for (const char c : currency) {
+            if (std::isupper(static_cast<unsigned char>(c)) == 0) {
+                return "";
+            }
+        }
+        // CXXX_0YY
+        return "C" + currency + "_0" + decStr;
+    }
+
+    // Other categories don't have dynamic format IDs
     return "";
 }
 

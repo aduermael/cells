@@ -10,6 +10,7 @@ import type {
   FormattedValueResult,
   CellFormatIdResult,
   FunctionInfo,
+  FormatDetails,
 } from "./types";
 import type {
   WorkerMessage,
@@ -467,6 +468,39 @@ export class CellsClient {
   async formatWithCode(value: number, formatCode: string): Promise<FormattedValueResult> {
     const response = await this._send("formatWithCode", { value, formatCode });
     return response as FormattedValueResult;
+  }
+
+  /**
+   * Get detailed information about a format ID.
+   * @param formatId Format ID to get details for
+   * @returns Format details including category, decimals, separator, currency
+   */
+  async getFormatDetails(formatId: string): Promise<FormatDetails> {
+    const response = await this._send("getFormatDetails", { formatId });
+    return response as FormatDetails;
+  }
+
+  /**
+   * Generate a format ID for given parameters.
+   * @param category Format category: "number", "currency", "percentage"
+   * @param decimals Decimal places (0-15)
+   * @param separator Whether to use thousands separator (only for number)
+   * @param currency Currency code for currency category (e.g., "USD")
+   * @returns Object with formatId on success, error on failure
+   */
+  async makeFormatId(
+    category: string,
+    decimals: number,
+    separator: boolean,
+    currency: string
+  ): Promise<{ formatId?: string; error?: string }> {
+    const response = await this._send("makeFormatId", {
+      category,
+      decimals,
+      separator,
+      currency,
+    });
+    return response as { formatId?: string; error?: string };
   }
 
   // ========== Column/Row Operations API ==========

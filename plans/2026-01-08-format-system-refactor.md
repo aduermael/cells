@@ -1,6 +1,6 @@
 Status: IN_PROGRESS
 Created At: 2026-01-08 01:09 UTC
-Updated At: 2026-01-08 03:45 UTC
+Updated At: 2026-01-08 05:30 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -125,15 +125,15 @@ Make built-in formats use the dynamic system under the hood.
 
 ---
 
-## Phase 5: Remove Format Logic from TypeScript
+## Phase 5: Remove Format Logic from TypeScript ✅
 
 Remove all format parsing/generation from TypeScript, replace with C++ API calls.
 
-- [ ] 5a: Add C++ API `getFormatDetails(formatId)` → returns JSON with category, decimals, etc.
-- [ ] 5b: Add C++ API `generateFormatId(category, decimals, options)` → returns format ID
-- [ ] 5c: Remove `parseCurrentFormat()` from format-controls.ts, call C++ instead
-- [ ] 5d: Remove `generateFormatId()` from format-controls.ts, call C++ instead
-- [ ] 5e: Remove `availableFormats` caching, fetch fresh each time (or invalidate on format change)
+- [x] 5a: Add C++ API `getFormatDetails(formatId)` → returns JSON with category, decimals, etc.
+- [x] 5b: Add C++ API `makeFormatId(category, decimals, separator, currency)` → returns format ID
+- [x] 5c: Remove `parseCurrentFormat()` from format-controls.ts, call C++ instead
+- [x] 5d: Remove `generateFormatId()` from format-controls.ts, call C++ instead
+- [x] 5e: Remove `availableFormats` caching, query C++ directly via getFormatDetails()
 
 **New C++ APIs:**
 ```cpp

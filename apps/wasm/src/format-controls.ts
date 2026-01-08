@@ -2,7 +2,7 @@
 // Handles format dropdown, currency/percent toggles, and decimal +/- buttons
 
 import type { WasmDataSource } from "./wasm-data-source";
-import type { NumberFormat, NumberFormatCategory, Position, CellData } from "./types";
+import type { NumberFormatCategory, Position, CellData } from "./types";
 
 // =============================================================================
 // Types
@@ -106,7 +106,6 @@ export class FormatControls {
   // State
   // =========================================================================
 
-  private availableFormats: NumberFormat[] = [];
   private currentCategory: NumberFormatCategory = "GENERAL";
   private currentCurrency: CurrencyType = "USD";
   private isDropdownOpen = false;
@@ -153,9 +152,8 @@ export class FormatControls {
   // =========================================================================
 
   /** Set the data source after WASM initialization */
-  async setDataSource(dataSource: WasmDataSource): Promise<void> {
+  setDataSource(dataSource: WasmDataSource): void {
     this.dataSource = dataSource;
-    await this.loadAvailableFormats();
   }
 
   /** Update the displayed format for the current cell selection */
@@ -526,9 +524,6 @@ export class FormatControls {
         // Trigger re-render and formula bar update
         this.requestRender();
         this.updateFormulaBar();
-
-        // Reload available formats to include the new custom format
-        await this.loadAvailableFormats();
       }
 
       this.closeCustomFormatPanel();
@@ -543,81 +538,68 @@ export class FormatControls {
   // Private Methods - Format Operations
   // =========================================================================
 
-  private async loadAvailableFormats(): Promise<void> {
-    if (!this.dataSource) return;
-
-    try {
-      this.availableFormats = await this.dataSource.getAvailableFormats();
-    } catch (error) {
-      console.error("Failed to load available formats:", error);
-    }
-  }
-
   private async getCategoryForFormatId(formatId: string): Promise<NumberFormatCategory> {
     if (formatId === "~" || formatId === "") {
       return "GENERAL";
     }
 
-    // Look up in available formats
-    const format = this.availableFormats.find((f) => f.id === formatId);
-    if (format) {
-      // C++ returns lowercase categories, convert to uppercase for TypeScript
-      return format.category.toUpperCase() as NumberFormatCategory;
-    }
-
-    // Fallback: query from data source
+    // Query C++ for format details (single source of truth)
     if (this.dataSource) {
-      const formats = await this.dataSource.getAvailableFormats();
-      const found = formats.find((f) => f.id === formatId);
-      if (found) {
-        return found.category.toUpperCase() as NumberFormatCategory;
+      const details = await this.dataSource.client.getFormatDetails(formatId);
+      if (!details.error) {
+        return details.category.toUpperCase() as NumberFormatCategory;
       }
     }
 
     return "GENERAL";
   }
 
-  private getFormatIdForCategory(category: NumberFormatCategory): string {
-    // Find formats matching the category (C++ returns lowercase)
-    const matchingFormats = this.availableFormats.filter(
-      (f) => f.category.toUpperCase() === category
+  private async getFormatIdForCategory(category: NumberFormatCategory): Promise<string> {
+    if (!this.dataSource) return "~";
+
+    // Use sensible defaults for each category
+    // Currency: 2 decimals (industry standard: $100.00)
+    // Number: 0 decimals, no separator (clean: 1235)
+    // Percentage: 0 decimals (clean: 15%)
+    let decimals = 0;
+    let separator = false;
+    let currency = "";
+
+    const categoryLower = category.toLowerCase();
+
+    switch (category) {
+      case "CURRENCY":
+        decimals = 2;
+        separator = true;
+        currency = this.currentCurrency; // Use currently selected currency
+        break;
+      case "NUMBER":
+        decimals = 0;
+        separator = false;
+        break;
+      case "PERCENTAGE":
+        decimals = 0;
+        separator = false;
+        break;
+      default:
+        // For non-numeric categories (DATE, TIME, etc.), return well-known format IDs
+        if (category === "DATE") return "FMT_DSHT";
+        if (category === "TIME") return "FMT_T12H";
+        if (category === "SCIENTIFIC") return "FMT_SCI2";
+        if (category === "TEXT") return "FMT_TEXT";
+        if (category === "GENERAL") return "~";
+        // Fall back to number format
+        return "FMT_N000";
+    }
+
+    const result = await this.dataSource.client.makeFormatId(
+      categoryLower,
+      decimals,
+      separator,
+      currency
     );
 
-    if (matchingFormats.length === 0) {
-      return "~";
-    }
-
-    // Currency is special - default to 2 decimal places (industry standard: $100.00)
-    if (category === "CURRENCY") {
-      const twoDecimal = matchingFormats.find((f) => f.decimalPlaces === 2);
-      if (twoDecimal) {
-        return twoDecimal.id;
-      }
-    }
-
-    // For other categories, prefer 0 decimal places without thousands separator.
-    // This makes "15%" instead of "15.00%" for Percent, and "1235" instead of "1,235" for Number.
-    const zeroDecimalNoSeparator = matchingFormats.find(
-      (f) => f.decimalPlaces === 0 && !f.useThousandsSeparator
-    );
-    if (zeroDecimalNoSeparator) {
-      return zeroDecimalNoSeparator.id;
-    }
-
-    // Fall back to 0 decimal places (with separator if that's all we have)
-    const zeroDecimal = matchingFormats.find((f) => f.decimalPlaces === 0);
-    if (zeroDecimal) {
-      return zeroDecimal.id;
-    }
-
-    // Fall back to format with 2 decimal places (common default)
-    const twoDecimal = matchingFormats.find((f) => f.decimalPlaces === 2);
-    if (twoDecimal) {
-      return twoDecimal.id;
-    }
-
-    // Otherwise return the first matching format (array is non-empty due to check at line 394)
-    return matchingFormats[0]?.id ?? "~";
+    return result.formatId || "~";
   }
 
   private setDisplayedFormat(formatId: string, category: NumberFormatCategory): void {
@@ -699,7 +681,7 @@ export class FormatControls {
     }
 
     // Get the format ID for this category
-    const formatId = this.getFormatIdForCategory(category);
+    const formatId = await this.getFormatIdForCategory(category);
 
     try {
       // Apply format to cell
@@ -724,23 +706,32 @@ export class FormatControls {
     const cellData = this.getSelectedCellData();
     const currentFormatId = cellData?.formatId || "~";
 
-    // Parse the current format to determine category, decimals, etc.
-    const parsed = this.parseCurrentFormat(currentFormatId);
+    // Get format details from C++ (single source of truth)
+    const details = await this.dataSource.client.getFormatDetails(currentFormatId);
+    if (details.error) {
+      console.error("Failed to get format details:", details.error);
+      return;
+    }
 
-    // Calculate new decimals (0-15 range, dynamically generated)
-    const newDecimals = Math.max(0, Math.min(15, parsed.decimals + delta));
+    // Calculate new decimals (0-15 range)
+    const newDecimals = Math.max(0, Math.min(15, details.decimals + delta));
 
-    // Generate the new format ID dynamically based on category
-    const newFormatId = this.generateFormatId(
-      parsed.category,
+    // Generate the new format ID via C++ API
+    const result = await this.dataSource.client.makeFormatId(
+      details.category,
       newDecimals,
-      parsed.currency,
-      parsed.hasSeparator
+      details.separator,
+      details.currency || ""
     );
 
+    if (result.error || !result.formatId) {
+      console.error("Failed to generate format ID:", result.error);
+      return;
+    }
+
     try {
-      await this.dataSource.setCellFormatAt(position.col, position.row, newFormatId);
-      this.setDisplayedFormat(newFormatId, parsed.category);
+      await this.dataSource.setCellFormatAt(position.col, position.row, result.formatId);
+      this.setDisplayedFormat(result.formatId, details.category.toUpperCase() as NumberFormatCategory);
       this.requestRender();
       this.updateFormulaBar();
     } catch (error) {
@@ -748,126 +739,4 @@ export class FormatControls {
     }
   }
 
-  /**
-   * Parse a format ID to extract category, decimals, currency, and separator settings.
-   */
-  private parseCurrentFormat(formatId: string): {
-    category: NumberFormatCategory;
-    decimals: number;
-    currency: CurrencyType | null;
-    hasSeparator: boolean;
-  } {
-    // Try to find in available formats first
-    const format = this.availableFormats.find((f) => f.id === formatId);
-    if (format) {
-      // Extract currency from format ID if applicable
-      let currency: CurrencyType | null = null;
-      const currencyMatch = formatId.match(/^C([A-Z]{3})_0\d{2}$/);
-      if (currencyMatch) {
-        currency = currencyMatch[1] as CurrencyType;
-      } else if (formatId.startsWith("FMT_C")) {
-        currency = "USD"; // Legacy USD format
-      }
-
-      return {
-        category: format.category.toUpperCase() as NumberFormatCategory,
-        decimals: format.decimalPlaces,
-        currency,
-        hasSeparator: format.useThousandsSeparator,
-      };
-    }
-
-    // Try parsing dynamic format IDs directly
-    // Pattern: FMT_P0XX (percentage)
-    const pctMatch = formatId.match(/^FMT_P0(\d{2})$/);
-    if (pctMatch && pctMatch[1]) {
-      return {
-        category: "PERCENTAGE",
-        decimals: parseInt(pctMatch[1], 10),
-        currency: null,
-        hasSeparator: false,
-      };
-    }
-
-    // Pattern: FMT_N0XX (number without separator)
-    const numMatch = formatId.match(/^FMT_N0(\d{2})$/);
-    if (numMatch && numMatch[1]) {
-      return {
-        category: "NUMBER",
-        decimals: parseInt(numMatch[1], 10),
-        currency: null,
-        hasSeparator: false,
-      };
-    }
-
-    // Pattern: FMT_NSXX (number with separator, 2-digit decimals)
-    const numSepMatch = formatId.match(/^FMT_NS(\d{2})$/);
-    if (numSepMatch && numSepMatch[1]) {
-      return {
-        category: "NUMBER",
-        decimals: parseInt(numSepMatch[1], 10),
-        currency: null,
-        hasSeparator: true,
-      };
-    }
-
-    // Pattern: CXXX_0YY (currency)
-    const currMatch = formatId.match(/^C([A-Z]{3})_0(\d{2})$/);
-    if (currMatch && currMatch[1] && currMatch[2]) {
-      return {
-        category: "CURRENCY",
-        decimals: parseInt(currMatch[2], 10),
-        currency: currMatch[1] as CurrencyType,
-        hasSeparator: true,
-      };
-    }
-
-    // Default to NUMBER with 2 decimals
-    return {
-      category: "NUMBER",
-      decimals: 2,
-      currency: null,
-      hasSeparator: false,
-    };
-  }
-
-  /**
-   * Generate a format ID dynamically based on category, decimals, and options.
-   *
-   * Format ID patterns (all 8 chars):
-   * - FMT_P0XX: Percentage with XX decimal places (00-15)
-   * - FMT_N0XX: Number with XX decimal places (00-15)
-   * - FMT_NSXX: Number with separator, XX decimal places (00-15)
-   * - CXXX_0YY: Currency with 3-letter code and YY decimal places (00-15)
-   */
-  private generateFormatId(
-    category: NumberFormatCategory,
-    decimals: number,
-    currency: CurrencyType | null,
-    hasSeparator: boolean
-  ): string {
-    const dec2 = decimals.toString().padStart(2, "0");
-
-    switch (category) {
-      case "PERCENTAGE":
-        return `FMT_P0${dec2}`;
-
-      case "CURRENCY":
-        if (currency) {
-          return `C${currency}_0${dec2}`;
-        }
-        // Default to USD if no currency specified
-        return `CUSD_0${dec2}`;
-
-      case "NUMBER":
-        if (hasSeparator) {
-          return `FMT_NS${dec2}`;
-        }
-        return `FMT_N0${dec2}`;
-
-      default:
-        // For other categories (DATE, TIME, etc.), just return NUMBER format
-        return `FMT_N0${dec2}`;
-    }
-  }
 }
