@@ -258,10 +258,19 @@ Note: worker-handlers.ts exceeds 500 lines but is kept cohesive because:
 - [x] 5.3b: Extract `worker-collab.ts` (collaboration/sync handling in worker)
 - [x] 5.3c: Keep `worker.ts` as main entry (message routing, WASM loading)
 
-### 5.4: script-panel.ts (1035 lines → 2 files)
+### 5.4: script-panel.ts (1035 lines → 2 files) ✅ COMPLETED
 
-- [ ] 5.4a: Extract `script-autocomplete.ts` (autocomplete UI and logic)
-- [ ] 5.4b: Keep `script-panel.ts` (editor panel, syntax highlighting)
+Split into 2 files:
+- script-panel.ts: 684 lines (editor panel, syntax highlighting, tab indent/dedent)
+- script-autocomplete.ts: 485 lines (autocomplete UI and logic)
+
+Note: script-panel.ts exceeds 500 lines but is kept cohesive because:
+- Tab indent/dedent requires tokenizer access which is initialized in constructor
+- Console panel management is tightly coupled with panel visibility
+- Splitting further would require passing many callbacks between modules
+
+- [x] 5.4a: Extract `script-autocomplete.ts` (autocomplete UI and logic)
+- [x] 5.4b: Keep `script-panel.ts` (editor panel, syntax highlighting)
 
 ## Phase 6: Final Review
 

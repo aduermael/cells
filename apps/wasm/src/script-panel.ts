@@ -14,8 +14,12 @@
 // - Line numbers and horizontal scrolling
 // - Execute scripts via C++ Luau sandbox
 // - Display output, errors, and instruction count
-// - Autocomplete suggestions for Cells API
 // - Panel resizing via drag handle
+// - Tab indentation/dedentation with smart block analysis
+//
+// Related modules:
+// - script-autocomplete.ts: Autocomplete popup UI and logic
+// - syntax-highlighter.ts: Luau syntax highlighting
 //
 // Luau API available in scripts:
 // - getCell(ref), setCell(ref, value), getCells(range)
@@ -25,7 +29,8 @@
 // =============================================================================
 
 import { SyntaxHighlighter, type TokenizeFunction } from "./syntax-highlighter";
-import type { LuauToken, AutocompleteResult, AutocompleteSuggestion } from "./client-types";
+import { ScriptAutocomplete } from "./script-autocomplete";
+import type { LuauToken, AutocompleteResult } from "./client-types";
 
 // =============================================================================
 // Types
@@ -77,15 +82,9 @@ export class ScriptPanel {
   private executeScript: (script: string) => Promise<ScriptResult>;
   private onScriptExecuted: () => void | Promise<void>;
   private tokenize?: TokenizeFunction;
-  private getAutocomplete?: (source: string, line: number, column: number) => Promise<AutocompleteResult>;
 
-  // Autocomplete UI elements
-  private autocompletePopup: HTMLElement | null = null;
-  private autocompleteItems: AutocompleteSuggestion[] = [];
-  private autocompleteSelectedIndex: number = 0;
-  private autocompleteVisible: boolean = false;
-  private autocompleteDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-  private autocompleteUserNavigated: boolean = false; // True if user navigated with arrows
+  // Autocomplete (separate module)
+  private autocomplete: ScriptAutocomplete | null = null;
 
   // =========================================================================
   // State
@@ -158,8 +157,11 @@ export class ScriptPanel {
 
     // Initialize autocomplete if provided
     if (config.getAutocomplete) {
-      this.getAutocomplete = config.getAutocomplete;
-      this.createAutocompletePopup();
+      this.autocomplete = new ScriptAutocomplete({
+        editor: this.editor,
+        panel: this.panel,
+        getAutocomplete: config.getAutocomplete,
+      });
     }
 
     this.setupEventListeners();
@@ -337,7 +339,7 @@ export class ScriptPanel {
     // Keyboard shortcuts in editor
     this.editor.addEventListener("keydown", (e) => {
       // Handle autocomplete navigation first
-      if (this.handleAutocompleteKey(e)) {
+      if (this.autocomplete?.handleKey(e)) {
         return;
       }
 
@@ -349,9 +351,9 @@ export class ScriptPanel {
       }
       // Escape: hide autocomplete first, then console, then panel
       if (e.key === "Escape") {
-        if (this.autocompleteVisible) {
+        if (this.autocomplete?.isVisible()) {
           e.preventDefault();
-          this.hideAutocomplete();
+          this.autocomplete.hide();
           return;
         }
         if (this.consoleVisible) {
@@ -376,21 +378,6 @@ export class ScriptPanel {
         this.handleTabDedent();
         return;
       }
-    });
-
-    // Trigger autocomplete as user types (debounced)
-    this.editor.addEventListener("input", () => {
-      this.triggerAutocompleteDebounced();
-    });
-
-    // Hide autocomplete when editor loses focus
-    this.editor.addEventListener("blur", () => {
-      // Small delay to allow click on autocomplete item
-      setTimeout(() => {
-        if (!this.editor.contains(document.activeElement)) {
-          this.hideAutocomplete();
-        }
-      }, 100);
     });
 
     // Resize handling
@@ -693,366 +680,5 @@ export class ScriptPanel {
     }
 
     return 0;
-  }
-
-  // =========================================================================
-  // Autocomplete
-  // =========================================================================
-
-  /**
-   * Create the autocomplete popup element
-   */
-  private createAutocompletePopup(): void {
-    this.autocompletePopup = document.createElement("div");
-    this.autocompletePopup.className = "autocomplete-popup";
-    this.autocompletePopup.style.display = "none";
-    // Append to panel so it's positioned relative to the editor
-    this.panel.appendChild(this.autocompletePopup);
-  }
-
-  /**
-   * Get the current cursor position as (line, column) - 0-indexed
-   */
-  private getCursorPosition(): { line: number; column: number } {
-    const value = this.editor.value;
-    const cursorPos = this.editor.selectionStart;
-
-    // Count lines before cursor
-    const textBeforeCursor = value.substring(0, cursorPos);
-    const lines = textBeforeCursor.split("\n");
-    const line = lines.length - 1;
-    const column = (lines[lines.length - 1] ?? "").length;
-
-    return { line, column };
-  }
-
-  /**
-   * Get pixel position for cursor (for popup placement)
-   */
-  private getCursorPixelPosition(): { x: number; y: number } {
-    const value = this.editor.value;
-    const cursorPos = this.editor.selectionStart;
-
-    // Count lines and get column
-    const textBeforeCursor = value.substring(0, cursorPos);
-    const lines = textBeforeCursor.split("\n");
-    const lineIndex = lines.length - 1;
-    const column = (lines[lines.length - 1] ?? "").length;
-
-    // Approximate character dimensions (monospace font)
-    const lineHeight = 19.5; // 13px * 1.5 line-height
-    const charWidth = 7.8; // approximate for 13px monospace
-
-    // Account for padding (12px) and line numbers gutter (40px)
-    const editorRect = this.editor.getBoundingClientRect();
-    const x = editorRect.left + 12 + column * charWidth;
-    const y = editorRect.top + 12 + (lineIndex + 1) * lineHeight - this.editor.scrollTop;
-
-    return { x, y };
-  }
-
-  /**
-   * Trigger autocomplete at current cursor position
-   */
-  private async triggerAutocomplete(): Promise<void> {
-    if (!this.getAutocomplete) return;
-
-    const source = this.editor.value;
-    const { line, column } = this.getCursorPosition();
-
-    try {
-      const result = await this.getAutocomplete(source, line, column);
-      if (result.suggestions.length > 0) {
-        this.showAutocomplete(result.suggestions);
-      } else {
-        this.hideAutocomplete();
-      }
-    } catch {
-      this.hideAutocomplete();
-    }
-  }
-
-  /**
-   * Trigger autocomplete with debouncing (100ms delay)
-   */
-  private triggerAutocompleteDebounced(): void {
-    if (!this.getAutocomplete) return;
-
-    // Cancel any pending request
-    if (this.autocompleteDebounceTimer) {
-      clearTimeout(this.autocompleteDebounceTimer);
-    }
-
-    this.autocompleteDebounceTimer = setTimeout(() => {
-      this.autocompleteDebounceTimer = null;
-      this.triggerAutocomplete();
-    }, 100);
-  }
-
-  /**
-   * Show autocomplete popup with suggestions
-   */
-  private showAutocomplete(suggestions: AutocompleteSuggestion[]): void {
-    if (!this.autocompletePopup) return;
-
-    // Sort suggestions: type-correct first, then correctFunctionResult, then rest
-    const sortedSuggestions = this.sortSuggestionsByTypeCorrectness(suggestions);
-
-    this.autocompleteItems = sortedSuggestions;
-    this.autocompleteSelectedIndex = 0;
-    this.autocompleteVisible = true;
-    this.autocompleteUserNavigated = false; // Reset navigation state for new suggestions
-
-    // Build popup content
-    this.autocompletePopup.innerHTML = "";
-    sortedSuggestions.forEach((suggestion, index) => {
-      const item = document.createElement("div");
-      item.className = "autocomplete-item" + (index === 0 ? " selected" : "");
-      // Add type-correct class for visual highlighting
-      if (suggestion.typeCorrect === "correct") {
-        item.classList.add("type-correct");
-      } else if (suggestion.typeCorrect === "correctFunctionResult") {
-        item.classList.add("type-correct-fn");
-      }
-      item.dataset.index = String(index);
-
-      // Kind icon
-      const icon = document.createElement("span");
-      icon.className = "autocomplete-icon";
-      icon.textContent = this.getKindIcon(suggestion.kind);
-      item.appendChild(icon);
-
-      // Label
-      const label = document.createElement("span");
-      label.className = "autocomplete-label";
-      label.textContent = suggestion.label;
-      if (suggestion.deprecated) {
-        label.classList.add("deprecated");
-      }
-      item.appendChild(label);
-
-      // Detail (type info)
-      if (suggestion.detail) {
-        const detail = document.createElement("span");
-        detail.className = "autocomplete-detail";
-        detail.textContent = suggestion.detail;
-        item.appendChild(detail);
-      }
-
-      // Type correctness indicator
-      if (suggestion.typeCorrect === "correct" || suggestion.typeCorrect === "correctFunctionResult") {
-        const indicator = document.createElement("span");
-        indicator.className = "autocomplete-type-indicator";
-        indicator.textContent = "✓";
-        indicator.title = suggestion.typeCorrect === "correct"
-          ? "Matches expected type"
-          : "Returns expected type";
-        item.appendChild(indicator);
-      }
-
-      // Click handler
-      item.addEventListener("mousedown", (e) => {
-        e.preventDefault(); // Prevent blur
-        this.acceptAutocomplete(index);
-      });
-
-      // Hover handler
-      item.addEventListener("mouseenter", () => {
-        this.selectAutocompleteItem(index);
-      });
-
-      this.autocompletePopup!.appendChild(item);
-    });
-
-    // Position popup near cursor
-    const { x, y } = this.getCursorPixelPosition();
-    const panelRect = this.panel.getBoundingClientRect();
-
-    // Position relative to panel
-    this.autocompletePopup.style.left = `${x - panelRect.left}px`;
-    this.autocompletePopup.style.top = `${y - panelRect.top}px`;
-    this.autocompletePopup.style.display = "block";
-
-    // Ensure popup doesn't overflow viewport
-    requestAnimationFrame(() => {
-      if (!this.autocompletePopup) return;
-      const popupRect = this.autocompletePopup.getBoundingClientRect();
-
-      // Check right overflow
-      if (popupRect.right > window.innerWidth - 8) {
-        this.autocompletePopup.style.left = `${window.innerWidth - popupRect.width - panelRect.left - 8}px`;
-      }
-
-      // Check bottom overflow - show above cursor if needed
-      if (popupRect.bottom > window.innerHeight - 8) {
-        const lineHeight = 19.5;
-        this.autocompletePopup.style.top = `${y - panelRect.top - popupRect.height - lineHeight}px`;
-      }
-    });
-  }
-
-  /**
-   * Hide autocomplete popup
-   */
-  private hideAutocomplete(): void {
-    if (!this.autocompletePopup) return;
-    this.autocompletePopup.style.display = "none";
-    this.autocompleteVisible = false;
-    this.autocompleteItems = [];
-  }
-
-  /**
-   * Select an autocomplete item by index
-   */
-  private selectAutocompleteItem(index: number): void {
-    if (!this.autocompletePopup) return;
-
-    // Update visual selection
-    const items = this.autocompletePopup.querySelectorAll(".autocomplete-item");
-    items.forEach((item, i) => {
-      item.classList.toggle("selected", i === index);
-    });
-
-    this.autocompleteSelectedIndex = index;
-
-    // Scroll into view if needed
-    const selectedItem = items[index] as HTMLElement;
-    if (selectedItem) {
-      selectedItem.scrollIntoView({ block: "nearest" });
-    }
-  }
-
-  /**
-   * Accept the selected or specified autocomplete suggestion
-   */
-  private acceptAutocomplete(index?: number): void {
-    const idx = index ?? this.autocompleteSelectedIndex;
-    const suggestion = this.autocompleteItems[idx];
-    if (!suggestion) {
-      this.hideAutocomplete();
-      return;
-    }
-
-    // Find the word being typed (to replace it)
-    const value = this.editor.value;
-    const cursorPos = this.editor.selectionStart;
-
-    // Find word start (go back until non-identifier char)
-    let wordStart = cursorPos;
-    while (wordStart > 0 && /[a-zA-Z0-9_]/.test(value[wordStart - 1] ?? "")) {
-      wordStart--;
-    }
-
-    // Replace the partial word with the completion
-    const before = value.substring(0, wordStart);
-    const after = value.substring(cursorPos);
-    const insertText = suggestion.insertText;
-
-    this.editor.value = before + insertText + after;
-
-    // Set cursor after inserted text
-    const newCursorPos = wordStart + insertText.length;
-    this.editor.selectionStart = this.editor.selectionEnd = newCursorPos;
-
-    // Trigger input event to update syntax highlighting
-    this.editor.dispatchEvent(new Event("input", { bubbles: true }));
-
-    this.hideAutocomplete();
-    this.editor.focus();
-  }
-
-  /**
-   * Handle keyboard navigation in autocomplete popup
-   * Returns true if the key was handled
-   */
-  private handleAutocompleteKey(e: KeyboardEvent): boolean {
-    if (!this.autocompleteVisible) return false;
-
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        this.autocompleteUserNavigated = true;
-        this.selectAutocompleteItem(
-          Math.min(this.autocompleteSelectedIndex + 1, this.autocompleteItems.length - 1)
-        );
-        return true;
-
-      case "ArrowUp":
-        e.preventDefault();
-        this.autocompleteUserNavigated = true;
-        this.selectAutocompleteItem(
-          Math.max(this.autocompleteSelectedIndex - 1, 0)
-        );
-        return true;
-
-      case "Tab":
-        // Tab always accepts (common IDE behavior)
-        e.preventDefault();
-        this.acceptAutocomplete();
-        return true;
-
-      case "Enter":
-        // Enter only accepts if user has navigated with arrows
-        // Otherwise, let Enter insert a newline (fall through)
-        if (this.autocompleteUserNavigated) {
-          e.preventDefault();
-          this.acceptAutocomplete();
-          return true;
-        }
-        // Hide autocomplete but don't prevent Enter
-        this.hideAutocomplete();
-        return false;
-
-      case "Escape":
-        e.preventDefault();
-        this.hideAutocomplete();
-        return true;
-
-      default:
-        return false;
-    }
-  }
-
-  /**
-   * Get icon for suggestion kind
-   */
-  private getKindIcon(kind: AutocompleteSuggestion["kind"]): string {
-    switch (kind) {
-      case "function": return "ƒ";
-      case "property": return "●";
-      case "variable": return "x";
-      case "keyword": return "◆";
-      case "module": return "◫";
-      case "class": return "◇";
-      case "text": return "T";
-      case "path": return "/";
-      default: return "·";
-    }
-  }
-
-  /**
-   * Sort suggestions by type correctness (Phase 4b)
-   * Order: correct > correctFunctionResult > none
-   */
-  private sortSuggestionsByTypeCorrectness(
-    suggestions: AutocompleteSuggestion[]
-  ): AutocompleteSuggestion[] {
-    return [...suggestions].sort((a, b) => {
-      const scoreA = this.getTypeCorrectScore(a.typeCorrect);
-      const scoreB = this.getTypeCorrectScore(b.typeCorrect);
-      // Higher score first
-      return scoreB - scoreA;
-    });
-  }
-
-  /**
-   * Get numeric score for type correctness (for sorting)
-   */
-  private getTypeCorrectScore(typeCorrect: AutocompleteSuggestion["typeCorrect"]): number {
-    switch (typeCorrect) {
-      case "correct": return 2;
-      case "correctFunctionResult": return 1;
-      default: return 0;
-    }
   }
 }
