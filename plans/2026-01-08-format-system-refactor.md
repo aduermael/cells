@@ -195,14 +195,19 @@ When a formula is entered into a cell with GENERAL format, Excel automatically i
   - Apply the inherited format ID to the cell
   - This happens automatically at formula entry time, transparent to UI
 
-- [ ] 7c: Add unit tests for format inheritance
-  - Single cell reference: `=A1` inherits A1's format
-  - Multiple refs same format: `=A1+B1` (both currency) → currency
-  - Multiple refs different formats: `=A1+B1` (currency + percentage) → priority rules
-  - Literal with ref: `=A1*2` (A1 is currency) → currency (literal doesn't affect)
-  - Range references: `=SUM(A1:A5)` where A1:A5 have same format → inherit
-  - Mixed range: `=SUM(A1:A5)` with mixed formats → priority rules
-  - Nested formulas: `=A1+B1` where A1 contains `=C1` → use A1's format (not C1's)
+- [x] 7c: Add unit tests for format inheritance (26 tests in number_format_test.cc)
+  - Format priority ordering tests (6 tests)
+  - Single cell reference inheritance (currency, percentage)
+  - GENERAL/empty/~ formats are not inherited
+  - Binary operations with same/different formats
+  - Currency wins over percentage regardless of order
+  - More decimals wins in same category
+  - Separator beats no separator at same decimals
+  - Literals don't affect inheritance
+  - Function calls inherit from args
+  - Range references inherit from corners
+  - Unary operations inherit from operand
+  - Nested formulas use cell's format (not underlying formula's)
 
 - [ ] 7d: Add E2E tests for format inheritance
   - Enter currency in A1, enter `=A1*2` in B1, verify B1 shows currency format

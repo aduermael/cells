@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include "core/cells/formula_ast.h"
+
 namespace cells {
 namespace {
 
@@ -637,6 +639,321 @@ TEST(MakeFormatIdTest, UnsupportedCategory) {
     EXPECT_EQ(makeFormatId("date", 0, false, ""), "");
     EXPECT_EQ(makeFormatId("time", 0, false, ""), "");
     EXPECT_EQ(makeFormatId("general", 0, false, ""), "");
+}
+
+// --- Format Priority Tests ---
+
+TEST(FormatPriorityTest, DateTimeHighestPriority) {
+    EXPECT_EQ(getFormatPriority(NumberFormatCategory::DATE), 100);
+    EXPECT_EQ(getFormatPriority(NumberFormatCategory::TIME), 100);
+    EXPECT_EQ(getFormatPriority(NumberFormatCategory::DATE_TIME), 100);
+}
+
+TEST(FormatPriorityTest, CurrencySecondPriority) {
+    EXPECT_EQ(getFormatPriority(NumberFormatCategory::CURRENCY), 80);
+    EXPECT_EQ(getFormatPriority(NumberFormatCategory::ACCOUNTING), 80);
+}
+
+TEST(FormatPriorityTest, PercentageThirdPriority) {
+    EXPECT_EQ(getFormatPriority(NumberFormatCategory::PERCENTAGE), 60);
+}
+
+TEST(FormatPriorityTest, NumberFourthPriority) {
+    EXPECT_EQ(getFormatPriority(NumberFormatCategory::NUMBER), 40);
+}
+
+TEST(FormatPriorityTest, GeneralLowestPriority) {
+    EXPECT_EQ(getFormatPriority(NumberFormatCategory::GENERAL), 0);
+    EXPECT_EQ(getFormatPriority(NumberFormatCategory::TEXT), 0);
+}
+
+TEST(FormatPriorityTest, PriorityOrdering) {
+    // Verify the ordering is correct
+    EXPECT_GT(getFormatPriority(NumberFormatCategory::DATE),
+              getFormatPriority(NumberFormatCategory::CURRENCY));
+    EXPECT_GT(getFormatPriority(NumberFormatCategory::CURRENCY),
+              getFormatPriority(NumberFormatCategory::PERCENTAGE));
+    EXPECT_GT(getFormatPriority(NumberFormatCategory::PERCENTAGE),
+              getFormatPriority(NumberFormatCategory::NUMBER));
+    EXPECT_GT(getFormatPriority(NumberFormatCategory::NUMBER),
+              getFormatPriority(NumberFormatCategory::GENERAL));
+}
+
+// --- Format Inheritance Tests ---
+
+TEST(InferFormatTest, NullAstReturnsEmpty) {
+    FormatLookup lookup = [](const std::string&) { return "CUSD_002"; };
+    EXPECT_EQ(inferFormatFromFormula(nullptr, lookup), "");
+}
+
+TEST(InferFormatTest, NoReferencesReturnsEmpty) {
+    // Create an AST with just a number literal
+    NumberLiteralNode node(42.0);
+    FormatLookup lookup = [](const std::string&) { return "CUSD_002"; };
+    EXPECT_EQ(inferFormatFromFormula(&node, lookup), "");
+}
+
+TEST(InferFormatTest, SingleCellRefInheritsCurrency) {
+    // Create an AST with a cell reference that resolves to a cell ID
+    CellRefNode cellRef("A", 1, false, false);
+    cellRef.cellId = "CELL_001";  // Resolved cell ID
+
+    FormatLookup lookup = [](const std::string& cellId) {
+        if (cellId == "CELL_001") {
+            return std::string("CUSD_002");  // USD currency, 2 decimals
+        }
+        return std::string("");
+    };
+
+    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "CUSD_002");
+}
+
+TEST(InferFormatTest, SingleCellRefInheritsPercentage) {
+    CellRefNode cellRef("B", 2, true, true);
+    cellRef.cellId = "CELL_002";
+
+    FormatLookup lookup = [](const std::string& cellId) {
+        if (cellId == "CELL_002") {
+            return std::string("FMT_P002");  // Percentage, 2 decimals
+        }
+        return std::string("");
+    };
+
+    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "FMT_P002");
+}
+
+TEST(InferFormatTest, GeneralFormatNotInherited) {
+    CellRefNode cellRef("A", 1, false, false);
+    cellRef.cellId = "CELL_001";
+
+    // Cell has GENERAL format - should not be inherited
+    FormatLookup lookup = [](const std::string&) { return std::string("FMT_GEN0"); };
+
+    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "");
+}
+
+TEST(InferFormatTest, EmptyFormatNotInherited) {
+    CellRefNode cellRef("A", 1, false, false);
+    cellRef.cellId = "CELL_001";
+
+    // Cell has no format - should not be inherited
+    FormatLookup lookup = [](const std::string&) { return std::string(""); };
+
+    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "");
+}
+
+TEST(InferFormatTest, TildeFormatNotInherited) {
+    CellRefNode cellRef("A", 1, false, false);
+    cellRef.cellId = "CELL_001";
+
+    // "~" means null format - should not be inherited
+    FormatLookup lookup = [](const std::string&) { return std::string("~"); };
+
+    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "");
+}
+
+TEST(InferFormatTest, BinaryOpBothSameFormat) {
+    // =A1+B1 where both have currency format
+    auto left = std::make_unique<CellRefNode>("A", 1, false, false);
+    left->cellId = "CELL_A1";
+    auto right = std::make_unique<CellRefNode>("B", 1, false, false);
+    right->cellId = "CELL_B1";
+
+    BinaryOpNode binOp(BinaryOp::ADD, std::move(left), std::move(right));
+
+    FormatLookup lookup = [](const std::string& cellId) {
+        if (cellId == "CELL_A1" || cellId == "CELL_B1") {
+            return std::string("CUSD_002");  // Both have currency
+        }
+        return std::string("");
+    };
+
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "CUSD_002");
+}
+
+TEST(InferFormatTest, BinaryOpCurrencyWinsOverPercentage) {
+    // =A1+B1 where A1 is percentage, B1 is currency
+    // Currency has higher priority, so it should win
+    auto left = std::make_unique<CellRefNode>("A", 1, false, false);
+    left->cellId = "CELL_A1";
+    auto right = std::make_unique<CellRefNode>("B", 1, false, false);
+    right->cellId = "CELL_B1";
+
+    BinaryOpNode binOp(BinaryOp::ADD, std::move(left), std::move(right));
+
+    FormatLookup lookup = [](const std::string& cellId) {
+        if (cellId == "CELL_A1") {
+            return std::string("FMT_P002");  // Percentage
+        }
+        if (cellId == "CELL_B1") {
+            return std::string("CUSD_002");  // Currency (higher priority)
+        }
+        return std::string("");
+    };
+
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "CUSD_002");
+}
+
+TEST(InferFormatTest, BinaryOpCurrencyWinsRegardlessOfOrder) {
+    // Same as above but with reversed order in formula
+    auto left = std::make_unique<CellRefNode>("A", 1, false, false);
+    left->cellId = "CELL_A1";
+    auto right = std::make_unique<CellRefNode>("B", 1, false, false);
+    right->cellId = "CELL_B1";
+
+    BinaryOpNode binOp(BinaryOp::ADD, std::move(left), std::move(right));
+
+    FormatLookup lookup = [](const std::string& cellId) {
+        if (cellId == "CELL_A1") {
+            return std::string("CUSD_002");  // Currency (higher priority)
+        }
+        if (cellId == "CELL_B1") {
+            return std::string("FMT_P002");  // Percentage
+        }
+        return std::string("");
+    };
+
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "CUSD_002");
+}
+
+TEST(InferFormatTest, MoreDecimalsWinsInSameCategory) {
+    // =A1+B1 where both are NUMBER but with different decimals
+    auto left = std::make_unique<CellRefNode>("A", 1, false, false);
+    left->cellId = "CELL_A1";
+    auto right = std::make_unique<CellRefNode>("B", 1, false, false);
+    right->cellId = "CELL_B1";
+
+    BinaryOpNode binOp(BinaryOp::ADD, std::move(left), std::move(right));
+
+    FormatLookup lookup = [](const std::string& cellId) {
+        if (cellId == "CELL_A1") {
+            return std::string("FMT_N002");  // NUMBER, 2 decimals
+        }
+        if (cellId == "CELL_B1") {
+            return std::string("FMT_N004");  // NUMBER, 4 decimals (more specific)
+        }
+        return std::string("");
+    };
+
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "FMT_N004");
+}
+
+TEST(InferFormatTest, LiteralWithRefInheritsFromRef) {
+    // =A1*2 where A1 has currency format
+    // Literal (2) doesn't affect format inheritance
+    auto left = std::make_unique<CellRefNode>("A", 1, false, false);
+    left->cellId = "CELL_A1";
+    auto right = std::make_unique<NumberLiteralNode>(2.0);
+
+    BinaryOpNode binOp(BinaryOp::MULTIPLY, std::move(left), std::move(right));
+
+    FormatLookup lookup = [](const std::string& cellId) {
+        if (cellId == "CELL_A1") {
+            return std::string("CUSD_002");
+        }
+        return std::string("");
+    };
+
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "CUSD_002");
+}
+
+TEST(InferFormatTest, FunctionCallInheritsFromArgs) {
+    // =SUM(A1, B1) where both have percentage format
+    auto arg1 = std::make_unique<CellRefNode>("A", 1, false, false);
+    arg1->cellId = "CELL_A1";
+    auto arg2 = std::make_unique<CellRefNode>("B", 1, false, false);
+    arg2->cellId = "CELL_B1";
+
+    FunctionCallNode funcCall("SUM");
+    funcCall.args.push_back(std::move(arg1));
+    funcCall.args.push_back(std::move(arg2));
+
+    FormatLookup lookup = [](const std::string&) {
+        return std::string("FMT_P002");  // Both have percentage
+    };
+
+    EXPECT_EQ(inferFormatFromFormula(&funcCall, lookup), "FMT_P002");
+}
+
+TEST(InferFormatTest, RangeRefInheritsFromCorners) {
+    // Range A1:B2 - corners are A1 and B2
+    auto topLeft = std::make_unique<CellRefNode>("A", 1, false, false);
+    topLeft->cellId = "CELL_A1";
+    auto bottomRight = std::make_unique<CellRefNode>("B", 2, false, false);
+    bottomRight->cellId = "CELL_B2";
+
+    RangeRefNode rangeRef(std::move(topLeft), std::move(bottomRight));
+
+    FormatLookup lookup = [](const std::string& cellId) {
+        if (cellId == "CELL_A1") {
+            return std::string("CUSD_002");  // Currency
+        }
+        if (cellId == "CELL_B2") {
+            return std::string("FMT_P002");  // Percentage
+        }
+        return std::string("");
+    };
+
+    // Currency wins over percentage
+    EXPECT_EQ(inferFormatFromFormula(&rangeRef, lookup), "CUSD_002");
+}
+
+TEST(InferFormatTest, UnaryOpInheritsFromOperand) {
+    // =-A1 (negation)
+    auto operand = std::make_unique<CellRefNode>("A", 1, false, false);
+    operand->cellId = "CELL_A1";
+
+    UnaryOpNode unaryOp(UnaryOp::NEGATE, std::move(operand));
+
+    FormatLookup lookup = [](const std::string& cellId) {
+        if (cellId == "CELL_A1") {
+            return std::string("CUSD_002");
+        }
+        return std::string("");
+    };
+
+    EXPECT_EQ(inferFormatFromFormula(&unaryOp, lookup), "CUSD_002");
+}
+
+TEST(InferFormatTest, UseCellFormatNotUnderlyingFormula) {
+    // When A1 contains =B1 and has currency format, and B1 has percentage format,
+    // referencing =A1 should use A1's format (currency), not B1's (percentage)
+    // This is tested by the format lookup returning A1's explicit format
+    CellRefNode cellRef("A", 1, false, false);
+    cellRef.cellId = "CELL_A1";
+
+    FormatLookup lookup = [](const std::string& cellId) {
+        if (cellId == "CELL_A1") {
+            // A1's formatId is currency (it has a formula =B1 but format is currency)
+            return std::string("CUSD_002");
+        }
+        return std::string("");
+    };
+
+    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "CUSD_002");
+}
+
+TEST(InferFormatTest, SeparatorBeatsNoSeparatorSameDecimals) {
+    // =A1+B1 where A1 has NUMBER, B1 has NUMBER with separator (same decimals)
+    auto left = std::make_unique<CellRefNode>("A", 1, false, false);
+    left->cellId = "CELL_A1";
+    auto right = std::make_unique<CellRefNode>("B", 1, false, false);
+    right->cellId = "CELL_B1";
+
+    BinaryOpNode binOp(BinaryOp::ADD, std::move(left), std::move(right));
+
+    FormatLookup lookup = [](const std::string& cellId) {
+        if (cellId == "CELL_A1") {
+            return std::string("FMT_N002");  // NUMBER, 2 decimals, no separator
+        }
+        if (cellId == "CELL_B1") {
+            return std::string("FMT_NS02");  // NUMBER, 2 decimals, with separator
+        }
+        return std::string("");
+    };
+
+    // FMT_NS02 (with separator) should win
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "FMT_NS02");
 }
 
 }  // namespace

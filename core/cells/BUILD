@@ -55,6 +55,7 @@ cc_test(
     name = "number_format_test",
     srcs = ["number_format_test.cc"],
     deps = [
+        ":formula_ast",
         ":number_format",
         "@googletest//:gtest_main",
     ],
