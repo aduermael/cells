@@ -198,6 +198,9 @@ export class AppEventManager {
     private fillDragStartX = 0;
     private fillDragStartY = 0;
 
+    /** Pointer ID captured during drag operations (null if not captured) */
+    private capturedPointerId: number | null = null;
+
     constructor(config: AppEventManagerConfig) {
         this.config = config;
     }
@@ -422,11 +425,11 @@ export class AppEventManager {
             passive: false,
         });
 
-        // Mouse interactions
-        canvas.addEventListener("mousedown", (e) => this.handleMouseDown(e));
-        canvas.addEventListener("mousemove", (e) => this.handleMouseMove(e));
-        canvas.addEventListener("mouseup", (e) => this.handleMouseUp(e));
-        canvas.addEventListener("mouseleave", () => this.handleMouseLeave());
+        // Pointer interactions (pointer events allow capture for drag outside canvas)
+        canvas.addEventListener("pointerdown", (e) => this.handleMouseDown(e));
+        canvas.addEventListener("pointermove", (e) => this.handleMouseMove(e));
+        canvas.addEventListener("pointerup", (e) => this.handleMouseUp(e));
+        canvas.addEventListener("pointerleave", () => this.handleMouseLeave());
         canvas.addEventListener("dblclick", (e) => this.handleDblClick(e));
 
         // Context menu (right-click)
@@ -499,7 +502,7 @@ export class AppEventManager {
         updateScrollbars();
     }
 
-    private handleMouseDown(e: MouseEvent): void {
+    private handleMouseDown(e: PointerEvent): void {
         const {
             canvas,
             uiStateMachine,
@@ -750,6 +753,9 @@ export class AppEventManager {
                 const selStart = getSelectionStart();
                 const isShiftClick = e.shiftKey && selStart;
 
+                // Capture pointer ID for drag outside canvas
+                const pointerId = e.pointerId;
+
                 // Helper to apply selection
                 const applySelection = () => {
                     if (isShiftClick && selStart) {
@@ -768,6 +774,9 @@ export class AppEventManager {
                         selectionStart: isShiftClick ? selStart : { col, row },
                         selectionEnd: { col, row },
                     });
+                    // Capture pointer to continue tracking outside canvas
+                    canvas.setPointerCapture(pointerId);
+                    this.capturedPointerId = pointerId;
                     render();
                     updateFormulaBar();
                     canvas.focus();
@@ -787,7 +796,7 @@ export class AppEventManager {
         }
     }
 
-    private handleMouseMove(e: MouseEvent): void {
+    private handleMouseMove(e: PointerEvent): void {
         const {
             canvas,
             uiStateMachine,
@@ -994,15 +1003,18 @@ export class AppEventManager {
         }
 
         // Range selection drag
-        if (
-            uiStateMachine.isInState("SELECTING") &&
-            x > HEADER_WIDTH &&
-            y > HEADER_HEIGHT
-        ) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+        // When pointer is captured, allow tracking even outside canvas bounds
+        const isPointerCaptured = this.capturedPointerId !== null;
+        const inGridArea = x > HEADER_WIDTH && y > HEADER_HEIGHT;
+        if (uiStateMachine.isInState("SELECTING") && (inGridArea || isPointerCaptured)) {
+            // Clamp coordinates to valid grid area when outside bounds
+            const clampedX = Math.max(HEADER_WIDTH + 1, x);
+            const clampedY = Math.max(HEADER_HEIGHT + 1, y);
+
+            const col = getColAtX(clampedX, scrollX, colWidths, sheetInfo.colCount);
             const discoveredRows = this.config.getDiscoveredRows();
             const row = getRowAtY(
-                y,
+                clampedY,
                 scrollY,
                 rowHeights,
                 Math.max(sheetInfo.rowCount, discoveredRows),
@@ -1107,7 +1119,7 @@ export class AppEventManager {
         }
     }
 
-    private async handleMouseUp(e: MouseEvent): Promise<void> {
+    private async handleMouseUp(e: PointerEvent): Promise<void> {
         const {
             canvas,
             uiStateMachine,
@@ -1195,6 +1207,11 @@ export class AppEventManager {
         // End range selection
         if (uiStateMachine.isInState("SELECTING")) {
             uiStateMachine.transition(UIEvent.STOP_SELECTING);
+            // Release pointer capture
+            if (this.capturedPointerId !== null) {
+                canvas.releasePointerCapture(this.capturedPointerId);
+                this.capturedPointerId = null;
+            }
             // Keep selectionStart and selectionEnd as they are
             // selectedCell should be set to selectionStart (the anchor)
             const selStart = getSelectionStart();
@@ -1372,8 +1389,8 @@ export class AppEventManager {
         setPendingDragColumn(false);
         setPendingDragRow(false);
 
-        // End range selection on mouse leave
-        if (uiStateMachine.isInState("SELECTING")) {
+        // End range selection on mouse leave (unless pointer is captured for drag-outside-canvas)
+        if (uiStateMachine.isInState("SELECTING") && this.capturedPointerId === null) {
             uiStateMachine.transition(UIEvent.STOP_SELECTING);
             const selStart = getSelectionStart();
             if (selStart) {
