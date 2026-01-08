@@ -1,22 +1,32 @@
 # CRDT & Collaboration
 
-## Implementation Status
+## Core Principle: All Mutations Through CRDT Operations
 
-**Current state (December 2024):** Core CRDT infrastructure implemented.
+**ALL workbook mutations MUST go through CRDT operations.** This is not optional.
+
+This architectural constraint ensures:
+1. **Collaboration by design** - Every change is automatically syncable
+2. **No special cases** - Same code path for local edits and remote syncs
+3. **Deterministic state** - State is always derivable from operation log
+4. **Clean abstractions** - UI layer never directly mutates the model
+
+```
+❌ WRONG: sheet->setCellValue(cellId, "hello");
+✅ RIGHT: applyOperation(SetValueOp{cellId, "hello", hlc});
+```
+
+## Implementation Status
 
 | Component | Status | Source Files |
 |-----------|--------|--------------|
-| Hybrid Logical Clock | ✅ Implemented | `core/cells/hlc.h`, `hlc.cc` |
-| Cell operations (CRDT) | ✅ Implemented | `core/cells/crdt.h`, `crdt.cc` |
-| Operation types | ✅ Implemented | `core/cells/operation.h`, `operation.cc` |
-| Operation log (OpLog) | ✅ Implemented | `core/cells/oplog.h`, `oplog.cc` |
-| Sync manager | ✅ Implemented | `core/cells/sync_manager.h`, `sync_manager.cc` |
-| Branch-based undo/redo | ❌ Not implemented | — |
-| Presence/cursors | ❌ Not implemented | — |
-
-The core CRDT engine is fully functional, supporting conflict-free collaborative editing with operation-based synchronization. Branch-based undo/redo and presence features are planned for future implementation.
-
----
+| Hybrid Logical Clock | Implemented | `core/cells/hlc.h`, `hlc.cc` |
+| CRDT operations | Implemented | `core/cells/crdt.h`, `crdt.cc` |
+| Operation types | Implemented | `core/cells/operation.h`, `operation.cc` |
+| Operation log (OpLog) | Implemented | `core/cells/oplog.h`, `oplog.cc` |
+| Sync manager | Implemented | `core/cells/sync_manager.h`, `sync_manager.cc` |
+| WebRTC P2P sync | Implemented | `core/net/` |
+| Presence/cursors | Implemented | `core/net/common/Presence.cc` |
+| Branch-based undo/redo | Planned | — |
 
 ## Overview
 
@@ -173,13 +183,13 @@ Sent frequently (~10/sec), separate from OpLog.
 3. **Rate limiting**: Prevent op flooding
 4. **Signatures**: Optional op signing for audit
 
-## Libraries to Consider
+## Implementation Notes
 
-| Library | Notes |
-|---------|-------|
-| **Automerge** | Mature, JSON CRDT, C FFI |
-| **Yjs** | Fast, great docs, JS-centric |
-| **Diamond Types** | Very fast, text-focused |
-| **cr-sqlite** | SQL queries on CRDT |
+The CRDT implementation is **custom-built** for spreadsheet operations:
 
-**Recommendation**: Start with custom implementation for cells (simpler than text CRDT). Cell-level LWW with operation log is straightforward. Evaluate Automerge-rs later if complexity grows.
+- **Cell-level LWW** (Last-Writer-Wins) - simpler than text CRDTs
+- **Operation log** - append-only, indexes by cell/axis ID
+- **HLC ordering** - deterministic conflict resolution
+- **P2P sync** - WebRTC with signaling server for setup only
+
+This approach is simpler and more efficient than general-purpose CRDT libraries (Automerge, Yjs) because spreadsheet operations are discrete cell/axis mutations, not character-by-character text edits.
