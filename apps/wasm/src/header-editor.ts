@@ -1,5 +1,27 @@
-// Header Editor - Column header editing and formula bar editing
-// Handles renaming column headers and editing cells via the formula bar.
+// =============================================================================
+// Header Editor
+// =============================================================================
+//
+// Editing components for column headers and the formula bar. Provides two
+// distinct editing experiences: column renaming and formula bar cell editing.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - ColumnHeaderEditor: rename columns via inline text input
+// - FormulaBarEditor: edit cell content via the formula bar
+// - Synchronize formula bar with in-cell editor
+// - Syntax highlight formulas during editing
+// - Show cell reference (e.g., "A1") in name box
+//
+// FormulaBarEditor design:
+// - Uses contenteditable div for formula colorization
+// - Shares edit state with CellEditor via EditingSession
+// - Supports formula autocomplete
+// - Updates formula highlights for visual feedback
+//
+// =============================================================================
 
 import type { WasmDataSource } from "./wasm-data-source";
 import type { CppSyncAdapter } from "./cpp-sync-adapter";

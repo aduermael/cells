@@ -1,6 +1,27 @@
-// Sheet Tabs - Sheet tab management and UI
-// Handles rendering sheet tabs, switching sheets, renaming, deleting,
-// and drag-and-drop reordering of sheets.
+// =============================================================================
+// Sheet Tabs
+// =============================================================================
+//
+// UI component for the sheet tabs bar at the bottom of the spreadsheet.
+// Manages multi-sheet workbooks with tab-based navigation.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Render sheet tabs with active indicator
+// - Switch between sheets on tab click
+// - Inline editing for sheet renaming
+// - Add new sheet button
+// - Delete sheet with confirmation dialog
+// - Drag-and-drop sheet reordering
+// - Context menu for sheet operations
+//
+// Sheet operations flow:
+// - User action → SheetTabsManager → WasmDataSource → C++ CRDT
+// - C++ notifies change → DataSource listener → SheetTabsManager.update()
+//
+// =============================================================================
 
 import type { WasmDataSource } from "./wasm-data-source";
 import type { UIStateMachine } from "./ui-state";

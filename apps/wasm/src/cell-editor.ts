@@ -1,6 +1,28 @@
-// Cell Editor - In-place cell editing functionality
-// Handles starting, committing, and canceling cell edits, as well as
-// navigation after editing and formula bar synchronization.
+// =============================================================================
+// Cell Editor
+// =============================================================================
+//
+// In-place cell editing for the spreadsheet grid. Manages the contenteditable
+// overlay that appears when editing a cell directly in the grid.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Position and show edit overlay at selected cell
+// - Handle edit modes: append, replace, select all
+// - Syntax highlight formulas in real-time
+// - Synchronize content with formula bar
+// - Commit edits on Enter, cancel on Escape
+// - Navigate to adjacent cell on Tab/Enter completion
+//
+// Coordinates with:
+// - FormulaBarEditor: keeps both editors in sync
+// - FormulaAutocomplete: shows function suggestions
+// - EditingSession: tracks current edit state
+// - GridRenderer: positions editor relative to cell bounds
+//
+// =============================================================================
 
 import type { WasmDataSource } from "./wasm-data-source";
 import type { CppSyncAdapter } from "./cpp-sync-adapter";
