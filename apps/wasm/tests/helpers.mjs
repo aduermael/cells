@@ -210,6 +210,16 @@ export async function getFormulaBarContent(page) {
 }
 
 /**
+ * Get the cell editor content (the in-cell editor that appears on double-click)
+ */
+export async function getCellEditorContent(page) {
+  return await page.evaluate(() => {
+    const el = document.getElementById('cell-display');
+    return el ? el.textContent : null;
+  });
+}
+
+/**
  * Get the displayed value of a cell (the computed result, not the formula)
  * This reads directly from the engine via the app's data cache
  */

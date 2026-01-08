@@ -5,8 +5,10 @@ import { runTests } from './harness.mjs';
 import {
   waitForAppReady,
   clickCell,
+  doubleClickCell,
   setCellValue,
   getFormulaBarContent,
+  getCellEditorContent,
   getCellDisplayValue,
   assertEqual,
   sleep,
@@ -72,6 +74,67 @@ const tests = {
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
     assertEqual(formulaBar, '=10+5', 'Formula bar should show formula =10+5');
+  },
+
+  // ============================================================================
+  // In-cell editing shows raw value tests (Phase 2 of format system refactor)
+  // ============================================================================
+
+  'In-cell editing shows raw value for percentage cell': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a percentage value (this auto-formats to 15%)
+    await setCellValue(ctx.page, 'A1', '15%');
+    await sleep(200);
+
+    // Cell should display formatted value
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '15%', 'Cell should display formatted value 15%');
+
+    // Double-click to enter edit mode - should show raw value
+    await doubleClickCell(ctx.page, 'A1');
+    await sleep(150);
+    const editorContent = await getCellEditorContent(ctx.page);
+    assertEqual(editorContent, '0.15', 'In-cell editor should show raw value 0.15, not formatted 15%');
+  },
+
+  'In-cell editing shows raw value for currency cell': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a currency value (this auto-formats to $1,234.50)
+    await setCellValue(ctx.page, 'A1', '$1234.50');
+    await sleep(200);
+
+    // Cell should display formatted value
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '$1,234.50', 'Cell should display formatted value $1,234.50');
+
+    // Double-click to enter edit mode - should show raw value
+    await doubleClickCell(ctx.page, 'A1');
+    await sleep(150);
+    const editorContent = await getCellEditorContent(ctx.page);
+    assertEqual(editorContent, '1234.5', 'In-cell editor should show raw value 1234.5, not formatted $1,234.50');
+  },
+
+  'In-cell editing shows formula for formula cells': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a formula
+    await setCellValue(ctx.page, 'A1', '=10+5');
+    await sleep(200);
+
+    // Cell should display result
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '15', 'Cell should display formula result 15');
+
+    // Double-click to enter edit mode - should show formula
+    await doubleClickCell(ctx.page, 'A1');
+    await sleep(150);
+    const editorContent = await getCellEditorContent(ctx.page);
+    assertEqual(editorContent, '=10+5', 'In-cell editor should show formula =10+5');
   },
 
   // ============================================================================
