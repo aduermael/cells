@@ -1,6 +1,6 @@
-Status: IN_PROGRESS
+Status: COMPLETED
 Created At: 2026-01-08 01:09 UTC
-Updated At: 2026-01-08 06:15 UTC
+Updated At: 2026-01-08 03:02 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -209,10 +209,13 @@ When a formula is entered into a cell with GENERAL format, Excel automatically i
   - Unary operations inherit from operand
   - Nested formulas use cell's format (not underlying formula's)
 
-- [ ] 7d: Add E2E tests for format inheritance
-  - Enter currency in A1, enter `=A1*2` in B1, verify B1 shows currency format
-  - Enter percentage in A1, enter `=A1+0.1` in B1, verify B1 shows percentage format
-  - Enter currency in A1, format B1 as NUMBER, enter `=A1` in B1 → B1 stays NUMBER (not GENERAL)
+- [x] 7d: Add E2E tests for format inheritance (6 tests in format.test.mjs)
+  - Formula inherits currency format from referenced cell (=A1*2 → $200.00)
+  - Formula inherits percentage format from referenced cell (=A1+0.1 → 25%)
+  - Explicit format on cell is not overridden by formula inheritance
+  - Currency format wins over percentage in multi-ref formula
+  - Formula with no formatted references stays General
+  - SUM function inherits format from range
 
 **Example scenarios:**
 

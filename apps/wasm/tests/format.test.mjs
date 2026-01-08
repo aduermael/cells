@@ -827,6 +827,185 @@ const tests = {
     const currencyLabel = await ctx.page.$eval('#currency-dropdown-label', el => el.textContent);
     assertEqual(currencyLabel, '£', 'Currency dropdown should still show £ symbol after decimal change');
   },
+
+  // ============================================================================
+  // Format inheritance tests (Phase 7 of format system refactor)
+  // ============================================================================
+
+  'Formula inherits currency format from referenced cell': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a currency value in A1 (this auto-formats to currency)
+    await setCellValue(ctx.page, 'A1', '$100');
+    await sleep(200);
+
+    // Verify A1 has currency format
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+    let formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Currency', 'A1 should have Currency format');
+
+    // Enter formula in B1 that references A1
+    await setCellValue(ctx.page, 'B1', '=A1*2');
+    await sleep(200);
+
+    // Verify B1 displays as currency (should inherit format)
+    const display = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(display, '$200.00', 'Formula =A1*2 should inherit currency format and display as $200.00');
+
+    // Verify B1's format dropdown shows Currency
+    await clickCell(ctx.page, 'B1');
+    await sleep(100);
+    formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Currency', 'B1 should inherit Currency format from A1');
+  },
+
+  'Formula inherits percentage format from referenced cell': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a percentage value in A1
+    await setCellValue(ctx.page, 'A1', '15%');
+    await sleep(200);
+
+    // Verify A1 has percentage format
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+    let formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Percent', 'A1 should have Percent format');
+
+    // Enter formula in B1 that references A1
+    await setCellValue(ctx.page, 'B1', '=A1+0.1');
+    await sleep(200);
+
+    // Verify B1 displays as percentage (should inherit format)
+    // 0.15 + 0.1 = 0.25 → displayed as 25%
+    const display = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(display, '25%', 'Formula =A1+0.1 should inherit percentage format and display as 25%');
+
+    // Verify B1's format dropdown shows Percent
+    await clickCell(ctx.page, 'B1');
+    await sleep(100);
+    formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Percent', 'B1 should inherit Percent format from A1');
+  },
+
+  'Explicit format on cell is not overridden by formula inheritance': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a currency value in A1
+    await setCellValue(ctx.page, 'A1', '$100');
+    await sleep(200);
+
+    // Click on B1 and explicitly set it to Number format before entering formula
+    await clickCell(ctx.page, 'B1');
+    await sleep(100);
+    await ctx.page.click('#format-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-format-category="NUMBER"]');
+    await sleep(200);
+
+    // Verify B1 now has Number format
+    let formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Number', 'B1 should have Number format after explicit selection');
+
+    // Now enter formula in B1 that references A1
+    await setCellValue(ctx.page, 'B1', '=A1');
+    await sleep(200);
+
+    // Verify B1 still has Number format (not inherited Currency)
+    // The format inheritance should only apply when cell has GENERAL format
+    await clickCell(ctx.page, 'B1');
+    await sleep(100);
+    formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Number', 'B1 should keep Number format (not inherit Currency) because it was explicitly set');
+
+    // Verify display shows Number format, not Currency
+    const display = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(display, '100.00', 'B1 should display as Number format (100.00), not Currency ($100.00)');
+  },
+
+  'Currency format wins over percentage in multi-ref formula': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a percentage value in A1
+    await setCellValue(ctx.page, 'A1', '10%');
+    await sleep(200);
+
+    // Enter a currency value in B1
+    await setCellValue(ctx.page, 'B1', '$100');
+    await sleep(200);
+
+    // Enter formula in C1 that references both A1 and B1
+    await setCellValue(ctx.page, 'C1', '=A1+B1');
+    await sleep(200);
+
+    // Currency has higher priority than percentage, so C1 should inherit Currency
+    // 0.1 + 100 = 100.1 displayed as $100.10
+    const display = await getCellDisplayValue(ctx.page, 'C1');
+    assertEqual(display, '$100.10', 'Formula =A1+B1 should inherit Currency format (higher priority than Percent)');
+
+    // Verify C1's format dropdown shows Currency
+    await clickCell(ctx.page, 'C1');
+    await sleep(100);
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Currency', 'C1 should inherit Currency format (higher priority than Percent)');
+  },
+
+  'Formula with no formatted references stays General': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter plain numbers in A1 and B1
+    await setCellValue(ctx.page, 'A1', '10');
+    await sleep(200);
+    await setCellValue(ctx.page, 'B1', '20');
+    await sleep(200);
+
+    // Enter formula in C1 that references both
+    await setCellValue(ctx.page, 'C1', '=A1+B1');
+    await sleep(200);
+
+    // C1 should stay General since neither A1 nor B1 have a format
+    const display = await getCellDisplayValue(ctx.page, 'C1');
+    assertEqual(display, '30', 'Formula result should display as 30 (General format)');
+
+    // Verify C1's format dropdown shows General
+    await clickCell(ctx.page, 'C1');
+    await sleep(100);
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'General', 'C1 should stay General when references have no format');
+  },
+
+  'SUM function inherits format from range': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter currency values in A1:A3
+    await setCellValue(ctx.page, 'A1', '$10');
+    await sleep(100);
+    await setCellValue(ctx.page, 'A2', '$20');
+    await sleep(100);
+    await setCellValue(ctx.page, 'A3', '$30');
+    await sleep(200);
+
+    // Enter SUM formula in A4
+    await setCellValue(ctx.page, 'A4', '=SUM(A1:A3)');
+    await sleep(200);
+
+    // A4 should inherit Currency format
+    const display = await getCellDisplayValue(ctx.page, 'A4');
+    assertEqual(display, '$60.00', 'SUM formula should inherit Currency format and display as $60.00');
+
+    // Verify A4's format dropdown shows Currency
+    await clickCell(ctx.page, 'A4');
+    await sleep(100);
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Currency', 'A4 should inherit Currency format from range');
+  },
 };
 
 // Run all tests
