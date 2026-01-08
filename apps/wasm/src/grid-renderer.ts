@@ -1,5 +1,28 @@
-// Grid Renderer Module
-// Handles all canvas rendering for the spreadsheet grid
+// =============================================================================
+// Grid Renderer
+// =============================================================================
+//
+// Canvas rendering for the spreadsheet grid. Draws cells, headers, selection,
+// formula highlights, and remote user presence indicators.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Render cell content (text, numbers, formatted values)
+// - Draw column/row headers with resize handles
+// - Draw selection highlighting (cell, range, column, row)
+// - Draw fill handle and fill preview during drag-fill
+// - Render formula reference highlights during editing
+// - Show remote user cursors and selections (collaboration)
+//
+// Architecture:
+// - GridRenderer coordinates sub-renderers (headers, selection, presence)
+// - Uses viewport culling to only draw visible cells
+// - Supports frozen rows/columns (not yet implemented)
+// - Theme-aware colors via getGridColors()
+//
+// =============================================================================
 
 import type { SheetInfo, CellData, Position } from "./types.js";
 import {

@@ -1,6 +1,26 @@
-// Grid Utilities - Coordinate conversion and cell lookup functions
-// These utilities handle mapping between screen coordinates, grid positions,
-// and cell data for the spreadsheet grid.
+// =============================================================================
+// Grid Utilities
+// =============================================================================
+//
+// Coordinate conversion and cell lookup functions. Maps between screen pixels,
+// grid positions (col/row indices), and cell data from the sparse model.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Coordinate conversion: pixel ↔ column/row index
+// - Cell lookup: getCellAt() finds cell data at grid position
+// - Hit testing: detect resize handles, drop targets
+// - Selection helpers: hasRangeSelection(), normalizeRange()
+// - ID helpers: getColumnId(), getRowId() from sparse model
+//
+// Performance notes:
+// - getColAtX/getRowAtY use O(n) scan for simplicity
+// - getColAtXFast/getRowAtYFast use precomputed pixel offsets for O(1)
+// - Use fast versions when pixel offset arrays are available
+//
+// =============================================================================
 
 import {
   HEADER_WIDTH,

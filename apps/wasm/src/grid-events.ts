@@ -1,5 +1,26 @@
-// Grid Events Module
-// Handles mouse/keyboard event handling for the spreadsheet grid
+// =============================================================================
+// Grid Events
+// =============================================================================
+//
+// Mouse and keyboard event handling for the spreadsheet grid canvas.
+// Translates raw DOM events into grid-level state changes.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Hit testing: convert pixel coordinates to cell/header/resize handle
+// - Selection: single cell, range, column, row selection via mouse
+// - Drag operations: column/row reordering, resize handles
+// - Scroll handling: mouse wheel, touch scroll
+// - Keyboard navigation: arrow keys, Tab, Enter
+//
+// State emission:
+// - Emits GridEventState objects describing what changed
+// - Does not directly modify App state (caller applies changes)
+// - Enables decoupled testing of event logic
+//
+// =============================================================================
 
 import {
     HEADER_HEIGHT,
