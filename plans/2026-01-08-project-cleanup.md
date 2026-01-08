@@ -168,7 +168,7 @@ Add 10-20 line documentation headers to all TypeScript files.
 - [x] 3d: Add headers to apps/wasm/src/*.ts (cell-editor, header-editor, sheet-tabs)
 - [x] 3e: Add headers to apps/wasm/src/*.ts (ui-state, clipboard, format-controls)
 - [x] 3f: Add headers to apps/wasm/src/*.ts (collab-ui, cpp-sync-adapter, rtc-proxy)
-- [ ] 3g: Add headers to apps/wasm/src/*.ts (script-panel, agent-panel, ast-debug)
+- [x] 3g: Add headers to apps/wasm/src/*.ts (script-panel, agent-panel, ast-debug)
 - [ ] 3h: Add headers to apps/wasm/src/*.ts (file-loader, room-url, presence-broadcast)
 
 ## Phase 4: Split Large C++ Files

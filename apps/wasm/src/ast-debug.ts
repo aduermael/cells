@@ -1,5 +1,26 @@
-// AST Debug Panel - Formula AST visualization for debugging
-// Provides a debug panel that shows the parsed AST of formulas in real-time.
+// =============================================================================
+// AST Debug Panel
+// =============================================================================
+//
+// Developer tool for visualizing formula AST (Abstract Syntax Tree).
+// Shows the parsed structure of formulas in real-time for debugging.
+//
+// This is a UI-ONLY module. Formula parsing goes through C++ parser
+// via the WASM bridge.
+//
+// Key responsibilities:
+// - Toggle debug panel visibility
+// - Parse formula text and display AST
+// - Format AST nodes with syntax highlighting
+// - Show parse errors with location info
+// - Update automatically as user types formula
+//
+// Usage:
+// - Enable via View menu or keyboard shortcut
+// - Type formula in cell editor to see live AST
+// - Useful for debugging formula parser issues
+//
+// =============================================================================
 
 import type { CellsClient } from "./client";
 

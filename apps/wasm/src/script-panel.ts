@@ -1,5 +1,28 @@
-// Script Panel - Luau scripting interface
-// Provides a dedicated panel for writing and executing Luau scripts.
+// =============================================================================
+// Script Panel
+// =============================================================================
+//
+// Luau scripting interface for programmatic spreadsheet manipulation.
+// Provides a code editor panel with syntax highlighting and execution.
+//
+// This is a UI-ONLY module. Script execution goes through C++ Luau sandbox
+// via the WASM bridge.
+//
+// Key responsibilities:
+// - Toggle script panel visibility
+// - Code editor with Luau syntax highlighting
+// - Line numbers and horizontal scrolling
+// - Execute scripts via C++ Luau sandbox
+// - Display output, errors, and instruction count
+// - Autocomplete suggestions for Cells API
+// - Panel resizing via drag handle
+//
+// Luau API available in scripts:
+// - getCell(ref), setCell(ref, value), getCells(range)
+// - getSheet(), getSheets(), addSheet(), deleteSheet()
+// - getRow(), getColumn(), insertRow(), insertColumn()
+//
+// =============================================================================
 
 import { SyntaxHighlighter, type TokenizeFunction } from "./syntax-highlighter";
 import type { LuauToken, AutocompleteResult, AutocompleteSuggestion } from "./client-types";

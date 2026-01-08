@@ -1,5 +1,28 @@
-// Agent Panel - AI chat interface for the spreadsheet
-// Manages the chat panel UI and communicates with the agent via CellsClient
+// =============================================================================
+// Agent Panel
+// =============================================================================
+//
+// AI chat interface for natural-language spreadsheet commands. Users can
+// type requests like "sum column A" and the agent executes them.
+//
+// This is a UI-ONLY module. Agent communication goes through C++ agent client
+// via the WASM bridge.
+//
+// Key responsibilities:
+// - Toggle agent panel visibility
+// - Chat message display with user/assistant roles
+// - Text input with Enter to send
+// - Show tool use progress (what the agent is doing)
+// - Streaming response display
+// - Clear conversation history
+// - Minimize/maximize panel
+//
+// Agent integration:
+// - Connects to external agent server via HTTP
+// - Subscribes to agent events (tool_use, done, error)
+// - Refreshes viewport after agent makes changes
+//
+// =============================================================================
 
 import type { CellsClient } from "./client";
 import type {
