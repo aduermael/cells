@@ -713,9 +713,9 @@ canvas {
     background: var(--color-bg-primary);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
-    box-shadow: var(--shadow-dropdown);
+    box-shadow: 0 4px 16px var(--color-shadow);
     min-width: 260px;
-    z-index: var(--z-dropdown);
+    z-index: 1000; /* Same as .dropdown-menu */
 }
 
 #custom-format-panel.hidden {
