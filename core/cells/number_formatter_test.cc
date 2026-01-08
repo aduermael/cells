@@ -531,5 +531,88 @@ TEST(DynamicFormatTest, InvalidDynamicIdFallsBackToGeneral) {
     EXPECT_EQ(result.text, "42.5");  // General format
 }
 
+// =============================================================================
+// formatEditValue tests
+// =============================================================================
+
+TEST(EditValueTest, DateReturnsFormattedDate) {
+    NumberFormatRegistry registry;
+    // Dec 12, 2025 -> serial date 46003
+    double serial = DateUtils::toSerialDate(2025, 12, 12);
+    EXPECT_DOUBLE_EQ(serial, 46003.0);
+    auto editValue = formatEditValue(registry, serial, BuiltInFormats::DATE_SHORT);
+    // Should return "12/12/2025" not "46003"
+    EXPECT_EQ(editValue, "12/12/2025");
+}
+
+TEST(EditValueTest, TimeReturnsFormattedTime) {
+    NumberFormatRegistry registry;
+    // 3:30 PM -> fractional day 0.645833...
+    double frac = TimeUtils::toFractionalDay(15, 30, 0);
+    auto editValue = formatEditValue(registry, frac, BuiltInFormats::TIME_12H);
+    // Should return "3:30 PM" not "0.645833..."
+    EXPECT_EQ(editValue, "3:30 PM");
+}
+
+TEST(EditValueTest, DateTimeReturnsFormattedDateTime) {
+    NumberFormatRegistry registry;
+    double serial = DateUtils::toSerialDate(2025, 12, 12);
+    double frac = TimeUtils::toFractionalDay(15, 30, 0);
+    auto editValue = formatEditValue(registry, serial + frac, BuiltInFormats::DATETIME_SHORT);
+    // Should return "12/12/2025 3:30 PM"
+    EXPECT_EQ(editValue, "12/12/2025 3:30 PM");
+}
+
+TEST(EditValueTest, PercentageReturnsPercentString) {
+    NumberFormatRegistry registry;
+    // 15% stored as 0.15
+    auto editValue = formatEditValue(registry, 0.15, BuiltInFormats::PERCENTAGE_0);
+    // Should return "15%" not "0.15"
+    EXPECT_EQ(editValue, "15%");
+}
+
+TEST(EditValueTest, PercentageWithDecimalsReturnsPercentString) {
+    NumberFormatRegistry registry;
+    // 15.5% stored as 0.155
+    auto editValue = formatEditValue(registry, 0.155, BuiltInFormats::PERCENTAGE_2);
+    // Should return "15.50%" not "0.155"
+    EXPECT_EQ(editValue, "15.50%");
+}
+
+TEST(EditValueTest, CurrencyReturnsRawValue) {
+    NumberFormatRegistry registry;
+    // Currency should return raw value, not formatted display
+    auto editValue = formatEditValue(registry, 1000.56, BuiltInFormats::CURRENCY_2);
+    // Should return "1000.56" not "$1,000.56"
+    EXPECT_EQ(editValue, "1000.56");
+}
+
+TEST(EditValueTest, NumberWithSeparatorReturnsRawValue) {
+    NumberFormatRegistry registry;
+    // Number format should return raw value without separators
+    auto editValue = formatEditValue(registry, 1456789.0, BuiltInFormats::NUMBER_SEP);
+    // Should return "1456789" not "1,456,789"
+    EXPECT_EQ(editValue, "1456789");
+}
+
+TEST(EditValueTest, GeneralReturnsRawValue) {
+    NumberFormatRegistry registry;
+    auto editValue = formatEditValue(registry, 123.456, BuiltInFormats::GENERAL);
+    EXPECT_EQ(editValue, "123.456");
+}
+
+TEST(EditValueTest, NullFormatIdReturnsRawValue) {
+    NumberFormatRegistry registry;
+    auto editValue = formatEditValue(registry, 42.5, ID{});
+    EXPECT_EQ(editValue, "42.5");
+}
+
+TEST(EditValueTest, IntegerReturnsWithoutDecimals) {
+    NumberFormatRegistry registry;
+    auto editValue = formatEditValue(registry, 1000.0, BuiltInFormats::CURRENCY_2);
+    // Integer value should show without unnecessary decimals
+    EXPECT_EQ(editValue, "1000");
+}
+
 }  // namespace
 }  // namespace cells

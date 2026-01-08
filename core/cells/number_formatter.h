@@ -94,6 +94,20 @@ FormattedValue formatWithFormat(double value, const NumberFormat& format,
 // Shows integers without decimals, limits decimal places for floats
 FormattedValue formatGeneral(double value, const FormatLocale& locale = FormatLocale::US());
 
+// Format a value for editing (formula bar / cell editor)
+// Returns human-readable "edit value" instead of raw underlying value:
+// - DATE: Returns formatted date string (e.g., "12/12/2025" not "46003")
+// - TIME: Returns formatted time string (e.g., "3:30 PM" not "0.645833")
+// - DATETIME: Returns date + time string
+// - PERCENTAGE: Returns percentage string (e.g., "15%" not "0.15")
+// - CURRENCY/NUMBER/GENERAL: Returns raw numeric value as string
+// registry: Format registry to look up format by ID (may cache new dynamic formats)
+// value: The numeric value to format for editing
+// formatId: ID of the format to use (null ID = GENERAL)
+// locale: Locale settings for formatting
+std::string formatEditValue(NumberFormatRegistry& registry, double value, const ID& formatId,
+                            const FormatLocale& locale = FormatLocale::US());
+
 // Format a plain number with specified decimal places and thousands separator
 // decimalPlaces: Number of decimal places (0-15)
 // useThousandsSeparator: Whether to add thousands separators

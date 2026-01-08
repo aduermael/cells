@@ -92,6 +92,53 @@ static std::string formatDecimal(double value, uint8_t decimalPlaces, char decim
     return result;
 }
 
+// Format a value for editing (formula bar / cell editor)
+std::string formatEditValue(NumberFormatRegistry& registry, double value, const ID& formatId,
+                            const FormatLocale& locale) {
+    // Null ID means GENERAL format - return raw value
+    if (formatId.isNull()) {
+        return formatGeneral(value, locale).text;
+    }
+
+    // Look up the format
+    const NumberFormat* format = registry.getOrCreateFormat(formatId);
+    if (format == nullptr) {
+        return formatGeneral(value, locale).text;
+    }
+
+    // Return human-readable edit value based on category
+    switch (format->category) {
+        case NumberFormatCategory::DATE:
+            // Return formatted date (e.g., "12/12/2025" not "46003")
+            return formatDate(value, BuiltInFormats::DATE_SHORT, locale).text;
+
+        case NumberFormatCategory::TIME:
+            // Return formatted time (e.g., "3:30 PM" not "0.645833")
+            return formatTime(value, BuiltInFormats::TIME_12H, locale).text;
+
+        case NumberFormatCategory::DATE_TIME: {
+            // Return date + time (e.g., "12/12/2025 3:30 PM")
+            return formatDateTime(value, formatId, locale).text;
+        }
+
+        case NumberFormatCategory::PERCENTAGE:
+            // Return percentage string (e.g., "15%" not "0.15")
+            // Use the format's decimal places for precision
+            return formatPercentage(value, format->decimalPlaces, locale).text;
+
+        case NumberFormatCategory::CURRENCY:
+        case NumberFormatCategory::ACCOUNTING:
+        case NumberFormatCategory::NUMBER:
+        case NumberFormatCategory::SCIENTIFIC:
+        case NumberFormatCategory::FRACTION:
+        case NumberFormatCategory::TEXT:
+        case NumberFormatCategory::GENERAL:
+        default:
+            // For currency, numbers, etc.: return raw value
+            return formatGeneral(value, locale).text;
+    }
+}
+
 // Format as GENERAL format
 FormattedValue formatGeneral(double value, const FormatLocale& locale) {
     // Handle special cases
