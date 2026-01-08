@@ -672,14 +672,13 @@ std::string CellsEngine::getRemotePresences() {
 // ============================================================================
 
 void CellsEngine::syncClientStateDidChange(cells::net::SyncClient& /*client*/,
-                                            cells::net::SyncState /*newState*/) {
+                                            cells::net::SyncClientState /*newState*/) {
     notifyListeners(ChangeType::SYNC_STATE_CHANGED);
 }
 
 void CellsEngine::syncClientPeerDidChange(cells::net::SyncClient& /*client*/,
-                                           const std::string& peerId,
-                                           const std::string& /*peerName*/) {
-    notifyListenersWithData(ChangeType::PEER_JOINED, peerId);
+                                           const cells::net::PeerInfo& peer) {
+    notifyListenersWithData(ChangeType::PEER_JOINED, peer.id);
 }
 
 void CellsEngine::syncClientPeerDidDisconnect(cells::net::SyncClient& /*client*/,
@@ -698,13 +697,14 @@ void CellsEngine::syncClientDidError(cells::net::SyncClient& /*client*/,
 }
 
 void CellsEngine::syncClientLatencyDidUpdate(cells::net::SyncClient& /*client*/,
-                                              uint32_t /*latencyMs*/) {
+                                              const std::string& /*peer_id*/,
+                                              int /*latency_ms*/) {
     // Latency updates - not currently notified to JS
 }
 
 void CellsEngine::syncClientPresenceDidUpdate(cells::net::SyncClient& /*client*/,
                                                const std::string& peerId,
-                                               const cells::net::Presence& /*presence*/) {
+                                               const cells::net::PresenceData& /*presence*/) {
     notifyListenersWithData(ChangeType::PRESENCE_CHANGED, peerId);
 }
 

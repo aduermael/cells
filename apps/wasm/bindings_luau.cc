@@ -90,12 +90,11 @@ void CellsEngine::onAgentToolResultNeeded(const std::string& toolUseId) {
 }
 
 void CellsEngine::onAgentComplete(const std::string& stopReason,
-                                   const std::string& /*inputTokens*/,
-                                   const std::string& /*outputTokens*/) {
+                                   const std::string& conversationId) {
     if (!_agentListener.isNull() && !_agentListener.isUndefined()) {
         std::ostringstream json;
         json << "{\"stop_reason\":\"" << jsonEscape(stopReason) << "\",";
-        json << "\"conversation_id\":\"" << jsonEscape(_agentConversationId) << "\"}";
+        json << "\"conversation_id\":\"" << jsonEscape(conversationId) << "\"}";
         _agentListener(std::string("done"), json.str());
     }
 }
@@ -220,7 +219,7 @@ void CellsEngine::handleAgentSSEEvent(const std::string& eventType, const std::s
             return;
         }
 
-        onAgentComplete(stopReason, "", "");
+        onAgentComplete(stopReason, _agentConversationId);
         _pendingToolId.clear();
         _pendingToolName.clear();
         _pendingToolInput.clear();

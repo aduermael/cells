@@ -19,6 +19,7 @@
 #include <sstream>
 
 #include "core/cells/formula_eval.h"
+#include "core/cells/formula_recalc.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/number_formatter.h"
 

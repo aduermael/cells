@@ -275,20 +275,20 @@ public:
     // ========================================================================
 
     void syncClientStateDidChange(cells::net::SyncClient& client,
-                                  cells::net::SyncState newState) override;
+                                  cells::net::SyncClientState newState) override;
     void syncClientPeerDidChange(cells::net::SyncClient& client,
-                                 const std::string& peerId,
-                                 const std::string& peerName) override;
+                                 const cells::net::PeerInfo& peer) override;
     void syncClientPeerDidDisconnect(cells::net::SyncClient& client,
                                      const std::string& peerId) override;
     void syncClientDataDidChange(cells::net::SyncClient& client) override;
     void syncClientDidError(cells::net::SyncClient& client,
                             const std::string& error) override;
     void syncClientLatencyDidUpdate(cells::net::SyncClient& client,
-                                    uint32_t latencyMs) override;
+                                    const std::string& peer_id,
+                                    int latency_ms) override;
     void syncClientPresenceDidUpdate(cells::net::SyncClient& client,
                                      const std::string& peerId,
-                                     const cells::net::Presence& presence) override;
+                                     const cells::net::PresenceData& presence) override;
     void syncClientPresenceDidRemove(cells::net::SyncClient& client,
                                      const std::string& peerId) override;
 
@@ -301,8 +301,7 @@ public:
                         const std::string& input) override;
     void onAgentToolResultNeeded(const std::string& toolUseId) override;
     void onAgentComplete(const std::string& stopReason,
-                         const std::string& inputTokens,
-                         const std::string& outputTokens) override;
+                         const std::string& conversationId) override;
     void onAgentError(const std::string& message) override;
 
     // ========================================================================
