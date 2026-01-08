@@ -379,7 +379,7 @@ body {
 .btn.btn-icon {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 3px;
 }
 
 .btn.btn-icon .btn-icon-svg {
@@ -591,11 +591,24 @@ canvas {
     min-width: 36px;
 }
 
-/* Decimal buttons - equal width, fill row */
+/* Row 2 buttons - equal width, fill row */
 #format-decimal-decrease,
-#format-decimal-increase {
+#format-decimal-increase,
+#format-percent-btn {
     flex: 1;
     justify-content: center;
+}
+
+/* Active state for percent button */
+#format-percent-btn.active {
+    background: var(--color-primary);
+    color: var(--color-bg-primary);
+    border-color: var(--color-primary);
+}
+
+#format-percent-btn.active:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
 }
 
 #format-dropdown {
@@ -649,9 +662,23 @@ canvas {
 }
 
 #currency-dropdown-btn {
-    min-width: 44px;
-    justify-content: space-between;
-    gap: 2px;
+    min-width: 36px;
+    justify-content: center;
+    gap: 3px;
+}
+
+/* Show arrow and adjust layout only when currency format is active */
+#currency-dropdown.active #currency-dropdown-btn {
+    min-width: 36px;
+}
+
+/* Hide dropdown arrow when not in currency format */
+#currency-dropdown-arrow {
+    display: none;
+}
+
+#currency-dropdown.active #currency-dropdown-arrow {
+    display: block;
 }
 
 #currency-dropdown-label {

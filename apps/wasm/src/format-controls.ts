@@ -29,6 +29,7 @@ export interface FormatControlsConfig {
   currencyDropdownMenu: HTMLElement;
   decimalIncreaseBtn: HTMLButtonElement;
   decimalDecreaseBtn: HTMLButtonElement;
+  percentBtn: HTMLButtonElement;
   // Custom format panel elements
   customFormatPanel: HTMLElement;
   customFormatInput: HTMLInputElement;
@@ -78,6 +79,7 @@ export class FormatControls {
   private currencyDropdownMenu: HTMLElement;
   private decimalIncreaseBtn: HTMLButtonElement;
   private decimalDecreaseBtn: HTMLButtonElement;
+  private percentBtn: HTMLButtonElement;
   private customFormatPanel: HTMLElement;
   private customFormatInput: HTMLInputElement;
   private customFormatPreview: HTMLElement;
@@ -130,6 +132,7 @@ export class FormatControls {
     this.currencyDropdownMenu = config.currencyDropdownMenu;
     this.decimalIncreaseBtn = config.decimalIncreaseBtn;
     this.decimalDecreaseBtn = config.decimalDecreaseBtn;
+    this.percentBtn = config.percentBtn;
     this.customFormatPanel = config.customFormatPanel;
     this.customFormatInput = config.customFormatInput;
     this.customFormatPreview = config.customFormatPreview;
@@ -243,10 +246,16 @@ export class FormatControls {
       }
     });
 
-    // Currency dropdown toggle
+    // Currency button: apply currency when not in currency mode, toggle dropdown when in currency mode
     this.currencyDropdownBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      this.toggleCurrencyDropdown();
+      if (this.currentCategory === "CURRENCY" || this.currentCategory === "ACCOUNTING") {
+        // Already in currency mode - toggle dropdown to change currency
+        this.toggleCurrencyDropdown();
+      } else {
+        // Not in currency mode - apply currency format directly
+        this.handleCurrencySelect(this.currentCurrency, this.getCurrencySymbol(this.currentCurrency));
+      }
     });
 
     // Currency item selection
@@ -269,6 +278,11 @@ export class FormatControls {
     // Decimal decrease
     this.decimalDecreaseBtn.addEventListener("click", () => {
       this.handleDecimalChange(-1);
+    });
+
+    // Percent button
+    this.percentBtn.addEventListener("click", () => {
+      this.handleCategorySelect("PERCENTAGE");
     });
 
     // Keyboard shortcuts
@@ -615,6 +629,10 @@ export class FormatControls {
     // Update currency dropdown active state
     const isCurrency = category === "CURRENCY" || category === "ACCOUNTING";
     this.currencyDropdown.classList.toggle("active", isCurrency);
+
+    // Update percent button active state
+    const isPercentage = category === "PERCENTAGE";
+    this.percentBtn.classList.toggle("active", isPercentage);
 
     // If this is a currency format, update the currency dropdown to show the right currency
     // Format ID pattern: C<CURRENCY>_0XX (e.g., CUSD_002) or legacy FMT_C0XX
