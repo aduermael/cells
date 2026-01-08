@@ -327,7 +327,8 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
 
         if (isGeneralFormat && formula->ast != nullptr && targetSheet != nullptr) {
             // Create a format lookup for this sheet
-            FormatLookup formatLookup = [targetSheet](const std::string& cellIdStr) -> std::string {
+            const FormatLookup formatLookup =
+                [targetSheet](const std::string& cellIdStr) -> std::string {
                 const ID cellId(cellIdStr);
                 const Cell* refCell = targetSheet->getCell(cellId);
                 if (refCell == nullptr) {

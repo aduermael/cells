@@ -796,8 +796,7 @@ bool isMoreSpecific(const std::string& candidateId, const std::string& currentId
     }
     if (!candidate.valid) {
         // Candidate is unparseable (custom format?) - it wins if current is basic
-        return getFormatPriority(current.category) <
-               50;  // Custom formats beat basic NUMBER
+        return getFormatPriority(current.category) < 50;  // Custom formats beat basic NUMBER
     }
     if (!current.valid) {
         // Current is unparseable - candidate must have higher priority to win
