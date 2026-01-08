@@ -175,20 +175,17 @@ Add 10-20 line documentation headers to all TypeScript files.
 
 Split files that are significantly over 500 lines and have clear separation boundaries.
 
-**Note:** Started implementation - created `bindings.h` header file with full class declaration.
-The split requires moving inline method implementations to separate `.cc` files.
-
-### 4.1: bindings.cc (4852 lines → 8 files)
+### 4.1: bindings.cc (4852 lines → 8 files) ✅ COMPLETED
 
 - [x] Create `bindings.h` header with full class declaration
-- [ ] 4.1a: Extract `bindings_core.cc` (Workbook, Sheet, Cell types and basic ops)
-- [ ] 4.1b: Extract `bindings_formula.cc` (formula parsing, eval, display)
-- [ ] 4.1c: Extract `bindings_crdt.cc` (CRDT operations, OpLog, SyncManager)
-- [ ] 4.1d: Extract `bindings_viewport.cc` (ViewportIndex, spatial queries)
-- [ ] 4.1e: Extract `bindings_file.cc` (XLSX/CSV/ZCD import/export)
-- [ ] 4.1f: Extract `bindings_format.cc` (number formatting, input parsing)
-- [ ] 4.1g: Extract `bindings_luau.cc` (Luau sandbox, autocomplete)
-- [ ] 4.1h: Keep `bindings.cc` as main entry with module registration
+- [x] 4.1a: Extract `bindings_core.cc` (Workbook, Sheet, Cell types and basic ops)
+- [x] 4.1b: Extract `bindings_formula.cc` (formula parsing, eval, display)
+- [x] 4.1c: Extract `bindings_crdt.cc` (CRDT operations, OpLog, SyncManager)
+- [x] 4.1d: Extract `bindings_viewport.cc` (ViewportIndex, spatial queries)
+- [x] 4.1e: Extract `bindings_file.cc` (XLSX/CSV/ZCD import/export)
+- [x] 4.1f: Extract `bindings_format.cc` (number formatting, input parsing)
+- [x] 4.1g: Extract `bindings_luau.cc` (Luau sandbox, autocomplete)
+- [x] 4.1h: Keep `bindings.cc` as main entry with module registration
 
 ### 4.2: luau_sandbox.cc (1885 lines → 3 files)
 

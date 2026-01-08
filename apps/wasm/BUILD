@@ -34,7 +34,17 @@ wasm_cc_binary(
 # Requires --config=wasm to enable exceptions for pugixml dependency
 cc_binary(
     name = "cells_wasm_bin",
-    srcs = ["bindings.cc"],
+    srcs = [
+        "bindings.cc",
+        "bindings.h",
+        "bindings_core.cc",
+        "bindings_crdt.cc",
+        "bindings_file.cc",
+        "bindings_format.cc",
+        "bindings_formula.cc",
+        "bindings_luau.cc",
+        "bindings_viewport.cc",
+    ],
     linkopts = EMSCRIPTEN_LINKOPTS + [
         "-s SINGLE_FILE=0",  # Keep .wasm separate for better caching
         "-lwebsocket.js",  # WebSocket support for networking

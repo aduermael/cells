@@ -140,7 +140,7 @@ public:
     std::string formatCellById(const std::string& cellIdStr);
     std::string getFormatDetails(const std::string& formatId);
     std::string makeFormatId(const std::string& category, int decimals, bool separator,
-                             const std::string& currency, bool percent);
+                             const std::string& currency);
 
     // ========================================================================
     // Column/row resize operations (bindings_core.cc)
