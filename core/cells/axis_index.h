@@ -1,3 +1,31 @@
+// =============================================================================
+// Axis Index
+// =============================================================================
+//
+// High-level wrapper around OSTree for column/row spatial indexing.
+// Provides a clean API for pixel-to-axis and axis-to-pixel conversions.
+//
+// Key responsibilities:
+// - Convert pixel offsets to axis IDs (column at pixel X, row at pixel Y)
+// - Convert axis IDs to pixel offsets (where does column/row start?)
+// - Insert, remove, resize, and reorder axes with O(log n) updates
+// - Maintain position ordering (0-indexed sequence of columns/rows)
+//
+// Usage example:
+//   AxisIndex columns;
+//   columns.insert(colId1, 0, 100);  // 100px column at position 0
+//   columns.insert(colId2, 1, 150);  // 150px column at position 1
+//   auto result = columns.pixelToAxis(120);
+//   // result: colId2, offsetInAxis=20, position=1
+//
+// This is the building block for ViewportIndex which combines column
+// and row indices for full 2D viewport queries.
+//
+// Dependencies: ostree.h, types.h
+// Used by: viewport_index.h (2D viewport queries)
+//
+// =============================================================================
+
 #ifndef CELLS_AXIS_INDEX_H_
 #define CELLS_AXIS_INDEX_H_
 

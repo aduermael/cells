@@ -1,3 +1,30 @@
+// =============================================================================
+// Order-Statistic Tree (OSTree)
+// =============================================================================
+//
+// Augmented red-black tree providing O(log n) spatial indexing for columns/rows.
+// Each node stores a "size" (width/height in pixels) and maintains subtree totals.
+//
+// Key responsibilities:
+// - O(log n) findByOffset: given pixel offset, find containing node
+// - O(log n) getOffset: given node, compute cumulative pixel offset
+// - O(log n) insert/delete: maintain balanced tree structure
+// - O(log n) updateSize: change node size and propagate to ancestors
+//
+// This is the core data structure bridging UUID-based sparse representation
+// and pixel-coordinate viewport rendering. It answers: "which column is at
+// pixel X?" and "what pixel does column UUID start at?"
+//
+// Each node stores:
+// - id: 8-char base62 UUID (column or row identifier)
+// - size: pixel width (column) or height (row)
+// - subtree_total: sum of sizes in this subtree for O(log n) offset queries
+//
+// Dependencies: types.h
+// Used by: axis_index.h (wrapper providing column/row-specific API)
+//
+// =============================================================================
+
 #ifndef CELLS_OSTREE_H_
 #define CELLS_OSTREE_H_
 

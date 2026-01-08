@@ -1,3 +1,33 @@
+// =============================================================================
+// Viewport Index
+// =============================================================================
+//
+// Spatial index for efficient viewport queries: "which cells are visible in
+// this pixel rectangle?" Uses two AxisIndex instances (columns, rows) plus
+// a cell hash map for O(log n + k) queries where k = visible cells.
+//
+// Key responsibilities:
+// - Query cells within a viewport (pixel coordinates) for rendering
+// - Convert pixel coordinates to column/row IDs and vice versa
+// - Support incremental O(log n) updates for cell and axis changes
+// - Maintain cell index for O(1) cell lookups by (colId, rowId)
+//
+// Unlike a quadtree which requires O(n) rebuilds, ViewportIndex supports:
+// - Cell additions/removals: O(1)
+// - Axis insertions/deletions: O(log n)
+// - Axis resizing: O(log n)
+// - Axis reordering: O(log n)
+//
+// Query algorithm:
+// 1. Use AxisIndex to find visible column/row ranges
+// 2. Iterate visible ranges, look up cells in hash map
+// 3. Return ViewportEntry list with cell pointers and bounding boxes
+//
+// Dependencies: axis_index.h, model.h, types.h
+// Used by: bindings.cc (WASM rendering), grid-renderer.ts (TypeScript UI)
+//
+// =============================================================================
+
 #ifndef CELLS_VIEWPORT_INDEX_H_
 #define CELLS_VIEWPORT_INDEX_H_
 
