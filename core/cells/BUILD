@@ -826,7 +826,11 @@ cc_test(
 
 cc_library(
     name = "luau_sandbox",
-    srcs = ["luau_sandbox.cc"],
+    srcs = [
+        "luau_api.cc",
+        "luau_sandbox.cc",
+        "luau_types.cc",
+    ],
     hdrs = ["luau_sandbox.h"],
     visibility = ["//visibility:public"],
     deps = [

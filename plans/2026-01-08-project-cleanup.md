@@ -187,11 +187,11 @@ Split files that are significantly over 500 lines and have clear separation boun
 - [x] 4.1g: Extract `bindings_luau.cc` (Luau sandbox, autocomplete)
 - [x] 4.1h: Keep `bindings.cc` as main entry with module registration
 
-### 4.2: luau_sandbox.cc (1885 lines → 3 files)
+### 4.2: luau_sandbox.cc (1885 lines → 3 files) ✅ COMPLETED
 
-- [ ] 4.2a: Extract `luau_api.cc` (API functions exposed to Luau scripts)
-- [ ] 4.2b: Extract `luau_types.cc` (type coercion, Cell/Sheet wrappers)
-- [ ] 4.2c: Keep `luau_sandbox.cc` as main sandbox (VM lifecycle, execution)
+- [x] 4.2a: Extract `luau_api.cc` (API functions exposed to Luau scripts)
+- [x] 4.2b: Extract `luau_types.cc` (type coercion, Cell/Sheet wrappers)
+- [x] 4.2c: Keep `luau_sandbox.cc` as main sandbox (VM lifecycle, execution)
 
 ### 4.3: crdt.cc (1520 lines → 3 files)
 

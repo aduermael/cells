@@ -172,6 +172,7 @@ private:
     // Helper: Get context from registry
     static Workbook* getWorkbook(lua_State* L);
     static Sheet* getSheet(lua_State* L);
+    static LuauSandbox* getSandbox(lua_State* L);
 
     // Helper: Create a cell Lua object and cache it
     void pushCellObject(lua_State* L, Cell* cell) const;
