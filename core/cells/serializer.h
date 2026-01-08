@@ -1,3 +1,29 @@
+// =============================================================================
+// .zcd File Serializer
+// =============================================================================
+//
+// Serializes Workbook model to the native .zcd text format.
+// Produces git-friendly output with one entity per line.
+//
+// Key responsibilities:
+// - Output document header and custom formats
+// - Serialize sheets with columns, rows, and cells
+// - Handle formula serialization with UUID references
+// - Serialize operation log for CRDT persistence
+//
+// Output format matches docs/persistence.md specification:
+// - D <id> "<name>": Document header
+// - F <id> "<format-code>": Custom number format
+// - S <id> "<name>": Sheet header
+// - C <id> <pos> [props]: Column definition
+// - R <id> <pos> [props]: Row definition
+// - X <id> <col> <row> <type> <value>: Cell data
+//
+// Dependencies: model.h, oplog.h, types.h
+// Used by: bindings.cc (file saving), CLI tools
+//
+// =============================================================================
+
 #ifndef CELLS_SERIALIZER_H_
 #define CELLS_SERIALIZER_H_
 

@@ -1,3 +1,30 @@
+// =============================================================================
+// .zcd File Parser
+// =============================================================================
+//
+// Parses the native .zcd (Cells Document) text format into a Workbook model.
+// This format is designed for git-friendly diffs with one entity per line.
+//
+// Key responsibilities:
+// - Parse document, sheet, column, row, cell, and format definitions
+// - Handle UUID-based references and shared formulas
+// - Parse operation log for CRDT synchronization
+// - Report detailed errors with line numbers
+//
+// File format (line types):
+// - D <id> "<name>": Document header
+// - F <id> "<format-code>": Custom number format
+// - S <id> "<name>": Sheet definition
+// - C <id> <pos> [props]: Column axis
+// - R <id> <pos> [props]: Row axis
+// - X <id> <col> <row> <type> <value>: Cell data
+// - O <hlc> <op-type> <target-id> <payload>: Operation
+//
+// Dependencies: model.h, oplog.h, types.h
+// Used by: bindings.cc (file loading), CLI tools
+//
+// =============================================================================
+
 #ifndef CELLS_PARSER_H_
 #define CELLS_PARSER_H_
 

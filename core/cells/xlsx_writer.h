@@ -1,3 +1,30 @@
+// =============================================================================
+// XLSX Writer (Excel Export)
+// =============================================================================
+//
+// Writes our Workbook model to Microsoft Excel .xlsx format.
+// Uses miniz for ZIP compression and pugixml for XML generation.
+//
+// Key responsibilities:
+// - Generate valid XLSX package structure (ZIP with XML files)
+// - Write worksheets, shared strings, and workbook metadata
+// - Convert UUID-based references back to A1 notation
+// - Output column widths and row heights
+// - Handle formula export with proper A1 conversion
+//
+// Output structure:
+// - [Content_Types].xml: Content type definitions
+// - _rels/.rels: Package relationships
+// - xl/workbook.xml: Workbook structure
+// - xl/worksheets/sheet*.xml: Sheet data
+// - xl/sharedStrings.xml: Deduplicated string table
+// - xl/styles.xml: Cell styles and formats
+//
+// Dependencies: model.h
+// Used by: bindings.cc (file export), CLI tools
+//
+// =============================================================================
+
 #ifndef CELLS_XLSX_WRITER_H_
 #define CELLS_XLSX_WRITER_H_
 

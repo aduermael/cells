@@ -1,3 +1,31 @@
+// =============================================================================
+// CSV Writer (CSV Export)
+// =============================================================================
+//
+// Writes Sheet or Workbook data to CSV format following RFC 4180.
+// Formula cells output computed values, not formulas.
+//
+// Key responsibilities:
+// - Generate RFC 4180 compliant CSV output
+// - Quote fields containing delimiters, quotes, or newlines
+// - Escape quotes as double-quotes within quoted fields
+// - Support configurable delimiters and line endings
+// - Optionally include column names as header row
+//
+// Output rules (RFC 4180):
+// - CRLF line endings (configurable)
+// - Fields with special chars are double-quoted
+// - Internal double-quotes escaped as ""
+// - Last record may omit trailing CRLF
+//
+// Note: CSV export only includes the first sheet (CSV has no
+// multi-sheet concept). Use XLSX for multi-sheet export.
+//
+// Dependencies: model.h
+// Used by: bindings.cc (file export), CLI tools
+//
+// =============================================================================
+
 #ifndef CELLS_CSV_WRITER_H_
 #define CELLS_CSV_WRITER_H_
 

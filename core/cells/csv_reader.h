@@ -1,3 +1,32 @@
+// =============================================================================
+// CSV Reader (CSV Import)
+// =============================================================================
+//
+// Parses CSV files into our Workbook model following RFC 4180.
+// Supports various delimiters and auto-detection of value types.
+//
+// Key responsibilities:
+// - Parse RFC 4180 compliant CSV (with extensions)
+// - Handle quoted fields with escaped quotes ("" -> ")
+// - Auto-detect numeric, boolean, and date values
+// - Support configurable delimiters (comma, tab, semicolon)
+// - Handle UTF-8 BOM
+//
+// RFC 4180 features:
+// - CRLF line endings (also accepts LF-only)
+// - Quoted fields may contain delimiters and newlines
+// - Double-quote escaping within quoted fields
+//
+// Extensions:
+// - Optional header row detection
+// - Auto-type detection (numbers, booleans)
+// - Configurable field delimiter
+//
+// Dependencies: model.h
+// Used by: bindings.cc (file import), CLI tools
+//
+// =============================================================================
+
 #ifndef CELLS_CSV_READER_H_
 #define CELLS_CSV_READER_H_
 

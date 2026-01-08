@@ -1,3 +1,29 @@
+// =============================================================================
+// XLSX Reader (Excel Import)
+// =============================================================================
+//
+// Reads Microsoft Excel .xlsx files into our Workbook model.
+// Uses miniz for ZIP decompression and pugixml for XML parsing.
+//
+// Key responsibilities:
+// - Extract and parse XLSX package (ZIP containing XML files)
+// - Read worksheets, shared strings, styles, and workbook metadata
+// - Convert A1 references to UUID-based references
+// - Support progress callbacks for large files
+// - Handle shared formulas and array formulas
+//
+// Supported features:
+// - Multiple worksheets
+// - Cell values (numbers, strings, dates, booleans)
+// - Formulas (converted to UUID format)
+// - Column widths and row heights
+// - Custom number formats
+//
+// Dependencies: model.h
+// Used by: bindings.cc (file import), CLI tools
+//
+// =============================================================================
+
 #ifndef CELLS_XLSX_READER_H_
 #define CELLS_XLSX_READER_H_
 
