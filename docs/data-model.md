@@ -1,5 +1,11 @@
 # Data Model
 
+## Overview
+
+The data model is **UUID-based** at its core. All cells, columns, and rows are identified by UUIDs, not coordinates. The 2D grid view that users see is derived from this sparse UUID representation.
+
+**Key Principle**: UUIDs are the source of truth. Grid coordinates (A1, B2) are computed views.
+
 ## Core Concepts
 
 ### Cell
@@ -116,10 +122,65 @@ Positions don't need to be contiguous. Empty positions are simply not stored.
 
 | Method | Complexity | Use Case |
 |--------|------------|----------|
-| By UUID | O(1) | Primary lookup |
-| By (col_id, row_id) | O(1) | UI coordinate lookup |
-| By position (col_pos, row_pos) | O(n) | Requires sorting by position |
+| By UUID | O(1) | Primary lookup (hashmap) |
+| By (col_id, row_id) | O(1) | Cell grid lookup (hashmap) |
+| By pixel coordinate | O(log n) | UI viewport queries (Order Statistic Tree) |
 | Range iterator | O(k) | Formula evaluation |
+
+## Order Statistic Tree
+
+The Order Statistic Tree (OSTree) bridges the gap between pixel coordinates (what the UI needs) and UUID identifiers (what the data model uses).
+
+### The Problem
+
+The UI needs to answer: "Which columns/rows are visible in pixels 500-1000?"
+
+With sparse UUID-based data, we can't just divide by column width. We need a data structure that:
+1. Maps pixel offsets to axis UUIDs efficiently
+2. Updates incrementally as axes are inserted/deleted/resized
+3. Supports efficient range queries for viewports
+
+### The Solution
+
+Two Order Statistic Trees per sheet:
+- **Column OSTree**: Maps x-pixel → column UUID
+- **Row OSTree**: Maps y-pixel → row UUID
+
+```
+Pixel offset:     0      100    200    300    400    500
+                  │       │      │      │      │      │
+                  ▼       ▼      ▼      ▼      ▼      ▼
+OSTree:       ┌───────┬───────┬───────┬───────┬───────┐
+              │Col A  │Col B  │ (gap) │Col E  │Col F  │
+              │100px  │100px  │ 0px   │100px  │100px  │
+              └───────┴───────┴───────┴───────┴───────┘
+                  │       │              │       │
+                  ▼       ▼              ▼       ▼
+UUID:         aB3kQ2x  cD5mN8y        fH2pR4t  gK7sT1w
+```
+
+### Operations
+
+| Operation | Complexity | Description |
+|-----------|------------|-------------|
+| `findAtOffset(px)` | O(log n) | Get axis UUID at pixel offset |
+| `getOffsetForAxis(uuid)` | O(log n) | Get pixel offset for axis |
+| `queryRange(start, end)` | O(log n + k) | Get all axes in pixel range |
+| `insert(axis)` | O(log n) | Add axis (updates subtree sizes) |
+| `remove(axis)` | O(log n) | Remove axis |
+| `resize(axis, newSize)` | O(log n) | Change axis width/height |
+
+### Key Properties
+
+- **Subtree size tracking**: Each node stores the cumulative pixel size of its subtree
+- **Augmented BST**: Standard BST operations with size aggregation
+- **Incremental updates**: Insert/delete/resize update only O(log n) nodes
+
+### Implementation
+
+- Header: `core/cells/ostree.h`
+- Implementation: `core/cells/ostree.cc`
+- Viewport queries: `core/cells/viewport_index.h`
 
 ## Cell Storage
 
