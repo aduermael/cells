@@ -348,6 +348,7 @@ Test files are in `apps/wasm/tests/`:
 ## Design Decisions
 
 **Implemented:**
+
 - [x] **Language**: C++17 for core engine
 - [x] **Build system**: Bazel with Bzlmod - fast incremental builds, hermetic
 - [x] **Cell storage**: Sparse quadtree - efficient viewport queries, O(log n) access
@@ -356,12 +357,14 @@ Test files are in `apps/wasm/tests/`:
 - [x] **State management**: Listener pattern - WASM notifies TypeScript of changes
 
 **Planned (not yet implemented):**
+
 - [ ] **Formula runtime**: Native AST interpreter - no dependencies, simpler, full control
 - [ ] **Undo/redo**: Branch-based history - aligns with git-friendly philosophy, clean CRDT semantics
 - [ ] **Native apps**: Platform-native UI (SwiftUI for Apple, WinUI for Windows, web already done)
 - [ ] **Type system**: Completely optional - Excel-like by default, column types as gradual discovery
 
 **Implemented:**
+
 - [x] **Networking**: P2P via WebRTC - no relay servers, CRDT-native sync
 - [x] **CRDT sync**: Operation-based CRDT with HLC ordering, LWW conflict resolution
 - [x] **Presence**: Real-time cursor/selection sharing
