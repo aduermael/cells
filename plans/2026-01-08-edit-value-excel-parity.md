@@ -114,14 +114,14 @@ std::string formatEditValue(NumberFormatRegistry& registry, double value,
 
 Update the viewport query to include editValue alongside value and display.
 
-- [ ] 2a: Update `CellData` in viewport response to include `editValue` field in `bindings_format.cc`
+- [x] 2a: Update `CellData` in viewport response to include `editValue` field in `bindings_viewport.cc`
   - In `queryViewport()`, compute and include `editValue` for each cell
   - Call new `formatEditValue()` function
 
-- [ ] 2b: Update TypeScript types in `apps/wasm/src/types.ts`
+- [x] 2b: Update TypeScript types in `apps/wasm/src/types.ts`
   - Add `editValue?: string` to `CellData` interface
 
-- [ ] 2c: Add E2E test verifying editValue is returned correctly in viewport
+- [x] 2c: Add E2E test verifying editValue is returned correctly in viewport
 
 **Implementation for 2a (in queryViewport):**
 ```cpp

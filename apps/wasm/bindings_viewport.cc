@@ -130,11 +130,15 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             // Evaluate the formula and show the calculated value
             EvalResult result = evaluateCell(sheet, entry.cell);
             std::string displayValue;
+            std::string editValue;
             if (result.isError()) {
                 displayValue = errorToString(result.getError());
+                editValue = displayValue;
                 json << "\"isError\":true,";
             } else if (result.isNumber()) {
                 const double num = result.getNumber();
+                // Compute edit value for formula results
+                editValue = formatEditValue(_formatRegistry, num, entry.cell->formatId);
                 if (!entry.cell->formatId.isNull()) {
                     FormattedValue formatted = formatNumber(
                         _formatRegistry, _workbook->getCustomFormats(), num, entry.cell->formatId);
@@ -164,33 +168,42 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 }
             } else if (result.isString()) {
                 displayValue = result.getString();
+                editValue = displayValue;
             } else if (result.isBoolean()) {
                 displayValue = result.getBoolean() ? "TRUE" : "FALSE";
+                editValue = displayValue;
             } else {
                 displayValue = "";
+                editValue = "";
             }
-            json << "\"display\":\"" << jsonEscape(displayValue) << "\"";
+            json << "\"display\":\"" << jsonEscape(displayValue) << "\",";
+            json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
         } else {
             char typeChar = valueTypeToChar(entry.cell->value.type);
             json << "\"type\":\"" << typeChar << "\",";
 
             bool useFormattedValue = false;
             std::string displayValue;
+            std::string editValue;
 
             if (!entry.cell->formatId.isNull() &&
                 (entry.cell->value.type == CellValueType::NUMBER)) {
+                const double numValue = entry.cell->value.asNumber();
                 FormattedValue formatted =
                     formatNumber(_formatRegistry, _workbook->getCustomFormats(),
-                                 entry.cell->value.asNumber(), entry.cell->formatId);
+                                 numValue, entry.cell->formatId);
                 if (!formatted.isError) {
                     displayValue = formatted.text;
                     useFormattedValue = true;
                 }
+                // Compute edit value for formatted numbers
+                editValue = formatEditValue(_formatRegistry, numValue, entry.cell->formatId);
             }
 
             if (useFormattedValue) {
                 json << "\"value\":\"" << jsonEscape(entry.cell->value.raw) << "\",";
-                json << "\"display\":\"" << jsonEscape(displayValue) << "\"";
+                json << "\"display\":\"" << jsonEscape(displayValue) << "\",";
+                json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
             } else {
                 json << "\"value\":\"" << jsonEscape(entry.cell->value.raw) << "\"";
             }

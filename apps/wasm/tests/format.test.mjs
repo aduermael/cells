@@ -1006,6 +1006,60 @@ const tests = {
     const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
     assertEqual(formatLabel, 'Currency', 'A4 should inherit Currency format from range');
   },
+
+  // ============================================================================
+  // Edit Value tests (Phase 2 of edit-value-excel-parity plan)
+  // ============================================================================
+
+  'Viewport API returns editValue for percentage cells': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a percentage value
+    await setCellValue(ctx.page, 'A1', '15%');
+    await sleep(200);
+
+    // Get cell data from the app context (same method as getCellDisplayValue)
+    const cellData = await ctx.page.evaluate(() => {
+      if (window._appContext && window._appContext.app && window._appContext.app.cells) {
+        return window._appContext.app.cells.find(c => c.col === 0 && c.row === 0);
+      }
+      return null;
+    });
+
+    if (!cellData) {
+      throw new Error('A1 cell not found in viewport');
+    }
+
+    // Verify editValue is present and correct
+    assertEqual(cellData.editValue, '15%', 'Viewport should return editValue "15%" for percentage cell');
+    assertEqual(cellData.display, '15%', 'Display should be "15%"');
+  },
+
+  'Viewport API returns editValue for currency cells (raw number)': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a currency value
+    await setCellValue(ctx.page, 'A1', '$1234.50');
+    await sleep(200);
+
+    // Get cell data from the app context
+    const cellData = await ctx.page.evaluate(() => {
+      if (window._appContext && window._appContext.app && window._appContext.app.cells) {
+        return window._appContext.app.cells.find(c => c.col === 0 && c.row === 0);
+      }
+      return null;
+    });
+
+    if (!cellData) {
+      throw new Error('A1 cell not found in viewport');
+    }
+
+    // For currency, editValue should be raw number (like Excel)
+    assertEqual(cellData.editValue, '1234.5', 'Viewport should return editValue "1234.5" for currency cell');
+    assertEqual(cellData.display, '$1,234.50', 'Display should be "$1,234.50"');
+  },
 };
 
 // Run all tests

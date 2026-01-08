@@ -72,6 +72,7 @@ export interface CellData {
   value?: string; // For non-formula cells
   formula?: string; // For formula cells (A1 notation)
   display?: string; // For formula cells (computed value)
+  editValue?: string; // Human-readable value for formula bar/editing (e.g., "12/12/2025" for dates)
   formatId?: string; // Number format ID (~ or empty for GENERAL)
 }
 
