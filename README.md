@@ -52,23 +52,23 @@ A high-performance, collaborative spreadsheet engine with:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        UI Layer                                  │
-│   (Platform-native: SwiftUI / WinUI / TypeScript+Canvas2D)      │
+│                    UI Layer (TypeScript)                         │
+│    Canvas2D rendering, event handling, minimal display cache     │
 └─────────────────────────────────────────────────────────────────┘
-                              │
+                              │ WASM Bridge
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Grid Renderer (C++17)                        │
-│        Virtual scrolling, viewport culling, dirty regions        │
+│                Order Statistic Tree (C++17)                      │
+│   O(log n) spatial indexing: pixel coords ↔ UUID cells/axes     │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Core Engine (C++17)                           │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │ Data Model  │  │ Formula     │  │ CRDT / Collaboration    │  │
-│  │ (Cells,     │◄─┤ Engine      │  │ Engine                  │  │
-│  │ Dimensions) │  │ (Native AST)│  │                         │  │
+│  │ Data Model  │  │ Formula     │  │ CRDT Operations         │  │
+│  │ (UUID-based │◄─┤ Engine      │  │ (All mutations)         │  │
+│  │ cells/axes) │  │ (Native AST)│  │                         │  │
 │  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -79,57 +79,63 @@ A high-performance, collaborative spreadsheet engine with:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+**Key Architectural Principles:**
+- **UUID Source of Truth**: All cells, columns, rows identified by UUIDs, not coordinates
+- **CRDT-First**: ALL workbook mutations go through CRDT operations (enables collaboration by design)
+- **OSTree Bridge**: Order Statistic Tree translates "pixels 500-1000" ↔ "which UUID columns?"
+- **Web-Only UI**: Engine compiles to WASM, UI is TypeScript+Canvas2D (native builds for CLI only)
+
 ## Core Components
 
 ### 1. [Data Model](./docs/data-model.md)
 
-- UUID-based cell identification
-- N-dimensional sparse structure
-- Doubly-linked dimension chains with gap encoding
+- **UUID-based identification** - cells, columns, and rows use UUIDs (source of truth)
+- The 2D grid view is derived from sparse UUID representation via Order Statistic Tree
+- N-dimensional sparse structure with doubly-linked dimension chains
 
-### 2. [Type System](./docs/type-system.md)
+### 2. [Order Statistic Tree](./docs/data-model.md#order-statistic-tree)
+
+- O(log n) spatial indexing between UI pixel coordinates and sparse UUID representation
+- Translates "show me pixels 500-1000" ↔ "which columns/rows are there?"
+- Maintained incrementally as columns/rows are inserted, deleted, or resized
+
+### 3. [CRDT Operations](./docs/crdt.md)
+
+- **All mutations go through CRDT ops** - enforces collaboration-native design
+- Operation-based CRDT with HLC ordering, LWW conflict resolution
+- Cell operations: set value, set formula, set format, clear
+- Axis operations: insert, delete, move, resize columns/rows
+
+### 4. [Formula Engine](./docs/formula-engine.md)
+
+- Excel formula parser → AST → native evaluation
+- Dependency graph for reactive updates
+- Reference adjustment during copy/paste (AST-based, not string manipulation)
+
+### 5. [Type System](./docs/type-system.md)
 
 - **Completely optional** - works exactly like Excel by default
 - Column typing as gradual discovery (not enforced like AirTable)
-- Features Excel can't represent (stickiness): relations, select options, validation
+- Features Excel can't represent: relations, select options, validation
 - Always exportable to XLSX (with warnings for feature loss)
 
-### 3. [Formula Engine](./docs/formula-engine.md)
+### 6. [Persistence & File Format](./docs/persistence.md)
 
-- Excel formula parser → AST
-- Native AST interpreter in C/C++
-- Dependency graph for reactive updates
-
-### 4. [CRDT & Collaboration](./docs/crdt.md)
-
-- Operation-based CRDT for cell mutations
-- Dimension structure CRDTs (insert/delete/reorder)
-- Conflict resolution strategies
-
-### 5. [Persistence & File Format](./docs/persistence.md)
-
-- Git-diff-friendly text format
+- Git-diff-friendly text format (.zcd)
 - Binary format for large files
 - Import/export (xlsx, csv)
 
-### 6. [Rendering](./docs/rendering.md)
+### 7. [Rendering](./docs/rendering.md)
 
+- Canvas2D rendering in TypeScript (web only)
 - Virtual viewport with aggressive culling
-- Dirty region tracking
-- Platform-specific backends
+- Dirty region tracking for efficient redraws
 
-### 7. [Networking & Collaboration](./docs/networking.md)
+### 8. [Networking & Collaboration](./docs/networking.md)
 
-- WebRTC peer-to-peer connections
-- No relay server for document data
+- WebRTC peer-to-peer connections (no relay servers)
 - Lightweight signaling for connection setup
-- Mesh topology for small groups
-
-### 8. [Cross-Platform Strategy](./docs/cross-platform.md)
-
-- Core as shared C++17 library
-- WebAssembly compilation for web
-- Platform-native UI (SwiftUI, WinUI, TypeScript+Canvas2D for web)
+- Real-time presence/cursor sharing
 
 ## Directory Structure
 
@@ -316,19 +322,20 @@ Test files are in `apps/wasm/tests/`:
 ## Current Implementation Status
 
 **Core Engine (C++17):**
-- Data model with UUID-based cells, sparse quadtree storage
-- XLSX import (basic support)
-- .zcd text format (read/write) - see [File Format](./docs/file-format.md)
-- Viewport-based querying with spatial indexing
+- Data model with UUID-based cells and Order Statistic Tree spatial indexing
+- CRDT operations for all mutations (collaboration-native)
+- Formula engine with Excel-compatible parser, native AST evaluation, dependency graph
+- XLSX import/export, .zcd text format (git-friendly)
+- Number formatting with Excel-compatible format codes
 - Multi-sheet support
 
 **WebAssembly Build:**
 - Full core engine compiled to WASM via Emscripten
 - Web Worker architecture for non-blocking UI
-- Canvas2D-based grid renderer
-- Interactive editing, selection, resizing
-- Keyboard navigation
-- Listener-driven UI refresh
+- Canvas2D-based grid renderer with virtual scrolling
+- Interactive editing, selection, column/row resizing and reordering
+- Keyboard navigation, clipboard support
+- Luau scripting with autocomplete
 
 **Real-time Collaboration:**
 - P2P sync via WebRTC (no relay servers)
@@ -339,35 +346,33 @@ Test files are in `apps/wasm/tests/`:
 
 **CLI Tool:**
 - File format conversion (xlsx ↔ zcd)
-- Basic file inspection
-
-**Not Yet Implemented:**
-- Formula engine (AST parsing and evaluation)
-- Native platform apps (SwiftUI, WinUI)
+- Basic file inspection and validation
 
 ## Design Decisions
 
-**Implemented:**
-
-- [x] **Language**: C++17 for core engine
+**Architecture:**
+- [x] **Language**: C++17 for core engine, TypeScript for web UI
 - [x] **Build system**: Bazel with Bzlmod - fast incremental builds, hermetic
-- [x] **Cell storage**: Sparse quadtree - efficient viewport queries, O(log n) access
-- [x] **Cell IDs**: 8-character base62 UUIDs - compact, collision-resistant
-- [x] **Web UI**: TypeScript + Canvas2D with Web Worker - non-blocking, responsive, type-safe
-- [x] **State management**: Listener pattern - WASM notifies TypeScript of changes
+- [x] **Web deployment**: WASM + Web Worker - non-blocking, runs entirely in browser
 
-**Planned (not yet implemented):**
+**Data Model:**
+- [x] **Cell IDs**: 8-character base62 UUIDs - CRDT-friendly, stable references
+- [x] **Spatial indexing**: Order Statistic Tree - O(log n) pixel ↔ UUID mapping
+- [x] **CRDT-first**: All mutations go through CRDT operations (collaboration by design)
 
-- [ ] **Formula runtime**: Native AST interpreter - no dependencies, simpler, full control
-- [ ] **Undo/redo**: Branch-based history - aligns with git-friendly philosophy, clean CRDT semantics
-- [ ] **Native apps**: Platform-native UI (SwiftUI for Apple, WinUI for Windows, web already done)
-- [ ] **Type system**: Completely optional - Excel-like by default, column types as gradual discovery
+**Formula Engine:**
+- [x] **Formula runtime**: Native AST interpreter - no scripting VM, direct C++ execution
+- [x] **Dependency graph**: Automatic recalculation on cell changes
+- [x] **Reference adjustment**: AST-based (not string manipulation) for copy/paste
 
-**Implemented:**
-
-- [x] **Networking**: P2P via WebRTC - no relay servers, CRDT-native sync
+**Collaboration:**
+- [x] **Networking**: P2P via WebRTC - no relay servers for document data
 - [x] **CRDT sync**: Operation-based CRDT with HLC ordering, LWW conflict resolution
 - [x] **Presence**: Real-time cursor/selection sharing
+
+**Planned:**
+- [ ] **Undo/redo**: Branch-based history - aligns with git-friendly philosophy, clean CRDT semantics
+- [ ] **Type system**: Completely optional - Excel-like by default, column types as gradual discovery
 
 ## Design Philosophy
 
