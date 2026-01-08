@@ -1,6 +1,27 @@
-// App - Main Application State Manager
-// Manages global state, DOM references, and UI state machine for the spreadsheet application.
-// This module centralizes state management that was previously scattered in index.html.
+// =============================================================================
+// Application State Manager
+// =============================================================================
+//
+// Central state manager holding all application state, DOM references, and
+// the UI state machine. Created once by init.ts and passed to all components.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Hold DOM element references (canvas, toolbar buttons, dialogs)
+// - Manage grid state (columns, rows, selection, scroll position)
+// - Coordinate between GridRenderer and data source
+// - Track resize/drag contexts for column/row operations
+// - Provide unified access to all UI components
+//
+// State categories:
+// - DOM references: canvas, buttons, inputs, containers
+// - Grid state: columns, rows, columnWidths, rowHeights
+// - Selection: selectedCell, rangeSelection, fillOperation
+// - Interaction: resizeContext, dragContext, pendingDrag
+//
+// =============================================================================
 
 import type { CellsClient } from "./client";
 import type {

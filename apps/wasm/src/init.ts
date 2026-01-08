@@ -1,6 +1,27 @@
-// Init - Application initialization and module wiring
-// This module creates and connects all application components, providing
-// a unified interface for the main entry point (index.html).
+// =============================================================================
+// Application Initializer
+// =============================================================================
+//
+// Creates and wires together all application components from a CellsClient.
+// This is the main entry point called from index.html after WASM loads.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Create App instance with all DOM references
+// - Initialize GridRenderer, CellEditor, FormulaBar, SheetTabs
+// - Set up collaboration (CppSyncAdapter, PresenceBroadcaster, RoomManager)
+// - Wire change listeners between data source and UI components
+// - Handle room joining from URL parameters
+//
+// Component wiring:
+// - CellsClient → WasmDataSource → App → GridRenderer
+// - App → CellEditor, ColumnHeaderEditor, FormulaBarEditor, SheetTabsManager
+// - App → FileLoader, ClipboardManager, ScriptPanel, AgentPanel
+// - App → CppSyncAdapter → CollabUI, PresenceBroadcaster
+//
+// =============================================================================
 
 import type { CellsClient } from "./client";
 import type { Position } from "./types";

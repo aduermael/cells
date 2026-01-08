@@ -1,6 +1,28 @@
-// App Events - Canvas and document event handlers
-// This module sets up all event listeners for canvas interactions,
-// keyboard navigation, and window resize.
+// =============================================================================
+// Application Event Handlers
+// =============================================================================
+//
+// Central event coordination for canvas interactions, keyboard shortcuts,
+// and window events. Translates DOM events into UI state machine events.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Mouse events: clicks, drags, scroll, context menu on canvas
+// - Keyboard events: navigation, editing, shortcuts (Ctrl+C/V/X, Delete)
+// - Window events: resize, beforeunload
+// - Hit testing: determine which cell/header/resize handle was clicked
+// - Cursor management: update cursor based on hover position
+//
+// Event flow:
+// - DOM event → AppEventManager → UIStateMachine event
+// - UIStateMachine → state transition → App state update
+// - App state → GridRenderer.render() for visual feedback
+//
+// Uses grid-utils.ts for coordinate calculations (pixel ↔ cell position).
+//
+// =============================================================================
 
 import { UIEvent, type UIStateMachine } from "./ui-state";
 import type { WasmDataSource } from "./wasm-data-source";
