@@ -1,149 +1,122 @@
 # Cross-Platform Strategy
 
-## Implementation Status
+## Current Architecture
 
-**Current state (December 2024):** Web only via WebAssembly (WASM).
+The cells engine is designed for **web deployment only**. Native builds exist for CLI/headless use cases, but no native UI (SwiftUI, WinUI, etc.) is planned.
 
 | Component | Status |
 |-----------|--------|
-| Core engine (C++) | ✅ Implemented |
-| WASM build | ✅ Implemented |
-| Web UI (TypeScript + Canvas2D) | ✅ Implemented |
-| Swift bindings | ❌ Not started |
-| macOS/iOS apps | ❌ Not started |
-| Windows/Android | ❌ Not started |
-
-The architecture below describes the full vision. Currently only the Web/WASM path is implemented.
-
----
-
-## Target Platforms
-
-| Platform | Priority | Notes |
-|----------|----------|-------|
-| Web | P0 | Widest reach |
-| macOS | P0 | Primary development |
-| Windows | P1 | Largest desktop market |
-| iOS | P1 | Mobile companion |
-| Android | P2 | Mobile companion |
-| Linux | P2 | Developer audience |
+| Core engine (C++) | Implemented |
+| WASM build | Implemented |
+| Web UI (TypeScript + Canvas2D) | Implemented |
+| CLI tool (native) | Implemented |
+| Native UI apps | Not planned |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                      Application Layer                               │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐   │
-│  │ Web     │ │ macOS   │ │ Windows │ │ iOS     │ │ Android     │   │
-│  │ (TS)    │ │ (Swift) │ │ (C#/WPF)│ │ (Swift) │ │ (Kotlin)    │   │
-│  └────┬────┘ └────┬────┘ └────┬────┘ └────┬────┘ └──────┬──────┘   │
-│       └───────────┴───────────┴─────┬─────┴──────────────┘          │
-│                                     │                                │
-│                        Platform Bindings (FFI)                       │
-└─────────────────────────────────────┼───────────────────────────────┘
-                                      │
-┌─────────────────────────────────────┼───────────────────────────────┐
-│                      Core Engine (C++)                               │
-│                            C API                                     │
+│                    Web Application (TypeScript)                      │
+│   Canvas2D rendering, event handling, collaboration UI               │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                    WASM Bridge (Emscripten)
+                              │
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Core Engine (C++17)                             │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐   │
 │  │ Data Model  │ │ Formula     │ │ CRDT        │ │ Persistence │   │
+│  │ (UUID-based)│ │ Engine      │ │ Operations  │ │ (zcd, xlsx) │   │
 │  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘   │
-└──────────────────────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Build Targets
 
-| Platform | Compiler | Output |
-|----------|----------|--------|
-| macOS | Clang | libcells.a / .dylib |
-| iOS | Clang | libcells.a (arm64) |
-| Windows | MSVC | cells.lib / .dll |
-| Linux | GCC/Clang | libcells.a / .so |
-| Android | NDK | libcells.so |
-| Web | Emscripten | cells.wasm + .js |
+| Target | Compiler | Output | Use Case |
+|--------|----------|--------|----------|
+| WASM | Emscripten | cells.wasm + .js | Web application |
+| macOS | Clang | libcells.a | CLI tool |
+| Linux | GCC/Clang | libcells.a | CLI tool, CI |
+| Windows | MSVC | cells.lib | CLI tool |
 
-## C API Design
+## Web-Specific Architecture
 
-The C API is the contract between core and platform layers:
+The web application uses a **Web Worker architecture** for non-blocking UI:
 
-### Workbook Operations
-- `cells_workbook_new()` / `cells_workbook_free()`
-- `cells_workbook_load()` / `cells_workbook_save()`
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Main Thread                                     │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐   │
+│  │ Grid        │ │ Cell        │ │ Collab      │ │ UI State    │   │
+│  │ Renderer    │ │ Editor      │ │ UI          │ │ Manager     │   │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘   │
+│                              │                                       │
+│                    postMessage (async)                               │
+│                              │                                       │
+└──────────────────────────────┼──────────────────────────────────────┘
+                               │
+┌──────────────────────────────┼──────────────────────────────────────┐
+│                      Web Worker                                      │
+│                              │                                       │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                    WASM Core Engine                          │   │
+│  │  Data Model, Formula Engine, CRDT, File I/O, Networking      │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
-### Sheet Operations
-- `cells_workbook_add_sheet()` / `cells_workbook_get_sheet()`
-- `cells_workbook_sheet_count()`
+- **Main thread**: UI rendering (Canvas2D), event handling, minimal display cache
+- **Web Worker**: All WASM operations, file parsing, CRDT sync, networking
+- **Communication**: Async postMessage with structured clone
 
-### Cell Operations
-- `cells_sheet_set_cell_number()` / `cells_sheet_set_cell_string()`
-- `cells_sheet_set_cell_formula()`
-- `cells_cell_get_number()` / `cells_cell_get_string()`
+## TypeScript Responsibilities
 
-### Dimension Operations
-- `cells_sheet_insert_column()` / `cells_sheet_insert_row()`
-- `cells_sheet_delete_column()` / `cells_sheet_delete_row()`
+The TypeScript layer handles UI concerns only:
 
-### Rendering
-- `cells_render(sheet, viewport)` → DrawList
-- `cells_drawlist_free()`
+- Canvas2D grid rendering with virtual scrolling
+- Mouse and keyboard event handling
+- Cell editing (inline and formula bar)
+- Collaboration UI (connection status, presence indicators)
+- Clipboard operations (with browser APIs)
+- File dialogs and drag-drop (browser APIs)
 
-### Collaboration
-- `cells_set_operation_callback()` - notify when ops need sync
-- `cells_apply_remote_operation()` - apply op from peer
-- `cells_set_change_callback()` - notify UI of changes
+**Important**: TypeScript does NOT maintain workbook state. All data lives in the WASM core. TypeScript only caches display information (formatted values, column widths for rendering).
 
-## UI Framework Strategy
+## C++ Core Responsibilities
 
-### Decision: Platform-Native UIs
+The C++ core handles all data and logic:
 
-For maximum performance and native feel:
+- Workbook data model (cells, sheets, axes)
+- CRDT operations (all mutations must go through CRDT ops)
+- Formula parsing, evaluation, dependency graph
+- Order Statistic Tree (spatial indexing)
+- File import/export (xlsx, csv, zcd)
+- Number formatting and input parsing
+- WebRTC networking (via platform-specific delegates)
 
-| Platform | Framework |
-|----------|-----------|
-| macOS | SwiftUI |
-| iOS | SwiftUI |
-| Web | TypeScript + Canvas2D (esbuild bundled) |
-| Windows | WinUI 3 |
-| Android | Jetpack Compose |
+## Why Web-Only UI?
 
-### Why Not Flutter/Cross-Platform?
+1. **Reach**: Web works everywhere (desktop, mobile, tablet)
+2. **Deployment**: No app store approval, instant updates
+3. **Collaboration**: P2P WebRTC works great in browsers
+4. **Development speed**: Single UI codebase to maintain
 
-1. **Performance**: Native is always snappier
-2. **Platform integration**: Better gestures, menus, shortcuts
-3. **User expectations**: Spreadsheets need to feel "right"
-4. **App Store**: Native apps get better treatment
+Native builds exist for CLI/headless scenarios (batch processing, CI, testing) but the full spreadsheet UI is web-only.
 
-### Code Sharing
+## CLI Tool
 
-| Layer | Shared |
-|-------|--------|
-| Core engine | 100% (C++) |
-| C API | 100% |
-| Bindings | ~80% (per-language) |
-| UI patterns | ~60% (similar architecture) |
+The CLI tool uses native builds (not WASM) for performance:
 
-## Platform Bindings
+```bash
+# File conversion
+./cells convert input.xlsx output.zcd
 
-Each platform wraps the C API in idiomatic code:
+# File inspection
+./cells inspect file.zcd
 
-| Platform | Binding Style |
-|----------|---------------|
-| Swift | `@_silgen_name` + wrapper classes |
-| TypeScript | WASM + Embind + TypeScript definitions |
-| C# | P/Invoke + wrapper classes |
-| Kotlin | JNI + wrapper classes |
+# Validation
+./cells validate file.zcd
+```
 
-## Web-Specific Notes
-
-- WASM loaded asynchronously via Web Worker
-- Heavy operations (file parsing, CRDT sync) run in Web Worker
-- UI rendered to Canvas2D with TypeScript GridRenderer
-- TypeScript bundled with esbuild for fast builds and minimal bundle size
-- Type definitions (`cells.d.ts`) provide full type safety for WASM API
-
-## Development Order
-
-1. **Core engine** (C++) with comprehensive C API
-2. ✅ **WASM build** + TypeScript web app (implemented)
-3. **Swift bindings** + SwiftUI app (primary native platform)
-4. Other platforms as needed
+The CLI shares the same C++ core as the WASM build but links directly instead of going through Emscripten.
