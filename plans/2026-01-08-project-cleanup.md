@@ -206,13 +206,21 @@ Split files that are significantly over 500 lines and have clear separation boun
 
 ## Phase 5: Split Large TypeScript Files
 
-### 5.1: app-events.ts (2163 lines → 5 files)
+### 5.1: app-events.ts (2163 lines → 3 files) ✅ COMPLETED
 
-- [ ] 5.1a: Extract `mouse-events.ts` (canvas mouse handlers)
-- [ ] 5.1b: Extract `keyboard-events.ts` (keyboard navigation, shortcuts)
-- [ ] 5.1c: Extract `resize-events.ts` (column/row resize handling)
-- [ ] 5.1d: Extract `drag-events.ts` (column/row drag-and-drop)
-- [ ] 5.1e: Keep `app-events.ts` as coordinator (event manager setup)
+Split into 3 files (resize/drag logic is cohesive with mouse handlers):
+- app-events.ts: 198 lines (coordinator, types, window events)
+- mouse-events.ts: 1642 lines (mouse/pointer handlers, context menu)
+- keyboard-events.ts: 331 lines (keyboard navigation, shortcuts)
+
+Note: mouse-events.ts exceeds 500 lines but is kept cohesive because:
+- Mouse down/move/up handlers share state (drag bounds, pointer capture)
+- Resize, drag, fill, and selection logic are interleaved in each handler
+- Splitting further would increase complexity without improving maintainability
+
+- [x] 5.1a: Extract `mouse-events.ts` (canvas mouse handlers, includes resize/drag)
+- [x] 5.1b: Extract `keyboard-events.ts` (keyboard navigation, shortcuts)
+- [x] 5.1c: Keep `app-events.ts` as coordinator (event manager setup, types)
 
 ### 5.2: init.ts (1595 lines → 4 files)
 
