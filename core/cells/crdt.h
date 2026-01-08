@@ -1,3 +1,31 @@
+// =============================================================================
+// CRDT Operations API
+// =============================================================================
+//
+// High-level API for applying and creating CRDT operations on a Workbook.
+// This is the ONLY correct way to mutate the model when collaboration is active.
+//
+// Key responsibilities:
+// - Apply operations from local edits or remote peers
+// - Generate operations with proper HLC timestamps
+// - Handle conflict resolution (LWW for cells, interleave for inserts)
+// - Bootstrap OpLog when transitioning to collaboration mode
+//
+// Conflict resolution rules:
+// - Cell value conflicts: Last-Writer-Wins (highest HLC wins)
+// - Axis insert conflicts: Interleave by HLC (lower HLC comes first)
+// - Delete vs edit conflicts: Edit resurrects the entity (no data loss)
+//
+// Usage pattern:
+// 1. Create operation via make*Op() helper
+// 2. Apply via applyOperation() to mutate model AND add to OpLog
+// 3. SyncManager broadcasts to peers automatically
+//
+// Dependencies: model.h, operation.h
+// Used by: bindings.cc (UI-triggered edits), sync_manager.cc (remote ops)
+//
+// =============================================================================
+
 #ifndef CELLS_CRDT_H_
 #define CELLS_CRDT_H_
 

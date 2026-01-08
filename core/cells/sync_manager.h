@@ -1,3 +1,31 @@
+// =============================================================================
+// Sync Manager
+// =============================================================================
+//
+// Manages CRDT synchronization protocol with remote peers. Handles the sync
+// handshake, operation exchange, and conflict resolution across the network.
+//
+// Key responsibilities:
+// - Track connected peers and their sync state (last known HLC)
+// - Handle incoming messages: hello, sync-request, sync-response, operations
+// - Generate outgoing messages for local operations
+// - Prune old operations when all peers have acknowledged them
+//
+// Sync protocol:
+// 1. hello: Exchange HLC and operation count on connect
+// 2. sync-request: Request operations since a specific HLC
+// 3. sync-response: Send requested operations in HLC order
+// 4. operations: Broadcast new operations as they occur
+//
+// Transport layer:
+// The SyncManager is transport-agnostic. TypeScript provides WebRTC/WebSocket
+// transport via cpp-sync-adapter.ts which calls into this C++ layer.
+//
+// Dependencies: hlc.h, operation.h, types.h, model.h (forward decl)
+// Used by: bindings.cc (WASM bridge to JS sync layer)
+//
+// =============================================================================
+
 #ifndef CELLS_SYNC_MANAGER_H_
 #define CELLS_SYNC_MANAGER_H_
 

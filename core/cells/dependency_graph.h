@@ -1,3 +1,29 @@
+// =============================================================================
+// Dependency Graph
+// =============================================================================
+//
+// Tracks formula dependencies between cells for efficient recalculation.
+// Uses an R-tree for spatial queries ("what formulas reference this range?")
+// combined with direct/reverse hash maps for point lookups.
+//
+// Key responsibilities:
+// - Track which cells a formula depends on (forward dependencies)
+// - Find which formulas depend on a cell (reverse dependencies for recalc)
+// - Support range dependencies via R-tree spatial indexing
+// - Detect circular references
+// - Track volatile cells (NOW, RAND, etc.) for forced recalculation
+//
+// Data structures:
+// - R-tree: Spatial index for range queries (O(log n) lookup)
+// - dependencies_: cellId -> what it depends on (for formula display)
+// - reverseDeps_: cellId -> what depends on it (for recalculation)
+// - volatileCells_: Set of cells needing recalc every time
+//
+// Dependencies: rtree.h, types.h
+// Used by: Sheet (owns DependencyGraph), formula_eval.cc (recalculation order)
+//
+// =============================================================================
+
 #ifndef CELLS_DEPENDENCY_GRAPH_H_
 #define CELLS_DEPENDENCY_GRAPH_H_
 
