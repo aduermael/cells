@@ -193,11 +193,11 @@ Split files that are significantly over 500 lines and have clear separation boun
 - [x] 4.2b: Extract `luau_types.cc` (type coercion, Cell/Sheet wrappers)
 - [x] 4.2c: Keep `luau_sandbox.cc` as main sandbox (VM lifecycle, execution)
 
-### 4.3: crdt.cc (1520 lines → 3 files)
+### 4.3: crdt.cc (1520 lines → 3 files) ✅ COMPLETED
 
-- [ ] 4.3a: Extract `crdt_cell.cc` (cell operations: set, clear, format)
-- [ ] 4.3b: Extract `crdt_axis.cc` (axis operations: insert, delete, move, resize)
-- [ ] 4.3c: Keep `crdt.cc` as main entry (applyOperation dispatch, helpers)
+- [x] 4.3a: Extract `crdt_cell.cc` (cell operations: set, clear, format)
+- [x] 4.3b: Extract `crdt_axis.cc` (axis operations: insert, delete, move, resize)
+- [x] 4.3c: Keep `crdt.cc` as main entry (applyOperation dispatch, helpers)
 
 ### 4.4: model.cc (1070 lines → 2 files)
 

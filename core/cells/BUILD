@@ -198,8 +198,15 @@ cc_library(
 
 cc_library(
     name = "crdt",
-    srcs = ["crdt.cc"],
-    hdrs = ["crdt.h"],
+    srcs = [
+        "crdt.cc",
+        "crdt_axis.cc",
+        "crdt_cell.cc",
+    ],
+    hdrs = [
+        "crdt.h",
+        "crdt_internal.h",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":format_code_parser",
