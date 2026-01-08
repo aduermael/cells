@@ -1,3 +1,31 @@
+// =============================================================================
+// Reference Converter
+// =============================================================================
+//
+// Converts between UUID-based and A1-notation cell references.
+// Used for Excel import/export and clipboard operations.
+//
+// Key responsibilities:
+// - Convert UUID formula refs to A1 notation (for XLSX export)
+// - Convert A1 notation to UUID refs (for XLSX import)
+// - Adjust relative references during copy/paste operations
+// - Parse and format cell/range references
+//
+// UUID reference format:
+// - $$cellId: $A$1 (both absolute)
+// - $~cellId: $A1 (column absolute, row relative)
+// - ~$cellId: A$1 (column relative, row absolute)
+// - cellId: A1 (both relative, ~~ prefix omitted)
+//
+// AST-based adjustment:
+// - adjustASTReferences() shifts relative refs by row/col offset
+// - Used for fill-down, fill-right, and paste operations
+//
+// Dependencies: formula_ast.h, model.h, types.h
+// Used by: xlsx_reader.cc, xlsx_writer.cc, clipboard operations
+//
+// =============================================================================
+
 #ifndef CELLS_REF_CONVERTER_H_
 #define CELLS_REF_CONVERTER_H_
 

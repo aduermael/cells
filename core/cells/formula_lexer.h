@@ -1,3 +1,27 @@
+// =============================================================================
+// Formula Lexer (Tokenizer)
+// =============================================================================
+//
+// Tokenizes Excel-style formula strings into a sequence of tokens.
+// Supports both A1 notation (for UI input) and UUID-based format (for storage).
+//
+// Key responsibilities:
+// - Tokenize numbers, strings, booleans, identifiers, operators
+// - Recognize cell references (A1, $B$2), ranges (:), sheet prefixes (!)
+// - Handle UUID-based references ($$cellId, @$colId, #$rowId)
+// - Track source positions for error reporting and UI highlighting
+//
+// Token categories:
+// - Literals: NUMBER, STRING, BOOLEAN, PERCENT_LITERAL
+// - References: IDENTIFIER, COLUMN, ROW, UUID_CELL_REF, UUID_COLUMN_REF, UUID_ROW_REF
+// - Operators: PLUS, MINUS, STAR, SLASH, CARET, comparison operators
+// - Punctuation: LPAREN, RPAREN, COMMA, COLON, BANG, DOLLAR
+//
+// Dependencies: None (leaf module)
+// Used by: formula_parser.h, formula_ast.h
+//
+// =============================================================================
+
 #ifndef CELLS_FORMULA_LEXER_H_
 #define CELLS_FORMULA_LEXER_H_
 

@@ -1,3 +1,30 @@
+// =============================================================================
+// Formula Recalculation Engine
+// =============================================================================
+//
+// Manages formula recalculation in response to cell value changes.
+// Uses the dependency graph to determine recalculation order.
+//
+// Key responsibilities:
+// - Evaluate single cells or cascade from changed cells
+// - Determine recalculation order via topological sort
+// - Handle circular references with #CIRCULAR! errors
+// - Track and recalculate volatile cells (NOW, RAND, etc.)
+//
+// Recalculation strategy:
+// 1. Mark changed cells as dirty
+// 2. Propagate dirty flags to dependents
+// 3. Topologically sort dirty cells
+// 4. Evaluate in dependency order
+//
+// Note: This is a read-only evaluation layer. It computes values from
+// CRDT-synced input data but does not modify the CRDT state.
+//
+// Dependencies: types.h
+// Used by: bindings.cc (triggering recalc after edits)
+//
+// =============================================================================
+
 #ifndef CELLS_FORMULA_RECALC_H_
 #define CELLS_FORMULA_RECALC_H_
 

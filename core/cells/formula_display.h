@@ -1,3 +1,24 @@
+// =============================================================================
+// Formula Display Converter
+// =============================================================================
+//
+// Converts formula ASTs back to human-readable A1 notation for UI display.
+// This is the inverse of resolution: UUID-based AST -> A1 formula string.
+//
+// Key responsibilities:
+// - Convert cell UUIDs back to column letters (A, B, ..., AA, AB, ...)
+// - Convert row UUIDs back to row numbers (1, 2, 3, ...)
+// - Preserve absolute reference markers ($A$1 vs A1)
+// - Handle operator precedence for correct parenthesization
+//
+// This module is separate from FormulaResolver to avoid circular dependencies.
+// The resolver needs model.h; display only needs AST and Sheet for lookups.
+//
+// Dependencies: formula_ast.h
+// Used by: bindings.cc (formula bar display), formula_resolver.h
+//
+// =============================================================================
+
 #ifndef CELLS_FORMULA_DISPLAY_H_
 #define CELLS_FORMULA_DISPLAY_H_
 

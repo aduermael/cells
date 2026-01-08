@@ -1,3 +1,30 @@
+// =============================================================================
+// Formula Evaluation
+// =============================================================================
+//
+// Evaluates formula ASTs to compute cell values. Handles type coercion,
+// range iteration, and error propagation according to Excel semantics.
+//
+// Key responsibilities:
+// - Evaluate AST nodes recursively to produce EvalResult values
+// - Implement type coercion (number/string/boolean conversions)
+// - Handle range references and iterate over cell values
+// - Detect circular references during evaluation
+// - Enforce recursion limits for deeply nested formulas
+//
+// EvalResult types:
+// - NUMBER: numeric value (double)
+// - STRING: text value
+// - BOOLEAN: true/false
+// - ERROR: CellError (VALUE, REF, DIV, etc.)
+// - EMPTY: blank cell
+// - RANGE: bounds for SUM, AVERAGE, etc.
+//
+// Dependencies: types.h
+// Used by: formula_recalc.h, formula_functions.h, bindings.cc
+//
+// =============================================================================
+
 #ifndef CELLS_FORMULA_EVAL_H_
 #define CELLS_FORMULA_EVAL_H_
 

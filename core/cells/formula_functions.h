@@ -1,3 +1,28 @@
+// =============================================================================
+// Formula Function Registry
+// =============================================================================
+//
+// Central registry for all built-in formula functions (SUM, IF, VLOOKUP, etc.).
+// Functions are registered at startup and called during formula evaluation.
+//
+// Key responsibilities:
+// - Register built-in functions with implementation, signature, and metadata
+// - Provide case-insensitive function lookup
+// - Track volatile functions (NOW, RAND, TODAY) for recalculation
+// - Supply function list for autocomplete UI
+//
+// Function implementation:
+// - Arguments are passed as AST nodes for lazy evaluation (IF, AND, OR)
+// - Helper functions for argument expansion and type coercion
+// - Functions implemented in core/cells/functions/fn_*.cc
+//
+// Function categories: Math, Statistical, Logical, Text, Lookup, Date/Time
+//
+// Dependencies: formula_eval.h
+// Used by: formula_eval.cc (function calls), bindings.cc (autocomplete)
+//
+// =============================================================================
+
 #ifndef CELLS_FORMULA_FUNCTIONS_H_
 #define CELLS_FORMULA_FUNCTIONS_H_
 

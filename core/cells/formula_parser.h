@@ -1,3 +1,32 @@
+// =============================================================================
+// Formula Parser
+// =============================================================================
+//
+// Parses Excel-style formula strings into an Abstract Syntax Tree (AST).
+// Implements a recursive descent parser with operator precedence.
+//
+// Key responsibilities:
+// - Parse formula text starting with "=" into AST nodes
+// - Handle operator precedence: ^ > * / > + - > & > comparisons
+// - Support function calls with variable arguments
+// - Provide error recovery with ErrorNode for partial parsing
+//
+// Grammar (simplified EBNF):
+//   formula     = "=" expression
+//   expression  = comparison
+//   comparison  = concat (("=" | "<>" | "<" | "<=" | ">" | ">=") concat)*
+//   concat      = additive ("&" additive)*
+//   additive    = multiplicative (("+" | "-") multiplicative)*
+//   multiplicative = power (("*" | "/") power)*
+//   power       = unary ("^" unary)*
+//   unary       = ("-" | "+")? primary
+//   primary     = literal | reference | function_call | "(" expression ")"
+//
+// Dependencies: formula_ast.h, formula_lexer.h
+// Used by: bindings.cc, crdt.cc (formula input), xlsx_reader.cc
+//
+// =============================================================================
+
 #ifndef CELLS_FORMULA_PARSER_H_
 #define CELLS_FORMULA_PARSER_H_
 

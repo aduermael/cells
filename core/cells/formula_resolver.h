@@ -1,3 +1,27 @@
+// =============================================================================
+// Formula Reference Resolver
+// =============================================================================
+//
+// Resolves A1-notation references in formula ASTs to UUID-based references.
+// Auto-creates cells and axes as needed for referenced locations.
+//
+// Key responsibilities:
+// - Walk AST and resolve A1 refs (B2, $A$1) to cell/axis UUIDs
+// - Handle cross-sheet references (Sheet2!A1)
+// - Resolve named ranges via NamedRangeRegistry
+// - Extract reference info for UI highlighting
+// - Detect volatile functions (NOW, RAND, etc.)
+//
+// Resolution process:
+// 1. Parse formula text -> AST (via FormulaParser)
+// 2. Resolve AST refs -> UUIDs (this module)
+// 3. Serialize AST -> UUID formula text (via FormulaSerializer)
+//
+// Dependencies: formula_ast.h, formula_display.h, model.h, named_ranges.h
+// Used by: bindings.cc (cell editing), crdt.cc (applying formula ops)
+//
+// =============================================================================
+
 #ifndef CELLS_FORMULA_RESOLVER_H_
 #define CELLS_FORMULA_RESOLVER_H_
 

@@ -1,3 +1,27 @@
+// =============================================================================
+// Formula Abstract Syntax Tree (AST)
+// =============================================================================
+//
+// Defines AST node types for representing parsed Excel-style formulas.
+// The AST is the canonical representation of formulas; text is derived.
+//
+// Key responsibilities:
+// - Define node types: literals, cell/range refs, operators, functions
+// - Support both A1 notation (for UI) and UUID-based references (for storage)
+// - Provide cloning, JSON serialization, and error detection
+//
+// Node types:
+// - Literals: NUMBER, STRING, BOOLEAN
+// - References: CELL_REF, RANGE_REF, COLUMN_REF, ROW_REF, NAMED_REF
+// - Operators: BINARY_OP (+, -, *, /, etc.), UNARY_OP (-, +)
+// - FUNCTION_CALL: SUM, IF, VLOOKUP, etc.
+// - ERROR_NODE: Parse errors with partial recovery
+//
+// Dependencies: formula_lexer.h (for SourcePosition)
+// Used by: formula_parser.h, formula_eval.h, formula_resolver.h, formula_serializer.h
+//
+// =============================================================================
+
 #ifndef CELLS_FORMULA_AST_H_
 #define CELLS_FORMULA_AST_H_
 

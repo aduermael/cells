@@ -1,3 +1,29 @@
+// =============================================================================
+// Formula Serializer
+// =============================================================================
+//
+// Serializes resolved formula ASTs to UUID-based text format for storage.
+// This is the inverse of parsing: AST -> UUID formula string.
+//
+// Key responsibilities:
+// - Convert resolved AST to compact UUID-based formula text
+// - Encode absolute/relative reference markers ($$, $~, ~$, ~~)
+// - Handle operator precedence for correct parenthesization
+//
+// UUID reference format:
+// - $$cellId: both absolute ($A$1)
+// - $~cellId: column absolute, row relative ($A1)
+// - ~$cellId: column relative, row absolute (A$1)
+// - ~~cellId: both relative (A1)
+//
+// All cell refs are exactly 10 chars: 2-char prefix + 8-char UUID
+// Example: =~~xK7mNp2Q+~~fR3pK7wN for =A1+B1
+//
+// Dependencies: formula_ast.h
+// Used by: crdt.cc (storing formulas), file serialization
+//
+// =============================================================================
+
 #ifndef CELLS_FORMULA_SERIALIZER_H_
 #define CELLS_FORMULA_SERIALIZER_H_
 
