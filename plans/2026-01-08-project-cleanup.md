@@ -201,8 +201,8 @@ Split files that are significantly over 500 lines and have clear separation boun
 
 ### 4.4: model.cc (1070 lines → 2 files)
 
-- [ ] 4.4a: Extract `sheet.cc` (Sheet class implementation)
-- [ ] 4.4b: Keep `model.cc` for Workbook (Workbook owns Sheets)
+- [x] 4.4a: Extract `sheet.cc` (Sheet class implementation)
+- [x] 4.4b: Keep `model.cc` for Workbook (Workbook owns Sheets)
 
 ## Phase 5: Split Large TypeScript Files
 

@@ -181,7 +181,10 @@ cc_test(
 
 cc_library(
     name = "model",
-    srcs = ["model.cc"],
+    srcs = [
+        "model.cc",
+        "sheet.cc",
+    ],
     hdrs = ["model.h"],
     visibility = ["//visibility:public"],
     deps = [
