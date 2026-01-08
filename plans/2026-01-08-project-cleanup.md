@@ -241,11 +241,22 @@ Note: init-components.ts exceeds 500 lines but is kept cohesive because:
 - [x] 5.2c: Extract `init-collab.ts` (collaboration setup)
 - [x] 5.2d: Keep `init.ts` as main entry (high-level flow)
 
-### 5.3: worker.ts (1535 lines → 3 files)
+### 5.3: worker.ts (1535 lines → 4 files) ✅ COMPLETED
 
-- [ ] 5.3a: Extract `worker-handlers.ts` (message handlers for each operation)
-- [ ] 5.3b: Extract `worker-collab.ts` (collaboration/sync handling in worker)
-- [ ] 5.3c: Keep `worker.ts` as main entry (message routing, WASM loading)
+Split into 4 files (added worker-types.ts for shared types):
+- worker.ts: 807 lines (main entry, message routing, WASM loading)
+- worker-handlers.ts: 1121 lines (core spreadsheet handlers)
+- worker-collab.ts: 383 lines (collaboration/sync handlers)
+- worker-types.ts: 223 lines (shared type definitions)
+
+Note: worker-handlers.ts exceeds 500 lines but is kept cohesive because:
+- Each handler is a small, self-contained function (10-20 lines)
+- All handlers are related (core spreadsheet operations)
+- Splitting further would fragment related functionality without benefit
+
+- [x] 5.3a: Extract `worker-handlers.ts` (message handlers for each operation)
+- [x] 5.3b: Extract `worker-collab.ts` (collaboration/sync handling in worker)
+- [x] 5.3c: Keep `worker.ts` as main entry (message routing, WASM loading)
 
 ### 5.4: script-panel.ts (1035 lines → 2 files)
 
