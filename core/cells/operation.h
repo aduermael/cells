@@ -1,3 +1,31 @@
+// =============================================================================
+// CRDT Operations
+// =============================================================================
+//
+// Defines the Operation struct and OpType enum for CRDT-based collaborative
+// editing. Every workbook mutation is represented as an immutable operation
+// that can be applied, serialized, and synchronized across peers.
+//
+// Key responsibilities:
+// - Define all operation types (cell, column, row, sheet, format)
+// - Provide serialization to/from string (file format) and JSON (network)
+// - Support operation ordering via HLC timestamp comparison
+//
+// Operation categories:
+// - Cell: SET_VALUE, CLEAR, SET_STYLE, SET_FORMAT
+// - Column: INSERT, DELETE, MOVE, RESIZE, RENAME
+// - Row: INSERT, DELETE, MOVE, RESIZE (no rename)
+// - Sheet: CREATE, DELETE, RENAME
+// - Format: DEFINE (custom number formats)
+//
+// Serialization format: "wall.logical.node OP_TYPE target_id payload"
+// JSON format used for WebSocket/WebRTC transport
+//
+// Dependencies: hlc.h, types.h
+// Used by: crdt.cc, oplog.h, sync_manager.cc, bindings.cc
+//
+// =============================================================================
+
 #ifndef CELLS_OPERATION_H_
 #define CELLS_OPERATION_H_
 

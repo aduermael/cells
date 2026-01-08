@@ -130,7 +130,7 @@ Add 10-20 line documentation headers to all C++ files explaining what the module
 // =============================================================================
 ```
 
-- [ ] 2a: Add headers to core/cells/*.h (model, types, id, hlc, operation, oplog)
+- [x] 2a: Add headers to core/cells/*.h (model, types, id, hlc, operation, oplog)
 - [ ] 2b: Add headers to core/cells/*.h (crdt, sync_manager, dependency_graph)
 - [ ] 2c: Add headers to core/cells/*.h (formula_*, ref_converter)
 - [ ] 2d: Add headers to core/cells/*.h (ostree, axis_index, viewport_index)

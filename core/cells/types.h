@@ -1,3 +1,28 @@
+// =============================================================================
+// Core Type Definitions
+// =============================================================================
+//
+// Fundamental types used throughout the Cells engine: ID (8-char base62 UUID),
+// CellValueType (number, string, formula, etc.), CellError, and related utilities.
+//
+// Key responsibilities:
+// - Define the ID struct: 8-character base62 identifier (62^8 = 218 trillion)
+// - Provide IDHash for use in unordered containers
+// - Define cell value types and formula result types
+// - Define cell error types and their string representations
+// - Provide type conversion utilities for serialization
+//
+// Design notes:
+// - ID is fixed-size (8 chars) for efficient storage and comparison
+// - Null ID is represented by data[0] == '\0', serialized as "~"
+// - Formula types (FORMULA_*) encode both "is formula" and "result type"
+// - Error strings match Excel conventions (#DIV/0!, #REF!, etc.)
+//
+// Dependencies: None (leaf module)
+// Used by: Nearly all modules in the Cells engine
+//
+// =============================================================================
+
 #ifndef CELLS_TYPES_H_
 #define CELLS_TYPES_H_
 

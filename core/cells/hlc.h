@@ -1,3 +1,27 @@
+// =============================================================================
+// Hybrid Logical Clock (HLC)
+// =============================================================================
+//
+// Implements Hybrid Logical Clocks for CRDT operation ordering. HLC combines
+// wall clock time with a logical counter to provide causally-consistent
+// total ordering across distributed nodes.
+//
+// Key responsibilities:
+// - Generate unique, monotonically increasing timestamps
+// - Maintain causal ordering: if A happens-before B, then HLC(A) < HLC(B)
+// - Handle clock skew gracefully (logical counter advances if wall clock lags)
+// - Provide total ordering even for concurrent operations (node_id tiebreaker)
+//
+// HLC format: wall_time.logical.node_id
+// - wall_time: Unix milliseconds (64-bit)
+// - logical: Counter within same millisecond (32-bit)
+// - node_id: 8-char base62 node identifier (tiebreaker for same wall+logical)
+//
+// Dependencies: types.h (for ID)
+// Used by: operation.h, oplog.h, crdt.cc, sync_manager.cc
+//
+// =============================================================================
+
 #ifndef CELLS_HLC_H_
 #define CELLS_HLC_H_
 

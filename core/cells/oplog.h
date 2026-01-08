@@ -1,3 +1,31 @@
+// =============================================================================
+// Operation Log (OpLog)
+// =============================================================================
+//
+// Append-only log of CRDT operations for synchronization and persistence.
+// All operations are stored in HLC order with efficient lookup by entity ID.
+//
+// Key responsibilities:
+// - Store operations in causally-ordered sequence
+// - Deduplicate operations (same HLC = same operation)
+// - Provide efficient queries: since HLC, by entity, latest for entity
+// - Support garbage collection of acknowledged operations
+//
+// Data structures:
+// - Primary: vector<Operation> sorted by HLC
+// - Index: entity ID -> operation indices (for per-entity queries)
+// - Dedup: HLC string -> index (for duplicate detection)
+//
+// Used for:
+// - Initial sync: send all ops since peer's last known HLC
+// - Conflict resolution: last-writer-wins based on HLC ordering
+// - Undo/redo: operations can be reversed or replayed
+//
+// Dependencies: operation.h, types.h
+// Used by: sync_manager.cc, crdt.cc, model.h (Workbook owns OpLog)
+//
+// =============================================================================
+
 #ifndef CELLS_OPLOG_H_
 #define CELLS_OPLOG_H_
 

@@ -1,3 +1,27 @@
+// =============================================================================
+// Workbook Data Model
+// =============================================================================
+//
+// Core data structures representing a spreadsheet workbook: Workbook, Sheet,
+// Cell, Axis (column/row), and supporting types like CellValue and Formula.
+//
+// Key responsibilities:
+// - Define the in-memory representation of spreadsheet data
+// - Provide entity access by UUID (primary) or position (derived)
+// - Manage cell-axis relationships and formula ownership
+// - Track collaboration mode and custom format definitions
+//
+// Architecture notes:
+// - UUIDs are the source of truth; positions are derived via Order Statistic Tree
+// - When CollabMode is COLLABORATING, all mutations MUST go through CRDT operations
+// - Direct mutations are only valid for file loading or applying peer operations
+// - Formula AST is owned by Cell; text is serialized on-demand
+//
+// Dependencies: types.h, operation.h, oplog.h
+// Used by: crdt.cc, formula_eval.cc, bindings.cc, all persistence modules
+//
+// =============================================================================
+
 #ifndef CELLS_MODEL_H_
 #define CELLS_MODEL_H_
 
