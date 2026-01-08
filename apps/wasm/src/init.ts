@@ -366,16 +366,16 @@ export function initApp(): AppContext {
   /**
    * Get the value to display in the formula bar for a cell.
    * - Formula cells: show the formula (e.g., "=A1+B1")
-   * - Formatted cells: show the formatted value (e.g., "15%" for percentage)
-   * - Other cells: show the raw value
+   * - All other cells: show the raw value (not the formatted display)
+   *
+   * This matches Excel's behavior where the formula bar shows the underlying
+   * value (e.g., "0.15" not "15%") so users can see and edit the actual data.
    */
   function getFormulaBarValue(cell: { formula?: string; value?: string; display?: string } | null | undefined): string {
     if (!cell) return "";
     // Formula cells: always show the formula
     if (cell.formula) return cell.formula;
-    // Formatted cells: show the formatted display value (like Google Sheets)
-    if (cell.display) return cell.display;
-    // Default: show raw value
+    // All other cells: show raw value (not formatted display)
     return cell.value || "";
   }
 
