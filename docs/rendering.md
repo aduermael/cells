@@ -1,56 +1,45 @@
 # Rendering
 
-## Implementation Status
+## Overview
 
-**Current state (December 2024):** Canvas2D rendering in the browser only.
+Rendering is handled by **TypeScript Canvas2D** in the browser. The C++ core provides viewport queries (via Order Statistic Tree) but does not generate draw commands.
 
 | Component | Status |
 |-----------|--------|
-| Canvas2D backend (Web) | ✅ Implemented |
-| Grid lines, cells, headers | ✅ Implemented |
-| Selection rendering | ✅ Implemented |
-| Column/row resize preview | ✅ Implemented |
-| Drag-and-drop ghost | ✅ Implemented |
-| WebGL backend | ❌ Not started |
-| Native backends (Metal, DirectX) | ❌ Not started |
-| Dirty region tracking | ❌ Not implemented |
-| Frozen panes | ❌ Not implemented |
-
-The architecture below describes the full vision. See "Current Implementation" section at the end for actual implementation details.
-
----
-
-## Design Goals
-
-1. **60 FPS**: Smooth scrolling even with millions of cells
-2. **Memory efficient**: Only visible cells in memory
-3. **Cross-platform**: Same rendering logic for native/web
-4. **GPU accelerated**: When available
+| Canvas2D grid renderer | Implemented |
+| Grid lines, cells, headers | Implemented |
+| Selection rendering | Implemented |
+| Column/row resize preview | Implemented |
+| Drag-and-drop ghost | Implemented |
+| Formula bar highlights | Implemented |
+| Presence cursors (collab) | Implemented |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Platform UI Layer                             │
-│   (Native: AppKit/UIKit/Win32, Web: HTML/Canvas)                │
+│                    TypeScript UI (Main Thread)                   │
+│   Event handling, state management, requestAnimationFrame        │
 └────────────────────────────────────┬────────────────────────────┘
                                      │
                                      ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Grid Renderer (C++)                           │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
-│  │ Viewport    │  │ Layout      │  │ Draw Commands           │  │
-│  │ Manager     │──│ Engine      │──│ Generator               │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘  │
+│                    GridRenderer (TypeScript)                     │
+│   Canvas2D rendering, virtual scrolling, selection rendering     │
 └────────────────────────────────────┬────────────────────────────┘
                                      │
-                         ┌───────────┴───────────┐
-                         ▼                       ▼
-              ┌─────────────────┐     ┌─────────────────┐
-              │ Native Backend  │     │ WebGL/Canvas    │
-              │ (Metal/DX/etc)  │     │ Backend         │
-              └─────────────────┘     └─────────────────┘
+                                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    WASM Core (Web Worker)                        │
+│   Viewport queries, cell data, formatted values                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
+
+## Design Goals
+
+1. **60 FPS**: Smooth scrolling with virtual viewport
+2. **Memory efficient**: Only render visible cells
+3. **Simple**: Canvas2D is well-understood, easy to debug
 
 ## Core Concepts
 
@@ -92,45 +81,12 @@ The core generates a draw list; platform backends interpret it.
 5. **Selection**: Highlight selected range
 6. **Headers**: Column (A, B, C) and row (1, 2, 3) headers
 
-## Platform Backends
+## Virtual Scrolling
 
-| Platform | Backend | Notes |
-|----------|---------|-------|
-| macOS | Metal or Core Graphics | SwiftUI Canvas |
-| iOS | Metal or Core Graphics | SwiftUI Canvas |
-| Windows | Direct2D or DirectX | WinUI 3 |
-| Web | Canvas2D or WebGL | WebGL for large grids |
-
-## Dirty Region Tracking
-
-Only re-render changed areas:
-- Track dirty regions (cell bounds)
-- On change, add cell to dirty list
-- Render only cells overlapping dirty regions
-- Full redraw on scroll or zoom
-
-## Text Rendering
-
-Options:
-1. **Platform APIs** (CoreText, DirectWrite): Best quality, platform-specific
-2. **Font Atlas**: Fast, consistent, limited fonts
-3. **SDF Rendering**: Smooth at any zoom, GPU accelerated
-
-Recommendation: Platform APIs for quality, fallback to atlas for WebGL.
-
-## Scrolling
-
-### Smooth Scrolling
-
-Interpolate between current and target position with easing.
-Apply momentum decay for touch/trackpad scrolling.
-
-### Virtual Scrolling
-
-For millions of rows:
-- Calculate position mathematically (index × default height)
-- Use cached cumulative heights for variable row heights
-- Binary search to find row at position
+For large spreadsheets with millions of rows:
+- Order Statistic Tree provides O(log n) pixel-to-axis mapping
+- Only visible cells are queried from WASM core
+- Cell positions calculated on-demand during render
 
 ## Selection Rendering
 
@@ -142,14 +98,6 @@ For millions of rows:
 | Row/Column | Full row/column highlight |
 
 Plus: active cell indicator, resize handle (fill handle).
-
-## Frozen Panes
-
-Split viewport into four regions:
-1. **Scrollable** (bottom-right): Normal scrolling
-2. **Frozen columns** (left): Scrolls vertically only
-3. **Frozen rows** (top): Scrolls horizontally only
-4. **Corner** (top-left): Fixed
 
 ## Performance Targets
 
@@ -248,12 +196,10 @@ const COLORS = {
 } as const;
 ```
 
-### Not Implemented
+### Future Improvements
 
-- **Dirty region tracking** - Full redraw every frame
-- **WebGL acceleration** - Canvas2D only
-- **Frozen panes** - Not supported
-- **Zoom** - Not supported
+- **Dirty region tracking** - Currently full redraw every frame
+- **Zoom** - Not yet supported
 - **Smooth scrolling easing** - Direct scroll position updates
 
 ---
