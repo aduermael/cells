@@ -707,7 +707,7 @@ canvas {
 #custom-format-panel {
     position: absolute;
     top: 100%;
-    left: 0;
+    right: 0; /* Open to the left since dropdown is on right side of screen */
     margin-top: var(--spacing-xs);
     padding: var(--spacing-sm);
     background: var(--color-bg-primary);
@@ -719,7 +719,7 @@ canvas {
 }
 
 #custom-format-panel.hidden {
-    display: none;
+    display: none !important;
 }
 
 .custom-format-header {
