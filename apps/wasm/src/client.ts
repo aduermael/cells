@@ -499,7 +499,7 @@ export class CellsClient {
    */
   async getFormatDetails(formatId: string): Promise<FormatDetails> {
     const response = await this._send("getFormatDetails", { formatId });
-    return response as FormatDetails;
+    return response as unknown as FormatDetails;
   }
 
   /**

@@ -20,7 +20,6 @@
 // =============================================================================
 
 #include "core/cells/crdt_internal.h"
-
 #include "core/cells/format_code_parser.h"
 
 namespace cells {

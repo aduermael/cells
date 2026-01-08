@@ -23,8 +23,6 @@
 //
 // =============================================================================
 
-#include "core/cells/luau_sandbox.h"
-
 #include <cstring>
 
 #include "core/cells/crdt.h"
@@ -35,6 +33,7 @@
 #include "core/cells/formula_resolver.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
+#include "core/cells/luau_sandbox.h"
 #include "core/cells/model.h"
 #include "core/cells/ref_converter.h"
 

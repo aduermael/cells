@@ -222,12 +222,24 @@ Note: mouse-events.ts exceeds 500 lines but is kept cohesive because:
 - [x] 5.1b: Extract `keyboard-events.ts` (keyboard navigation, shortcuts)
 - [x] 5.1c: Keep `app-events.ts` as coordinator (event manager setup, types)
 
-### 5.2: init.ts (1595 lines → 4 files)
+### 5.2: init.ts (1595 lines → 5 files) ✅ COMPLETED
 
-- [ ] 5.2a: Extract `init-components.ts` (component creation/wiring)
-- [ ] 5.2b: Extract `init-listeners.ts` (data change listeners setup)
-- [ ] 5.2c: Extract `init-collab.ts` (collaboration setup)
-- [ ] 5.2d: Keep `init.ts` as main entry (createAppFromWorker, high-level flow)
+Split into 5 files (added init-rendering.ts for formula highlighting utilities):
+- init.ts: 232 lines (main entry, coordinator)
+- init-components.ts: 856 lines (component creation and wiring)
+- init-listeners.ts: 249 lines (data change listeners, viewport fetching)
+- init-collab.ts: 202 lines (collaboration setup)
+- init-rendering.ts: 285 lines (formula highlighting, cursor restoration)
+
+Note: init-components.ts exceeds 500 lines but is kept cohesive because:
+- Components reference each other (cellEditor↔formulaBarEditor, etc.)
+- Render functions need access to all components
+- Splitting further would increase complexity without improving maintainability
+
+- [x] 5.2a: Extract `init-components.ts` (component creation/wiring)
+- [x] 5.2b: Extract `init-listeners.ts` (data change listeners setup)
+- [x] 5.2c: Extract `init-collab.ts` (collaboration setup)
+- [x] 5.2d: Keep `init.ts` as main entry (high-level flow)
 
 ### 5.3: worker.ts (1535 lines → 3 files)
 

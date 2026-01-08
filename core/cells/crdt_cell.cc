@@ -18,7 +18,6 @@
 // =============================================================================
 
 #include "core/cells/crdt_internal.h"
-
 #include "core/cells/dependency_graph.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/number_format.h"

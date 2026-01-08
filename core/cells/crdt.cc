@@ -21,11 +21,11 @@
 
 #include "core/cells/crdt.h"
 
-#include "core/cells/crdt_internal.h"
-
-#include <algorithm>
 #include <cstdio>
 
+#include <algorithm>
+
+#include "core/cells/crdt_internal.h"
 #include "core/cells/formula_serializer.h"
 
 namespace cells {
@@ -569,7 +569,8 @@ size_t bootstrapOpLog(Workbook& workbook) {
 
     // Generate FORMAT_DEFINE operations for all custom formats
     for (const auto& [formatId, formatCode] : workbook.getCustomFormats()) {
-        const std::string payload = "{\"format_code\":\"" + internal::jsonEscape(formatCode) + "\"}";
+        const std::string payload =
+            "{\"format_code\":\"" + internal::jsonEscape(formatCode) + "\"}";
         const Operation op = makeFormatDefineOp(workbook, formatId, payload);
         oplog->addOperation(op);
         count++;
