@@ -175,8 +175,12 @@ Add 10-20 line documentation headers to all TypeScript files.
 
 Split files that are significantly over 500 lines and have clear separation boundaries.
 
+**Note:** Started implementation - created `bindings.h` header file with full class declaration.
+The split requires moving inline method implementations to separate `.cc` files.
+
 ### 4.1: bindings.cc (4852 lines → 8 files)
 
+- [x] Create `bindings.h` header with full class declaration
 - [ ] 4.1a: Extract `bindings_core.cc` (Workbook, Sheet, Cell types and basic ops)
 - [ ] 4.1b: Extract `bindings_formula.cc` (formula parsing, eval, display)
 - [ ] 4.1c: Extract `bindings_crdt.cc` (CRDT operations, OpLog, SyncManager)
