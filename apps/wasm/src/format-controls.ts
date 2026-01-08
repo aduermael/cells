@@ -1,5 +1,29 @@
-// Format Controls - UI for cell number formatting
-// Handles format dropdown, currency/percent toggles, and decimal +/- buttons
+// =============================================================================
+// Format Controls
+// =============================================================================
+//
+// Toolbar UI for cell number formatting. Provides dropdowns and buttons for
+// changing how numbers are displayed (currency, percentage, decimals).
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Format category dropdown (General, Number, Currency, Date, etc.)
+// - Currency type dropdown (USD, EUR, GBP, JPY, CNY)
+// - Decimal increase/decrease buttons
+// - Percentage toggle button
+// - Custom format input panel
+// - Apply format to selected cells
+//
+// Format flow:
+// - User selects format → FormatControls → WasmDataSource.setNumberFormat()
+// - C++ applies CRDT op → notifies change → GridRenderer re-renders cell
+//
+// Format IDs follow pattern: FMT_<category><precision>
+// Examples: FMT_N002 (number, 2 decimals), FMT_P001 (percent, 1 decimal)
+//
+// =============================================================================
 
 import type { WasmDataSource } from "./wasm-data-source";
 import type { NumberFormatCategory, Position, CellData } from "./types";

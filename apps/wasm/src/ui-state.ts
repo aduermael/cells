@@ -1,5 +1,28 @@
-// UI State Machine Module
-// Manages UI interaction modes as a formal state machine
+// =============================================================================
+// UI State Machine
+// =============================================================================
+//
+// Formal state machine managing UI interaction modes. Ensures only one
+// interaction mode is active at a time (e.g., can't resize while editing).
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Define valid UI states (IDLE, SELECTING, CELL_EDITING, etc.)
+// - Define events that trigger state transitions
+// - Enforce valid state transitions (e.g., can't start drag while editing)
+// - Provide state query methods for conditional UI logic
+// - Emit state change events for component coordination
+//
+// State categories:
+// - Idle: default state, awaiting user input
+// - Selection: mouse-drag range selection
+// - Editing: cell, formula bar, column header, sheet tab
+// - Drag: column/row reordering, sheet tab reordering
+// - Resize: column/row width/height adjustment
+//
+// =============================================================================
 
 import type {
   UIStateType,

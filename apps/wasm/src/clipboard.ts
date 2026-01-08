@@ -1,5 +1,30 @@
-// Clipboard - Copy/Cut/Paste operations for cells
-// Handles clipboard operations with internal JSON format and external TSV format.
+// =============================================================================
+// Clipboard Manager
+// =============================================================================
+//
+// Copy, cut, and paste operations for spreadsheet cells. Supports both
+// internal JSON format (preserving formulas) and external TSV format.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Copy selection to system clipboard (JSON + TSV formats)
+// - Cut selection (copy + mark for deletion on paste)
+// - Paste from clipboard (adjust formula references)
+// - Handle external paste (TSV from Excel/Sheets)
+// - Track cut state for visual feedback (dashed border)
+//
+// Clipboard formats:
+// - Internal: JSON with cell values, formulas, types, and format IDs
+// - External: TSV (tab-separated values) for cross-app compatibility
+//
+// Formula adjustment:
+// - Relative references (A1) are adjusted based on paste offset
+// - Absolute references ($A$1) remain unchanged
+// - Uses TypeScript implementation for browser clipboard API
+//
+// =============================================================================
 
 import type { WasmDataSource } from "./wasm-data-source";
 import type { CellData, Position } from "./types";
