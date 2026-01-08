@@ -1,5 +1,28 @@
-// Cells WASM Worker - Runs the spreadsheet engine in a Web Worker
-// This provides the same API semantics as the REST server but via postMessage
+// =============================================================================
+// Cells Worker
+// =============================================================================
+//
+// Web Worker that runs the spreadsheet engine (WASM module) in a background
+// thread. Provides the same API semantics as the REST server but via postMessage.
+//
+// This is the BRIDGE between UI and C++ core. All spreadsheet operations are
+// executed here via the WASM module, with results sent back to the main thread.
+//
+// Key responsibilities:
+// - Load and initialize the Emscripten-compiled WASM module
+// - Handle all spreadsheet operations (cells, sheets, formulas, formatting)
+// - Manage file import/export (XLSX, CSV, .cells format)
+// - Run CRDT synchronization for real-time collaboration
+// - Execute Luau scripts and provide autocomplete
+// - Relay WebRTC messages between C++ sync layer and main thread
+//
+// Architecture:
+// - Single CellsEngine instance per worker
+// - JSON-based message protocol with request/response IDs
+// - Listener callback for push notifications (cell changes, sync events)
+// - WASM memory management for binary file operations
+//
+// =============================================================================
 
 // ============================================================================
 // Type Definitions

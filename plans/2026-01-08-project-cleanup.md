@@ -162,7 +162,7 @@ Add 10-20 line documentation headers to all TypeScript files.
 // =============================================================================
 ```
 
-- [ ] 3a: Add headers to apps/wasm/src/*.ts (client, worker, wasm-data-source)
+- [x] 3a: Add headers to apps/wasm/src/*.ts (client, worker, wasm-data-source)
 - [ ] 3b: Add headers to apps/wasm/src/*.ts (init, app, app-events)
 - [ ] 3c: Add headers to apps/wasm/src/*.ts (grid-renderer, grid-events, grid-utils)
 - [ ] 3d: Add headers to apps/wasm/src/*.ts (cell-editor, header-editor, sheet-tabs)

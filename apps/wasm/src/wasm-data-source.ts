@@ -1,6 +1,26 @@
-// WASM Data Source - Wrapper around CellsClient for data operations
-// This class provides a clean interface for interacting with the WASM worker
-// through the CellsClient, handling workbook metadata and change notifications.
+// =============================================================================
+// WASM Data Source
+// =============================================================================
+//
+// Facade over CellsClient that provides a clean interface for UI components
+// to interact with the spreadsheet engine.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Manage workbook metadata (name, file info)
+// - Subscribe to and dispatch change notifications
+// - Provide simplified async API for common operations
+// - Handle file export with proper MIME types
+//
+// Design:
+// - Wraps CellsClient to add UI-specific concerns
+// - Tracks workbook name separately from engine state
+// - Routes change events to registered listeners
+// - Used by init.ts to wire up the application
+//
+// =============================================================================
 
 import type { CellsClient } from "./client";
 import type {

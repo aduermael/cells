@@ -1,5 +1,27 @@
-// Cells WASM Client - Main thread API for communicating with the WASM worker
-// Provides a Promise-based API that matches the REST server semantics
+// =============================================================================
+// Cells Client
+// =============================================================================
+//
+// Main thread API for communicating with the WASM worker. Provides a
+// Promise-based interface that matches the REST server semantics.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// Key responsibilities:
+// - Manage Web Worker communication via postMessage/onmessage
+// - Provide async/await API for all spreadsheet operations
+// - Handle request/response correlation with unique IDs
+// - Manage real-time collaboration via RTCProxy
+// - Bridge agent events from C++ to TypeScript callbacks
+//
+// Architecture:
+// - Main thread creates CellsClient, which spawns a Web Worker
+// - Worker loads WASM module and handles all spreadsheet logic
+// - Client sends JSON messages, worker executes and replies
+// - Collaboration uses WebRTC signaling via RTCProxy
+//
+// =============================================================================
 
 import { RTCProxy, type RTCMessagePayload } from "./rtc-proxy";
 import type {
