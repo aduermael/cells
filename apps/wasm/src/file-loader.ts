@@ -1,6 +1,27 @@
-// File Loader - File loading, exporting, and new file creation
-// Handles loading files from disk, auto-loading from persistence, exporting,
-// and creating new empty workbooks.
+// =============================================================================
+// File Loader
+// =============================================================================
+//
+// File I/O operations: loading from disk, auto-restore from IndexedDB,
+// exporting to various formats, and creating new empty workbooks.
+//
+// This is a UI-ONLY module. File parsing goes through C++ XLSX/CSV/ZCD readers
+// via the WASM bridge.
+//
+// Key responsibilities:
+// - Load files via file picker or drag-and-drop
+// - Auto-restore last opened file from IndexedDB on startup
+// - Export to XLSX, CSV, or .cells (ZCD) format
+// - Create new empty workbook
+// - Show loading/error states during file operations
+// - Detect file format from extension
+//
+// Persistence:
+// - Saves file data to IndexedDB for auto-restore
+// - Saves file metadata (name, format) to localStorage
+// - Prompts for confirmation when switching files
+//
+// =============================================================================
 
 import { CellsClient } from "./client";
 import { WasmDataSource, type DataChangeType } from "./wasm-data-source";

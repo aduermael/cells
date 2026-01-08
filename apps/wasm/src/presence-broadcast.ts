@@ -1,6 +1,27 @@
-// Presence Broadcast - Remote presence broadcasting and interpolation
-// Handles broadcasting local cursor/selection/mouse state to peers and
-// interpolating received remote presence data for smooth rendering.
+// =============================================================================
+// Presence Broadcaster
+// =============================================================================
+//
+// Broadcasts local presence (cursor, selection, mouse position) to peers
+// and interpolates remote presence for smooth rendering.
+//
+// This is a UI-ONLY module. Presence data is sent through CppSyncAdapter
+// to the C++ sync layer via WASM.
+//
+// Key responsibilities:
+// - Broadcast local cursor position when selection changes
+// - Broadcast local selection range
+// - Throttle mouse position broadcasts (every 200ms)
+// - Interpolate remote mouse positions for smooth animation
+// - Fade out idle mouse cursors after 3 seconds
+// - Transform remote presence data for GridRenderer
+//
+// Animation:
+// - Uses linear interpolation (lerp) for smooth mouse movement
+// - Fades cursor opacity after MOUSE_FADE_START ms of no movement
+// - Animation runs via requestAnimationFrame loop
+//
+// =============================================================================
 
 import type { CppSyncAdapter } from "./cpp-sync-adapter";
 import type { GridRenderer, RemotePresenceRender } from "./grid-renderer";

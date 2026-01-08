@@ -139,7 +139,7 @@ Add 10-20 line documentation headers to all C++ files explaining what the module
 - [x] 2g: Add headers to core/cells/*.h (luau_*, agent_client, fill_range)
 - [x] 2h: Add headers to core/cells/functions/*.h (fn_*)
 
-## Phase 3: Add File Headers to TypeScript UI
+## Phase 3: Add File Headers to TypeScript UI (COMPLETED)
 
 Add 10-20 line documentation headers to all TypeScript files.
 
@@ -169,7 +169,7 @@ Add 10-20 line documentation headers to all TypeScript files.
 - [x] 3e: Add headers to apps/wasm/src/*.ts (ui-state, clipboard, format-controls)
 - [x] 3f: Add headers to apps/wasm/src/*.ts (collab-ui, cpp-sync-adapter, rtc-proxy)
 - [x] 3g: Add headers to apps/wasm/src/*.ts (script-panel, agent-panel, ast-debug)
-- [ ] 3h: Add headers to apps/wasm/src/*.ts (file-loader, room-url, presence-broadcast)
+- [x] 3h: Add headers to apps/wasm/src/*.ts (file-loader, room-url, presence-broadcast)
 
 ## Phase 4: Split Large C++ Files
 

@@ -1,5 +1,26 @@
-// Room URL Module
-// Handles parsing room ID from URL and managing URL state for collaboration
+// =============================================================================
+// Room URL Manager
+// =============================================================================
+//
+// URL management for collaboration rooms. Parses room IDs from URL query
+// parameters and updates URL without page reload for shareable links.
+//
+// This is a UI-ONLY module. Room management is purely URL-based; actual
+// room joining goes through CppSyncAdapter.
+//
+// Key responsibilities:
+// - Parse room ID from URL (?room=XXXXXXXX)
+// - Validate room ID format (8-char base62)
+// - Update URL with room ID via history API
+// - Clear room ID from URL when leaving
+// - Generate unique room IDs for new rooms
+// - Handle browser back/forward navigation
+//
+// URL format:
+// - https://example.com/?room=abc12XYZ
+// - Room IDs are 8-character alphanumeric strings
+//
+// =============================================================================
 
 import type { RoomId, RoomManagerCallbacks } from "./types";
 
