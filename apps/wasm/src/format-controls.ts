@@ -559,7 +559,7 @@ export class FormatControls {
 
     // Use sensible defaults for each category
     // Currency: 2 decimals (industry standard: $100.00)
-    // Number: 0 decimals, no separator (clean: 1235)
+    // Number: 2 decimals (matches Excel Number format default)
     // Percentage: 0 decimals (clean: 15%)
     let decimals = 0;
     let separator = false;
@@ -574,7 +574,7 @@ export class FormatControls {
         currency = this.currentCurrency; // Use currently selected currency
         break;
       case "NUMBER":
-        decimals = 0;
+        decimals = 2;
         separator = false;
         break;
       case "PERCENTAGE":
@@ -588,8 +588,8 @@ export class FormatControls {
         if (category === "SCIENTIFIC") return "FMT_SCI2";
         if (category === "TEXT") return "FMT_TEXT";
         if (category === "GENERAL") return "~";
-        // Fall back to number format
-        return "FMT_N000";
+        // Fall back to number format (2 decimals, matches Excel)
+        return "FMT_N002";
     }
 
     const result = await this.dataSource.client.makeFormatId(

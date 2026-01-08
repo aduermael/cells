@@ -484,37 +484,37 @@ const tests = {
     await ctx.page.click('[data-format-category="NUMBER"]');
     await sleep(200);
 
-    // Number format defaults to 0 decimal places, showing rounded value (no separator)
+    // Number format defaults to 2 decimal places (matches Excel)
     let display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '1235', 'Number format should show 0 decimal places by default');
+    assertEqual(display, '1234.57', 'Number format should show 2 decimal places by default');
 
-    // Click decimal increase to go to 1 decimal place
+    // Click decimal increase to go to 3 decimal places
     await ctx.page.click('#format-decimal-increase');
     await sleep(200);
 
     display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '1234.6', 'After increase should show 1 decimal place');
+    assertEqual(display, '1234.568', 'After increase should show 3 decimal places');
 
-    // Click decimal increase to go to 2 decimal places
-    await ctx.page.click('#format-decimal-increase');
-    await sleep(200);
-
-    display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '1234.57', 'After second increase should show 2 decimal places');
-
-    // Now click decimal decrease to go back to 1 decimal place
+    // Now click decimal decrease to go back to 2 decimal places
     await ctx.page.click('#format-decimal-decrease');
     await sleep(200);
 
     display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '1234.6', 'After decrease should show 1 decimal place');
+    assertEqual(display, '1234.57', 'After decrease should show 2 decimal places');
 
-    // Click decimal decrease to go back to 0 decimal places
+    // Click decimal decrease to go to 1 decimal place
     await ctx.page.click('#format-decimal-decrease');
     await sleep(200);
 
     display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '1235', 'After second decrease should show 0 decimal places');
+    assertEqual(display, '1234.6', 'After second decrease should show 1 decimal place');
+
+    // Click decimal decrease to go to 0 decimal places
+    await ctx.page.click('#format-decimal-decrease');
+    await sleep(200);
+
+    display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '1235', 'After third decrease should show 0 decimal places');
   },
 
   'Decimal increase button adds decimal places': async (ctx) => {
@@ -535,37 +535,23 @@ const tests = {
     await ctx.page.click('[data-format-category="NUMBER"]');
     await sleep(200);
 
-    // Number format defaults to 0 decimal places (no separator)
+    // Number format defaults to 2 decimal places (matches Excel)
     let display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '1235', 'Number format should start with 0 decimal places');
-
-    // Click decimal increase to go from 0 to 1 decimal
-    await ctx.page.click('#format-decimal-increase');
-    await sleep(200);
-
-    display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '1234.6', 'After first increase should show 1 decimal place');
-
-    // Click decimal increase to go from 1 to 2 decimals
-    await ctx.page.click('#format-decimal-increase');
-    await sleep(200);
-
-    display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '1234.57', 'After second increase should show 2 decimal places');
+    assertEqual(display, '1234.57', 'Number format should start with 2 decimal places');
 
     // Click decimal increase to go from 2 to 3 decimals
     await ctx.page.click('#format-decimal-increase');
     await sleep(200);
 
     display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '1234.568', 'After third increase should show 3 decimal places');
+    assertEqual(display, '1234.568', 'After first increase should show 3 decimal places');
 
     // Click decimal increase to go from 3 to 4 decimals
     await ctx.page.click('#format-decimal-increase');
     await sleep(200);
 
     display = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(display, '1234.5678', 'After fourth increase should show 4 decimal places');
+    assertEqual(display, '1234.5678', 'After second increase should show 4 decimal places');
   },
 
   // ============================================================================
