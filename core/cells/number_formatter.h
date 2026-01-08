@@ -1,3 +1,29 @@
+// =============================================================================
+// Number Formatter
+// =============================================================================
+//
+// Formats numeric values according to NumberFormat definitions.
+// Handles locale-aware formatting with configurable separators.
+//
+// Key responsibilities:
+// - Format numbers according to format ID (General, Number, Currency, etc.)
+// - Apply locale settings (decimal separator, thousands separator)
+// - Format dates from Excel serial numbers (days since 1899-12-30)
+// - Format times from fractional day values (0.5 = noon)
+// - Handle accounting format (aligned currency, negatives in parens)
+//
+// Formatting functions:
+// - formatNumber(): Main entry point, looks up format by ID
+// - formatGeneral(): Auto-detect best representation
+// - formatPercentage(): Value * 100 with % suffix
+// - formatCurrency(): Currency symbol with alignment
+// - formatDate()/formatTime(): Date/time from serial numbers
+//
+// Dependencies: number_format.h, types.h, id.h
+// Used by: bindings.cc (cell display), formula_eval.cc
+//
+// =============================================================================
+
 #ifndef CELLS_NUMBER_FORMATTER_H_
 #define CELLS_NUMBER_FORMATTER_H_
 

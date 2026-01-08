@@ -1,3 +1,32 @@
+// =============================================================================
+// Format Code Parser
+// =============================================================================
+//
+// Parses Excel-style format code strings (e.g., "#,##0.00;(#,##0.00)") into
+// a structured representation for formatting.
+//
+// Key responsibilities:
+// - Parse format code syntax: digits (0, #), separators (., ,), symbols ($, %)
+// - Handle multi-section codes: positive;negative;zero;text
+// - Extract decimal places, thousands separators, currency symbols
+// - Validate format codes and report errors
+//
+// Format code syntax:
+// - 0: Digit placeholder (shows 0 if no digit)
+// - #: Digit placeholder (omits leading zeros)
+// - .: Decimal separator
+// - ,: Thousands separator (in integer portion)
+// - %: Percentage display (multiplies by 100)
+// - $, €, £, ¥: Currency symbols
+// - @: Text placeholder
+// - ;: Section separator (positive;negative;zero;text)
+// - "text": Literal text
+//
+// Dependencies: None
+// Used by: format_code_formatter.h, number_format.h (custom format creation)
+//
+// =============================================================================
+
 #ifndef CELLS_FORMAT_CODE_PARSER_H_
 #define CELLS_FORMAT_CODE_PARSER_H_
 

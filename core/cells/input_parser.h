@@ -1,3 +1,32 @@
+// =============================================================================
+// User Input Parser
+// =============================================================================
+//
+// Parses user-entered cell values and auto-detects appropriate formats.
+// Converts text input like "15%" or "$1,234" into numeric values with formats.
+//
+// Key responsibilities:
+// - Detect value types: percentage, currency, date, time, scientific, number
+// - Convert display format to stored value (15% -> 0.15, $1,234 -> 1234)
+// - Suggest appropriate format ID based on input pattern
+// - Handle date/time parsing with serial number conversion
+//
+// Input patterns recognized:
+// - Percentages: "15%", "15 %", "-15%"
+// - Currency: "$1,234.56", "-$1,234", "€100"
+// - Dates: "1/15/2024", "2024-01-15", "15-Jan-2024"
+// - Times: "12:30 PM", "14:30", "12:30:45"
+// - Scientific: "1.5E+10", "1.5e-5"
+// - Plain numbers: "1234", "1,234.56", "-123.45"
+//
+// Date utilities use Excel serial dates (days since 1899-12-30).
+// Time utilities use fractional days (0.5 = noon).
+//
+// Dependencies: number_format.h, types.h
+// Used by: bindings.cc (cell editing), XLSX import
+//
+// =============================================================================
+
 #ifndef CELLS_INPUT_PARSER_H_
 #define CELLS_INPUT_PARSER_H_
 

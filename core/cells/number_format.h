@@ -1,3 +1,30 @@
+// =============================================================================
+// Number Format Definitions
+// =============================================================================
+//
+// Defines number formats for cell display: currency, percentage, dates, etc.
+// Based on Excel's number format system with built-in and custom formats.
+//
+// Key responsibilities:
+// - Define NumberFormat struct with category, format code, and display options
+// - Provide built-in format IDs (GENERAL, NUMBER_2, CURRENCY_USD_2, etc.)
+// - Parse dynamic format IDs (FMT_P007 = percentage with 7 decimals)
+// - Registry for managing built-in and custom formats
+// - Format inference from formula references
+//
+// Format categories:
+// - GENERAL: Default display (auto-detect)
+// - NUMBER: Plain numbers (0, 2, 4 decimal places)
+// - CURRENCY: Currency symbols ($, €, £, ¥)
+// - PERCENTAGE: Percent display (value * 100 + %)
+// - DATE/TIME: Date and time formatting
+// - SCIENTIFIC: Scientific notation (1.5E+10)
+//
+// Dependencies: types.h
+// Used by: number_formatter.h, bindings.cc, input_parser.h
+//
+// =============================================================================
+
 #ifndef CELLS_NUMBER_FORMAT_H_
 #define CELLS_NUMBER_FORMAT_H_
 

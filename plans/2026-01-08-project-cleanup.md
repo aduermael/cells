@@ -135,7 +135,7 @@ Add 10-20 line documentation headers to all C++ files explaining what the module
 - [x] 2c: Add headers to core/cells/*.h (formula_*, ref_converter)
 - [x] 2d: Add headers to core/cells/*.h (ostree, axis_index, viewport_index)
 - [x] 2e: Add headers to core/cells/*.h (parser, serializer, xlsx_*, csv_*)
-- [ ] 2f: Add headers to core/cells/*.h (number_format, format_code_*, input_parser)
+- [x] 2f: Add headers to core/cells/*.h (number_format, format_code_*, input_parser)
 - [ ] 2g: Add headers to core/cells/*.h (luau_*, agent_client, fill_range)
 - [ ] 2h: Add headers to core/cells/functions/*.h (fn_*)
 

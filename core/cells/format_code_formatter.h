@@ -1,3 +1,25 @@
+// =============================================================================
+// Format Code Formatter
+// =============================================================================
+//
+// Formats numeric values using parsed format codes. Works with the output
+// of format_code_parser.h to produce formatted display strings.
+//
+// Key responsibilities:
+// - Apply parsed format codes to numeric values
+// - Select appropriate section based on value sign (positive/negative/zero)
+// - Handle percentage display (multiply by 100)
+// - Apply thousands separators and decimal formatting
+// - Handle text section (@) for non-numeric values
+//
+// This module provides low-level formatting using parsed format codes.
+// For high-level formatting with format IDs, use number_formatter.h.
+//
+// Dependencies: format_code_parser.h
+// Used by: number_formatter.h (custom format code execution)
+//
+// =============================================================================
+
 #ifndef CELLS_FORMAT_CODE_FORMATTER_H_
 #define CELLS_FORMAT_CODE_FORMATTER_H_
 
