@@ -505,6 +505,12 @@ std::string styleToJson(const CellStyle& style) {
     return ss.str();
 }
 
+// Helper to check if a JSON field is present
+bool hasJsonField(const std::string& json, const std::string& key) {
+    std::string searchKey = "\"" + key + "\":";
+    return json.find(searchKey) != std::string::npos;
+}
+
 // Helper to extract a boolean field from JSON
 bool extractBoolField(const std::string& json, const std::string& key, bool defaultValue) {
     std::string searchKey = "\"" + key + "\":";
@@ -585,6 +591,58 @@ CellStyle parseStyleJson(const std::string& json) {
     return style;
 }
 
+// Helper to merge style JSON into an existing style (only updates fields present in JSON)
+CellStyle mergeStyleJson(const CellStyle& baseStyle, const std::string& json) {
+    CellStyle style = baseStyle;
+
+    // Only update fields that are actually present in the JSON
+    if (hasJsonField(json, "bold")) {
+        style.bold = extractBoolField(json, "bold", baseStyle.bold);
+    }
+    if (hasJsonField(json, "italic")) {
+        style.italic = extractBoolField(json, "italic", baseStyle.italic);
+    }
+    if (hasJsonField(json, "underline")) {
+        style.underline = extractBoolField(json, "underline", baseStyle.underline);
+    }
+    if (hasJsonField(json, "bgColor")) {
+        style.bgColor = extractPayloadField(json, "bgColor");
+    }
+    if (hasJsonField(json, "textColor")) {
+        style.textColor = extractPayloadField(json, "textColor");
+    }
+    if (hasJsonField(json, "fontFamily")) {
+        style.fontFamily = extractPayloadField(json, "fontFamily");
+    }
+    if (hasJsonField(json, "fontSize")) {
+        style.fontSize = static_cast<uint8_t>(extractIntField(json, "fontSize", baseStyle.fontSize));
+    }
+    if (hasJsonField(json, "hAlign")) {
+        std::string hAlignStr = extractPayloadField(json, "hAlign");
+        if (hAlignStr == "center") {
+            style.hAlign = TextAlign::CENTER;
+        } else if (hAlignStr == "right") {
+            style.hAlign = TextAlign::RIGHT;
+        } else if (hAlignStr == "justify") {
+            style.hAlign = TextAlign::JUSTIFY;
+        } else {
+            style.hAlign = TextAlign::LEFT;
+        }
+    }
+    if (hasJsonField(json, "vAlign")) {
+        std::string vAlignStr = extractPayloadField(json, "vAlign");
+        if (vAlignStr == "top") {
+            style.vAlign = VerticalAlign::TOP;
+        } else if (vAlignStr == "middle") {
+            style.vAlign = VerticalAlign::MIDDLE;
+        } else {
+            style.vAlign = VerticalAlign::BOTTOM;
+        }
+    }
+
+    return style;
+}
+
 }  // namespace
 
 std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::string& styleJson) {
@@ -607,8 +665,15 @@ std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::s
         return "{\"error\":\"Cell not found\"}";
     }
 
-    // Parse the style JSON and create a style definition if needed
-    CellStyle style = parseStyleJson(styleJson);
+    // Get existing style (if any) and merge with incoming JSON
+    CellStyle baseStyle;  // Uses CellStyle defaults from model.h
+    if (!cell->styleId.isNull()) {
+        const CellStyle* existingStyle = _workbook->getStyle(cell->styleId);
+        if (existingStyle) {
+            baseStyle = *existingStyle;
+        }
+    }
+    CellStyle style = mergeStyleJson(baseStyle, styleJson);
 
     ID styleId;
     if (!style.isEmpty()) {
@@ -628,7 +693,9 @@ std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::s
 
             // Create STYLE_DEFINE operation for sync
             if (_workbook->isCollaborating()) {
-                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, styleJson);
+                // Store full merged style for sync (not partial styleJson)
+                std::string fullStyleJson = styleToJson(style);
+                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
                 applyOperation(*_workbook, styleOp);
             }
         }
@@ -659,8 +726,47 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
         return "{\"error\":\"Sheet not found\"}";
     }
 
-    // Parse the style JSON and create a style definition if needed
-    CellStyle style = parseStyleJson(styleJson);
+    // First, try to find existing cell to get its current style
+    CellStyle baseStyle;  // Uses CellStyle defaults from model.h
+    ID existingColId, existingRowId;
+    Cell* existingCell = nullptr;
+
+    // Find existing column at position
+    for (const auto& [id, axis] : sheet->columns) {
+        if (axis->position == col) {
+            existingColId = id;
+            break;
+        }
+    }
+
+    // Find existing row at position
+    for (const auto& [id, axis] : sheet->rows) {
+        if (axis->position == row) {
+            existingRowId = id;
+            break;
+        }
+    }
+
+    // If both column and row exist, try to find the cell
+    if (!existingColId.isNull() && !existingRowId.isNull()) {
+        for (const auto& [id, c] : sheet->cells) {
+            if (c->colId == existingColId && c->rowId == existingRowId) {
+                existingCell = c.get();
+                break;
+            }
+        }
+    }
+
+    // Get existing style if cell has one
+    if (existingCell && !existingCell->styleId.isNull()) {
+        const CellStyle* existingStyle = _workbook->getStyle(existingCell->styleId);
+        if (existingStyle) {
+            baseStyle = *existingStyle;
+        }
+    }
+
+    // Merge incoming JSON with existing style
+    CellStyle style = mergeStyleJson(baseStyle, styleJson);
 
     ID styleId;
     if (!style.isEmpty()) {
@@ -680,21 +786,17 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
 
             // Create STYLE_DEFINE operation for sync
             if (_workbook->isCollaborating()) {
-                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, styleJson);
+                // Store full merged style for sync (not partial styleJson)
+                std::string fullStyleJson = styleToJson(style);
+                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
                 applyOperation(*_workbook, styleOp);
             }
         }
     }
 
     // Find or create column at position
-    ID colId;
+    ID colId = existingColId;
     bool colCreated = false;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == col) {
-            colId = id;
-            break;
-        }
-    }
     if (colId.isNull()) {
         colId = generate_id();
         colCreated = true;
@@ -705,14 +807,8 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
     }
 
     // Find or create row at position
-    ID rowId;
+    ID rowId = existingRowId;
     bool rowCreated = false;
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == row) {
-            rowId = id;
-            break;
-        }
-    }
     if (rowId.isNull()) {
         rowId = generate_id();
         rowCreated = true;
@@ -725,10 +821,13 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
     // Find or create cell at this position
     ID cellId;
     bool cellCreated = false;
-    for (const auto& [id, c] : sheet->cells) {
-        if (c->colId == colId && c->rowId == rowId) {
-            cellId = id;
-            break;
+    if (existingCell) {
+        // Find the cell ID from the existing cell
+        for (const auto& [id, c] : sheet->cells) {
+            if (c.get() == existingCell) {
+                cellId = id;
+                break;
+            }
         }
     }
     if (cellId.isNull()) {

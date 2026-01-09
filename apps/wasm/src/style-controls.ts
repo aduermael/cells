@@ -292,7 +292,7 @@ export class StyleControls {
         if ((cellStyle.fontFamily || "") !== (firstStyle.fontFamily || "")) mixed.fontFamily = true;
         if ((cellStyle.fontSize || 0) !== (firstStyle.fontSize || 0)) mixed.fontSize = true;
         if ((cellStyle.hAlign || "left") !== (firstStyle.hAlign || "left")) mixed.hAlign = true;
-        if ((cellStyle.vAlign || "top") !== (firstStyle.vAlign || "top")) mixed.vAlign = true;
+        if ((cellStyle.vAlign || "bottom") !== (firstStyle.vAlign || "bottom")) mixed.vAlign = true;
       }
     }
 
@@ -655,7 +655,7 @@ export class StyleControls {
     // Update alignment buttons (TextAlign includes "justify", but we only show left/center/right)
     const hAlign = style.hAlign === "justify" ? "left" : (style.hAlign || "left");
     this.updateHAlignButtons(hAlign as "left" | "center" | "right", mixed?.hAlign);
-    this.updateVAlignButtons(style.vAlign || "top", mixed?.vAlign);
+    this.updateVAlignButtons(style.vAlign || "bottom", mixed?.vAlign);
   }
 
   private updateButtonState(

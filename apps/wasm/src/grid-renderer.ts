@@ -497,8 +497,8 @@ export class GridRenderer {
         textX = cellX + CELL_PADDING;
       }
 
-      // Set vertical alignment
-      const vAlign = style?.vAlign || "middle";
+      // Set vertical alignment (default matches CellStyle in C++)
+      const vAlign = style?.vAlign || "bottom";
       let textY: number;
       if (vAlign === "top") {
         ctx.textBaseline = "top";

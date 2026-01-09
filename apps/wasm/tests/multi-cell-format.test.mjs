@@ -261,6 +261,34 @@ const tests = {
     const label = await getFormatDropdownLabel(ctx.page);
     assertEqual(label, 'Currency', `Format dropdown should show "Currency" for uniform format, got: ${label}`);
   },
+
+  // ============================================================================
+  // Style merging tests (ensure styles are properly merged, not replaced)
+  // ============================================================================
+
+  'Bold and italic can be applied together': async (ctx) => {
+    // Regression test: previously, applying bold would reset italic and vice versa
+    // This test verifies that style properties are properly merged, not replaced
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    await setCellValue(ctx.page, 'G1', 'Bold and Italic');
+    await clickCell(ctx.page, 'G1');
+    await sleep(100);
+
+    // Apply bold first
+    await clickStyleButton(ctx.page, 'bold');
+    await sleep(200);
+
+    // Then apply italic - should NOT reset bold
+    await clickStyleButton(ctx.page, 'italic');
+    await sleep(200);
+
+    // Verify both styles are active
+    const style = await getCellStyle(ctx.page, 'G1');
+    assertTrue(style?.bold === true, `Cell should be bold, got: ${JSON.stringify(style)}`);
+    assertTrue(style?.italic === true, `Cell should be italic, got: ${JSON.stringify(style)}`);
+  },
 };
 
 // Run all tests
