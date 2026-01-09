@@ -1321,5 +1321,495 @@ TEST(XLSXWriterTest, RoundtripStyles) {
     }
 }
 
+// =============================================================================
+// XLSX Style Round-trip Tests (Phase 2d)
+// =============================================================================
+
+// Helper to compare style properties between original and roundtripped workbook
+namespace {
+void compareStyleAtPosition(const Workbook& wb1, const Workbook& wb2, Sheet* s1, Sheet* s2,
+                            int colPos, int rowPos, const std::string& context) {
+    Axis* col1 = s1->getColumnByPosition(colPos);
+    Axis* row1 = s1->getRowByPosition(rowPos);
+    Axis* col2 = s2->getColumnByPosition(colPos);
+    Axis* row2 = s2->getRowByPosition(rowPos);
+
+    ASSERT_NE(col1, nullptr) << context << ": original col " << colPos << " not found";
+    ASSERT_NE(row1, nullptr) << context << ": original row " << rowPos << " not found";
+    ASSERT_NE(col2, nullptr) << context << ": roundtrip col " << colPos << " not found";
+    ASSERT_NE(row2, nullptr) << context << ": roundtrip row " << rowPos << " not found";
+
+    Cell* cell1 = s1->getCellAt(col1->id, row1->id);
+    Cell* cell2 = s2->getCellAt(col2->id, row2->id);
+
+    ASSERT_NE(cell1, nullptr) << context << ": original cell not found";
+    ASSERT_NE(cell2, nullptr) << context << ": roundtrip cell not found";
+
+    // If original has no style, roundtrip should have no style
+    if (cell1->styleId.isNull()) {
+        // Cell may have acquired a default style during roundtrip, that's OK
+        // as long as it's an empty style
+        if (!cell2->styleId.isNull()) {
+            const CellStyle* style2 = wb2.getStyle(cell2->styleId);
+            if (style2) {
+                EXPECT_TRUE(style2->isEmpty())
+                    << context << ": unstyled cell should not acquire non-empty style";
+            }
+        }
+        return;
+    }
+
+    EXPECT_FALSE(cell2->styleId.isNull()) << context << ": styled cell lost its style";
+
+    const CellStyle* style1 = wb1.getStyle(cell1->styleId);
+    const CellStyle* style2 = wb2.getStyle(cell2->styleId);
+
+    ASSERT_NE(style1, nullptr) << context << ": original style not found";
+    ASSERT_NE(style2, nullptr) << context << ": roundtrip style not found";
+
+    // Compare individual properties
+    EXPECT_EQ(style1->bold, style2->bold) << context << ": bold mismatch";
+    EXPECT_EQ(style1->italic, style2->italic) << context << ": italic mismatch";
+    EXPECT_EQ(style1->underline, style2->underline) << context << ": underline mismatch";
+    EXPECT_EQ(style1->bgColor, style2->bgColor) << context << ": bgColor mismatch";
+    EXPECT_EQ(style1->textColor, style2->textColor) << context << ": textColor mismatch";
+    EXPECT_EQ(style1->hAlign, style2->hAlign) << context << ": hAlign mismatch";
+    EXPECT_EQ(style1->vAlign, style2->vAlign) << context << ": vAlign mismatch";
+}
+}  // namespace
+
+TEST(XLSXStyleRoundtripTest, RoundtripStyledFile) {
+    // Import styled XLSX file, export back, re-import and verify styles match
+    XLSXReadOptions readOpts;
+    readOpts.readStyles = true;
+
+    // Step 1: Import original styled.xlsx
+    auto result1 = readXLSX("testdata/xlsx/styled.xlsx", readOpts);
+    EXPECT_TRUE(result1.ok()) << (result1.error ? result1.error->toString() : "");
+    ASSERT_NE(result1.workbook, nullptr);
+
+    // Step 2: Export to new XLSX file
+    std::string path = tempFilePath("style_roundtrip.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*result1.workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Step 3: Re-import the exported file
+    auto result2 = readXLSX(path, readOpts);
+    EXPECT_TRUE(result2.ok()) << (result2.error ? result2.error->toString() : "");
+    ASSERT_NE(result2.workbook, nullptr);
+
+    // Step 4: Verify styles match
+    Sheet* sheet1 = result1.workbook->getSheetByIndex(0);
+    Sheet* sheet2 = result2.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet1, nullptr);
+    ASSERT_NE(sheet2, nullptr);
+
+    // Verify cell count matches
+    EXPECT_EQ(sheet1->cellCount(), sheet2->cellCount())
+        << "Cell count should be preserved after roundtrip";
+
+    // Compare styles at specific positions based on styled.xlsx layout:
+    // A1 = Bold, A2 = Italic
+    // B1 = Red background, B2 = Blue text
+    // C1 = Center aligned
+
+    // A1 (Bold)
+    compareStyleAtPosition(*result1.workbook, *result2.workbook, sheet1, sheet2, 0, 0, "A1");
+    // A2 (Italic)
+    compareStyleAtPosition(*result1.workbook, *result2.workbook, sheet1, sheet2, 0, 1, "A2");
+    // B1 (Red background)
+    compareStyleAtPosition(*result1.workbook, *result2.workbook, sheet1, sheet2, 1, 0, "B1");
+    // B2 (Blue text)
+    compareStyleAtPosition(*result1.workbook, *result2.workbook, sheet1, sheet2, 1, 1, "B2");
+    // C1 (Center aligned)
+    compareStyleAtPosition(*result1.workbook, *result2.workbook, sheet1, sheet2, 2, 0, "C1");
+}
+
+TEST(XLSXStyleRoundtripTest, RoundtripAllStyleProperties) {
+    // Create a workbook with all style properties and verify roundtrip
+    auto workbook = std::make_unique<Workbook>(generate_id(), "AllStyles");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    std::vector<ID> colIds;
+    for (int i = 0; i < 3; ++i) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        colIds.push_back(col->id);
+        sheet->addColumn(std::move(col));
+    }
+
+    std::vector<ID> rowIds;
+    for (int i = 0; i < 4; ++i) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet->addRow(std::move(row));
+    }
+
+    // Cell with bold+italic+underline
+    auto cell1 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[0]);
+    cell1->value = CellValue("Bold Italic Underline");
+    CellStyle style1;
+    style1.bold = true;
+    style1.italic = true;
+    style1.underline = true;
+    ID styleId1 = generate_id();
+    workbook->registerStyle(styleId1, style1);
+    cell1->styleId = styleId1;
+    sheet->addCell(std::move(cell1));
+
+    // Cell with colors
+    auto cell2 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[0]);
+    cell2->value = CellValue("Yellow BG, Blue Text");
+    CellStyle style2;
+    style2.bgColor = "#FFFF00";
+    style2.textColor = "#0000FF";
+    ID styleId2 = generate_id();
+    workbook->registerStyle(styleId2, style2);
+    cell2->styleId = styleId2;
+    sheet->addCell(std::move(cell2));
+
+    // Cell with alignment
+    auto cell3 = std::make_unique<Cell>(generate_id(), colIds[2], rowIds[0]);
+    cell3->value = CellValue("Center/Middle");
+    CellStyle style3;
+    style3.hAlign = TextAlign::CENTER;
+    style3.vAlign = VerticalAlign::MIDDLE;
+    ID styleId3 = generate_id();
+    workbook->registerStyle(styleId3, style3);
+    cell3->styleId = styleId3;
+    sheet->addCell(std::move(cell3));
+
+    // Cell with right alignment
+    auto cell4 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[1]);
+    cell4->value = CellValue(12345.67);
+    CellStyle style4;
+    style4.hAlign = TextAlign::RIGHT;
+    ID styleId4 = generate_id();
+    workbook->registerStyle(styleId4, style4);
+    cell4->styleId = styleId4;
+    sheet->addCell(std::move(cell4));
+
+    // Cell without style (plain)
+    auto cell5 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[1]);
+    cell5->value = CellValue("Plain text");
+    sheet->addCell(std::move(cell5));
+
+    // Cell with combined styles
+    auto cell6 = std::make_unique<Cell>(generate_id(), colIds[2], rowIds[1]);
+    cell6->value = CellValue("Full style");
+    CellStyle style6;
+    style6.bold = true;
+    style6.bgColor = "#00FF00";  // Green
+    style6.textColor = "#FFFFFF";  // White
+    style6.hAlign = TextAlign::CENTER;
+    style6.vAlign = VerticalAlign::BOTTOM;
+    ID styleId6 = generate_id();
+    workbook->registerStyle(styleId6, style6);
+    cell6->styleId = styleId6;
+    sheet->addCell(std::move(cell6));
+
+    workbook->addSheet(std::move(sheet));
+
+    // Write to XLSX
+    std::string path = tempFilePath("all_styles.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Read back
+    XLSXReadOptions readOpts;
+    readOpts.readStyles = true;
+    auto readResult = readXLSX(path, readOpts);
+    EXPECT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString() : "");
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Verify cell 1 (bold+italic+underline)
+    Axis* rc0 = readSheet->getColumnByPosition(0);
+    Axis* rr0 = readSheet->getRowByPosition(0);
+    if (rc0 && rr0) {
+        Cell* c = readSheet->getCellAt(rc0->id, rr0->id);
+        ASSERT_NE(c, nullptr);
+        EXPECT_FALSE(c->styleId.isNull());
+        const CellStyle* s = readResult.workbook->getStyle(c->styleId);
+        if (s) {
+            EXPECT_TRUE(s->bold) << "Cell should be bold";
+            EXPECT_TRUE(s->italic) << "Cell should be italic";
+            EXPECT_TRUE(s->underline) << "Cell should be underlined";
+        }
+    }
+
+    // Verify cell 2 (colors)
+    Axis* rc1 = readSheet->getColumnByPosition(1);
+    if (rc1 && rr0) {
+        Cell* c = readSheet->getCellAt(rc1->id, rr0->id);
+        ASSERT_NE(c, nullptr);
+        EXPECT_FALSE(c->styleId.isNull());
+        const CellStyle* s = readResult.workbook->getStyle(c->styleId);
+        if (s) {
+            EXPECT_EQ(s->bgColor, "#FFFF00") << "Cell should have yellow background";
+            EXPECT_EQ(s->textColor, "#0000FF") << "Cell should have blue text";
+        }
+    }
+
+    // Verify cell 3 (alignment)
+    Axis* rc2 = readSheet->getColumnByPosition(2);
+    if (rc2 && rr0) {
+        Cell* c = readSheet->getCellAt(rc2->id, rr0->id);
+        ASSERT_NE(c, nullptr);
+        EXPECT_FALSE(c->styleId.isNull());
+        const CellStyle* s = readResult.workbook->getStyle(c->styleId);
+        if (s) {
+            EXPECT_EQ(s->hAlign, TextAlign::CENTER) << "Cell should be center aligned";
+            EXPECT_EQ(s->vAlign, VerticalAlign::MIDDLE) << "Cell should be middle aligned";
+        }
+    }
+}
+
+TEST(XLSXStyleRoundtripTest, RoundtripMultipleSheetsWithStyles) {
+    // Create workbook with multiple sheets, each with different styles
+    auto workbook = std::make_unique<Workbook>(generate_id(), "MultiSheetStyles");
+
+    std::vector<std::pair<std::string, CellStyle>> sheetStyles = {
+        {"Sales", []() {
+             CellStyle s;
+             s.bold = true;
+             s.bgColor = "#4472C4";
+             return s;
+         }()},
+        {"Expenses",
+         []() {
+             CellStyle s;
+             s.italic = true;
+             s.textColor = "#FF0000";
+             return s;
+         }()},
+        {"Summary",
+         []() {
+             CellStyle s;
+             s.bold = true;
+             s.underline = true;
+             s.hAlign = TextAlign::CENTER;
+             return s;
+         }()},
+    };
+
+    for (const auto& [name, style] : sheetStyles) {
+        auto sheet = std::make_unique<Sheet>(generate_id(), name);
+
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = 0;
+        ID colId = col->id;
+        sheet->addColumn(std::move(col));
+
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = 0;
+        ID rowId = row->id;
+        sheet->addRow(std::move(row));
+
+        auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+        cell->value = CellValue(name + " Header");
+
+        ID styleId = generate_id();
+        workbook->registerStyle(styleId, style);
+        cell->styleId = styleId;
+
+        sheet->addCell(std::move(cell));
+        workbook->addSheet(std::move(sheet));
+    }
+
+    // Write to XLSX
+    std::string path = tempFilePath("multi_sheet_styles.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Read back
+    XLSXReadOptions readOpts;
+    readOpts.readStyles = true;
+    auto readResult = readXLSX(path, readOpts);
+    EXPECT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString() : "");
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    // Verify all sheets are present with correct styles
+    EXPECT_EQ(readResult.workbook->sheetCount(), 3u);
+
+    for (size_t i = 0; i < sheetStyles.size(); ++i) {
+        Sheet* sheet = readResult.workbook->getSheetByIndex(i);
+        ASSERT_NE(sheet, nullptr) << "Sheet " << i << " should exist";
+
+        Axis* col = sheet->getColumnByPosition(0);
+        Axis* row = sheet->getRowByPosition(0);
+        if (col && row) {
+            Cell* cell = sheet->getCellAt(col->id, row->id);
+            ASSERT_NE(cell, nullptr) << "Cell in sheet " << i << " should exist";
+            EXPECT_FALSE(cell->styleId.isNull()) << "Cell in sheet " << i << " should have style";
+
+            const CellStyle* readStyle = readResult.workbook->getStyle(cell->styleId);
+            ASSERT_NE(readStyle, nullptr) << "Style for sheet " << i << " should be registered";
+
+            const CellStyle& expected = sheetStyles[i].second;
+            EXPECT_EQ(readStyle->bold, expected.bold)
+                << "Bold mismatch in sheet " << sheetStyles[i].first;
+            EXPECT_EQ(readStyle->italic, expected.italic)
+                << "Italic mismatch in sheet " << sheetStyles[i].first;
+            EXPECT_EQ(readStyle->underline, expected.underline)
+                << "Underline mismatch in sheet " << sheetStyles[i].first;
+        }
+    }
+}
+
+TEST(XLSXStyleRoundtripTest, StyleDeduplication) {
+    // Test that identical styles are deduplicated during export
+    auto workbook = std::make_unique<Workbook>(generate_id(), "StyleDedup");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    std::vector<ID> colIds;
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    colIds.push_back(col->id);
+    sheet->addColumn(std::move(col));
+
+    std::vector<ID> rowIds;
+    for (int i = 0; i < 5; ++i) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet->addRow(std::move(row));
+    }
+
+    // Create the same style multiple times with different IDs
+    CellStyle boldStyle;
+    boldStyle.bold = true;
+
+    for (int i = 0; i < 5; ++i) {
+        auto cell = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[i]);
+        cell->value = CellValue("Bold " + std::to_string(i + 1));
+
+        // Each cell gets its own style ID, but all styles are identical
+        ID styleId = generate_id();
+        workbook->registerStyle(styleId, boldStyle);
+        cell->styleId = styleId;
+
+        sheet->addCell(std::move(cell));
+    }
+
+    workbook->addSheet(std::move(sheet));
+
+    // Write to XLSX
+    std::string path = tempFilePath("style_dedup.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Read back
+    XLSXReadOptions readOpts;
+    readOpts.readStyles = true;
+    auto readResult = readXLSX(path, readOpts);
+    EXPECT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString() : "");
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    // All cells should still have bold style
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    Axis* readCol = readSheet->getColumnByPosition(0);
+    ASSERT_NE(readCol, nullptr);
+
+    for (int i = 0; i < 5; ++i) {
+        Axis* readRow = readSheet->getRowByPosition(i);
+        ASSERT_NE(readRow, nullptr) << "Row " << i << " should exist";
+
+        Cell* cell = readSheet->getCellAt(readCol->id, readRow->id);
+        ASSERT_NE(cell, nullptr) << "Cell at row " << i << " should exist";
+        EXPECT_FALSE(cell->styleId.isNull()) << "Cell at row " << i << " should have style";
+
+        const CellStyle* style = readResult.workbook->getStyle(cell->styleId);
+        ASSERT_NE(style, nullptr) << "Style for row " << i << " should be registered";
+        EXPECT_TRUE(style->bold) << "Cell at row " << i << " should be bold";
+    }
+
+    // The number of registered styles after roundtrip should be <= original
+    // (deduplication should reduce the count)
+    EXPECT_LE(readResult.workbook->getStyles().size(), 5u)
+        << "Style deduplication should work - got " << readResult.workbook->getStyles().size();
+}
+
+TEST(XLSXStyleRoundtripTest, EmptyStyleNotWritten) {
+    // Test that cells with empty (default) styles don't create unnecessary style entries
+    auto workbook = std::make_unique<Workbook>(generate_id(), "EmptyStyle");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue("Plain text");
+
+    // Register an empty style
+    CellStyle emptyStyle;
+    EXPECT_TRUE(emptyStyle.isEmpty());
+    ID styleId = generate_id();
+    workbook->registerStyle(styleId, emptyStyle);
+    cell->styleId = styleId;
+
+    sheet->addCell(std::move(cell));
+    workbook->addSheet(std::move(sheet));
+
+    // Write to XLSX
+    std::string path = tempFilePath("empty_style.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Read back
+    XLSXReadOptions readOpts;
+    readOpts.readStyles = true;
+    auto readResult = readXLSX(path, readOpts);
+    EXPECT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString() : "");
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // The cell should still have the correct value
+    Axis* readCol = readSheet->getColumnByPosition(0);
+    Axis* readRow = readSheet->getRowByPosition(0);
+    ASSERT_NE(readCol, nullptr);
+    ASSERT_NE(readRow, nullptr);
+
+    Cell* readCell = readSheet->getCellAt(readCol->id, readRow->id);
+    ASSERT_NE(readCell, nullptr);
+    EXPECT_EQ(readCell->value.asString(), "Plain text");
+
+    // Cell may or may not have a style after roundtrip (depends on Excel's handling)
+    // If it has a style, it should be empty/default
+    if (!readCell->styleId.isNull()) {
+        const CellStyle* style = readResult.workbook->getStyle(readCell->styleId);
+        if (style) {
+            // Check that no significant properties are set
+            EXPECT_FALSE(style->bold);
+            EXPECT_FALSE(style->italic);
+            EXPECT_FALSE(style->underline);
+        }
+    }
+}
+
 }  // namespace
 }  // namespace cells

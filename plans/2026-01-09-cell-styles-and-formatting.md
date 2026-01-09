@@ -101,7 +101,7 @@ Ensure styles are properly preserved when importing/exporting XLSX and ZCD files
   - Test edge cases: empty styles, partial styles, all properties set
   - Add to C++ unit test suite
 
-- [ ] 2d: XLSX round-trip tests
+- [x] 2d: XLSX round-trip tests
   - Import styled XLSX file
   - Export back to XLSX
   - Re-import and verify styles match original
