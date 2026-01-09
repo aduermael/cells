@@ -108,7 +108,7 @@ Ensure styles are properly preserved when importing/exporting XLSX and ZCD files
   - Test with real-world XLSX files (Excel, Google Sheets exports)
   - Add to C++ unit test suite
 
-- [ ] 2e: CSV export consideration
+- [x] 2e: CSV export consideration
   - CSV has no style support (document this limitation)
   - Optionally: warn user when exporting styled sheet to CSV
 

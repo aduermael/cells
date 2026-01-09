@@ -458,5 +458,104 @@ TEST(CSVRoundtripTest, LargerDataRoundtrip) {
     EXPECT_EQ(writeResult.output, original);
 }
 
+// --- Style Warning Tests ---
+
+TEST(CSVWriterTest, NoStyleWarningForUnstyledSheet) {
+    // Sheet with no styles should not produce warnings
+    auto sheet = createSimpleSheet({"Name", "Value"}, {{"Alice", "100"}, {"Bob", "200"}});
+
+    CSVWriteResult result = writeCSV(*sheet);
+    EXPECT_TRUE(result.ok());
+    EXPECT_FALSE(result.stylesLost);
+    EXPECT_TRUE(result.warnings.empty());
+}
+
+TEST(CSVWriterTest, StyleWarningForStyledSheet) {
+    // Create a sheet with styled cells
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Styled");
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+
+    // Create column
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->name = "Value";
+    col->position = 0;
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    // Create row
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    // Create styled cell
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue("Bold Text");
+
+    // Register and apply a style
+    CellStyle boldStyle;
+    boldStyle.bold = true;
+    ID styleId = generate_id();
+    workbook->registerStyle(styleId, boldStyle);
+    cell->styleId = styleId;
+
+    sheet->addCell(std::move(cell));
+    workbook->addSheet(std::move(sheet));
+
+    // Export to CSV
+    CSVWriteResult result = writeCSV(*workbook);
+    EXPECT_TRUE(result.ok());
+
+    // Should have style warning
+    EXPECT_TRUE(result.stylesLost);
+    EXPECT_FALSE(result.warnings.empty());
+    EXPECT_NE(result.warnings[0].find("styles"), std::string::npos);
+    EXPECT_NE(result.warnings[0].find("XLSX"), std::string::npos);
+
+    // Data should still be correct
+    EXPECT_NE(result.output.find("Bold Text"), std::string::npos);
+}
+
+TEST(CSVWriterTest, StyleWarningOnlyOnce) {
+    // Multiple styled cells should only produce one warning
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Styled");
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+
+    // Create column
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->name = "Value";
+    col->position = 0;
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    // Register style
+    CellStyle boldStyle;
+    boldStyle.bold = true;
+    ID styleId = generate_id();
+    workbook->registerStyle(styleId, boldStyle);
+
+    // Create multiple styled cells
+    for (int i = 0; i < 5; i++) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        ID rowId = row->id;
+        sheet->addRow(std::move(row));
+
+        auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+        cell->value = CellValue("Row " + std::to_string(i));
+        cell->styleId = styleId;
+        sheet->addCell(std::move(cell));
+    }
+
+    workbook->addSheet(std::move(sheet));
+
+    CSVWriteResult result = writeCSV(*workbook);
+    EXPECT_TRUE(result.ok());
+    EXPECT_TRUE(result.stylesLost);
+
+    // Should only have one warning message
+    EXPECT_EQ(result.warnings.size(), 1u);
+}
+
 }  // namespace
 }  // namespace cells

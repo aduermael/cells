@@ -153,6 +153,9 @@ CSVWriteResult CSVWriter::write(const Sheet& sheet) {
         oss << endl;
     }
 
+    // Track if any styled cells are being exported
+    bool foundStyledCell = false;
+
     // Write data rows
     for (const ID& rowId : rows) {
         for (size_t c = 0; c < columns.size(); c++) {
@@ -165,6 +168,11 @@ CSVWriteResult CSVWriter::write(const Sheet& sheet) {
             if (cell != nullptr) {
                 std::string const value = formatValue(cell->value);
                 oss << escapeField(value);
+
+                // Check if cell has styles that will be lost
+                if (!foundStyledCell && !cell->styleId.isNull()) {
+                    foundStyledCell = true;
+                }
             }
             // Empty cell outputs empty field (nothing before the next delimiter)
         }
@@ -172,6 +180,15 @@ CSVWriteResult CSVWriter::write(const Sheet& sheet) {
     }
 
     result.output = oss.str();
+
+    // Set warning if styled cells were exported
+    if (foundStyledCell) {
+        result.stylesLost = true;
+        result.warnings.push_back(
+            "Cell styles (bold, colors, alignment, etc.) are not preserved in CSV format. "
+            "Use XLSX format to preserve styles.");
+    }
+
     return result;
 }
 

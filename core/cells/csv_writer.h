@@ -18,8 +18,14 @@
 // - Internal double-quotes escaped as ""
 // - Last record may omit trailing CRLF
 //
-// Note: CSV export only includes the first sheet (CSV has no
-// multi-sheet concept). Use XLSX for multi-sheet export.
+// Limitations:
+// - CSV export only includes the first sheet (CSV has no multi-sheet concept).
+//   Use XLSX for multi-sheet export.
+// - Cell styles are NOT exported (bold, italic, colors, alignment, etc.).
+//   CSV is a plain-text format with no style/formatting support.
+//   Use XLSX format to preserve cell styles.
+// - Number formats are NOT preserved. Numbers are exported as raw values.
+//   Dates appear as serial numbers unless pre-formatted to strings.
 //
 // Dependencies: model.h
 // Used by: bindings.cc (file export), CLI tools
@@ -57,8 +63,10 @@ struct CSVWriteError {
 
 // Result of writing a CSV file
 struct CSVWriteResult {
-    std::string output{};                  // CSV content on success
-    std::optional<CSVWriteError> error{};  // Present on failure
+    std::string output{};                   // CSV content on success
+    std::optional<CSVWriteError> error{};   // Present on failure
+    std::vector<std::string> warnings{};    // Non-fatal warnings (e.g., styles lost)
+    bool stylesLost{false};                 // True if styled cells were exported
 
     [[nodiscard]] bool ok() const { return !error.has_value(); }
     [[nodiscard]] explicit operator bool() const { return ok(); }
