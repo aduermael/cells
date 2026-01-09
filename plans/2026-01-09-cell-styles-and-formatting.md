@@ -334,11 +334,12 @@ Add keyboard shortcuts for common formatting operations.
 
 ## Phase 11: Final Polish and Testing
 
-- [ ] 11a: Run full test suite
-  - Unit tests: `make test`
-  - E2E tests: `cd apps/wasm && npm run test:parallel -- stable`
-  - Lint: `make lint`
-  - Format check: `make format-check`
+- [x] 11a: Run full test suite
+  - Unit tests: `make test` ✅ 49/49 passed
+  - E2E tests: `npm run test:parallel -- stable` ✅ 56/56 passed
+  - E2E tests: `multi-cell-format.test.mjs` ✅ 7/7 passed
+  - Lint: `make lint` ✅ Passed
+  - Format: `make format` ✅ No changes needed
 
 - [ ] 11b: Manual testing
   - Test all style buttons
