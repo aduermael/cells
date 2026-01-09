@@ -75,6 +75,7 @@ export interface CellData {
   editValue?: string; // Human-readable value for formula bar/editing (e.g., "12/12/2025" for dates)
   formatId?: string; // Number format ID (~ or empty for GENERAL)
   styleId?: string; // Cell style ID (~ or empty for default style)
+  style?: CellStyle; // Inline style for efficient rendering
 }
 
 // ============================================================================

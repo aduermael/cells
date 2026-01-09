@@ -272,6 +272,9 @@ export class GridRenderer {
       this.dragTargetIndex !== this.dragSourceIndex &&
       this.dragTargetIndex !== this.dragSourceIndex + 1;
 
+    // Cell background colors (drawn before grid lines so lines appear on top)
+    this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+
     // Grid lines
     this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
 
@@ -357,6 +360,35 @@ export class GridRenderer {
     ctx.stroke();
   }
 
+  /** Draw cell background colors */
+  private _drawCellBackgrounds(
+    ctx: CanvasRenderingContext2D,
+    viewWidth: number,
+    viewHeight: number,
+    colHasMoved: boolean,
+    rowHasMoved: boolean,
+    headerState: HeaderRendererState
+  ): void {
+    for (const cell of this.cells) {
+      if (colHasMoved && cell.col === this.dragSourceIndex) continue;
+      if (rowHasMoved && cell.row === this.dragSourceIndex) continue;
+
+      const bgColor = cell.style?.bgColor;
+      if (!bgColor) continue;
+
+      const colWidth = this.colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
+      const rowHeight = this.rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
+      const cellX = getColX(cell.col, headerState);
+      const cellY = getRowY(cell.row, headerState);
+
+      if (cellX + colWidth < HEADER_WIDTH || cellX > viewWidth) continue;
+      if (cellY + rowHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
+
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(cellX + 1, cellY + 1, colWidth - 1, rowHeight - 1);
+    }
+  }
+
   /** Draw grid lines */
   private _drawGridLines(
     ctx: CanvasRenderingContext2D,
@@ -420,11 +452,6 @@ export class GridRenderer {
     rowHasMoved: boolean,
     headerState: HeaderRendererState
   ): void {
-    ctx.fillStyle = this.colors.cellText;
-    ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-
     for (const cell of this.cells) {
       if (colHasMoved && cell.col === this.dragSourceIndex) continue;
       if (rowHasMoved && cell.row === this.dragSourceIndex) continue;
@@ -438,11 +465,82 @@ export class GridRenderer {
       if (cellY + rowHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
 
       const displayValue = cell.display || cell.value || "";
+      const style = cell.style;
+
       ctx.save();
       ctx.beginPath();
       ctx.rect(cellX + 1, cellY + 1, colWidth - 2, rowHeight - 2);
       ctx.clip();
-      ctx.fillText(displayValue, cellX + CELL_PADDING, cellY + rowHeight / 2);
+
+      // Set text color
+      ctx.fillStyle = style?.textColor || this.colors.cellText;
+
+      // Build font string with style properties
+      let fontStyle = "";
+      if (style?.italic) fontStyle += "italic ";
+      if (style?.bold) fontStyle += "bold ";
+      const fontSize = style?.fontSize || 13;
+      const fontFamily = style?.fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.font = fontStyle ? `${fontStyle}${fontSize}px ${fontFamily}` : `${fontSize}px ${fontFamily}`;
+
+      // Set horizontal alignment
+      const hAlign = style?.hAlign || "left";
+      let textX: number;
+      if (hAlign === "center") {
+        ctx.textAlign = "center";
+        textX = cellX + colWidth / 2;
+      } else if (hAlign === "right") {
+        ctx.textAlign = "right";
+        textX = cellX + colWidth - CELL_PADDING;
+      } else {
+        ctx.textAlign = "left";
+        textX = cellX + CELL_PADDING;
+      }
+
+      // Set vertical alignment
+      const vAlign = style?.vAlign || "middle";
+      let textY: number;
+      if (vAlign === "top") {
+        ctx.textBaseline = "top";
+        textY = cellY + 2; // Small padding from top
+      } else if (vAlign === "bottom") {
+        ctx.textBaseline = "bottom";
+        textY = cellY + rowHeight - 2; // Small padding from bottom
+      } else {
+        ctx.textBaseline = "middle";
+        textY = cellY + rowHeight / 2;
+      }
+
+      ctx.fillText(displayValue, textX, textY);
+
+      // Draw underline if enabled
+      if (style?.underline) {
+        const textMetrics = ctx.measureText(displayValue);
+        let underlineX: number;
+        if (hAlign === "center") {
+          underlineX = textX - textMetrics.width / 2;
+        } else if (hAlign === "right") {
+          underlineX = textX - textMetrics.width;
+        } else {
+          underlineX = textX;
+        }
+        // Adjust Y position based on vertical alignment
+        let underlineY: number;
+        if (vAlign === "top") {
+          underlineY = textY + fontSize + 1;
+        } else if (vAlign === "bottom") {
+          underlineY = textY + 1;
+        } else {
+          underlineY = textY + fontSize / 2 + 1;
+        }
+        ctx.beginPath();
+        ctx.strokeStyle = style?.textColor || this.colors.cellText;
+        ctx.lineWidth = 1;
+        ctx.moveTo(underlineX, underlineY);
+        ctx.lineTo(underlineX + textMetrics.width, underlineY);
+        ctx.stroke();
+      }
+
       ctx.restore();
     }
   }

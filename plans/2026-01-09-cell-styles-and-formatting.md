@@ -189,7 +189,7 @@ Add horizontal and vertical alignment buttons.
   - Update button active states
   - Apply alignment via WasmDataSource
 
-- [ ] 5c: Update grid renderer for alignment
+- [x] 5c: Update grid renderer for alignment
   - Read cell style for alignment values
   - Adjust text drawing position based on alignment
   - Handle text overflow with alignment

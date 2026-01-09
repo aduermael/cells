@@ -117,6 +117,43 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             json << "\"formatId\":\"" << entry.cell->formatId.toString() << "\",";
         }
 
+        // Include styleId and style properties if cell has a style
+        if (!entry.cell->styleId.isNull()) {
+            json << "\"styleId\":\"" << entry.cell->styleId.toString() << "\",";
+            // Include inline style properties for efficient rendering
+            if (const CellStyle* style = _workbook->getStyle(entry.cell->styleId)) {
+                json << "\"style\":{";
+                json << "\"bold\":" << (style->bold ? "true" : "false");
+                json << ",\"italic\":" << (style->italic ? "true" : "false");
+                json << ",\"underline\":" << (style->underline ? "true" : "false");
+                if (!style->bgColor.empty()) {
+                    json << ",\"bgColor\":\"" << style->bgColor << "\"";
+                }
+                if (!style->textColor.empty()) {
+                    json << ",\"textColor\":\"" << style->textColor << "\"";
+                }
+                if (!style->fontFamily.empty()) {
+                    json << ",\"fontFamily\":\"" << style->fontFamily << "\"";
+                }
+                if (style->fontSize > 0) {
+                    json << ",\"fontSize\":" << static_cast<int>(style->fontSize);
+                }
+                // Alignment - serialize enum values
+                switch (style->hAlign) {
+                    case TextAlign::LEFT: json << ",\"hAlign\":\"left\""; break;
+                    case TextAlign::CENTER: json << ",\"hAlign\":\"center\""; break;
+                    case TextAlign::RIGHT: json << ",\"hAlign\":\"right\""; break;
+                    case TextAlign::JUSTIFY: json << ",\"hAlign\":\"justify\""; break;
+                }
+                switch (style->vAlign) {
+                    case VerticalAlign::TOP: json << ",\"vAlign\":\"top\""; break;
+                    case VerticalAlign::MIDDLE: json << ",\"vAlign\":\"middle\""; break;
+                    case VerticalAlign::BOTTOM: json << ",\"vAlign\":\"bottom\""; break;
+                }
+                json << "},";
+            }
+        }
+
         if (entry.cell->isFormula()) {
             json << "\"type\":\"f\",";
             Formula* formula = entry.cell->getFormula();
