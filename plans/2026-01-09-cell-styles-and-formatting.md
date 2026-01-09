@@ -66,7 +66,7 @@ Add style support to the core data model with CRDT synchronization.
   - Add `bootstrapOpLog` support for styles
   - Ensure styles are included in ZCD file output
 
-- [ ] 1d: Add C++ unit tests
+- [x] 1d: Add C++ unit tests
   - Test CellStyle struct defaults
   - Test CELL_SET_STYLE operation application
   - Test STYLE_DEFINE operation

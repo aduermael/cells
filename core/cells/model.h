@@ -80,19 +80,10 @@ enum class CollabMode : std::uint8_t {
 // =============================================================================
 
 // Horizontal text alignment within cell
-enum class TextAlign : std::uint8_t {
-    LEFT = 0,
-    CENTER = 1,
-    RIGHT = 2,
-    JUSTIFY = 3
-};
+enum class TextAlign : std::uint8_t { LEFT = 0, CENTER = 1, RIGHT = 2, JUSTIFY = 3 };
 
 // Vertical text alignment within cell
-enum class VerticalAlign : std::uint8_t {
-    TOP = 0,
-    MIDDLE = 1,
-    BOTTOM = 2
-};
+enum class VerticalAlign : std::uint8_t { TOP = 0, MIDDLE = 1, BOTTOM = 2 };
 
 // Cell style properties for formatting
 // Each property is optional - empty string or 0 means "use default"
@@ -101,10 +92,10 @@ struct CellStyle {
     bool bold{false};
     bool italic{false};
     bool underline{false};
-    std::string bgColor;    // Background color (hex, e.g. "#FF0000")
-    std::string textColor;  // Text color (hex, e.g. "#000000")
-    std::string fontFamily; // Font name (e.g. "Arial"), empty = system default
-    uint8_t fontSize{0};    // Font size in points, 0 = default (11pt)
+    std::string bgColor;     // Background color (hex, e.g. "#FF0000")
+    std::string textColor;   // Text color (hex, e.g. "#000000")
+    std::string fontFamily;  // Font name (e.g. "Arial"), empty = system default
+    uint8_t fontSize{0};     // Font size in points, 0 = default (11pt)
     TextAlign hAlign{TextAlign::LEFT};
     VerticalAlign vAlign{VerticalAlign::BOTTOM};
 
@@ -112,24 +103,20 @@ struct CellStyle {
 
     // Check if style has any non-default values
     [[nodiscard]] bool isEmpty() const {
-        return !bold && !italic && !underline &&
-               bgColor.empty() && textColor.empty() &&
-               fontFamily.empty() && fontSize == 0 &&
-               hAlign == TextAlign::LEFT && vAlign == VerticalAlign::BOTTOM;
+        return !bold && !italic && !underline && bgColor.empty() && textColor.empty() &&
+               fontFamily.empty() && fontSize == 0 && hAlign == TextAlign::LEFT &&
+               vAlign == VerticalAlign::BOTTOM;
     }
 
     // Equality comparison
     bool operator==(const CellStyle& other) const {
-        return bold == other.bold && italic == other.italic &&
-               underline == other.underline && bgColor == other.bgColor &&
-               textColor == other.textColor && fontFamily == other.fontFamily &&
-               fontSize == other.fontSize && hAlign == other.hAlign &&
-               vAlign == other.vAlign;
+        return bold == other.bold && italic == other.italic && underline == other.underline &&
+               bgColor == other.bgColor && textColor == other.textColor &&
+               fontFamily == other.fontFamily && fontSize == other.fontSize &&
+               hAlign == other.hAlign && vAlign == other.vAlign;
     }
 
-    bool operator!=(const CellStyle& other) const {
-        return !(*this == other);
-    }
+    bool operator!=(const CellStyle& other) const { return !(*this == other); }
 };
 
 // =============================================================================

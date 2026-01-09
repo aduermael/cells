@@ -329,9 +329,9 @@ static int parseMonthName(const std::string& name) {
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
 
     // Full month names
-    static const std::string fullNames[] = {"january", "february", "march",     "april",
-                                            "may",     "june",     "july",      "august",
-                                            "september", "october", "november", "december"};
+    static const std::string fullNames[] = {"january",   "february", "march",    "april",
+                                            "may",       "june",     "july",     "august",
+                                            "september", "october",  "november", "december"};
     // Abbreviated month names
     static const std::string shortNames[] = {"jan", "feb", "mar", "apr", "may", "jun",
                                              "jul", "aug", "sep", "oct", "nov", "dec"};

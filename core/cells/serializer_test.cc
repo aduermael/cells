@@ -947,5 +947,167 @@ S sH3eE4tB "Sheet"
               "[Red]#,##0.00;[Blue]-#,##0.00");
 }
 
+// =============================================================================
+// Style Serialization Tests
+// =============================================================================
+
+TEST(StyleSerializationTest, SerializeStyleDefinition) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    wb->addSheet(std::move(sheet));
+
+    // Register a style
+    CellStyle style;
+    style.bold = true;
+    style.italic = true;
+    style.bgColor = "#FF0000";
+    wb->registerStyle(ID("STYbold1"), style);
+
+    const std::string output = serialize(*wb);
+
+    // Check style line is present
+    EXPECT_NE(output.find("Y STYbold1"), std::string::npos);
+    EXPECT_NE(output.find("\"bold\":true"), std::string::npos);
+    EXPECT_NE(output.find("\"italic\":true"), std::string::npos);
+    EXPECT_NE(output.find("\"bgColor\":\"#FF0000\""), std::string::npos);
+}
+
+TEST(StyleSerializationTest, SerializeCellWithStyle) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell->value = CellValue(42.0);
+    cell->styleId = ID("STYbold1");
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+
+    // Check cell line has style property
+    EXPECT_NE(output.find("sty:STYbold1"), std::string::npos);
+}
+
+TEST(StyleSerializationTest, ParseStyleDefinition) {
+    const std::string content = R"(
+D aB3cD4eF "Test"
+Y STYbold1 {"bold":true,"italic":false,"bgColor":"#FF0000","hAlign":"center"}
+S sH3eE4tB "Sheet"
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    EXPECT_TRUE(result.workbook->hasStyle(ID("STYbold1")));
+    const CellStyle* style = result.workbook->getStyle(ID("STYbold1"));
+    ASSERT_NE(style, nullptr);
+    EXPECT_TRUE(style->bold);
+    EXPECT_FALSE(style->italic);
+    EXPECT_EQ(style->bgColor, "#FF0000");
+    EXPECT_EQ(style->hAlign, TextAlign::CENTER);
+}
+
+TEST(StyleSerializationTest, ParseCellWithStyle) {
+    const std::string content = R"(
+D aB3cD4eF "Test"
+Y STYbold1 {"bold":true}
+S sH3eE4tB "Sheet"
+C cA1bC2dE 0
+R rA1bC2dE 0
+X xA1bC2dE cA1bC2dE rA1bC2dE n 42 sty:STYbold1
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+    Cell* cell = sheet->getCell(ID("xA1bC2dE"));
+    ASSERT_NE(cell, nullptr);
+    EXPECT_EQ(cell->styleId.toString(), "STYbold1");
+}
+
+TEST(StyleSerializationTest, RoundtripStyles) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell->value = CellValue(42.0);
+    cell->styleId = ID("STYbold1");
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    wb->addSheet(std::move(sheet));
+
+    // Register style
+    CellStyle style;
+    style.bold = true;
+    style.italic = true;
+    style.underline = true;
+    style.bgColor = "#FFFF00";
+    style.textColor = "#000000";
+    style.fontFamily = "Arial";
+    style.fontSize = 14;
+    style.hAlign = TextAlign::CENTER;
+    style.vAlign = VerticalAlign::MIDDLE;
+    wb->registerStyle(ID("STYbold1"), style);
+
+    // Serialize
+    const std::string serialized = serialize(*wb);
+
+    // Parse back
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Verify style is preserved
+    EXPECT_TRUE(result.workbook->hasStyle(ID("STYbold1")));
+    const CellStyle* parsed = result.workbook->getStyle(ID("STYbold1"));
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_TRUE(parsed->bold);
+    EXPECT_TRUE(parsed->italic);
+    EXPECT_TRUE(parsed->underline);
+    EXPECT_EQ(parsed->bgColor, "#FFFF00");
+    EXPECT_EQ(parsed->textColor, "#000000");
+    EXPECT_EQ(parsed->fontFamily, "Arial");
+    EXPECT_EQ(parsed->fontSize, 14);
+    EXPECT_EQ(parsed->hAlign, TextAlign::CENTER);
+    EXPECT_EQ(parsed->vAlign, VerticalAlign::MIDDLE);
+
+    // Verify cell style ID is preserved
+    Sheet* parsedSheet = result.workbook->getSheetByIndex(0);
+    Cell* parsedCell = parsedSheet->getCell(ID("xA1bC2dE"));
+    ASSERT_NE(parsedCell, nullptr);
+    EXPECT_EQ(parsedCell->styleId.toString(), "STYbold1");
+}
+
+TEST(StyleSerializationTest, ParseCellWithBothFormatAndStyle) {
+    const std::string content = R"(
+D aB3cD4eF "Test"
+F FMT_C002 "$#,##0.00"
+Y STYbold1 {"bold":true}
+S sH3eE4tB "Sheet"
+C cA1bC2dE 0
+R rA1bC2dE 0
+X xA1bC2dE cA1bC2dE rA1bC2dE n 42 fmt:FMT_C002 sty:STYbold1
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    Cell* cell = sheet->getCell(ID("xA1bC2dE"));
+    ASSERT_NE(cell, nullptr);
+    EXPECT_EQ(cell->formatId.toString(), "FMT_C002");
+    EXPECT_EQ(cell->styleId.toString(), "STYbold1");
+}
+
 }  // namespace
 }  // namespace cells

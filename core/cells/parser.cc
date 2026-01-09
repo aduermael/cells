@@ -271,11 +271,11 @@ static int extractJSONIntValue(std::string_view json, const std::string& key, in
     while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
         pos++;
     }
-    if (pos >= json.size() || !std::isdigit(json[pos])) {
+    if (pos >= json.size() || std::isdigit(json[pos]) == 0) {
         return defaultValue;
     }
     int result = 0;
-    while (pos < json.size() && std::isdigit(json[pos])) {
+    while (pos < json.size() && std::isdigit(json[pos]) != 0) {
         result = result * 10 + (json[pos] - '0');
         pos++;
     }

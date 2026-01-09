@@ -677,7 +677,8 @@ ApplyResult applyFormatDefine(Workbook& workbook, const Operation& op) {
 }
 
 // Helper to extract boolean from JSON payload
-static bool extractJSONBool(const std::string& json, const std::string& key, bool defaultValue = false) {
+static bool extractJSONBool(const std::string& json, const std::string& key,
+                            bool defaultValue = false) {
     // Look for "key":true or "key":false
     const std::string keyPattern = "\"" + key + "\":";
     auto pos = json.find(keyPattern);

@@ -522,5 +522,129 @@ TEST_F(CRDTConvergenceTest, DifferentCellsConcurrentEdits) {
     EXPECT_EQ(sheet_b->getCell(cell2)->value.asNumber(), 200);
 }
 
+// =============================================================================
+// Style Tests
+// =============================================================================
+
+TEST_F(CRDTTest, CellStyleDefaults) {
+    // Test that CellStyle has correct default values
+    CellStyle style;
+    EXPECT_FALSE(style.bold);
+    EXPECT_FALSE(style.italic);
+    EXPECT_FALSE(style.underline);
+    EXPECT_TRUE(style.bgColor.empty());
+    EXPECT_TRUE(style.textColor.empty());
+    EXPECT_TRUE(style.fontFamily.empty());
+    EXPECT_EQ(style.fontSize, 0);
+    EXPECT_EQ(style.hAlign, TextAlign::LEFT);
+    EXPECT_EQ(style.vAlign, VerticalAlign::BOTTOM);
+    EXPECT_TRUE(style.isEmpty());
+}
+
+TEST_F(CRDTTest, CellStyleNonEmpty) {
+    CellStyle style;
+    style.bold = true;
+    EXPECT_FALSE(style.isEmpty());
+
+    CellStyle style2;
+    style2.bgColor = "#FF0000";
+    EXPECT_FALSE(style2.isEmpty());
+}
+
+TEST_F(CRDTTest, CellStyleEquality) {
+    CellStyle a, b;
+    EXPECT_EQ(a, b);
+
+    a.bold = true;
+    EXPECT_NE(a, b);
+
+    b.bold = true;
+    EXPECT_EQ(a, b);
+
+    a.bgColor = "#FF0000";
+    EXPECT_NE(a, b);
+}
+
+TEST_F(CRDTTest, ApplyCellSetStyle) {
+    // Create and apply style operation
+    Operation op = makeCellSetStyleOp(*workbook, cell1, R"({"style_id":"STY_bold"})");
+    ApplyResult result = applyOperation(*workbook, op);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    // Verify the style ID was set
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    Cell* cell = sheet->getCell(cell1);
+    EXPECT_EQ(cell->styleId.toString(), "STY_bold");
+}
+
+TEST_F(CRDTTest, ApplyStyleDefine) {
+    // Define a style
+    const ID styleId("STYbold1");
+    const std::string payload = R"({"bold":true,"italic":false,"bgColor":"#FF0000"})";
+    Operation op = makeStyleDefineOp(*workbook, styleId, payload);
+
+    ApplyResult result = applyOperation(*workbook, op);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    // Verify the style was registered
+    EXPECT_TRUE(workbook->hasStyle(styleId));
+    const CellStyle* style = workbook->getStyle(styleId);
+    ASSERT_NE(style, nullptr);
+    EXPECT_TRUE(style->bold);
+    EXPECT_FALSE(style->italic);
+    EXPECT_EQ(style->bgColor, "#FF0000");
+}
+
+TEST_F(CRDTTest, ApplyStyleDefineDuplicate) {
+    const ID styleId("STYbold2");
+    const std::string payload = R"({"bold":true})";
+    Operation op1 = makeStyleDefineOp(*workbook, styleId, payload);
+
+    ApplyResult result1 = applyOperation(*workbook, op1);
+    EXPECT_EQ(result1, ApplyResult::SUCCESS);
+
+    // Define same style again should return ALREADY_APPLIED
+    Operation op2 = makeStyleDefineOp(*workbook, styleId, payload);
+    ApplyResult result2 = applyOperation(*workbook, op2);
+    EXPECT_EQ(result2, ApplyResult::ALREADY_APPLIED);
+}
+
+TEST_F(CRDTTest, StyleDefineAllProperties) {
+    const ID styleId("STY_full");
+    const std::string payload = R"({
+        "bold":true,
+        "italic":true,
+        "underline":true,
+        "bgColor":"#FFFF00",
+        "textColor":"#000000",
+        "fontFamily":"Arial",
+        "fontSize":14,
+        "hAlign":"center",
+        "vAlign":"middle"
+    })";
+    Operation op = makeStyleDefineOp(*workbook, styleId, payload);
+    applyOperation(*workbook, op);
+
+    const CellStyle* style = workbook->getStyle(styleId);
+    ASSERT_NE(style, nullptr);
+    EXPECT_TRUE(style->bold);
+    EXPECT_TRUE(style->italic);
+    EXPECT_TRUE(style->underline);
+    EXPECT_EQ(style->bgColor, "#FFFF00");
+    EXPECT_EQ(style->textColor, "#000000");
+    EXPECT_EQ(style->fontFamily, "Arial");
+    EXPECT_EQ(style->fontSize, 14);
+    EXPECT_EQ(style->hAlign, TextAlign::CENTER);
+    EXPECT_EQ(style->vAlign, VerticalAlign::MIDDLE);
+}
+
+TEST_F(CRDTTest, CellSetStyleNonExistentCell) {
+    // Try to set style on non-existent cell
+    ID fakeCell("FakeCelX");
+    Operation op = makeCellSetStyleOp(*workbook, fakeCell, R"({"style_id":"STY_bold"})");
+    ApplyResult result = applyOperation(*workbook, op);
+    EXPECT_EQ(result, ApplyResult::INVALID_TARGET);
+}
+
 }  // namespace
 }  // namespace cells
