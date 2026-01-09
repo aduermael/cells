@@ -74,6 +74,7 @@ export interface CellData {
   display?: string; // For formula cells (computed value)
   editValue?: string; // Human-readable value for formula bar/editing (e.g., "12/12/2025" for dates)
   formatId?: string; // Number format ID (~ or empty for GENERAL)
+  styleId?: string; // Cell style ID (~ or empty for default style)
 }
 
 // ============================================================================
@@ -136,6 +137,43 @@ export interface FormatDetails {
   separator: boolean; // whether thousands separator is used
   currency: string | null; // currency code if applicable, null otherwise
   error?: string; // set if format ID is not recognized
+}
+
+// ============================================================================
+// Cell Style Types
+// ============================================================================
+
+/** Horizontal text alignment within cell */
+export type TextAlign = "left" | "center" | "right" | "justify";
+
+/** Vertical text alignment within cell */
+export type VerticalAlign = "top" | "middle" | "bottom";
+
+/** Cell style properties for formatting */
+export interface CellStyle {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  bgColor: string; // Background color (hex, e.g. "#FF0000"), empty for default
+  textColor: string; // Text color (hex, e.g. "#000000"), empty for default
+  fontFamily: string; // Font name (e.g. "Arial"), empty for system default
+  fontSize: number; // Font size in points, 0 for default (11pt)
+  hAlign: TextAlign;
+  vAlign: VerticalAlign;
+}
+
+/** Registered style entry */
+export interface RegisteredStyle {
+  id: string; // Style ID (8-char base62)
+  style: CellStyle;
+}
+
+/** Result from createStyle */
+export interface CreateStyleResult {
+  success?: boolean;
+  styleId?: string;
+  existing?: boolean; // true if style already existed
+  error?: string;
 }
 
 // ============================================================================

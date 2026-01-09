@@ -125,7 +125,7 @@ Expose style operations through the WASM bridge.
   - `createStyle(styleJson)` - register style, return styleId
   - `getAvailableStyles()` - list registered styles
 
-- [ ] 3b: Add TypeScript types
+- [x] 3b: Add TypeScript types
   - Add `CellStyle` interface in types.ts
   - Add `TextAlign` and `VerticalAlign` enums
   - Update `CellData` to include `styleId` and `style`

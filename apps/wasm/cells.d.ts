@@ -247,6 +247,49 @@ declare module 'cells-wasm' {
   }
 
   /**
+   * Horizontal text alignment within cell
+   */
+  type TextAlign = 'left' | 'center' | 'right' | 'justify';
+
+  /**
+   * Vertical text alignment within cell
+   */
+  type VerticalAlign = 'top' | 'middle' | 'bottom';
+
+  /**
+   * Cell style properties for formatting
+   */
+  interface CellStyle {
+    bold: boolean;
+    italic: boolean;
+    underline: boolean;
+    bgColor: string;     // Background color (hex, e.g. "#FF0000"), empty for default
+    textColor: string;   // Text color (hex, e.g. "#000000"), empty for default
+    fontFamily: string;  // Font name (e.g. "Arial"), empty for system default
+    fontSize: number;    // Font size in points, 0 for default (11pt)
+    hAlign: TextAlign;
+    vAlign: VerticalAlign;
+  }
+
+  /**
+   * Registered style entry
+   */
+  interface RegisteredStyle {
+    id: string;          // Style ID (8-char base62)
+    style: CellStyle;
+  }
+
+  /**
+   * Result from createStyle
+   */
+  interface CreateStyleResult {
+    success?: boolean;
+    styleId?: string;
+    existing?: boolean;  // true if style already existed
+    error?: string;
+  }
+
+  /**
    * Cell data from viewport query
    */
   interface CellData {
@@ -258,6 +301,7 @@ declare module 'cells-wasm' {
     formula?: string;    // For formula cells (A1 notation)
     display?: string;    // For formula cells (computed value)
     isError?: boolean;   // True if formula evaluated to an error
+    styleId?: string;    // Cell style ID (~ or empty for default style)
   }
 
   /**
@@ -386,6 +430,55 @@ declare module 'cells-wasm' {
      * @returns JSON string with OperationResult including new cell ID
      */
     createCell(col: number, row: number, value: string): string;
+
+    // ========================================================================
+    // Cell style operations
+    // ========================================================================
+
+    /**
+     * Set a cell's style by cell ID
+     * @param cellId - Cell ID (8-char base62)
+     * @param styleJson - JSON string with style properties
+     * @returns JSON string with OperationResult
+     */
+    setCellStyle(cellId: string, styleJson: string): string;
+
+    /**
+     * Set a cell's style by position, creating cell if needed
+     * @param col - Column position (0-based)
+     * @param row - Row position (0-based)
+     * @param styleJson - JSON string with style properties
+     * @returns JSON string with OperationResult
+     */
+    setCellStyleAt(col: number, row: number, styleJson: string): string;
+
+    /**
+     * Get a cell's style by cell ID
+     * @param cellId - Cell ID (8-char base62)
+     * @returns JSON string with CellStyle properties
+     */
+    getCellStyle(cellId: string): string;
+
+    /**
+     * Get a cell's style by position
+     * @param col - Column position (0-based)
+     * @param row - Row position (0-based)
+     * @returns JSON string with CellStyle properties
+     */
+    getCellStyleAt(col: number, row: number): string;
+
+    /**
+     * Create a style definition and get its ID
+     * @param styleJson - JSON string with style properties
+     * @returns JSON string with CreateStyleResult
+     */
+    createStyle(styleJson: string): string;
+
+    /**
+     * Get all registered styles
+     * @returns JSON string with array of RegisteredStyle
+     */
+    getAvailableStyles(): string;
 
     // ========================================================================
     // Column/row resize
@@ -786,6 +879,12 @@ declare module 'cells-wasm' {
     ColumnInfo,
     RowInfo,
     ViewportResult,
+    // Cell Style types
+    TextAlign,
+    VerticalAlign,
+    CellStyle,
+    RegisteredStyle,
+    CreateStyleResult,
     // Formula API types (Phase 7)
     ValidateFormulaResult,
     RefType,
