@@ -33,6 +33,9 @@ import type {
   CellFormatIdResult,
   FunctionInfo,
   FormatDetails,
+  CellStyle,
+  RegisteredStyle,
+  CreateStyleResult,
 } from "./types";
 import type {
   WorkerMessage,
@@ -524,6 +527,69 @@ export class CellsClient {
       currency,
     });
     return response as { formatId?: string; error?: string };
+  }
+
+  // ========== Cell Style Operations API ==========
+
+  /**
+   * Set the style for a cell by cell ID.
+   * @param cellId Cell ID
+   * @param style Style properties to apply
+   */
+  async setCellStyle(cellId: string, style: Partial<CellStyle>): Promise<{ success: boolean }> {
+    await this._send("setCellStyle", { cellId, styleJson: JSON.stringify(style) });
+    return { success: true };
+  }
+
+  /**
+   * Set the style for a cell by position.
+   * @param col Column position (0-indexed)
+   * @param row Row position (0-indexed)
+   * @param style Style properties to apply
+   */
+  async setCellStyleAt(col: number, row: number, style: Partial<CellStyle>): Promise<{ success: boolean }> {
+    await this._send("setCellStyleAt", { col, row, styleJson: JSON.stringify(style) });
+    return { success: true };
+  }
+
+  /**
+   * Get the style for a cell by cell ID.
+   * @param cellId Cell ID
+   * @returns Cell style properties
+   */
+  async getCellStyle(cellId: string): Promise<CellStyle> {
+    const response = await this._send("getCellStyle", { cellId });
+    return response as unknown as CellStyle;
+  }
+
+  /**
+   * Get the style for a cell by position.
+   * @param col Column position (0-indexed)
+   * @param row Row position (0-indexed)
+   * @returns Cell style properties
+   */
+  async getCellStyleAt(col: number, row: number): Promise<CellStyle> {
+    const response = await this._send("getCellStyleAt", { col, row });
+    return response as unknown as CellStyle;
+  }
+
+  /**
+   * Create a style definition and get its ID.
+   * @param style Style properties
+   * @returns Result with styleId on success
+   */
+  async createStyle(style: Partial<CellStyle>): Promise<CreateStyleResult> {
+    const response = await this._send("createStyle", { styleJson: JSON.stringify(style) });
+    return response as unknown as CreateStyleResult;
+  }
+
+  /**
+   * Get all registered styles.
+   * @returns Array of registered style entries
+   */
+  async getAvailableStyles(): Promise<RegisteredStyle[]> {
+    const response = await this._send("getAvailableStyles");
+    return (response as unknown as { styles: RegisteredStyle[] }).styles || [];
   }
 
   // ========== Column/Row Operations API ==========

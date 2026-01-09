@@ -556,6 +556,81 @@ export function handleMakeFormatId(
 }
 
 // ============================================================================
+// Cell Style Operations
+// ============================================================================
+
+export function handleSetCellStyle(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { cellId, styleJson } = params as { cellId: string; styleJson: string };
+    const result = JSON.parse(engine.setCellStyle(cellId, styleJson)) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "styleSet", success: true });
+    }
+}
+
+export function handleSetCellStyleAt(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { col, row, styleJson } = params as {
+        col: number;
+        row: number;
+        styleJson: string;
+    };
+    const result = JSON.parse(engine.setCellStyleAt(col, row, styleJson)) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "styleSet", success: true });
+    }
+}
+
+export function handleGetCellStyle(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { cellId } = params as { cellId: string };
+    const result = JSON.parse(engine.getCellStyle(cellId));
+    respond({ type: "cellStyle", ...result });
+}
+
+export function handleGetCellStyleAt(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { col, row } = params as { col: number; row: number };
+    const result = JSON.parse(engine.getCellStyleAt(col, row));
+    respond({ type: "cellStyle", ...result });
+}
+
+export function handleCreateStyle(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { styleJson } = params as { styleJson: string };
+    const result = JSON.parse(engine.createStyle(styleJson));
+    respond({ type: "styleCreated", ...result });
+}
+
+export function handleGetAvailableStyles(
+    engine: CellsEngine,
+    _params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const result = JSON.parse(engine.getAvailableStyles());
+    respond({ type: "availableStyles", styles: result });
+}
+
+// ============================================================================
 // Column/Row Operations
 // ============================================================================
 

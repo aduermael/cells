@@ -72,6 +72,14 @@ export interface CellsEngine {
         currency: string,
     ): string;
 
+    // Cell style operations
+    setCellStyle(cellId: string, styleJson: string): string;
+    setCellStyleAt(col: number, row: number, styleJson: string): string;
+    getCellStyle(cellId: string): string;
+    getCellStyleAt(col: number, row: number): string;
+    createStyle(styleJson: string): string;
+    getAvailableStyles(): string;
+
     // Column/row operations
     resizeColumn(colId: string, width: number): string;
     resizeColumnByPos(pos: number, width: number): string;

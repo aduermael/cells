@@ -33,6 +33,9 @@ import type {
   FormattedValueResult,
   CellFormatIdResult,
   FunctionInfo,
+  CellStyle,
+  RegisteredStyle,
+  CreateStyleResult,
 } from "./types";
 import type { LuauToken, AutocompleteResult } from "./client-types";
 import { getMimeType, toSnakeCase } from "./utils";
@@ -214,6 +217,61 @@ export class WasmDataSource {
   /** Format a cell's value using its assigned format */
   async formatCellById(cellId: string): Promise<FormattedValueResult> {
     return this._client.formatCellById(cellId);
+  }
+
+  // ==========================================================================
+  // Cell Style Operations
+  // ==========================================================================
+
+  /** Set cell style by cell ID */
+  async setCellStyle(cellId: string, style: Partial<CellStyle>): Promise<{ success: boolean }> {
+    return this._client.setCellStyle(cellId, style);
+  }
+
+  /** Set cell style by position */
+  async setCellStyleAt(col: number, row: number, style: Partial<CellStyle>): Promise<{ success: boolean }> {
+    return this._client.setCellStyleAt(col, row, style);
+  }
+
+  /** Get cell style by cell ID */
+  async getCellStyle(cellId: string): Promise<CellStyle> {
+    return this._client.getCellStyle(cellId);
+  }
+
+  /** Get cell style by position */
+  async getCellStyleAt(col: number, row: number): Promise<CellStyle> {
+    return this._client.getCellStyleAt(col, row);
+  }
+
+  /** Create a style definition and get its ID */
+  async createStyle(style: Partial<CellStyle>): Promise<CreateStyleResult> {
+    return this._client.createStyle(style);
+  }
+
+  /** Get all registered styles */
+  async getAvailableStyles(): Promise<RegisteredStyle[]> {
+    return this._client.getAvailableStyles();
+  }
+
+  /** Set style for a range of cells */
+  async setStyleForRange(
+    startCol: number,
+    startRow: number,
+    endCol: number,
+    endRow: number,
+    style: Partial<CellStyle>
+  ): Promise<{ success: boolean; cellsStyled: number }> {
+    // Apply style to each cell in the range
+    let cellsStyled = 0;
+    for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
+      for (let row = Math.min(startRow, endRow); row <= Math.max(startRow, endRow); row++) {
+        const result = await this._client.setCellStyleAt(col, row, style);
+        if (result.success) {
+          cellsStyled++;
+        }
+      }
+    }
+    return { success: true, cellsStyled };
   }
 
   // ==========================================================================

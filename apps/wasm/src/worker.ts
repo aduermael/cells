@@ -64,6 +64,12 @@ import {
     handleFormatCellById,
     handleGetFormatDetails,
     handleMakeFormatId,
+    handleSetCellStyle,
+    handleSetCellStyleAt,
+    handleGetCellStyle,
+    handleGetCellStyleAt,
+    handleCreateStyle,
+    handleGetAvailableStyles,
     handleResizeColumn,
     handleResizeColumnByPos,
     handleResizeRow,
@@ -448,6 +454,28 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "makeFormatId":
                 handleMakeFormatId(engine, params, respond);
+                break;
+
+            // ================================================================
+            // Cell Style Operations
+            // ================================================================
+            case "setCellStyle":
+                handleSetCellStyle(engine, params, respond);
+                break;
+            case "setCellStyleAt":
+                handleSetCellStyleAt(engine, params, respond);
+                break;
+            case "getCellStyle":
+                handleGetCellStyle(engine, params, respond);
+                break;
+            case "getCellStyleAt":
+                handleGetCellStyleAt(engine, params, respond);
+                break;
+            case "createStyle":
+                handleCreateStyle(engine, params, respond);
+                break;
+            case "getAvailableStyles":
+                handleGetAvailableStyles(engine, params, respond);
                 break;
 
             // ================================================================

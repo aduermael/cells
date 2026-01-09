@@ -131,7 +131,7 @@ Expose style operations through the WASM bridge.
   - Update `CellData` to include `styleId` and `style`
   - Add style-related methods to `CellsClient` interface
 
-- [ ] 3c: Update WasmDataSource
+- [x] 3c: Update WasmDataSource
   - Add `setCellStyleAt(col, row, style)` method
   - Add `getCellStyleAt(col, row)` method
   - Add range methods: `setStyleForRange(startCol, startRow, endCol, endRow, style)`
