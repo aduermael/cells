@@ -216,7 +216,7 @@ Fix format and style operations to apply to all selected cells.
   - Style buttons: Show indeterminate state for mixed bold/italic/underline
   - Color pickers: Show "mixed" indicator for different colors
 
-- [ ] 6d: Add E2E tests for multi-cell formatting
+- [x] 6d: Add E2E tests for multi-cell formatting
   - Select range, apply format, verify all cells updated
   - Select range, apply style, verify all cells updated
   - Verify mixed state display

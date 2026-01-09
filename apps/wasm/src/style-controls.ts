@@ -271,14 +271,9 @@ export class StyleControls {
     const maxRow = Math.max(start.row, end.row);
 
     // Get the style of the first cell (anchor)
-    const firstCell = this.getCellDataAt(minCol, minRow);
-    let firstStyle: Partial<CellStyle> = {};
-    if (firstCell?.styleId && firstCell.styleId !== "~") {
-      const style = await this.dataSource.getCellStyleAt(minCol, minRow);
-      if (style) {
-        firstStyle = style;
-      }
-    }
+    // Always query the style via WASM - it returns correct defaults for unstyled cells
+    const firstStyle: Partial<CellStyle> =
+      await this.dataSource.getCellStyleAt(minCol, minRow) || {};
 
     // Track which properties are mixed
     const mixed: Partial<Record<keyof CellStyle, boolean>> = {};
@@ -288,14 +283,9 @@ export class StyleControls {
       for (let row = minRow; row <= maxRow; row++) {
         if (col === minCol && row === minRow) continue; // Skip first cell
 
-        const cell = this.getCellDataAt(col, row);
-        let cellStyle: Partial<CellStyle> = {};
-        if (cell?.styleId && cell.styleId !== "~") {
-          const style = await this.dataSource.getCellStyleAt(col, row);
-          if (style) {
-            cellStyle = style;
-          }
-        }
+        // Always query the style - WASM returns correct defaults
+        const cellStyle: Partial<CellStyle> =
+          await this.dataSource.getCellStyleAt(col, row) || {};
 
         // Compare each style property
         if (!!cellStyle.bold !== !!firstStyle.bold) mixed.bold = true;
