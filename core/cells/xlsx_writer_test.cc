@@ -1502,7 +1502,7 @@ TEST(XLSXStyleRoundtripTest, RoundtripAllStyleProperties) {
     cell6->value = CellValue("Full style");
     CellStyle style6;
     style6.bold = true;
-    style6.bgColor = "#00FF00";  // Green
+    style6.bgColor = "#00FF00";    // Green
     style6.textColor = "#FFFFFF";  // White
     style6.hAlign = TextAlign::CENTER;
     style6.vAlign = VerticalAlign::BOTTOM;
@@ -1577,7 +1577,8 @@ TEST(XLSXStyleRoundtripTest, RoundtripMultipleSheetsWithStyles) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "MultiSheetStyles");
 
     std::vector<std::pair<std::string, CellStyle>> sheetStyles = {
-        {"Sales", []() {
+        {"Sales",
+         []() {
              CellStyle s;
              s.bold = true;
              s.bgColor = "#4472C4";

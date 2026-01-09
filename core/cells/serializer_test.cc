@@ -1205,7 +1205,7 @@ TEST(StyleZCDRoundtripTest, PartialStyleColorOnly) {
     wb->addSheet(std::move(sheet));
 
     CellStyle style;
-    style.bgColor = "#FFFF00";  // Yellow background
+    style.bgColor = "#FFFF00";    // Yellow background
     style.textColor = "#0000FF";  // Blue text
     wb->registerStyle(ID("STYcolor"), style);
 

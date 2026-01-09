@@ -63,10 +63,10 @@ struct CSVWriteError {
 
 // Result of writing a CSV file
 struct CSVWriteResult {
-    std::string output{};                   // CSV content on success
-    std::optional<CSVWriteError> error{};   // Present on failure
-    std::vector<std::string> warnings{};    // Non-fatal warnings (e.g., styles lost)
-    bool stylesLost{false};                 // True if styled cells were exported
+    std::string output{};                  // CSV content on success
+    std::optional<CSVWriteError> error{};  // Present on failure
+    std::vector<std::string> warnings{};   // Non-fatal warnings (e.g., styles lost)
+    bool stylesLost{false};                // True if styled cells were exported
 
     [[nodiscard]] bool ok() const { return !error.has_value(); }
     [[nodiscard]] explicit operator bool() const { return ok(); }

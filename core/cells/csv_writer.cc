@@ -184,7 +184,7 @@ CSVWriteResult CSVWriter::write(const Sheet& sheet) {
     // Set warning if styled cells were exported
     if (foundStyledCell) {
         result.stylesLost = true;
-        result.warnings.push_back(
+        result.warnings.emplace_back(
             "Cell styles (bold, colors, alignment, etc.) are not preserved in CSV format. "
             "Use XLSX format to preserve styles.");
     }
