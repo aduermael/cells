@@ -42,6 +42,7 @@ import type { AgentPanel } from "./agent-panel";
 import type { WorkbookTitleEditor } from "./workbook-title-editor";
 import type { ClipboardManager } from "./clipboard";
 import type { FormatControls } from "./format-controls";
+import type { StyleControls } from "./style-controls";
 
 // =============================================================================
 // Types
@@ -63,6 +64,7 @@ export interface AppContext {
   workbookTitleEditor: WorkbookTitleEditor;
   clipboardManager: ClipboardManager;
   formatControls: FormatControls;
+  styleControls: StyleControls;
 
   // Methods exposed for index.html onclick handlers
   openFile: () => void;
@@ -222,6 +224,7 @@ export function initApp(): AppContext {
     workbookTitleEditor: components.workbookTitleEditor,
     clipboardManager: components.clipboardManager,
     formatControls: components.formatControls,
+    styleControls: components.styleControls,
 
     openFile: () => components.fileLoader.openFile(),
     newFile: () => components.fileLoader.newFile(),

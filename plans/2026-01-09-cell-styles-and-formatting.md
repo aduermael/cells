@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2026-01-09 02:13 UTC
-Updated At: 2026-01-09 02:35 UTC
+Updated At: 2026-01-09 19:45 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -142,31 +142,31 @@ Expose style operations through the WASM bridge.
 
 Add style buttons to the left side of the format controls in the formula bar.
 
-- [ ] 4a: Update HTML structure
+- [x] 4a: Update HTML structure
   - Add `#style-controls` div before `#format-controls` in formula-bar
   - Add row 1: Bold (B), Italic (I), Underline (U) buttons
   - Add row 2: Background color picker, Text color picker
   - Add row 3: Font dropdown, Font size dropdown
   - Add separator between style and format controls
 
-- [ ] 4b: Create StyleControls class
+- [x] 4b: Create StyleControls class
   - New file: `apps/wasm/src/style-controls.ts`
   - Mirror structure of FormatControls
   - Handle button clicks, apply styles via WasmDataSource
   - Update active state based on current cell's style
 
-- [ ] 4c: Add color picker component
+- [x] 4c: Add color picker component
   - Palette with common colors (8-16 colors)
   - Custom color input (hex)
   - "No color" / transparent option for background
-  - Recent colors row (track last 5 used)
+  - Recent colors row (track last 5 used) - deferred
 
 - [ ] 4d: Add font controls
   - Font family dropdown: System fonts + common web-safe fonts
   - Font size dropdown: 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72
   - Show current cell's font in dropdowns
 
-- [ ] 4e: Add CSS styles
+- [x] 4e: Add CSS styles
   - Style button active states
   - Color picker styling (light/dark theme)
   - Font dropdown styling

@@ -641,6 +641,14 @@ canvas {
     min-width: 140px;
 }
 
+/* Style controls separator */
+.style-separator {
+    width: 1px;
+    height: 52px; /* Match height of 2x2 button grid */
+    background: var(--color-border);
+    align-self: center;
+}
+
 .format-separator {
     width: 1px;
     height: 52px; /* Match height of 2x2 button grid */
@@ -2719,4 +2727,210 @@ canvas {
     font-size: 10px;
     color: var(--color-success);
     margin-left: var(--spacing-xs);
+}
+
+/* ============================================================================
+   Style Controls (text formatting, colors)
+   ============================================================================ */
+
+/* Style controls container - two rows layout like format controls */
+#style-controls {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    flex-shrink: 0;
+}
+
+/* Row 1: Bold, Italic, Underline buttons */
+#style-controls-row1 {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+/* Row 2: Background color, Text color buttons */
+#style-controls-row2 {
+    display: flex;
+    gap: var(--spacing-xs);
+}
+
+/* Style buttons (B, I, U) */
+.style-btn {
+    min-width: 24px;
+    justify-content: center;
+    font-family: inherit;
+}
+
+.style-btn strong {
+    font-weight: 700;
+}
+
+.style-btn em {
+    font-style: italic;
+}
+
+/* Active state for style buttons (when format is applied) */
+.style-btn.active {
+    background: var(--color-primary);
+    color: var(--color-bg-primary);
+    border-color: var(--color-primary);
+}
+
+.style-btn.active:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+}
+
+/* Color picker wrapper (contains button + popup) */
+.color-picker-wrapper {
+    position: relative;
+}
+
+/* Color button */
+.color-btn {
+    min-width: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 2px 4px;
+}
+
+.color-btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.color-btn-icon svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* Color swatch under icon */
+.color-swatch {
+    width: 14px;
+    height: 3px;
+    border-radius: 1px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+}
+
+/* When a color is set, show it */
+.color-swatch:not(:empty),
+.color-swatch[style] {
+    border: none;
+}
+
+/* Color picker popup */
+.color-picker-popup {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: var(--spacing-xs);
+    padding: var(--spacing-sm);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 16px var(--color-shadow);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition:
+        opacity var(--transition-fast),
+        transform var(--transition-fast),
+        visibility var(--transition-fast);
+}
+
+.color-picker-wrapper.open .color-picker-popup {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+/* Color palette grid */
+.color-picker-palette {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 3px;
+    margin-bottom: var(--spacing-sm);
+}
+
+/* Individual color option */
+.color-option {
+    width: 20px;
+    height: 20px;
+    border-radius: 3px;
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    padding: 0;
+}
+
+.color-option:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px var(--color-shadow);
+    z-index: 1;
+}
+
+.color-option.selected {
+    box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+/* No fill option (transparent with diagonal line) */
+.color-option.no-color {
+    background: linear-gradient(
+        to top right,
+        var(--color-bg-primary) 45%,
+        var(--color-danger) 45%,
+        var(--color-danger) 55%,
+        var(--color-bg-primary) 55%
+    );
+}
+
+/* Custom hex input */
+.color-picker-custom {
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--spacing-sm);
+}
+
+.color-hex-input {
+    width: 100%;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    font-family: var(--font-mono);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    text-transform: uppercase;
+}
+
+.color-hex-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.1);
+}
+
+.color-hex-input::placeholder {
+    color: var(--color-text-placeholder);
+    text-transform: none;
+}
+
+/* Mixed state indicator (when selection has different values) */
+.style-btn.mixed,
+.color-btn.mixed {
+    opacity: 0.6;
+}
+
+.style-btn.mixed::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--color-warning);
 }

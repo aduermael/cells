@@ -146,6 +146,21 @@ export interface DOMElements {
   customFormatApplyBtn: HTMLButtonElement;
   customFormatCancelBtn: HTMLButtonElement;
   settingsBtn: HTMLButtonElement;
+  // Style controls
+  styleControls: HTMLElement;
+  styleBoldBtn: HTMLButtonElement;
+  styleItalicBtn: HTMLButtonElement;
+  styleUnderlineBtn: HTMLButtonElement;
+  bgColorWrapper: HTMLElement;
+  bgColorBtn: HTMLButtonElement;
+  bgColorSwatch: HTMLElement;
+  bgColorPopup: HTMLElement;
+  bgColorHexInput: HTMLInputElement;
+  textColorWrapper: HTMLElement;
+  textColorBtn: HTMLButtonElement;
+  textColorSwatch: HTMLElement;
+  textColorPopup: HTMLElement;
+  textColorHexInput: HTMLInputElement;
 }
 
 // =============================================================================
@@ -562,6 +577,21 @@ export function createApp(): App {
     customFormatApplyBtn: getElement<HTMLButtonElement>("custom-format-apply"),
     customFormatCancelBtn: getElement<HTMLButtonElement>("custom-format-cancel"),
     settingsBtn: getElement<HTMLButtonElement>("settings-btn"),
+    // Style controls
+    styleControls: getElement("style-controls"),
+    styleBoldBtn: getElement<HTMLButtonElement>("style-bold-btn"),
+    styleItalicBtn: getElement<HTMLButtonElement>("style-italic-btn"),
+    styleUnderlineBtn: getElement<HTMLButtonElement>("style-underline-btn"),
+    bgColorWrapper: getElement("bg-color-wrapper"),
+    bgColorBtn: getElement<HTMLButtonElement>("style-bg-color-btn"),
+    bgColorSwatch: getElement("bg-color-swatch"),
+    bgColorPopup: getElement("bg-color-popup"),
+    bgColorHexInput: getElement<HTMLInputElement>("bg-color-hex"),
+    textColorWrapper: getElement("text-color-wrapper"),
+    textColorBtn: getElement<HTMLButtonElement>("style-text-color-btn"),
+    textColorSwatch: getElement("text-color-swatch"),
+    textColorPopup: getElement("text-color-popup"),
+    textColorHexInput: getElement<HTMLInputElement>("text-color-hex"),
   };
 
   return new App(elements);

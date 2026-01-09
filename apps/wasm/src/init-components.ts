@@ -29,6 +29,7 @@ import { CellEditor } from "./cell-editor";
 import { ColumnHeaderEditor, FormulaBarEditor } from "./header-editor";
 import { ClipboardManager } from "./clipboard";
 import { FormatControls } from "./format-controls";
+import { StyleControls } from "./style-controls";
 import { SheetTabsManager } from "./sheet-tabs";
 import { FileLoader } from "./file-loader";
 import { AppEventManager } from "./app-events";
@@ -84,6 +85,7 @@ export interface Components {
   formulaBarEditor: FormulaBarEditor;
   clipboardManager: ClipboardManager;
   formatControls: FormatControls;
+  styleControls: StyleControls;
   sheetTabsManager: SheetTabsManager;
   fileLoader: FileLoader;
   eventManager: AppEventManager;
@@ -120,8 +122,9 @@ export function createComponents(config: ComponentsConfig): Components {
     clearRoomIdFromUrl,
   } = config;
 
-  // Forward reference for formatControls (initialized later)
+  // Forward references for controls (initialized later)
   let formatControlsRef: FormatControls | null = null;
+  let styleControlsRef: StyleControls | null = null;
 
   // =========================================================================
   // Rendering Helpers
@@ -335,6 +338,9 @@ export function createComponents(config: ComponentsConfig): Components {
 
     if (formatControlsRef) {
       formatControlsRef.updateForCurrentCell();
+    }
+    if (styleControlsRef) {
+      styleControlsRef.updateForCurrentCell();
     }
   }
 
@@ -641,6 +647,39 @@ export function createComponents(config: ComponentsConfig): Components {
   );
   formatControlsRef = formatControls;
 
+  const styleControls = new StyleControls(
+    {
+      styleControls: elements.styleControls,
+      boldBtn: elements.styleBoldBtn,
+      italicBtn: elements.styleItalicBtn,
+      underlineBtn: elements.styleUnderlineBtn,
+      bgColorWrapper: elements.bgColorWrapper,
+      bgColorBtn: elements.bgColorBtn,
+      bgColorSwatch: elements.bgColorSwatch,
+      bgColorPopup: elements.bgColorPopup,
+      bgColorHexInput: elements.bgColorHexInput,
+      textColorWrapper: elements.textColorWrapper,
+      textColorBtn: elements.textColorBtn,
+      textColorSwatch: elements.textColorSwatch,
+      textColorPopup: elements.textColorPopup,
+      textColorHexInput: elements.textColorHexInput,
+    },
+    {
+      getSelectedCell: () => app.selectedCell,
+      getSelectedCellData: () => {
+        if (!app.selectedCell) return null;
+        return getCellAt(app.selectedCell.col, app.selectedCell.row, app.cells) ?? null;
+      },
+      getSelectionRange: () => ({
+        start: app.selectionStart,
+        end: app.selectionEnd,
+      }),
+      requestRender: render,
+      updateFormulaBar,
+    }
+  );
+  styleControlsRef = styleControls;
+
   elements.settingsBtn.addEventListener("click", () => {
     alert("Settings - Coming Soon!");
   });
@@ -683,6 +722,7 @@ export function createComponents(config: ComponentsConfig): Components {
       workbookTitleEditor.setDataSource(dataSource);
       clipboardManager.setDataSource(dataSource);
       formatControls.setDataSource(dataSource);
+      styleControls.setDataSource(dataSource);
       workbookTitleEditor.setTitle(dataSource.workbookName);
     },
     onDataChanged: handleDataChanged,
@@ -841,6 +881,7 @@ export function createComponents(config: ComponentsConfig): Components {
     formulaBarEditor,
     clipboardManager,
     formatControls,
+    styleControls,
     sheetTabsManager,
     fileLoader,
     eventManager,
