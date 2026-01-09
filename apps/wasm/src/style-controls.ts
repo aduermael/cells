@@ -72,8 +72,6 @@ export interface StyleControlsCallbacks {
   getSelectedCellData: () => CellData | null;
   /** Get the current selection range (start and end) */
   getSelectionRange: () => { start: Position | null; end: Position | null };
-  /** Get cell data at a specific position */
-  getCellDataAt: (col: number, row: number) => CellData | null;
   /** Request render after style change */
   requestRender: () => void;
   /** Update the formula bar display */
@@ -140,7 +138,6 @@ export class StyleControls {
   private getSelectedCell: () => Position | null;
   private getSelectedCellData: () => CellData | null;
   private getSelectionRange: () => { start: Position | null; end: Position | null };
-  private getCellDataAt: (col: number, row: number) => CellData | null;
   private requestRender: () => void;
   private updateFormulaBar: () => void;
 
@@ -191,7 +188,6 @@ export class StyleControls {
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectedCellData = callbacks.getSelectedCellData;
     this.getSelectionRange = callbacks.getSelectionRange;
-    this.getCellDataAt = callbacks.getCellDataAt;
     this.requestRender = callbacks.requestRender;
     this.updateFormulaBar = callbacks.updateFormulaBar;
 
