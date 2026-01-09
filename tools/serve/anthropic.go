@@ -100,7 +100,7 @@ type StreamEventHandler interface {
 func GetExecuteCodeTool() Tool {
 	return Tool{
 		Name:        "execute_code",
-		Description: "Execute Luau code to interact with the spreadsheet. API: getCell(ref, {create?}):Cell?, setCell(ref, value), getSheet({name?|index?}|name|index):Sheet?, selectSheet(sheet|name|index), addSheet(name?):Sheet, selectRange(range), deleteRange(range), fillRange({from, to}), setColumnWidth(col, {width}), setRowHeight(row, {height}), moveColumn(col, {to}), setDocumentTitle(title), getDocumentTitle():string. Cell has .value, .formula, .ref, .dependents, .dependencies. Sheet has .name. Use print() for output.",
+		Description: "Execute Luau code to interact with the spreadsheet. API: getCell(ref, {create?}):Cell?, setCell(ref, value), getSheet({name?|index?}|name|index):Sheet?, selectSheet(sheet|name|index), addSheet(name?):Sheet, selectRange(range), deleteRange(range), fillRange({from, to}), setColumnWidth(col, {width}), setRowHeight(row, {height}), moveColumn(col, {to}), setDocumentTitle(title), getDocumentTitle():string, setFormat(range, formatId), setStyle(range, styleTable), getFormats():table. Cell has .value, .formula, .ref, .format, .style, .dependents, .dependencies. Sheet has .name. Style table: {bold, italic, underline, bgColor, textColor, fontFamily, fontSize, hAlign, vAlign}. Use print() for output.",
 		InputSchema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -132,9 +132,36 @@ Available API:
 - moveColumn(col, {to}): Move a column to a new position.
 - setDocumentTitle(title): Set the document title.
 - getDocumentTitle(): Get the current document title.
+- setFormat(range, formatId): Apply number format to range (e.g., "A1:B10", "FMT_C002").
+- setStyle(range, styleTable): Apply style to range. styleTable: {bold, italic, underline, bgColor, textColor, fontFamily, fontSize, hAlign, vAlign}.
+- getFormats(): Returns table of available format IDs with descriptions.
 
-Cell properties: .value (read/write), .formula (read-only), .ref (read-only string like "A1"), .dependents (array of Cell), .dependencies (array of Cell)
+Cell properties:
+- .value (read/write): Cell value
+- .formula (read-only): Formula string if cell has formula
+- .ref (read-only): Cell reference string like "A1"
+- .format (read/write): Format ID string (e.g., "FMT_C002") or nil to clear
+- .style (read/write): Style table {bold, italic, underline, bgColor, textColor, fontFamily, fontSize, hAlign, vAlign} or nil to clear
+- .dependents (read-only): Array of cells that depend on this cell
+- .dependencies (read-only): Array of cells this cell depends on
+
 Sheet properties: .name (read-only)
+
+Style properties:
+- bold, italic, underline: boolean
+- bgColor, textColor: CSS hex color (e.g., "#FF0000") or nil
+- fontFamily: Font name string (e.g., "Arial")
+- fontSize: Number in points (e.g., 12)
+- hAlign: Horizontal alignment - use ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, or ALIGN_JUSTIFY
+- vAlign: Vertical alignment - use VALIGN_TOP, VALIGN_MIDDLE, or VALIGN_BOTTOM
+
+Color constants: COLOR_RED, COLOR_GREEN, COLOR_BLUE, COLOR_YELLOW, COLOR_MAGENTA, COLOR_CYAN, COLOR_WHITE, COLOR_BLACK, COLOR_GRAY, COLOR_ORANGE
+
+Common format IDs:
+- FMT_C002: Currency with 2 decimals ($1,234.56)
+- FMT_P002: Percentage with 2 decimals (12.34%)
+- FMT_N002: Number with 2 decimals (1,234.56)
+- Use getFormats() for full list
 
 Use print() to output information to the user.
 
@@ -143,6 +170,13 @@ Examples:
 - Write a cell: setCell("B2", 42) or getCell("B2", {create=true}).value = 42
 - Sum formula: setCell("C1", "=SUM(A1:B1)")
 - Find dependents: for _, dep in getCell("A1").dependents do print(dep.ref) end
+- Make header bold: setStyle("A1:F1", {bold=true})
+- Blue background on header: setStyle("A1:F1", {bgColor=COLOR_BLUE, textColor=COLOR_WHITE})
+- Center align a range: setStyle("B2:D10", {hAlign=ALIGN_CENTER})
+- Format as currency: setFormat("B2:B100", "FMT_C002")
+- Format as percentage: setFormat("C2:C100", "FMT_P002")
+- Single cell style: getCell("A1").style = {bold=true, italic=true, bgColor="#FFFF00"}
+- Clear style: getCell("A1").style = nil
 
 Be concise and helpful. When you need to inspect or modify the spreadsheet, use the execute_code tool.`
 }
