@@ -175,14 +175,14 @@ The current implementation is adequate for basic date handling. Howard Hinnant's
 
 ---
 
-## Phase 5: Enhance Time Parsing
+## Phase 5: Enhance Time Parsing ✅
 
 Add support for more time input formats.
 
-- [ ] 5a: Support time without seconds: "9:30" → 9:30:00
-- [ ] 5b: Support lowercase am/pm: "9:30am", "9:30 pm"
-- [ ] 5c: Support period notation: "9:30 a.m.", "9:30 p.m."
-- [ ] 5d: Add unit tests for new time formats
+- [x] 5a: Support time without seconds: "9:30" → 9:30:00 (already implemented)
+- [x] 5b: Support lowercase am/pm: "9:30am", "9:30 pm" (already implemented)
+- [x] 5c: Support period notation: "9:30 a.m.", "9:30 p.m."
+- [x] 5d: Add unit tests for new time formats
 
 ---
 

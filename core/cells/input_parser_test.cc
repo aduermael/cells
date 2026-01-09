@@ -422,6 +422,85 @@ TEST(TimeParsingTest, InvalidMinutes) {
 }
 
 // =============================================================================
+// Time format variations (Phase 5)
+// =============================================================================
+
+// 5a: Time without seconds (already supported)
+TEST(TimeParsingTest, WithoutSeconds24H) {
+    auto result = parseTime("9:30");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.formatId, BuiltInFormats::TIME_24H);
+    EXPECT_NEAR(result.numericValue, 9.5 / 24.0, 0.0001);
+}
+
+TEST(TimeParsingTest, WithoutSeconds12H) {
+    auto result = parseTime("9:30 AM");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.formatId, BuiltInFormats::TIME_12H);
+    EXPECT_NEAR(result.numericValue, 9.5 / 24.0, 0.0001);
+}
+
+// 5b: Lowercase am/pm
+TEST(TimeParsingTest, LowercaseAM) {
+    auto result = parseTime("9:30 am");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.formatId, BuiltInFormats::TIME_12H);
+    EXPECT_NEAR(result.numericValue, 9.5 / 24.0, 0.0001);
+}
+
+TEST(TimeParsingTest, LowercasePM) {
+    auto result = parseTime("9:30 pm");
+    EXPECT_TRUE(result.success);
+    EXPECT_NEAR(result.numericValue, 21.5 / 24.0, 0.0001);
+}
+
+TEST(TimeParsingTest, LowercaseNoSpace) {
+    auto result = parseTime("9:30pm");
+    EXPECT_TRUE(result.success);
+    EXPECT_NEAR(result.numericValue, 21.5 / 24.0, 0.0001);
+}
+
+TEST(TimeParsingTest, MixedCaseAm) {
+    auto result = parseTime("9:30 Am");
+    EXPECT_TRUE(result.success);
+    EXPECT_NEAR(result.numericValue, 9.5 / 24.0, 0.0001);
+}
+
+// 5c: Period notation (a.m. / p.m.)
+TEST(TimeParsingTest, PeriodNotationAM) {
+    auto result = parseTime("9:30 a.m.");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.formatId, BuiltInFormats::TIME_12H);
+    EXPECT_NEAR(result.numericValue, 9.5 / 24.0, 0.0001);
+}
+
+TEST(TimeParsingTest, PeriodNotationPM) {
+    auto result = parseTime("9:30 p.m.");
+    EXPECT_TRUE(result.success);
+    EXPECT_NEAR(result.numericValue, 21.5 / 24.0, 0.0001);
+}
+
+TEST(TimeParsingTest, PeriodNotationNoSpace) {
+    auto result = parseTime("9:30p.m.");
+    EXPECT_TRUE(result.success);
+    EXPECT_NEAR(result.numericValue, 21.5 / 24.0, 0.0001);
+}
+
+TEST(TimeParsingTest, PeriodNotationUppercase) {
+    auto result = parseTime("9:30 A.M.");
+    EXPECT_TRUE(result.success);
+    EXPECT_NEAR(result.numericValue, 9.5 / 24.0, 0.0001);
+}
+
+TEST(TimeParsingTest, PeriodNotationWithSeconds) {
+    auto result = parseTime("9:30:45 p.m.");
+    EXPECT_TRUE(result.success);
+    // 21:30:45 = (21*3600 + 30*60 + 45) / 86400
+    double expected = (21 * 3600.0 + 30 * 60.0 + 45.0) / 86400.0;
+    EXPECT_NEAR(result.numericValue, expected, 0.0001);
+}
+
+// =============================================================================
 // Scientific notation tests
 // =============================================================================
 
@@ -540,6 +619,18 @@ TEST(AutoDetectTest, DetectsDateShortMonthName) {
 
 TEST(AutoDetectTest, DetectsTime) {
     auto result = parseUserInput("12:30 PM");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.formatCategory, NumberFormatCategory::TIME);
+}
+
+TEST(AutoDetectTest, DetectsTimeLowercase) {
+    auto result = parseUserInput("9:30 am");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.formatCategory, NumberFormatCategory::TIME);
+}
+
+TEST(AutoDetectTest, DetectsTimePeriodNotation) {
+    auto result = parseUserInput("9:30 p.m.");
     EXPECT_TRUE(result.success);
     EXPECT_EQ(result.formatCategory, NumberFormatCategory::TIME);
 }

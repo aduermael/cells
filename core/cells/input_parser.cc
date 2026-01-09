@@ -479,8 +479,22 @@ ParsedInput parseTime(const std::string& input) {
     bool isPM = false;
     bool is12Hour = false;
 
+    // Normalize input: remove periods from a.m./p.m. notation
+    std::string normalizedInput = trimmed;
+    // Replace "a.m." with "am" and "p.m." with "pm" (case insensitive)
+    std::string lowerInput = trimmed;
+    std::transform(lowerInput.begin(), lowerInput.end(), lowerInput.begin(), ::tolower);
+    auto amDotPos = lowerInput.find("a.m.");
+    if (amDotPos != std::string::npos) {
+        normalizedInput = trimmed.substr(0, amDotPos) + "AM" + trimmed.substr(amDotPos + 4);
+    }
+    auto pmDotPos = lowerInput.find("p.m.");
+    if (pmDotPos != std::string::npos) {
+        normalizedInput = trimmed.substr(0, pmDotPos) + "PM" + trimmed.substr(pmDotPos + 4);
+    }
+
     // Check for AM/PM
-    std::string upperInput = trimmed;
+    std::string upperInput = normalizedInput;
     std::transform(upperInput.begin(), upperInput.end(), upperInput.begin(), ::toupper);
 
     if (upperInput.find("PM") != std::string::npos) {
@@ -491,13 +505,13 @@ ParsedInput parseTime(const std::string& input) {
     }
 
     // Remove AM/PM for parsing
-    std::string timePart = trimmed;
+    std::string timePart = normalizedInput;
     const auto amPos = upperInput.find("AM");
     const auto pmPos = upperInput.find("PM");
     if (amPos != std::string::npos) {
-        timePart = trim(trimmed.substr(0, amPos));
+        timePart = trim(normalizedInput.substr(0, amPos));
     } else if (pmPos != std::string::npos) {
-        timePart = trim(trimmed.substr(0, pmPos));
+        timePart = trim(normalizedInput.substr(0, pmPos));
     }
 
     // Try HH:MM:SS or HH:MM
