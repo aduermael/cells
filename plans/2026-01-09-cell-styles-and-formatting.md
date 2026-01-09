@@ -2,7 +2,7 @@
 
 Status: READY
 Created At: 2026-01-09 02:13 UTC
-Updated At: 2026-01-09 02:20 UTC
+Updated At: 2026-01-09 02:35 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -395,3 +395,38 @@ Available fonts (common web-safe):
 - Style lookup: < 1ms per cell
 - Batch style operations: < 100ms for 1000 cells
 - Render with styles: < 16ms for visible viewport (60fps)
+
+### XLSX Format Reference (ECMA-376 / ISO/IEC 29500)
+
+XLSX files follow the **Office Open XML (OOXML)** standard:
+- **ECMA-376**: https://www.ecma-international.org/publications-and-standards/standards/ecma-376/
+- **ISO/IEC 29500**: https://www.iso.org/standard/71691.html
+
+File structure (ZIP archive):
+```
+xl/
+├── workbook.xml         # Workbook structure, sheet references
+├── styles.xml           # Styles: fonts, fills, borders, numFmts, cellXfs
+├── sharedStrings.xml    # Shared string table (optional)
+└── worksheets/
+    └── sheetN.xml       # Cell data with style index references (s="N")
+```
+
+Key elements in `xl/styles.xml`:
+- `<numFmts>` - Custom number format codes
+- `<fonts>` - Font definitions (name, size, bold, italic, color)
+- `<fills>` - Fill patterns and colors (patternFill, fgColor, bgColor)
+- `<borders>` - Border styles (left, right, top, bottom, diagonal)
+- `<cellXfs>` - Cell format records combining font + fill + border + alignment + numFmt
+
+Cell style reference in `xl/worksheets/sheetN.xml`:
+```xml
+<c r="A1" s="3" t="s">  <!-- s="3" references cellXfs index 3 -->
+  <v>0</v>
+</c>
+```
+
+Color formats in XLSX:
+- `<color rgb="FFRRGGBB"/>` - ARGB hex (alpha + RGB)
+- `<color theme="N"/>` - Theme color index
+- `<color indexed="N"/>` - Legacy indexed color
