@@ -184,7 +184,7 @@ Add horizontal and vertical alignment buttons.
   - Vertical: Top, Middle, Bottom (mutually exclusive)
   - Use toggle button group pattern
 
-- [ ] 5b: Implement alignment in StyleControls
+- [x] 5b: Implement alignment in StyleControls
   - Handle alignment button clicks
   - Update button active states
   - Apply alignment via WasmDataSource

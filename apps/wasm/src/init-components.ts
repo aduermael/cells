@@ -671,6 +671,15 @@ export function createComponents(config: ComponentsConfig): Components {
       fontSizeBtn: elements.fontSizeBtn,
       fontSizeLabel: elements.fontSizeLabel,
       fontSizeMenu: elements.fontSizeMenu,
+      // Alignment controls
+      hAlignGroup: elements.hAlignGroup,
+      alignLeftBtn: elements.alignLeftBtn,
+      alignCenterBtn: elements.alignCenterBtn,
+      alignRightBtn: elements.alignRightBtn,
+      vAlignGroup: elements.vAlignGroup,
+      valignTopBtn: elements.valignTopBtn,
+      valignMiddleBtn: elements.valignMiddleBtn,
+      valignBottomBtn: elements.valignBottomBtn,
     },
     {
       getSelectedCell: () => app.selectedCell,

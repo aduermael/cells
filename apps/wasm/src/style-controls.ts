@@ -53,6 +53,15 @@ export interface StyleControlsConfig {
   fontSizeBtn: HTMLButtonElement;
   fontSizeLabel: HTMLElement;
   fontSizeMenu: HTMLElement;
+  // Alignment controls
+  hAlignGroup: HTMLElement;
+  alignLeftBtn: HTMLButtonElement;
+  alignCenterBtn: HTMLButtonElement;
+  alignRightBtn: HTMLButtonElement;
+  vAlignGroup: HTMLElement;
+  valignTopBtn: HTMLButtonElement;
+  valignMiddleBtn: HTMLButtonElement;
+  valignBottomBtn: HTMLButtonElement;
 }
 
 /** Callback signatures */
@@ -108,6 +117,13 @@ export class StyleControls {
   private fontSizeBtn: HTMLButtonElement;
   private fontSizeLabel: HTMLElement;
   private fontSizeMenu: HTMLElement;
+  // Alignment controls
+  private alignLeftBtn: HTMLButtonElement;
+  private alignCenterBtn: HTMLButtonElement;
+  private alignRightBtn: HTMLButtonElement;
+  private valignTopBtn: HTMLButtonElement;
+  private valignMiddleBtn: HTMLButtonElement;
+  private valignBottomBtn: HTMLButtonElement;
 
   // =========================================================================
   // Dependencies
@@ -161,6 +177,13 @@ export class StyleControls {
     this.fontSizeBtn = config.fontSizeBtn;
     this.fontSizeLabel = config.fontSizeLabel;
     this.fontSizeMenu = config.fontSizeMenu;
+    // Alignment controls (hAlignGroup and vAlignGroup containers are passed but not stored)
+    this.alignLeftBtn = config.alignLeftBtn;
+    this.alignCenterBtn = config.alignCenterBtn;
+    this.alignRightBtn = config.alignRightBtn;
+    this.valignTopBtn = config.valignTopBtn;
+    this.valignMiddleBtn = config.valignMiddleBtn;
+    this.valignBottomBtn = config.valignBottomBtn;
 
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectedCellData = callbacks.getSelectedCellData;
@@ -382,6 +405,28 @@ export class StyleControls {
         }
       }
     });
+
+    // Horizontal alignment buttons
+    this.alignLeftBtn.addEventListener("click", () => {
+      this.applyHAlign("left");
+    });
+    this.alignCenterBtn.addEventListener("click", () => {
+      this.applyHAlign("center");
+    });
+    this.alignRightBtn.addEventListener("click", () => {
+      this.applyHAlign("right");
+    });
+
+    // Vertical alignment buttons
+    this.valignTopBtn.addEventListener("click", () => {
+      this.applyVAlign("top");
+    });
+    this.valignMiddleBtn.addEventListener("click", () => {
+      this.applyVAlign("middle");
+    });
+    this.valignBottomBtn.addEventListener("click", () => {
+      this.applyVAlign("bottom");
+    });
   }
 
   // =========================================================================
@@ -453,6 +498,44 @@ export class StyleControls {
     }
   }
 
+  private async applyHAlign(hAlign: "left" | "center" | "right"): Promise<void> {
+    const position = this.getSelectedCell();
+    if (!position || !this.dataSource) return;
+
+    const styleUpdate: Partial<CellStyle> = { hAlign };
+
+    try {
+      await this.applyStyleToSelection(styleUpdate);
+
+      this.currentStyle.hAlign = hAlign;
+      this.updateHAlignButtons(hAlign);
+
+      this.requestRender();
+      this.updateFormulaBar();
+    } catch (error) {
+      console.error("Failed to apply horizontal alignment:", error);
+    }
+  }
+
+  private async applyVAlign(vAlign: "top" | "middle" | "bottom"): Promise<void> {
+    const position = this.getSelectedCell();
+    if (!position || !this.dataSource) return;
+
+    const styleUpdate: Partial<CellStyle> = { vAlign };
+
+    try {
+      await this.applyStyleToSelection(styleUpdate);
+
+      this.currentStyle.vAlign = vAlign;
+      this.updateVAlignButtons(vAlign);
+
+      this.requestRender();
+      this.updateFormulaBar();
+    } catch (error) {
+      console.error("Failed to apply vertical alignment:", error);
+    }
+  }
+
   /**
    * Apply a style update to all cells in the current selection range.
    */
@@ -502,6 +585,11 @@ export class StyleControls {
     // Update font dropdowns
     this.updateFontFamilyDisplay(style.fontFamily || "Arial");
     this.updateFontSizeDisplay(style.fontSize || 12);
+
+    // Update alignment buttons (TextAlign includes "justify", but we only show left/center/right)
+    const hAlign = style.hAlign === "justify" ? "left" : (style.hAlign || "left");
+    this.updateHAlignButtons(hAlign as "left" | "center" | "right");
+    this.updateVAlignButtons(style.vAlign || "top");
   }
 
   private updateButtonState(
@@ -548,6 +636,18 @@ export class StyleControls {
         optionColor.toUpperCase() === color.toUpperCase()
       );
     });
+  }
+
+  private updateHAlignButtons(hAlign: "left" | "center" | "right"): void {
+    this.alignLeftBtn.classList.toggle("active", hAlign === "left");
+    this.alignCenterBtn.classList.toggle("active", hAlign === "center");
+    this.alignRightBtn.classList.toggle("active", hAlign === "right");
+  }
+
+  private updateVAlignButtons(vAlign: "top" | "middle" | "bottom"): void {
+    this.valignTopBtn.classList.toggle("active", vAlign === "top");
+    this.valignMiddleBtn.classList.toggle("active", vAlign === "middle");
+    this.valignBottomBtn.classList.toggle("active", vAlign === "bottom");
   }
 
   // =========================================================================
