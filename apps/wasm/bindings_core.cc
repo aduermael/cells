@@ -27,6 +27,7 @@
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/input_parser.h"
+#include "core/cells/number_formatter.h"
 #include "core/cells/operation.h"
 #include "core/log/include/Logger.h"
 
@@ -700,6 +701,13 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
             std::ostringstream json;
             json << "{\"success\":true,\"id\":\"" << id.toString() << "\",\"existed\":true,";
 
+            // Compute editValue for formatted numbers (dates, percentages, etc.)
+            std::string editValue = cell->value.raw;
+            if (cell->value.type == CellValueType::NUMBER && !cell->formatId.isNull()) {
+                double numValue = cell->value.asNumber();
+                editValue = formatEditValue(_formatRegistry, numValue, cell->formatId);
+            }
+
             if (cell->isFormula()) {
                 Formula* formula = cell->getFormula();
                 if (formula != nullptr && formula->ast != nullptr) {
@@ -707,9 +715,11 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
                     std::string a1Formula = _refConverter.formulaToA1(uuidFormula);
                     json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
                 }
-                json << "\"value\":\"" << jsonEscape(cell->value.raw) << "\"";
+                json << "\"value\":\"" << jsonEscape(cell->value.raw) << "\",";
+                json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
             } else {
-                json << "\"value\":\"" << jsonEscape(cell->value.raw) << "\"";
+                json << "\"value\":\"" << jsonEscape(cell->value.raw) << "\",";
+                json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
             }
             json << "}";
             return json.str();
@@ -741,7 +751,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
 
     std::ostringstream json;
     json << "{\"success\":true,\"id\":\"" << cellId.toString()
-         << "\",\"existed\":false,\"value\":\"\"}";
+         << "\",\"existed\":false,\"value\":\"\",\"editValue\":\"\"}";
     return json.str();
 }
 

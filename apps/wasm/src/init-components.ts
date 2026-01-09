@@ -273,11 +273,13 @@ export function createComponents(config: ComponentsConfig): Components {
   // =========================================================================
 
   function getFormulaBarValue(
-    cell: { formula?: string; value?: string; display?: string } | null | undefined
+    cell: { formula?: string; value?: string; editValue?: string; display?: string } | null | undefined
   ): string {
     if (!cell) return "";
     if (cell.formula) return cell.formula;
-    return cell.value || "";
+    // Use editValue for human-readable display (dates, percentages, etc.)
+    // Fall back to raw value if editValue not available
+    return cell.editValue ?? cell.value ?? "";
   }
 
   function updateFormulaBar(): void {

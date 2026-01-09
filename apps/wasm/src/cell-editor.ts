@@ -426,7 +426,9 @@ export class CellEditor {
         selectedCell.row
       );
       cellId = result.id;
-      initialValue = result.formula || result.value || "";
+      // For formulas, show the formula text; for values, use editValue
+      // (human-readable format for dates, percentages, etc.)
+      initialValue = result.formula || result.editValue || "";
       // If cell was created, refresh viewport to include it
       if (!result.existed) {
         await this.onFetchViewport();

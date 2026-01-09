@@ -374,6 +374,7 @@ export class CellsClient {
       id: response.cellId as string,
       existed: response.existed as boolean,
       value: response.value as string,
+      editValue: (response.editValue as string) ?? (response.value as string),
       formula: (response.formula as string) || null,
     };
   }

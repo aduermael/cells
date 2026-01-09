@@ -16,10 +16,10 @@ import {
 
 const tests = {
   // ============================================================================
-  // Formula bar shows raw value tests (Phase 1 of format system refactor)
+  // Formula bar shows edit value tests (Excel-parity)
   // ============================================================================
 
-  'Formula bar shows raw value for percentage cell': async (ctx) => {
+  'Formula bar shows edit value for percentage cell': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
@@ -31,11 +31,11 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '15%', 'Cell should display formatted value 15%');
 
-    // But formula bar should show raw value (like Excel)
+    // Formula bar should show human-readable edit value (like Excel)
     await clickCell(ctx.page, 'A1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
-    assertEqual(formulaBar, '0.15', 'Formula bar should show raw value 0.15, not formatted 15%');
+    assertEqual(formulaBar, '15%', 'Formula bar should show edit value 15%');
   },
 
   'Formula bar shows raw value for currency cell': async (ctx) => {
@@ -77,10 +77,10 @@ const tests = {
   },
 
   // ============================================================================
-  // In-cell editing shows raw value tests (Phase 2 of format system refactor)
+  // In-cell editing shows edit value tests (Excel-parity)
   // ============================================================================
 
-  'In-cell editing shows raw value for percentage cell': async (ctx) => {
+  'In-cell editing shows edit value for percentage cell': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
@@ -92,11 +92,11 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '15%', 'Cell should display formatted value 15%');
 
-    // Double-click to enter edit mode - should show raw value
+    // Double-click to enter edit mode - should show human-readable edit value
     await doubleClickCell(ctx.page, 'A1');
     await sleep(150);
     const editorContent = await getCellEditorContent(ctx.page);
-    assertEqual(editorContent, '0.15', 'In-cell editor should show raw value 0.15, not formatted 15%');
+    assertEqual(editorContent, '15%', 'In-cell editor should show edit value 15%');
   },
 
   'In-cell editing shows raw value for currency cell': async (ctx) => {
@@ -153,11 +153,11 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '15%', 'Cell should display 15%');
 
-    // Formula bar should show raw value (like Excel)
+    // Formula bar should show human-readable edit value (like Excel)
     await clickCell(ctx.page, 'A1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
-    assertEqual(formulaBar, '0.15', 'Formula bar should show raw value 0.15');
+    assertEqual(formulaBar, '15%', 'Formula bar should show edit value 15%');
   },
 
   'Currency input auto-detects format': async (ctx) => {
@@ -229,11 +229,11 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'E1');
     assertEqual(display, '-25%', 'Cell should display -25%');
 
-    // Formula bar should show raw value
+    // Formula bar should show human-readable edit value
     await clickCell(ctx.page, 'E1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
-    assertEqual(formulaBar, '-0.25', 'Formula bar should show raw value -0.25');
+    assertEqual(formulaBar, '-25%', 'Formula bar should show edit value -25%');
   },
 
   'Currency without decimals works': async (ctx) => {
@@ -267,11 +267,11 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'G1');
     assertEqual(display, '12.5%', 'Cell should display 12.5% (preserving 1 decimal)');
 
-    // Formula bar should show raw value
+    // Formula bar should show human-readable edit value
     await clickCell(ctx.page, 'G1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
-    assertEqual(formulaBar, '0.125', 'Formula bar should show raw value 0.125');
+    assertEqual(formulaBar, '12.5%', 'Formula bar should show edit value 12.5%');
   },
 
   'Percentage with 2 decimals preserves format': async (ctx) => {
@@ -286,11 +286,11 @@ const tests = {
     const display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '12.50%', 'Cell should display 12.50% (preserving 2 decimals)');
 
-    // Formula bar should show raw value
+    // Formula bar should show human-readable edit value
     await clickCell(ctx.page, 'A1');
     await sleep(100);
     const formulaBar = await getFormulaBarContent(ctx.page);
-    assertEqual(formulaBar, '0.125', 'Formula bar should show raw value 0.125');
+    assertEqual(formulaBar, '12.50%', 'Formula bar should show edit value 12.50%');
   },
 
   'Currency with 1 decimal preserves format': async (ctx) => {

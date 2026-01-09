@@ -71,6 +71,7 @@ export interface GetOrCreateCellResult {
   id: string;
   existed: boolean;
   value: string;
+  editValue: string; // Human-readable value for editing (dates, percentages, etc.)
   formula: string | null;
 }
 

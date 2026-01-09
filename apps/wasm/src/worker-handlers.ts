@@ -345,6 +345,7 @@ export function handleGetOrCreateCellAt(
             cellId: result.id,
             existed: result.existed,
             value: result.value,
+            editValue: result.editValue || result.value,
             formula: result.formula || null,
         });
     }
