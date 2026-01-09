@@ -1060,6 +1060,106 @@ const tests = {
     assertEqual(cellData.editValue, '1234.5', 'Viewport should return editValue "1234.5" for currency cell');
     assertEqual(cellData.display, '$1,234.50', 'Display should be "$1,234.50"');
   },
+
+  // ============================================================================
+  // Percentage editing round-trip tests (Phase 6 of edit-value-excel-parity plan)
+  // ============================================================================
+
+  'Editing percentage cell preserves format': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a percentage value (creates 15% cell)
+    await setCellValue(ctx.page, 'A1', '15%');
+    await sleep(200);
+
+    // Verify initial display
+    let display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '15%', 'Initial cell should display 15%');
+
+    // Double-click to edit the cell
+    await doubleClickCell(ctx.page, 'A1');
+    await sleep(150);
+
+    // Verify editor shows edit value "15%"
+    const editorContent = await getCellEditorContent(ctx.page);
+    assertEqual(editorContent, '15%', 'Editor should show 15%');
+
+    // Clear and type new percentage value (triple-click to select all text)
+    await ctx.page.click('#cell-display', { clickCount: 3 });
+    await ctx.page.keyboard.type('20%');
+    await ctx.page.keyboard.press('Enter');
+    await sleep(200);
+
+    // Verify new display value
+    display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '20%', 'Cell should now display 20%');
+
+    // Verify formula bar shows edit value
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+    const formulaBar = await getFormulaBarContent(ctx.page);
+    assertEqual(formulaBar, '20%', 'Formula bar should show 20%');
+
+    // Verify underlying value is 0.2 (stored as decimal)
+    const cellData = await ctx.page.evaluate(() => {
+      if (window._appContext && window._appContext.app && window._appContext.app.cells) {
+        return window._appContext.app.cells.find(c => c.col === 0 && c.row === 0);
+      }
+      return null;
+    });
+    if (!cellData) {
+      throw new Error('A1 cell not found in viewport');
+    }
+    // Use approximate equality for floating point values
+    const storedValue = cellData.value;
+    if (Math.abs(storedValue - 0.2) > 0.0001) {
+      throw new Error(`Stored value should be 0.2 (not 20): got ${storedValue}`);
+    }
+  },
+
+  'Editing percentage cell with decimal places': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a percentage value with decimals
+    await setCellValue(ctx.page, 'A1', '15.5%');
+    await sleep(200);
+
+    // Verify initial display
+    let display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '15.5%', 'Initial cell should display 15.5%');
+
+    // Double-click to edit the cell
+    await doubleClickCell(ctx.page, 'A1');
+    await sleep(150);
+
+    // Clear and type new percentage value with 2 decimal places (triple-click to select all)
+    await ctx.page.click('#cell-display', { clickCount: 3 });
+    await ctx.page.keyboard.type('20.75%');
+    await ctx.page.keyboard.press('Enter');
+    await sleep(200);
+
+    // Verify new display value preserves decimal places
+    display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '20.75%', 'Cell should now display 20.75%');
+
+    // Verify underlying value is 0.2075 (stored as decimal)
+    const cellData = await ctx.page.evaluate(() => {
+      if (window._appContext && window._appContext.app && window._appContext.app.cells) {
+        return window._appContext.app.cells.find(c => c.col === 0 && c.row === 0);
+      }
+      return null;
+    });
+    if (!cellData) {
+      throw new Error('A1 cell not found in viewport');
+    }
+    // Use approximate equality for floating point values
+    const storedValue = cellData.value;
+    if (Math.abs(storedValue - 0.2075) > 0.0001) {
+      throw new Error(`Stored value should be 0.2075: got ${storedValue}`);
+    }
+  },
 };
 
 // Run all tests

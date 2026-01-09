@@ -186,17 +186,19 @@ Add support for more time input formats.
 
 ---
 
-## Phase 6: Percentage Parsing Enhancement
+## Phase 6: Percentage Parsing Enhancement ✅
 
 When user types "15%", parsing already works. But when EDITING a percentage cell, they should be able to type "15%" and have it work correctly.
 
-- [ ] 6a: Ensure percentage parsing handles decimal places correctly
+- [x] 6a: Ensure percentage parsing handles decimal places correctly
   - "15%" → 0.15 (stored value)
   - "15.5%" → 0.155 (stored value)
   - Preserve decimal places from input in format
+  - (Already implemented in input_parser.cc with comprehensive unit tests)
 
-- [ ] 6b: Add E2E test for editing percentage cell
+- [x] 6b: Add E2E test for editing percentage cell
   - Edit existing 15% cell, change to "20%", verify stored as 0.20
+  - Added tests in format.test.mjs: "Editing percentage cell preserves format" and "Editing percentage cell with decimal places"
 
 ---
 
