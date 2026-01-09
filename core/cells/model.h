@@ -75,6 +75,67 @@ enum class CollabMode : std::uint8_t {
 // Then apply with applyOperation() to both mutate the model AND add to OpLog.
 // =============================================================================
 
+// =============================================================================
+// Cell Style Types
+// =============================================================================
+
+// Horizontal text alignment within cell
+enum class TextAlign : std::uint8_t {
+    LEFT = 0,
+    CENTER = 1,
+    RIGHT = 2,
+    JUSTIFY = 3
+};
+
+// Vertical text alignment within cell
+enum class VerticalAlign : std::uint8_t {
+    TOP = 0,
+    MIDDLE = 1,
+    BOTTOM = 2
+};
+
+// Cell style properties for formatting
+// Each property is optional - empty string or 0 means "use default"
+// Colors use CSS hex format: "#RRGGBB" or "" for transparent/default
+struct CellStyle {
+    bool bold{false};
+    bool italic{false};
+    bool underline{false};
+    std::string bgColor;    // Background color (hex, e.g. "#FF0000")
+    std::string textColor;  // Text color (hex, e.g. "#000000")
+    std::string fontFamily; // Font name (e.g. "Arial"), empty = system default
+    uint8_t fontSize{0};    // Font size in points, 0 = default (11pt)
+    TextAlign hAlign{TextAlign::LEFT};
+    VerticalAlign vAlign{VerticalAlign::BOTTOM};
+
+    CellStyle() = default;
+
+    // Check if style has any non-default values
+    [[nodiscard]] bool isEmpty() const {
+        return !bold && !italic && !underline &&
+               bgColor.empty() && textColor.empty() &&
+               fontFamily.empty() && fontSize == 0 &&
+               hAlign == TextAlign::LEFT && vAlign == VerticalAlign::BOTTOM;
+    }
+
+    // Equality comparison
+    bool operator==(const CellStyle& other) const {
+        return bold == other.bold && italic == other.italic &&
+               underline == other.underline && bgColor == other.bgColor &&
+               textColor == other.textColor && fontFamily == other.fontFamily &&
+               fontSize == other.fontSize && hAlign == other.hAlign &&
+               vAlign == other.vAlign;
+    }
+
+    bool operator!=(const CellStyle& other) const {
+        return !(*this == other);
+    }
+};
+
+// =============================================================================
+// Cell Value Types
+// =============================================================================
+
 // Cell value - stores the raw value as a string (for simplicity)
 // The type field indicates how to interpret it
 struct CellValue {
@@ -130,6 +191,7 @@ struct Cell {
     CellValue value;   // Direct value OR cached formula result
     Formula* formula;  // null = value cell, non-null = formula cell (owned)
     ID formatId;       // Number format ID (null = use default/General format)
+    ID styleId;        // Cell style ID (null = use default style)
 
     // Shared formula support: if non-null, this cell uses master's formula
     // (does not own the formula - master owns it)
@@ -409,6 +471,23 @@ struct Workbook {
     // Get all custom formats (for bootstrapOpLog and sync)
     [[nodiscard]] const std::unordered_map<ID, std::string, IDHash>& getCustomFormats() const;
 
+    // ========================================================================
+    // Cell styles (CRDT-synced)
+    // ========================================================================
+
+    // Register a style definition (called by CRDT when applying STYLE_DEFINE)
+    // Returns true if the style was newly added, false if it already existed
+    bool registerStyle(const ID& styleId, const CellStyle& style);
+
+    // Check if a style is defined
+    [[nodiscard]] bool hasStyle(const ID& styleId) const;
+
+    // Get a style by ID (returns nullptr if not found)
+    [[nodiscard]] const CellStyle* getStyle(const ID& styleId) const;
+
+    // Get all styles (for bootstrapOpLog and sync)
+    [[nodiscard]] const std::unordered_map<ID, CellStyle, IDHash>& getStyles() const;
+
 private:
     // Sheet lookup by ID
     std::unordered_map<ID, Sheet*, IDHash> _sheetIndex;
@@ -431,6 +510,10 @@ private:
     // Custom format definitions (format ID -> format code)
     // Synced via FORMAT_DEFINE operations
     std::unordered_map<ID, std::string, IDHash> _customFormats;
+
+    // Cell style definitions (style ID -> CellStyle)
+    // Synced via STYLE_DEFINE operations
+    std::unordered_map<ID, CellStyle, IDHash> _styles;
 };
 
 }  // namespace cells

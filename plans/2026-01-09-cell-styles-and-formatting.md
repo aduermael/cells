@@ -45,7 +45,7 @@ Add comprehensive cell styling support including text formatting (bold, italic, 
 
 Add style support to the core data model with CRDT synchronization.
 
-- [ ] 1a: Define CellStyle struct in model.h
+- [x] 1a: Define CellStyle struct in model.h
   - Add `enum class TextAlign { LEFT, CENTER, RIGHT, JUSTIFY }`
   - Add `enum class VerticalAlign { TOP, MIDDLE, BOTTOM }`
   - Add `struct CellStyle { bool bold, italic, underline; std::string bgColor, textColor, fontFamily; uint8_t fontSize; TextAlign hAlign; VerticalAlign vAlign; }`

@@ -549,4 +549,25 @@ const std::unordered_map<ID, std::string, IDHash>& Workbook::getCustomFormats() 
     return _customFormats;
 }
 
+bool Workbook::registerStyle(const ID& styleId, const CellStyle& style) {
+    auto [it, inserted] = _styles.try_emplace(styleId, style);
+    return inserted;
+}
+
+bool Workbook::hasStyle(const ID& styleId) const {
+    return _styles.find(styleId) != _styles.end();
+}
+
+const CellStyle* Workbook::getStyle(const ID& styleId) const {
+    auto it = _styles.find(styleId);
+    if (it != _styles.end()) {
+        return &it->second;
+    }
+    return nullptr;
+}
+
+const std::unordered_map<ID, CellStyle, IDHash>& Workbook::getStyles() const {
+    return _styles;
+}
+
 }  // namespace cells
