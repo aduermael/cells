@@ -79,7 +79,7 @@ Add style support to the core data model with CRDT synchronization.
 
 Ensure styles are properly preserved when importing/exporting XLSX and ZCD files.
 
-- [ ] 2a: XLSX style import
+- [x] 2a: XLSX style import
   - Parse cell styles from XLSX `styles.xml` (fonts, fills, borders, alignment)
   - Map XLSX font properties to CellStyle (bold, italic, underline, fontFamily, fontSize)
   - Map XLSX fill patterns to bgColor (solid fills, pattern fills)

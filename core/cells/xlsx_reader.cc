@@ -69,9 +69,316 @@ int mapCellType(const char* type) {
             return 2;  // Number
         case 'd':
             return 5;  // Date
+        case 'i':
+            // "inlineStr" - inline string
+            return 1;  // STRING
         default:
             return 2;  // Default to number
     }
+}
+
+// ---------------------------------------------------------------------------
+// XLSX Style parsing helpers
+// ---------------------------------------------------------------------------
+
+// Parsed font from styles.xml
+struct XLSXFont {
+    bool bold{false};
+    bool italic{false};
+    bool underline{false};
+    std::string name;      // Font family name
+    double size{0};        // Font size in points
+    std::string color;     // Text color as #RRGGBB
+};
+
+// Parsed fill (background) from styles.xml
+struct XLSXFill {
+    std::string fgColor;  // Foreground color as #RRGGBB (used for solid fills)
+    std::string bgColor;  // Background color as #RRGGBB
+};
+
+// Parsed alignment from styles.xml
+struct XLSXAlignment {
+    cells::TextAlign horizontal{cells::TextAlign::LEFT};
+    cells::VerticalAlign vertical{cells::VerticalAlign::BOTTOM};
+};
+
+// Cell format record (cellXfs entry) - combines font, fill, alignment
+struct XLSXCellFormat {
+    int fontId{0};
+    int fillId{0};
+    int numFmtId{0};
+    bool applyFont{false};
+    bool applyFill{false};
+    bool applyAlignment{false};
+    XLSXAlignment alignment;
+};
+
+// Convert ARGB hex "FFRRGGBB" to "#RRGGBB"
+std::string argbToRgb(const char* argb) {
+    if (argb == nullptr || argb[0] == '\0') {
+        return {};
+    }
+    // XLSX colors can be ARGB (8 chars) or RGB (6 chars)
+    const size_t len = std::strlen(argb);
+    if (len == 8) {
+        // Skip alpha, take RGB
+        return "#" + std::string(argb + 2, 6);
+    }
+    if (len == 6) {
+        return "#" + std::string(argb, 6);
+    }
+    return {};
+}
+
+// Parse horizontal alignment string to enum
+cells::TextAlign parseHorizontalAlign(const char* align) {
+    if (align == nullptr) {
+        return cells::TextAlign::LEFT;
+    }
+    if (std::strcmp(align, "center") == 0 || std::strcmp(align, "centerContinuous") == 0) {
+        return cells::TextAlign::CENTER;
+    }
+    if (std::strcmp(align, "right") == 0) {
+        return cells::TextAlign::RIGHT;
+    }
+    if (std::strcmp(align, "justify") == 0 || std::strcmp(align, "distributed") == 0) {
+        return cells::TextAlign::JUSTIFY;
+    }
+    return cells::TextAlign::LEFT;
+}
+
+// Parse vertical alignment string to enum
+cells::VerticalAlign parseVerticalAlign(const char* align) {
+    if (align == nullptr) {
+        return cells::VerticalAlign::BOTTOM;
+    }
+    if (std::strcmp(align, "top") == 0) {
+        return cells::VerticalAlign::TOP;
+    }
+    if (std::strcmp(align, "center") == 0) {
+        return cells::VerticalAlign::MIDDLE;
+    }
+    // Default is bottom
+    return cells::VerticalAlign::BOTTOM;
+}
+
+// Container for all parsed styles from styles.xml
+struct XLSXStyles {
+    std::vector<XLSXFont> fonts;
+    std::vector<XLSXFill> fills;
+    std::vector<XLSXCellFormat> cellFormats;  // cellXfs entries
+
+    // Convert an XLSX cell format index to our CellStyle
+    // Returns true if any non-default style properties were found
+    bool getCellStyle(int styleIndex, cells::CellStyle& outStyle) const {
+        if (styleIndex < 0 || styleIndex >= static_cast<int>(cellFormats.size())) {
+            return false;
+        }
+
+        const XLSXCellFormat& xf = cellFormats[styleIndex];
+        bool hasStyle = false;
+
+        // Apply font properties
+        if (xf.applyFont && xf.fontId >= 0 && xf.fontId < static_cast<int>(fonts.size())) {
+            const XLSXFont& font = fonts[xf.fontId];
+            if (font.bold) {
+                outStyle.bold = true;
+                hasStyle = true;
+            }
+            if (font.italic) {
+                outStyle.italic = true;
+                hasStyle = true;
+            }
+            if (font.underline) {
+                outStyle.underline = true;
+                hasStyle = true;
+            }
+            if (!font.name.empty()) {
+                outStyle.fontFamily = font.name;
+                hasStyle = true;
+            }
+            if (font.size > 0) {
+                outStyle.fontSize = static_cast<uint8_t>(font.size);
+                hasStyle = true;
+            }
+            if (!font.color.empty()) {
+                outStyle.textColor = font.color;
+                hasStyle = true;
+            }
+        }
+
+        // Apply fill properties (background color)
+        if (xf.applyFill && xf.fillId >= 0 && xf.fillId < static_cast<int>(fills.size())) {
+            const XLSXFill& fill = fills[xf.fillId];
+            if (!fill.fgColor.empty()) {
+                outStyle.bgColor = fill.fgColor;
+                hasStyle = true;
+            }
+        }
+
+        // Apply alignment
+        if (xf.applyAlignment) {
+            if (xf.alignment.horizontal != cells::TextAlign::LEFT) {
+                outStyle.hAlign = xf.alignment.horizontal;
+                hasStyle = true;
+            }
+            if (xf.alignment.vertical != cells::VerticalAlign::BOTTOM) {
+                outStyle.vAlign = xf.alignment.vertical;
+                hasStyle = true;
+            }
+        }
+
+        return hasStyle;
+    }
+};
+
+// Create a unique key string from a CellStyle (for deduplication)
+std::string cellStyleToKey(const cells::CellStyle& style) {
+    std::ostringstream oss;
+    oss << (style.bold ? "B" : "b")
+        << (style.italic ? "I" : "i")
+        << (style.underline ? "U" : "u")
+        << "|" << style.bgColor
+        << "|" << style.textColor
+        << "|" << style.fontFamily
+        << "|" << static_cast<int>(style.fontSize)
+        << "|" << static_cast<int>(style.hAlign)
+        << "|" << static_cast<int>(style.vAlign);
+    return oss.str();
+}
+
+// Parse xl/styles.xml into XLSXStyles struct
+XLSXStyles parseStylesXml(const std::string& content) {
+    XLSXStyles styles;
+
+    if (content.empty()) {
+        return styles;
+    }
+
+    pugi::xml_document doc;
+    if (!doc.load_buffer(content.data(), content.size())) {
+        return styles;
+    }
+
+    auto styleSheet = doc.child("styleSheet");
+
+    // Parse fonts
+    auto fontsNode = styleSheet.child("fonts");
+    for (auto fontNode : fontsNode.children("font")) {
+        XLSXFont font;
+
+        // Bold: <b/> or <b val="true"/>
+        auto bNode = fontNode.child("b");
+        if (bNode) {
+            const char* val = bNode.attribute("val").value();
+            font.bold = (val == nullptr || val[0] == '\0' || std::strcmp(val, "1") == 0 ||
+                         std::strcmp(val, "true") == 0);
+        }
+
+        // Italic: <i/> or <i val="true"/>
+        auto iNode = fontNode.child("i");
+        if (iNode) {
+            const char* val = iNode.attribute("val").value();
+            font.italic = (val == nullptr || val[0] == '\0' || std::strcmp(val, "1") == 0 ||
+                           std::strcmp(val, "true") == 0);
+        }
+
+        // Underline: <u/> or <u val="single"/>
+        auto uNode = fontNode.child("u");
+        if (uNode) {
+            const char* val = uNode.attribute("val").value();
+            // Any underline value counts as underline (single, double, etc.)
+            font.underline =
+                (val == nullptr || val[0] == '\0' || std::strcmp(val, "none") != 0);
+        }
+
+        // Font name: <name val="Arial"/>
+        auto nameNode = fontNode.child("name");
+        if (nameNode) {
+            font.name = nameNode.attribute("val").value();
+        }
+
+        // Font size: <sz val="11"/>
+        auto szNode = fontNode.child("sz");
+        if (szNode) {
+            font.size = szNode.attribute("val").as_double(0);
+        }
+
+        // Font color: <color rgb="FF000000"/> or <color theme="1"/>
+        auto colorNode = fontNode.child("color");
+        if (colorNode) {
+            const char* rgb = colorNode.attribute("rgb").value();
+            if (rgb && rgb[0] != '\0') {
+                font.color = argbToRgb(rgb);
+            }
+            // TODO: Support theme colors (requires parsing theme.xml)
+        }
+
+        styles.fonts.push_back(font);
+    }
+
+    // Parse fills
+    auto fillsNode = styleSheet.child("fills");
+    for (auto fillNode : fillsNode.children("fill")) {
+        XLSXFill fill;
+
+        auto patternFill = fillNode.child("patternFill");
+        if (patternFill) {
+            const char* patternType = patternFill.attribute("patternType").value();
+            // Only extract color for solid fills
+            if (patternType && std::strcmp(patternType, "solid") == 0) {
+                auto fgColorNode = patternFill.child("fgColor");
+                if (fgColorNode) {
+                    const char* rgb = fgColorNode.attribute("rgb").value();
+                    if (rgb && rgb[0] != '\0') {
+                        fill.fgColor = argbToRgb(rgb);
+                    }
+                    // TODO: Support theme colors
+                }
+            }
+        }
+
+        styles.fills.push_back(fill);
+    }
+
+    // Parse cellXfs (cell format records)
+    auto cellXfsNode = styleSheet.child("cellXfs");
+    for (auto xfNode : cellXfsNode.children("xf")) {
+        XLSXCellFormat xf;
+
+        xf.fontId = xfNode.attribute("fontId").as_int(0);
+        xf.fillId = xfNode.attribute("fillId").as_int(0);
+        xf.numFmtId = xfNode.attribute("numFmtId").as_int(0);
+
+        // Check apply* attributes
+        xf.applyFont = xfNode.attribute("applyFont").as_bool(false);
+        xf.applyFill = xfNode.attribute("applyFill").as_bool(false);
+        xf.applyAlignment = xfNode.attribute("applyAlignment").as_bool(false);
+
+        // If fontId > 0 but applyFont is not explicitly set, still apply font
+        // Many XLSX files omit applyFont when font should be applied
+        if (xf.fontId > 0 && !xf.applyFont) {
+            xf.applyFont = true;
+        }
+        if (xf.fillId > 0 && !xf.applyFill) {
+            xf.applyFill = true;
+        }
+
+        // Parse alignment
+        auto alignmentNode = xfNode.child("alignment");
+        if (alignmentNode) {
+            xf.applyAlignment = true;
+            xf.alignment.horizontal =
+                parseHorizontalAlign(alignmentNode.attribute("horizontal").value());
+            xf.alignment.vertical =
+                parseVerticalAlign(alignmentNode.attribute("vertical").value());
+        }
+
+        styles.cellFormats.push_back(xf);
+    }
+
+    return styles;
 }
 
 }  // namespace
@@ -201,8 +508,15 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 const char* id = rel.attribute("Id").value();
                 const char* target = rel.attribute("Target").value();
                 if (id && target) {
-                    // Target is relative to xl/, e.g., "worksheets/sheet1.xml"
-                    const std::string fullPath = "xl/" + std::string(target);
+                    // Target can be absolute (/xl/worksheets/sheet1.xml) or relative (worksheets/sheet1.xml)
+                    std::string fullPath;
+                    if (target[0] == '/') {
+                        // Absolute path - strip leading slash
+                        fullPath = std::string(target + 1);
+                    } else {
+                        // Relative path - prepend xl/
+                        fullPath = "xl/" + std::string(target);
+                    }
                     sheetPaths[id] = fullPath;
                 }
             }
@@ -271,6 +585,20 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         }
     }
     logTiming("parse sharedStrings", start);
+
+    // Parse styles if requested
+    start = std::chrono::steady_clock::now();
+    XLSXStyles xlsxStyles;
+    // Map from CellStyle to our style ID (for deduplication)
+    std::unordered_map<std::string, ID> styleToId;
+
+    if (options.readStyles) {
+        std::string stylesContent = zip.readFile("xl/styles.xml");
+        if (!stylesContent.empty()) {
+            xlsxStyles = parseStylesXml(stylesContent);
+        }
+    }
+    logTiming("parse styles", start);
 
     // Create workbook
     auto workbook = std::make_unique<Workbook>(generate_id(), "Imported");
@@ -373,6 +701,31 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             }
         };
 
+        // Style application helper - gets or creates a style ID for an XLSX style index
+        auto getOrCreateStyleId = [&](int xlsxStyleIndex) -> ID {
+            if (!options.readStyles || xlsxStyleIndex <= 0) {
+                return {};  // Null ID - no style or default style
+            }
+
+            CellStyle cellStyle;
+            if (!xlsxStyles.getCellStyle(xlsxStyleIndex, cellStyle)) {
+                return {};  // Failed to convert style
+            }
+
+            // Check if this style already exists (deduplication)
+            const std::string styleKey = cellStyleToKey(cellStyle);
+            auto it = styleToId.find(styleKey);
+            if (it != styleToId.end()) {
+                return it->second;
+            }
+
+            // Register new style
+            const ID styleId = generate_id();
+            workbook->registerStyle(styleId, cellStyle);
+            styleToId[styleKey] = styleId;
+            return styleId;
+        };
+
         for (auto row : sheetData.children("row")) {
             for (auto cellNode : row.children("c")) {
                 int col = 0, rowNum = 0;
@@ -384,9 +737,10 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
                 // Get value
                 std::string value;
+                const char* type = cellNode.attribute("t").value();
                 auto vNode = cellNode.child("v");
+
                 if (vNode) {
-                    const char* type = cellNode.attribute("t").value();
                     const char* rawValue = vNode.text().get();
 
                     if (type && type[0] == 's') {
@@ -398,6 +752,23 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                     } else {
                         value = rawValue;
                     }
+                } else if (type && std::strcmp(type, "inlineStr") == 0) {
+                    // Inline string: <c t="inlineStr"><is><t>text</t></is></c>
+                    auto isNode = cellNode.child("is");
+                    if (isNode) {
+                        auto tNode = isNode.child("t");
+                        if (tNode) {
+                            value = tNode.text().get();
+                        } else {
+                            // Rich text: concatenate all <t> elements within <r> elements
+                            for (auto rNode : isNode.children("r")) {
+                                auto rtNode = rNode.child("t");
+                                if (rtNode) {
+                                    value += rtNode.text().get();
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Skip empty cells
@@ -408,8 +779,14 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 // Create cell
                 auto cell = std::make_unique<Cell>(generate_id(), columnIds[col], rowIds[rowNum]);
 
-                // Parse value based on type
-                const char* type = cellNode.attribute("t").value();
+                // Apply style if present
+                const int styleIndex = cellNode.attribute("s").as_int(0);
+                const ID styleId = getOrCreateStyleId(styleIndex);
+                if (!styleId.isNull()) {
+                    cell->styleId = styleId;
+                }
+
+                // Parse value based on type (type was read earlier)
                 const int cellType = mapCellType(type);
 
                 switch (cellType) {

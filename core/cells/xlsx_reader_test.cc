@@ -306,6 +306,183 @@ TEST(XLSXReaderTest, SkipDimensionsWhenDisabled) {
 }
 
 // ============================================================================
+// Style Reading Tests
+// ============================================================================
+
+TEST(XLSXReaderTest, ReadStylesBold) {
+    XLSXReadOptions options;
+    options.readStyles = true;
+
+    auto result = readXLSX(testFilePath("styled.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+    ASSERT_GT(result.workbook->sheetCount(), 0u)
+        << "Workbook should have at least one sheet";
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr) << "getSheetByIndex(0) returned null";
+
+    // Find A1 (Bold cell) - it's the first cell at column 0, row 0
+    Cell* boldCell = nullptr;
+    Axis* col0 = sheet->getColumnByPosition(0);
+    Axis* row0 = sheet->getRowByPosition(0);
+    if (col0 && row0) {
+        boldCell = sheet->getCellAt(col0->id, row0->id);
+    }
+    ASSERT_NE(boldCell, nullptr) << "Bold cell A1 should exist";
+
+    // Should have a style ID
+    EXPECT_FALSE(boldCell->styleId.isNull()) << "Bold cell should have a style";
+
+    // Get the style and verify it's bold
+    const CellStyle* style = result.workbook->getStyle(boldCell->styleId);
+    ASSERT_NE(style, nullptr) << "Style should be registered in workbook";
+    EXPECT_TRUE(style->bold) << "Cell A1 should be bold";
+}
+
+TEST(XLSXReaderTest, ReadStylesItalic) {
+    XLSXReadOptions options;
+    options.readStyles = true;
+
+    auto result = readXLSX(testFilePath("styled.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // Find A2 (Italic cell) - column 0, row 1
+    Cell* italicCell = nullptr;
+    Axis* col0 = sheet->getColumnByPosition(0);
+    Axis* row1 = sheet->getRowByPosition(1);
+    if (col0 && row1) {
+        italicCell = sheet->getCellAt(col0->id, row1->id);
+    }
+    ASSERT_NE(italicCell, nullptr) << "Italic cell A2 should exist";
+
+    // Should have a style ID
+    EXPECT_FALSE(italicCell->styleId.isNull()) << "Italic cell should have a style";
+
+    // Get the style and verify it's italic
+    const CellStyle* style = result.workbook->getStyle(italicCell->styleId);
+    ASSERT_NE(style, nullptr) << "Style should be registered in workbook";
+    EXPECT_TRUE(style->italic) << "Cell A2 should be italic";
+}
+
+TEST(XLSXReaderTest, ReadStylesBackgroundColor) {
+    XLSXReadOptions options;
+    options.readStyles = true;
+
+    auto result = readXLSX(testFilePath("styled.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // Find B1 (Red background cell) - column 1, row 0
+    Cell* redBgCell = nullptr;
+    Axis* col1 = sheet->getColumnByPosition(1);
+    Axis* row0 = sheet->getRowByPosition(0);
+    if (col1 && row0) {
+        redBgCell = sheet->getCellAt(col1->id, row0->id);
+    }
+    ASSERT_NE(redBgCell, nullptr) << "Red background cell B1 should exist";
+
+    // Should have a style ID
+    EXPECT_FALSE(redBgCell->styleId.isNull()) << "Red BG cell should have a style";
+
+    // Get the style and verify it has red background
+    const CellStyle* style = result.workbook->getStyle(redBgCell->styleId);
+    ASSERT_NE(style, nullptr) << "Style should be registered in workbook";
+    EXPECT_EQ(style->bgColor, "#FF0000") << "Cell B1 should have red background";
+}
+
+TEST(XLSXReaderTest, ReadStylesTextColor) {
+    XLSXReadOptions options;
+    options.readStyles = true;
+
+    auto result = readXLSX(testFilePath("styled.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // Find B2 (Blue text cell) - column 1, row 1
+    Cell* blueTextCell = nullptr;
+    Axis* col1 = sheet->getColumnByPosition(1);
+    Axis* row1 = sheet->getRowByPosition(1);
+    if (col1 && row1) {
+        blueTextCell = sheet->getCellAt(col1->id, row1->id);
+    }
+    ASSERT_NE(blueTextCell, nullptr) << "Blue text cell B2 should exist";
+
+    // Should have a style ID
+    EXPECT_FALSE(blueTextCell->styleId.isNull()) << "Blue text cell should have a style";
+
+    // Get the style and verify it has blue text
+    const CellStyle* style = result.workbook->getStyle(blueTextCell->styleId);
+    ASSERT_NE(style, nullptr) << "Style should be registered in workbook";
+    EXPECT_EQ(style->textColor, "#0000FF") << "Cell B2 should have blue text";
+}
+
+TEST(XLSXReaderTest, ReadStylesAlignment) {
+    XLSXReadOptions options;
+    options.readStyles = true;
+
+    auto result = readXLSX(testFilePath("styled.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // Find C1 (Center aligned cell) - column 2, row 0
+    Cell* centerCell = nullptr;
+    Axis* col2 = sheet->getColumnByPosition(2);
+    Axis* row0 = sheet->getRowByPosition(0);
+    if (col2 && row0) {
+        centerCell = sheet->getCellAt(col2->id, row0->id);
+    }
+    ASSERT_NE(centerCell, nullptr) << "Center aligned cell C1 should exist";
+
+    // Should have a style ID
+    EXPECT_FALSE(centerCell->styleId.isNull()) << "Center cell should have a style";
+
+    // Get the style and verify it's center aligned
+    const CellStyle* style = result.workbook->getStyle(centerCell->styleId);
+    ASSERT_NE(style, nullptr) << "Style should be registered in workbook";
+    EXPECT_EQ(style->hAlign, TextAlign::CENTER) << "Cell C1 should be center aligned";
+}
+
+TEST(XLSXReaderTest, ReadStylesSkipWhenDisabled) {
+    XLSXReadOptions options;
+    options.readStyles = false;
+
+    auto result = readXLSX(testFilePath("styled.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // When styles are disabled, cells should have null styleId
+    Axis* col0 = sheet->getColumnByPosition(0);
+    Axis* row0 = sheet->getRowByPosition(0);
+    if (col0 && row0) {
+        Cell* cell = sheet->getCellAt(col0->id, row0->id);
+        if (cell) {
+            EXPECT_TRUE(cell->styleId.isNull()) << "Style should be null when readStyles=false";
+        }
+    }
+
+    // Workbook should have no styles
+    EXPECT_TRUE(result.workbook->getStyles().empty())
+        << "No styles should be registered when readStyles=false";
+}
+
+// ============================================================================
 // XLSXReadError Tests
 // ============================================================================
 
