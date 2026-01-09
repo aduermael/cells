@@ -92,6 +92,48 @@
                     <button class="btn btn-icon btn-sm style-btn" id="style-underline-btn" title="Underline (Cmd+U)">
                         <span style="text-decoration: underline;">U</span>
                     </button>
+                    <div class="dropdown font-dropdown" id="font-family-dropdown">
+                        <button class="btn btn-icon btn-sm" id="font-family-btn" title="Font family">
+                            <span id="font-family-label">Arial</span>
+                            <svg class="dropdown-arrow" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M6 9l6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div class="dropdown-menu font-dropdown-menu">
+                            <button class="dropdown-item font-item" data-font="Arial" style="font-family: Arial">Arial</button>
+                            <button class="dropdown-item font-item" data-font="Helvetica" style="font-family: Helvetica">Helvetica</button>
+                            <button class="dropdown-item font-item" data-font="Times New Roman" style="font-family: 'Times New Roman'">Times New Roman</button>
+                            <button class="dropdown-item font-item" data-font="Georgia" style="font-family: Georgia">Georgia</button>
+                            <button class="dropdown-item font-item" data-font="Courier New" style="font-family: 'Courier New'">Courier New</button>
+                            <button class="dropdown-item font-item" data-font="Verdana" style="font-family: Verdana">Verdana</button>
+                            <button class="dropdown-item font-item" data-font="Trebuchet MS" style="font-family: 'Trebuchet MS'">Trebuchet MS</button>
+                        </div>
+                    </div>
+                    <div class="dropdown font-dropdown" id="font-size-dropdown">
+                        <button class="btn btn-icon btn-sm" id="font-size-btn" title="Font size">
+                            <span id="font-size-label">12</span>
+                            <svg class="dropdown-arrow" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M6 9l6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div class="dropdown-menu font-dropdown-menu font-size-menu">
+                            <button class="dropdown-item" data-size="8">8</button>
+                            <button class="dropdown-item" data-size="9">9</button>
+                            <button class="dropdown-item" data-size="10">10</button>
+                            <button class="dropdown-item" data-size="11">11</button>
+                            <button class="dropdown-item" data-size="12">12</button>
+                            <button class="dropdown-item" data-size="14">14</button>
+                            <button class="dropdown-item" data-size="16">16</button>
+                            <button class="dropdown-item" data-size="18">18</button>
+                            <button class="dropdown-item" data-size="20">20</button>
+                            <button class="dropdown-item" data-size="24">24</button>
+                            <button class="dropdown-item" data-size="28">28</button>
+                            <button class="dropdown-item" data-size="32">32</button>
+                            <button class="dropdown-item" data-size="36">36</button>
+                            <button class="dropdown-item" data-size="48">48</button>
+                            <button class="dropdown-item" data-size="72">72</button>
+                        </div>
+                    </div>
                 </div>
                 <div id="style-controls-row2">
                     <div class="color-picker-wrapper" id="bg-color-wrapper">

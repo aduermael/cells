@@ -161,7 +161,7 @@ Add style buttons to the left side of the format controls in the formula bar.
   - "No color" / transparent option for background
   - Recent colors row (track last 5 used) - deferred
 
-- [ ] 4d: Add font controls
+- [x] 4d: Add font controls
   - Font family dropdown: System fonts + common web-safe fonts
   - Font size dropdown: 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72
   - Show current cell's font in dropdowns

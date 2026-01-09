@@ -44,6 +44,15 @@ export interface StyleControlsConfig {
   textColorSwatch: HTMLElement;
   textColorPopup: HTMLElement;
   textColorHexInput: HTMLInputElement;
+  // Font controls
+  fontFamilyDropdown: HTMLElement;
+  fontFamilyBtn: HTMLButtonElement;
+  fontFamilyLabel: HTMLElement;
+  fontFamilyMenu: HTMLElement;
+  fontSizeDropdown: HTMLElement;
+  fontSizeBtn: HTMLButtonElement;
+  fontSizeLabel: HTMLElement;
+  fontSizeMenu: HTMLElement;
 }
 
 /** Callback signatures */
@@ -91,6 +100,14 @@ export class StyleControls {
   private textColorSwatch: HTMLElement;
   private textColorPopup: HTMLElement;
   private textColorHexInput: HTMLInputElement;
+  private fontFamilyDropdown: HTMLElement;
+  private fontFamilyBtn: HTMLButtonElement;
+  private fontFamilyLabel: HTMLElement;
+  private fontFamilyMenu: HTMLElement;
+  private fontSizeDropdown: HTMLElement;
+  private fontSizeBtn: HTMLButtonElement;
+  private fontSizeLabel: HTMLElement;
+  private fontSizeMenu: HTMLElement;
 
   // =========================================================================
   // Dependencies
@@ -136,6 +153,14 @@ export class StyleControls {
     this.textColorSwatch = config.textColorSwatch;
     this.textColorPopup = config.textColorPopup;
     this.textColorHexInput = config.textColorHexInput;
+    this.fontFamilyDropdown = config.fontFamilyDropdown;
+    this.fontFamilyBtn = config.fontFamilyBtn;
+    this.fontFamilyLabel = config.fontFamilyLabel;
+    this.fontFamilyMenu = config.fontFamilyMenu;
+    this.fontSizeDropdown = config.fontSizeDropdown;
+    this.fontSizeBtn = config.fontSizeBtn;
+    this.fontSizeLabel = config.fontSizeLabel;
+    this.fontSizeMenu = config.fontSizeMenu;
 
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectedCellData = callbacks.getSelectedCellData;
@@ -283,6 +308,46 @@ export class StyleControls {
         !this.textColorWrapper.contains(target)
       ) {
         this.closeColorPopups();
+      }
+      if (
+        !this.fontFamilyDropdown.contains(target) &&
+        !this.fontSizeDropdown.contains(target)
+      ) {
+        this.closeFontDropdowns();
+      }
+    });
+
+    // Font family dropdown toggle
+    this.fontFamilyBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.toggleFontDropdown("family");
+    });
+
+    // Font size dropdown toggle
+    this.fontSizeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.toggleFontDropdown("size");
+    });
+
+    // Font family selection
+    this.fontFamilyMenu.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const fontItem = target.closest("[data-font]") as HTMLElement;
+      if (fontItem) {
+        const fontFamily = fontItem.dataset.font || "Arial";
+        this.applyFontFamily(fontFamily);
+        this.closeFontDropdowns();
+      }
+    });
+
+    // Font size selection
+    this.fontSizeMenu.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const sizeItem = target.closest("[data-size]") as HTMLElement;
+      if (sizeItem) {
+        const fontSize = parseInt(sizeItem.dataset.size || "12", 10);
+        this.applyFontSize(fontSize);
+        this.closeFontDropdowns();
       }
     });
 
@@ -433,6 +498,10 @@ export class StyleControls {
     // Update color swatches
     this.updateBgColorSwatch(style.bgColor || "");
     this.updateTextColorSwatch(style.textColor || "");
+
+    // Update font dropdowns
+    this.updateFontFamilyDisplay(style.fontFamily || "Arial");
+    this.updateFontSizeDisplay(style.fontSize || 12);
   }
 
   private updateButtonState(
@@ -505,5 +574,88 @@ export class StyleControls {
 
   private isValidHexColor(color: string): boolean {
     return /^#[0-9A-Fa-f]{6}$/.test(color) || /^#[0-9A-Fa-f]{3}$/.test(color);
+  }
+
+  // =========================================================================
+  // Private Methods - Font Controls
+  // =========================================================================
+
+  private toggleFontDropdown(type: "family" | "size"): void {
+    const dropdown = type === "family" ? this.fontFamilyDropdown : this.fontSizeDropdown;
+    const isOpen = dropdown.classList.contains("open");
+
+    // Close all font dropdowns first
+    this.closeFontDropdowns();
+
+    // Toggle the clicked one
+    if (!isOpen) {
+      dropdown.classList.add("open");
+    }
+  }
+
+  private closeFontDropdowns(): void {
+    this.fontFamilyDropdown.classList.remove("open");
+    this.fontSizeDropdown.classList.remove("open");
+  }
+
+  private async applyFontFamily(fontFamily: string): Promise<void> {
+    const position = this.getSelectedCell();
+    if (!position || !this.dataSource) return;
+
+    const styleUpdate: Partial<CellStyle> = { fontFamily };
+
+    try {
+      await this.applyStyleToSelection(styleUpdate);
+
+      this.currentStyle.fontFamily = fontFamily;
+      this.updateFontFamilyDisplay(fontFamily);
+
+      this.requestRender();
+      this.updateFormulaBar();
+    } catch (error) {
+      console.error("Failed to apply font family:", error);
+    }
+  }
+
+  private async applyFontSize(fontSize: number): Promise<void> {
+    const position = this.getSelectedCell();
+    if (!position || !this.dataSource) return;
+
+    const styleUpdate: Partial<CellStyle> = { fontSize };
+
+    try {
+      await this.applyStyleToSelection(styleUpdate);
+
+      this.currentStyle.fontSize = fontSize;
+      this.updateFontSizeDisplay(fontSize);
+
+      this.requestRender();
+      this.updateFormulaBar();
+    } catch (error) {
+      console.error("Failed to apply font size:", error);
+    }
+  }
+
+  private updateFontFamilyDisplay(fontFamily: string): void {
+    this.fontFamilyLabel.textContent = fontFamily;
+    this.fontFamilyLabel.style.fontFamily = fontFamily;
+
+    // Update menu selection
+    const items = this.fontFamilyMenu.querySelectorAll("[data-font]");
+    items.forEach((item) => {
+      const itemFont = (item as HTMLElement).dataset.font || "";
+      item.classList.toggle("active", itemFont === fontFamily);
+    });
+  }
+
+  private updateFontSizeDisplay(fontSize: number): void {
+    this.fontSizeLabel.textContent = String(fontSize);
+
+    // Update menu selection
+    const items = this.fontSizeMenu.querySelectorAll("[data-size]");
+    items.forEach((item) => {
+      const itemSize = parseInt((item as HTMLElement).dataset.size || "0", 10);
+      item.classList.toggle("active", itemSize === fontSize);
+    });
   }
 }

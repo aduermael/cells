@@ -2934,3 +2934,56 @@ canvas {
     border-radius: 50%;
     background: var(--color-warning);
 }
+
+/* Font dropdowns */
+.font-dropdown {
+    display: inline-block;
+}
+
+#font-family-btn {
+    min-width: 70px;
+    max-width: 100px;
+}
+
+#font-family-label {
+    display: inline-block;
+    max-width: 70px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+#font-size-btn {
+    min-width: 40px;
+}
+
+#font-size-label {
+    min-width: 16px;
+    text-align: center;
+}
+
+.font-dropdown-menu {
+    left: 0;
+    right: auto;
+    min-width: 120px;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.font-dropdown-menu.font-size-menu {
+    min-width: 60px;
+}
+
+.font-dropdown-menu .dropdown-item {
+    padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.font-dropdown-menu .font-item {
+    font-size: var(--font-size-md);
+}
+
+/* Font dropdown open state */
+.font-dropdown.open .dropdown-arrow {
+    transform: rotate(180deg);
+}

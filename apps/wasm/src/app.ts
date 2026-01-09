@@ -161,6 +161,15 @@ export interface DOMElements {
   textColorSwatch: HTMLElement;
   textColorPopup: HTMLElement;
   textColorHexInput: HTMLInputElement;
+  // Font controls
+  fontFamilyDropdown: HTMLElement;
+  fontFamilyBtn: HTMLButtonElement;
+  fontFamilyLabel: HTMLElement;
+  fontFamilyMenu: HTMLElement;
+  fontSizeDropdown: HTMLElement;
+  fontSizeBtn: HTMLButtonElement;
+  fontSizeLabel: HTMLElement;
+  fontSizeMenu: HTMLElement;
 }
 
 // =============================================================================
@@ -592,6 +601,15 @@ export function createApp(): App {
     textColorSwatch: getElement("text-color-swatch"),
     textColorPopup: getElement("text-color-popup"),
     textColorHexInput: getElement<HTMLInputElement>("text-color-hex"),
+    // Font controls
+    fontFamilyDropdown: getElement("font-family-dropdown"),
+    fontFamilyBtn: getElement<HTMLButtonElement>("font-family-btn"),
+    fontFamilyLabel: getElement("font-family-label"),
+    fontFamilyMenu: document.querySelector("#font-family-dropdown .dropdown-menu") as HTMLElement,
+    fontSizeDropdown: getElement("font-size-dropdown"),
+    fontSizeBtn: getElement<HTMLButtonElement>("font-size-btn"),
+    fontSizeLabel: getElement("font-size-label"),
+    fontSizeMenu: document.querySelector("#font-size-dropdown .dropdown-menu") as HTMLElement,
   };
 
   return new App(elements);
