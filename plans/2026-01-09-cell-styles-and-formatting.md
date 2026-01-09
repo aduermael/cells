@@ -206,7 +206,7 @@ Fix format and style operations to apply to all selected cells.
   - Apply format to each cell in range
   - Single CRDT transaction for atomicity (if supported) or sequential ops
 
-- [ ] 6b: Update StyleControls for multi-cell
+- [x] 6b: Update StyleControls for multi-cell
   - Same pattern as FormatControls
   - Apply style to each cell in selection range
   - Update UI to show "mixed" state when selection has different styles
