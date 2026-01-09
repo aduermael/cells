@@ -238,6 +238,42 @@ ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op) {
     return ApplyResult::SUCCESS;
 }
 
+ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op) {
+    // Find the target cell across all sheets
+    Cell* cell = nullptr;
+
+    for (auto& s : workbook.sheets) {
+        cell = s->getCell(op.target_id);
+        if (cell != nullptr) {
+            break;
+        }
+    }
+
+    if (cell == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer style operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if (existing.type == OpType::CELL_SET_STYLE && existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    // Parse payload: {"style_id":"STY_abc123"}
+    const std::string styleIdStr = extractJSONString(op.payload, "style_id");
+    if (styleIdStr.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    // Set the style ID (null ID "~" means clear style / use default)
+    cell->styleId = ID(styleIdStr);
+
+    return ApplyResult::SUCCESS;
+}
+
 ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
     Sheet* targetSheet = nullptr;
     const Cell* cell = nullptr;

@@ -676,5 +676,72 @@ ApplyResult applyFormatDefine(Workbook& workbook, const Operation& op) {
     return ApplyResult::SUCCESS;
 }
 
+// Helper to extract boolean from JSON payload
+static bool extractJSONBool(const std::string& json, const std::string& key, bool defaultValue = false) {
+    // Look for "key":true or "key":false
+    const std::string keyPattern = "\"" + key + "\":";
+    auto pos = json.find(keyPattern);
+    if (pos == std::string::npos) {
+        return defaultValue;
+    }
+    pos += keyPattern.size();
+    // Skip whitespace
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
+        pos++;
+    }
+    if (pos >= json.size()) {
+        return defaultValue;
+    }
+    if (json.substr(pos, 4) == "true") {
+        return true;
+    }
+    if (json.substr(pos, 5) == "false") {
+        return false;
+    }
+    return defaultValue;
+}
+
+ApplyResult applyStyleDefine(Workbook& workbook, const Operation& op) {
+    // Check if this style is already defined
+    if (workbook.hasStyle(op.target_id)) {
+        return ApplyResult::ALREADY_APPLIED;
+    }
+
+    // Parse style properties from JSON payload
+    CellStyle style;
+    style.bold = extractJSONBool(op.payload, "bold", false);
+    style.italic = extractJSONBool(op.payload, "italic", false);
+    style.underline = extractJSONBool(op.payload, "underline", false);
+    style.bgColor = extractJSONString(op.payload, "bgColor");
+    style.textColor = extractJSONString(op.payload, "textColor");
+    style.fontFamily = extractJSONString(op.payload, "fontFamily");
+    style.fontSize = static_cast<uint8_t>(extractJSONInt(op.payload, "fontSize", 0));
+
+    // Parse alignment enums
+    const std::string hAlignStr = extractJSONString(op.payload, "hAlign");
+    if (hAlignStr == "center") {
+        style.hAlign = TextAlign::CENTER;
+    } else if (hAlignStr == "right") {
+        style.hAlign = TextAlign::RIGHT;
+    } else if (hAlignStr == "justify") {
+        style.hAlign = TextAlign::JUSTIFY;
+    } else {
+        style.hAlign = TextAlign::LEFT;
+    }
+
+    const std::string vAlignStr = extractJSONString(op.payload, "vAlign");
+    if (vAlignStr == "top") {
+        style.vAlign = VerticalAlign::TOP;
+    } else if (vAlignStr == "middle") {
+        style.vAlign = VerticalAlign::MIDDLE;
+    } else {
+        style.vAlign = VerticalAlign::BOTTOM;
+    }
+
+    workbook.registerStyle(op.target_id, style);
+
+    return ApplyResult::SUCCESS;
+}
+
 }  // namespace internal
 }  // namespace cells

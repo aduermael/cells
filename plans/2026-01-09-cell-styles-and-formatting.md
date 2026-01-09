@@ -52,7 +52,7 @@ Add style support to the core data model with CRDT synchronization.
   - Add `ID styleId` field to Cell struct
   - Add style registry to Workbook (like custom formats)
 
-- [ ] 1b: Add CRDT operations for styles
+- [x] 1b: Add CRDT operations for styles
   - Add `CELL_SET_STYLE` operation type in operation.h
   - Add `STYLE_DEFINE` operation type for style definitions
   - Implement `makeCellSetStyleOp()` in crdt.cc

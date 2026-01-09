@@ -17,6 +17,7 @@
 // - Row: INSERT, DELETE, MOVE, RESIZE (no rename)
 // - Sheet: CREATE, DELETE, RENAME
 // - Format: DEFINE (custom number formats)
+// - Style: DEFINE (cell styles)
 //
 // Serialization format: "wall.logical.node OP_TYPE target_id payload"
 // JSON format used for WebSocket/WebRTC transport
@@ -71,6 +72,9 @@ enum class OpType : uint8_t {
 
     // Format operations
     FORMAT_DEFINE = 40,  // Define a custom number format
+
+    // Style operations
+    STYLE_DEFINE = 41,  // Define a cell style
 
     // Legacy operations (deprecated, kept for backwards compatibility parsing)
     // These map to COL_* or ROW_* based on isCol payload field

@@ -49,6 +49,9 @@ const char* opTypeToString(OpType type) {
         // Format operations
         case OpType::FORMAT_DEFINE:
             return "FORMAT_DEFINE";
+        // Style operations
+        case OpType::STYLE_DEFINE:
+            return "STYLE_DEFINE";
         // Legacy DIM_* operations (deprecated)
         case OpType::DIM_INSERT_AXIS:
             return "DIM_INSERT_AXIS";
@@ -107,6 +110,10 @@ OpType stringToOpType(const std::string& str) {
     // Format operations
     if (str == "FORMAT_DEFINE") {
         return OpType::FORMAT_DEFINE;
+    }
+    // Style operations
+    if (str == "STYLE_DEFINE") {
+        return OpType::STYLE_DEFINE;
     }
     // Column operations
     if (str == "COL_INSERT") {

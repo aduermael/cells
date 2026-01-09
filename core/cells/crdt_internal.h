@@ -54,6 +54,9 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op);
 // Apply CELL_SET_FORMAT operation
 ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op);
 
+// Apply CELL_SET_STYLE operation
+ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op);
+
 // Apply CELL_CLEAR operation
 ApplyResult applyCellClear(Workbook& workbook, const Operation& op);
 
@@ -90,6 +93,9 @@ ApplyResult applyWorkbookRename(Workbook& workbook, const Operation& op);
 
 // Format operations
 ApplyResult applyFormatDefine(Workbook& workbook, const Operation& op);
+
+// Style operations
+ApplyResult applyStyleDefine(Workbook& workbook, const Operation& op);
 
 }  // namespace internal
 }  // namespace cells

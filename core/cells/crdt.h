@@ -76,6 +76,10 @@ Operation makeCellClearOp(Workbook& workbook, const ID& cellId);
 // Payload: {"format_id":"FMT_C002"} or {"format_id":"~"} for default
 Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const std::string& payload);
 
+// Generate a CELL_SET_STYLE operation to set a cell's style.
+// Payload: {"style_id":"..."} or {"style_id":"~"} for default/no style
+Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const std::string& payload);
+
 // Generate a DIM_INSERT_AXIS operation for inserting a column or row.
 Operation makeDimInsertAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
 
@@ -121,6 +125,10 @@ Operation makeWorkbookRenameOp(Workbook& workbook, const std::string& payload);
 // Generate a FORMAT_DEFINE operation for defining a custom number format.
 // Payload: {"format_id":"...","format_code":"..."}
 Operation makeFormatDefineOp(Workbook& workbook, const ID& formatId, const std::string& payload);
+
+// Generate a STYLE_DEFINE operation for defining a cell style.
+// Payload: JSON with style properties (bold, italic, bgColor, etc.)
+Operation makeStyleDefineOp(Workbook& workbook, const ID& styleId, const std::string& payload);
 
 // Bootstrap the OpLog with the current workbook state.
 // Called when transitioning from OFFLINE to COLLABORATING mode.

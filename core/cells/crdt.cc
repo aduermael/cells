@@ -244,8 +244,7 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             break;
 
         case OpType::CELL_SET_STYLE:
-            // Not fully implemented yet - just accept it
-            result = ApplyResult::SUCCESS;
+            result = internal::applyCellSetStyle(workbook, op);
             break;
 
         case OpType::CELL_SET_FORMAT:
@@ -331,6 +330,10 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
         case OpType::FORMAT_DEFINE:
             result = internal::applyFormatDefine(workbook, op);
             break;
+
+        case OpType::STYLE_DEFINE:
+            result = internal::applyStyleDefine(workbook, op);
+            break;
     }
 
     // Add to OpLog regardless of result (for history/sync)
@@ -380,6 +383,11 @@ Operation makeCellClearOp(Workbook& workbook, const ID& cellId) {
 Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::CELL_SET_FORMAT, cellId, payload};
+}
+
+Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::CELL_SET_STYLE, cellId, payload};
 }
 
 Operation makeDimInsertAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
@@ -478,6 +486,11 @@ Operation makeFormatDefineOp(Workbook& workbook, const ID& formatId, const std::
     return {hlc, OpType::FORMAT_DEFINE, formatId, payload};
 }
 
+Operation makeStyleDefineOp(Workbook& workbook, const ID& styleId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::STYLE_DEFINE, styleId, payload};
+}
+
 // =============================================================================
 // Bootstrap OpLog
 // =============================================================================
@@ -572,6 +585,56 @@ size_t bootstrapOpLog(Workbook& workbook) {
         const std::string payload =
             "{\"format_code\":\"" + internal::jsonEscape(formatCode) + "\"}";
         const Operation op = makeFormatDefineOp(workbook, formatId, payload);
+        oplog->addOperation(op);
+        count++;
+    }
+
+    // Generate STYLE_DEFINE operations for all styles
+    for (const auto& [styleId, style] : workbook.getStyles()) {
+        std::string payload = "{";
+        payload += "\"bold\":" + std::string(style.bold ? "true" : "false");
+        payload += ",\"italic\":" + std::string(style.italic ? "true" : "false");
+        payload += ",\"underline\":" + std::string(style.underline ? "true" : "false");
+        if (!style.bgColor.empty()) {
+            payload += ",\"bgColor\":\"" + internal::jsonEscape(style.bgColor) + "\"";
+        }
+        if (!style.textColor.empty()) {
+            payload += ",\"textColor\":\"" + internal::jsonEscape(style.textColor) + "\"";
+        }
+        if (!style.fontFamily.empty()) {
+            payload += ",\"fontFamily\":\"" + internal::jsonEscape(style.fontFamily) + "\"";
+        }
+        if (style.fontSize > 0) {
+            payload += ",\"fontSize\":" + std::to_string(style.fontSize);
+        }
+        // Horizontal alignment
+        switch (style.hAlign) {
+            case TextAlign::CENTER:
+                payload += ",\"hAlign\":\"center\"";
+                break;
+            case TextAlign::RIGHT:
+                payload += ",\"hAlign\":\"right\"";
+                break;
+            case TextAlign::JUSTIFY:
+                payload += ",\"hAlign\":\"justify\"";
+                break;
+            default:
+                break;  // LEFT is default, omit
+        }
+        // Vertical alignment
+        switch (style.vAlign) {
+            case VerticalAlign::TOP:
+                payload += ",\"vAlign\":\"top\"";
+                break;
+            case VerticalAlign::MIDDLE:
+                payload += ",\"vAlign\":\"middle\"";
+                break;
+            default:
+                break;  // BOTTOM is default, omit
+        }
+        payload += "}";
+
+        const Operation op = makeStyleDefineOp(workbook, styleId, payload);
         oplog->addOperation(op);
         count++;
     }
