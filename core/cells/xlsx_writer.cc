@@ -227,8 +227,8 @@ public:
         fontIndex_[fontKey(fonts_[0])] = 0;
 
         // Add required fills (indices 0 and 1) - required by Excel
-        fills_.push_back(XLSXFillEntry{});          // none
-        fills_.push_back(XLSXFillEntry{"gray125"});  // gray125 (required placeholder)
+        fills_.emplace_back();                          // none (index 0)
+        fills_.emplace_back(XLSXFillEntry{"gray125"});  // gray125 (required placeholder)
         fillIndex_[""] = 0;
         fillIndex_["gray125"] = 1;
 
@@ -281,8 +281,8 @@ private:
 
     static std::string fontKey(const XLSXFontEntry& f) {
         std::ostringstream oss;
-        oss << (f.bold ? "B" : "b") << (f.italic ? "I" : "i") << (f.underline ? "U" : "u")
-            << "|" << f.name << "|" << f.size << "|" << f.color;
+        oss << (f.bold ? "B" : "b") << (f.italic ? "I" : "i") << (f.underline ? "U" : "u") << "|"
+            << f.name << "|" << f.size << "|" << f.color;
         return oss.str();
     }
 
@@ -384,8 +384,7 @@ struct CellPosition {
 // cellStyleIndices maps cell pointer to XLSX style index (s attribute)
 std::string generateWorksheet(
     const cells::Sheet& sheet, SharedStringTable& sst, const cells::RefConverter& refConverter,
-    bool writeFormulas,
-    const std::unordered_map<const cells::Cell*, size_t>& cellStyleIndices) {
+    bool writeFormulas, const std::unordered_map<const cells::Cell*, size_t>& cellStyleIndices) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
     xml << "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\n";
@@ -678,17 +677,15 @@ std::string generateStyles(const StyleTable& styles) {
     xml << "  <fills count=\"" << fills.size() << "\">\n";
     for (size_t i = 0; i < fills.size(); ++i) {
         const auto& fill = fills[i];
-        if (i == 0) {
-            // First fill is always none
-            xml << "    <fill><patternFill patternType=\"none\"/></fill>\n";
-        } else if (i == 1 && fill.fgColor == "gray125") {
+        if (i == 1 && fill.fgColor == "gray125") {
             // Second fill is required gray125 placeholder
             xml << "    <fill><patternFill patternType=\"gray125\"/></fill>\n";
-        } else if (!fill.fgColor.empty()) {
+        } else if (!fill.fgColor.empty() && fill.fgColor != "gray125") {
             // Solid fill with color
-            xml << "    <fill><patternFill patternType=\"solid\"><fgColor rgb=\""
-                << fill.fgColor << "\"/></patternFill></fill>\n";
+            xml << "    <fill><patternFill patternType=\"solid\"><fgColor rgb=\"" << fill.fgColor
+                << "\"/></patternFill></fill>\n";
         } else {
+            // Empty fill or index 0 - use none pattern
             xml << "    <fill><patternFill patternType=\"none\"/></fill>\n";
         }
     }
@@ -915,8 +912,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         refConverter.setContext(sheet);
 
         // Generate worksheet XML
-        const std::string sheetXml = generateWorksheet(sheet, sst, refConverter,
-                                                       options_.writeFormulas, cellStyleIndices);
+        const std::string sheetXml =
+            generateWorksheet(sheet, sst, refConverter, options_.writeFormulas, cellStyleIndices);
 
         const std::string sheetPath = "xl/worksheets/sheet" + std::to_string(i + 1) + ".xml";
         if (!zip.addFile(sheetPath, sheetXml)) {

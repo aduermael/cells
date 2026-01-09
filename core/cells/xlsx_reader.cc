@@ -86,9 +86,9 @@ struct XLSXFont {
     bool bold{false};
     bool italic{false};
     bool underline{false};
-    std::string name;      // Font family name
-    double size{0};        // Font size in points
-    std::string color;     // Text color as #RRGGBB
+    std::string name;   // Font family name
+    double size{0};     // Font size in points
+    std::string color;  // Text color as #RRGGBB
 };
 
 // Parsed fill (background) from styles.xml
@@ -236,15 +236,10 @@ struct XLSXStyles {
 // Create a unique key string from a CellStyle (for deduplication)
 std::string cellStyleToKey(const cells::CellStyle& style) {
     std::ostringstream oss;
-    oss << (style.bold ? "B" : "b")
-        << (style.italic ? "I" : "i")
-        << (style.underline ? "U" : "u")
-        << "|" << style.bgColor
-        << "|" << style.textColor
-        << "|" << style.fontFamily
-        << "|" << static_cast<int>(style.fontSize)
-        << "|" << static_cast<int>(style.hAlign)
-        << "|" << static_cast<int>(style.vAlign);
+    oss << (style.bold ? "B" : "b") << (style.italic ? "I" : "i") << (style.underline ? "U" : "u")
+        << "|" << style.bgColor << "|" << style.textColor << "|" << style.fontFamily << "|"
+        << static_cast<int>(style.fontSize) << "|" << static_cast<int>(style.hAlign) << "|"
+        << static_cast<int>(style.vAlign);
     return oss.str();
 }
 
@@ -289,8 +284,7 @@ XLSXStyles parseStylesXml(const std::string& content) {
         if (uNode) {
             const char* val = uNode.attribute("val").value();
             // Any underline value counts as underline (single, double, etc.)
-            font.underline =
-                (val == nullptr || val[0] == '\0' || std::strcmp(val, "none") != 0);
+            font.underline = (val == nullptr || val[0] == '\0' || std::strcmp(val, "none") != 0);
         }
 
         // Font name: <name val="Arial"/>
@@ -371,8 +365,7 @@ XLSXStyles parseStylesXml(const std::string& content) {
             xf.applyAlignment = true;
             xf.alignment.horizontal =
                 parseHorizontalAlign(alignmentNode.attribute("horizontal").value());
-            xf.alignment.vertical =
-                parseVerticalAlign(alignmentNode.attribute("vertical").value());
+            xf.alignment.vertical = parseVerticalAlign(alignmentNode.attribute("vertical").value());
         }
 
         styles.cellFormats.push_back(xf);
@@ -508,7 +501,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 const char* id = rel.attribute("Id").value();
                 const char* target = rel.attribute("Target").value();
                 if (id && target) {
-                    // Target can be absolute (/xl/worksheets/sheet1.xml) or relative (worksheets/sheet1.xml)
+                    // Target can be absolute (/xl/worksheets/sheet1.xml) or relative
+                    // (worksheets/sheet1.xml)
                     std::string fullPath;
                     if (target[0] == '/') {
                         // Absolute path - strip leading slash
@@ -593,7 +587,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     std::unordered_map<std::string, ID> styleToId;
 
     if (options.readStyles) {
-        std::string stylesContent = zip.readFile("xl/styles.xml");
+        const std::string stylesContent = zip.readFile("xl/styles.xml");
         if (!stylesContent.empty()) {
             xlsxStyles = parseStylesXml(stylesContent);
         }

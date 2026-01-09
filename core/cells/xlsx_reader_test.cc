@@ -316,8 +316,7 @@ TEST(XLSXReaderTest, ReadStylesBold) {
     auto result = readXLSX(testFilePath("styled.xlsx"), options);
     EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
     ASSERT_NE(result.workbook, nullptr);
-    ASSERT_GT(result.workbook->sheetCount(), 0u)
-        << "Workbook should have at least one sheet";
+    ASSERT_GT(result.workbook->sheetCount(), 0u) << "Workbook should have at least one sheet";
 
     Sheet* sheet = result.workbook->getSheetByIndex(0);
     ASSERT_NE(sheet, nullptr) << "getSheetByIndex(0) returned null";

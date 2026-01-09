@@ -417,6 +417,7 @@ cc_library(
 cc_test(
     name = "xlsx_writer_test",
     srcs = ["xlsx_writer_test.cc"],
+    data = ["//testdata/xlsx:sample_xlsx_files"],
     deps = [
         ":id",
         ":xlsx_reader",
