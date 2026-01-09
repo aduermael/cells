@@ -2987,3 +2987,50 @@ canvas {
 .font-dropdown.open .dropdown-arrow {
     transform: rotate(180deg);
 }
+
+/* Alignment button groups */
+.align-btn-group {
+    display: flex;
+    gap: 1px;
+    background: var(--color-border);
+    border-radius: var(--border-radius);
+    padding: 1px;
+}
+
+.align-btn {
+    min-width: 22px;
+    height: 22px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-primary);
+    border: none;
+    border-radius: 0;
+}
+
+.align-btn:first-child {
+    border-radius: var(--border-radius-smaller) 0 0 var(--border-radius-smaller);
+}
+
+.align-btn:last-child {
+    border-radius: 0 var(--border-radius-smaller) var(--border-radius-smaller) 0;
+}
+
+.align-btn:hover {
+    background: var(--color-bg-hover);
+}
+
+.align-btn.active {
+    background: var(--color-primary);
+    color: var(--color-bg-primary);
+}
+
+.align-btn.active:hover {
+    background: var(--color-primary-hover);
+}
+
+.align-btn svg {
+    width: 12px;
+    height: 12px;
+}

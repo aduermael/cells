@@ -178,7 +178,7 @@ Add style buttons to the left side of the format controls in the formula bar.
 
 Add horizontal and vertical alignment buttons.
 
-- [ ] 5a: Update HTML with alignment buttons
+- [x] 5a: Update HTML with alignment buttons
   - Add alignment button group after font controls
   - Horizontal: Left, Center, Right (mutually exclusive)
   - Vertical: Top, Middle, Bottom (mutually exclusive)

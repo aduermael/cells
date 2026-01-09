@@ -170,6 +170,15 @@ export interface DOMElements {
   fontSizeBtn: HTMLButtonElement;
   fontSizeLabel: HTMLElement;
   fontSizeMenu: HTMLElement;
+  // Alignment controls
+  hAlignGroup: HTMLElement;
+  alignLeftBtn: HTMLButtonElement;
+  alignCenterBtn: HTMLButtonElement;
+  alignRightBtn: HTMLButtonElement;
+  vAlignGroup: HTMLElement;
+  valignTopBtn: HTMLButtonElement;
+  valignMiddleBtn: HTMLButtonElement;
+  valignBottomBtn: HTMLButtonElement;
 }
 
 // =============================================================================
@@ -610,6 +619,15 @@ export function createApp(): App {
     fontSizeBtn: getElement<HTMLButtonElement>("font-size-btn"),
     fontSizeLabel: getElement("font-size-label"),
     fontSizeMenu: document.querySelector("#font-size-dropdown .dropdown-menu") as HTMLElement,
+    // Alignment controls
+    hAlignGroup: getElement("h-align-group"),
+    alignLeftBtn: getElement<HTMLButtonElement>("align-left-btn"),
+    alignCenterBtn: getElement<HTMLButtonElement>("align-center-btn"),
+    alignRightBtn: getElement<HTMLButtonElement>("align-right-btn"),
+    vAlignGroup: getElement("v-align-group"),
+    valignTopBtn: getElement<HTMLButtonElement>("valign-top-btn"),
+    valignMiddleBtn: getElement<HTMLButtonElement>("valign-middle-btn"),
+    valignBottomBtn: getElement<HTMLButtonElement>("valign-bottom-btn"),
   };
 
   return new App(elements);
