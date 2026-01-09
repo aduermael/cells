@@ -1109,5 +1109,471 @@ X xA1bC2dE cA1bC2dE rA1bC2dE n 42 fmt:FMT_C002 sty:STYbold1
     EXPECT_EQ(cell->styleId.toString(), "STYbold1");
 }
 
+// =============================================================================
+// ZCD Style Round-trip Tests (Phase 2c)
+// =============================================================================
+
+TEST(StyleZCDRoundtripTest, EmptyStyleRoundtrip) {
+    // Test that an empty style (all defaults) serializes and deserializes correctly
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell->value = CellValue(42.0);
+    cell->styleId = ID("STYempty");
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    wb->addSheet(std::move(sheet));
+
+    // Register empty style (all defaults)
+    CellStyle emptyStyle;
+    EXPECT_TRUE(emptyStyle.isEmpty());
+    wb->registerStyle(ID("STYempty"), emptyStyle);
+
+    // Serialize
+    const std::string serialized = serialize(*wb);
+
+    // Parse back
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Verify empty style is preserved
+    EXPECT_TRUE(result.workbook->hasStyle(ID("STYempty")));
+    const CellStyle* parsed = result.workbook->getStyle(ID("STYempty"));
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_TRUE(parsed->isEmpty());
+    EXPECT_FALSE(parsed->bold);
+    EXPECT_FALSE(parsed->italic);
+    EXPECT_FALSE(parsed->underline);
+    EXPECT_TRUE(parsed->bgColor.empty());
+    EXPECT_TRUE(parsed->textColor.empty());
+    EXPECT_TRUE(parsed->fontFamily.empty());
+    EXPECT_EQ(parsed->fontSize, 0);
+    EXPECT_EQ(parsed->hAlign, TextAlign::LEFT);
+    EXPECT_EQ(parsed->vAlign, VerticalAlign::BOTTOM);
+}
+
+TEST(StyleZCDRoundtripTest, PartialStyleBoldOnly) {
+    // Test style with only bold set
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell->value = CellValue("Header");
+    cell->styleId = ID("STYbold0");
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    wb->addSheet(std::move(sheet));
+
+    CellStyle style;
+    style.bold = true;
+    wb->registerStyle(ID("STYbold0"), style);
+
+    const std::string serialized = serialize(*wb);
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    const CellStyle* parsed = result.workbook->getStyle(ID("STYbold0"));
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_TRUE(parsed->bold);
+    EXPECT_FALSE(parsed->italic);
+    EXPECT_FALSE(parsed->underline);
+}
+
+TEST(StyleZCDRoundtripTest, PartialStyleColorOnly) {
+    // Test style with only colors set
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell->value = CellValue("Highlighted");
+    cell->styleId = ID("STYcolor");
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    wb->addSheet(std::move(sheet));
+
+    CellStyle style;
+    style.bgColor = "#FFFF00";  // Yellow background
+    style.textColor = "#0000FF";  // Blue text
+    wb->registerStyle(ID("STYcolor"), style);
+
+    const std::string serialized = serialize(*wb);
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    const CellStyle* parsed = result.workbook->getStyle(ID("STYcolor"));
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->bgColor, "#FFFF00");
+    EXPECT_EQ(parsed->textColor, "#0000FF");
+    EXPECT_FALSE(parsed->bold);
+    EXPECT_FALSE(parsed->italic);
+}
+
+TEST(StyleZCDRoundtripTest, PartialStyleAlignmentOnly) {
+    // Test style with only alignment set
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell->value = CellValue("Centered");
+    cell->styleId = ID("STYalign");
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    wb->addSheet(std::move(sheet));
+
+    CellStyle style;
+    style.hAlign = TextAlign::CENTER;
+    style.vAlign = VerticalAlign::MIDDLE;
+    wb->registerStyle(ID("STYalign"), style);
+
+    const std::string serialized = serialize(*wb);
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    const CellStyle* parsed = result.workbook->getStyle(ID("STYalign"));
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->hAlign, TextAlign::CENTER);
+    EXPECT_EQ(parsed->vAlign, VerticalAlign::MIDDLE);
+    EXPECT_FALSE(parsed->bold);
+}
+
+TEST(StyleZCDRoundtripTest, PartialStyleFontOnly) {
+    // Test style with only font properties set
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell->value = CellValue("Large Text");
+    cell->styleId = ID("STYfont0");
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    wb->addSheet(std::move(sheet));
+
+    CellStyle style;
+    style.fontFamily = "Times New Roman";
+    style.fontSize = 18;
+    wb->registerStyle(ID("STYfont0"), style);
+
+    const std::string serialized = serialize(*wb);
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    const CellStyle* parsed = result.workbook->getStyle(ID("STYfont0"));
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->fontFamily, "Times New Roman");
+    EXPECT_EQ(parsed->fontSize, 18);
+    EXPECT_FALSE(parsed->bold);
+}
+
+TEST(StyleZCDRoundtripTest, MultipleCellsDifferentStyles) {
+    // Test multiple cells with different styles
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+
+    // Create grid
+    auto col1 = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    col1->position = 0;
+    auto col2 = std::make_unique<Axis>(ID("cB3dE4fG"), true);
+    col2->position = 1;
+    auto row1 = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row1->position = 0;
+    auto row2 = std::make_unique<Axis>(ID("rB3dE4fG"), false);
+    row2->position = 1;
+
+    // Cell A1: Bold header
+    auto cellA1 = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cellA1->value = CellValue("Name");
+    cellA1->styleId = ID("STYhead0");
+
+    // Cell B1: Bold header
+    auto cellB1 = std::make_unique<Cell>(ID("xB3dE4fG"), ID("cB3dE4fG"), ID("rA1bC2dE"));
+    cellB1->value = CellValue("Value");
+    cellB1->styleId = ID("STYhead0");
+
+    // Cell A2: Normal text
+    auto cellA2 = std::make_unique<Cell>(ID("xC5fG6hJ"), ID("cA1bC2dE"), ID("rB3dE4fG"));
+    cellA2->value = CellValue("Item 1");
+    // No style
+
+    // Cell B2: Currency with color
+    auto cellB2 = std::make_unique<Cell>(ID("xD7hJ8kL"), ID("cB3dE4fG"), ID("rB3dE4fG"));
+    cellB2->value = CellValue(1234.56);
+    cellB2->styleId = ID("STYmoney");
+
+    sheet->addColumn(std::move(col1));
+    sheet->addColumn(std::move(col2));
+    sheet->addRow(std::move(row1));
+    sheet->addRow(std::move(row2));
+    sheet->addCell(std::move(cellA1));
+    sheet->addCell(std::move(cellB1));
+    sheet->addCell(std::move(cellA2));
+    sheet->addCell(std::move(cellB2));
+    wb->addSheet(std::move(sheet));
+
+    // Register styles
+    CellStyle headerStyle;
+    headerStyle.bold = true;
+    headerStyle.bgColor = "#4472C4";
+    headerStyle.textColor = "#FFFFFF";
+    headerStyle.hAlign = TextAlign::CENTER;
+    wb->registerStyle(ID("STYhead0"), headerStyle);
+
+    CellStyle moneyStyle;
+    moneyStyle.textColor = "#008000";  // Green for positive values
+    moneyStyle.hAlign = TextAlign::RIGHT;
+    wb->registerStyle(ID("STYmoney"), moneyStyle);
+
+    // Serialize
+    const std::string serialized = serialize(*wb);
+
+    // Parse back
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Verify styles
+    EXPECT_TRUE(result.workbook->hasStyle(ID("STYhead0")));
+    EXPECT_TRUE(result.workbook->hasStyle(ID("STYmoney")));
+
+    const CellStyle* header = result.workbook->getStyle(ID("STYhead0"));
+    ASSERT_NE(header, nullptr);
+    EXPECT_TRUE(header->bold);
+    EXPECT_EQ(header->bgColor, "#4472C4");
+    EXPECT_EQ(header->textColor, "#FFFFFF");
+    EXPECT_EQ(header->hAlign, TextAlign::CENTER);
+
+    const CellStyle* money = result.workbook->getStyle(ID("STYmoney"));
+    ASSERT_NE(money, nullptr);
+    EXPECT_EQ(money->textColor, "#008000");
+    EXPECT_EQ(money->hAlign, TextAlign::RIGHT);
+
+    // Verify cells
+    Sheet* parsedSheet = result.workbook->getSheetByIndex(0);
+    EXPECT_EQ(parsedSheet->getCell(ID("xA1bC2dE"))->styleId.toString(), "STYhead0");
+    EXPECT_EQ(parsedSheet->getCell(ID("xB3dE4fG"))->styleId.toString(), "STYhead0");
+    EXPECT_TRUE(parsedSheet->getCell(ID("xC5fG6hJ"))->styleId.isNull());
+    EXPECT_EQ(parsedSheet->getCell(ID("xD7hJ8kL"))->styleId.toString(), "STYmoney");
+}
+
+TEST(StyleZCDRoundtripTest, AllAlignmentValues) {
+    // Test all alignment values round-trip correctly
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    wb->addSheet(std::move(sheet));
+
+    // Test all horizontal alignment values
+    CellStyle leftStyle;
+    leftStyle.hAlign = TextAlign::LEFT;
+    wb->registerStyle(ID("STYleft0"), leftStyle);
+
+    CellStyle centerStyle;
+    centerStyle.hAlign = TextAlign::CENTER;
+    wb->registerStyle(ID("STYcentr"), centerStyle);
+
+    CellStyle rightStyle;
+    rightStyle.hAlign = TextAlign::RIGHT;
+    wb->registerStyle(ID("STYright"), rightStyle);
+
+    CellStyle justifyStyle;
+    justifyStyle.hAlign = TextAlign::JUSTIFY;
+    wb->registerStyle(ID("STYjstfy"), justifyStyle);
+
+    // Test all vertical alignment values
+    CellStyle topStyle;
+    topStyle.vAlign = VerticalAlign::TOP;
+    wb->registerStyle(ID("STYtop00"), topStyle);
+
+    CellStyle middleStyle;
+    middleStyle.vAlign = VerticalAlign::MIDDLE;
+    wb->registerStyle(ID("STYmidl0"), middleStyle);
+
+    CellStyle bottomStyle;
+    bottomStyle.vAlign = VerticalAlign::BOTTOM;
+    wb->registerStyle(ID("STYbotm0"), bottomStyle);
+
+    // Serialize and parse
+    const std::string serialized = serialize(*wb);
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Verify horizontal alignments
+    EXPECT_EQ(result.workbook->getStyle(ID("STYleft0"))->hAlign, TextAlign::LEFT);
+    EXPECT_EQ(result.workbook->getStyle(ID("STYcentr"))->hAlign, TextAlign::CENTER);
+    EXPECT_EQ(result.workbook->getStyle(ID("STYright"))->hAlign, TextAlign::RIGHT);
+    EXPECT_EQ(result.workbook->getStyle(ID("STYjstfy"))->hAlign, TextAlign::JUSTIFY);
+
+    // Verify vertical alignments
+    EXPECT_EQ(result.workbook->getStyle(ID("STYtop00"))->vAlign, VerticalAlign::TOP);
+    EXPECT_EQ(result.workbook->getStyle(ID("STYmidl0"))->vAlign, VerticalAlign::MIDDLE);
+    EXPECT_EQ(result.workbook->getStyle(ID("STYbotm0"))->vAlign, VerticalAlign::BOTTOM);
+}
+
+TEST(StyleZCDRoundtripTest, StyleWithSpecialCharactersInFont) {
+    // Test font family with special characters
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    wb->addSheet(std::move(sheet));
+
+    CellStyle style;
+    style.fontFamily = "Courier New";  // Space in name
+    style.fontSize = 12;
+    wb->registerStyle(ID("STYcourn"), style);
+
+    const std::string serialized = serialize(*wb);
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    const CellStyle* parsed = result.workbook->getStyle(ID("STYcourn"));
+    ASSERT_NE(parsed, nullptr);
+    EXPECT_EQ(parsed->fontFamily, "Courier New");
+    EXPECT_EQ(parsed->fontSize, 12);
+}
+
+TEST(StyleZCDRoundtripTest, RoundtripStylesFromTestdataFile) {
+    // Load styles.zcd from testdata directory and verify round-trip
+    const std::string content = readTestFile("styles.zcd");
+    ASSERT_FALSE(content.empty()) << "Failed to load testdata/styles.zcd";
+
+    // Parse original
+    ParseResult result1 = parse(content);
+    ASSERT_TRUE(result1.ok()) << (result1.error ? result1.error->toString() : "");
+
+    // Verify styles loaded
+    EXPECT_TRUE(result1.workbook->hasStyle(ID("STYhead0")));
+    EXPECT_TRUE(result1.workbook->hasStyle(ID("STYmoney")));
+    EXPECT_TRUE(result1.workbook->hasStyle(ID("STYwarn0")));
+    EXPECT_TRUE(result1.workbook->hasStyle(ID("STYitalc")));
+    EXPECT_TRUE(result1.workbook->hasStyle(ID("STYunder")));
+    EXPECT_TRUE(result1.workbook->hasStyle(ID("STYfull0")));
+
+    // Verify full style has all properties
+    const CellStyle* fullStyle = result1.workbook->getStyle(ID("STYfull0"));
+    ASSERT_NE(fullStyle, nullptr);
+    EXPECT_TRUE(fullStyle->bold);
+    EXPECT_TRUE(fullStyle->italic);
+    EXPECT_TRUE(fullStyle->underline);
+    EXPECT_EQ(fullStyle->bgColor, "#FF0000");
+    EXPECT_EQ(fullStyle->textColor, "#FFFFFF");
+    EXPECT_EQ(fullStyle->fontFamily, "Arial");
+    EXPECT_EQ(fullStyle->fontSize, 14);
+    EXPECT_EQ(fullStyle->hAlign, TextAlign::CENTER);
+    EXPECT_EQ(fullStyle->vAlign, VerticalAlign::MIDDLE);
+
+    // Serialize
+    const std::string serialized = serialize(*result1.workbook);
+    EXPECT_FALSE(serialized.empty());
+
+    // Parse again
+    ParseResult result2 = parse(serialized);
+    ASSERT_TRUE(result2.ok()) << (result2.error ? result2.error->toString() : "");
+
+    // Verify all styles match after round-trip
+    EXPECT_EQ(*result1.workbook->getStyle(ID("STYhead0")),
+              *result2.workbook->getStyle(ID("STYhead0")));
+    EXPECT_EQ(*result1.workbook->getStyle(ID("STYmoney")),
+              *result2.workbook->getStyle(ID("STYmoney")));
+    EXPECT_EQ(*result1.workbook->getStyle(ID("STYwarn0")),
+              *result2.workbook->getStyle(ID("STYwarn0")));
+    EXPECT_EQ(*result1.workbook->getStyle(ID("STYfull0")),
+              *result2.workbook->getStyle(ID("STYfull0")));
+
+    // Verify cell count matches
+    compareWorkbooks(*result1.workbook, *result2.workbook);
+}
+
+TEST(StyleZCDRoundtripTest, ParseStyledZCDFile) {
+    // Parse a ZCD file with styles - simulating reading from disk
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Styled Document"
+Y STYhead0 {"bold":true,"bgColor":"#4472C4","textColor":"#FFFFFF","hAlign":"center"}
+Y STYmoney {"textColor":"#008000","hAlign":"right"}
+Y STYwarn0 {"bgColor":"#FFC000","bold":true}
+F FMT_C002 "$#,##0.00"
+S sH3eE4tB "Data"
+C cA1bC2dE 0
+C cB3dE4fG 1
+R rA1bC2dE 0
+R rB3dE4fG 1
+R rC5fG6hJ 2
+X xA1bC2dE cA1bC2dE rA1bC2dE s "Category" sty:STYhead0
+X xB3dE4fG cB3dE4fG rA1bC2dE s "Amount" sty:STYhead0
+X xC5fG6hJ cA1bC2dE rB3dE4fG s "Sales"
+X xD7hJ8kL cB3dE4fG rB3dE4fG n 10000 fmt:FMT_C002 sty:STYmoney
+X xE9kL0mN cA1bC2dE rC5fG6hJ s "Warning" sty:STYwarn0
+X xF1mN2pQ cB3dE4fG rC5fG6hJ n -500 fmt:FMT_C002 sty:STYwarn0
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Verify all styles loaded
+    EXPECT_TRUE(result.workbook->hasStyle(ID("STYhead0")));
+    EXPECT_TRUE(result.workbook->hasStyle(ID("STYmoney")));
+    EXPECT_TRUE(result.workbook->hasStyle(ID("STYwarn0")));
+
+    // Verify style properties
+    const CellStyle* header = result.workbook->getStyle(ID("STYhead0"));
+    ASSERT_NE(header, nullptr);
+    EXPECT_TRUE(header->bold);
+    EXPECT_EQ(header->bgColor, "#4472C4");
+    EXPECT_EQ(header->textColor, "#FFFFFF");
+    EXPECT_EQ(header->hAlign, TextAlign::CENTER);
+
+    const CellStyle* money = result.workbook->getStyle(ID("STYmoney"));
+    ASSERT_NE(money, nullptr);
+    EXPECT_EQ(money->textColor, "#008000");
+    EXPECT_EQ(money->hAlign, TextAlign::RIGHT);
+
+    const CellStyle* warn = result.workbook->getStyle(ID("STYwarn0"));
+    ASSERT_NE(warn, nullptr);
+    EXPECT_TRUE(warn->bold);
+    EXPECT_EQ(warn->bgColor, "#FFC000");
+
+    // Verify cells have correct styles
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    EXPECT_EQ(sheet->getCell(ID("xA1bC2dE"))->styleId.toString(), "STYhead0");
+    EXPECT_EQ(sheet->getCell(ID("xD7hJ8kL"))->styleId.toString(), "STYmoney");
+    EXPECT_EQ(sheet->getCell(ID("xE9kL0mN"))->styleId.toString(), "STYwarn0");
+
+    // Verify cell with both format and style
+    Cell* amountCell = sheet->getCell(ID("xD7hJ8kL"));
+    EXPECT_EQ(amountCell->formatId.toString(), "FMT_C002");
+    EXPECT_EQ(amountCell->styleId.toString(), "STYmoney");
+
+    // Serialize and verify round-trip
+    const std::string serialized = serialize(*result.workbook);
+    ParseResult result2 = parse(serialized);
+    ASSERT_TRUE(result2.ok()) << (result2.error ? result2.error->toString() : "");
+
+    // Compare styles after round-trip
+    const CellStyle* header2 = result2.workbook->getStyle(ID("STYhead0"));
+    EXPECT_EQ(*header, *header2);
+
+    const CellStyle* money2 = result2.workbook->getStyle(ID("STYmoney"));
+    EXPECT_EQ(*money, *money2);
+
+    const CellStyle* warn2 = result2.workbook->getStyle(ID("STYwarn0"));
+    EXPECT_EQ(*warn, *warn2);
+}
+
 }  // namespace
 }  // namespace cells

@@ -1,0 +1,51 @@
+#cells v1
+D tY8pL3mK "Styles Test"
+
+# Style definitions
+Y STYhead0 {"bold":true,"bgColor":"#4472C4","textColor":"#FFFFFF","hAlign":"center"}
+Y STYmoney {"textColor":"#008000","hAlign":"right","fontFamily":"Courier New"}
+Y STYwarn0 {"bgColor":"#FFC000","bold":true}
+Y STYitalc {"italic":true}
+Y STYunder {"underline":true}
+Y STYfull0 {"bold":true,"italic":true,"underline":true,"bgColor":"#FF0000","textColor":"#FFFFFF","fontFamily":"Arial","fontSize":14,"hAlign":"center","vAlign":"middle"}
+
+# Custom format
+F FMT_C002 "$#,##0.00"
+
+S qR5sW2xN "Styled Sheet"
+
+#cols
+C cA1bC2dE 0
+C cB3dE4fG 1
+C cC5fG6hJ 2
+
+#rows
+R rA1bC2dE 0
+R rB3dE4fG 1
+R rC5fG6hJ 2
+R rD7hJ8kL 3
+R rE9kL0mN 4
+
+#cells - Header row with header style
+X xA1aB2cD cA1bC2dE rA1bC2dE s "Name" sty:STYhead0
+X xA2aB3cD cB3dE4fG rA1bC2dE s "Amount" sty:STYhead0
+X xA3aB4cD cC5fG6hJ rA1bC2dE s "Status" sty:STYhead0
+
+#cells - Data row 1
+X xB1bC2dE cA1bC2dE rB3dE4fG s "Product A"
+X xB2bC3dE cB3dE4fG rB3dE4fG n 1500.50 fmt:FMT_C002 sty:STYmoney
+X xB3bC4dE cC5fG6hJ rB3dE4fG s "Active"
+
+#cells - Data row 2 with italic
+X xC1cD2eF cA1bC2dE rC5fG6hJ s "Product B" sty:STYitalc
+X xC2cD3eF cB3dE4fG rC5fG6hJ n 2300.00 fmt:FMT_C002 sty:STYmoney
+X xC3cD4eF cC5fG6hJ rC5fG6hJ s "Pending" sty:STYunder
+
+#cells - Data row 3 with warning
+X xD1dE2fG cA1bC2dE rD7hJ8kL s "Product C" sty:STYwarn0
+X xD2dE3fG cB3dE4fG rD7hJ8kL n -500.00 fmt:FMT_C002 sty:STYwarn0
+X xD3dE4fG cC5fG6hJ rD7hJ8kL s "Overdue" sty:STYwarn0
+
+#cells - Full style test
+X xE1eF2gH cA1bC2dE rE9kL0mN s "Full Style" sty:STYfull0
+

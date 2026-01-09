@@ -95,7 +95,7 @@ Ensure styles are properly preserved when importing/exporting XLSX and ZCD files
   - Update xlsx_writer.cc to reference style indices
   - Handle style deduplication (same style = same index)
 
-- [ ] 2c: ZCD round-trip tests
+- [x] 2c: ZCD round-trip tests
   - Create test file with various styles (bold, colors, fonts, alignment)
   - Save to ZCD, reload, verify all styles preserved
   - Test edge cases: empty styles, partial styles, all properties set
