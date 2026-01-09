@@ -69,6 +69,8 @@ export interface FormatControlsCallbacks {
   getSelectedCell: () => Position | null;
   /** Get the selected cell data (for current format) */
   getSelectedCellData: () => CellData | null;
+  /** Get the current selection range (start and end) */
+  getSelectionRange: () => { start: Position | null; end: Position | null };
   /** Request render after format change */
   requestRender: () => void;
   /** Update the formula bar display */
@@ -123,6 +125,7 @@ export class FormatControls {
 
   private getSelectedCell: () => Position | null;
   private getSelectedCellData: () => CellData | null;
+  private getSelectionRange: () => { start: Position | null; end: Position | null };
   private requestRender: () => void;
   private updateFormulaBar: () => void;
 
@@ -165,6 +168,7 @@ export class FormatControls {
 
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectedCellData = callbacks.getSelectedCellData;
+    this.getSelectionRange = callbacks.getSelectionRange;
     this.requestRender = callbacks.requestRender;
     this.updateFormulaBar = callbacks.updateFormulaBar;
 
@@ -425,7 +429,7 @@ export class FormatControls {
     const formatId = this.getFormatIdForCurrency(currency, 2);
 
     try {
-      await this.dataSource.setCellFormatAt(position.col, position.row, formatId);
+      await this.applyFormatToSelection(formatId);
       this.currentCurrency = currency;
       this.currencyDropdownLabel.textContent = symbol;
       this.setDisplayedFormat(formatId, "CURRENCY");
@@ -539,8 +543,8 @@ export class FormatControls {
       }
 
       if (result.formatId) {
-        // Apply the format to the cell
-        await this.dataSource.setCellFormatAt(position.col, position.row, result.formatId);
+        // Apply the format to all cells in selection range
+        await this.applyFormatToSelection(result.formatId);
 
         // Update display
         this.setDisplayedFormat(result.formatId, "CUSTOM");
@@ -708,8 +712,8 @@ export class FormatControls {
     const formatId = await this.getFormatIdForCategory(category);
 
     try {
-      // Apply format to cell
-      await this.dataSource.setCellFormatAt(position.col, position.row, formatId);
+      // Apply format to all cells in selection range
+      await this.applyFormatToSelection(formatId);
 
       // Update display
       this.setDisplayedFormat(formatId, category);
@@ -754,12 +758,42 @@ export class FormatControls {
     }
 
     try {
-      await this.dataSource.setCellFormatAt(position.col, position.row, result.formatId);
+      await this.applyFormatToSelection(result.formatId);
       this.setDisplayedFormat(result.formatId, details.category.toUpperCase() as NumberFormatCategory);
       this.requestRender();
       this.updateFormulaBar();
     } catch (error) {
       console.error("Failed to change decimal places:", error);
+    }
+  }
+
+  /**
+   * Apply a format to all cells in the current selection range.
+   */
+  private async applyFormatToSelection(formatId: string): Promise<void> {
+    if (!this.dataSource) return;
+
+    const { start, end } = this.getSelectionRange();
+    const cell = this.getSelectedCell();
+
+    // If no range selection, just apply to selected cell
+    if (!start || !end || (start.col === end.col && start.row === end.row)) {
+      if (cell) {
+        await this.dataSource.setCellFormatAt(cell.col, cell.row, formatId);
+      }
+      return;
+    }
+
+    // Apply to all cells in range
+    const minCol = Math.min(start.col, end.col);
+    const maxCol = Math.max(start.col, end.col);
+    const minRow = Math.min(start.row, end.row);
+    const maxRow = Math.max(start.row, end.row);
+
+    for (let col = minCol; col <= maxCol; col++) {
+      for (let row = minRow; row <= maxRow; row++) {
+        await this.dataSource.setCellFormatAt(col, row, formatId);
+      }
     }
   }
 

@@ -146,7 +146,7 @@ export class WasmDataSource {
   async getOrCreateCellAt(
     col: number,
     row: number
-  ): Promise<{ id: string; value: string; formula?: string | null; existed: boolean }> {
+  ): Promise<{ id: string; value: string; editValue: string; formula?: string | null; existed: boolean }> {
     return this._client.getOrCreateCellAt(col, row);
   }
 

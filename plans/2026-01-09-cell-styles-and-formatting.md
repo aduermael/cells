@@ -200,7 +200,7 @@ Add horizontal and vertical alignment buttons.
 
 Fix format and style operations to apply to all selected cells.
 
-- [ ] 6a: Update FormatControls for multi-cell
+- [x] 6a: Update FormatControls for multi-cell
   - Change `getSelectedCell()` to use `getSelectionRange()`
   - Loop through range: `for col in [startCol, endCol], for row in [startRow, endRow]`
   - Apply format to each cell in range

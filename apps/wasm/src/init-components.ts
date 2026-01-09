@@ -641,6 +641,10 @@ export function createComponents(config: ComponentsConfig): Components {
         if (!app.selectedCell) return null;
         return getCellAt(app.selectedCell.col, app.selectedCell.row, app.cells) ?? null;
       },
+      getSelectionRange: () => ({
+        start: app.selectionStart,
+        end: app.selectionEnd,
+      }),
       requestRender: render,
       updateFormulaBar,
     }
