@@ -2,6 +2,7 @@
 
 #include <cctype>
 #include <cmath>
+#include <ctime>
 
 #include <algorithm>
 #include <charconv>
@@ -312,6 +313,44 @@ void fromFractionalDay(double fraction, int& hours, int& minutes, int& seconds) 
 
 }  // namespace TimeUtils
 
+// Helper: convert 2-digit year to 4-digit year
+// Excel convention: 00-29 -> 2000-2029, 30-99 -> 1930-1999
+static int expandTwoDigitYear(int twoDigitYear) {
+    if (twoDigitYear >= 0 && twoDigitYear <= 29) {
+        return 2000 + twoDigitYear;
+    }
+    return 1900 + twoDigitYear;
+}
+
+// Helper: parse month name to month number (1-12), returns 0 if not found
+static int parseMonthName(const std::string& name) {
+    // Convert to lowercase for comparison
+    std::string lower = name;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+
+    // Full month names
+    static const std::string fullNames[] = {"january", "february", "march",     "april",
+                                            "may",     "june",     "july",      "august",
+                                            "september", "october", "november", "december"};
+    // Abbreviated month names
+    static const std::string shortNames[] = {"jan", "feb", "mar", "apr", "may", "jun",
+                                             "jul", "aug", "sep", "oct", "nov", "dec"};
+
+    for (int i = 0; i < 12; i++) {
+        if (lower == fullNames[i] || lower == shortNames[i]) {
+            return i + 1;
+        }
+    }
+    return 0;  // Not found
+}
+
+// Helper: get current year (for short date formats)
+static int getCurrentYear() {
+    const std::time_t now = std::time(nullptr);
+    const std::tm* local = std::localtime(&now);
+    return 1900 + local->tm_year;
+}
+
 // Parse date input
 ParsedInput parseDate(const std::string& input) {
     const std::string trimmed = trim(input);
@@ -320,25 +359,93 @@ ParsedInput parseDate(const std::string& input) {
     }
 
     int year = 0, month = 0, day = 0;
+    bool parsed = false;
 
-    // Try MM/DD/YYYY or M/D/YYYY
-    const std::regex slashDateRegex(R"((\d{1,2})/(\d{1,2})/(\d{4}))");
     std::smatch match;
-    if (std::regex_match(trimmed, match, slashDateRegex)) {
+
+    // Try MM/DD/YYYY or M/D/YYYY (4-digit year)
+    const std::regex slashDate4Regex(R"((\d{1,2})/(\d{1,2})/(\d{4}))");
+    if (std::regex_match(trimmed, match, slashDate4Regex)) {
         month = std::stoi(match[1].str());
         day = std::stoi(match[2].str());
         year = std::stoi(match[3].str());
+        parsed = true;
     }
+
+    // Try MM/DD/YY or M/D/YY (2-digit year)
+    if (!parsed) {
+        const std::regex slashDate2Regex(R"((\d{1,2})/(\d{1,2})/(\d{2}))");
+        if (std::regex_match(trimmed, match, slashDate2Regex)) {
+            month = std::stoi(match[1].str());
+            day = std::stoi(match[2].str());
+            year = expandTwoDigitYear(std::stoi(match[3].str()));
+            parsed = true;
+        }
+    }
+
     // Try YYYY-MM-DD (ISO format)
-    else {
+    if (!parsed) {
         const std::regex isoDateRegex(R"((\d{4})-(\d{1,2})-(\d{1,2}))");
         if (std::regex_match(trimmed, match, isoDateRegex)) {
             year = std::stoi(match[1].str());
             month = std::stoi(match[2].str());
             day = std::stoi(match[3].str());
-        } else {
-            return ParsedInput::error("Unrecognized date format");
+            parsed = true;
         }
+    }
+
+    // Try "Jan 15, 2025" or "January 15, 2025"
+    if (!parsed) {
+        const std::regex monthNameDayYearRegex(R"(([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4}))");
+        if (std::regex_match(trimmed, match, monthNameDayYearRegex)) {
+            month = parseMonthName(match[1].str());
+            day = std::stoi(match[2].str());
+            year = std::stoi(match[3].str());
+            if (month > 0) {
+                parsed = true;
+            }
+        }
+    }
+
+    // Try "15 Jan 2025" or "15-Jan-2025"
+    if (!parsed) {
+        const std::regex dayMonthNameYearRegex(R"((\d{1,2})[\s-]+([A-Za-z]+)[\s-]+(\d{4}))");
+        if (std::regex_match(trimmed, match, dayMonthNameYearRegex)) {
+            day = std::stoi(match[1].str());
+            month = parseMonthName(match[2].str());
+            year = std::stoi(match[3].str());
+            if (month > 0) {
+                parsed = true;
+            }
+        }
+    }
+
+    // Try short formats without year: "1/15" -> January 15 of current year
+    if (!parsed) {
+        const std::regex shortSlashRegex(R"((\d{1,2})/(\d{1,2}))");
+        if (std::regex_match(trimmed, match, shortSlashRegex)) {
+            month = std::stoi(match[1].str());
+            day = std::stoi(match[2].str());
+            year = getCurrentYear();
+            parsed = true;
+        }
+    }
+
+    // Try "Jan 15" or "January 15" -> January 15 of current year
+    if (!parsed) {
+        const std::regex monthNameDayRegex(R"(([A-Za-z]+)\s+(\d{1,2}))");
+        if (std::regex_match(trimmed, match, monthNameDayRegex)) {
+            month = parseMonthName(match[1].str());
+            day = std::stoi(match[2].str());
+            year = getCurrentYear();
+            if (month > 0) {
+                parsed = true;
+            }
+        }
+    }
+
+    if (!parsed) {
+        return ParsedInput::error("Unrecognized date format");
     }
 
     // Validate date
@@ -541,10 +648,15 @@ ParsedInput parseUserInput(const std::string& input) {
         }
     }
 
-    // 5. Date (contains / or - in date patterns)
-    // Check for date-like patterns
-    const std::regex datePattern(R"(\d{1,4}[/-]\d{1,2}[/-]\d{1,4})");
-    if (std::regex_search(trimmed, datePattern)) {
+    // 5. Date (contains / or - in date patterns, or month names)
+    // Check for numeric date patterns (MM/DD/YYYY, YYYY-MM-DD, M/D, etc.)
+    const std::regex numericDatePattern(R"(\d{1,4}[/-]\d{1,2}(?:[/-]\d{1,4})?)");
+    // Check for text month patterns (Jan 15, 15 Jan, January 15, 2025, etc.)
+    const std::regex textMonthPattern(
+        R"([A-Za-z]{3,9}\s+\d{1,2}|"
+        R"(\d{1,2}[\s-]+[A-Za-z]{3,9}))");
+    if (std::regex_search(trimmed, numericDatePattern) ||
+        std::regex_search(trimmed, textMonthPattern)) {
         ParsedInput result = parseDate(trimmed);
         if (result.success) {
             return result;

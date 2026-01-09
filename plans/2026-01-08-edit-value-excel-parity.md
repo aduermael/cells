@@ -152,23 +152,23 @@ Update TypeScript to use editValue instead of raw value for display.
 
 ---
 
-## Phase 4: Enhance Date Parsing
+## Phase 4: Enhance Date Parsing ✅
 
 Excel accepts many date input formats. Enhance date parsing to match.
 
-- [ ] 4a: Add support for 2-digit years in `parseDate()` in `input_parser.cc`
+- [x] 4a: Add support for 2-digit years in `parseDate()` in `input_parser.cc`
   - "12/12/25" → 12/12/2025 (years 00-29 → 2000-2029, 30-99 → 1930-1999)
   - Update existing MM/DD/YYYY regex to also match MM/DD/YY
 
-- [ ] 4b: Add support for text month names
+- [x] 4b: Add support for text month names
   - "Jan 15, 2025" or "January 15, 2025"
   - "15 Jan 2025" or "15-Jan-2025"
 
-- [ ] 4c: Add support for short date formats
+- [x] 4c: Add support for short date formats
   - "1/15" → January 15 of current year
   - "Jan 15" → January 15 of current year
 
-- [ ] 4d: Add unit tests for all new date parsing formats
+- [x] 4d: Add unit tests for all new date parsing formats
 
 **Note on date libraries:**
 The current implementation is adequate for basic date handling. Howard Hinnant's date library (https://github.com/HowardHinnant/date) is excellent but adds external dependencies. The current approach using std::regex and manual calculation is sufficient and has no dependencies. We can revisit if timezone support is needed.

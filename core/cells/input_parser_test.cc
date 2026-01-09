@@ -204,6 +204,169 @@ TEST(DateParsingTest, NotLeapYear) {
 }
 
 // =============================================================================
+// 2-digit year parsing tests
+// =============================================================================
+
+TEST(DateParsingTest, TwoDigitYear00) {
+    // 00 -> 2000
+    auto result = parseDate("1/15/00");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(year, 2000);
+    EXPECT_EQ(month, 1);
+    EXPECT_EQ(day, 15);
+}
+
+TEST(DateParsingTest, TwoDigitYear25) {
+    // 25 -> 2025
+    auto result = parseDate("12/12/25");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(year, 2025);
+    EXPECT_EQ(month, 12);
+    EXPECT_EQ(day, 12);
+}
+
+TEST(DateParsingTest, TwoDigitYear29) {
+    // 29 -> 2029 (boundary)
+    auto result = parseDate("6/1/29");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(year, 2029);
+}
+
+TEST(DateParsingTest, TwoDigitYear30) {
+    // 30 -> 1930 (boundary)
+    auto result = parseDate("6/1/30");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(year, 1930);
+}
+
+TEST(DateParsingTest, TwoDigitYear99) {
+    // 99 -> 1999
+    auto result = parseDate("12/31/99");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(year, 1999);
+}
+
+// =============================================================================
+// Text month name parsing tests
+// =============================================================================
+
+TEST(DateParsingTest, MonthNameDayYear) {
+    // "Jan 15, 2025"
+    auto result = parseDate("Jan 15, 2025");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(year, 2025);
+    EXPECT_EQ(month, 1);
+    EXPECT_EQ(day, 15);
+}
+
+TEST(DateParsingTest, FullMonthNameDayYear) {
+    // "January 15, 2025"
+    auto result = parseDate("January 15, 2025");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(year, 2025);
+    EXPECT_EQ(month, 1);
+    EXPECT_EQ(day, 15);
+}
+
+TEST(DateParsingTest, MonthNameDayYearNoComma) {
+    // "Jan 15 2025" (without comma)
+    auto result = parseDate("Jan 15 2025");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(year, 2025);
+    EXPECT_EQ(month, 1);
+    EXPECT_EQ(day, 15);
+}
+
+TEST(DateParsingTest, DayMonthNameYearSpaces) {
+    // "15 Jan 2025"
+    auto result = parseDate("15 Jan 2025");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(year, 2025);
+    EXPECT_EQ(month, 1);
+    EXPECT_EQ(day, 15);
+}
+
+TEST(DateParsingTest, DayMonthNameYearDashes) {
+    // "15-Jan-2025"
+    auto result = parseDate("15-Jan-2025");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(year, 2025);
+    EXPECT_EQ(month, 1);
+    EXPECT_EQ(day, 15);
+}
+
+TEST(DateParsingTest, AllMonthNames) {
+    // Test all 12 months
+    const char* months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+    for (int i = 0; i < 12; i++) {
+        std::string input = std::string(months[i]) + " 1, 2025";
+        auto result = parseDate(input);
+        EXPECT_TRUE(result.success) << "Failed for " << months[i];
+        int year = 0, month = 0, day = 0;
+        DateUtils::fromSerialDate(result.numericValue, year, month, day);
+        EXPECT_EQ(month, i + 1) << "Failed for " << months[i];
+    }
+}
+
+// =============================================================================
+// Short date format tests (no year)
+// =============================================================================
+
+TEST(DateParsingTest, ShortSlashFormat) {
+    // "1/15" -> January 15 of current year
+    auto result = parseDate("1/15");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(month, 1);
+    EXPECT_EQ(day, 15);
+    // Year should be current year (can't check exact value as it changes)
+    EXPECT_GE(year, 2020);  // Reasonable lower bound
+}
+
+TEST(DateParsingTest, ShortMonthNameFormat) {
+    // "Jan 15" -> January 15 of current year
+    auto result = parseDate("Jan 15");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(month, 1);
+    EXPECT_EQ(day, 15);
+    EXPECT_GE(year, 2020);
+}
+
+TEST(DateParsingTest, ShortFullMonthNameFormat) {
+    // "December 25" -> December 25 of current year
+    auto result = parseDate("December 25");
+    EXPECT_TRUE(result.success);
+    int year = 0, month = 0, day = 0;
+    DateUtils::fromSerialDate(result.numericValue, year, month, day);
+    EXPECT_EQ(month, 12);
+    EXPECT_EQ(day, 25);
+}
+
+// =============================================================================
 // Time parsing tests
 // =============================================================================
 
@@ -347,6 +510,30 @@ TEST(AutoDetectTest, DetectsCurrency) {
 
 TEST(AutoDetectTest, DetectsDate) {
     auto result = parseUserInput("1/15/2024");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.formatCategory, NumberFormatCategory::DATE);
+}
+
+TEST(AutoDetectTest, DetectsDateTwoDigitYear) {
+    auto result = parseUserInput("12/12/25");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.formatCategory, NumberFormatCategory::DATE);
+}
+
+TEST(AutoDetectTest, DetectsDateWithMonthName) {
+    auto result = parseUserInput("Jan 15, 2025");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.formatCategory, NumberFormatCategory::DATE);
+}
+
+TEST(AutoDetectTest, DetectsDateShortFormat) {
+    auto result = parseUserInput("1/15");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.formatCategory, NumberFormatCategory::DATE);
+}
+
+TEST(AutoDetectTest, DetectsDateShortMonthName) {
+    auto result = parseUserInput("Jan 15");
     EXPECT_TRUE(result.success);
     EXPECT_EQ(result.formatCategory, NumberFormatCategory::DATE);
 }
