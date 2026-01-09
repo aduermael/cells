@@ -457,4 +457,462 @@ std::string CellsEngine::makeFormatId(const std::string& category, int decimals,
     return "{\"formatId\":\"" + result + "\"}";
 }
 
+// ============================================================================
+// Cell style operations
+// ============================================================================
+
+namespace {
+
+// Helper to serialize CellStyle to JSON
+std::string styleToJson(const CellStyle& style) {
+    std::ostringstream ss;
+    ss << "{";
+    ss << "\"bold\":" << (style.bold ? "true" : "false");
+    ss << ",\"italic\":" << (style.italic ? "true" : "false");
+    ss << ",\"underline\":" << (style.underline ? "true" : "false");
+    ss << ",\"bgColor\":\"" << jsonEscape(style.bgColor) << "\"";
+    ss << ",\"textColor\":\"" << jsonEscape(style.textColor) << "\"";
+    ss << ",\"fontFamily\":\"" << jsonEscape(style.fontFamily) << "\"";
+    ss << ",\"fontSize\":" << static_cast<int>(style.fontSize);
+    ss << ",\"hAlign\":\"";
+    switch (style.hAlign) {
+        case TextAlign::LEFT:
+            ss << "left";
+            break;
+        case TextAlign::CENTER:
+            ss << "center";
+            break;
+        case TextAlign::RIGHT:
+            ss << "right";
+            break;
+        case TextAlign::JUSTIFY:
+            ss << "justify";
+            break;
+    }
+    ss << "\",\"vAlign\":\"";
+    switch (style.vAlign) {
+        case VerticalAlign::TOP:
+            ss << "top";
+            break;
+        case VerticalAlign::MIDDLE:
+            ss << "middle";
+            break;
+        case VerticalAlign::BOTTOM:
+            ss << "bottom";
+            break;
+    }
+    ss << "\"}";
+    return ss.str();
+}
+
+// Helper to extract a boolean field from JSON
+bool extractBoolField(const std::string& json, const std::string& key, bool defaultValue) {
+    std::string searchKey = "\"" + key + "\":";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) {
+        return defaultValue;
+    }
+    pos += searchKey.length();
+    // Skip whitespace
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
+        pos++;
+    }
+    if (pos >= json.size()) {
+        return defaultValue;
+    }
+    return json.substr(pos, 4) == "true";
+}
+
+// Helper to extract an integer field from JSON
+int extractIntField(const std::string& json, const std::string& key, int defaultValue) {
+    std::string searchKey = "\"" + key + "\":";
+    size_t pos = json.find(searchKey);
+    if (pos == std::string::npos) {
+        return defaultValue;
+    }
+    pos += searchKey.length();
+    // Skip whitespace
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
+        pos++;
+    }
+    if (pos >= json.size()) {
+        return defaultValue;
+    }
+    int value = 0;
+    bool negative = false;
+    if (json[pos] == '-') {
+        negative = true;
+        pos++;
+    }
+    while (pos < json.size() && json[pos] >= '0' && json[pos] <= '9') {
+        value = value * 10 + (json[pos] - '0');
+        pos++;
+    }
+    return negative ? -value : value;
+}
+
+// Helper to parse CellStyle from JSON
+CellStyle parseStyleJson(const std::string& json) {
+    CellStyle style;
+    style.bold = extractBoolField(json, "bold", false);
+    style.italic = extractBoolField(json, "italic", false);
+    style.underline = extractBoolField(json, "underline", false);
+    style.bgColor = extractPayloadField(json, "bgColor");
+    style.textColor = extractPayloadField(json, "textColor");
+    style.fontFamily = extractPayloadField(json, "fontFamily");
+    style.fontSize = static_cast<uint8_t>(extractIntField(json, "fontSize", 0));
+
+    std::string hAlignStr = extractPayloadField(json, "hAlign");
+    if (hAlignStr == "center") {
+        style.hAlign = TextAlign::CENTER;
+    } else if (hAlignStr == "right") {
+        style.hAlign = TextAlign::RIGHT;
+    } else if (hAlignStr == "justify") {
+        style.hAlign = TextAlign::JUSTIFY;
+    } else {
+        style.hAlign = TextAlign::LEFT;
+    }
+
+    std::string vAlignStr = extractPayloadField(json, "vAlign");
+    if (vAlignStr == "top") {
+        style.vAlign = VerticalAlign::TOP;
+    } else if (vAlignStr == "middle") {
+        style.vAlign = VerticalAlign::MIDDLE;
+    } else {
+        style.vAlign = VerticalAlign::BOTTOM;
+    }
+
+    return style;
+}
+
+}  // namespace
+
+std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::string& styleJson) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    if (cellIdStr.size() != ID_LENGTH) {
+        return "{\"error\":\"Invalid cell ID\"}";
+    }
+    ID cellId(cellIdStr);
+
+    auto* cell = sheet->getCell(cellId);
+    if (!cell) {
+        return "{\"error\":\"Cell not found\"}";
+    }
+
+    // Parse the style JSON and create a style definition if needed
+    CellStyle style = parseStyleJson(styleJson);
+
+    ID styleId;
+    if (!style.isEmpty()) {
+        // Check if this style already exists
+        const auto& existingStyles = _workbook->getStyles();
+        for (const auto& [id, existingStyle] : existingStyles) {
+            if (existingStyle == style) {
+                styleId = id;
+                break;
+            }
+        }
+
+        // Create new style if not found
+        if (styleId.isNull()) {
+            styleId = generate_id();
+            _workbook->registerStyle(styleId, style);
+
+            // Create STYLE_DEFINE operation for sync
+            if (_workbook->isCollaborating()) {
+                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, styleJson);
+                applyOperation(*_workbook, styleOp);
+            }
+        }
+    }
+
+    // Set the cell's styleId
+    std::string payload =
+        "{\"style_id\":\"" + (styleId.isNull() ? "~" : styleId.toString()) + "\"}";
+    Operation op = makeCellSetStyleOp(*_workbook, cellId, payload);
+    applyOperation(*_workbook, op);
+
+    if (_syncManager) {
+        _syncManager->queueOperationsBroadcast();
+        _syncManager->pruneOpLog();
+    }
+
+    notifyListeners(ChangeType::CELL_CHANGED);
+    return "{\"success\":true}";
+}
+
+std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::string& styleJson) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Parse the style JSON and create a style definition if needed
+    CellStyle style = parseStyleJson(styleJson);
+
+    ID styleId;
+    if (!style.isEmpty()) {
+        // Check if this style already exists
+        const auto& existingStyles = _workbook->getStyles();
+        for (const auto& [id, existingStyle] : existingStyles) {
+            if (existingStyle == style) {
+                styleId = id;
+                break;
+            }
+        }
+
+        // Create new style if not found
+        if (styleId.isNull()) {
+            styleId = generate_id();
+            _workbook->registerStyle(styleId, style);
+
+            // Create STYLE_DEFINE operation for sync
+            if (_workbook->isCollaborating()) {
+                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, styleJson);
+                applyOperation(*_workbook, styleOp);
+            }
+        }
+    }
+
+    // Find or create column at position
+    ID colId;
+    bool colCreated = false;
+    for (const auto& [id, axis] : sheet->columns) {
+        if (axis->position == col) {
+            colId = id;
+            break;
+        }
+    }
+    if (colId.isNull()) {
+        colId = generate_id();
+        colCreated = true;
+        std::string colPayload = "{\"pos\":" + std::to_string(col) +
+                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
+        applyOperation(*_workbook, colOp);
+    }
+
+    // Find or create row at position
+    ID rowId;
+    bool rowCreated = false;
+    for (const auto& [id, axis] : sheet->rows) {
+        if (axis->position == row) {
+            rowId = id;
+            break;
+        }
+    }
+    if (rowId.isNull()) {
+        rowId = generate_id();
+        rowCreated = true;
+        std::string rowPayload = "{\"pos\":" + std::to_string(row) +
+                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
+        applyOperation(*_workbook, rowOp);
+    }
+
+    // Find or create cell at this position
+    ID cellId;
+    bool cellCreated = false;
+    for (const auto& [id, c] : sheet->cells) {
+        if (c->colId == colId && c->rowId == rowId) {
+            cellId = id;
+            break;
+        }
+    }
+    if (cellId.isNull()) {
+        cellId = generate_id();
+        cellCreated = true;
+        std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" + colId.toString() +
+                                  "\",\"row_id\":\"" + rowId.toString() + "\"}";
+        Operation cellOp = makeCellSetValueOp(*_workbook, cellId, cellPayload);
+        applyOperation(*_workbook, cellOp);
+    }
+
+    // Set the cell's styleId
+    std::string payload =
+        "{\"style_id\":\"" + (styleId.isNull() ? "~" : styleId.toString()) + "\"}";
+    Operation op = makeCellSetStyleOp(*_workbook, cellId, payload);
+    applyOperation(*_workbook, op);
+
+    if (_syncManager) {
+        _syncManager->queueOperationsBroadcast();
+        _syncManager->pruneOpLog();
+    }
+
+    if (colCreated) {
+        _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
+    }
+    if (rowCreated) {
+        _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
+    }
+    if (cellCreated) {
+        Cell* newCell = sheet->getCell(cellId);
+        if (newCell) {
+            _viewportIndex.onCellAdded(newCell);
+        }
+    }
+
+    notifyListeners(ChangeType::CELL_CHANGED);
+    return "{\"success\":true}";
+}
+
+std::string CellsEngine::getCellStyle(const std::string& cellIdStr) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    if (cellIdStr.size() != ID_LENGTH) {
+        return "{\"error\":\"Invalid cell ID\"}";
+    }
+    ID cellId(cellIdStr);
+
+    auto* cell = sheet->getCell(cellId);
+    if (!cell) {
+        return "{\"error\":\"Cell not found\"}";
+    }
+
+    if (cell->styleId.isNull()) {
+        // Return empty/default style
+        CellStyle defaultStyle;
+        return styleToJson(defaultStyle);
+    }
+
+    const CellStyle* style = _workbook->getStyle(cell->styleId);
+    if (!style) {
+        // Style ID is set but not found in registry - return default
+        CellStyle defaultStyle;
+        return styleToJson(defaultStyle);
+    }
+
+    return styleToJson(*style);
+}
+
+std::string CellsEngine::getCellStyleAt(uint32_t col, uint32_t row) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Find column and row at positions
+    ID colId, rowId;
+    for (const auto& [id, axis] : sheet->columns) {
+        if (axis->position == col) {
+            colId = id;
+            break;
+        }
+    }
+    for (const auto& [id, axis] : sheet->rows) {
+        if (axis->position == row) {
+            rowId = id;
+            break;
+        }
+    }
+
+    if (colId.isNull() || rowId.isNull()) {
+        // No axis at this position - return default style
+        CellStyle defaultStyle;
+        return styleToJson(defaultStyle);
+    }
+
+    // Find cell at this position
+    Cell* cell = nullptr;
+    for (const auto& [id, c] : sheet->cells) {
+        if (c->colId == colId && c->rowId == rowId) {
+            cell = c.get();
+            break;
+        }
+    }
+
+    if (!cell || cell->styleId.isNull()) {
+        // No cell or no style - return default
+        CellStyle defaultStyle;
+        return styleToJson(defaultStyle);
+    }
+
+    const CellStyle* style = _workbook->getStyle(cell->styleId);
+    if (!style) {
+        CellStyle defaultStyle;
+        return styleToJson(defaultStyle);
+    }
+
+    return styleToJson(*style);
+}
+
+std::string CellsEngine::createStyle(const std::string& styleJson) {
+    if (!_workbook) {
+        return "{\"error\":\"No workbook\"}";
+    }
+
+    CellStyle style = parseStyleJson(styleJson);
+
+    // Check if this style already exists
+    const auto& existingStyles = _workbook->getStyles();
+    for (const auto& [id, existingStyle] : existingStyles) {
+        if (existingStyle == style) {
+            return "{\"success\":true,\"styleId\":\"" + id.toString() + "\",\"existing\":true}";
+        }
+    }
+
+    // Create new style
+    ID styleId = generate_id();
+    _workbook->registerStyle(styleId, style);
+
+    // Create STYLE_DEFINE operation for sync
+    if (_workbook->isCollaborating()) {
+        Operation styleOp = makeStyleDefineOp(*_workbook, styleId, styleJson);
+        applyOperation(*_workbook, styleOp);
+
+        if (_syncManager) {
+            _syncManager->queueOperationsBroadcast();
+            _syncManager->pruneOpLog();
+        }
+    }
+
+    return "{\"success\":true,\"styleId\":\"" + styleId.toString() + "\"}";
+}
+
+std::string CellsEngine::getAvailableStyles() {
+    if (!_workbook) {
+        return "[]";
+    }
+
+    std::ostringstream ss;
+    ss << "[";
+
+    const auto& styles = _workbook->getStyles();
+    bool first = true;
+    for (const auto& [id, style] : styles) {
+        if (!first) {
+            ss << ",";
+        }
+        first = false;
+
+        ss << "{\"id\":\"" << id.toString() << "\",\"style\":" << styleToJson(style) << "}";
+    }
+
+    ss << "]";
+    return ss.str();
+}
+
 }  // namespace cells::wasm

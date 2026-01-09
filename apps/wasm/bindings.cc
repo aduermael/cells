@@ -133,6 +133,13 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("formatCellById", &cells::wasm::CellsEngine::formatCellById)
         .function("getFormatDetails", &cells::wasm::CellsEngine::getFormatDetails)
         .function("makeFormatId", &cells::wasm::CellsEngine::makeFormatId)
+        // Cell styles
+        .function("setCellStyle", &cells::wasm::CellsEngine::setCellStyle)
+        .function("setCellStyleAt", &cells::wasm::CellsEngine::setCellStyleAt)
+        .function("getCellStyle", &cells::wasm::CellsEngine::getCellStyle)
+        .function("getCellStyleAt", &cells::wasm::CellsEngine::getCellStyleAt)
+        .function("createStyle", &cells::wasm::CellsEngine::createStyle)
+        .function("getAvailableStyles", &cells::wasm::CellsEngine::getAvailableStyles)
         // Column/row resize
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)
         .function("resizeColumnByPos", &cells::wasm::CellsEngine::resizeColumnByPos)

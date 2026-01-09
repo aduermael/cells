@@ -143,6 +143,17 @@ public:
                              const std::string& currency);
 
     // ========================================================================
+    // Cell style operations (bindings_format.cc)
+    // ========================================================================
+
+    std::string setCellStyle(const std::string& cellIdStr, const std::string& styleJson);
+    std::string setCellStyleAt(uint32_t col, uint32_t row, const std::string& styleJson);
+    std::string getCellStyle(const std::string& cellIdStr);
+    std::string getCellStyleAt(uint32_t col, uint32_t row);
+    std::string createStyle(const std::string& styleJson);
+    std::string getAvailableStyles();
+
+    // ========================================================================
     // Column/row resize operations (bindings_core.cc)
     // ========================================================================
 

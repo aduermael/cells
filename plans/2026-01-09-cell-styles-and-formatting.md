@@ -118,7 +118,7 @@ Ensure styles are properly preserved when importing/exporting XLSX and ZCD files
 
 Expose style operations through the WASM bridge.
 
-- [ ] 3a: Add bindings for style operations
+- [x] 3a: Add bindings for style operations
   - `setCellStyle(cellId, styleJson)` - set style on single cell
   - `setCellStyleAt(col, row, styleJson)` - set style by position
   - `getCellStyle(cellId)` - get style as JSON
