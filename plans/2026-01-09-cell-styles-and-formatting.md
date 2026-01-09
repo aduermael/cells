@@ -250,41 +250,41 @@ Update the canvas renderer to display styled text.
 
 ---
 
-## Phase 8: Luau Scripting API
+## Phase 8: Luau Scripting API ✅ COMPLETED
 
 Expose formatting and styling through the Luau API.
 
-- [ ] 8a: Add cell.format property
+- [x] 8a: Add cell.format property
   - Read: returns format ID string or nil
   - Write: `cell.format = "FMT_C002"` sets format via CRDT
   - Add to luaCellIndex metamethod
 
-- [ ] 8b: Add cell.style property
+- [x] 8b: Add cell.style property
   - Read: returns style table `{bold=true, bgColor="#FF0000", ...}`
   - Write: `cell.style = {bold=true}` (merges with existing)
   - Write: `cell.style = nil` clears style
   - Add to luaCellIndex and luaCellNewindex metamethods
 
-- [ ] 8c: Add setFormat() function
+- [x] 8c: Add setFormat() function
   - `setFormat(range, formatId)` - apply format to range
   - `setFormat("A1:B10", "FMT_P002")` - percentage with 2 decimals
   - Range parsing reuses existing parseA1Range helper
 
-- [ ] 8d: Add setStyle() function
+- [x] 8d: Add setStyle() function
   - `setStyle(range, styleTable)` - apply style to range
   - `setStyle("A1:B10", {bold=true, bgColor="#FFFF00"})`
   - Merges provided properties with defaults
 
-- [ ] 8e: Add getFormats() function
+- [x] 8e: Add getFormats() function
   - `getFormats()` - returns array of available format IDs with descriptions
   - Useful for scripts to discover valid format options
 
-- [ ] 8f: Add helper style constants
+- [x] 8f: Add helper style constants
   - `ALIGN_LEFT`, `ALIGN_CENTER`, `ALIGN_RIGHT`
   - `VALIGN_TOP`, `VALIGN_MIDDLE`, `VALIGN_BOTTOM`
   - Common colors: `COLOR_RED`, `COLOR_GREEN`, `COLOR_BLUE`, etc.
 
-- [ ] 8g: Add Luau unit tests
+- [x] 8g: Add Luau unit tests
   - Test cell.format read/write
   - Test cell.style read/write
   - Test setFormat() on ranges

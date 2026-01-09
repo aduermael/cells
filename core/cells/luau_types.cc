@@ -7,7 +7,7 @@
 // and string representation (__tostring).
 //
 // Key responsibilities:
-// - Cell object: exposes .ref, .value, .formula, .dependents, .dependencies
+// - Cell object: exposes .ref, .value, .formula, .format, .style, .dependents, .dependencies
 // - Sheet object: exposes .name property with read/write support
 // - Object caching: maintains identity (cellA == cellB if same UUID)
 // - Type coercion: Lua values ↔ CellValue types
@@ -16,6 +16,8 @@
 // - ref: A1 reference string (read-only)
 // - value: number/string/boolean/nil (read/write)
 // - formula: formula string if cell has formula (read-only)
+// - format: format ID string like "FMT_C002" (read/write)
+// - style: style table {bold, italic, underline, bgColor, textColor, ...} (read/write)
 // - dependents: array of cells that depend on this cell
 // - dependencies: array of cells this cell depends on
 //
@@ -35,6 +37,7 @@
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_resolver.h"
 #include "core/cells/formula_serializer.h"
+#include "core/cells/id.h"
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/model.h"
 #include "core/cells/ref_converter.h"
@@ -161,6 +164,91 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
             }
         }
         lua_pushnil(L);
+        return 1;
+    }
+
+    // Handle .format property - returns format ID string or nil
+    if (strcmp(key, "format") == 0) {
+        if (!cell->formatId.isNull()) {
+            lua_pushstring(L, cell->formatId.toString().c_str());
+            return 1;
+        }
+        lua_pushnil(L);
+        return 1;
+    }
+
+    // Handle .style property - returns style table or nil
+    if (strcmp(key, "style") == 0) {
+        if (cell->styleId.isNull()) {
+            lua_pushnil(L);
+            return 1;
+        }
+        // Get workbook to look up style
+        const Workbook* workbook = getWorkbook(L);
+        if (workbook == nullptr) {
+            lua_pushnil(L);
+            return 1;
+        }
+        const CellStyle* style = workbook->getStyle(cell->styleId);
+        if (style == nullptr) {
+            lua_pushnil(L);
+            return 1;
+        }
+        // Return style as Lua table
+        lua_newtable(L);
+        lua_pushboolean(L, style->bold ? 1 : 0);
+        lua_setfield(L, -2, "bold");
+        lua_pushboolean(L, style->italic ? 1 : 0);
+        lua_setfield(L, -2, "italic");
+        lua_pushboolean(L, style->underline ? 1 : 0);
+        lua_setfield(L, -2, "underline");
+        if (!style->bgColor.empty()) {
+            lua_pushstring(L, style->bgColor.c_str());
+            lua_setfield(L, -2, "bgColor");
+        }
+        if (!style->textColor.empty()) {
+            lua_pushstring(L, style->textColor.c_str());
+            lua_setfield(L, -2, "textColor");
+        }
+        if (!style->fontFamily.empty()) {
+            lua_pushstring(L, style->fontFamily.c_str());
+            lua_setfield(L, -2, "fontFamily");
+        }
+        if (style->fontSize > 0) {
+            lua_pushnumber(L, style->fontSize);
+            lua_setfield(L, -2, "fontSize");
+        }
+        // Horizontal alignment
+        const char* hAlignStr = "left";
+        switch (style->hAlign) {
+            case TextAlign::CENTER:
+                hAlignStr = "center";
+                break;
+            case TextAlign::RIGHT:
+                hAlignStr = "right";
+                break;
+            case TextAlign::JUSTIFY:
+                hAlignStr = "justify";
+                break;
+            default:
+                break;
+        }
+        lua_pushstring(L, hAlignStr);
+        lua_setfield(L, -2, "hAlign");
+        // Vertical alignment
+        const char* vAlignStr = "bottom";
+        switch (style->vAlign) {
+            case VerticalAlign::TOP:
+                vAlignStr = "top";
+                break;
+            case VerticalAlign::MIDDLE:
+                vAlignStr = "middle";
+                break;
+            default:
+                break;
+        }
+        lua_pushstring(L, vAlignStr);
+        lua_setfield(L, -2, "vAlign");
         return 1;
     }
 
@@ -392,6 +480,237 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
     // Handle cell.formula = x (read-only)
     if (strcmp(key, "formula") == 0) {
         luaL_error(L, "cell.formula is read-only (use setCell with = prefix)");
+    }
+
+    // Handle cell.format = "FMT_C002" or cell.format = nil
+    if (strcmp(key, "format") == 0) {
+        // Get the cell UUID from the table
+        lua_getfield(L, 1, "_uuid");
+        if (lua_isstring(L, -1) == 0) {
+            luaL_error(L, "format: invalid cell object");
+        }
+        const char* uuidStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        // Get context
+        Workbook* workbook = getWorkbook(L);
+        Sheet* sheet = getSheet(L);
+        if (sheet == nullptr || workbook == nullptr) {
+            luaL_error(L, "format: no context set");
+        }
+
+        const ID cellId(uuidStr);
+        const Cell* cell = sheet->getCell(cellId);
+        if (cell == nullptr) {
+            luaL_error(L, "format: cell not found");
+        }
+
+        // Build payload - null ID "~" clears format
+        std::string formatIdStr = "~";
+        if (lua_isstring(L, 3) != 0) {
+            formatIdStr = lua_tostring(L, 3);
+        } else if (lua_isnil(L, 3) == 0) {
+            luaL_error(L, "cell.format: expected string or nil");
+        }
+
+        const std::string payload = R"({"format_id":")" + jsonEscape(formatIdStr) + R"("})";
+        const Operation op = makeCellSetFormatOp(*workbook, cell->id, payload);
+        applyOperation(*workbook, op);
+        return 0;
+    }
+
+    // Handle cell.style = {bold=true, ...} or cell.style = nil
+    if (strcmp(key, "style") == 0) {
+        // Get the cell UUID from the table
+        lua_getfield(L, 1, "_uuid");
+        if (lua_isstring(L, -1) == 0) {
+            luaL_error(L, "style: invalid cell object");
+        }
+        const char* uuidStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        // Get context
+        Workbook* workbook = getWorkbook(L);
+        Sheet* sheet = getSheet(L);
+        if (sheet == nullptr || workbook == nullptr) {
+            luaL_error(L, "style: no context set");
+        }
+
+        const ID cellId(uuidStr);
+        const Cell* cell = sheet->getCell(cellId);
+        if (cell == nullptr) {
+            luaL_error(L, "style: cell not found");
+        }
+
+        // Handle nil - clear style
+        if (lua_isnil(L, 3) != 0) {
+            const std::string payload = R"({"style_id":"~"})";
+            const Operation op = makeCellSetStyleOp(*workbook, cell->id, payload);
+            applyOperation(*workbook, op);
+            return 0;
+        }
+
+        // Expect a table with style properties
+        if (lua_istable(L, 3) == 0) {
+            luaL_error(L, "cell.style: expected table or nil");
+        }
+
+        // Build style from table
+        CellStyle style;
+
+        // Get existing style to merge with (if any)
+        if (!cell->styleId.isNull()) {
+            const CellStyle* existing = workbook->getStyle(cell->styleId);
+            if (existing != nullptr) {
+                style = *existing;
+            }
+        }
+
+        // Merge provided properties
+        lua_getfield(L, 3, "bold");
+        if (lua_isboolean(L, -1) != 0) {
+            style.bold = lua_toboolean(L, -1) != 0;
+        }
+        lua_pop(L, 1);
+
+        lua_getfield(L, 3, "italic");
+        if (lua_isboolean(L, -1) != 0) {
+            style.italic = lua_toboolean(L, -1) != 0;
+        }
+        lua_pop(L, 1);
+
+        lua_getfield(L, 3, "underline");
+        if (lua_isboolean(L, -1) != 0) {
+            style.underline = lua_toboolean(L, -1) != 0;
+        }
+        lua_pop(L, 1);
+
+        lua_getfield(L, 3, "bgColor");
+        if (lua_isstring(L, -1) != 0) {
+            style.bgColor = lua_tostring(L, -1);
+        } else if (lua_isnil(L, -1) != 0) {
+            style.bgColor.clear();
+        }
+        lua_pop(L, 1);
+
+        lua_getfield(L, 3, "textColor");
+        if (lua_isstring(L, -1) != 0) {
+            style.textColor = lua_tostring(L, -1);
+        } else if (lua_isnil(L, -1) != 0) {
+            style.textColor.clear();
+        }
+        lua_pop(L, 1);
+
+        lua_getfield(L, 3, "fontFamily");
+        if (lua_isstring(L, -1) != 0) {
+            style.fontFamily = lua_tostring(L, -1);
+        } else if (lua_isnil(L, -1) != 0) {
+            style.fontFamily.clear();
+        }
+        lua_pop(L, 1);
+
+        lua_getfield(L, 3, "fontSize");
+        if (lua_isnumber(L, -1) != 0) {
+            style.fontSize = static_cast<uint8_t>(lua_tonumber(L, -1));
+        }
+        lua_pop(L, 1);
+
+        lua_getfield(L, 3, "hAlign");
+        if (lua_isstring(L, -1) != 0) {
+            const char* hAlignStr = lua_tostring(L, -1);
+            if (strcmp(hAlignStr, "center") == 0) {
+                style.hAlign = TextAlign::CENTER;
+            } else if (strcmp(hAlignStr, "right") == 0) {
+                style.hAlign = TextAlign::RIGHT;
+            } else if (strcmp(hAlignStr, "justify") == 0) {
+                style.hAlign = TextAlign::JUSTIFY;
+            } else {
+                style.hAlign = TextAlign::LEFT;
+            }
+        }
+        lua_pop(L, 1);
+
+        lua_getfield(L, 3, "vAlign");
+        if (lua_isstring(L, -1) != 0) {
+            const char* vAlignStr = lua_tostring(L, -1);
+            if (strcmp(vAlignStr, "top") == 0) {
+                style.vAlign = VerticalAlign::TOP;
+            } else if (strcmp(vAlignStr, "middle") == 0) {
+                style.vAlign = VerticalAlign::MIDDLE;
+            } else {
+                style.vAlign = VerticalAlign::BOTTOM;
+            }
+        }
+        lua_pop(L, 1);
+
+        // If style is empty, clear it
+        if (style.isEmpty()) {
+            const std::string payload = R"({"style_id":"~"})";
+            const Operation op = makeCellSetStyleOp(*workbook, cell->id, payload);
+            applyOperation(*workbook, op);
+            return 0;
+        }
+
+        // Generate a new style ID and define the style
+        const ID styleId = generate_id();
+
+        // Build STYLE_DEFINE payload
+        std::string stylePayload = "{";
+        stylePayload += R"("bold":)" + std::string(style.bold ? "true" : "false");
+        stylePayload += R"(,"italic":)" + std::string(style.italic ? "true" : "false");
+        stylePayload += R"(,"underline":)" + std::string(style.underline ? "true" : "false");
+        if (!style.bgColor.empty()) {
+            stylePayload += R"(,"bgColor":")" + jsonEscape(style.bgColor) + R"(")";
+        }
+        if (!style.textColor.empty()) {
+            stylePayload += R"(,"textColor":")" + jsonEscape(style.textColor) + R"(")";
+        }
+        if (!style.fontFamily.empty()) {
+            stylePayload += R"(,"fontFamily":")" + jsonEscape(style.fontFamily) + R"(")";
+        }
+        if (style.fontSize > 0) {
+            stylePayload += R"(,"fontSize":)" + std::to_string(style.fontSize);
+        }
+        // Alignment
+        const char* hAlignName = "left";
+        switch (style.hAlign) {
+            case TextAlign::CENTER:
+                hAlignName = "center";
+                break;
+            case TextAlign::RIGHT:
+                hAlignName = "right";
+                break;
+            case TextAlign::JUSTIFY:
+                hAlignName = "justify";
+                break;
+            default:
+                break;
+        }
+        stylePayload += R"(,"hAlign":")" + std::string(hAlignName) + R"(")";
+        const char* vAlignName = "bottom";
+        switch (style.vAlign) {
+            case VerticalAlign::TOP:
+                vAlignName = "top";
+                break;
+            case VerticalAlign::MIDDLE:
+                vAlignName = "middle";
+                break;
+            default:
+                break;
+        }
+        stylePayload += R"(,"vAlign":")" + std::string(vAlignName) + R"(")";
+        stylePayload += "}";
+
+        // Apply STYLE_DEFINE operation
+        const Operation defineOp = makeStyleDefineOp(*workbook, styleId, stylePayload);
+        applyOperation(*workbook, defineOp);
+
+        // Apply CELL_SET_STYLE operation
+        const std::string cellPayload = R"({"style_id":")" + styleId.toString() + R"("})";
+        const Operation styleOp = makeCellSetStyleOp(*workbook, cell->id, cellPayload);
+        applyOperation(*workbook, styleOp);
+
+        return 0;
     }
 
     // For other keys, set in the table itself

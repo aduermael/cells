@@ -245,9 +245,60 @@ void LuauSandbox::registerCellsAPI() {
     lua_pushcfunction(L_, &LuauSandbox::luaRangeFill, "fillRange");
     lua_setglobal(L_, "fillRange");
 
+    // Format and style functions
+    lua_pushcfunction(L_, &LuauSandbox::luaSetFormat, "setFormat");
+    lua_setglobal(L_, "setFormat");
+
+    lua_pushcfunction(L_, &LuauSandbox::luaSetStyle, "setStyle");
+    lua_setglobal(L_, "setStyle");
+
+    lua_pushcfunction(L_, &LuauSandbox::luaGetFormats, "getFormats");
+    lua_setglobal(L_, "getFormats");
+
     // Register print() for console output
     lua_pushcfunction(L_, &LuauSandbox::luaPrint, "print");
     lua_setglobal(L_, "print");
+
+    // Register style constants
+    // Horizontal alignment
+    lua_pushstring(L_, "left");
+    lua_setglobal(L_, "ALIGN_LEFT");
+    lua_pushstring(L_, "center");
+    lua_setglobal(L_, "ALIGN_CENTER");
+    lua_pushstring(L_, "right");
+    lua_setglobal(L_, "ALIGN_RIGHT");
+    lua_pushstring(L_, "justify");
+    lua_setglobal(L_, "ALIGN_JUSTIFY");
+
+    // Vertical alignment
+    lua_pushstring(L_, "top");
+    lua_setglobal(L_, "VALIGN_TOP");
+    lua_pushstring(L_, "middle");
+    lua_setglobal(L_, "VALIGN_MIDDLE");
+    lua_pushstring(L_, "bottom");
+    lua_setglobal(L_, "VALIGN_BOTTOM");
+
+    // Common colors
+    lua_pushstring(L_, "#FF0000");
+    lua_setglobal(L_, "COLOR_RED");
+    lua_pushstring(L_, "#00FF00");
+    lua_setglobal(L_, "COLOR_GREEN");
+    lua_pushstring(L_, "#0000FF");
+    lua_setglobal(L_, "COLOR_BLUE");
+    lua_pushstring(L_, "#FFFF00");
+    lua_setglobal(L_, "COLOR_YELLOW");
+    lua_pushstring(L_, "#FF00FF");
+    lua_setglobal(L_, "COLOR_MAGENTA");
+    lua_pushstring(L_, "#00FFFF");
+    lua_setglobal(L_, "COLOR_CYAN");
+    lua_pushstring(L_, "#FFFFFF");
+    lua_setglobal(L_, "COLOR_WHITE");
+    lua_pushstring(L_, "#000000");
+    lua_setglobal(L_, "COLOR_BLACK");
+    lua_pushstring(L_, "#808080");
+    lua_setglobal(L_, "COLOR_GRAY");
+    lua_pushstring(L_, "#FFA500");
+    lua_setglobal(L_, "COLOR_ORANGE");
 }
 
 void LuauSandbox::setContext(Workbook* workbook, Sheet* sheet) {

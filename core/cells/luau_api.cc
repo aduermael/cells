@@ -927,4 +927,340 @@ int LuauSandbox::luaPrint(lua_State* L) {
     return 0;
 }
 
+// ============================================================================
+// Cells API: setFormat(range, formatId)
+// Apply format to all cells in range
+// range: A1 notation like "A1:B10" or "A1" for single cell
+// formatId: format ID string like "FMT_C002", "FMT_P001", or nil to clear
+// ============================================================================
+int LuauSandbox::luaSetFormat(lua_State* L) {
+    const char* range = luaL_checkstring(L, 1);
+
+    // Get formatId (can be string or nil)
+    std::string formatIdStr = "~";  // Default: clear format
+    if (lua_isstring(L, 2) != 0) {
+        formatIdStr = lua_tostring(L, 2);
+    } else if (lua_isnil(L, 2) == 0) {
+        luaL_error(L, "setFormat: second argument must be format ID string or nil");
+    }
+
+    Sheet* sheet = getSheet(L);
+    Workbook* workbook = getWorkbook(L);
+    if (sheet == nullptr || workbook == nullptr) {
+        luaL_error(L, "setFormat: no context set");
+    }
+
+    // Parse range
+    int fromCol = 0;
+    int fromRow = 0;
+    int toCol = 0;
+    int toRow = 0;
+    if (!parseA1Range(range, &fromCol, &fromRow, &toCol, &toRow)) {
+        luaL_error(L, "setFormat: invalid range '%s'", range);
+    }
+
+    // Normalize range
+    if (fromCol > toCol) {
+        std::swap(fromCol, toCol);
+    }
+    if (fromRow > toRow) {
+        std::swap(fromRow, toRow);
+    }
+
+    // Apply format to all cells in range
+    const std::string payload = R"({"format_id":")" + jsonEscape(formatIdStr) + R"("})";
+
+    for (int c = fromCol; c <= toCol; c++) {
+        for (int r = fromRow; r <= toRow; r++) {
+            // Get or create cell at this position
+            const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
+            const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
+            const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
+
+            const Operation op = makeCellSetFormatOp(*workbook, cell->id, payload);
+            applyOperation(*workbook, op);
+        }
+    }
+
+    return 0;
+}
+
+// ============================================================================
+// Cells API: setStyle(range, styleTable)
+// Apply style to all cells in range
+// range: A1 notation like "A1:B10" or "A1" for single cell
+// styleTable: {bold=true, italic=false, bgColor="#FF0000", ...} or nil to clear
+// ============================================================================
+int LuauSandbox::luaSetStyle(lua_State* L) {
+    const char* range = luaL_checkstring(L, 1);
+
+    Sheet* sheet = getSheet(L);
+    Workbook* workbook = getWorkbook(L);
+    if (sheet == nullptr || workbook == nullptr) {
+        luaL_error(L, "setStyle: no context set");
+    }
+
+    // Parse range
+    int fromCol = 0;
+    int fromRow = 0;
+    int toCol = 0;
+    int toRow = 0;
+    if (!parseA1Range(range, &fromCol, &fromRow, &toCol, &toRow)) {
+        luaL_error(L, "setStyle: invalid range '%s'", range);
+    }
+
+    // Normalize range
+    if (fromCol > toCol) {
+        std::swap(fromCol, toCol);
+    }
+    if (fromRow > toRow) {
+        std::swap(fromRow, toRow);
+    }
+
+    // Handle nil - clear style
+    if (lua_isnil(L, 2) != 0) {
+        const std::string payload = R"({"style_id":"~"})";
+        for (int c = fromCol; c <= toCol; c++) {
+            for (int r = fromRow; r <= toRow; r++) {
+                const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
+                const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
+                const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
+
+                const Operation op = makeCellSetStyleOp(*workbook, cell->id, payload);
+                applyOperation(*workbook, op);
+            }
+        }
+        return 0;
+    }
+
+    // Expect a table
+    if (lua_istable(L, 2) == 0) {
+        luaL_error(L, "setStyle: second argument must be style table or nil");
+    }
+
+    // Build style from table
+    CellStyle style;
+
+    lua_getfield(L, 2, "bold");
+    if (lua_isboolean(L, -1) != 0) {
+        style.bold = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "italic");
+    if (lua_isboolean(L, -1) != 0) {
+        style.italic = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "underline");
+    if (lua_isboolean(L, -1) != 0) {
+        style.underline = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "bgColor");
+    if (lua_isstring(L, -1) != 0) {
+        style.bgColor = lua_tostring(L, -1);
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "textColor");
+    if (lua_isstring(L, -1) != 0) {
+        style.textColor = lua_tostring(L, -1);
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "fontFamily");
+    if (lua_isstring(L, -1) != 0) {
+        style.fontFamily = lua_tostring(L, -1);
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "fontSize");
+    if (lua_isnumber(L, -1) != 0) {
+        style.fontSize = static_cast<uint8_t>(lua_tonumber(L, -1));
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "hAlign");
+    if (lua_isstring(L, -1) != 0) {
+        const char* hAlignStr = lua_tostring(L, -1);
+        if (strcmp(hAlignStr, "center") == 0) {
+            style.hAlign = TextAlign::CENTER;
+        } else if (strcmp(hAlignStr, "right") == 0) {
+            style.hAlign = TextAlign::RIGHT;
+        } else if (strcmp(hAlignStr, "justify") == 0) {
+            style.hAlign = TextAlign::JUSTIFY;
+        } else {
+            style.hAlign = TextAlign::LEFT;
+        }
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "vAlign");
+    if (lua_isstring(L, -1) != 0) {
+        const char* vAlignStr = lua_tostring(L, -1);
+        if (strcmp(vAlignStr, "top") == 0) {
+            style.vAlign = VerticalAlign::TOP;
+        } else if (strcmp(vAlignStr, "middle") == 0) {
+            style.vAlign = VerticalAlign::MIDDLE;
+        } else {
+            style.vAlign = VerticalAlign::BOTTOM;
+        }
+    }
+    lua_pop(L, 1);
+
+    // If style is empty, clear it
+    if (style.isEmpty()) {
+        const std::string payload = R"({"style_id":"~"})";
+        for (int c = fromCol; c <= toCol; c++) {
+            for (int r = fromRow; r <= toRow; r++) {
+                const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
+                const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
+                const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
+
+                const Operation op = makeCellSetStyleOp(*workbook, cell->id, payload);
+                applyOperation(*workbook, op);
+            }
+        }
+        return 0;
+    }
+
+    // Generate a new style ID and define the style
+    const ID styleId = generate_id();
+
+    // Build STYLE_DEFINE payload
+    std::string stylePayload = "{";
+    stylePayload += R"("bold":)" + std::string(style.bold ? "true" : "false");
+    stylePayload += R"(,"italic":)" + std::string(style.italic ? "true" : "false");
+    stylePayload += R"(,"underline":)" + std::string(style.underline ? "true" : "false");
+    if (!style.bgColor.empty()) {
+        stylePayload += R"(,"bgColor":")" + jsonEscape(style.bgColor) + R"(")";
+    }
+    if (!style.textColor.empty()) {
+        stylePayload += R"(,"textColor":")" + jsonEscape(style.textColor) + R"(")";
+    }
+    if (!style.fontFamily.empty()) {
+        stylePayload += R"(,"fontFamily":")" + jsonEscape(style.fontFamily) + R"(")";
+    }
+    if (style.fontSize > 0) {
+        stylePayload += R"(,"fontSize":)" + std::to_string(style.fontSize);
+    }
+    // Alignment
+    const char* hAlignName = "left";
+    switch (style.hAlign) {
+        case TextAlign::CENTER:
+            hAlignName = "center";
+            break;
+        case TextAlign::RIGHT:
+            hAlignName = "right";
+            break;
+        case TextAlign::JUSTIFY:
+            hAlignName = "justify";
+            break;
+        default:
+            break;
+    }
+    stylePayload += R"(,"hAlign":")" + std::string(hAlignName) + R"(")";
+    const char* vAlignName = "bottom";
+    switch (style.vAlign) {
+        case VerticalAlign::TOP:
+            vAlignName = "top";
+            break;
+        case VerticalAlign::MIDDLE:
+            vAlignName = "middle";
+            break;
+        default:
+            break;
+    }
+    stylePayload += R"(,"vAlign":")" + std::string(vAlignName) + R"(")";
+    stylePayload += "}";
+
+    // Apply STYLE_DEFINE operation
+    const Operation defineOp = makeStyleDefineOp(*workbook, styleId, stylePayload);
+    applyOperation(*workbook, defineOp);
+
+    // Apply CELL_SET_STYLE to all cells in range
+    const std::string cellPayload = R"({"style_id":")" + styleId.toString() + R"("})";
+    for (int c = fromCol; c <= toCol; c++) {
+        for (int r = fromRow; r <= toRow; r++) {
+            const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
+            const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
+            const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
+
+            const Operation op = makeCellSetStyleOp(*workbook, cell->id, cellPayload);
+            applyOperation(*workbook, op);
+        }
+    }
+
+    return 0;
+}
+
+// ============================================================================
+// Cells API: getFormats()
+// Returns array of available format IDs with descriptions
+// ============================================================================
+int LuauSandbox::luaGetFormats(lua_State* L) {
+    // Return a table of built-in format IDs with descriptions
+    // Based on the format system defined in format_code_parser.h
+    lua_newtable(L);
+    int idx = 1;
+
+    // Helper to add format entry
+    auto addFormat = [L, &idx](const char* formatId, const char* description) {
+        lua_newtable(L);
+        lua_pushstring(L, formatId);
+        lua_setfield(L, -2, "id");
+        lua_pushstring(L, description);
+        lua_setfield(L, -2, "description");
+        lua_rawseti(L, -2, idx++);
+    };
+
+    // Number formats (General, Number)
+    addFormat("FMT_0000", "General - no specific format");
+    addFormat("FMT_N000", "Number - no decimals");
+    addFormat("FMT_N001", "Number - 1 decimal");
+    addFormat("FMT_N002", "Number - 2 decimals");
+    addFormat("FMT_N003", "Number - 3 decimals");
+    addFormat("FMT_N004", "Number - 4 decimals");
+
+    // Currency formats
+    addFormat("FMT_C000", "Currency - no decimals");
+    addFormat("FMT_C001", "Currency - 1 decimal");
+    addFormat("FMT_C002", "Currency - 2 decimals");
+
+    // Percentage formats
+    addFormat("FMT_P000", "Percentage - no decimals");
+    addFormat("FMT_P001", "Percentage - 1 decimal");
+    addFormat("FMT_P002", "Percentage - 2 decimals");
+
+    // Scientific notation
+    addFormat("FMT_E002", "Scientific - 2 decimals");
+
+    // Date formats
+    addFormat("FMT_D001", "Date - MM/DD/YYYY");
+    addFormat("FMT_D002", "Date - DD/MM/YYYY");
+    addFormat("FMT_D003", "Date - YYYY-MM-DD");
+
+    // Time formats
+    addFormat("FMT_T001", "Time - HH:MM:SS");
+    addFormat("FMT_T002", "Time - HH:MM");
+
+    // Also list custom formats from the workbook
+    const Workbook* workbook = getWorkbook(L);
+    if (workbook != nullptr) {
+        for (const auto& [fmtId, fmtCode] : workbook->getCustomFormats()) {
+            lua_newtable(L);
+            lua_pushstring(L, fmtId.toString().c_str());
+            lua_setfield(L, -2, "id");
+            lua_pushstring(L, fmtCode.c_str());
+            lua_setfield(L, -2, "description");
+            lua_rawseti(L, -2, idx++);
+        }
+    }
+
+    return 1;
+}
+
 }  // namespace cells

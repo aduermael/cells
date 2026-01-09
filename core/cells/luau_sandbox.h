@@ -163,6 +163,11 @@ private:
     static int luaRangeDelete(lua_State* L);
     static int luaRangeFill(lua_State* L);
 
+    // Format and style operations
+    static int luaSetFormat(lua_State* L);   // setFormat(range, formatId)
+    static int luaSetStyle(lua_State* L);    // setStyle(range, styleTable)
+    static int luaGetFormats(lua_State* L);  // getFormats() - returns available formats
+
     // Output operations
     static int luaPrint(lua_State* L);
 

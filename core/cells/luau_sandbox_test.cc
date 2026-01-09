@@ -1643,5 +1643,252 @@ TEST(LuauSandboxTest, CellValueAssignmentWithFormula) {
     EXPECT_EQ(r5.output, "50");
 }
 
+// =============================================================================
+// Format and Style API Tests (Phase 8)
+// =============================================================================
+
+TEST(LuauSandboxTest, CellFormatRead) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Cell without format should return nil
+    auto r1 = sandbox.execute("return type(getCell('A1').format)");
+    EXPECT_TRUE(r1.success) << r1.error;
+    EXPECT_EQ(r1.output, "nil");
+}
+
+TEST(LuauSandboxTest, CellFormatWrite) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();  // Enable OpLog
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set format on a cell
+    auto r1 = sandbox.execute(R"(
+        local cell = getCell('A1', {create=true})
+        cell.format = "FMT_C002"
+        return cell.format
+    )");
+    EXPECT_TRUE(r1.success) << r1.error;
+    EXPECT_EQ(r1.output, "FMT_C002");
+
+    // Clear format with nil
+    auto r2 = sandbox.execute(R"(
+        local cell = getCell('A1')
+        cell.format = nil
+        return type(cell.format)
+    )");
+    EXPECT_TRUE(r2.success) << r2.error;
+    EXPECT_EQ(r2.output, "nil");
+}
+
+TEST(LuauSandboxTest, CellStyleRead) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Cell without style should return nil
+    auto r1 = sandbox.execute("return type(getCell('A1').style)");
+    EXPECT_TRUE(r1.success) << r1.error;
+    EXPECT_EQ(r1.output, "nil");
+}
+
+TEST(LuauSandboxTest, CellStyleWrite) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();  // Enable OpLog
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set style on a cell
+    auto r1 = sandbox.execute(R"(
+        local cell = getCell('A1', {create=true})
+        cell.style = {bold=true, italic=true, bgColor="#FF0000"}
+        return tostring(cell.style.bold) .. "," .. tostring(cell.style.italic)
+    )");
+    EXPECT_TRUE(r1.success) << r1.error;
+    EXPECT_EQ(r1.output, "true,true");
+
+    // Verify bgColor
+    auto r2 = sandbox.execute("return getCell('A1').style.bgColor");
+    EXPECT_TRUE(r2.success) << r2.error;
+    EXPECT_EQ(r2.output, "#FF0000");
+
+    // Clear style with nil
+    auto r3 = sandbox.execute(R"(
+        local cell = getCell('A1')
+        cell.style = nil
+        return type(cell.style)
+    )");
+    EXPECT_TRUE(r3.success) << r3.error;
+    EXPECT_EQ(r3.output, "nil");
+}
+
+TEST(LuauSandboxTest, SetFormatRange) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set format on range
+    auto r1 = sandbox.execute(R"(
+        setFormat("A1:B2", "FMT_P002")
+        return getCell('A1').format
+    )");
+    EXPECT_TRUE(r1.success) << r1.error;
+    EXPECT_EQ(r1.output, "FMT_P002");
+
+    // Verify B2 also got the format
+    auto r2 = sandbox.execute("return getCell('B2').format");
+    EXPECT_TRUE(r2.success) << r2.error;
+    EXPECT_EQ(r2.output, "FMT_P002");
+}
+
+TEST(LuauSandboxTest, SetStyleRange) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set style on range
+    auto r1 = sandbox.execute(R"(
+        setStyle("A1:B2", {bold=true, textColor="#0000FF"})
+        return tostring(getCell('A1').style.bold)
+    )");
+    EXPECT_TRUE(r1.success) << r1.error;
+    EXPECT_EQ(r1.output, "true");
+
+    // Verify B2 also got the style
+    auto r2 = sandbox.execute("return getCell('B2').style.textColor");
+    EXPECT_TRUE(r2.success) << r2.error;
+    EXPECT_EQ(r2.output, "#0000FF");
+
+    // Clear style with nil
+    auto r3 = sandbox.execute(R"(
+        setStyle("A1:B2", nil)
+        return type(getCell('A1').style)
+    )");
+    EXPECT_TRUE(r3.success) << r3.error;
+    EXPECT_EQ(r3.output, "nil");
+}
+
+TEST(LuauSandboxTest, GetFormats) {
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // getFormats() should return a table with built-in formats
+    auto r1 = sandbox.execute(R"(
+        local formats = getFormats()
+        return #formats > 0
+    )");
+    EXPECT_TRUE(r1.success) << r1.error;
+    EXPECT_EQ(r1.output, "true");
+
+    // Check that FMT_C002 is in the list
+    auto r2 = sandbox.execute(R"(
+        local formats = getFormats()
+        for _, fmt in ipairs(formats) do
+            if fmt.id == "FMT_C002" then
+                return "found"
+            end
+        end
+        return "not found"
+    )");
+    EXPECT_TRUE(r2.success) << r2.error;
+    EXPECT_EQ(r2.output, "found");
+}
+
+TEST(LuauSandboxTest, StyleConstants) {
+    LuauSandbox sandbox;
+
+    // Test alignment constants
+    auto r1 = sandbox.execute("return ALIGN_LEFT");
+    EXPECT_TRUE(r1.success) << r1.error;
+    EXPECT_EQ(r1.output, "left");
+
+    auto r2 = sandbox.execute("return ALIGN_CENTER");
+    EXPECT_TRUE(r2.success) << r2.error;
+    EXPECT_EQ(r2.output, "center");
+
+    auto r3 = sandbox.execute("return VALIGN_MIDDLE");
+    EXPECT_TRUE(r3.success) << r3.error;
+    EXPECT_EQ(r3.output, "middle");
+
+    // Test color constants
+    auto r4 = sandbox.execute("return COLOR_RED");
+    EXPECT_TRUE(r4.success) << r4.error;
+    EXPECT_EQ(r4.output, "#FF0000");
+
+    auto r5 = sandbox.execute("return COLOR_BLUE");
+    EXPECT_TRUE(r5.success) << r5.error;
+    EXPECT_EQ(r5.output, "#0000FF");
+}
+
+TEST(LuauSandboxTest, StyleWithAlignmentConstants) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set style using constants
+    auto r1 = sandbox.execute(R"(
+        local cell = getCell('A1', {create=true})
+        cell.style = {hAlign=ALIGN_CENTER, vAlign=VALIGN_MIDDLE, bgColor=COLOR_YELLOW}
+        return cell.style.hAlign .. "," .. cell.style.vAlign
+    )");
+    EXPECT_TRUE(r1.success) << r1.error;
+    EXPECT_EQ(r1.output, "center,middle");
+
+    // Verify background color
+    auto r2 = sandbox.execute("return getCell('A1').style.bgColor");
+    EXPECT_TRUE(r2.success) << r2.error;
+    EXPECT_EQ(r2.output, "#FFFF00");
+}
+
+TEST(LuauSandboxTest, StyleMerging) {
+    auto workbook = createTestWorkbook();
+    workbook->startCollaboration();
+    Sheet* sheet = workbook->getSheetByIndex(0);
+
+    LuauSandbox sandbox;
+    sandbox.setContext(workbook.get(), sheet);
+
+    // Set initial style
+    auto r1 = sandbox.execute(R"(
+        local cell = getCell('A1', {create=true})
+        cell.style = {bold=true, bgColor="#FF0000"}
+        return tostring(cell.style.bold)
+    )");
+    EXPECT_TRUE(r1.success) << r1.error;
+    EXPECT_EQ(r1.output, "true");
+
+    // Update style - should merge with existing
+    auto r2 = sandbox.execute(R"(
+        local cell = getCell('A1')
+        cell.style = {italic=true}
+        return tostring(cell.style.bold) .. "," .. tostring(cell.style.italic)
+    )");
+    EXPECT_TRUE(r2.success) << r2.error;
+    // Bold should be preserved from previous style, italic should be new
+    EXPECT_EQ(r2.output, "true,true");
+}
+
 }  // namespace
 }  // namespace cells
