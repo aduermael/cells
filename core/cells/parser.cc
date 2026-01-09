@@ -134,10 +134,8 @@ bool Parser::parseLine(std::string_view line) {
         case 'X':  // Cell
             return parseCell(line.substr(firstNonSpace));
 
-        case 'T':  // Style definition (ignored for now)
-        case 'Y':  // Cell-style mapping (ignored for now)
-            // These sections are deferred to a later implementation plan
-            return true;
+        case 'Y':  // Style definition
+            return parseStyle(line.substr(firstNonSpace));
 
         case 'O':  // OpLog entry
             return parseOperation(line.substr(firstNonSpace));
@@ -204,6 +202,142 @@ bool Parser::parseFormat(std::string_view line) {
 
     // Register the custom format in the workbook
     workbook_->registerCustomFormat(formatId, formatCode);
+    return true;
+}
+
+// Helper to extract JSON string value for a key (simple parsing)
+static std::string extractJSONStringValue(std::string_view json, const std::string& key) {
+    const std::string keyPattern = "\"" + key + "\":\"";
+    auto pos = json.find(keyPattern);
+    if (pos == std::string_view::npos) {
+        return "";
+    }
+    pos += keyPattern.size();
+    // Find closing quote
+    std::string result;
+    while (pos < json.size() && json[pos] != '"') {
+        if (json[pos] == '\\' && pos + 1 < json.size()) {
+            pos++;  // Skip escape char
+            if (json[pos] == 'n') {
+                result += '\n';
+            } else if (json[pos] == 't') {
+                result += '\t';
+            } else if (json[pos] == 'r') {
+                result += '\r';
+            } else {
+                result += json[pos];
+            }
+        } else {
+            result += json[pos];
+        }
+        pos++;
+    }
+    return result;
+}
+
+// Helper to extract JSON bool value for a key
+static bool extractJSONBoolValue(std::string_view json, const std::string& key, bool defaultValue) {
+    const std::string keyPattern = "\"" + key + "\":";
+    auto pos = json.find(keyPattern);
+    if (pos == std::string_view::npos) {
+        return defaultValue;
+    }
+    pos += keyPattern.size();
+    // Skip whitespace
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
+        pos++;
+    }
+    if (pos >= json.size()) {
+        return defaultValue;
+    }
+    if (json.substr(pos, 4) == "true") {
+        return true;
+    }
+    if (json.substr(pos, 5) == "false") {
+        return false;
+    }
+    return defaultValue;
+}
+
+// Helper to extract JSON int value for a key
+static int extractJSONIntValue(std::string_view json, const std::string& key, int defaultValue) {
+    const std::string keyPattern = "\"" + key + "\":";
+    auto pos = json.find(keyPattern);
+    if (pos == std::string_view::npos) {
+        return defaultValue;
+    }
+    pos += keyPattern.size();
+    // Skip whitespace
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
+        pos++;
+    }
+    if (pos >= json.size() || !std::isdigit(json[pos])) {
+        return defaultValue;
+    }
+    int result = 0;
+    while (pos < json.size() && std::isdigit(json[pos])) {
+        result = result * 10 + (json[pos] - '0');
+        pos++;
+    }
+    return result;
+}
+
+bool Parser::parseStyle(std::string_view line) {
+    // Format: Y <id> <json-props>
+    if (line.size() < 2 || line[0] != 'Y' || line[1] != ' ') {
+        return setError("Invalid style line");
+    }
+
+    line = line.substr(2);  // Skip "Y "
+
+    // Parse ID (until space)
+    const size_t spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos || spacePos < 1) {
+        return setError("Missing style ID");
+    }
+
+    const std::string idStr(line.substr(0, spacePos));
+    const ID styleId(idStr);
+
+    // Parse JSON payload
+    const std::string_view json = line.substr(spacePos + 1);
+    if (json.empty() || json[0] != '{') {
+        return setError("Missing style JSON payload");
+    }
+
+    // Parse style properties from JSON
+    CellStyle style;
+    style.bold = extractJSONBoolValue(json, "bold", false);
+    style.italic = extractJSONBoolValue(json, "italic", false);
+    style.underline = extractJSONBoolValue(json, "underline", false);
+    style.bgColor = extractJSONStringValue(json, "bgColor");
+    style.textColor = extractJSONStringValue(json, "textColor");
+    style.fontFamily = extractJSONStringValue(json, "fontFamily");
+    style.fontSize = static_cast<uint8_t>(extractJSONIntValue(json, "fontSize", 0));
+
+    // Parse alignment enums
+    const std::string hAlignStr = extractJSONStringValue(json, "hAlign");
+    if (hAlignStr == "center") {
+        style.hAlign = TextAlign::CENTER;
+    } else if (hAlignStr == "right") {
+        style.hAlign = TextAlign::RIGHT;
+    } else if (hAlignStr == "justify") {
+        style.hAlign = TextAlign::JUSTIFY;
+    } else {
+        style.hAlign = TextAlign::LEFT;
+    }
+
+    const std::string vAlignStr = extractJSONStringValue(json, "vAlign");
+    if (vAlignStr == "top") {
+        style.vAlign = VerticalAlign::TOP;
+    } else if (vAlignStr == "middle") {
+        style.vAlign = VerticalAlign::MIDDLE;
+    } else {
+        style.vAlign = VerticalAlign::BOTTOM;
+    }
+
+    // Register the style in the workbook
+    workbook_->registerStyle(styleId, style);
     return true;
 }
 
@@ -611,6 +745,14 @@ bool Parser::parseCellProps(std::string_view props, Cell& cell) {
                 end = props.size();
             }
             cell.formatId = ID(std::string(props.substr(0, end)));
+            props = (end < props.size()) ? props.substr(end) : "";
+        } else if (key == "sty") {
+            // Style ID: 8 characters
+            size_t end = props.find_first_of(" \t");
+            if (end == std::string_view::npos) {
+                end = props.size();
+            }
+            cell.styleId = ID(std::string(props.substr(0, end)));
             props = (end < props.size()) ? props.substr(end) : "";
         } else {
             // Unknown property - skip value

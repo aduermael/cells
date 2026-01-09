@@ -59,7 +59,7 @@ Add style support to the core data model with CRDT synchronization.
   - Implement `makeStyleDefineOp()` in crdt.cc
   - Handle in `applyOperation()` switch
 
-- [ ] 1c: Add style serialization for ZCD format
+- [x] 1c: Add style serialization for ZCD format
   - JSON payload format: `{"bold":true,"italic":false,"bgColor":"#FF0000",...}`
   - Add style serialization in serializer.cc for .cells/.zcd format
   - Add style deserialization in deserializer.cc

@@ -102,6 +102,7 @@ private:
     // Line type parsers
     bool parseDocument(std::string_view line);   // D <id> "<name>"
     bool parseFormat(std::string_view line);     // F <id> "<format-code>"
+    bool parseStyle(std::string_view line);      // Y <id> <json-props>
     bool parseSheet(std::string_view line);      // S <id> "<name>"
     bool parseColumn(std::string_view line);     // C <id> <pos> [props]
     bool parseRow(std::string_view line);        // R <id> <pos> [props]

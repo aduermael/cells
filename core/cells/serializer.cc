@@ -57,6 +57,9 @@ void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
     // Serialize custom formats (before sheets, as cells may reference them)
     serializeCustomFormats(workbook, out);
 
+    // Serialize styles (before sheets, as cells may reference them)
+    serializeStyles(workbook, out);
+
     // Serialize each sheet
     for (const auto& sheet : workbook.sheets) {
         serializeSheet(*sheet, out);
@@ -95,6 +98,71 @@ void Serializer::serializeCustomFormats(const Workbook& workbook, std::ostream& 
     // Format: F <format-id> "<format-code>"
     for (const auto& [idStr, formatCode] : ordered) {
         out << "F " << idStr << " \"" << escapeString(formatCode) << "\"\n";
+    }
+}
+
+void Serializer::serializeStyles(const Workbook& workbook, std::ostream& out) const {
+    const auto& styles = workbook.getStyles();
+    if (styles.empty()) {
+        return;
+    }
+
+    // Sort styles by ID for deterministic output
+    std::vector<std::pair<std::string, const CellStyle*>> ordered;
+    ordered.reserve(styles.size());
+
+    for (const auto& [styleId, style] : styles) {
+        ordered.emplace_back(styleId.toString(), &style);
+    }
+
+    std::sort(ordered.begin(), ordered.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    // Output style definitions
+    // Format: Y <style-id> <json-props>
+    for (const auto& [idStr, style] : ordered) {
+        out << "Y " << idStr << " {";
+        out << "\"bold\":" << (style->bold ? "true" : "false");
+        out << ",\"italic\":" << (style->italic ? "true" : "false");
+        out << ",\"underline\":" << (style->underline ? "true" : "false");
+        if (!style->bgColor.empty()) {
+            out << ",\"bgColor\":\"" << escapeString(style->bgColor) << "\"";
+        }
+        if (!style->textColor.empty()) {
+            out << ",\"textColor\":\"" << escapeString(style->textColor) << "\"";
+        }
+        if (!style->fontFamily.empty()) {
+            out << ",\"fontFamily\":\"" << escapeString(style->fontFamily) << "\"";
+        }
+        if (style->fontSize > 0) {
+            out << ",\"fontSize\":" << static_cast<int>(style->fontSize);
+        }
+        // Horizontal alignment
+        switch (style->hAlign) {
+            case TextAlign::CENTER:
+                out << ",\"hAlign\":\"center\"";
+                break;
+            case TextAlign::RIGHT:
+                out << ",\"hAlign\":\"right\"";
+                break;
+            case TextAlign::JUSTIFY:
+                out << ",\"hAlign\":\"justify\"";
+                break;
+            default:
+                break;  // LEFT is default, omit
+        }
+        // Vertical alignment
+        switch (style->vAlign) {
+            case VerticalAlign::TOP:
+                out << ",\"vAlign\":\"top\"";
+                break;
+            case VerticalAlign::MIDDLE:
+                out << ",\"vAlign\":\"middle\"";
+                break;
+            default:
+                break;  // BOTTOM is default, omit
+        }
+        out << "}\n";
     }
 }
 
@@ -187,7 +255,7 @@ void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out)
 }
 
 void Serializer::serializeCell(const Cell& cell, std::ostream& out) const {
-    // Format: X <id> <col> <row> <type> <value> [fmt:<formatId>]
+    // Format: X <id> <col> <row> <type> <value> [fmt:<formatId>] [sty:<styleId>]
     out << "X " << cell.id.toString() << " " << cell.colId.toString() << " "
         << cell.rowId.toString() << " ";
 
@@ -196,6 +264,11 @@ void Serializer::serializeCell(const Cell& cell, std::ostream& out) const {
     // Optional format property (only if not null/default)
     if (!cell.formatId.isNull()) {
         out << " fmt:" << cell.formatId.toString();
+    }
+
+    // Optional style property (only if not null/default)
+    if (!cell.styleId.isNull()) {
+        out << " sty:" << cell.styleId.toString();
     }
 
     out << "\n";

@@ -63,6 +63,9 @@ private:
     // Serialize custom number formats
     void serializeCustomFormats(const Workbook& workbook, std::ostream& out) const;
 
+    // Serialize cell styles
+    void serializeStyles(const Workbook& workbook, std::ostream& out) const;
+
     // Serialize a single sheet
     void serializeSheet(const Sheet& sheet, std::ostream& out) const;
 
