@@ -167,6 +167,172 @@ private:
     std::unordered_map<std::string, size_t> index_;
 };
 
+// ---------------------------------------------------------------------------
+// Style Table for XLSX export
+// ---------------------------------------------------------------------------
+
+// Font entry for styles.xml
+struct XLSXFontEntry {
+    bool bold{false};
+    bool italic{false};
+    bool underline{false};
+    std::string name{"Calibri"};
+    double size{11};
+    std::string color;  // Empty = default, otherwise ARGB
+
+    bool operator==(const XLSXFontEntry& other) const {
+        return bold == other.bold && italic == other.italic && underline == other.underline &&
+               name == other.name && size == other.size && color == other.color;
+    }
+};
+
+// Fill entry for styles.xml
+struct XLSXFillEntry {
+    std::string fgColor;  // ARGB hex, empty = none
+
+    bool operator==(const XLSXFillEntry& other) const { return fgColor == other.fgColor; }
+};
+
+// Cell format entry (cellXfs)
+struct XLSXCellFormatEntry {
+    size_t fontId{0};
+    size_t fillId{0};
+    cells::TextAlign hAlign{cells::TextAlign::LEFT};
+    cells::VerticalAlign vAlign{cells::VerticalAlign::BOTTOM};
+    bool hasAlignment{false};
+
+    bool operator==(const XLSXCellFormatEntry& other) const {
+        return fontId == other.fontId && fillId == other.fillId && hAlign == other.hAlign &&
+               vAlign == other.vAlign && hasAlignment == other.hasAlignment;
+    }
+};
+
+// Convert #RRGGBB to FFRRGGBB (ARGB)
+std::string rgbToArgb(const std::string& rgb) {
+    if (rgb.empty()) {
+        return {};
+    }
+    if (rgb.size() == 7 && rgb[0] == '#') {
+        return "FF" + rgb.substr(1);
+    }
+    return rgb;
+}
+
+// Style table that collects fonts, fills, and cell formats for XLSX export
+class StyleTable {
+public:
+    StyleTable() {
+        // Add default font (index 0) - required by Excel
+        fonts_.push_back(XLSXFontEntry{});
+        fontIndex_[fontKey(fonts_[0])] = 0;
+
+        // Add required fills (indices 0 and 1) - required by Excel
+        fills_.push_back(XLSXFillEntry{});          // none
+        fills_.push_back(XLSXFillEntry{"gray125"});  // gray125 (required placeholder)
+        fillIndex_[""] = 0;
+        fillIndex_["gray125"] = 1;
+
+        // Add default cell format (index 0)
+        formats_.push_back(XLSXCellFormatEntry{});
+        formatIndex_[formatKey(formats_[0])] = 0;
+    }
+
+    // Get or add a cell format for a given CellStyle
+    // Returns the cellXfs index for this style
+    size_t getOrAddFormat(const cells::CellStyle& style) {
+        // First, get or add font
+        XLSXFontEntry font;
+        font.bold = style.bold;
+        font.italic = style.italic;
+        font.underline = style.underline;
+        font.name = style.fontFamily.empty() ? "Calibri" : style.fontFamily;
+        font.size = style.fontSize > 0 ? style.fontSize : 11;
+        font.color = rgbToArgb(style.textColor);
+        const size_t fontId = getOrAddFont(font);
+
+        // Get or add fill (background)
+        XLSXFillEntry fill;
+        fill.fgColor = rgbToArgb(style.bgColor);
+        const size_t fillId = getOrAddFill(fill);
+
+        // Create cell format
+        XLSXCellFormatEntry xf;
+        xf.fontId = fontId;
+        xf.fillId = fillId;
+        xf.hAlign = style.hAlign;
+        xf.vAlign = style.vAlign;
+        xf.hasAlignment = (style.hAlign != cells::TextAlign::LEFT ||
+                           style.vAlign != cells::VerticalAlign::BOTTOM);
+
+        return getOrAddCellFormat(xf);
+    }
+
+    [[nodiscard]] const std::vector<XLSXFontEntry>& fonts() const { return fonts_; }
+    [[nodiscard]] const std::vector<XLSXFillEntry>& fills() const { return fills_; }
+    [[nodiscard]] const std::vector<XLSXCellFormatEntry>& formats() const { return formats_; }
+
+private:
+    std::vector<XLSXFontEntry> fonts_;
+    std::vector<XLSXFillEntry> fills_;
+    std::vector<XLSXCellFormatEntry> formats_;
+    std::unordered_map<std::string, size_t> fontIndex_;
+    std::unordered_map<std::string, size_t> fillIndex_;
+    std::unordered_map<std::string, size_t> formatIndex_;
+
+    static std::string fontKey(const XLSXFontEntry& f) {
+        std::ostringstream oss;
+        oss << (f.bold ? "B" : "b") << (f.italic ? "I" : "i") << (f.underline ? "U" : "u")
+            << "|" << f.name << "|" << f.size << "|" << f.color;
+        return oss.str();
+    }
+
+    static std::string formatKey(const XLSXCellFormatEntry& xf) {
+        std::ostringstream oss;
+        oss << xf.fontId << "|" << xf.fillId << "|" << static_cast<int>(xf.hAlign) << "|"
+            << static_cast<int>(xf.vAlign) << "|" << xf.hasAlignment;
+        return oss.str();
+    }
+
+    size_t getOrAddFont(const XLSXFontEntry& font) {
+        const std::string key = fontKey(font);
+        auto it = fontIndex_.find(key);
+        if (it != fontIndex_.end()) {
+            return it->second;
+        }
+        const size_t idx = fonts_.size();
+        fonts_.push_back(font);
+        fontIndex_[key] = idx;
+        return idx;
+    }
+
+    size_t getOrAddFill(const XLSXFillEntry& fill) {
+        // Empty fill uses index 0
+        if (fill.fgColor.empty()) {
+            return 0;
+        }
+        auto it = fillIndex_.find(fill.fgColor);
+        if (it != fillIndex_.end()) {
+            return it->second;
+        }
+        const size_t idx = fills_.size();
+        fills_.push_back(fill);
+        fillIndex_[fill.fgColor] = idx;
+        return idx;
+    }
+
+    size_t getOrAddCellFormat(const XLSXCellFormatEntry& xf) {
+        const std::string key = formatKey(xf);
+        auto it = formatIndex_.find(key);
+        if (it != formatIndex_.end()) {
+            return it->second;
+        }
+        const size_t idx = formats_.size();
+        formats_.push_back(xf);
+        formatIndex_[key] = idx;
+        return idx;
+    }
+};
+
 // Escape XML special characters
 std::string escapeXml(const std::string& str) {
     std::string result;
@@ -215,8 +381,11 @@ struct CellPosition {
 };
 
 // Generate worksheet XML
-std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
-                              const cells::RefConverter& refConverter, bool writeFormulas) {
+// cellStyleIndices maps cell pointer to XLSX style index (s attribute)
+std::string generateWorksheet(
+    const cells::Sheet& sheet, SharedStringTable& sst, const cells::RefConverter& refConverter,
+    bool writeFormulas,
+    const std::unordered_map<const cells::Cell*, size_t>& cellStyleIndices) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
     xml << "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\n";
@@ -332,6 +501,12 @@ std::string generateWorksheet(const cells::Sheet& sheet, SharedStringTable& sst,
 
             xml << "      <c r=\"" << cellRef << "\"";
 
+            // Add style index if cell has a style
+            auto styleIt = cellStyleIndices.find(cell);
+            if (styleIt != cellStyleIndices.end() && styleIt->second > 0) {
+                xml << " s=\"" << styleIt->second << "\"";
+            }
+
             // Handle formula cells
             if (writeFormulas && formula != nullptr && formula->ast != nullptr) {
                 xml << ">\n";
@@ -443,31 +618,129 @@ std::string generateSharedStrings(const SharedStringTable& sst) {
     return xml.str();
 }
 
-// Generate xl/styles.xml (minimal required styles)
-std::string generateStyles() {
-    // Minimal styles.xml required by Excel to open the file
-    return R"(<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <fonts count="1">
-    <font>
-      <sz val="11"/>
-      <name val="Calibri"/>
-    </font>
-  </fonts>
-  <fills count="2">
-    <fill><patternFill patternType="none"/></fill>
-    <fill><patternFill patternType="gray125"/></fill>
-  </fills>
-  <borders count="1">
-    <border><left/><right/><top/><bottom/><diagonal/></border>
-  </borders>
-  <cellStyleXfs count="1">
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
-  </cellStyleXfs>
-  <cellXfs count="1">
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-  </cellXfs>
-</styleSheet>)";
+// Horizontal alignment enum to XLSX string
+const char* hAlignToXlsx(cells::TextAlign align) {
+    switch (align) {
+        case cells::TextAlign::CENTER:
+            return "center";
+        case cells::TextAlign::RIGHT:
+            return "right";
+        case cells::TextAlign::JUSTIFY:
+            return "justify";
+        default:
+            return "left";
+    }
+}
+
+// Vertical alignment enum to XLSX string
+const char* vAlignToXlsx(cells::VerticalAlign align) {
+    switch (align) {
+        case cells::VerticalAlign::TOP:
+            return "top";
+        case cells::VerticalAlign::MIDDLE:
+            return "center";
+        default:
+            return "bottom";
+    }
+}
+
+// Generate xl/styles.xml from collected styles
+std::string generateStyles(const StyleTable& styles) {
+    std::ostringstream xml;
+    xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
+    xml << "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\n";
+
+    // Fonts
+    const auto& fonts = styles.fonts();
+    xml << "  <fonts count=\"" << fonts.size() << "\">\n";
+    for (const auto& font : fonts) {
+        xml << "    <font>\n";
+        if (font.bold) {
+            xml << "      <b/>\n";
+        }
+        if (font.italic) {
+            xml << "      <i/>\n";
+        }
+        if (font.underline) {
+            xml << "      <u/>\n";
+        }
+        xml << "      <sz val=\"" << font.size << "\"/>\n";
+        if (!font.color.empty()) {
+            xml << "      <color rgb=\"" << font.color << "\"/>\n";
+        }
+        xml << "      <name val=\"" << escapeXml(font.name) << "\"/>\n";
+        xml << "    </font>\n";
+    }
+    xml << "  </fonts>\n";
+
+    // Fills
+    const auto& fills = styles.fills();
+    xml << "  <fills count=\"" << fills.size() << "\">\n";
+    for (size_t i = 0; i < fills.size(); ++i) {
+        const auto& fill = fills[i];
+        if (i == 0) {
+            // First fill is always none
+            xml << "    <fill><patternFill patternType=\"none\"/></fill>\n";
+        } else if (i == 1 && fill.fgColor == "gray125") {
+            // Second fill is required gray125 placeholder
+            xml << "    <fill><patternFill patternType=\"gray125\"/></fill>\n";
+        } else if (!fill.fgColor.empty()) {
+            // Solid fill with color
+            xml << "    <fill><patternFill patternType=\"solid\"><fgColor rgb=\""
+                << fill.fgColor << "\"/></patternFill></fill>\n";
+        } else {
+            xml << "    <fill><patternFill patternType=\"none\"/></fill>\n";
+        }
+    }
+    xml << "  </fills>\n";
+
+    // Borders (just default for now)
+    xml << "  <borders count=\"1\">\n";
+    xml << "    <border><left/><right/><top/><bottom/><diagonal/></border>\n";
+    xml << "  </borders>\n";
+
+    // Cell style formats (just default)
+    xml << "  <cellStyleXfs count=\"1\">\n";
+    xml << "    <xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/>\n";
+    xml << "  </cellStyleXfs>\n";
+
+    // Cell formats (cellXfs)
+    const auto& formats = styles.formats();
+    xml << "  <cellXfs count=\"" << formats.size() << "\">\n";
+    for (const auto& xf : formats) {
+        xml << "    <xf numFmtId=\"0\" fontId=\"" << xf.fontId << "\" fillId=\"" << xf.fillId
+            << "\" borderId=\"0\" xfId=\"0\"";
+
+        // Apply flags
+        if (xf.fontId > 0) {
+            xml << " applyFont=\"1\"";
+        }
+        if (xf.fillId > 0) {
+            xml << " applyFill=\"1\"";
+        }
+        if (xf.hasAlignment) {
+            xml << " applyAlignment=\"1\"";
+        }
+
+        if (xf.hasAlignment) {
+            xml << ">\n";
+            xml << "      <alignment";
+            if (xf.hAlign != cells::TextAlign::LEFT) {
+                xml << " horizontal=\"" << hAlignToXlsx(xf.hAlign) << "\"";
+            }
+            if (xf.vAlign != cells::VerticalAlign::BOTTOM) {
+                xml << " vertical=\"" << vAlignToXlsx(xf.vAlign) << "\"";
+            }
+            xml << "/>\n";
+            xml << "    </xf>\n";
+        } else {
+            xml << "/>\n";
+        }
+    }
+    xml << "  </cellXfs>\n";
+
+    xml << "</styleSheet>";
+    return xml.str();
 }
 
 }  // namespace
@@ -606,8 +879,25 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         return result;
     }
 
+    // Collect styles from all sheets
+    StyleTable styleTable;
+    std::unordered_map<const Cell*, size_t> cellStyleIndices;
+
+    for (const auto& sheet : workbook.sheets) {
+        for (const auto& [id, cell] : sheet->cells) {
+            if (!cell->styleId.isNull()) {
+                // Look up the CellStyle in the workbook
+                const CellStyle* style = workbook.getStyle(cell->styleId);
+                if (style != nullptr) {
+                    const size_t styleIdx = styleTable.getOrAddFormat(*style);
+                    cellStyleIndices[cell.get()] = styleIdx;
+                }
+            }
+        }
+    }
+
     // Write styles
-    if (!zip.addFile("xl/styles.xml", generateStyles())) {
+    if (!zip.addFile("xl/styles.xml", generateStyles(styleTable))) {
         result.error = XLSXWriteError("Failed to write xl/styles.xml");
         return result;
     }
@@ -625,8 +915,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         refConverter.setContext(sheet);
 
         // Generate worksheet XML
-        const std::string sheetXml =
-            generateWorksheet(sheet, sst, refConverter, options_.writeFormulas);
+        const std::string sheetXml = generateWorksheet(sheet, sst, refConverter,
+                                                       options_.writeFormulas, cellStyleIndices);
 
         const std::string sheetPath = "xl/worksheets/sheet" + std::to_string(i + 1) + ".xml";
         if (!zip.addFile(sheetPath, sheetXml)) {

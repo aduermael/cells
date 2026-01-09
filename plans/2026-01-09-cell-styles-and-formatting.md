@@ -87,7 +87,7 @@ Ensure styles are properly preserved when importing/exporting XLSX and ZCD files
   - Map XLSX alignment to hAlign/vAlign
   - Update xlsx_reader.cc to populate Cell.styleId
 
-- [ ] 2b: XLSX style export
+- [x] 2b: XLSX style export
   - Generate `styles.xml` with cell styles on XLSX export
   - Create font entries for unique font combinations
   - Create fill entries for unique background colors
