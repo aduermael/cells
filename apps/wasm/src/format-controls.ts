@@ -71,6 +71,8 @@ export interface FormatControlsCallbacks {
   getSelectedCellData: () => CellData | null;
   /** Get the current selection range (start and end) */
   getSelectionRange: () => { start: Position | null; end: Position | null };
+  /** Get cell data at a specific position */
+  getCellDataAt: (col: number, row: number) => CellData | null;
   /** Request render after format change */
   requestRender: () => void;
   /** Update the formula bar display */
@@ -126,6 +128,7 @@ export class FormatControls {
   private getSelectedCell: () => Position | null;
   private getSelectedCellData: () => CellData | null;
   private getSelectionRange: () => { start: Position | null; end: Position | null };
+  private getCellDataAt: (col: number, row: number) => CellData | null;
   private requestRender: () => void;
   private updateFormulaBar: () => void;
 
@@ -169,6 +172,7 @@ export class FormatControls {
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectedCellData = callbacks.getSelectedCellData;
     this.getSelectionRange = callbacks.getSelectionRange;
+    this.getCellDataAt = callbacks.getCellDataAt;
     this.requestRender = callbacks.requestRender;
     this.updateFormulaBar = callbacks.updateFormulaBar;
 
@@ -194,10 +198,48 @@ export class FormatControls {
       return;
     }
 
+    // Check if selection has mixed formats
+    const { start, end } = this.getSelectionRange();
+    if (start && end && (start.col !== end.col || start.row !== end.row)) {
+      const hasMixed = this.checkMixedFormats(start, end);
+      if (hasMixed) {
+        this.setDisplayedFormat("~", "MIXED" as NumberFormatCategory);
+        return;
+      }
+    }
+
     // Get format from cell data
     const formatId = cellData.formatId || "~";
     const category = await this.getCategoryForFormatId(formatId);
     this.setDisplayedFormat(formatId, category);
+  }
+
+  /**
+   * Check if cells in the selection range have different formats.
+   */
+  private checkMixedFormats(start: Position, end: Position): boolean {
+    const minCol = Math.min(start.col, end.col);
+    const maxCol = Math.max(start.col, end.col);
+    const minRow = Math.min(start.row, end.row);
+    const maxRow = Math.max(start.row, end.row);
+
+    // Get the format of the first cell (anchor)
+    const firstCell = this.getCellDataAt(minCol, minRow);
+    const firstFormat = firstCell?.formatId || "~";
+
+    // Check all cells in range
+    for (let col = minCol; col <= maxCol; col++) {
+      for (let row = minRow; row <= maxRow; row++) {
+        if (col === minCol && row === minRow) continue; // Skip first cell
+        const cell = this.getCellDataAt(col, row);
+        const cellFormat = cell?.formatId || "~";
+        if (cellFormat !== firstFormat) {
+          return true; // Found different format
+        }
+      }
+    }
+
+    return false; // All cells have same format
   }
 
   // =========================================================================
@@ -630,17 +672,20 @@ export class FormatControls {
     return result.formatId || "~";
   }
 
-  private setDisplayedFormat(formatId: string, category: NumberFormatCategory): void {
-    this.currentCategory = category;
+  private setDisplayedFormat(formatId: string, category: NumberFormatCategory | "MIXED"): void {
+    // Store real category (not MIXED) for format operations
+    if (category !== "MIXED") {
+      this.currentCategory = category;
+    }
 
     // Update dropdown label
     this.formatDropdownLabel.textContent = this.getCategoryDisplayName(category);
 
-    // Update currency dropdown active state
+    // Update currency dropdown active state (inactive for MIXED)
     const isCurrency = category === "CURRENCY" || category === "ACCOUNTING";
     this.currencyDropdown.classList.toggle("active", isCurrency);
 
-    // Update percent button active state
+    // Update percent button active state (inactive for MIXED)
     const isPercentage = category === "PERCENTAGE";
     this.percentBtn.classList.toggle("active", isPercentage);
 
@@ -680,8 +725,8 @@ export class FormatControls {
     return symbols[currency] || "$";
   }
 
-  private getCategoryDisplayName(category: NumberFormatCategory): string {
-    const names: Record<NumberFormatCategory, string> = {
+  private getCategoryDisplayName(category: NumberFormatCategory | "MIXED"): string {
+    const names: Record<NumberFormatCategory | "MIXED", string> = {
       GENERAL: "General",
       NUMBER: "Number",
       CURRENCY: "Currency",
@@ -694,6 +739,7 @@ export class FormatControls {
       FRACTION: "Fraction",
       TEXT: "Text",
       CUSTOM: "Custom",
+      MIXED: "Multiple",
     };
     return names[category] || category;
   }

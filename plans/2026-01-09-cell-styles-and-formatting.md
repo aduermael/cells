@@ -211,7 +211,7 @@ Fix format and style operations to apply to all selected cells.
   - Apply style to each cell in selection range
   - Update UI to show "mixed" state when selection has different styles
 
-- [ ] 6c: Add "mixed" state UI indicators
+- [x] 6c: Add "mixed" state UI indicators
   - Format dropdown: Show "Multiple" when cells have different formats
   - Style buttons: Show indeterminate state for mixed bold/italic/underline
   - Color pickers: Show "mixed" indicator for different colors

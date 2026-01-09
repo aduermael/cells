@@ -72,6 +72,8 @@ export interface StyleControlsCallbacks {
   getSelectedCellData: () => CellData | null;
   /** Get the current selection range (start and end) */
   getSelectionRange: () => { start: Position | null; end: Position | null };
+  /** Get cell data at a specific position */
+  getCellDataAt: (col: number, row: number) => CellData | null;
   /** Request render after style change */
   requestRender: () => void;
   /** Update the formula bar display */
@@ -138,6 +140,7 @@ export class StyleControls {
   private getSelectedCell: () => Position | null;
   private getSelectedCellData: () => CellData | null;
   private getSelectionRange: () => { start: Position | null; end: Position | null };
+  private getCellDataAt: (col: number, row: number) => CellData | null;
   private requestRender: () => void;
   private updateFormulaBar: () => void;
 
@@ -188,6 +191,7 @@ export class StyleControls {
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectedCellData = callbacks.getSelectedCellData;
     this.getSelectionRange = callbacks.getSelectionRange;
+    this.getCellDataAt = callbacks.getCellDataAt;
     this.requestRender = callbacks.requestRender;
     this.updateFormulaBar = callbacks.updateFormulaBar;
 
@@ -219,6 +223,16 @@ export class StyleControls {
       return;
     }
 
+    // Check if selection has mixed styles
+    const { start, end } = this.getSelectionRange();
+    if (start && end && (start.col !== end.col || start.row !== end.row)) {
+      const mixedProps = await this.checkMixedStyles(start, end);
+      if (mixedProps) {
+        this.setDisplayedStyle(mixedProps.style, mixedProps.mixed);
+        return;
+      }
+    }
+
     // Get style from cell data via WASM
     if (cellData.styleId && cellData.styleId !== "~") {
       const styleJson = await this.dataSource.getCellStyleAt(
@@ -239,6 +253,69 @@ export class StyleControls {
       bgColor: "",
       textColor: "",
     });
+  }
+
+  /**
+   * Check if cells in the selection range have different styles.
+   * Returns the style of the first cell and which properties are mixed.
+   */
+  private async checkMixedStyles(start: Position, end: Position): Promise<{
+    style: Partial<CellStyle>;
+    mixed: Partial<Record<keyof CellStyle, boolean>>;
+  } | null> {
+    if (!this.dataSource) return null;
+
+    const minCol = Math.min(start.col, end.col);
+    const maxCol = Math.max(start.col, end.col);
+    const minRow = Math.min(start.row, end.row);
+    const maxRow = Math.max(start.row, end.row);
+
+    // Get the style of the first cell (anchor)
+    const firstCell = this.getCellDataAt(minCol, minRow);
+    let firstStyle: Partial<CellStyle> = {};
+    if (firstCell?.styleId && firstCell.styleId !== "~") {
+      const style = await this.dataSource.getCellStyleAt(minCol, minRow);
+      if (style) {
+        firstStyle = style;
+      }
+    }
+
+    // Track which properties are mixed
+    const mixed: Partial<Record<keyof CellStyle, boolean>> = {};
+
+    // Check all cells in range
+    for (let col = minCol; col <= maxCol; col++) {
+      for (let row = minRow; row <= maxRow; row++) {
+        if (col === minCol && row === minRow) continue; // Skip first cell
+
+        const cell = this.getCellDataAt(col, row);
+        let cellStyle: Partial<CellStyle> = {};
+        if (cell?.styleId && cell.styleId !== "~") {
+          const style = await this.dataSource.getCellStyleAt(col, row);
+          if (style) {
+            cellStyle = style;
+          }
+        }
+
+        // Compare each style property
+        if (!!cellStyle.bold !== !!firstStyle.bold) mixed.bold = true;
+        if (!!cellStyle.italic !== !!firstStyle.italic) mixed.italic = true;
+        if (!!cellStyle.underline !== !!firstStyle.underline) mixed.underline = true;
+        if ((cellStyle.bgColor || "") !== (firstStyle.bgColor || "")) mixed.bgColor = true;
+        if ((cellStyle.textColor || "") !== (firstStyle.textColor || "")) mixed.textColor = true;
+        if ((cellStyle.fontFamily || "") !== (firstStyle.fontFamily || "")) mixed.fontFamily = true;
+        if ((cellStyle.fontSize || 0) !== (firstStyle.fontSize || 0)) mixed.fontSize = true;
+        if ((cellStyle.hAlign || "left") !== (firstStyle.hAlign || "left")) mixed.hAlign = true;
+        if ((cellStyle.vAlign || "top") !== (firstStyle.vAlign || "top")) mixed.vAlign = true;
+      }
+    }
+
+    // If any property is mixed, return the result
+    if (Object.keys(mixed).length > 0) {
+      return { style: firstStyle, mixed };
+    }
+
+    return null;
   }
 
   // =========================================================================
@@ -570,31 +647,35 @@ export class StyleControls {
   // Private Methods - UI Updates
   // =========================================================================
 
-  private setDisplayedStyle(style: Partial<CellStyle>): void {
+  private setDisplayedStyle(
+    style: Partial<CellStyle>,
+    mixed?: Partial<Record<keyof CellStyle, boolean>>
+  ): void {
     this.currentStyle = style;
 
-    // Update button states
-    this.updateButtonState("bold", !!style.bold);
-    this.updateButtonState("italic", !!style.italic);
-    this.updateButtonState("underline", !!style.underline);
+    // Update button states (with mixed/indeterminate support)
+    this.updateButtonState("bold", !!style.bold, mixed?.bold);
+    this.updateButtonState("italic", !!style.italic, mixed?.italic);
+    this.updateButtonState("underline", !!style.underline, mixed?.underline);
 
-    // Update color swatches
-    this.updateBgColorSwatch(style.bgColor || "");
-    this.updateTextColorSwatch(style.textColor || "");
+    // Update color swatches (show mixed indicator if colors differ)
+    this.updateBgColorSwatch(style.bgColor || "", mixed?.bgColor);
+    this.updateTextColorSwatch(style.textColor || "", mixed?.textColor);
 
     // Update font dropdowns
-    this.updateFontFamilyDisplay(style.fontFamily || "Arial");
-    this.updateFontSizeDisplay(style.fontSize || 12);
+    this.updateFontFamilyDisplay(style.fontFamily || "Arial", mixed?.fontFamily);
+    this.updateFontSizeDisplay(style.fontSize || 12, mixed?.fontSize);
 
     // Update alignment buttons (TextAlign includes "justify", but we only show left/center/right)
     const hAlign = style.hAlign === "justify" ? "left" : (style.hAlign || "left");
-    this.updateHAlignButtons(hAlign as "left" | "center" | "right");
-    this.updateVAlignButtons(style.vAlign || "top");
+    this.updateHAlignButtons(hAlign as "left" | "center" | "right", mixed?.hAlign);
+    this.updateVAlignButtons(style.vAlign || "top", mixed?.vAlign);
   }
 
   private updateButtonState(
     property: "bold" | "italic" | "underline",
-    active: boolean
+    active: boolean,
+    isMixed?: boolean
   ): void {
     const btn =
       property === "bold"
@@ -603,11 +684,16 @@ export class StyleControls {
           ? this.italicBtn
           : this.underlineBtn;
 
-    btn.classList.toggle("active", active);
+    btn.classList.toggle("active", active && !isMixed);
+    btn.classList.toggle("mixed", !!isMixed);
   }
 
-  private updateBgColorSwatch(color: string): void {
-    if (color) {
+  private updateBgColorSwatch(color: string, isMixed?: boolean): void {
+    if (isMixed) {
+      // Show mixed indicator (diagonal stripes)
+      this.bgColorSwatch.style.background = "repeating-linear-gradient(45deg, #ccc, #ccc 2px, #fff 2px, #fff 4px)";
+      this.bgColorSwatch.style.border = "1px solid var(--color-border)";
+    } else if (color) {
       this.bgColorSwatch.style.background = color;
       this.bgColorSwatch.style.border = "none";
     } else {
@@ -616,15 +702,20 @@ export class StyleControls {
     }
 
     // Update palette selection
-    this.updatePaletteSelection(this.bgColorPopup, color);
+    this.updatePaletteSelection(this.bgColorPopup, isMixed ? "" : color);
   }
 
-  private updateTextColorSwatch(color: string): void {
-    const displayColor = color || "#000000";
-    this.textColorSwatch.style.background = displayColor;
+  private updateTextColorSwatch(color: string, isMixed?: boolean): void {
+    if (isMixed) {
+      // Show mixed indicator (diagonal stripes)
+      this.textColorSwatch.style.background = "repeating-linear-gradient(45deg, #333, #333 2px, #666 2px, #666 4px)";
+    } else {
+      const displayColor = color || "#000000";
+      this.textColorSwatch.style.background = displayColor;
+    }
 
     // Update palette selection
-    this.updatePaletteSelection(this.textColorPopup, color);
+    this.updatePaletteSelection(this.textColorPopup, isMixed ? "" : color);
   }
 
   private updatePaletteSelection(popup: HTMLElement, color: string): void {
@@ -638,16 +729,18 @@ export class StyleControls {
     });
   }
 
-  private updateHAlignButtons(hAlign: "left" | "center" | "right"): void {
-    this.alignLeftBtn.classList.toggle("active", hAlign === "left");
-    this.alignCenterBtn.classList.toggle("active", hAlign === "center");
-    this.alignRightBtn.classList.toggle("active", hAlign === "right");
+  private updateHAlignButtons(hAlign: "left" | "center" | "right", isMixed?: boolean): void {
+    // When mixed, don't highlight any button
+    this.alignLeftBtn.classList.toggle("active", !isMixed && hAlign === "left");
+    this.alignCenterBtn.classList.toggle("active", !isMixed && hAlign === "center");
+    this.alignRightBtn.classList.toggle("active", !isMixed && hAlign === "right");
   }
 
-  private updateVAlignButtons(vAlign: "top" | "middle" | "bottom"): void {
-    this.valignTopBtn.classList.toggle("active", vAlign === "top");
-    this.valignMiddleBtn.classList.toggle("active", vAlign === "middle");
-    this.valignBottomBtn.classList.toggle("active", vAlign === "bottom");
+  private updateVAlignButtons(vAlign: "top" | "middle" | "bottom", isMixed?: boolean): void {
+    // When mixed, don't highlight any button
+    this.valignTopBtn.classList.toggle("active", !isMixed && vAlign === "top");
+    this.valignMiddleBtn.classList.toggle("active", !isMixed && vAlign === "middle");
+    this.valignBottomBtn.classList.toggle("active", !isMixed && vAlign === "bottom");
   }
 
   // =========================================================================
@@ -736,26 +829,35 @@ export class StyleControls {
     }
   }
 
-  private updateFontFamilyDisplay(fontFamily: string): void {
-    this.fontFamilyLabel.textContent = fontFamily;
-    this.fontFamilyLabel.style.fontFamily = fontFamily;
+  private updateFontFamilyDisplay(fontFamily: string, isMixed?: boolean): void {
+    if (isMixed) {
+      this.fontFamilyLabel.textContent = "Multiple";
+      this.fontFamilyLabel.style.fontFamily = "";
+    } else {
+      this.fontFamilyLabel.textContent = fontFamily;
+      this.fontFamilyLabel.style.fontFamily = fontFamily;
+    }
 
     // Update menu selection
     const items = this.fontFamilyMenu.querySelectorAll("[data-font]");
     items.forEach((item) => {
       const itemFont = (item as HTMLElement).dataset.font || "";
-      item.classList.toggle("active", itemFont === fontFamily);
+      item.classList.toggle("active", !isMixed && itemFont === fontFamily);
     });
   }
 
-  private updateFontSizeDisplay(fontSize: number): void {
-    this.fontSizeLabel.textContent = String(fontSize);
+  private updateFontSizeDisplay(fontSize: number, isMixed?: boolean): void {
+    if (isMixed) {
+      this.fontSizeLabel.textContent = "-";
+    } else {
+      this.fontSizeLabel.textContent = String(fontSize);
+    }
 
     // Update menu selection
     const items = this.fontSizeMenu.querySelectorAll("[data-size]");
     items.forEach((item) => {
       const itemSize = parseInt((item as HTMLElement).dataset.size || "0", 10);
-      item.classList.toggle("active", itemSize === fontSize);
+      item.classList.toggle("active", !isMixed && itemSize === fontSize);
     });
   }
 }

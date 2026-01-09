@@ -645,6 +645,7 @@ export function createComponents(config: ComponentsConfig): Components {
         start: app.selectionStart,
         end: app.selectionEnd,
       }),
+      getCellDataAt: (col, row) => getCellAt(col, row, app.cells) ?? null,
       requestRender: render,
       updateFormulaBar,
     }
@@ -695,6 +696,7 @@ export function createComponents(config: ComponentsConfig): Components {
         start: app.selectionStart,
         end: app.selectionEnd,
       }),
+      getCellDataAt: (col, row) => getCellAt(col, row, app.cells) ?? null,
       requestRender: render,
       updateFormulaBar,
     }
