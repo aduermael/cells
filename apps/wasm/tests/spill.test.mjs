@@ -136,72 +136,9 @@ const tests = {
     assertTrue(isGrayed, 'Formula bar should have spilled-cell class');
   },
 
-  'Cannot edit spilled cell by typing': async (ctx) => {
-    await ctx.page.goto(ctx.baseUrl);
-    await waitForAppReady(ctx.page);
-
-    // Enter SEQUENCE formula
-    await setCellValue(ctx.page, 'A1', '=SEQUENCE(3)');
-    await sleep(300);
-
-    // Click on a spilled cell (A2)
-    await clickCell(ctx.page, 'A2');
-    await sleep(200);
-
-    // Try to type - this should not open the cell editor
-    await ctx.page.keyboard.type('test');
-    await sleep(200);
-
-    // Verify cell editor is not visible
-    const editorVisible = await isCellEditorVisible(ctx.page);
-    assertTrue(!editorVisible, 'Cell editor should not be visible for spilled cell');
-
-    // Verify the spilled value is unchanged
-    const val = await getCellDisplayValue(ctx.page, 'A2');
-    assertEqual(val, '2', 'Spilled cell value should be unchanged');
-  },
-
-  'Cannot edit spilled cell with F2': async (ctx) => {
-    await ctx.page.goto(ctx.baseUrl);
-    await waitForAppReady(ctx.page);
-
-    // Enter SEQUENCE formula
-    await setCellValue(ctx.page, 'A1', '=SEQUENCE(3)');
-    await sleep(300);
-
-    // Click on a spilled cell (A2)
-    await clickCell(ctx.page, 'A2');
-    await sleep(200);
-
-    // Press F2 - should not open cell editor
-    await ctx.page.keyboard.press('F2');
-    await sleep(200);
-
-    // Verify cell editor is not visible
-    const editorVisible = await isCellEditorVisible(ctx.page);
-    assertTrue(!editorVisible, 'Cell editor should not open with F2 on spilled cell');
-  },
-
-  'Cannot delete spilled cell with Backspace': async (ctx) => {
-    await ctx.page.goto(ctx.baseUrl);
-    await waitForAppReady(ctx.page);
-
-    // Enter SEQUENCE formula
-    await setCellValue(ctx.page, 'A1', '=SEQUENCE(3)');
-    await sleep(300);
-
-    // Click on a spilled cell (A2)
-    await clickCell(ctx.page, 'A2');
-    await sleep(200);
-
-    // Press Backspace
-    await ctx.page.keyboard.press('Backspace');
-    await sleep(300);
-
-    // Verify the spill range is still intact
-    const val2 = await getCellDisplayValue(ctx.page, 'A2');
-    assertEqual(val2, '2', 'Spilled cell value should be unchanged after Backspace');
-  },
+  // NOTE: Tests for "Cannot edit spilled cell" have been removed.
+  // In the new Excel-compatible behavior, users CAN edit spilled cells.
+  // This causes the spill master to show #SPILL! error, which is tested below.
 
   'Master cell can be edited': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
@@ -324,6 +261,70 @@ const tests = {
     // Verify spill highlight is cleared
     highlight = await getSpillRangeHighlight(ctx.page);
     assertTrue(highlight === null, 'Spill highlight should be null when selecting cell outside spill range');
+  },
+
+  'Typing into spilled cell blocks spill and shows #SPILL! error': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter SEQUENCE formula that creates 3 rows
+    await setCellValue(ctx.page, 'A1', '=SEQUENCE(3)');
+    await sleep(300);
+
+    // Verify spill range is created
+    let val1 = await getCellDisplayValue(ctx.page, 'A1');
+    let val2 = await getCellDisplayValue(ctx.page, 'A2');
+    let val3 = await getCellDisplayValue(ctx.page, 'A3');
+    assertEqual(val1, '1', 'A1 should display 1 initially');
+    assertEqual(val2, '2', 'A2 should display 2 initially');
+    assertEqual(val3, '3', 'A3 should display 3 initially');
+
+    // Type a value into spilled cell A2 (should block the spill)
+    await setCellValue(ctx.page, 'A2', 'blocked');
+    await sleep(300);
+
+    // Verify master cell now shows #SPILL! error
+    val1 = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(val1, '#SPILL!', 'A1 should display #SPILL! error after blocking');
+
+    // Verify A2 shows the blocking value
+    val2 = await getCellDisplayValue(ctx.page, 'A2');
+    assertEqual(val2, 'blocked', 'A2 should display the blocking value');
+
+    // Verify A3 is now empty (spill was cleared)
+    val3 = await getCellDisplayValue(ctx.page, 'A3');
+    assertTrue(val3 === null || val3 === '', 'A3 should be empty after spill is blocked');
+  },
+
+  'Deleting blocking value restores spill': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter SEQUENCE formula that creates 3 rows
+    await setCellValue(ctx.page, 'A1', '=SEQUENCE(3)');
+    await sleep(300);
+
+    // Block the spill by typing into A2
+    await setCellValue(ctx.page, 'A2', 'blocked');
+    await sleep(300);
+
+    // Verify #SPILL! error is shown
+    let val1 = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(val1, '#SPILL!', 'A1 should show #SPILL! error');
+
+    // Delete the blocking value in A2
+    await clickCell(ctx.page, 'A2');
+    await sleep(200);
+    await ctx.page.keyboard.press('Delete');
+    await sleep(300);
+
+    // Verify spill is restored
+    val1 = await getCellDisplayValue(ctx.page, 'A1');
+    const val2 = await getCellDisplayValue(ctx.page, 'A2');
+    const val3 = await getCellDisplayValue(ctx.page, 'A3');
+    assertEqual(val1, '1', 'A1 should display 1 after spill is restored');
+    assertEqual(val2, '2', 'A2 should display 2 after spill is restored');
+    assertEqual(val3, '3', 'A3 should display 3 after spill is restored');
   },
 };
 

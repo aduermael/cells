@@ -219,14 +219,9 @@ export class KeyboardEventHandlers {
             case "Delete":
             case "Backspace":
                 e.preventDefault();
-                if (hasRangeSelection(getSelectionStart(), getSelectionEnd())) {
-                    cellEditor.deleteRangeCells();
-                } else {
-                    cellEditor.startEditing({
-                        mode: "replace",
-                        initialChar: "",
-                    });
-                }
+                // Delete/Backspace always clears cells (matches Excel behavior)
+                // For single cell or range selection, use deleteRangeCells
+                cellEditor.deleteRangeCells();
                 return;
             case "Escape":
                 if (hasRangeSelection(getSelectionStart(), getSelectionEnd())) {

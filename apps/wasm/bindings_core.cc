@@ -517,6 +517,10 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
         }
     }
 
+    // Check if this cell's position is part of a spill range BEFORE updating
+    // If so, the spill master will need to be recalculated after the update
+    const ID spillMasterIdBeforeUpdate = sheet->getSpillMaster(cell->colId, cell->rowId);
+
     Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
     applyOperation(*_workbook, op);
 
@@ -533,6 +537,24 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
 
     markDirty(sheet, cellId);
     std::vector<ID> changed = {cellId};
+
+    // If this position was part of a spill range, recalculate the spill master
+    // This will detect the blocking cell and show #SPILL! error on the master
+    if (!spillMasterIdBeforeUpdate.isNull()) {
+        markDirty(sheet, spillMasterIdBeforeUpdate);
+        changed.push_back(spillMasterIdBeforeUpdate);
+    }
+
+    // Also recalculate all cells with #SPILL! error - the value change might
+    // have removed a blocking condition, allowing spills to be restored
+    for (const auto& [id, cellPtr] : sheet->cells) {
+        if (cellPtr->value.type == CellValueType::FORMULA_ERROR &&
+            cellPtr->value.error == CellError::SPILL) {
+            markDirty(sheet, id);
+            changed.push_back(id);
+        }
+    }
+
     cells::recalculate(sheet, changed);
     cells::recalculateVolatile(sheet);
 
@@ -586,6 +608,10 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
         applyOperation(*_workbook, rowOp);
     }
 
+    // Check if this position is part of a spill range BEFORE creating the cell
+    // If so, the spill master will need to be recalculated after the cell is created
+    const ID spillMasterIdBeforeCreate = sheet->getSpillMaster(colId, rowId);
+
     ID cellId = generate_id();
     std::string idSuffix =
         ",\"col_id\":\"" + colId.toString() + "\",\"row_id\":\"" + rowId.toString() + "\"}";
@@ -631,6 +657,14 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
 
     markDirty(sheet, cellId);
     std::vector<ID> changed = {cellId};
+
+    // If this position was part of a spill range, recalculate the spill master
+    // This will detect the blocking cell and show #SPILL! error on the master
+    if (!spillMasterIdBeforeCreate.isNull()) {
+        markDirty(sheet, spillMasterIdBeforeCreate);
+        changed.push_back(spillMasterIdBeforeCreate);
+    }
+
     cells::recalculate(sheet, changed);
     cells::recalculateVolatile(sheet);
 
@@ -787,6 +821,21 @@ std::string CellsEngine::deleteCell(const std::string& cellIdStr) {
     }
 
     _viewportIndex.onCellRemoved(colId, rowId);
+
+    // After deleting a cell, recalculate all cells with #SPILL! error
+    // This allows blocked spills to be restored when the blocking cell is removed
+    std::vector<ID> spillErrorCells;
+    for (const auto& [id, cellPtr] : sheet->cells) {
+        if (cellPtr->value.type == CellValueType::FORMULA_ERROR &&
+            cellPtr->value.error == CellError::SPILL) {
+            spillErrorCells.push_back(id);
+            markDirty(sheet, id);
+        }
+    }
+    if (!spillErrorCells.empty()) {
+        cells::recalculate(sheet, spillErrorCells);
+    }
+
     notifyListeners(ChangeType::CELL_CHANGED);
 
     return "{\"success\":true}";
@@ -835,6 +884,21 @@ std::string CellsEngine::deleteCellAt(uint32_t col, uint32_t row) {
             }
 
             _viewportIndex.onCellRemoved(colId, rowId);
+
+            // After deleting a cell, recalculate all cells with #SPILL! error
+            // This allows blocked spills to be restored when the blocking cell is removed
+            std::vector<ID> spillErrorCells;
+            for (const auto& [cellId, cellPtr] : sheet->cells) {
+                if (cellPtr->value.type == CellValueType::FORMULA_ERROR &&
+                    cellPtr->value.error == CellError::SPILL) {
+                    spillErrorCells.push_back(cellId);
+                    markDirty(sheet, cellId);
+                }
+            }
+            if (!spillErrorCells.empty()) {
+                cells::recalculate(sheet, spillErrorCells);
+            }
+
             notifyListeners(ChangeType::CELL_CHANGED);
             return "{\"success\":true,\"deleted\":true}";
         }

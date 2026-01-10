@@ -430,8 +430,9 @@ export class CellEditor {
     const selectedCell = this.getSelectedCell();
     if (!selectedCell || this.isEditing() || !this.dataSource) return;
 
-    // Prevent editing spilled cells (non-master cells in a spill range)
-    if (this.isSelectedCellSpilled()) return;
+    // NOTE: Spilled cells CAN be edited. When a value is written to a spilled cell,
+    // the C++ engine detects the blocking and shows #SPILL! on the master cell.
+    // Deleting the blocking value restores the spill. This matches Excel behavior.
 
     // Get or create cell - single call returns ID and value
     let cellId: string | null = null;
@@ -610,7 +611,8 @@ export class CellEditor {
 
   /**
    * Delete all cells in the current range selection.
-   * Skips spilled cells (non-master cells in a spill range).
+   * Skips virtual spilled cells (which don't have actual Cell objects).
+   * Note: Deleting a cell that was blocking a spill will restore the spill.
    */
   async deleteRangeCells(): Promise<void> {
     if (!this.dataSource) return;
@@ -625,7 +627,8 @@ export class CellEditor {
       // Delete cells at each position - deleteCellAt is a no-op if cell doesn't exist
       for (let col = range.minCol; col <= range.maxCol; col++) {
         for (let row = range.minRow; row <= range.maxRow; row++) {
-          // Skip spilled cells - they can't be deleted directly
+          // Skip virtual spilled cells - they don't have actual Cell objects to delete
+          // Note: Real cells that are blocking a spill (isSpilled=false) WILL be deleted
           const cellData = this.getCellDataAt(col, row);
           if (cellData?.isSpilled) continue;
           await this.dataSource.deleteCellAt(col, row);

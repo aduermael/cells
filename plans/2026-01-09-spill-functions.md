@@ -353,18 +353,20 @@ Post-implementation bug fixes discovered during testing. Each bug should be repr
     - E2E tests: "Column reference is colored in formula bar", "Row reference is colored in formula bar"
   - **Note**: WASM build is currently broken (Luau exception issue), E2E tests pending
 
-- [ ] 10d: Allow editing cells that would break existing spill
+- [x] 10d: Allow editing cells that would break existing spill
   - **Bug**: Cannot type into a cell currently occupied by a spill range
   - **Current behavior**: Editing is blocked for spilled cells (too restrictive)
   - **Expected behavior (Excel-compatible)**:
     - User CAN type a value into a spilled cell
     - This causes the spill master to show `#SPILL!` error
     - Deleting the blocking value should dynamically restore the spill
-  - **Note**: Currently works if blocking cell has value BEFORE spill formula is entered, but not after
-  - **Approach**:
-    - Remove edit restriction for spilled cells in CellEditor
-    - Ensure recalculation properly detects blocking and triggers `#SPILL!`
-    - Add E2E test: enter spill formula → type into spilled cell → verify `#SPILL!` → delete blocking value → verify spill restored
+  - **Fix**:
+    - Removed edit restriction in `CellEditor.startEditing()` (cell-editor.ts)
+    - Added spill master recalculation in `createCell()` and `updateCellWithFormatDetection()` when cell is created/updated at a spill position
+    - Added #SPILL! cell recalculation in `deleteCell()`, `deleteCellAt()`, and `updateCellWithFormatDetection()` to restore spills when blocking cells are removed or cleared
+    - Changed Delete/Backspace key to always call `deleteRangeCells()` for Excel-compatible clear behavior (keyboard-events.ts)
+    - Removed obsolete E2E tests that verified editing was blocked for spilled cells
+    - Added two new E2E tests: "Typing into spilled cell blocks spill and shows #SPILL! error" and "Deleting blocking value restores spill"
 
 - [ ] 10e: (Placeholder for additional bugs found during testing)
 
