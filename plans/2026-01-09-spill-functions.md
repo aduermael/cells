@@ -230,10 +230,13 @@ bits 4-7: reserved for future use
   - When populating spilled positions, set `isSpilledFrom` flag (for virtual cells, track in map only)
   - Flags allow O(1) check "is this cell involved in spill?" before map lookup
 
-- [ ] 7e: Update serialization
+- [x] 7e: Update serialization
   - Flags are runtime-only, not persisted to ZCD
   - On load: rebuild flags from relationships (shared formula refs, spill recalc)
   - Ensure XLSX reader/writer still works with new structure
+  - Verified: `_flags` field initialized to 0, not serialized anywhere
+  - Shared formula flags: rebuilt by `registerSharedFormulaGroup()` in parser.cc:904 and xlsx_reader.cc:896
+  - Spill flags: rebuilt during recalculation when `registerSpillRange()` is called
 
 - [ ] 7f: Update tests
   - Verify Cell size reduction
