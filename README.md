@@ -15,7 +15,7 @@ A high-performance, collaborative spreadsheet engine with:
 |----------|------:|
 | C++ | 32,705 |
 | TypeScript | 19,043 |
-| Markdown | 13,075 |
+| Markdown | 13,071 |
 | CSS | 2,445 |
 | Starlark | 1,492 |
 | Go | 1,363 |
@@ -42,7 +42,7 @@ A high-performance, collaborative spreadsheet engine with:
 | E2E (Puppeteer) | 153 |
 | **Total** | **2445** |
 
-- **Commits**: 913
+- **Commits**: 914
 - **WASM Module**: 4.70 MB
 - **Total Web Bundle**: 6.39 MB
 
