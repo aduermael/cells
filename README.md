@@ -15,14 +15,14 @@ A high-performance, collaborative spreadsheet engine with:
 |----------|------:|
 | C++ | 32,705 |
 | TypeScript | 19,043 |
-| Markdown | 13,071 |
+| Markdown | 13,074 |
 | CSS | 2,445 |
 | Starlark | 1,492 |
 | Go | 1,363 |
 | JavaScript | 1,173 |
 | Objective-C++ | 1,007 |
 | HTML | 854 |
-| Shell | 754 |
+| Shell | 760 |
 
 ### Test Code
 
@@ -42,11 +42,17 @@ A high-performance, collaborative spreadsheet engine with:
 | E2E (Puppeteer) | 153 |
 | **Total** | **2445** |
 
-- **Commits**: 915
+- **Commits**: 916
 - **WASM Module**: 4.70 MB
 - **Total Web Bundle**: 6.39 MB
 
 <sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./scripts/generate-stats.sh`</sub>
+
+### LOC Evolution
+
+<img src="stats/loc-evolution.svg" alt="Lines of Code Evolution" width="100%">
+
+<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with `./scripts/loc-tracker.sh && node scripts/generate-loc-svg.mjs`</sub>
 ## Architecture Overview
 
 ```
