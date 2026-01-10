@@ -479,10 +479,44 @@ TEST_F(FormulaResolverTest, DisplayConversion_RowRef) {
 // Round-trip tests
 // ===========================================================================
 
+TEST_F(FormulaResolverTest, DisplayConversion_SpillRangeRef) {
+    auto ast = parseFormula("=A1#");
+    FormulaResolver resolver(*workbook, *sheet1);
+    resolver.resolve(ast.get());
+
+    FormulaDisplayConverter converter(*sheet1);
+    std::string display = converter.toDisplayString(ast.get());
+
+    EXPECT_EQ(display, "=A1#");
+}
+
+TEST_F(FormulaResolverTest, DisplayConversion_SpillRangeRefAbsolute) {
+    auto ast = parseFormula("=$B$2#");
+    FormulaResolver resolver(*workbook, *sheet1);
+    resolver.resolve(ast.get());
+
+    FormulaDisplayConverter converter(*sheet1);
+    std::string display = converter.toDisplayString(ast.get());
+
+    EXPECT_EQ(display, "=$B$2#");
+}
+
+TEST_F(FormulaResolverTest, DisplayConversion_SpillRangeInFunction) {
+    auto ast = parseFormula("=SUM(A1#)");
+    FormulaResolver resolver(*workbook, *sheet1);
+    resolver.resolve(ast.get());
+
+    FormulaDisplayConverter converter(*sheet1);
+    std::string display = converter.toDisplayString(ast.get());
+
+    EXPECT_EQ(display, "=SUM(A1#)");
+}
+
 TEST_F(FormulaResolverTest, RoundTrip_ParseResolveDisplay) {
     std::vector<std::string> formulas = {
-        "=A1",  "=$A$1", "=A1+B1", "=A1*B1+C1", "=SUM(A1:C3)", "=IF(A1,B1,C1)", "=A:A",    "=1:1",
-        "=A:C", "=1:3",  "=-A1",   "=A1^2",     "=A1&B1",      "=A1=B1",        "=A1<>B1",
+        "=A1",   "=$A$1", "=A1+B1", "=A1*B1+C1", "=SUM(A1:C3)",  "=IF(A1,B1,C1)",
+        "=A:A",  "=1:1",  "=A:C",   "=1:3",      "=-A1",         "=A1^2",
+        "=A1&B1", "=A1=B1", "=A1<>B1", "=A1#",   "=$A$1#",       "=SUM(A1#)",
     };
 
     for (const auto& formula : formulas) {

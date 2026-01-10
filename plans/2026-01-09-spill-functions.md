@@ -293,9 +293,11 @@ UI layer only renders based on spill data queried from C++ via WASM bindings.
 
 ## Phase 9: Integration & Polish
 
-- [ ] 9a: Update formula display for spill references
-  - FormulaDisplayConverter handles SpillRangeRefNode
+- [x] 9a: Update formula display for spill references
+  - FormulaDisplayConverter handles SpillRangeRefNode (already implemented)
   - Display as `A1#` in formula bar
+  - Added tests: DisplayConversion_SpillRangeRef, DisplayConversion_SpillRangeRefAbsolute, DisplayConversion_SpillRangeInFunction
+  - Added spill range refs to round-trip test suite
 
 - [ ] 9b: Handle edge cases
   - Spill into merged cells → #SPILL!
