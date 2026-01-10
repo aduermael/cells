@@ -166,7 +166,7 @@ First spill-capable function as proof of concept.
   - `SpillRangeRefNode { CellRefNode* anchor }`
   - Parser: `cell_ref '#'` → SpillRangeRefNode
 
-- [ ] 5c: Implement SpillRangeRef evaluation
+- [x] 5c: Implement SpillRangeRef evaluation
   - Look up anchor cell's spill range from `Sheet::spillMasters`
   - Return RANGE result covering the spill area
   - If anchor has no spill range, return single cell

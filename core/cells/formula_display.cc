@@ -52,6 +52,8 @@ std::string FormulaDisplayConverter::nodeToString(const ASTNode* node) const {
             return rowRangeRefToString(static_cast<const RowRangeRefNode*>(node));
         case ASTNodeType::NAMED_REF:
             return namedRefToString(static_cast<const NamedRefNode*>(node));
+        case ASTNodeType::SPILL_RANGE_REF:
+            return spillRangeRefToString(static_cast<const SpillRangeRefNode*>(node));
         case ASTNodeType::BINARY_OP:
             return binaryOpToString(static_cast<const BinaryOpNode*>(node));
         case ASTNodeType::UNARY_OP:
@@ -290,6 +292,11 @@ std::string FormulaDisplayConverter::rowRangeRefToString(const RowRangeRefNode* 
 
 std::string FormulaDisplayConverter::namedRefToString(const NamedRefNode* node) const {
     return node->name;
+}
+
+std::string FormulaDisplayConverter::spillRangeRefToString(const SpillRangeRefNode* node) const {
+    // Convert anchor cell ref to string and append #
+    return cellRefToString(node->anchor.get()) + "#";
 }
 
 std::string FormulaDisplayConverter::binaryOpToString(const BinaryOpNode* node) const {

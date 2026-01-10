@@ -91,6 +91,10 @@ ResolveResult FormulaResolver::resolveNode(ASTNode* node) {
         case ASTNodeType::NAMED_REF:
             return resolveNamedRef(static_cast<NamedRefNode*>(node));
 
+        case ASTNodeType::SPILL_RANGE_REF:
+            // Resolve the anchor cell reference
+            return resolveCellRef(static_cast<SpillRangeRefNode*>(node)->anchor.get());
+
         case ASTNodeType::BINARY_OP:
             return resolveBinaryOp(static_cast<BinaryOpNode*>(node));
 

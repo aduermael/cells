@@ -53,6 +53,7 @@ private:
     [[nodiscard]] std::string columnRangeRefToString(const ColumnRangeRefNode* node) const;
     [[nodiscard]] std::string rowRangeRefToString(const RowRangeRefNode* node) const;
     [[nodiscard]] std::string namedRefToString(const NamedRefNode* node) const;
+    [[nodiscard]] std::string spillRangeRefToString(const SpillRangeRefNode* node) const;
     [[nodiscard]] std::string binaryOpToString(const BinaryOpNode* node) const;
     [[nodiscard]] std::string unaryOpToString(const UnaryOpNode* node) const;
     [[nodiscard]] std::string functionCallToString(const FunctionCallNode* node) const;

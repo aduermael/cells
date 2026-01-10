@@ -1220,5 +1220,109 @@ TEST(EvalResultTest, SingleRowFactory) {
     EXPECT_EQ(row, r.getRangeBounds().endRowId);
 }
 
+// =============================================================================
+// SPILL RANGE REFERENCE TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, SpillRangeRef_NoSpillData) {
+    // A cell with no spill data should return itself as a 1x1 range
+    setCellValue(0, 0, 10.0);  // A1 = 10
+
+    EvalResult r = eval("=A1#");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+
+    // The range should be 1x1 (just A1)
+    EXPECT_EQ(0u, r.getRangeBounds().startRowPos);
+    EXPECT_EQ(0u, r.getRangeBounds().endRowPos);
+}
+
+TEST_F(FormulaEvalTest, SpillRangeRef_WithSpillData) {
+    // Create a cell with spill data (manually registered)
+    Cell* a1 = setCellValue(0, 0, 10.0);  // A1 = master cell
+
+    // Register spill data: A1 spills to A2, A3 (column A, rows 1, 2)
+    std::vector<std::pair<ID, ID>> spillPositions;
+    spillPositions.push_back({colIds[0], rowIds[1]});  // A2
+    spillPositions.push_back({colIds[0], rowIds[2]});  // A3
+
+    std::vector<CellValue> spillValues;
+    spillValues.push_back(CellValue(20.0));  // A2 = 20
+    spillValues.push_back(CellValue(30.0));  // A3 = 30
+
+    sheet->registerSpillRange(a1->id, spillPositions, spillValues);
+
+    // Now A1# should return a range covering A1:A3
+    EvalResult r = eval("=A1#");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+
+    // The range should be A1:A3 (rows 0-2)
+    EXPECT_EQ(0u, r.getRangeBounds().startRowPos);
+    EXPECT_EQ(2u, r.getRangeBounds().endRowPos);
+}
+
+TEST_F(FormulaEvalTest, SpillRangeRef_2DSpill) {
+    // Create a cell with 2D spill data (2x2 array)
+    Cell* a1 = setCellValue(0, 0, 1.0);  // A1 = master cell
+
+    // Register spill data: A1 spills to B1, A2, B2
+    std::vector<std::pair<ID, ID>> spillPositions;
+    spillPositions.push_back({colIds[1], rowIds[0]});  // B1
+    spillPositions.push_back({colIds[0], rowIds[1]});  // A2
+    spillPositions.push_back({colIds[1], rowIds[1]});  // B2
+
+    std::vector<CellValue> spillValues;
+    spillValues.push_back(CellValue(2.0));  // B1 = 2
+    spillValues.push_back(CellValue(3.0));  // A2 = 3
+    spillValues.push_back(CellValue(4.0));  // B2 = 4
+
+    sheet->registerSpillRange(a1->id, spillPositions, spillValues);
+
+    // Now A1# should return a range covering A1:B2
+    EvalResult r = eval("=A1#");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+
+    // The range should be A1:B2 (rows 0-1, cols A-B)
+    EXPECT_EQ(0u, r.getRangeBounds().startRowPos);
+    EXPECT_EQ(1u, r.getRangeBounds().endRowPos);
+    EXPECT_EQ(colIds[0], r.getRangeBounds().startColId);
+    EXPECT_EQ(colIds[1], r.getRangeBounds().endColId);
+}
+
+TEST_F(FormulaEvalTest, SpillRangeRef_InFunction) {
+    // Test SUM(A1#) with spill data
+    Cell* a1 = setCellValue(0, 0, 10.0);  // A1 = master cell
+
+    // Register spill data: A1 spills to A2, A3
+    std::vector<std::pair<ID, ID>> spillPositions;
+    spillPositions.push_back({colIds[0], rowIds[1]});  // A2
+    spillPositions.push_back({colIds[0], rowIds[2]});  // A3
+
+    std::vector<CellValue> spillValues;
+    spillValues.push_back(CellValue(20.0));  // A2 = 20
+    spillValues.push_back(CellValue(30.0));  // A3 = 30
+
+    sheet->registerSpillRange(a1->id, spillPositions, spillValues);
+
+    // Also set actual cells at A2 and A3 so SUM can iterate over them
+    setCellValue(0, 1, 20.0);  // A2 = 20
+    setCellValue(0, 2, 30.0);  // A3 = 30
+
+    // SUM(A1#) should sum A1:A3 = 10 + 20 + 30 = 60
+    EvalResult r = eval("=SUM(A1#)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(60.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, SpillRangeRef_NonExistentCell) {
+    // Reference a non-spill cell (empty) returns a 1x1 range (not an error)
+    // This matches Excel behavior where A1# on a non-array formula just returns A1
+    EvalResult r = eval("=Z99#");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+}
+
 }  // namespace
 }  // namespace cells

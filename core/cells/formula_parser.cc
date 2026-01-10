@@ -340,7 +340,8 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
 
                     // Check for spill range first (A1#)
                     if (match(TokenType::HASH)) {
-                        const SourcePosition spillPos{cellRef->position.start, previous_.position.end};
+                        const SourcePosition spillPos{cellRef->position.start,
+                                                      previous_.position.end};
                         return std::make_unique<SpillRangeRefNode>(std::move(cellRef), spillPos);
                     }
                     // Check for range
@@ -363,7 +364,8 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
                         if (match(TokenType::HASH)) {
                             const SourcePosition spillPos{cellRef->position.start,
                                                           previous_.position.end};
-                            return std::make_unique<SpillRangeRefNode>(std::move(cellRef), spillPos);
+                            return std::make_unique<SpillRangeRefNode>(std::move(cellRef),
+                                                                       spillPos);
                         }
                         if (match(TokenType::COLON)) {
                             // Range like A$1:B$2

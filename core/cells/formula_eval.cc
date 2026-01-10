@@ -24,6 +24,7 @@ static EvalResult evaluateRowRef(const RowRefNode* node, EvalContext& ctx);
 static EvalResult evaluateColumnRangeRef(const ColumnRangeRefNode* node, EvalContext& ctx);
 static EvalResult evaluateRowRangeRef(const RowRangeRefNode* node, EvalContext& ctx);
 static EvalResult evaluateFunctionCall(const FunctionCallNode* node, EvalContext& ctx);
+static EvalResult evaluateSpillRangeRef(const SpillRangeRefNode* node, EvalContext& ctx);
 
 // Convert a CellValue to an EvalResult
 static EvalResult cellValueToEvalResult(const CellValue& value) {
@@ -957,6 +958,10 @@ EvalResult evaluate(const ASTNode* node, EvalContext& ctx) {
         case ASTNodeType::FUNCTION_CALL:
             return evaluateFunctionCall(static_cast<const FunctionCallNode*>(node), ctx);
 
+        // Spill range reference (A1#) - evaluates to the spill range of the anchor cell
+        case ASTNodeType::SPILL_RANGE_REF:
+            return evaluateSpillRangeRef(static_cast<const SpillRangeRefNode*>(node), ctx);
+
         // Named references - not yet implemented
         case ASTNodeType::NAMED_REF:
             // TODO: Implement named range lookup
@@ -968,6 +973,96 @@ EvalResult evaluate(const ASTNode* node, EvalContext& ctx) {
     }
 
     return EvalResult::Error(CellError::VALUE);
+}
+
+// Evaluate a spill range reference (A1#)
+// Returns a RANGE result covering the anchor cell plus all spilled cells.
+// If the anchor cell has no spill data (non-spilling formula), returns just the anchor as a range.
+static EvalResult evaluateSpillRangeRef(const SpillRangeRefNode* node, EvalContext& ctx) {
+    if (!ctx.sheet || !node->anchor) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // Get the anchor cell ID from the CellRefNode
+    const ID anchorCellId(node->anchor->cellId);
+    if (anchorCellId.isNull()) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // Look up the spill info for this cell
+    const SpillInfo* spillInfo = ctx.sheet->getSpillInfo(anchorCellId);
+
+    if (!spillInfo || spillInfo->spilledPositions.empty()) {
+        // No spill data - the anchor cell is not a spill master or has no spilled values.
+        // In Excel, this would be a #SPILL! error if the formula should spill but doesn't,
+        // or it could just return the single cell as a range.
+        // For now, we return the single cell as a 1x1 range.
+        // We need to get the anchor cell's column and row IDs.
+        const Cell* anchorCell = ctx.sheet->getCell(anchorCellId);
+        if (!anchorCell) {
+            return EvalResult::Error(CellError::REF);
+        }
+
+        // Get position info from the cell
+        const Axis* col = ctx.sheet->getColumn(anchorCell->colId);
+        const Axis* row = ctx.sheet->getRow(anchorCell->rowId);
+        if (!col || !row) {
+            return EvalResult::Error(CellError::REF);
+        }
+
+        // Return a 1x1 cell range for the anchor
+        return EvalResult::CellRange(anchorCell->colId, anchorCell->colId, row->position,
+                                     row->position);
+    }
+
+    // We have spill data. Build a range that covers the anchor + all spilled positions.
+    // The SpillInfo stores spilledPositions as (colId, rowId) pairs.
+    // We need to find the bounding rectangle.
+
+    // First, get the anchor cell's position
+    const Cell* anchorCell = ctx.sheet->getCell(anchorCellId);
+    if (!anchorCell) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    const Axis* anchorCol = ctx.sheet->getColumn(anchorCell->colId);
+    const Axis* anchorRow = ctx.sheet->getRow(anchorCell->rowId);
+    if (!anchorCol || !anchorRow) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // Start with anchor position as bounds
+    uint32_t minColPos = anchorCol->position;
+    uint32_t maxColPos = anchorCol->position;
+    uint32_t minRowPos = anchorRow->position;
+    uint32_t maxRowPos = anchorRow->position;
+    ID minColId = anchorCell->colId;
+    ID maxColId = anchorCell->colId;
+
+    // Expand bounds to include all spilled positions
+    for (const auto& [colId, rowId] : spillInfo->spilledPositions) {
+        const Axis* col = ctx.sheet->getColumn(colId);
+        const Axis* row = ctx.sheet->getRow(rowId);
+        if (col && row) {
+            if (col->position < minColPos) {
+                minColPos = col->position;
+                minColId = colId;
+            }
+            if (col->position > maxColPos) {
+                maxColPos = col->position;
+                maxColId = colId;
+            }
+            if (row->position < minRowPos) {
+                minRowPos = row->position;
+            }
+            if (row->position > maxRowPos) {
+                maxRowPos = row->position;
+            }
+        }
+    }
+
+    // Return the bounding range
+    return EvalResult::CellRange(minColId, maxColId, minRowPos, maxRowPos);
 }
 
 }  // namespace cells
