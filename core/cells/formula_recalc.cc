@@ -123,6 +123,22 @@ EvalResult evaluateCell(Sheet* sheet, Cell* cell) {
     // Evaluate the formula
     EvalResult result = evaluate(formula->ast, ctx);
 
+    // Handle array results (spill functions like UNIQUE, SORT, FILTER, etc.)
+    if (result.isArray()) {
+        processSpill(sheet, cell, result);
+        // processSpill sets the cell value from the first array element
+        // or sets #SPILL! error if blocked
+        formula->dirty = false;
+        // Return the first element as the "visible" result for this cell
+        if (result.getArrayRows() > 0 && result.getArrayCols() > 0) {
+            return result.getArrayAt(0, 0);
+        }
+        return EvalResult::Empty();
+    }
+
+    // Clear any existing spill range (formula result is no longer an array)
+    sheet->clearSpillRange(cell->id);
+
     // Store the result in the cell's value using FORMULA_* result types
     // This preserves the formula nature while indicating the computed result type.
     // Using specific types (FORMULA_NUMBER, etc.) allows code to know both
@@ -375,6 +391,227 @@ std::vector<ID> getDirtyCells(Sheet* sheet) {
     }
 
     return dirtyCells;
+}
+
+// =============================================================================
+// Spill Range Management
+// =============================================================================
+
+std::vector<std::pair<ID, ID>> calculateSpillRange(Sheet* sheet, Cell* masterCell, size_t rows,
+                                                   size_t cols) {
+    std::vector<std::pair<ID, ID>> positions;
+
+    if (!sheet || !masterCell || rows == 0 || cols == 0) {
+        return positions;
+    }
+
+    // Get master cell's position
+    const Axis* masterCol = sheet->getColumn(masterCell->colId);
+    const Axis* masterRow = sheet->getRow(masterCell->rowId);
+    if (!masterCol || !masterRow) {
+        return positions;
+    }
+
+    const uint32_t startColPos = masterCol->position;
+    const uint32_t startRowPos = masterRow->position;
+
+    // Reserve space for all positions except master (at position 0,0 of the array)
+    positions.reserve(rows * cols - 1);
+
+    // Collect positions in row-major order (matches array layout)
+    for (size_t r = 0; r < rows; ++r) {
+        for (size_t c = 0; c < cols; ++c) {
+            // Skip the master cell position (top-left of spill range)
+            if (r == 0 && c == 0) {
+                continue;
+            }
+
+            const uint32_t targetColPos = startColPos + static_cast<uint32_t>(c);
+            const uint32_t targetRowPos = startRowPos + static_cast<uint32_t>(r);
+
+            // Get or create column at target position
+            const Axis* const col = sheet->getOrCreateColumnByPosition(targetColPos);
+            if (!col) {
+                // Failed to create column - abort
+                positions.clear();
+                return positions;
+            }
+
+            // Get or create row at target position
+            const Axis* const row = sheet->getOrCreateRowByPosition(targetRowPos);
+            if (!row) {
+                // Failed to create row - abort
+                positions.clear();
+                return positions;
+            }
+
+            positions.emplace_back(col->id, row->id);
+        }
+    }
+
+    return positions;
+}
+
+bool checkSpillBlocked(Sheet* sheet, const ID& masterCellId,
+                       const std::vector<std::pair<ID, ID>>& spillPositions) {
+    if (!sheet) {
+        return true;  // No sheet = blocked
+    }
+
+    for (const auto& [colId, rowId] : spillPositions) {
+        // Check if this position is already spilled from a DIFFERENT master
+        const ID existingMaster = sheet->getSpillMaster(colId, rowId);
+        if (!existingMaster.isNull() && existingMaster != masterCellId) {
+            // Position is spilled from another formula - blocked
+            return true;
+        }
+
+        // Check if there's a cell at this position
+        const Cell* cell = sheet->getCellAt(colId, rowId);
+        if (cell) {
+            // Cell exists - check if it has content that would block spill
+            // A cell blocks if:
+            // 1. It has its own formula (not just cached result)
+            // 2. It has a non-empty value that wasn't set by a spill
+
+            // If cell has its own formula, it blocks
+            if (cell->isFormula()) {
+                return true;
+            }
+
+            // If cell has a non-empty value, it blocks
+            // (Empty cells and cells with empty strings don't block)
+            if (cell->value.type != CellValueType::FORMULA_EMPTY) {
+                if (cell->value.type == CellValueType::STRING ||
+                    cell->value.type == CellValueType::FORMULA_STRING) {
+                    // Empty strings don't block
+                    if (!cell->value.raw.empty()) {
+                        return true;
+                    }
+                } else if (cell->value.type != CellValueType::FORMULA &&
+                           cell->value.error == CellError::NONE) {
+                    // Non-formula types with actual values block
+                    // Check if it's an actual value (not just default)
+                    if (cell->value.type == CellValueType::NUMBER ||
+                        cell->value.type == CellValueType::BOOLEAN ||
+                        cell->value.type == CellValueType::DATE ||
+                        cell->value.type == CellValueType::DATE_TIME ||
+                        cell->value.type == CellValueType::FORMULA_NUMBER ||
+                        cell->value.type == CellValueType::FORMULA_BOOLEAN) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    return false;  // Not blocked
+}
+
+void processSpill(Sheet* sheet, Cell* masterCell, const EvalResult& result) {
+    if (!sheet || !masterCell) {
+        return;
+    }
+
+    // If result is not an array, clear any existing spill and return
+    if (!result.isArray()) {
+        sheet->clearSpillRange(masterCell->id);
+        return;
+    }
+
+    const size_t arrayRows = result.getArrayRows();
+    const size_t arrayCols = result.getArrayCols();
+
+    // Empty array - no spill needed
+    if (arrayRows == 0 || arrayCols == 0) {
+        sheet->clearSpillRange(masterCell->id);
+        return;
+    }
+
+    // Single cell result (1x1) - no spill, just store the value
+    if (arrayRows == 1 && arrayCols == 1) {
+        sheet->clearSpillRange(masterCell->id);
+        // The master cell's value will be set by the caller from arrayValue[0][0]
+        return;
+    }
+
+    // Calculate spill positions (excludes master cell)
+    const std::vector<std::pair<ID, ID>> spillPositions =
+        calculateSpillRange(sheet, masterCell, arrayRows, arrayCols);
+
+    // Check if spill is blocked
+    if (checkSpillBlocked(sheet, masterCell->id, spillPositions)) {
+        // Blocked - set master to #SPILL! error and clear any existing spill
+        sheet->clearSpillRange(masterCell->id);
+        masterCell->value = CellValue(CellError::SPILL);
+        masterCell->value.type = CellValueType::FORMULA_ERROR;
+        return;
+    }
+
+    // Build the list of spilled values (excludes master cell value at [0][0])
+    std::vector<CellValue> spilledValues;
+    spilledValues.reserve(spillPositions.size());
+
+    const auto& array = result.getArray();
+    for (size_t r = 0; r < arrayRows; ++r) {
+        for (size_t c = 0; c < arrayCols; ++c) {
+            // Skip master cell position
+            if (r == 0 && c == 0) {
+                continue;
+            }
+
+            // Convert EvalResult to CellValue
+            const EvalResult& elem = array[r][c];
+            CellValue val;
+            if (elem.isError()) {
+                val = CellValue(elem.getError());
+                val.type = CellValueType::FORMULA_ERROR;
+            } else if (elem.isNumber()) {
+                val = CellValue(elem.getNumber());
+                val.type = CellValueType::FORMULA_NUMBER;
+            } else if (elem.isString()) {
+                val = CellValue(elem.getString());
+                val.type = CellValueType::FORMULA_STRING;
+            } else if (elem.isBoolean()) {
+                val = CellValue(elem.getBoolean());
+                val.type = CellValueType::FORMULA_BOOLEAN;
+            } else {
+                // Empty or other type
+                val = CellValue("");
+                val.type = CellValueType::FORMULA_EMPTY;
+            }
+            spilledValues.push_back(std::move(val));
+        }
+    }
+
+    // Register the spill range
+    sheet->registerSpillRange(masterCell->id, spillPositions, spilledValues);
+
+    // Set the master cell's value from the first element of the array
+    const EvalResult& firstElem = array[0][0];
+    if (firstElem.isError()) {
+        masterCell->value = CellValue(firstElem.getError());
+        masterCell->value.type = CellValueType::FORMULA_ERROR;
+    } else if (firstElem.isNumber()) {
+        masterCell->value = CellValue(firstElem.getNumber());
+        masterCell->value.type = CellValueType::FORMULA_NUMBER;
+    } else if (firstElem.isString()) {
+        masterCell->value = CellValue(firstElem.getString());
+        masterCell->value.type = CellValueType::FORMULA_STRING;
+    } else if (firstElem.isBoolean()) {
+        masterCell->value = CellValue(firstElem.getBoolean());
+        masterCell->value.type = CellValueType::FORMULA_BOOLEAN;
+    } else {
+        masterCell->value = CellValue("");
+        masterCell->value.type = CellValueType::FORMULA_EMPTY;
+    }
+}
+
+void clearSpillForMaster(Sheet* sheet, const ID& masterCellId) {
+    if (!sheet) {
+        return;
+    }
+    sheet->clearSpillRange(masterCellId);
 }
 
 }  // namespace cells

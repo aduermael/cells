@@ -660,5 +660,279 @@ TEST_F(FormulaRecalcTest, RecalculatePreservesFormulaText) {
     EXPECT_EQ(formulaBefore, formulaAfter);
 }
 
+// =============================================================================
+// Spill Range Tests
+// =============================================================================
+
+TEST_F(FormulaRecalcTest, CalculateSpillRangeBasic) {
+    // Test basic spill range calculation
+    Cell* a1 = setCellValue(0, 0, 1.0);
+    ASSERT_NE(a1, nullptr);
+
+    // Calculate spill range for a 3x2 array starting at A1
+    auto positions = calculateSpillRange(sheet, a1, 3, 2);
+
+    // Should have 5 positions (3*2 - 1 for master cell)
+    EXPECT_EQ(positions.size(), 5u);
+
+    // Verify positions are in row-major order (excluding master at 0,0):
+    // (0,0)=master, (1,0), (0,1), (1,1), (0,2), (1,2)
+    // Expected: B1, A2, B2, A3, B3
+}
+
+TEST_F(FormulaRecalcTest, CalculateSpillRangeSingleRow) {
+    Cell* a1 = setCellValue(0, 0, 1.0);
+    ASSERT_NE(a1, nullptr);
+
+    // 1x3 array (single row, 3 columns)
+    auto positions = calculateSpillRange(sheet, a1, 1, 3);
+
+    // Should have 2 positions (1*3 - 1)
+    EXPECT_EQ(positions.size(), 2u);
+}
+
+TEST_F(FormulaRecalcTest, CalculateSpillRangeSingleColumn) {
+    Cell* a1 = setCellValue(0, 0, 1.0);
+    ASSERT_NE(a1, nullptr);
+
+    // 3x1 array (3 rows, single column)
+    auto positions = calculateSpillRange(sheet, a1, 3, 1);
+
+    // Should have 2 positions (3*1 - 1)
+    EXPECT_EQ(positions.size(), 2u);
+}
+
+TEST_F(FormulaRecalcTest, CheckSpillBlockedEmpty) {
+    Cell* a1 = setCellValue(0, 0, 1.0);
+    ASSERT_NE(a1, nullptr);
+
+    // Calculate positions for a 2x2 spill
+    auto positions = calculateSpillRange(sheet, a1, 2, 2);
+    ASSERT_EQ(positions.size(), 3u);
+
+    // Should NOT be blocked (cells don't exist or are empty)
+    EXPECT_FALSE(checkSpillBlocked(sheet, a1->id, positions));
+}
+
+TEST_F(FormulaRecalcTest, CheckSpillBlockedByValue) {
+    Cell* a1 = setCellValue(0, 0, 1.0);
+    ASSERT_NE(a1, nullptr);
+
+    // Put a value in B1 (which would be in the spill range)
+    setCellValue(1, 0, 42.0);
+
+    // Calculate positions for a 2x2 spill
+    auto positions = calculateSpillRange(sheet, a1, 2, 2);
+    ASSERT_EQ(positions.size(), 3u);
+
+    // Should be blocked (B1 has a value)
+    EXPECT_TRUE(checkSpillBlocked(sheet, a1->id, positions));
+}
+
+TEST_F(FormulaRecalcTest, CheckSpillBlockedByFormula) {
+    Cell* a1 = setCellValue(0, 0, 1.0);
+    ASSERT_NE(a1, nullptr);
+
+    // Put a formula in B1 (which would be in the spill range)
+    setCellFormula(1, 0, "=1+1");
+
+    // Calculate positions for a 2x2 spill
+    auto positions = calculateSpillRange(sheet, a1, 2, 2);
+
+    // Should be blocked (B1 has a formula)
+    EXPECT_TRUE(checkSpillBlocked(sheet, a1->id, positions));
+}
+
+TEST_F(FormulaRecalcTest, ProcessSpillBasicArray) {
+    Cell* a1 = setCellValue(0, 0, 0.0);  // Master cell
+    ASSERT_NE(a1, nullptr);
+
+    // Create a 2x2 array result
+    std::vector<std::vector<EvalResult>> arrayData = {
+        {EvalResult::Number(1.0), EvalResult::Number(2.0)},
+        {EvalResult::Number(3.0), EvalResult::Number(4.0)}};
+    EvalResult arrayResult = EvalResult::Array(std::move(arrayData));
+
+    // Process the spill
+    processSpill(sheet, a1, arrayResult);
+
+    // Master cell should have first value
+    EXPECT_DOUBLE_EQ(a1->value.asNumber(), 1.0);
+
+    // Check spill info
+    const SpillInfo* spillInfo = sheet->getSpillInfo(a1->id);
+    ASSERT_NE(spillInfo, nullptr);
+    EXPECT_EQ(spillInfo->spillCount(), 3u);
+
+    // Check spilled values
+    // B1 should have 2.0
+    const Axis* colB = sheet->getColumnByPosition(1);
+    const Axis* row1 = sheet->getRowByPosition(0);
+    ASSERT_NE(colB, nullptr);
+    ASSERT_NE(row1, nullptr);
+    const CellValue* b1Val = sheet->getSpilledValue(colB->id, row1->id);
+    ASSERT_NE(b1Val, nullptr);
+    EXPECT_DOUBLE_EQ(b1Val->asNumber(), 2.0);
+
+    // A2 should have 3.0
+    const Axis* colA = sheet->getColumnByPosition(0);
+    const Axis* row2 = sheet->getRowByPosition(1);
+    ASSERT_NE(colA, nullptr);
+    ASSERT_NE(row2, nullptr);
+    const CellValue* a2Val = sheet->getSpilledValue(colA->id, row2->id);
+    ASSERT_NE(a2Val, nullptr);
+    EXPECT_DOUBLE_EQ(a2Val->asNumber(), 3.0);
+
+    // B2 should have 4.0
+    const CellValue* b2Val = sheet->getSpilledValue(colB->id, row2->id);
+    ASSERT_NE(b2Val, nullptr);
+    EXPECT_DOUBLE_EQ(b2Val->asNumber(), 4.0);
+}
+
+TEST_F(FormulaRecalcTest, ProcessSpillBlocked) {
+    Cell* a1 = setCellValue(0, 0, 0.0);  // Master cell
+    ASSERT_NE(a1, nullptr);
+
+    // Put a blocking value in B1
+    setCellValue(1, 0, 999.0);
+
+    // Create a 2x2 array result
+    std::vector<std::vector<EvalResult>> arrayData = {
+        {EvalResult::Number(1.0), EvalResult::Number(2.0)},
+        {EvalResult::Number(3.0), EvalResult::Number(4.0)}};
+    EvalResult arrayResult = EvalResult::Array(std::move(arrayData));
+
+    // Process the spill
+    processSpill(sheet, a1, arrayResult);
+
+    // Master cell should have #SPILL! error
+    EXPECT_TRUE(a1->hasError());
+    EXPECT_EQ(a1->value.error, CellError::SPILL);
+
+    // No spill info should be registered
+    const SpillInfo* spillInfo = sheet->getSpillInfo(a1->id);
+    EXPECT_EQ(spillInfo, nullptr);
+}
+
+TEST_F(FormulaRecalcTest, ProcessSpillSingleElement) {
+    Cell* a1 = setCellValue(0, 0, 0.0);  // Master cell
+    ASSERT_NE(a1, nullptr);
+
+    // Create a 1x1 array result (single element, no spill needed)
+    std::vector<std::vector<EvalResult>> arrayData = {{EvalResult::Number(42.0)}};
+    EvalResult arrayResult = EvalResult::Array(std::move(arrayData));
+
+    // Process the spill
+    processSpill(sheet, a1, arrayResult);
+
+    // No spill should occur
+    const SpillInfo* spillInfo = sheet->getSpillInfo(a1->id);
+    EXPECT_EQ(spillInfo, nullptr);
+}
+
+TEST_F(FormulaRecalcTest, ProcessSpillEmptyArray) {
+    Cell* a1 = setCellValue(0, 0, 0.0);  // Master cell
+    ASSERT_NE(a1, nullptr);
+
+    // Create an empty array result
+    EvalResult arrayResult = EvalResult::EmptyArray();
+
+    // Process the spill
+    processSpill(sheet, a1, arrayResult);
+
+    // No spill should occur
+    const SpillInfo* spillInfo = sheet->getSpillInfo(a1->id);
+    EXPECT_EQ(spillInfo, nullptr);
+}
+
+TEST_F(FormulaRecalcTest, ClearSpillForMaster) {
+    Cell* a1 = setCellValue(0, 0, 0.0);  // Master cell
+    ASSERT_NE(a1, nullptr);
+
+    // Create a 2x2 array result and process spill
+    std::vector<std::vector<EvalResult>> arrayData = {
+        {EvalResult::Number(1.0), EvalResult::Number(2.0)},
+        {EvalResult::Number(3.0), EvalResult::Number(4.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(arrayData)));
+
+    // Verify spill exists
+    EXPECT_NE(sheet->getSpillInfo(a1->id), nullptr);
+
+    // Clear the spill
+    clearSpillForMaster(sheet, a1->id);
+
+    // Spill should be gone
+    EXPECT_EQ(sheet->getSpillInfo(a1->id), nullptr);
+}
+
+TEST_F(FormulaRecalcTest, SpillRangeReplace) {
+    Cell* a1 = setCellValue(0, 0, 0.0);  // Master cell
+    ASSERT_NE(a1, nullptr);
+
+    // First, create a 3x3 spill
+    std::vector<std::vector<EvalResult>> largeArray = {
+        {EvalResult::Number(1.0), EvalResult::Number(2.0), EvalResult::Number(3.0)},
+        {EvalResult::Number(4.0), EvalResult::Number(5.0), EvalResult::Number(6.0)},
+        {EvalResult::Number(7.0), EvalResult::Number(8.0), EvalResult::Number(9.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(largeArray)));
+
+    const SpillInfo* info1 = sheet->getSpillInfo(a1->id);
+    ASSERT_NE(info1, nullptr);
+    EXPECT_EQ(info1->spillCount(), 8u);  // 3*3 - 1
+
+    // Now replace with a smaller 2x2 spill
+    std::vector<std::vector<EvalResult>> smallArray = {
+        {EvalResult::Number(10.0), EvalResult::Number(20.0)},
+        {EvalResult::Number(30.0), EvalResult::Number(40.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(smallArray)));
+
+    // Should have smaller spill now
+    const SpillInfo* info2 = sheet->getSpillInfo(a1->id);
+    ASSERT_NE(info2, nullptr);
+    EXPECT_EQ(info2->spillCount(), 3u);  // 2*2 - 1
+    EXPECT_DOUBLE_EQ(a1->value.asNumber(), 10.0);
+}
+
+TEST_F(FormulaRecalcTest, SpillIsSpilledPosition) {
+    Cell* a1 = setCellValue(0, 0, 0.0);  // Master cell
+    ASSERT_NE(a1, nullptr);
+
+    // Create a 2x2 spill
+    std::vector<std::vector<EvalResult>> arrayData = {
+        {EvalResult::Number(1.0), EvalResult::Number(2.0)},
+        {EvalResult::Number(3.0), EvalResult::Number(4.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(arrayData)));
+
+    // Master cell position is NOT in spilledFrom (it's the master)
+    EXPECT_FALSE(sheet->isSpilledPosition(colIds[0], rowIds[0]));
+
+    // B1, A2, B2 should be spilled positions
+    const Axis* colB = sheet->getColumnByPosition(1);
+    const Axis* row2 = sheet->getRowByPosition(1);
+    ASSERT_NE(colB, nullptr);
+    ASSERT_NE(row2, nullptr);
+
+    EXPECT_TRUE(sheet->isSpilledPosition(colB->id, rowIds[0]));  // B1
+    EXPECT_TRUE(sheet->isSpilledPosition(colIds[0], row2->id));  // A2
+    EXPECT_TRUE(sheet->isSpilledPosition(colB->id, row2->id));   // B2
+}
+
+TEST_F(FormulaRecalcTest, SpillGetSpillMaster) {
+    Cell* a1 = setCellValue(0, 0, 0.0);  // Master cell
+    ASSERT_NE(a1, nullptr);
+
+    // Create a 2x2 spill
+    std::vector<std::vector<EvalResult>> arrayData = {
+        {EvalResult::Number(1.0), EvalResult::Number(2.0)},
+        {EvalResult::Number(3.0), EvalResult::Number(4.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(arrayData)));
+
+    // Get master for B1
+    const Axis* colB = sheet->getColumnByPosition(1);
+    ASSERT_NE(colB, nullptr);
+    ID master = sheet->getSpillMaster(colB->id, rowIds[0]);
+    EXPECT_EQ(master, a1->id);
+}
+
 }  // namespace
 }  // namespace cells

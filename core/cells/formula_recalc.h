@@ -28,6 +28,7 @@
 #ifndef CELLS_FORMULA_RECALC_H_
 #define CELLS_FORMULA_RECALC_H_
 
+#include <utility>
 #include <vector>
 
 #include "core/cells/types.h"
@@ -76,6 +77,38 @@ bool hasDirtyCells(Sheet* sheet);
 
 // Get all cells that need recalculation, in proper order
 std::vector<ID> getDirtyCells(Sheet* sheet);
+
+// =============================================================================
+// Spill Range Management
+// =============================================================================
+// Functions for handling dynamic array formula "spill" behavior where a single
+// formula produces multiple values that populate neighboring cells automatically.
+// =============================================================================
+
+// Calculate the positions where an array result would spill
+// Returns vector of (colId, rowId) pairs for each spilled position (excludes master)
+// Creates new columns/rows if needed to accommodate the spill
+// If successful, positions are returned in row-major order
+std::vector<std::pair<ID, ID>> calculateSpillRange(Sheet* sheet, Cell* masterCell, size_t rows,
+                                                   size_t cols);
+
+// Check if a spill range would be blocked by existing data
+// A position is "blocked" if:
+// - Cell exists with a non-empty value (has content)
+// - Cell has its own formula (not just a cached result)
+// - Cell is spilled from a DIFFERENT master (not this one)
+// Returns true if blocked, false if spill can proceed
+bool checkSpillBlocked(Sheet* sheet, const ID& masterCellId,
+                       const std::vector<std::pair<ID, ID>>& spillPositions);
+
+// Process spill for a cell after evaluation
+// If the result is an ARRAY type, calculates spill range and populates values
+// If blocked, sets master cell to #SPILL! error
+// If not an array, clears any existing spill for this cell
+void processSpill(Sheet* sheet, Cell* masterCell, const EvalResult& result);
+
+// Clear spill range for a master cell (call when master is deleted or formula changes)
+void clearSpillForMaster(Sheet* sheet, const ID& masterCellId);
 
 }  // namespace cells
 

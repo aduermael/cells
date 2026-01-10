@@ -85,12 +85,12 @@ Extend the data model to track spill relationships without persisting spilled va
 
 Modify formula evaluation to detect array results and handle spilling.
 
-- [ ] 2a: Add spill range calculation in formula_eval
+- [x] 2a: Add spill range calculation in formula_eval
   - After evaluating a formula that returns ARRAY, calculate target positions
   - `calculateSpillRange(Cell* master, size_t rows, size_t cols)` → vector of (colId, rowId)
   - Creates new columns/rows if needed (auto-extend)
 
-- [ ] 2b: Add spill blocking detection
+- [x] 2b: Add spill blocking detection
   - `checkSpillBlocked(Sheet*, masterCellId, spillPositions)` → bool
   - A position is "blocked" if:
     - Cell exists with a value (not empty)
@@ -98,14 +98,14 @@ Modify formula evaluation to detect array results and handle spilling.
     - Cell is spilled from a DIFFERENT master
   - If blocked, master cell gets `#SPILL!` error, no spilling occurs
 
-- [ ] 2c: Implement spill population during recalculation
+- [x] 2c: Implement spill population during recalculation
   - In `recalculateCell()`: if result is ARRAY and not blocked:
     - Clear previous spill range for this master (if any)
     - Register new spill range in `Sheet::spillMasters` and `spilledFrom`
     - Store individual values in spilled positions (runtime cache, not CRDT)
   - If blocked: clear any existing spill, set master to #SPILL!
 
-- [ ] 2d: Add spill range cleanup on master cell deletion/change
+- [x] 2d: Add spill range cleanup on master cell deletion/change
   - When master cell is deleted: clear its spill range
   - When master formula changes: recalculate and update spill range
   - When cell in spill range gets a value: trigger master recalc → #SPILL!
