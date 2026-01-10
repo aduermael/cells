@@ -1,0 +1,92 @@
+<svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .title { font: bold 16px sans-serif; fill: #333333; }
+      .axis-label { font: 12px sans-serif; fill: #333333; }
+      .tick-label { font: 11px sans-serif; fill: #666666; }
+      .legend-text { font: 12px sans-serif; fill: #333333; }
+      .legend-value { font: bold 12px sans-serif; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="100%" height="100%" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="400" y="28" text-anchor="middle" class="title">Lines of Code Evolution</text>
+
+  <!-- Chart area -->
+  <g transform="translate(0, 0)">
+    <!-- Grid lines -->
+    <line x1="80" y1="340.0" x2="680" y2="340.0" stroke="#e0e0e0" stroke-dasharray="4,4"/>
+    <line x1="80" y1="267.5" x2="680" y2="267.5" stroke="#e0e0e0" stroke-dasharray="4,4"/>
+    <line x1="80" y1="195.0" x2="680" y2="195.0" stroke="#e0e0e0" stroke-dasharray="4,4"/>
+    <line x1="80" y1="122.5" x2="680" y2="122.5" stroke="#e0e0e0" stroke-dasharray="4,4"/>
+    <line x1="80" y1="50.0" x2="680" y2="50.0" stroke="#e0e0e0" stroke-dasharray="4,4"/>
+
+    <!-- Y-axis -->
+    <line x1="80" y1="50" x2="80" y2="340" stroke="#333333" stroke-width="1"/>
+
+    <!-- Y-axis ticks and labels -->
+    
+    <line x1="75" y1="340.0" x2="80" y2="340.0" stroke="#333333"/>
+    <text x="70" y="344.0" text-anchor="end" class="tick-label">0</text>
+    <line x1="75" y1="267.5" x2="80" y2="267.5" stroke="#333333"/>
+    <text x="70" y="271.5" text-anchor="end" class="tick-label">21k</text>
+    <line x1="75" y1="195.0" x2="80" y2="195.0" stroke="#333333"/>
+    <text x="70" y="199.0" text-anchor="end" class="tick-label">42k</text>
+    <line x1="75" y1="122.5" x2="80" y2="122.5" stroke="#333333"/>
+    <text x="70" y="126.5" text-anchor="end" class="tick-label">63k</text>
+    <line x1="75" y1="50.0" x2="80" y2="50.0" stroke="#333333"/>
+    <text x="70" y="54.0" text-anchor="end" class="tick-label">84k</text>
+
+    <!-- Y-axis label -->
+    <text x="20" y="195" text-anchor="middle" transform="rotate(-90, 20, 195)" class="axis-label">Lines of Code</text>
+
+    <!-- X-axis -->
+    <line x1="80" y1="340" x2="680" y2="340" stroke="#333333" stroke-width="1"/>
+
+    <!-- X-axis ticks and labels -->
+    
+    <line x1="80.0" y1="340" x2="80.0" y2="345" stroke="#333333"/>
+    <text x="80.0" y="360" text-anchor="middle" class="tick-label">12/15</text>
+    <line x1="200.0" y1="340" x2="200.0" y2="345" stroke="#333333"/>
+    <text x="200.0" y="360" text-anchor="middle" class="tick-label">12/20</text>
+    <line x1="320.0" y1="340" x2="320.0" y2="345" stroke="#333333"/>
+    <text x="320.0" y="360" text-anchor="middle" class="tick-label">12/25</text>
+    <line x1="440.0" y1="340" x2="440.0" y2="345" stroke="#333333"/>
+    <text x="440.0" y="360" text-anchor="middle" class="tick-label">12/30</text>
+    <line x1="560.0" y1="340" x2="560.0" y2="345" stroke="#333333"/>
+    <text x="560.0" y="360" text-anchor="middle" class="tick-label">01/04</text>
+    <line x1="680.0" y1="340" x2="680.0" y2="345" stroke="#333333"/>
+    <text x="680.0" y="360" text-anchor="middle" class="tick-label">01/09</text>
+
+    <!-- Area fills -->
+    <path d="M 80.0 329.6 L 104.0 322.9 L 128.0 322.8 L 152.0 314.0 L 176.0 295.4 L 200.0 261.5 L 224.0 258.9 L 248.0 233.4 L 272.0 234.8 L 296.0 212.7 L 320.0 182.7 L 344.0 174.0 L 368.0 167.0 L 392.0 165.2 L 416.0 155.6 L 440.0 142.5 L 464.0 134.9 L 488.0 127.6 L 512.0 110.9 L 536.0 107.1 L 560.0 106.5 L 584.0 105.3 L 608.0 102.9 L 632.0 97.4 L 656.0 88.9 L 680.0 76.4 L 680.0 340.0 L 80.0 340.0 Z" fill="#058601" fill-opacity="0.1"/>
+    <path d="M 80.0 340.0 L 104.0 340.0 L 128.0 332.2 L 152.0 328.1 L 176.0 326.1 L 200.0 321.3 L 224.0 321.2 L 248.0 317.3 L 272.0 317.3 L 296.0 313.9 L 320.0 284.3 L 344.0 284.0 L 368.0 281.8 L 392.0 280.6 L 416.0 274.1 L 440.0 269.3 L 464.0 265.1 L 488.0 261.9 L 512.0 258.0 L 536.0 256.0 L 560.0 255.0 L 584.0 253.8 L 608.0 252.2 L 632.0 247.1 L 656.0 245.8 L 680.0 240.2 L 680.0 340.0 L 80.0 340.0 Z" fill="#2196F3" fill-opacity="0.1"/>
+
+    <!-- Lines -->
+    <path d="M 80.0 329.6 L 104.0 322.9 L 128.0 322.8 L 152.0 314.0 L 176.0 295.4 L 200.0 261.5 L 224.0 258.9 L 248.0 233.4 L 272.0 234.8 L 296.0 212.7 L 320.0 182.7 L 344.0 174.0 L 368.0 167.0 L 392.0 165.2 L 416.0 155.6 L 440.0 142.5 L 464.0 134.9 L 488.0 127.6 L 512.0 110.9 L 536.0 107.1 L 560.0 106.5 L 584.0 105.3 L 608.0 102.9 L 632.0 97.4 L 656.0 88.9 L 680.0 76.4" fill="none" stroke="#058601" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 80.0 340.0 L 104.0 340.0 L 128.0 332.2 L 152.0 328.1 L 176.0 326.1 L 200.0 321.3 L 224.0 321.2 L 248.0 317.3 L 272.0 317.3 L 296.0 313.9 L 320.0 284.3 L 344.0 284.0 L 368.0 281.8 L 392.0 280.6 L 416.0 274.1 L 440.0 269.3 L 464.0 265.1 L 488.0 261.9 L 512.0 258.0 L 536.0 256.0 L 560.0 255.0 L 584.0 253.8 L 608.0 252.2 L 632.0 247.1 L 656.0 245.8 L 680.0 240.2" fill="none" stroke="#2196F3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- Data point dots (latest only) -->
+    <circle cx="680.0" cy="76.4" r="4" fill="#058601"/>
+    <circle cx="680.0" cy="240.2" r="4" fill="#2196F3"/>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(695, 70)">
+    <rect x="0" y="0" width="14" height="14" fill="#058601" rx="2"/>
+    <text x="20" y="12" class="legend-text">Product</text>
+    <text x="20" y="28" class="legend-value" fill="#058601">76,077</text>
+
+    <rect x="0" y="50" width="14" height="14" fill="#2196F3" rx="2"/>
+    <text x="20" y="62" class="legend-text">Test</text>
+    <text x="20" y="78" class="legend-value" fill="#2196F3">28,797</text>
+  </g>
+
+  <!-- Footer -->
+  <text x="400" y="390" text-anchor="middle" class="tick-label">
+    2025-12-15 to 2026-01-09 (26 days with commits)
+  </text>
+</svg>
