@@ -278,11 +278,16 @@ UI layer only renders based on spill data queried from C++ via WASM bindings.
   - Formula bar uses `pointer-events: none` via CSS for spilled cells
   - Deleting master cell clears entire spill (handled in C++)
 
-- [ ] 8d: Add E2E tests for spill UI behavior
-  - Test spill range highlighting
-  - Test formula bar ghosting
-  - Test edit prevention
-  - Test #SPILL! error display when blocked
+- [x] 8d: Add E2E tests for spill UI behavior
+  - Created spill.test.mjs with 7 tests:
+    - SEQUENCE creates a spill range
+    - Spilled cell shows grayed formula bar
+    - Cannot edit spilled cell by typing
+    - Cannot edit spilled cell with F2
+    - Cannot delete spilled cell with Backspace
+    - Master cell can be edited
+    - UNIQUE creates spill range with unique values
+  - Fixed bug in ref_converter.cc: 8-char function names (like SEQUENCE) were incorrectly treated as cell IDs
 
 ---
 

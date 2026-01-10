@@ -383,6 +383,19 @@ size_t RefConverter::extractCellRef(const std::string& formula, size_t pos, std:
         if (pos + 8 < formula.size() && std::isalnum(formula[pos + 8]) != 0) {
             return 0;
         }
+        // Make sure this isn't part of a function name (preceded by alphanumeric or underscore)
+        // Function names like SEQUENCE, TRANSPOSE are 8 chars and would match otherwise
+        if (pos > 0) {
+            const char prev = formula[pos - 1];
+            if (std::isalnum(prev) != 0 || prev == '_') {
+                return 0;
+            }
+        }
+        // Make sure this isn't a function call (followed by '(')
+        // Cell IDs are never followed directly by '(' in valid formulas
+        if (pos + 8 < formula.size() && formula[pos + 8] == '(') {
+            return 0;
+        }
         refType = ReferenceType::RELATIVE;
         cellId = formula.substr(pos, 8);
         return 8;
