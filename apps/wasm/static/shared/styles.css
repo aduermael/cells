@@ -647,14 +647,15 @@ canvas {
     height: 52px; /* Match height of 2x2 button grid */
     background: var(--color-border);
     align-self: center;
+    margin: 0 calc(-1 * var(--spacing-xs)); /* Reduce gap to match button spacing */
 }
 
 .format-separator {
     width: 1px;
     height: 52px; /* Match height of 2x2 button grid */
     background: var(--color-border);
-    /* No extra margin - bar gap (8px) provides consistent spacing */
     align-self: center;
+    margin: 0 calc(-1 * var(--spacing-xs)); /* Reduce gap to match button spacing */
 }
 
 /* Formula bar action buttons (settings + script) - vertical stack */
@@ -2940,17 +2941,23 @@ canvas {
     display: inline-block;
 }
 
+#font-family-dropdown {
+    flex: 1; /* Expand to fill available space in row */
+}
+
 #font-family-btn {
-    min-width: 70px;
-    max-width: 100px;
+    width: 100%;
+    height: 24px; /* Fixed height to prevent layout shifts */
 }
 
 #font-family-label {
     display: inline-block;
-    max-width: 70px;
+    flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: left;
+    line-height: 1; /* Consistent line height regardless of font */
     vertical-align: middle;
 }
 

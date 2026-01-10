@@ -818,10 +818,10 @@ export class StyleControls {
   private updateFontFamilyDisplay(fontFamily: string, isMixed?: boolean): void {
     if (isMixed) {
       this.fontFamilyLabel.textContent = "Multiple";
-      this.fontFamilyLabel.style.fontFamily = "";
     } else {
       this.fontFamilyLabel.textContent = fontFamily;
-      this.fontFamilyLabel.style.fontFamily = fontFamily;
+      // Don't apply font-family to label - different fonts have different metrics
+      // which causes layout shifts. Font preview is shown in the dropdown menu.
     }
 
     // Update menu selection

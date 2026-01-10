@@ -170,6 +170,36 @@
                             </svg>
                         </button>
                     </div>
+                    <div class="color-picker-wrapper" id="text-color-wrapper">
+                        <button class="btn btn-icon btn-sm color-btn" id="style-text-color-btn" title="Text color">
+                            <span class="color-btn-icon" id="text-color-icon">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 20h16"/>
+                                    <path d="M9.5 4h5L18 16H6L9.5 4z"/>
+                                </svg>
+                            </span>
+                            <span class="color-swatch" id="text-color-swatch" style="background:#000000"></span>
+                        </button>
+                        <div class="color-picker-popup" id="text-color-popup">
+                            <div class="color-picker-palette">
+                                <button class="color-option" data-color="#000000" style="background:#000000" title="Black"></button>
+                                <button class="color-option" data-color="#374151" style="background:#374151" title="Gray 700"></button>
+                                <button class="color-option" data-color="#6B7280" style="background:#6B7280" title="Gray 500"></button>
+                                <button class="color-option" data-color="#9CA3AF" style="background:#9CA3AF" title="Gray 400"></button>
+                                <button class="color-option" data-color="#DC2626" style="background:#DC2626" title="Red 600"></button>
+                                <button class="color-option" data-color="#EA580C" style="background:#EA580C" title="Orange 600"></button>
+                                <button class="color-option" data-color="#D97706" style="background:#D97706" title="Amber 600"></button>
+                                <button class="color-option" data-color="#059669" style="background:#059669" title="Green 600"></button>
+                                <button class="color-option" data-color="#2563EB" style="background:#2563EB" title="Blue 600"></button>
+                                <button class="color-option" data-color="#4F46E5" style="background:#4F46E5" title="Indigo 600"></button>
+                                <button class="color-option" data-color="#7C3AED" style="background:#7C3AED" title="Purple 600"></button>
+                                <button class="color-option" data-color="#DB2777" style="background:#DB2777" title="Pink 600"></button>
+                            </div>
+                            <div class="color-picker-custom">
+                                <input type="text" class="color-hex-input" id="text-color-hex" placeholder="#RRGGBB" maxlength="7" />
+                            </div>
+                        </div>
+                    </div>
                     <div class="color-picker-wrapper" id="bg-color-wrapper">
                         <button class="btn btn-icon btn-sm color-btn" id="style-bg-color-btn" title="Background color">
                             <span class="color-btn-icon" id="bg-color-icon">
@@ -216,36 +246,6 @@
                             </div>
                             <div class="color-picker-custom">
                                 <input type="text" class="color-hex-input" id="bg-color-hex" placeholder="#RRGGBB" maxlength="7" />
-                            </div>
-                        </div>
-                    </div>
-                    <div class="color-picker-wrapper" id="text-color-wrapper">
-                        <button class="btn btn-icon btn-sm color-btn" id="style-text-color-btn" title="Text color">
-                            <span class="color-btn-icon" id="text-color-icon">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M4 20h16"/>
-                                    <path d="M9.5 4h5L18 16H6L9.5 4z"/>
-                                </svg>
-                            </span>
-                            <span class="color-swatch" id="text-color-swatch" style="background:#000000"></span>
-                        </button>
-                        <div class="color-picker-popup" id="text-color-popup">
-                            <div class="color-picker-palette">
-                                <button class="color-option" data-color="#000000" style="background:#000000" title="Black"></button>
-                                <button class="color-option" data-color="#374151" style="background:#374151" title="Gray 700"></button>
-                                <button class="color-option" data-color="#6B7280" style="background:#6B7280" title="Gray 500"></button>
-                                <button class="color-option" data-color="#9CA3AF" style="background:#9CA3AF" title="Gray 400"></button>
-                                <button class="color-option" data-color="#DC2626" style="background:#DC2626" title="Red 600"></button>
-                                <button class="color-option" data-color="#EA580C" style="background:#EA580C" title="Orange 600"></button>
-                                <button class="color-option" data-color="#D97706" style="background:#D97706" title="Amber 600"></button>
-                                <button class="color-option" data-color="#059669" style="background:#059669" title="Green 600"></button>
-                                <button class="color-option" data-color="#2563EB" style="background:#2563EB" title="Blue 600"></button>
-                                <button class="color-option" data-color="#4F46E5" style="background:#4F46E5" title="Indigo 600"></button>
-                                <button class="color-option" data-color="#7C3AED" style="background:#7C3AED" title="Purple 600"></button>
-                                <button class="color-option" data-color="#DB2777" style="background:#DB2777" title="Pink 600"></button>
-                            </div>
-                            <div class="color-picker-custom">
-                                <input type="text" class="color-hex-input" id="text-color-hex" placeholder="#RRGGBB" maxlength="7" />
                             </div>
                         </div>
                     </div>
