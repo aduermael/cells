@@ -724,6 +724,7 @@ cc_library(
     srcs = [
         "formula_eval.cc",
         "formula_functions.cc",
+        "//core/cells/functions:fn_array.cc",
         "//core/cells/functions:fn_datetime.cc",
         "//core/cells/functions:fn_logic.cc",
         "//core/cells/functions:fn_lookup.cc",
@@ -735,6 +736,7 @@ cc_library(
     hdrs = [
         "formula_eval.h",
         "formula_functions.h",
+        "//core/cells/functions:fn_array.h",
         "//core/cells/functions:fn_datetime.h",
         "//core/cells/functions:fn_logic.h",
         "//core/cells/functions:fn_lookup.h",

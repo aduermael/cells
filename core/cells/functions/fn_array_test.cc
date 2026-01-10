@@ -1,0 +1,371 @@
+#include "core/cells/functions/fn_array.h"
+
+#include <gtest/gtest.h>
+#include <memory>
+#include <string>
+#include <unordered_set>
+
+#include "core/cells/formula_ast.h"
+#include "core/cells/formula_eval.h"
+#include "core/cells/formula_functions.h"
+#include "core/cells/formula_parser.h"
+#include "core/cells/formula_resolver.h"
+#include "core/cells/id.h"
+#include "core/cells/model.h"
+
+namespace cells {
+namespace {
+
+class FnArrayTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Create a workbook with one sheet
+        workbook = std::make_unique<Workbook>(generate_id(), "Test");
+        workbook->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet1"));
+        sheet = workbook->getSheetByIndex(0);
+
+        // Create columns A-Z (positions 0-25)
+        for (uint32_t i = 0; i < 26; i++) {
+            auto col = std::make_unique<Axis>(generate_id(), true);
+            col->position = i;
+            col->name = Sheet::positionToColumnName(i);
+            colIds[i] = col->id;
+            sheet->addColumn(std::move(col));
+        }
+
+        // Create rows 1-100 (positions 0-99)
+        for (uint32_t i = 0; i < 100; i++) {
+            auto row = std::make_unique<Axis>(generate_id(), false);
+            row->position = i;
+            rowIds[i] = row->id;
+            sheet->addRow(std::move(row));
+        }
+    }
+
+    // Parse and evaluate a formula
+    EvalResult eval(const std::string& formula) {
+        FormulaParser parser(formula);
+        auto ast = parser.parse();
+        if (!ast || parser.hasErrors()) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+
+        // Resolve references
+        FormulaResolver resolver(*workbook, *sheet);
+        resolver.resolve(ast.get());
+
+        // Evaluate
+        std::unordered_set<ID> evaluating;
+        EvalContext ctx;
+        ctx.sheet = sheet;
+        ctx.workbook = workbook.get();
+        ctx.evaluatingCells = &evaluating;
+        ctx.recursionDepth = 0;
+
+        return evaluate(ast.get(), ctx);
+    }
+
+    // Set a cell value (number)
+    Cell* setCellValue(uint32_t col, uint32_t row, double value) {
+        Cell* cell = sheet->getOrCreateCellAt(colIds[col], rowIds[row]);
+        cell->value = CellValue(value);
+        return cell;
+    }
+
+    // Set a cell value (string)
+    Cell* setCellString(uint32_t col, uint32_t row, const std::string& value) {
+        Cell* cell = sheet->getOrCreateCellAt(colIds[col], rowIds[row]);
+        cell->value = CellValue(value);
+        return cell;
+    }
+
+    std::unique_ptr<Workbook> workbook;
+    Sheet* sheet = nullptr;
+    ID colIds[26];
+    ID rowIds[100];
+};
+
+// =============================================================================
+// UNIQUE Tests - Basic functionality
+// =============================================================================
+
+TEST_F(FnArrayTest, UniqueBasicSingleColumn) {
+    // A1:A5 = {1, 2, 2, 3, 1}
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+    setCellValue(0, 2, 2.0);
+    setCellValue(0, 3, 3.0);
+    setCellValue(0, 4, 1.0);
+
+    EvalResult result = eval("=UNIQUE(A1:A5)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+
+    // Should return {1, 2, 3}
+    EXPECT_TRUE(result.getArrayAt(0, 0).isNumber());
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_TRUE(result.getArrayAt(1, 0).isNumber());
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 2.0);
+    EXPECT_TRUE(result.getArrayAt(2, 0).isNumber());
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 3.0);
+}
+
+TEST_F(FnArrayTest, UniqueAllDuplicates) {
+    // A1:A3 = {5, 5, 5}
+    setCellValue(0, 0, 5.0);
+    setCellValue(0, 1, 5.0);
+    setCellValue(0, 2, 5.0);
+
+    EvalResult result = eval("=UNIQUE(A1:A3)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 5.0);
+}
+
+TEST_F(FnArrayTest, UniqueNoDuplicates) {
+    // A1:A3 = {1, 2, 3}
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+    setCellValue(0, 2, 3.0);
+
+    EvalResult result = eval("=UNIQUE(A1:A3)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+}
+
+TEST_F(FnArrayTest, UniqueWithStrings) {
+    // A1:A5 = {"Apple", "Banana", "Apple", "Cherry", "Banana"}
+    setCellString(0, 0, "Apple");
+    setCellString(0, 1, "Banana");
+    setCellString(0, 2, "Apple");
+    setCellString(0, 3, "Cherry");
+    setCellString(0, 4, "Banana");
+
+    EvalResult result = eval("=UNIQUE(A1:A5)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+
+    EXPECT_TRUE(result.getArrayAt(0, 0).isString());
+    EXPECT_EQ(result.getArrayAt(0, 0).getString(), "Apple");
+    EXPECT_TRUE(result.getArrayAt(1, 0).isString());
+    EXPECT_EQ(result.getArrayAt(1, 0).getString(), "Banana");
+    EXPECT_TRUE(result.getArrayAt(2, 0).isString());
+    EXPECT_EQ(result.getArrayAt(2, 0).getString(), "Cherry");
+}
+
+// =============================================================================
+// UNIQUE Tests - exactly_once parameter
+// =============================================================================
+
+TEST_F(FnArrayTest, UniqueExactlyOnce) {
+    // A1:A5 = {1, 2, 2, 3, 1}
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+    setCellValue(0, 2, 2.0);
+    setCellValue(0, 3, 3.0);
+    setCellValue(0, 4, 1.0);
+
+    // Only 3 appears exactly once
+    // Use FALSE explicitly for by_col since parser doesn't support empty args
+    EvalResult result = eval("=UNIQUE(A1:A5,FALSE,TRUE)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 3.0);
+}
+
+TEST_F(FnArrayTest, UniqueExactlyOnceAllDuplicates) {
+    // A1:A3 = {1, 1, 1}
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 1.0);
+    setCellValue(0, 2, 1.0);
+
+    // No values appear exactly once
+    EvalResult result = eval("=UNIQUE(A1:A3,FALSE,TRUE)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 0u);  // Empty array
+}
+
+TEST_F(FnArrayTest, UniqueExactlyOnceMultiple) {
+    // A1:A6 = {1, 2, 3, 3, 4, 4}
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+    setCellValue(0, 2, 3.0);
+    setCellValue(0, 3, 3.0);
+    setCellValue(0, 4, 4.0);
+    setCellValue(0, 5, 4.0);
+
+    // 1 and 2 appear exactly once
+    EvalResult result = eval("=UNIQUE(A1:A6,FALSE,TRUE)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 2u);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 2.0);
+}
+
+// =============================================================================
+// UNIQUE Tests - Multi-column (rows comparison)
+// =============================================================================
+
+TEST_F(FnArrayTest, UniqueMultiColumnRows) {
+    // A1:B4 = {{1, "A"}, {2, "B"}, {1, "A"}, {3, "C"}}
+    setCellValue(0, 0, 1.0);
+    setCellString(1, 0, "A");
+    setCellValue(0, 1, 2.0);
+    setCellString(1, 1, "B");
+    setCellValue(0, 2, 1.0);
+    setCellString(1, 2, "A");
+    setCellValue(0, 3, 3.0);
+    setCellString(1, 3, "C");
+
+    EvalResult result = eval("=UNIQUE(A1:B4)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);  // Unique rows: {1,A}, {2,B}, {3,C}
+    EXPECT_EQ(result.getArrayCols(), 2u);
+
+    // First row: {1, "A"}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_EQ(result.getArrayAt(0, 1).getString(), "A");
+
+    // Second row: {2, "B"}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 2.0);
+    EXPECT_EQ(result.getArrayAt(1, 1).getString(), "B");
+
+    // Third row: {3, "C"}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 3.0);
+    EXPECT_EQ(result.getArrayAt(2, 1).getString(), "C");
+}
+
+// =============================================================================
+// UNIQUE Tests - by_col parameter (compare columns instead of rows)
+// =============================================================================
+
+TEST_F(FnArrayTest, UniqueByColumn) {
+    // A1:C1 = {1, 2, 1} (one row, three columns)
+    // by_col=TRUE should compare columns and return unique columns
+    setCellValue(0, 0, 1.0);  // A1
+    setCellValue(1, 0, 2.0);  // B1
+    setCellValue(2, 0, 1.0);  // C1
+
+    EvalResult result = eval("=UNIQUE(A1:C1,TRUE)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_EQ(result.getArrayCols(), 2u);  // Only 2 unique columns: {1} and {2}
+
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 1).getNumber(), 2.0);
+}
+
+TEST_F(FnArrayTest, UniqueByColumnMultiRow) {
+    // A1:D2 = {{1, 2, 1, 3}, {A, B, A, C}}
+    // Columns are: {1,A}, {2,B}, {1,A}, {3,C}
+    // Unique columns: {1,A}, {2,B}, {3,C}
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(2, 0, 1.0);
+    setCellValue(3, 0, 3.0);
+    setCellString(0, 1, "A");
+    setCellString(1, 1, "B");
+    setCellString(2, 1, "A");
+    setCellString(3, 1, "C");
+
+    EvalResult result = eval("=UNIQUE(A1:D2,TRUE)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 2u);
+    EXPECT_EQ(result.getArrayCols(), 3u);  // 3 unique columns
+}
+
+// =============================================================================
+// UNIQUE Tests - Error cases
+// =============================================================================
+
+TEST_F(FnArrayTest, UniqueNoArgs) {
+    EvalResult result = eval("=UNIQUE()");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, UniqueTooManyArgs) {
+    setCellValue(0, 0, 1.0);
+    EvalResult result = eval("=UNIQUE(A1:A3,FALSE,FALSE,FALSE)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, UniqueErrorPropagation) {
+    // Cell with an error should propagate
+    Cell* cell = sheet->getOrCreateCellAt(colIds[0], rowIds[0]);
+    cell->value = CellValue(CellError::DIV);
+    setCellValue(0, 1, 2.0);
+    setCellValue(0, 2, 3.0);
+
+    EvalResult result = eval("=UNIQUE(A1:A3)");
+    // The result should include the error as one of the unique values
+    // (errors are treated as values, not propagated in array functions)
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);
+    EXPECT_TRUE(result.getArrayAt(0, 0).isError());
+    EXPECT_EQ(result.getArrayAt(0, 0).getError(), CellError::DIV);
+}
+
+// =============================================================================
+// UNIQUE Tests - Single value
+// =============================================================================
+
+TEST_F(FnArrayTest, UniqueSingleCell) {
+    setCellValue(0, 0, 42.0);
+
+    EvalResult result = eval("=UNIQUE(A1)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 42.0);
+}
+
+// =============================================================================
+// UNIQUE Tests - Empty cells
+// =============================================================================
+
+TEST_F(FnArrayTest, UniqueWithEmptyCells) {
+    // A1=1, A2=empty, A3=1, A4=empty
+    setCellValue(0, 0, 1.0);
+    // A2 is empty (not set)
+    setCellValue(0, 2, 1.0);
+    // A4 is empty (not set)
+
+    EvalResult result = eval("=UNIQUE(A1:A4)");
+    ASSERT_TRUE(result.isArray());
+    // Should have 2 unique values: 1 and empty
+    EXPECT_EQ(result.getArrayRows(), 2u);
+}
+
+// =============================================================================
+// UNIQUE Tests - Mixed types
+// =============================================================================
+
+TEST_F(FnArrayTest, UniqueMixedTypes) {
+    // Numbers and strings that look like numbers are different
+    setCellValue(0, 0, 1.0);   // Number 1
+    setCellString(0, 1, "1");  // String "1"
+    setCellValue(0, 2, 1.0);   // Number 1 (duplicate)
+    setCellString(0, 3, "1");  // String "1" (duplicate)
+    setCellValue(0, 4, 2.0);   // Number 2
+
+    EvalResult result = eval("=UNIQUE(A1:A5)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);  // {1, "1", 2}
+
+    EXPECT_TRUE(result.getArrayAt(0, 0).isNumber());
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_TRUE(result.getArrayAt(1, 0).isString());
+    EXPECT_EQ(result.getArrayAt(1, 0).getString(), "1");
+    EXPECT_TRUE(result.getArrayAt(2, 0).isNumber());
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 2.0);
+}
+
+}  // namespace
+}  // namespace cells

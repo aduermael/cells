@@ -8,6 +8,7 @@
 
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_eval.h"
+#include "core/cells/functions/fn_array.h"
 #include "core/cells/functions/fn_datetime.h"
 #include "core/cells/functions/fn_logic.h"
 #include "core/cells/functions/fn_lookup.h"
@@ -199,6 +200,7 @@ EvalResult evaluateAsBoolean(const ASTNode* arg, EvalContext& ctx) {
 
 void initializeBuiltinFunctions(FunctionRegistry& registry) {
     // Register functions from individual modules
+    registerArrayFunctions(registry);
     registerMathFunctions(registry);
     registerLogicFunctions(registry);
     registerTextFunctions(registry);

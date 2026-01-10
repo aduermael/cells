@@ -5,6 +5,8 @@ package(default_visibility = ["//core/cells:__pkg__"])
 
 # Export source files for inclusion in formula_eval
 exports_files([
+    "fn_array.cc",
+    "fn_array.h",
     "fn_datetime.cc",
     "fn_datetime.h",
     "fn_logic.cc",
@@ -20,6 +22,19 @@ exports_files([
     "fn_text.cc",
     "fn_text.h",
 ])
+
+cc_test(
+    name = "fn_array_test",
+    srcs = ["fn_array_test.cc"],
+    deps = [
+        "//core/cells:formula_eval",
+        "//core/cells:formula_parser",
+        "//core/cells:formula_resolver",
+        "//core/cells:id",
+        "//core/cells:model",
+        "@googletest//:gtest_main",
+    ],
+)
 
 cc_test(
     name = "fn_rand_test",

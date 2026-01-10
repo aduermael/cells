@@ -112,23 +112,25 @@ Modify formula evaluation to detect array results and handle spilling.
 
 ---
 
-## Phase 3: Implement UNIQUE Function
+## Phase 3: Implement UNIQUE Function ✅
 
 First spill-capable function as proof of concept.
 
-- [ ] 3a: Implement UNIQUE function returning ARRAY result
+- [x] 3a: Implement UNIQUE function returning ARRAY result
   - Signature: `UNIQUE(array, [by_col], [exactly_once])`
   - `array`: source range to extract unique values from
   - `by_col`: FALSE (default) = compare rows, TRUE = compare columns
   - `exactly_once`: FALSE (default) = all unique, TRUE = only values appearing once
   - Returns `EvalResult::ARRAY` with unique values as single column (or row if by_col)
 
-- [ ] 3b: Add UNIQUE tests
+- [x] 3b: Add UNIQUE tests
   - Basic: `=UNIQUE(A1:A5)` with duplicates → returns unique values
-  - Exactly once: `=UNIQUE(A1:A5,,TRUE)` → only non-duplicated values
+  - Exactly once: `=UNIQUE(A1:A5,FALSE,TRUE)` → only non-duplicated values
   - By column: `=UNIQUE(A1:C1,TRUE)` → unique columns
   - Empty input → empty array
   - Error in input → error propagation
+  - Multi-column row comparison
+  - Mixed types (numbers vs strings)
 
 ---
 
