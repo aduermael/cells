@@ -367,5 +367,269 @@ TEST_F(FnArrayTest, UniqueMixedTypes) {
     EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 2.0);
 }
 
+// =============================================================================
+// SORT Tests - Basic functionality
+// =============================================================================
+
+TEST_F(FnArrayTest, SortBasicAscending) {
+    // A1:A5 = {3, 1, 4, 1, 5}
+    setCellValue(0, 0, 3.0);
+    setCellValue(0, 1, 1.0);
+    setCellValue(0, 2, 4.0);
+    setCellValue(0, 3, 1.0);
+    setCellValue(0, 4, 5.0);
+
+    EvalResult result = eval("=SORT(A1:A5)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 5u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+
+    // Should return {1, 1, 3, 4, 5}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(3, 0).getNumber(), 4.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(4, 0).getNumber(), 5.0);
+}
+
+TEST_F(FnArrayTest, SortBasicDescending) {
+    // A1:A5 = {3, 1, 4, 1, 5}
+    setCellValue(0, 0, 3.0);
+    setCellValue(0, 1, 1.0);
+    setCellValue(0, 2, 4.0);
+    setCellValue(0, 3, 1.0);
+    setCellValue(0, 4, 5.0);
+
+    EvalResult result = eval("=SORT(A1:A5,1,-1)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 5u);
+
+    // Should return {5, 4, 3, 1, 1}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 5.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 4.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(3, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(4, 0).getNumber(), 1.0);
+}
+
+TEST_F(FnArrayTest, SortWithStrings) {
+    // A1:A4 = {"Banana", "Apple", "Cherry", "Apple"}
+    setCellString(0, 0, "Banana");
+    setCellString(0, 1, "Apple");
+    setCellString(0, 2, "Cherry");
+    setCellString(0, 3, "Apple");
+
+    EvalResult result = eval("=SORT(A1:A4)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 4u);
+
+    // Should return {"Apple", "Apple", "Banana", "Cherry"}
+    EXPECT_EQ(result.getArrayAt(0, 0).getString(), "Apple");
+    EXPECT_EQ(result.getArrayAt(1, 0).getString(), "Apple");
+    EXPECT_EQ(result.getArrayAt(2, 0).getString(), "Banana");
+    EXPECT_EQ(result.getArrayAt(3, 0).getString(), "Cherry");
+}
+
+// =============================================================================
+// SORT Tests - Multi-column with sort_index
+// =============================================================================
+
+TEST_F(FnArrayTest, SortMultiColumnByFirstColumn) {
+    // A1:B3 = {{3, "C"}, {1, "A"}, {2, "B"}}
+    setCellValue(0, 0, 3.0);
+    setCellString(1, 0, "C");
+    setCellValue(0, 1, 1.0);
+    setCellString(1, 1, "A");
+    setCellValue(0, 2, 2.0);
+    setCellString(1, 2, "B");
+
+    EvalResult result = eval("=SORT(A1:B3)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);
+    EXPECT_EQ(result.getArrayCols(), 2u);
+
+    // Should be sorted by first column: {1,A}, {2,B}, {3,C}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_EQ(result.getArrayAt(0, 1).getString(), "A");
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 2.0);
+    EXPECT_EQ(result.getArrayAt(1, 1).getString(), "B");
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 3.0);
+    EXPECT_EQ(result.getArrayAt(2, 1).getString(), "C");
+}
+
+TEST_F(FnArrayTest, SortMultiColumnBySecondColumn) {
+    // A1:B3 = {{1, "C"}, {2, "A"}, {3, "B"}}
+    setCellValue(0, 0, 1.0);
+    setCellString(1, 0, "C");
+    setCellValue(0, 1, 2.0);
+    setCellString(1, 1, "A");
+    setCellValue(0, 2, 3.0);
+    setCellString(1, 2, "B");
+
+    EvalResult result = eval("=SORT(A1:B3,2)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);
+    EXPECT_EQ(result.getArrayCols(), 2u);
+
+    // Should be sorted by second column (string): {2,A}, {3,B}, {1,C}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 2.0);
+    EXPECT_EQ(result.getArrayAt(0, 1).getString(), "A");
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 3.0);
+    EXPECT_EQ(result.getArrayAt(1, 1).getString(), "B");
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 1.0);
+    EXPECT_EQ(result.getArrayAt(2, 1).getString(), "C");
+}
+
+// =============================================================================
+// SORT Tests - by_col parameter (sort columns by row values)
+// =============================================================================
+
+TEST_F(FnArrayTest, SortByColumnSingleRow) {
+    // A1:C1 = {3, 1, 2} (one row, three columns)
+    setCellValue(0, 0, 3.0);  // A1
+    setCellValue(1, 0, 1.0);  // B1
+    setCellValue(2, 0, 2.0);  // C1
+
+    EvalResult result = eval("=SORT(A1:C1,1,1,TRUE)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_EQ(result.getArrayCols(), 3u);
+
+    // Should return {1, 2, 3}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 1).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 2).getNumber(), 3.0);
+}
+
+TEST_F(FnArrayTest, SortByColumnMultiRow) {
+    // A1:D2 = {{3, 1, 2, 4}, {"C", "A", "B", "D"}}
+    // Sorting by row 1 (numbers): cols should be reordered as {1,A}, {2,B}, {3,C}, {4,D}
+    setCellValue(0, 0, 3.0);
+    setCellValue(1, 0, 1.0);
+    setCellValue(2, 0, 2.0);
+    setCellValue(3, 0, 4.0);
+    setCellString(0, 1, "C");
+    setCellString(1, 1, "A");
+    setCellString(2, 1, "B");
+    setCellString(3, 1, "D");
+
+    EvalResult result = eval("=SORT(A1:D2,1,1,TRUE)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 2u);
+    EXPECT_EQ(result.getArrayCols(), 4u);
+
+    // Row 1: {1, 2, 3, 4}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 1).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 2).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 3).getNumber(), 4.0);
+    // Row 2: {"A", "B", "C", "D"}
+    EXPECT_EQ(result.getArrayAt(1, 0).getString(), "A");
+    EXPECT_EQ(result.getArrayAt(1, 1).getString(), "B");
+    EXPECT_EQ(result.getArrayAt(1, 2).getString(), "C");
+    EXPECT_EQ(result.getArrayAt(1, 3).getString(), "D");
+}
+
+// =============================================================================
+// SORT Tests - Error cases
+// =============================================================================
+
+TEST_F(FnArrayTest, SortNoArgs) {
+    EvalResult result = eval("=SORT()");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, SortTooManyArgs) {
+    setCellValue(0, 0, 1.0);
+    EvalResult result = eval("=SORT(A1:A3,1,1,FALSE,FALSE)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, SortInvalidSortIndex) {
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+
+    // Sort index 0 is invalid
+    EvalResult result = eval("=SORT(A1:A2,0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+
+    // Sort index larger than columns is invalid
+    result = eval("=SORT(A1:A2,5)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, SortInvalidSortOrder) {
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+
+    // Sort order must be 1 or -1
+    EvalResult result = eval("=SORT(A1:A2,1,2)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// SORT Tests - Mixed types
+// =============================================================================
+
+TEST_F(FnArrayTest, SortMixedTypes) {
+    // Numbers sort before strings in Excel
+    setCellValue(0, 0, 5.0);      // Number
+    setCellString(0, 1, "Apple"); // String
+    setCellValue(0, 2, 1.0);      // Number
+    setCellString(0, 3, "Banana"); // String
+
+    EvalResult result = eval("=SORT(A1:A4)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 4u);
+
+    // Excel sort order: numbers first, then strings
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 5.0);
+    EXPECT_EQ(result.getArrayAt(2, 0).getString(), "Apple");
+    EXPECT_EQ(result.getArrayAt(3, 0).getString(), "Banana");
+}
+
+TEST_F(FnArrayTest, SortStableSort) {
+    // Test that sort is stable - equal values maintain original order
+    // A1:B3 = {{1, "First"}, {2, "Second"}, {1, "Third"}}
+    setCellValue(0, 0, 1.0);
+    setCellString(1, 0, "First");
+    setCellValue(0, 1, 2.0);
+    setCellString(1, 1, "Second");
+    setCellValue(0, 2, 1.0);
+    setCellString(1, 2, "Third");
+
+    EvalResult result = eval("=SORT(A1:B3)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);
+
+    // The two rows with value 1 should maintain their original order
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_EQ(result.getArrayAt(0, 1).getString(), "First");
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 1.0);
+    EXPECT_EQ(result.getArrayAt(1, 1).getString(), "Third");
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 2.0);
+    EXPECT_EQ(result.getArrayAt(2, 1).getString(), "Second");
+}
+
+// =============================================================================
+// SORT Tests - Single cell
+// =============================================================================
+
+TEST_F(FnArrayTest, SortSingleCell) {
+    setCellValue(0, 0, 42.0);
+
+    EvalResult result = eval("=SORT(A1)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 42.0);
+}
+
 }  // namespace
 }  // namespace cells

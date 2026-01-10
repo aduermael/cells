@@ -136,7 +136,7 @@ First spill-capable function as proof of concept.
 
 ## Phase 4: Implement Additional Spill Functions
 
-- [ ] 4a: Implement SORT function
+- [x] 4a: Implement SORT function
   - Signature: `SORT(array, [sort_index], [sort_order], [by_col])`
   - Returns sorted array (spills)
 

@@ -36,6 +36,82 @@ bool evalResultsEqual(const EvalResult& a, const EvalResult& b) {
     }
 }
 
+// Helper to compare two EvalResults for sorting
+// Returns: -1 if a < b, 0 if a == b, 1 if a > b
+// Excel sort order: numbers < text < logical < errors < empty
+int compareEvalResults(const EvalResult& a, const EvalResult& b) {
+    // Both numbers
+    if (a.isNumber() && b.isNumber()) {
+        if (a.getNumber() < b.getNumber()) {
+            return -1;
+        }
+        if (a.getNumber() > b.getNumber()) {
+            return 1;
+        }
+        return 0;
+    }
+
+    // Both strings - case-insensitive comparison
+    if (a.isString() && b.isString()) {
+        std::string strA = a.getString();
+        std::string strB = b.getString();
+        std::transform(strA.begin(), strA.end(), strA.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        std::transform(strB.begin(), strB.end(), strB.begin(),
+                       [](unsigned char c) { return std::tolower(c); });
+        if (strA < strB) {
+            return -1;
+        }
+        if (strA > strB) {
+            return 1;
+        }
+        return 0;
+    }
+
+    // Both booleans
+    if (a.isBoolean() && b.isBoolean()) {
+        if (!a.getBoolean() && b.getBoolean()) {
+            return -1;  // FALSE < TRUE
+        }
+        if (a.getBoolean() && !b.getBoolean()) {
+            return 1;
+        }
+        return 0;
+    }
+
+    // Both errors
+    if (a.isError() && b.isError()) {
+        return 0;  // Errors are equal for sorting
+    }
+
+    // Both empty
+    if (a.isEmpty() && b.isEmpty()) {
+        return 0;
+    }
+
+    // Mixed types - Excel sort order: numbers < text < logical < errors < empty
+    auto typeOrder = [](const EvalResult& e) -> int {
+        if (e.isNumber()) {
+            return 0;
+        }
+        if (e.isString()) {
+            return 1;
+        }
+        if (e.isBoolean()) {
+            return 2;
+        }
+        if (e.isError()) {
+            return 3;
+        }
+        if (e.isEmpty()) {
+            return 4;
+        }
+        return 5;  // Arrays or ranges
+    };
+
+    return typeOrder(a) - typeOrder(b) < 0 ? -1 : 1;
+}
+
 // Helper to check if two rows (vectors of EvalResult) are equal
 bool rowsEqual(const std::vector<EvalResult>& a, const std::vector<EvalResult>& b) {
     if (a.size() != b.size()) {
@@ -309,9 +385,155 @@ EvalResult fn_UNIQUE(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     return EvalResult::Array(std::move(uniqueRows));
 }
 
+EvalResult fn_SORT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    // Validate arguments: SORT(array, [sort_index], [sort_order], [by_col])
+    if (args.empty() || args.size() > 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    // Evaluate first argument (array/range)
+    EvalResult rangeResult = evaluate(args[0], ctx);
+    if (rangeResult.isError()) {
+        return rangeResult;
+    }
+
+    // Parse optional sort_index argument (default: 1 = first column/row)
+    int sortIndex = 1;
+    if (args.size() >= 2) {
+        EvalResult sortIndexResult = evaluateAsNumber(args[1], ctx);
+        if (sortIndexResult.isError()) {
+            return sortIndexResult;
+        }
+        sortIndex = static_cast<int>(sortIndexResult.getNumber());
+        if (sortIndex < 1) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+
+    // Parse optional sort_order argument (default: 1 = ascending, -1 = descending)
+    int sortOrder = 1;
+    if (args.size() >= 3) {
+        EvalResult sortOrderResult = evaluateAsNumber(args[2], ctx);
+        if (sortOrderResult.isError()) {
+            return sortOrderResult;
+        }
+        sortOrder = static_cast<int>(sortOrderResult.getNumber());
+        // Excel accepts 1 for ascending, -1 for descending
+        if (sortOrder != 1 && sortOrder != -1) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+
+    // Parse optional by_col argument (default: false = sort by rows)
+    bool byCol = false;
+    if (args.size() >= 4) {
+        EvalResult byColResult = evaluateAsBoolean(args[3], ctx);
+        if (byColResult.isError()) {
+            return byColResult;
+        }
+        byCol = byColResult.getBoolean();
+    }
+
+    // Handle array result type (from another spill function)
+    std::vector<std::vector<EvalResult>> data;
+    if (rangeResult.isArray()) {
+        data = rangeResult.getArray();
+    } else {
+        // Collect range as 2D array
+        auto [rangeData, error] = collectRangeAs2D(rangeResult, ctx);
+        if (error.isError()) {
+            return error;
+        }
+        data = std::move(rangeData);
+    }
+
+    // Handle empty input
+    if (data.empty() || (data.size() == 1 && data[0].empty())) {
+        return EvalResult::EmptyArray();
+    }
+
+    if (byCol) {
+        // Sorting by columns: transpose, sort, transpose back
+        const size_t numRows = data.size();
+        const size_t numCols = data.empty() ? 0 : data[0].size();
+
+        // Validate sort_index
+        if (static_cast<size_t>(sortIndex) > numRows) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+
+        // Transpose: columns become rows
+        std::vector<std::vector<EvalResult>> transposed;
+        transposed.reserve(numCols);
+        for (size_t c = 0; c < numCols; ++c) {
+            std::vector<EvalResult> col;
+            col.reserve(numRows);
+            for (size_t r = 0; r < numRows; ++r) {
+                if (c < data[r].size()) {
+                    col.push_back(data[r][c]);
+                } else {
+                    col.push_back(EvalResult::Empty());
+                }
+            }
+            transposed.push_back(std::move(col));
+        }
+
+        // Sort transposed rows by the sort key
+        const size_t keyIdx = static_cast<size_t>(sortIndex - 1);
+        std::stable_sort(transposed.begin(), transposed.end(),
+                         [keyIdx, sortOrder](const std::vector<EvalResult>& a,
+                                             const std::vector<EvalResult>& b) {
+                             const EvalResult& va = (keyIdx < a.size()) ? a[keyIdx] : EvalResult::Empty();
+                             const EvalResult& vb = (keyIdx < b.size()) ? b[keyIdx] : EvalResult::Empty();
+                             const int cmp = compareEvalResults(va, vb);
+                             return sortOrder > 0 ? cmp < 0 : cmp > 0;
+                         });
+
+        // Transpose back
+        const size_t sortedCols = transposed.size();
+        std::vector<std::vector<EvalResult>> result;
+        result.reserve(numRows);
+        for (size_t r = 0; r < numRows; ++r) {
+            std::vector<EvalResult> row;
+            row.reserve(sortedCols);
+            for (size_t c = 0; c < sortedCols; ++c) {
+                if (r < transposed[c].size()) {
+                    row.push_back(transposed[c][r]);
+                } else {
+                    row.push_back(EvalResult::Empty());
+                }
+            }
+            result.push_back(std::move(row));
+        }
+        return EvalResult::Array(std::move(result));
+    }
+
+    // Sort by rows (default behavior)
+    const size_t numCols = data.empty() ? 0 : data[0].size();
+
+    // Validate sort_index
+    if (static_cast<size_t>(sortIndex) > numCols) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    const size_t keyIdx = static_cast<size_t>(sortIndex - 1);
+    std::stable_sort(data.begin(), data.end(),
+                     [keyIdx, sortOrder](const std::vector<EvalResult>& a,
+                                         const std::vector<EvalResult>& b) {
+                         const EvalResult& va = (keyIdx < a.size()) ? a[keyIdx] : EvalResult::Empty();
+                         const EvalResult& vb = (keyIdx < b.size()) ? b[keyIdx] : EvalResult::Empty();
+                         const int cmp = compareEvalResults(va, vb);
+                         return sortOrder > 0 ? cmp < 0 : cmp > 0;
+                     });
+
+    return EvalResult::Array(std::move(data));
+}
+
 void registerArrayFunctions(FunctionRegistry& registry) {
     registry.registerFunction("UNIQUE", fn_UNIQUE, "(array, [by_col], [exactly_once])",
                               "Returns unique values from a range", "Array");
+    registry.registerFunction("SORT", fn_SORT, "(array, [sort_index], [sort_order], [by_col])",
+                              "Sorts a range of data", "Array");
 }
 
 }  // namespace cells

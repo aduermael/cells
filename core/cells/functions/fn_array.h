@@ -34,6 +34,13 @@ namespace cells {
 // exactly_once: FALSE (default) = all unique, TRUE = only values appearing exactly once
 EvalResult fn_UNIQUE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// SORT(array, [sort_index], [sort_order], [by_col]) - Sorts a range of data
+// array: The range to sort
+// sort_index: Which column/row to sort by (1-based, default: 1)
+// sort_order: 1 = ascending (default), -1 = descending
+// by_col: FALSE (default) = sort rows by column values, TRUE = sort columns by row values
+EvalResult fn_SORT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // Forward declaration
 class FunctionRegistry;
 
