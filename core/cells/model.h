@@ -44,6 +44,7 @@ struct Cell;
 struct Sheet;
 struct Workbook;
 struct SharedFormulaGroup;
+struct SharedFormulaInfo;
 struct OpLog;
 struct SpillInfo;
 
@@ -188,7 +189,9 @@ inline CellFlags operator|(CellFlags a, CellFlags b) {
 inline CellFlags operator&(CellFlags a, CellFlags b) {
     return static_cast<CellFlags>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
 }
-inline CellFlags operator~(CellFlags a) { return static_cast<CellFlags>(~static_cast<uint8_t>(a)); }
+inline CellFlags operator~(CellFlags a) {
+    return static_cast<CellFlags>(~static_cast<uint8_t>(a));
+}
 inline CellFlags& operator|=(CellFlags& a, CellFlags b) {
     a = a | b;
     return a;
@@ -328,6 +331,20 @@ struct SpillInfo {
 
     // Get the number of spilled cells (excluding master)
     [[nodiscard]] size_t spillCount() const { return spilledPositions.size(); }
+};
+
+// SharedFormulaInfo - tracks a shared formula group at the Sheet level
+// The master cell owns the formula; subscribers reference it
+// This is the Sheet-level tracking structure (runtime-only, not persisted)
+struct SharedFormulaInfo {
+    ID masterCellId;              // Cell that owns the formula
+    std::vector<ID> subscribers;  // Cell IDs using master's formula
+
+    SharedFormulaInfo() = default;
+    explicit SharedFormulaInfo(const ID& master) : masterCellId(master) {}
+
+    // Get total cells in group (master + subscribers)
+    [[nodiscard]] size_t size() const { return 1 + subscribers.size(); }
 };
 
 // Axis - represents a column or row
@@ -477,6 +494,36 @@ struct Sheet {
     // Clear all spill data (called during full recalculation)
     void clearAllSpillRanges();
 
+    // ========================================================================
+    // Shared Formula Tracking (Runtime-Only)
+    // ========================================================================
+
+    // Get shared formula info for a master cell (returns nullptr if not a master)
+    [[nodiscard]] SharedFormulaInfo* getSharedFormulaInfo(const ID& masterCellId);
+    [[nodiscard]] const SharedFormulaInfo* getSharedFormulaInfo(const ID& masterCellId) const;
+
+    // Get the master cell ID if this cell is a shared formula subscriber (returns null ID if not)
+    [[nodiscard]] ID getSharedFormulaMaster(const ID& subscriberId) const;
+
+    // Check if a cell is part of any shared formula group (master or subscriber)
+    [[nodiscard]] bool isInSharedFormulaGroup(const ID& cellId) const;
+
+    // Register a new shared formula group (masterId owns the formula, subscribers reference it)
+    void registerSharedFormulaGroup(const ID& masterCellId, const std::vector<ID>& subscriberIds);
+
+    // Add a subscriber to an existing shared formula group
+    void addSharedFormulaSubscriber(const ID& masterCellId, const ID& subscriberId);
+
+    // Remove a subscriber from a shared formula group
+    // If no subscribers remain, removes the group entirely
+    void removeSharedFormulaSubscriber(const ID& subscriberId);
+
+    // Clear the shared formula group for a master (removes master and all subscribers)
+    void clearSharedFormulaGroup(const ID& masterCellId);
+
+    // Clear all shared formula tracking data
+    void clearAllSharedFormulaGroups();
+
 private:
     // Secondary index: (colId, rowId) -> cellId
     std::unordered_map<std::string, ID> _cellIndex;
@@ -494,6 +541,16 @@ private:
     // Reverse lookup: (colId, rowId) composite key → master cell ID
     // Only contains spilled positions, not the master position itself
     std::unordered_map<std::string, ID> _spilledFrom;
+
+    // ========================================================================
+    // Shared formula tracking (runtime-only, not persisted)
+    // ========================================================================
+
+    // Maps master cell ID → shared formula info (subscriber list)
+    std::unordered_map<ID, SharedFormulaInfo, IDHash> _sharedFormulaMasters;
+
+    // Reverse lookup: subscriber cell ID → master cell ID
+    std::unordered_map<ID, ID, IDHash> _sharedFormulaFrom;
 
     // Build composite key for cell index
     static std::string makeCellKey(const ID& colId, const ID& rowId);

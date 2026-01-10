@@ -211,7 +211,7 @@ bits 4-7: reserved for future use
   - Add helper methods: `setFlag()`, `clearFlag()`, `hasFlag()`
   - Add public accessors that use flags internally
 
-- [ ] 7b: Add shared formula tracking to Sheet
+- [x] 7b: Add shared formula tracking to Sheet
   - Add `_sharedFormulaMasters`: map masterId → SharedFormulaInfo
   - Add `_sharedFormulaFrom`: map subscriberId → masterId
   - Similar structure to `_spillMasters`/`_spilledFrom`
