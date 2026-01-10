@@ -743,6 +743,72 @@ EvalResult fn_SEQUENCE(const std::vector<const ASTNode*>& args, EvalContext& ctx
     return EvalResult::Array(std::move(result));
 }
 
+EvalResult fn_TRANSPOSE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    // Validate arguments: TRANSPOSE(array)
+    if (args.size() != 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    // Evaluate the array argument
+    EvalResult rangeResult = evaluate(args[0], ctx);
+    if (rangeResult.isError()) {
+        return rangeResult;
+    }
+
+    // Collect array data
+    std::vector<std::vector<EvalResult>> data;
+    if (rangeResult.isArray()) {
+        data = rangeResult.getArray();
+    } else {
+        auto [rangeData, error] = collectRangeAs2D(rangeResult, ctx);
+        if (error.isError()) {
+            return error;
+        }
+        data = std::move(rangeData);
+    }
+
+    // Handle empty input
+    if (data.empty()) {
+        return EvalResult::EmptyArray();
+    }
+
+    // Handle single value (1x1 stays 1x1)
+    if (data.size() == 1 && data[0].size() == 1) {
+        return EvalResult::Array(std::move(data));
+    }
+
+    // Calculate dimensions
+    const size_t numRows = data.size();
+    size_t numCols = 0;
+    for (const auto& row : data) {
+        numCols = std::max(numCols, row.size());
+    }
+
+    // If it's a single cell, just return it as is
+    if (numCols == 0) {
+        return EvalResult::EmptyArray();
+    }
+
+    // Create transposed result
+    std::vector<std::vector<EvalResult>> result;
+    result.reserve(numCols);
+
+    for (size_t c = 0; c < numCols; ++c) {
+        std::vector<EvalResult> row;
+        row.reserve(numRows);
+        for (size_t r = 0; r < numRows; ++r) {
+            if (c < data[r].size()) {
+                row.push_back(data[r][c]);
+            } else {
+                row.push_back(EvalResult::Empty());
+            }
+        }
+        result.push_back(std::move(row));
+    }
+
+    return EvalResult::Array(std::move(result));
+}
+
 void registerArrayFunctions(FunctionRegistry& registry) {
     registry.registerFunction("UNIQUE", fn_UNIQUE, "(array, [by_col], [exactly_once])",
                               "Returns unique values from a range", "Array");
@@ -752,6 +818,8 @@ void registerArrayFunctions(FunctionRegistry& registry) {
                               "Filters a range based on criteria", "Array");
     registry.registerFunction("SEQUENCE", fn_SEQUENCE, "(rows, [cols], [start], [step])",
                               "Generates a sequence of numbers", "Array");
+    registry.registerFunction("TRANSPOSE", fn_TRANSPOSE, "(array)",
+                              "Transposes rows and columns", "Array");
 }
 
 }  // namespace cells

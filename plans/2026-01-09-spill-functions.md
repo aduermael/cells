@@ -148,11 +148,11 @@ First spill-capable function as proof of concept.
   - Signature: `SEQUENCE(rows, [cols], [start], [step])`
   - Returns generated number sequence (spills)
 
-- [ ] 4d: Implement TRANSPOSE function (upgrade existing if any)
+- [x] 4d: Implement TRANSPOSE function (upgrade existing if any)
   - Signature: `TRANSPOSE(array)`
   - Returns transposed array (spills)
 
-- [ ] 4e: Add tests for all new functions
+- [x] 4e: Add tests for all new functions
 
 ---
 

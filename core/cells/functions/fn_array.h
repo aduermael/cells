@@ -54,6 +54,11 @@ EvalResult fn_FILTER(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // step: Increment between values (default: 1)
 EvalResult fn_SEQUENCE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// TRANSPOSE(array) - Transposes rows and columns
+// array: The range or array to transpose
+// Returns an array with rows and columns swapped
+EvalResult fn_TRANSPOSE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // Forward declaration
 class FunctionRegistry;
 

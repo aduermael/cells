@@ -973,5 +973,142 @@ TEST_F(FnArrayTest, SequenceSingleCell) {
     EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 42.0);
 }
 
+// =============================================================================
+// TRANSPOSE Tests - Basic functionality
+// =============================================================================
+
+TEST_F(FnArrayTest, TransposeColumnToRow) {
+    // A1:A3 = {1, 2, 3} (column vector)
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+    setCellValue(0, 2, 3.0);
+
+    EvalResult result = eval("=TRANSPOSE(A1:A3)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_EQ(result.getArrayCols(), 3u);
+
+    // Should return {1, 2, 3} as a row
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 1).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 2).getNumber(), 3.0);
+}
+
+TEST_F(FnArrayTest, TransposeRowToColumn) {
+    // A1:C1 = {1, 2, 3} (row vector)
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(2, 0, 3.0);
+
+    EvalResult result = eval("=TRANSPOSE(A1:C1)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+
+    // Should return {1, 2, 3} as a column
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 3.0);
+}
+
+TEST_F(FnArrayTest, TransposeMatrix) {
+    // A1:B3 = {{1, 2}, {3, 4}, {5, 6}} (3x2 matrix)
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(0, 1, 3.0);
+    setCellValue(1, 1, 4.0);
+    setCellValue(0, 2, 5.0);
+    setCellValue(1, 2, 6.0);
+
+    EvalResult result = eval("=TRANSPOSE(A1:B3)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 2u);  // Now 2x3
+    EXPECT_EQ(result.getArrayCols(), 3u);
+
+    // Row 0: {1, 3, 5}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 1).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 2).getNumber(), 5.0);
+    // Row 1: {2, 4, 6}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 1).getNumber(), 4.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 2).getNumber(), 6.0);
+}
+
+TEST_F(FnArrayTest, TransposeMixedTypes) {
+    // A1:B2 = {{1, "A"}, {2, "B"}}
+    setCellValue(0, 0, 1.0);
+    setCellString(1, 0, "A");
+    setCellValue(0, 1, 2.0);
+    setCellString(1, 1, "B");
+
+    EvalResult result = eval("=TRANSPOSE(A1:B2)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 2u);
+    EXPECT_EQ(result.getArrayCols(), 2u);
+
+    // Row 0: {1, 2}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 1).getNumber(), 2.0);
+    // Row 1: {"A", "B"}
+    EXPECT_EQ(result.getArrayAt(1, 0).getString(), "A");
+    EXPECT_EQ(result.getArrayAt(1, 1).getString(), "B");
+}
+
+// =============================================================================
+// TRANSPOSE Tests - Error cases
+// =============================================================================
+
+TEST_F(FnArrayTest, TransposeNoArgs) {
+    EvalResult result = eval("=TRANSPOSE()");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, TransposeTooManyArgs) {
+    setCellValue(0, 0, 1.0);
+    EvalResult result = eval("=TRANSPOSE(A1,B1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// TRANSPOSE Tests - Single cell
+// =============================================================================
+
+TEST_F(FnArrayTest, TransposeSingleCell) {
+    setCellValue(0, 0, 42.0);
+
+    EvalResult result = eval("=TRANSPOSE(A1)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 42.0);
+}
+
+// =============================================================================
+// TRANSPOSE Tests - Square matrix
+// =============================================================================
+
+TEST_F(FnArrayTest, TransposeSquareMatrix) {
+    // A1:B2 = {{1, 2}, {3, 4}}
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(0, 1, 3.0);
+    setCellValue(1, 1, 4.0);
+
+    EvalResult result = eval("=TRANSPOSE(A1:B2)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 2u);
+    EXPECT_EQ(result.getArrayCols(), 2u);
+
+    // Row 0: {1, 3}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 1).getNumber(), 3.0);
+    // Row 1: {2, 4}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 1).getNumber(), 4.0);
+}
+
 }  // namespace
 }  // namespace cells
