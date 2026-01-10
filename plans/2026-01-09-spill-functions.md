@@ -1,6 +1,6 @@
-Status: READY
+Status: COMPLETED
 Created At: 2026-01-09 19:40 UTC
-Updated At: 2026-01-10 19:35 UTC
+Updated At: 2026-01-10 20:10 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -306,9 +306,14 @@ UI layer only renders based on spill data queried from C++ via WASM bindings.
   - Very large spill ranges → added MAX_SPILL_CELLS limit (1,000,000 cells)
   - Added tests: SpillSizeLimitExceeded, SpillSizeJustUnderLimit
 
-- [ ] 9c: Documentation
-  - Add spill functions to any function documentation
-  - Document the `#` operator
+- [x] 9c: Documentation
+  - Updated docs/formula-engine.md implementation status (now "Fully implemented")
+  - Added "Dynamic Arrays (Spill Behavior)" section documenting:
+    - Key behaviors and spill semantics
+    - Spill-capable functions (UNIQUE, SORT, FILTER, SEQUENCE, TRANSPOSE)
+    - The `#` spill range operator with examples
+    - Spill blocking conditions
+    - Limits (MAX_SPILL_CELLS)
 
 ---
 

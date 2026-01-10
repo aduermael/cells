@@ -2,17 +2,16 @@
 
 ## Implementation Status
 
-**Current state (December 2024):** Not implemented.
+**Current state (January 2026):** Fully implemented.
 
 | Component | Status |
 |-----------|--------|
-| Lexer/Tokenizer | ❌ Not implemented |
-| AST Parser | ❌ Not implemented |
-| Execution Engine | ❌ Not implemented |
-| Dependency Graph | ❌ Not implemented |
-| Function Library | ❌ Not implemented |
-
-This document describes the planned architecture for the formula engine. The current implementation stores formula text in cells but does not evaluate them.
+| Lexer/Tokenizer | ✅ Implemented |
+| AST Parser | ✅ Implemented |
+| Execution Engine | ✅ Implemented |
+| Dependency Graph | ✅ Implemented |
+| Function Library | ✅ 60+ functions |
+| Dynamic Arrays (Spill) | ✅ Implemented |
 
 ---
 
@@ -164,6 +163,54 @@ When cell X changes:
 ### Circular Reference Detection
 
 DFS from each dependency to detect cycles. Flag as `#CIRCULAR` error.
+
+## Dynamic Arrays (Spill Behavior)
+
+Excel-compatible dynamic array functionality where formulas can return multiple values that automatically "spill" into neighboring cells.
+
+### Key Behaviors
+
+- Formula results that return arrays automatically populate adjacent cells
+- Only the "master cell" (top-left) contains the actual formula
+- Spilled cells show the formula grayed out in the formula bar (non-editable)
+- If any cell in the spill range is blocked (has data), show `#SPILL!` error
+- Selecting any cell in the spill range highlights the entire spill boundary
+- Spilled values are runtime-only (not persisted) - recomputed on recalculation
+
+### Spill-Capable Functions
+
+| Function | Description | Example |
+|----------|-------------|---------|
+| UNIQUE | Extract unique values | `=UNIQUE(A1:A10)` |
+| SORT | Sort array by column | `=SORT(A1:B10,1,-1)` |
+| FILTER | Filter rows by criteria | `=FILTER(A1:B10,A1:A10>50)` |
+| SEQUENCE | Generate number sequence | `=SEQUENCE(5,3,1,1)` |
+| TRANSPOSE | Flip rows/columns | `=TRANSPOSE(A1:C3)` |
+
+### Spill Range Operator (#)
+
+The `#` operator references the entire spill range of a cell:
+
+```
+=SUM(A1#)     // Sum all spilled values starting from A1
+=AVERAGE(D2#) // Average of spill range at D2
+```
+
+This is useful for referencing dynamic arrays whose size may change.
+
+### Spill Blocking
+
+A spill is blocked when the target cells contain:
+- Existing values (non-empty cells)
+- Other formulas
+- Spilled values from a different formula
+
+When blocked, the master cell displays `#SPILL!` error.
+
+### Limits
+
+- Maximum spill size: 1,000,000 cells (prevents performance issues)
+- Circular spill dependencies are detected and show `#CIRCULAR!` error
 
 ## Performance Optimizations
 
