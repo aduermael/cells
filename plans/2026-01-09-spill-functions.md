@@ -299,11 +299,12 @@ UI layer only renders based on spill data queried from C++ via WASM bindings.
   - Added tests: DisplayConversion_SpillRangeRef, DisplayConversion_SpillRangeRefAbsolute, DisplayConversion_SpillRangeInFunction
   - Added spill range refs to round-trip test suite
 
-- [ ] 9b: Handle edge cases
-  - Spill into merged cells → #SPILL!
-  - Spill across sheet boundaries → truncate at edge
-  - Circular spill dependencies → detect and error
-  - Very large spill ranges → performance limits?
+- [x] 9b: Handle edge cases
+  - Spill into merged cells → #SPILL! (N/A: merged cells not implemented)
+  - Spill across sheet boundaries → auto-extend (columns/rows created as needed)
+  - Circular spill dependencies → already handled by formula circular reference detection
+  - Very large spill ranges → added MAX_SPILL_CELLS limit (1,000,000 cells)
+  - Added tests: SpillSizeLimitExceeded, SpillSizeJustUnderLimit
 
 - [ ] 9c: Documentation
   - Add spill functions to any function documentation

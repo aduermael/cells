@@ -535,6 +535,16 @@ void processSpill(Sheet* sheet, Cell* masterCell, const EvalResult& result) {
         return;
     }
 
+    // Check spill size limit to prevent performance issues
+    const size_t totalCells = arrayRows * arrayCols;
+    if (totalCells > MAX_SPILL_CELLS) {
+        // Too large - set master to #SPILL! error
+        sheet->clearSpillRange(masterCell->id);
+        masterCell->value = CellValue(CellError::SPILL);
+        masterCell->value.type = CellValueType::FORMULA_ERROR;
+        return;
+    }
+
     // Calculate spill positions (excludes master cell)
     const std::vector<std::pair<ID, ID>> spillPositions =
         calculateSpillRange(sheet, masterCell, arrayRows, arrayCols);

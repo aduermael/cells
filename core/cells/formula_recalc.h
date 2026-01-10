@@ -85,6 +85,11 @@ std::vector<ID> getDirtyCells(Sheet* sheet);
 // formula produces multiple values that populate neighboring cells automatically.
 // =============================================================================
 
+// Maximum number of cells that can be spilled by a single formula
+// This prevents runaway spill operations that could impact performance
+// Matches Excel's practical limit of ~1 million cells
+constexpr size_t MAX_SPILL_CELLS = 1000000;
+
 // Calculate the positions where an array result would spill
 // Returns vector of (colId, rowId) pairs for each spilled position (excludes master)
 // Creates new columns/rows if needed to accommodate the spill
