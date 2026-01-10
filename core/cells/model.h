@@ -170,6 +170,34 @@ struct Formula {
     [[nodiscard]] bool hasVolatile() const;
 };
 
+// Cell flags for runtime state tracking (not persisted)
+// Combines shared formula and spill state in a single byte
+enum class CellFlags : uint8_t {
+    NONE = 0,
+    SHARED_FORMULA_MASTER = 1 << 0,      // bit 0: This cell is a shared formula master
+    SHARED_FORMULA_SUBSCRIBER = 1 << 1,  // bit 1: This cell subscribes to another's formula
+    SPILL_MASTER = 1 << 2,               // bit 2: This cell is a spill range master
+    SPILLED_FROM = 1 << 3,               // bit 3: This position has spilled data
+    // bits 4-7: reserved for future use
+};
+
+// Bitwise operators for CellFlags
+inline CellFlags operator|(CellFlags a, CellFlags b) {
+    return static_cast<CellFlags>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+}
+inline CellFlags operator&(CellFlags a, CellFlags b) {
+    return static_cast<CellFlags>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
+}
+inline CellFlags operator~(CellFlags a) { return static_cast<CellFlags>(~static_cast<uint8_t>(a)); }
+inline CellFlags& operator|=(CellFlags& a, CellFlags b) {
+    a = a | b;
+    return a;
+}
+inline CellFlags& operator&=(CellFlags& a, CellFlags b) {
+    a = a & b;
+    return a;
+}
+
 // Cell - fundamental unit of data
 // Either a direct value OR a formula with cached result
 struct Cell {
@@ -221,9 +249,25 @@ struct Cell {
     // Clear formula, making this a value cell
     void clearFormula();
 
+    // ========================================================================
+    // Flag helpers (for runtime state)
+    // ========================================================================
+
+    // Check if a flag is set
+    [[nodiscard]] bool hasFlag(CellFlags flag) const;
+
+    // Set a flag
+    void setFlag(CellFlags flag);
+
+    // Clear a flag
+    void clearFlag(CellFlags flag);
+
+    // Get all flags (for debugging/testing)
+    [[nodiscard]] uint8_t getFlags() const { return _flags; }
+
 private:
-    // Track if this cell is a shared formula master (has subscribers)
-    bool _isSharedFormulaMaster = false;
+    // Runtime flags (not persisted) - combines multiple bool fields
+    uint8_t _flags = 0;
     friend struct SharedFormulaGroup;
 };
 

@@ -206,7 +206,7 @@ bit 3: isSpilledFrom
 bits 4-7: reserved for future use
 ```
 
-- [ ] 7a: Add `uint8_t _flags` field to Cell
+- [x] 7a: Add `uint8_t _flags` field to Cell
   - Replace `bool _isSharedFormulaMaster` with flag bit
   - Add helper methods: `setFlag()`, `clearFlag()`, `hasFlag()`
   - Add public accessors that use flags internally

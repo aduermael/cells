@@ -196,10 +196,10 @@ Cell::Cell(Cell&& other) noexcept
       value(std::move(other.value)),
       formula(other.formula),
       sharedFormulaRef(other.sharedFormulaRef),
-      _isSharedFormulaMaster(other._isSharedFormulaMaster) {
+      _flags(other._flags) {
     other.formula = nullptr;
     other.sharedFormulaRef = nullptr;
-    other._isSharedFormulaMaster = false;
+    other._flags = 0;
 }
 
 Cell& Cell::operator=(Cell&& other) noexcept {
@@ -214,10 +214,10 @@ Cell& Cell::operator=(Cell&& other) noexcept {
         value = std::move(other.value);
         formula = other.formula;
         sharedFormulaRef = other.sharedFormulaRef;
-        _isSharedFormulaMaster = other._isSharedFormulaMaster;
+        _flags = other._flags;
         other.formula = nullptr;
         other.sharedFormulaRef = nullptr;
-        other._isSharedFormulaMaster = false;
+        other._flags = 0;
     }
     return *this;
 }
@@ -231,7 +231,7 @@ bool Cell::isSharedFormula() const {
 }
 
 bool Cell::isSharedFormulaMaster() const {
-    return _isSharedFormulaMaster;
+    return hasFlag(CellFlags::SHARED_FORMULA_MASTER);
 }
 
 bool Cell::hasError() const {
@@ -260,7 +260,7 @@ void Cell::setSharedFormulaRef(Cell* master) {
     sharedFormulaRef = master;
     if (master != nullptr) {
         value.type = CellValueType::FORMULA;
-        master->_isSharedFormulaMaster = true;
+        master->setFlag(CellFlags::SHARED_FORMULA_MASTER);
     }
 }
 
@@ -271,7 +271,19 @@ void Cell::clearFormula() {
     }
     formula = nullptr;
     sharedFormulaRef = nullptr;
-    // Note: _isSharedFormulaMaster is managed by SharedFormulaGroup
+    // Note: SHARED_FORMULA_MASTER flag is managed by SharedFormulaGroup
+}
+
+bool Cell::hasFlag(CellFlags flag) const {
+    return (static_cast<uint8_t>(_flags) & static_cast<uint8_t>(flag)) != 0;
+}
+
+void Cell::setFlag(CellFlags flag) {
+    _flags |= static_cast<uint8_t>(flag);
+}
+
+void Cell::clearFlag(CellFlags flag) {
+    _flags &= ~static_cast<uint8_t>(flag);
 }
 
 // ============================================================================
@@ -302,7 +314,7 @@ void SharedFormulaGroup::removeSubscriber(Cell* cell) {
 
     // Update master's flag if no more subscribers
     if (master != nullptr && subscribers.empty()) {
-        master->_isSharedFormulaMaster = false;
+        master->clearFlag(CellFlags::SHARED_FORMULA_MASTER);
     }
 }
 
@@ -310,7 +322,7 @@ Cell* SharedFormulaGroup::promoteMaster() {
     if (subscribers.empty()) {
         // No subscribers, group becomes empty
         if (master != nullptr) {
-            master->_isSharedFormulaMaster = false;
+            master->clearFlag(CellFlags::SHARED_FORMULA_MASTER);
         }
         master = nullptr;
         return nullptr;
@@ -354,9 +366,13 @@ Cell* SharedFormulaGroup::promoteMaster() {
 
     // Update master flags
     if (master != nullptr) {
-        master->_isSharedFormulaMaster = false;
+        master->clearFlag(CellFlags::SHARED_FORMULA_MASTER);
     }
-    newMaster->_isSharedFormulaMaster = !subscribers.empty();
+    if (!subscribers.empty()) {
+        newMaster->setFlag(CellFlags::SHARED_FORMULA_MASTER);
+    } else {
+        newMaster->clearFlag(CellFlags::SHARED_FORMULA_MASTER);
+    }
 
     master = newMaster;
     return newMaster;
