@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2026-01-09 19:40 UTC
-Updated At: 2026-01-10 04:37 UTC
+Updated At: 2026-01-10 18:03 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -187,26 +187,79 @@ First spill-capable function as proof of concept.
 
 ---
 
-## Phase 7: UI Rendering (TypeScript)
+## Phase 7: Unify Cell Flags (Structural Refactor)
+
+Unify shared formula and spill tracking by moving shared formula relationships to Sheet level (like spill) and adding a flags byte to Cell for fast runtime checks.
+
+**Rationale:**
+- Currently `_spillMasters`/`_spilledFrom` are at Sheet level (good)
+- But `sharedFormulaRef`/`_isSharedFormulaMaster` are at Cell level (increases Cell size)
+- A pointer (`Cell* sharedFormulaRef`) adds 8 bytes to every Cell
+- Moving to Sheet-level maps + a flags byte reduces memory and unifies architecture
+
+**Flags byte layout (runtime-only, not persisted):**
+```
+bit 0: isSharedFormulaMaster
+bit 1: isSharedFormulaSubscriber
+bit 2: isSpillMaster
+bit 3: isSpilledFrom
+bits 4-7: reserved for future use
+```
+
+- [ ] 7a: Add `uint8_t _flags` field to Cell
+  - Replace `bool _isSharedFormulaMaster` with flag bit
+  - Add helper methods: `setFlag()`, `clearFlag()`, `hasFlag()`
+  - Add public accessors that use flags internally
+
+- [ ] 7b: Add shared formula tracking to Sheet
+  - Add `_sharedFormulaMasters`: map masterId → SharedFormulaInfo
+  - Add `_sharedFormulaFrom`: map subscriberId → masterId
+  - Similar structure to `_spillMasters`/`_spilledFrom`
+
+- [ ] 7c: Remove `sharedFormulaRef` pointer from Cell
+  - Update `Cell::getFormula()` to look up master via Sheet
+  - Update `Cell::isSharedFormula()` to check flag + Sheet map
+  - Update `Cell::setSharedFormulaRef()` to use Sheet methods
+  - Update `SharedFormulaGroup` to use Sheet-level storage
+
+- [ ] 7d: Add spill flags to runtime tracking
+  - When registering spill range, set `isSpillMaster` flag on master cell
+  - When populating spilled positions, set `isSpilledFrom` flag (for virtual cells, track in map only)
+  - Flags allow O(1) check "is this cell involved in spill?" before map lookup
+
+- [ ] 7e: Update serialization
+  - Flags are runtime-only, not persisted to ZCD
+  - On load: rebuild flags from relationships (shared formula refs, spill recalc)
+  - Ensure XLSX reader/writer still works with new structure
+
+- [ ] 7f: Update tests
+  - Verify Cell size reduction
+  - Test shared formula behavior unchanged
+  - Test spill behavior unchanged
+  - Test flag consistency after operations
+
+---
+
+## Phase 8: UI Rendering (TypeScript)
 
 UI layer only renders based on spill data queried from C++ via WASM bindings.
 
-- [ ] 7a: Highlight spill range on cell selection
+- [ ] 8a: Highlight spill range on cell selection
   - Call `getSpillRangeForCell()` from C++ to get spill bounds
   - If cell is part of a spill range, draw border around entire range
   - Use a distinct color (e.g., blue border like Excel)
 
-- [ ] 7b: Gray out formula bar for spilled cells
+- [ ] 8b: Gray out formula bar for spilled cells
   - Check `isSpilled` flag from `getCell()` response (from C++)
   - If spilled (non-master): show master's formula grayed out, disable editing
   - If master: normal editable behavior
 
-- [ ] 7c: Prevent editing spilled cells
+- [ ] 8c: Prevent editing spilled cells
   - Check `isSpilled` flag before allowing edit
   - If user tries to type in spilled cell, show message
   - Deleting master cell clears entire spill (handled in C++)
 
-- [ ] 7d: Add E2E tests for spill UI behavior
+- [ ] 8d: Add E2E tests for spill UI behavior
   - Test spill range highlighting
   - Test formula bar ghosting
   - Test edit prevention
@@ -214,19 +267,19 @@ UI layer only renders based on spill data queried from C++ via WASM bindings.
 
 ---
 
-## Phase 8: Integration & Polish
+## Phase 9: Integration & Polish
 
-- [ ] 8a: Update formula display for spill references
+- [ ] 9a: Update formula display for spill references
   - FormulaDisplayConverter handles SpillRangeRefNode
   - Display as `A1#` in formula bar
 
-- [ ] 8b: Handle edge cases
+- [ ] 9b: Handle edge cases
   - Spill into merged cells → #SPILL!
   - Spill across sheet boundaries → truncate at edge
   - Circular spill dependencies → detect and error
   - Very large spill ranges → performance limits?
 
-- [ ] 8c: Documentation
+- [ ] 9c: Documentation
   - Add spill functions to any function documentation
   - Document the `#` operator
 
