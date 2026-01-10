@@ -263,14 +263,19 @@ UI layer only renders based on spill data queried from C++ via WASM bindings.
   - Added `drawSpillRangeHighlight()` function in grid-selection-renderer.ts
   - Selection change triggers async spill range query and updates highlight
 
-- [ ] 8b: Gray out formula bar for spilled cells
-  - Check `isSpilled` flag from `getCell()` response (from C++)
-  - If spilled (non-master): show master's formula grayed out, disable editing
-  - If master: normal editable behavior
+- [x] 8b: Gray out formula bar for spilled cells
+  - Added `masterFormula` to viewport query response for spilled cells
+  - Added `isSpilled`, `isSpillMaster`, `spillMasterId`, `masterFormula` to CellData type
+  - Formula bar shows master formula when spilled cell is selected
+  - Added `.spilled-cell` CSS class with grayed out styling
+  - Formula highlights work for spilled cells (shows master's references)
 
-- [ ] 8c: Prevent editing spilled cells
-  - Check `isSpilled` flag before allowing edit
-  - If user tries to type in spilled cell, show message
+- [x] 8c: Prevent editing spilled cells
+  - Added `getCellDataAt` callback to CellEditor for checking spill status
+  - Added `isSelectedCellSpilled()` method to CellEditor
+  - `startEditing()` returns early if selected cell is spilled
+  - `deleteRangeCells()` skips spilled cells (can't delete non-master cells)
+  - Formula bar uses `pointer-events: none` via CSS for spilled cells
   - Deleting master cell clears entire spill (handled in C++)
 
 - [ ] 8d: Add E2E tests for spill UI behavior

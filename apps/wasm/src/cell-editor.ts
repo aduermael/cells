@@ -34,7 +34,7 @@ import {
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
 } from "./grid-renderer";
-import type { Position, SheetInfo } from "./types";
+import type { Position, SheetInfo, CellData } from "./types";
 import type { FormulaHighlight } from "./grid-constants";
 import { getNormalizedRange } from "./grid-utils";
 import {
@@ -116,6 +116,7 @@ export class CellEditor {
   private getScrollY: () => number;
   private getFormulaHighlights: () => FormulaHighlight[];
   private getDiscoveredRows: () => number;
+  private getCellDataAt: (col: number, row: number) => CellData | null;
 
   // =========================================================================
   // Callbacks
@@ -154,6 +155,7 @@ export class CellEditor {
     getScrollY: () => number;
     getFormulaHighlights: () => FormulaHighlight[];
     getDiscoveredRows: () => number;
+    getCellDataAt: (col: number, row: number) => CellData | null;
     onFetchViewport: () => Promise<void>;
     onRender: () => void;
     onUpdateFormulaBar: () => void;
@@ -178,6 +180,7 @@ export class CellEditor {
     this.getScrollY = config.getScrollY;
     this.getFormulaHighlights = config.getFormulaHighlights;
     this.getDiscoveredRows = config.getDiscoveredRows;
+    this.getCellDataAt = config.getCellDataAt;
     this.onFetchViewport = config.onFetchViewport;
     this.onRender = config.onRender;
     this.onUpdateFormulaBar = config.onUpdateFormulaBar;
@@ -252,6 +255,17 @@ export class CellEditor {
 
   isEditing(): boolean {
     return this.uiStateMachine.isInState("CELL_EDITING");
+  }
+
+  /**
+   * Check if the selected cell is a spilled cell (non-master cell in a spill range).
+   * Spilled cells cannot be edited directly.
+   */
+  isSelectedCellSpilled(): boolean {
+    const selectedCell = this.getSelectedCell();
+    if (!selectedCell) return false;
+    const cellData = this.getCellDataAt(selectedCell.col, selectedCell.row);
+    return cellData?.isSpilled === true;
   }
 
   /**
@@ -415,6 +429,9 @@ export class CellEditor {
     const { focusCellEditor = true, mode = "select", initialChar = "" } = options;
     const selectedCell = this.getSelectedCell();
     if (!selectedCell || this.isEditing() || !this.dataSource) return;
+
+    // Prevent editing spilled cells (non-master cells in a spill range)
+    if (this.isSelectedCellSpilled()) return;
 
     // Get or create cell - single call returns ID and value
     let cellId: string | null = null;
@@ -592,7 +609,8 @@ export class CellEditor {
   }
 
   /**
-   * Delete all cells in the current range selection
+   * Delete all cells in the current range selection.
+   * Skips spilled cells (non-master cells in a spill range).
    */
   async deleteRangeCells(): Promise<void> {
     if (!this.dataSource) return;
@@ -607,6 +625,9 @@ export class CellEditor {
       // Delete cells at each position - deleteCellAt is a no-op if cell doesn't exist
       for (let col = range.minCol; col <= range.maxCol; col++) {
         for (let row = range.minRow; row <= range.maxRow; row++) {
+          // Skip spilled cells - they can't be deleted directly
+          const cellData = this.getCellDataAt(col, row);
+          if (cellData?.isSpilled) continue;
           await this.dataSource.deleteCellAt(col, row);
         }
       }

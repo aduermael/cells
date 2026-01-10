@@ -940,6 +940,7 @@ canvas {
 #formula-display.spilled-cell {
     color: var(--color-text-disabled);
     cursor: default;
+    pointer-events: none;
 }
 
 /* Formula reference colors in text */

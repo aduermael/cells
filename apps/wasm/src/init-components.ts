@@ -575,6 +575,7 @@ export function createComponents(config: ComponentsConfig): Components {
     getScrollY: () => app.scrollY,
     getFormulaHighlights: () => app.formulaHighlights,
     getDiscoveredRows: () => app.discoveredRows,
+    getCellDataAt: (col, row) => getCellAt(col, row, app.cells) ?? null,
     onFetchViewport: fetchViewport,
     onRender: render,
     onUpdateFormulaBar: updateFormulaBar,
