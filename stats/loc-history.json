@@ -1,161 +1,187 @@
 {
-  "generated": "2026-01-09T23:54:48Z",
+  "generated": "2026-01-10T02:28:07Z",
   "history": [
     {
       "date": "2025-12-15",
       "commit": "3c73535",
-      "productTotal": 3003,
-      "testTotal": 0
+      "productTotal": 0,
+      "testTotal": 0,
+      "docsTotal": 3003
     },
     {
       "date": "2025-12-16",
       "commit": "8850484",
-      "productTotal": 4942,
-      "testTotal": 0
+      "productTotal": 465,
+      "testTotal": 0,
+      "docsTotal": 4477
     },
     {
       "date": "2025-12-17",
       "commit": "18fef3b",
-      "productTotal": 4955,
-      "testTotal": 2254
+      "productTotal": 3040,
+      "testTotal": 2254,
+      "docsTotal": 1915
     },
     {
       "date": "2025-12-18",
       "commit": "1d979b2",
-      "productTotal": 7501,
-      "testTotal": 3437
+      "productTotal": 5233,
+      "testTotal": 3437,
+      "docsTotal": 2268
     },
     {
       "date": "2025-12-19",
       "commit": "62decb8",
-      "productTotal": 12870,
-      "testTotal": 4018
+      "productTotal": 9606,
+      "testTotal": 4018,
+      "docsTotal": 3264
     },
     {
       "date": "2025-12-20",
       "commit": "1044aeb",
-      "productTotal": 22654,
-      "testTotal": 5400
+      "productTotal": 18040,
+      "testTotal": 5400,
+      "docsTotal": 4614
     },
     {
       "date": "2025-12-21",
       "commit": "315985a",
-      "productTotal": 23391,
-      "testTotal": 5412
+      "productTotal": 18297,
+      "testTotal": 5412,
+      "docsTotal": 5094
     },
     {
       "date": "2025-12-22",
       "commit": "f8931d3",
-      "productTotal": 30770,
-      "testTotal": 6559
+      "productTotal": 24949,
+      "testTotal": 6559,
+      "docsTotal": 5821
     },
     {
       "date": "2025-12-23",
       "commit": "cbef867",
-      "productTotal": 30352,
-      "testTotal": 6559
+      "productTotal": 24382,
+      "testTotal": 6559,
+      "docsTotal": 5970
     },
     {
       "date": "2025-12-24",
       "commit": "046771f",
-      "productTotal": 36744,
-      "testTotal": 7546
+      "productTotal": 30015,
+      "testTotal": 7546,
+      "docsTotal": 6729
     },
     {
       "date": "2025-12-25",
       "commit": "c08bfea",
-      "productTotal": 45394,
-      "testTotal": 16085
+      "productTotal": 37182,
+      "testTotal": 16085,
+      "docsTotal": 8212
     },
     {
       "date": "2025-12-26",
       "commit": "09394ec",
-      "productTotal": 47891,
-      "testTotal": 16146
+      "productTotal": 39448,
+      "testTotal": 16146,
+      "docsTotal": 8443
     },
     {
       "date": "2025-12-27",
       "commit": "87f073e",
-      "productTotal": 49921,
-      "testTotal": 16786
+      "productTotal": 41291,
+      "testTotal": 16786,
+      "docsTotal": 8630
     },
     {
       "date": "2025-12-28",
       "commit": "88f9f32",
-      "productTotal": 50449,
-      "testTotal": 17137
+      "productTotal": 41712,
+      "testTotal": 17137,
+      "docsTotal": 8737
     },
     {
       "date": "2025-12-29",
       "commit": "3d8e9bb",
-      "productTotal": 53199,
-      "testTotal": 19028
+      "productTotal": 44128,
+      "testTotal": 19028,
+      "docsTotal": 9071
     },
     {
       "date": "2025-12-30",
       "commit": "b160f2f",
-      "productTotal": 57001,
-      "testTotal": 20401
+      "productTotal": 47307,
+      "testTotal": 20401,
+      "docsTotal": 9694
     },
     {
       "date": "2025-12-31",
       "commit": "f3ae0e4",
-      "productTotal": 59184,
-      "testTotal": 21609
+      "productTotal": 48992,
+      "testTotal": 21609,
+      "docsTotal": 10192
     },
     {
       "date": "2026-01-01",
       "commit": "8a15b91",
-      "productTotal": 61297,
-      "testTotal": 22549
+      "productTotal": 50443,
+      "testTotal": 22549,
+      "docsTotal": 10854
     },
     {
       "date": "2026-01-02",
       "commit": "e78e3cd",
-      "productTotal": 66125,
-      "testTotal": 23661
+      "productTotal": 55026,
+      "testTotal": 23661,
+      "docsTotal": 11099
     },
     {
       "date": "2026-01-03",
       "commit": "ab8baa2",
-      "productTotal": 67211,
-      "testTotal": 24227
+      "productTotal": 55693,
+      "testTotal": 24227,
+      "docsTotal": 11518
     },
     {
       "date": "2026-01-04",
       "commit": "321eca6",
-      "productTotal": 67387,
-      "testTotal": 24533
+      "productTotal": 55840,
+      "testTotal": 24533,
+      "docsTotal": 11547
     },
     {
       "date": "2026-01-05",
       "commit": "4b81391",
-      "productTotal": 67739,
-      "testTotal": 24875
+      "productTotal": 55986,
+      "testTotal": 24875,
+      "docsTotal": 11753
     },
     {
       "date": "2026-01-06",
       "commit": "96bfd80",
-      "productTotal": 68416,
-      "testTotal": 25342
+      "productTotal": 56483,
+      "testTotal": 25342,
+      "docsTotal": 11933
     },
     {
       "date": "2026-01-07",
       "commit": "9d4579d",
-      "productTotal": 69997,
-      "testTotal": 26809
+      "productTotal": 57851,
+      "testTotal": 26809,
+      "docsTotal": 12146
     },
     {
       "date": "2026-01-08",
       "commit": "b202998",
-      "productTotal": 72459,
-      "testTotal": 27176
+      "productTotal": 59569,
+      "testTotal": 27176,
+      "docsTotal": 12890
     },
     {
       "date": "2026-01-09",
-      "commit": "ddb7da2",
-      "productTotal": 76077,
-      "testTotal": 28797
+      "commit": "f389756",
+      "productTotal": 63499,
+      "testTotal": 28797,
+      "docsTotal": 13074
     }
   ]
 }
