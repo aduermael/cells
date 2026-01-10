@@ -47,6 +47,13 @@ EvalResult fn_SORT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // if_empty: Value to return if all rows/columns are filtered out
 EvalResult fn_FILTER(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// SEQUENCE(rows, [cols], [start], [step]) - Generates a sequence of numbers
+// rows: Number of rows to generate
+// cols: Number of columns to generate (default: 1)
+// start: Starting value (default: 1)
+// step: Increment between values (default: 1)
+EvalResult fn_SEQUENCE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // Forward declaration
 class FunctionRegistry;
 

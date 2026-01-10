@@ -676,6 +676,73 @@ EvalResult fn_FILTER(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     return EvalResult::Array(std::move(result));
 }
 
+EvalResult fn_SEQUENCE(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    // Validate arguments: SEQUENCE(rows, [cols], [start], [step])
+    if (args.empty() || args.size() > 4) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    // Evaluate rows argument (required)
+    EvalResult rowsResult = evaluateAsNumber(args[0], ctx);
+    if (rowsResult.isError()) {
+        return rowsResult;
+    }
+    int rows = static_cast<int>(rowsResult.getNumber());
+    if (rows < 1) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    // Evaluate cols argument (default: 1)
+    int cols = 1;
+    if (args.size() >= 2) {
+        EvalResult colsResult = evaluateAsNumber(args[1], ctx);
+        if (colsResult.isError()) {
+            return colsResult;
+        }
+        cols = static_cast<int>(colsResult.getNumber());
+        if (cols < 1) {
+            return EvalResult::Error(CellError::VALUE);
+        }
+    }
+
+    // Evaluate start argument (default: 1)
+    double start = 1.0;
+    if (args.size() >= 3) {
+        EvalResult startResult = evaluateAsNumber(args[2], ctx);
+        if (startResult.isError()) {
+            return startResult;
+        }
+        start = startResult.getNumber();
+    }
+
+    // Evaluate step argument (default: 1)
+    double step = 1.0;
+    if (args.size() >= 4) {
+        EvalResult stepResult = evaluateAsNumber(args[3], ctx);
+        if (stepResult.isError()) {
+            return stepResult;
+        }
+        step = stepResult.getNumber();
+    }
+
+    // Generate the sequence
+    std::vector<std::vector<EvalResult>> result;
+    result.reserve(static_cast<size_t>(rows));
+
+    double value = start;
+    for (int r = 0; r < rows; ++r) {
+        std::vector<EvalResult> row;
+        row.reserve(static_cast<size_t>(cols));
+        for (int c = 0; c < cols; ++c) {
+            row.push_back(EvalResult::Number(value));
+            value += step;
+        }
+        result.push_back(std::move(row));
+    }
+
+    return EvalResult::Array(std::move(result));
+}
+
 void registerArrayFunctions(FunctionRegistry& registry) {
     registry.registerFunction("UNIQUE", fn_UNIQUE, "(array, [by_col], [exactly_once])",
                               "Returns unique values from a range", "Array");
@@ -683,6 +750,8 @@ void registerArrayFunctions(FunctionRegistry& registry) {
                               "Sorts a range of data", "Array");
     registry.registerFunction("FILTER", fn_FILTER, "(array, include, [if_empty])",
                               "Filters a range based on criteria", "Array");
+    registry.registerFunction("SEQUENCE", fn_SEQUENCE, "(rows, [cols], [start], [step])",
+                              "Generates a sequence of numbers", "Array");
 }
 
 }  // namespace cells

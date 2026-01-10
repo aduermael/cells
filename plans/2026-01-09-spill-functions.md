@@ -144,7 +144,7 @@ First spill-capable function as proof of concept.
   - Signature: `FILTER(array, include, [if_empty])`
   - Returns filtered rows/columns matching criteria (spills)
 
-- [ ] 4c: Implement SEQUENCE function
+- [x] 4c: Implement SEQUENCE function
   - Signature: `SEQUENCE(rows, [cols], [start], [step])`
   - Returns generated number sequence (spills)
 

@@ -838,5 +838,140 @@ TEST_F(FnArrayTest, FilterSingleCellFalse) {
     EXPECT_EQ(result.getError(), CellError::CALC);
 }
 
+// =============================================================================
+// SEQUENCE Tests - Basic functionality
+// =============================================================================
+
+TEST_F(FnArrayTest, SequenceBasicSingleColumn) {
+    EvalResult result = eval("=SEQUENCE(5)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 5u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+
+    // Should return {1, 2, 3, 4, 5}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(3, 0).getNumber(), 4.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(4, 0).getNumber(), 5.0);
+}
+
+TEST_F(FnArrayTest, SequenceRowsAndCols) {
+    EvalResult result = eval("=SEQUENCE(3,4)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);
+    EXPECT_EQ(result.getArrayCols(), 4u);
+
+    // Should return {{1,2,3,4}, {5,6,7,8}, {9,10,11,12}}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 1).getNumber(), 2.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 2).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 3).getNumber(), 4.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 5.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 1).getNumber(), 6.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 2).getNumber(), 7.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 3).getNumber(), 8.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 9.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 1).getNumber(), 10.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 2).getNumber(), 11.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 3).getNumber(), 12.0);
+}
+
+TEST_F(FnArrayTest, SequenceCustomStart) {
+    EvalResult result = eval("=SEQUENCE(3,1,10)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+
+    // Should return {10, 11, 12}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 10.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 11.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 12.0);
+}
+
+TEST_F(FnArrayTest, SequenceCustomStep) {
+    EvalResult result = eval("=SEQUENCE(4,1,0,5)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 4u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+
+    // Should return {0, 5, 10, 15}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 0.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 5.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 10.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(3, 0).getNumber(), 15.0);
+}
+
+TEST_F(FnArrayTest, SequenceNegativeStep) {
+    EvalResult result = eval("=SEQUENCE(5,1,10,-2)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 5u);
+
+    // Should return {10, 8, 6, 4, 2}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 10.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 8.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 6.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(3, 0).getNumber(), 4.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(4, 0).getNumber(), 2.0);
+}
+
+TEST_F(FnArrayTest, SequenceFractionalStep) {
+    EvalResult result = eval("=SEQUENCE(4,1,0,0.5)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 4u);
+
+    // Should return {0, 0.5, 1, 1.5}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 0.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 0.5);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(3, 0).getNumber(), 1.5);
+}
+
+// =============================================================================
+// SEQUENCE Tests - Error cases
+// =============================================================================
+
+TEST_F(FnArrayTest, SequenceNoArgs) {
+    EvalResult result = eval("=SEQUENCE()");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, SequenceTooManyArgs) {
+    EvalResult result = eval("=SEQUENCE(1,1,1,1,1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, SequenceZeroRows) {
+    EvalResult result = eval("=SEQUENCE(0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, SequenceNegativeRows) {
+    EvalResult result = eval("=SEQUENCE(-5)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, SequenceZeroCols) {
+    EvalResult result = eval("=SEQUENCE(5,0)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// SEQUENCE Tests - Single cell
+// =============================================================================
+
+TEST_F(FnArrayTest, SequenceSingleCell) {
+    EvalResult result = eval("=SEQUENCE(1,1,42)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 42.0);
+}
+
 }  // namespace
 }  // namespace cells
