@@ -79,6 +79,7 @@ enum class TokenType : std::uint8_t {
     COLON,   // :
     BANG,    // !
     DOLLAR,  // $
+    HASH,    // # (spill range operator, e.g., A1#)
 
     // Error token (for invalid input)
     ERROR,

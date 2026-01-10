@@ -158,9 +158,9 @@ First spill-capable function as proof of concept.
 
 ## Phase 5: Spill Range Operator (#)
 
-- [ ] 5a: Add `#` operator to formula lexer
+- [x] 5a: Add `#` operator to formula lexer
   - Recognize `A1#` as spill range reference
-  - New token type: `SPILL_REF`
+  - New token type: `HASH`
 
 - [ ] 5b: Add SpillRangeRef AST node
   - `SpillRangeRefNode { CellRefNode* anchor }`

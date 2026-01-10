@@ -469,6 +469,14 @@ TEST(FormulaLexerTest, PunctuationDollar) {
     EXPECT_EQ(tok.type, TokenType::DOLLAR);
 }
 
+TEST(FormulaLexerTest, PunctuationHash) {
+    // # not followed by $ or ~ is a standalone HASH token (spill operator)
+    FormulaLexer lexer("#");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::HASH);
+    EXPECT_EQ(tok.text, "#");
+}
+
 // ============================================================================
 // Identifier Token Tests
 // ============================================================================
@@ -702,6 +710,7 @@ TEST(FormulaLexerTest, TokenTypeName) {
     EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::IDENTIFIER), "IDENTIFIER");
     EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::COLUMN), "COLUMN");
     EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::PLUS), "PLUS");
+    EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::HASH), "HASH");
     EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::END_OF_INPUT), "END_OF_INPUT");
     EXPECT_STREQ(FormulaLexer::tokenTypeName(TokenType::ERROR), "ERROR");
 }
@@ -921,6 +930,61 @@ TEST(FormulaLexerTest, DollarSignStillWorksForA1) {
     EXPECT_EQ(tokens[0].type, TokenType::DOLLAR);
     EXPECT_EQ(tokens[1].type, TokenType::COLUMN);
     EXPECT_EQ(tokens[2].type, TokenType::NUMBER);
+}
+
+// ============================================================================
+// Spill Range Operator Tests
+// ============================================================================
+
+TEST(FormulaLexerTest, SpillRangeOperator) {
+    // A1# - cell reference followed by spill operator
+    FormulaLexer lexer("A1#");
+    auto tokens = lexer.tokenizeAll();
+    // A, 1, #, END
+    ASSERT_EQ(tokens.size(), 4u);
+    EXPECT_EQ(tokens[0].type, TokenType::COLUMN);
+    EXPECT_EQ(tokens[1].type, TokenType::NUMBER);
+    EXPECT_EQ(tokens[2].type, TokenType::HASH);
+}
+
+TEST(FormulaLexerTest, SpillRangeInFormula) {
+    // =SUM(A1#) - spill range in a function
+    FormulaLexer lexer("=SUM(A1#)");
+    auto tokens = lexer.tokenizeAll();
+    // =, SUM, (, A, 1, #, ), END
+    ASSERT_EQ(tokens.size(), 8u);
+    EXPECT_EQ(tokens[0].type, TokenType::EQUAL);
+    EXPECT_EQ(tokens[1].type, TokenType::IDENTIFIER);
+    EXPECT_EQ(tokens[2].type, TokenType::LPAREN);
+    EXPECT_EQ(tokens[3].type, TokenType::COLUMN);
+    EXPECT_EQ(tokens[4].type, TokenType::NUMBER);
+    EXPECT_EQ(tokens[5].type, TokenType::HASH);
+    EXPECT_EQ(tokens[6].type, TokenType::RPAREN);
+}
+
+TEST(FormulaLexerTest, SpillRangeWithAbsoluteRef) {
+    // $A$1# - absolute cell reference followed by spill operator
+    FormulaLexer lexer("$A$1#");
+    auto tokens = lexer.tokenizeAll();
+    // $, A, $, 1, #, END
+    ASSERT_EQ(tokens.size(), 6u);
+    EXPECT_EQ(tokens[0].type, TokenType::DOLLAR);
+    EXPECT_EQ(tokens[1].type, TokenType::COLUMN);
+    EXPECT_EQ(tokens[2].type, TokenType::DOLLAR);
+    EXPECT_EQ(tokens[3].type, TokenType::NUMBER);
+    EXPECT_EQ(tokens[4].type, TokenType::HASH);
+}
+
+TEST(FormulaLexerTest, HashVsUuidRowRef) {
+    // # followed by $ or ~ is UUID row ref, otherwise it's HASH
+    FormulaLexer lexer("#");
+    Token tok = lexer.nextToken();
+    EXPECT_EQ(tok.type, TokenType::HASH);
+
+    // But #$ is a UUID row ref prefix
+    FormulaLexer lexer2("#$row10001");
+    Token tok2 = lexer2.nextToken();
+    EXPECT_EQ(tok2.type, TokenType::UUID_ROW_REF);
 }
 
 }  // namespace

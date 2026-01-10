@@ -163,6 +163,8 @@ const char* FormulaLexer::tokenTypeName(TokenType type) {
             return "BANG";
         case TokenType::DOLLAR:
             return "DOLLAR";
+        case TokenType::HASH:
+            return "HASH";
         case TokenType::ERROR:
             return "ERROR";
     }
@@ -311,7 +313,8 @@ Token FormulaLexer::scanToken() {
                 advance();  // Consume second char
                 return scanUuidRowRef(start, absolute);
             }
-            return makeErrorToken("Unexpected character '#'", start);
+            // Otherwise it's the spill range operator (e.g., A1#)
+            return makeToken(TokenType::HASH, start);
         case '=':
             return makeToken(TokenType::EQUAL, start);
         case '<':
