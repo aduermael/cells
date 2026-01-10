@@ -3,15 +3,17 @@
 // =============================================================================
 //
 // Implementation of the core data model types: CellValue, Formula, Cell, Axis,
-// SharedFormulaGroup, and Workbook. Sheet implementation is in sheet.cc.
+// and Workbook. Sheet implementation is in sheet.cc.
 //
 // Key responsibilities:
 // - CellValue: Type-safe value storage with number/string/boolean/error conversions
 // - Formula: AST ownership and volatile function detection
 // - Cell: Value/formula cell management with shared formula support
 // - Axis: Column/row metadata (position, size)
-// - SharedFormulaGroup: Master/subscriber relationships for shared formulas
 // - Workbook: Top-level container with sheets, OpLog, and collaboration mode
+//
+// Shared formula master/subscriber relationships are managed at Sheet level
+// via SharedFormulaInfo and the _sharedFormulaMasters/_sharedFormulaFrom maps.
 //
 // Dependencies: types.h, operation.h, oplog.h, formula_ast.h
 // Used by: crdt.cc (applies operations), bindings.cc (WASM API), sheet.cc
@@ -274,115 +276,6 @@ void Cell::setFlag(CellFlags flag) {
 
 void Cell::clearFlag(CellFlags flag) {
     _flags &= ~static_cast<uint8_t>(flag);
-}
-
-// ============================================================================
-// SharedFormulaGroup
-// ============================================================================
-
-void SharedFormulaGroup::addSubscriber(Cell* cell) {
-    if (cell == nullptr || cell == master) {
-        return;
-    }
-
-    // Mark cell as a shared formula subscriber
-    cell->setSharedFormulaSubscriber(true);
-    subscribers.push_back(cell);
-
-    // Mark master as having subscribers
-    if (master != nullptr) {
-        master->setFlag(CellFlags::SHARED_FORMULA_MASTER);
-    }
-}
-
-void SharedFormulaGroup::removeSubscriber(Cell* cell) {
-    if (cell == nullptr) {
-        return;
-    }
-
-    // Find and remove from subscribers
-    auto it = std::find(subscribers.begin(), subscribers.end(), cell);
-    if (it != subscribers.end()) {
-        subscribers.erase(it);
-        cell->setSharedFormulaSubscriber(false);
-    }
-
-    // Update master's flag if no more subscribers
-    if (master != nullptr && subscribers.empty()) {
-        master->clearFlag(CellFlags::SHARED_FORMULA_MASTER);
-    }
-}
-
-Cell* SharedFormulaGroup::promoteMaster() {
-    if (subscribers.empty()) {
-        // No subscribers, group becomes empty
-        if (master != nullptr) {
-            master->clearFlag(CellFlags::SHARED_FORMULA_MASTER);
-        }
-        master = nullptr;
-        return nullptr;
-    }
-
-    // Sort subscribers alphabetically by UUID to get deterministic new master
-    // Use a temporary vector with (id_string, index) pairs to avoid pointer sorting
-    std::vector<std::pair<std::string, size_t>> sortedIndices;
-    sortedIndices.reserve(subscribers.size());
-    for (size_t i = 0; i < subscribers.size(); ++i) {
-        sortedIndices.emplace_back(subscribers[i]->id.toString(), i);
-    }
-    std::sort(sortedIndices.begin(), sortedIndices.end());
-
-    // Rebuild subscribers in sorted order
-    std::vector<Cell*> sortedSubscribers;
-    sortedSubscribers.reserve(subscribers.size());
-    for (const auto& [idStr, idx] : sortedIndices) {
-        sortedSubscribers.push_back(subscribers[idx]);
-    }
-    subscribers = std::move(sortedSubscribers);
-
-    // New master is first subscriber alphabetically
-    Cell* newMaster = subscribers.front();
-    subscribers.erase(subscribers.begin());
-
-    // Clone formula from old master to new master
-    if (master != nullptr && master->formula != nullptr) {
-        // New master gets its own copy of the formula
-        newMaster->clearFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
-        auto* newFormula = new Formula();
-        if (master->formula->ast != nullptr) {
-            newFormula->ast = master->formula->ast->clone().release();
-        }
-        newFormula->dirty = master->formula->dirty;
-        newMaster->formula = newFormula;
-    }
-
-    // Remaining subscribers keep their subscriber flag (they're still subscribers)
-    // Note: Sheet-level tracking must be updated separately by caller
-
-    // Update master flags
-    if (master != nullptr) {
-        master->clearFlag(CellFlags::SHARED_FORMULA_MASTER);
-    }
-    if (!subscribers.empty()) {
-        newMaster->setFlag(CellFlags::SHARED_FORMULA_MASTER);
-    } else {
-        newMaster->clearFlag(CellFlags::SHARED_FORMULA_MASTER);
-    }
-
-    master = newMaster;
-    return newMaster;
-}
-
-std::vector<Cell*> SharedFormulaGroup::getAllCells() const {
-    std::vector<Cell*> cells;
-    cells.reserve(1 + subscribers.size());
-
-    if (master != nullptr) {
-        cells.push_back(master);
-    }
-    cells.insert(cells.end(), subscribers.begin(), subscribers.end());
-
-    return cells;
 }
 
 // ============================================================================

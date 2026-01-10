@@ -43,7 +43,6 @@ struct Axis;
 struct Cell;
 struct Sheet;
 struct Workbook;
-struct SharedFormulaGroup;
 struct SharedFormulaInfo;
 struct OpLog;
 struct SpillInfo;
@@ -271,30 +270,6 @@ struct Cell {
 private:
     // Runtime flags (not persisted) - combines multiple bool fields
     uint8_t _flags = 0;
-    friend struct SharedFormulaGroup;
-};
-
-// SharedFormulaGroup - manages shared formula master/subscriber relationships
-// Master cell owns the formula, subscribers reference it
-struct SharedFormulaGroup {
-    Cell* master;                    // First alphabetically, owns the formula
-    std::vector<Cell*> subscribers;  // Cells using =@master
-
-    SharedFormulaGroup() : master(nullptr) {}
-    explicit SharedFormulaGroup(Cell* master) : master(master) {}
-
-    // Add a subscriber to this group
-    void addSubscriber(Cell* cell);
-
-    // Remove a subscriber from this group
-    void removeSubscriber(Cell* cell);
-
-    // Promote next subscriber to master (when master is deleted)
-    // Returns new master, or nullptr if no subscribers remain
-    Cell* promoteMaster();
-
-    // Get all cells in the group (master + subscribers)
-    [[nodiscard]] std::vector<Cell*> getAllCells() const;
 };
 
 // =============================================================================
