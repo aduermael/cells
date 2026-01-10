@@ -200,7 +200,7 @@ generate_readme_section() {
     local TEMP_TEST_FILE=$(mktemp)
     trap "rm -f $TEMP_FILE $TEMP_TEST_FILE" RETURN
 
-    # Add all languages with lines > 0 to source table
+    # Add all languages with lines > 0 to source table (excluding Markdown - that's documentation)
     [ "$cpp_lines" -gt 0 ] && echo "$cpp_lines C++" >> "$TEMP_FILE"
     [ "$js_lines" -gt 0 ] && echo "$js_lines JavaScript" >> "$TEMP_FILE"
     [ "$ts_lines" -gt 0 ] && echo "$ts_lines TypeScript" >> "$TEMP_FILE"
@@ -209,7 +209,6 @@ generate_readme_section() {
     [ "$go_lines" -gt 0 ] && echo "$go_lines Go" >> "$TEMP_FILE"
     [ "$luau_lines" -gt 0 ] && echo "$luau_lines Luau" >> "$TEMP_FILE"
     [ "$objcpp_lines" -gt 0 ] && echo "$objcpp_lines Objective-C++" >> "$TEMP_FILE"
-    [ "$md_lines" -gt 0 ] && echo "$md_lines Markdown" >> "$TEMP_FILE"
     [ "$bzl_lines" -gt 0 ] && echo "$bzl_lines Starlark" >> "$TEMP_FILE"
     [ "$sh_lines" -gt 0 ] && echo "$sh_lines Shell" >> "$TEMP_FILE"
 
@@ -244,6 +243,18 @@ generate_readme_section() {
             formatted=$(echo "$lines" | awk '{printf "%'\''d", $1}')
             echo "| $lang | $formatted |"
         done
+    else
+        echo "| (none) | 0 |"
+    fi
+
+    echo ""
+    echo "### Documentation"
+    echo ""
+    echo "| Language | Lines |"
+    echo "|----------|------:|"
+    if [ "$md_lines" -gt 0 ]; then
+        formatted=$(echo "$md_lines" | awk '{printf "%'\''d", $1}')
+        echo "| Markdown | $formatted |"
     else
         echo "| (none) | 0 |"
     fi

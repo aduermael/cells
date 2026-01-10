@@ -87,6 +87,16 @@ run_cloc_product() {
     cloc --json \
          --exclude-dir=bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party \
          --not-match-f='_test\.(cc|cpp|go)|\.test\.(mjs|js|ts)|\.spec\.(mjs|js|ts)|/tests/' \
+         --exclude-ext=md \
+         --quiet \
+         "$path" 2>/dev/null | jq -r '.SUM.code // 0'
+}
+
+run_cloc_docs() {
+    local path="$1"
+    cloc --json \
+         --exclude-dir=bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party \
+         --include-ext=md \
          --quiet \
          "$path" 2>/dev/null | jq -r '.SUM.code // 0'
 }
@@ -137,6 +147,7 @@ for DATE in $DATES_TO_PROCESS; do
     # Run CLOC
     PRODUCT_LINES=$(run_cloc_product "$WORKTREE_PATH")
     TEST_LINES=$(run_cloc_test "$WORKTREE_PATH")
+    DOCS_LINES=$(run_cloc_docs "$WORKTREE_PATH")
 
     # Remove worktree
     git worktree remove --force "$WORKTREE_PATH" 2>/dev/null || rm -rf "$WORKTREE_PATH"
@@ -147,13 +158,14 @@ for DATE in $DATES_TO_PROCESS; do
         --arg commit "$SHORT_COMMIT" \
         --argjson product "$PRODUCT_LINES" \
         --argjson test "$TEST_LINES" \
-        '{date: $date, commit: $commit, productTotal: $product, testTotal: $test}')
+        --argjson docs "$DOCS_LINES" \
+        '{date: $date, commit: $commit, productTotal: $product, testTotal: $test, docsTotal: $docs}')
 
     # Update history file
     jq --argjson entry "$NEW_ENTRY" '.history += [$entry]' "$HISTORY_FILE" > "$HISTORY_FILE.tmp"
     mv "$HISTORY_FILE.tmp" "$HISTORY_FILE"
 
-    echo "    Product: $PRODUCT_LINES, Test: $TEST_LINES" >&2
+    echo "    Product: $PRODUCT_LINES, Test: $TEST_LINES, Docs: $DOCS_LINES" >&2
 done
 
 # Update generated timestamp

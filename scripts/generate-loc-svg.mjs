@@ -24,6 +24,7 @@ const CHART_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
 // Colors
 const PRODUCT_COLOR = '#058601';  // Green from project icon
 const TEST_COLOR = '#2196F3';     // Blue for tests
+const DOCS_COLOR = '#FF9800';     // Orange for documentation
 const GRID_COLOR = '#e0e0e0';
 const TEXT_COLOR = '#333333';
 
@@ -50,7 +51,8 @@ function generateSVG(history) {
     const dates = history.map(h => h.date);
     const maxProduct = Math.max(...history.map(h => h.productTotal));
     const maxTest = Math.max(...history.map(h => h.testTotal));
-    const maxY = Math.max(maxProduct, maxTest) * 1.1; // 10% padding
+    const maxDocs = Math.max(...history.map(h => h.docsTotal || 0));
+    const maxY = Math.max(maxProduct, maxTest, maxDocs) * 1.1; // 10% padding
 
     const xScale = (index) => MARGIN.left + (index / (history.length - 1 || 1)) * CHART_WIDTH;
     const yScale = (value) => MARGIN.top + CHART_HEIGHT - (value / maxY) * CHART_HEIGHT;
@@ -64,12 +66,20 @@ function generateSVG(history) {
         `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(h.testTotal).toFixed(1)}`
     ).join(' ');
 
+    const docsPath = history.map((h, i) =>
+        `${i === 0 ? 'M' : 'L'} ${xScale(i).toFixed(1)} ${yScale(h.docsTotal || 0).toFixed(1)}`
+    ).join(' ');
+
     // Generate area fill paths
     const productAreaPath = productPath +
         ` L ${xScale(history.length - 1).toFixed(1)} ${yScale(0).toFixed(1)}` +
         ` L ${xScale(0).toFixed(1)} ${yScale(0).toFixed(1)} Z`;
 
     const testAreaPath = testPath +
+        ` L ${xScale(history.length - 1).toFixed(1)} ${yScale(0).toFixed(1)}` +
+        ` L ${xScale(0).toFixed(1)} ${yScale(0).toFixed(1)} Z`;
+
+    const docsAreaPath = docsPath +
         ` L ${xScale(history.length - 1).toFixed(1)} ${yScale(0).toFixed(1)}` +
         ` L ${xScale(0).toFixed(1)} ${yScale(0).toFixed(1)} Z`;
 
@@ -91,6 +101,7 @@ function generateSVG(history) {
     // Get latest values for legend
     const latestProduct = history[history.length - 1].productTotal;
     const latestTest = history[history.length - 1].testTotal;
+    const latestDocs = history[history.length - 1].docsTotal || 0;
 
     return `<svg viewBox="0 0 ${WIDTH} ${HEIGHT}" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -136,25 +147,32 @@ function generateSVG(history) {
     <!-- Area fills -->
     <path d="${productAreaPath}" fill="${PRODUCT_COLOR}" fill-opacity="0.1"/>
     <path d="${testAreaPath}" fill="${TEST_COLOR}" fill-opacity="0.1"/>
+    <path d="${docsAreaPath}" fill="${DOCS_COLOR}" fill-opacity="0.1"/>
 
     <!-- Lines -->
     <path d="${productPath}" fill="none" stroke="${PRODUCT_COLOR}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     <path d="${testPath}" fill="none" stroke="${TEST_COLOR}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${docsPath}" fill="none" stroke="${DOCS_COLOR}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 
     <!-- Data point dots (latest only) -->
     <circle cx="${xScale(history.length - 1).toFixed(1)}" cy="${yScale(latestProduct).toFixed(1)}" r="4" fill="${PRODUCT_COLOR}"/>
     <circle cx="${xScale(history.length - 1).toFixed(1)}" cy="${yScale(latestTest).toFixed(1)}" r="4" fill="${TEST_COLOR}"/>
+    <circle cx="${xScale(history.length - 1).toFixed(1)}" cy="${yScale(latestDocs).toFixed(1)}" r="4" fill="${DOCS_COLOR}"/>
   </g>
 
   <!-- Legend -->
-  <g transform="translate(${MARGIN.left + CHART_WIDTH + 15}, ${MARGIN.top + 20})">
+  <g transform="translate(${MARGIN.left + CHART_WIDTH + 15}, ${MARGIN.top + 10})">
     <rect x="0" y="0" width="14" height="14" fill="${PRODUCT_COLOR}" rx="2"/>
     <text x="20" y="12" class="legend-text">Product</text>
-    <text x="20" y="28" class="legend-value" fill="${PRODUCT_COLOR}">${latestProduct.toLocaleString()}</text>
+    <text x="20" y="26" class="legend-value" fill="${PRODUCT_COLOR}">${latestProduct.toLocaleString()}</text>
 
-    <rect x="0" y="50" width="14" height="14" fill="${TEST_COLOR}" rx="2"/>
-    <text x="20" y="62" class="legend-text">Test</text>
-    <text x="20" y="78" class="legend-value" fill="${TEST_COLOR}">${latestTest.toLocaleString()}</text>
+    <rect x="0" y="42" width="14" height="14" fill="${TEST_COLOR}" rx="2"/>
+    <text x="20" y="54" class="legend-text">Test</text>
+    <text x="20" y="68" class="legend-value" fill="${TEST_COLOR}">${latestTest.toLocaleString()}</text>
+
+    <rect x="0" y="84" width="14" height="14" fill="${DOCS_COLOR}" rx="2"/>
+    <text x="20" y="96" class="legend-text">Docs</text>
+    <text x="20" y="110" class="legend-value" fill="${DOCS_COLOR}">${latestDocs.toLocaleString()}</text>
   </g>
 
   <!-- Footer -->
@@ -179,7 +197,7 @@ try {
     console.log(`  - ${data.history.length} data points`);
     if (data.history.length > 0) {
         const latest = data.history[data.history.length - 1];
-        console.log(`  - Latest: Product ${latest.productTotal.toLocaleString()}, Test ${latest.testTotal.toLocaleString()}`);
+        console.log(`  - Latest: Product ${latest.productTotal.toLocaleString()}, Test ${latest.testTotal.toLocaleString()}, Docs ${(latest.docsTotal || 0).toLocaleString()}`);
     }
 } catch (err) {
     console.error('Error:', err.message);
