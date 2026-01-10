@@ -71,13 +71,17 @@ struct RangeBounds {
 
 // Result of evaluating a formula or sub-expression
 struct EvalResult {
-    enum class Type : std::uint8_t { NUMBER, STRING, BOOLEAN, ERROR, EMPTY, RANGE };
+    enum class Type : std::uint8_t { NUMBER, STRING, BOOLEAN, ERROR, EMPTY, RANGE, ARRAY };
     Type type{Type::EMPTY};
     double numberValue{0.0};
     std::string stringValue;
     bool boolValue{false};
     CellError error{CellError::NONE};
     RangeBounds rangeBounds;  // For RANGE type
+
+    // For ARRAY type: row-major 2D array of results
+    // arrayValue[row][col] - outer vector is rows, inner is columns
+    std::vector<std::vector<EvalResult>> arrayValue;
 
     // Default constructor creates an empty result
     EvalResult() = default;
@@ -167,6 +171,39 @@ struct EvalResult {
         return Range(bounds);
     }
 
+    // Create an array result from a 2D vector of results
+    // The vector is row-major: arrayValue[row][col]
+    static EvalResult Array(std::vector<std::vector<EvalResult>> arr) {
+        EvalResult r;
+        r.type = Type::ARRAY;
+        r.arrayValue = std::move(arr);
+        return r;
+    }
+
+    // Create an empty array (0x0)
+    static EvalResult EmptyArray() {
+        EvalResult r;
+        r.type = Type::ARRAY;
+        return r;
+    }
+
+    // Create a single-column array from a 1D vector
+    static EvalResult ColumnArray(std::vector<EvalResult> col) {
+        std::vector<std::vector<EvalResult>> arr;
+        arr.reserve(col.size());
+        for (auto& v : col) {
+            arr.push_back({std::move(v)});
+        }
+        return Array(std::move(arr));
+    }
+
+    // Create a single-row array from a 1D vector
+    static EvalResult RowArray(std::vector<EvalResult> row) {
+        std::vector<std::vector<EvalResult>> arr;
+        arr.push_back(std::move(row));
+        return Array(std::move(arr));
+    }
+
     // Type coercion methods
     // Converts to number:
     // - Number: returns as-is
@@ -205,7 +242,8 @@ struct EvalResult {
             case Type::EMPTY:
                 return Number(0.0);
             case Type::RANGE:
-                // Ranges can't be converted to a single number
+            case Type::ARRAY:
+                // Ranges/arrays can't be converted to a single number
                 return Error(CellError::VALUE);
         }
         return Error(CellError::VALUE);
@@ -246,7 +284,8 @@ struct EvalResult {
             case Type::EMPTY:
                 return String("");
             case Type::RANGE:
-                // Ranges can't be converted to a single string
+            case Type::ARRAY:
+                // Ranges/arrays can't be converted to a single string
                 return Error(CellError::VALUE);
         }
         return String("");
@@ -272,7 +311,8 @@ struct EvalResult {
             case Type::EMPTY:
                 return Boolean(false);
             case Type::RANGE:
-                // Ranges can't be converted to a single boolean
+            case Type::ARRAY:
+                // Ranges/arrays can't be converted to a single boolean
                 return Error(CellError::VALUE);
         }
         return Error(CellError::VALUE);
@@ -285,6 +325,7 @@ struct EvalResult {
     [[nodiscard]] bool isBoolean() const { return type == Type::BOOLEAN; }
     [[nodiscard]] bool isEmpty() const { return type == Type::EMPTY; }
     [[nodiscard]] bool isRange() const { return type == Type::RANGE; }
+    [[nodiscard]] bool isArray() const { return type == Type::ARRAY; }
 
     // Get the number value (assumes type is NUMBER)
     [[nodiscard]] double getNumber() const { return numberValue; }
@@ -300,6 +341,26 @@ struct EvalResult {
 
     // Get the range bounds (assumes type is RANGE)
     [[nodiscard]] const RangeBounds& getRangeBounds() const { return rangeBounds; }
+
+    // Get the array value (assumes type is ARRAY)
+    [[nodiscard]] const std::vector<std::vector<EvalResult>>& getArray() const {
+        return arrayValue;
+    }
+
+    // Get array dimensions (0 if not an array or empty)
+    [[nodiscard]] size_t getArrayRows() const { return isArray() ? arrayValue.size() : 0; }
+    [[nodiscard]] size_t getArrayCols() const {
+        return (isArray() && !arrayValue.empty()) ? arrayValue[0].size() : 0;
+    }
+
+    // Get value at array position (returns Empty if out of bounds)
+    [[nodiscard]] const EvalResult& getArrayAt(size_t row, size_t col) const {
+        static const EvalResult empty = Empty();
+        if (!isArray() || row >= arrayValue.size() || col >= arrayValue[row].size()) {
+            return empty;
+        }
+        return arrayValue[row][col];
+    }
 };
 
 // Context for evaluation (sheet access, cell positions, etc.)

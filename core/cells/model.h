@@ -45,6 +45,7 @@ struct Sheet;
 struct Workbook;
 struct SharedFormulaGroup;
 struct OpLog;
+struct SpillInfo;
 
 // Collaboration mode for the workbook
 // Determines how edits are tracked and synchronized
@@ -249,6 +250,42 @@ struct SharedFormulaGroup {
     [[nodiscard]] std::vector<Cell*> getAllCells() const;
 };
 
+// =============================================================================
+// Spill Range Management (Runtime-Only)
+// =============================================================================
+//
+// Tracks dynamic array formula "spill" behavior where a single formula
+// produces multiple values that populate neighboring cells automatically.
+// This data is runtime-only (not persisted) - recomputed on recalculation.
+//
+
+// SpillInfo - tracks a spill range from a master cell
+// The master cell contains the array formula; spilled positions get computed values
+struct SpillInfo {
+    ID masterCellId;  // Cell containing the array formula
+
+    // Spilled positions as (colId, rowId) pairs
+    // Does NOT include the master cell position
+    // Order: row-major (left-to-right, top-to-bottom)
+    std::vector<std::pair<ID, ID>> spilledPositions;
+
+    // Cached spilled values (parallel to spilledPositions)
+    // These are the computed values from the array result
+    std::vector<CellValue> spilledValues;
+
+    SpillInfo() = default;
+    explicit SpillInfo(const ID& master) : masterCellId(master) {}
+
+    // Clear all spilled data
+    void clear() {
+        spilledPositions.clear();
+        spilledValues.clear();
+    }
+
+    // Get the number of spilled cells (excluding master)
+    [[nodiscard]] size_t spillCount() const { return spilledPositions.size(); }
+};
+
 // Axis - represents a column or row
 struct Axis {
     std::string name;   // Custom name (empty = compute from position)
@@ -369,12 +406,50 @@ struct Sheet {
     [[nodiscard]] DependencyGraph* getDependencyGraph() { return _depGraph.get(); }
     [[nodiscard]] const DependencyGraph* getDependencyGraph() const { return _depGraph.get(); }
 
+    // ========================================================================
+    // Spill Range Management (Runtime-Only)
+    // ========================================================================
+
+    // Get spill info for a master cell (returns nullptr if not a spill master)
+    [[nodiscard]] SpillInfo* getSpillInfo(const ID& masterCellId);
+    [[nodiscard]] const SpillInfo* getSpillInfo(const ID& masterCellId) const;
+
+    // Get the master cell ID if this position is spilled into (returns null ID if not spilled)
+    [[nodiscard]] ID getSpillMaster(const ID& colId, const ID& rowId) const;
+
+    // Check if a position is part of any spill range (including master position)
+    [[nodiscard]] bool isSpilledPosition(const ID& colId, const ID& rowId) const;
+
+    // Get spilled value at a position (returns nullptr if not a spilled position)
+    [[nodiscard]] const CellValue* getSpilledValue(const ID& colId, const ID& rowId) const;
+
+    // Register a new spill range (clears any existing spill for this master first)
+    void registerSpillRange(const ID& masterCellId, const std::vector<std::pair<ID, ID>>& positions,
+                            const std::vector<CellValue>& values);
+
+    // Clear the spill range for a master cell
+    void clearSpillRange(const ID& masterCellId);
+
+    // Clear all spill data (called during full recalculation)
+    void clearAllSpillRanges();
+
 private:
     // Secondary index: (colId, rowId) -> cellId
     std::unordered_map<std::string, ID> _cellIndex;
 
     // Dependency graph for tracking formula dependencies
     std::unique_ptr<DependencyGraph> _depGraph;
+
+    // ========================================================================
+    // Spill range tracking (runtime-only, not persisted)
+    // ========================================================================
+
+    // Maps master cell ID → spill info (positions and values)
+    std::unordered_map<ID, SpillInfo, IDHash> _spillMasters;
+
+    // Reverse lookup: (colId, rowId) composite key → master cell ID
+    // Only contains spilled positions, not the master position itself
+    std::unordered_map<std::string, ID> _spilledFrom;
 
     // Build composite key for cell index
     static std::string makeCellKey(const ID& colId, const ID& rowId);

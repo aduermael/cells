@@ -64,18 +64,18 @@ From [Microsoft Excel Documentation](https://support.microsoft.com/en-us/office/
 
 Extend the data model to track spill relationships without persisting spilled values.
 
-- [ ] 1a: Add `SpillInfo` struct and spill tracking to Sheet
+- [x] 1a: Add `SpillInfo` struct and spill tracking to Sheet
   - `SpillInfo { ID masterCellId; vector<pair<ID,ID>> spilledPositions; }`
   - `Sheet::spillMasters` map: masterCellId → SpillInfo
   - `Sheet::spilledFrom` map: (colId,rowId) → masterCellId (reverse lookup)
   - These are runtime-only, not serialized
 
-- [ ] 1b: Add `EvalResult::ARRAY` type for multi-value results
+- [x] 1b: Add `EvalResult::ARRAY` type for multi-value results
   - New type in `EvalResult`: `ARRAY` with `vector<vector<EvalResult>> arrayValue`
   - Add `isArray()`, `getArray()`, `getArrayRows()`, `getArrayCols()` methods
   - Arrays are row-major: `arrayValue[row][col]`
 
-- [ ] 1c: Add `CellError::SPILL` error type
+- [x] 1c: Add `CellError::SPILL` error type
   - Add `SPILL` to `CellError` enum in `types.h`
   - Add `#SPILL!` string representation in error formatting
 

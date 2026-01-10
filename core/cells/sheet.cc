@@ -566,4 +566,95 @@ void Sheet::clearCellFormula(const ID& cellId) {
     cell->clearFormula();
 }
 
+// ============================================================================
+// Spill Range Management
+// ============================================================================
+
+SpillInfo* Sheet::getSpillInfo(const ID& masterCellId) {
+    auto it = _spillMasters.find(masterCellId);
+    return (it != _spillMasters.end()) ? &it->second : nullptr;
+}
+
+const SpillInfo* Sheet::getSpillInfo(const ID& masterCellId) const {
+    auto it = _spillMasters.find(masterCellId);
+    return (it != _spillMasters.end()) ? &it->second : nullptr;
+}
+
+ID Sheet::getSpillMaster(const ID& colId, const ID& rowId) const {
+    auto key = makeCellKey(colId, rowId);
+    auto it = _spilledFrom.find(key);
+    return (it != _spilledFrom.end()) ? it->second : ID();
+}
+
+bool Sheet::isSpilledPosition(const ID& colId, const ID& rowId) const {
+    auto key = makeCellKey(colId, rowId);
+    return _spilledFrom.find(key) != _spilledFrom.end();
+}
+
+const CellValue* Sheet::getSpilledValue(const ID& colId, const ID& rowId) const {
+    auto key = makeCellKey(colId, rowId);
+    auto it = _spilledFrom.find(key);
+    if (it == _spilledFrom.end()) {
+        return nullptr;
+    }
+
+    const ID& masterId = it->second;
+    const SpillInfo* info = getSpillInfo(masterId);
+    if (info == nullptr) {
+        return nullptr;
+    }
+
+    // Find the index in spilledPositions
+    for (size_t i = 0; i < info->spilledPositions.size(); ++i) {
+        const auto& [pColId, pRowId] = info->spilledPositions[i];
+        if (pColId == colId && pRowId == rowId) {
+            return (i < info->spilledValues.size()) ? &info->spilledValues[i] : nullptr;
+        }
+    }
+
+    return nullptr;
+}
+
+void Sheet::registerSpillRange(const ID& masterCellId,
+                               const std::vector<std::pair<ID, ID>>& positions,
+                               const std::vector<CellValue>& values) {
+    // Clear any existing spill for this master first
+    clearSpillRange(masterCellId);
+
+    // Create new spill info
+    SpillInfo info(masterCellId);
+    info.spilledPositions = positions;
+    info.spilledValues = values;
+
+    // Register in spillMasters
+    _spillMasters[masterCellId] = std::move(info);
+
+    // Build reverse lookup for each spilled position
+    for (const auto& [colId, rowId] : positions) {
+        auto key = makeCellKey(colId, rowId);
+        _spilledFrom[key] = masterCellId;
+    }
+}
+
+void Sheet::clearSpillRange(const ID& masterCellId) {
+    auto it = _spillMasters.find(masterCellId);
+    if (it == _spillMasters.end()) {
+        return;
+    }
+
+    // Remove all reverse lookups for this master's spilled positions
+    for (const auto& [colId, rowId] : it->second.spilledPositions) {
+        auto key = makeCellKey(colId, rowId);
+        _spilledFrom.erase(key);
+    }
+
+    // Remove the master entry
+    _spillMasters.erase(it);
+}
+
+void Sheet::clearAllSpillRanges() {
+    _spillMasters.clear();
+    _spilledFrom.clear();
+}
+
 }  // namespace cells
