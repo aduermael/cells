@@ -629,7 +629,15 @@ void Sheet::registerSpillRange(const ID& masterCellId,
     // Register in spillMasters
     _spillMasters[masterCellId] = std::move(info);
 
+    // Set SPILL_MASTER flag on the master cell for O(1) lookup
+    Cell* master = getCell(masterCellId);
+    if (master != nullptr) {
+        master->setFlag(CellFlags::SPILL_MASTER);
+    }
+
     // Build reverse lookup for each spilled position
+    // Note: SPILLED_FROM flag is not set on cells because spilled positions
+    // are virtual (no actual Cell object) - we track them in the _spilledFrom map only
     for (const auto& [colId, rowId] : positions) {
         auto key = makeCellKey(colId, rowId);
         _spilledFrom[key] = masterCellId;
@@ -648,11 +656,25 @@ void Sheet::clearSpillRange(const ID& masterCellId) {
         _spilledFrom.erase(key);
     }
 
+    // Clear SPILL_MASTER flag on the master cell
+    Cell* master = getCell(masterCellId);
+    if (master != nullptr) {
+        master->clearFlag(CellFlags::SPILL_MASTER);
+    }
+
     // Remove the master entry
     _spillMasters.erase(it);
 }
 
 void Sheet::clearAllSpillRanges() {
+    // Clear SPILL_MASTER flags on all master cells before clearing the maps
+    for (const auto& [masterId, info] : _spillMasters) {
+        Cell* master = getCell(masterId);
+        if (master != nullptr) {
+            master->clearFlag(CellFlags::SPILL_MASTER);
+        }
+    }
+
     _spillMasters.clear();
     _spilledFrom.clear();
 }

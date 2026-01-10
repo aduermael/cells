@@ -225,7 +225,7 @@ bits 4-7: reserved for future use
   - Updated `SharedFormulaGroup` to use flags and Sheet-level storage
   - Updated serializer.cc, parser.cc, xlsx_reader.cc, xlsx_writer.cc to use Sheet-level API
 
-- [ ] 7d: Add spill flags to runtime tracking
+- [x] 7d: Add spill flags to runtime tracking
   - When registering spill range, set `isSpillMaster` flag on master cell
   - When populating spilled positions, set `isSpilledFrom` flag (for virtual cells, track in map only)
   - Flags allow O(1) check "is this cell involved in spill?" before map lookup
