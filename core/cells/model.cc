@@ -174,19 +174,17 @@ bool Formula::hasVolatile() const {
 // Cell
 // ============================================================================
 
-Cell::Cell() : id(), colId(), rowId(), value(), formula(nullptr), sharedFormulaRef(nullptr) {}
+Cell::Cell() : id(), colId(), rowId(), value(), formula(nullptr) {}
 
-Cell::Cell(const ID& id)
-    : id(id), colId(), rowId(), value(), formula(nullptr), sharedFormulaRef(nullptr) {}
+Cell::Cell(const ID& id) : id(id), colId(), rowId(), value(), formula(nullptr) {}
 
 Cell::Cell(const ID& id, const ID& col, const ID& row)
-    : id(id), colId(col), rowId(row), value(), formula(nullptr), sharedFormulaRef(nullptr) {}
+    : id(id), colId(col), rowId(row), value(), formula(nullptr) {}
 
 Cell::~Cell() {
-    // Only delete formula if we own it (not a shared formula subscriber)
-    if (formula != nullptr && sharedFormulaRef == nullptr) {
-        delete formula;
-    }
+    // Delete formula if we own it (subscribers don't have formulas, so formula is always owned)
+    // Note: shared formula subscribers have formula = nullptr, so this is safe
+    delete formula;
 }
 
 Cell::Cell(Cell&& other) noexcept
@@ -195,39 +193,33 @@ Cell::Cell(Cell&& other) noexcept
       rowId(other.rowId),
       value(std::move(other.value)),
       formula(other.formula),
-      sharedFormulaRef(other.sharedFormulaRef),
       _flags(other._flags) {
     other.formula = nullptr;
-    other.sharedFormulaRef = nullptr;
     other._flags = 0;
 }
 
 Cell& Cell::operator=(Cell&& other) noexcept {
     if (this != &other) {
-        // Only delete formula if we own it
-        if (formula != nullptr && sharedFormulaRef == nullptr) {
-            delete formula;
-        }
+        // Delete our formula (subscribers don't have formulas)
+        delete formula;
         id = other.id;
         colId = other.colId;
         rowId = other.rowId;
         value = std::move(other.value);
         formula = other.formula;
-        sharedFormulaRef = other.sharedFormulaRef;
         _flags = other._flags;
         other.formula = nullptr;
-        other.sharedFormulaRef = nullptr;
         other._flags = 0;
     }
     return *this;
 }
 
 bool Cell::isFormula() const {
-    return formula != nullptr || sharedFormulaRef != nullptr;
+    return formula != nullptr || hasFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
 }
 
 bool Cell::isSharedFormula() const {
-    return sharedFormulaRef != nullptr;
+    return hasFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
 }
 
 bool Cell::isSharedFormulaMaster() const {
@@ -239,9 +231,8 @@ bool Cell::hasError() const {
 }
 
 Formula* Cell::getFormula() const {
-    if (sharedFormulaRef != nullptr) {
-        return sharedFormulaRef->formula;
-    }
+    // Returns own formula only. For shared formula subscribers, returns nullptr.
+    // Use Sheet::getEffectiveFormula(cell) to get the effective formula.
     return formula;
 }
 
@@ -254,24 +245,23 @@ void Cell::setFormula(Formula* f) {
     }
 }
 
-void Cell::setSharedFormulaRef(Cell* master) {
-    // Clear any existing formula or shared ref
-    clearFormula();
-    sharedFormulaRef = master;
-    if (master != nullptr) {
+void Cell::setSharedFormulaSubscriber(bool isSubscriber) {
+    if (isSubscriber) {
+        // Clear any existing formula
+        clearFormula();
         value.type = CellValueType::FORMULA;
-        master->setFlag(CellFlags::SHARED_FORMULA_MASTER);
+        setFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
+    } else {
+        clearFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
     }
 }
 
 void Cell::clearFormula() {
-    // Only delete formula if we own it (not a shared formula subscriber)
-    if (formula != nullptr && sharedFormulaRef == nullptr) {
-        delete formula;
-    }
+    // Delete formula if we have one (subscribers don't have formulas)
+    delete formula;
     formula = nullptr;
-    sharedFormulaRef = nullptr;
-    // Note: SHARED_FORMULA_MASTER flag is managed by SharedFormulaGroup
+    clearFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
+    // Note: SHARED_FORMULA_MASTER flag is managed by Sheet-level methods
 }
 
 bool Cell::hasFlag(CellFlags flag) const {
@@ -295,9 +285,14 @@ void SharedFormulaGroup::addSubscriber(Cell* cell) {
         return;
     }
 
-    // Set cell's shared formula reference to master
-    cell->setSharedFormulaRef(master);
+    // Mark cell as a shared formula subscriber
+    cell->setSharedFormulaSubscriber(true);
     subscribers.push_back(cell);
+
+    // Mark master as having subscribers
+    if (master != nullptr) {
+        master->setFlag(CellFlags::SHARED_FORMULA_MASTER);
+    }
 }
 
 void SharedFormulaGroup::removeSubscriber(Cell* cell) {
@@ -309,7 +304,7 @@ void SharedFormulaGroup::removeSubscriber(Cell* cell) {
     auto it = std::find(subscribers.begin(), subscribers.end(), cell);
     if (it != subscribers.end()) {
         subscribers.erase(it);
-        cell->sharedFormulaRef = nullptr;
+        cell->setSharedFormulaSubscriber(false);
     }
 
     // Update master's flag if no more subscribers
@@ -351,18 +346,18 @@ Cell* SharedFormulaGroup::promoteMaster() {
 
     // Clone formula from old master to new master
     if (master != nullptr && master->formula != nullptr) {
-        newMaster->formula = new Formula();
+        // New master gets its own copy of the formula
+        newMaster->clearFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
+        auto* newFormula = new Formula();
         if (master->formula->ast != nullptr) {
-            newMaster->formula->ast = master->formula->ast->clone().release();
+            newFormula->ast = master->formula->ast->clone().release();
         }
-        newMaster->formula->dirty = master->formula->dirty;
-        newMaster->sharedFormulaRef = nullptr;
+        newFormula->dirty = master->formula->dirty;
+        newMaster->formula = newFormula;
     }
 
-    // Update all remaining subscribers to point to new master
-    for (Cell* sub : subscribers) {
-        sub->sharedFormulaRef = newMaster;
-    }
+    // Remaining subscribers keep their subscriber flag (they're still subscribers)
+    // Note: Sheet-level tracking must be updated separately by caller
 
     // Update master flags
     if (master != nullptr) {

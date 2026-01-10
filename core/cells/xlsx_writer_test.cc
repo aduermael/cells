@@ -746,20 +746,25 @@ TEST(XLSXWriterTest, WriteSharedFormulas) {
     auto masterCell = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[0]);
     masterCell->value = CellValue(20.0);
     masterCell->setFormula(createFormula("=A1*2"));
-    Cell* masterPtr = masterCell.get();
+    ID masterId = masterCell->id;
     sheet->addCell(std::move(masterCell));
 
     // B2 = shared formula subscriber (result 40)
     auto subCell1 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[1]);
     subCell1->value = CellValue(40.0);
-    subCell1->setSharedFormulaRef(masterPtr);
+    subCell1->setSharedFormulaSubscriber(true);
+    ID sub1Id = subCell1->id;
     sheet->addCell(std::move(subCell1));
 
     // B3 = shared formula subscriber (result 60)
     auto subCell2 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[2]);
     subCell2->value = CellValue(60.0);
-    subCell2->setSharedFormulaRef(masterPtr);
+    subCell2->setSharedFormulaSubscriber(true);
+    ID sub2Id = subCell2->id;
     sheet->addCell(std::move(subCell2));
+
+    // Register shared formula group at Sheet level
+    sheet->registerSharedFormulaGroup(masterId, {sub1Id, sub2Id});
 
     workbook->addSheet(std::move(sheet));
 

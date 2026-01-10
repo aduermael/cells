@@ -872,6 +872,9 @@ bool Parser::parseCell(std::string_view line) {
 }
 
 bool Parser::resolveSharedFormulas() {
+    // Group pending shared formulas by master
+    std::unordered_map<ID, std::vector<ID>, IDHash> masterToSubscribers;
+
     // Resolve all pending shared formula references
     for (const auto& [subscriberId, masterUUIDStr] : pendingSharedFormulas_) {
         // Find subscriber cell
@@ -888,10 +891,17 @@ bool Parser::resolveSharedFormulas() {
         if (masterIt == cellsByIdForResolution_.end()) {
             return setError("Shared formula master not found: " + masterUUIDStr);
         }
-        Cell* master = masterIt->second;
 
-        // Link subscriber to master
-        subscriber->setSharedFormulaRef(master);
+        // Mark cell as a shared formula subscriber
+        subscriber->setSharedFormulaSubscriber(true);
+
+        // Group by master
+        masterToSubscribers[masterID].push_back(subscriberId);
+    }
+
+    // Register shared formula groups at Sheet level
+    for (const auto& [masterId, subscriberIds] : masterToSubscribers) {
+        currentSheet_->registerSharedFormulaGroup(masterId, subscriberIds);
     }
 
     return true;

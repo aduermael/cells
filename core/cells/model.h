@@ -212,10 +212,6 @@ struct Cell {
     ID formatId;       // Number format ID (null = use default/General format)
     ID styleId;        // Cell style ID (null = use default style)
 
-    // Shared formula support: if non-null, this cell uses master's formula
-    // (does not own the formula - master owns it)
-    Cell* sharedFormulaRef;
-
     Cell();
     explicit Cell(const ID& id);
     Cell(const ID& id, const ID& col, const ID& row);
@@ -232,22 +228,26 @@ struct Cell {
     // Returns true if cell has a formula (own or shared)
     [[nodiscard]] bool isFormula() const;
 
-    // Returns true if cell uses another cell's formula
+    // Returns true if cell uses another cell's formula (subscriber)
+    // NOTE: Use Sheet::getSharedFormulaMaster() to get the actual master cell ID
     [[nodiscard]] bool isSharedFormula() const;
 
     // Returns true if cell is a shared formula master (has subscribers)
     [[nodiscard]] bool isSharedFormulaMaster() const;
 
+    // Mark cell as a shared formula subscriber (sets flag only)
+    // The actual master relationship is tracked at Sheet level
+    void setSharedFormulaSubscriber(bool isSubscriber = true);
+
     [[nodiscard]] bool hasError() const;
 
-    // Get the effective formula (own formula or master's formula)
+    // Get this cell's own formula (does NOT follow shared formula reference)
+    // For shared formula subscribers, this returns nullptr.
+    // Use Sheet::getEffectiveFormula(cell) to get the effective formula for any cell.
     [[nodiscard]] Formula* getFormula() const;
 
     // Set cell to a formula (takes ownership)
     void setFormula(Formula* f);
-
-    // Set cell to use another cell's formula (shared formula subscriber)
-    void setSharedFormulaRef(Cell* master);
 
     // Clear formula, making this a value cell
     void clearFormula();
@@ -504,6 +504,13 @@ struct Sheet {
 
     // Get the master cell ID if this cell is a shared formula subscriber (returns null ID if not)
     [[nodiscard]] ID getSharedFormulaMaster(const ID& subscriberId) const;
+
+    // Get the effective formula for a cell (follows shared formula reference if needed)
+    // For regular cells, returns cell->formula
+    // For shared formula subscribers, returns the master cell's formula
+    // Returns nullptr if cell has no formula
+    [[nodiscard]] Formula* getEffectiveFormula(Cell* cell);
+    [[nodiscard]] const Formula* getEffectiveFormula(const Cell* cell) const;
 
     // Check if a cell is part of any shared formula group (master or subscriber)
     [[nodiscard]] bool isInSharedFormulaGroup(const ID& cellId) const;

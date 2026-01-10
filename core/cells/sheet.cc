@@ -676,6 +676,56 @@ ID Sheet::getSharedFormulaMaster(const ID& subscriberId) const {
     return (it != _sharedFormulaFrom.end()) ? it->second : ID();
 }
 
+Formula* Sheet::getEffectiveFormula(Cell* cell) {
+    if (cell == nullptr) {
+        return nullptr;
+    }
+
+    // If cell has its own formula, return it
+    if (cell->formula != nullptr) {
+        return cell->formula;
+    }
+
+    // If cell is a shared formula subscriber, look up the master
+    if (cell->hasFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER)) {
+        const ID masterId = getSharedFormulaMaster(cell->id);
+        if (!masterId.isNull()) {
+            const Cell* master = getCell(masterId);
+            if (master != nullptr) {
+                return master->formula;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+const Formula* Sheet::getEffectiveFormula(const Cell* cell) const {
+    if (cell == nullptr) {
+        return nullptr;
+    }
+
+    // If cell has its own formula, return it
+    if (cell->formula != nullptr) {
+        return cell->formula;
+    }
+
+    // If cell is a shared formula subscriber, look up the master
+    if (cell->hasFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER)) {
+        const ID masterId = getSharedFormulaMaster(cell->id);
+        if (!masterId.isNull()) {
+            // Use const_cast since getCell is non-const but we return const Formula*
+            auto* ncThis = const_cast<Sheet*>(this);
+            const Cell* master = ncThis->getCell(masterId);
+            if (master != nullptr) {
+                return master->formula;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
 bool Sheet::isInSharedFormulaGroup(const ID& cellId) const {
     // Check if it's a master
     if (_sharedFormulaMasters.find(cellId) != _sharedFormulaMasters.end()) {

@@ -82,10 +82,11 @@ private:
     void serializeAxis(const Axis& axis, char prefix, std::ostream& out) const;
 
     // Serialize a single cell
-    void serializeCell(const Cell& cell, std::ostream& out) const;
+    void serializeCell(const Cell& cell, const Sheet& sheet, std::ostream& out) const;
 
     // Serialize cell value based on type
-    void serializeCellValue(const CellValue& value, const Cell& cell, std::ostream& out) const;
+    void serializeCellValue(const CellValue& value, const Cell& cell, const Sheet& sheet,
+                            std::ostream& out) const;
 
     // Serialize operation log section
     void serializeOpLog(const OpLog& oplog, std::ostream& out) const;

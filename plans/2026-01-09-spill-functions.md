@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2026-01-09 19:40 UTC
-Updated At: 2026-01-10 18:03 UTC
+Updated At: 2026-01-10 21:15 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -216,11 +216,14 @@ bits 4-7: reserved for future use
   - Add `_sharedFormulaFrom`: map subscriberId → masterId
   - Similar structure to `_spillMasters`/`_spilledFrom`
 
-- [ ] 7c: Remove `sharedFormulaRef` pointer from Cell
-  - Update `Cell::getFormula()` to look up master via Sheet
-  - Update `Cell::isSharedFormula()` to check flag + Sheet map
-  - Update `Cell::setSharedFormulaRef()` to use Sheet methods
-  - Update `SharedFormulaGroup` to use Sheet-level storage
+- [x] 7c: Remove `sharedFormulaRef` pointer from Cell
+  - Removed 8-byte `sharedFormulaRef` pointer from Cell struct
+  - `Cell::getFormula()` now returns own formula only (nullptr for subscribers)
+  - Added `Cell::setSharedFormulaSubscriber()` to set the subscriber flag
+  - `Cell::isSharedFormula()` now checks SHARED_FORMULA_SUBSCRIBER flag
+  - Added `Sheet::getEffectiveFormula(Cell*)` to get formula (follows master reference)
+  - Updated `SharedFormulaGroup` to use flags and Sheet-level storage
+  - Updated serializer.cc, parser.cc, xlsx_reader.cc, xlsx_writer.cc to use Sheet-level API
 
 - [ ] 7d: Add spill flags to runtime tracking
   - When registering spill range, set `isSpillMaster` flag on master cell

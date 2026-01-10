@@ -514,17 +514,22 @@ TEST(SharedFormulaTest, SerializeSharedFormulaSubscriber) {
     // Master cell (first alphabetically: xAMaster)
     auto masterCell = std::make_unique<Cell>(ID("xAMaster"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     masterCell->setFormula(createFormula("=SUM(A1:A10)"));
-    Cell* masterPtr = masterCell.get();
+    ID masterId = masterCell->id;
 
     // Subscriber cell (second alphabetically: xBSubscr)
     auto subCell = std::make_unique<Cell>(ID("xBSubscr"), ID("cA1bC2dE"), ID("rB3dE4fG"));
-    subCell->setSharedFormulaRef(masterPtr);
+    subCell->setSharedFormulaSubscriber(true);
+    ID subId = subCell->id;
 
     sheet->addColumn(std::move(col));
     sheet->addRow(std::move(row1));
     sheet->addRow(std::move(row2));
     sheet->addCell(std::move(masterCell));
     sheet->addCell(std::move(subCell));
+
+    // Register shared formula group at Sheet level
+    sheet->registerSharedFormulaGroup(masterId, {subId});
+
     wb->addSheet(std::move(sheet));
 
     const std::string output = serialize(*wb);
@@ -550,14 +555,16 @@ TEST(SharedFormulaTest, RoundtripSharedFormulas) {
     // Master cell
     auto masterCell = std::make_unique<Cell>(ID("xAMaster"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     masterCell->setFormula(createFormula("=A1+B1"));
-    Cell* masterPtr = masterCell.get();
+    ID masterId = masterCell->id;
 
     // Two subscriber cells
     auto sub1 = std::make_unique<Cell>(ID("xBSub001"), ID("cA1bC2dE"), ID("rB3dE4fG"));
-    sub1->setSharedFormulaRef(masterPtr);
+    sub1->setSharedFormulaSubscriber(true);
+    ID sub1Id = sub1->id;
 
     auto sub2 = std::make_unique<Cell>(ID("xCSub002"), ID("cA1bC2dE"), ID("rC5fG6hI"));
-    sub2->setSharedFormulaRef(masterPtr);
+    sub2->setSharedFormulaSubscriber(true);
+    ID sub2Id = sub2->id;
 
     sheet->addColumn(std::move(col));
     sheet->addRow(std::move(row1));
@@ -566,6 +573,10 @@ TEST(SharedFormulaTest, RoundtripSharedFormulas) {
     sheet->addCell(std::move(masterCell));
     sheet->addCell(std::move(sub1));
     sheet->addCell(std::move(sub2));
+
+    // Register shared formula group at Sheet level
+    sheet->registerSharedFormulaGroup(masterId, {sub1Id, sub2Id});
+
     wb->addSheet(std::move(sheet));
 
     // Serialize
@@ -599,14 +610,18 @@ TEST(SharedFormulaTest, RoundtripSharedFormulas) {
     EXPECT_NE(parsedMaster->formula, nullptr);
     EXPECT_EQ(FormulaSerializer::serialize(parsedMaster->formula->ast), "=A1+B1");
 
-    // Verify subscribers reference master
+    // Verify subscribers reference master via Sheet-level tracking
     EXPECT_TRUE(parsedSub1->isFormula());
     EXPECT_TRUE(parsedSub1->isSharedFormula());
-    EXPECT_EQ(parsedSub1->sharedFormulaRef, parsedMaster);
+    EXPECT_EQ(parsedSheet->getSharedFormulaMaster(parsedSub1->id), parsedMaster->id);
 
     EXPECT_TRUE(parsedSub2->isFormula());
     EXPECT_TRUE(parsedSub2->isSharedFormula());
-    EXPECT_EQ(parsedSub2->sharedFormulaRef, parsedMaster);
+    EXPECT_EQ(parsedSheet->getSharedFormulaMaster(parsedSub2->id), parsedMaster->id);
+
+    // Verify effective formula returns master's formula
+    EXPECT_EQ(parsedSheet->getEffectiveFormula(parsedSub1), parsedMaster->formula);
+    EXPECT_EQ(parsedSheet->getEffectiveFormula(parsedSub2), parsedMaster->formula);
 
     // Verify master is marked as master
     EXPECT_TRUE(parsedMaster->isSharedFormulaMaster());
@@ -636,7 +651,8 @@ X xAMaster cA1bC2dE rA1bC2dE f "=A1+B1"
     ASSERT_NE(subscriber, nullptr);
 
     EXPECT_TRUE(subscriber->isSharedFormula());
-    EXPECT_EQ(subscriber->sharedFormulaRef, master);
+    EXPECT_EQ(sheet->getSharedFormulaMaster(subscriber->id), master->id);
+    EXPECT_EQ(sheet->getEffectiveFormula(subscriber), master->formula);
 }
 
 TEST(SharedFormulaTest, ParseInvalidSharedFormulaReference) {

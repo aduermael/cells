@@ -445,13 +445,26 @@ std::string generateWorksheet(
                 masterToSi[cell] = nextSi++;
             }
         }
-        // Map subscribers to their master's si
+        // Build master cell ID -> cell pointer map for reverse lookup
+        std::unordered_map<std::string, const cells::Cell*> cellIdToCell;
         for (const auto& pair : sheet.cells) {
             const cells::Cell* cell = pair.second.get();
-            if (cell->isSharedFormula() && cell->sharedFormulaRef != nullptr) {
-                auto masterIt = masterToSi.find(cell->sharedFormulaRef);
-                if (masterIt != masterToSi.end()) {
-                    subscriberToSi[cell] = masterIt->second;
+            cellIdToCell[cell->id.toString()] = cell;
+        }
+
+        // Map subscribers to their master's si using Sheet-level tracking
+        for (const auto& pair : sheet.cells) {
+            const cells::Cell* cell = pair.second.get();
+            if (cell->isSharedFormula()) {
+                const cells::ID masterId = sheet.getSharedFormulaMaster(cell->id);
+                if (!masterId.isNull()) {
+                    auto masterCellIt = cellIdToCell.find(masterId.toString());
+                    if (masterCellIt != cellIdToCell.end()) {
+                        auto masterSiIt = masterToSi.find(masterCellIt->second);
+                        if (masterSiIt != masterToSi.end()) {
+                            subscriberToSi[cell] = masterSiIt->second;
+                        }
+                    }
                 }
             }
         }

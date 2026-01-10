@@ -232,7 +232,7 @@ void Serializer::serializeCells(const Sheet& sheet, std::ostream& out) const {
 
     // Serialize in order
     for (const auto& item : ordered) {
-        serializeCell(*item.second, out);
+        serializeCell(*item.second, sheet, out);
     }
 }
 
@@ -254,12 +254,12 @@ void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out)
     out << "\n";
 }
 
-void Serializer::serializeCell(const Cell& cell, std::ostream& out) const {
+void Serializer::serializeCell(const Cell& cell, const Sheet& sheet, std::ostream& out) const {
     // Format: X <id> <col> <row> <type> <value> [fmt:<formatId>] [sty:<styleId>]
     out << "X " << cell.id.toString() << " " << cell.colId.toString() << " "
         << cell.rowId.toString() << " ";
 
-    serializeCellValue(cell.value, cell, out);
+    serializeCellValue(cell.value, cell, sheet, out);
 
     // Optional format property (only if not null/default)
     if (!cell.formatId.isNull()) {
@@ -274,7 +274,7 @@ void Serializer::serializeCell(const Cell& cell, std::ostream& out) const {
     out << "\n";
 }
 
-void Serializer::serializeCellValue(const CellValue& value, const Cell& cell,
+void Serializer::serializeCellValue(const CellValue& value, const Cell& cell, const Sheet& sheet,
                                     std::ostream& out) const {
     const char typeChar = valueTypeToChar(value.type);
     out << typeChar << " ";
@@ -304,8 +304,14 @@ void Serializer::serializeCellValue(const CellValue& value, const Cell& cell,
         case CellValueType::FORMULA_ERROR:
         case CellValueType::FORMULA_EMPTY:
             // Shared formula subscriber: write =@masterUUID reference
-            if (cell.sharedFormulaRef != nullptr) {
-                out << "\"=@" << cell.sharedFormulaRef->id.toString() << "\"";
+            if (cell.isSharedFormula()) {
+                const ID masterId = sheet.getSharedFormulaMaster(cell.id);
+                if (!masterId.isNull()) {
+                    out << "\"=@" << masterId.toString() << "\"";
+                } else {
+                    // Should not happen - subscriber without master
+                    out << "\"=\"";
+                }
             }
             // Master or regular formula: generate text from AST
             else if (cell.formula != nullptr && cell.formula->ast != nullptr) {

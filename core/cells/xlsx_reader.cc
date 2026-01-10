@@ -877,14 +877,23 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             }
         }
 
-        // Link shared formula subscribers to their masters
+        // Link shared formula subscribers to their masters using Sheet-level tracking
         for (const auto& [si, subscribers] : sharedFormulaSubscribers) {
             auto masterIt = sharedFormulaMasters.find(si);
             if (masterIt != sharedFormulaMasters.end()) {
-                Cell* master = masterIt->second;
+                const Cell* master = masterIt->second;
+
+                // Collect subscriber IDs
+                std::vector<ID> subscriberIds;
+                subscriberIds.reserve(subscribers.size());
                 for (Cell* subscriber : subscribers) {
-                    subscriber->setSharedFormulaRef(master);
+                    subscriberIds.push_back(subscriber->id);
+                    // Mark cell as a shared formula subscriber
+                    subscriber->setSharedFormulaSubscriber(true);
                 }
+
+                // Register the shared formula group at Sheet level
+                sheet->registerSharedFormulaGroup(master->id, subscriberIds);
             } else {
                 // Master not found - add warning and leave subscriber without formula
                 addWarning("Shared formula master not found for si=" + std::to_string(si));
