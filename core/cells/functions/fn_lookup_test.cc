@@ -195,6 +195,73 @@ TEST_F(FnLookupTest, IndexStringValue) {
     EXPECT_EQ(result.getString(), "world");
 }
 
+TEST_F(FnLookupTest, IndexWholeColumn) {
+    // A1=10, A2=20, A3=30
+    setCellValue(0, 0, 10.0);
+    setCellValue(0, 1, 20.0);
+    setCellValue(0, 2, 30.0);
+
+    // INDEX(A:A, 2) should return A2 = 20
+    EvalResult result = eval("=INDEX(A:A, 2)");
+    ASSERT_TRUE(result.isNumber());
+    EXPECT_EQ(result.getNumber(), 20.0);
+}
+
+TEST_F(FnLookupTest, IndexWholeColumnWithColArg) {
+    setCellValue(0, 0, 10.0);
+    setCellValue(0, 1, 20.0);
+
+    // INDEX(A:A, 1, 1) should return A1 = 10
+    EvalResult result = eval("=INDEX(A:A, 1, 1)");
+    ASSERT_TRUE(result.isNumber());
+    EXPECT_EQ(result.getNumber(), 10.0);
+}
+
+TEST_F(FnLookupTest, IndexColumnRange) {
+    // A1=1, B1=2, C1=3
+    // A2=4, B2=5, C2=6
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(2, 0, 3.0);
+    setCellValue(0, 1, 4.0);
+    setCellValue(1, 1, 5.0);
+    setCellValue(2, 1, 6.0);
+
+    // INDEX(A:C, 2, 2) should return B2 = 5
+    EvalResult result = eval("=INDEX(A:C, 2, 2)");
+    ASSERT_TRUE(result.isNumber());
+    EXPECT_EQ(result.getNumber(), 5.0);
+}
+
+TEST_F(FnLookupTest, IndexWholeRow) {
+    // A1=10, B1=20, C1=30
+    setCellValue(0, 0, 10.0);
+    setCellValue(1, 0, 20.0);
+    setCellValue(2, 0, 30.0);
+
+    // INDEX(1:1, 1, 2) should return B1 = 20
+    EvalResult result = eval("=INDEX(1:1, 1, 2)");
+    ASSERT_TRUE(result.isNumber());
+    EXPECT_EQ(result.getNumber(), 20.0);
+}
+
+TEST_F(FnLookupTest, IndexRowRange) {
+    // A1=1, B1=2
+    // A2=3, B2=4
+    // A3=5, B3=6
+    setCellValue(0, 0, 1.0);
+    setCellValue(1, 0, 2.0);
+    setCellValue(0, 1, 3.0);
+    setCellValue(1, 1, 4.0);
+    setCellValue(0, 2, 5.0);
+    setCellValue(1, 2, 6.0);
+
+    // INDEX(1:3, 2, 2) should return B2 = 4
+    EvalResult result = eval("=INDEX(1:3, 2, 2)");
+    ASSERT_TRUE(result.isNumber());
+    EXPECT_EQ(result.getNumber(), 4.0);
+}
+
 // =============================================================================
 // MATCH Tests
 // =============================================================================

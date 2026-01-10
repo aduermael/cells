@@ -28,24 +28,71 @@ RangeDimensions getRangeDimensions(const RangeBounds& bounds, Sheet* sheet) {
     RangeDimensions dims;
     dims.valid = false;
 
-    if (!sheet || bounds.type != RangeType::CELL_RANGE) {
-        return dims;  // Only support cell ranges for now
-    }
-
-    // Get start and end columns
-    const Axis* startCol = sheet->getColumn(bounds.startColId);
-    const Axis* endCol = sheet->getColumn(bounds.endColId);
-
-    if (!startCol || !endCol) {
+    if (!sheet) {
         return dims;
     }
 
-    dims.startColPos = startCol->position;
-    dims.startRowPos = bounds.startRowPos;  // Use position bounds directly
-    dims.cols = static_cast<uint32_t>(
-        std::abs(static_cast<int>(endCol->position) - static_cast<int>(startCol->position)) + 1);
-    dims.rows = static_cast<uint32_t>(bounds.endRowPos - bounds.startRowPos + 1);
-    dims.valid = true;
+    switch (bounds.type) {
+        case RangeType::CELL_RANGE: {
+            // Get start and end columns
+            const Axis* startCol = sheet->getColumn(bounds.startColId);
+            const Axis* endCol = sheet->getColumn(bounds.endColId);
+
+            if (!startCol || !endCol) {
+                return dims;
+            }
+
+            dims.startColPos = startCol->position;
+            dims.startRowPos = bounds.startRowPos;  // Use position bounds directly
+            dims.cols = static_cast<uint32_t>(
+                std::abs(static_cast<int>(endCol->position) - static_cast<int>(startCol->position)) +
+                1);
+            dims.rows = static_cast<uint32_t>(bounds.endRowPos - bounds.startRowPos + 1);
+            dims.valid = true;
+            break;
+        }
+        case RangeType::COLUMN:
+        case RangeType::COLUMN_RANGE: {
+            // Whole column(s) - columns are bounded, rows are "unlimited"
+            const Axis* startCol = sheet->getColumn(bounds.startColId);
+            const Axis* endCol = sheet->getColumn(bounds.endColId);
+
+            if (!startCol || !endCol) {
+                return dims;
+            }
+
+            dims.startColPos = startCol->position;
+            dims.startRowPos = 0;  // Start from first row
+            dims.cols = static_cast<uint32_t>(
+                std::abs(static_cast<int>(endCol->position) - static_cast<int>(startCol->position)) +
+                1);
+            // Use a large number for rows - effectively unlimited
+            // INDEX will validate against actual row index provided
+            dims.rows = 1048576;  // Excel's max row count
+            dims.valid = true;
+            break;
+        }
+        case RangeType::ROW:
+        case RangeType::ROW_RANGE: {
+            // Whole row(s) - rows are bounded, columns are "unlimited"
+            const Axis* startRow = sheet->getRow(bounds.startRowId);
+            const Axis* endRow = sheet->getRow(bounds.endRowId);
+
+            if (!startRow || !endRow) {
+                return dims;
+            }
+
+            dims.startColPos = 0;  // Start from first column
+            dims.startRowPos = startRow->position;
+            dims.rows = static_cast<uint32_t>(
+                std::abs(static_cast<int>(endRow->position) - static_cast<int>(startRow->position)) +
+                1);
+            // Use a large number for cols - effectively unlimited
+            dims.cols = 16384;  // Excel's max column count
+            dims.valid = true;
+            break;
+        }
+    }
 
     return dims;
 }
@@ -53,20 +100,47 @@ RangeDimensions getRangeDimensions(const RangeBounds& bounds, Sheet* sheet) {
 // Helper to get cell value at position in range (0-indexed offsets from range start)
 EvalResult getCellAtPosition(EvalContext& ctx, const RangeBounds& bounds, uint32_t rowOffset,
                              uint32_t colOffset) {
-    if (!ctx.sheet || bounds.type != RangeType::CELL_RANGE) {
+    if (!ctx.sheet) {
         return EvalResult::Error(CellError::REF);
     }
 
-    // Get start column
-    const Axis* startCol = ctx.sheet->getColumn(bounds.startColId);
+    uint32_t targetColPos = 0;
+    uint32_t targetRowPos = 0;
 
-    if (!startCol) {
-        return EvalResult::Error(CellError::REF);
+    switch (bounds.type) {
+        case RangeType::CELL_RANGE: {
+            // Get start column
+            const Axis* startCol = ctx.sheet->getColumn(bounds.startColId);
+            if (!startCol) {
+                return EvalResult::Error(CellError::REF);
+            }
+            targetColPos = startCol->position + colOffset;
+            targetRowPos = bounds.startRowPos + rowOffset;
+            break;
+        }
+        case RangeType::COLUMN:
+        case RangeType::COLUMN_RANGE: {
+            // Whole column(s) - start from column A, row 1
+            const Axis* startCol = ctx.sheet->getColumn(bounds.startColId);
+            if (!startCol) {
+                return EvalResult::Error(CellError::REF);
+            }
+            targetColPos = startCol->position + colOffset;
+            targetRowPos = rowOffset;  // 0-indexed from row 1
+            break;
+        }
+        case RangeType::ROW:
+        case RangeType::ROW_RANGE: {
+            // Whole row(s) - start from column A
+            const Axis* startRow = ctx.sheet->getRow(bounds.startRowId);
+            if (!startRow) {
+                return EvalResult::Error(CellError::REF);
+            }
+            targetColPos = colOffset;  // 0-indexed from column A
+            targetRowPos = startRow->position + rowOffset;
+            break;
+        }
     }
-
-    // Calculate target position (use position bounds for rows)
-    const uint32_t targetColPos = startCol->position + colOffset;
-    const uint32_t targetRowPos = bounds.startRowPos + rowOffset;
 
     // Find the column and row at those positions
     const Axis* targetCol = ctx.sheet->getColumnByPosition(targetColPos);

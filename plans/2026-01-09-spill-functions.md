@@ -1,6 +1,6 @@
 Status: IN PROGRESS
 Created At: 2026-01-09 19:40 UTC
-Updated At: 2026-01-10 21:45 UTC
+Updated At: 2026-01-10 22:10 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -331,11 +331,13 @@ Post-implementation bug fixes discovered during testing. Each bug should be repr
     - "Spill highlight shows when selecting spilled cell"
     - "Spill highlight clears when selecting cell outside spill range"
 
-- [ ] 10b: Fix `=INDEX(A:A)` returning #REF! error
+- [x] 10b: Fix `=INDEX(A:A)` returning #REF! error
   - **Bug**: Using whole-column reference in INDEX returns #REF! error
-  - **Steps to reproduce**: Enter `=INDEX(A:A, 1)` or `=INDEX(A:A)` in a cell
-  - **Expected**: Should return value from column A (first value or specified index)
-  - **Approach**: Add unit test for INDEX with column reference, debug formula evaluation
+  - **Root cause**: `getRangeDimensions` and `getCellAtPosition` in fn_lookup.cc only handled `CELL_RANGE` type, returning invalid/error for `COLUMN`, `COLUMN_RANGE`, `ROW`, `ROW_RANGE` types
+  - **Fix**: Extended both helper functions to handle all range types:
+    - `COLUMN`/`COLUMN_RANGE`: Use column IDs, rows start at 0 with "unlimited" max (1M rows)
+    - `ROW`/`ROW_RANGE`: Use row IDs, columns start at 0 with "unlimited" max (16K cols)
+  - **Tests added**: IndexWholeColumn, IndexWholeColumnWithColArg, IndexColumnRange, IndexWholeRow, IndexRowRange
 
 - [ ] 10c: Fix column reference highlighting in formula bar
   - **Bug**: Whole-column references like `A:A` are not highlighted correctly in the formula bar
