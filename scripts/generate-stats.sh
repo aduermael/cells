@@ -26,36 +26,49 @@ for arg in "$@"; do
     esac
 done
 
-EXCLUDE_PATTERN="bazel-|\.git|node_modules|dist|compile_commands|\.cache|external"
+# Check for CLOC
+if ! command -v cloc &> /dev/null; then
+    echo "Error: cloc not installed. Install with: brew install cloc" >&2
+    exit 1
+fi
 
-# Function to count lines for source files (excluding tests)
-count_source_lines() {
-    local patterns="$1"
-    local total=0
+CLOC_EXCLUDE="bazel-bin,bazel-out,bazel-cells,bazel-testlogs,node_modules,dist,.cache,external,third_party,.git"
 
-    for pattern in $patterns; do
-        count=$(find "$PROJECT_ROOT" -type f -name "$pattern" 2>/dev/null | \
-            grep -vE "$EXCLUDE_PATTERN" | \
-            grep -vE "_test\.(cc|cpp|go|js|mjs|ts|luau|lua)$|\.test\.(js|mjs|ts|luau|lua)$|\.spec\.(js|mjs|ts|luau|lua)$|test_.*\.(cc|cpp|js|luau|lua)$|/tests/" | \
-            xargs cat 2>/dev/null | wc -l | tr -d ' ')
-        total=$((total + count))
-    done
-    echo "$total"
+# Run CLOC and get JSON output for source files (excluding tests)
+get_cloc_source_json() {
+    cloc --json \
+         --exclude-dir="$CLOC_EXCLUDE" \
+         --not-match-f='_test\.(cc|cpp|go)|\.test\.(mjs|js|ts)|\.spec\.(mjs|js|ts)|/tests/' \
+         --quiet \
+         "$PROJECT_ROOT" 2>/dev/null
 }
 
-# Function to count lines for test files
-count_test_lines() {
-    local patterns="$1"
-    local total=0
+# Run CLOC for test files in /tests/ directories
+get_cloc_tests_dir_json() {
+    if [ -d "$PROJECT_ROOT/apps/wasm/tests" ]; then
+        cloc --json \
+             --exclude-dir=node_modules \
+             --quiet \
+             "$PROJECT_ROOT/apps/wasm/tests" 2>/dev/null
+    else
+        echo '{}'
+    fi
+}
 
-    for pattern in $patterns; do
-        count=$(find "$PROJECT_ROOT" -type f -name "$pattern" 2>/dev/null | \
-            grep -vE "$EXCLUDE_PATTERN" | \
-            grep -E "_test\.(cc|cpp|go|js|mjs|ts|luau|lua)$|\.test\.(js|mjs|ts|luau|lua)$|\.spec\.(js|mjs|ts|luau|lua)$|test_.*\.(cc|cpp|js|luau|lua)$|/tests/" | \
-            xargs cat 2>/dev/null | wc -l | tr -d ' ')
-        total=$((total + count))
-    done
-    echo "$total"
+# Run CLOC for _test.* and *.test.* files
+get_cloc_test_files_json() {
+    cloc --json \
+         --exclude-dir="$CLOC_EXCLUDE,tests" \
+         --match-f='_test\.(cc|cpp|go)|\.test\.(mjs|js|ts)|\.spec\.(mjs|js|ts)' \
+         --quiet \
+         "$PROJECT_ROOT" 2>/dev/null || echo '{}'
+}
+
+# Extract code lines for a language from CLOC JSON
+extract_lines() {
+    local json="$1"
+    local lang="$2"
+    echo "$json" | jq -r ".[\"$lang\"].code // 0" 2>/dev/null || echo 0
 }
 
 # Function to format bytes to human readable
@@ -80,29 +93,40 @@ if [ "$BUILD_WASM" = true ]; then
     make wasm-dist > /dev/null 2>&1
 fi
 
-# Count source lines for each language (excluding tests)
-cpp_lines=$(count_source_lines "*.cc *.cpp *.h")
-js_lines=$(count_source_lines "*.js *.mjs")
-ts_lines=$(count_source_lines "*.ts")
-html_lines=$(count_source_lines "*.html")
-css_lines=$(count_source_lines "*.css")
-go_lines=$(count_source_lines "*.go")
-luau_lines=$(count_source_lines "*.luau *.lua")
-objcpp_lines=$(count_source_lines "*.mm")
-md_lines=$(count_source_lines "*.md")
-sh_lines=$(count_source_lines "*.sh")
+echo "Collecting stats with CLOC..." >&2
 
-# Starlark needs special handling for BUILD files
-bzl_lines=$(find "$PROJECT_ROOT" -type f \( -name "BUILD" -o -name "*.bzl" -o -name "BUILD.bazel" \) 2>/dev/null | \
-    grep -vE "$EXCLUDE_PATTERN" | xargs cat 2>/dev/null | wc -l | tr -d ' ')
+# Get CLOC data for source files
+SOURCE_JSON=$(get_cloc_source_json)
 
-# Count test lines for each language
-cpp_test_lines=$(count_test_lines "*.cc *.cpp")
-objcpp_test_lines=$(count_test_lines "*.mm")
-js_test_lines=$(count_test_lines "*.js *.mjs")
-ts_test_lines=$(count_test_lines "*.ts")
-go_test_lines=$(count_test_lines "*.go")
-luau_test_lines=$(count_test_lines "*.luau *.lua")
+# Extract source lines for each language (CLOC uses specific language names)
+cpp_lines=$(extract_lines "$SOURCE_JSON" "C++")
+# Add header files to C++ count
+cpp_header_lines=$(extract_lines "$SOURCE_JSON" "C/C++ Header")
+cpp_lines=$((cpp_lines + cpp_header_lines))
+
+js_lines=$(extract_lines "$SOURCE_JSON" "JavaScript")
+ts_lines=$(extract_lines "$SOURCE_JSON" "TypeScript")
+html_lines=$(extract_lines "$SOURCE_JSON" "HTML")
+css_lines=$(extract_lines "$SOURCE_JSON" "CSS")
+go_lines=$(extract_lines "$SOURCE_JSON" "Go")
+luau_lines=$(extract_lines "$SOURCE_JSON" "Luau")
+objcpp_lines=$(extract_lines "$SOURCE_JSON" "Objective-C++")
+md_lines=$(extract_lines "$SOURCE_JSON" "Markdown")
+sh_lines=$(extract_lines "$SOURCE_JSON" "Bourne Shell")
+# Starlark: CLOC may report as "Starlark" or "Bazel" depending on file extension
+bzl_lines=$(($(extract_lines "$SOURCE_JSON" "Starlark") + $(extract_lines "$SOURCE_JSON" "Bazel")))
+
+# Get CLOC data for test files (two separate calls for simpler parsing)
+TESTS_DIR_JSON=$(get_cloc_tests_dir_json)
+TEST_FILES_JSON=$(get_cloc_test_files_json)
+
+# Extract test lines (combine both sources)
+cpp_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "C++") + $(extract_lines "$TESTS_DIR_JSON" "C++")))
+objcpp_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "Objective-C++") + $(extract_lines "$TESTS_DIR_JSON" "Objective-C++")))
+js_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "JavaScript") + $(extract_lines "$TESTS_DIR_JSON" "JavaScript")))
+ts_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "TypeScript") + $(extract_lines "$TESTS_DIR_JSON" "TypeScript")))
+go_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "Go") + $(extract_lines "$TESTS_DIR_JSON" "Go")))
+luau_test_lines=$(($(extract_lines "$TEST_FILES_JSON" "Luau") + $(extract_lines "$TESTS_DIR_JSON" "Luau")))
 
 # Count C++ unit tests (TEST and TEST_F macros)
 cpp_unit_tests=0
@@ -240,7 +264,13 @@ generate_readme_section() {
     echo "- **WASM Module**: $wasm_size"
     echo "- **Total Web Bundle**: $bundle_size"
     echo ""
-    echo "<sub>Generated with \`./scripts/generate-stats.sh\`</sub>"
+    echo "<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with \`./scripts/generate-stats.sh\`</sub>"
+    echo ""
+    echo "### LOC Evolution"
+    echo ""
+    echo '<img src="stats/loc-evolution.svg" alt="Lines of Code Evolution" width="100%">'
+    echo ""
+    echo "<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with \`./scripts/loc-tracker.sh && node scripts/generate-loc-svg.mjs\`</sub>"
 }
 
 # -----------------------------------------------------------------------------
@@ -267,10 +297,15 @@ if [ "$UPDATE_README" = true ]; then
         !in_section { print }
     ' "$README_FILE" > "$TEMP_OUTPUT" && mv "$TEMP_OUTPUT" "$README_FILE"
 
-    echo "Updated README.md"
+    echo "Updated README.md tables"
 
-    # Commit the changes
-    git add README.md
+    # Update LOC evolution graph
+    echo "Updating LOC evolution graph..."
+    "$SCRIPT_DIR/loc-tracker.sh"
+    node "$SCRIPT_DIR/generate-loc-svg.mjs"
+
+    # Commit all changes
+    git add README.md stats/
     git commit -m "Update project stats
 
 - Source: $(echo "$cpp_lines" | awk '{printf "%'\''d", $1}') C++, $(echo "$ts_lines" | awk '{printf "%'\''d", $1}') TypeScript
