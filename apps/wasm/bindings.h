@@ -114,6 +114,15 @@ public:
     uint32_t getTotalHeight();
 
     // ========================================================================
+    // Spill range queries (bindings_viewport.cc)
+    // ========================================================================
+
+    // Get spill range info for a cell at the given position
+    // Returns JSON with: masterId, masterCol, masterRow, endCol, endRow, spillCount
+    // Returns empty object if position is not part of any spill range
+    std::string getSpillRangeAt(uint32_t col, uint32_t row);
+
+    // ========================================================================
     // Cell operations (bindings_core.cc)
     // ========================================================================
 

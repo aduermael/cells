@@ -173,14 +173,16 @@ First spill-capable function as proof of concept.
 
 ---
 
-## Phase 6: WASM Bindings
+## Phase 6: WASM Bindings ✅
 
-- [ ] 6a: Expose spill info in cell queries
-  - `getCell()` response includes: `isSpilled: bool`, `spillMasterId: string | null`
-  - `getSpillRange(cellId)` → returns spill range bounds if cell is master
+- [x] 6a: Expose spill info in cell queries
+  - `queryViewport()` response includes: `isSpilled: bool`, `spillMasterId: string`, `isSpillMaster: bool`
+  - Virtual spilled cells (no actual cell in cells map) are now included in viewport query
+  - Spilled values shown with `type: "s"` marker
 
-- [ ] 6b: Add spill range query for highlighting
-  - `getSpillRangeForCell(colId, rowId)` → returns master cell ID and full spill bounds
+- [x] 6b: Add spill range query for highlighting
+  - `getSpillRangeAt(col, row)` → returns master cell ID and full spill bounds
+  - Returns: `masterId`, `masterCol`, `masterRow`, `minCol`, `minRow`, `maxCol`, `maxRow`, `spillCount`
   - Used by UI to highlight spill range on selection
 
 ---

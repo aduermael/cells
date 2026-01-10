@@ -112,6 +112,8 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getRowPixelOffset", &cells::wasm::CellsEngine::getRowPixelOffset)
         .function("getTotalWidth", &cells::wasm::CellsEngine::getTotalWidth)
         .function("getTotalHeight", &cells::wasm::CellsEngine::getTotalHeight)
+        // Spill range queries
+        .function("getSpillRangeAt", &cells::wasm::CellsEngine::getSpillRangeAt)
         // Cell operations
         .function("updateCell", &cells::wasm::CellsEngine::updateCell)
         .function("updateCellWithFormatDetection",
