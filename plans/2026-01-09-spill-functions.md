@@ -1,6 +1,6 @@
-Status: COMPLETED
+Status: IN PROGRESS
 Created At: 2026-01-09 19:40 UTC
-Updated At: 2026-01-10 20:10 UTC
+Updated At: 2026-01-10 21:45 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -314,6 +314,50 @@ UI layer only renders based on spill data queried from C++ via WASM bindings.
     - The `#` spill range operator with examples
     - Spill blocking conditions
     - Limits (MAX_SPILL_CELLS)
+
+---
+
+## Phase 10: Bug Fixes
+
+Post-implementation bug fixes discovered during testing. Each bug should be reproduced with a failing test first, then the test should be made to pass.
+
+- [ ] 10a: Improve spill range highlighting behavior
+  - **Bug**: Spill range highlighting behavior is inconsistent
+  - **Expected behavior**:
+    - When selecting ANY cell in a spill range, highlight the entire spill range
+    - Master cell should have special visual treatment (e.g., thicker border, different color, or icon)
+    - When selecting a cell OUTSIDE a spill range, no spill highlight should show
+  - **Approach**: Add E2E tests for spill highlighting, update grid-selection-renderer.ts to:
+    - Always query spill range when selection changes
+    - Clear spill highlight when selected cell is not part of a spill
+    - Distinguish master cell visually (e.g., solid border vs dashed for spilled cells)
+
+- [ ] 10b: Fix `=INDEX(A:A)` returning #REF! error
+  - **Bug**: Using whole-column reference in INDEX returns #REF! error
+  - **Steps to reproduce**: Enter `=INDEX(A:A, 1)` or `=INDEX(A:A)` in a cell
+  - **Expected**: Should return value from column A (first value or specified index)
+  - **Approach**: Add unit test for INDEX with column reference, debug formula evaluation
+
+- [ ] 10c: Fix column reference highlighting in formula bar
+  - **Bug**: Whole-column references like `A:A` are not highlighted correctly in the formula bar
+  - **Steps to reproduce**: Enter `=SUM(A:A)` and observe formula bar highlighting
+  - **Expected**: Column A should be highlighted with reference color
+  - **Approach**: Add test for column ref highlighting, fix formula highlighting logic in TypeScript
+
+- [ ] 10d: Allow editing cells that would break existing spill
+  - **Bug**: Cannot type into a cell currently occupied by a spill range
+  - **Current behavior**: Editing is blocked for spilled cells (too restrictive)
+  - **Expected behavior (Excel-compatible)**:
+    - User CAN type a value into a spilled cell
+    - This causes the spill master to show `#SPILL!` error
+    - Deleting the blocking value should dynamically restore the spill
+  - **Note**: Currently works if blocking cell has value BEFORE spill formula is entered, but not after
+  - **Approach**:
+    - Remove edit restriction for spilled cells in CellEditor
+    - Ensure recalculation properly detects blocking and triggers `#SPILL!`
+    - Add E2E test: enter spill formula → type into spilled cell → verify `#SPILL!` → delete blocking value → verify spill restored
+
+- [ ] 10e: (Placeholder for additional bugs found during testing)
 
 ---
 
