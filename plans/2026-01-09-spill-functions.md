@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2026-01-09 19:40 UTC
-Updated At: 2026-01-09 19:40 UTC
+Updated At: 2026-01-10 04:37 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -32,6 +32,22 @@ Implement Excel-compatible spill/dynamic array functionality where formulas can 
 - The `#` operator references entire spill ranges (e.g., `D2#` = all spilled values from D2)
 
 **Target functions:** UNIQUE, SORT, FILTER, SEQUENCE, TRANSPOSE, RANDARRAY
+
+## Architecture Principle
+
+**All spill logic lives in C++ (core engine), not TypeScript (UI).**
+
+Even though spill data is runtime-only (not persisted to CRDT/file), the tracking structures and evaluation logic must be in the C++ core:
+- `SpillInfo`, `spillMasters`, `spilledFrom` maps → in `Sheet` (C++)
+- Spill range calculation, blocking detection → in `formula_eval.cc` / `formula_recalc.cc`
+- Spilled cell values → stored in C++ runtime cache, queried via WASM bindings
+- TypeScript only handles **rendering** (highlighting, grayed formula bar) based on data from C++
+
+This ensures:
+1. Consistency across all platforms (WASM, CLI, native)
+2. Single source of truth for spill state
+3. Proper integration with dependency graph and recalculation
+4. No duplicated logic between C++ and TypeScript
 
 ## Research Summary
 
@@ -167,24 +183,24 @@ First spill-capable function as proof of concept.
 
 ---
 
-## Phase 7: UI Integration (TypeScript)
+## Phase 7: UI Rendering (TypeScript)
+
+UI layer only renders based on spill data queried from C++ via WASM bindings.
 
 - [ ] 7a: Highlight spill range on cell selection
-  - When selecting any cell, check if it's part of a spill range
-  - If yes, draw a border around the entire spill range (similar to selection but different style)
+  - Call `getSpillRangeForCell()` from C++ to get spill bounds
+  - If cell is part of a spill range, draw border around entire range
   - Use a distinct color (e.g., blue border like Excel)
 
 - [ ] 7b: Gray out formula bar for spilled cells
-  - When selecting a spilled (non-master) cell:
-    - Show the master's formula in the formula bar
-    - Apply "ghosted" styling (gray text, non-editable)
-    - Disable editing in formula bar
-  - When selecting master cell: normal editable behavior
+  - Check `isSpilled` flag from `getCell()` response (from C++)
+  - If spilled (non-master): show master's formula grayed out, disable editing
+  - If master: normal editable behavior
 
 - [ ] 7c: Prevent editing spilled cells
-  - Block typing/editing in spilled cells
-  - If user tries to type, show tooltip: "Can't edit spilled cell"
-  - Allow deleting entire spill by deleting master cell
+  - Check `isSpilled` flag before allowing edit
+  - If user tries to type in spilled cell, show message
+  - Deleting master cell clears entire spill (handled in C++)
 
 - [ ] 7d: Add E2E tests for spill UI behavior
   - Test spill range highlighting
@@ -213,6 +229,18 @@ First spill-capable function as proof of concept.
 ---
 
 ## Technical Notes
+
+### Runtime-Only But Still C++
+
+Spill data is "runtime-only" meaning:
+- NOT persisted to .cells files or CRDT operations
+- Recomputed on file load / recalculation
+
+But it still lives in C++:
+- `Sheet` holds `spillMasters` and `spilledFrom` maps (cleared on load, rebuilt on recalc)
+- Spilled cell values stored in a C++ cache structure (not in `Cell::value` for non-master cells)
+- All blocking detection, range calculation, cleanup logic in C++
+- TypeScript queries this state via WASM, never computes it
 
 ### Why Not Persist Spilled Values?
 

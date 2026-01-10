@@ -64,6 +64,10 @@ export interface ClipboardCell {
   type: CellData["type"];
   /** Number format ID (e.g., "FMT_P002" for percentage with 2 decimals) */
   formatId?: string;
+  /** Style ID for cell styling */
+  styleId?: string;
+  /** Style properties (if available from viewport data) */
+  style?: CellData["style"];
 }
 
 
@@ -306,6 +310,14 @@ export class ClipboardManager {
             clipCell.formatId = cell.formatId;
           }
 
+          // Include style ID and style properties if present
+          if (cell.styleId && cell.styleId !== "~") {
+            clipCell.styleId = cell.styleId;
+          }
+          if (cell.style) {
+            clipCell.style = cell.style;
+          }
+
           clipboardCells.push(clipCell);
         }
       }
@@ -456,6 +468,22 @@ export class ClipboardManager {
             console.error(
               `Failed to set format at (${targetCol}, ${targetRow}):`,
               formatErr
+            );
+          }
+        }
+
+        // Apply style if present (only for internal paste)
+        if (cell.style && data.sourceCol !== undefined) {
+          try {
+            await this.dataSource.setCellStyleAt(
+              targetCol,
+              targetRow,
+              cell.style
+            );
+          } catch (styleErr) {
+            console.error(
+              `Failed to set style at (${targetCol}, ${targetRow}):`,
+              styleErr
             );
           }
         }

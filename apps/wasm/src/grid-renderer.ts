@@ -484,11 +484,14 @@ export class GridRenderer {
       ctx.font = fontStyle ? `${fontStyle}${fontSize}px ${fontFamily}` : `${fontSize}px ${fontFamily}`;
 
       // Set horizontal alignment
+      // Content area is inset by 1px on each side for grid lines
       const hAlign = style?.hAlign || "left";
       let textX: number;
       if (hAlign === "center") {
         ctx.textAlign = "center";
-        textX = cellX + colWidth / 2;
+        // Center within the content area (between grid lines: cellX+1 to cellX+colWidth-1)
+        // Round to nearest pixel for crisp rendering
+        textX = Math.round(cellX + colWidth / 2);
       } else if (hAlign === "right") {
         ctx.textAlign = "right";
         textX = cellX + colWidth - CELL_PADDING;
