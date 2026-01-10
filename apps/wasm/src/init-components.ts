@@ -277,9 +277,11 @@ export function createComponents(config: ComponentsConfig): Components {
   // =========================================================================
 
   function getFormulaBarValue(
-    cell: { formula?: string; value?: string; editValue?: string; display?: string } | null | undefined
+    cell: { formula?: string; value?: string; editValue?: string; display?: string; isSpilled?: boolean; masterFormula?: string } | null | undefined
   ): string {
     if (!cell) return "";
+    // For spilled cells, show the master formula (grayed out)
+    if (cell.isSpilled && cell.masterFormula) return cell.masterFormula;
     if (cell.formula) return cell.formula;
     // Use editValue for human-readable display (dates, percentages, etc.)
     // Fall back to raw value if editValue not available
@@ -305,6 +307,7 @@ export function createComponents(config: ComponentsConfig): Components {
       return;
     }
 
+    let isSpilledCell = false;
     if (hasRangeSelection(app.selectionStart, app.selectionEnd)) {
       if (app.selectionStart) {
         const ref = colToLetter(app.selectionStart.col) + (app.selectionStart.row + 1);
@@ -313,6 +316,7 @@ export function createComponents(config: ComponentsConfig): Components {
         const value = getFormulaBarValue(anchorCell);
         elements.formulaInput.value = value;
         elements.formulaDisplay.textContent = value;
+        isSpilledCell = anchorCell?.isSpilled === true;
       }
     } else {
       const ref = colToLetter(app.selectedCell.col) + (app.selectedCell.row + 1);
@@ -321,12 +325,18 @@ export function createComponents(config: ComponentsConfig): Components {
       const value = getFormulaBarValue(cell);
       elements.formulaInput.value = value;
       elements.formulaDisplay.textContent = value;
+      isSpilledCell = cell?.isSpilled === true;
     }
     elements.formulaDisplay.dataset.placeholder = "";
+    // Gray out formula bar for spilled cells (non-master cells in spill range)
+    elements.formulaDisplay.classList.toggle("spilled-cell", isSpilledCell);
 
     if (!cellEditor.isEditing() && !formulaBarEditor.isEditingFormulaBar()) {
       const cell = getCellAt(app.selectedCell.col, app.selectedCell.row, app.cells);
-      const formulaValue = cell?.formula || "";
+      // Use master formula for spilled cells, otherwise use the cell's own formula
+      const formulaValue = (cell?.isSpilled && cell?.masterFormula)
+        ? cell.masterFormula
+        : (cell?.formula || "");
       if (formulaValue.startsWith("=")) {
         updateFormulaHighlights(formulaValue);
       } else {

@@ -936,6 +936,12 @@ canvas {
     color: var(--color-text-placeholder);
 }
 
+/* Spilled cell formula display - grayed out and non-editable */
+#formula-display.spilled-cell {
+    color: var(--color-text-disabled);
+    cursor: default;
+}
+
 /* Formula reference colors in text */
 #formula-display .formula-ref,
 #cell-display .formula-ref {

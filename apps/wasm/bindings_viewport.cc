@@ -161,6 +161,17 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         if (isSpilledCell) {
             json << "\"isSpilled\":true,";
             json << "\"spillMasterId\":\"" << spillMaster.toString() << "\",";
+            // Include master formula for display in formula bar (grayed out)
+            Cell* masterCell = sheet->getCell(spillMaster);
+            if (masterCell != nullptr) {
+                Formula* masterFormula = masterCell->getFormula();
+                if (masterFormula != nullptr && masterFormula->ast != nullptr) {
+                    const std::string uuidFormula =
+                        FormulaSerializer::serialize(masterFormula->ast);
+                    const std::string a1Formula = _refConverter.formulaToA1(uuidFormula);
+                    json << "\"masterFormula\":\"" << jsonEscape(a1Formula) << "\",";
+                }
+            }
         }
 
         // Check if this cell is a spill master (has a spill range)
@@ -322,6 +333,9 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             json << "\"row\":" << rowPos << ",";
             json << "\"isSpilled\":true,";
             json << "\"spillMasterId\":\"" << cell->id.toString() << "\",";
+            if (!masterFormula.empty()) {
+                json << "\"masterFormula\":\"" << jsonEscape(masterFormula) << "\",";
+            }
             json << "\"type\":\"s\",";  // Spilled value type
 
             // Get the spilled value

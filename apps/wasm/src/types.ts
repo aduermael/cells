@@ -76,6 +76,11 @@ export interface CellData {
   formatId?: string; // Number format ID (~ or empty for GENERAL)
   styleId?: string; // Cell style ID (~ or empty for default style)
   style?: CellStyle; // Inline style for efficient rendering
+  // Spill range properties
+  isSpilled?: boolean; // True if this cell is part of a spill range (not the master)
+  isSpillMaster?: boolean; // True if this cell is the master of a spill range
+  spillMasterId?: string; // ID of the master cell if this is a spilled cell
+  masterFormula?: string; // Formula of the master cell (for displaying in formula bar when spilled)
 }
 
 // ============================================================================
