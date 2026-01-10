@@ -475,6 +475,48 @@ TEST(FormulaParserTest, WholeRowRef) {
     EXPECT_EQ(row->row, 1);
 }
 
+TEST(FormulaParserTest, WholeRowRefPosition) {
+    // Row reference position should span the full "1:1" text
+    const std::string formula = "=1:1";
+    FormulaParser parser(formula);
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::ROW_REF);
+
+    auto* row = dynamic_cast<RowRefNode*>(ast.get());
+    ASSERT_NE(row, nullptr);
+
+    // Position should span from first '1' to end of second '1' (positions 1-4)
+    EXPECT_EQ(row->position.start, 1u);
+    EXPECT_EQ(row->position.end, 4u);
+
+    // Verify the text can be extracted
+    const std::string refText =
+        formula.substr(row->position.start, row->position.end - row->position.start);
+    EXPECT_EQ(refText, "1:1");
+}
+
+TEST(FormulaParserTest, WholeColumnRefPosition) {
+    // Column reference position should span the full "A:A" text
+    const std::string formula = "=A:A";
+    FormulaParser parser(formula);
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::COLUMN_REF);
+
+    auto* col = dynamic_cast<ColumnRefNode*>(ast.get());
+    ASSERT_NE(col, nullptr);
+
+    // Position should span from first 'A' to end of second 'A' (positions 1-4)
+    EXPECT_EQ(col->position.start, 1u);
+    EXPECT_EQ(col->position.end, 4u);
+
+    // Verify the text can be extracted
+    const std::string refText =
+        formula.substr(col->position.start, col->position.end - col->position.start);
+    EXPECT_EQ(refText, "A:A");
+}
+
 TEST(FormulaParserTest, RowRangeRef) {
     FormulaParser parser("=1:10");
     auto ast = parser.parse();
@@ -485,6 +527,48 @@ TEST(FormulaParserTest, RowRangeRef) {
     ASSERT_NE(rowRange, nullptr);
     EXPECT_EQ(rowRange->startRow, 1);
     EXPECT_EQ(rowRange->endRow, 10);
+}
+
+TEST(FormulaParserTest, RowRangeRefPosition) {
+    // Row range reference position should span the full "1:10" text
+    const std::string formula = "=1:10";
+    FormulaParser parser(formula);
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::ROW_RANGE_REF);
+
+    auto* rowRange = dynamic_cast<RowRangeRefNode*>(ast.get());
+    ASSERT_NE(rowRange, nullptr);
+
+    // Position should span from first '1' to end of '10' (positions 1-5)
+    EXPECT_EQ(rowRange->position.start, 1u);
+    EXPECT_EQ(rowRange->position.end, 5u);
+
+    // Verify the text can be extracted
+    const std::string refText =
+        formula.substr(rowRange->position.start, rowRange->position.end - rowRange->position.start);
+    EXPECT_EQ(refText, "1:10");
+}
+
+TEST(FormulaParserTest, ColumnRangeRefPosition) {
+    // Column range reference position should span the full "A:C" text
+    const std::string formula = "=A:C";
+    FormulaParser parser(formula);
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::COLUMN_RANGE_REF);
+
+    auto* colRange = dynamic_cast<ColumnRangeRefNode*>(ast.get());
+    ASSERT_NE(colRange, nullptr);
+
+    // Position should span from 'A' to end of 'C' (positions 1-4)
+    EXPECT_EQ(colRange->position.start, 1u);
+    EXPECT_EQ(colRange->position.end, 4u);
+
+    // Verify the text can be extracted
+    const std::string refText =
+        formula.substr(colRange->position.start, colRange->position.end - colRange->position.start);
+    EXPECT_EQ(refText, "A:C");
 }
 
 // ============================================================================

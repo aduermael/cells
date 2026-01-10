@@ -266,7 +266,7 @@ std::unique_ptr<ASTNode> FormulaParser::primary() {
             // It's a row reference, parse it
             const int startRow = static_cast<int>(numToken.numberValue());
             advance();  // Consume :
-            return parseRowRef(false, startRow, "");
+            return parseRowRef(false, startRow, "", numToken.position);
         }
         // Just a number literal
         return std::make_unique<NumberLiteralNode>(numToken.numberValue(), numToken.position);
@@ -391,14 +391,20 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
                     advance();
                     if (check(TokenType::IDENTIFIER) || check(TokenType::COLUMN)) {
                         const std::string endCol(current_.text);
+                        const SourcePosition endPos = current_.position;
                         advance();
                         if (isValidColumnName(endCol)) {
+                            // Compute full position from start of first column to end of second
+                            const SourcePosition fullPos{id.position.start, endPos.end};
                             if (name == endCol) {
                                 // Single column: A:A
-                                return std::make_unique<ColumnRefNode>(name, false, id.position);
+                                return std::make_unique<ColumnRefNode>(name, false, fullPos);
                             }
                             // Column range: A:C
-                            return std::make_unique<ColumnRangeRefNode>(name, endCol, false, false);
+                            auto node =
+                                std::make_unique<ColumnRangeRefNode>(name, endCol, false, false);
+                            node->position = fullPos;
+                            return node;
                         }
                     }
                     if (check(TokenType::DOLLAR)) {
@@ -406,8 +412,13 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
                         advance();
                         if (check(TokenType::IDENTIFIER) || check(TokenType::COLUMN)) {
                             const std::string endCol(current_.text);
+                            const SourcePosition endPos = current_.position;
                             advance();
-                            return std::make_unique<ColumnRangeRefNode>(name, endCol, false, true);
+                            const SourcePosition fullPos{id.position.start, endPos.end};
+                            auto node =
+                                std::make_unique<ColumnRangeRefNode>(name, endCol, false, true);
+                            node->position = fullPos;
+                            return node;
                         }
                     }
                 }
@@ -495,17 +506,21 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
             const bool secondAbsolute = match(TokenType::DOLLAR);
             if (check(TokenType::COLUMN) || check(TokenType::IDENTIFIER)) {
                 const std::string endCol(current_.text);
+                const SourcePosition endPos = current_.position;
                 advance();
                 if (isValidColumnName(endCol)) {
+                    // Compute full position from start of first column to end of second column
+                    const SourcePosition fullPos{pos.start, endPos.end};
                     if (col == endCol && !secondAbsolute) {
                         // Single column: A:A
-                        auto node = std::make_unique<ColumnRefNode>(col, false, pos);
+                        auto node = std::make_unique<ColumnRefNode>(col, false, fullPos);
                         node->sheetName = sheetName;
                         return node;
                     }
                     // Column range: A:C
                     auto node =
                         std::make_unique<ColumnRangeRefNode>(col, endCol, false, secondAbsolute);
+                    node->position = fullPos;
                     node->sheetName = sheetName;
                     return node;
                 }
@@ -527,7 +542,7 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
         const SourcePosition pos = current_.position;
         advance();
         if (match(TokenType::COLON)) {
-            return parseRowRef(false, startRow, sheetName);
+            return parseRowRef(false, startRow, sheetName, pos);
         }
         // Just a number literal (shouldn't normally happen in formula context)
         return std::make_unique<NumberLiteralNode>(static_cast<double>(startRow), pos);
@@ -619,22 +634,26 @@ FormulaParser::CellRefComponents FormulaParser::parseCellRefComponents() {
 }
 
 std::unique_ptr<ASTNode> FormulaParser::parseRowRef(bool startAbsolute, int startRow,
-                                                    const std::string& sheetName) {
+                                                    const std::string& sheetName,
+                                                    SourcePosition startPos) {
     // After seeing "N:" we expect another number
     const bool endAbsolute = match(TokenType::DOLLAR);
 
     if (check(TokenType::NUMBER)) {
         const int endRow = static_cast<int>(current_.numberValue());
+        // Compute full position from start of first number to end of second number
+        const SourcePosition fullPos{startPos.start, current_.position.end};
         advance();
 
         if (startRow == endRow && startAbsolute == endAbsolute) {
             // Single row: 1:1
-            auto node = std::make_unique<RowRefNode>(startRow, startAbsolute);
+            auto node = std::make_unique<RowRefNode>(startRow, startAbsolute, fullPos);
             node->sheetName = sheetName;
             return node;
         }
         // Row range: 1:5
         auto node = std::make_unique<RowRangeRefNode>(startRow, endRow, startAbsolute, endAbsolute);
+        node->position = fullPos;
         node->sheetName = sheetName;
         return node;
     }

@@ -44,9 +44,9 @@ RangeDimensions getRangeDimensions(const RangeBounds& bounds, Sheet* sheet) {
 
             dims.startColPos = startCol->position;
             dims.startRowPos = bounds.startRowPos;  // Use position bounds directly
-            dims.cols = static_cast<uint32_t>(
-                std::abs(static_cast<int>(endCol->position) - static_cast<int>(startCol->position)) +
-                1);
+            dims.cols = static_cast<uint32_t>(std::abs(static_cast<int>(endCol->position) -
+                                                       static_cast<int>(startCol->position)) +
+                                              1);
             dims.rows = static_cast<uint32_t>(bounds.endRowPos - bounds.startRowPos + 1);
             dims.valid = true;
             break;
@@ -63,9 +63,9 @@ RangeDimensions getRangeDimensions(const RangeBounds& bounds, Sheet* sheet) {
 
             dims.startColPos = startCol->position;
             dims.startRowPos = 0;  // Start from first row
-            dims.cols = static_cast<uint32_t>(
-                std::abs(static_cast<int>(endCol->position) - static_cast<int>(startCol->position)) +
-                1);
+            dims.cols = static_cast<uint32_t>(std::abs(static_cast<int>(endCol->position) -
+                                                       static_cast<int>(startCol->position)) +
+                                              1);
             // Use a large number for rows - effectively unlimited
             // INDEX will validate against actual row index provided
             dims.rows = 1048576;  // Excel's max row count
@@ -84,9 +84,9 @@ RangeDimensions getRangeDimensions(const RangeBounds& bounds, Sheet* sheet) {
 
             dims.startColPos = 0;  // Start from first column
             dims.startRowPos = startRow->position;
-            dims.rows = static_cast<uint32_t>(
-                std::abs(static_cast<int>(endRow->position) - static_cast<int>(startRow->position)) +
-                1);
+            dims.rows = static_cast<uint32_t>(std::abs(static_cast<int>(endRow->position) -
+                                                       static_cast<int>(startRow->position)) +
+                                              1);
             // Use a large number for cols - effectively unlimited
             dims.cols = 16384;  // Excel's max column count
             dims.valid = true;

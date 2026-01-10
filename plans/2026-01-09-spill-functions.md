@@ -339,11 +339,19 @@ Post-implementation bug fixes discovered during testing. Each bug should be repr
     - `ROW`/`ROW_RANGE`: Use row IDs, columns start at 0 with "unlimited" max (16K cols)
   - **Tests added**: IndexWholeColumn, IndexWholeColumnWithColArg, IndexColumnRange, IndexWholeRow, IndexRowRange
 
-- [ ] 10c: Fix column reference highlighting in formula bar
-  - **Bug**: Whole-column references like `A:A` are not highlighted correctly in the formula bar
-  - **Steps to reproduce**: Enter `=SUM(A:A)` and observe formula bar highlighting
-  - **Expected**: Column A should be highlighted with reference color
-  - **Approach**: Add test for column ref highlighting, fix formula highlighting logic in TypeScript
+- [x] 10c: Fix column/row reference highlighting in formula bar
+  - **Bug**: Whole-column/row references like `A:A` and `1:1` were not highlighted correctly in the formula bar
+  - **Root cause**: AST parser was setting source position to only the first token, not the full reference text
+  - **Fix**: Updated `FormulaParser` to compute full source position spanning from start to end of reference:
+    - `parseRowRef()` now takes `startPos` parameter and computes `fullPos{startPos.start, endToken.position.end}`
+    - `ColumnRefNode` position now spans full `A:A` instead of just first `A`
+    - `ColumnRangeRefNode` position now spans full `A:C`
+    - `RowRefNode` position now spans full `1:1`
+    - `RowRangeRefNode` position now spans full `1:10`
+  - **Tests added**:
+    - C++ unit tests: WholeRowRefPosition, WholeColumnRefPosition, RowRangeRefPosition, ColumnRangeRefPosition
+    - E2E tests: "Column reference is colored in formula bar", "Row reference is colored in formula bar"
+  - **Note**: WASM build is currently broken (Luau exception issue), E2E tests pending
 
 - [ ] 10d: Allow editing cells that would break existing spill
   - **Bug**: Cannot type into a cell currently occupied by a spill range

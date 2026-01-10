@@ -337,6 +337,90 @@ const tests = {
 
     assertTrue(hasColoredRef, 'Cell reference A1 should be colored in formula bar');
   },
+
+  // ============================================================================
+  // Column/Row Reference Highlighting Tests
+  // ============================================================================
+
+  'Column reference is colored in formula bar': async (ctx) => {
+    // Whole column references like A:A should be highlighted with full text
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter some values in column A
+    await setCellValue(ctx.page, 'A1', '10');
+    await setCellValue(ctx.page, 'A2', '20');
+    await sleep(100);
+
+    // Enter a formula with a column reference
+    await setCellValue(ctx.page, 'B1', '=SUM(A:A)');
+    await sleep(200);
+
+    // Click B1 to select it and trigger formula highlighting
+    await clickCell(ctx.page, 'B1');
+    await sleep(300);
+
+    // Check that A:A reference is colored (the full "A:A" text should be in one span)
+    const hasColoredRef = await ctx.page.evaluate(() => {
+      const formulaDisplay = document.getElementById('formula-display');
+      if (!formulaDisplay) return false;
+
+      const spans = formulaDisplay.querySelectorAll('.formula-ref');
+      for (const span of spans) {
+        const text = span.textContent;
+        // The full A:A should be highlighted
+        if (text === 'A:A') {
+          const style = span.getAttribute('style') || '';
+          if (style.includes('color:') || span.style.color) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+
+    assertTrue(hasColoredRef, 'Column reference A:A should be fully colored in formula bar');
+  },
+
+  'Row reference is colored in formula bar': async (ctx) => {
+    // Whole row references like 1:1 should be highlighted
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter some values in row 1
+    await setCellValue(ctx.page, 'A1', '10');
+    await setCellValue(ctx.page, 'B1', '20');
+    await sleep(100);
+
+    // Enter a formula with a row reference
+    await setCellValue(ctx.page, 'A2', '=SUM(1:1)');
+    await sleep(200);
+
+    // Click A2 to select it and trigger formula highlighting
+    await clickCell(ctx.page, 'A2');
+    await sleep(300);
+
+    // Check that 1:1 reference is colored
+    const hasColoredRef = await ctx.page.evaluate(() => {
+      const formulaDisplay = document.getElementById('formula-display');
+      if (!formulaDisplay) return false;
+
+      const spans = formulaDisplay.querySelectorAll('.formula-ref');
+      for (const span of spans) {
+        const text = span.textContent;
+        // The full 1:1 should be highlighted
+        if (text === '1:1') {
+          const style = span.getAttribute('style') || '';
+          if (style.includes('color:') || span.style.color) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+
+    assertTrue(hasColoredRef, 'Row reference 1:1 should be fully colored in formula bar');
+  },
 };
 
 // Run all tests

@@ -102,7 +102,7 @@ private:
     std::unique_ptr<ASTNode> parseReference();
     std::unique_ptr<ASTNode> parseCellOrRangeRef(const std::string& sheetName);
     std::unique_ptr<ASTNode> parseRowRef(bool startAbsolute, int startRow,
-                                         const std::string& sheetName);
+                                         const std::string& sheetName, SourcePosition startPos);
     std::unique_ptr<ASTNode> parseFunctionCall(const std::string& name);
 
     // UUID reference parsing (for stored formula format)
