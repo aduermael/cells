@@ -111,6 +111,12 @@ export const FORMULA_ERROR_COLOR = {
   bg: "rgba(211, 47, 47, 0.15)",
 } as const;
 
+// Spill range highlight color (blue like Excel)
+export const SPILL_RANGE_COLOR = {
+  border: "#4285f4",
+  bg: "rgba(66, 133, 244, 0.08)",
+} as const;
+
 // Remote presence label styling
 export const PRESENCE_LABEL_FONT =
   '10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
@@ -155,6 +161,16 @@ export interface RemotePresenceRender {
   mouseOpacity?: number;
 }
 
+/** Spill range highlight information */
+export interface SpillRangeHighlight {
+  minCol: number;
+  maxCol: number;
+  minRow: number;
+  maxRow: number;
+  masterCol: number;
+  masterRow: number;
+}
+
 /** State references that can be set from the main application */
 export interface GridRendererState {
   sheetInfo?: SheetInfo | null;
@@ -194,4 +210,6 @@ export interface GridRendererState {
   isFillDragging?: boolean;
   /** Fill preview range (shown with dashed border during fill drag) */
   fillPreviewRange?: { minCol: number; maxCol: number; minRow: number; maxRow: number } | null;
+  /** Spill range highlight (shown when selected cell is part of a spill range) */
+  spillRangeHighlight?: SpillRangeHighlight | null;
 }

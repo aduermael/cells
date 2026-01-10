@@ -969,6 +969,26 @@ export class CellsClient {
     return JSON.parse(response.result as string) as AutocompleteResult;
   }
 
+  // ========== Spill Range API ==========
+
+  /**
+   * Get spill range information for a cell at the given position.
+   * Returns empty object if the cell is not part of a spill range.
+   */
+  async getSpillRangeAt(col: number, row: number): Promise<{
+    masterId?: string;
+    masterCol?: number;
+    masterRow?: number;
+    minCol?: number;
+    minRow?: number;
+    maxCol?: number;
+    maxRow?: number;
+    spillCount?: number;
+  }> {
+    const response = await this._send("getSpillRangeAt", { col, row });
+    return JSON.parse(response.result as string);
+  }
+
   // ========== AI Agent API ==========
 
   /** Set callback for agent events (text, tool_use, done, error) */

@@ -1138,6 +1138,20 @@ export function handleGetAutocomplete(
 }
 
 // ============================================================================
+// Spill Range Queries
+// ============================================================================
+
+export function handleGetSpillRangeAt(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { col, row } = params as { col: number; row: number };
+    const result = engine.getSpillRangeAt(col, row);
+    respond({ type: "spillRange", result });
+}
+
+// ============================================================================
 // AI Agent
 // ============================================================================
 

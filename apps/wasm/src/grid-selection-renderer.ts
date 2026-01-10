@@ -8,7 +8,9 @@ import {
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
   getGridColors,
+  SPILL_RANGE_COLOR,
   type NormalizedRange,
+  type SpillRangeHighlight,
 } from "./grid-constants.js";
 
 // Fill handle size in pixels
@@ -420,5 +422,66 @@ export function drawFillPreview(
   ctx.lineWidth = 2;
   ctx.setLineDash([4, 4]); // 4px dash, 4px gap
   ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW - 1, clipH - 1);
+  ctx.restore();
+}
+
+/**
+ * Draw spill range highlight when selected cell is part of a spill range.
+ * Uses a blue border (like Excel) to show the entire spill area.
+ */
+export function drawSpillRangeHighlight(
+  ctx: CanvasRenderingContext2D,
+  state: SelectionRendererState,
+  spillRange: SpillRangeHighlight,
+  viewWidth: number,
+  viewHeight: number
+): void {
+  // Calculate spill range bounds
+  let rangeX = HEADER_WIDTH - state.scrollX;
+  for (let i = 0; i < spillRange.minCol; i++) {
+    rangeX += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+  }
+  let rangeY = HEADER_HEIGHT - state.scrollY;
+  for (let i = 0; i < spillRange.minRow; i++) {
+    rangeY += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+  }
+
+  // Calculate total width and height of spill range
+  let rangeW = 0;
+  for (let i = spillRange.minCol; i <= spillRange.maxCol; i++) {
+    rangeW += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+  }
+  let rangeH = 0;
+  for (let i = spillRange.minRow; i <= spillRange.maxRow; i++) {
+    rangeH += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+  }
+
+  // Check if spill range is visible
+  if (
+    rangeX + rangeW <= HEADER_WIDTH ||
+    rangeX >= viewWidth ||
+    rangeY + rangeH <= HEADER_HEIGHT ||
+    rangeY >= viewHeight
+  ) {
+    return;
+  }
+
+  // Clip to data area
+  const clipX = Math.max(HEADER_WIDTH, rangeX);
+  const clipY = Math.max(HEADER_HEIGHT, rangeY);
+  const clipW = Math.min(rangeW, rangeX + rangeW - clipX);
+  const clipH = Math.min(rangeH, rangeY + rangeH - clipY);
+
+  ctx.save();
+
+  // Draw subtle background fill
+  ctx.fillStyle = SPILL_RANGE_COLOR.bg;
+  ctx.fillRect(clipX, clipY, clipW, clipH);
+
+  // Draw blue border (like Excel's spill range indicator)
+  ctx.strokeStyle = SPILL_RANGE_COLOR.border;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW - 1, clipH - 1);
+
   ctx.restore();
 }

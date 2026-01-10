@@ -206,6 +206,9 @@ export interface CellsEngine {
     getReferencesFromPartial(formulaText: string): string;
     detectCircularRef(cellId: string): string;
     getVolatileCells(): string;
+
+    // Spill range queries
+    getSpillRangeAt(col: number, row: number): string;
 }
 
 /** Factory function type for WASM module initialization */

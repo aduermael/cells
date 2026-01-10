@@ -46,6 +46,7 @@ import {
   drawRowSelection,
   drawFillHandle,
   drawFillPreview,
+  drawSpillRangeHighlight,
   type FillHandleBounds,
 } from "./grid-selection-renderer.js";
 import {
@@ -72,11 +73,13 @@ export {
   getGridColors,
   FORMULA_REF_COLORS,
   FORMULA_ERROR_COLOR,
+  SPILL_RANGE_COLOR,
   type GridColors,
   type NormalizedRange,
   type RemotePresenceRender,
   type GridRendererState,
   type FormulaHighlight,
+  type SpillRangeHighlight,
 } from "./grid-constants.js";
 
 /**
@@ -144,6 +147,9 @@ export class GridRenderer {
   // Fill handle drag state
   isFillDragging = false;
   fillPreviewRange: { minCol: number; maxCol: number; minRow: number; maxRow: number } | null = null;
+
+  // Spill range highlight state (for dynamic array formulas)
+  spillRangeHighlight: { minCol: number; maxCol: number; minRow: number; maxRow: number; masterCol: number; masterRow: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -294,6 +300,20 @@ export class GridRenderer {
         hoveredFormulaRefIndex: this.hoveredFormulaRefIndex,
       };
       drawFormulaHighlights(ctx, formulaState, viewWidth, viewHeight);
+    }
+
+    // Spill range highlight (drawn before selection so it appears behind)
+    if (this.spillRangeHighlight) {
+      const spillState = {
+        scrollX: this.scrollX,
+        scrollY: this.scrollY,
+        colWidths: this.colWidths,
+        rowHeights: this.rowHeights,
+        selectionStart: this.selectionStart,
+        selectionEnd: this.selectionEnd,
+        selectedCell: this.selectedCell,
+      };
+      drawSpillRangeHighlight(ctx, spillState, this.spillRangeHighlight, viewWidth, viewHeight);
     }
 
     // Column/row selection highlights

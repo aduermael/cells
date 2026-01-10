@@ -105,6 +105,7 @@ import {
     handleExecuteScript,
     handleTokenizeLuau,
     handleGetAutocomplete,
+    handleGetSpillRangeAt,
     handleInitAgent,
     handleIsAgentInitialized,
     handleGetAgentConversationId,
@@ -726,6 +727,13 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "getAutocomplete":
                 handleGetAutocomplete(engine, params, respond);
+                break;
+
+            // ================================================================
+            // Spill Range Queries
+            // ================================================================
+            case "getSpillRangeAt":
+                handleGetSpillRangeAt(engine, params, respond);
                 break;
 
             // ================================================================

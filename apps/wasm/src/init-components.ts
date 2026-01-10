@@ -166,6 +166,7 @@ export function createComponents(config: ComponentsConfig): Components {
       discoveredRows: app.discoveredRows,
       isFillDragging: app.isFillDragging,
       fillPreviewRange: app.fillPreviewRange,
+      spillRangeHighlight: app.spillRangeHighlight,
     });
   }
 
@@ -407,6 +408,32 @@ export function createComponents(config: ComponentsConfig): Components {
     app.selectedCell = cell;
     app.selectionStart = start;
     app.selectionEnd = end;
+    // Update spill range highlight (async, non-blocking)
+    updateSpillRangeHighlight(cell);
+  }
+
+  async function updateSpillRangeHighlight(cell: Position): Promise<void> {
+    if (!app.dataSource) {
+      app.spillRangeHighlight = null;
+      return;
+    }
+    try {
+      const spillInfo = await app.dataSource.getSpillRangeAt(cell.col, cell.row);
+      if (spillInfo.masterId) {
+        app.spillRangeHighlight = {
+          minCol: spillInfo.minCol!,
+          maxCol: spillInfo.maxCol!,
+          minRow: spillInfo.minRow!,
+          maxRow: spillInfo.maxRow!,
+          masterCol: spillInfo.masterCol!,
+          masterRow: spillInfo.masterRow!,
+        };
+      } else {
+        app.spillRangeHighlight = null;
+      }
+    } catch {
+      app.spillRangeHighlight = null;
+    }
   }
 
   function setDefaultSelection(): void {
@@ -415,6 +442,8 @@ export function createComponents(config: ComponentsConfig): Components {
     app.selectionEnd = { col: 0, row: 0 };
     app.selectedColumn = -1;
     app.selectedRow = -1;
+    // Update spill range highlight for default cell
+    updateSpillRangeHighlight({ col: 0, row: 0 });
   }
 
   // =========================================================================

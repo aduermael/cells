@@ -347,6 +347,13 @@ export class App {
   fillPreviewRange: { minCol: number; maxCol: number; minRow: number; maxRow: number } | null = null;
 
   // =========================================================================
+  // Spill Range Highlight State
+  // =========================================================================
+
+  /** Spill range highlight for dynamic array formulas */
+  spillRangeHighlight: { minCol: number; maxCol: number; minRow: number; maxRow: number; masterCol: number; masterRow: number } | null = null;
+
+  // =========================================================================
   // Formula Highlighting State
   // =========================================================================
 

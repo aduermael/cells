@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2026-01-09 19:40 UTC
-Updated At: 2026-01-10 21:15 UTC
+Updated At: 2026-01-10 19:35 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -255,10 +255,13 @@ bits 4-7: reserved for future use
 
 UI layer only renders based on spill data queried from C++ via WASM bindings.
 
-- [ ] 8a: Highlight spill range on cell selection
-  - Call `getSpillRangeForCell()` from C++ to get spill bounds
-  - If cell is part of a spill range, draw border around entire range
-  - Use a distinct color (e.g., blue border like Excel)
+- [x] 8a: Highlight spill range on cell selection
+  - Call `getSpillRangeAt()` from C++ to get spill bounds (exposed via WASM)
+  - If cell is part of a spill range, draw blue border around entire range
+  - Added `SPILL_RANGE_COLOR` constant (blue: #4285f4)
+  - Added `SpillRangeHighlight` interface and state to grid renderer
+  - Added `drawSpillRangeHighlight()` function in grid-selection-renderer.ts
+  - Selection change triggers async spill range query and updates highlight
 
 - [ ] 8b: Gray out formula bar for spilled cells
   - Check `isSpilled` flag from `getCell()` response (from C++)

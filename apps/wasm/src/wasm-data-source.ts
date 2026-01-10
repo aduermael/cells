@@ -512,4 +512,25 @@ export class WasmDataSource {
   async getAutocomplete(source: string, line: number, column: number): Promise<AutocompleteResult> {
     return this._client.getAutocomplete(source, line, column);
   }
+
+  // ==========================================================================
+  // Spill Range Queries
+  // ==========================================================================
+
+  /**
+   * Get spill range information for a cell at the given position.
+   * Returns empty object if the cell is not part of a spill range.
+   */
+  async getSpillRangeAt(col: number, row: number): Promise<{
+    masterId?: string;
+    masterCol?: number;
+    masterRow?: number;
+    minCol?: number;
+    minRow?: number;
+    maxCol?: number;
+    maxRow?: number;
+    spillCount?: number;
+  }> {
+    return this._client.getSpillRangeAt(col, row);
+  }
 }
