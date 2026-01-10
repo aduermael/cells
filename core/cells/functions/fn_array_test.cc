@@ -578,10 +578,10 @@ TEST_F(FnArrayTest, SortInvalidSortOrder) {
 
 TEST_F(FnArrayTest, SortMixedTypes) {
     // Numbers sort before strings in Excel
-    setCellValue(0, 0, 5.0);      // Number
-    setCellString(0, 1, "Apple"); // String
-    setCellValue(0, 2, 1.0);      // Number
-    setCellString(0, 3, "Banana"); // String
+    setCellValue(0, 0, 5.0);        // Number
+    setCellString(0, 1, "Apple");   // String
+    setCellValue(0, 2, 1.0);        // Number
+    setCellString(0, 3, "Banana");  // String
 
     EvalResult result = eval("=SORT(A1:A4)");
     ASSERT_TRUE(result.isArray());

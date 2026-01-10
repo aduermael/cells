@@ -479,15 +479,16 @@ EvalResult fn_SORT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         }
 
         // Sort transposed rows by the sort key
-        const size_t keyIdx = static_cast<size_t>(sortIndex - 1);
-        std::stable_sort(transposed.begin(), transposed.end(),
-                         [keyIdx, sortOrder](const std::vector<EvalResult>& a,
-                                             const std::vector<EvalResult>& b) {
-                             const EvalResult& va = (keyIdx < a.size()) ? a[keyIdx] : EvalResult::Empty();
-                             const EvalResult& vb = (keyIdx < b.size()) ? b[keyIdx] : EvalResult::Empty();
-                             const int cmp = compareEvalResults(va, vb);
-                             return sortOrder > 0 ? cmp < 0 : cmp > 0;
-                         });
+        const auto keyIdx = static_cast<size_t>(sortIndex - 1);
+        std::stable_sort(
+            transposed.begin(), transposed.end(),
+            [keyIdx, sortOrder](const std::vector<EvalResult>& a,
+                                const std::vector<EvalResult>& b) {
+                const EvalResult& va = (keyIdx < a.size()) ? a[keyIdx] : EvalResult::Empty();
+                const EvalResult& vb = (keyIdx < b.size()) ? b[keyIdx] : EvalResult::Empty();
+                const int cmp = compareEvalResults(va, vb);
+                return sortOrder > 0 ? cmp < 0 : cmp > 0;
+            });
 
         // Transpose back
         const size_t sortedCols = transposed.size();
@@ -516,15 +517,15 @@ EvalResult fn_SORT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
         return EvalResult::Error(CellError::VALUE);
     }
 
-    const size_t keyIdx = static_cast<size_t>(sortIndex - 1);
-    std::stable_sort(data.begin(), data.end(),
-                     [keyIdx, sortOrder](const std::vector<EvalResult>& a,
-                                         const std::vector<EvalResult>& b) {
-                         const EvalResult& va = (keyIdx < a.size()) ? a[keyIdx] : EvalResult::Empty();
-                         const EvalResult& vb = (keyIdx < b.size()) ? b[keyIdx] : EvalResult::Empty();
-                         const int cmp = compareEvalResults(va, vb);
-                         return sortOrder > 0 ? cmp < 0 : cmp > 0;
-                     });
+    const auto keyIdx = static_cast<size_t>(sortIndex - 1);
+    std::stable_sort(
+        data.begin(), data.end(),
+        [keyIdx, sortOrder](const std::vector<EvalResult>& a, const std::vector<EvalResult>& b) {
+            const EvalResult& va = (keyIdx < a.size()) ? a[keyIdx] : EvalResult::Empty();
+            const EvalResult& vb = (keyIdx < b.size()) ? b[keyIdx] : EvalResult::Empty();
+            const int cmp = compareEvalResults(va, vb);
+            return sortOrder > 0 ? cmp < 0 : cmp > 0;
+        });
 
     return EvalResult::Array(std::move(data));
 }
@@ -630,8 +631,7 @@ EvalResult fn_FILTER(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     if (filterRows) {
         // Filter rows based on include column
         for (size_t r = 0; r < dataRows; ++r) {
-            const EvalResult& inc =
-                (incCols == 1) ? includeData[r][0] : includeData[r][0];
+            const EvalResult& inc = includeData[r][0];
             if (isTruthy(inc)) {
                 result.push_back(data[r]);
             }
@@ -649,7 +649,7 @@ EvalResult fn_FILTER(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
         // Build result with only kept columns
         for (size_t r = 0; r < dataRows; ++r) {
             std::vector<EvalResult> row;
-            for (size_t c : keepCols) {
+            for (const size_t c : keepCols) {
                 if (c < data[r].size()) {
                     row.push_back(data[r][c]);
                 } else {
@@ -687,7 +687,7 @@ EvalResult fn_SEQUENCE(const std::vector<const ASTNode*>& args, EvalContext& ctx
     if (rowsResult.isError()) {
         return rowsResult;
     }
-    int rows = static_cast<int>(rowsResult.getNumber());
+    const int rows = static_cast<int>(rowsResult.getNumber());
     if (rows < 1) {
         return EvalResult::Error(CellError::VALUE);
     }
@@ -818,8 +818,8 @@ void registerArrayFunctions(FunctionRegistry& registry) {
                               "Filters a range based on criteria", "Array");
     registry.registerFunction("SEQUENCE", fn_SEQUENCE, "(rows, [cols], [start], [step])",
                               "Generates a sequence of numbers", "Array");
-    registry.registerFunction("TRANSPOSE", fn_TRANSPOSE, "(array)",
-                              "Transposes rows and columns", "Array");
+    registry.registerFunction("TRANSPOSE", fn_TRANSPOSE, "(array)", "Transposes rows and columns",
+                              "Array");
 }
 
 }  // namespace cells
