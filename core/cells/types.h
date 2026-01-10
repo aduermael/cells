@@ -219,6 +219,7 @@ enum class CellError : std::uint8_t {
     CIRCULAR,  // Circular reference detected
     NA,        // #N/A - value not available (e.g., lookup not found)
     SPILL,     // #SPILL! - array formula blocked by existing data
+    CALC,      // #CALC! - calculation error (e.g., FILTER with no results)
 };
 
 // Error strings as they appear in file format
@@ -231,6 +232,7 @@ constexpr const char* ERROR_NUM_STR = "#NUM!";
 constexpr const char* ERROR_CIRCULAR_STR = "#CIRCULAR!";
 constexpr const char* ERROR_NA_STR = "#N/A";
 constexpr const char* ERROR_SPILL_STR = "#SPILL!";
+constexpr const char* ERROR_CALC_STR = "#CALC!";
 
 // Convert error string to CellError
 inline CellError stringToError(const std::string& s) {
@@ -261,6 +263,9 @@ inline CellError stringToError(const std::string& s) {
     if (s == ERROR_SPILL_STR) {
         return CellError::SPILL;
     }
+    if (s == ERROR_CALC_STR) {
+        return CellError::CALC;
+    }
     return CellError::NONE;
 }
 
@@ -287,6 +292,8 @@ inline const char* errorToString(CellError error) {
             return ERROR_NA_STR;
         case CellError::SPILL:
             return ERROR_SPILL_STR;
+        case CellError::CALC:
+            return ERROR_CALC_STR;
     }
     return "";
 }

@@ -140,7 +140,7 @@ First spill-capable function as proof of concept.
   - Signature: `SORT(array, [sort_index], [sort_order], [by_col])`
   - Returns sorted array (spills)
 
-- [ ] 4b: Implement FILTER function
+- [x] 4b: Implement FILTER function
   - Signature: `FILTER(array, include, [if_empty])`
   - Returns filtered rows/columns matching criteria (spills)
 

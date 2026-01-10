@@ -41,6 +41,12 @@ EvalResult fn_UNIQUE(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 // by_col: FALSE (default) = sort rows by column values, TRUE = sort columns by row values
 EvalResult fn_SORT(const std::vector<const ASTNode*>& args, EvalContext& ctx);
 
+// FILTER(array, include, [if_empty]) - Filters data based on boolean criteria
+// array: The range to filter
+// include: Boolean array determining which rows/columns to include
+// if_empty: Value to return if all rows/columns are filtered out
+EvalResult fn_FILTER(const std::vector<const ASTNode*>& args, EvalContext& ctx);
+
 // Forward declaration
 class FunctionRegistry;
 

@@ -631,5 +631,212 @@ TEST_F(FnArrayTest, SortSingleCell) {
     EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 42.0);
 }
 
+// =============================================================================
+// FILTER Tests - Basic functionality
+// =============================================================================
+
+TEST_F(FnArrayTest, FilterBasicRows) {
+    // A1:A5 = {1, 2, 3, 4, 5}
+    // B1:B5 = {TRUE, FALSE, TRUE, FALSE, TRUE}
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+    setCellValue(0, 2, 3.0);
+    setCellValue(0, 3, 4.0);
+    setCellValue(0, 4, 5.0);
+    // Set B column as boolean criteria
+    Cell* b1 = sheet->getOrCreateCellAt(colIds[1], rowIds[0]);
+    b1->value = CellValue(true);
+    Cell* b2 = sheet->getOrCreateCellAt(colIds[1], rowIds[1]);
+    b2->value = CellValue(false);
+    Cell* b3 = sheet->getOrCreateCellAt(colIds[1], rowIds[2]);
+    b3->value = CellValue(true);
+    Cell* b4 = sheet->getOrCreateCellAt(colIds[1], rowIds[3]);
+    b4->value = CellValue(false);
+    Cell* b5 = sheet->getOrCreateCellAt(colIds[1], rowIds[4]);
+    b5->value = CellValue(true);
+
+    EvalResult result = eval("=FILTER(A1:A5,B1:B5)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 3u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+
+    // Should return {1, 3, 5}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 3.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(2, 0).getNumber(), 5.0);
+}
+
+TEST_F(FnArrayTest, FilterMultiColumn) {
+    // A1:B3 = {{1, "A"}, {2, "B"}, {3, "C"}}
+    // C1:C3 = {TRUE, FALSE, TRUE}
+    setCellValue(0, 0, 1.0);
+    setCellString(1, 0, "A");
+    setCellValue(0, 1, 2.0);
+    setCellString(1, 1, "B");
+    setCellValue(0, 2, 3.0);
+    setCellString(1, 2, "C");
+
+    Cell* c1 = sheet->getOrCreateCellAt(colIds[2], rowIds[0]);
+    c1->value = CellValue(true);
+    Cell* c2 = sheet->getOrCreateCellAt(colIds[2], rowIds[1]);
+    c2->value = CellValue(false);
+    Cell* c3 = sheet->getOrCreateCellAt(colIds[2], rowIds[2]);
+    c3->value = CellValue(true);
+
+    EvalResult result = eval("=FILTER(A1:B3,C1:C3)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 2u);
+    EXPECT_EQ(result.getArrayCols(), 2u);
+
+    // Should return {{1, "A"}, {3, "C"}}
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+    EXPECT_EQ(result.getArrayAt(0, 1).getString(), "A");
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 3.0);
+    EXPECT_EQ(result.getArrayAt(1, 1).getString(), "C");
+}
+
+TEST_F(FnArrayTest, FilterWithNumbers) {
+    // Numbers can be used as criteria (0 = FALSE, non-zero = TRUE)
+    setCellValue(0, 0, 10.0);
+    setCellValue(0, 1, 20.0);
+    setCellValue(0, 2, 30.0);
+
+    setCellValue(1, 0, 1.0);  // TRUE
+    setCellValue(1, 1, 0.0);  // FALSE
+    setCellValue(1, 2, 2.0);  // TRUE
+
+    EvalResult result = eval("=FILTER(A1:A3,B1:B3)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 2u);
+
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 10.0);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(1, 0).getNumber(), 30.0);
+}
+
+// =============================================================================
+// FILTER Tests - if_empty parameter
+// =============================================================================
+
+TEST_F(FnArrayTest, FilterIfEmptyUsed) {
+    // All criteria are FALSE
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+
+    Cell* b1 = sheet->getOrCreateCellAt(colIds[1], rowIds[0]);
+    b1->value = CellValue(false);
+    Cell* b2 = sheet->getOrCreateCellAt(colIds[1], rowIds[1]);
+    b2->value = CellValue(false);
+
+    // With if_empty, should return that value
+    EvalResult result = eval("=FILTER(A1:A2,B1:B2,\"No matches\")");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+    EXPECT_EQ(result.getArrayAt(0, 0).getString(), "No matches");
+}
+
+TEST_F(FnArrayTest, FilterIfEmptyNotUsed) {
+    // Some criteria are TRUE, so if_empty should not be used
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+
+    Cell* b1 = sheet->getOrCreateCellAt(colIds[1], rowIds[0]);
+    b1->value = CellValue(true);
+    Cell* b2 = sheet->getOrCreateCellAt(colIds[1], rowIds[1]);
+    b2->value = CellValue(false);
+
+    EvalResult result = eval("=FILTER(A1:A2,B1:B2,\"No matches\")");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 1.0);
+}
+
+TEST_F(FnArrayTest, FilterNoMatchesNoIfEmpty) {
+    // All criteria are FALSE and no if_empty - should return #CALC! error
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+
+    Cell* b1 = sheet->getOrCreateCellAt(colIds[1], rowIds[0]);
+    b1->value = CellValue(false);
+    Cell* b2 = sheet->getOrCreateCellAt(colIds[1], rowIds[1]);
+    b2->value = CellValue(false);
+
+    EvalResult result = eval("=FILTER(A1:A2,B1:B2)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::CALC);
+}
+
+// =============================================================================
+// FILTER Tests - Error cases
+// =============================================================================
+
+TEST_F(FnArrayTest, FilterNoArgs) {
+    EvalResult result = eval("=FILTER()");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, FilterOneArg) {
+    setCellValue(0, 0, 1.0);
+    EvalResult result = eval("=FILTER(A1:A3)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, FilterTooManyArgs) {
+    setCellValue(0, 0, 1.0);
+    Cell* b1 = sheet->getOrCreateCellAt(colIds[1], rowIds[0]);
+    b1->value = CellValue(true);
+    EvalResult result = eval("=FILTER(A1:A3,B1:B3,\"empty\",\"extra\")");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+TEST_F(FnArrayTest, FilterDimensionMismatch) {
+    // 5 rows of data but only 3 rows of criteria
+    setCellValue(0, 0, 1.0);
+    setCellValue(0, 1, 2.0);
+    setCellValue(0, 2, 3.0);
+    setCellValue(0, 3, 4.0);
+    setCellValue(0, 4, 5.0);
+
+    Cell* b1 = sheet->getOrCreateCellAt(colIds[1], rowIds[0]);
+    b1->value = CellValue(true);
+    Cell* b2 = sheet->getOrCreateCellAt(colIds[1], rowIds[1]);
+    b2->value = CellValue(false);
+    Cell* b3 = sheet->getOrCreateCellAt(colIds[1], rowIds[2]);
+    b3->value = CellValue(true);
+
+    EvalResult result = eval("=FILTER(A1:A5,B1:B3)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// =============================================================================
+// FILTER Tests - Single cell
+// =============================================================================
+
+TEST_F(FnArrayTest, FilterSingleCellTrue) {
+    setCellValue(0, 0, 42.0);
+    Cell* b1 = sheet->getOrCreateCellAt(colIds[1], rowIds[0]);
+    b1->value = CellValue(true);
+
+    EvalResult result = eval("=FILTER(A1,B1)");
+    ASSERT_TRUE(result.isArray());
+    EXPECT_EQ(result.getArrayRows(), 1u);
+    EXPECT_EQ(result.getArrayCols(), 1u);
+    EXPECT_DOUBLE_EQ(result.getArrayAt(0, 0).getNumber(), 42.0);
+}
+
+TEST_F(FnArrayTest, FilterSingleCellFalse) {
+    setCellValue(0, 0, 42.0);
+    Cell* b1 = sheet->getOrCreateCellAt(colIds[1], rowIds[0]);
+    b1->value = CellValue(false);
+
+    EvalResult result = eval("=FILTER(A1,B1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::CALC);
+}
+
 }  // namespace
 }  // namespace cells

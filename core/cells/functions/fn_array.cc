@@ -529,11 +529,160 @@ EvalResult fn_SORT(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     return EvalResult::Array(std::move(data));
 }
 
+EvalResult fn_FILTER(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    // Validate arguments: FILTER(array, include, [if_empty])
+    if (args.size() < 2 || args.size() > 3) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    // Evaluate first argument (array/range)
+    EvalResult rangeResult = evaluate(args[0], ctx);
+    if (rangeResult.isError()) {
+        return rangeResult;
+    }
+
+    // Evaluate second argument (include criteria - array of TRUE/FALSE)
+    EvalResult includeResult = evaluate(args[1], ctx);
+    if (includeResult.isError()) {
+        return includeResult;
+    }
+
+    // Parse optional if_empty argument (value to return if all filtered out)
+    EvalResult ifEmptyResult = EvalResult::Empty();
+    bool hasIfEmpty = false;
+    if (args.size() >= 3) {
+        ifEmptyResult = evaluate(args[2], ctx);
+        if (ifEmptyResult.isError()) {
+            return ifEmptyResult;
+        }
+        hasIfEmpty = true;
+    }
+
+    // Collect array data
+    std::vector<std::vector<EvalResult>> data;
+    if (rangeResult.isArray()) {
+        data = rangeResult.getArray();
+    } else {
+        auto [rangeData, error] = collectRangeAs2D(rangeResult, ctx);
+        if (error.isError()) {
+            return error;
+        }
+        data = std::move(rangeData);
+    }
+
+    // Handle empty input
+    if (data.empty() || (data.size() == 1 && data[0].empty())) {
+        if (hasIfEmpty) {
+            // Return if_empty as a single-cell array
+            std::vector<std::vector<EvalResult>> result;
+            result.push_back({ifEmptyResult});
+            return EvalResult::Array(std::move(result));
+        }
+        return EvalResult::Error(CellError::CALC);
+    }
+
+    // Collect include criteria
+    std::vector<std::vector<EvalResult>> includeData;
+    if (includeResult.isArray()) {
+        includeData = includeResult.getArray();
+    } else {
+        auto [incData, error] = collectRangeAs2D(includeResult, ctx);
+        if (error.isError()) {
+            return error;
+        }
+        includeData = std::move(incData);
+    }
+
+    // Determine filter direction based on include array dimensions
+    const size_t dataRows = data.size();
+    const size_t dataCols = data.empty() ? 0 : data[0].size();
+    const size_t incRows = includeData.size();
+    const size_t incCols = includeData.empty() ? 0 : includeData[0].size();
+
+    // Check if include is a single column (filter rows) or single row (filter columns)
+    const bool filterRows = (incCols == 1 && incRows > 1) || (incRows == dataRows);
+    const bool filterCols = (incRows == 1 && incCols > 1) || (incCols == dataCols);
+
+    if (filterRows && incRows != dataRows) {
+        // Include array row count must match data row count
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    if (filterCols && !filterRows && incCols != dataCols) {
+        // Include array column count must match data column count
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    // Helper to check if a value is truthy for filtering
+    auto isTruthy = [](const EvalResult& val) -> bool {
+        if (val.isBoolean()) {
+            return val.getBoolean();
+        }
+        if (val.isNumber()) {
+            return val.getNumber() != 0;
+        }
+        // Strings, errors, empty are considered FALSE
+        return false;
+    };
+
+    std::vector<std::vector<EvalResult>> result;
+
+    if (filterRows) {
+        // Filter rows based on include column
+        for (size_t r = 0; r < dataRows; ++r) {
+            const EvalResult& inc =
+                (incCols == 1) ? includeData[r][0] : includeData[r][0];
+            if (isTruthy(inc)) {
+                result.push_back(data[r]);
+            }
+        }
+    } else if (filterCols) {
+        // Filter columns based on include row
+        // First determine which columns to keep
+        std::vector<size_t> keepCols;
+        for (size_t c = 0; c < dataCols; ++c) {
+            if (c < incCols && isTruthy(includeData[0][c])) {
+                keepCols.push_back(c);
+            }
+        }
+
+        // Build result with only kept columns
+        for (size_t r = 0; r < dataRows; ++r) {
+            std::vector<EvalResult> row;
+            for (size_t c : keepCols) {
+                if (c < data[r].size()) {
+                    row.push_back(data[r][c]);
+                } else {
+                    row.push_back(EvalResult::Empty());
+                }
+            }
+            result.push_back(std::move(row));
+        }
+    } else {
+        // Include dimensions don't match - error
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    // If no rows/cols matched, return if_empty or error
+    if (result.empty() || (result.size() == 1 && result[0].empty())) {
+        if (hasIfEmpty) {
+            std::vector<std::vector<EvalResult>> emptyResult;
+            emptyResult.push_back({ifEmptyResult});
+            return EvalResult::Array(std::move(emptyResult));
+        }
+        return EvalResult::Error(CellError::CALC);
+    }
+
+    return EvalResult::Array(std::move(result));
+}
+
 void registerArrayFunctions(FunctionRegistry& registry) {
     registry.registerFunction("UNIQUE", fn_UNIQUE, "(array, [by_col], [exactly_once])",
                               "Returns unique values from a range", "Array");
     registry.registerFunction("SORT", fn_SORT, "(array, [sort_index], [sort_order], [by_col])",
                               "Sorts a range of data", "Array");
+    registry.registerFunction("FILTER", fn_FILTER, "(array, include, [if_empty])",
+                              "Filters a range based on criteria", "Array");
 }
 
 }  // namespace cells
