@@ -429,6 +429,7 @@ export function createComponents(config: ComponentsConfig): Components {
     }
     try {
       const spillInfo = await app.dataSource.getSpillRangeAt(cell.col, cell.row);
+      const oldHighlight = app.spillRangeHighlight;
       if (spillInfo.masterId) {
         app.spillRangeHighlight = {
           minCol: spillInfo.minCol!,
@@ -440,6 +441,10 @@ export function createComponents(config: ComponentsConfig): Components {
         };
       } else {
         app.spillRangeHighlight = null;
+      }
+      // Re-render if highlight changed (async update after render)
+      if (oldHighlight !== app.spillRangeHighlight) {
+        render();
       }
     } catch {
       app.spillRangeHighlight = null;
@@ -870,7 +875,14 @@ export function createComponents(config: ComponentsConfig): Components {
     setPendingDragStartX: (v) => { app.pendingDragStartX = v; },
     getPendingDragStartY: () => app.pendingDragStartY,
     setPendingDragStartY: (v) => { app.pendingDragStartY = v; },
-    setSelectedCell: (cell) => { app.selectedCell = cell; },
+    setSelectedCell: (cell) => {
+      app.selectedCell = cell;
+      if (cell) {
+        updateSpillRangeHighlight(cell);
+      } else {
+        app.spillRangeHighlight = null;
+      }
+    },
     setSelectedColumn: (col) => { app.selectedColumn = col ?? -1; },
     setSelectedRow: (row) => { app.selectedRow = row ?? -1; },
     setSelectionStart: (pos) => { app.selectionStart = pos; },

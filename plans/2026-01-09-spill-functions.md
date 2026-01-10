@@ -321,16 +321,15 @@ UI layer only renders based on spill data queried from C++ via WASM bindings.
 
 Post-implementation bug fixes discovered during testing. Each bug should be reproduced with a failing test first, then the test should be made to pass.
 
-- [ ] 10a: Improve spill range highlighting behavior
-  - **Bug**: Spill range highlighting behavior is inconsistent
-  - **Expected behavior**:
-    - When selecting ANY cell in a spill range, highlight the entire spill range
-    - Master cell should have special visual treatment (e.g., thicker border, different color, or icon)
-    - When selecting a cell OUTSIDE a spill range, no spill highlight should show
-  - **Approach**: Add E2E tests for spill highlighting, update grid-selection-renderer.ts to:
-    - Always query spill range when selection changes
-    - Clear spill highlight when selected cell is not part of a spill
-    - Distinguish master cell visually (e.g., solid border vs dashed for spilled cells)
+- [x] 10a: Improve spill range highlighting behavior
+  - **Bug**: Spill range highlighting behavior was inconsistent - highlight not clearing when selecting outside spill
+  - **Root cause**: `setSelectedCell` in the AppEventManager config was not triggering `updateSpillRangeHighlight`
+  - **Fix**: Modified `setSelectedCell` to call `updateSpillRangeHighlight(cell)` when cell is set, and clear highlight when cell is null
+  - **Fix**: Added `render()` call after async highlight update completes to ensure UI reflects changes
+  - **Added E2E tests**:
+    - "Spill highlight shows when selecting master cell"
+    - "Spill highlight shows when selecting spilled cell"
+    - "Spill highlight clears when selecting cell outside spill range"
 
 - [ ] 10b: Fix `=INDEX(A:A)` returning #REF! error
   - **Bug**: Using whole-column reference in INDEX returns #REF! error

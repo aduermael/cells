@@ -71,6 +71,18 @@ async function isCellEditorVisible(page) {
   });
 }
 
+/**
+ * Get the current spill range highlight state from the app
+ */
+async function getSpillRangeHighlight(page) {
+  return await page.evaluate(() => {
+    if (window._appContext && window._appContext.app) {
+      return window._appContext.app.spillRangeHighlight;
+    }
+    return null;
+  });
+}
+
 const tests = {
   'SEQUENCE creates a spill range': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
@@ -242,6 +254,76 @@ const tests = {
     assertEqual(val1, 'apple', 'B1 should be apple');
     assertEqual(val2, 'banana', 'B2 should be banana');
     assertEqual(val3, 'cherry', 'B3 should be cherry');
+  },
+
+  'Spill highlight shows when selecting master cell': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter SEQUENCE formula that creates 3 rows
+    await setCellValue(ctx.page, 'A1', '=SEQUENCE(3)');
+    await sleep(300);
+
+    // Click on the master cell (A1)
+    await clickCell(ctx.page, 'A1');
+    await sleep(200);
+
+    // Verify spill highlight is shown
+    const highlight = await getSpillRangeHighlight(ctx.page);
+    assertTrue(highlight !== null, 'Spill highlight should be shown when master cell is selected');
+    assertEqual(highlight.minCol, 0, 'Spill highlight minCol should be 0 (column A)');
+    assertEqual(highlight.maxCol, 0, 'Spill highlight maxCol should be 0 (column A)');
+    assertEqual(highlight.minRow, 0, 'Spill highlight minRow should be 0 (row 1)');
+    assertEqual(highlight.maxRow, 2, 'Spill highlight maxRow should be 2 (row 3)');
+    assertEqual(highlight.masterCol, 0, 'Master cell column should be 0');
+    assertEqual(highlight.masterRow, 0, 'Master cell row should be 0');
+  },
+
+  'Spill highlight shows when selecting spilled cell': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter SEQUENCE formula
+    await setCellValue(ctx.page, 'A1', '=SEQUENCE(3)');
+    await sleep(300);
+
+    // Click on a spilled cell (A2)
+    await clickCell(ctx.page, 'A2');
+    await sleep(200);
+
+    // Verify spill highlight is shown
+    const highlight = await getSpillRangeHighlight(ctx.page);
+    assertTrue(highlight !== null, 'Spill highlight should be shown when spilled cell is selected');
+    assertEqual(highlight.minCol, 0, 'Spill highlight minCol should be 0');
+    assertEqual(highlight.maxCol, 0, 'Spill highlight maxCol should be 0');
+    assertEqual(highlight.minRow, 0, 'Spill highlight minRow should be 0');
+    assertEqual(highlight.maxRow, 2, 'Spill highlight maxRow should be 2');
+    // Master cell should be A1
+    assertEqual(highlight.masterCol, 0, 'Master cell column should be 0');
+    assertEqual(highlight.masterRow, 0, 'Master cell row should be 0');
+  },
+
+  'Spill highlight clears when selecting cell outside spill range': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter SEQUENCE formula
+    await setCellValue(ctx.page, 'A1', '=SEQUENCE(3)');
+    await sleep(300);
+
+    // First click on spilled cell to verify highlight is shown
+    await clickCell(ctx.page, 'A2');
+    await sleep(200);
+    let highlight = await getSpillRangeHighlight(ctx.page);
+    assertTrue(highlight !== null, 'Spill highlight should be shown when spilled cell is selected');
+
+    // Now click on a cell outside the spill range
+    await clickCell(ctx.page, 'B1');
+    await sleep(400); // Wait for async highlight update and re-render
+
+    // Verify spill highlight is cleared
+    highlight = await getSpillRangeHighlight(ctx.page);
+    assertTrue(highlight === null, 'Spill highlight should be null when selecting cell outside spill range');
   },
 };
 
