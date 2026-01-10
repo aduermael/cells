@@ -514,9 +514,9 @@ TEST_F(FormulaResolverTest, DisplayConversion_SpillRangeInFunction) {
 
 TEST_F(FormulaResolverTest, RoundTrip_ParseResolveDisplay) {
     std::vector<std::string> formulas = {
-        "=A1",   "=$A$1", "=A1+B1", "=A1*B1+C1", "=SUM(A1:C3)",  "=IF(A1,B1,C1)",
-        "=A:A",  "=1:1",  "=A:C",   "=1:3",      "=-A1",         "=A1^2",
-        "=A1&B1", "=A1=B1", "=A1<>B1", "=A1#",   "=$A$1#",       "=SUM(A1#)",
+        "=A1",    "=$A$1",  "=A1+B1",  "=A1*B1+C1", "=SUM(A1:C3)", "=IF(A1,B1,C1)",
+        "=A:A",   "=1:1",   "=A:C",    "=1:3",      "=-A1",        "=A1^2",
+        "=A1&B1", "=A1=B1", "=A1<>B1", "=A1#",      "=$A$1#",      "=SUM(A1#)",
     };
 
     for (const auto& formula : formulas) {
