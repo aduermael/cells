@@ -53,6 +53,7 @@ enum class ASTNodeType : std::uint8_t {
     COLUMN_RANGE_REF,  // Column range (A:C)
     ROW_RANGE_REF,     // Row range (1:5)
     NAMED_REF,         // Named range
+    SPILL_RANGE_REF,   // Spill range reference (A1#)
 
     // Operators
     BINARY_OP,  // +, -, *, /, ^, &, =, <>, <, <=, >, >=
@@ -369,6 +370,30 @@ struct NamedRefNode : public ASTNode {
     }
 
     [[nodiscard]] std::string toJson() const override;
+};
+
+// Spill range reference: A1# (refers to the spill range starting at A1)
+// In Excel, if A1 contains a formula that spills into A1:C3, then A1# refers to A1:C3
+struct SpillRangeRefNode : public ASTNode {
+    std::unique_ptr<CellRefNode> anchor;  // The anchor cell (e.g., A1 in A1#)
+
+    explicit SpillRangeRefNode(std::unique_ptr<CellRefNode> anchorCell)
+        : ASTNode(ASTNodeType::SPILL_RANGE_REF), anchor(std::move(anchorCell)) {}
+
+    SpillRangeRefNode(std::unique_ptr<CellRefNode> anchorCell, SourcePosition pos)
+        : ASTNode(ASTNodeType::SPILL_RANGE_REF, pos), anchor(std::move(anchorCell)) {}
+
+    [[nodiscard]] std::unique_ptr<ASTNode> clone() const override {
+        auto anchorClone =
+            std::unique_ptr<CellRefNode>(static_cast<CellRefNode*>(anchor->clone().release()));
+        auto n = std::make_unique<SpillRangeRefNode>(std::move(anchorClone));
+        n->position = position;
+        return n;
+    }
+
+    [[nodiscard]] std::string toJson() const override;
+
+    [[nodiscard]] bool hasError() const override { return anchor->hasError(); }
 };
 
 // Binary operation: A1 + B2

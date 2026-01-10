@@ -162,7 +162,7 @@ First spill-capable function as proof of concept.
   - Recognize `A1#` as spill range reference
   - New token type: `HASH`
 
-- [ ] 5b: Add SpillRangeRef AST node
+- [x] 5b: Add SpillRangeRef AST node
   - `SpillRangeRefNode { CellRefNode* anchor }`
   - Parser: `cell_ref '#'` → SpillRangeRefNode
 

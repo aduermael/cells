@@ -123,6 +123,9 @@ private:
         SourcePosition position;  // Full span of the cell reference
     };
     [[nodiscard]] CellRefComponents parseCellRefComponents();
+
+    // Helper to wrap a cell reference with spill range operator if # follows
+    std::unique_ptr<ASTNode> maybeWrapSpillRange(std::unique_ptr<CellRefNode> cellRef);
 };
 
 }  // namespace cells

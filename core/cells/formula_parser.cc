@@ -338,6 +338,11 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
                     advance();
                     auto cellRef = std::make_unique<CellRefNode>(name, row, false, false, fullPos);
 
+                    // Check for spill range first (A1#)
+                    if (match(TokenType::HASH)) {
+                        const SourcePosition spillPos{cellRef->position.start, previous_.position.end};
+                        return std::make_unique<SpillRangeRefNode>(std::move(cellRef), spillPos);
+                    }
                     // Check for range
                     if (match(TokenType::COLON)) {
                         return parseCellOrRangeRef(sheetName);  // Parse second part of range
@@ -354,6 +359,12 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
                         advance();
                         auto cellRef =
                             std::make_unique<CellRefNode>(name, row, false, true, fullPos);
+                        // Check for spill range first (A$1#)
+                        if (match(TokenType::HASH)) {
+                            const SourcePosition spillPos{cellRef->position.start,
+                                                          previous_.position.end};
+                            return std::make_unique<SpillRangeRefNode>(std::move(cellRef), spillPos);
+                        }
                         if (match(TokenType::COLON)) {
                             // Range like A$1:B$2
                             auto second = parseCellOrRangeRef("");
@@ -420,6 +431,11 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
             auto cellRef = std::make_unique<CellRefNode>(col, row, false, false, fullPos);
             cellRef->sheetName = sheetName;
 
+            // Check for spill range first (A1#)
+            if (match(TokenType::HASH)) {
+                const SourcePosition spillPos{cellRef->position.start, previous_.position.end};
+                return std::make_unique<SpillRangeRefNode>(std::move(cellRef), spillPos);
+            }
             // Check for range (A1:B2)
             if (match(TokenType::COLON)) {
                 auto second = parseCellOrRangeRef(sheetName);
@@ -447,6 +463,11 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
                 auto cellRef = std::make_unique<CellRefNode>(col, row, false, true, fullPos);
                 cellRef->sheetName = sheetName;
 
+                // Check for spill range first (A$1#)
+                if (match(TokenType::HASH)) {
+                    const SourcePosition spillPos{cellRef->position.start, previous_.position.end};
+                    return std::make_unique<SpillRangeRefNode>(std::move(cellRef), spillPos);
+                }
                 // Check for range
                 if (match(TokenType::COLON)) {
                     auto second = parseCellOrRangeRef(sheetName);
@@ -548,7 +569,7 @@ std::unique_ptr<ASTNode> FormulaParser::parseCellOrRangeRef(const std::string& s
         return std::make_unique<RangeRefNode>(std::move(cellRef), std::move(secondCell), rangePos);
     }
 
-    return cellRef;
+    return maybeWrapSpillRange(std::move(cellRef));
 }
 
 FormulaParser::CellRefComponents FormulaParser::parseCellRefComponents() {
@@ -679,6 +700,12 @@ std::unique_ptr<ASTNode> FormulaParser::parseUuidCellRef() {
     auto node = std::make_unique<CellRefNode>("", 0, colAbsolute, rowAbsolute, tok.position);
     node->cellId = cellId;
 
+    // Check for spill range first (UUID_CELL_REF #), since # binds tighter than :
+    if (match(TokenType::HASH)) {
+        const SourcePosition spillPos{node->position.start, previous_.position.end};
+        return std::make_unique<SpillRangeRefNode>(std::move(node), spillPos);
+    }
+
     // Check for range (UUID_CELL_REF : UUID_CELL_REF)
     if (match(TokenType::COLON)) {
         if (check(TokenType::UUID_CELL_REF)) {
@@ -770,6 +797,16 @@ std::unique_ptr<ASTNode> FormulaParser::parseUuidRowRef() {
     }
 
     return node;
+}
+
+std::unique_ptr<ASTNode> FormulaParser::maybeWrapSpillRange(std::unique_ptr<CellRefNode> cellRef) {
+    // Check if the cell reference is followed by # (spill range operator)
+    if (match(TokenType::HASH)) {
+        // Extend position to include the # operator
+        const SourcePosition spillPos{cellRef->position.start, previous_.position.end};
+        return std::make_unique<SpillRangeRefNode>(std::move(cellRef), spillPos);
+    }
+    return cellRef;
 }
 
 }  // namespace cells

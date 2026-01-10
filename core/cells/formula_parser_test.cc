@@ -986,5 +986,136 @@ TEST(FormulaParserTest, ValidFormulaNoErrorNode) {
     EXPECT_FALSE(parser.hasErrors());
 }
 
+// ============================================================================
+// Spill Range Reference Tests
+// ============================================================================
+
+TEST(FormulaParserTest, SpillRangeSimple) {
+    // A1# - spill range reference
+    FormulaParser parser("=A1#");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::SPILL_RANGE_REF);
+
+    auto* spillRef = dynamic_cast<SpillRangeRefNode*>(ast.get());
+    ASSERT_NE(spillRef, nullptr);
+    ASSERT_NE(spillRef->anchor, nullptr);
+    EXPECT_EQ(spillRef->anchor->column, "A");
+    EXPECT_EQ(spillRef->anchor->row, 1);
+}
+
+TEST(FormulaParserTest, SpillRangeAbsolute) {
+    // $A$1# - absolute cell ref with spill
+    FormulaParser parser("=$A$1#");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::SPILL_RANGE_REF);
+
+    auto* spillRef = dynamic_cast<SpillRangeRefNode*>(ast.get());
+    ASSERT_NE(spillRef, nullptr);
+    ASSERT_NE(spillRef->anchor, nullptr);
+    EXPECT_TRUE(spillRef->anchor->colAbsolute);
+    EXPECT_TRUE(spillRef->anchor->rowAbsolute);
+}
+
+TEST(FormulaParserTest, SpillRangeInFunction) {
+    // SUM(A1#) - spill range as function argument
+    FormulaParser parser("=SUM(A1#)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::FUNCTION_CALL);
+
+    auto* func = dynamic_cast<FunctionCallNode*>(ast.get());
+    ASSERT_NE(func, nullptr);
+    ASSERT_EQ(func->args.size(), 1u);
+    EXPECT_EQ(func->args[0]->type, ASTNodeType::SPILL_RANGE_REF);
+}
+
+TEST(FormulaParserTest, SpillRangeInExpression) {
+    // A1#+B2 - spill range in expression
+    FormulaParser parser("=A1#+B2");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::BINARY_OP);
+
+    auto* binOp = dynamic_cast<BinaryOpNode*>(ast.get());
+    ASSERT_NE(binOp, nullptr);
+    EXPECT_EQ(binOp->left->type, ASTNodeType::SPILL_RANGE_REF);
+    EXPECT_EQ(binOp->right->type, ASTNodeType::CELL_REF);
+}
+
+TEST(FormulaParserTest, SpillRangePosition) {
+    // Check position spans from cell to #
+    FormulaParser parser("=A1#");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    auto* spillRef = dynamic_cast<SpillRangeRefNode*>(ast.get());
+    ASSERT_NE(spillRef, nullptr);
+    // Position should be from start of A (position 1) to end of # (position 4)
+    EXPECT_EQ(spillRef->position.start, 1u);
+    EXPECT_EQ(spillRef->position.end, 4u);
+}
+
+TEST(FormulaParserTest, SpillRangeToJson) {
+    FormulaParser parser("=A1#");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    auto* spillRef = dynamic_cast<SpillRangeRefNode*>(ast.get());
+    ASSERT_NE(spillRef, nullptr);
+
+    std::string json = spillRef->toJson();
+    EXPECT_TRUE(json.find("SpillRangeRef") != std::string::npos);
+    EXPECT_TRUE(json.find("anchor") != std::string::npos);
+}
+
+TEST(FormulaParserTest, SpillRangeClone) {
+    FormulaParser parser("=A1#");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    auto clone = ast->clone();
+    ASSERT_NE(clone, nullptr);
+    EXPECT_EQ(clone->type, ASTNodeType::SPILL_RANGE_REF);
+
+    auto* cloneSpill = dynamic_cast<SpillRangeRefNode*>(clone.get());
+    ASSERT_NE(cloneSpill, nullptr);
+    ASSERT_NE(cloneSpill->anchor, nullptr);
+    EXPECT_EQ(cloneSpill->anchor->column, "A");
+    EXPECT_EQ(cloneSpill->anchor->row, 1);
+}
+
+TEST(FormulaParserTest, SpillRangeUuid) {
+    // UUID cell ref with spill: ~~cellId12#
+    FormulaParser parser("=~~cellId12#");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_FALSE(parser.hasErrors());
+    EXPECT_EQ(ast->type, ASTNodeType::SPILL_RANGE_REF);
+
+    auto* spillRef = dynamic_cast<SpillRangeRefNode*>(ast.get());
+    ASSERT_NE(spillRef, nullptr);
+    EXPECT_EQ(spillRef->anchor->cellId, "cellId12");
+}
+
+TEST(FormulaParserTest, SpillRangeVsRange) {
+    // A1# is spill range, A1:B2 is range (not A1#:B2)
+    FormulaParser parser("=A1:B2");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    EXPECT_EQ(ast->type, ASTNodeType::RANGE_REF);
+
+    // # binds tighter: A1# means spill of A1, not part of range
+    FormulaParser parser2("=A1#");
+    auto ast2 = parser2.parse();
+    ASSERT_NE(ast2, nullptr);
+    EXPECT_EQ(ast2->type, ASTNodeType::SPILL_RANGE_REF);
+}
+
 }  // namespace
 }  // namespace cells
