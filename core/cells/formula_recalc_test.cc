@@ -934,5 +934,109 @@ TEST_F(FormulaRecalcTest, SpillGetSpillMaster) {
     EXPECT_EQ(master, a1->id);
 }
 
+// ============================================================================
+// Spill Flags Tests (Phase 7d)
+// ============================================================================
+
+TEST_F(FormulaRecalcTest, SpillMasterFlagSetOnRegister) {
+    Cell* a1 = setCellValue(0, 0, 0.0);
+    ASSERT_NE(a1, nullptr);
+
+    // Initially no spill flag
+    EXPECT_FALSE(a1->hasFlag(CellFlags::SPILL_MASTER));
+
+    // Create a spill
+    std::vector<std::vector<EvalResult>> arrayData = {
+        {EvalResult::Number(1.0), EvalResult::Number(2.0)},
+        {EvalResult::Number(3.0), EvalResult::Number(4.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(arrayData)));
+
+    // SPILL_MASTER flag should be set
+    EXPECT_TRUE(a1->hasFlag(CellFlags::SPILL_MASTER));
+}
+
+TEST_F(FormulaRecalcTest, SpillMasterFlagClearedOnClear) {
+    Cell* a1 = setCellValue(0, 0, 0.0);
+    ASSERT_NE(a1, nullptr);
+
+    // Create a spill
+    std::vector<std::vector<EvalResult>> arrayData = {
+        {EvalResult::Number(1.0), EvalResult::Number(2.0)},
+        {EvalResult::Number(3.0), EvalResult::Number(4.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(arrayData)));
+    EXPECT_TRUE(a1->hasFlag(CellFlags::SPILL_MASTER));
+
+    // Clear the spill
+    clearSpillForMaster(sheet, a1->id);
+
+    // SPILL_MASTER flag should be cleared
+    EXPECT_FALSE(a1->hasFlag(CellFlags::SPILL_MASTER));
+}
+
+TEST_F(FormulaRecalcTest, SpillMasterFlagClearedOnClearAll) {
+    Cell* a1 = setCellValue(0, 0, 0.0);
+    Cell* c1 = setCellValue(2, 0, 0.0);
+    ASSERT_NE(a1, nullptr);
+    ASSERT_NE(c1, nullptr);
+
+    // Create two spills
+    std::vector<std::vector<EvalResult>> arrayData1 = {
+        {EvalResult::Number(1.0), EvalResult::Number(2.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(arrayData1)));
+
+    std::vector<std::vector<EvalResult>> arrayData2 = {
+        {EvalResult::Number(10.0), EvalResult::Number(20.0)}};
+    processSpill(sheet, c1, EvalResult::Array(std::move(arrayData2)));
+
+    EXPECT_TRUE(a1->hasFlag(CellFlags::SPILL_MASTER));
+    EXPECT_TRUE(c1->hasFlag(CellFlags::SPILL_MASTER));
+
+    // Clear all spills
+    sheet->clearAllSpillRanges();
+
+    // Both flags should be cleared
+    EXPECT_FALSE(a1->hasFlag(CellFlags::SPILL_MASTER));
+    EXPECT_FALSE(c1->hasFlag(CellFlags::SPILL_MASTER));
+}
+
+TEST_F(FormulaRecalcTest, SpillMasterFlagRemainsOnReplace) {
+    Cell* a1 = setCellValue(0, 0, 0.0);
+    ASSERT_NE(a1, nullptr);
+
+    // Create first spill (2x2)
+    std::vector<std::vector<EvalResult>> arrayData1 = {
+        {EvalResult::Number(1.0), EvalResult::Number(2.0)},
+        {EvalResult::Number(3.0), EvalResult::Number(4.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(arrayData1)));
+    EXPECT_TRUE(a1->hasFlag(CellFlags::SPILL_MASTER));
+
+    // Replace with different spill (1x2 - still requires spill)
+    std::vector<std::vector<EvalResult>> arrayData2 = {
+        {EvalResult::Number(10.0), EvalResult::Number(20.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(arrayData2)));
+
+    // Flag should still be set (it was cleared then re-set)
+    EXPECT_TRUE(a1->hasFlag(CellFlags::SPILL_MASTER));
+}
+
+TEST_F(FormulaRecalcTest, SpillMasterFlagClearedOnSingleValue) {
+    Cell* a1 = setCellValue(0, 0, 0.0);
+    ASSERT_NE(a1, nullptr);
+
+    // Create a spill (2x2)
+    std::vector<std::vector<EvalResult>> arrayData = {
+        {EvalResult::Number(1.0), EvalResult::Number(2.0)},
+        {EvalResult::Number(3.0), EvalResult::Number(4.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(arrayData)));
+    EXPECT_TRUE(a1->hasFlag(CellFlags::SPILL_MASTER));
+
+    // Replace with 1x1 array (single value - no spill needed)
+    std::vector<std::vector<EvalResult>> singleValue = {{EvalResult::Number(10.0)}};
+    processSpill(sheet, a1, EvalResult::Array(std::move(singleValue)));
+
+    // Flag should be cleared (no spill exists anymore)
+    EXPECT_FALSE(a1->hasFlag(CellFlags::SPILL_MASTER));
+}
+
 }  // namespace
 }  // namespace cells

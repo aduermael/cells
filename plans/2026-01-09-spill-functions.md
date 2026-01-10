@@ -238,11 +238,16 @@ bits 4-7: reserved for future use
   - Shared formula flags: rebuilt by `registerSharedFormulaGroup()` in parser.cc:904 and xlsx_reader.cc:896
   - Spill flags: rebuilt during recalculation when `registerSpillRange()` is called
 
-- [ ] 7f: Update tests
-  - Verify Cell size reduction
-  - Test shared formula behavior unchanged
-  - Test spill behavior unchanged
-  - Test flag consistency after operations
+- [x] 7f: Update tests
+  - Verify Cell size reduction (from Phase 7a-7c: removed 8-byte pointer, added 1-byte flags)
+  - Test shared formula behavior unchanged (xlsx_writer_test, serializer_test pass)
+  - Test spill behavior unchanged (formula_recalc_test passes)
+  - Test flag consistency after operations:
+    - SpillMasterFlagSetOnRegister: flag set when spill is registered
+    - SpillMasterFlagClearedOnClear: flag cleared when spill is cleared
+    - SpillMasterFlagClearedOnClearAll: both masters' flags cleared on clearAll
+    - SpillMasterFlagRemainsOnReplace: flag stays set when replacing spill with another
+    - SpillMasterFlagClearedOnSingleValue: flag cleared when replaced with 1x1 (no spill)
 
 ---
 
