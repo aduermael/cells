@@ -10,8 +10,15 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+# Use Bazel's workspace directory if available (when run via bazel run)
+# Otherwise fall back to script location (when run directly)
+if [ -n "${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
+    REPO_ROOT="$BUILD_WORKSPACE_DIRECTORY"
+    SCRIPT_DIR="$REPO_ROOT/tools"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+fi
 
 # Colors for output
 RED='\033[0;31m'

@@ -127,12 +127,12 @@ tools/
 
 Add `sh_binary` targets that wrap the shell scripts:
 
-- [ ] 2a: Add `sh_binary` targets for cli, cli-release
-- [ ] 2b: Add `sh_binary` targets for wasm, wasm-debug, wasm-dist
-- [ ] 2c: Add `sh_binary` targets for serve
-- [ ] 2d: Add `sh_binary` targets for test, e2e, e2e-headed
-- [ ] 2e: Add `sh_binary` targets for check, format, lint, check-types
-- [ ] 2f: Remove any obsolete targets from BUILD file
+- [x] 2a: Add `sh_binary` targets for cli, cli-release
+- [x] 2b: Add `sh_binary` targets for wasm, wasm-debug, wasm-dist
+- [x] 2c: Add `sh_binary` targets for serve
+- [x] 2d: Add `sh_binary` targets for test, e2e, e2e-headed
+- [x] 2e: Add `sh_binary` targets for check, format, lint, check-types
+- [x] 2f: Remove any obsolete targets from BUILD file (none existed)
 
 ## Phase 3: Update TypeScript Build
 
