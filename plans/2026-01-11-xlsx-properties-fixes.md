@@ -36,8 +36,8 @@ Core formula evaluation is **sound** - calculations already deferred until all c
 
 Parse named ranges from XLSX so formulas can reference them.
 
-- [ ] 1a: Parse `<definedNames>` from xl/workbook.xml in xlsx_reader.cc
-- [ ] 1b: Add unit tests for named range parsing (workbook and sheet scoped)
+- [x] 1a: Parse `<definedNames>` from xl/workbook.xml in xlsx_reader.cc
+- [x] 1b: Add unit tests for named range parsing (workbook and sheet scoped)
 
 **Files:** `core/cells/xlsx_reader.cc`, `core/cells/xlsx_reader_test.cc`
 

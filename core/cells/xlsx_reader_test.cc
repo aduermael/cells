@@ -3,6 +3,7 @@
 #include <string>
 
 #include "core/cells/formula_serializer.h"
+#include "core/cells/named_ranges.h"
 
 #include "gtest/gtest.h"
 
@@ -515,6 +516,90 @@ TEST(XLSXReaderTest, WarningsCollected) {
     auto result = readXLSX(testFilePath("formulas.xlsx"));
     // Just verify that warnings is a vector (may or may not have content)
     EXPECT_TRUE(result.warnings.empty() || !result.warnings.empty());
+}
+
+// ============================================================================
+// Named Range Tests
+// ============================================================================
+
+TEST(XLSXReaderTest, ReadNamedRangesFromLBOModel) {
+    // This file has 11 defined names:
+    // - 10 workbook-scoped named ranges (e.g., Company_Name, LTM_EBITDA)
+    // - 1 sheet-scoped name (_xlnm.Print_Area which should be skipped)
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"));
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    // Get the named range registry
+    auto* registry = result.workbook->getNamedRanges();
+    ASSERT_NE(registry, nullptr);
+
+    // Should have workbook-scoped named ranges
+    auto workbookNames = registry->getWorkbookScoped();
+    EXPECT_GE(workbookNames.size(), 10u)
+        << "Expected at least 10 workbook-scoped named ranges from the LBO model";
+
+    // Verify a few specific named ranges exist
+    // Note: The file has named ranges like Company_Name, LTM_EBITDA, etc.
+    Sheet* sheet = result.workbook->getSheetByName("LBO-60-Minutes");
+    ASSERT_NE(sheet, nullptr);
+
+    // Test resolving a named range
+    const NamedRange* companyName = registry->resolve("Company_Name", sheet->id);
+    if (companyName != nullptr) {
+        EXPECT_EQ(companyName->name, "Company_Name");
+        EXPECT_EQ(companyName->scope, NamedRangeScope::WORKBOOK);
+        EXPECT_EQ(companyName->target.type, NamedRangeTarget::Type::CELL);
+        EXPECT_FALSE(companyName->target.id1.isNull());
+    }
+}
+
+TEST(XLSXReaderTest, NamedRangeSkipsReservedNames) {
+    // _xlnm.* names (like _xlnm.Print_Area) should be skipped
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"));
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    auto* registry = result.workbook->getNamedRanges();
+    ASSERT_NE(registry, nullptr);
+
+    // _xlnm.Print_Area should NOT be in the registry
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    const NamedRange* printArea = registry->resolve("_xlnm.Print_Area", sheet->id);
+    EXPECT_EQ(printArea, nullptr) << "_xlnm.Print_Area should be skipped during import";
+}
+
+TEST(XLSXReaderTest, NamedRangeSingleCellTarget) {
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"));
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    auto* registry = result.workbook->getNamedRanges();
+    ASSERT_NE(registry, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByName("LBO-60-Minutes");
+    ASSERT_NE(sheet, nullptr);
+
+    // Company_Name points to a single cell ($D$7)
+    const NamedRange* nr = registry->resolve("Company_Name", sheet->id);
+    if (nr != nullptr) {
+        EXPECT_EQ(nr->target.type, NamedRangeTarget::Type::CELL);
+
+        // The cell ID should point to D7 (column 3, row 6 in 0-indexed)
+        // Verify the target cell exists
+        Cell* targetCell = sheet->getCell(nr->target.id1);
+        if (targetCell != nullptr) {
+            // Get the column and row positions
+            Axis* col = sheet->getColumn(targetCell->colId);
+            Axis* row = sheet->getRow(targetCell->rowId);
+            if (col != nullptr && row != nullptr) {
+                EXPECT_EQ(col->position, 3u) << "Company_Name should be in column D (index 3)";
+                EXPECT_EQ(row->position, 6u) << "Company_Name should be in row 7 (index 6)";
+            }
+        }
+    }
 }
 
 }  // namespace

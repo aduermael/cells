@@ -11,6 +11,7 @@
 
 #include "core/cells/formula_parser.h"
 #include "core/cells/id.h"
+#include "core/cells/named_ranges.h"
 #include "core/cells/types.h"
 
 #include "miniz.h"
@@ -241,6 +242,146 @@ std::string cellStyleToKey(const cells::CellStyle& style) {
         << static_cast<int>(style.fontSize) << "|" << static_cast<int>(style.hAlign) << "|"
         << static_cast<int>(style.vAlign);
     return oss.str();
+}
+
+// ---------------------------------------------------------------------------
+// Named Range parsing helpers
+// ---------------------------------------------------------------------------
+
+// Raw defined name from XLSX - needs to be resolved after sheets are loaded
+struct RawDefinedName {
+    std::string name;       // e.g., "Company_Name"
+    std::string reference;  // e.g., "'Sheet1'!$D$7" or "'Sheet1'!$A$1:$N$249"
+    int localSheetId{-1};   // -1 for workbook scope, 0-indexed sheet index for sheet scope
+};
+
+// Parse the reference part of a defined name (e.g., "'Sheet1'!$D$7")
+// Returns: sheet name, start ref (col, row, colAbs, rowAbs), and optionally end ref for ranges
+struct ParsedDefinedNameRef {
+    std::string sheetName;
+
+    // Start cell (or single cell)
+    int startCol{-1};
+    int startRow{-1};
+    bool startColAbsolute{false};
+    bool startRowAbsolute{false};
+
+    // End cell for ranges (or -1 if single cell)
+    int endCol{-1};
+    int endRow{-1};
+    bool endColAbsolute{false};
+    bool endRowAbsolute{false};
+
+    bool valid{false};
+    bool isRange{false};
+};
+
+// Parse a cell reference like "$D$7" or "D7" into column and row indices
+// Returns false if parsing fails
+bool parseCellRefWithAbsolute(const char* ref, int& col, int& row, bool& colAbsolute,
+                              bool& rowAbsolute) {
+    col = 0;
+    row = 0;
+    colAbsolute = false;
+    rowAbsolute = false;
+
+    // Check for column absolute marker
+    if (*ref == '$') {
+        colAbsolute = true;
+        ref++;
+    }
+
+    // Parse column letters (A-Z, AA-ZZ, etc.)
+    if (*ref < 'A' || *ref > 'Z') {
+        return false;
+    }
+    while (*ref >= 'A' && *ref <= 'Z') {
+        col = col * 26 + (*ref - 'A' + 1);
+        ref++;
+    }
+    col--;  // Convert to 0-indexed
+
+    // Check for row absolute marker
+    if (*ref == '$') {
+        rowAbsolute = true;
+        ref++;
+    }
+
+    // Parse row number
+    if (*ref < '0' || *ref > '9') {
+        return false;
+    }
+    while (*ref >= '0' && *ref <= '9') {
+        row = row * 10 + (*ref - '0');
+        ref++;
+    }
+    row--;  // Convert to 0-indexed
+
+    return true;
+}
+
+// Parse a defined name reference like "'Sheet1'!$D$7" or "'Sheet1'!$A$1:$N$249"
+ParsedDefinedNameRef parseDefinedNameRef(const std::string& refStr) {
+    ParsedDefinedNameRef result;
+
+    if (refStr.empty()) {
+        return result;
+    }
+
+    // Find the sheet reference separator '!'
+    size_t exclamPos = refStr.find('!');
+    if (exclamPos == std::string::npos) {
+        return result;  // No sheet reference
+    }
+
+    // Parse sheet name
+    std::string sheetPart = refStr.substr(0, exclamPos);
+    std::string cellPart = refStr.substr(exclamPos + 1);
+
+    // Sheet name may be quoted (e.g., "'Sheet 1'")
+    if (!sheetPart.empty() && sheetPart[0] == '\'') {
+        // Remove surrounding single quotes
+        if (sheetPart.size() >= 2 && sheetPart.back() == '\'') {
+            result.sheetName = sheetPart.substr(1, sheetPart.size() - 2);
+            // Handle escaped single quotes ('' -> ')
+            size_t pos = 0;
+            while ((pos = result.sheetName.find("''", pos)) != std::string::npos) {
+                result.sheetName.replace(pos, 2, "'");
+                pos++;
+            }
+        } else {
+            return result;  // Invalid quoted sheet name
+        }
+    } else {
+        result.sheetName = sheetPart;
+    }
+
+    // Check for range (contains ':')
+    size_t colonPos = cellPart.find(':');
+    if (colonPos != std::string::npos) {
+        // It's a range like "$A$1:$N$249"
+        result.isRange = true;
+        std::string startPart = cellPart.substr(0, colonPos);
+        std::string endPart = cellPart.substr(colonPos + 1);
+
+        if (!parseCellRefWithAbsolute(startPart.c_str(), result.startCol, result.startRow,
+                                      result.startColAbsolute, result.startRowAbsolute)) {
+            return result;
+        }
+        if (!parseCellRefWithAbsolute(endPart.c_str(), result.endCol, result.endRow,
+                                      result.endColAbsolute, result.endRowAbsolute)) {
+            return result;
+        }
+    } else {
+        // It's a single cell like "$D$7"
+        if (!parseCellRefWithAbsolute(cellPart.c_str(), result.startCol, result.startRow,
+                                      result.startColAbsolute, result.startRowAbsolute)) {
+            return result;
+        }
+    }
+
+    result.valid = true;
+    return result;
 }
 
 // Parse xl/styles.xml into XLSXStyles struct
@@ -548,6 +689,25 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     if (sheetInfo.empty()) {
         result.error = XLSXReadError("No sheets found in workbook");
         return result;
+    }
+
+    // Parse defined names (named ranges) from workbook.xml
+    // These will be resolved after all sheets are loaded
+    std::vector<RawDefinedName> rawDefinedNames;
+    for (auto defName : wbDoc.child("workbook").child("definedNames").children("definedName")) {
+        const char* name = defName.attribute("name").value();
+        const char* refText = defName.text().get();
+        if (name && name[0] != '\0' && refText && refText[0] != '\0') {
+            RawDefinedName rawName;
+            rawName.name = name;
+            rawName.reference = refText;
+            // localSheetId is 0-indexed sheet index for sheet-scoped names
+            // If not present, it's workbook-scoped
+            if (defName.attribute("localSheetId")) {
+                rawName.localSheetId = defName.attribute("localSheetId").as_int(-1);
+            }
+            rawDefinedNames.push_back(rawName);
+        }
     }
     logTiming("parse workbook", start);
 
@@ -909,6 +1069,118 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         result.error = XLSXReadError("Sheet \"" + options.sheetName + "\" not found");
         return result;
     }
+
+    // Resolve named ranges now that all sheets and cells are loaded
+    start = std::chrono::steady_clock::now();
+    for (const auto& rawName : rawDefinedNames) {
+        // Skip reserved names (like _xlnm.Print_Area, _xlnm.Print_Titles)
+        if (rawName.name.find("_xlnm.") == 0) {
+            continue;
+        }
+
+        ParsedDefinedNameRef parsed = parseDefinedNameRef(rawName.reference);
+        if (!parsed.valid) {
+            addWarning("Failed to parse named range reference: " + rawName.name + " = " +
+                       rawName.reference);
+            continue;
+        }
+
+        // Find the target sheet
+        Sheet* targetSheet = workbook->getSheetByName(parsed.sheetName);
+        if (targetSheet == nullptr) {
+            addWarning("Named range references unknown sheet: " + rawName.name + " -> " +
+                       parsed.sheetName);
+            continue;
+        }
+
+        // Get the cell(s) by position
+        Axis* startCol = targetSheet->getColumnByPosition(static_cast<uint32_t>(parsed.startCol));
+        Axis* startRow = targetSheet->getRowByPosition(static_cast<uint32_t>(parsed.startRow));
+
+        if (startCol == nullptr || startRow == nullptr) {
+            addWarning("Named range references out-of-bounds cell: " + rawName.name);
+            continue;
+        }
+
+        Cell* startCell = targetSheet->getCellAt(startCol->id, startRow->id);
+
+        // Determine scope
+        ID scopeSheetId;
+        if (rawName.localSheetId >= 0 &&
+            rawName.localSheetId < static_cast<int>(workbook->sheetCount())) {
+            // Sheet-scoped: use the sheet at localSheetId index
+            Sheet* scopeSheet = workbook->getSheetByIndex(static_cast<size_t>(rawName.localSheetId));
+            if (scopeSheet != nullptr) {
+                scopeSheetId = scopeSheet->id;
+            }
+        }
+
+        NamedRangeRegistry* registry = workbook->getNamedRanges();
+        if (registry == nullptr) {
+            continue;
+        }
+
+        if (parsed.isRange) {
+            // Range reference
+            Axis* endCol = targetSheet->getColumnByPosition(static_cast<uint32_t>(parsed.endCol));
+            Axis* endRow = targetSheet->getRowByPosition(static_cast<uint32_t>(parsed.endRow));
+
+            if (endCol == nullptr || endRow == nullptr) {
+                addWarning("Named range references out-of-bounds end cell: " + rawName.name);
+                continue;
+            }
+
+            Cell* endCell = targetSheet->getCellAt(endCol->id, endRow->id);
+
+            // Create or get the corner cells
+            // For ranges, we need both start and end cells to exist
+            // If they don't exist, we need to handle this case
+            ID startCellId;
+            ID endCellId;
+
+            if (startCell != nullptr) {
+                startCellId = startCell->id;
+            } else {
+                // Cell doesn't exist at this position - create a virtual target
+                // For now, just skip (cell must exist)
+                addWarning("Named range start cell does not exist: " + rawName.name);
+                continue;
+            }
+
+            if (endCell != nullptr) {
+                endCellId = endCell->id;
+            } else {
+                // End cell doesn't exist - create a virtual target
+                addWarning("Named range end cell does not exist: " + rawName.name);
+                continue;
+            }
+
+            NamedRangeTarget target =
+                NamedRangeTarget::range(startCellId, endCellId, targetSheet->id);
+
+            if (scopeSheetId.isNull()) {
+                registry->defineWorkbook(rawName.name, target);
+            } else {
+                registry->defineSheet(rawName.name, scopeSheetId, target);
+            }
+        } else {
+            // Single cell reference
+            if (startCell == nullptr) {
+                // Cell doesn't exist at this position
+                addWarning("Named range cell does not exist: " + rawName.name);
+                continue;
+            }
+
+            NamedRangeTarget target = NamedRangeTarget::cell(startCell->id, targetSheet->id);
+
+            if (scopeSheetId.isNull()) {
+                registry->defineWorkbook(rawName.name, target);
+            } else {
+                registry->defineSheet(rawName.name, scopeSheetId, target);
+            }
+        }
+    }
+    logTiming("resolve named ranges", start);
 
     // Final progress report (100% complete)
     if (options.progressCallback && cellsLoaded > lastProgressReport) {
