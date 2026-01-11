@@ -2,9 +2,35 @@
 
 Please start or continue executing this plan: $1
 
-Only continue current phase if not finished or start next one. 
-Always take a break at the end of each phase or if something needs to be clarified. 
+## Pacing
 
-Commit each bullet point / sub-task, including plan update (checkmark at least) in the commit. 
+- Only continue current phase if not finished or start next one
+- Always take a break at the end of each phase or if something needs to be clarified
+- It's also OK to take a break after any step if a lot was accomplished - no need to run all steps at once when the work is complex
 
-Don't forget to run `make lint`, `make format` and `make test` at the end, that order. Everything should be ✅.
+## Commits
+
+Create a commit for each step of each phase, including the plan update (checkmark at least) in the commit.
+
+Commit message format: `<phase><step>: short description` (lowercase)
+- Example: `1c: add validation for empty inputs`
+
+## Plan updates
+
+When checking off a step in the plan, optionally add 1-2 sentences explaining what was done if it's useful to extend the step description.
+
+## Tests
+
+At the end of each phase, run tests in this order. Everything should pass:
+
+1. `bazel run :test` (unit tests)
+2. `bazel run :lint`
+2. `bazel run :check-types`
+4. `bazel run :e2e` (E2E tests)
+3. `bazel run :format`
+
+## Phase completion
+
+At the end of each phase, display:
+- A quick summary of what was done
+- ~3 lines about what comes next
