@@ -36,11 +36,11 @@ Following plan management guidelines defined in AGENTS.md
 
 | Task | Command |
 |------|---------|
-| Build | `make build` |
-| Unit tests | `make test` |
-| E2E tests | `cd apps/wasm && npm run test:parallel -- stable` |
-| Lint | `make lint` |
-| Format | `make format` |
+| Build WASM | `bazel run :wasm` |
+| Unit tests | `bazel run :test` |
+| E2E tests | `bazel run :e2e` |
+| Lint | `bazel run :lint` |
+| Format | `bazel run :format` |
 ```
 
 All timestamps must be in **UTC timezone**. To get the current UTC time, run:
@@ -112,14 +112,14 @@ When executing a plan, each subtask gets its own commit named by phase and subta
 **All checks must pass at the end of each phase.** Run:
 
 ```bash
-make check
+bazel run :check
 ```
 
-This runs all verification steps in sequence with 16 parallel jobs:
+This runs all verification steps in sequence (parallelism is auto-detected):
 1. Unit tests (C++)
 2. Linter
 3. Type checks (TypeScript)
-4. Integration tests (E2E stable suite)
+4. E2E tests (all tests)
 5. Formatter check
 
 **If any step fails:** Fix the issue before proceeding. Do not introduce regressions.
@@ -157,59 +157,69 @@ testdata/                   # Sample .zcd files for testing
 
 ## Build & Test Commands
 
-**IMPORTANT:** Always use Makefile targets or npm scripts. Never run raw `bazel` or `node` commands directly.
+**IMPORTANT:** Always use `bazel run :target` commands. This ensures correct flags and consistent behavior.
 
-**Which build command to use:**
-- `make build` - C++ core engine only (no WASM)
-- `make wasm` or `make wasm-dist` - TypeScript/WASM web app (use this for frontend work)
+### Build Commands
 
-### Core Engine (C++)
+| Task | Command | Output |
+|------|---------|--------|
+| Build CLI (dev) | `bazel run :cli` | `dist/cli/cells` |
+| Build CLI (release) | `bazel run :cli-release` | `dist/cli/cells` |
+| Build WASM (dev) | `bazel run :wasm` | `dist/wasm/` |
+| Build WASM (debug) | `bazel run :wasm-debug` | `dist/wasm/` (with DWARF) |
+| Build WASM (release) | `bazel run :wasm-dist` | `dist/wasm/` (optimized) |
+| Serve locally | `bazel run :serve` | Serves `dist/wasm/` |
 
-| Task | Command |
-|------|---------|
-| Build all | `make build` |
-| Build CLI | `make cli` |
-| Build CLI (optimized) | `make cli-release` |
-| Run unit tests | `make test` |
-| Format code | `make format` |
-| Check format | `make format-check` |
-| Lint | `make lint` |
-| Lint + fix | `make lint-fix` |
-| Full check (format + lint + build) | `make check` |
-| Generate compile_commands.json | `make compile-db` |
-| Clean | `make clean` |
-
-### WASM / Web App
+### Test Commands
 
 | Task | Command |
 |------|---------|
-| Build WASM + dist | `make wasm-dist` |
-| Build debug WASM | `make wasm-debug-dist` |
-| Serve locally | `make wasm-serve` |
-| TypeScript check | `make check-types` |
+| Run unit tests | `bazel run :test` |
+| Run E2E tests (headless) | `bazel run :e2e` |
+| Run E2E tests (headed) | `bazel run :e2e-headed` |
+| Run single E2E test | `bazel run :e2e -- smoke` |
 
-### E2E Tests (apps/wasm)
+### Code Quality Commands
 
 | Task | Command |
 |------|---------|
-| All tests (parallel) | `cd apps/wasm && npm run test:parallel` |
-| Stable tests (parallel) | `cd apps/wasm && npm run test:parallel -- stable` |
-| Collab tests (parallel) | `cd apps/wasm && npm run test:parallel -- collab` |
-| Single suite | `cd apps/wasm && npm run test:smoke` |
-| Headed mode (debug) | `HEADED=1 npm run test:smoke` |
+| Run all checks | `bazel run :check` |
+| Format code | `bazel run :format` |
+| Lint code | `bazel run :lint` |
+| Type check | `bazel run :check-types` |
 
-### Test Suites
+### E2E Test Details
 
-- **Stable suites:** smoke, formula, editing, column-move, clipboard, selection
-- **Experimental suites:** collab, initial-sync, collab-demo (may fail)
+Run all tests (default):
+```bash
+bazel run :e2e
+```
+
+Run a specific test file:
+```bash
+bazel run :e2e -- smoke       # Just smoke tests
+bazel run :e2e -- formula     # Just formula tests
+bazel run :e2e -- editing     # Just editing tests
+```
+
+Run with browser visible (for debugging):
+```bash
+bazel run :e2e-headed          # All tests, browser visible
+bazel run :e2e-headed -- smoke # Single test, browser visible
+```
+
+**Available tests:** smoke, formula, editing, column-move, clipboard, selection, script, collab, initial-sync, collab-demo
+
+**Note:** All tests must pass. There is no "stable" subset - if a test is flaky or broken, fix it or remove it.
 
 ## Common Mistakes to Avoid
 
 | Wrong | Right |
 |-------|-------|
-| `bazel build //apps/cli:cells` | `make cli` |
-| `bazel test //core/...` | `make test` |
-| `node tests/smoke.test.mjs && node tests/formula.test.mjs` | `cd apps/wasm && npm run test:parallel -- stable` |
-| `bazel build --config=wasm //apps/wasm:cells_wasm` | `make wasm-dist` |
+| `bazel build //apps/cli:cells` | `bazel run :cli` |
+| `bazel test //core/...` | `bazel run :test` |
+| `node tests/smoke.test.mjs && node tests/formula.test.mjs` | `bazel run :e2e` |
+| `bazel build --config=wasm //apps/wasm:cells_wasm` | `bazel run :wasm-dist` |
+| `cd apps/wasm && npm run test:parallel -- stable` | `bazel run :e2e` |
 
-**Why use Makefile targets?** They include correct flags, handle file copying, and are tested and documented.
+**Why use `bazel run :` targets?** They include correct flags, handle file copying to `dist/`, and are tested and documented.
