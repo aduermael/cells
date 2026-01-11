@@ -10,6 +10,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Test collection definitions
+// Note: All tests must pass. There is no "stable" subset - if a test is flaky or broken, fix it or remove it.
 const COLLECTIONS = {
   all: [
     'smoke.test.mjs',
@@ -22,14 +23,6 @@ const COLLECTIONS = {
     'collab.test.mjs',
     'initial-sync.test.mjs',
     'collab-demo.test.mjs',
-  ],
-  stable: [
-    'smoke.test.mjs',
-    'formula.test.mjs',
-    'editing.test.mjs',
-    'column-move.test.mjs',
-    'clipboard.test.mjs',
-    'selection.test.mjs',
   ],
   collab: [
     'collab.test.mjs',
@@ -79,7 +72,6 @@ Usage: node run-parallel.mjs [options] [collection]
 
 Collections:
   all      All test files (default)
-  stable   Stable tests: smoke, formula, editing, column-move, clipboard, selection
   collab   Collaboration tests: collab, initial-sync, collab-demo
   script   Script tests: script
 
@@ -89,7 +81,6 @@ Options:
 
 Examples:
   node run-parallel.mjs                  # Run all tests
-  node run-parallel.mjs stable           # Run stable tests
   node run-parallel.mjs -c 5 collab      # Run collab tests with max 5 concurrent
 `);
 }

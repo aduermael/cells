@@ -108,20 +108,20 @@ tools/
 └── lint.sh          # Lint code (move from scripts/)
 ```
 
-- [ ] 1a: Create `tools/cli.sh` - builds CLI binary to `dist/cli/cells`
-- [ ] 1b: Create `tools/cli-release.sh` - builds optimized CLI to `dist/cli/cells`
-- [ ] 1c: Create `tools/wasm.sh` - builds WASM + TS to `dist/wasm/`
-- [ ] 1d: Create `tools/wasm-debug.sh` - builds debug WASM to `dist/wasm/`
-- [ ] 1e: Create `tools/wasm-dist.sh` - builds optimized WASM to `dist/wasm/`
-- [ ] 1f: Create `tools/serve.sh` - serves `dist/wasm/` directory
-- [ ] 1g: Create `tools/test.sh` - runs unit tests with auto-detected parallelism
-- [ ] 1h: Create `tools/e2e.sh` - runs E2E tests headless with auto-detected parallelism
-- [ ] 1i: Create `tools/e2e-headed.sh` - runs E2E tests with browser visible
-- [ ] 1j: Update `apps/wasm/tests/run-parallel.mjs` - remove "stable" collection, keep only "all"
-- [ ] 1k: Create `tools/check-types.sh` - runs TypeScript type checking
-- [ ] 1l: Move `scripts/check.sh` to `tools/check.sh` and update for new commands
-- [ ] 1m: Move `scripts/format.sh` to `tools/format.sh`
-- [ ] 1n: Move `scripts/lint.sh` to `tools/lint.sh`
+- [x] 1a: Create `tools/cli.sh` - builds CLI binary to `dist/cli/cells`
+- [x] 1b: Create `tools/cli-release.sh` - builds optimized CLI to `dist/cli/cells`
+- [x] 1c: Create `tools/wasm.sh` - builds WASM + TS to `dist/wasm/`
+- [x] 1d: Create `tools/wasm-debug.sh` - builds debug WASM to `dist/wasm/`
+- [x] 1e: Create `tools/wasm-dist.sh` - builds optimized WASM to `dist/wasm/`
+- [x] 1f: Create `tools/serve.sh` - serves `dist/wasm/` directory
+- [x] 1g: Create `tools/test.sh` - runs unit tests with auto-detected parallelism
+- [x] 1h: Create `tools/e2e.sh` - runs E2E tests headless with auto-detected parallelism
+- [x] 1i: Create `tools/e2e-headed.sh` - runs E2E tests with browser visible
+- [x] 1j: Update `apps/wasm/tests/run-parallel.mjs` - remove "stable" collection, keep only "all"
+- [x] 1k: Create `tools/check-types.sh` - runs TypeScript type checking
+- [x] 1l: Move `scripts/check.sh` to `tools/check.sh` and update for new commands
+- [x] 1m: Move `scripts/format.sh` to `tools/format.sh`
+- [x] 1n: Move `scripts/lint.sh` to `tools/lint.sh`
 
 ## Phase 2: Update Root BUILD File
 
