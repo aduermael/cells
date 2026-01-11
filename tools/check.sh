@@ -67,6 +67,8 @@ time_cmd() {
 # 1. Unit tests (C++)
 echo -e "${BOLD}=== Unit Tests (C++) ===${NC}"
 unit_test_cmd() {
+    # Must run from workspace root, not from bazel-bin
+    cd "$REPO_ROOT"
     if command -v bazel &> /dev/null; then
         bazel test //core/...
     elif command -v bazelisk &> /dev/null; then

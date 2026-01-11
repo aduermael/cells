@@ -1,4 +1,4 @@
-Status: READY
+Status: DONE
 Created At: 2026-01-11 07:03 UTC
 Updated At: 2026-01-11 07:17 UTC
 Following plan management guidelines defined in AGENTS.md
@@ -167,7 +167,7 @@ Add `sh_binary` targets that wrap the shell scripts:
 - [x] 7a: Delete `apps/wasm/dist/` directory if it exists
 - [x] 7b: Test all `bazel run :` commands work correctly
 - [x] 7c: Fix any failing E2E tests (including pre-existing failures)
-- [ ] 7d: Run `bazel run :check` - ALL checks must pass (unit tests, lint, E2E, format)
+- [x] 7d: Run `bazel run :check` - ALL checks must pass (unit tests, lint, E2E, format)
 
 ---
 
