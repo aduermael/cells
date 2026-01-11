@@ -144,7 +144,10 @@ Add `sh_binary` targets that wrap the shell scripts:
 
 - [ ] 4a: Update `tools/serve/main.go` default `-dir` to `dist/wasm`
 - [ ] 4b: Update `.gitignore` - remove `apps/wasm/dist/`, keep `dist/`
-- [ ] 4c: Delete `scripts/` directory (all scripts moved to `tools/`)
+- [ ] 4c: Delete `scripts/` directory contents that are now in `tools/` (check.sh, format.sh, lint.sh)
+- [ ] 4d: Move remaining `scripts/` files to `tools/` (generate_large_cells.py, generate-*.sh, loc-tracker.sh)
+- [ ] 4e: Delete `scripts/` directory after moving all files
+- [ ] 4f: Move `examples/` scripts to `tools/examples/` or delete if obsolete
 
 ## Phase 5: Delete Makefile
 

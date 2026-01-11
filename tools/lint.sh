@@ -42,6 +42,8 @@ if [ ! -f "$COMPILE_DB" ]; then
 fi
 
 # Get Bazel external directory for third-party includes
+# Must cd to REPO_ROOT first so bazel info works correctly
+cd "$REPO_ROOT"
 BAZEL_OUTPUT_BASE=$(bazel info output_base 2>/dev/null || bazelisk info output_base 2>/dev/null || echo "")
 PUGIXML_INCLUDE=""
 LUAU_INCLUDE=""
@@ -125,14 +127,23 @@ echo ""
 TMPDIR=$(mktemp -d)
 trap "rm -rf $TMPDIR" EXIT
 
-# Build the extra args string for clang-tidy
-EXTRA_ARGS="-std=c++17 -I$REPO_ROOT -I$REPO_ROOT/third_party/miniz"
-if [ -n "${PUGIXML_INCLUDE:-}" ]; then
-    EXTRA_ARGS="$EXTRA_ARGS $PUGIXML_INCLUDE"
-fi
-if [ -n "${LUAU_INCLUDE:-}" ]; then
-    EXTRA_ARGS="$EXTRA_ARGS $LUAU_INCLUDE"
-fi
+# Build the extra args for clang-tidy
+# Write args to a temp file to preserve word boundaries across subprocess calls
+EXTRA_ARGS_FILE="$TMPDIR/extra_args.txt"
+{
+    echo "-std=c++17"
+    echo "-I$REPO_ROOT"
+    echo "-I$REPO_ROOT/third_party/miniz"
+    if [ -n "${PUGIXML_INCLUDE:-}" ]; then
+        echo "$PUGIXML_INCLUDE"
+    fi
+    if [ -n "${LUAU_INCLUDE:-}" ]; then
+        # Split LUAU_INCLUDE by space and write each -I separately
+        for arg in $LUAU_INCLUDE; do
+            echo "$arg"
+        done
+    fi
+} > "$EXTRA_ARGS_FILE"
 
 # Function to lint a single file (exported for xargs)
 lint_one_file() {
@@ -140,7 +151,7 @@ lint_one_file() {
     local tmpdir="$2"
     local project_root="$3"
     local fix_mode="$4"
-    local extra_args="$5"
+    local extra_args_file="$5"
 
     if [ ! -f "$file" ]; then
         return 0
@@ -159,13 +170,19 @@ lint_one_file() {
         cmd+=(--fix)
     fi
 
+    # Read extra args from file (preserves word boundaries)
+    local extra_args=()
+    while IFS= read -r arg; do
+        extra_args+=("$arg")
+    done < "$extra_args_file"
+
     # Run clang-tidy
     local exit_code=0
     "${cmd[@]}" \
         --config-file="$project_root/.clang-tidy" \
         "$file" \
         -- \
-        $extra_args \
+        "${extra_args[@]}" \
         > "$outfile" 2>&1 || exit_code=$?
 
     echo "$exit_code" > "$exitfile"
@@ -174,7 +191,7 @@ export -f lint_one_file
 
 # Run linting in parallel
 printf '%s\n' "${FILES[@]}" | xargs -P "$NPROCS" -I {} bash -c \
-    'lint_one_file "$1" "$2" "$3" "$4" "$5"' _ {} "$TMPDIR" "$REPO_ROOT" "$FIX_MODE" "$EXTRA_ARGS"
+    'lint_one_file "$1" "$2" "$3" "$4" "$5"' _ {} "$TMPDIR" "$REPO_ROOT" "$FIX_MODE" "$EXTRA_ARGS_FILE"
 
 # Collect results
 FAILED=0
