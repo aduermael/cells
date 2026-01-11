@@ -228,6 +228,33 @@ Document what's supported and what's not.
 
 ---
 
+## Phase 12: Fix Collab Test Flakiness
+
+Fix the flaky collaboration e2e tests. No e2e test should be flaky - there's always a way to make them reliable.
+
+**Affected test files:**
+- `collab.test.mjs` - Cell changes sync between peers, formula sync, bidirectional sync
+- `initial-sync.test.mjs` - New peer receives full document state
+- `collab-demo.test.mjs` - Various collaboration demo scenarios
+
+**Potential issues to investigate:**
+- [ ] 12a: Timing issues - insufficient waits for WebSocket/WebRTC connections
+- [ ] 12b: Race conditions in peer discovery and room joining
+- [ ] 12c: Sync completion detection - need reliable way to know when sync is done
+- [ ] 12d: Browser/frame lifecycle issues (detached frames)
+- [ ] 12e: Port conflicts or server startup timing
+
+**Approach:**
+- Add explicit wait conditions instead of fixed sleep() calls
+- Add retry logic with exponential backoff for flaky assertions
+- Improve test isolation (ensure clean state between tests)
+- Add debug logging to identify root causes
+- Consider using WebSocket/RTC event hooks for sync completion
+
+**Note:** Collab test failures can be ignored until reaching this phase.
+
+---
+
 ## Key Implementation Details
 
 ### Named Range Parsing (Phase 1a)
