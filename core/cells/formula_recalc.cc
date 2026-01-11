@@ -115,7 +115,8 @@ EvalResult evaluateCell(Sheet* sheet, Cell* cell) {
 
     EvalContext ctx;
     ctx.sheet = sheet;
-    ctx.workbook = nullptr;  // TODO: Add workbook parameter for cross-sheet refs
+    ctx.workbook = sheet->getWorkbook();
+    ctx.namedRanges = ctx.workbook ? ctx.workbook->getNamedRanges() : nullptr;
     ctx.currentCellId = cell->id;
     ctx.evaluatingCells = &evaluatingCells;
     ctx.recursionDepth = 0;

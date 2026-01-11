@@ -415,6 +415,17 @@ struct Sheet {
         const std::string& name);  // "A" -> 0, "Z" -> 25, "AA" -> 26, "" -> -1
 
     // ========================================================================
+    // Parent workbook access
+    // ========================================================================
+
+    // Get the parent workbook (nullptr if sheet not yet added to a workbook)
+    [[nodiscard]] Workbook* getWorkbook() { return _workbook; }
+    [[nodiscard]] const Workbook* getWorkbook() const { return _workbook; }
+
+    // Set the parent workbook (called by Workbook::addSheet)
+    void setWorkbook(Workbook* wb) { _workbook = wb; }
+
+    // ========================================================================
     // Formula management
     // ========================================================================
 
@@ -507,6 +518,9 @@ struct Sheet {
     void clearAllSharedFormulaGroups();
 
 private:
+    // Parent workbook (set by Workbook::addSheet)
+    Workbook* _workbook{nullptr};
+
     // Secondary index: (colId, rowId) -> cellId
     std::unordered_map<std::string, ID> _cellIndex;
 

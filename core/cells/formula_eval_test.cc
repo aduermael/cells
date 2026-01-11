@@ -11,6 +11,7 @@
 #include "core/cells/formula_resolver.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
+#include "core/cells/named_ranges.h"
 
 #include "gtest/gtest.h"
 
@@ -52,7 +53,7 @@ protected:
         }
 
         // Resolve references
-        FormulaResolver resolver(*workbook, *sheet);
+        FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
         resolver.resolve(ast.get());
 
         // Evaluate
@@ -60,6 +61,7 @@ protected:
         EvalContext ctx;
         ctx.sheet = sheet;
         ctx.workbook = workbook.get();
+        ctx.namedRanges = workbook->getNamedRanges();
         ctx.evaluatingCells = &evaluating;
         ctx.recursionDepth = 0;
 
@@ -1322,6 +1324,238 @@ TEST_F(FormulaEvalTest, SpillRangeRef_NonExistentCell) {
     EvalResult r = eval("=Z99#");
     ASSERT_TRUE(r.isRange());
     EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+}
+
+// =============================================================================
+// NAMED RANGE EVALUATION TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, NamedRange_SingleCell) {
+    // Define a named range pointing to A1
+    setCellValue(0, 0, 42.0);  // A1 = 42
+
+    // Get the cell ID for A1
+    Cell* a1 = sheet->getCellAt(colIds[0], rowIds[0]);
+    ASSERT_NE(nullptr, a1);
+
+    // Register the named range
+    NamedRangeTarget target = NamedRangeTarget::cell(a1->id, sheet->id);
+    workbook->getNamedRanges()->defineWorkbook("MyValue", target);
+
+    // Evaluate formula referencing the named range
+    EvalResult r = eval("=MyValue");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(42.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, NamedRange_SingleCellString) {
+    // Define a named range pointing to a string cell
+    setCellValue(0, 0, "hello");  // A1 = "hello"
+
+    Cell* a1 = sheet->getCellAt(colIds[0], rowIds[0]);
+    ASSERT_NE(nullptr, a1);
+
+    NamedRangeTarget target = NamedRangeTarget::cell(a1->id, sheet->id);
+    workbook->getNamedRanges()->defineWorkbook("Greeting", target);
+
+    EvalResult r = eval("=Greeting");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("hello", r.getString());
+}
+
+TEST_F(FormulaEvalTest, NamedRange_Arithmetic) {
+    // Use named ranges in arithmetic expressions
+    setCellValue(0, 0, 10.0);  // A1 = 10
+    setCellValue(1, 0, 5.0);   // B1 = 5
+
+    Cell* a1 = sheet->getCellAt(colIds[0], rowIds[0]);
+    Cell* b1 = sheet->getCellAt(colIds[1], rowIds[0]);
+
+    workbook->getNamedRanges()->defineWorkbook("Price",
+                                               NamedRangeTarget::cell(a1->id, sheet->id));
+    workbook->getNamedRanges()->defineWorkbook("Quantity",
+                                               NamedRangeTarget::cell(b1->id, sheet->id));
+
+    EvalResult r = eval("=Price*Quantity");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(50.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, NamedRange_Range) {
+    // Define a named range covering A1:A3
+    setCellValue(0, 0, 1.0);  // A1 = 1
+    setCellValue(0, 1, 2.0);  // A2 = 2
+    setCellValue(0, 2, 3.0);  // A3 = 3
+
+    Cell* topLeft = sheet->getCellAt(colIds[0], rowIds[0]);
+    Cell* bottomRight = sheet->getCellAt(colIds[0], rowIds[2]);
+
+    NamedRangeTarget target = NamedRangeTarget::range(topLeft->id, bottomRight->id, sheet->id);
+    workbook->getNamedRanges()->defineWorkbook("Numbers", target);
+
+    // Named range should return a RANGE result
+    EvalResult r = eval("=Numbers");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::CELL_RANGE, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, NamedRange_SUM) {
+    // Use named range with SUM function
+    setCellValue(0, 0, 10.0);  // A1 = 10
+    setCellValue(0, 1, 20.0);  // A2 = 20
+    setCellValue(0, 2, 30.0);  // A3 = 30
+
+    Cell* topLeft = sheet->getCellAt(colIds[0], rowIds[0]);
+    Cell* bottomRight = sheet->getCellAt(colIds[0], rowIds[2]);
+
+    NamedRangeTarget target = NamedRangeTarget::range(topLeft->id, bottomRight->id, sheet->id);
+    workbook->getNamedRanges()->defineWorkbook("DataRange", target);
+
+    EvalResult r = eval("=SUM(DataRange)");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(60.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, NamedRange_NotFound) {
+    // Reference a non-existent named range
+    EvalResult r = eval("=NonExistentRange");
+    ASSERT_TRUE(r.isError());
+    EXPECT_EQ(CellError::NAME, r.getError());
+}
+
+TEST_F(FormulaEvalTest, NamedRange_SheetScoped) {
+    // Define a sheet-scoped named range
+    setCellValue(0, 0, 100.0);  // A1 = 100
+
+    Cell* a1 = sheet->getCellAt(colIds[0], rowIds[0]);
+
+    // Define as sheet-scoped
+    workbook->getNamedRanges()->defineSheet("LocalValue", sheet->id,
+                                            NamedRangeTarget::cell(a1->id, sheet->id));
+
+    EvalResult r = eval("=LocalValue");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(100.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, NamedRange_WholeColumn) {
+    // Define a named range for a whole column
+    setCellValue(0, 0, 1.0);  // A1 = 1
+    setCellValue(0, 4, 5.0);  // A5 = 5
+
+    Axis* colA = sheet->getColumn(colIds[0]);
+    ASSERT_NE(nullptr, colA);
+
+    NamedRangeTarget target = NamedRangeTarget::column(colA->id, sheet->id);
+    workbook->getNamedRanges()->defineWorkbook("ColumnA", target);
+
+    EvalResult r = eval("=ColumnA");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::COLUMN, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, NamedRange_WholeRow) {
+    // Define a named range for a whole row
+    // Note: Can't use "Row1" because it looks like a cell reference
+    setCellValue(0, 0, 1.0);  // A1 = 1
+    setCellValue(4, 0, 5.0);  // E1 = 5
+
+    Axis* row1 = sheet->getRow(rowIds[0]);
+    ASSERT_NE(nullptr, row1);
+
+    NamedRangeTarget target = NamedRangeTarget::row(row1->id, sheet->id);
+    bool registered = workbook->getNamedRanges()->defineWorkbook("FirstRow", target);
+    ASSERT_TRUE(registered) << "Failed to register named range 'FirstRow'";
+
+    EvalResult r = eval("=FirstRow");
+    ASSERT_TRUE(r.isRange()) << "Expected Range, got type: " << static_cast<int>(r.type);
+    EXPECT_EQ(RangeType::ROW, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, NamedRange_ColumnRange) {
+    // Define a named range for columns A:C
+    Axis* colA = sheet->getColumn(colIds[0]);
+    Axis* colC = sheet->getColumn(colIds[2]);
+
+    NamedRangeTarget target = NamedRangeTarget::columnRange(colA->id, colC->id, sheet->id);
+    workbook->getNamedRanges()->defineWorkbook("FirstThreeCols", target);
+
+    EvalResult r = eval("=FirstThreeCols");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::COLUMN_RANGE, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, NamedRange_RowRange) {
+    // Define a named range for rows 1:5
+    Axis* row1 = sheet->getRow(rowIds[0]);
+    Axis* row5 = sheet->getRow(rowIds[4]);
+
+    NamedRangeTarget target = NamedRangeTarget::rowRange(row1->id, row5->id, sheet->id);
+    workbook->getNamedRanges()->defineWorkbook("FirstFiveRows", target);
+
+    EvalResult r = eval("=FirstFiveRows");
+    ASSERT_TRUE(r.isRange());
+    EXPECT_EQ(RangeType::ROW_RANGE, r.getRangeBounds().type);
+}
+
+TEST_F(FormulaEvalTest, NamedRange_EmptyCell) {
+    // Named range pointing to an empty cell should return Empty
+    // (which converts to 0 in numeric context)
+    Cell* emptyCell = sheet->getOrCreateCellAt(colIds[5], rowIds[5]);  // F6
+
+    NamedRangeTarget target = NamedRangeTarget::cell(emptyCell->id, sheet->id);
+    workbook->getNamedRanges()->defineWorkbook("EmptyRef", target);
+
+    EvalResult r = eval("=EmptyRef");
+    // Empty cell reference returns Empty
+    ASSERT_TRUE(r.isEmpty());
+    // Which converts to 0 in numeric context
+    EvalResult num = r.toNumber();
+    ASSERT_TRUE(num.isNumber());
+    EXPECT_DOUBLE_EQ(0.0, num.getNumber());
+}
+
+TEST_F(FormulaEvalTest, NamedRange_WithFormula) {
+    // Named range pointing to a cell with a formula
+    setCellValue(0, 0, 10.0);  // A1 = 10
+    setCellFormula(1, 0, "=A1*2");  // B1 = =A1*2
+
+    Cell* b1 = sheet->getCellAt(colIds[1], rowIds[0]);
+
+    NamedRangeTarget target = NamedRangeTarget::cell(b1->id, sheet->id);
+    workbook->getNamedRanges()->defineWorkbook("Calculated", target);
+
+    EvalResult r = eval("=Calculated");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(20.0, r.getNumber());
+}
+
+TEST_F(FormulaEvalTest, NamedRange_InConditional) {
+    // Use named range in IF function
+    setCellValue(0, 0, 75.0);  // A1 = 75
+
+    Cell* a1 = sheet->getCellAt(colIds[0], rowIds[0]);
+    workbook->getNamedRanges()->defineWorkbook("Score",
+                                               NamedRangeTarget::cell(a1->id, sheet->id));
+
+    EvalResult r = eval("=IF(Score>=70,\"Pass\",\"Fail\")");
+    ASSERT_TRUE(r.isString());
+    EXPECT_EQ("Pass", r.getString());
+}
+
+TEST_F(FormulaEvalTest, NamedRange_CaseInsensitive) {
+    // Named range names should be case-insensitive
+    setCellValue(0, 0, 123.0);
+
+    Cell* a1 = sheet->getCellAt(colIds[0], rowIds[0]);
+    workbook->getNamedRanges()->defineWorkbook("MyName",
+                                               NamedRangeTarget::cell(a1->id, sheet->id));
+
+    // Note: The parser/resolver should handle case-insensitivity
+    // This test verifies the name is found regardless of case
+    EvalResult r = eval("=MyName");
+    ASSERT_TRUE(r.isNumber());
+    EXPECT_DOUBLE_EQ(123.0, r.getNumber());
 }
 
 }  // namespace

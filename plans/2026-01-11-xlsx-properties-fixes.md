@@ -47,12 +47,18 @@ Parse named ranges from XLSX so formulas can reference them.
 
 Connect parsed named ranges to formula evaluation.
 
-- [ ] 2a: Update formula resolver to look up named ranges from registry
-- [ ] 2b: Add formula evaluation tests with named ranges
+- [x] 2a: Update formula evaluator to resolve named ranges from registry
+- [x] 2b: Add formula evaluation tests with named ranges
 
-**Files:** `core/cells/formula_resolver.cc`, tests
+**Files:** `core/cells/formula_eval.cc`, `core/cells/formula_eval_test.cc`, `core/cells/formula_recalc.cc`, `core/cells/model.h`, `core/cells/model.cc`
 
 **Verification:** Open test file - #REF! errors should be resolved
+
+**Implementation notes:**
+- Added `NamedRangeRegistry*` to `EvalContext` for evaluator access
+- Added `_workbook` back-pointer to Sheet with `getWorkbook()`/`setWorkbook()` methods
+- Implemented `evaluateNamedRef()` supporting CELL, RANGE, COLUMN, ROW, COLUMN_RANGE, ROW_RANGE target types
+- 15 new unit tests covering named range evaluation scenarios
 
 ---
 

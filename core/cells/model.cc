@@ -331,6 +331,9 @@ void Workbook::addSheet(std::unique_ptr<Sheet> sheet) {
     const ID& sheetId = sheet->id;
     Sheet* rawPtr = sheet.get();
 
+    // Set parent workbook reference
+    rawPtr->setWorkbook(this);
+
     sheets.push_back(std::move(sheet));
     _sheetIndex[sheetId] = rawPtr;
 }

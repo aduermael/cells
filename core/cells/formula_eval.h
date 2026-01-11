@@ -363,11 +363,15 @@ struct EvalResult {
     }
 };
 
+// Forward declaration
+class NamedRangeRegistry;
+
 // Context for evaluation (sheet access, cell positions, etc.)
 struct EvalContext {
     Sheet* sheet{nullptr};
     Workbook* workbook{nullptr};
-    ID currentCellId;  // For relative reference resolution
+    NamedRangeRegistry* namedRanges{nullptr};  // For resolving named range references
+    ID currentCellId;                          // For relative reference resolution
     int recursionDepth{0};
     static const int MAX_RECURSION = 1000;
 

@@ -10,6 +10,7 @@
 #include "core/cells/formula_ast.h"
 #include "core/cells/formula_functions.h"
 #include "core/cells/model.h"
+#include "core/cells/named_ranges.h"
 
 namespace cells {
 
@@ -25,6 +26,7 @@ static EvalResult evaluateColumnRangeRef(const ColumnRangeRefNode* node, EvalCon
 static EvalResult evaluateRowRangeRef(const RowRangeRefNode* node, EvalContext& ctx);
 static EvalResult evaluateFunctionCall(const FunctionCallNode* node, EvalContext& ctx);
 static EvalResult evaluateSpillRangeRef(const SpillRangeRefNode* node, EvalContext& ctx);
+static EvalResult evaluateNamedRef(const NamedRefNode* node, EvalContext& ctx);
 
 // Convert a CellValue to an EvalResult
 static EvalResult cellValueToEvalResult(const CellValue& value) {
@@ -962,10 +964,9 @@ EvalResult evaluate(const ASTNode* node, EvalContext& ctx) {
         case ASTNodeType::SPILL_RANGE_REF:
             return evaluateSpillRangeRef(static_cast<const SpillRangeRefNode*>(node), ctx);
 
-        // Named references - not yet implemented
+        // Named references
         case ASTNodeType::NAMED_REF:
-            // TODO: Implement named range lookup
-            return EvalResult::Error(CellError::NAME);
+            return evaluateNamedRef(static_cast<const NamedRefNode*>(node), ctx);
 
         // Error node
         case ASTNodeType::ERROR_NODE:
@@ -1063,6 +1064,202 @@ static EvalResult evaluateSpillRangeRef(const SpillRangeRefNode* node, EvalConte
 
     // Return the bounding range
     return EvalResult::CellRange(minColId, maxColId, minRowPos, maxRowPos);
+}
+
+// Evaluate a named range reference
+// Looks up the named range in the registry and returns the appropriate value/range
+static EvalResult evaluateNamedRef(const NamedRefNode* node, EvalContext& ctx) {
+    if (!ctx.namedRanges) {
+        // No named range registry available
+        return EvalResult::Error(CellError::NAME);
+    }
+
+    // Resolve the named range using the current sheet's ID for scoping
+    const ID currentSheetId = ctx.sheet ? ctx.sheet->id : ID();
+    const NamedRange* namedRange = ctx.namedRanges->resolve(node->name, currentSheetId);
+
+    if (!namedRange) {
+        // Named range not found
+        return EvalResult::Error(CellError::NAME);
+    }
+
+    // Get the target sheet (if specified)
+    Sheet* targetSheet = ctx.sheet;
+    if (!namedRange->target.sheetId.isNull() && ctx.workbook) {
+        // Named range targets a specific sheet
+        for (const auto& s : ctx.workbook->sheets) {
+            if (s->id == namedRange->target.sheetId) {
+                targetSheet = s.get();
+                break;
+            }
+        }
+    }
+
+    if (!targetSheet) {
+        return EvalResult::Error(CellError::REF);
+    }
+
+    // Evaluate based on target type
+    switch (namedRange->target.type) {
+        case NamedRangeTarget::Type::CELL: {
+            // Single cell reference - get the cell's value
+            Cell* cell = targetSheet->getCell(namedRange->target.id1);
+            if (!cell) {
+                // Empty cell reference returns 0
+                return EvalResult::Number(0.0);
+            }
+
+            // Check for circular reference
+            if (ctx.evaluatingCells && (ctx.evaluatingCells->count(namedRange->target.id1) != 0u)) {
+                return EvalResult::Error(CellError::CIRCULAR);
+            }
+
+            // If cell has a dirty formula, evaluate it
+            Formula* formula = cell->getFormula();
+            if (formula && formula->dirty && formula->ast) {
+                // Mark that we're evaluating this cell (circular reference detection)
+                bool addedToSet = false;
+                if (ctx.evaluatingCells) {
+                    ctx.evaluatingCells->insert(namedRange->target.id1);
+                    addedToSet = true;
+                }
+
+                // Check recursion depth
+                if (ctx.recursionDepth >= EvalContext::MAX_RECURSION) {
+                    if (addedToSet) {
+                        ctx.evaluatingCells->erase(namedRange->target.id1);
+                    }
+                    return EvalResult::Error(CellError::CIRCULAR);
+                }
+
+                // Recursively evaluate
+                EvalContext subCtx = ctx;
+                subCtx.currentCellId = namedRange->target.id1;
+                subCtx.recursionDepth++;
+
+                EvalResult result = evaluate(formula->ast, subCtx);
+
+                // Store result in cell value
+                if (result.isError()) {
+                    cell->value = CellValue(result.getError());
+                    cell->value.type = CellValueType::FORMULA_ERROR;
+                } else if (result.isNumber()) {
+                    cell->value = CellValue(result.getNumber());
+                    cell->value.type = CellValueType::FORMULA_NUMBER;
+                } else if (result.isString()) {
+                    cell->value = CellValue(result.getString());
+                    cell->value.type = CellValueType::FORMULA_STRING;
+                } else if (result.isBoolean()) {
+                    cell->value = CellValue(result.getBoolean());
+                    cell->value.type = CellValueType::FORMULA_BOOLEAN;
+                } else {
+                    cell->value = CellValue("");
+                    cell->value.type = CellValueType::FORMULA_EMPTY;
+                }
+
+                formula->dirty = false;
+
+                // Remove from evaluating set
+                if (addedToSet) {
+                    ctx.evaluatingCells->erase(namedRange->target.id1);
+                }
+
+                return result;
+            }
+
+            // Return the cell's current value
+            return cellValueToEvalResult(cell->value);
+        }
+
+        case NamedRangeTarget::Type::RANGE: {
+            // Range reference - return range bounds for iteration by functions
+            // Need to look up the cells to get their column/row information
+            Cell* topLeftCell = targetSheet->getCell(namedRange->target.id1);
+            Cell* bottomRightCell = targetSheet->getCell(namedRange->target.id2);
+
+            if (!topLeftCell || !bottomRightCell) {
+                return EvalResult::Error(CellError::REF);
+            }
+
+            const Axis* startCol = targetSheet->getColumn(topLeftCell->colId);
+            const Axis* endCol = targetSheet->getColumn(bottomRightCell->colId);
+            const Axis* startRow = targetSheet->getRow(topLeftCell->rowId);
+            const Axis* endRow = targetSheet->getRow(bottomRightCell->rowId);
+
+            if (!startCol || !endCol || !startRow || !endRow) {
+                return EvalResult::Error(CellError::REF);
+            }
+
+            // Ensure proper ordering
+            ID startColId = startCol->id;
+            ID endColId = endCol->id;
+            uint32_t startRowPos = startRow->position;
+            uint32_t endRowPos = endRow->position;
+
+            if (startCol->position > endCol->position) {
+                std::swap(startColId, endColId);
+            }
+            if (startRowPos > endRowPos) {
+                std::swap(startRowPos, endRowPos);
+            }
+
+            return EvalResult::CellRange(startColId, endColId, startRowPos, endRowPos);
+        }
+
+        case NamedRangeTarget::Type::COLUMN: {
+            // Single column reference
+            const Axis* col = targetSheet->getColumn(namedRange->target.id1);
+            if (!col) {
+                return EvalResult::Error(CellError::REF);
+            }
+            return EvalResult::SingleColumn(col->id);
+        }
+
+        case NamedRangeTarget::Type::ROW: {
+            // Single row reference
+            const Axis* row = targetSheet->getRow(namedRange->target.id1);
+            if (!row) {
+                return EvalResult::Error(CellError::REF);
+            }
+            return EvalResult::SingleRow(row->id);
+        }
+
+        case NamedRangeTarget::Type::COLUMN_RANGE: {
+            // Column range reference
+            const Axis* startCol = targetSheet->getColumn(namedRange->target.id1);
+            const Axis* endCol = targetSheet->getColumn(namedRange->target.id2);
+
+            if (!startCol || !endCol) {
+                return EvalResult::Error(CellError::REF);
+            }
+
+            // Ensure proper ordering
+            if (startCol->position > endCol->position) {
+                std::swap(startCol, endCol);
+            }
+
+            return EvalResult::ColumnRange(startCol->id, endCol->id);
+        }
+
+        case NamedRangeTarget::Type::ROW_RANGE: {
+            // Row range reference
+            const Axis* startRow = targetSheet->getRow(namedRange->target.id1);
+            const Axis* endRow = targetSheet->getRow(namedRange->target.id2);
+
+            if (!startRow || !endRow) {
+                return EvalResult::Error(CellError::REF);
+            }
+
+            // Ensure proper ordering
+            if (startRow->position > endRow->position) {
+                std::swap(startRow, endRow);
+            }
+
+            return EvalResult::RowRange(startRow->id, endRow->id);
+        }
+    }
+
+    return EvalResult::Error(CellError::NAME);
 }
 
 }  // namespace cells
