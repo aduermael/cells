@@ -7,11 +7,16 @@
 #include <unordered_map>
 
 #include "core/cells/formula_serializer.h"
+#include "core/cells/named_ranges.h"
 #include "core/cells/ref_converter.h"
 
 #include "miniz.h"
 
 namespace {
+
+// Forward declarations
+std::string escapeXml(const std::string& str);
+std::string colIndexToLetter(size_t index);
 
 // ZIP file writing using miniz
 class ZipWriter {
@@ -99,18 +104,295 @@ std::string generateRootRels() {
     return xml.str();
 }
 
+// Convert a cell's position to A1 reference with sheet name
+// Output format: 'SheetName'!$A$1 (always absolute for named ranges)
+std::string cellIdToXlsxRef(const cells::Cell* cell, const cells::Sheet* sheet) {
+    if (cell == nullptr || sheet == nullptr) {
+        return "";
+    }
+
+    // Find column and row positions
+    auto colIt = sheet->columns.find(cell->colId);
+    auto rowIt = sheet->rows.find(cell->rowId);
+    if (colIt == sheet->columns.end() || rowIt == sheet->rows.end()) {
+        return "";
+    }
+
+    const uint32_t colPos = colIt->second->position;
+    const uint32_t rowPos = rowIt->second->position;
+
+    // Convert to A1 notation (1-indexed row)
+    const std::string colLetter = colIndexToLetter(colPos);
+    const std::string rowNum = std::to_string(rowPos + 1);
+
+    // Format with sheet name (single quotes if needed)
+    std::ostringstream ref;
+    // Use single quotes around sheet name if it contains spaces or special chars
+    const std::string& sheetName = sheet->name;
+    const bool needsQuotes =
+        sheetName.find(' ') != std::string::npos || sheetName.find('\'') != std::string::npos ||
+        sheetName.find('!') != std::string::npos || sheetName.find('[') != std::string::npos;
+
+    if (needsQuotes) {
+        ref << "'";
+        // Escape single quotes by doubling them
+        for (const char c : sheetName) {
+            if (c == '\'') {
+                ref << "''";
+            } else {
+                ref << c;
+            }
+        }
+        ref << "'";
+    } else {
+        ref << sheetName;
+    }
+    ref << "!$" << colLetter << "$" << rowNum;
+    return ref.str();
+}
+
+// Convert a range (two cell IDs) to XLSX reference: 'SheetName'!$A$1:$C$3
+std::string rangeToXlsxRef(const cells::Cell* startCell, const cells::Cell* endCell,
+                           const cells::Sheet* sheet) {
+    if (startCell == nullptr || endCell == nullptr || sheet == nullptr) {
+        return "";
+    }
+
+    // Find positions for start cell
+    auto startColIt = sheet->columns.find(startCell->colId);
+    auto startRowIt = sheet->rows.find(startCell->rowId);
+    if (startColIt == sheet->columns.end() || startRowIt == sheet->rows.end()) {
+        return "";
+    }
+
+    // Find positions for end cell
+    auto endColIt = sheet->columns.find(endCell->colId);
+    auto endRowIt = sheet->rows.find(endCell->rowId);
+    if (endColIt == sheet->columns.end() || endRowIt == sheet->rows.end()) {
+        return "";
+    }
+
+    const uint32_t startColPos = startColIt->second->position;
+    const uint32_t startRowPos = startRowIt->second->position;
+    const uint32_t endColPos = endColIt->second->position;
+    const uint32_t endRowPos = endRowIt->second->position;
+
+    // Format with sheet name
+    std::ostringstream ref;
+    const std::string& sheetName = sheet->name;
+    const bool needsQuotes =
+        sheetName.find(' ') != std::string::npos || sheetName.find('\'') != std::string::npos ||
+        sheetName.find('!') != std::string::npos || sheetName.find('[') != std::string::npos;
+
+    if (needsQuotes) {
+        ref << "'";
+        for (const char c : sheetName) {
+            if (c == '\'') {
+                ref << "''";
+            } else {
+                ref << c;
+            }
+        }
+        ref << "'";
+    } else {
+        ref << sheetName;
+    }
+
+    ref << "!$" << colIndexToLetter(startColPos) << "$" << (startRowPos + 1) << ":$"
+        << colIndexToLetter(endColPos) << "$" << (endRowPos + 1);
+    return ref.str();
+}
+
+// Convert a column range to XLSX reference: 'SheetName'!$A:$C
+std::string columnRangeToXlsxRef(const cells::Axis* startCol, const cells::Axis* endCol,
+                                 const cells::Sheet* sheet) {
+    if (startCol == nullptr || sheet == nullptr) {
+        return "";
+    }
+
+    // Format with sheet name
+    std::ostringstream ref;
+    const std::string& sheetName = sheet->name;
+    const bool needsQuotes =
+        sheetName.find(' ') != std::string::npos || sheetName.find('\'') != std::string::npos ||
+        sheetName.find('!') != std::string::npos || sheetName.find('[') != std::string::npos;
+
+    if (needsQuotes) {
+        ref << "'";
+        for (const char c : sheetName) {
+            if (c == '\'') {
+                ref << "''";
+            } else {
+                ref << c;
+            }
+        }
+        ref << "'";
+    } else {
+        ref << sheetName;
+    }
+
+    ref << "!$" << colIndexToLetter(startCol->position);
+    if (endCol != nullptr && endCol->id != startCol->id) {
+        ref << ":$" << colIndexToLetter(endCol->position);
+    } else {
+        // Single column - format as $A:$A
+        ref << ":$" << colIndexToLetter(startCol->position);
+    }
+    return ref.str();
+}
+
+// Convert a row range to XLSX reference: 'SheetName'!$1:$3
+std::string rowRangeToXlsxRef(const cells::Axis* startRow, const cells::Axis* endRow,
+                              const cells::Sheet* sheet) {
+    if (startRow == nullptr || sheet == nullptr) {
+        return "";
+    }
+
+    // Format with sheet name
+    std::ostringstream ref;
+    const std::string& sheetName = sheet->name;
+    const bool needsQuotes =
+        sheetName.find(' ') != std::string::npos || sheetName.find('\'') != std::string::npos ||
+        sheetName.find('!') != std::string::npos || sheetName.find('[') != std::string::npos;
+
+    if (needsQuotes) {
+        ref << "'";
+        for (const char c : sheetName) {
+            if (c == '\'') {
+                ref << "''";
+            } else {
+                ref << c;
+            }
+        }
+        ref << "'";
+    } else {
+        ref << sheetName;
+    }
+
+    ref << "!$" << (startRow->position + 1);
+    if (endRow != nullptr && endRow->id != startRow->id) {
+        ref << ":$" << (endRow->position + 1);
+    } else {
+        // Single row - format as $1:$1
+        ref << ":$" << (startRow->position + 1);
+    }
+    return ref.str();
+}
+
 // Generate xl/workbook.xml
-std::string generateWorkbook(const std::vector<std::string>& sheetNames) {
+std::string generateWorkbook(const cells::Workbook& workbook) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
     xml << "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" "
            "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">\n";
     xml << "  <sheets>\n";
-    for (size_t i = 0; i < sheetNames.size(); ++i) {
-        xml << "    <sheet name=\"" << sheetNames[i] << "\" sheetId=\"" << (i + 1)
-            << "\" r:id=\"rId" << (i + 1) << "\"/>\n";
+    for (size_t i = 0; i < workbook.sheets.size(); ++i) {
+        xml << "    <sheet name=\"" << escapeXml(workbook.sheets[i]->name) << "\" sheetId=\""
+            << (i + 1) << "\" r:id=\"rId" << (i + 1) << "\"/>\n";
     }
     xml << "  </sheets>\n";
+
+    // Export named ranges (definedNames)
+    const cells::NamedRangeRegistry* registry = workbook.getNamedRanges();
+    if (registry != nullptr) {
+        const std::vector<const cells::NamedRange*> allRanges = registry->getAll();
+        if (!allRanges.empty()) {
+            xml << "  <definedNames>\n";
+
+            // Build sheet ID to index map for localSheetId
+            std::unordered_map<std::string, size_t> sheetIdToIndex;
+            for (size_t i = 0; i < workbook.sheets.size(); ++i) {
+                sheetIdToIndex[workbook.sheets[i]->id.toString()] = i;
+            }
+
+            for (const cells::NamedRange* namedRange : allRanges) {
+                // Convert target to XLSX reference
+                std::string xlsxRef;
+                const cells::NamedRangeTarget& target = namedRange->target;
+
+                // Find the target sheet
+                const cells::Sheet* targetSheet = workbook.getSheet(target.sheetId);
+                if (targetSheet == nullptr) {
+                    continue;  // Skip if sheet not found
+                }
+
+                switch (target.type) {
+                    case cells::NamedRangeTarget::Type::CELL: {
+                        const cells::Cell* cell = targetSheet->cells.count(target.id1) != 0
+                                                      ? targetSheet->cells.at(target.id1).get()
+                                                      : nullptr;
+                        xlsxRef = cellIdToXlsxRef(cell, targetSheet);
+                        break;
+                    }
+                    case cells::NamedRangeTarget::Type::RANGE: {
+                        const cells::Cell* startCell = targetSheet->cells.count(target.id1) != 0
+                                                           ? targetSheet->cells.at(target.id1).get()
+                                                           : nullptr;
+                        const cells::Cell* endCell = targetSheet->cells.count(target.id2) != 0
+                                                         ? targetSheet->cells.at(target.id2).get()
+                                                         : nullptr;
+                        xlsxRef = rangeToXlsxRef(startCell, endCell, targetSheet);
+                        break;
+                    }
+                    case cells::NamedRangeTarget::Type::COLUMN: {
+                        const cells::Axis* col = targetSheet->columns.count(target.id1) != 0
+                                                     ? targetSheet->columns.at(target.id1).get()
+                                                     : nullptr;
+                        xlsxRef = columnRangeToXlsxRef(col, col, targetSheet);
+                        break;
+                    }
+                    case cells::NamedRangeTarget::Type::ROW: {
+                        const cells::Axis* row = targetSheet->rows.count(target.id1) != 0
+                                                     ? targetSheet->rows.at(target.id1).get()
+                                                     : nullptr;
+                        xlsxRef = rowRangeToXlsxRef(row, row, targetSheet);
+                        break;
+                    }
+                    case cells::NamedRangeTarget::Type::COLUMN_RANGE: {
+                        const cells::Axis* startCol =
+                            targetSheet->columns.count(target.id1) != 0
+                                ? targetSheet->columns.at(target.id1).get()
+                                : nullptr;
+                        const cells::Axis* endCol = targetSheet->columns.count(target.id2) != 0
+                                                        ? targetSheet->columns.at(target.id2).get()
+                                                        : nullptr;
+                        xlsxRef = columnRangeToXlsxRef(startCol, endCol, targetSheet);
+                        break;
+                    }
+                    case cells::NamedRangeTarget::Type::ROW_RANGE: {
+                        const cells::Axis* startRow = targetSheet->rows.count(target.id1) != 0
+                                                          ? targetSheet->rows.at(target.id1).get()
+                                                          : nullptr;
+                        const cells::Axis* endRow = targetSheet->rows.count(target.id2) != 0
+                                                        ? targetSheet->rows.at(target.id2).get()
+                                                        : nullptr;
+                        xlsxRef = rowRangeToXlsxRef(startRow, endRow, targetSheet);
+                        break;
+                    }
+                }
+
+                if (xlsxRef.empty()) {
+                    continue;  // Skip if conversion failed
+                }
+
+                xml << "    <definedName name=\"" << escapeXml(namedRange->name) << "\"";
+
+                // Add localSheetId for sheet-scoped names
+                if (namedRange->scope == cells::NamedRangeScope::SHEET &&
+                    !namedRange->scopeSheetId.isNull()) {
+                    auto scopeIt = sheetIdToIndex.find(namedRange->scopeSheetId.toString());
+                    if (scopeIt != sheetIdToIndex.end()) {
+                        xml << " localSheetId=\"" << scopeIt->second << "\"";
+                    }
+                }
+
+                xml << ">" << escapeXml(xlsxRef) << "</definedName>\n";
+            }
+
+            xml << "  </definedNames>\n";
+        }
+    }
+
     xml << "</workbook>";
     return xml.str();
 }
@@ -860,13 +1142,6 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         return result;
     }
 
-    // Collect sheet names
-    std::vector<std::string> sheetNames;
-    sheetNames.reserve(workbook.sheets.size());
-    for (const auto& sheet : workbook.sheets) {
-        sheetNames.push_back(sheet->name);
-    }
-
     // Write root files
     if (!zip.addFile("[Content_Types].xml", generateContentTypes(workbook.sheets.size()))) {
         result.error = XLSXWriteError("Failed to write [Content_Types].xml");
@@ -879,7 +1154,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
     }
 
     // Write workbook files
-    if (!zip.addFile("xl/workbook.xml", generateWorkbook(sheetNames))) {
+    if (!zip.addFile("xl/workbook.xml", generateWorkbook(workbook))) {
         result.error = XLSXWriteError("Failed to write xl/workbook.xml");
         return result;
     }

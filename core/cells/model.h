@@ -566,6 +566,7 @@ struct Workbook {
 
     // Sheet operations
     Sheet* getSheet(const ID& sheetId);
+    [[nodiscard]] const Sheet* getSheet(const ID& sheetId) const;
     Sheet* getSheetByIndex(size_t index);
     void addSheet(std::unique_ptr<Sheet> sheet);
     bool removeSheet(const ID& sheetId);  // Returns true if sheet was removed

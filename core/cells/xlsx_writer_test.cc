@@ -8,6 +8,7 @@
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
+#include "core/cells/named_ranges.h"
 #include "core/cells/xlsx_reader.h"
 
 #include "gtest/gtest.h"
@@ -1815,6 +1816,400 @@ TEST(XLSXStyleRoundtripTest, EmptyStyleNotWritten) {
             EXPECT_FALSE(style->underline);
         }
     }
+}
+
+// =============================================================================
+// Named Ranges Round-trip Tests (Phase 3)
+// =============================================================================
+
+TEST(XLSXNamedRangeRoundtripTest, RoundtripSingleCellNamedRange) {
+    // Create a workbook with a single-cell named range and verify round-trip
+    auto workbook = std::make_unique<Workbook>(generate_id(), "NamedRanges");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Create 3x3 grid
+    std::vector<ID> colIds;
+    for (int i = 0; i < 3; ++i) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        colIds.push_back(col->id);
+        sheet->addColumn(std::move(col));
+    }
+
+    std::vector<ID> rowIds;
+    for (int i = 0; i < 3; ++i) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet->addRow(std::move(row));
+    }
+
+    // Add cells
+    auto cell1 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[0]);
+    cell1->value = CellValue("Company Name");
+    ID targetCellId = cell1->id;
+    sheet->addCell(std::move(cell1));
+
+    auto cell2 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[0]);
+    cell2->value = CellValue(100.0);
+    sheet->addCell(std::move(cell2));
+
+    ID sheetId = sheet->id;
+    workbook->addSheet(std::move(sheet));
+
+    // Define a named range pointing to A1 (workbook-scoped)
+    NamedRangeRegistry* registry = workbook->getNamedRanges();
+    ASSERT_NE(registry, nullptr);
+
+    NamedRangeTarget target = NamedRangeTarget::cell(targetCellId, sheetId);
+    EXPECT_TRUE(registry->defineWorkbook("CompanyName", target));
+
+    // Write to XLSX
+    std::string path = tempFilePath("named_range_single.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Read back
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString() : "");
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    // Verify named range exists
+    NamedRangeRegistry* readRegistry = readResult.workbook->getNamedRanges();
+    ASSERT_NE(readRegistry, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    const NamedRange* nr = readRegistry->resolve("CompanyName", readSheet->id);
+    ASSERT_NE(nr, nullptr) << "Named range 'CompanyName' should exist after round-trip";
+    EXPECT_EQ(nr->name, "CompanyName");
+    EXPECT_EQ(nr->scope, NamedRangeScope::WORKBOOK);
+    EXPECT_EQ(nr->target.type, NamedRangeTarget::Type::CELL);
+
+    // Verify target points to correct cell (A1)
+    Cell* targetCell = readSheet->getCell(nr->target.id1);
+    if (targetCell != nullptr) {
+        Axis* col = readSheet->getColumn(targetCell->colId);
+        Axis* row = readSheet->getRow(targetCell->rowId);
+        EXPECT_EQ(col->position, 0u) << "Target should be in column A (position 0)";
+        EXPECT_EQ(row->position, 0u) << "Target should be in row 1 (position 0)";
+    }
+}
+
+TEST(XLSXNamedRangeRoundtripTest, RoundtripRangeNamedRange) {
+    // Create a workbook with a range named range (A1:C3)
+    auto workbook = std::make_unique<Workbook>(generate_id(), "NamedRanges");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Create 3x3 grid
+    std::vector<ID> colIds;
+    for (int i = 0; i < 3; ++i) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        colIds.push_back(col->id);
+        sheet->addColumn(std::move(col));
+    }
+
+    std::vector<ID> rowIds;
+    for (int i = 0; i < 3; ++i) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet->addRow(std::move(row));
+    }
+
+    // Add cells to define the range corners
+    auto cellA1 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[0]);
+    cellA1->value = CellValue("Top Left");
+    ID cellA1Id = cellA1->id;
+    sheet->addCell(std::move(cellA1));
+
+    auto cellC3 = std::make_unique<Cell>(generate_id(), colIds[2], rowIds[2]);
+    cellC3->value = CellValue("Bottom Right");
+    ID cellC3Id = cellC3->id;
+    sheet->addCell(std::move(cellC3));
+
+    ID sheetId = sheet->id;
+    workbook->addSheet(std::move(sheet));
+
+    // Define a range named range (A1:C3)
+    NamedRangeRegistry* registry = workbook->getNamedRanges();
+    ASSERT_NE(registry, nullptr);
+
+    NamedRangeTarget target = NamedRangeTarget::range(cellA1Id, cellC3Id, sheetId);
+    EXPECT_TRUE(registry->defineWorkbook("DataRange", target));
+
+    // Write to XLSX
+    std::string path = tempFilePath("named_range_range.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Read back
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString() : "");
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    // Verify named range exists
+    NamedRangeRegistry* readRegistry = readResult.workbook->getNamedRanges();
+    ASSERT_NE(readRegistry, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    const NamedRange* nr = readRegistry->resolve("DataRange", readSheet->id);
+    ASSERT_NE(nr, nullptr) << "Named range 'DataRange' should exist after round-trip";
+    EXPECT_EQ(nr->name, "DataRange");
+    EXPECT_EQ(nr->scope, NamedRangeScope::WORKBOOK);
+    EXPECT_EQ(nr->target.type, NamedRangeTarget::Type::RANGE);
+
+    // Verify target points to correct range (A1:C3)
+    Cell* startCell = readSheet->getCell(nr->target.id1);
+    Cell* endCell = readSheet->getCell(nr->target.id2);
+    if (startCell != nullptr && endCell != nullptr) {
+        Axis* startCol = readSheet->getColumn(startCell->colId);
+        Axis* startRow = readSheet->getRow(startCell->rowId);
+        Axis* endCol = readSheet->getColumn(endCell->colId);
+        Axis* endRow = readSheet->getRow(endCell->rowId);
+
+        EXPECT_EQ(startCol->position, 0u) << "Start should be column A";
+        EXPECT_EQ(startRow->position, 0u) << "Start should be row 1";
+        EXPECT_EQ(endCol->position, 2u) << "End should be column C";
+        EXPECT_EQ(endRow->position, 2u) << "End should be row 3";
+    }
+}
+
+TEST(XLSXNamedRangeRoundtripTest, RoundtripSheetScopedNamedRange) {
+    // Create a workbook with a sheet-scoped named range
+    auto workbook = std::make_unique<Workbook>(generate_id(), "NamedRanges");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue("Local Value");
+    ID cellId = cell->id;
+    sheet->addCell(std::move(cell));
+
+    ID sheetId = sheet->id;
+    workbook->addSheet(std::move(sheet));
+
+    // Define a sheet-scoped named range
+    NamedRangeRegistry* registry = workbook->getNamedRanges();
+    ASSERT_NE(registry, nullptr);
+
+    NamedRangeTarget target = NamedRangeTarget::cell(cellId, sheetId);
+    EXPECT_TRUE(registry->defineSheet("LocalName", sheetId, target));
+
+    // Write to XLSX
+    std::string path = tempFilePath("named_range_sheet_scoped.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Read back
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString() : "");
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    // Verify named range exists
+    NamedRangeRegistry* readRegistry = readResult.workbook->getNamedRanges();
+    ASSERT_NE(readRegistry, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    const NamedRange* nr = readRegistry->resolve("LocalName", readSheet->id);
+    ASSERT_NE(nr, nullptr) << "Named range 'LocalName' should exist after round-trip";
+    EXPECT_EQ(nr->name, "LocalName");
+    EXPECT_EQ(nr->scope, NamedRangeScope::SHEET);
+}
+
+TEST(XLSXNamedRangeRoundtripTest, RoundtripMultipleNamedRanges) {
+    // Create a workbook with multiple named ranges
+    auto workbook = std::make_unique<Workbook>(generate_id(), "NamedRanges");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Create 3x3 grid
+    std::vector<ID> colIds;
+    for (int i = 0; i < 3; ++i) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        colIds.push_back(col->id);
+        sheet->addColumn(std::move(col));
+    }
+
+    std::vector<ID> rowIds;
+    for (int i = 0; i < 3; ++i) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet->addRow(std::move(row));
+    }
+
+    // Add cells
+    auto cellA1 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[0]);
+    cellA1->value = CellValue("Company");
+    ID cellA1Id = cellA1->id;
+    sheet->addCell(std::move(cellA1));
+
+    auto cellB1 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[0]);
+    cellB1->value = CellValue(1000.0);
+    ID cellB1Id = cellB1->id;
+    sheet->addCell(std::move(cellB1));
+
+    auto cellC1 = std::make_unique<Cell>(generate_id(), colIds[2], rowIds[0]);
+    cellC1->value = CellValue(2000.0);
+    ID cellC1Id = cellC1->id;
+    sheet->addCell(std::move(cellC1));
+
+    ID sheetId = sheet->id;
+    workbook->addSheet(std::move(sheet));
+
+    // Define multiple named ranges
+    NamedRangeRegistry* registry = workbook->getNamedRanges();
+    ASSERT_NE(registry, nullptr);
+
+    EXPECT_TRUE(registry->defineWorkbook("Company", NamedRangeTarget::cell(cellA1Id, sheetId)));
+    EXPECT_TRUE(registry->defineWorkbook("Revenue", NamedRangeTarget::cell(cellB1Id, sheetId)));
+    EXPECT_TRUE(registry->defineWorkbook("Expenses", NamedRangeTarget::cell(cellC1Id, sheetId)));
+
+    // Write to XLSX
+    std::string path = tempFilePath("named_range_multiple.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Read back
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString() : "");
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    // Verify all named ranges exist
+    NamedRangeRegistry* readRegistry = readResult.workbook->getNamedRanges();
+    ASSERT_NE(readRegistry, nullptr);
+
+    auto workbookScoped = readRegistry->getWorkbookScoped();
+    EXPECT_EQ(workbookScoped.size(), 3u) << "Should have 3 workbook-scoped named ranges";
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    EXPECT_NE(readRegistry->resolve("Company", readSheet->id), nullptr);
+    EXPECT_NE(readRegistry->resolve("Revenue", readSheet->id), nullptr);
+    EXPECT_NE(readRegistry->resolve("Expenses", readSheet->id), nullptr);
+}
+
+TEST(XLSXNamedRangeRoundtripTest, RoundtripFromLBOModelFile) {
+    // Read the LBO model file with named ranges, export, re-import, verify
+    auto result1 = readXLSX("testdata/xlsx/init_lbo_model_60min_is_revenue_cf_only.xlsx");
+    EXPECT_TRUE(result1.ok()) << (result1.error ? result1.error->toString() : "");
+    ASSERT_NE(result1.workbook, nullptr);
+
+    // Check named ranges in original
+    NamedRangeRegistry* registry1 = result1.workbook->getNamedRanges();
+    ASSERT_NE(registry1, nullptr);
+
+    auto originalNames = registry1->getWorkbookScoped();
+    size_t originalCount = originalNames.size();
+    EXPECT_GE(originalCount, 10u) << "Original file should have at least 10 named ranges";
+
+    // Export to new file
+    std::string path = tempFilePath("lbo_named_ranges_roundtrip.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*result1.workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Re-import
+    auto result2 = readXLSX(path);
+    EXPECT_TRUE(result2.ok()) << (result2.error ? result2.error->toString() : "");
+    ASSERT_NE(result2.workbook, nullptr);
+
+    // Check named ranges in re-imported file
+    NamedRangeRegistry* registry2 = result2.workbook->getNamedRanges();
+    ASSERT_NE(registry2, nullptr);
+
+    auto reimportedNames = registry2->getWorkbookScoped();
+    EXPECT_EQ(reimportedNames.size(), originalCount)
+        << "Number of named ranges should be preserved after round-trip";
+
+    // Verify specific named ranges are preserved
+    Sheet* sheet = result2.workbook->getSheetByName("LBO-60-Minutes");
+    if (sheet != nullptr) {
+        const NamedRange* companyName = registry2->resolve("Company_Name", sheet->id);
+        if (companyName != nullptr) {
+            EXPECT_EQ(companyName->name, "Company_Name");
+            EXPECT_EQ(companyName->scope, NamedRangeScope::WORKBOOK);
+        }
+    }
+}
+
+TEST(XLSXNamedRangeRoundtripTest, RoundtripNameWithSpecialChars) {
+    // Test named range with underscores (common in Excel)
+    auto workbook = std::make_unique<Workbook>(generate_id(), "NamedRanges");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue(12345.0);
+    ID cellId = cell->id;
+    sheet->addCell(std::move(cell));
+
+    ID sheetId = sheet->id;
+    workbook->addSheet(std::move(sheet));
+
+    // Define named range with underscores
+    NamedRangeRegistry* registry = workbook->getNamedRanges();
+    ASSERT_NE(registry, nullptr);
+
+    NamedRangeTarget target = NamedRangeTarget::cell(cellId, sheetId);
+    EXPECT_TRUE(registry->defineWorkbook("Total_Revenue_2024", target));
+
+    // Write to XLSX
+    std::string path = tempFilePath("named_range_underscores.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Read back
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString() : "");
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    NamedRangeRegistry* readRegistry = readResult.workbook->getNamedRanges();
+    ASSERT_NE(readRegistry, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    const NamedRange* nr = readRegistry->resolve("Total_Revenue_2024", readSheet->id);
+    ASSERT_NE(nr, nullptr) << "Named range with underscores should round-trip correctly";
+    EXPECT_EQ(nr->name, "Total_Revenue_2024");
 }
 
 }  // namespace

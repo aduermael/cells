@@ -66,10 +66,18 @@ Connect parsed named ranges to formula evaluation.
 
 Round-trip support for named ranges.
 
-- [ ] 3a: Export named ranges to XLSX in xlsx_writer.cc
-- [ ] 3b: Add named range round-trip test
+- [x] 3a: Export named ranges to XLSX in xlsx_writer.cc
+- [x] 3b: Add named range round-trip test
 
 **Files:** `core/cells/xlsx_writer.cc`, `core/cells/xlsx_writer_test.cc`
+
+**Implementation notes:**
+- Added `generateWorkbook()` to export `<definedNames>` section with all named ranges
+- Supports CELL, RANGE, COLUMN, ROW, COLUMN_RANGE, ROW_RANGE target types
+- Handles sheet-scoped names with `localSheetId` attribute
+- Properly escapes sheet names with spaces/special characters
+- Added const overload `Workbook::getSheet(const ID&) const` for const-correct access
+- 6 new round-trip tests including LBO model file test
 
 ---
 

@@ -316,6 +316,11 @@ Sheet* Workbook::getSheet(const ID& sheetId) {
     return (it != _sheetIndex.end()) ? it->second : nullptr;
 }
 
+const Sheet* Workbook::getSheet(const ID& sheetId) const {
+    auto it = _sheetIndex.find(sheetId);
+    return (it != _sheetIndex.end()) ? it->second : nullptr;
+}
+
 Sheet* Workbook::getSheetByIndex(size_t index) {
     if (index >= sheets.size()) {
         return nullptr;
