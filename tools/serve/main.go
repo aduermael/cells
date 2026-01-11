@@ -290,7 +290,7 @@ func relayMessage(room *Room, fromPeerID string, msg SignalingMessage) {
 
 func main() {
 	port := flag.Int("port", 8081, "Port to listen on")
-	dir := flag.String("dir", "dist", "Directory to serve")
+	dir := flag.String("dir", "dist/wasm", "Directory to serve")
 	enableCollab := flag.Bool("enable-collab", false, "Enable collaboration WebSocket endpoint")
 	enableAgent := flag.Bool("enable-agent", false, "Enable AI agent endpoint (requires ANTHROPIC_API_KEY)")
 	maxRoomSize := flag.Int("max-room-size", 10, "Maximum peers per room")
@@ -331,7 +331,7 @@ func main() {
 
 	// Check if directory exists
 	if _, err := os.Stat(absDir); os.IsNotExist(err) {
-		log.Fatalf("Directory does not exist: %s\nRun 'make wasm-dist' first.", absDir)
+		log.Fatalf("Directory does not exist: %s\nRun 'bazel run :wasm' first.", absDir)
 	}
 
 	// Create file server with custom MIME types

@@ -16,7 +16,6 @@ MODULE.bazel.lock
 *.a
 /cells
 /dist/
-apps/wasm/dist/
 
 # Node.js
 node_modules/
