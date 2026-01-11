@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2026-01-11 17:39 UTC
-Updated At: 2026-01-11 17:45 UTC
+Updated At: 2026-01-11 18:05 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -87,9 +87,10 @@ Store named ranges in ZCD file format.
 
 - [ ] 4a: Add ZCD record type for named ranges (N record in persistence.cc)
 - [ ] 4b: Add CRDT operations NAMED_RANGE_DEFINE and NAMED_RANGE_DELETE
-- [ ] 4c: Add persistence tests for named ranges
+- [ ] 4c: Add unit tests for named range persistence (save/load ZCD)
+- [ ] 4d: Add e2e test for named range persistence across sessions
 
-**Files:** `core/cells/persistence.cc`, `core/cells/operation.h`
+**Files:** `core/cells/persistence.cc`, `core/cells/persistence_test.cc`, `core/cells/operation.h`, `apps/wasm/tests/*.spec.ts`
 
 ---
 
@@ -100,8 +101,10 @@ Show named ranges in formula bar dropdown.
 - [ ] 5a: Add WASM binding to get all named ranges for current workbook
 - [ ] 5b: Add named ranges dropdown to ref button in formula bar
 - [ ] 5c: Clicking named range inserts it into formula
+- [ ] 5d: Add unit test for WASM binding returning named ranges
+- [ ] 5e: Add e2e test for named range dropdown interaction (open, click, verify formula input)
 
-**Files:** `apps/wasm/bindings_*.cc`, `apps/wasm/src/formula-bar.ts`
+**Files:** `apps/wasm/bindings_*.cc`, `apps/wasm/src/formula-bar.ts`, `apps/wasm/tests/*.spec.ts`
 
 ---
 
@@ -115,9 +118,10 @@ Support `showGridLines` sheet property. No UI for now, but available via Luau sc
 - [ ] 6d: Add ZCD format support for showGridLines
 - [ ] 6e: Add Luau API: `sheet:setGridLines(bool)` and `sheet:getGridLines()`
 - [ ] 6f: Update frontend grid renderer to respect showGridLines
-- [ ] 6g: Add round-trip test for grid visibility
+- [ ] 6g: Add unit tests: XLSX round-trip, ZCD persistence, Luau API
+- [ ] 6h: Add e2e test for grid lines visibility (toggle via Luau, verify render)
 
-**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`
+**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`, `apps/wasm/tests/*.spec.ts`
 
 **Verification:** Open test file - grid lines should be hidden. Test via Luau: `getSheet():setGridLines(false)`
 
@@ -134,9 +138,10 @@ Support `zoomScale` sheet property. Includes UI controls to stress-test 2D grid 
 - [ ] 7e: Add Luau API: `sheet:setZoom(scale)` and `sheet:getZoom()`
 - [ ] 7f: Update frontend grid renderer to apply zoom transform
 - [ ] 7g: Add zoom UI controls (zoom in/out buttons or slider in toolbar/status bar)
-- [ ] 7h: Add round-trip test for zoom
+- [ ] 7h: Add unit tests: XLSX round-trip, ZCD persistence, Luau API
+- [ ] 7i: Add e2e test for zoom UI controls (click zoom buttons, verify scale applied)
 
-**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`, `apps/wasm/src/toolbar.ts` or `status-bar.ts`
+**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`, `apps/wasm/src/toolbar.ts` or `status-bar.ts`, `apps/wasm/tests/*.spec.ts`
 
 **Verification:** Open test file - zoom should be 115%. UI zoom controls should work. Manual testing validates 2D rendering at various zoom levels.
 
@@ -153,9 +158,10 @@ Support hiding axes. Available via Luau scripting.
 - [ ] 8e: Update ZCD format for axis hidden property
 - [ ] 8f: Add Luau API: `hideColumn(col)`, `hideRow(row)`, `showColumn(col)`, `showRow(row)`
 - [ ] 8g: Update frontend to skip hidden axes in rendering
-- [ ] 8h: Add round-trip test for hidden axes
+- [ ] 8h: Add unit tests: XLSX round-trip, ZCD persistence, Luau API, CRDT operations
+- [ ] 8i: Add e2e test for hidden axes (hide via Luau, verify column/row not rendered)
 
-**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/operation.h`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`
+**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/operation.h`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`, `apps/wasm/tests/*.spec.ts`
 
 ---
 
@@ -171,9 +177,10 @@ Support axis-level styling (Excel-compatible). Available via Luau and UI.
 - [ ] 9f: Add effective style resolution (cell > column > row > default)
 - [ ] 9g: Add Luau API: `setColumnStyle(col, style)`, `setRowStyle(row, style)`
 - [ ] 9h: Update frontend style controls to set axis style when column/row selected
-- [ ] 9i: Add round-trip test for axis styles
+- [ ] 9i: Add unit tests: XLSX round-trip, ZCD persistence, effective style resolution, CRDT operations
+- [ ] 9j: Add e2e test for axis styles (select column, apply bold, verify new cells inherit)
 
-**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/operation.h`, `core/cells/luau_api.cc`, `apps/wasm/src/style-controls.ts`
+**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/operation.h`, `core/cells/luau_api.cc`, `apps/wasm/src/style-controls.ts`, `apps/wasm/tests/*.spec.ts`
 
 **Verification:** Select column → apply bold → new cells in column inherit style
 
@@ -190,9 +197,10 @@ Support frozen rows/columns. Includes UI (View menu or right-click on row/column
 - [ ] 10e: Add Luau API: `sheet:freeze(col, row)` and `sheet:getFreeze()`
 - [ ] 10f: Implement freeze pane rendering in frontend (split viewport)
 - [ ] 10g: Add freeze pane UI (e.g., View menu "Freeze Panes" or context menu on headers)
-- [ ] 10h: Add round-trip test for freeze panes
+- [ ] 10h: Add unit tests: XLSX round-trip, ZCD persistence, Luau API
+- [ ] 10i: Add e2e test for freeze panes (scroll, verify frozen area stays fixed; test UI controls)
 
-**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`, `apps/wasm/src/menu.ts` or context menu
+**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`, `apps/wasm/src/menu.ts` or context menu, `apps/wasm/tests/*.spec.ts`
 
 **Verification:** Open file with freeze panes - frozen area should stay fixed while scrolling. UI controls should work.
 
