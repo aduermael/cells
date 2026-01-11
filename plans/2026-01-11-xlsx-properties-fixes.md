@@ -1,0 +1,234 @@
+Status: READY
+Created At: 2026-01-11 17:39 UTC
+Updated At: 2026-01-11 17:45 UTC
+Following plan management guidelines defined in AGENTS.md
+
+## Commands
+
+| Task | Command |
+|------|---------|
+| Build WASM | `bazel run :wasm` |
+| Unit tests | `bazel run :test` |
+| E2E tests | `bazel run :e2e` |
+| All checks | `bazel run :check` |
+
+---
+
+# XLSX Properties Fixes & Named Ranges Support
+
+## Summary
+
+Fix issues found during testing with `init_lbo_model_60min_is_revenue_cf_only.xlsx`:
+
+1. **#REF! errors** - Caused by named ranges not being parsed (11 named ranges in file)
+2. **Missing properties** - Grid hidden (`showGridLines="0"`), zoom, column default styles
+3. **Named ranges not supported** - Data structures exist but XLSX import/UI missing
+4. **Column/row styles not working** - Need Excel-compatible axis default styles
+5. **Round-trip tests needed** - Comprehensive property preservation tests
+
+## Architecture Assessment
+
+Core formula evaluation is **sound** - calculations already deferred until all cells loaded. Issues are missing XLSX parsing, not architectural problems.
+
+---
+
+## Phase 1: Named Ranges - XLSX Import
+
+Parse named ranges from XLSX so formulas can reference them.
+
+- [ ] 1a: Parse `<definedNames>` from xl/workbook.xml in xlsx_reader.cc
+- [ ] 1b: Add unit tests for named range parsing (workbook and sheet scoped)
+
+**Files:** `core/cells/xlsx_reader.cc`, `core/cells/xlsx_reader_test.cc`
+
+---
+
+## Phase 2: Named Ranges - Formula Resolution
+
+Connect parsed named ranges to formula evaluation.
+
+- [ ] 2a: Update formula resolver to look up named ranges from registry
+- [ ] 2b: Add formula evaluation tests with named ranges
+
+**Files:** `core/cells/formula_resolver.cc`, tests
+
+**Verification:** Open test file - #REF! errors should be resolved
+
+---
+
+## Phase 3: Named Ranges - XLSX Export
+
+Round-trip support for named ranges.
+
+- [ ] 3a: Export named ranges to XLSX in xlsx_writer.cc
+- [ ] 3b: Add named range round-trip test
+
+**Files:** `core/cells/xlsx_writer.cc`, `core/cells/xlsx_writer_test.cc`
+
+---
+
+## Phase 4: Named Ranges - ZCD Persistence
+
+Store named ranges in ZCD file format.
+
+- [ ] 4a: Add ZCD record type for named ranges (N record in persistence.cc)
+- [ ] 4b: Add CRDT operations NAMED_RANGE_DEFINE and NAMED_RANGE_DELETE
+- [ ] 4c: Add persistence tests for named ranges
+
+**Files:** `core/cells/persistence.cc`, `core/cells/operation.h`
+
+---
+
+## Phase 5: Named Ranges - UI
+
+Show named ranges in formula bar dropdown.
+
+- [ ] 5a: Add WASM binding to get all named ranges for current workbook
+- [ ] 5b: Add named ranges dropdown to ref button in formula bar
+- [ ] 5c: Clicking named range inserts it into formula
+
+**Files:** `apps/wasm/bindings_*.cc`, `apps/wasm/src/formula-bar.ts`
+
+---
+
+## Phase 6: Grid Lines Visibility
+
+Support `showGridLines` sheet property. No UI for now, but available via Luau scripting.
+
+- [ ] 6a: Add `showGridLines` to Sheet model (or SheetView struct)
+- [ ] 6b: Parse showGridLines from XLSX sheetView element
+- [ ] 6c: Export showGridLines to XLSX
+- [ ] 6d: Add ZCD format support for showGridLines
+- [ ] 6e: Add Luau API: `sheet:setGridLines(bool)` and `sheet:getGridLines()`
+- [ ] 6f: Update frontend grid renderer to respect showGridLines
+- [ ] 6g: Add round-trip test for grid visibility
+
+**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`
+
+**Verification:** Open test file - grid lines should be hidden. Test via Luau: `getSheet():setGridLines(false)`
+
+---
+
+## Phase 7: Zoom Level
+
+Support `zoomScale` sheet property. Includes UI controls to stress-test 2D grid rendering.
+
+- [ ] 7a: Add `zoomScale` to Sheet model
+- [ ] 7b: Parse zoomScale from XLSX sheetView element
+- [ ] 7c: Export zoomScale to XLSX
+- [ ] 7d: Add ZCD format support for zoomScale
+- [ ] 7e: Add Luau API: `sheet:setZoom(scale)` and `sheet:getZoom()`
+- [ ] 7f: Update frontend grid renderer to apply zoom transform
+- [ ] 7g: Add zoom UI controls (zoom in/out buttons or slider in toolbar/status bar)
+- [ ] 7h: Add round-trip test for zoom
+
+**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`, `apps/wasm/src/toolbar.ts` or `status-bar.ts`
+
+**Verification:** Open test file - zoom should be 115%. UI zoom controls should work. Manual testing validates 2D rendering at various zoom levels.
+
+---
+
+## Phase 8: Hidden Columns/Rows
+
+Support hiding axes. Available via Luau scripting.
+
+- [ ] 8a: Add `hidden` field to Axis struct
+- [ ] 8b: Parse hidden attribute from XLSX col/row elements
+- [ ] 8c: Export hidden attribute to XLSX
+- [ ] 8d: Add CRDT operation AXIS_SET_HIDDEN
+- [ ] 8e: Update ZCD format for axis hidden property
+- [ ] 8f: Add Luau API: `hideColumn(col)`, `hideRow(row)`, `showColumn(col)`, `showRow(row)`
+- [ ] 8g: Update frontend to skip hidden axes in rendering
+- [ ] 8h: Add round-trip test for hidden axes
+
+**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/operation.h`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`
+
+---
+
+## Phase 9: Column/Row Default Styles
+
+Support axis-level styling (Excel-compatible). Available via Luau and UI.
+
+- [ ] 9a: Add `defaultStyleId` field to Axis struct
+- [ ] 9b: Parse style attribute from XLSX col/row elements
+- [ ] 9c: Export axis default style to XLSX
+- [ ] 9d: Add CRDT operation AXIS_SET_STYLE
+- [ ] 9e: Update ZCD format for axis style property
+- [ ] 9f: Add effective style resolution (cell > column > row > default)
+- [ ] 9g: Add Luau API: `setColumnStyle(col, style)`, `setRowStyle(row, style)`
+- [ ] 9h: Update frontend style controls to set axis style when column/row selected
+- [ ] 9i: Add round-trip test for axis styles
+
+**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/operation.h`, `core/cells/luau_api.cc`, `apps/wasm/src/style-controls.ts`
+
+**Verification:** Select column → apply bold → new cells in column inherit style
+
+---
+
+## Phase 10: Freeze Panes
+
+Support frozen rows/columns. Includes UI (View menu or right-click on row/column header).
+
+- [ ] 10a: Add freezeCol/freezeRow to Sheet model
+- [ ] 10b: Parse pane element from XLSX sheetView
+- [ ] 10c: Export freeze panes to XLSX
+- [ ] 10d: Add ZCD format support for freeze panes
+- [ ] 10e: Add Luau API: `sheet:freeze(col, row)` and `sheet:getFreeze()`
+- [ ] 10f: Implement freeze pane rendering in frontend (split viewport)
+- [ ] 10g: Add freeze pane UI (e.g., View menu "Freeze Panes" or context menu on headers)
+- [ ] 10h: Add round-trip test for freeze panes
+
+**Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`, `apps/wasm/src/menu.ts` or context menu
+
+**Verification:** Open file with freeze panes - frozen area should stay fixed while scrolling. UI controls should work.
+
+---
+
+## Phase 11: Unsupported Properties Manifest
+
+Document what's supported and what's not.
+
+- [ ] 11a: Create testdata/xlsx/UNSUPPORTED_PROPERTIES.md with full property inventory
+
+---
+
+## Key Implementation Details
+
+### Named Range Parsing (Phase 1a)
+```cpp
+pugi::xml_node definedNames = workbookNode.child("definedNames");
+for (auto defName : definedNames.children("definedName")) {
+    std::string name = defName.attribute("name").as_string();
+    std::string ref = defName.text().as_string();  // "'Sheet1'!$B$2"
+    int localSheetId = defName.attribute("localSheetId").as_int(-1);
+    // Parse ref and register in NamedRangeRegistry
+}
+```
+
+### Effective Style Resolution (Phase 9f)
+```cpp
+CellStyle* getEffectiveStyle(Cell* cell, Sheet* sheet) {
+    if (!cell->styleId.isNull()) return getStyle(cell->styleId);
+    Axis* col = sheet->getColumn(cell->colId);
+    if (col && !col->defaultStyleId.isNull()) return getStyle(col->defaultStyleId);
+    Axis* row = sheet->getRow(cell->rowId);
+    if (row && !row->defaultStyleId.isNull()) return getStyle(row->defaultStyleId);
+    return getDefaultStyle();
+}
+```
+
+### ZCD Named Range Record (Phase 4a)
+```
+#namedranges
+N <id> "<name>" <scope:W|S> <sheet-id|-> <type> <target-data>
+```
+
+---
+
+## Deferred (Not in Scope)
+
+- Column grouping/outlining (`outlineLevel`)
+- Conditional formatting
+- Data validation
+- Theme colors
+- Print settings
