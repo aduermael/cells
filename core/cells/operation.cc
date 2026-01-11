@@ -52,6 +52,11 @@ const char* opTypeToString(OpType type) {
         // Style operations
         case OpType::STYLE_DEFINE:
             return "STYLE_DEFINE";
+        // Named range operations
+        case OpType::NAMED_RANGE_DEFINE:
+            return "NAMED_RANGE_DEFINE";
+        case OpType::NAMED_RANGE_DELETE:
+            return "NAMED_RANGE_DELETE";
         // Legacy DIM_* operations (deprecated)
         case OpType::DIM_INSERT_AXIS:
             return "DIM_INSERT_AXIS";
@@ -114,6 +119,13 @@ OpType stringToOpType(const std::string& str) {
     // Style operations
     if (str == "STYLE_DEFINE") {
         return OpType::STYLE_DEFINE;
+    }
+    // Named range operations
+    if (str == "NAMED_RANGE_DEFINE") {
+        return OpType::NAMED_RANGE_DEFINE;
+    }
+    if (str == "NAMED_RANGE_DELETE") {
+        return OpType::NAMED_RANGE_DELETE;
     }
     // Column operations
     if (str == "COL_INSERT") {

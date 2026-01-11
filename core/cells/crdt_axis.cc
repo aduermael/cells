@@ -21,6 +21,7 @@
 
 #include "core/cells/crdt_internal.h"
 #include "core/cells/format_code_parser.h"
+#include "core/cells/named_ranges.h"
 
 namespace cells {
 namespace internal {
@@ -740,6 +741,112 @@ ApplyResult applyStyleDefine(Workbook& workbook, const Operation& op) {
     }
 
     workbook.registerStyle(op.target_id, style);
+
+    return ApplyResult::SUCCESS;
+}
+
+ApplyResult applyNamedRangeDefine(Workbook& workbook, const Operation& op) {
+    // Extract named range properties from JSON payload
+    const std::string name = extractJSONString(op.payload, "name");
+    if (name.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    const std::string scopeStr = extractJSONString(op.payload, "scope");
+    if (scopeStr.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    const std::string scopeSheetIdStr = extractJSONString(op.payload, "scopeSheetId");
+    const std::string targetTypeStr = extractJSONString(op.payload, "targetType");
+    const std::string id1Str = extractJSONString(op.payload, "id1");
+    const std::string id2Str = extractJSONString(op.payload, "id2");
+    const std::string targetSheetIdStr = extractJSONString(op.payload, "targetSheetId");
+
+    if (targetTypeStr.empty() || id1Str.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    // Build target
+    NamedRangeTarget target;
+    if (targetTypeStr == "CELL") {
+        target.type = NamedRangeTarget::Type::CELL;
+    } else if (targetTypeStr == "RANGE") {
+        target.type = NamedRangeTarget::Type::RANGE;
+    } else if (targetTypeStr == "COLUMN") {
+        target.type = NamedRangeTarget::Type::COLUMN;
+    } else if (targetTypeStr == "ROW") {
+        target.type = NamedRangeTarget::Type::ROW;
+    } else if (targetTypeStr == "COLUMN_RANGE") {
+        target.type = NamedRangeTarget::Type::COLUMN_RANGE;
+    } else if (targetTypeStr == "ROW_RANGE") {
+        target.type = NamedRangeTarget::Type::ROW_RANGE;
+    } else {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    target.id1 = ID(id1Str);
+    if (!id2Str.empty() && id2Str != "-") {
+        target.id2 = ID(id2Str);
+    }
+    if (!targetSheetIdStr.empty() && targetSheetIdStr != "-") {
+        target.sheetId = ID(targetSheetIdStr);
+    }
+
+    // Register the named range
+    NamedRangeRegistry* registry = workbook.getNamedRanges();
+    if (registry == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    if (scopeStr == "W") {
+        // Workbook scope - overwrite if exists (idempotent)
+        registry->removeWorkbook(name);  // Remove if exists
+        registry->defineWorkbook(name, target);
+    } else if (scopeStr == "S") {
+        // Sheet scope
+        if (scopeSheetIdStr.empty() || scopeSheetIdStr == "-") {
+            return ApplyResult::INVALID_PAYLOAD;
+        }
+        const ID scopeSheetId(scopeSheetIdStr);
+        registry->removeSheet(name, scopeSheetId);  // Remove if exists
+        registry->defineSheet(name, scopeSheetId, target);
+    } else {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    return ApplyResult::SUCCESS;
+}
+
+ApplyResult applyNamedRangeDelete(Workbook& workbook, const Operation& op) {
+    // Extract deletion key from JSON payload
+    const std::string name = extractJSONString(op.payload, "name");
+    if (name.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    const std::string scopeStr = extractJSONString(op.payload, "scope");
+    if (scopeStr.empty()) {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
+
+    NamedRangeRegistry* registry = workbook.getNamedRanges();
+    if (registry == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    if (scopeStr == "W") {
+        registry->removeWorkbook(name);
+    } else if (scopeStr == "S") {
+        const std::string scopeSheetIdStr = extractJSONString(op.payload, "scopeSheetId");
+        if (scopeSheetIdStr.empty() || scopeSheetIdStr == "-") {
+            return ApplyResult::INVALID_PAYLOAD;
+        }
+        const ID scopeSheetId(scopeSheetIdStr);
+        registry->removeSheet(name, scopeSheetId);
+    } else {
+        return ApplyResult::INVALID_PAYLOAD;
+    }
 
     return ApplyResult::SUCCESS;
 }

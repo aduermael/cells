@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "core/cells/formula_parser.h"
+#include "core/cells/named_ranges.h"
 
 namespace cells {
 
@@ -136,6 +137,9 @@ bool Parser::parseLine(std::string_view line) {
 
         case 'Y':  // Style definition
             return parseStyle(line.substr(firstNonSpace));
+
+        case 'N':  // Named range
+            return parseNamedRange(line.substr(firstNonSpace));
 
         case 'O':  // OpLog entry
             return parseOperation(line.substr(firstNonSpace));
@@ -338,6 +342,152 @@ bool Parser::parseStyle(std::string_view line) {
 
     // Register the style in the workbook
     workbook_->registerStyle(styleId, style);
+    return true;
+}
+
+// Helper to parse token from string_view, updating the view
+static std::string_view parseToken(std::string_view& input) {
+    // Skip leading whitespace
+    const size_t start = input.find_first_not_of(" \t");
+    if (start == std::string_view::npos) {
+        input = "";
+        return "";
+    }
+    input = input.substr(start);
+
+    // Find end of token
+    const size_t end = input.find_first_of(" \t");
+    if (end == std::string_view::npos) {
+        const std::string_view token = input;
+        input = "";
+        return token;
+    }
+
+    const std::string_view token = input.substr(0, end);
+    input = input.substr(end);
+    return token;
+}
+
+bool Parser::parseNamedRange(std::string_view line) {
+    // Format: N "<name>" <scope:W|S> <scope-sheet-id|-> <target-type> <target-data>
+    // Target data depends on type:
+    //   CELL: <id1> <sheet-id>
+    //   RANGE: <id1> <id2> <sheet-id>
+    //   COLUMN/ROW: <id1> <sheet-id>
+    //   COLUMN_RANGE/ROW_RANGE: <id1> <id2> <sheet-id>
+
+    if (line.size() < 2 || line[0] != 'N' || line[1] != ' ') {
+        return setError("Invalid named range line");
+    }
+
+    line = line.substr(2);  // Skip "N "
+
+    // Skip leading whitespace
+    const size_t start = line.find_first_not_of(" \t");
+    if (start == std::string_view::npos) {
+        return setError("Missing named range name");
+    }
+    line = line.substr(start);
+
+    // Parse quoted name
+    std::string name;
+    size_t consumed = 0;
+    if (!parseQuotedString(line, name, consumed)) {
+        return setError("Invalid named range name, expected quoted string");
+    }
+    line = line.substr(consumed);
+
+    // Parse scope (W or S)
+    const std::string_view scopeToken = parseToken(line);
+    if (scopeToken.empty()) {
+        return setError("Missing named range scope");
+    }
+
+    NamedRangeScope scope = NamedRangeScope::WORKBOOK;  // Default to workbook scope
+    if (scopeToken == "W") {
+        scope = NamedRangeScope::WORKBOOK;
+    } else if (scopeToken == "S") {
+        scope = NamedRangeScope::SHEET;
+    } else {
+        return setError("Invalid named range scope: " + std::string(scopeToken));
+    }
+
+    // Parse scope sheet ID (- for null)
+    const std::string_view scopeSheetToken = parseToken(line);
+    if (scopeSheetToken.empty()) {
+        return setError("Missing named range scope sheet ID");
+    }
+    ID scopeSheetId;
+    if (scopeSheetToken != "-") {
+        scopeSheetId = ID(std::string(scopeSheetToken));
+    }
+
+    // Parse target type
+    const std::string_view typeToken = parseToken(line);
+    if (typeToken.empty()) {
+        return setError("Missing named range target type");
+    }
+
+    NamedRangeTarget::Type targetType = NamedRangeTarget::Type::CELL;  // Default to cell
+    if (typeToken == "CELL") {
+        targetType = NamedRangeTarget::Type::CELL;
+    } else if (typeToken == "RANGE") {
+        targetType = NamedRangeTarget::Type::RANGE;
+    } else if (typeToken == "COLUMN") {
+        targetType = NamedRangeTarget::Type::COLUMN;
+    } else if (typeToken == "ROW") {
+        targetType = NamedRangeTarget::Type::ROW;
+    } else if (typeToken == "COLUMN_RANGE") {
+        targetType = NamedRangeTarget::Type::COLUMN_RANGE;
+    } else if (typeToken == "ROW_RANGE") {
+        targetType = NamedRangeTarget::Type::ROW_RANGE;
+    } else {
+        return setError("Invalid named range target type: " + std::string(typeToken));
+    }
+
+    // Parse target data based on type
+    NamedRangeTarget target;
+    target.type = targetType;
+
+    // Parse id1
+    const std::string_view id1Token = parseToken(line);
+    if (id1Token.empty()) {
+        return setError("Missing named range target id1");
+    }
+    target.id1 = ID(std::string(id1Token));
+
+    // For RANGE, COLUMN_RANGE, ROW_RANGE: parse id2
+    if (targetType == NamedRangeTarget::Type::RANGE ||
+        targetType == NamedRangeTarget::Type::COLUMN_RANGE ||
+        targetType == NamedRangeTarget::Type::ROW_RANGE) {
+        const std::string_view id2Token = parseToken(line);
+        if (id2Token.empty()) {
+            return setError("Missing named range target id2");
+        }
+        target.id2 = ID(std::string(id2Token));
+    }
+
+    // Parse target sheet ID (- for null)
+    const std::string_view targetSheetToken = parseToken(line);
+    if (targetSheetToken.empty()) {
+        return setError("Missing named range target sheet ID");
+    }
+    if (targetSheetToken != "-") {
+        target.sheetId = ID(std::string(targetSheetToken));
+    }
+
+    // Register the named range in the workbook
+    NamedRangeRegistry* registry = workbook_->getNamedRanges();
+    if (registry == nullptr) {
+        return setError("Named range registry not available");
+    }
+
+    if (scope == NamedRangeScope::WORKBOOK) {
+        registry->defineWorkbook(name, target);
+    } else {
+        registry->defineSheet(name, scopeSheetId, target);
+    }
+
     return true;
 }
 

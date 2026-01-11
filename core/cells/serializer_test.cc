@@ -11,6 +11,7 @@
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
+#include "core/cells/named_ranges.h"
 #include "core/cells/parser.h"
 
 #include "gtest/gtest.h"
@@ -1589,6 +1590,318 @@ X xF1mN2pQ cB3dE4fG rC5fG6hJ n -500 fmt:FMT_C002 sty:STYwarn0
 
     const CellStyle* warn2 = result2.workbook->getStyle(ID("STYwarn0"));
     EXPECT_EQ(*warn, *warn2);
+}
+
+// =============================================================================
+// Named Range ZCD Persistence Tests (Phase 4c)
+// =============================================================================
+
+TEST(NamedRangeZCDTest, SerializeWorkbookScopedNamedRange) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell->value = CellValue(100.0);
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    sheet->addCell(std::move(cell));
+    wb->addSheet(std::move(sheet));
+
+    // Define a workbook-scoped named range
+    NamedRangeTarget target = NamedRangeTarget::cell(ID("xA1bC2dE"), ID("sH3eE4tB"));
+    wb->getNamedRanges()->defineWorkbook("MyTotal", target);
+
+    const std::string output = serialize(*wb);
+
+    // Should contain named range line
+    EXPECT_NE(output.find("N \"MyTotal\""), std::string::npos);
+    EXPECT_NE(output.find("W -"), std::string::npos);  // Workbook scope
+    EXPECT_NE(output.find("CELL"), std::string::npos);
+    EXPECT_NE(output.find("xA1bC2dE"), std::string::npos);
+}
+
+TEST(NamedRangeZCDTest, SerializeSheetScopedNamedRange) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+
+    sheet->addColumn(std::move(col));
+    sheet->addRow(std::move(row));
+    wb->addSheet(std::move(sheet));
+
+    // Define a sheet-scoped named range for a column
+    NamedRangeTarget target = NamedRangeTarget::column(ID("cA1bC2dE"), ID("sH3eE4tB"));
+    wb->getNamedRanges()->defineSheet("Revenue", ID("sH3eE4tB"), target);
+
+    const std::string output = serialize(*wb);
+
+    // Should contain named range line with sheet scope
+    EXPECT_NE(output.find("N \"Revenue\""), std::string::npos);
+    EXPECT_NE(output.find("S sH3eE4tB"), std::string::npos);  // Sheet scope
+    EXPECT_NE(output.find("COLUMN"), std::string::npos);
+}
+
+TEST(NamedRangeZCDTest, SerializeRangeTarget) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+
+    auto col1 = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    col1->position = 0;
+    auto col2 = std::make_unique<Axis>(ID("cB3dE4fG"), true);
+    col2->position = 1;
+    auto row1 = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row1->position = 0;
+    auto row2 = std::make_unique<Axis>(ID("rB3dE4fG"), false);
+    row2->position = 1;
+
+    auto cellA1 = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    auto cellB2 = std::make_unique<Cell>(ID("xB3dE4fG"), ID("cB3dE4fG"), ID("rB3dE4fG"));
+
+    sheet->addColumn(std::move(col1));
+    sheet->addColumn(std::move(col2));
+    sheet->addRow(std::move(row1));
+    sheet->addRow(std::move(row2));
+    sheet->addCell(std::move(cellA1));
+    sheet->addCell(std::move(cellB2));
+    wb->addSheet(std::move(sheet));
+
+    // Define a named range for a cell range (A1:B2)
+    NamedRangeTarget target =
+        NamedRangeTarget::range(ID("xA1bC2dE"), ID("xB3dE4fG"), ID("sH3eE4tB"));
+    wb->getNamedRanges()->defineWorkbook("DataRange", target);
+
+    const std::string output = serialize(*wb);
+
+    // Should contain RANGE with both cell IDs
+    EXPECT_NE(output.find("N \"DataRange\""), std::string::npos);
+    EXPECT_NE(output.find("RANGE"), std::string::npos);
+    EXPECT_NE(output.find("xA1bC2dE"), std::string::npos);
+    EXPECT_NE(output.find("xB3dE4fG"), std::string::npos);
+}
+
+TEST(NamedRangeZCDTest, ParseNamedRange) {
+    const std::string content = R"(
+D aB3cD4eF "Test"
+N "MyTotal" W - CELL xA1bC2dE sH3eE4tB
+S sH3eE4tB "Sheet1"
+C cA1bC2dE 0
+R rA1bC2dE 0
+X xA1bC2dE cA1bC2dE rA1bC2dE n 100
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Verify named range was parsed
+    NamedRangeRegistry* registry = result.workbook->getNamedRanges();
+    ASSERT_NE(registry, nullptr);
+
+    const NamedRange* nr = registry->resolve("MyTotal", ID());
+    ASSERT_NE(nr, nullptr);
+    EXPECT_EQ(nr->name, "MyTotal");
+    EXPECT_EQ(nr->scope, NamedRangeScope::WORKBOOK);
+    EXPECT_EQ(nr->target.type, NamedRangeTarget::Type::CELL);
+    EXPECT_EQ(nr->target.id1.toString(), "xA1bC2dE");
+    EXPECT_EQ(nr->target.sheetId.toString(), "sH3eE4tB");
+}
+
+TEST(NamedRangeZCDTest, ParseSheetScopedNamedRange) {
+    const std::string content = R"(
+D aB3cD4eF "Test"
+N "LocalName" S sH3eE4tB COLUMN cA1bC2dE sH3eE4tB
+S sH3eE4tB "Sheet1"
+C cA1bC2dE 0
+R rA1bC2dE 0
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    NamedRangeRegistry* registry = result.workbook->getNamedRanges();
+    ASSERT_NE(registry, nullptr);
+
+    // Should find it when resolving from the sheet
+    const NamedRange* nr = registry->resolve("LocalName", ID("sH3eE4tB"));
+    ASSERT_NE(nr, nullptr);
+    EXPECT_EQ(nr->name, "LocalName");
+    EXPECT_EQ(nr->scope, NamedRangeScope::SHEET);
+    EXPECT_EQ(nr->scopeSheetId.toString(), "sH3eE4tB");
+    EXPECT_EQ(nr->target.type, NamedRangeTarget::Type::COLUMN);
+}
+
+TEST(NamedRangeZCDTest, ParseRangeNamedRange) {
+    const std::string content = R"(
+D aB3cD4eF "Test"
+N "DataArea" W - RANGE xA1bC2dE xB3dE4fG sH3eE4tB
+S sH3eE4tB "Sheet1"
+C cA1bC2dE 0
+C cB3dE4fG 1
+R rA1bC2dE 0
+R rB3dE4fG 1
+X xA1bC2dE cA1bC2dE rA1bC2dE n 1
+X xB3dE4fG cB3dE4fG rB3dE4fG n 2
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    NamedRangeRegistry* registry = result.workbook->getNamedRanges();
+    const NamedRange* nr = registry->resolve("DataArea", ID());
+    ASSERT_NE(nr, nullptr);
+    EXPECT_EQ(nr->target.type, NamedRangeTarget::Type::RANGE);
+    EXPECT_EQ(nr->target.id1.toString(), "xA1bC2dE");
+    EXPECT_EQ(nr->target.id2.toString(), "xB3dE4fG");
+    EXPECT_EQ(nr->target.sheetId.toString(), "sH3eE4tB");
+}
+
+TEST(NamedRangeZCDTest, RoundtripNamedRanges) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+
+    auto col1 = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    col1->position = 0;
+    auto col2 = std::make_unique<Axis>(ID("cB3dE4fG"), true);
+    col2->position = 1;
+    auto row1 = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row1->position = 0;
+
+    auto cell1 = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
+    cell1->value = CellValue(100.0);
+    auto cell2 = std::make_unique<Cell>(ID("xB3dE4fG"), ID("cB3dE4fG"), ID("rA1bC2dE"));
+    cell2->value = CellValue(200.0);
+
+    sheet->addColumn(std::move(col1));
+    sheet->addColumn(std::move(col2));
+    sheet->addRow(std::move(row1));
+    sheet->addCell(std::move(cell1));
+    sheet->addCell(std::move(cell2));
+    wb->addSheet(std::move(sheet));
+
+    // Define multiple named ranges of different types
+    wb->getNamedRanges()->defineWorkbook("CellRef",
+                                         NamedRangeTarget::cell(ID("xA1bC2dE"), ID("sH3eE4tB")));
+    wb->getNamedRanges()->defineWorkbook(
+        "RangeRef", NamedRangeTarget::range(ID("xA1bC2dE"), ID("xB3dE4fG"), ID("sH3eE4tB")));
+    wb->getNamedRanges()->defineWorkbook("ColRef",
+                                         NamedRangeTarget::column(ID("cA1bC2dE"), ID("sH3eE4tB")));
+    wb->getNamedRanges()->defineSheet("LocalName", ID("sH3eE4tB"),
+                                      NamedRangeTarget::row(ID("rA1bC2dE"), ID("sH3eE4tB")));
+
+    // Serialize
+    const std::string serialized = serialize(*wb);
+
+    // Parse back
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Verify all named ranges are preserved
+    NamedRangeRegistry* registry = result.workbook->getNamedRanges();
+    ASSERT_NE(registry, nullptr);
+
+    // Check workbook-scoped names
+    const NamedRange* cellRef = registry->resolve("CellRef", ID());
+    ASSERT_NE(cellRef, nullptr);
+    EXPECT_EQ(cellRef->scope, NamedRangeScope::WORKBOOK);
+    EXPECT_EQ(cellRef->target.type, NamedRangeTarget::Type::CELL);
+    EXPECT_EQ(cellRef->target.id1.toString(), "xA1bC2dE");
+
+    const NamedRange* rangeRef = registry->resolve("RangeRef", ID());
+    ASSERT_NE(rangeRef, nullptr);
+    EXPECT_EQ(rangeRef->target.type, NamedRangeTarget::Type::RANGE);
+    EXPECT_EQ(rangeRef->target.id1.toString(), "xA1bC2dE");
+    EXPECT_EQ(rangeRef->target.id2.toString(), "xB3dE4fG");
+
+    const NamedRange* colRef = registry->resolve("ColRef", ID());
+    ASSERT_NE(colRef, nullptr);
+    EXPECT_EQ(colRef->target.type, NamedRangeTarget::Type::COLUMN);
+    EXPECT_EQ(colRef->target.id1.toString(), "cA1bC2dE");
+
+    // Check sheet-scoped name (should only resolve from that sheet)
+    const NamedRange* localName = registry->resolve("LocalName", ID("sH3eE4tB"));
+    ASSERT_NE(localName, nullptr);
+    EXPECT_EQ(localName->scope, NamedRangeScope::SHEET);
+    EXPECT_EQ(localName->scopeSheetId.toString(), "sH3eE4tB");
+    EXPECT_EQ(localName->target.type, NamedRangeTarget::Type::ROW);
+
+    // Sheet-scoped name should not resolve from workbook scope
+    const NamedRange* localFromWB = registry->resolve("LocalName", ID());
+    EXPECT_EQ(localFromWB, nullptr);
+}
+
+TEST(NamedRangeZCDTest, RoundtripColumnRowRanges) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+
+    auto col1 = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    col1->position = 0;
+    auto col2 = std::make_unique<Axis>(ID("cB3dE4fG"), true);
+    col2->position = 1;
+    auto row1 = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row1->position = 0;
+    auto row2 = std::make_unique<Axis>(ID("rB3dE4fG"), false);
+    row2->position = 1;
+
+    sheet->addColumn(std::move(col1));
+    sheet->addColumn(std::move(col2));
+    sheet->addRow(std::move(row1));
+    sheet->addRow(std::move(row2));
+    wb->addSheet(std::move(sheet));
+
+    // Define column range and row range named ranges
+    wb->getNamedRanges()->defineWorkbook(
+        "ColRange", NamedRangeTarget::columnRange(ID("cA1bC2dE"), ID("cB3dE4fG"), ID("sH3eE4tB")));
+    wb->getNamedRanges()->defineWorkbook(
+        "RowRange", NamedRangeTarget::rowRange(ID("rA1bC2dE"), ID("rB3dE4fG"), ID("sH3eE4tB")));
+
+    // Serialize
+    const std::string serialized = serialize(*wb);
+
+    // Should contain the named ranges
+    EXPECT_NE(serialized.find("COLUMN_RANGE"), std::string::npos);
+    EXPECT_NE(serialized.find("ROW_RANGE"), std::string::npos);
+
+    // Parse back
+    ParseResult result = parse(serialized);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    NamedRangeRegistry* registry = result.workbook->getNamedRanges();
+
+    const NamedRange* colRange = registry->resolve("ColRange", ID());
+    ASSERT_NE(colRange, nullptr);
+    EXPECT_EQ(colRange->target.type, NamedRangeTarget::Type::COLUMN_RANGE);
+    EXPECT_EQ(colRange->target.id1.toString(), "cA1bC2dE");
+    EXPECT_EQ(colRange->target.id2.toString(), "cB3dE4fG");
+
+    const NamedRange* rowRange = registry->resolve("RowRange", ID());
+    ASSERT_NE(rowRange, nullptr);
+    EXPECT_EQ(rowRange->target.type, NamedRangeTarget::Type::ROW_RANGE);
+    EXPECT_EQ(rowRange->target.id1.toString(), "rA1bC2dE");
+    EXPECT_EQ(rowRange->target.id2.toString(), "rB3dE4fG");
+}
+
+TEST(NamedRangeZCDTest, ParseNamedRangeWithSpecialChars) {
+    // Test named range with special characters in name that need escaping
+    const std::string content = R"(
+D aB3cD4eF "Test"
+N "Total_2024.Q1" W - CELL xA1bC2dE sH3eE4tB
+S sH3eE4tB "Sheet1"
+C cA1bC2dE 0
+R rA1bC2dE 0
+X xA1bC2dE cA1bC2dE rA1bC2dE n 100
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    NamedRangeRegistry* registry = result.workbook->getNamedRanges();
+    const NamedRange* nr = registry->resolve("Total_2024.Q1", ID());
+    ASSERT_NE(nr, nullptr);
+    EXPECT_EQ(nr->name, "Total_2024.Q1");
 }
 
 }  // namespace

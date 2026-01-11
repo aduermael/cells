@@ -1,0 +1,11 @@
+D dOC12345 "Named Ranges Test"
+N "MyTotal" W - CELL xA1bC2dE sH3eE4tB
+N "DataRange" W - RANGE xA1bC2dE xB3dE4fG sH3eE4tB
+N "ColA" W - COLUMN cA1bC2dE sH3eE4tB
+S sH3eE4tB "Sheet1"
+C cA1bC2dE 0 w:100
+C cB3dE4fG 1 w:100
+R rA1bC2dE 0
+R rB3dE4fG 1
+X xA1bC2dE cA1bC2dE rA1bC2dE n 100
+X xB3dE4fG cB3dE4fG rB3dE4fG n 200

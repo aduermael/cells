@@ -130,6 +130,16 @@ Operation makeFormatDefineOp(Workbook& workbook, const ID& formatId, const std::
 // Payload: JSON with style properties (bold, italic, bgColor, etc.)
 Operation makeStyleDefineOp(Workbook& workbook, const ID& styleId, const std::string& payload);
 
+// Generate a NAMED_RANGE_DEFINE operation for defining a named range.
+// Payload: JSON with named range definition
+// {"name":"MyRange","scope":"W","scopeSheetId":"-",
+//  "targetType":"CELL","id1":"...","id2":"-","targetSheetId":"..."}
+Operation makeNamedRangeDefineOp(Workbook& workbook, const std::string& payload);
+
+// Generate a NAMED_RANGE_DELETE operation for deleting a named range.
+// Payload: {"name":"MyRange","scope":"W","scopeSheetId":"-"}
+Operation makeNamedRangeDeleteOp(Workbook& workbook, const std::string& payload);
+
 // Bootstrap the OpLog with the current workbook state.
 // Called when transitioning from OFFLINE to COLLABORATING mode.
 // Generates operations for all existing axes and cells in HLC order.

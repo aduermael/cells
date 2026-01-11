@@ -76,6 +76,10 @@ enum class OpType : uint8_t {
     // Style operations
     STYLE_DEFINE = 41,  // Define a cell style
 
+    // Named range operations
+    NAMED_RANGE_DEFINE = 50,  // Define a named range
+    NAMED_RANGE_DELETE = 51,  // Delete a named range
+
     // Legacy operations (deprecated, kept for backwards compatibility parsing)
     // These map to COL_* or ROW_* based on isCol payload field
     DIM_INSERT_AXIS = 100,  // Use COL_INSERT or ROW_INSERT instead

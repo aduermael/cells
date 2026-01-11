@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2026-01-11 17:39 UTC
-Updated At: 2026-01-11 18:05 UTC
+Updated At: 2026-01-11 (Phase 4 complete)
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -85,12 +85,19 @@ Round-trip support for named ranges.
 
 Store named ranges in ZCD file format.
 
-- [ ] 4a: Add ZCD record type for named ranges (N record in persistence.cc)
-- [ ] 4b: Add CRDT operations NAMED_RANGE_DEFINE and NAMED_RANGE_DELETE
-- [ ] 4c: Add unit tests for named range persistence (save/load ZCD)
-- [ ] 4d: Add e2e test for named range persistence across sessions
+- [x] 4a: Add ZCD record type for named ranges (N record in serializer.cc/parser.cc)
+- [x] 4b: Add CRDT operations NAMED_RANGE_DEFINE and NAMED_RANGE_DELETE
+- [x] 4c: Add unit tests for named range persistence (save/load ZCD)
+- [x] 4d: Add e2e test for named range persistence across sessions
 
-**Files:** `core/cells/persistence.cc`, `core/cells/persistence_test.cc`, `core/cells/operation.h`, `apps/wasm/tests/*.spec.ts`
+**Files:** `core/cells/serializer.cc`, `core/cells/parser.cc`, `core/cells/serializer_test.cc`, `core/cells/operation.h`, `core/cells/operation.cc`, `core/cells/crdt.h`, `core/cells/crdt.cc`, `core/cells/crdt_axis.cc`, `core/cells/crdt_internal.h`, `apps/wasm/bindings.h`, `apps/wasm/bindings.cc`, `apps/wasm/bindings_core.cc`, `apps/wasm/tests/helpers.mjs`, `apps/wasm/tests/named-ranges.test.mjs`, `testdata/named_ranges.zcd`
+
+**Implementation notes:**
+- Added N record type for named ranges: `N "<name>" <scope:W|S> <scope-sheet-id|-> <target-type> <target-data>`
+- Added NAMED_RANGE_DEFINE (50) and NAMED_RANGE_DELETE (51) operation types
+- Added getNamedRanges() WASM binding to expose named ranges to JavaScript
+- Created e2e test for loading/exporting named ranges
+- 10 new unit tests for named range ZCD persistence
 
 ---
 
@@ -98,13 +105,15 @@ Store named ranges in ZCD file format.
 
 Show named ranges in formula bar dropdown.
 
-- [ ] 5a: Add WASM binding to get all named ranges for current workbook
+- [x] 5a: Add WASM binding to get all named ranges for current workbook (done in Phase 4)
 - [ ] 5b: Add named ranges dropdown to ref button in formula bar
 - [ ] 5c: Clicking named range inserts it into formula
-- [ ] 5d: Add unit test for WASM binding returning named ranges
+- [x] 5d: Add unit test for WASM binding returning named ranges (done in Phase 4)
 - [ ] 5e: Add e2e test for named range dropdown interaction (open, click, verify formula input)
 
 **Files:** `apps/wasm/bindings_*.cc`, `apps/wasm/src/formula-bar.ts`, `apps/wasm/tests/*.spec.ts`
+
+**Note:** Items 5a and 5d were completed as part of Phase 4 (getNamedRanges() binding added)
 
 ---
 

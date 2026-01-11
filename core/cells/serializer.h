@@ -66,6 +66,9 @@ private:
     // Serialize cell styles
     void serializeStyles(const Workbook& workbook, std::ostream& out) const;
 
+    // Serialize named ranges
+    void serializeNamedRanges(const Workbook& workbook, std::ostream& out) const;
+
     // Serialize a single sheet
     void serializeSheet(const Sheet& sheet, std::ostream& out) const;
 

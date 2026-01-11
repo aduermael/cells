@@ -215,7 +215,29 @@ cells/
 
 **Bazel** - Fast incremental builds, hermetic, scales well.
 
-All build commands use `bazel run :target` format:
+### ⚠️ IMPORTANT: Always Use Wrapper Targets
+
+**DO NOT** run `bazel build //apps/wasm:cells_wasm` or similar directly!
+
+Always use the wrapper targets via `bazel run :target` format. The wrapper scripts handle:
+- Special build flags (e.g., `--config=wasm` for WASM builds)
+- Output copying to `dist/` directory
+- TypeScript bundling and other post-build steps
+
+```bash
+# ✅ CORRECT - use wrapper targets
+bazel run :wasm           # Build WASM
+bazel run :test           # Run tests
+bazel run :lint           # Run linter
+
+# ❌ WRONG - don't use bazel build directly for WASM
+bazel build //apps/wasm:cells_wasm    # Missing --config=wasm, will FAIL!
+
+# ℹ️ Native builds work directly but prefer wrappers for consistency
+bazel build //core/cells:parser       # OK for native, but prefer bazel run :test
+```
+
+### Available Commands
 
 ```bash
 # Build CLI
@@ -224,6 +246,11 @@ bazel run :cli-release    # Optimized build → dist/cli/cells
 
 # Run unit tests
 bazel run :test
+
+# Code quality
+bazel run :lint           # Run clang-tidy linter
+bazel run :format         # Run clang-format
+bazel run :check-types    # TypeScript type checking
 
 # Run E2E tests
 bazel run :e2e            # All tests, headless

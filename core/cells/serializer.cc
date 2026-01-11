@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "core/cells/formula_serializer.h"
+#include "core/cells/named_ranges.h"
 
 namespace cells {
 
@@ -59,6 +60,9 @@ void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
 
     // Serialize styles (before sheets, as cells may reference them)
     serializeStyles(workbook, out);
+
+    // Serialize named ranges (before sheets, as formulas may reference them)
+    serializeNamedRanges(workbook, out);
 
     // Serialize each sheet
     for (const auto& sheet : workbook.sheets) {
@@ -163,6 +167,78 @@ void Serializer::serializeStyles(const Workbook& workbook, std::ostream& out) co
                 break;  // BOTTOM is default, omit
         }
         out << "}\n";
+    }
+}
+
+void Serializer::serializeNamedRanges(const Workbook& workbook, std::ostream& out) const {
+    const NamedRangeRegistry* registry = workbook.getNamedRanges();
+    if (registry == nullptr) {
+        return;
+    }
+
+    const std::vector<const NamedRange*> allRanges = registry->getAll();
+    if (allRanges.empty()) {
+        return;
+    }
+
+    // Copy to vector of values for deterministic sorting (avoids pointer comparison)
+    std::vector<NamedRange> rangesCopy;
+    rangesCopy.reserve(allRanges.size());
+    for (const NamedRange* nr : allRanges) {
+        rangesCopy.push_back(*nr);
+    }
+
+    // Sort named ranges by name for deterministic output
+    std::sort(rangesCopy.begin(), rangesCopy.end(),
+              [](const NamedRange& a, const NamedRange& b) { return a.name < b.name; });
+
+    // Output named range definitions
+    // Format: N "<name>" <scope:W|S> <scope-sheet-id|-> <target-type> <target-data>
+    // Target types: CELL, RANGE, COLUMN, ROW, COLUMN_RANGE, ROW_RANGE
+    // Target data format depends on type:
+    //   CELL: <cell-id> <sheet-id>
+    //   RANGE: <id1> <id2> <sheet-id>
+    //   COLUMN/ROW: <axis-id> <sheet-id>
+    //   COLUMN_RANGE/ROW_RANGE: <id1> <id2> <sheet-id>
+    for (const NamedRange& nr : rangesCopy) {
+        out << "N \"" << escapeString(nr.name) << "\" ";
+
+        // Scope
+        if (nr.scope == NamedRangeScope::WORKBOOK) {
+            out << "W -";
+        } else {
+            out << "S " << nr.scopeSheetId.toString();
+        }
+
+        // Target type and data
+        const NamedRangeTarget& target = nr.target;
+        switch (target.type) {
+            case NamedRangeTarget::Type::CELL:
+                out << " CELL " << target.id1.toString();
+                out << " " << (target.sheetId.isNull() ? "-" : target.sheetId.toString());
+                break;
+            case NamedRangeTarget::Type::RANGE:
+                out << " RANGE " << target.id1.toString() << " " << target.id2.toString();
+                out << " " << (target.sheetId.isNull() ? "-" : target.sheetId.toString());
+                break;
+            case NamedRangeTarget::Type::COLUMN:
+                out << " COLUMN " << target.id1.toString();
+                out << " " << (target.sheetId.isNull() ? "-" : target.sheetId.toString());
+                break;
+            case NamedRangeTarget::Type::ROW:
+                out << " ROW " << target.id1.toString();
+                out << " " << (target.sheetId.isNull() ? "-" : target.sheetId.toString());
+                break;
+            case NamedRangeTarget::Type::COLUMN_RANGE:
+                out << " COLUMN_RANGE " << target.id1.toString() << " " << target.id2.toString();
+                out << " " << (target.sheetId.isNull() ? "-" : target.sheetId.toString());
+                break;
+            case NamedRangeTarget::Type::ROW_RANGE:
+                out << " ROW_RANGE " << target.id1.toString() << " " << target.id2.toString();
+                out << " " << (target.sheetId.isNull() ? "-" : target.sheetId.toString());
+                break;
+        }
+        out << "\n";
     }
 }
 

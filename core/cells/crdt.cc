@@ -27,6 +27,7 @@
 
 #include "core/cells/crdt_internal.h"
 #include "core/cells/formula_serializer.h"
+#include "core/cells/named_ranges.h"
 
 namespace cells {
 
@@ -334,6 +335,14 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
         case OpType::STYLE_DEFINE:
             result = internal::applyStyleDefine(workbook, op);
             break;
+
+        case OpType::NAMED_RANGE_DEFINE:
+            result = internal::applyNamedRangeDefine(workbook, op);
+            break;
+
+        case OpType::NAMED_RANGE_DELETE:
+            result = internal::applyNamedRangeDelete(workbook, op);
+            break;
     }
 
     // Add to OpLog regardless of result (for history/sync)
@@ -491,6 +500,18 @@ Operation makeStyleDefineOp(Workbook& workbook, const ID& styleId, const std::st
     return {hlc, OpType::STYLE_DEFINE, styleId, payload};
 }
 
+Operation makeNamedRangeDefineOp(Workbook& workbook, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    // Use workbook ID as target since named ranges are workbook-level entities
+    return {hlc, OpType::NAMED_RANGE_DEFINE, workbook.id, payload};
+}
+
+Operation makeNamedRangeDeleteOp(Workbook& workbook, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    // Use workbook ID as target since named ranges are workbook-level entities
+    return {hlc, OpType::NAMED_RANGE_DELETE, workbook.id, payload};
+}
+
 // =============================================================================
 // Bootstrap OpLog
 // =============================================================================
@@ -637,6 +658,57 @@ size_t bootstrapOpLog(Workbook& workbook) {
         const Operation op = makeStyleDefineOp(workbook, styleId, payload);
         oplog->addOperation(op);
         count++;
+    }
+
+    // Generate NAMED_RANGE_DEFINE operations for all named ranges
+    const NamedRangeRegistry* registry = workbook.getNamedRanges();
+    if (registry != nullptr) {
+        for (const NamedRange* nr : registry->getAll()) {
+            std::string payload = "{";
+            payload += "\"name\":\"" + internal::jsonEscape(nr->name) + "\"";
+
+            // Scope
+            if (nr->scope == NamedRangeScope::WORKBOOK) {
+                payload += ",\"scope\":\"W\",\"scopeSheetId\":\"-\"";
+            } else {
+                payload +=
+                    ",\"scope\":\"S\",\"scopeSheetId\":\"" + nr->scopeSheetId.toString() + "\"";
+            }
+
+            // Target type
+            const NamedRangeTarget& target = nr->target;
+            switch (target.type) {
+                case NamedRangeTarget::Type::CELL:
+                    payload += ",\"targetType\":\"CELL\"";
+                    break;
+                case NamedRangeTarget::Type::RANGE:
+                    payload += ",\"targetType\":\"RANGE\"";
+                    break;
+                case NamedRangeTarget::Type::COLUMN:
+                    payload += ",\"targetType\":\"COLUMN\"";
+                    break;
+                case NamedRangeTarget::Type::ROW:
+                    payload += ",\"targetType\":\"ROW\"";
+                    break;
+                case NamedRangeTarget::Type::COLUMN_RANGE:
+                    payload += ",\"targetType\":\"COLUMN_RANGE\"";
+                    break;
+                case NamedRangeTarget::Type::ROW_RANGE:
+                    payload += ",\"targetType\":\"ROW_RANGE\"";
+                    break;
+            }
+
+            // Target IDs
+            payload += ",\"id1\":\"" + target.id1.toString() + "\"";
+            payload += ",\"id2\":\"" + (target.id2.isNull() ? "-" : target.id2.toString()) + "\"";
+            payload += ",\"targetSheetId\":\"" +
+                       (target.sheetId.isNull() ? "-" : target.sheetId.toString()) + "\"";
+            payload += "}";
+
+            const Operation op = makeNamedRangeDefineOp(workbook, payload);
+            oplog->addOperation(op);
+            count++;
+        }
     }
 
     return count;

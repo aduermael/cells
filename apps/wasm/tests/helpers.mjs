@@ -660,3 +660,36 @@ export async function loadTestFile(page, filename) {
   // Wait for file to load
   await waitForAppReady(page);
 }
+
+/**
+ * Get all named ranges from the workbook
+ * @param {import('puppeteer').Page} page
+ * @returns {Promise<Array<{name: string, scope: string, targetType: string, id1: string, id2?: string, sheetId?: string}>>}
+ */
+export async function getNamedRanges(page) {
+  const result = await page.evaluate(() => {
+    const ctx = window._appContext;
+    if (!ctx || !ctx.app || !ctx.app.dataSource) {
+      return [];
+    }
+    const jsonStr = ctx.app.dataSource.client.getNamedRanges();
+    return JSON.parse(jsonStr);
+  });
+  return result;
+}
+
+/**
+ * Export workbook to ZCD format
+ * @param {import('puppeteer').Page} page
+ * @returns {Promise<string>} ZCD content
+ */
+export async function exportToZCD(page) {
+  const result = await page.evaluate(() => {
+    const ctx = window._appContext;
+    if (!ctx || !ctx.app || !ctx.app.dataSource) {
+      return '';
+    }
+    return ctx.app.dataSource.client.exportToCells();
+  });
+  return result;
+}

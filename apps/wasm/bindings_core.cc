@@ -27,6 +27,7 @@
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/input_parser.h"
+#include "core/cells/named_ranges.h"
 #include "core/cells/number_formatter.h"
 #include "core/cells/operation.h"
 #include "core/log/include/Logger.h"
@@ -1482,6 +1483,83 @@ void CellsEngine::setWorkbookName(const std::string& name) {
     applyOperation(*_workbook, op);
 
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
+}
+
+// ============================================================================
+// Named ranges
+// ============================================================================
+
+std::string CellsEngine::getNamedRanges() {
+    if (!_workbook) {
+        return "[]";
+    }
+
+    const NamedRangeRegistry* registry = _workbook->getNamedRanges();
+    if (registry == nullptr) {
+        return "[]";
+    }
+
+    std::vector<const NamedRange*> allRanges = registry->getAll();
+    if (allRanges.empty()) {
+        return "[]";
+    }
+
+    std::ostringstream json;
+    json << "[";
+    bool first = true;
+    for (const NamedRange* nr : allRanges) {
+        if (!first) {
+            json << ",";
+        }
+        first = false;
+
+        json << "{";
+        json << "\"name\":\"" << jsonEscape(nr->name) << "\"";
+
+        // Scope
+        json << ",\"scope\":\"" << (nr->scope == NamedRangeScope::WORKBOOK ? "workbook" : "sheet") << "\"";
+        if (nr->scope == NamedRangeScope::SHEET) {
+            json << ",\"scopeSheetId\":\"" << nr->scopeSheetId.toString() << "\"";
+        }
+
+        // Target type
+        const char* typeStr = "";
+        switch (nr->target.type) {
+            case NamedRangeTarget::Type::CELL:
+                typeStr = "cell";
+                break;
+            case NamedRangeTarget::Type::RANGE:
+                typeStr = "range";
+                break;
+            case NamedRangeTarget::Type::COLUMN:
+                typeStr = "column";
+                break;
+            case NamedRangeTarget::Type::ROW:
+                typeStr = "row";
+                break;
+            case NamedRangeTarget::Type::COLUMN_RANGE:
+                typeStr = "column_range";
+                break;
+            case NamedRangeTarget::Type::ROW_RANGE:
+                typeStr = "row_range";
+                break;
+        }
+        json << ",\"targetType\":\"" << typeStr << "\"";
+
+        // Target IDs
+        json << ",\"id1\":\"" << nr->target.id1.toString() << "\"";
+        if (!nr->target.id2.isNull()) {
+            json << ",\"id2\":\"" << nr->target.id2.toString() << "\"";
+        }
+        if (!nr->target.sheetId.isNull()) {
+            json << ",\"sheetId\":\"" << nr->target.sheetId.toString() << "\"";
+        }
+
+        json << "}";
+    }
+    json << "]";
+
+    return json.str();
 }
 
 // ============================================================================
