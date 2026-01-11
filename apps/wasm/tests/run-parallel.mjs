@@ -19,6 +19,7 @@ const COLLECTIONS = {
     'column-move.test.mjs',
     'clipboard.test.mjs',
     'selection.test.mjs',
+    'named-ranges.test.mjs',
     'collab.test.mjs',
     'initial-sync.test.mjs',
     'collab-demo.test.mjs',

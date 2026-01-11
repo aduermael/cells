@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2026-01-11 17:39 UTC
-Updated At: 2026-01-11 (Phase 4 complete)
+Updated At: 2026-01-11 (Phase 5 complete)
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -106,14 +106,19 @@ Store named ranges in ZCD file format.
 Show named ranges in formula bar dropdown.
 
 - [x] 5a: Add WASM binding to get all named ranges for current workbook (done in Phase 4)
-- [ ] 5b: Add named ranges dropdown to ref button in formula bar
-- [ ] 5c: Clicking named range inserts it into formula
+- [x] 5b: Add named ranges dropdown to ref button in formula bar
+- [x] 5c: Clicking named range inserts it into formula
 - [x] 5d: Add unit test for WASM binding returning named ranges (done in Phase 4)
-- [ ] 5e: Add e2e test for named range dropdown interaction (open, click, verify formula input)
+- [x] 5e: Add e2e test for named range dropdown interaction (open, click, verify formula input)
 
-**Files:** `apps/wasm/bindings_*.cc`, `apps/wasm/src/formula-bar.ts`, `apps/wasm/tests/*.spec.ts`
+**Files:** `apps/wasm/bindings_*.cc`, `apps/wasm/src/formula-bar.ts`, `apps/wasm/src/named-ranges-dropdown.ts`, `apps/wasm/tests/named-ranges.test.mjs`
 
-**Note:** Items 5a and 5d were completed as part of Phase 4 (getNamedRanges() binding added)
+**Implementation notes:**
+- Created new `NamedRangesDropdown` component for displaying named ranges
+- Added dropdown arrow to cell reference wrapper in formula bar
+- Clicking a named range inserts `=<name>` into formula bar and starts editing
+- When already editing, inserts the named range name at cursor position
+- 4 new e2e tests for dropdown UI interaction (open, click to insert, empty state)
 
 ---
 

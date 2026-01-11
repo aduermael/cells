@@ -59,6 +59,7 @@ export interface CellsEngine {
     getAvailableFormats(): string;
     createCustomFormat(formatCode: string): string;
     getFormulaFunctions(): string;
+    getNamedRanges(): string;
     getCellFormatId(cellId: string): string;
     parseUserInputValue(input: string): string;
     formatCellValue(value: number, formatId: string): string;

@@ -89,6 +89,7 @@ export interface DOMElements {
   cellDisplay: HTMLElement;
   columnHeaderEditor: HTMLInputElement;
   formulaBar: HTMLElement;
+  cellRefWrapper: HTMLElement;
   cellReference: HTMLElement;
   formulaInput: HTMLInputElement;
   formulaDisplay: HTMLElement;
@@ -545,6 +546,7 @@ export function createApp(): App {
     cellDisplay: getElement("cell-display"),
     columnHeaderEditor: getElement<HTMLInputElement>("column-header-editor"),
     formulaBar: getElement("formula-bar"),
+    cellRefWrapper: getElement("cell-ref-wrapper"),
     cellReference: getElement("cell-reference"),
     formulaInput: getElement<HTMLInputElement>("formula-input"),
     formulaDisplay: getElement("formula-display"),

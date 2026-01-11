@@ -57,6 +57,7 @@ import {
     handleGetAvailableFormats,
     handleCreateCustomFormat,
     handleGetFormulaFunctions,
+    handleGetNamedRanges,
     handleGetCellFormatId,
     handleParseUserInputValue,
     handleFormatCellValue,
@@ -434,6 +435,9 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "getFormulaFunctions":
                 handleGetFormulaFunctions(engine, params, respond);
+                break;
+            case "getNamedRanges":
+                handleGetNamedRanges(engine, params, respond);
                 break;
             case "getCellFormatId":
                 handleGetCellFormatId(engine, params, respond);

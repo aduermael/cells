@@ -32,6 +32,7 @@ import type {
   FormattedValueResult,
   CellFormatIdResult,
   FunctionInfo,
+  NamedRangeInfo,
   FormatDetails,
   CellStyle,
   RegisteredStyle,
@@ -441,6 +442,15 @@ export class CellsClient {
   async getFormulaFunctions(): Promise<FunctionInfo[]> {
     const response = await this._send("getFormulaFunctions", {});
     return (response as unknown as { functions: FunctionInfo[] }).functions;
+  }
+
+  /**
+   * Get all named ranges in the workbook.
+   * Returns an array of NamedRangeInfo objects for the dropdown.
+   */
+  async getNamedRanges(): Promise<NamedRangeInfo[]> {
+    const response = await this._send("getNamedRanges", {});
+    return (response as unknown as { namedRanges: NamedRangeInfo[] }).namedRanges;
   }
 
   /**

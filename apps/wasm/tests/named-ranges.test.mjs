@@ -1,6 +1,6 @@
-// Named Range Persistence E2E Tests
-// Tests that named ranges are correctly loaded from ZCD files and preserved
-// through export/reimport cycles.
+// Named Range Persistence and UI E2E Tests
+// Tests that named ranges are correctly loaded from ZCD files, preserved
+// through export/reimport cycles, and accessible via the dropdown UI.
 
 import { runTests } from './harness.mjs';
 import {
@@ -132,6 +132,114 @@ const tests = {
       JSON.stringify(sortedNames),
       'Named ranges should be sorted alphabetically'
     );
+  },
+
+  'Named ranges dropdown opens and shows ranges': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Load the named ranges test file
+    await loadTestFile(ctx.page, 'named_ranges.zcd');
+    await sleep(500);
+
+    // Click on the cell reference wrapper to open dropdown
+    const cellRefWrapper = await ctx.page.$('#cell-ref-wrapper');
+    assertTrue(cellRefWrapper, 'Cell reference wrapper should exist');
+    await cellRefWrapper.click();
+    await sleep(200);
+
+    // Check that dropdown is visible
+    const dropdown = await ctx.page.$('.named-ranges-dropdown');
+    assertTrue(dropdown, 'Named ranges dropdown should exist');
+
+    const isVisible = await ctx.page.evaluate(() => {
+      const dd = document.querySelector('.named-ranges-dropdown');
+      return dd && dd.style.display !== 'none';
+    });
+    assertTrue(isVisible, 'Named ranges dropdown should be visible');
+
+    // Check that it shows the named ranges
+    const items = await ctx.page.$$('.named-range-item');
+    assertEqual(items.length, 3, 'Dropdown should show 3 named range items');
+
+    // Verify the names are present
+    const names = await ctx.page.evaluate(() => {
+      const nameElements = document.querySelectorAll('.named-range-name');
+      return Array.from(nameElements).map(el => el.textContent);
+    });
+    assertTrue(names.includes('ColA'), 'Dropdown should show ColA');
+    assertTrue(names.includes('DataRange'), 'Dropdown should show DataRange');
+    assertTrue(names.includes('MyTotal'), 'Dropdown should show MyTotal');
+
+    // Close the dropdown by clicking outside
+    await ctx.page.click('#grid');
+    await sleep(100);
+
+    const isHidden = await ctx.page.evaluate(() => {
+      const dd = document.querySelector('.named-ranges-dropdown');
+      return dd && dd.style.display === 'none';
+    });
+    assertTrue(isHidden, 'Named ranges dropdown should be hidden after clicking outside');
+  },
+
+  'Click named range inserts into formula': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Load the named ranges test file
+    await loadTestFile(ctx.page, 'named_ranges.zcd');
+    await sleep(500);
+
+    // Open dropdown and click on MyTotal
+    const cellRefWrapper = await ctx.page.$('#cell-ref-wrapper');
+    await cellRefWrapper.click();
+    await sleep(200);
+
+    // Find and click MyTotal item
+    await ctx.page.evaluate(() => {
+      const items = document.querySelectorAll('.named-range-item');
+      for (const item of items) {
+        if (item.querySelector('.named-range-name').textContent === 'MyTotal') {
+          item.click();
+          break;
+        }
+      }
+    });
+    await sleep(200);
+
+    // Check that formula bar shows =MyTotal
+    const formulaValue = await ctx.page.evaluate(() => {
+      return document.querySelector('#formula-display').textContent;
+    });
+    assertEqual(formulaValue, '=MyTotal', 'Formula bar should show =MyTotal');
+
+    // Check that dropdown is closed
+    const isHidden = await ctx.page.evaluate(() => {
+      const dd = document.querySelector('.named-ranges-dropdown');
+      return dd && dd.style.display === 'none';
+    });
+    assertTrue(isHidden, 'Dropdown should close after selection');
+  },
+
+  'Empty state shown when no named ranges': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Load a simple ZCD file without named ranges
+    await loadTestFile(ctx.page, 'simple.zcd');
+    await sleep(500);
+
+    // Open dropdown
+    const cellRefWrapper = await ctx.page.$('#cell-ref-wrapper');
+    await cellRefWrapper.click();
+    await sleep(200);
+
+    // Check for empty state message
+    const emptyMessage = await ctx.page.evaluate(() => {
+      const empty = document.querySelector('.named-ranges-empty');
+      return empty ? empty.textContent : null;
+    });
+    assertEqual(emptyMessage, 'No named ranges defined', 'Should show empty state message');
   },
 };
 

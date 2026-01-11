@@ -455,6 +455,15 @@ export function handleGetFormulaFunctions(
     respond({ type: "functions", functions });
 }
 
+export function handleGetNamedRanges(
+    engine: CellsEngine,
+    _params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const namedRanges = JSON.parse(engine.getNamedRanges());
+    respond({ type: "namedRanges", namedRanges });
+}
+
 export function handleGetCellFormatId(
     engine: CellsEngine,
     params: Record<string, unknown>,

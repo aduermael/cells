@@ -667,13 +667,12 @@ export async function loadTestFile(page, filename) {
  * @returns {Promise<Array<{name: string, scope: string, targetType: string, id1: string, id2?: string, sheetId?: string}>>}
  */
 export async function getNamedRanges(page) {
-  const result = await page.evaluate(() => {
+  const result = await page.evaluate(async () => {
     const ctx = window._appContext;
     if (!ctx || !ctx.app || !ctx.app.dataSource) {
       return [];
     }
-    const jsonStr = ctx.app.dataSource.client.getNamedRanges();
-    return JSON.parse(jsonStr);
+    return await ctx.app.dataSource.getNamedRanges();
   });
   return result;
 }
@@ -684,12 +683,15 @@ export async function getNamedRanges(page) {
  * @returns {Promise<string>} ZCD content
  */
 export async function exportToZCD(page) {
-  const result = await page.evaluate(() => {
+  const result = await page.evaluate(async () => {
     const ctx = window._appContext;
     if (!ctx || !ctx.app || !ctx.app.dataSource) {
       return '';
     }
-    return ctx.app.dataSource.client.exportToCells();
+    const exportResult = await ctx.app.dataSource.client.exportCells();
+    // Convert ArrayBuffer to string
+    const decoder = new TextDecoder('utf-8');
+    return decoder.decode(exportResult.data);
   });
   return result;
 }

@@ -30,6 +30,7 @@ import { ColumnHeaderEditor, FormulaBarEditor } from "./header-editor";
 import { ClipboardManager } from "./clipboard";
 import { FormatControls } from "./format-controls";
 import { StyleControls } from "./style-controls";
+import { NamedRangesDropdown } from "./named-ranges-dropdown";
 import { SheetTabsManager } from "./sheet-tabs";
 import { FileLoader } from "./file-loader";
 import { AppEventManager } from "./app-events";
@@ -751,6 +752,36 @@ export function createComponents(config: ComponentsConfig): Components {
     alert("Settings - Coming Soon!");
   });
 
+  // Named ranges dropdown for quick insertion
+  const namedRangesDropdown = new NamedRangesDropdown(
+    elements.formulaBar,
+    elements.cellRefWrapper,
+    (name: string) => {
+      // Insert named range into formula when selected
+      if (cellEditor.isEditing()) {
+        cellEditor.insertReferenceAtCursor(name);
+      } else if (formulaBarEditor.isEditingFormulaBar()) {
+        formulaBarEditor.insertReferenceAtCursor(name);
+      } else {
+        // Start editing with the named range as a formula
+        const formulaValue = "=" + name;
+        elements.formulaInput.value = formulaValue;
+        elements.formulaDisplay.textContent = formulaValue;
+        // Focus the formula display to start editing
+        elements.formulaDisplay.focus();
+        // Set cursor at end
+        const selection = window.getSelection();
+        if (selection) {
+          const range = document.createRange();
+          range.selectNodeContents(elements.formulaDisplay);
+          range.collapse(false); // Collapse to end
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+    }
+  );
+
   const sheetTabsManager = new SheetTabsManager({
     uiStateMachine: app.uiStateMachine,
     sheetTabsContainer: elements.sheetTabsContainer,
@@ -790,6 +821,7 @@ export function createComponents(config: ComponentsConfig): Components {
       clipboardManager.setDataSource(dataSource);
       formatControls.setDataSource(dataSource);
       styleControls.setDataSource(dataSource);
+      namedRangesDropdown.setDataSource(dataSource);
       workbookTitleEditor.setTitle(dataSource.workbookName);
     },
     onDataChanged: handleDataChanged,

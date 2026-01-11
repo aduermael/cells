@@ -33,6 +33,7 @@ import type {
   FormattedValueResult,
   CellFormatIdResult,
   FunctionInfo,
+  NamedRangeInfo,
   CellStyle,
   RegisteredStyle,
   CreateStyleResult,
@@ -197,6 +198,11 @@ export class WasmDataSource {
   /** Get all registered formula functions with metadata for autocomplete */
   async getFormulaFunctions(): Promise<FunctionInfo[]> {
     return this._client.getFormulaFunctions();
+  }
+
+  /** Get all named ranges in the workbook for dropdown */
+  async getNamedRanges(): Promise<NamedRangeInfo[]> {
+    return this._client.getNamedRanges();
   }
 
   /** Get cell format ID */

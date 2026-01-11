@@ -74,8 +74,13 @@
             </div>
         </div>
         <div id="formula-bar" class="hidden">
-            <!-- Left: Cell reference + Formula input -->
-            <span id="cell-reference">A1</span>
+            <!-- Left: Cell reference with named ranges dropdown + Formula input -->
+            <div id="cell-ref-wrapper">
+                <span id="cell-reference" title="Click for named ranges">A1</span>
+                <svg class="cell-ref-dropdown-arrow" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
+            </div>
             <div id="formula-input-container">
                 <input type="text" id="formula-input" />
                 <div id="formula-display" contenteditable="true" data-placeholder="Select a cell to view or edit its value"></div>

@@ -194,6 +194,23 @@ export interface FunctionInfo {
   category: string; // Category, e.g., "Math", "Logic", "Text"
 }
 
+/** Named range scope */
+export type NamedRangeScope = "workbook" | "sheet";
+
+/** Named range target type */
+export type NamedRangeTargetType = "cell" | "range" | "column" | "row" | "column_range" | "row_range";
+
+/** Named range information for dropdown/autocomplete */
+export interface NamedRangeInfo {
+  name: string; // Named range name, e.g., "Revenue"
+  scope: NamedRangeScope; // "workbook" or "sheet"
+  scopeSheetId?: string; // Sheet ID if scope is "sheet"
+  targetType: NamedRangeTargetType; // Target type
+  id1: string; // First target ID (cell, column, or row)
+  id2?: string; // Second target ID (for ranges)
+  sheetId?: string; // Target sheet ID
+}
+
 /** Column information */
 export interface ColumnInfo {
   id: string;
