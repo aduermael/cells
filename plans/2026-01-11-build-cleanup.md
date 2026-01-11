@@ -164,7 +164,7 @@ Add `sh_binary` targets that wrap the shell scripts:
 
 ## Phase 7: Cleanup and Validation
 
-- [ ] 7a: Delete `apps/wasm/dist/` directory if it exists
+- [x] 7a: Delete `apps/wasm/dist/` directory if it exists
 - [ ] 7b: Test all `bazel run :` commands work correctly
 - [ ] 7c: Fix any failing E2E tests (including pre-existing failures)
 - [ ] 7d: Run `bazel run :check` - ALL checks must pass (unit tests, lint, E2E, format)
