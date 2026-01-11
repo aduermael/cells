@@ -153,7 +153,7 @@ Add `sh_binary` targets that wrap the shell scripts:
 
 ## Phase 5: Delete Makefile
 
-- [ ] 5a: Delete `Makefile` from repo root
+- [x] 5a: Delete `Makefile` from repo root
 
 ## Phase 6: Update Documentation
 
