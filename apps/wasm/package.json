@@ -6,7 +6,6 @@
   "scripts": {
     "build": "node build.mjs",
     "check-types": "tsc --noEmit",
-    "watch": "node build.mjs --watch",
     "test": "node tests/smoke.test.mjs",
     "test:smoke": "node tests/smoke.test.mjs",
     "test:formula": "node tests/formula.test.mjs",

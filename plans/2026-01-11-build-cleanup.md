@@ -138,9 +138,9 @@ Add `sh_binary` targets that wrap the shell scripts:
 
 ## Phase 3: Update TypeScript Build
 
-- [ ] 3a: Update `apps/wasm/build.mjs` to output to `../../dist/wasm/` instead of `dist/`
-- [ ] 3b: Remove watch mode from build.mjs (not needed)
-- [ ] 3c: Update `apps/wasm/package.json` to remove watch script
+- [x] 3a: Update `apps/wasm/build.mjs` to output to `../../dist/wasm/` instead of `dist/`
+- [x] 3b: Remove watch mode from build.mjs (not needed)
+- [x] 3c: Update `apps/wasm/package.json` to remove watch script
 
 ## Phase 4: Update Supporting Files
 
