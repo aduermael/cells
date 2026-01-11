@@ -1371,8 +1371,7 @@ TEST_F(FormulaEvalTest, NamedRange_Arithmetic) {
     Cell* a1 = sheet->getCellAt(colIds[0], rowIds[0]);
     Cell* b1 = sheet->getCellAt(colIds[1], rowIds[0]);
 
-    workbook->getNamedRanges()->defineWorkbook("Price",
-                                               NamedRangeTarget::cell(a1->id, sheet->id));
+    workbook->getNamedRanges()->defineWorkbook("Price", NamedRangeTarget::cell(a1->id, sheet->id));
     workbook->getNamedRanges()->defineWorkbook("Quantity",
                                                NamedRangeTarget::cell(b1->id, sheet->id));
 
@@ -1517,7 +1516,7 @@ TEST_F(FormulaEvalTest, NamedRange_EmptyCell) {
 
 TEST_F(FormulaEvalTest, NamedRange_WithFormula) {
     // Named range pointing to a cell with a formula
-    setCellValue(0, 0, 10.0);  // A1 = 10
+    setCellValue(0, 0, 10.0);       // A1 = 10
     setCellFormula(1, 0, "=A1*2");  // B1 = =A1*2
 
     Cell* b1 = sheet->getCellAt(colIds[1], rowIds[0]);
@@ -1535,8 +1534,7 @@ TEST_F(FormulaEvalTest, NamedRange_InConditional) {
     setCellValue(0, 0, 75.0);  // A1 = 75
 
     Cell* a1 = sheet->getCellAt(colIds[0], rowIds[0]);
-    workbook->getNamedRanges()->defineWorkbook("Score",
-                                               NamedRangeTarget::cell(a1->id, sheet->id));
+    workbook->getNamedRanges()->defineWorkbook("Score", NamedRangeTarget::cell(a1->id, sheet->id));
 
     EvalResult r = eval("=IF(Score>=70,\"Pass\",\"Fail\")");
     ASSERT_TRUE(r.isString());
@@ -1548,8 +1546,7 @@ TEST_F(FormulaEvalTest, NamedRange_CaseInsensitive) {
     setCellValue(0, 0, 123.0);
 
     Cell* a1 = sheet->getCellAt(colIds[0], rowIds[0]);
-    workbook->getNamedRanges()->defineWorkbook("MyName",
-                                               NamedRangeTarget::cell(a1->id, sheet->id));
+    workbook->getNamedRanges()->defineWorkbook("MyName", NamedRangeTarget::cell(a1->id, sheet->id));
 
     // Note: The parser/resolver should handle case-insensitivity
     // This test verifies the name is found regardless of case

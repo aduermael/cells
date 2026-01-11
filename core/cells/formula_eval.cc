@@ -1174,8 +1174,8 @@ static EvalResult evaluateNamedRef(const NamedRefNode* node, EvalContext& ctx) {
         case NamedRangeTarget::Type::RANGE: {
             // Range reference - return range bounds for iteration by functions
             // Need to look up the cells to get their column/row information
-            Cell* topLeftCell = targetSheet->getCell(namedRange->target.id1);
-            Cell* bottomRightCell = targetSheet->getCell(namedRange->target.id2);
+            const Cell* topLeftCell = targetSheet->getCell(namedRange->target.id1);
+            const Cell* bottomRightCell = targetSheet->getCell(namedRange->target.id2);
 
             if (!topLeftCell || !bottomRightCell) {
                 return EvalResult::Error(CellError::REF);

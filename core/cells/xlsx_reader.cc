@@ -329,14 +329,14 @@ ParsedDefinedNameRef parseDefinedNameRef(const std::string& refStr) {
     }
 
     // Find the sheet reference separator '!'
-    size_t exclamPos = refStr.find('!');
+    const size_t exclamPos = refStr.find('!');
     if (exclamPos == std::string::npos) {
         return result;  // No sheet reference
     }
 
     // Parse sheet name
     std::string sheetPart = refStr.substr(0, exclamPos);
-    std::string cellPart = refStr.substr(exclamPos + 1);
+    const std::string cellPart = refStr.substr(exclamPos + 1);
 
     // Sheet name may be quoted (e.g., "'Sheet 1'")
     if (!sheetPart.empty() && sheetPart[0] == '\'') {
@@ -357,12 +357,12 @@ ParsedDefinedNameRef parseDefinedNameRef(const std::string& refStr) {
     }
 
     // Check for range (contains ':')
-    size_t colonPos = cellPart.find(':');
+    const size_t colonPos = cellPart.find(':');
     if (colonPos != std::string::npos) {
         // It's a range like "$A$1:$N$249"
         result.isRange = true;
-        std::string startPart = cellPart.substr(0, colonPos);
-        std::string endPart = cellPart.substr(colonPos + 1);
+        const std::string startPart = cellPart.substr(0, colonPos);
+        const std::string endPart = cellPart.substr(colonPos + 1);
 
         if (!parseCellRefWithAbsolute(startPart.c_str(), result.startCol, result.startRow,
                                       result.startColAbsolute, result.startRowAbsolute)) {
@@ -703,7 +703,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             rawName.reference = refText;
             // localSheetId is 0-indexed sheet index for sheet-scoped names
             // If not present, it's workbook-scoped
-            if (defName.attribute("localSheetId")) {
+            if (static_cast<bool>(defName.attribute("localSheetId"))) {
                 rawName.localSheetId = defName.attribute("localSheetId").as_int(-1);
             }
             rawDefinedNames.push_back(rawName);
@@ -1078,7 +1078,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             continue;
         }
 
-        ParsedDefinedNameRef parsed = parseDefinedNameRef(rawName.reference);
+        const ParsedDefinedNameRef parsed = parseDefinedNameRef(rawName.reference);
         if (!parsed.valid) {
             addWarning("Failed to parse named range reference: " + rawName.name + " = " +
                        rawName.reference);
@@ -1094,22 +1094,25 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         }
 
         // Get the cell(s) by position
-        Axis* startCol = targetSheet->getColumnByPosition(static_cast<uint32_t>(parsed.startCol));
-        Axis* startRow = targetSheet->getRowByPosition(static_cast<uint32_t>(parsed.startRow));
+        const Axis* startCol =
+            targetSheet->getColumnByPosition(static_cast<uint32_t>(parsed.startCol));
+        const Axis* startRow =
+            targetSheet->getRowByPosition(static_cast<uint32_t>(parsed.startRow));
 
         if (startCol == nullptr || startRow == nullptr) {
             addWarning("Named range references out-of-bounds cell: " + rawName.name);
             continue;
         }
 
-        Cell* startCell = targetSheet->getCellAt(startCol->id, startRow->id);
+        const Cell* startCell = targetSheet->getCellAt(startCol->id, startRow->id);
 
         // Determine scope
         ID scopeSheetId;
         if (rawName.localSheetId >= 0 &&
             rawName.localSheetId < static_cast<int>(workbook->sheetCount())) {
             // Sheet-scoped: use the sheet at localSheetId index
-            Sheet* scopeSheet = workbook->getSheetByIndex(static_cast<size_t>(rawName.localSheetId));
+            const Sheet* scopeSheet =
+                workbook->getSheetByIndex(static_cast<size_t>(rawName.localSheetId));
             if (scopeSheet != nullptr) {
                 scopeSheetId = scopeSheet->id;
             }
@@ -1122,15 +1125,17 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
         if (parsed.isRange) {
             // Range reference
-            Axis* endCol = targetSheet->getColumnByPosition(static_cast<uint32_t>(parsed.endCol));
-            Axis* endRow = targetSheet->getRowByPosition(static_cast<uint32_t>(parsed.endRow));
+            const Axis* endCol =
+                targetSheet->getColumnByPosition(static_cast<uint32_t>(parsed.endCol));
+            const Axis* endRow =
+                targetSheet->getRowByPosition(static_cast<uint32_t>(parsed.endRow));
 
             if (endCol == nullptr || endRow == nullptr) {
                 addWarning("Named range references out-of-bounds end cell: " + rawName.name);
                 continue;
             }
 
-            Cell* endCell = targetSheet->getCellAt(endCol->id, endRow->id);
+            const Cell* endCell = targetSheet->getCellAt(endCol->id, endRow->id);
 
             // Create or get the corner cells
             // For ranges, we need both start and end cells to exist
@@ -1155,7 +1160,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 continue;
             }
 
-            NamedRangeTarget target =
+            const NamedRangeTarget target =
                 NamedRangeTarget::range(startCellId, endCellId, targetSheet->id);
 
             if (scopeSheetId.isNull()) {
@@ -1171,7 +1176,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 continue;
             }
 
-            NamedRangeTarget target = NamedRangeTarget::cell(startCell->id, targetSheet->id);
+            const NamedRangeTarget target = NamedRangeTarget::cell(startCell->id, targetSheet->id);
 
             if (scopeSheetId.isNull()) {
                 registry->defineWorkbook(rawName.name, target);
