@@ -83,7 +83,7 @@ bazel run :e2e-headed          # All tests, browser visible
 bazel run :e2e-headed -- smoke # Single test, browser visible
 ```
 
-**Available tests:** smoke, formula, editing, column-move, clipboard, selection, script, collab, initial-sync, collab-demo
+**Available tests:** smoke, formula, editing, column-move, clipboard, selection, collab, initial-sync, collab-demo
 
 **Note:** All tests must pass. There is no "stable" subset - if a test is flaky or broken, fix it or remove it.
 
@@ -165,8 +165,8 @@ Add `sh_binary` targets that wrap the shell scripts:
 ## Phase 7: Cleanup and Validation
 
 - [x] 7a: Delete `apps/wasm/dist/` directory if it exists
-- [ ] 7b: Test all `bazel run :` commands work correctly
-- [ ] 7c: Fix any failing E2E tests (including pre-existing failures)
+- [x] 7b: Test all `bazel run :` commands work correctly
+- [x] 7c: Fix any failing E2E tests (including pre-existing failures)
 - [ ] 7d: Run `bazel run :check` - ALL checks must pass (unit tests, lint, E2E, format)
 
 ---

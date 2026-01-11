@@ -19,7 +19,6 @@ const COLLECTIONS = {
     'column-move.test.mjs',
     'clipboard.test.mjs',
     'selection.test.mjs',
-    'script.test.mjs',
     'collab.test.mjs',
     'initial-sync.test.mjs',
     'collab-demo.test.mjs',
@@ -28,9 +27,6 @@ const COLLECTIONS = {
     'collab.test.mjs',
     'initial-sync.test.mjs',
     'collab-demo.test.mjs',
-  ],
-  script: [
-    'script.test.mjs',
   ],
 };
 
@@ -73,7 +69,6 @@ Usage: node run-parallel.mjs [options] [collection]
 Collections:
   all      All test files (default)
   collab   Collaboration tests: collab, initial-sync, collab-demo
-  script   Script tests: script
 
 Options:
   -c, --concurrency N   Maximum concurrent tests (default: ${DEFAULT_CONCURRENCY})
