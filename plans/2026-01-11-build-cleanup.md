@@ -13,6 +13,8 @@ Following plan management guidelines defined in AGENTS.md
 | Lint | `bazel run :lint` |
 | Format | `bazel run :format` |
 
+**Completion Criteria:** All tests must pass (unit tests, E2E tests, lint, format) before this plan is considered complete. This includes fixing any pre-existing failures - no broken windows.
+
 ---
 
 # Build System Cleanup
@@ -164,8 +166,8 @@ Add `sh_binary` targets that wrap the shell scripts:
 
 - [ ] 7a: Delete `apps/wasm/dist/` directory if it exists
 - [ ] 7b: Test all `bazel run :` commands work correctly
-- [ ] 7c: Run `bazel run :check` to verify nothing is broken
-- [ ] 7d: Verify E2E tests pass with `bazel run :e2e`
+- [ ] 7c: Fix any failing E2E tests (including pre-existing failures)
+- [ ] 7d: Run `bazel run :check` - ALL checks must pass (unit tests, lint, E2E, format)
 
 ---
 
