@@ -51,13 +51,13 @@ A high-performance, collaborative spreadsheet engine with:
 - **WASM Module**: 4.70 MB
 - **Total Web Bundle**: 6.39 MB
 
-<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./scripts/generate-stats.sh`</sub>
+<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./tools/generate-stats.sh`</sub>
 
 ### LOC Evolution
 
 <img src="stats/loc-evolution.svg" alt="Lines of Code Evolution" width="100%">
 
-<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with `./scripts/loc-tracker.sh && node scripts/generate-loc-svg.mjs`</sub>
+<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with `./tools/loc-tracker.sh && node tools/generate-loc-svg.mjs`</sub>
 ## Architecture Overview
 
 ```
@@ -153,7 +153,6 @@ A high-performance, collaborative spreadsheet engine with:
 cells/
 ├── WORKSPACE               # Bazel workspace root
 ├── MODULE.bazel            # Bzlmod module definition
-├── Makefile                # Development commands
 ├── core/                   # C++17 core engine
 │   ├── BUILD
 │   └── cells/              # Main library
@@ -174,8 +173,8 @@ cells/
 │       └── static/         # Web UI (index.html, CSS)
 ├── docs/                   # Architecture docs
 ├── plans/                  # Implementation plans
-├── scripts/                # Build and dev scripts
-└── dist/                   # Built WASM distribution (generated)
+├── tools/                  # Build and dev scripts
+└── dist/                   # Built artifacts (cli/, wasm/)
 ```
 
 ## Key Design Decisions
@@ -216,21 +215,20 @@ cells/
 
 **Bazel** - Fast incremental builds, hermetic, scales well.
 
+All build commands use `bazel run :target` format:
+
 ```bash
-# Build core library
-make build          # or: bazel build //core/...
+# Build CLI
+bazel run :cli            # Development build → dist/cli/cells
+bazel run :cli-release    # Optimized build → dist/cli/cells
 
-# Run tests
-make test           # or: bazel test //core/...
+# Run unit tests
+bazel run :test
 
-# Run e2e tests (requires dist/ from wasm-dist)
-cd apps/wasm && npm test
-
-# Build CLI (development)
-make cli            # Creates ./cells binary
-
-# Build CLI (optimized)
-make release        # Creates optimized ./cells binary
+# Run E2E tests
+bazel run :e2e            # All tests, headless
+bazel run :e2e -- smoke   # Specific test
+bazel run :e2e-headed     # With browser visible
 ```
 
 ### WebAssembly Build
@@ -238,22 +236,19 @@ make release        # Creates optimized ./cells binary
 The cells engine compiles to WebAssembly for a fully functional in-browser spreadsheet:
 
 ```bash
-# Build WASM module (development)
-make wasm
-
-# Build distribution package (optimized)
-make wasm-dist
-
-# Output: dist/ folder ready for deployment
+# Build WASM module
+bazel run :wasm           # Development build → dist/wasm/
+bazel run :wasm-debug     # Debug build (with DWARF)
+bazel run :wasm-dist      # Optimized build for deployment
 ```
 
-The distribution package includes:
+The distribution package (`dist/wasm/`) includes:
 - `cells_wasm_bin.wasm` - WASM binary (~1.04MB)
 - `cells_wasm_bin.js` - Emscripten JS glue
 - `cells.d.ts` - TypeScript definitions for WASM API
 - `index.html` - Full spreadsheet UI
 - `worker.js` - Web Worker for async WASM operations (bundled from TypeScript)
-- `client.js` - Main thread API with GridRenderer, CollabUI, etc. (bundled from TypeScript)
+- `main.js` - Main thread code (bundled from TypeScript)
 - `shared/` - CSS styles
 
 **Web UI Features:**
@@ -267,42 +262,30 @@ The distribution package includes:
 
 **Test locally:**
 ```bash
-make wasm-dist
-python3 -m http.server 8080 --directory dist
-# Open http://localhost:8080/
+bazel run :wasm-dist
+bazel run :serve          # Start server on port 8081
+# Open http://localhost:8081/
 ```
 
-**Run e2e tests:**
+**Run E2E tests:**
 
-The web app includes e2e tests using Chrome headless via Puppeteer:
+The web app includes E2E tests using Chrome headless via Puppeteer:
 
 ```bash
-# Build distribution first
-make wasm-dist
+# Run all tests (headless, auto-detects parallelism)
+bazel run :e2e
 
-# Run tests in parallel (recommended - much faster)
-cd apps/wasm && npm run test:parallel              # All tests
-npm run test:parallel -- stable                    # Stable tests only
-npm run test:parallel -- collab                    # Collaboration tests
-npm run test:parallel -- --concurrency 5 stable    # Limit concurrency
+# Run specific test
+bazel run :e2e -- smoke         # Just smoke tests
+bazel run :e2e -- formula       # Just formula tests
+bazel run :e2e -- editing       # Just editing tests
 
-# Run tests sequentially (legacy)
-npm run test:stable   # Stable tests
-npm run test:all      # All tests
-
-# Run specific test suites
-npm run test:smoke        # Basic UI functionality
-npm run test:formula      # Formula entry and computation
-npm run test:editing      # Cell editing operations
-npm run test:column-move  # Column/row operations
-npm run test:collab       # Two-peer collaboration sync (experimental, may fail)
-
-# Watch tests run in a visible browser window
-HEADED=1 npm run test:smoke
-
-# Slow down for debugging (100ms between actions)
-HEADED=1 SLOWMO=100 npm run test:smoke
+# Run with browser visible (for debugging)
+bazel run :e2e-headed           # All tests
+bazel run :e2e-headed -- smoke  # Single test
 ```
+
+**Available tests:** smoke, formula, editing, column-move, clipboard, selection, script, collab, initial-sync, collab-demo
 
 Test files are in `apps/wasm/tests/`:
 - `harness.mjs` - Test harness (starts server + Chrome)
@@ -311,10 +294,10 @@ Test files are in `apps/wasm/tests/`:
 - `formula.test.mjs` - Formula tests (entry, computation, dependencies)
 - `editing.test.mjs` - Cell editing (delete, overwrite, Tab/Enter navigation)
 - `column-move.test.mjs` - Column/row operations (sparse columns, drag to reorder)
-- `collab.test.mjs` - Collaboration tests (experimental, may fail)
+- `collab.test.mjs` - Collaboration tests
 
 **Deploy to static hosting:**
-- Upload contents of `dist/` to any static host (GitHub Pages, Netlify, Vercel, etc.)
+- Upload contents of `dist/wasm/` to any static host (GitHub Pages, Netlify, Vercel, etc.)
 - No server-side code required - runs entirely in browser
 
 ```
