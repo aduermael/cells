@@ -120,6 +120,9 @@ Show named ranges in formula bar dropdown.
 - When already editing, inserts the named range name at cursor position
 - 4 new e2e tests for dropdown UI interaction (open, click to insert, empty state)
 
+**Follow-up fix needed:**
+- [ ] 5f: Fix dropdown transparency - background is see-through, grid shows behind text
+
 ---
 
 ## Phase 6: Grid Lines Visibility
