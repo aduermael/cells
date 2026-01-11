@@ -159,7 +159,7 @@ Add `sh_binary` targets that wrap the shell scripts:
 
 - [x] 6a: Update AGENTS.md - replace all `make` commands with `bazel run :` equivalents
 - [x] 6b: Update AGENTS.md - update "Common Mistakes to Avoid" section
-- [ ] 6c: Update GETTING_STARTED.md with new build commands
+- [x] 6c: Update GETTING_STARTED.md with new build commands
 - [ ] 6d: Update README.md if it references make commands
 
 ## Phase 7: Cleanup and Validation

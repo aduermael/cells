@@ -28,44 +28,54 @@ sudo apt install clang clang-format clang-tidy
 
 ## Building
 
-Build all targets:
+Build the CLI:
 
 ```bash
-make build
-# or directly:
-bazel build //core/...
+bazel run :cli           # Development build
+bazel run :cli-release   # Optimized build
 ```
 
-Build a specific target:
+Output: `dist/cli/cells`
+
+Build the WASM web app:
 
 ```bash
-bazel build //core/cells:parser
-bazel build //core/cells:serializer
+bazel run :wasm          # Development build
+bazel run :wasm-debug    # Debug build (with DWARF)
+bazel run :wasm-dist     # Optimized build for deployment
 ```
+
+Output: `dist/wasm/`
 
 ## Running Tests
 
-Run all tests:
+### Unit Tests
 
 ```bash
-make test
-# or directly:
-bazel test //core/...
+bazel run :test
+```
+
+### E2E Tests
+
+Run all E2E tests (headless):
+```bash
+bazel run :e2e
 ```
 
 Run a specific test:
-
 ```bash
-bazel test //core/cells:parser_test
-bazel test //core/cells:serializer_test
-bazel test //core/cells:id_test
+bazel run :e2e -- smoke
+bazel run :e2e -- formula
+bazel run :e2e -- editing
 ```
 
-Run with verbose output:
-
+Run with browser visible (for debugging):
 ```bash
-bazel test //core/... --test_output=all
+bazel run :e2e-headed
+bazel run :e2e-headed -- smoke
 ```
+
+**Available tests:** smoke, formula, editing, column-move, clipboard, selection, script, collab, initial-sync, collab-demo
 
 ## CLI Tool
 
@@ -74,10 +84,11 @@ The `cells` CLI converts between spreadsheet formats.
 ### Building
 
 ```bash
-bazel build //apps/cli:cells
+bazel run :cli           # Development build
+bazel run :cli-release   # Optimized build
 ```
 
-The binary is at `bazel-bin/apps/cli/cells`.
+The binary is at `dist/cli/cells`.
 
 ### Basic Usage
 
@@ -125,9 +136,9 @@ The primary UI is a browser-based spreadsheet using WebAssembly.
 ### Building
 
 ```bash
-make wasm
-# or directly:
-bazel build --config=wasm //apps/wasm:cells_wasm
+bazel run :wasm          # Development build
+bazel run :wasm-debug    # Debug build (with DWARF)
+bazel run :wasm-dist     # Optimized build for deployment
 ```
 
 ### Running Locally
@@ -135,22 +146,22 @@ bazel build --config=wasm //apps/wasm:cells_wasm
 Build the distribution and start the local server:
 
 ```bash
-make wasm-dist    # Build optimized WASM and copy to dist/
-make wasm-serve   # Start local server on port 8081
+bazel run :wasm-dist     # Build optimized WASM
+bazel run :serve         # Start local server on port 8081
 ```
 
 Then open http://localhost:8081/ in your browser.
 
 ### Distribution Package
 
-The `make wasm-dist` command creates a `dist/` directory with all files needed for deployment:
+The `bazel run :wasm-dist` command creates a `dist/wasm/` directory with all files needed for deployment:
 
 ```
-dist/
+dist/wasm/
 ├── cells_wasm_bin.js      # WASM loader (Emscripten)
 ├── cells_wasm_bin.wasm    # Compiled engine (~729KB)
 ├── worker.js              # Web Worker (bundled from TypeScript)
-├── client.js              # Main thread API (bundled from TypeScript)
+├── main.js                # Main thread code (bundled from TypeScript)
 ├── index.html             # Spreadsheet UI
 ├── cells.d.ts             # TypeScript definitions for WASM API
 └── shared/                # CSS styles
@@ -167,20 +178,10 @@ dist/
 
 ## Code Formatting
 
-Format all C++ code:
+Format all code:
 
 ```bash
-make format
-# or directly:
-./scripts/format.sh
-```
-
-Check formatting without making changes:
-
-```bash
-make format-check
-# or directly:
-./scripts/format.sh --check
+bazel run :format
 ```
 
 ## Linting
@@ -188,33 +189,21 @@ make format-check
 Run the linter:
 
 ```bash
-make lint
-# or directly:
-./scripts/lint.sh
+bazel run :lint
 ```
 
-Run linter with auto-fix:
+## TypeScript Type Check
 
 ```bash
-make lint-fix
-# or directly:
-./scripts/lint.sh --fix
+bazel run :check-types
 ```
 
 ## Running All Checks
 
-Run formatting, linting, and build in one command:
+Run all verification in one command (unit tests, lint, type checks, E2E tests, format):
 
 ```bash
-make check
-# or directly:
-./scripts/check.sh
-```
-
-Fix all auto-fixable issues:
-
-```bash
-make fix
+bazel run :check
 ```
 
 ## IDE Setup
@@ -224,8 +213,6 @@ make fix
 For IDE features like code completion and go-to-definition:
 
 ```bash
-make compile-db
-# or directly:
 bazel run //:refresh_compile_commands
 ```
 
@@ -256,35 +243,33 @@ cells/
 ├── testdata/               # Sample .zcd files
 ├── docs/                   # Architecture documentation
 ├── plans/                  # Implementation plans
-├── scripts/                # Build/lint scripts
-├── tools/                  # Development utilities
+├── tools/                  # Build/lint scripts and utilities
 │   └── serve/              # Local WASM server
-├── Makefile                # Convenience targets
 ├── MODULE.bazel            # Bazel module definition
 └── WORKSPACE               # Bazel workspace
 ```
 
 ## Quick Reference
 
-| Task | Command |
-|------|---------|
-| Build all | `make build` |
-| Build CLI | `make cli` |
-| Build WASM | `make wasm` |
-| Build WASM dist | `make wasm-dist` |
-| Run WASM UI | `make wasm-serve` |
-| Run tests | `make test` |
-| Format code | `make format` |
-| Check formatting | `make format-check` |
-| Lint | `make lint` |
-| Lint + fix | `make lint-fix` |
-| All checks | `make check` |
-| Fix all | `make fix` |
-| TypeScript check | `make check-types` |
-| Generate compile DB | `make compile-db` |
-| Clean | `make clean` |
-| Convert files | `cells -i input.xlsx output.csv` |
-| File info | `cells -I file.xlsx` |
+| Task | Command | Output |
+|------|---------|--------|
+| Build CLI (dev) | `bazel run :cli` | `dist/cli/cells` |
+| Build CLI (release) | `bazel run :cli-release` | `dist/cli/cells` |
+| Build WASM (dev) | `bazel run :wasm` | `dist/wasm/` |
+| Build WASM (debug) | `bazel run :wasm-debug` | `dist/wasm/` |
+| Build WASM (release) | `bazel run :wasm-dist` | `dist/wasm/` |
+| Serve locally | `bazel run :serve` | - |
+| Run unit tests | `bazel run :test` | - |
+| Run E2E tests | `bazel run :e2e` | - |
+| Run E2E tests (headed) | `bazel run :e2e-headed` | - |
+| Run single E2E test | `bazel run :e2e -- smoke` | - |
+| Format code | `bazel run :format` | - |
+| Lint | `bazel run :lint` | - |
+| TypeScript check | `bazel run :check-types` | - |
+| All checks | `bazel run :check` | - |
+| Generate compile DB | `bazel run //:refresh_compile_commands` | - |
+| Convert files | `dist/cli/cells -i input.xlsx output.csv` | - |
+| File info | `dist/cli/cells -I file.xlsx` | - |
 
 ## Troubleshooting
 
