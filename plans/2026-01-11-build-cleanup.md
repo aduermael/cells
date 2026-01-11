@@ -1,6 +1,6 @@
 Status: READY
 Created At: 2026-01-11 07:03 UTC
-Updated At: 2026-01-11 07:15 UTC
+Updated At: 2026-01-11 07:17 UTC
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -47,7 +47,7 @@ After cleanup, these will be the ONLY build commands:
 | Build WASM (release) | `bazel run :wasm-dist` | `dist/wasm/` (optimized) |
 | Serve locally | `bazel run :serve` | Serves `dist/wasm/` |
 | Run unit tests | `bazel run :test` | - |
-| Run E2E tests | `bazel run :e2e` | Headless, stable suite |
+| Run E2E tests | `bazel run :e2e` | Headless, all tests |
 | Run E2E tests (headed) | `bazel run :e2e-headed` | With browser visible |
 | Run single E2E test | `bazel run :e2e -- smoke` | Run specific test |
 | Run all checks | `bazel run :check` | - |
@@ -63,7 +63,7 @@ After cleanup, these will be the ONLY build commands:
 
 ### E2E Test Commands
 
-Run all stable tests (default):
+Run all tests (default):
 ```bash
 bazel run :e2e
 ```
@@ -75,19 +75,15 @@ bazel run :e2e -- formula     # Just formula tests
 bazel run :e2e -- editing     # Just editing tests
 ```
 
-Run a test collection:
-```bash
-bazel run :e2e -- stable      # smoke, formula, editing, column-move, clipboard, selection
-bazel run :e2e -- collab      # collab, initial-sync, collab-demo
-bazel run :e2e -- all         # Everything
-```
-
 Run with browser visible (for debugging):
 ```bash
-bazel run :e2e-headed -- smoke
+bazel run :e2e-headed          # All tests, browser visible
+bazel run :e2e-headed -- smoke # Single test, browser visible
 ```
 
-**Available test files:** smoke, formula, editing, column-move, clipboard, selection, script, collab, initial-sync, collab-demo
+**Available tests:** smoke, formula, editing, column-move, clipboard, selection, script, collab, initial-sync, collab-demo
+
+**Note:** All tests must pass. There is no "stable" subset - if a test is flaky or broken, fix it or remove it.
 
 ---
 
@@ -121,10 +117,11 @@ tools/
 - [ ] 1g: Create `tools/test.sh` - runs unit tests with auto-detected parallelism
 - [ ] 1h: Create `tools/e2e.sh` - runs E2E tests headless with auto-detected parallelism
 - [ ] 1i: Create `tools/e2e-headed.sh` - runs E2E tests with browser visible
-- [ ] 1j: Create `tools/check-types.sh` - runs TypeScript type checking
-- [ ] 1k: Move `scripts/check.sh` to `tools/check.sh` and update for new commands
-- [ ] 1l: Move `scripts/format.sh` to `tools/format.sh`
-- [ ] 1m: Move `scripts/lint.sh` to `tools/lint.sh`
+- [ ] 1j: Update `apps/wasm/tests/run-parallel.mjs` - remove "stable" collection, keep only "all"
+- [ ] 1k: Create `tools/check-types.sh` - runs TypeScript type checking
+- [ ] 1l: Move `scripts/check.sh` to `tools/check.sh` and update for new commands
+- [ ] 1m: Move `scripts/format.sh` to `tools/format.sh`
+- [ ] 1n: Move `scripts/lint.sh` to `tools/lint.sh`
 
 ## Phase 2: Update Root BUILD File
 
@@ -266,9 +263,9 @@ JOBS=$(get_num_cores)
 #!/bin/bash
 # Run E2E tests (headless)
 # Usage: bazel run :e2e [-- <test>]
-#   <test> can be: smoke, formula, editing, column-move, clipboard, selection,
-#                  script, collab, initial-sync, collab-demo
-#          or collection: stable (default), collab, all
+#   <test> can be a single test: smoke, formula, editing, column-move, clipboard,
+#          selection, script, collab, initial-sync, collab-demo
+#          or omit to run all tests (default)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -286,20 +283,18 @@ get_num_cores() {
 }
 
 JOBS=$(get_num_cores)
-TARGET="${1:-stable}"
+TARGET="${1:-}"
 
-# Check if it's a single test file or a collection
-SINGLE_TESTS="smoke formula editing column-move clipboard selection script collab initial-sync collab-demo"
-if echo "$SINGLE_TESTS" | grep -qw "$TARGET"; then
+cd apps/wasm
+
+if [ -n "$TARGET" ]; then
     # Run single test file
-    echo "Running $TARGET test with $JOBS parallel workers..."
-    cd apps/wasm
+    echo "Running $TARGET test..."
     node "tests/${TARGET}.test.mjs"
 else
-    # Run collection
-    echo "Running $TARGET tests with $JOBS parallel workers..."
-    cd apps/wasm
-    npm run test:parallel -- --concurrency "$JOBS" "$TARGET"
+    # Run all tests
+    echo "Running all E2E tests with $JOBS parallel workers..."
+    npm run test:parallel -- --concurrency "$JOBS" all
 fi
 ```
 
@@ -312,19 +307,15 @@ fi
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$REPO_ROOT"
+cd "$REPO_ROOT/apps/wasm"
 
 export HEADED=1
-TARGET="${1:-stable}"
+TARGET="${1:-}"
 
-# Check if it's a single test file or a collection
-SINGLE_TESTS="smoke formula editing column-move clipboard selection script collab initial-sync collab-demo"
-if echo "$SINGLE_TESTS" | grep -qw "$TARGET"; then
-    cd apps/wasm
+if [ -n "$TARGET" ]; then
     node "tests/${TARGET}.test.mjs"
 else
-    cd apps/wasm
-    npm run test:parallel -- "$TARGET"
+    npm run test:parallel -- all
 fi
 ```
 
