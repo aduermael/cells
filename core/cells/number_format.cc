@@ -370,6 +370,24 @@ ParsedFormatId parseFormatId(const std::string& id) {
         }
     }
 
+    // Pattern: FMT_C0XX (legacy currency format with XX decimal places, USD only)
+    // Example: FMT_C002 = USD currency with 2 decimal places
+    if (id.size() == 8 && id.substr(0, 5) == "FMT_C" && id[5] == '0') {
+        if (std::isdigit(static_cast<unsigned char>(id[6])) != 0 &&
+            std::isdigit(static_cast<unsigned char>(id[7])) != 0) {
+            const int decimals = (id[6] - '0') * 10 + (id[7] - '0');
+            if (decimals <= 15) {
+                result.category = NumberFormatCategory::CURRENCY;
+                result.decimalPlaces = static_cast<uint8_t>(decimals);
+                result.useThousandsSeparator = true;
+                result.currencyCode = "USD";
+                result.currencySymbol = "$";
+                result.valid = true;
+                return result;
+            }
+        }
+    }
+
     // Pattern: CXXX_0YY (currency with 3-letter code and YY decimal places)
     // Example: CUSD_008 = USD with 8 decimal places
     if (id.size() == 8 && id[0] == 'C' && id[4] == '_' && id[5] == '0') {

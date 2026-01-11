@@ -671,9 +671,15 @@ const tests = {
     await clickCell(ctx.page, 'A1');
     await sleep(100);
 
-    // Open currency dropdown and select EUR
+    // First click applies default currency (USD), putting cell in currency mode
+    await ctx.page.click('#currency-dropdown-btn');
+    await sleep(200);
+
+    // Second click opens the dropdown (since cell is now in currency mode)
     await ctx.page.click('#currency-dropdown-btn');
     await sleep(100);
+
+    // Select EUR from the dropdown
     await ctx.page.click('[data-currency="EUR"]');
     await sleep(300);
 
@@ -702,9 +708,15 @@ const tests = {
     await clickCell(ctx.page, 'A1');
     await sleep(100);
 
-    // Open currency dropdown and select GBP
+    // First click applies default currency (USD), putting cell in currency mode
+    await ctx.page.click('#currency-dropdown-btn');
+    await sleep(200);
+
+    // Second click opens the dropdown (since cell is now in currency mode)
     await ctx.page.click('#currency-dropdown-btn');
     await sleep(100);
+
+    // Select GBP from the dropdown
     await ctx.page.click('[data-currency="GBP"]');
     await sleep(300);
 
@@ -729,9 +741,15 @@ const tests = {
     await clickCell(ctx.page, 'A1');
     await sleep(100);
 
-    // Open currency dropdown and select JPY
+    // First click applies default currency (USD), putting cell in currency mode
+    await ctx.page.click('#currency-dropdown-btn');
+    await sleep(200);
+
+    // Second click opens the dropdown (since cell is now in currency mode)
     await ctx.page.click('#currency-dropdown-btn');
     await sleep(100);
+
+    // Select JPY from the dropdown
     await ctx.page.click('[data-currency="JPY"]');
     await sleep(300);
 
@@ -756,9 +774,15 @@ const tests = {
     await clickCell(ctx.page, 'A1');
     await sleep(100);
 
-    // Open currency dropdown and select EUR
+    // First click applies default currency (USD), putting cell in currency mode
+    await ctx.page.click('#currency-dropdown-btn');
+    await sleep(200);
+
+    // Second click opens the dropdown (since cell is now in currency mode)
     await ctx.page.click('#currency-dropdown-btn');
     await sleep(100);
+
+    // Select EUR from the dropdown
     await ctx.page.click('[data-currency="EUR"]');
     await sleep(300);
 
@@ -805,9 +829,15 @@ const tests = {
     await clickCell(ctx.page, 'A1');
     await sleep(100);
 
-    // Open currency dropdown and select GBP
+    // First click applies default currency (USD), putting cell in currency mode
+    await ctx.page.click('#currency-dropdown-btn');
+    await sleep(200);
+
+    // Second click opens the dropdown (since cell is now in currency mode)
     await ctx.page.click('#currency-dropdown-btn');
     await sleep(100);
+
+    // Select GBP from the dropdown
     await ctx.page.click('[data-currency="GBP"]');
     await sleep(300);
 
@@ -836,8 +866,8 @@ const tests = {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
-    // Enter a currency value in A1 (this auto-formats to currency)
-    await setCellValue(ctx.page, 'A1', '$100');
+    // Enter a currency value in A1 with 2 decimals (this auto-formats to currency with 2 decimal places)
+    await setCellValue(ctx.page, 'A1', '$100.00');
     await sleep(200);
 
     // Verify A1 has currency format
@@ -935,8 +965,8 @@ const tests = {
     await setCellValue(ctx.page, 'A1', '10%');
     await sleep(200);
 
-    // Enter a currency value in B1
-    await setCellValue(ctx.page, 'B1', '$100');
+    // Enter a currency value in B1 with 2 decimals
+    await setCellValue(ctx.page, 'B1', '$100.00');
     await sleep(200);
 
     // Enter formula in C1 that references both A1 and B1
@@ -984,12 +1014,12 @@ const tests = {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
-    // Enter currency values in A1:A3
-    await setCellValue(ctx.page, 'A1', '$10');
+    // Enter currency values in A1:A3 with 2 decimals
+    await setCellValue(ctx.page, 'A1', '$10.00');
     await sleep(100);
-    await setCellValue(ctx.page, 'A2', '$20');
+    await setCellValue(ctx.page, 'A2', '$20.00');
     await sleep(100);
-    await setCellValue(ctx.page, 'A3', '$30');
+    await setCellValue(ctx.page, 'A3', '$30.00');
     await sleep(200);
 
     // Enter SUM formula in A4

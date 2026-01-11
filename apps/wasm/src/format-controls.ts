@@ -314,14 +314,14 @@ export class FormatControls {
       }
     });
 
-    // Currency button: apply currency when not in currency mode, toggle dropdown when in currency mode
+    // Currency button: apply last-used currency when not in currency mode, toggle dropdown when in currency mode
     this.currencyDropdownBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (this.currentCategory === "CURRENCY" || this.currentCategory === "ACCOUNTING") {
         // Already in currency mode - toggle dropdown to change currency
         this.toggleCurrencyDropdown();
       } else {
-        // Not in currency mode - apply currency format directly
+        // Not in currency mode - apply last-used currency format directly
         this.handleCurrencySelect(this.currentCurrency, this.getCurrencySymbol(this.currentCurrency));
       }
     });
