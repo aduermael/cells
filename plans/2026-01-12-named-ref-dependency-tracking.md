@@ -88,12 +88,14 @@ Ensure the import path provides the named range registry to the dependency graph
 
 Add comprehensive tests for named reference dependency tracking.
 
-- [ ] 4a: Test basic named reference dependency extraction (CELL target)
-- [ ] 4b: Test range named reference dependency extraction (RANGE target)
-- [ ] 4c: Test column/row named reference dependency extraction
-- [ ] 4d: Test sheet-scoped vs workbook-scoped resolution
-- [ ] 4e: Test recursive named references (named range → named range → cell)
-- [ ] 4f: Test circular named reference protection
+- [x] 4a: Test basic named reference dependency extraction (CELL target) - `NamedRefCell` test
+- [x] 4b: Test range named reference dependency extraction (RANGE target) - `NamedRefRange` test
+- [x] 4c: Test column/row named reference dependency extraction - `NamedRefColumn`, `NamedRefRow`, `NamedRefColumnRange`, `NamedRefRowRange` tests
+- [x] 4d: Test sheet-scoped vs workbook-scoped resolution - `NamedRefSheetScoped`, `NamedRefWorkbookScopedFallback` tests
+- [x] 4e: Test recursive named references - N/A (architecture stores resolved cell IDs, not formulas pointing to other named ranges)
+- [x] 4f: Test circular named reference protection - N/A (not possible with current architecture; depth limit exists as defensive measure)
+
+Also added: `NamedRefUnresolved`, `NamedRefWithoutRegistry`, `NamedRefMixedWithCellRef`, `NamedRefSourcePositionPreserved`, `NamedRefMultipleInFormula` tests
 
 **Files:** `core/cells/dependency_graph_test.cc`
 

@@ -8,6 +8,7 @@
 #include "core/cells/formula_resolver.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
+#include "core/cells/named_ranges.h"
 
 #include "gtest/gtest.h"
 
@@ -441,6 +442,298 @@ TEST_F(DependencyGraphTest, LiteralOnlyFormula) {
 
     auto deps = graph_.getDependencies(cell->id);
     EXPECT_TRUE(deps.empty());  // No references in formula
+}
+
+// ============================================================================
+// Named Reference Dependency Tests
+// ============================================================================
+
+TEST_F(DependencyGraphTest, NamedRefCell) {
+    // Define a named range pointing to cell A1
+    Cell* cellA1 = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[0]);
+    registry_.defineWorkbook("MyCell", NamedRangeTarget::cell(cellA1->id, sheet_->id));
+
+    // Parse formula using the named reference
+    auto ast = parseFormula("=MyCell+10");
+    ASSERT_NE(ast, nullptr);
+
+    // Add formula with named range resolution
+    Cell* cellB1 = sheet_->getOrCreateCellAt(colIds_[1], rowIds_[0]);
+    graph_.addFormula(cellB1->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    auto deps = graph_.getDependencies(cellB1->id);
+    EXPECT_EQ(deps.size(), 1u);
+    EXPECT_EQ(deps[0].type, DependencyRef::Type::CELL);
+    EXPECT_EQ(deps[0].cellId, cellA1->id);
+}
+
+TEST_F(DependencyGraphTest, NamedRefRange) {
+    // Define a named range pointing to A1:C3
+    Cell* cellA1 = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[0]);
+    Cell* cellC3 = sheet_->getOrCreateCellAt(colIds_[2], rowIds_[2]);
+    registry_.defineWorkbook("MyRange",
+                             NamedRangeTarget::range(cellA1->id, cellC3->id, sheet_->id));
+
+    // Parse formula using the named range
+    auto ast = parseFormula("=SUM(MyRange)");
+    ASSERT_NE(ast, nullptr);
+
+    // Add formula with named range resolution
+    Cell* cellD1 = sheet_->getOrCreateCellAt(colIds_[3], rowIds_[0]);
+    graph_.addFormula(cellD1->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    auto deps = graph_.getDependencies(cellD1->id);
+    EXPECT_EQ(deps.size(), 1u);
+    EXPECT_EQ(deps[0].type, DependencyRef::Type::RANGE);
+    EXPECT_EQ(deps[0].startCellId, cellA1->id);
+    EXPECT_EQ(deps[0].endCellId, cellC3->id);
+}
+
+TEST_F(DependencyGraphTest, NamedRefColumn) {
+    // Define a named range pointing to column A
+    registry_.defineWorkbook("ColA", NamedRangeTarget::column(colIds_[0], sheet_->id));
+
+    // Parse formula using the named range
+    auto ast = parseFormula("=SUM(ColA)");
+    ASSERT_NE(ast, nullptr);
+
+    // Add formula with named range resolution
+    Cell* cellB1 = sheet_->getOrCreateCellAt(colIds_[1], rowIds_[0]);
+    graph_.addFormula(cellB1->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    auto deps = graph_.getDependencies(cellB1->id);
+    EXPECT_EQ(deps.size(), 1u);
+    EXPECT_EQ(deps[0].type, DependencyRef::Type::COLUMN);
+    EXPECT_EQ(deps[0].columnId, colIds_[0]);
+}
+
+TEST_F(DependencyGraphTest, NamedRefRow) {
+    // Define a named range pointing to row 1
+    // Note: "Row1" is invalid because it looks like a cell reference (3 letters + digit)
+    // Use "FirstRow" instead
+    registry_.defineWorkbook("FirstRow", NamedRangeTarget::row(rowIds_[0], sheet_->id));
+
+    // Parse formula using the named range
+    auto ast = parseFormula("=SUM(FirstRow)");
+    ASSERT_NE(ast, nullptr);
+
+    // Add formula with named range resolution
+    Cell* cellA2 = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[1]);
+    graph_.addFormula(cellA2->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    auto deps = graph_.getDependencies(cellA2->id);
+    EXPECT_EQ(deps.size(), 1u);
+    EXPECT_EQ(deps[0].type, DependencyRef::Type::ROW);
+    EXPECT_EQ(deps[0].rowId, rowIds_[0]);
+}
+
+TEST_F(DependencyGraphTest, NamedRefColumnRange) {
+    // Define a named range pointing to columns A:C
+    registry_.defineWorkbook("ColsAC",
+                             NamedRangeTarget::columnRange(colIds_[0], colIds_[2], sheet_->id));
+
+    // Parse formula using the named range
+    auto ast = parseFormula("=SUM(ColsAC)");
+    ASSERT_NE(ast, nullptr);
+
+    // Add formula with named range resolution
+    Cell* cellD1 = sheet_->getOrCreateCellAt(colIds_[3], rowIds_[0]);
+    graph_.addFormula(cellD1->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    auto deps = graph_.getDependencies(cellD1->id);
+    EXPECT_EQ(deps.size(), 1u);
+    EXPECT_EQ(deps[0].type, DependencyRef::Type::COLUMN_RANGE);
+    EXPECT_EQ(deps[0].startColumnId, colIds_[0]);
+    EXPECT_EQ(deps[0].endColumnId, colIds_[2]);
+}
+
+TEST_F(DependencyGraphTest, NamedRefRowRange) {
+    // Define a named range pointing to rows 1:3
+    registry_.defineWorkbook("Rows13",
+                             NamedRangeTarget::rowRange(rowIds_[0], rowIds_[2], sheet_->id));
+
+    // Parse formula using the named range
+    auto ast = parseFormula("=SUM(Rows13)");
+    ASSERT_NE(ast, nullptr);
+
+    // Add formula with named range resolution
+    Cell* cellA4 = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[3]);
+    graph_.addFormula(cellA4->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    auto deps = graph_.getDependencies(cellA4->id);
+    EXPECT_EQ(deps.size(), 1u);
+    EXPECT_EQ(deps[0].type, DependencyRef::Type::ROW_RANGE);
+    EXPECT_EQ(deps[0].startRowId, rowIds_[0]);
+    EXPECT_EQ(deps[0].endRowId, rowIds_[2]);
+}
+
+TEST_F(DependencyGraphTest, NamedRefSheetScoped) {
+    // Define a workbook-scoped named range
+    Cell* cellA1 = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[0]);
+    Cell* cellB1 = sheet_->getOrCreateCellAt(colIds_[1], rowIds_[0]);
+    registry_.defineWorkbook("Value", NamedRangeTarget::cell(cellA1->id, sheet_->id));
+
+    // Define a sheet-scoped named range with the same name (should shadow)
+    registry_.defineSheet("Value", sheet_->id, NamedRangeTarget::cell(cellB1->id, sheet_->id));
+
+    // Parse formula using the named reference - sheet-scoped should take precedence
+    auto ast = parseFormula("=Value*2");
+    ASSERT_NE(ast, nullptr);
+
+    Cell* cellC1 = sheet_->getOrCreateCellAt(colIds_[2], rowIds_[0]);
+    graph_.addFormula(cellC1->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    auto deps = graph_.getDependencies(cellC1->id);
+    EXPECT_EQ(deps.size(), 1u);
+    EXPECT_EQ(deps[0].type, DependencyRef::Type::CELL);
+    // Should resolve to B1 (sheet-scoped), not A1 (workbook-scoped)
+    EXPECT_EQ(deps[0].cellId, cellB1->id);
+}
+
+TEST_F(DependencyGraphTest, NamedRefWorkbookScopedFallback) {
+    // Define only a workbook-scoped named range (no sheet-scoped shadow)
+    Cell* cellA1 = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[0]);
+    registry_.defineWorkbook("GlobalValue", NamedRangeTarget::cell(cellA1->id, sheet_->id));
+
+    // Parse formula using the named reference
+    auto ast = parseFormula("=GlobalValue+5");
+    ASSERT_NE(ast, nullptr);
+
+    Cell* cellB1 = sheet_->getOrCreateCellAt(colIds_[1], rowIds_[0]);
+    graph_.addFormula(cellB1->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    auto deps = graph_.getDependencies(cellB1->id);
+    EXPECT_EQ(deps.size(), 1u);
+    EXPECT_EQ(deps[0].type, DependencyRef::Type::CELL);
+    EXPECT_EQ(deps[0].cellId, cellA1->id);
+}
+
+TEST_F(DependencyGraphTest, NamedRefUnresolved) {
+    // Use a named reference that doesn't exist
+    auto ast = parseFormula("=UndefinedName+1");
+    ASSERT_NE(ast, nullptr);
+
+    Cell* cellA1 = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[0]);
+    graph_.addFormula(cellA1->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    // Unresolved named ref should not add any dependencies
+    auto deps = graph_.getDependencies(cellA1->id);
+    EXPECT_TRUE(deps.empty());
+}
+
+TEST_F(DependencyGraphTest, NamedRefWithoutRegistry) {
+    // Define a named range but don't pass the registry
+    Cell* cellA1 = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[0]);
+    registry_.defineWorkbook("MyCell", NamedRangeTarget::cell(cellA1->id, sheet_->id));
+
+    // Parse formula using the named reference
+    auto ast = parseFormula("=MyCell+10");
+    ASSERT_NE(ast, nullptr);
+
+    // Add formula WITHOUT named range resolution (null registry)
+    Cell* cellB1 = sheet_->getOrCreateCellAt(colIds_[1], rowIds_[0]);
+    graph_.addFormula(cellB1->id, ast.get());  // No registry passed
+
+    // Without registry, named refs are not resolved
+    auto deps = graph_.getDependencies(cellB1->id);
+    EXPECT_TRUE(deps.empty());
+}
+
+TEST_F(DependencyGraphTest, NamedRefMixedWithCellRef) {
+    // Define a named range
+    Cell* cellA1 = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[0]);
+    registry_.defineWorkbook("Named", NamedRangeTarget::cell(cellA1->id, sheet_->id));
+
+    // Parse formula with both named ref and regular cell ref
+    auto ast = parseFormula("=Named+B1");
+    ASSERT_NE(ast, nullptr);
+
+    Cell* cellB1 = sheet_->getOrCreateCellAt(colIds_[1], rowIds_[0]);
+    Cell* cellC1 = sheet_->getOrCreateCellAt(colIds_[2], rowIds_[0]);
+    graph_.addFormula(cellC1->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    auto deps = graph_.getDependencies(cellC1->id);
+    EXPECT_EQ(deps.size(), 2u);
+
+    // Should have both A1 (from named ref) and B1 (from cell ref)
+    bool foundA1 = false;
+    bool foundB1 = false;
+    for (const auto& dep : deps) {
+        if (dep.cellId == cellA1->id) {
+            foundA1 = true;
+        }
+        if (dep.cellId == cellB1->id) {
+            foundB1 = true;
+        }
+    }
+    EXPECT_TRUE(foundA1) << "Should find dependency on A1 (named ref)";
+    EXPECT_TRUE(foundB1) << "Should find dependency on B1 (cell ref)";
+}
+
+TEST_F(DependencyGraphTest, NamedRefSourcePositionPreserved) {
+    // Define a named range
+    Cell* cellA1 = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[0]);
+    registry_.defineWorkbook("Price", NamedRangeTarget::cell(cellA1->id, sheet_->id));
+
+    // Parse formula: =Price*2
+    // Position: 01234567
+    //           =Price*2
+    auto ast = parseFormula("=Price*2");
+    ASSERT_NE(ast, nullptr);
+
+    Cell* cellB1 = sheet_->getOrCreateCellAt(colIds_[1], rowIds_[0]);
+    graph_.addFormula(cellB1->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    auto deps = graph_.getDependencies(cellB1->id);
+    EXPECT_EQ(deps.size(), 1u);
+    // Source position should be for "Price" (starts at 1, ends at 6)
+    EXPECT_EQ(deps[0].sourceStart, 1);
+    EXPECT_EQ(deps[0].sourceEnd, 6);
+}
+
+// Note on recursive/circular named references:
+// The current NamedRangeRegistry architecture stores resolved cell/range IDs directly,
+// not references to other named ranges. This means:
+// - Named ranges always point to concrete cells/rows/columns, not to other named ranges
+// - "Recursive" named references (NameA -> NameB -> Cell) are not possible in this design
+// - Circular named references are also not possible at the data model level
+//
+// The depth limit (kMaxNamedRefDepth = 32) in ReferenceExtractor exists as defensive
+// protection in case the architecture evolves to support formula-based named ranges.
+//
+// Therefore, tests 4e (recursive named refs) and 4f (circular named refs) from the plan
+// are N/A - they cannot occur with the current architecture.
+
+TEST_F(DependencyGraphTest, NamedRefMultipleInFormula) {
+    // Define multiple named ranges
+    Cell* cellA1 = sheet_->getOrCreateCellAt(colIds_[0], rowIds_[0]);
+    Cell* cellB1 = sheet_->getOrCreateCellAt(colIds_[1], rowIds_[0]);
+    registry_.defineWorkbook("Price", NamedRangeTarget::cell(cellA1->id, sheet_->id));
+    registry_.defineWorkbook("Quantity", NamedRangeTarget::cell(cellB1->id, sheet_->id));
+
+    // Parse formula using multiple named references
+    auto ast = parseFormula("=Price*Quantity");
+    ASSERT_NE(ast, nullptr);
+
+    Cell* cellC1 = sheet_->getOrCreateCellAt(colIds_[2], rowIds_[0]);
+    graph_.addFormula(cellC1->id, ast.get(), nullptr, &registry_, sheet_->id);
+
+    auto deps = graph_.getDependencies(cellC1->id);
+    EXPECT_EQ(deps.size(), 2u);
+
+    // Should have both Price (A1) and Quantity (B1)
+    bool foundPrice = false;
+    bool foundQuantity = false;
+    for (const auto& dep : deps) {
+        if (dep.cellId == cellA1->id) {
+            foundPrice = true;
+        }
+        if (dep.cellId == cellB1->id) {
+            foundQuantity = true;
+        }
+    }
+    EXPECT_TRUE(foundPrice) << "Should find dependency on Price (A1)";
+    EXPECT_TRUE(foundQuantity) << "Should find dependency on Quantity (B1)";
 }
 
 }  // namespace
