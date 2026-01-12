@@ -85,6 +85,11 @@ export interface CellData {
   isSpillMaster?: boolean; // True if this cell is the master of a spill range
   spillMasterId?: string; // ID of the master cell if this is a spilled cell
   masterFormula?: string; // Formula of the master cell (for displaying in formula bar when spilled)
+  // Merged cell properties
+  isMergeAnchor?: boolean; // True if this cell is the anchor (top-left) of a merged region
+  isMergedCell?: boolean; // True if this cell is part of a merged region (but not the anchor)
+  mergeColSpan?: number; // Number of columns spanned (only set on anchor)
+  mergeRowSpan?: number; // Number of rows spanned (only set on anchor)
 }
 
 // ============================================================================

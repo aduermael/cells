@@ -240,6 +240,18 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             json << "\"isSpillMaster\":true,";
         }
 
+        // Check if this cell is part of a merged cell region
+        const MergeRange* mergeRange = sheet->getMergeRange(entry.cell->colId, entry.cell->rowId);
+        if (mergeRange != nullptr) {
+            if (sheet->isMergeAnchor(entry.cell->colId, entry.cell->rowId)) {
+                json << "\"isMergeAnchor\":true,";
+                json << "\"mergeColSpan\":" << mergeRange->colSpan << ",";
+                json << "\"mergeRowSpan\":" << mergeRange->rowSpan << ",";
+            } else {
+                json << "\"isMergedCell\":true,";
+            }
+        }
+
         if (entry.cell->isFormula()) {
             json << "\"type\":\"f\",";
             Formula* formula = entry.cell->getFormula();

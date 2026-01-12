@@ -488,19 +488,37 @@ export class GridRenderer {
       if (colHasMoved && cell.col === this.dragSourceIndex) continue;
       if (rowHasMoved && cell.row === this.dragSourceIndex) continue;
 
+      // Skip merged cells (not anchors) - their background is drawn by the anchor
+      if (cell.isMergedCell) continue;
+
       const bgColor = cell.style?.bgColor;
       if (!bgColor) continue;
 
-      const colWidth = this.colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
-      const rowHeight = this.rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
       const cellX = getColX(cell.col, headerState);
       const cellY = getRowY(cell.row, headerState);
 
-      if (cellX + colWidth < HEADER_WIDTH || cellX > viewWidth) continue;
-      if (cellY + rowHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
+      // Calculate width/height (possibly spanning multiple cells for merged regions)
+      let totalWidth = 0;
+      let totalHeight = 0;
+      if (cell.isMergeAnchor && cell.mergeColSpan && cell.mergeRowSpan) {
+        // Sum up widths for all columns in the merge
+        for (let c = 0; c < cell.mergeColSpan; c++) {
+          totalWidth += this.colWidths.get(cell.col + c) || DEFAULT_COL_WIDTH;
+        }
+        // Sum up heights for all rows in the merge
+        for (let r = 0; r < cell.mergeRowSpan; r++) {
+          totalHeight += this.rowHeights.get(cell.row + r) || DEFAULT_ROW_HEIGHT;
+        }
+      } else {
+        totalWidth = this.colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
+        totalHeight = this.rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
+      }
+
+      if (cellX + totalWidth < HEADER_WIDTH || cellX > viewWidth) continue;
+      if (cellY + totalHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
 
       ctx.fillStyle = bgColor;
-      ctx.fillRect(cellX + 1, cellY + 1, colWidth - 1, rowHeight - 1);
+      ctx.fillRect(cellX + 1, cellY + 1, totalWidth - 1, totalHeight - 1);
     }
   }
 
@@ -574,10 +592,28 @@ export class GridRenderer {
       if (colHasMoved && cell.col === this.dragSourceIndex) continue;
       if (rowHasMoved && cell.row === this.dragSourceIndex) continue;
 
-      const colWidth = this.colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
-      const rowHeight = this.rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
+      // Skip merged cells (not anchors) - their content is drawn by the anchor
+      if (cell.isMergedCell) continue;
+
       const cellX = getColX(cell.col, headerState);
       const cellY = getRowY(cell.row, headerState);
+
+      // Calculate width/height (possibly spanning multiple cells for merged regions)
+      let colWidth = 0;
+      let rowHeight = 0;
+      if (cell.isMergeAnchor && cell.mergeColSpan && cell.mergeRowSpan) {
+        // Sum up widths for all columns in the merge
+        for (let c = 0; c < cell.mergeColSpan; c++) {
+          colWidth += this.colWidths.get(cell.col + c) || DEFAULT_COL_WIDTH;
+        }
+        // Sum up heights for all rows in the merge
+        for (let r = 0; r < cell.mergeRowSpan; r++) {
+          rowHeight += this.rowHeights.get(cell.row + r) || DEFAULT_ROW_HEIGHT;
+        }
+      } else {
+        colWidth = this.colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
+        rowHeight = this.rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
+      }
 
       if (cellX + colWidth < HEADER_WIDTH || cellX > viewWidth) continue;
       if (cellY + rowHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
