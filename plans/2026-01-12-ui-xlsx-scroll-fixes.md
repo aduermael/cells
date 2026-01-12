@@ -21,7 +21,7 @@ The `<mergeCells>` element in XLSX is completely ignored, causing:
 - Section headers with backgrounds only styling first cell
 
 - [x] 2a: Add merged cell range storage to Sheet model (vector of merge ranges with top-left anchor). Added `MergeRange` struct and storage to Sheet with index for O(1) lookup by position.
-- [ ] 2b: Parse `<mergeCells><mergedCell ref="A2:E2"/>` from worksheet XML during import
+- [x] 2b: Parse `<mergeCells><mergedCell ref="A2:E2"/>` from worksheet XML during import. Added parsing after cell creation in xlsx_reader.cc.
 - [ ] 2c: Update grid renderer to span text/styling across merged cell ranges
 - [ ] 2d: Export merged cells back to XLSX during write
 - [ ] 2e: Add tests for merged cell import/export round-trip

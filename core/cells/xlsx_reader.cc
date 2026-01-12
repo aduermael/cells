@@ -1452,6 +1452,56 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         }
         logTiming("create cells", start);
 
+        // Parse merged cells (<mergeCells> element in worksheet XML)
+        // Format: <mergeCells><mergeCell ref="A2:E2"/></mergeCells>
+        start = std::chrono::steady_clock::now();
+        auto mergeCellsNode = worksheetNode.child("mergeCells");
+        if (mergeCellsNode) {
+            for (auto mergeNode : mergeCellsNode.children("mergeCell")) {
+                const char* refAttr = mergeNode.attribute("ref").value();
+                if (refAttr == nullptr || refAttr[0] == '\0') {
+                    continue;
+                }
+
+                // Parse range reference (e.g., "A2:E2")
+                std::string refStr(refAttr);
+                size_t colonPos = refStr.find(':');
+                if (colonPos == std::string::npos) {
+                    // Single cell, not a valid merge
+                    continue;
+                }
+
+                int startCol = 0, startRow = 0, endCol = 0, endRow = 0;
+                parseCellRef(refStr.substr(0, colonPos).c_str(), startCol, startRow);
+                parseCellRef(refStr.substr(colonPos + 1).c_str(), endCol, endRow);
+
+                // Validate bounds
+                if (startCol < 0 || startCol >= maxCol || startRow < 0 || startRow >= maxRow ||
+                    endCol < 0 || endCol >= maxCol || endRow < 0 || endRow >= maxRow) {
+                    addWarning("Merged cell range out of bounds: " + refStr);
+                    continue;
+                }
+
+                // Calculate spans
+                const int colSpan = endCol - startCol + 1;
+                const int rowSpan = endRow - startRow + 1;
+
+                if (colSpan < 1 || rowSpan < 1 || (colSpan == 1 && rowSpan == 1)) {
+                    // Invalid merge
+                    continue;
+                }
+
+                // Get anchor column and row IDs
+                const ID& anchorColId = columnIds[startCol];
+                const ID& anchorRowId = rowIds[startRow];
+
+                // Add merge range to sheet
+                sheet->addMergeRange(anchorColId, anchorRowId, static_cast<uint16_t>(colSpan),
+                                     static_cast<uint16_t>(rowSpan));
+            }
+        }
+        logTiming("parse merged cells", start);
+
         workbook->addSheet(std::move(sheet));
     }
 
