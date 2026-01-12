@@ -1,4 +1,4 @@
-Status: IN_PROGRESS
+Status: DONE
 Created At: 2026-01-12 UTC
 Following plan management guidelines defined in AGENTS.md
 
@@ -105,10 +105,12 @@ Also added: `NamedRefUnresolved`, `NamedRefWithoutRegistry`, `NamedRefMixedWithC
 
 Verify the specific bug is fixed.
 
-- [ ] 5a: Add e2e test that imports `init_lbo_model_60min_is_revenue_cf_only.xlsx` and verifies no #REF! errors
-- [ ] 5b: Verify cells like K8 evaluate correctly on initial load (no manual recalc needed)
+- [x] 5a: Add e2e test that imports `init_lbo_model_60min_is_revenue_cf_only.xlsx` and verifies no #REF! errors
+- [x] 5b: Verify cells like K8 evaluate correctly on initial load (no manual recalc needed)
 
-**Files:** `apps/wasm/tests/named-ranges.test.mjs` or new test file
+**Fix:** Added formula resolution step to XLSX import in `bindings_file.cc`. XLSX formulas are parsed with A1 notation but weren't resolved to UUIDs before evaluation, causing `#REF!` errors. Now `FormulaResolver::resolve()` is called for each formula after import.
+
+**Files:** `apps/wasm/bindings_file.cc`, `apps/wasm/tests/named-ref-import.test.mjs`, `apps/wasm/tests/run-parallel.mjs`
 
 ---
 

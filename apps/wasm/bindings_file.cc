@@ -24,6 +24,7 @@
 #include "core/cells/csv_writer.h"
 #include "core/cells/dependency_graph.h"
 #include "core/cells/formula_recalc.h"
+#include "core/cells/formula_resolver.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/parser.h"
 #include "core/cells/serializer.h"
@@ -119,13 +120,17 @@ std::string CellsEngine::loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
     _activeSheetIndex = 0;
     rebuildViewportIndex();
 
-    // Parse and evaluate all formulas in all sheets after loading
-    const NamedRangeRegistry* namedRanges = _workbook->getNamedRanges();
+    // Resolve and evaluate all formulas in all sheets after loading
+    // XLSX formulas are parsed with A1 notation - we must resolve them to UUIDs first
+    NamedRangeRegistry* namedRanges = _workbook->getNamedRanges();
     for (size_t i = 0; i < _workbook->sheetCount(); ++i) {
         auto* sheet = _workbook->getSheetByIndex(i);
         if (sheet) {
             std::vector<ID> formulaCells;
             DependencyGraph* depGraph = sheet->getDependencyGraph();
+
+            // Create resolver for this sheet to convert A1 refs to UUIDs
+            FormulaResolver resolver(*_workbook, *sheet, namedRanges);
 
             auto positionResolver = [sheet](const ID& cellId) -> std::pair<int32_t, int32_t> {
                 if (sheet == nullptr) return {-1, -1};
@@ -144,8 +149,13 @@ std::string CellsEngine::loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
             };
 
             for (const auto& [cellId, cell] : sheet->cells) {
-                if (cell->isFormula() && cell->formula != nullptr) {
-                    if (depGraph != nullptr && cell->formula->ast != nullptr) {
+                if (cell->isFormula() && cell->formula != nullptr &&
+                    cell->formula->ast != nullptr) {
+                    // Resolve formula references from A1 notation to UUIDs
+                    // This converts CellRefNode column/row to resolved cellId
+                    resolver.resolve(cell->formula->ast);
+
+                    if (depGraph != nullptr) {
                         depGraph->addFormula(cell->id, cell->formula->ast, positionResolver,
                                              namedRanges, sheet->id);
                         if (cell->formula->hasVolatile()) {
