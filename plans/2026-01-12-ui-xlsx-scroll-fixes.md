@@ -24,7 +24,7 @@ The `<mergeCells>` element in XLSX is completely ignored, causing:
 - [x] 2b: Parse `<mergeCells><mergedCell ref="A2:E2"/>` from worksheet XML during import. Added parsing after cell creation in xlsx_reader.cc.
 - [x] 2c: Update grid renderer to span text/styling across merged cell ranges. Added merge properties to CellData types, viewport bindings, and grid renderer to draw backgrounds and text across merged regions.
 - [x] 2d: Export merged cells back to XLSX during write. Added `<mergeCells>` element generation in xlsx_writer.cc generateWorksheet().
-- [ ] 2e: Add tests for merged cell import/export round-trip
+- [x] 2e: Add tests for merged cell import/export round-trip. Added 3 tests: API verification, roundtrip, and styled merges. Fixed xlsx_reader to create missing columns/rows for merge ranges.
 
 ## Phase 3: Improve Scroll Rendering with Minimum Frequency
 

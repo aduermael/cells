@@ -348,8 +348,8 @@ struct Axis {
 // MergeRange - defines a rectangular region of merged cells
 // Stored by anchor position (top-left cell's col/row IDs)
 struct MergeRange {
-    ID anchorColId;  // Top-left column ID (leftmost column)
-    ID anchorRowId;  // Top-left row ID (topmost row)
+    ID anchorColId;       // Top-left column ID (leftmost column)
+    ID anchorRowId;       // Top-left row ID (topmost row)
     uint16_t colSpan{1};  // Number of columns in merge (>= 1)
     uint16_t rowSpan{1};  // Number of rows in merge (>= 1)
 
@@ -570,7 +570,8 @@ struct Sheet {
     // Add a merged cell region (anchor is top-left, spans colSpan x rowSpan)
     // The anchorColId/anchorRowId identify the top-left cell
     // Requires columns/rows to exist at these positions
-    void addMergeRange(const ID& anchorColId, const ID& anchorRowId, uint16_t colSpan, uint16_t rowSpan);
+    void addMergeRange(const ID& anchorColId, const ID& anchorRowId, uint16_t colSpan,
+                       uint16_t rowSpan);
 
     // Remove a merged cell region by its anchor position
     void removeMergeRange(const ID& anchorColId, const ID& anchorRowId);

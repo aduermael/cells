@@ -1454,6 +1454,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
         // Parse merged cells (<mergeCells> element in worksheet XML)
         // Format: <mergeCells><mergeCell ref="A2:E2"/></mergeCells>
+        // Note: Merged cells may span columns/rows that don't have cells.
+        // We need to ensure those columns/rows exist before adding the merge.
         start = std::chrono::steady_clock::now();
         auto mergeCellsNode = worksheetNode.child("mergeCells");
         if (mergeCellsNode) {
@@ -1475,11 +1477,30 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 parseCellRef(refStr.substr(0, colonPos).c_str(), startCol, startRow);
                 parseCellRef(refStr.substr(colonPos + 1).c_str(), endCol, endRow);
 
-                // Validate bounds
-                if (startCol < 0 || startCol >= maxCol || startRow < 0 || startRow >= maxRow ||
-                    endCol < 0 || endCol >= maxCol || endRow < 0 || endRow >= maxRow) {
-                    addWarning("Merged cell range out of bounds: " + refStr);
+                // Basic sanity check
+                if (startCol < 0 || startRow < 0 || endCol < startCol || endRow < startRow) {
+                    addWarning("Invalid merged cell range: " + refStr);
                     continue;
+                }
+
+                // Ensure columns exist up to endCol
+                while (static_cast<int>(columnIds.size()) <= endCol) {
+                    ID colId = generate_id();
+                    auto col = std::make_unique<Axis>(colId, true);
+                    col->position = static_cast<uint32_t>(columnIds.size());
+                    col->size = DEFAULT_COLUMN_WIDTH;
+                    columnIds.push_back(colId);
+                    sheet->addColumn(std::move(col));
+                }
+
+                // Ensure rows exist up to endRow
+                while (static_cast<int>(rowIds.size()) <= endRow) {
+                    ID rowId = generate_id();
+                    auto row = std::make_unique<Axis>(rowId, false);
+                    row->position = static_cast<uint32_t>(rowIds.size());
+                    row->size = DEFAULT_ROW_HEIGHT;
+                    rowIds.push_back(rowId);
+                    sheet->addRow(std::move(row));
                 }
 
                 // Calculate spans

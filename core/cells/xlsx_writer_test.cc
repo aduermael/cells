@@ -2855,5 +2855,219 @@ TEST(XLSXWriterTest, RowDefaultStyleRoundTrip) {
     }
 }
 
+// ============================================================================
+// Merged Cells Tests
+// ============================================================================
+
+// Simple test to verify Sheet API works
+TEST(XLSXWriterTest, MergedCellsApiWorks) {
+    // Create a sheet and add merged cells directly
+    Sheet sheet(generate_id(), "Test");
+
+    std::vector<ID> colIds, rowIds;
+    for (int i = 0; i < 5; i++) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        colIds.push_back(col->id);
+        sheet.addColumn(std::move(col));
+
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet.addRow(std::move(row));
+    }
+
+    ASSERT_EQ(sheet.columnCount(), 5u);
+    ASSERT_EQ(sheet.rowCount(), 5u);
+
+    // Add merge range
+    sheet.addMergeRange(colIds[0], rowIds[0], 3, 1);
+
+    // Verify it was added
+    const auto& merges = sheet.getMergeRanges();
+    ASSERT_EQ(merges.size(), 1u) << "Merge range should be added";
+    EXPECT_EQ(merges[0].colSpan, 3u);
+    EXPECT_EQ(merges[0].rowSpan, 1u);
+
+    // Verify anchor lookup
+    EXPECT_TRUE(sheet.isMergeAnchor(colIds[0], rowIds[0])) << "(0,0) should be anchor";
+    EXPECT_FALSE(sheet.isMergeAnchor(colIds[1], rowIds[0])) << "(1,0) should not be anchor";
+
+    // Verify merged cell lookup
+    EXPECT_FALSE(sheet.isMergedCell(colIds[0], rowIds[0])) << "(0,0) anchor is not a merged cell";
+    EXPECT_TRUE(sheet.isMergedCell(colIds[1], rowIds[0])) << "(1,0) should be merged cell";
+    EXPECT_TRUE(sheet.isMergedCell(colIds[2], rowIds[0])) << "(2,0) should be merged cell";
+    EXPECT_FALSE(sheet.isMergedCell(colIds[3], rowIds[0])) << "(3,0) should not be merged";
+}
+
+TEST(XLSXWriterTest, RoundtripMergedCells) {
+    // Create a workbook with merged cells
+    auto workbook = std::make_unique<Workbook>(generate_id(), "MergedCells");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Create 5 columns and 5 rows
+    std::vector<ID> colIds;
+    std::vector<ID> rowIds;
+    for (int i = 0; i < 5; ++i) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        colIds.push_back(col->id);
+        sheet->addColumn(std::move(col));
+
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet->addRow(std::move(row));
+    }
+
+    // Add a cell at the anchor of a merge (A1 with value "Merged Header")
+    auto cell1 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[0]);
+    cell1->value = CellValue("Merged Header");
+    sheet->addCell(std::move(cell1));
+
+    // Add another cell at B3 for a different merge
+    auto cell2 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[2]);
+    cell2->value = CellValue("Another Merge");
+    sheet->addCell(std::move(cell2));
+
+    // Add merge ranges
+    // A1:C1 (3 cols, 1 row)
+    sheet->addMergeRange(colIds[0], rowIds[0], 3, 1);
+
+    // B3:C4 (2 cols, 2 rows)
+    sheet->addMergeRange(colIds[1], rowIds[2], 2, 2);
+
+    // Verify merges were added before writing
+    ASSERT_EQ(sheet->getMergeRanges().size(), 2u) << "Merges should be in sheet before write";
+
+    workbook->addSheet(std::move(sheet));
+
+    // Write to XLSX
+    std::string path = tempFilePath("merged_cells.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    // Read back
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok()) << (readResult.error ? readResult.error->toString() : "");
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Verify merge ranges were preserved
+    const auto& merges = readSheet->getMergeRanges();
+    EXPECT_EQ(merges.size(), 2u) << "Should have 2 merge ranges";
+
+    // Find and verify each merge
+    bool foundMerge1 = false;
+    bool foundMerge2 = false;
+
+    for (const auto& merge : merges) {
+        // Get anchor position
+        Axis* anchorCol = readSheet->getColumn(merge.anchorColId);
+        Axis* anchorRow = readSheet->getRow(merge.anchorRowId);
+        ASSERT_NE(anchorCol, nullptr);
+        ASSERT_NE(anchorRow, nullptr);
+
+        if (anchorCol->position == 0 && anchorRow->position == 0) {
+            // A1:C1 merge
+            EXPECT_EQ(merge.colSpan, 3u) << "First merge should span 3 columns";
+            EXPECT_EQ(merge.rowSpan, 1u) << "First merge should span 1 row";
+            foundMerge1 = true;
+        } else if (anchorCol->position == 1 && anchorRow->position == 2) {
+            // B3:C4 merge
+            EXPECT_EQ(merge.colSpan, 2u) << "Second merge should span 2 columns";
+            EXPECT_EQ(merge.rowSpan, 2u) << "Second merge should span 2 rows";
+            foundMerge2 = true;
+        }
+    }
+
+    EXPECT_TRUE(foundMerge1) << "A1:C1 merge not found";
+    EXPECT_TRUE(foundMerge2) << "B3:C4 merge not found";
+}
+
+TEST(XLSXWriterTest, MergedCellsWithStyles) {
+    // Test that merged cells with styles are preserved
+    auto workbook = std::make_unique<Workbook>(generate_id(), "StyledMerge");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Create columns and rows
+    std::vector<ID> colIds;
+    std::vector<ID> rowIds;
+    for (int i = 0; i < 3; ++i) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        colIds.push_back(col->id);
+        sheet->addColumn(std::move(col));
+
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        rowIds.push_back(row->id);
+        sheet->addRow(std::move(row));
+    }
+
+    // Create a styled cell at the anchor
+    CellStyle style;
+    style.bold = true;
+    style.bgColor = "#FF0000";
+    ID styleId = generate_id();
+    workbook->registerStyle(styleId, style);
+
+    auto cell = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[0]);
+    cell->value = CellValue("Styled Merge");
+    cell->styleId = styleId;
+    sheet->addCell(std::move(cell));
+
+    // Add merge range A1:C3
+    sheet->addMergeRange(colIds[0], rowIds[0], 3, 3);
+
+    workbook->addSheet(std::move(sheet));
+
+    // Write and read back
+    std::string path = tempFilePath("styled_merge.xlsx");
+    TempFileGuard guard(path);
+
+    auto writeResult = writeXLSX(*workbook, path);
+    EXPECT_TRUE(writeResult.ok()) << (writeResult.error ? writeResult.error->toString() : "");
+
+    XLSXReadOptions readOptions;
+    readOptions.readStyles = true;
+    auto readResult = readXLSX(path, readOptions);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Verify merge
+    const auto& merges = readSheet->getMergeRanges();
+    EXPECT_EQ(merges.size(), 1u);
+    if (!merges.empty()) {
+        EXPECT_EQ(merges[0].colSpan, 3u);
+        EXPECT_EQ(merges[0].rowSpan, 3u);
+    }
+
+    // Verify anchor cell has style
+    Axis* readCol0 = readSheet->getColumnByPosition(0);
+    Axis* readRow0 = readSheet->getRowByPosition(0);
+    ASSERT_NE(readCol0, nullptr);
+    ASSERT_NE(readRow0, nullptr);
+
+    Cell* anchorCell = readSheet->getCellAt(readCol0->id, readRow0->id);
+    ASSERT_NE(anchorCell, nullptr);
+    EXPECT_FALSE(anchorCell->styleId.isNull()) << "Anchor cell should have style";
+
+    if (!anchorCell->styleId.isNull()) {
+        const CellStyle* readStyle = readResult.workbook->getStyle(anchorCell->styleId);
+        ASSERT_NE(readStyle, nullptr);
+        EXPECT_TRUE(readStyle->bold) << "Style should be bold";
+        // Note: bgColor format may differ slightly between import/export
+        EXPECT_FALSE(readStyle->bgColor.empty()) << "Style should have background color";
+    }
+}
+
 }  // namespace
 }  // namespace cells
