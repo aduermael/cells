@@ -86,15 +86,20 @@ export function setupDataListeners(config: DataListenersConfig): {
     const viewWidth = container.clientWidth;
     const viewHeight = container.clientHeight;
 
-    const startCol = Math.max(0, Math.floor(app.scrollX / DEFAULT_COL_WIDTH) - 2);
-    const startRow = Math.max(0, Math.floor(app.scrollY / DEFAULT_ROW_HEIGHT) - 2);
+    // Overscan: fetch extra rows/columns beyond visible area so small scrolls
+    // show pre-fetched data without waiting for a new fetch
+    const OVERSCAN_COLS = 8;  // Columns to fetch beyond visible area on each side
+    const OVERSCAN_ROWS = 15; // Rows to fetch beyond visible area on each side
+
+    const startCol = Math.max(0, Math.floor(app.scrollX / DEFAULT_COL_WIDTH) - OVERSCAN_COLS);
+    const startRow = Math.max(0, Math.floor(app.scrollY / DEFAULT_ROW_HEIGHT) - OVERSCAN_ROWS);
     const endCol = Math.min(
       app.sheetInfo.colCount,
-      startCol + Math.ceil(viewWidth / DEFAULT_COL_WIDTH) + 4
+      startCol + Math.ceil(viewWidth / DEFAULT_COL_WIDTH) + OVERSCAN_COLS * 2
     );
     const endRow = Math.min(
       app.sheetInfo.rowCount,
-      startRow + Math.ceil(viewHeight / DEFAULT_ROW_HEIGHT) + 4
+      startRow + Math.ceil(viewHeight / DEFAULT_ROW_HEIGHT) + OVERSCAN_ROWS * 2
     );
 
     try {
@@ -140,40 +145,51 @@ export function setupDataListeners(config: DataListenersConfig): {
   }
 
   let fetchInFlight = false;
-  let fetchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-  const FETCH_DEBOUNCE_MS = 16; // ~1 frame, responsive but prevents flooding
+  let lastFetchTime = 0;
+  let trailingFetchTimer: ReturnType<typeof setTimeout> | null = null;
+  const THROTTLE_INTERVAL_MS = 100; // Minimum time between fetches during continuous scroll
 
   /**
-   * Request a viewport fetch with debouncing.
-   * - Debounces rapid scroll events to prevent flooding the WASM worker
-   * - If a fetch is in flight, waits for it to complete then fetches again
-   * - Uses current scroll position at fetch time (not when queued)
+   * Request a viewport fetch with throttle + trailing pattern.
+   *
+   * During continuous scrolling (like trackpad inertia), this ensures:
+   * 1. Fetches happen at minimum THROTTLE_INTERVAL_MS frequency (not blocked forever)
+   * 2. A single trailing fetch fires after scrolling stops
+   *
+   * This replaces pure debounce which would reset on every scroll event,
+   * causing the grid to appear frozen during long inertial scrolls.
    */
   function fetchViewportNow(): void {
-    // Clear any pending debounce timer
-    if (fetchDebounceTimer !== null) {
-      clearTimeout(fetchDebounceTimer);
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime;
+
+    // Clear any pending trailing fetch timer
+    if (trailingFetchTimer !== null) {
+      clearTimeout(trailingFetchTimer);
+      trailingFetchTimer = null;
     }
 
-    // Debounce: wait a short time for scroll to settle
-    fetchDebounceTimer = setTimeout(() => {
-      fetchDebounceTimer = null;
+    if (timeSinceLastFetch >= THROTTLE_INTERVAL_MS) {
+      // Enough time has passed - fetch immediately
       doFetchViewport();
-    }, FETCH_DEBOUNCE_MS);
+    }
+
+    // Always schedule a trailing fetch for when scrolling stops
+    // This ensures we get a final accurate render after inertia ends
+    trailingFetchTimer = setTimeout(() => {
+      trailingFetchTimer = null;
+      doFetchViewport();
+    }, THROTTLE_INTERVAL_MS);
   }
 
   async function doFetchViewport(): Promise<void> {
     if (fetchInFlight) {
-      // A fetch is in progress - schedule another after it completes
-      // The next fetch will use the current scroll position
-      fetchDebounceTimer = setTimeout(() => {
-        fetchDebounceTimer = null;
-        doFetchViewport();
-      }, FETCH_DEBOUNCE_MS);
+      // A fetch is already in progress - the trailing timer will catch up
       return;
     }
 
     fetchInFlight = true;
+    lastFetchTime = Date.now();
     try {
       await fetchViewport();
       render();

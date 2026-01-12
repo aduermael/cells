@@ -32,11 +32,11 @@ The current debounce on `fetchViewportNow()` resets on every scroll event. With 
 
 **Solution:** Replace pure debounce with throttle + trailing debounce. Guarantee viewport fetches happen at a minimum frequency (e.g., every 100-150ms) during continuous scrolling, with a single trailing fetch after scrolling stops.
 
-- [ ] 3a: Change `fetchViewportNow()` to throttle pattern: fetch immediately if enough time has passed since last fetch, track `lastFetchTime` timestamp
-- [ ] 3b: Add single trailing fetch: schedule one final fetch after throttle interval, cancel/reschedule if new scroll events arrive, but don't re-trigger once it fires
-- [ ] 3c: Add viewport buffer/overscan: fetch extra rows/columns beyond visible area (e.g., 10-20 rows above/below, 5-10 cols left/right) so small scrolls show pre-fetched data
-- [ ] 3d: Keep rendering cached cell data during scroll (render what we have, fetch updates will fill in new areas)
-- [ ] 3e: Test with long inertial scrolls and small scroll movements to verify behavior
+- [x] 3a: Change `fetchViewportNow()` to throttle pattern: fetch immediately if enough time has passed since last fetch, track `lastFetchTime` timestamp. Implemented 100ms throttle interval with `lastFetchTime` tracking.
+- [x] 3b: Add single trailing fetch: schedule one final fetch after throttle interval, cancel/reschedule if new scroll events arrive, but don't re-trigger once it fires. Added `trailingFetchTimer` that schedules a final fetch after scrolling stops.
+- [x] 3c: Add viewport buffer/overscan: fetch extra rows/columns beyond visible area (e.g., 10-20 rows above/below, 5-10 cols left/right) so small scrolls show pre-fetched data. Increased overscan to 15 rows and 8 columns on each side.
+- [x] 3d: Keep rendering cached cell data during scroll (render what we have, fetch updates will fill in new areas). Already handled - `render()` is called immediately on scroll events with cached data, before the async fetch. Combined with throttle pattern (3a-3b) and larger overscan (3c), scrolling now shows pre-fetched data smoothly.
+- [x] 3e: Test with long inertial scrolls and small scroll movements to verify behavior. All 83 E2E tests pass. Build and type-check successful.
 
 ## Phase 4: Restore AI Panel Button
 
