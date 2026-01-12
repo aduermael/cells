@@ -991,6 +991,34 @@ std::string generateWorksheet(
     }
 
     xml << "  </sheetData>\n";
+
+    // Write merged cells
+    const auto& mergeRanges = sheet.getMergeRanges();
+    if (!mergeRanges.empty()) {
+        xml << "  <mergeCells count=\"" << mergeRanges.size() << "\">\n";
+        for (const auto& range : mergeRanges) {
+            // Find anchor column and row positions
+            auto anchorColIt = sheet.columns.find(range.anchorColId);
+            auto anchorRowIt = sheet.rows.find(range.anchorRowId);
+            if (anchorColIt == sheet.columns.end() || anchorRowIt == sheet.rows.end()) {
+                continue;  // Skip invalid merge ranges
+            }
+
+            const uint32_t startColPos = anchorColIt->second->position;
+            const uint32_t startRowPos = anchorRowIt->second->position;
+            const uint32_t endColPos = startColPos + range.colSpan - 1;
+            const uint32_t endRowPos = startRowPos + range.rowSpan - 1;
+
+            // Convert to A1 notation (1-indexed rows)
+            const std::string startRef =
+                colIndexToLetter(startColPos) + std::to_string(startRowPos + 1);
+            const std::string endRef = colIndexToLetter(endColPos) + std::to_string(endRowPos + 1);
+
+            xml << "    <mergeCell ref=\"" << startRef << ":" << endRef << "\"/>\n";
+        }
+        xml << "  </mergeCells>\n";
+    }
+
     xml << "</worksheet>";
 
     return xml.str();
