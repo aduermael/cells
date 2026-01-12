@@ -576,6 +576,30 @@ bool Parser::parseSheetView(std::string_view line) {
             } else {
                 line = line.substr(end);
             }
+        } else if (key == "zoomScale") {
+            // Integer value: 10-400
+            const size_t end = line.find_first_of(" \t");
+            const std::string_view valueStr =
+                (end == std::string_view::npos) ? line : line.substr(0, end);
+
+            int zoom = 100;
+            auto result = std::from_chars(valueStr.data(), valueStr.data() + valueStr.size(), zoom);
+            if (result.ec == std::errc{}) {
+                // Clamp to valid range
+                if (zoom < 10) {
+                    zoom = 10;
+                }
+                if (zoom > 400) {
+                    zoom = 400;
+                }
+                currentSheet_->zoomScale = static_cast<uint16_t>(zoom);
+            }
+
+            if (end == std::string_view::npos) {
+                line = "";
+            } else {
+                line = line.substr(end);
+            }
         } else {
             // Unknown property - skip value
             const size_t end = line.find_first_of(" \t");

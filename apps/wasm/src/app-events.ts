@@ -57,6 +57,7 @@ export interface AppEventManagerConfig {
 
     // State accessors
     getSheetInfo: () => SheetInfo | null;
+    getZoomScale: () => number;  // Returns current zoom scale (100 = 100%)
     getSelectedCell: () => Position | null;
     getSelectionStart: () => Position | null;
     getSelectionEnd: () => Position | null;

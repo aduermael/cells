@@ -856,6 +856,31 @@ int LuauSandbox::luaSheetIndex(lua_State* L) {
         return 1;
     }
 
+    // Handle .zoomScale property
+    if (strcmp(key, "zoomScale") == 0) {
+        // Get the sheet UUID from the table
+        lua_getfield(L, 1, "_uuid");
+        if (lua_isstring(L, -1) == 0) {
+            luaL_error(L, "zoomScale: invalid sheet object");
+        }
+        const char* uuidStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        Workbook* workbook = getWorkbook(L);
+        if (workbook == nullptr) {
+            luaL_error(L, "zoomScale: no context set");
+        }
+
+        const ID sheetId(uuidStr);
+        const Sheet* sheet = workbook->getSheet(sheetId);
+        if (sheet == nullptr) {
+            luaL_error(L, "zoomScale: sheet not found");
+        }
+
+        lua_pushinteger(L, sheet->zoomScale);
+        return 1;
+    }
+
     // For other keys, look up in the table itself
     lua_rawget(L, 1);
     return 1;
@@ -933,6 +958,46 @@ int LuauSandbox::luaSheetNewIndex(lua_State* L) {
 
         // Directly set the property (no CRDT operation for view properties yet)
         sheet->showGridLines = showGridLines;
+
+        return 0;
+    }
+
+    // Handle .zoomScale = number assignment
+    if (strcmp(key, "zoomScale") == 0) {
+        if (lua_isnumber(L, 3) == 0) {
+            luaL_error(L, "sheet.zoomScale must be a number (10-400)");
+        }
+        int zoom = static_cast<int>(lua_tonumber(L, 3));
+
+        // Clamp to valid range
+        if (zoom < 10) {
+            zoom = 10;
+        }
+        if (zoom > 400) {
+            zoom = 400;
+        }
+
+        // Get the sheet UUID from the table
+        lua_getfield(L, 1, "_uuid");
+        if (lua_isstring(L, -1) == 0) {
+            luaL_error(L, "zoomScale: invalid sheet object");
+        }
+        const char* uuidStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        Workbook* workbook = getWorkbook(L);
+        if (workbook == nullptr) {
+            luaL_error(L, "zoomScale: no context set");
+        }
+
+        const ID sheetId(uuidStr);
+        Sheet* sheet = workbook->getSheet(sheetId);
+        if (sheet == nullptr) {
+            luaL_error(L, "zoomScale: sheet not found");
+        }
+
+        // Directly set the property (no CRDT operation for view properties yet)
+        sheet->zoomScale = static_cast<uint16_t>(zoom);
 
         return 0;
     }

@@ -794,6 +794,20 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 if (showGridLinesAttr) {
                     sheet->showGridLines = showGridLinesAttr.as_bool(true);
                 }
+
+                // zoomScale: default is 100, valid range 10-400
+                auto zoomScaleAttr = sheetViewNode.attribute("zoomScale");
+                if (zoomScaleAttr) {
+                    int zoom = zoomScaleAttr.as_int(100);
+                    // Clamp to valid range
+                    if (zoom < 10) {
+                        zoom = 10;
+                    }
+                    if (zoom > 400) {
+                        zoom = 400;
+                    }
+                    sheet->zoomScale = static_cast<uint16_t>(zoom);
+                }
             }
         }
 

@@ -2286,5 +2286,116 @@ TEST(XLSXWriterTest, WriteShowGridLinesFalse) {
     EXPECT_FALSE(readSheet->showGridLines);
 }
 
+// =============================================================================
+// Zoom Scale Tests
+// =============================================================================
+
+TEST(XLSXWriterTest, WriteZoomScaleDefault) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    // zoomScale defaults to 100
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue(1.0);
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("zoom_default.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify zoomScale is 100 (default)
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+    EXPECT_EQ(readSheet->zoomScale, 100);
+}
+
+TEST(XLSXWriterTest, WriteZoomScale150) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->zoomScale = 150;  // 150% zoom
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue(1.0);
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("zoom_150.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify zoomScale is 150
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+    EXPECT_EQ(readSheet->zoomScale, 150);
+}
+
+TEST(XLSXWriterTest, WriteMultipleViewProperties) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->showGridLines = false;  // Hide grid lines
+    sheet->zoomScale = 75;         // 75% zoom
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue(1.0);
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("multiple_view_props.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify both properties
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+    EXPECT_FALSE(readSheet->showGridLines);
+    EXPECT_EQ(readSheet->zoomScale, 75);
+}
+
 }  // namespace
 }  // namespace cells

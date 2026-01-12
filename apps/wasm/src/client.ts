@@ -303,6 +303,7 @@ export class CellsClient {
       defaultColWidth: response.defaultColWidth as number,
       defaultRowHeight: response.defaultRowHeight as number,
       showGridLines: response.showGridLines as boolean,
+      zoomScale: response.zoomScale as number,
     };
   }
 

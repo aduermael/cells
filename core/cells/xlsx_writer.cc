@@ -758,11 +758,14 @@ std::string generateWorksheet(
             << "\"/>\n";
     }
 
-    // Write sheetViews (including showGridLines)
+    // Write sheetViews (including showGridLines and zoomScale)
     xml << "  <sheetViews>\n";
     xml << "    <sheetView workbookViewId=\"0\"";
     if (!sheet.showGridLines) {
         xml << " showGridLines=\"0\"";
+    }
+    if (sheet.zoomScale != 100) {
+        xml << " zoomScale=\"" << sheet.zoomScale << "\"";
     }
     xml << "/>\n";
     xml << "  </sheetViews>\n";

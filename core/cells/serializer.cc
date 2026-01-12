@@ -247,10 +247,19 @@ void Serializer::serializeSheet(const Sheet& sheet, std::ostream& out) const {
     out << "S " << sheet.id.toString() << " \"" << escapeString(sheet.name) << "\"\n";
 
     // Sheet view properties (only if non-default)
-    // Format: V <properties...>
+    // Format: V <key:value...>
     // showGridLines is true by default, only output if false
-    if (!sheet.showGridLines) {
-        out << "V showGridLines:0\n";
+    // zoomScale is 100 by default, only output if different
+    const bool hasViewProps = !sheet.showGridLines || sheet.zoomScale != 100;
+    if (hasViewProps) {
+        out << "V";
+        if (!sheet.showGridLines) {
+            out << " showGridLines:0";
+        }
+        if (sheet.zoomScale != 100) {
+            out << " zoomScale:" << sheet.zoomScale;
+        }
+        out << "\n";
     }
 
     // Columns, rows, cells

@@ -332,6 +332,48 @@ TEST(SerializerTest, SerializeShowGridLinesFalse) {
     EXPECT_NE(output.find("V showGridLines:0"), std::string::npos);
 }
 
+TEST(SerializerTest, SerializeZoomScaleDefault) {
+    // When zoomScale is 100 (default), V line should not be emitted
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    // zoomScale defaults to 100
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    // V line should not appear when zoomScale is default (100)
+    EXPECT_EQ(output.find("V "), std::string::npos);
+}
+
+TEST(SerializerTest, SerializeZoomScaleNonDefault) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->zoomScale = 150;
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    // V line should appear when zoomScale is not default
+    EXPECT_NE(output.find("V zoomScale:150"), std::string::npos);
+}
+
+TEST(SerializerTest, SerializeMultipleViewProperties) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->showGridLines = false;
+    sheet->zoomScale = 75;
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    // V line should have both properties
+    EXPECT_NE(output.find("showGridLines:0"), std::string::npos);
+    EXPECT_NE(output.find("zoomScale:75"), std::string::npos);
+}
+
 // --- Convenience Functions ---
 
 TEST(SerializerTest, ConvenienceSerializeFunction) {

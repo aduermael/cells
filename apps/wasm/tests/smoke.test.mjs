@@ -114,6 +114,56 @@ const tests = {
     const name = await getWorkbookName(ctx.page);
     assertEqual(name, 'Budget 2024', 'Workbook name should be extracted from D line');
   },
+
+  'Zoom controls work correctly': async (ctx) => {
+    // Listen for console errors
+    ctx.page.on('console', msg => {
+      if (msg.type() === 'error') {
+        console.log('[Browser Error]', msg.text());
+      }
+    });
+    ctx.page.on('pageerror', err => {
+      console.log('[Page Error]', err.message);
+    });
+
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Load a test file to make the bottom bar visible
+    await loadTestFile(ctx.page, 'budget.zcd');
+    await sleep(500);
+
+    // Wait for bottom bar to be visible (it gets shown after file load)
+    await ctx.page.waitForSelector('#bottom-bar:not(.hidden)', { timeout: 5000 });
+    await sleep(200);
+
+    // Get initial zoom level (should be 100%)
+    let zoomLevel = await ctx.page.$eval('#zoom-level', el => el.textContent);
+    assertEqual(zoomLevel, '100%', 'Initial zoom should be 100%');
+
+    // Click zoom in button
+    await ctx.page.click('#zoom-in-btn');
+    await sleep(100);
+
+    zoomLevel = await ctx.page.$eval('#zoom-level', el => el.textContent);
+    assertEqual(zoomLevel, '125%', 'Zoom should increase to 125%');
+
+    // Click zoom out button twice to go below 100%
+    await ctx.page.click('#zoom-out-btn');
+    await sleep(100);
+    await ctx.page.click('#zoom-out-btn');
+    await sleep(100);
+
+    zoomLevel = await ctx.page.$eval('#zoom-level', el => el.textContent);
+    assertEqual(zoomLevel, '75%', 'Zoom should decrease to 75%');
+
+    // Verify canvas has CSS transform applied
+    const hasTransform = await ctx.page.$eval('#grid', el => {
+      const transform = window.getComputedStyle(el).transform;
+      return transform !== 'none' && transform !== '';
+    });
+    assertTrue(hasTransform, 'Canvas should have CSS transform for zoom');
+  },
 };
 
 // Run all tests

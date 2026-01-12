@@ -84,6 +84,27 @@ export class MouseEventHandlers {
     }
 
     // =========================================================================
+    // Coordinate Conversion
+    // =========================================================================
+
+    /**
+     * Convert screen coordinates to canvas coordinates accounting for zoom
+     * @param e Mouse event
+     * @returns Canvas-relative x, y coordinates
+     */
+    protected getCanvasCoords(e: MouseEvent): { x: number; y: number } {
+        const rect = this.config.canvas.getBoundingClientRect();
+        const zoomScale = this.config.getZoomScale();
+        const factor = zoomScale / 100;
+        // When CSS transform scale is applied, getBoundingClientRect returns scaled size
+        // We need to divide by the factor to get canvas-relative coordinates
+        return {
+            x: (e.clientX - rect.left) / factor,
+            y: (e.clientY - rect.top) / factor,
+        };
+    }
+
+    // =========================================================================
     // Formula Reference Insertion Helpers
     // =========================================================================
 
@@ -390,9 +411,7 @@ export class MouseEventHandlers {
         const sheetInfo = getSheetInfo();
         if (!sheetInfo) return;
 
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const { x, y } = this.getCanvasCoords(e);
         const scrollX = getScrollX();
         const scrollY = getScrollY();
         const colWidths = getColWidths();
@@ -667,9 +686,7 @@ export class MouseEventHandlers {
         const sheetInfo = getSheetInfo();
         if (!sheetInfo) return;
 
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const { x, y } = this.getCanvasCoords(e);
         const scrollX = getScrollX();
         const scrollY = getScrollY();
         const colWidths = getColWidths();
@@ -1222,7 +1239,6 @@ export class MouseEventHandlers {
 
     handleDblClick(e: MouseEvent): void {
         const {
-            canvas,
             getSheetInfo,
             getScrollX,
             getScrollY,
@@ -1240,9 +1256,7 @@ export class MouseEventHandlers {
         const sheetInfo = getSheetInfo();
         if (!sheetInfo) return;
 
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const { x, y } = this.getCanvasCoords(e);
         const scrollX = getScrollX();
         const scrollY = getScrollY();
         const colWidths = getColWidths();
@@ -1288,7 +1302,6 @@ export class MouseEventHandlers {
         e.preventDefault();
 
         const {
-            canvas,
             getSheetInfo,
             getScrollX,
             getScrollY,
@@ -1299,9 +1312,7 @@ export class MouseEventHandlers {
         const sheetInfo = getSheetInfo();
         if (!sheetInfo) return;
 
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        const { x, y } = this.getCanvasCoords(e);
         const scrollX = getScrollX();
         const scrollY = getScrollY();
         const colWidths = getColWidths();

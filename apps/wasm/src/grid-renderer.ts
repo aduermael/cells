@@ -151,6 +151,9 @@ export class GridRenderer {
   // Spill range highlight state (for dynamic array formulas)
   spillRangeHighlight: { minCol: number; maxCol: number; minRow: number; maxRow: number; masterCol: number; masterRow: number } | null = null;
 
+  // Zoom scale (100 = 100%, range 10-400)
+  private _zoomScale = 100;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext("2d");
@@ -163,6 +166,45 @@ export class GridRenderer {
   /** Update state references from the main application */
   setStateRefs(state: GridRendererState): void {
     Object.assign(this, state);
+    // If sheetInfo has a zoom level, sync it
+    if (state.sheetInfo?.zoomScale !== undefined) {
+      this.setZoomScale(state.sheetInfo.zoomScale);
+    }
+  }
+
+  /** Get the current zoom scale (10-400) */
+  getZoomScale(): number {
+    return this._zoomScale;
+  }
+
+  /**
+   * Set the zoom scale (10-400)
+   * Applies CSS transform to the canvas for visual zoom
+   */
+  setZoomScale(scale: number): void {
+    // Clamp to valid range
+    scale = Math.max(10, Math.min(400, scale));
+    if (this._zoomScale === scale) return;
+
+    this._zoomScale = scale;
+
+    // Apply CSS transform for zoom effect
+    // transform-origin is top-left so zoom expands to bottom-right
+    const factor = scale / 100;
+    this.canvas.style.transformOrigin = "top left";
+    this.canvas.style.transform = `scale(${factor})`;
+  }
+
+  /**
+   * Convert screen coordinates to canvas coordinates accounting for zoom
+   * Use this when processing mouse events
+   */
+  screenToCanvas(screenX: number, screenY: number): { x: number; y: number } {
+    const factor = this._zoomScale / 100;
+    return {
+      x: screenX / factor,
+      y: screenY / factor,
+    };
   }
 
   /** Resize the canvas to fit its container */

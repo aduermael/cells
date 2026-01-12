@@ -352,6 +352,7 @@ struct Sheet {
 
     // Sheet view properties
     bool showGridLines{true};  // Show grid lines (default: true)
+    uint16_t zoomScale{100};   // Zoom level percentage (10-400, default: 100)
 
     // Axis storage (maps ID -> Axis)
     std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> columns;

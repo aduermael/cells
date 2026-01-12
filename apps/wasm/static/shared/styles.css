@@ -897,7 +897,7 @@ canvas {
 .named-ranges-dropdown {
     position: absolute;
     z-index: 1000;
-    background: var(--color-bg);
+    background: var(--color-bg-primary);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-lg);
@@ -1341,6 +1341,32 @@ canvas {
 /* Spacer to push chat button to the right in bottom bar */
 .bottom-bar-spacer {
     flex: 1;
+}
+
+/* Zoom controls in bottom bar */
+#zoom-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-left: 1px solid var(--color-border);
+    margin-right: var(--spacing-xs);
+}
+
+#zoom-level {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    min-width: 36px;
+    text-align: center;
+    user-select: none;
+}
+
+.zoom-btn {
+    padding: 2px 4px;
+}
+
+.zoom-btn svg {
+    display: block;
 }
 
 /* Chat open button in bottom bar - styled like a sheet tab but with green accent */

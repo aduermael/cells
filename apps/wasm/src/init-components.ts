@@ -34,6 +34,7 @@ import { NamedRangesDropdown } from "./named-ranges-dropdown";
 import { SheetTabsManager } from "./sheet-tabs";
 import { FileLoader } from "./file-loader";
 import { AppEventManager } from "./app-events";
+import { ZoomControls } from "./zoom-controls";
 import { persistence } from "./persistence";
 import { getCellAt, colToLetter, hasRangeSelection } from "./grid-utils";
 import { colorizeFormula } from "./formula-colorizer.js";
@@ -90,6 +91,7 @@ export interface Components {
   sheetTabsManager: SheetTabsManager;
   fileLoader: FileLoader;
   eventManager: AppEventManager;
+  zoomControls: ZoomControls;
   // Functions
   render: () => void;
   renderPresenceOnly: () => void;
@@ -863,6 +865,7 @@ export function createComponents(config: ComponentsConfig): Components {
     scriptPanel,
     formulaInput: elements.formulaInput,
     getSheetInfo: () => app.sheetInfo,
+    getZoomScale: () => app.renderer.getZoomScale(),
     getSelectedCell: () => app.selectedCell,
     getSelectionStart: () => app.selectionStart,
     getSelectionEnd: () => app.selectionEnd,
@@ -972,6 +975,19 @@ export function createComponents(config: ComponentsConfig): Components {
   });
 
   // =========================================================================
+  // Create ZoomControls
+  // =========================================================================
+
+  const zoomControls = new ZoomControls();
+  zoomControls.setRenderer(app.renderer);
+  zoomControls.setOnZoomChange(() => {
+    // When zoom changes, we don't need to re-render the canvas
+    // CSS transform handles the visual zoom
+    // But we might want to update scrollbar calculations
+    updateScrollbars();
+  });
+
+  // =========================================================================
   // Return Components
   // =========================================================================
 
@@ -991,6 +1007,7 @@ export function createComponents(config: ComponentsConfig): Components {
     sheetTabsManager,
     fileLoader,
     eventManager,
+    zoomControls,
     render,
     renderPresenceOnly,
     resizeCanvas,

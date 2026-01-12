@@ -678,6 +678,76 @@ R xY9zA1bC 0
     }
 }
 
+TEST(ParserTest, ParseSheetViewZoomScaleDefault) {
+    // Default zoomScale is 100 when not specified
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok());
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_EQ(sheet->zoomScale, 100);  // Default is 100
+    }
+}
+
+TEST(ParserTest, ParseSheetViewZoomScale150) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+V zoomScale:150
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "no error");
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_EQ(sheet->zoomScale, 150);
+    }
+}
+
+TEST(ParserTest, ParseSheetViewMultipleProperties) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+V showGridLines:0 zoomScale:75
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "no error");
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_FALSE(sheet->showGridLines);
+        EXPECT_EQ(sheet->zoomScale, 75);
+    }
+}
+
 // Convenience function
 TEST(ParserTest, ParseConvenienceFunction) {
     const std::string content = R"(#cells v1

@@ -403,6 +403,20 @@
             <div id="sheet-tabs-container"></div>
             <button id="add-sheet-btn" class="sheet-tab-add" title="Add sheet">+</button>
             <div class="bottom-bar-spacer"></div>
+            <div id="zoom-controls">
+                <button id="zoom-out-btn" class="btn btn-icon btn-sm zoom-btn" title="Zoom out">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+                <span id="zoom-level">100%</span>
+                <button id="zoom-in-btn" class="btn btn-icon btn-sm zoom-btn" title="Zoom in">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"/>
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                    </svg>
+                </button>
+            </div>
             <button id="chat-open-btn" class="chat-open-btn hidden" title="Open AI Assistant">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -410,7 +424,7 @@
                 <span>AI</span>
             </button>
         </div>
-        <div id="chat-panel">
+        <div id="chat-panel" class="hidden">
             <div id="chat-header">
                 <span id="chat-title">AI Assistant</span>
                 <div id="chat-header-actions">
