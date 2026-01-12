@@ -75,3 +75,12 @@ Verify all improvements work together with the LBO model file.
 - [ ] 8c: Test that borders appear correctly (section dividers, table borders)
 - [ ] 8d: Test that zoom slider works and persists during interaction
 - [ ] 8e: Test that AI panel positioning doesn't interfere with controls
+
+## Phase 9: Fix Cell Editor Positioning for Merged Cells
+
+When editing a merged cell, the cell editor appears at an offset instead of on top of the cell. The editor should position at the merge anchor and span the full merged area.
+
+- [ ] 9a: In cell-editor.ts `positionEditor`, check if selected cell is part of a merge (via `isMergedCell` or `isMergeAnchor`)
+- [ ] 9b: If merged, find the anchor cell position and use `mergeColSpan`/`mergeRowSpan` to calculate editor size
+- [ ] 9c: Position editor at anchor coordinates, size to span full merged region
+- [ ] 9d: Test editing merged cells of various sizes and positions
