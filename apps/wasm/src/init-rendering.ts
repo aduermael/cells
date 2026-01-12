@@ -117,6 +117,66 @@ export function referenceToHighlight(
         };
       }
       break;
+
+    case "named":
+      // Named ranges are rendered based on their resolved target type
+      if (ref.targetType && ref.name) {
+        const baseHighlight = {
+          type: "named" as const,
+          colorIndex,
+          sourceStart: ref.sourceStart,
+          sourceEnd: ref.sourceEnd,
+          namedRangeName: ref.name,
+          namedTargetType: ref.targetType,
+        };
+
+        switch (ref.targetType) {
+          case "cell":
+            if (ref.col !== undefined && ref.row !== undefined) {
+              return { ...baseHighlight, col: ref.col, row: ref.row };
+            }
+            break;
+          case "range":
+            if (
+              ref.startCol !== undefined &&
+              ref.startRow !== undefined &&
+              ref.endCol !== undefined &&
+              ref.endRow !== undefined
+            ) {
+              return {
+                ...baseHighlight,
+                startCol: ref.startCol,
+                startRow: ref.startRow,
+                endCol: ref.endCol,
+                endRow: ref.endRow,
+              };
+            }
+            break;
+          case "column":
+            if (ref.col !== undefined) {
+              return { ...baseHighlight, col: ref.col };
+            } else if (ref.startCol !== undefined && ref.endCol !== undefined) {
+              return {
+                ...baseHighlight,
+                startCol: ref.startCol,
+                endCol: ref.endCol,
+              };
+            }
+            break;
+          case "row":
+            if (ref.row !== undefined) {
+              return { ...baseHighlight, row: ref.row };
+            } else if (ref.startRow !== undefined && ref.endRow !== undefined) {
+              return {
+                ...baseHighlight,
+                startRow: ref.startRow,
+                endRow: ref.endRow,
+              };
+            }
+            break;
+        }
+      }
+      break;
   }
   return null;
 }

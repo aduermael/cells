@@ -133,7 +133,7 @@ export interface NormalizedRange {
 
 /** Formula reference highlight for rendering */
 export interface FormulaHighlight {
-  type: "cell" | "range" | "column" | "row";
+  type: "cell" | "range" | "column" | "row" | "named";
   colorIndex: number; // Index into FORMULA_REF_COLORS array
   isError?: boolean; // Use error color instead
   // For cell references
@@ -147,6 +147,9 @@ export interface FormulaHighlight {
   // Source position in formula text (for text highlighting)
   sourceStart: number;
   sourceEnd: number;
+  // For named references - the resolved target type and name
+  namedRangeName?: string;
+  namedTargetType?: "cell" | "range" | "column" | "row";
 }
 
 /** Remote presence data for rendering */

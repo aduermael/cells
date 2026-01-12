@@ -1049,6 +1049,42 @@ canvas {
     text-shadow: 0 0 2px currentColor;
 }
 
+/* Named range reference tooltip */
+#formula-display .formula-ref-named,
+#cell-display .formula-ref-named {
+    position: relative;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+}
+
+#formula-display .formula-ref-named::after,
+#cell-display .formula-ref-named::after {
+    content: "Named: " attr(data-named-range);
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-bg-tooltip, #333);
+    color: var(--color-text-tooltip, #fff);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: normal;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+#formula-display .formula-ref-named:hover::after,
+#cell-display .formula-ref-named:hover::after {
+    opacity: 1;
+    visibility: visible;
+}
+
 /* Cell Editor Container - wrapper for contenteditable and hidden input */
 #cell-editor-container {
     position: absolute;

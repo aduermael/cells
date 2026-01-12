@@ -155,6 +155,7 @@ export interface ReferenceInfo {
   startAxisId?: string;
   endAxisId?: string;
   name?: string; // For named refs
+  targetType?: "cell" | "range" | "column" | "row"; // Resolved target type for named refs
   sheetId?: string; // For cross-sheet refs
   sourceStart: number; // Start position in formula text
   sourceEnd: number; // End position in formula text

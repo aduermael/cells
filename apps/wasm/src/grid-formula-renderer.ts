@@ -261,6 +261,122 @@ export function drawFormulaHighlights(
           }
         }
         break;
+
+      case "named":
+        // Named ranges render based on their resolved target type
+        switch (highlight.namedTargetType) {
+          case "cell":
+            if (highlight.col !== undefined && highlight.row !== undefined) {
+              drawCellHighlight(
+                ctx,
+                highlight.col,
+                highlight.row,
+                color,
+                state,
+                viewWidth,
+                viewHeight,
+                isHovered
+              );
+            }
+            break;
+
+          case "range":
+            if (
+              highlight.startCol !== undefined &&
+              highlight.startRow !== undefined &&
+              highlight.endCol !== undefined &&
+              highlight.endRow !== undefined
+            ) {
+              drawRangeHighlight(
+                ctx,
+                highlight.startCol,
+                highlight.startRow,
+                highlight.endCol,
+                highlight.endRow,
+                color,
+                state,
+                viewWidth,
+                viewHeight,
+                isHovered
+              );
+            }
+            break;
+
+          case "column":
+            // Single column or column range
+            if (highlight.col !== undefined) {
+              const colX = getColPixelX(highlight.col, state.scrollX, state.colPixelOffsets, state.colWidths);
+              const colW = state.colWidths.get(highlight.col) || DEFAULT_COL_WIDTH;
+              if (colX + colW > HEADER_WIDTH && colX < viewWidth) {
+                const clipX = Math.max(HEADER_WIDTH, colX);
+                const clipW = Math.min(colW, colX + colW - clipX);
+                ctx.fillStyle = isHovered ? color.bg.replace("0.15", "0.25") : color.bg;
+                ctx.fillRect(clipX, HEADER_HEIGHT, clipW, viewHeight - HEADER_HEIGHT);
+                ctx.strokeStyle = color.border;
+                ctx.lineWidth = isHovered ? 3 : 2;
+                const inset = isHovered ? 1.5 : 1;
+                ctx.strokeRect(clipX + inset, HEADER_HEIGHT + inset, clipW - inset * 2, viewHeight - HEADER_HEIGHT - inset * 2);
+              }
+            } else if (highlight.startCol !== undefined && highlight.endCol !== undefined) {
+              // Column range
+              const minCol = Math.min(highlight.startCol, highlight.endCol);
+              const maxCol = Math.max(highlight.startCol, highlight.endCol);
+              const rangeX = getColPixelX(minCol, state.scrollX, state.colPixelOffsets, state.colWidths);
+              let rangeW = 0;
+              for (let i = minCol; i <= maxCol; i++) {
+                rangeW += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+              }
+              if (rangeX + rangeW > HEADER_WIDTH && rangeX < viewWidth) {
+                const clipX = Math.max(HEADER_WIDTH, rangeX);
+                const clipW = Math.min(rangeW, rangeX + rangeW - clipX);
+                ctx.fillStyle = isHovered ? color.bg.replace("0.15", "0.25") : color.bg;
+                ctx.fillRect(clipX, HEADER_HEIGHT, clipW, viewHeight - HEADER_HEIGHT);
+                ctx.strokeStyle = color.border;
+                ctx.lineWidth = isHovered ? 3 : 2;
+                const inset = isHovered ? 1.5 : 1;
+                ctx.strokeRect(clipX + inset, HEADER_HEIGHT + inset, clipW - inset * 2, viewHeight - HEADER_HEIGHT - inset * 2);
+              }
+            }
+            break;
+
+          case "row":
+            // Single row or row range
+            if (highlight.row !== undefined) {
+              const rowY = getRowPixelY(highlight.row, state.scrollY, state.rowPixelOffsets, state.rowHeights);
+              const rowH = state.rowHeights.get(highlight.row) || DEFAULT_ROW_HEIGHT;
+              if (rowY + rowH > HEADER_HEIGHT && rowY < viewHeight) {
+                const clipY = Math.max(HEADER_HEIGHT, rowY);
+                const clipH = Math.min(rowH, rowY + rowH - clipY);
+                ctx.fillStyle = isHovered ? color.bg.replace("0.15", "0.25") : color.bg;
+                ctx.fillRect(HEADER_WIDTH, clipY, viewWidth - HEADER_WIDTH, clipH);
+                ctx.strokeStyle = color.border;
+                ctx.lineWidth = isHovered ? 3 : 2;
+                const inset = isHovered ? 1.5 : 1;
+                ctx.strokeRect(HEADER_WIDTH + inset, clipY + inset, viewWidth - HEADER_WIDTH - inset * 2, clipH - inset * 2);
+              }
+            } else if (highlight.startRow !== undefined && highlight.endRow !== undefined) {
+              // Row range
+              const minRow = Math.min(highlight.startRow, highlight.endRow);
+              const maxRow = Math.max(highlight.startRow, highlight.endRow);
+              const rangeY = getRowPixelY(minRow, state.scrollY, state.rowPixelOffsets, state.rowHeights);
+              let rangeH = 0;
+              for (let i = minRow; i <= maxRow; i++) {
+                rangeH += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+              }
+              if (rangeY + rangeH > HEADER_HEIGHT && rangeY < viewHeight) {
+                const clipY = Math.max(HEADER_HEIGHT, rangeY);
+                const clipH = Math.min(rangeH, rangeY + rangeH - clipY);
+                ctx.fillStyle = isHovered ? color.bg.replace("0.15", "0.25") : color.bg;
+                ctx.fillRect(HEADER_WIDTH, clipY, viewWidth - HEADER_WIDTH, clipH);
+                ctx.strokeStyle = color.border;
+                ctx.lineWidth = isHovered ? 3 : 2;
+                const inset = isHovered ? 1.5 : 1;
+                ctx.strokeRect(HEADER_WIDTH + inset, clipY + inset, viewWidth - HEADER_WIDTH - inset * 2, clipH - inset * 2);
+              }
+            }
+            break;
+        }
+        break;
     }
   }
 

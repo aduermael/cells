@@ -101,18 +101,35 @@ export function colorizeFormula(
 ): string {
   const segments = getFormulaSegments(formula, highlights);
 
+  // Sort highlights by source position to match segment order
+  const sortedHighlights = [...highlights].sort(
+    (a, b) => a.sourceStart - b.sourceStart
+  );
+
   // Track which highlight index each colored segment corresponds to
   let highlightIndex = 0;
+  let segmentHighlightIndex = 0;
 
   return segments
     .map((segment) => {
       const escapedText = escapeHtml(segment.text);
       if (segment.colorIndex !== undefined) {
         const color = getHighlightColor(segment.colorIndex, segment.isError);
+        const currentHighlight = sortedHighlights[segmentHighlightIndex];
         const refIndex = highlightIndex++;
+        segmentHighlightIndex++;
         const isHovered = refIndex === hoveredRefIndex;
         const hoverClass = isHovered ? " formula-ref-hovered" : "";
-        return `<span class="formula-ref${hoverClass}" data-ref-index="${refIndex}" style="color: ${color}; font-weight: 600;">${escapedText}</span>`;
+
+        // Add named range class and data attribute if this is a named reference
+        let namedRangeAttr = "";
+        let namedRangeClass = "";
+        if (currentHighlight?.type === "named" && currentHighlight.namedRangeName) {
+          namedRangeClass = " formula-ref-named";
+          namedRangeAttr = ` data-named-range="${escapeHtml(currentHighlight.namedRangeName)}"`;
+        }
+
+        return `<span class="formula-ref${hoverClass}${namedRangeClass}" data-ref-index="${refIndex}"${namedRangeAttr} style="color: ${color}; font-weight: 600;">${escapedText}</span>`;
       }
       return escapedText;
     })

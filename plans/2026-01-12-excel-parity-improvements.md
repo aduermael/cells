@@ -6,10 +6,10 @@ Comprehensive fixes to improve Excel compatibility: named range highlighting, co
 
 Named ranges should be highlighted when editing a formula that references them, similar to how cell/range references are highlighted. Currently, FormulaHighlight only supports types: "cell", "range", "column", "row".
 
-- [ ] 1a: Add "named" type to FormulaHighlight interface in grid-constants.ts with name field and resolved target (cell/range/column/row info)
-- [ ] 1b: Update formula parser (C++) to return named range references in ReferenceInfo, resolving the named range to its target coordinates
-- [ ] 1c: Update init-rendering.ts convertReferenceInfoToHighlight to handle named range type and create FormulaHighlight with resolved coordinates
-- [ ] 1d: Add visual effect when hovering over a named range in the formula bar (show tooltip with range definition or highlight in dropdown)
+- [x] 1a: Add "named" type to FormulaHighlight interface in grid-constants.ts with name field and resolved target (cell/range/column/row info). Added namedRangeName and namedTargetType fields.
+- [x] 1b: Update formula parser (C++) to return named range references in ReferenceInfo, resolving the named range to its target coordinates. Updated bindings_formula.cc to resolve named ranges and return targetType with col/row coordinates.
+- [x] 1c: Update init-rendering.ts referenceToHighlight to handle named range type and create FormulaHighlight with resolved coordinates. Also updated grid-formula-renderer.ts to render named ranges based on their target type.
+- [x] 1d: Add visual effect when hovering over a named range in the formula bar. Added dotted underline style and tooltip showing "Named: [name]" on hover via CSS pseudo-element.
 
 ## Phase 2: Fix Zoom Reset on Scroll
 

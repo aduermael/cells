@@ -368,10 +368,92 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
                 }
                 break;
             }
-            case ReferenceInfo::Type::NAMED:
+            case ReferenceInfo::Type::NAMED: {
                 json << "\"type\":\"named\",";
                 json << "\"name\":\"" << jsonEscape(ref.namedRangeName) << "\"";
+                // Resolve the named range to get target coordinates
+                const NamedRange* nr = _workbook->getNamedRanges()->resolve(
+                    ref.namedRangeName, sheet->id);
+                if (nr) {
+                    const auto& target = nr->target;
+                    // Get the target sheet (may be different from current sheet)
+                    Sheet* targetSheet = target.sheetId.isNull()
+                        ? sheet
+                        : _workbook->getSheet(target.sheetId);
+                    if (targetSheet) {
+                        switch (target.type) {
+                            case NamedRangeTarget::Type::CELL: {
+                                json << ",\"targetType\":\"cell\"";
+                                const Cell* cell = targetSheet->getCell(target.id1);
+                                if (cell) {
+                                    const Axis* col = targetSheet->getColumn(cell->colId);
+                                    const Axis* row = targetSheet->getRow(cell->rowId);
+                                    if (col && row) {
+                                        json << ",\"col\":" << col->position;
+                                        json << ",\"row\":" << row->position;
+                                    }
+                                }
+                                break;
+                            }
+                            case NamedRangeTarget::Type::RANGE: {
+                                json << ",\"targetType\":\"range\"";
+                                const Cell* topLeft = targetSheet->getCell(target.id1);
+                                const Cell* bottomRight = targetSheet->getCell(target.id2);
+                                if (topLeft && bottomRight) {
+                                    const Axis* startCol = targetSheet->getColumn(topLeft->colId);
+                                    const Axis* startRow = targetSheet->getRow(topLeft->rowId);
+                                    const Axis* endCol = targetSheet->getColumn(bottomRight->colId);
+                                    const Axis* endRow = targetSheet->getRow(bottomRight->rowId);
+                                    if (startCol && startRow && endCol && endRow) {
+                                        json << ",\"startCol\":" << startCol->position;
+                                        json << ",\"startRow\":" << startRow->position;
+                                        json << ",\"endCol\":" << endCol->position;
+                                        json << ",\"endRow\":" << endRow->position;
+                                    }
+                                }
+                                break;
+                            }
+                            case NamedRangeTarget::Type::COLUMN: {
+                                json << ",\"targetType\":\"column\"";
+                                const Axis* axis = targetSheet->getColumn(target.id1);
+                                if (axis) {
+                                    json << ",\"col\":" << axis->position;
+                                }
+                                break;
+                            }
+                            case NamedRangeTarget::Type::ROW: {
+                                json << ",\"targetType\":\"row\"";
+                                const Axis* axis = targetSheet->getRow(target.id1);
+                                if (axis) {
+                                    json << ",\"row\":" << axis->position;
+                                }
+                                break;
+                            }
+                            case NamedRangeTarget::Type::COLUMN_RANGE: {
+                                json << ",\"targetType\":\"column\"";
+                                const Axis* startAxis = targetSheet->getColumn(target.id1);
+                                const Axis* endAxis = targetSheet->getColumn(target.id2);
+                                if (startAxis && endAxis) {
+                                    json << ",\"startCol\":" << startAxis->position;
+                                    json << ",\"endCol\":" << endAxis->position;
+                                }
+                                break;
+                            }
+                            case NamedRangeTarget::Type::ROW_RANGE: {
+                                json << ",\"targetType\":\"row\"";
+                                const Axis* startAxis = targetSheet->getRow(target.id1);
+                                const Axis* endAxis = targetSheet->getRow(target.id2);
+                                if (startAxis && endAxis) {
+                                    json << ",\"startRow\":" << startAxis->position;
+                                    json << ",\"endRow\":" << endAxis->position;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
                 break;
+            }
         }
 
         if (!ref.sheetId.isNull()) {
