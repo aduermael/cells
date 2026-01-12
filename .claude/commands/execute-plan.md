@@ -27,14 +27,12 @@ Do not use pnpm build commands directly - always use bazel build scripts.
 
 ## Tests
 
-At the end of each phase, run tests in this order. Everything should pass:
+At the end of each phase, run `bazel run :check` which runs all checks (unit tests, lint, type-check). Then run E2E tests:
 
-1. `bazel run :test` (unit tests)
-2. `bazel run :lint`
-3. `bazel run :check-types`
-4. `bazel run :wasm-dist` (build before E2E tests)
-5. `bazel run :e2e` (E2E tests)
-6. `bazel run :format`
+1. `bazel run :check` (unit tests + lint + type-check)
+2. `bazel run :wasm-dist` (build before E2E tests)
+3. `bazel run :e2e` (E2E tests)
+4. `bazel run :format` (auto-fix formatting)
 
 For debugging E2E tests with a visible browser, use `bazel run :e2e-headed`.
 
