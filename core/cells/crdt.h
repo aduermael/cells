@@ -113,6 +113,8 @@ Operation makeRowMoveOp(Workbook& workbook, const ID& axisId, const std::string&
 // Axis operations (apply to both columns and rows)
 // payload: "1" for hidden, "0" for visible
 Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden);
+// payload: style ID string, or empty string to clear style
+Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const ID& styleId);
 
 // Generate a SHEET_CREATE operation.
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload);

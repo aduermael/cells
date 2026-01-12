@@ -2112,5 +2112,53 @@ TEST(SerializerTest, HiddenAxisRoundTrip) {
     EXPECT_TRUE(parsedRow->hidden);
 }
 
+TEST(SerializerTest, AxisDefaultStyleRoundTrip) {
+    // Create workbook with styled column and row
+    Workbook wb(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+
+    // Register styles in workbook
+    CellStyle boldStyle;
+    boldStyle.bold = true;
+    wb.registerStyle(ID("sT1yL2eA"), boldStyle);
+
+    CellStyle italicStyle;
+    italicStyle.italic = true;
+    wb.registerStyle(ID("sT1yL2eB"), italicStyle);
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    col->defaultStyleId = ID("sT1yL2eA");
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row->defaultStyleId = ID("sT1yL2eB");
+    sheet->addRow(std::move(row));
+
+    wb.addSheet(std::move(sheet));
+
+    // Serialize
+    Serializer serializer;
+    const std::string output = serializer.serialize(wb);
+
+    // Verify output contains style property
+    EXPECT_NE(output.find("sty:sT1yL2eA"), std::string::npos);
+    EXPECT_NE(output.find("sty:sT1yL2eB"), std::string::npos);
+
+    // Parse back
+    ParseResult result = parse(output);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    Sheet* parsedSheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(parsedSheet, nullptr);
+
+    Axis* parsedCol = parsedSheet->getColumn(ID("cA1bC2dE"));
+    ASSERT_NE(parsedCol, nullptr);
+    EXPECT_EQ(parsedCol->defaultStyleId.toString(), "sT1yL2eA");
+
+    Axis* parsedRow = parsedSheet->getRow(ID("rA1bC2dE"));
+    ASSERT_NE(parsedRow, nullptr);
+    EXPECT_EQ(parsedRow->defaultStyleId.toString(), "sT1yL2eB");
+}
+
 }  // namespace
 }  // namespace cells

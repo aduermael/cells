@@ -64,6 +64,7 @@ enum class OpType : uint8_t {
 
     // Axis operations (apply to both columns and rows)
     AXIS_SET_HIDDEN = 19,  // Set axis hidden state
+    AXIS_SET_STYLE = 52,   // Set axis default style
 
     // Sheet operations
     SHEET_CREATE = 20,  // Create new sheet

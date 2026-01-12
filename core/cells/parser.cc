@@ -734,6 +734,19 @@ bool Parser::parseAxisProps(std::string_view props, Axis& axis) {
             } else {
                 props = props.substr(endPos);
             }
+        } else if (key == "sty") {
+            // Style ID value
+            const size_t endPos = props.find_first_of(" \t");
+            const std::string_view valueStr =
+                (endPos == std::string_view::npos) ? props : props.substr(0, endPos);
+
+            axis.defaultStyleId = ID(std::string(valueStr));
+
+            if (endPos == std::string_view::npos) {
+                props = "";
+            } else {
+                props = props.substr(endPos);
+            }
         } else {
             // Unknown property - skip to next space
             const size_t endPos = props.find_first_of(" \t");

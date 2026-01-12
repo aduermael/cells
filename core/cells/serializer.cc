@@ -347,6 +347,10 @@ void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out)
         out << " hidden:1";
     }
 
+    if (!axis.defaultStyleId.isNull()) {
+        out << " sty:" << axis.defaultStyleId.toString();
+    }
+
     out << "\n";
 }
 

@@ -239,6 +239,12 @@ void LuauSandbox::registerCellsAPI() {
     lua_pushcfunction(L_, &LuauSandbox::luaShowRow, "showRow");
     lua_setglobal(L_, "showRow");
 
+    lua_pushcfunction(L_, &LuauSandbox::luaSetColumnStyle, "setColumnStyle");
+    lua_setglobal(L_, "setColumnStyle");
+
+    lua_pushcfunction(L_, &LuauSandbox::luaSetRowStyle, "setRowStyle");
+    lua_setglobal(L_, "setRowStyle");
+
     lua_pushcfunction(L_, &LuauSandbox::luaSelectSheet, "selectSheet");
     lua_setglobal(L_, "selectSheet");
 

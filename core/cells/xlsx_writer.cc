@@ -664,9 +664,11 @@ struct CellPosition {
 
 // Generate worksheet XML
 // cellStyleIndices maps cell pointer to XLSX style index (s attribute)
+// axisStyleIndices maps axis pointer to XLSX style index (style attribute for cols, s for rows)
 std::string generateWorksheet(
     const cells::Sheet& sheet, SharedStringTable& sst, const cells::RefConverter& refConverter,
-    bool writeFormulas, const std::unordered_map<const cells::Cell*, size_t>& cellStyleIndices) {
+    bool writeFormulas, const std::unordered_map<const cells::Cell*, size_t>& cellStyleIndices,
+    const std::unordered_map<const cells::Axis*, size_t>& axisStyleIndices) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
     xml << "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\n";
@@ -770,23 +772,37 @@ std::string generateWorksheet(
     xml << "/>\n";
     xml << "  </sheetViews>\n";
 
-    // Write cols element if any columns are hidden
-    bool hasHiddenCols = false;
+    // Write cols element if any columns have hidden or style attributes
+    bool needColsElement = false;
     for (const auto& colPair : columns) {
         auto it = sheet.columns.find(colPair.second);
-        if (it != sheet.columns.end() && it->second->hidden) {
-            hasHiddenCols = true;
-            break;
+        if (it != sheet.columns.end()) {
+            if (it->second->hidden || axisStyleIndices.count(it->second.get()) > 0) {
+                needColsElement = true;
+                break;
+            }
         }
     }
-    if (hasHiddenCols) {
+    if (needColsElement) {
         xml << "  <cols>\n";
         for (size_t i = 0; i < columns.size(); ++i) {
             auto it = sheet.columns.find(columns[i].second);
-            if (it != sheet.columns.end() && it->second->hidden) {
-                // Excel uses 1-based column indices
-                xml << "    <col min=\"" << (i + 1) << "\" max=\"" << (i + 1)
-                    << "\" hidden=\"1\"/>\n";
+            if (it != sheet.columns.end()) {
+                const bool hidden = it->second->hidden;
+                auto styleIt = axisStyleIndices.find(it->second.get());
+                const bool hasStyle = styleIt != axisStyleIndices.end() && styleIt->second > 0;
+
+                if (hidden || hasStyle) {
+                    // Excel uses 1-based column indices
+                    xml << "    <col min=\"" << (i + 1) << "\" max=\"" << (i + 1) << "\"";
+                    if (hasStyle) {
+                        xml << " style=\"" << styleIt->second << "\"";
+                    }
+                    if (hidden) {
+                        xml << " hidden=\"1\"";
+                    }
+                    xml << "/>\n";
+                }
             }
         }
         xml << "  </cols>\n";
@@ -807,19 +823,29 @@ std::string generateWorksheet(
             }
         }
 
-        // Check if row is hidden
+        // Check if row is hidden and/or has style
         bool rowHidden = false;
+        size_t rowStyleIdx = 0;
         auto rowIt = sheet.rows.find(rows[rowIdx].second);
-        if (rowIt != sheet.rows.end() && rowIt->second->hidden) {
-            rowHidden = true;
+        if (rowIt != sheet.rows.end()) {
+            if (rowIt->second->hidden) {
+                rowHidden = true;
+            }
+            auto styleIt = axisStyleIndices.find(rowIt->second.get());
+            if (styleIt != axisStyleIndices.end()) {
+                rowStyleIdx = styleIt->second;
+            }
         }
 
-        // Skip rows with no cells and not hidden
-        if (!hasAnyCells && !rowHidden) {
+        // Skip rows with no cells, not hidden, and no style
+        if (!hasAnyCells && !rowHidden && rowStyleIdx == 0) {
             continue;
         }
 
         xml << "    <row r=\"" << (rowIdx + 1) << "\"";
+        if (rowStyleIdx > 0) {
+            xml << " s=\"" << rowStyleIdx << "\" customFormat=\"1\"";
+        }
         if (rowHidden) {
             xml << " hidden=\"1\"";
         }
@@ -1210,11 +1236,13 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         return result;
     }
 
-    // Collect styles from all sheets
+    // Collect styles from all sheets (cells and axes)
     StyleTable styleTable;
     std::unordered_map<const Cell*, size_t> cellStyleIndices;
+    std::unordered_map<const Axis*, size_t> axisStyleIndices;
 
     for (const auto& sheet : workbook.sheets) {
+        // Collect cell styles
         for (const auto& [id, cell] : sheet->cells) {
             if (!cell->styleId.isNull()) {
                 // Look up the CellStyle in the workbook
@@ -1222,6 +1250,26 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
                 if (style != nullptr) {
                     const size_t styleIdx = styleTable.getOrAddFormat(*style);
                     cellStyleIndices[cell.get()] = styleIdx;
+                }
+            }
+        }
+        // Collect column default styles
+        for (const auto& [id, col] : sheet->columns) {
+            if (!col->defaultStyleId.isNull()) {
+                const CellStyle* style = workbook.getStyle(col->defaultStyleId);
+                if (style != nullptr) {
+                    const size_t styleIdx = styleTable.getOrAddFormat(*style);
+                    axisStyleIndices[col.get()] = styleIdx;
+                }
+            }
+        }
+        // Collect row default styles
+        for (const auto& [id, row] : sheet->rows) {
+            if (!row->defaultStyleId.isNull()) {
+                const CellStyle* style = workbook.getStyle(row->defaultStyleId);
+                if (style != nullptr) {
+                    const size_t styleIdx = styleTable.getOrAddFormat(*style);
+                    axisStyleIndices[row.get()] = styleIdx;
                 }
             }
         }
@@ -1246,8 +1294,8 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         refConverter.setContext(sheet);
 
         // Generate worksheet XML
-        const std::string sheetXml =
-            generateWorksheet(sheet, sst, refConverter, options_.writeFormulas, cellStyleIndices);
+        const std::string sheetXml = generateWorksheet(
+            sheet, sst, refConverter, options_.writeFormulas, cellStyleIndices, axisStyleIndices);
 
         const std::string sheetPath = "xl/worksheets/sheet" + std::to_string(i + 1) + ".xml";
         if (!zip.addFile(sheetPath, sheetXml)) {

@@ -26,6 +26,60 @@
 
 namespace cells::wasm {
 
+// =============================================================================
+// Helper: Effective Style Resolution
+// =============================================================================
+// Resolves the effective style for a cell following the hierarchy:
+// 1. Cell's own style (highest priority)
+// 2. Column's default style
+// 3. Row's default style
+// 4. No style (null)
+
+struct EffectiveStyleResult {
+    ID styleId;                   // The resolved style ID
+    const CellStyle* style;       // The resolved style pointer (may be null)
+    bool fromCell;                // true if style came from cell itself
+    bool fromColumn;              // true if style came from column default
+    bool fromRow;                 // true if style came from row default
+};
+
+EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, const Workbook& workbook) {
+    EffectiveStyleResult result = {{}, nullptr, false, false, false};
+
+    // Priority 1: Cell's own style
+    if (!cell.styleId.isNull()) {
+        result.styleId = cell.styleId;
+        result.style = workbook.getStyle(cell.styleId);
+        result.fromCell = true;
+        return result;
+    }
+
+    // Priority 2: Column's default style
+    const Axis* col = sheet.columns.count(cell.colId) > 0
+        ? sheet.columns.at(cell.colId).get()
+        : nullptr;
+    if (col && !col->defaultStyleId.isNull()) {
+        result.styleId = col->defaultStyleId;
+        result.style = workbook.getStyle(col->defaultStyleId);
+        result.fromColumn = true;
+        return result;
+    }
+
+    // Priority 3: Row's default style
+    const Axis* row = sheet.rows.count(cell.rowId) > 0
+        ? sheet.rows.at(cell.rowId).get()
+        : nullptr;
+    if (row && !row->defaultStyleId.isNull()) {
+        result.styleId = row->defaultStyleId;
+        result.style = workbook.getStyle(row->defaultStyleId);
+        result.fromRow = true;
+        return result;
+    }
+
+    // No style found
+    return result;
+}
+
 std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t col2, uint32_t row2) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"No sheet available\"}";
@@ -118,41 +172,47 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             json << "\"formatId\":\"" << entry.cell->formatId.toString() << "\",";
         }
 
-        // Include styleId and style properties if cell has a style
-        if (!entry.cell->styleId.isNull()) {
-            json << "\"styleId\":\"" << entry.cell->styleId.toString() << "\",";
+        // Include effective style (resolves cell > column > row hierarchy)
+        EffectiveStyleResult effectiveStyle = getEffectiveStyle(*entry.cell, *sheet, *_workbook);
+        if (!effectiveStyle.styleId.isNull() && effectiveStyle.style != nullptr) {
+            json << "\"styleId\":\"" << effectiveStyle.styleId.toString() << "\",";
             // Include inline style properties for efficient rendering
-            if (const CellStyle* style = _workbook->getStyle(entry.cell->styleId)) {
-                json << "\"style\":{";
-                json << "\"bold\":" << (style->bold ? "true" : "false");
-                json << ",\"italic\":" << (style->italic ? "true" : "false");
-                json << ",\"underline\":" << (style->underline ? "true" : "false");
-                if (!style->bgColor.empty()) {
-                    json << ",\"bgColor\":\"" << style->bgColor << "\"";
-                }
-                if (!style->textColor.empty()) {
-                    json << ",\"textColor\":\"" << style->textColor << "\"";
-                }
-                if (!style->fontFamily.empty()) {
-                    json << ",\"fontFamily\":\"" << style->fontFamily << "\"";
-                }
-                if (style->fontSize > 0) {
-                    json << ",\"fontSize\":" << static_cast<int>(style->fontSize);
-                }
-                // Alignment - serialize enum values
-                switch (style->hAlign) {
-                    case TextAlign::LEFT: json << ",\"hAlign\":\"left\""; break;
-                    case TextAlign::CENTER: json << ",\"hAlign\":\"center\""; break;
-                    case TextAlign::RIGHT: json << ",\"hAlign\":\"right\""; break;
-                    case TextAlign::JUSTIFY: json << ",\"hAlign\":\"justify\""; break;
-                }
-                switch (style->vAlign) {
-                    case VerticalAlign::TOP: json << ",\"vAlign\":\"top\""; break;
-                    case VerticalAlign::MIDDLE: json << ",\"vAlign\":\"middle\""; break;
-                    case VerticalAlign::BOTTOM: json << ",\"vAlign\":\"bottom\""; break;
-                }
-                json << "},";
+            const CellStyle* style = effectiveStyle.style;
+            json << "\"style\":{";
+            json << "\"bold\":" << (style->bold ? "true" : "false");
+            json << ",\"italic\":" << (style->italic ? "true" : "false");
+            json << ",\"underline\":" << (style->underline ? "true" : "false");
+            if (!style->bgColor.empty()) {
+                json << ",\"bgColor\":\"" << style->bgColor << "\"";
             }
+            if (!style->textColor.empty()) {
+                json << ",\"textColor\":\"" << style->textColor << "\"";
+            }
+            if (!style->fontFamily.empty()) {
+                json << ",\"fontFamily\":\"" << style->fontFamily << "\"";
+            }
+            if (style->fontSize > 0) {
+                json << ",\"fontSize\":" << static_cast<int>(style->fontSize);
+            }
+            // Alignment - serialize enum values
+            switch (style->hAlign) {
+                case TextAlign::LEFT: json << ",\"hAlign\":\"left\""; break;
+                case TextAlign::CENTER: json << ",\"hAlign\":\"center\""; break;
+                case TextAlign::RIGHT: json << ",\"hAlign\":\"right\""; break;
+                case TextAlign::JUSTIFY: json << ",\"hAlign\":\"justify\""; break;
+            }
+            switch (style->vAlign) {
+                case VerticalAlign::TOP: json << ",\"vAlign\":\"top\""; break;
+                case VerticalAlign::MIDDLE: json << ",\"vAlign\":\"middle\""; break;
+                case VerticalAlign::BOTTOM: json << ",\"vAlign\":\"bottom\""; break;
+            }
+            // Indicate if style is inherited from axis (column or row)
+            if (effectiveStyle.fromColumn) {
+                json << ",\"inheritedFrom\":\"column\"";
+            } else if (effectiveStyle.fromRow) {
+                json << ",\"inheritedFrom\":\"row\"";
+            }
+            json << "},";
         }
 
         // Check if this cell is part of a spill range

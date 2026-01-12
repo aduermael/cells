@@ -2545,5 +2545,164 @@ TEST(XLSXWriterTest, HiddenRowRoundTrip) {
     EXPECT_FALSE(readRow3->hidden) << "Row 2 should not be hidden";
 }
 
+TEST(XLSXWriterTest, ColumnDefaultStyleRoundTrip) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Column Style Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Register a style
+    CellStyle boldStyle;
+    boldStyle.bold = true;
+    const ID styleId = generate_id();
+    workbook->registerStyle(styleId, boldStyle);
+
+    // Create columns, set default style on middle one
+    auto col1 = std::make_unique<Axis>(generate_id(), true);
+    col1->position = 0;
+    sheet->addColumn(std::move(col1));
+
+    auto col2 = std::make_unique<Axis>(generate_id(), true);
+    col2->position = 1;
+    col2->defaultStyleId = styleId;  // Styled column
+    sheet->addColumn(std::move(col2));
+
+    auto col3 = std::make_unique<Axis>(generate_id(), true);
+    col3->position = 2;
+    sheet->addColumn(std::move(col3));
+
+    // Add rows
+    for (int i = 0; i < 3; ++i) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = static_cast<uint32_t>(i);
+        sheet->addRow(std::move(row));
+    }
+
+    // Add cells in all columns to ensure data exists
+    for (int c = 0; c < 3; ++c) {
+        auto cell = std::make_unique<Cell>(generate_id(),
+                                           sheet->getColumnByPosition(static_cast<uint32_t>(c))->id,
+                                           sheet->getRowByPosition(0)->id);
+        cell->value = CellValue(static_cast<double>(c + 1));
+        sheet->addCell(std::move(cell));
+    }
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("column_style.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify column style
+    XLSXReadOptions readOptions;
+    readOptions.readStyles = true;
+    auto readResult = readXLSX(path, readOptions);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Find columns by position
+    Axis* readCol1 = readSheet->getColumnByPosition(0);
+    Axis* readCol2 = readSheet->getColumnByPosition(1);
+    Axis* readCol3 = readSheet->getColumnByPosition(2);
+
+    ASSERT_NE(readCol1, nullptr);
+    ASSERT_NE(readCol2, nullptr);
+    ASSERT_NE(readCol3, nullptr);
+
+    // Column 1 should have default style, others should not
+    EXPECT_TRUE(readCol1->defaultStyleId.isNull()) << "Column 0 should not have default style";
+    EXPECT_FALSE(readCol2->defaultStyleId.isNull()) << "Column 1 should have default style";
+    EXPECT_TRUE(readCol3->defaultStyleId.isNull()) << "Column 2 should not have default style";
+
+    // Verify the style content
+    if (!readCol2->defaultStyleId.isNull()) {
+        const CellStyle* readStyle = readResult.workbook->getStyle(readCol2->defaultStyleId);
+        ASSERT_NE(readStyle, nullptr);
+        EXPECT_TRUE(readStyle->bold) << "Column 1 style should be bold";
+    }
+}
+
+TEST(XLSXWriterTest, RowDefaultStyleRoundTrip) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Row Style Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Register a style
+    CellStyle italicStyle;
+    italicStyle.italic = true;
+    const ID styleId = generate_id();
+    workbook->registerStyle(styleId, italicStyle);
+
+    // Add columns
+    for (int i = 0; i < 3; ++i) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = static_cast<uint32_t>(i);
+        sheet->addColumn(std::move(col));
+    }
+
+    // Create rows, set default style on middle one
+    auto row1 = std::make_unique<Axis>(generate_id(), false);
+    row1->position = 0;
+    sheet->addRow(std::move(row1));
+
+    auto row2 = std::make_unique<Axis>(generate_id(), false);
+    row2->position = 1;
+    row2->defaultStyleId = styleId;  // Styled row
+    sheet->addRow(std::move(row2));
+
+    auto row3 = std::make_unique<Axis>(generate_id(), false);
+    row3->position = 2;
+    sheet->addRow(std::move(row3));
+
+    // Add cells in all rows to ensure data exists
+    for (int r = 0; r < 3; ++r) {
+        auto cell = std::make_unique<Cell>(generate_id(), sheet->getColumnByPosition(0)->id,
+                                           sheet->getRowByPosition(static_cast<uint32_t>(r))->id);
+        cell->value = CellValue(static_cast<double>(r + 1));
+        sheet->addCell(std::move(cell));
+    }
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("row_style.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify row style
+    XLSXReadOptions readOptions;
+    readOptions.readStyles = true;
+    auto readResult = readXLSX(path, readOptions);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Find rows by position
+    Axis* readRow1 = readSheet->getRowByPosition(0);
+    Axis* readRow2 = readSheet->getRowByPosition(1);
+    Axis* readRow3 = readSheet->getRowByPosition(2);
+
+    ASSERT_NE(readRow1, nullptr);
+    ASSERT_NE(readRow2, nullptr);
+    ASSERT_NE(readRow3, nullptr);
+
+    // Row 1 should have default style, others should not
+    EXPECT_TRUE(readRow1->defaultStyleId.isNull()) << "Row 0 should not have default style";
+    EXPECT_FALSE(readRow2->defaultStyleId.isNull()) << "Row 1 should have default style";
+    EXPECT_TRUE(readRow3->defaultStyleId.isNull()) << "Row 2 should not have default style";
+
+    // Verify the style content
+    if (!readRow2->defaultStyleId.isNull()) {
+        const CellStyle* readStyle = readResult.workbook->getStyle(readRow2->defaultStyleId);
+        ASSERT_NE(readStyle, nullptr);
+        EXPECT_TRUE(readStyle->italic) << "Row 1 style should be italic";
+    }
+}
+
 }  // namespace
 }  // namespace cells

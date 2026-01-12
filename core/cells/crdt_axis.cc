@@ -305,6 +305,44 @@ ApplyResult applyAxisSetHidden(Workbook& workbook, const Operation& op) {
     return ApplyResult::SUCCESS;
 }
 
+ApplyResult applyAxisSetStyle(Workbook& workbook, const Operation& op) {
+    Axis* axis = nullptr;
+
+    // Search for axis in all sheets (could be column or row)
+    for (auto& s : workbook.sheets) {
+        axis = s->getColumn(op.target_id);
+        if (axis != nullptr) {
+            break;
+        }
+        axis = s->getRow(op.target_id);
+        if (axis != nullptr) {
+            break;
+        }
+    }
+
+    if (axis == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer set_style operations
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if (existing.type == OpType::AXIS_SET_STYLE && existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    // Payload is the style ID (or empty string to clear)
+    if (op.payload.empty()) {
+        axis->defaultStyleId = ID{};  // Clear style
+    } else {
+        axis->defaultStyleId = ID(op.payload);
+    }
+
+    return ApplyResult::SUCCESS;
+}
+
 ApplyResult applyColMove(Workbook& workbook, const Operation& op) {
     Axis* axis = nullptr;
     Sheet* targetSheet = nullptr;

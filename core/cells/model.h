@@ -330,6 +330,7 @@ struct Axis {
     uint32_t size;       // Width (column) or height (row) in pixels
     bool isColumn;       // true = column (x), false = row (y)
     bool hidden{false};  // Whether axis is hidden (default: false)
+    ID defaultStyleId;   // Default style for cells in this axis (null = no default)
 
     Axis();
     explicit Axis(const ID& id, bool isColumn = true);

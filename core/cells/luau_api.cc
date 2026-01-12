@@ -669,6 +669,165 @@ int LuauSandbox::luaShowRow(lua_State* L) {
 }
 
 // ============================================================================
+// Axis API: setColumnStyle(col, style)
+// Set default style for a column. Style is a table with style properties.
+// e.g., setColumnStyle("A", {bold=true, bgColor="#FF0000"})
+// ============================================================================
+int LuauSandbox::luaSetColumnStyle(lua_State* L) {
+    const char* colRef = luaL_checkstring(L, 1);
+    luaL_checktype(L, 2, LUA_TTABLE);
+
+    Sheet* sheet = getSheet(L);
+    Workbook* workbook = getWorkbook(L);
+    if (sheet == nullptr || workbook == nullptr) {
+        luaL_error(L, "setColumnStyle: no context set");
+    }
+
+    // Parse column reference
+    const int colIdx = parseColumnLetter(colRef, nullptr);
+    if (colIdx < 0) {
+        luaL_error(L, "setColumnStyle: invalid column '%s'", colRef);
+    }
+
+    const Axis* col = sheet->getColumnByPosition(static_cast<uint32_t>(colIdx));
+    if (col == nullptr) {
+        luaL_error(L, "setColumnStyle: column '%s' not found", colRef);
+    }
+
+    // Parse style table into CellStyle
+    CellStyle style;
+    lua_getfield(L, 2, "bold");
+    if (lua_isboolean(L, -1) != 0) {
+        style.bold = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "italic");
+    if (lua_isboolean(L, -1) != 0) {
+        style.italic = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "underline");
+    if (lua_isboolean(L, -1) != 0) {
+        style.underline = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "bgColor");
+    if (lua_isstring(L, -1) != 0) {
+        style.bgColor = lua_tostring(L, -1);
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "textColor");
+    if (lua_isstring(L, -1) != 0) {
+        style.textColor = lua_tostring(L, -1);
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "fontFamily");
+    if (lua_isstring(L, -1) != 0) {
+        style.fontFamily = lua_tostring(L, -1);
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "fontSize");
+    if (lua_isnumber(L, -1) != 0) {
+        style.fontSize = static_cast<uint8_t>(lua_tointeger(L, -1));
+    }
+    lua_pop(L, 1);
+
+    // Register the style and apply to column
+    const ID styleId = generate_id();
+    workbook->registerStyle(styleId, style);
+
+    const Operation op = makeAxisSetStyleOp(*workbook, col->id, styleId);
+    applyOperation(*workbook, op);
+
+    return 0;
+}
+
+// ============================================================================
+// Axis API: setRowStyle(row, style)
+// Set default style for a row. Style is a table with style properties.
+// e.g., setRowStyle(1, {bold=true, bgColor="#FF0000"})
+// ============================================================================
+int LuauSandbox::luaSetRowStyle(lua_State* L) {
+    const int rowNum = static_cast<int>(luaL_checknumber(L, 1));
+    luaL_checktype(L, 2, LUA_TTABLE);
+
+    Sheet* sheet = getSheet(L);
+    Workbook* workbook = getWorkbook(L);
+    if (sheet == nullptr || workbook == nullptr) {
+        luaL_error(L, "setRowStyle: no context set");
+    }
+
+    if (rowNum < 1) {
+        luaL_error(L, "setRowStyle: row number must be >= 1");
+    }
+
+    const int rowIdx = rowNum - 1;  // Convert to 0-based
+    const Axis* row = sheet->getRowByPosition(static_cast<uint32_t>(rowIdx));
+    if (row == nullptr) {
+        luaL_error(L, "setRowStyle: row %d not found", rowNum);
+    }
+
+    // Parse style table into CellStyle
+    CellStyle style;
+    lua_getfield(L, 2, "bold");
+    if (lua_isboolean(L, -1) != 0) {
+        style.bold = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "italic");
+    if (lua_isboolean(L, -1) != 0) {
+        style.italic = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "underline");
+    if (lua_isboolean(L, -1) != 0) {
+        style.underline = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "bgColor");
+    if (lua_isstring(L, -1) != 0) {
+        style.bgColor = lua_tostring(L, -1);
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "textColor");
+    if (lua_isstring(L, -1) != 0) {
+        style.textColor = lua_tostring(L, -1);
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "fontFamily");
+    if (lua_isstring(L, -1) != 0) {
+        style.fontFamily = lua_tostring(L, -1);
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "fontSize");
+    if (lua_isnumber(L, -1) != 0) {
+        style.fontSize = static_cast<uint8_t>(lua_tointeger(L, -1));
+    }
+    lua_pop(L, 1);
+
+    // Register the style and apply to row
+    const ID styleId = generate_id();
+    workbook->registerStyle(styleId, style);
+
+    const Operation op = makeAxisSetStyleOp(*workbook, row->id, styleId);
+    applyOperation(*workbook, op);
+
+    return 0;
+}
+
+// ============================================================================
 // Cells API: selectSheet(sheet|name|index)
 // Accepts: sheet object, name string, or 1-based index number
 // ============================================================================

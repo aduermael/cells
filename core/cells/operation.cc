@@ -39,6 +39,8 @@ const char* opTypeToString(OpType type) {
         // Axis operations
         case OpType::AXIS_SET_HIDDEN:
             return "AXIS_SET_HIDDEN";
+        case OpType::AXIS_SET_STYLE:
+            return "AXIS_SET_STYLE";
         // Sheet operations
         case OpType::SHEET_CREATE:
             return "SHEET_CREATE";
@@ -162,6 +164,9 @@ OpType stringToOpType(const std::string& str) {
     // Axis operations
     if (str == "AXIS_SET_HIDDEN") {
         return OpType::AXIS_SET_HIDDEN;
+    }
+    if (str == "AXIS_SET_STYLE") {
+        return OpType::AXIS_SET_STYLE;
     }
     return OpType::CELL_SET_VALUE;  // Default
 }

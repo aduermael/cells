@@ -757,6 +757,32 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     // Create workbook
     auto workbook = std::make_unique<Workbook>(generate_id(), "Imported");
 
+    // Style application helper - gets or creates a style ID for an XLSX style index
+    // Defined here to be usable for both cell styles and axis default styles
+    auto getOrCreateStyleId = [&](int xlsxStyleIndex) -> ID {
+        if (!options.readStyles || xlsxStyleIndex <= 0) {
+            return {};  // Null ID - no style or default style
+        }
+
+        CellStyle cellStyle;
+        if (!xlsxStyles.getCellStyle(xlsxStyleIndex, cellStyle)) {
+            return {};  // Failed to convert style
+        }
+
+        // Check if this style already exists (deduplication)
+        const std::string styleKey = cellStyleToKey(cellStyle);
+        auto it = styleToId.find(styleKey);
+        if (it != styleToId.end()) {
+            return it->second;
+        }
+
+        // Register new style
+        const ID styleId = generate_id();
+        workbook->registerStyle(styleId, cellStyle);
+        styleToId[styleKey] = styleId;
+        return styleId;
+    };
+
     // Process each sheet
     for (const auto& [sheetName, sheetPath] : sheetInfo) {
         // Filter sheets if specific sheet requested
@@ -811,19 +837,24 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             }
         }
 
-        // Parse column properties (<cols> element) - includes hidden, width, etc.
+        // Parse column properties (<cols> element) - includes hidden, width, style, etc.
         // XLSX cols use 1-based column indices and can specify ranges (min/max)
         start = std::chrono::steady_clock::now();
-        std::unordered_map<int, bool> columnHidden;  // 0-indexed col -> hidden
+        std::unordered_map<int, bool> columnHidden;     // 0-indexed col -> hidden
+        std::unordered_map<int, int> columnStyleIndex;  // 0-indexed col -> XLSX style index
         auto colsNode = worksheetNode.child("cols");
         if (colsNode) {
             for (auto colNode : colsNode.children("col")) {
                 const int minCol = colNode.attribute("min").as_int(1) - 1;  // Convert to 0-indexed
                 const int maxColRange = colNode.attribute("max").as_int(1) - 1;
                 const bool hidden = colNode.attribute("hidden").as_bool(false);
-                if (hidden) {
-                    for (int c = minCol; c <= maxColRange; ++c) {
+                const int styleIndex = colNode.attribute("style").as_int(0);
+                for (int c = minCol; c <= maxColRange; ++c) {
+                    if (hidden) {
                         columnHidden[c] = true;
+                    }
+                    if (styleIndex > 0) {
+                        columnStyleIndex[c] = styleIndex;
                     }
                 }
             }
@@ -835,8 +866,9 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         int maxRow = 0, maxCol = 0;
         auto sheetData = sheetDoc.child("worksheet").child("sheetData");
 
-        // Also track hidden rows as we scan
-        std::unordered_map<int, bool> rowHidden;  // 0-indexed row -> hidden
+        // Also track hidden rows and row styles as we scan
+        std::unordered_map<int, bool> rowHidden;     // 0-indexed row -> hidden
+        std::unordered_map<int, int> rowStyleIndex;  // 0-indexed row -> XLSX style index
 
         for (auto row : sheetData.children("row")) {
             const int rowNum = row.attribute("r").as_int() - 1;  // 0-indexed
@@ -847,6 +879,12 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             // Check if row is hidden
             if (row.attribute("hidden").as_bool(false)) {
                 rowHidden[rowNum] = true;
+            }
+
+            // Check for row default style (s attribute)
+            const int styleIndex = row.attribute("s").as_int(0);
+            if (styleIndex > 0) {
+                rowStyleIndex[rowNum] = styleIndex;
             }
 
             for (auto cell : row.children("c")) {
@@ -871,6 +909,11 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             col->position = static_cast<uint32_t>(c);
             col->size = DEFAULT_COLUMN_WIDTH;
             col->hidden = columnHidden.count(c) > 0;
+            // Apply column default style if present
+            auto styleIt = columnStyleIndex.find(c);
+            if (styleIt != columnStyleIndex.end()) {
+                col->defaultStyleId = getOrCreateStyleId(styleIt->second);
+            }
             columnIds.push_back(col->id);
             sheet->addColumn(std::move(col));
         }
@@ -880,6 +923,11 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             rowAxis->position = static_cast<uint32_t>(r);
             rowAxis->size = DEFAULT_ROW_HEIGHT;
             rowAxis->hidden = rowHidden.count(r) > 0;
+            // Apply row default style if present
+            auto styleIt = rowStyleIndex.find(r);
+            if (styleIt != rowStyleIndex.end()) {
+                rowAxis->defaultStyleId = getOrCreateStyleId(styleIt->second);
+            }
             rowIds.push_back(rowAxis->id);
             sheet->addRow(std::move(rowAxis));
         }
@@ -910,31 +958,6 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 options.progressCallback(cellsLoaded, totalCellEstimate);
                 lastProgressReport = cellsLoaded;
             }
-        };
-
-        // Style application helper - gets or creates a style ID for an XLSX style index
-        auto getOrCreateStyleId = [&](int xlsxStyleIndex) -> ID {
-            if (!options.readStyles || xlsxStyleIndex <= 0) {
-                return {};  // Null ID - no style or default style
-            }
-
-            CellStyle cellStyle;
-            if (!xlsxStyles.getCellStyle(xlsxStyleIndex, cellStyle)) {
-                return {};  // Failed to convert style
-            }
-
-            // Check if this style already exists (deduplication)
-            const std::string styleKey = cellStyleToKey(cellStyle);
-            auto it = styleToId.find(styleKey);
-            if (it != styleToId.end()) {
-                return it->second;
-            }
-
-            // Register new style
-            const ID styleId = generate_id();
-            workbook->registerStyle(styleId, cellStyle);
-            styleToId[styleKey] = styleId;
-            return styleId;
         };
 
         for (auto row : sheetData.children("row")) {
