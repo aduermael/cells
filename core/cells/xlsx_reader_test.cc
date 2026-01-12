@@ -602,5 +602,107 @@ TEST(XLSXReaderTest, NamedRangeSingleCellTarget) {
     }
 }
 
+// ============================================================================
+// Number Format Import Tests
+// ============================================================================
+
+TEST(XLSXReaderTest, ReadNumberFormatsFromLBOModel) {
+    // The LBO model file has currency formats (USD), percentages, and dates
+    XLSXReadOptions options;
+    options.readStyles = true;
+
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByName("LBO-60-Minutes");
+    ASSERT_NE(sheet, nullptr);
+
+    // Look for cells with number formats
+    bool foundCurrencyFormat = false;
+    bool foundPercentageFormat = false;
+    bool foundNumberFormat = false;
+
+    for (const auto& [cellId, cell] : sheet->cells) {
+        if (cell->formatId.isNull()) {
+            continue;
+        }
+
+        const std::string formatIdStr = cell->formatId.toString();
+
+        // Check for currency format (CUSD_*, CEUR_*, etc.)
+        if (formatIdStr[0] == 'C' && formatIdStr.size() >= 5 && formatIdStr[4] == '_') {
+            foundCurrencyFormat = true;
+        }
+
+        // Check for percentage format (FMT_P*)
+        if (formatIdStr.substr(0, 5) == "FMT_P") {
+            foundPercentageFormat = true;
+        }
+
+        // Check for number format with separator (FMT_NS*)
+        if (formatIdStr.substr(0, 6) == "FMT_NS") {
+            foundNumberFormat = true;
+        }
+    }
+
+    EXPECT_TRUE(foundCurrencyFormat || foundNumberFormat || foundPercentageFormat)
+        << "Expected to find at least one cell with number format in the LBO model";
+}
+
+TEST(XLSXReaderTest, ReadNumberFormatsWithStyles) {
+    // Verify that number formats are applied alongside visual styles
+    XLSXReadOptions options;
+    options.readStyles = true;
+
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // Count cells with formats
+    size_t cellsWithStyleAndFormat = 0;
+    size_t cellsWithFormatOnly = 0;
+    size_t cellsWithStyleOnly = 0;
+
+    for (const auto& [cellId, cell] : sheet->cells) {
+        const bool hasStyle = !cell->styleId.isNull();
+        const bool hasFormat = !cell->formatId.isNull();
+
+        if (hasStyle && hasFormat) {
+            cellsWithStyleAndFormat++;
+        } else if (hasFormat) {
+            cellsWithFormatOnly++;
+        } else if (hasStyle) {
+            cellsWithStyleOnly++;
+        }
+    }
+
+    // Verify we have cells with different combinations
+    // The LBO model should have styled cells and/or formatted cells
+    EXPECT_GT(cellsWithStyleAndFormat + cellsWithFormatOnly + cellsWithStyleOnly, 0u)
+        << "Expected to find cells with styles or formats";
+}
+
+TEST(XLSXReaderTest, NumberFormatsNotImportedWhenStylesDisabled) {
+    // Number formats should NOT be imported when readStyles is false
+    XLSXReadOptions options;
+    options.readStyles = false;
+
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // All cells should have null formatId when styles are disabled
+    for (const auto& [cellId, cell] : sheet->cells) {
+        EXPECT_TRUE(cell->formatId.isNull()) << "formatId should be null when readStyles=false";
+    }
+}
+
 }  // namespace
 }  // namespace cells

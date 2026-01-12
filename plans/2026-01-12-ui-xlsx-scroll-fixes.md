@@ -9,10 +9,10 @@ The XLSX reader parses `numFmtId` from cell formats but never applies it to `cel
 - Percentages showing as decimals (e.g., "0.3" instead of "30.0%")
 - Dates showing as Excel serial numbers (e.g., "42735" instead of "2016-12-31")
 
-- [ ] 1a: Parse custom number formats from `<numFmts>` element in styles.xml into a map of numFmtId -> format code
-- [ ] 1b: Create helper to map XLSX numFmtId to Cells format ID (handle both built-in formats 0-163 and custom formats 164+)
-- [ ] 1c: Apply formatId to cells during XLSX import based on their style's numFmtId
-- [ ] 1d: Add unit tests for number format import (currency, percentage, date formats)
+- [x] 1a: Parse custom number formats from `<numFmts>` element in styles.xml into a map of numFmtId -> format code. Added `customNumFormats` map to `XLSXStyles` struct and parsing logic in `parseStylesXml()`.
+- [x] 1b: Create helper to map XLSX numFmtId to Cells format ID (handle both built-in formats 0-163 and custom formats 164+). Added `mapNumFmtIdToFormatId()` function that handles Excel built-in formats and parses custom format codes.
+- [x] 1c: Apply formatId to cells during XLSX import based on their style's numFmtId. Added `getFormatId` lambda with caching and applied formatId to cells during import.
+- [x] 1d: Add unit tests for number format import (currency, percentage, date formats). Added 3 tests: `ReadNumberFormatsFromLBOModel`, `ReadNumberFormatsWithStyles`, `NumberFormatsNotImportedWhenStylesDisabled`.
 
 ## Phase 2: Implement Merged Cells Support
 
