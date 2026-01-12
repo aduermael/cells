@@ -1387,6 +1387,7 @@ canvas {
     white-space: nowrap;
     transition: all var(--transition-fast);
     flex-shrink: 0;
+    margin-left: var(--spacing-sm);
 }
 
 .chat-open-btn:hover {
