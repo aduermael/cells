@@ -938,7 +938,7 @@ void Sheet::addMergeRange(const ID& anchorColId, const ID& anchorRowId, uint16_t
     }
 
     // Create the merge range
-    MergeRange range(anchorColId, anchorRowId, colSpan, rowSpan);
+    const MergeRange range(anchorColId, anchorRowId, colSpan, rowSpan);
     const size_t rangeIndex = _mergeRanges.size();
     _mergeRanges.push_back(range);
 

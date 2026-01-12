@@ -41,6 +41,7 @@ export interface CellsEngine {
     deleteSheet(index: number): string;
     renameSheet(index: number, name: string): string;
     moveSheet(fromIndex: number, toIndex: number): string;
+    setFreezePanes(freezeCol: number, freezeRow: number): void;
 
     // Viewport
     queryViewport(x1: number, y1: number, x2: number, y2: number): string;

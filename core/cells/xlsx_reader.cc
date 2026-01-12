@@ -1466,8 +1466,8 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 }
 
                 // Parse range reference (e.g., "A2:E2")
-                std::string refStr(refAttr);
-                size_t colonPos = refStr.find(':');
+                const std::string refStr(refAttr);
+                const size_t colonPos = refStr.find(':');
                 if (colonPos == std::string::npos) {
                     // Single cell, not a valid merge
                     continue;
@@ -1485,7 +1485,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
                 // Ensure columns exist up to endCol
                 while (static_cast<int>(columnIds.size()) <= endCol) {
-                    ID colId = generate_id();
+                    const ID colId = generate_id();
                     auto col = std::make_unique<Axis>(colId, true);
                     col->position = static_cast<uint32_t>(columnIds.size());
                     col->size = DEFAULT_COLUMN_WIDTH;
@@ -1495,7 +1495,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
                 // Ensure rows exist up to endRow
                 while (static_cast<int>(rowIds.size()) <= endRow) {
-                    ID rowId = generate_id();
+                    const ID rowId = generate_id();
                     auto row = std::make_unique<Axis>(rowId, false);
                     row->position = static_cast<uint32_t>(rowIds.size());
                     row->size = DEFAULT_ROW_HEIGHT;
