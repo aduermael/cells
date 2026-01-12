@@ -28,12 +28,14 @@ The `<mergeCells>` element in XLSX is completely ignored, causing:
 
 ## Phase 3: Improve Scroll Rendering with Minimum Frequency
 
-During fast inertial scrolling, the 16ms debounce on `fetchViewportNow()` can cause the grid to appear empty because data fetching lags behind rendering.
+The current debounce on `fetchViewportNow()` resets on every scroll event. With trackpad inertia, scroll events continue firing for several seconds after the user lifts their fingers. Each event resets the debounce timer, so the fetch/render may never happen until inertia completely stops - making the grid appear empty or frozen for a long time.
 
-- [ ] 3a: Add throttled rendering with minimum frequency guarantee (render at least every 100ms during scroll, even if debounced fetch is pending)
-- [ ] 3b: Show stale cached cell data during scroll instead of empty cells (render what we have, even if viewport fetch is pending)
-- [ ] 3c: Add visual indicator for cells being loaded (subtle loading state) to reduce perceived emptiness
-- [ ] 3d: Test scroll performance with large spreadsheets to ensure no lag is introduced
+**Solution:** Replace pure debounce with throttle + trailing debounce. Guarantee viewport fetches happen at a minimum frequency (e.g., every 100-150ms) during continuous scrolling, while still debouncing the final fetch after scrolling stops.
+
+- [ ] 3a: Change `fetchViewportNow()` from debounce to throttle-with-trailing pattern: fetch immediately if enough time has passed since last fetch, otherwise schedule trailing fetch
+- [ ] 3b: Keep rendering with cached/stale cell data during scroll (render what we have for visible cells, fetch will update them)
+- [ ] 3c: Test with long inertial scrolls to verify grid stays populated and responsive
+- [ ] 3d: Tune throttle interval (100-150ms) to balance responsiveness vs WASM worker load
 
 ## Phase 4: Restore AI Panel Button
 
