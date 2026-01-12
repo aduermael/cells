@@ -20,7 +20,7 @@ The `<mergeCells>` element in XLSX is completely ignored, causing:
 - Merged text appearing truncated (only in first cell)
 - Section headers with backgrounds only styling first cell
 
-- [ ] 2a: Add merged cell range storage to Sheet model (vector of merge ranges with top-left anchor)
+- [x] 2a: Add merged cell range storage to Sheet model (vector of merge ranges with top-left anchor). Added `MergeRange` struct and storage to Sheet with index for O(1) lookup by position.
 - [ ] 2b: Parse `<mergeCells><mergedCell ref="A2:E2"/>` from worksheet XML during import
 - [ ] 2c: Update grid renderer to span text/styling across merged cell ranges
 - [ ] 2d: Export merged cells back to XLSX during write

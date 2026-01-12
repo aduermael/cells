@@ -893,4 +893,153 @@ void Sheet::clearAllSharedFormulaGroups() {
     _sharedFormulaFrom.clear();
 }
 
+// ============================================================================
+// Merged Cells
+// ============================================================================
+
+const MergeRange* Sheet::getMergeRange(const ID& colId, const ID& rowId) const {
+    auto key = makeCellKey(colId, rowId);
+    auto it = _mergeIndex.find(key);
+    if (it == _mergeIndex.end()) {
+        return nullptr;
+    }
+    return &_mergeRanges[it->second];
+}
+
+bool Sheet::isMergeAnchor(const ID& colId, const ID& rowId) const {
+    const MergeRange* range = getMergeRange(colId, rowId);
+    if (range == nullptr) {
+        return false;
+    }
+    return range->anchorColId == colId && range->anchorRowId == rowId;
+}
+
+bool Sheet::isMergedCell(const ID& colId, const ID& rowId) const {
+    const MergeRange* range = getMergeRange(colId, rowId);
+    if (range == nullptr) {
+        return false;
+    }
+    // It's a merged (non-anchor) cell if we're in the range but not the anchor
+    return !(range->anchorColId == colId && range->anchorRowId == rowId);
+}
+
+void Sheet::addMergeRange(const ID& anchorColId, const ID& anchorRowId, uint16_t colSpan,
+                          uint16_t rowSpan) {
+    // Validate span (must be at least 1 in each direction, and span more than 1 cell total)
+    if (colSpan < 1 || rowSpan < 1 || (colSpan == 1 && rowSpan == 1)) {
+        return;
+    }
+
+    // Get anchor column/row positions
+    const Axis* anchorCol = getColumn(anchorColId);
+    const Axis* anchorRow = getRow(anchorRowId);
+    if (anchorCol == nullptr || anchorRow == nullptr) {
+        return;
+    }
+
+    // Create the merge range
+    MergeRange range(anchorColId, anchorRowId, colSpan, rowSpan);
+    const size_t rangeIndex = _mergeRanges.size();
+    _mergeRanges.push_back(range);
+
+    // Build index entries for all cells in the merged region
+    const uint32_t startColPos = anchorCol->position;
+    const uint32_t startRowPos = anchorRow->position;
+
+    for (uint32_t c = 0; c < colSpan; ++c) {
+        const Axis* col = getColumnByPosition(startColPos + c);
+        if (col == nullptr) {
+            continue;
+        }
+        for (uint32_t r = 0; r < rowSpan; ++r) {
+            const Axis* row = getRowByPosition(startRowPos + r);
+            if (row == nullptr) {
+                continue;
+            }
+            auto key = makeCellKey(col->id, row->id);
+            _mergeIndex[key] = rangeIndex;
+        }
+    }
+}
+
+void Sheet::removeMergeRange(const ID& anchorColId, const ID& anchorRowId) {
+    // Find the merge range by its anchor
+    auto anchorKey = makeCellKey(anchorColId, anchorRowId);
+    auto it = _mergeIndex.find(anchorKey);
+    if (it == _mergeIndex.end()) {
+        return;
+    }
+
+    const size_t indexToRemove = it->second;
+    const MergeRange& range = _mergeRanges[indexToRemove];
+
+    // Only allow removing by the actual anchor
+    if (range.anchorColId != anchorColId || range.anchorRowId != anchorRowId) {
+        return;
+    }
+
+    // Get anchor positions
+    const Axis* anchorCol = getColumn(anchorColId);
+    const Axis* anchorRow = getRow(anchorRowId);
+    if (anchorCol == nullptr || anchorRow == nullptr) {
+        return;
+    }
+
+    const uint32_t startColPos = anchorCol->position;
+    const uint32_t startRowPos = anchorRow->position;
+
+    // Remove all index entries for this merge range
+    for (uint32_t c = 0; c < range.colSpan; ++c) {
+        const Axis* col = getColumnByPosition(startColPos + c);
+        if (col == nullptr) {
+            continue;
+        }
+        for (uint32_t r = 0; r < range.rowSpan; ++r) {
+            const Axis* row = getRowByPosition(startRowPos + r);
+            if (row == nullptr) {
+                continue;
+            }
+            auto key = makeCellKey(col->id, row->id);
+            _mergeIndex.erase(key);
+        }
+    }
+
+    // Remove from the vector (swap with last and pop for efficiency)
+    if (indexToRemove != _mergeRanges.size() - 1) {
+        // Swap with last element
+        _mergeRanges[indexToRemove] = std::move(_mergeRanges.back());
+
+        // Update all index entries that pointed to the moved element
+        const MergeRange& movedRange = _mergeRanges[indexToRemove];
+        const Axis* movedAnchorCol = getColumn(movedRange.anchorColId);
+        const Axis* movedAnchorRow = getRow(movedRange.anchorRowId);
+        if (movedAnchorCol != nullptr && movedAnchorRow != nullptr) {
+            const uint32_t movedColPos = movedAnchorCol->position;
+            const uint32_t movedRowPos = movedAnchorRow->position;
+
+            for (uint32_t c = 0; c < movedRange.colSpan; ++c) {
+                const Axis* col = getColumnByPosition(movedColPos + c);
+                if (col == nullptr) {
+                    continue;
+                }
+                for (uint32_t r = 0; r < movedRange.rowSpan; ++r) {
+                    const Axis* row = getRowByPosition(movedRowPos + r);
+                    if (row == nullptr) {
+                        continue;
+                    }
+                    auto key = makeCellKey(col->id, row->id);
+                    _mergeIndex[key] = indexToRemove;
+                }
+            }
+        }
+    }
+
+    _mergeRanges.pop_back();
+}
+
+void Sheet::clearAllMergeRanges() {
+    _mergeRanges.clear();
+    _mergeIndex.clear();
+}
+
 }  // namespace cells
