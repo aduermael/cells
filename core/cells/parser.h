@@ -105,6 +105,7 @@ private:
     bool parseStyle(std::string_view line);       // Y <id> <json-props>
     bool parseNamedRange(std::string_view line);  // N "<name>" <scope> <target>
     bool parseSheet(std::string_view line);       // S <id> "<name>"
+    bool parseSheetView(std::string_view line);   // V <properties...>
     bool parseColumn(std::string_view line);      // C <id> <pos> [props]
     bool parseRow(std::string_view line);         // R <id> <pos> [props]
     bool parseCell(std::string_view line);        // X <id> <col> <row> <type> <value>

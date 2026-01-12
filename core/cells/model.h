@@ -350,6 +350,9 @@ struct Sheet {
     ID id;             // Unique identifier
     std::string name;  // Sheet name
 
+    // Sheet view properties
+    bool showGridLines{true};  // Show grid lines (default: true)
+
     // Axis storage (maps ID -> Axis)
     std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> columns;
     std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> rows;

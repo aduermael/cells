@@ -246,6 +246,13 @@ void Serializer::serializeSheet(const Sheet& sheet, std::ostream& out) const {
     // Sheet ID and name
     out << "S " << sheet.id.toString() << " \"" << escapeString(sheet.name) << "\"\n";
 
+    // Sheet view properties (only if non-default)
+    // Format: V <properties...>
+    // showGridLines is true by default, only output if false
+    if (!sheet.showGridLines) {
+        out << "V showGridLines:0\n";
+    }
+
     // Columns, rows, cells
     serializeColumns(sheet, out);
     serializeRows(sheet, out);

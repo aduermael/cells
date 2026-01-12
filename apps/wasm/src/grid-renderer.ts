@@ -420,6 +420,9 @@ export class GridRenderer {
   ): void {
     if (!this.sheetInfo) return;
 
+    // Respect showGridLines sheet property
+    if (this.sheetInfo.showGridLines === false) return;
+
     ctx.strokeStyle = this.colors.gridLine;
     ctx.lineWidth = 1;
 

@@ -831,6 +831,31 @@ int LuauSandbox::luaSheetIndex(lua_State* L) {
         return 1;
     }
 
+    // Handle .gridLines property (showGridLines)
+    if (strcmp(key, "gridLines") == 0) {
+        // Get the sheet UUID from the table
+        lua_getfield(L, 1, "_uuid");
+        if (lua_isstring(L, -1) == 0) {
+            luaL_error(L, "gridLines: invalid sheet object");
+        }
+        const char* uuidStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        Workbook* workbook = getWorkbook(L);
+        if (workbook == nullptr) {
+            luaL_error(L, "gridLines: no context set");
+        }
+
+        const ID sheetId(uuidStr);
+        const Sheet* sheet = workbook->getSheet(sheetId);
+        if (sheet == nullptr) {
+            luaL_error(L, "gridLines: sheet not found");
+        }
+
+        lua_pushboolean(L, sheet->showGridLines ? 1 : 0);
+        return 1;
+    }
+
     // For other keys, look up in the table itself
     lua_rawget(L, 1);
     return 1;
@@ -876,6 +901,38 @@ int LuauSandbox::luaSheetNewIndex(lua_State* L) {
         const std::string payload = R"({"name":")" + jsonEscape(newName) + R"("})";
         const Operation op = makeSheetRenameOp(*workbook, sheet->id, payload);
         applyOperation(*workbook, op);
+
+        return 0;
+    }
+
+    // Handle .gridLines = true/false assignment
+    if (strcmp(key, "gridLines") == 0) {
+        if (lua_isboolean(L, 3) == 0) {
+            luaL_error(L, "sheet.gridLines must be a boolean");
+        }
+        const bool showGridLines = lua_toboolean(L, 3) != 0;
+
+        // Get the sheet UUID from the table
+        lua_getfield(L, 1, "_uuid");
+        if (lua_isstring(L, -1) == 0) {
+            luaL_error(L, "gridLines: invalid sheet object");
+        }
+        const char* uuidStr = lua_tostring(L, -1);
+        lua_pop(L, 1);
+
+        Workbook* workbook = getWorkbook(L);
+        if (workbook == nullptr) {
+            luaL_error(L, "gridLines: no context set");
+        }
+
+        const ID sheetId(uuidStr);
+        Sheet* sheet = workbook->getSheet(sheetId);
+        if (sheet == nullptr) {
+            luaL_error(L, "gridLines: sheet not found");
+        }
+
+        // Directly set the property (no CRDT operation for view properties yet)
+        sheet->showGridLines = showGridLines;
 
         return 0;
     }

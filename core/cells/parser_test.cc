@@ -608,6 +608,76 @@ C cA1bC2dE
     EXPECT_EQ(result.error->line, 5);
 }
 
+// Sheet view properties (V line)
+TEST(ParserTest, ParseSheetViewShowGridLinesDefault) {
+    // Default showGridLines is true when not specified
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok());
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_TRUE(sheet->showGridLines);  // Default is true
+    }
+}
+
+TEST(ParserTest, ParseSheetViewShowGridLinesFalse) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+V showGridLines:0
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "no error");
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_FALSE(sheet->showGridLines);
+    }
+}
+
+TEST(ParserTest, ParseSheetViewShowGridLinesTrue) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+V showGridLines:1
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "no error");
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_TRUE(sheet->showGridLines);
+    }
+}
+
 // Convenience function
 TEST(ParserTest, ParseConvenienceFunction) {
     const std::string content = R"(#cells v1

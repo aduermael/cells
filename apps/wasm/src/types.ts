@@ -61,6 +61,7 @@ export interface SheetInfo {
   colCount: number;
   defaultColWidth: number;
   defaultRowHeight: number;
+  showGridLines: boolean;
 }
 
 /** Cell data from viewport query */

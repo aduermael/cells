@@ -141,6 +141,9 @@ bool Parser::parseLine(std::string_view line) {
         case 'N':  // Named range
             return parseNamedRange(line.substr(firstNonSpace));
 
+        case 'V':  // Sheet view properties
+            return parseSheetView(line.substr(firstNonSpace));
+
         case 'O':  // OpLog entry
             return parseOperation(line.substr(firstNonSpace));
 
@@ -520,6 +523,69 @@ bool Parser::parseSheet(std::string_view line) {
     auto sheet = std::make_unique<Sheet>(sheetId, std::move(name));
     currentSheet_ = sheet.get();
     workbook_->addSheet(std::move(sheet));
+
+    return true;
+}
+
+bool Parser::parseSheetView(std::string_view line) {
+    // Format: V <properties...>
+    // Properties: key:value pairs (e.g., showGridLines:0)
+    if (currentSheet_ == nullptr) {
+        return setError("Sheet view properties outside of sheet");
+    }
+
+    if (line.size() < 2 || line[0] != 'V' || line[1] != ' ') {
+        return setError("Invalid sheet view line");
+    }
+
+    line = line.substr(2);  // Skip "V "
+
+    // Parse key:value pairs
+    while (!line.empty()) {
+        // Skip leading whitespace
+        const size_t start = line.find_first_not_of(" \t");
+        if (start == std::string_view::npos) {
+            break;
+        }
+        line = line.substr(start);
+
+        // Find key:value pair
+        const size_t colonPos = line.find(':');
+        if (colonPos == std::string_view::npos) {
+            break;
+        }
+
+        const std::string_view key = line.substr(0, colonPos);
+        line = line.substr(colonPos + 1);
+
+        if (line.empty()) {
+            break;
+        }
+
+        // Parse value based on key
+        if (key == "showGridLines") {
+            // Boolean value: 0 or 1
+            const size_t end = line.find_first_of(" \t");
+            const std::string_view valueStr =
+                (end == std::string_view::npos) ? line : line.substr(0, end);
+
+            currentSheet_->showGridLines = (valueStr != "0");
+
+            if (end == std::string_view::npos) {
+                line = "";
+            } else {
+                line = line.substr(end);
+            }
+        } else {
+            // Unknown property - skip value
+            const size_t end = line.find_first_of(" \t");
+            if (end == std::string_view::npos) {
+                line = "";
+            } else {
+                line = line.substr(end);
+            }
+        }
+    }
 
     return true;
 }

@@ -305,6 +305,33 @@ TEST(SerializerTest, SerializeRowHeight) {
     EXPECT_NE(output.find("h:48"), std::string::npos);
 }
 
+TEST(SerializerTest, SerializeShowGridLinesDefault) {
+    // When showGridLines is true (default), V line should not be emitted
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    // showGridLines defaults to true
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    // V line should not appear when showGridLines is default (true)
+    EXPECT_EQ(output.find("V showGridLines"), std::string::npos);
+}
+
+TEST(SerializerTest, SerializeShowGridLinesFalse) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->showGridLines = false;
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    // V line should appear when showGridLines is false
+    EXPECT_NE(output.find("V showGridLines:0"), std::string::npos);
+}
+
 // --- Convenience Functions ---
 
 TEST(SerializerTest, ConvenienceSerializeFunction) {

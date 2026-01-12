@@ -302,6 +302,7 @@ export class CellsClient {
       colCount: response.colCount as number,
       defaultColWidth: response.defaultColWidth as number,
       defaultRowHeight: response.defaultRowHeight as number,
+      showGridLines: response.showGridLines as boolean,
     };
   }
 

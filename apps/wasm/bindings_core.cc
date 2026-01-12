@@ -196,7 +196,8 @@ std::string CellsEngine::getSheetInfo() {
     json << "\"rowCount\":" << rowCount << ",";
     json << "\"colCount\":" << colCount << ",";
     json << "\"defaultColWidth\":" << DEFAULT_COLUMN_WIDTH << ",";
-    json << "\"defaultRowHeight\":" << DEFAULT_ROW_HEIGHT;
+    json << "\"defaultRowHeight\":" << DEFAULT_ROW_HEIGHT << ",";
+    json << "\"showGridLines\":" << (sheet->showGridLines ? "true" : "false");
     json << "}";
 
     return json.str();

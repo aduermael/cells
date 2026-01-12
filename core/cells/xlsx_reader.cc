@@ -783,6 +783,20 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         // Create our Sheet
         auto sheet = std::make_unique<Sheet>(generate_id(), sheetName);
 
+        // Parse sheet view properties (grid lines, zoom, etc.)
+        auto worksheetNode = sheetDoc.child("worksheet");
+        auto sheetViewsNode = worksheetNode.child("sheetViews");
+        if (sheetViewsNode) {
+            auto sheetViewNode = sheetViewsNode.child("sheetView");
+            if (sheetViewNode) {
+                // showGridLines: default is "1" (true), "0" means hidden
+                auto showGridLinesAttr = sheetViewNode.attribute("showGridLines");
+                if (showGridLinesAttr) {
+                    sheet->showGridLines = showGridLinesAttr.as_bool(true);
+                }
+            }
+        }
+
         // First pass: find dimensions
         start = std::chrono::steady_clock::now();
         int maxRow = 0, maxCol = 0;

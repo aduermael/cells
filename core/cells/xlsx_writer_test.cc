@@ -2212,5 +2212,79 @@ TEST(XLSXNamedRangeRoundtripTest, RoundtripNameWithSpecialChars) {
     EXPECT_EQ(nr->name, "Total_Revenue_2024");
 }
 
+// =============================================================================
+// Sheet View Properties Tests (showGridLines)
+// =============================================================================
+
+TEST(XLSXWriterTest, WriteShowGridLinesDefault) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    // showGridLines defaults to true
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue(1.0);
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("gridlines_default.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify showGridLines is true (default)
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+    EXPECT_TRUE(readSheet->showGridLines);
+}
+
+TEST(XLSXWriterTest, WriteShowGridLinesFalse) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->showGridLines = false;  // Hide grid lines
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue(1.0);
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("gridlines_hidden.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify showGridLines is false
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+    EXPECT_FALSE(readSheet->showGridLines);
+}
+
 }  // namespace
 }  // namespace cells

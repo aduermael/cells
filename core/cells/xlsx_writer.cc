@@ -758,6 +758,15 @@ std::string generateWorksheet(
             << "\"/>\n";
     }
 
+    // Write sheetViews (including showGridLines)
+    xml << "  <sheetViews>\n";
+    xml << "    <sheetView workbookViewId=\"0\"";
+    if (!sheet.showGridLines) {
+        xml << " showGridLines=\"0\"";
+    }
+    xml << "/>\n";
+    xml << "  </sheetViews>\n";
+
     xml << "  <sheetData>\n";
 
     // Write rows
