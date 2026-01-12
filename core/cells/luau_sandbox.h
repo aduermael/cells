@@ -158,6 +158,8 @@ private:
     static int luaShowRow(lua_State* L);
     static int luaSetColumnStyle(lua_State* L);
     static int luaSetRowStyle(lua_State* L);
+    static int luaFreezePanes(lua_State* L);     // freezePanes(col, row) - freeze columns and rows
+    static int luaGetFreezePanes(lua_State* L);  // getFreezePanes() - returns {col=N, row=N}
 
     // Sheet operations
     static int luaSelectSheet(lua_State* L);  // selectSheet(sheet|name|index)

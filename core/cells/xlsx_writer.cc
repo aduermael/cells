@@ -760,7 +760,7 @@ std::string generateWorksheet(
             << "\"/>\n";
     }
 
-    // Write sheetViews (including showGridLines and zoomScale)
+    // Write sheetViews (including showGridLines, zoomScale, and freeze panes)
     xml << "  <sheetViews>\n";
     xml << "    <sheetView workbookViewId=\"0\"";
     if (!sheet.showGridLines) {
@@ -769,7 +769,34 @@ std::string generateWorksheet(
     if (sheet.zoomScale != 100) {
         xml << " zoomScale=\"" << sheet.zoomScale << "\"";
     }
-    xml << "/>\n";
+
+    // Add freeze panes if either freezeCol or freezeRow is set
+    if (sheet.freezeCol > 0 || sheet.freezeRow > 0) {
+        xml << ">\n";
+        xml << "      <pane";
+        if (sheet.freezeCol > 0) {
+            xml << " xSplit=\"" << sheet.freezeCol << "\"";
+        }
+        if (sheet.freezeRow > 0) {
+            xml << " ySplit=\"" << sheet.freezeRow << "\"";
+        }
+        // topLeftCell is the first unfrozen cell (e.g., B2 if col A and row 1 are frozen)
+        const std::string topLeftCol = colIndexToLetter(sheet.freezeCol);
+        const int topLeftRow = sheet.freezeRow + 1;  // 1-indexed for XLSX
+        xml << " topLeftCell=\"" << topLeftCol << topLeftRow << "\"";
+        // Determine activePane based on which dimensions are frozen
+        if (sheet.freezeCol > 0 && sheet.freezeRow > 0) {
+            xml << " activePane=\"bottomRight\"";
+        } else if (sheet.freezeCol > 0) {
+            xml << " activePane=\"topRight\"";
+        } else {
+            xml << " activePane=\"bottomLeft\"";
+        }
+        xml << " state=\"frozen\"/>\n";
+        xml << "    </sheetView>\n";
+    } else {
+        xml << "/>\n";
+    }
     xml << "  </sheetViews>\n";
 
     // Write cols element if any columns have hidden or style attributes

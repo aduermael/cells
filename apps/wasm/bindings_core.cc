@@ -198,7 +198,9 @@ std::string CellsEngine::getSheetInfo() {
     json << "\"defaultColWidth\":" << DEFAULT_COLUMN_WIDTH << ",";
     json << "\"defaultRowHeight\":" << DEFAULT_ROW_HEIGHT << ",";
     json << "\"showGridLines\":" << (sheet->showGridLines ? "true" : "false") << ",";
-    json << "\"zoomScale\":" << sheet->zoomScale;
+    json << "\"zoomScale\":" << sheet->zoomScale << ",";
+    json << "\"freezeCol\":" << sheet->freezeCol << ",";
+    json << "\"freezeRow\":" << sheet->freezeRow;
     json << "}";
 
     return json.str();
@@ -225,6 +227,15 @@ void CellsEngine::setActiveSheet(int index) {
         rebuildViewportIndex();
         notifyListeners(ChangeType::SHEET_CHANGED);
     }
+}
+
+void CellsEngine::setFreezePanes(int freezeCol, int freezeRow) {
+    Sheet* sheet = activeSheet();
+    if (!sheet) return;
+
+    sheet->freezeCol = static_cast<uint16_t>(std::max(0, freezeCol));
+    sheet->freezeRow = static_cast<uint16_t>(std::max(0, freezeRow));
+    notifyListeners(ChangeType::SHEET_CHANGED);
 }
 
 std::string CellsEngine::addSheet(const std::string& name) {

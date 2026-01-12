@@ -106,6 +106,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("deleteSheet", &cells::wasm::CellsEngine::deleteSheet)
         .function("renameSheet", &cells::wasm::CellsEngine::renameSheet)
         .function("moveSheet", &cells::wasm::CellsEngine::moveSheet)
+        .function("setFreezePanes", &cells::wasm::CellsEngine::setFreezePanes)
         // Viewport
         .function("queryViewport", &cells::wasm::CellsEngine::queryViewport)
         .function("getColumnPixelOffset", &cells::wasm::CellsEngine::getColumnPixelOffset)

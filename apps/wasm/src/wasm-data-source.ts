@@ -390,6 +390,11 @@ export class WasmDataSource {
     return this._client.deleteRowById(rowId);
   }
 
+  /** Set freeze panes (frozen columns and rows) */
+  async setFreezePanes(freezeCol: number, freezeRow: number): Promise<void> {
+    return this._client.setFreezePanes(freezeCol, freezeRow);
+  }
+
   /** Fill a range with extrapolated values from a source range */
   async fillRange(
     sourceMinCol: number, sourceMinRow: number,

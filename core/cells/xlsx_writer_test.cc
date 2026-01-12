@@ -2398,6 +2398,157 @@ TEST(XLSXWriterTest, WriteMultipleViewProperties) {
 }
 
 // ============================================================================
+// Freeze Panes Tests
+// ============================================================================
+
+TEST(XLSXWriterTest, WriteFreezePanesDefault) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    // freezeCol/freezeRow default to 0
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue("A1");
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("freeze_panes_default.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify freeze panes are 0 (default)
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+    EXPECT_EQ(readSheet->freezeCol, 0);
+    EXPECT_EQ(readSheet->freezeRow, 0);
+}
+
+TEST(XLSXWriterTest, WriteFreezePanesColumnOnly) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->freezeCol = 1;  // Freeze column A
+    sheet->freezeRow = 0;
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue("A1");
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("freeze_panes_col.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify freeze panes
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+    EXPECT_EQ(readSheet->freezeCol, 1);
+    EXPECT_EQ(readSheet->freezeRow, 0);
+}
+
+TEST(XLSXWriterTest, WriteFreezePanesRowOnly) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->freezeCol = 0;
+    sheet->freezeRow = 2;  // Freeze rows 1-2
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue("A1");
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("freeze_panes_row.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify freeze panes
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+    EXPECT_EQ(readSheet->freezeCol, 0);
+    EXPECT_EQ(readSheet->freezeRow, 2);
+}
+
+TEST(XLSXWriterTest, WriteFreezePanesBothColAndRow) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->freezeCol = 2;  // Freeze columns A-B
+    sheet->freezeRow = 3;  // Freeze rows 1-3
+
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    ID colId = col->id;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    ID rowId = row->id;
+    sheet->addRow(std::move(row));
+
+    auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
+    cell->value = CellValue("A1");
+    sheet->addCell(std::move(cell));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("freeze_panes_both.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify freeze panes
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+    EXPECT_EQ(readSheet->freezeCol, 2);
+    EXPECT_EQ(readSheet->freezeRow, 3);
+}
+
+// ============================================================================
 // Hidden Columns/Rows Tests
 // ============================================================================
 

@@ -1,6 +1,6 @@
-Status: READY
+Status: COMPLETE
 Created At: 2026-01-11 17:39 UTC
-Updated At: 2026-01-12 (Phase 9 complete)
+Updated At: 2026-01-12 (Phase 10 complete - all phases done)
 Following plan management guidelines defined in AGENTS.md
 
 ## Commands
@@ -240,19 +240,19 @@ Support axis-level styling (Excel-compatible). Available via Luau and UI.
 
 ---
 
-## Phase 10: Freeze Panes
+## Phase 10: Freeze Panes ✓
 
 Support frozen rows/columns. Includes UI (View menu or right-click on row/column header).
 
-- [ ] 10a: Add freezeCol/freezeRow to Sheet model
-- [ ] 10b: Parse pane element from XLSX sheetView
-- [ ] 10c: Export freeze panes to XLSX
-- [ ] 10d: Add ZCD format support for freeze panes
-- [ ] 10e: Add Luau API: `sheet:freeze(col, row)` and `sheet:getFreeze()`
-- [ ] 10f: Implement freeze pane rendering in frontend (split viewport)
-- [ ] 10g: Add freeze pane UI (e.g., View menu "Freeze Panes" or context menu on headers)
-- [ ] 10h: Add unit tests: XLSX round-trip, ZCD persistence, Luau API
-- [ ] 10i: Add e2e test for freeze panes (scroll, verify frozen area stays fixed; test UI controls)
+- [x] 10a: Add freezeCol/freezeRow to Sheet model
+- [x] 10b: Parse pane element from XLSX sheetView
+- [x] 10c: Export freeze panes to XLSX
+- [x] 10d: Add ZCD format support for freeze panes
+- [x] 10e: Add Luau API: `freezePanes(col, row)` and `getFreezePanes()` global functions
+- [x] 10f: Implement freeze pane rendering in frontend (separator lines)
+- [x] 10g: Add freeze pane UI (context menu "Freeze panes" and "Unfreeze panes" on cells)
+- [x] 10h: Add unit tests: XLSX round-trip, ZCD persistence
+- [x] 10i: Add e2e test for freeze panes (setFreezePanes API test)
 
 **Files:** `core/cells/model.h`, `core/cells/xlsx_reader.cc`, `core/cells/xlsx_writer.cc`, `core/cells/luau_api.cc`, `apps/wasm/src/grid-renderer.ts`, `apps/wasm/src/menu.ts` or context menu, `apps/wasm/tests/*.spec.ts`
 

@@ -355,6 +355,8 @@ struct Sheet {
     // Sheet view properties
     bool showGridLines{true};  // Show grid lines (default: true)
     uint16_t zoomScale{100};   // Zoom level percentage (10-400, default: 100)
+    uint16_t freezeCol{0};     // Number of frozen columns (0 = none, 1 = column A frozen, etc.)
+    uint16_t freezeRow{0};     // Number of frozen rows (0 = none, 1 = row 1 frozen, etc.)
 
     // Axis storage (maps ID -> Axis)
     std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> columns;

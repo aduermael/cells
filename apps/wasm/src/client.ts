@@ -304,11 +304,17 @@ export class CellsClient {
       defaultRowHeight: response.defaultRowHeight as number,
       showGridLines: response.showGridLines as boolean,
       zoomScale: response.zoomScale as number,
+      freezeCol: (response.freezeCol as number) ?? 0,
+      freezeRow: (response.freezeRow as number) ?? 0,
     };
   }
 
   async setActiveSheet(index: number): Promise<void> {
     await this._send("setActiveSheet", { index });
+  }
+
+  async setFreezePanes(freezeCol: number, freezeRow: number): Promise<void> {
+    await this._send("setFreezePanes", { freezeCol, freezeRow });
   }
 
   async getSheets(): Promise<GetSheetsResult> {

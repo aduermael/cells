@@ -272,6 +272,19 @@ export function handleMoveSheet(
     }
 }
 
+export function handleSetFreezePanes(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { freezeCol, freezeRow } = params as {
+        freezeCol: number;
+        freezeRow: number;
+    };
+    engine.setFreezePanes(freezeCol, freezeRow);
+    respond({ type: "freezePanesSet", success: true });
+}
+
 // ============================================================================
 // Cell Operations
 // ============================================================================

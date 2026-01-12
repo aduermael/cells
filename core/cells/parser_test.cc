@@ -748,6 +748,80 @@ R xY9zA1bC 0
     }
 }
 
+TEST(ParserTest, ParseSheetViewFreezePanesDefault) {
+    // Default freezeCol/freezeRow are 0 when not specified
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok());
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_EQ(sheet->freezeCol, 0);  // Default is 0
+        EXPECT_EQ(sheet->freezeRow, 0);  // Default is 0
+    }
+}
+
+TEST(ParserTest, ParseSheetViewFreezePanes) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+V freezeCol:2 freezeRow:3
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "no error");
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_EQ(sheet->freezeCol, 2);
+        EXPECT_EQ(sheet->freezeRow, 3);
+    }
+}
+
+TEST(ParserTest, ParseSheetViewAllProperties) {
+    const std::string content = R"(#cells v1
+D aB3cD4eF "Test"
+S gH5jK6mN "Sheet1"
+V showGridLines:0 zoomScale:115 freezeCol:1 freezeRow:2
+#cols
+C pQ7rS8tW 0
+#rows
+R xY9zA1bC 0
+#cells
+)";
+
+    Parser parser;
+    ParseResult result = parser.parse(content);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "no error");
+
+    if (result.workbook) {
+        Sheet* sheet = result.workbook->getSheetByIndex(0);
+        ASSERT_NE(sheet, nullptr);
+        EXPECT_FALSE(sheet->showGridLines);
+        EXPECT_EQ(sheet->zoomScale, 115);
+        EXPECT_EQ(sheet->freezeCol, 1);
+        EXPECT_EQ(sheet->freezeRow, 2);
+    }
+}
+
 // Convenience function
 TEST(ParserTest, ParseConvenienceFunction) {
     const std::string content = R"(#cells v1

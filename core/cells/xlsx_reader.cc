@@ -834,6 +834,26 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                     }
                     sheet->zoomScale = static_cast<uint16_t>(zoom);
                 }
+
+                // Parse freeze panes from <pane> element
+                // XLSX uses xSplit/ySplit to indicate frozen columns/rows when state="frozen"
+                auto paneNode = sheetViewNode.child("pane");
+                if (paneNode) {
+                    auto stateAttr = paneNode.attribute("state");
+                    const std::string state = stateAttr ? stateAttr.as_string() : "";
+                    // Only handle frozen panes, not split panes
+                    if (state == "frozen" || state == "frozenSplit") {
+                        const int xSplit = paneNode.attribute("xSplit").as_int(0);
+                        const int ySplit = paneNode.attribute("ySplit").as_int(0);
+                        // xSplit = number of frozen columns, ySplit = number of frozen rows
+                        if (xSplit > 0) {
+                            sheet->freezeCol = static_cast<uint16_t>(xSplit);
+                        }
+                        if (ySplit > 0) {
+                            sheet->freezeRow = static_cast<uint16_t>(ySplit);
+                        }
+                    }
+                }
             }
         }
 

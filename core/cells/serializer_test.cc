@@ -374,6 +374,54 @@ TEST(SerializerTest, SerializeMultipleViewProperties) {
     EXPECT_NE(output.find("zoomScale:75"), std::string::npos);
 }
 
+TEST(SerializerTest, SerializeFreezePanesDefault) {
+    // When freezeCol/freezeRow are 0 (default), V line should not be emitted
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    // freezeCol/freezeRow default to 0
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    // V line should not appear when freeze panes are default (0)
+    EXPECT_EQ(output.find("V "), std::string::npos);
+}
+
+TEST(SerializerTest, SerializeFreezePanesNonDefault) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->freezeCol = 2;
+    sheet->freezeRow = 3;
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    // V line should appear when freeze panes are set
+    EXPECT_NE(output.find("freezeCol:2"), std::string::npos);
+    EXPECT_NE(output.find("freezeRow:3"), std::string::npos);
+}
+
+TEST(SerializerTest, SerializeAllViewProperties) {
+    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->showGridLines = false;
+    sheet->zoomScale = 115;
+    sheet->freezeCol = 1;
+    sheet->freezeRow = 2;
+    sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
+    sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
+    wb->addSheet(std::move(sheet));
+
+    const std::string output = serialize(*wb);
+    // V line should have all properties
+    EXPECT_NE(output.find("showGridLines:0"), std::string::npos);
+    EXPECT_NE(output.find("zoomScale:115"), std::string::npos);
+    EXPECT_NE(output.find("freezeCol:1"), std::string::npos);
+    EXPECT_NE(output.find("freezeRow:2"), std::string::npos);
+}
+
 // --- Convenience Functions ---
 
 TEST(SerializerTest, ConvenienceSerializeFunction) {

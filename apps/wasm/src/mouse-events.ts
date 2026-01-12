@@ -1517,6 +1517,28 @@ export class MouseEventHandlers {
                         clipboardManager.paste();
                     },
                 });
+                items.push({ type: "separator" });
+                items.push({
+                    label: "Freeze panes",
+                    action: async () => {
+                        const ds = getDataSource();
+                        if (!ds) return;
+                        // Freeze rows above and columns to the left of current cell
+                        await ds.setFreezePanes(context.col, context.row);
+                        fetchViewportNow();
+                        render();
+                    },
+                });
+                items.push({
+                    label: "Unfreeze panes",
+                    action: async () => {
+                        const ds = getDataSource();
+                        if (!ds) return;
+                        await ds.setFreezePanes(0, 0);
+                        fetchViewportNow();
+                        render();
+                    },
+                });
                 break;
             }
 

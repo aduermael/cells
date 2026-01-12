@@ -420,6 +420,59 @@ export class GridRenderer {
     ctx.moveTo(HEADER_WIDTH + 0.5, 0);
     ctx.lineTo(HEADER_WIDTH + 0.5, viewHeight);
     ctx.stroke();
+
+    // Draw freeze pane separator lines
+    this._drawFreezePaneSeparators(ctx, viewWidth, viewHeight);
+  }
+
+  /** Draw thick separator lines to indicate freeze pane boundaries */
+  private _drawFreezePaneSeparators(
+    ctx: CanvasRenderingContext2D,
+    viewWidth: number,
+    viewHeight: number
+  ): void {
+    if (!this.sheetInfo) return;
+
+    const freezeCol = this.sheetInfo.freezeCol || 0;
+    const freezeRow = this.sheetInfo.freezeRow || 0;
+
+    if (freezeCol === 0 && freezeRow === 0) return;
+
+    // Calculate freeze pane boundaries
+    // Frozen columns start at HEADER_WIDTH (column header area)
+    let freezeColX = HEADER_WIDTH;
+    for (let col = 0; col < freezeCol; col++) {
+      freezeColX += this.colWidths.get(col) || DEFAULT_COL_WIDTH;
+    }
+
+    // Frozen rows start at HEADER_HEIGHT (row header area)
+    let freezeRowY = HEADER_HEIGHT;
+    for (let row = 0; row < freezeRow; row++) {
+      freezeRowY += this.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+    }
+
+    // Draw thick separator lines
+    ctx.save();
+    ctx.strokeStyle = this.colors.headerBorder;
+    ctx.lineWidth = 2;
+
+    if (freezeCol > 0) {
+      // Vertical separator after frozen columns
+      ctx.beginPath();
+      ctx.moveTo(freezeColX + 0.5, HEADER_HEIGHT);
+      ctx.lineTo(freezeColX + 0.5, viewHeight);
+      ctx.stroke();
+    }
+
+    if (freezeRow > 0) {
+      // Horizontal separator after frozen rows
+      ctx.beginPath();
+      ctx.moveTo(HEADER_WIDTH, freezeRowY + 0.5);
+      ctx.lineTo(viewWidth, freezeRowY + 0.5);
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   /** Draw cell background colors */

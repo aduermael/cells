@@ -63,6 +63,8 @@ export interface SheetInfo {
   defaultRowHeight: number;
   showGridLines: boolean;
   zoomScale: number; // 10-400, default 100
+  freezeCol: number; // Number of frozen columns (0 = none)
+  freezeRow: number; // Number of frozen rows (0 = none)
 }
 
 /** Cell data from viewport query */

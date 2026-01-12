@@ -46,6 +46,7 @@ import {
     handleDeleteSheet,
     handleRenameSheet,
     handleMoveSheet,
+    handleSetFreezePanes,
     handleUpdateCell,
     handleUpdateCellWithFormatDetection,
     handleCreateCell,
@@ -394,6 +395,9 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "moveSheet":
                 handleMoveSheet(engine, params, respond);
+                break;
+            case "setFreezePanes":
+                handleSetFreezePanes(engine, params, respond);
                 break;
 
             // ================================================================

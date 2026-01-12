@@ -828,6 +828,56 @@ int LuauSandbox::luaSetRowStyle(lua_State* L) {
 }
 
 // ============================================================================
+// Freeze Panes API: freezePanes(col, row)
+// Freeze the specified number of columns and rows
+// col: number of columns to freeze (0 = none, 1 = column A, etc.)
+// row: number of rows to freeze (0 = none, 1 = row 1, etc.)
+// e.g., freezePanes(1, 2) freezes column A and rows 1-2
+// ============================================================================
+int LuauSandbox::luaFreezePanes(lua_State* L) {
+    const int freezeCol = static_cast<int>(luaL_optnumber(L, 1, 0));
+    const int freezeRow = static_cast<int>(luaL_optnumber(L, 2, 0));
+
+    Sheet* sheet = getSheet(L);
+    if (sheet == nullptr) {
+        luaL_error(L, "freezePanes: no context set");
+    }
+
+    if (freezeCol < 0) {
+        luaL_error(L, "freezePanes: col must be >= 0");
+    }
+    if (freezeRow < 0) {
+        luaL_error(L, "freezePanes: row must be >= 0");
+    }
+
+    // Directly set the sheet properties (no CRDT operation for view properties yet)
+    sheet->freezeCol = static_cast<uint16_t>(freezeCol);
+    sheet->freezeRow = static_cast<uint16_t>(freezeRow);
+
+    return 0;
+}
+
+// ============================================================================
+// Freeze Panes API: getFreezePanes()
+// Returns a table with col and row fields indicating frozen panes
+// e.g., {col=1, row=2} means column A and rows 1-2 are frozen
+// ============================================================================
+int LuauSandbox::luaGetFreezePanes(lua_State* L) {
+    const Sheet* sheet = getSheet(L);
+    if (sheet == nullptr) {
+        luaL_error(L, "getFreezePanes: no context set");
+    }
+
+    lua_newtable(L);
+    lua_pushinteger(L, sheet->freezeCol);
+    lua_setfield(L, -2, "col");
+    lua_pushinteger(L, sheet->freezeRow);
+    lua_setfield(L, -2, "row");
+
+    return 1;
+}
+
+// ============================================================================
 // Cells API: selectSheet(sheet|name|index)
 // Accepts: sheet object, name string, or 1-based index number
 // ============================================================================

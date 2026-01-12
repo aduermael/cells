@@ -250,7 +250,9 @@ void Serializer::serializeSheet(const Sheet& sheet, std::ostream& out) const {
     // Format: V <key:value...>
     // showGridLines is true by default, only output if false
     // zoomScale is 100 by default, only output if different
-    const bool hasViewProps = !sheet.showGridLines || sheet.zoomScale != 100;
+    // freezeCol/freezeRow are 0 by default, only output if non-zero
+    const bool hasViewProps = !sheet.showGridLines || sheet.zoomScale != 100 ||
+                              sheet.freezeCol > 0 || sheet.freezeRow > 0;
     if (hasViewProps) {
         out << "V";
         if (!sheet.showGridLines) {
@@ -258,6 +260,12 @@ void Serializer::serializeSheet(const Sheet& sheet, std::ostream& out) const {
         }
         if (sheet.zoomScale != 100) {
             out << " zoomScale:" << sheet.zoomScale;
+        }
+        if (sheet.freezeCol > 0) {
+            out << " freezeCol:" << sheet.freezeCol;
+        }
+        if (sheet.freezeRow > 0) {
+            out << " freezeRow:" << sheet.freezeRow;
         }
         out << "\n";
     }

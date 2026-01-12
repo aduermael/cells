@@ -102,6 +102,7 @@ public:
     std::string deleteSheet(int index);
     std::string renameSheet(int index, const std::string& name);
     std::string moveSheet(int fromIndex, int toIndex);
+    void setFreezePanes(int freezeCol, int freezeRow);
 
     // ========================================================================
     // Viewport query (bindings_viewport.cc)

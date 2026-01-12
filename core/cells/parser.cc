@@ -600,6 +600,42 @@ bool Parser::parseSheetView(std::string_view line) {
             } else {
                 line = line.substr(end);
             }
+        } else if (key == "freezeCol") {
+            // Integer value: number of frozen columns
+            const size_t end = line.find_first_of(" \t");
+            const std::string_view valueStr =
+                (end == std::string_view::npos) ? line : line.substr(0, end);
+
+            int freezeCol = 0;
+            auto result =
+                std::from_chars(valueStr.data(), valueStr.data() + valueStr.size(), freezeCol);
+            if (result.ec == std::errc{} && freezeCol >= 0) {
+                currentSheet_->freezeCol = static_cast<uint16_t>(freezeCol);
+            }
+
+            if (end == std::string_view::npos) {
+                line = "";
+            } else {
+                line = line.substr(end);
+            }
+        } else if (key == "freezeRow") {
+            // Integer value: number of frozen rows
+            const size_t end = line.find_first_of(" \t");
+            const std::string_view valueStr =
+                (end == std::string_view::npos) ? line : line.substr(0, end);
+
+            int freezeRow = 0;
+            auto result =
+                std::from_chars(valueStr.data(), valueStr.data() + valueStr.size(), freezeRow);
+            if (result.ec == std::errc{} && freezeRow >= 0) {
+                currentSheet_->freezeRow = static_cast<uint16_t>(freezeRow);
+            }
+
+            if (end == std::string_view::npos) {
+                line = "";
+            } else {
+                line = line.substr(end);
+            }
         } else {
             // Unknown property - skip value
             const size_t end = line.find_first_of(" \t");
