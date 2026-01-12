@@ -19,15 +19,24 @@ Commit message format: `<phase><step>: short description` (lowercase)
 
 When checking off a step in the plan, optionally add 1-2 sentences explaining what was done if it's useful to extend the step description.
 
+## Building
+
+Use `bazel run :wasm-dist` to build the WASM distribution. This compiles the WASM module and TypeScript, then copies all files to `dist/wasm/`.
+
+Do not use pnpm build commands directly - always use bazel build scripts.
+
 ## Tests
 
 At the end of each phase, run tests in this order. Everything should pass:
 
 1. `bazel run :test` (unit tests)
 2. `bazel run :lint`
-2. `bazel run :check-types`
-4. `bazel run :e2e` (E2E tests)
-3. `bazel run :format`
+3. `bazel run :check-types`
+4. `bazel run :wasm-dist` (build before E2E tests)
+5. `bazel run :e2e` (E2E tests)
+6. `bazel run :format`
+
+For debugging E2E tests with a visible browser, use `bazel run :e2e-headed`.
 
 ## Phase completion
 

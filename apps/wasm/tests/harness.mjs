@@ -17,7 +17,7 @@ const CONFIG = {
   serverPort: parseInt(process.env.TEST_PORT || '8082', 10), // Use TEST_PORT for parallel tests
   lightpandaPort: 9222,
   lightpandaHost: '127.0.0.1',
-  distDir: join(projectRoot, 'dist'),
+  distDir: join(projectRoot, 'dist', 'wasm'),
   timeout: 30000,
   // Use Chrome instead of Lightpanda (Lightpanda has limited canvas support)
   useChrome: process.env.USE_CHROME === '1' || true, // Default to Chrome for canvas-based app
@@ -107,7 +107,7 @@ async function waitForServer(port, maxAttempts = 30) {
 async function startServer() {
   // Check if dist directory exists
   if (!existsSync(CONFIG.distDir)) {
-    throw new Error(`dist/ directory not found. Run 'make wasm-dist' first.`);
+    throw new Error(`dist/wasm/ directory not found. Run 'bazel run :wasm-dist' first.`);
   }
 
   // Kill any existing process on the port
