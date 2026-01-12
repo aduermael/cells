@@ -4,15 +4,24 @@
 #include <stack>
 
 #include "core/cells/formula_ast.h"
+#include "core/cells/named_ranges.h"
 
 namespace cells {
 
 namespace {
 
+// Maximum recursion depth for named reference resolution (prevents infinite loops)
+constexpr int kMaxNamedRefDepth = 32;
+
 // Helper to extract references from an AST node and populate DependencyRef
 class ReferenceExtractor {
 public:
-    void extract(const ASTNode* node, std::vector<DependencyRef>& refs) {
+    ReferenceExtractor() = default;
+
+    ReferenceExtractor(const NamedRangeRegistry* registry, const ID& sheetId)
+        : namedRegistry_(registry), sheetId_(sheetId) {}
+
+    void extract(const ASTNode* node, std::vector<DependencyRef>& refs, int depth = 0) {
         if (!node) {
             return;
         }
@@ -102,21 +111,21 @@ public:
 
             case ASTNodeType::BINARY_OP: {
                 auto* binOp = static_cast<const BinaryOpNode*>(node);
-                extract(binOp->left.get(), refs);
-                extract(binOp->right.get(), refs);
+                extract(binOp->left.get(), refs, depth);
+                extract(binOp->right.get(), refs, depth);
                 break;
             }
 
             case ASTNodeType::UNARY_OP: {
                 auto* unaryOp = static_cast<const UnaryOpNode*>(node);
-                extract(unaryOp->operand.get(), refs);
+                extract(unaryOp->operand.get(), refs, depth);
                 break;
             }
 
             case ASTNodeType::FUNCTION_CALL: {
                 auto* funcCall = static_cast<const FunctionCallNode*>(node);
                 for (const auto& arg : funcCall->args) {
-                    extract(arg.get(), refs);
+                    extract(arg.get(), refs, depth);
                 }
                 break;
             }
@@ -124,13 +133,64 @@ public:
             case ASTNodeType::ERROR_NODE: {
                 auto* errorNode = static_cast<const ErrorNode*>(node);
                 for (const auto& child : errorNode->partialChildren) {
-                    extract(child.get(), refs);
+                    extract(child.get(), refs, depth);
+                }
+                break;
+            }
+
+            case ASTNodeType::NAMED_REF: {
+                // Resolve named reference to its underlying target
+                if (namedRegistry_ && depth < kMaxNamedRefDepth) {
+                    auto* namedRef = static_cast<const NamedRefNode*>(node);
+                    const NamedRange* range = namedRegistry_->resolve(namedRef->name, sheetId_);
+                    if (range) {
+                        // Convert the named range target to DependencyRef
+                        DependencyRef info;
+                        info.sourceStart = static_cast<int32_t>(namedRef->position.start);
+                        info.sourceEnd = static_cast<int32_t>(namedRef->position.end);
+
+                        switch (range->target.type) {
+                            case NamedRangeTarget::Type::CELL:
+                                info.type = DependencyRef::Type::CELL;
+                                info.cellId = range->target.id1;
+                                refs.push_back(info);
+                                break;
+                            case NamedRangeTarget::Type::RANGE:
+                                info.type = DependencyRef::Type::RANGE;
+                                info.startCellId = range->target.id1;
+                                info.endCellId = range->target.id2;
+                                refs.push_back(info);
+                                break;
+                            case NamedRangeTarget::Type::COLUMN:
+                                info.type = DependencyRef::Type::COLUMN;
+                                info.columnId = range->target.id1;
+                                refs.push_back(info);
+                                break;
+                            case NamedRangeTarget::Type::ROW:
+                                info.type = DependencyRef::Type::ROW;
+                                info.rowId = range->target.id1;
+                                refs.push_back(info);
+                                break;
+                            case NamedRangeTarget::Type::COLUMN_RANGE:
+                                info.type = DependencyRef::Type::COLUMN_RANGE;
+                                info.startColumnId = range->target.id1;
+                                info.endColumnId = range->target.id2;
+                                refs.push_back(info);
+                                break;
+                            case NamedRangeTarget::Type::ROW_RANGE:
+                                info.type = DependencyRef::Type::ROW_RANGE;
+                                info.startRowId = range->target.id1;
+                                info.endRowId = range->target.id2;
+                                refs.push_back(info);
+                                break;
+                        }
+                    }
                 }
                 break;
             }
 
             default:
-                // Literals, named refs (need resolution first), etc.
+                // Literals, etc.
                 break;
         }
     }
@@ -179,17 +239,28 @@ public:
                 return false;
         }
     }
+
+private:
+    const NamedRangeRegistry* namedRegistry_ = nullptr;
+    ID sheetId_;
 };
 
 }  // namespace
 
 void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast) {
-    // Delegate to overload without position resolver (no R-tree population)
-    addFormula(cellId, ast, nullptr);
+    // Delegate to overload without position resolver or named range registry
+    addFormula(cellId, ast, nullptr, nullptr, ID());
 }
 
 void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast,
                                  const PositionResolver& resolver) {
+    // Delegate to overload without named range registry
+    addFormula(cellId, ast, resolver, nullptr, ID());
+}
+
+void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast,
+                                 const PositionResolver& resolver,
+                                 const NamedRangeRegistry* namedRegistry, const ID& sheetId) {
     // Remove old dependencies first
     removeFormula(cellId);
 
@@ -197,8 +268,8 @@ void DependencyGraph::addFormula(const ID& cellId, const ASTNode* ast,
         return;
     }
 
-    // Extract references from AST
-    ReferenceExtractor extractor;
+    // Extract references from AST (with named range resolution if registry provided)
+    ReferenceExtractor extractor(namedRegistry, sheetId);
     std::vector<DependencyRef> refs;
     extractor.extract(ast, refs);
 

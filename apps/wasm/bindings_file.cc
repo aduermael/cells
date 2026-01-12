@@ -24,6 +24,7 @@
 #include "core/cells/csv_writer.h"
 #include "core/cells/dependency_graph.h"
 #include "core/cells/formula_recalc.h"
+#include "core/cells/named_ranges.h"
 #include "core/cells/parser.h"
 #include "core/cells/serializer.h"
 #include "core/cells/xlsx_reader.h"
@@ -41,6 +42,7 @@ std::string CellsEngine::loadFromCells(const std::string& content) {
     rebuildViewportIndex();
 
     // Parse and evaluate all formulas in all sheets after loading
+    const NamedRangeRegistry* namedRanges = _workbook->getNamedRanges();
     for (size_t i = 0; i < _workbook->sheetCount(); ++i) {
         auto* sheet = _workbook->getSheetByIndex(i);
         if (sheet) {
@@ -66,7 +68,8 @@ std::string CellsEngine::loadFromCells(const std::string& content) {
             for (const auto& [cellId, cell] : sheet->cells) {
                 if (cell->isFormula() && cell->formula != nullptr) {
                     if (depGraph != nullptr && cell->formula->ast != nullptr) {
-                        depGraph->addFormula(cell->id, cell->formula->ast, positionResolver);
+                        depGraph->addFormula(cell->id, cell->formula->ast, positionResolver,
+                                             namedRanges, sheet->id);
                         if (cell->formula->hasVolatile()) {
                             depGraph->markVolatile(cell->id);
                         }
@@ -117,6 +120,7 @@ std::string CellsEngine::loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
     rebuildViewportIndex();
 
     // Parse and evaluate all formulas in all sheets after loading
+    const NamedRangeRegistry* namedRanges = _workbook->getNamedRanges();
     for (size_t i = 0; i < _workbook->sheetCount(); ++i) {
         auto* sheet = _workbook->getSheetByIndex(i);
         if (sheet) {
@@ -142,7 +146,8 @@ std::string CellsEngine::loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
             for (const auto& [cellId, cell] : sheet->cells) {
                 if (cell->isFormula() && cell->formula != nullptr) {
                     if (depGraph != nullptr && cell->formula->ast != nullptr) {
-                        depGraph->addFormula(cell->id, cell->formula->ast, positionResolver);
+                        depGraph->addFormula(cell->id, cell->formula->ast, positionResolver,
+                                             namedRanges, sheet->id);
                         if (cell->formula->hasVolatile()) {
                             depGraph->markVolatile(cell->id);
                         }

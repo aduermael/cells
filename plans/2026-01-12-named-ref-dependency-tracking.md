@@ -1,4 +1,4 @@
-Status: PENDING
+Status: IN_PROGRESS
 Created At: 2026-01-12 UTC
 Following plan management guidelines defined in AGENTS.md
 
@@ -51,11 +51,11 @@ Track named references in the dependency graph by resolving them to their underl
 
 Update the dependency graph to accept a `NamedRangeRegistry` for resolving named references.
 
-- [ ] 1a: Add `NamedRangeRegistry*` parameter to `ReferenceExtractor::extract()` (optional, nullable for backwards compat)
-- [ ] 1b: Add `NamedRangeRegistry*` and `sheetId` parameters to `addFormula()` overload
-- [ ] 1c: Update `addFormula()` callers to pass registry when available
+- [x] 1a: Add `NamedRangeRegistry*` parameter to `ReferenceExtractor::extract()` (optional, nullable for backwards compat)
+- [x] 1b: Add `NamedRangeRegistry*` and `sheetId` parameters to `addFormula()` overload
+- [x] 1c: Update `addFormula()` callers to pass registry when available
 
-**Files:** `core/cells/dependency_graph.h`, `core/cells/dependency_graph.cc`
+**Files:** `core/cells/dependency_graph.h`, `core/cells/dependency_graph.cc`, `apps/wasm/bindings_file.cc`, `core/cells/BUILD`
 
 ---
 
@@ -63,30 +63,13 @@ Update the dependency graph to accept a `NamedRangeRegistry` for resolving named
 
 Extract dependencies from named references by resolving them to their target cells/ranges.
 
-- [ ] 2a: Add `NAMED_REF` case to `ReferenceExtractor::extract()` that resolves the named reference
-- [ ] 2b: Convert resolved target (CELL, RANGE, COLUMN, ROW, etc.) to appropriate `DependencyRef` entries
-- [ ] 2c: Handle sheet-scoped vs workbook-scoped named ranges correctly
-- [ ] 2d: Handle recursive named references (named range referencing another named range)
-- [ ] 2e: Add recursion depth limit to prevent infinite loops from circular named references
+- [x] 2a: Add `NAMED_REF` case to `ReferenceExtractor::extract()` that resolves the named reference
+- [x] 2b: Convert resolved target (CELL, RANGE, COLUMN, ROW, etc.) to appropriate `DependencyRef` entries
+- [x] 2c: Handle sheet-scoped vs workbook-scoped named ranges correctly (via `resolve()` which already handles scope)
+- [x] 2d: Handle recursive named references - N/A, current architecture stores resolved cell IDs not formulas
+- [x] 2e: Add recursion depth limit to prevent infinite loops from circular named references (`kMaxNamedRefDepth = 32`)
 
 **Files:** `core/cells/dependency_graph.cc`
-
-**Key implementation:**
-```cpp
-case ASTNodeType::NAMED_REF: {
-    auto* namedRef = static_cast<const NamedRefNode*>(node);
-    if (namedRegistry) {
-        const NamedRange* range = namedRegistry->resolve(namedRef->name, sheetId);
-        if (range) {
-            // Convert range target to DependencyRef based on target type
-            // CELL -> single cell dependency
-            // RANGE -> range dependency
-            // etc.
-        }
-    }
-    break;
-}
-```
 
 ---
 
@@ -94,10 +77,10 @@ case ASTNodeType::NAMED_REF: {
 
 Ensure the import path provides the named range registry to the dependency graph.
 
-- [ ] 3a: Update `bindings_file.cc` to pass `NamedRangeRegistry*` when building dependency graph during import
-- [ ] 3b: Ensure named ranges are fully loaded before dependency graph is built
+- [x] 3a: Update `bindings_file.cc` to pass `NamedRangeRegistry*` when building dependency graph during import
+- [x] 3b: Ensure named ranges are fully loaded before dependency graph is built (XLSX reader loads them first)
 
-**Files:** `apps/wasm/bindings_file.cc`, `apps/wasm/bindings.cc`
+**Files:** `apps/wasm/bindings_file.cc`
 
 ---
 

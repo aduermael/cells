@@ -684,6 +684,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":formula_ast",
+        ":named_ranges",
         ":rtree",
         ":types",
     ],

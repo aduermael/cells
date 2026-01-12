@@ -43,6 +43,7 @@ namespace cells {
 
 // Forward declarations
 struct ASTNode;
+class NamedRangeRegistry;
 
 // Position resolver callback for converting cell IDs to grid positions
 // Takes a cell ID and returns (col, row) position, or (-1, -1) if not found
@@ -83,6 +84,12 @@ public:
     // Add dependencies with position resolution for R-tree-based range queries
     // The resolver converts cell IDs to (col, row) positions for spatial indexing
     void addFormula(const ID& cellId, const ASTNode* ast, const PositionResolver& resolver);
+
+    // Add dependencies with named range resolution
+    // The registry resolves named references to their underlying cell/range targets
+    // sheetId is used for resolving sheet-scoped named ranges
+    void addFormula(const ID& cellId, const ASTNode* ast, const PositionResolver& resolver,
+                    const NamedRangeRegistry* namedRegistry, const ID& sheetId);
 
     // Remove all dependencies for a cell
     // Call this when clearing a formula or before updating it
