@@ -44,5 +44,5 @@ The AI panel button (`chat-open-btn`) is hidden by default in HTML and never mad
 
 - [x] 4a: Remove `hidden` class from `chat-open-btn` in index.html so button is visible by default
 - [x] 4b: Adjust bottom bar layout so AI button doesn't overlap zoom controls (add proper spacing/margin between zoom-controls and chat-open-btn). Added `margin-left: var(--spacing-sm)` to `.chat-open-btn`.
-- [ ] 4c: Verify AI panel show/hide toggle works correctly with button visibility
-- [ ] 4d: Test that zoom controls remain accessible when AI panel is open
+- [x] 4c: Verify AI panel show/hide toggle works correctly with button visibility. The AgentPanel show/hide methods properly toggle hidden class on both panel and button.
+- [x] 4d: Test that zoom controls remain accessible when AI panel is open. Chat panel uses fixed positioning and doesn't affect bottom bar layout. All 83 E2E tests pass.
