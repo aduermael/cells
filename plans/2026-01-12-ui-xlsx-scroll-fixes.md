@@ -30,12 +30,13 @@ The `<mergeCells>` element in XLSX is completely ignored, causing:
 
 The current debounce on `fetchViewportNow()` resets on every scroll event. With trackpad inertia, scroll events continue firing for several seconds after the user lifts their fingers. Each event resets the debounce timer, so the fetch/render may never happen until inertia completely stops - making the grid appear empty or frozen for a long time.
 
-**Solution:** Replace pure debounce with throttle + trailing debounce. Guarantee viewport fetches happen at a minimum frequency (e.g., every 100-150ms) during continuous scrolling, while still debouncing the final fetch after scrolling stops.
+**Solution:** Replace pure debounce with throttle + trailing debounce. Guarantee viewport fetches happen at a minimum frequency (e.g., every 100-150ms) during continuous scrolling, with a single trailing fetch after scrolling stops.
 
-- [ ] 3a: Change `fetchViewportNow()` from debounce to throttle-with-trailing pattern: fetch immediately if enough time has passed since last fetch, otherwise schedule trailing fetch
-- [ ] 3b: Keep rendering with cached/stale cell data during scroll (render what we have for visible cells, fetch will update them)
-- [ ] 3c: Test with long inertial scrolls to verify grid stays populated and responsive
-- [ ] 3d: Tune throttle interval (100-150ms) to balance responsiveness vs WASM worker load
+- [ ] 3a: Change `fetchViewportNow()` to throttle pattern: fetch immediately if enough time has passed since last fetch, track `lastFetchTime` timestamp
+- [ ] 3b: Add single trailing fetch: schedule one final fetch after throttle interval, cancel/reschedule if new scroll events arrive, but don't re-trigger once it fires
+- [ ] 3c: Add viewport buffer/overscan: fetch extra rows/columns beyond visible area (e.g., 10-20 rows above/below, 5-10 cols left/right) so small scrolls show pre-fetched data
+- [ ] 3d: Keep rendering cached cell data during scroll (render what we have, fetch updates will fill in new areas)
+- [ ] 3e: Test with long inertial scrolls and small scroll movements to verify behavior
 
 ## Phase 4: Restore AI Panel Button
 
