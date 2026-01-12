@@ -129,7 +129,7 @@ export function colorizeFormula(
           namedRangeAttr = ` data-named-range="${escapeHtml(currentHighlight.namedRangeName)}"`;
         }
 
-        return `<span class="formula-ref${hoverClass}${namedRangeClass}" data-ref-index="${refIndex}"${namedRangeAttr} style="color: ${color}; font-weight: 600;">${escapedText}</span>`;
+        return `<span class="formula-ref${hoverClass}${namedRangeClass}" data-ref-index="${refIndex}"${namedRangeAttr} spellcheck="false" style="color: ${color}; font-weight: 600;">${escapedText}</span>`;
       }
       return escapedText;
     })
