@@ -551,6 +551,124 @@ int LuauSandbox::luaColumnMove(lua_State* L) {
 }
 
 // ============================================================================
+// Axis API: hideColumn(col)
+// Hide a column by letter (e.g., "A", "B", "AB")
+// ============================================================================
+int LuauSandbox::luaHideColumn(lua_State* L) {
+    const char* colRef = luaL_checkstring(L, 1);
+
+    Sheet* sheet = getSheet(L);
+    Workbook* workbook = getWorkbook(L);
+    if (sheet == nullptr || workbook == nullptr) {
+        luaL_error(L, "hideColumn: no context set");
+    }
+
+    // Parse column reference
+    const int colIdx = parseColumnLetter(colRef, nullptr);
+    if (colIdx < 0) {
+        luaL_error(L, "hideColumn: invalid column '%s'", colRef);
+    }
+
+    const Axis* col = sheet->getColumnByPosition(static_cast<uint32_t>(colIdx));
+    if (col == nullptr) {
+        luaL_error(L, "hideColumn: column '%s' not found", colRef);
+    }
+
+    const Operation op = makeAxisSetHiddenOp(*workbook, col->id, true);
+    applyOperation(*workbook, op);
+
+    return 0;
+}
+
+// ============================================================================
+// Axis API: showColumn(col)
+// Show a hidden column by letter (e.g., "A", "B", "AB")
+// ============================================================================
+int LuauSandbox::luaShowColumn(lua_State* L) {
+    const char* colRef = luaL_checkstring(L, 1);
+
+    Sheet* sheet = getSheet(L);
+    Workbook* workbook = getWorkbook(L);
+    if (sheet == nullptr || workbook == nullptr) {
+        luaL_error(L, "showColumn: no context set");
+    }
+
+    // Parse column reference
+    const int colIdx = parseColumnLetter(colRef, nullptr);
+    if (colIdx < 0) {
+        luaL_error(L, "showColumn: invalid column '%s'", colRef);
+    }
+
+    const Axis* col = sheet->getColumnByPosition(static_cast<uint32_t>(colIdx));
+    if (col == nullptr) {
+        luaL_error(L, "showColumn: column '%s' not found", colRef);
+    }
+
+    const Operation op = makeAxisSetHiddenOp(*workbook, col->id, false);
+    applyOperation(*workbook, op);
+
+    return 0;
+}
+
+// ============================================================================
+// Axis API: hideRow(row)
+// Hide a row by number (1-based)
+// ============================================================================
+int LuauSandbox::luaHideRow(lua_State* L) {
+    const int rowNum = static_cast<int>(luaL_checknumber(L, 1));
+
+    Sheet* sheet = getSheet(L);
+    Workbook* workbook = getWorkbook(L);
+    if (sheet == nullptr || workbook == nullptr) {
+        luaL_error(L, "hideRow: no context set");
+    }
+
+    if (rowNum < 1) {
+        luaL_error(L, "hideRow: row number must be >= 1");
+    }
+
+    const int rowIdx = rowNum - 1;  // Convert to 0-based
+    const Axis* row = sheet->getRowByPosition(static_cast<uint32_t>(rowIdx));
+    if (row == nullptr) {
+        luaL_error(L, "hideRow: row %d not found", rowNum);
+    }
+
+    const Operation op = makeAxisSetHiddenOp(*workbook, row->id, true);
+    applyOperation(*workbook, op);
+
+    return 0;
+}
+
+// ============================================================================
+// Axis API: showRow(row)
+// Show a hidden row by number (1-based)
+// ============================================================================
+int LuauSandbox::luaShowRow(lua_State* L) {
+    const int rowNum = static_cast<int>(luaL_checknumber(L, 1));
+
+    Sheet* sheet = getSheet(L);
+    Workbook* workbook = getWorkbook(L);
+    if (sheet == nullptr || workbook == nullptr) {
+        luaL_error(L, "showRow: no context set");
+    }
+
+    if (rowNum < 1) {
+        luaL_error(L, "showRow: row number must be >= 1");
+    }
+
+    const int rowIdx = rowNum - 1;  // Convert to 0-based
+    const Axis* row = sheet->getRowByPosition(static_cast<uint32_t>(rowIdx));
+    if (row == nullptr) {
+        luaL_error(L, "showRow: row %d not found", rowNum);
+    }
+
+    const Operation op = makeAxisSetHiddenOp(*workbook, row->id, false);
+    applyOperation(*workbook, op);
+
+    return 0;
+}
+
+// ============================================================================
 // Cells API: selectSheet(sheet|name|index)
 // Accepts: sheet object, name string, or 1-based index number
 // ============================================================================

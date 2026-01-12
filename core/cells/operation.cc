@@ -36,6 +36,9 @@ const char* opTypeToString(OpType type) {
             return "ROW_MOVE";
         case OpType::ROW_RESIZE:
             return "ROW_RESIZE";
+        // Axis operations
+        case OpType::AXIS_SET_HIDDEN:
+            return "AXIS_SET_HIDDEN";
         // Sheet operations
         case OpType::SHEET_CREATE:
             return "SHEET_CREATE";
@@ -155,6 +158,10 @@ OpType stringToOpType(const std::string& str) {
     }
     if (str == "ROW_RESIZE") {
         return OpType::ROW_RESIZE;
+    }
+    // Axis operations
+    if (str == "AXIS_SET_HIDDEN") {
+        return OpType::AXIS_SET_HIDDEN;
     }
     return OpType::CELL_SET_VALUE;  // Default
 }

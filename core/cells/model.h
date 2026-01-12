@@ -324,11 +324,12 @@ struct SharedFormulaInfo {
 
 // Axis - represents a column or row
 struct Axis {
-    std::string name;   // Custom name (empty = compute from position)
-    ID id;              // Unique identifier (8-char base62)
-    uint32_t position;  // Visual position (0-indexed)
-    uint32_t size;      // Width (column) or height (row) in pixels
-    bool isColumn;      // true = column (x), false = row (y)
+    std::string name;    // Custom name (empty = compute from position)
+    ID id;               // Unique identifier (8-char base62)
+    uint32_t position;   // Visual position (0-indexed)
+    uint32_t size;       // Width (column) or height (row) in pixels
+    bool isColumn;       // true = column (x), false = row (y)
+    bool hidden{false};  // Whether axis is hidden (default: false)
 
     Axis();
     explicit Axis(const ID& id, bool isColumn = true);

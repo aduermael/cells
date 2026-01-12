@@ -770,6 +770,28 @@ std::string generateWorksheet(
     xml << "/>\n";
     xml << "  </sheetViews>\n";
 
+    // Write cols element if any columns are hidden
+    bool hasHiddenCols = false;
+    for (const auto& colPair : columns) {
+        auto it = sheet.columns.find(colPair.second);
+        if (it != sheet.columns.end() && it->second->hidden) {
+            hasHiddenCols = true;
+            break;
+        }
+    }
+    if (hasHiddenCols) {
+        xml << "  <cols>\n";
+        for (size_t i = 0; i < columns.size(); ++i) {
+            auto it = sheet.columns.find(columns[i].second);
+            if (it != sheet.columns.end() && it->second->hidden) {
+                // Excel uses 1-based column indices
+                xml << "    <col min=\"" << (i + 1) << "\" max=\"" << (i + 1)
+                    << "\" hidden=\"1\"/>\n";
+            }
+        }
+        xml << "  </cols>\n";
+    }
+
     xml << "  <sheetData>\n";
 
     // Write rows
@@ -785,11 +807,23 @@ std::string generateWorksheet(
             }
         }
 
-        if (!hasAnyCells) {
+        // Check if row is hidden
+        bool rowHidden = false;
+        auto rowIt = sheet.rows.find(rows[rowIdx].second);
+        if (rowIt != sheet.rows.end() && rowIt->second->hidden) {
+            rowHidden = true;
+        }
+
+        // Skip rows with no cells and not hidden
+        if (!hasAnyCells && !rowHidden) {
             continue;
         }
 
-        xml << "    <row r=\"" << (rowIdx + 1) << "\">\n";
+        xml << "    <row r=\"" << (rowIdx + 1) << "\"";
+        if (rowHidden) {
+            xml << " hidden=\"1\"";
+        }
+        xml << ">\n";
 
         for (size_t colIdx = 0; colIdx < columns.size(); ++colIdx) {
             const uint64_t key = (static_cast<uint64_t>(rowIdx) << 32) | colIdx;

@@ -396,7 +396,8 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             json << "\"width\":" << col->size << ",";
             auto pixelOffset = _viewportIndex.columnToPixel(id);
             json << "\"pixelOffset\":" << (pixelOffset ? *pixelOffset : 0) << ",";
-            json << "\"name\":\"" << jsonEscape(col->name) << "\"";
+            json << "\"name\":\"" << jsonEscape(col->name) << "\",";
+            json << "\"hidden\":" << (col->hidden ? "true" : "false");
             json << "}";
         }
     }
@@ -417,7 +418,8 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             json << "\"height\":" << row->size << ",";
             auto pixelOffset = _viewportIndex.rowToPixel(id);
             json << "\"pixelOffset\":" << (pixelOffset ? *pixelOffset : 0) << ",";
-            json << "\"name\":\"" << jsonEscape(row->name) << "\"";
+            json << "\"name\":\"" << jsonEscape(row->name) << "\",";
+            json << "\"hidden\":" << (row->hidden ? "true" : "false");
             json << "}";
         }
     }

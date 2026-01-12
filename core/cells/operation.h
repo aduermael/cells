@@ -62,6 +62,9 @@ enum class OpType : uint8_t {
     ROW_RESIZE = 18,  // Resize row height
     // Note: ROW_RENAME intentionally omitted - rows cannot be renamed
 
+    // Axis operations (apply to both columns and rows)
+    AXIS_SET_HIDDEN = 19,  // Set axis hidden state
+
     // Sheet operations
     SHEET_CREATE = 20,  // Create new sheet
     SHEET_DELETE = 21,  // Delete sheet

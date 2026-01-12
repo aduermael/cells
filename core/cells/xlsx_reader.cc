@@ -811,15 +811,42 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             }
         }
 
+        // Parse column properties (<cols> element) - includes hidden, width, etc.
+        // XLSX cols use 1-based column indices and can specify ranges (min/max)
+        start = std::chrono::steady_clock::now();
+        std::unordered_map<int, bool> columnHidden;  // 0-indexed col -> hidden
+        auto colsNode = worksheetNode.child("cols");
+        if (colsNode) {
+            for (auto colNode : colsNode.children("col")) {
+                const int minCol = colNode.attribute("min").as_int(1) - 1;  // Convert to 0-indexed
+                const int maxColRange = colNode.attribute("max").as_int(1) - 1;
+                const bool hidden = colNode.attribute("hidden").as_bool(false);
+                if (hidden) {
+                    for (int c = minCol; c <= maxColRange; ++c) {
+                        columnHidden[c] = true;
+                    }
+                }
+            }
+        }
+        logTiming("parse cols element", start);
+
         // First pass: find dimensions
         start = std::chrono::steady_clock::now();
         int maxRow = 0, maxCol = 0;
         auto sheetData = sheetDoc.child("worksheet").child("sheetData");
 
+        // Also track hidden rows as we scan
+        std::unordered_map<int, bool> rowHidden;  // 0-indexed row -> hidden
+
         for (auto row : sheetData.children("row")) {
             const int rowNum = row.attribute("r").as_int() - 1;  // 0-indexed
             if (rowNum >= maxRow) {
                 maxRow = rowNum + 1;
+            }
+
+            // Check if row is hidden
+            if (row.attribute("hidden").as_bool(false)) {
+                rowHidden[rowNum] = true;
             }
 
             for (auto cell : row.children("c")) {
@@ -843,16 +870,18 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             auto col = std::make_unique<Axis>(generate_id(), true);
             col->position = static_cast<uint32_t>(c);
             col->size = DEFAULT_COLUMN_WIDTH;
+            col->hidden = columnHidden.count(c) > 0;
             columnIds.push_back(col->id);
             sheet->addColumn(std::move(col));
         }
 
         for (int r = 0; r < maxRow; ++r) {
-            auto row = std::make_unique<Axis>(generate_id(), false);
-            row->position = static_cast<uint32_t>(r);
-            row->size = DEFAULT_ROW_HEIGHT;
-            rowIds.push_back(row->id);
-            sheet->addRow(std::move(row));
+            auto rowAxis = std::make_unique<Axis>(generate_id(), false);
+            rowAxis->position = static_cast<uint32_t>(r);
+            rowAxis->size = DEFAULT_ROW_HEIGHT;
+            rowAxis->hidden = rowHidden.count(r) > 0;
+            rowIds.push_back(rowAxis->id);
+            sheet->addRow(std::move(rowAxis));
         }
         logTiming("create rows/cols", start);
 

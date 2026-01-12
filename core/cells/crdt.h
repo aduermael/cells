@@ -110,6 +110,10 @@ Operation makeRowResizeOp(Workbook& workbook, const ID& axisId, const std::strin
 Operation makeRowMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload);
 // Note: No makeRowRenameOp - rows cannot be renamed
 
+// Axis operations (apply to both columns and rows)
+// payload: "1" for hidden, "0" for visible
+Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden);
+
 // Generate a SHEET_CREATE operation.
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload);
 

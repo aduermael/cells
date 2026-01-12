@@ -124,14 +124,15 @@ export function setupDataListeners(config: DataListenersConfig): {
       // from the viewport query are tree-based (dense) which is wrong for sparse
       // columns/rows. The rendering code has fallback logic to compute sparse
       // offsets correctly based on position and default widths.
+      // Hidden columns/rows get 0 width/height to effectively hide them.
       for (const col of app.columns) {
-        app.colWidths.set(col.pos, col.width || DEFAULT_COL_WIDTH);
+        app.colWidths.set(col.pos, col.hidden ? 0 : (col.width || DEFAULT_COL_WIDTH));
         if (col.name) {
           app.colNames.set(col.pos, col.name);
         }
       }
       for (const row of app.rows) {
-        app.rowHeights.set(row.pos, row.height || DEFAULT_ROW_HEIGHT);
+        app.rowHeights.set(row.pos, row.hidden ? 0 : (row.height || DEFAULT_ROW_HEIGHT));
       }
     } catch (e) {
       console.error("Error fetching viewport:", e);

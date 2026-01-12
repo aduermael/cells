@@ -2397,5 +2397,153 @@ TEST(XLSXWriterTest, WriteMultipleViewProperties) {
     EXPECT_EQ(readSheet->zoomScale, 75);
 }
 
+// ============================================================================
+// Hidden Columns/Rows Tests
+// ============================================================================
+
+TEST(XLSXWriterTest, HiddenColumnRoundTrip) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Hidden Column Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Create 3 columns, hide the middle one
+    auto col1 = std::make_unique<Axis>(generate_id(), true);
+    col1->position = 0;
+    col1->hidden = false;
+    sheet->addColumn(std::move(col1));
+
+    auto col2 = std::make_unique<Axis>(generate_id(), true);
+    col2->position = 1;
+    col2->hidden = true;  // Hidden column
+    sheet->addColumn(std::move(col2));
+
+    auto col3 = std::make_unique<Axis>(generate_id(), true);
+    col3->position = 2;
+    col3->hidden = false;
+    sheet->addColumn(std::move(col3));
+
+    // Add a row
+    auto row = std::make_unique<Axis>(generate_id(), false);
+    row->position = 0;
+    sheet->addRow(std::move(row));
+
+    // Add cells to each column so the XLSX dimensions include all columns
+    Sheet* rawSheet = sheet.get();
+    auto cell1 = std::make_unique<Cell>(generate_id(), rawSheet->getColumnByPosition(0)->id,
+                                        rawSheet->getRowByPosition(0)->id);
+    cell1->value = CellValue(1.0);
+    sheet->addCell(std::move(cell1));
+
+    auto cell2 = std::make_unique<Cell>(generate_id(), rawSheet->getColumnByPosition(1)->id,
+                                        rawSheet->getRowByPosition(0)->id);
+    cell2->value = CellValue(2.0);
+    sheet->addCell(std::move(cell2));
+
+    auto cell3 = std::make_unique<Cell>(generate_id(), rawSheet->getColumnByPosition(2)->id,
+                                        rawSheet->getRowByPosition(0)->id);
+    cell3->value = CellValue(3.0);
+    sheet->addCell(std::move(cell3));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("hidden_column.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify hidden state
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Find columns by position
+    Axis* readCol1 = readSheet->getColumnByPosition(0);
+    Axis* readCol2 = readSheet->getColumnByPosition(1);
+    Axis* readCol3 = readSheet->getColumnByPosition(2);
+
+    ASSERT_NE(readCol1, nullptr);
+    ASSERT_NE(readCol2, nullptr);
+    ASSERT_NE(readCol3, nullptr);
+
+    EXPECT_FALSE(readCol1->hidden) << "Column 0 should not be hidden";
+    EXPECT_TRUE(readCol2->hidden) << "Column 1 should be hidden";
+    EXPECT_FALSE(readCol3->hidden) << "Column 2 should not be hidden";
+}
+
+TEST(XLSXWriterTest, HiddenRowRoundTrip) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Hidden Row Test");
+    auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+
+    // Add a column
+    auto col = std::make_unique<Axis>(generate_id(), true);
+    col->position = 0;
+    sheet->addColumn(std::move(col));
+
+    // Create 3 rows, hide the middle one
+    auto row1 = std::make_unique<Axis>(generate_id(), false);
+    row1->position = 0;
+    row1->hidden = false;
+    sheet->addRow(std::move(row1));
+
+    auto row2 = std::make_unique<Axis>(generate_id(), false);
+    row2->position = 1;
+    row2->hidden = true;  // Hidden row
+    sheet->addRow(std::move(row2));
+
+    auto row3 = std::make_unique<Axis>(generate_id(), false);
+    row3->position = 2;
+    row3->hidden = false;
+    sheet->addRow(std::move(row3));
+
+    // Add a cell to each row so they get exported
+    Sheet* rawSheet = sheet.get();
+    auto cell1 = std::make_unique<Cell>(generate_id(), rawSheet->getColumnByPosition(0)->id,
+                                        rawSheet->getRowByPosition(0)->id);
+    cell1->value = CellValue(1.0);
+    sheet->addCell(std::move(cell1));
+
+    auto cell2 = std::make_unique<Cell>(generate_id(), rawSheet->getColumnByPosition(0)->id,
+                                        rawSheet->getRowByPosition(1)->id);
+    cell2->value = CellValue(2.0);
+    sheet->addCell(std::move(cell2));
+
+    auto cell3 = std::make_unique<Cell>(generate_id(), rawSheet->getColumnByPosition(0)->id,
+                                        rawSheet->getRowByPosition(2)->id);
+    cell3->value = CellValue(3.0);
+    sheet->addCell(std::move(cell3));
+
+    workbook->addSheet(std::move(sheet));
+
+    std::string path = tempFilePath("hidden_row.xlsx");
+    TempFileGuard guard(path);
+
+    auto result = writeXLSX(*workbook, path);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    // Read back and verify hidden state
+    auto readResult = readXLSX(path);
+    EXPECT_TRUE(readResult.ok());
+    ASSERT_NE(readResult.workbook, nullptr);
+
+    Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
+    ASSERT_NE(readSheet, nullptr);
+
+    // Find rows by position
+    Axis* readRow1 = readSheet->getRowByPosition(0);
+    Axis* readRow2 = readSheet->getRowByPosition(1);
+    Axis* readRow3 = readSheet->getRowByPosition(2);
+
+    ASSERT_NE(readRow1, nullptr);
+    ASSERT_NE(readRow2, nullptr);
+    ASSERT_NE(readRow3, nullptr);
+
+    EXPECT_FALSE(readRow1->hidden) << "Row 0 should not be hidden";
+    EXPECT_TRUE(readRow2->hidden) << "Row 1 should be hidden";
+    EXPECT_FALSE(readRow3->hidden) << "Row 2 should not be hidden";
+}
+
 }  // namespace
 }  // namespace cells

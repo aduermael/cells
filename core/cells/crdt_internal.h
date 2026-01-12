@@ -77,6 +77,9 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op);
 ApplyResult applyRowResize(Workbook& workbook, const Operation& op);
 ApplyResult applyRowMove(Workbook& workbook, const Operation& op);
 
+// Axis operations (apply to both columns and rows)
+ApplyResult applyAxisSetHidden(Workbook& workbook, const Operation& op);
+
 // Legacy DIM_* operations (backwards compatibility)
 ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op);
 ApplyResult applyDimResizeAxis(Workbook& workbook, const Operation& op);

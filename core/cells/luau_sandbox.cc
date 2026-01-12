@@ -227,6 +227,18 @@ void LuauSandbox::registerCellsAPI() {
     lua_pushcfunction(L_, &LuauSandbox::luaColumnMove, "moveColumn");
     lua_setglobal(L_, "moveColumn");
 
+    lua_pushcfunction(L_, &LuauSandbox::luaHideColumn, "hideColumn");
+    lua_setglobal(L_, "hideColumn");
+
+    lua_pushcfunction(L_, &LuauSandbox::luaShowColumn, "showColumn");
+    lua_setglobal(L_, "showColumn");
+
+    lua_pushcfunction(L_, &LuauSandbox::luaHideRow, "hideRow");
+    lua_setglobal(L_, "hideRow");
+
+    lua_pushcfunction(L_, &LuauSandbox::luaShowRow, "showRow");
+    lua_setglobal(L_, "showRow");
+
     lua_pushcfunction(L_, &LuauSandbox::luaSelectSheet, "selectSheet");
     lua_setglobal(L_, "selectSheet");
 

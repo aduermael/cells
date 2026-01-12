@@ -290,6 +290,11 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             result = internal::applyRowResize(workbook, op);
             break;
 
+        // Axis operations
+        case OpType::AXIS_SET_HIDDEN:
+            result = internal::applyAxisSetHidden(workbook, op);
+            break;
+
         // Legacy DIM_* operations (backwards compatibility)
         case OpType::DIM_INSERT_AXIS:
             result = internal::applyDimInsertAxis(workbook, op);
@@ -468,6 +473,11 @@ Operation makeRowResizeOp(Workbook& workbook, const ID& axisId, const std::strin
 Operation makeRowMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::ROW_MOVE, axisId, payload};
+}
+
+Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::AXIS_SET_HIDDEN, axisId, hidden ? "1" : "0"};
 }
 
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {

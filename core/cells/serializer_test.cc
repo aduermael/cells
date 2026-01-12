@@ -1973,5 +1973,144 @@ X xA1bC2dE cA1bC2dE rA1bC2dE n 100
     EXPECT_EQ(nr->name, "Total_2024.Q1");
 }
 
+// --- Hidden Columns/Rows Tests ---
+
+TEST(SerializerTest, SerializeHiddenColumn) {
+    Workbook wb(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    col->hidden = true;
+    sheet->addColumn(std::move(col));
+
+    wb.addSheet(std::move(sheet));
+
+    Serializer serializer;
+    const std::string output = serializer.serialize(wb);
+
+    // Should include hidden:1 property
+    EXPECT_NE(output.find("hidden:1"), std::string::npos);
+}
+
+TEST(SerializerTest, SerializeHiddenRow) {
+    Workbook wb(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row->hidden = true;
+    sheet->addRow(std::move(row));
+
+    wb.addSheet(std::move(sheet));
+
+    Serializer serializer;
+    const std::string output = serializer.serialize(wb);
+
+    // Should include hidden:1 property
+    EXPECT_NE(output.find("hidden:1"), std::string::npos);
+}
+
+TEST(SerializerTest, VisibleColumnNoHiddenProperty) {
+    Workbook wb(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    col->hidden = false;  // Not hidden (default)
+    sheet->addColumn(std::move(col));
+
+    wb.addSheet(std::move(sheet));
+
+    Serializer serializer;
+    const std::string output = serializer.serialize(wb);
+
+    // Should NOT include hidden property for visible columns
+    EXPECT_EQ(output.find("hidden:"), std::string::npos);
+}
+
+TEST(ParserTest, ParseHiddenColumn) {
+    const std::string content = R"(D aB3cD4eF "Test"
+S sH3eE4tB "Sheet1"
+C cA1bC2dE 0 hidden:1
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    Axis* col = sheet->getColumn(ID("cA1bC2dE"));
+    ASSERT_NE(col, nullptr);
+    EXPECT_TRUE(col->hidden);
+}
+
+TEST(ParserTest, ParseHiddenRow) {
+    const std::string content = R"(D aB3cD4eF "Test"
+S sH3eE4tB "Sheet1"
+R rA1bC2dE 0 hidden:1
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    Axis* row = sheet->getRow(ID("rA1bC2dE"));
+    ASSERT_NE(row, nullptr);
+    EXPECT_TRUE(row->hidden);
+}
+
+TEST(ParserTest, ParseVisibleColumnNoHiddenProperty) {
+    const std::string content = R"(D aB3cD4eF "Test"
+S sH3eE4tB "Sheet1"
+C cA1bC2dE 0
+)";
+
+    ParseResult result = parse(content);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    Axis* col = sheet->getColumn(ID("cA1bC2dE"));
+    ASSERT_NE(col, nullptr);
+    EXPECT_FALSE(col->hidden);  // Default is visible
+}
+
+TEST(SerializerTest, HiddenAxisRoundTrip) {
+    // Create workbook with hidden column and row
+    Workbook wb(ID("aB3cD4eF"), "Test");
+    auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+
+    auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
+    col->hidden = true;
+    sheet->addColumn(std::move(col));
+
+    auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
+    row->hidden = true;
+    sheet->addRow(std::move(row));
+
+    wb.addSheet(std::move(sheet));
+
+    // Serialize
+    Serializer serializer;
+    const std::string output = serializer.serialize(wb);
+
+    // Parse back
+    ParseResult result = parse(output);
+    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
+
+    Sheet* parsedSheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(parsedSheet, nullptr);
+
+    Axis* parsedCol = parsedSheet->getColumn(ID("cA1bC2dE"));
+    ASSERT_NE(parsedCol, nullptr);
+    EXPECT_TRUE(parsedCol->hidden);
+
+    Axis* parsedRow = parsedSheet->getRow(ID("rA1bC2dE"));
+    ASSERT_NE(parsedRow, nullptr);
+    EXPECT_TRUE(parsedRow->hidden);
+}
+
 }  // namespace
 }  // namespace cells

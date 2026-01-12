@@ -343,6 +343,10 @@ void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out)
         out << " name:\"" << escapeString(axis.name) << "\"";
     }
 
+    if (axis.hidden) {
+        out << " hidden:1";
+    }
+
     out << "\n";
 }
 

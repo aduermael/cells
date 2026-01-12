@@ -721,6 +721,19 @@ bool Parser::parseAxisProps(std::string_view props, Axis& axis) {
             }
             axis.name = std::move(name);
             props = props.substr(consumed);
+        } else if (key == "hidden") {
+            // Boolean value (0 or 1)
+            const size_t endPos = props.find_first_of(" \t");
+            const std::string_view valueStr =
+                (endPos == std::string_view::npos) ? props : props.substr(0, endPos);
+
+            axis.hidden = (valueStr == "1");
+
+            if (endPos == std::string_view::npos) {
+                props = "";
+            } else {
+                props = props.substr(endPos);
+            }
         } else {
             // Unknown property - skip to next space
             const size_t endPos = props.find_first_of(" \t");

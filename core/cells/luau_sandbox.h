@@ -152,6 +152,10 @@ private:
     static int luaColumnSetWidth(lua_State* L);
     static int luaRowSetHeight(lua_State* L);
     static int luaColumnMove(lua_State* L);
+    static int luaHideColumn(lua_State* L);
+    static int luaShowColumn(lua_State* L);
+    static int luaHideRow(lua_State* L);
+    static int luaShowRow(lua_State* L);
 
     // Sheet operations
     static int luaSelectSheet(lua_State* L);  // selectSheet(sheet|name|index)

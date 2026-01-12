@@ -220,6 +220,7 @@ export interface ColumnInfo {
   width: number;
   pixelOffset: number; // Pre-computed X pixel offset (O(log n) from ViewportIndex)
   name: string;
+  hidden: boolean; // Whether column is hidden
 }
 
 /** Row information */
@@ -229,6 +230,7 @@ export interface RowInfo {
   height: number;
   pixelOffset: number; // Pre-computed Y pixel offset (O(log n) from ViewportIndex)
   name: string;
+  hidden: boolean; // Whether row is hidden
 }
 
 /** Viewport query result */
