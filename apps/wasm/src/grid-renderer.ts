@@ -586,6 +586,106 @@ export class GridRenderer {
     }
   }
 
+  /**
+   * Represents a unique edge between two cells.
+   * For a horizontal edge, col/row refers to the cell above, col2/row2 to the cell below.
+   * For a vertical edge, col/row refers to the cell to the left, col2/row2 to the cell to the right.
+   */
+  private _edgeKey(orientation: "h" | "v", col: number, row: number): string {
+    // For horizontal edges: edge is between row-1 and row (top of row = bottom of row-1)
+    // For vertical edges: edge is between col-1 and col (left of col = right of col-1)
+    return `${orientation}:${col}:${row}`;
+  }
+
+  /**
+   * Border priority for deduplication - higher value wins.
+   * Priority is based on: thickness first, then darkness of color.
+   */
+  private _getBorderPriority(edge: { style: BorderStyle; color: string }): number {
+    const width = this._getBorderWidth(edge.style);
+    // Calculate darkness from color (lower RGB sum = darker = higher priority)
+    let darkness = 0;
+    if (edge.color && edge.color.startsWith("#") && edge.color.length >= 7) {
+      const r = parseInt(edge.color.slice(1, 3), 16);
+      const g = parseInt(edge.color.slice(3, 5), 16);
+      const b = parseInt(edge.color.slice(5, 7), 16);
+      // Invert so darker colors have higher darkness value (max 765)
+      darkness = 765 - (r + g + b);
+    } else {
+      // Default black has maximum darkness
+      darkness = 765;
+    }
+    // Combine: width is most important, darkness is tiebreaker
+    // width * 1000 ensures width always wins over color
+    return width * 1000 + darkness;
+  }
+
+  /** Build a map of border edges, keeping only the highest priority border for each edge */
+  private _buildBorderEdgeMap(
+    colHasMoved: boolean,
+    rowHasMoved: boolean
+  ): Map<string, { style: BorderStyle; color: string }> {
+    const edgeMap = new Map<string, { style: BorderStyle; color: string }>();
+
+    for (const cell of this.cells) {
+      if (colHasMoved && cell.col === this.dragSourceIndex) continue;
+      if (rowHasMoved && cell.row === this.dragSourceIndex) continue;
+
+      const border = cell.style?.border;
+      if (!border) continue;
+
+      // Determine cell dimensions (for merge anchors)
+      let colSpan = 1;
+      let rowSpan = 1;
+      if (cell.isMergeAnchor && cell.mergeColSpan && cell.mergeRowSpan) {
+        colSpan = cell.mergeColSpan;
+        rowSpan = cell.mergeRowSpan;
+      }
+
+      // Top border - horizontal edge at the top of this cell
+      if (border.top && border.top.style !== "none") {
+        const key = this._edgeKey("h", cell.col, cell.row);
+        const priority = this._getBorderPriority(border.top);
+        const existing = edgeMap.get(key);
+        if (!existing || priority > this._getBorderPriority(existing)) {
+          edgeMap.set(key, { style: border.top.style, color: border.top.color || "#000000" });
+        }
+      }
+
+      // Bottom border - horizontal edge at the bottom of this cell (top of next row)
+      if (border.bottom && border.bottom.style !== "none") {
+        const key = this._edgeKey("h", cell.col, cell.row + rowSpan);
+        const priority = this._getBorderPriority(border.bottom);
+        const existing = edgeMap.get(key);
+        if (!existing || priority > this._getBorderPriority(existing)) {
+          edgeMap.set(key, { style: border.bottom.style, color: border.bottom.color || "#000000" });
+        }
+      }
+
+      // Left border - vertical edge at the left of this cell
+      if (border.left && border.left.style !== "none") {
+        const key = this._edgeKey("v", cell.col, cell.row);
+        const priority = this._getBorderPriority(border.left);
+        const existing = edgeMap.get(key);
+        if (!existing || priority > this._getBorderPriority(existing)) {
+          edgeMap.set(key, { style: border.left.style, color: border.left.color || "#000000" });
+        }
+      }
+
+      // Right border - vertical edge at the right of this cell (left of next col)
+      if (border.right && border.right.style !== "none") {
+        const key = this._edgeKey("v", cell.col + colSpan, cell.row);
+        const priority = this._getBorderPriority(border.right);
+        const existing = edgeMap.get(key);
+        if (!existing || priority > this._getBorderPriority(existing)) {
+          edgeMap.set(key, { style: border.right.style, color: border.right.color || "#000000" });
+        }
+      }
+    }
+
+    return edgeMap;
+  }
+
   /** Get line width for a border style */
   private _getBorderWidth(style: BorderStyle): number {
     switch (style) {
@@ -637,7 +737,15 @@ export class GridRenderer {
     }
   }
 
-  /** Draw cell borders (custom per-cell borders from styles) */
+  /**
+   * Draw cell borders using edge deduplication.
+   *
+   * When adjacent cells both have borders on a shared edge (e.g., cell A has bottom border,
+   * cell B below has top border), we only draw one border to avoid double-thickness lines.
+   * The border with higher priority (thicker, then darker) wins.
+   *
+   * Borders are drawn centered on cell edges for proper alignment.
+   */
   private _drawCellBorders(
     ctx: CanvasRenderingContext2D,
     viewWidth: number,
@@ -646,101 +754,112 @@ export class GridRenderer {
     rowHasMoved: boolean,
     headerState: HeaderRendererState
   ): void {
-    // Only draw borders for cells that have border styles
-    for (const cell of this.cells) {
-      if (colHasMoved && cell.col === this.dragSourceIndex) continue;
-      if (rowHasMoved && cell.row === this.dragSourceIndex) continue;
+    // Build deduplicated edge map
+    const edgeMap = this._buildBorderEdgeMap(colHasMoved, rowHasMoved);
 
-      const border = cell.style?.border;
-      if (!border) continue;
+    if (edgeMap.size === 0) return;
 
-      // Check if any edge has a non-none border
-      const hasTop = border.top && border.top.style !== "none";
-      const hasRight = border.right && border.right.style !== "none";
-      const hasBottom = border.bottom && border.bottom.style !== "none";
-      const hasLeft = border.left && border.left.style !== "none";
+    // Draw each unique edge once
+    for (const [key, edge] of edgeMap) {
+      const parts = key.split(":");
+      const orientation = parts[0];
+      const col = parseInt(parts[1] || "0", 10);
+      const row = parseInt(parts[2] || "0", 10);
 
-      if (!hasTop && !hasRight && !hasBottom && !hasLeft) continue;
+      const width = this._getBorderWidth(edge.style);
+      ctx.strokeStyle = edge.color;
+      ctx.lineWidth = width;
+      this._setBorderDash(ctx, edge.style);
 
-      const cellX = getColX(cell.col, headerState);
-      const cellY = getRowY(cell.row, headerState);
+      if (orientation === "h") {
+        // Horizontal edge: draw at the boundary between row-1 and row
+        // Edge position is at the top of 'row' (or bottom of 'row-1')
+        const y = getRowY(row, headerState);
 
-      // Handle merged cells - use merge dimensions
-      let colWidth: number;
-      let rowHeight: number;
-      if (cell.isMergeAnchor && cell.mergeColSpan && cell.mergeRowSpan) {
-        colWidth = 0;
-        for (let c = 0; c < cell.mergeColSpan; c++) {
-          colWidth += this.colWidths.get(cell.col + c) || DEFAULT_COL_WIDTH;
+        // Skip if outside visible area
+        if (y < HEADER_HEIGHT - width || y > viewHeight + width) continue;
+
+        // For horizontal edges, we need to determine the span
+        // Find the cell that owns this edge to determine its column span
+        let startX = getColX(col, headerState);
+        let endX = startX + (this.colWidths.get(col) || DEFAULT_COL_WIDTH);
+
+        // Check if this edge spans multiple columns (from merged cells)
+        // The edge key uses the anchor cell's column, but we need to find the actual span
+        for (const cell of this.cells) {
+          if (cell.col !== col) continue;
+          const cellRowSpan = cell.isMergeAnchor && cell.mergeRowSpan ? cell.mergeRowSpan : 1;
+          const cellColSpan = cell.isMergeAnchor && cell.mergeColSpan ? cell.mergeColSpan : 1;
+
+          // Check if this cell's top or bottom edge matches our edge
+          if (cell.row === row || cell.row + cellRowSpan === row) {
+            // This cell owns this edge - calculate full span
+            endX = startX;
+            for (let c = 0; c < cellColSpan; c++) {
+              endX += this.colWidths.get(col + c) || DEFAULT_COL_WIDTH;
+            }
+            break;
+          }
         }
-        rowHeight = 0;
-        for (let r = 0; r < cell.mergeRowSpan; r++) {
-          rowHeight += this.rowHeights.get(cell.row + r) || DEFAULT_ROW_HEIGHT;
-        }
+
+        // Clamp to visible area
+        startX = Math.max(startX, HEADER_WIDTH);
+        endX = Math.min(endX, viewWidth);
+
+        if (startX >= endX) continue;
+
+        ctx.beginPath();
+        // Center the line on the edge (add 0.5 for crisp 1px lines)
+        const lineY = Math.round(y) + 0.5;
+        ctx.moveTo(startX, lineY);
+        ctx.lineTo(endX, lineY);
+        ctx.stroke();
       } else {
-        colWidth = this.colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
-        rowHeight = this.rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
-      }
+        // Vertical edge: draw at the boundary between col-1 and col
+        // Edge position is at the left of 'col' (or right of 'col-1')
+        const x = getColX(col, headerState);
 
-      // Skip if cell is outside visible area
-      if (cellX + colWidth < HEADER_WIDTH || cellX > viewWidth) continue;
-      if (cellY + rowHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
+        // Skip if outside visible area
+        if (x < HEADER_WIDTH - width || x > viewWidth + width) continue;
 
-      // Draw top border
-      if (hasTop) {
-        const width = this._getBorderWidth(border.top.style);
-        ctx.strokeStyle = border.top.color || "#000000";
-        ctx.lineWidth = width;
-        this._setBorderDash(ctx, border.top.style);
+        // For vertical edges, determine the row span
+        let startY = getRowY(row, headerState);
+        let endY = startY + (this.rowHeights.get(row) || DEFAULT_ROW_HEIGHT);
+
+        // Check if this edge spans multiple rows (from merged cells)
+        for (const cell of this.cells) {
+          if (cell.row !== row) continue;
+          const cellColSpan = cell.isMergeAnchor && cell.mergeColSpan ? cell.mergeColSpan : 1;
+          const cellRowSpan = cell.isMergeAnchor && cell.mergeRowSpan ? cell.mergeRowSpan : 1;
+
+          // Check if this cell's left or right edge matches our edge
+          if (cell.col === col || cell.col + cellColSpan === col) {
+            // This cell owns this edge - calculate full span
+            endY = startY;
+            for (let r = 0; r < cellRowSpan; r++) {
+              endY += this.rowHeights.get(row + r) || DEFAULT_ROW_HEIGHT;
+            }
+            break;
+          }
+        }
+
+        // Clamp to visible area
+        startY = Math.max(startY, HEADER_HEIGHT);
+        endY = Math.min(endY, viewHeight);
+
+        if (startY >= endY) continue;
+
         ctx.beginPath();
-        const y = cellY + width / 2;
-        ctx.moveTo(cellX, y);
-        ctx.lineTo(cellX + colWidth, y);
+        // Center the line on the edge (add 0.5 for crisp 1px lines)
+        const lineX = Math.round(x) + 0.5;
+        ctx.moveTo(lineX, startY);
+        ctx.lineTo(lineX, endY);
         ctx.stroke();
       }
-
-      // Draw right border
-      if (hasRight) {
-        const width = this._getBorderWidth(border.right.style);
-        ctx.strokeStyle = border.right.color || "#000000";
-        ctx.lineWidth = width;
-        this._setBorderDash(ctx, border.right.style);
-        ctx.beginPath();
-        const x = cellX + colWidth - width / 2;
-        ctx.moveTo(x, cellY);
-        ctx.lineTo(x, cellY + rowHeight);
-        ctx.stroke();
-      }
-
-      // Draw bottom border
-      if (hasBottom) {
-        const width = this._getBorderWidth(border.bottom.style);
-        ctx.strokeStyle = border.bottom.color || "#000000";
-        ctx.lineWidth = width;
-        this._setBorderDash(ctx, border.bottom.style);
-        ctx.beginPath();
-        const y = cellY + rowHeight - width / 2;
-        ctx.moveTo(cellX, y);
-        ctx.lineTo(cellX + colWidth, y);
-        ctx.stroke();
-      }
-
-      // Draw left border
-      if (hasLeft) {
-        const width = this._getBorderWidth(border.left.style);
-        ctx.strokeStyle = border.left.color || "#000000";
-        ctx.lineWidth = width;
-        this._setBorderDash(ctx, border.left.style);
-        ctx.beginPath();
-        const x = cellX + width / 2;
-        ctx.moveTo(x, cellY);
-        ctx.lineTo(x, cellY + rowHeight);
-        ctx.stroke();
-      }
-
-      // Reset line dash
-      ctx.setLineDash([]);
     }
+
+    // Reset line dash
+    ctx.setLineDash([]);
   }
 
   /** Draw cell values */

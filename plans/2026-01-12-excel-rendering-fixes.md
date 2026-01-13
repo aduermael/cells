@@ -19,10 +19,10 @@ When adjacent cells both have borders (e.g., cell A has bottom border, cell B be
 
 **Design considerations:** Ideally borders should be shared between cells (each border has 2 owners), but with UUID-based sparse cells this is complex, especially when moving cells. Alternative approach: keep all 4 borders per cell but render centered on the edge, drawing the most visible line (thicker, darker) in priority over neighbor's line.
 
-- [ ] 2a: In grid-renderer.ts, before drawing borders, build a map of all border edges by position
-- [ ] 2b: When two cells share an edge, only draw the border once (prefer thicker/darker line, or cell that appears first as tiebreaker)
-- [ ] 2c: Ensure borders render centered on cell edges rather than inside/outside
-- [ ] 2d: Add test case verifying border thickness is correct for adjacent bordered cells
+- [x] 2a: In grid-renderer.ts, before drawing borders, build a map of all border edges by position. Added `_edgeKey()` and `_buildBorderEdgeMap()` methods.
+- [x] 2b: When two cells share an edge, only draw the border once (prefer thicker/darker line, or cell that appears first as tiebreaker). Added `_getBorderPriority()` that considers line width first, then color darkness.
+- [x] 2c: Ensure borders render centered on cell edges rather than inside/outside. Rewrote `_drawCellBorders()` to iterate unique edges and draw centered with 0.5px offset for crisp lines.
+- [x] 2d: Add test case verifying border thickness is correct for adjacent bordered cells. Added test to lbo-integration.test.mjs that identifies shared edges (found 29 in LBO model).
 
 ## Phase 3: Text Alignment Fixes
 
