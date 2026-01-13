@@ -259,6 +259,41 @@ const tests = {
     await sleep(100);
     assertEqual(await getFormulaBarContent(ctx.page), '', 'E3 should be empty after Delete');
   },
+
+  'Title selection clears when clicking canvas': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Click on workbook title to focus it
+    await ctx.page.click('#workbook-title');
+    await sleep(100);
+
+    // Select all text in the title (double-click or Ctrl+A)
+    await ctx.page.click('#workbook-title', { clickCount: 2 });
+    await sleep(100);
+
+    // Verify there's a selection in the title
+    const hasSelectionBefore = await ctx.page.evaluate(() => {
+      const sel = window.getSelection();
+      return sel && sel.toString().length > 0;
+    });
+    assertEqual(hasSelectionBefore, true, 'Should have selection in title after double-click');
+
+    // Click on a cell in the canvas
+    await clickCell(ctx.page, 'B2');
+    await sleep(200);
+
+    // Verify the selection is now cleared
+    const hasSelectionAfter = await ctx.page.evaluate(() => {
+      const sel = window.getSelection();
+      return sel && sel.toString().length > 0;
+    });
+    assertEqual(hasSelectionAfter, false, 'Selection should be cleared after clicking canvas');
+
+    // Verify cell selection works correctly
+    const cellRef = await getCurrentCellRef(ctx.page);
+    assertEqual(cellRef, 'B2', 'Cell B2 should be selected');
+  },
 };
 
 // Run all tests

@@ -412,6 +412,12 @@ export class MouseEventHandlers {
             commitFormulaBarEdit,
         } = this.config;
 
+        // Clear any lingering text selection from other elements (e.g., title editor)
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            selection.removeAllRanges();
+        }
+
         const sheetInfo = getSheetInfo();
         if (!sheetInfo) return;
 

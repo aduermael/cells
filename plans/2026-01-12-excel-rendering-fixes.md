@@ -59,6 +59,6 @@ Current zoom uses CSS transform which scales pixels but doesn't change the viewp
 
 When editing the document title and clicking on a cell, the title selection sometimes remains visible.
 
-- [ ] 6a: Investigate the blur/focus flow between workbook-title-editor and canvas
-- [ ] 6b: Clear window selection when canvas receives focus
-- [ ] 6c: Add test for title edit followed by cell selection
+- [x] 6a: Investigate the blur/focus flow between workbook-title-editor and canvas. Title uses contenteditable with `window.getSelection()` for text selection. Clicking canvas calls `canvas.focus()` but this doesn't clear the window selection.
+- [x] 6b: Clear window selection when canvas receives focus. Added `window.getSelection().removeAllRanges()` at the start of `handleMouseDown()` in mouse-events.ts.
+- [x] 6c: Add test for title edit followed by cell selection. Added `'Title selection clears when clicking canvas'` test to editing.test.mjs.
