@@ -59,7 +59,7 @@ Implement Excel-style text overflow: when a cell contains text longer than its w
 
 Add per-cell border rendering with customizable thickness, color, and style. Currently only grid lines are drawn uniformly.
 
-- [ ] 7a: Add border properties to CellStyle struct in C++ (top/right/bottom/left border color, thickness, style)
+- [x] 7a: Add border properties to CellStyle struct in C++ (top/right/bottom/left border color, thickness, style). Added BorderStyle enum, BorderEdge struct, and CellBorder struct to model.h.
 - [ ] 7b: Parse `<border>` elements from XLSX styles.xml (left/right/top/bottom with color and style attributes)
 - [ ] 7c: Apply parsed borders to CellStyle during XLSX import
 - [ ] 7d: Store border data in CellData type for TypeScript rendering
