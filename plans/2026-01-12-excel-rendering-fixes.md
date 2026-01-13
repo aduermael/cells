@@ -17,9 +17,12 @@ Excel XLSX files use theme colors (e.g., `theme="4" tint="-0.5"`) and indexed co
 
 When adjacent cells both have borders (e.g., cell A has bottom border, cell B below has top border), both borders render creating a visually thicker line. Excel only renders one border.
 
+**Design considerations:** Ideally borders should be shared between cells (each border has 2 owners), but with UUID-based sparse cells this is complex, especially when moving cells. Alternative approach: keep all 4 borders per cell but render centered on the edge, drawing the most visible line (thicker, darker) in priority over neighbor's line.
+
 - [ ] 2a: In grid-renderer.ts, before drawing borders, build a map of all border edges by position
-- [ ] 2b: When two cells share an edge, only draw the border once (prefer the cell that appears first, or use priority rules)
-- [ ] 2c: Add test case verifying border thickness is correct for adjacent bordered cells
+- [ ] 2b: When two cells share an edge, only draw the border once (prefer thicker/darker line, or cell that appears first as tiebreaker)
+- [ ] 2c: Ensure borders render centered on cell edges rather than inside/outside
+- [ ] 2d: Add test case verifying border thickness is correct for adjacent bordered cells
 
 ## Phase 3: Text Alignment Fixes
 
