@@ -475,17 +475,47 @@ struct XLSXFillEntry {
     bool operator==(const XLSXFillEntry& other) const { return fgColor == other.fgColor; }
 };
 
+// Single border edge entry for styles.xml
+struct XLSXBorderEdgeEntry {
+    cells::BorderStyle style{cells::BorderStyle::NONE};
+    std::string color;  // ARGB hex, empty = use default (auto)
+
+    bool operator==(const XLSXBorderEdgeEntry& other) const {
+        return style == other.style && color == other.color;
+    }
+
+    [[nodiscard]] bool hasValue() const { return style != cells::BorderStyle::NONE; }
+};
+
+// Border entry for styles.xml
+struct XLSXBorderEntry {
+    XLSXBorderEdgeEntry left;
+    XLSXBorderEdgeEntry right;
+    XLSXBorderEdgeEntry top;
+    XLSXBorderEdgeEntry bottom;
+
+    bool operator==(const XLSXBorderEntry& other) const {
+        return left == other.left && right == other.right && top == other.top &&
+               bottom == other.bottom;
+    }
+
+    [[nodiscard]] bool hasValue() const {
+        return left.hasValue() || right.hasValue() || top.hasValue() || bottom.hasValue();
+    }
+};
+
 // Cell format entry (cellXfs)
 struct XLSXCellFormatEntry {
     size_t fontId{0};
     size_t fillId{0};
+    size_t borderId{0};
     cells::TextAlign hAlign{cells::TextAlign::LEFT};
     cells::VerticalAlign vAlign{cells::VerticalAlign::BOTTOM};
     bool hasAlignment{false};
 
     bool operator==(const XLSXCellFormatEntry& other) const {
-        return fontId == other.fontId && fillId == other.fillId && hAlign == other.hAlign &&
-               vAlign == other.vAlign && hasAlignment == other.hasAlignment;
+        return fontId == other.fontId && fillId == other.fillId && borderId == other.borderId &&
+               hAlign == other.hAlign && vAlign == other.vAlign && hasAlignment == other.hasAlignment;
     }
 };
 
@@ -500,7 +530,7 @@ std::string rgbToArgb(const std::string& rgb) {
     return rgb;
 }
 
-// Style table that collects fonts, fills, and cell formats for XLSX export
+// Style table that collects fonts, fills, borders, and cell formats for XLSX export
 class StyleTable {
 public:
     StyleTable() {
@@ -513,6 +543,10 @@ public:
         fills_.emplace_back(XLSXFillEntry{"gray125"});  // gray125 (required placeholder)
         fillIndex_[""] = 0;
         fillIndex_["gray125"] = 1;
+
+        // Add default border (index 0) - required by Excel
+        borders_.emplace_back();  // Empty border (no edges)
+        borderIndex_[borderKey(borders_[0])] = 0;
 
         // Add default cell format (index 0)
         formats_.push_back(XLSXCellFormatEntry{});
@@ -537,10 +571,23 @@ public:
         fill.fgColor = rgbToArgb(style.bgColor);
         const size_t fillId = getOrAddFill(fill);
 
+        // Get or add border
+        XLSXBorderEntry border;
+        border.left.style = style.border.left.style;
+        border.left.color = rgbToArgb(style.border.left.color);
+        border.right.style = style.border.right.style;
+        border.right.color = rgbToArgb(style.border.right.color);
+        border.top.style = style.border.top.style;
+        border.top.color = rgbToArgb(style.border.top.color);
+        border.bottom.style = style.border.bottom.style;
+        border.bottom.color = rgbToArgb(style.border.bottom.color);
+        const size_t borderId = getOrAddBorder(border);
+
         // Create cell format
         XLSXCellFormatEntry xf;
         xf.fontId = fontId;
         xf.fillId = fillId;
+        xf.borderId = borderId;
         xf.hAlign = style.hAlign;
         xf.vAlign = style.vAlign;
         xf.hasAlignment = (style.hAlign != cells::TextAlign::LEFT ||
@@ -551,14 +598,17 @@ public:
 
     [[nodiscard]] const std::vector<XLSXFontEntry>& fonts() const { return fonts_; }
     [[nodiscard]] const std::vector<XLSXFillEntry>& fills() const { return fills_; }
+    [[nodiscard]] const std::vector<XLSXBorderEntry>& borders() const { return borders_; }
     [[nodiscard]] const std::vector<XLSXCellFormatEntry>& formats() const { return formats_; }
 
 private:
     std::vector<XLSXFontEntry> fonts_;
     std::vector<XLSXFillEntry> fills_;
+    std::vector<XLSXBorderEntry> borders_;
     std::vector<XLSXCellFormatEntry> formats_;
     std::unordered_map<std::string, size_t> fontIndex_;
     std::unordered_map<std::string, size_t> fillIndex_;
+    std::unordered_map<std::string, size_t> borderIndex_;
     std::unordered_map<std::string, size_t> formatIndex_;
 
     static std::string fontKey(const XLSXFontEntry& f) {
@@ -568,10 +618,20 @@ private:
         return oss.str();
     }
 
+    static std::string borderEdgeKey(const XLSXBorderEdgeEntry& e) {
+        return std::to_string(static_cast<int>(e.style)) + ":" + e.color;
+    }
+
+    static std::string borderKey(const XLSXBorderEntry& b) {
+        return borderEdgeKey(b.left) + "|" + borderEdgeKey(b.right) + "|" + borderEdgeKey(b.top) +
+               "|" + borderEdgeKey(b.bottom);
+    }
+
     static std::string formatKey(const XLSXCellFormatEntry& xf) {
         std::ostringstream oss;
-        oss << xf.fontId << "|" << xf.fillId << "|" << static_cast<int>(xf.hAlign) << "|"
-            << static_cast<int>(xf.vAlign) << "|" << xf.hasAlignment;
+        oss << xf.fontId << "|" << xf.fillId << "|" << xf.borderId << "|"
+            << static_cast<int>(xf.hAlign) << "|" << static_cast<int>(xf.vAlign) << "|"
+            << xf.hasAlignment;
         return oss.str();
     }
 
@@ -599,6 +659,22 @@ private:
         const size_t idx = fills_.size();
         fills_.push_back(fill);
         fillIndex_[fill.fgColor] = idx;
+        return idx;
+    }
+
+    size_t getOrAddBorder(const XLSXBorderEntry& border) {
+        // Empty border uses index 0
+        if (!border.hasValue()) {
+            return 0;
+        }
+        const std::string key = borderKey(border);
+        auto it = borderIndex_.find(key);
+        if (it != borderIndex_.end()) {
+            return it->second;
+        }
+        const size_t idx = borders_.size();
+        borders_.push_back(border);
+        borderIndex_[key] = idx;
         return idx;
     }
 
@@ -1065,6 +1141,58 @@ const char* vAlignToXlsx(cells::VerticalAlign align) {
     }
 }
 
+// Border style enum to XLSX string
+const char* borderStyleToXlsx(cells::BorderStyle style) {
+    switch (style) {
+        case cells::BorderStyle::THIN:
+            return "thin";
+        case cells::BorderStyle::MEDIUM:
+            return "medium";
+        case cells::BorderStyle::THICK:
+            return "thick";
+        case cells::BorderStyle::DASHED:
+            return "dashed";
+        case cells::BorderStyle::DOTTED:
+            return "dotted";
+        case cells::BorderStyle::DOUBLE:
+            return "double";
+        case cells::BorderStyle::HAIR:
+            return "hair";
+        case cells::BorderStyle::MEDIUM_DASHED:
+            return "mediumDashed";
+        case cells::BorderStyle::DASH_DOT:
+            return "dashDot";
+        case cells::BorderStyle::MEDIUM_DASH_DOT:
+            return "mediumDashDot";
+        case cells::BorderStyle::DASH_DOT_DOT:
+            return "dashDotDot";
+        case cells::BorderStyle::MEDIUM_DASH_DOT_DOT:
+            return "mediumDashDotDot";
+        case cells::BorderStyle::SLANT_DASH_DOT:
+            return "slantDashDot";
+        default:
+            return nullptr;  // NONE - don't output style attribute
+    }
+}
+
+// Output a border edge element (left, right, top, bottom)
+void writeBorderEdge(std::ostringstream& xml, const char* name, const XLSXBorderEdgeEntry& edge) {
+    const char* styleStr = borderStyleToXlsx(edge.style);
+    if (styleStr == nullptr) {
+        // No border style - write empty element
+        xml << "      <" << name << "/>\n";
+    } else {
+        xml << "      <" << name << " style=\"" << styleStr << "\">";
+        if (!edge.color.empty()) {
+            xml << "<color rgb=\"" << edge.color << "\"/>";
+        } else {
+            // Use auto color (black)
+            xml << "<color auto=\"1\"/>";
+        }
+        xml << "</" << name << ">\n";
+    }
+}
+
 // Generate xl/styles.xml from collected styles
 std::string generateStyles(const StyleTable& styles) {
     std::ostringstream xml;
@@ -1113,9 +1241,18 @@ std::string generateStyles(const StyleTable& styles) {
     }
     xml << "  </fills>\n";
 
-    // Borders (just default for now)
-    xml << "  <borders count=\"1\">\n";
-    xml << "    <border><left/><right/><top/><bottom/><diagonal/></border>\n";
+    // Borders
+    const auto& borders = styles.borders();
+    xml << "  <borders count=\"" << borders.size() << "\">\n";
+    for (const auto& border : borders) {
+        xml << "    <border>\n";
+        writeBorderEdge(xml, "left", border.left);
+        writeBorderEdge(xml, "right", border.right);
+        writeBorderEdge(xml, "top", border.top);
+        writeBorderEdge(xml, "bottom", border.bottom);
+        xml << "      <diagonal/>\n";
+        xml << "    </border>\n";
+    }
     xml << "  </borders>\n";
 
     // Cell style formats (just default)
@@ -1128,7 +1265,7 @@ std::string generateStyles(const StyleTable& styles) {
     xml << "  <cellXfs count=\"" << formats.size() << "\">\n";
     for (const auto& xf : formats) {
         xml << "    <xf numFmtId=\"0\" fontId=\"" << xf.fontId << "\" fillId=\"" << xf.fillId
-            << "\" borderId=\"0\" xfId=\"0\"";
+            << "\" borderId=\"" << xf.borderId << "\" xfId=\"0\"";
 
         // Apply flags
         if (xf.fontId > 0) {
@@ -1136,6 +1273,9 @@ std::string generateStyles(const StyleTable& styles) {
         }
         if (xf.fillId > 0) {
             xml << " applyFill=\"1\"";
+        }
+        if (xf.borderId > 0) {
+            xml << " applyBorder=\"1\"";
         }
         if (xf.hasAlignment) {
             xml << " applyAlignment=\"1\"";
