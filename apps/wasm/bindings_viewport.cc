@@ -80,6 +80,36 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
     return result;
 }
 
+// Helper: Convert BorderStyle enum to JSON string value
+const char* borderStyleToString(BorderStyle style) {
+    switch (style) {
+        case BorderStyle::NONE: return "none";
+        case BorderStyle::THIN: return "thin";
+        case BorderStyle::MEDIUM: return "medium";
+        case BorderStyle::THICK: return "thick";
+        case BorderStyle::DASHED: return "dashed";
+        case BorderStyle::DOTTED: return "dotted";
+        case BorderStyle::DOUBLE: return "double";
+        case BorderStyle::HAIR: return "hair";
+        case BorderStyle::MEDIUM_DASHED: return "mediumDashed";
+        case BorderStyle::DASH_DOT: return "dashDot";
+        case BorderStyle::MEDIUM_DASH_DOT: return "mediumDashDot";
+        case BorderStyle::DASH_DOT_DOT: return "dashDotDot";
+        case BorderStyle::MEDIUM_DASH_DOT_DOT: return "mediumDashDotDot";
+        case BorderStyle::SLANT_DASH_DOT: return "slantDashDot";
+        default: return "none";
+    }
+}
+
+// Helper: Serialize a single border edge to JSON
+void serializeBorderEdge(std::ostringstream& json, const char* name, const BorderEdge& edge) {
+    json << "\"" << name << "\":{\"style\":\"" << borderStyleToString(edge.style) << "\"";
+    if (!edge.color.empty()) {
+        json << ",\"color\":\"" << edge.color << "\"";
+    }
+    json << "}";
+}
+
 std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t col2, uint32_t row2) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"No sheet available\"}";
@@ -205,6 +235,18 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 case VerticalAlign::TOP: json << ",\"vAlign\":\"top\""; break;
                 case VerticalAlign::MIDDLE: json << ",\"vAlign\":\"middle\""; break;
                 case VerticalAlign::BOTTOM: json << ",\"vAlign\":\"bottom\""; break;
+            }
+            // Include border if any edge has a non-NONE style
+            if (style->border.hasValue()) {
+                json << ",\"border\":{";
+                serializeBorderEdge(json, "top", style->border.top);
+                json << ",";
+                serializeBorderEdge(json, "right", style->border.right);
+                json << ",";
+                serializeBorderEdge(json, "bottom", style->border.bottom);
+                json << ",";
+                serializeBorderEdge(json, "left", style->border.left);
+                json << "}";
             }
             // Indicate if style is inherited from axis (column or row)
             if (effectiveStyle.fromColumn) {

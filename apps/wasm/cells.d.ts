@@ -257,6 +257,30 @@ declare module 'cells-wasm' {
   type VerticalAlign = 'top' | 'middle' | 'bottom';
 
   /**
+   * Border style for cell edges (matches C++ BorderStyle enum)
+   */
+  type BorderStyle = 'none' | 'thin' | 'medium' | 'thick' | 'dashed' | 'dotted' | 'double' | 'hair' |
+    'mediumDashed' | 'dashDot' | 'mediumDashDot' | 'dashDotDot' | 'mediumDashDotDot' | 'slantDashDot';
+
+  /**
+   * Single border edge definition
+   */
+  interface BorderEdge {
+    style: BorderStyle;
+    color: string;  // Hex color "#RRGGBB" or empty for default black
+  }
+
+  /**
+   * Complete cell border (all four edges)
+   */
+  interface CellBorder {
+    top: BorderEdge;
+    right: BorderEdge;
+    bottom: BorderEdge;
+    left: BorderEdge;
+  }
+
+  /**
    * Cell style properties for formatting
    */
   interface CellStyle {
@@ -269,6 +293,7 @@ declare module 'cells-wasm' {
     fontSize: number;    // Font size in points, 0 for default (11pt)
     hAlign: TextAlign;
     vAlign: VerticalAlign;
+    border?: CellBorder; // Cell borders (optional for backwards compatibility)
   }
 
   /**
@@ -882,6 +907,9 @@ declare module 'cells-wasm' {
     // Cell Style types
     TextAlign,
     VerticalAlign,
+    BorderStyle,
+    BorderEdge,
+    CellBorder,
     CellStyle,
     RegisteredStyle,
     CreateStyleResult,
