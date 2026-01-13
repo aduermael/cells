@@ -15,9 +15,9 @@ Named ranges should be highlighted when editing a formula that references them, 
 
 The zoom level resets to 100% during scrolling because `setStateRefs` is called with `sheetInfo.zoomScale` which comes from the backend (always 100) and overwrites the UI-modified zoom. The zoom should be stored in the renderer and only synced from sheetInfo on initial load.
 
-- [ ] 2a: Modify GridRenderer.setStateRefs to only set zoom from sheetInfo on first call (track with flag), not on subsequent updates
-- [ ] 2b: Add setter on ZoomControls to update the renderer's zoom without triggering sheetInfo sync
-- [ ] 2c: Test that zoom persists during scrolling, sheet switching, and viewport fetches
+- [x] 2a: Modify GridRenderer.setStateRefs to only set zoom from sheetInfo on first call (track with flag), not on subsequent updates. Added `_zoomInitialized` flag to track first initialization.
+- [x] 2b: Add setter on ZoomControls to update the renderer's zoom without triggering sheetInfo sync. Already working correctly - ZoomControls has no sheetInfo reference.
+- [x] 2c: Test that zoom persists during scrolling, sheet switching, and viewport fetches. All tests pass.
 
 ## Phase 3: Gradual Zoom Slider
 

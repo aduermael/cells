@@ -153,6 +153,8 @@ export class GridRenderer {
 
   // Zoom scale (100 = 100%, range 10-400)
   private _zoomScale = 100;
+  // Track if zoom has been initialized from sheetInfo (only sync once)
+  private _zoomInitialized = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -166,9 +168,11 @@ export class GridRenderer {
   /** Update state references from the main application */
   setStateRefs(state: GridRendererState): void {
     Object.assign(this, state);
-    // If sheetInfo has a zoom level, sync it
-    if (state.sheetInfo?.zoomScale !== undefined) {
+    // Only sync zoom from sheetInfo on first call (initial load)
+    // After that, UI-modified zoom should persist
+    if (!this._zoomInitialized && state.sheetInfo?.zoomScale !== undefined) {
       this.setZoomScale(state.sheetInfo.zoomScale);
+      this._zoomInitialized = true;
     }
   }
 
