@@ -629,6 +629,7 @@ export class FormatControls {
 
     // Use sensible defaults for each category
     // Currency: 2 decimals (industry standard: $100.00)
+    // Accounting: 2 decimals (matches Currency default)
     // Number: 2 decimals (matches Excel Number format default)
     // Percentage: 0 decimals (clean: 15%)
     let decimals = 0;
@@ -643,6 +644,9 @@ export class FormatControls {
         separator = true;
         currency = this.currentCurrency; // Use currently selected currency
         break;
+      case "ACCOUNTING":
+        // Accounting format: use built-in FMT_A002 (2 decimals, aligned $ with parentheses for negatives)
+        return "FMT_A002";
       case "NUMBER":
         decimals = 2;
         separator = false;

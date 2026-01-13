@@ -1031,15 +1031,26 @@ cells::ID mapNumFmtIdToFormatId(int numFmtId, const XLSXStyles& styles) {
         // Currency formats (5-8) - USD with various decimal places
         case 5:                            // $#,##0_);($#,##0)
         case 6:                            // $#,##0_);[Red]($#,##0)
-        case 37:                           // #,##0_);(#,##0)
-        case 38:                           // #,##0_);[Red](#,##0)
             return cells::ID("CUSD_000");  // CURRENCY_USD_0
         case 7:                            // $#,##0.00_);($#,##0.00)
         case 8:                            // $#,##0.00_);[Red]($#,##0.00)
+            return cells::ID("CUSD_002");  // CURRENCY_USD_2
+
+        // Number formats with parentheses (37-40) - not accounting, just number with parens
+        case 37:                           // #,##0_);(#,##0)
+        case 38:                           // #,##0_);[Red](#,##0)
+            return cells::ID("FMT_NS00");  // NUMBER_SEP (thousands separator, 0 decimals)
         case 39:                           // #,##0.00_);(#,##0.00)
         case 40:                           // #,##0.00_);[Red](#,##0.00)
-        case 44:                           // _("$"* #,##0.00_);_("$"* \(#,##0.00\)
-            return cells::ID("CUSD_002");  // CURRENCY_USD_2
+            return cells::ID("FMT_NS02");  // NUMBER_SEP2 (thousands separator, 2 decimals)
+
+        // Accounting formats (41-44) - with aligned currency symbols
+        case 41:  // _(*#,##0_);_(*(#,##0);_(*"-"_);_(@_) - no currency, 0 decimals
+        case 42:  // _($*#,##0_);_($*(#,##0);_($*"-"_);_(@_) - USD, 0 decimals
+            return cells::ID("FMT_A000");  // ACCOUNTING_0
+        case 43:  // _(*#,##0.00_);_(*(#,##0.00);_(*"-"??_);_(@_) - no currency, 2 decimals
+        case 44:  // _($*#,##0.00_);_($*(#,##0.00);_($*"-"??_);_(@_) - USD, 2 decimals
+            return cells::ID("FMT_A002");  // ACCOUNTING_2
 
         // Percentage formats
         case 9:                            // 0%
@@ -1097,6 +1108,30 @@ cells::ID mapNumFmtIdToFormatId(int numFmtId, const XLSXStyles& styles) {
     const std::string& formatCode = it->second;
 
     // Try to detect format type from format code and map to built-in format
+
+    // Check for accounting format (contains _( or _* alignment patterns)
+    // Accounting formats use patterns like: _($* #,##0.00_) or _(*#,##0_)
+    if (formatCode.find("_(*") != std::string::npos ||
+        formatCode.find("_($*") != std::string::npos ||
+        formatCode.find("_(\"$\"*") != std::string::npos) {
+        // Count decimal places
+        int decimals = 0;
+        const size_t dotPos = formatCode.find('.');
+        if (dotPos != std::string::npos) {
+            for (size_t i = dotPos + 1; i < formatCode.size(); ++i) {
+                if (formatCode[i] == '0') {
+                    ++decimals;
+                } else if (formatCode[i] != '#') {
+                    break;  // Stop at first non-digit placeholder
+                }
+            }
+        }
+        if (decimals >= 2) {
+            return cells::ID("FMT_A002");  // ACCOUNTING_2
+        }
+        return cells::ID("FMT_A000");  // ACCOUNTING_0
+    }
+
     // Check for percentage (contains %)
     if (formatCode.find('%') != std::string::npos) {
         // Count decimal places by looking for pattern like ".00%"

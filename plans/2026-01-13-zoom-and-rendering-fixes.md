@@ -38,11 +38,11 @@ Blue header sections in LBO model don't fill expected width - likely related to 
 
 The Accounting format (aligned currency symbol, negatives in parentheses) is partially implemented but not available in the UI and may not be applied from XLSX files correctly.
 
-- [ ] 5a: Add Accounting format option to the number format dropdown in the toolbar UI (style-controls.ts and HTML)
-- [ ] 5b: Review XLSX format code parsing for accounting formats (format codes with `_*` alignment characters and `_(` negative patterns)
-- [ ] 5c: Update `mapNumFmtIdToFormatId` to correctly identify and map accounting format IDs (37-44 in Excel's built-in formats)
-- [ ] 5d: Add unit test for accounting format display (e.g., `$ 2.29` with aligned symbol, `($108.30)` for negatives)
-- [ ] 5e: Add E2E test that applies Accounting format from UI and verifies display
+- [x] 5a: Add Accounting format option to the number format dropdown in the toolbar UI (style-controls.ts and HTML). Added "Accounting" option to format dropdown in index.html and updated `getFormatIdForCategory` in format-controls.ts to return FMT_A002 for ACCOUNTING category.
+- [x] 5b: Review XLSX format code parsing for accounting formats (format codes with `_*` alignment characters and `_(` negative patterns). Added detection for accounting format patterns (`_(*`, `_($*`, `_(\"$\"*`) in custom format parsing.
+- [x] 5c: Update `mapNumFmtIdToFormatId` to correctly identify and map accounting format IDs (37-44 in Excel's built-in formats). Fixed mapping: 37-40 are number formats with parentheses (not accounting), 41-44 are actual accounting formats mapped to FMT_A000/FMT_A002.
+- [x] 5d: Add unit test for accounting format display (e.g., `$ 2.29` with aligned symbol, `($108.30)` for negatives). Added 4 tests in number_formatter_test.cc for AccountingFromRegistry, AccountingNegativeFromRegistry, AccountingZeroFromRegistry, and AccountingNoDecimalsFromRegistry.
+- [x] 5e: Add E2E test that applies Accounting format from UI and verifies display. Added 4 E2E tests in format.test.mjs for positive, negative, zero, and large numbers with thousands separator.
 
 ## Phase 6: EOMONTH Function
 

@@ -1190,6 +1190,106 @@ const tests = {
       throw new Error(`Stored value should be 0.2075: got ${storedValue}`);
     }
   },
+
+  // ============================================================================
+  // Accounting format tests
+  // ============================================================================
+
+  'Accounting format from dropdown displays correctly': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a positive number
+    await setCellValue(ctx.page, 'A1', '2.29');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open format dropdown and select Accounting format
+    await ctx.page.click('#format-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-format-category="ACCOUNTING"]');
+    await sleep(300);
+
+    // Check the displayed value shows accounting format (aligned symbol with space, 2 decimals)
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '$ 2.29', 'Accounting format should display as "$ 2.29" (with space after symbol)');
+
+    // Check the format dropdown shows "Accounting"
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Accounting', 'Format dropdown should show Accounting');
+  },
+
+  'Accounting format displays negative values in parentheses': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a negative number
+    await setCellValue(ctx.page, 'A1', '-108.30');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open format dropdown and select Accounting format
+    await ctx.page.click('#format-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-format-category="ACCOUNTING"]');
+    await sleep(300);
+
+    // Check the displayed value shows negative in parentheses
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '($ 108.30)', 'Accounting format should display negative as "($ 108.30)"');
+  },
+
+  'Accounting format displays zero correctly': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter zero
+    await setCellValue(ctx.page, 'A1', '0');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open format dropdown and select Accounting format
+    await ctx.page.click('#format-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-format-category="ACCOUNTING"]');
+    await sleep(300);
+
+    // Check the displayed value shows zero with 2 decimals
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '$ 0.00', 'Accounting format should display zero as "$ 0.00"');
+  },
+
+  'Accounting format with large numbers uses thousands separator': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Enter a large number
+    await setCellValue(ctx.page, 'A1', '1234567.89');
+    await sleep(200);
+
+    // Click on the cell to select it
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Open format dropdown and select Accounting format
+    await ctx.page.click('#format-dropdown-btn');
+    await sleep(100);
+    await ctx.page.click('[data-format-category="ACCOUNTING"]');
+    await sleep(300);
+
+    // Check the displayed value shows thousands separator
+    const display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '$ 1,234,567.89', 'Accounting format should display as "$ 1,234,567.89" with thousands separator');
+  },
 };
 
 // Run all tests

@@ -459,6 +459,38 @@ TEST(FormatNumberTest, PercentageWithDecimalsFromRegistry) {
     EXPECT_EQ(result.text, "15.50%");
 }
 
+TEST(FormatNumberTest, AccountingFromRegistry) {
+    NumberFormatRegistry registry;
+    auto result = formatNumber(registry, 2.29, BuiltInFormats::ACCOUNTING_2);
+    EXPECT_FALSE(result.isError);
+    // Accounting format: aligned currency symbol with space, 2 decimals
+    EXPECT_EQ(result.text, "$ 2.29");
+}
+
+TEST(FormatNumberTest, AccountingNegativeFromRegistry) {
+    NumberFormatRegistry registry;
+    auto result = formatNumber(registry, -108.30, BuiltInFormats::ACCOUNTING_2);
+    EXPECT_FALSE(result.isError);
+    // Accounting format: negatives in parentheses
+    EXPECT_EQ(result.text, "($ 108.30)");
+}
+
+TEST(FormatNumberTest, AccountingZeroFromRegistry) {
+    NumberFormatRegistry registry;
+    auto result = formatNumber(registry, 0.0, BuiltInFormats::ACCOUNTING_2);
+    EXPECT_FALSE(result.isError);
+    // Accounting format: zero with 2 decimals
+    EXPECT_EQ(result.text, "$ 0.00");
+}
+
+TEST(FormatNumberTest, AccountingNoDecimalsFromRegistry) {
+    NumberFormatRegistry registry;
+    auto result = formatNumber(registry, 1234.0, BuiltInFormats::ACCOUNTING_0);
+    EXPECT_FALSE(result.isError);
+    // Accounting format: aligned currency, 0 decimals
+    EXPECT_EQ(result.text, "$ 1,234");
+}
+
 // =============================================================================
 // Dynamic format ID tests (formats not in registry)
 // =============================================================================
