@@ -137,12 +137,13 @@ export function getDragAdjustedColX(
       if (cachedOffset !== undefined) {
         return zoomedHeaderWidth + Math.round(cachedOffset * zoomFactor);
       }
-      let x = zoomedHeaderWidth;
+      // Fallback: sum unzoomed widths first, then zoom the total
+      // This matches the cached calculation and avoids rounding accumulation errors
+      let offset = 0;
       for (let i = 0; i < col; i++) {
-        const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-        x += getZoomedColWidth(baseWidth);
+        offset += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
       }
-      return x;
+      return zoomedHeaderWidth + Math.round(offset * zoomFactor);
     }
 
     // Non-frozen columns: apply scroll but stay to the right of frozen area
@@ -150,41 +151,41 @@ export function getDragAdjustedColX(
     if (cachedOffset !== undefined) {
       return zoomedHeaderWidth + Math.round(cachedOffset * zoomFactor) - zoomedScrollX;
     }
-    // Fallback: calculate from scratch (O(n))
-    let x = zoomedHeaderWidth - zoomedScrollX;
+    // Fallback: sum unzoomed widths first, then zoom the total
+    // This matches the cached calculation and avoids rounding accumulation errors
+    let offset = 0;
     for (let i = 0; i < col; i++) {
-      const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-      x += getZoomedColWidth(baseWidth);
+      offset += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
     }
-    return x;
+    return zoomedHeaderWidth + Math.round(offset * zoomFactor) - zoomedScrollX;
   }
 
-  // Dragging case - maintain existing logic but add freeze awareness
-  const sourceW = getZoomedColWidth(
-    state.colWidths.get(state.dragSourceIndex) || DEFAULT_COL_WIDTH
-  );
-  let x = isFrozen ? zoomedHeaderWidth : zoomedHeaderWidth - zoomedScrollX;
+  // Dragging case - sum unzoomed widths then zoom to avoid rounding accumulation
+  const sourceBaseW = state.colWidths.get(state.dragSourceIndex) || DEFAULT_COL_WIDTH;
+  let offset = 0;
 
   if (state.dragTargetIndex < state.dragSourceIndex) {
     for (let i = 0; i < col; i++) {
       if (i === state.dragSourceIndex) continue;
-      const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-      x += getZoomedColWidth(baseWidth);
+      offset += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
     }
     if (col >= state.dragTargetIndex && col !== state.dragSourceIndex) {
-      x += sourceW;
+      offset += sourceBaseW;
     }
   } else {
     for (let i = 0; i < col; i++) {
       if (i === state.dragSourceIndex) continue;
-      const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-      x += getZoomedColWidth(baseWidth);
+      offset += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
       if (i === state.dragTargetIndex - 1) {
-        x += sourceW;
+        offset += sourceBaseW;
       }
     }
   }
-  return x;
+
+  const zoomedOffset = Math.round(offset * zoomFactor);
+  return isFrozen
+    ? zoomedHeaderWidth + zoomedOffset
+    : zoomedHeaderWidth + zoomedOffset - zoomedScrollX;
 }
 
 /**
@@ -220,12 +221,13 @@ export function getDragAdjustedRowY(
       if (cachedOffset !== undefined) {
         return zoomedHeaderHeight + Math.round(cachedOffset * zoomFactor);
       }
-      let y = zoomedHeaderHeight;
+      // Fallback: sum unzoomed heights first, then zoom the total
+      // This matches the cached calculation and avoids rounding accumulation errors
+      let offset = 0;
       for (let i = 0; i < row; i++) {
-        const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-        y += getZoomedRowHeight(baseHeight);
+        offset += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
       }
-      return y;
+      return zoomedHeaderHeight + Math.round(offset * zoomFactor);
     }
 
     // Non-frozen rows: apply scroll
@@ -233,41 +235,41 @@ export function getDragAdjustedRowY(
     if (cachedOffset !== undefined) {
       return zoomedHeaderHeight + Math.round(cachedOffset * zoomFactor) - zoomedScrollY;
     }
-    // Fallback: calculate from scratch (O(n))
-    let y = zoomedHeaderHeight - zoomedScrollY;
+    // Fallback: sum unzoomed heights first, then zoom the total
+    // This matches the cached calculation and avoids rounding accumulation errors
+    let offset = 0;
     for (let i = 0; i < row; i++) {
-      const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-      y += getZoomedRowHeight(baseHeight);
+      offset += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
     }
-    return y;
+    return zoomedHeaderHeight + Math.round(offset * zoomFactor) - zoomedScrollY;
   }
 
-  // Dragging case - maintain existing logic but add freeze awareness
-  const sourceH = getZoomedRowHeight(
-    state.rowHeights.get(state.dragSourceIndex) || DEFAULT_ROW_HEIGHT
-  );
-  let y = isFrozen ? zoomedHeaderHeight : zoomedHeaderHeight - zoomedScrollY;
+  // Dragging case - sum unzoomed heights then zoom to avoid rounding accumulation
+  const sourceBaseH = state.rowHeights.get(state.dragSourceIndex) || DEFAULT_ROW_HEIGHT;
+  let offset = 0;
 
   if (state.dragTargetIndex < state.dragSourceIndex) {
     for (let i = 0; i < row; i++) {
       if (i === state.dragSourceIndex) continue;
-      const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-      y += getZoomedRowHeight(baseHeight);
+      offset += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
     }
     if (row >= state.dragTargetIndex && row !== state.dragSourceIndex) {
-      y += sourceH;
+      offset += sourceBaseH;
     }
   } else {
     for (let i = 0; i < row; i++) {
       if (i === state.dragSourceIndex) continue;
-      const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-      y += getZoomedRowHeight(baseHeight);
+      offset += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
       if (i === state.dragTargetIndex - 1) {
-        y += sourceH;
+        offset += sourceBaseH;
       }
     }
   }
-  return y;
+
+  const zoomedOffset = Math.round(offset * zoomFactor);
+  return isFrozen
+    ? zoomedHeaderHeight + zoomedOffset
+    : zoomedHeaderHeight + zoomedOffset - zoomedScrollY;
 }
 
 /**
