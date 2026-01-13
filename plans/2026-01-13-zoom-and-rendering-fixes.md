@@ -134,11 +134,11 @@ Ensure all rendered entities update correctly when zoom level changes.
 
 Review and fix any remaining zoom-dependent UI elements.
 
-- [ ] 8.6a: Verify scrollbar thumb size/position accounts for zoom
-- [ ] 8.6b: Verify formula reference highlights (colored boxes during formula editing) use zoom
-- [ ] 8.6c: Verify remote presence cursors/selections use zoom
-- [ ] 8.6d: Verify drag-and-drop ghost elements use zoom
-- [ ] 8.6e: Verify frozen pane dividers (if implemented) use zoom
+- [x] 8.6a: Verify scrollbar thumb size/position accounts for zoom. Fixed viewport dimensions in scrollbar callbacks to use zoomed header dimensions and convert screen pixels to logical coordinates by dividing by zoom factor.
+- [x] 8.6b: Verify formula reference highlights (colored boxes during formula editing) use zoom. Refactored `grid-formula-renderer.ts` to use `getCellBounds()`, `getRangeBounds()` and zoomed header dimensions throughout.
+- [x] 8.6c: Verify remote presence cursors/selections use zoom. Refactored `grid-presence-renderer.ts` to use `getCellBounds()`, `getRangeBounds()` and zoomed header dimensions throughout.
+- [x] 8.6d: Verify drag-and-drop ghost elements use zoom. Fixed `_drawColumnDragGhost()` and `_drawRowDragGhost()` in `grid-renderer.ts` to use `getZoomedColWidth()`, `getZoomedRowHeight()`, and zoomed header dimensions.
+- [x] 8.6e: Verify frozen pane dividers (if implemented) use zoom. **Already zoom-aware** - `getFrozenColWidth()` and `getFrozenRowHeight()` use zoomed dimensions, and divider lines are drawn at zoomed coordinates.
 
 ### 8.7: Regression Test Suite
 

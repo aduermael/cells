@@ -26,8 +26,6 @@
 
 import type { SheetInfo, CellData, Position, BorderStyle } from "./types.js";
 import {
-  HEADER_HEIGHT,
-  HEADER_WIDTH,
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
   getGridColors,
@@ -1269,20 +1267,23 @@ export class GridRenderer {
     _viewWidth: number,
     viewHeight: number
   ): void {
-    const colW = this.colWidths.get(this.dragSourceIndex) || DEFAULT_COL_WIDTH;
+    // Use zoomed dimensions for drag ghost
+    const baseColW = this.colWidths.get(this.dragSourceIndex) || DEFAULT_COL_WIDTH;
+    const colW = getZoomedColWidth(baseColW);
+    const zoomedHeaderHeight = getZoomedHeaderHeight();
     const ghostX = this.dragMouseX - colW / 2;
 
     ctx.fillStyle = this.colors.selectionBorder;
-    ctx.fillRect(ghostX, 0, colW, HEADER_HEIGHT);
+    ctx.fillRect(ghostX, 0, colW, zoomedHeaderHeight);
 
     ctx.fillStyle = "#fff";
-    ctx.font = `12px ${getFallbackFonts()}`;
+    ctx.font = `${getZoomedFontSize(12)}px ${getFallbackFonts()}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(this.getColumnHeaderText(this.dragSourceIndex), ghostX + colW / 2, HEADER_HEIGHT / 2);
+    ctx.fillText(this.getColumnHeaderText(this.dragSourceIndex), ghostX + colW / 2, zoomedHeaderHeight / 2);
 
     ctx.fillStyle = this.colors.selectionBg;
-    ctx.fillRect(ghostX, HEADER_HEIGHT, colW, viewHeight - HEADER_HEIGHT);
+    ctx.fillRect(ghostX, zoomedHeaderHeight, colW, viewHeight - zoomedHeaderHeight);
 
     ctx.strokeStyle = this.colors.selectionBorder;
     ctx.lineWidth = 2;
@@ -1294,20 +1295,23 @@ export class GridRenderer {
     viewWidth: number,
     _viewHeight: number
   ): void {
-    const rowH = this.rowHeights.get(this.dragSourceIndex) || DEFAULT_ROW_HEIGHT;
+    // Use zoomed dimensions for drag ghost
+    const baseRowH = this.rowHeights.get(this.dragSourceIndex) || DEFAULT_ROW_HEIGHT;
+    const rowH = getZoomedRowHeight(baseRowH);
+    const zoomedHeaderWidth = getZoomedHeaderWidth();
     const ghostY = this.dragMouseY - rowH / 2;
 
     ctx.fillStyle = this.colors.selectionBorder;
-    ctx.fillRect(0, ghostY, HEADER_WIDTH, rowH);
+    ctx.fillRect(0, ghostY, zoomedHeaderWidth, rowH);
 
     ctx.fillStyle = "#fff";
-    ctx.font = `12px ${getFallbackFonts()}`;
+    ctx.font = `${getZoomedFontSize(12)}px ${getFallbackFonts()}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(this.dragSourceIndex + 1), HEADER_WIDTH / 2, ghostY + rowH / 2);
+    ctx.fillText(String(this.dragSourceIndex + 1), zoomedHeaderWidth / 2, ghostY + rowH / 2);
 
     ctx.fillStyle = this.colors.selectionBg;
-    ctx.fillRect(HEADER_WIDTH, ghostY, viewWidth - HEADER_WIDTH, rowH);
+    ctx.fillRect(zoomedHeaderWidth, ghostY, viewWidth - zoomedHeaderWidth, rowH);
 
     ctx.strokeStyle = this.colors.selectionBorder;
     ctx.lineWidth = 2;

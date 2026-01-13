@@ -46,6 +46,11 @@ import {
   HEADER_HEIGHT,
 } from "./grid-renderer";
 import {
+  getZoomFactor,
+  getZoomedHeaderWidth,
+  getZoomedHeaderHeight,
+} from "./grid-constants";
+import {
   ScrollbarManager,
   calculateContentDimensions,
   calculateDiscoveredRows,
@@ -241,8 +246,18 @@ export function createComponents(config: ComponentsConfig): Components {
       getScrollY: () => app.scrollY,
       setScrollX: (x) => { app.scrollX = x; },
       setScrollY: (y) => { app.scrollY = y; },
-      getViewportWidth: () => elements.canvas.clientWidth - HEADER_WIDTH,
-      getViewportHeight: () => elements.canvas.clientHeight - HEADER_HEIGHT,
+      // Viewport dimensions need to be in logical (unzoomed) coordinates to match
+      // content dimensions. Screen pixels of scrollable area / zoom = logical viewport.
+      getViewportWidth: () => {
+        const zoomFactor = getZoomFactor();
+        const scrollableScreenWidth = elements.canvas.clientWidth - getZoomedHeaderWidth();
+        return scrollableScreenWidth / zoomFactor + HEADER_WIDTH;
+      },
+      getViewportHeight: () => {
+        const zoomFactor = getZoomFactor();
+        const scrollableScreenHeight = elements.canvas.clientHeight - getZoomedHeaderHeight();
+        return scrollableScreenHeight / zoomFactor + HEADER_HEIGHT;
+      },
       getContentWidth: () => {
         const colCount = app.sheetInfo?.colCount ?? 22;
         const { width } = calculateContentDimensions(colCount, 0, app.colWidths, app.rowHeights);
@@ -253,11 +268,14 @@ export function createComponents(config: ComponentsConfig): Components {
         return height;
       },
       onScroll: () => {
-        const viewportHeight = elements.canvas.clientHeight - HEADER_HEIGHT;
+        // Convert screen viewport to logical coordinates for row discovery
+        const zoomFactor = getZoomFactor();
+        const scrollableScreenHeight = elements.canvas.clientHeight - getZoomedHeaderHeight();
+        const logicalViewportHeight = scrollableScreenHeight / zoomFactor;
         const actualRows = app.sheetInfo?.rowCount ?? 100;
         app.discoveredRows = calculateDiscoveredRows(
           app.scrollY,
-          viewportHeight,
+          logicalViewportHeight,
           app.discoveredRows,
           actualRows
         );
@@ -270,11 +288,14 @@ export function createComponents(config: ComponentsConfig): Components {
 
   function updateScrollbars(): void {
     if (!app.scrollbarManager) return;
-    const viewportHeight = elements.canvas.clientHeight - HEADER_HEIGHT;
+    // Convert screen viewport to logical coordinates for row discovery
+    const zoomFactor = getZoomFactor();
+    const scrollableScreenHeight = elements.canvas.clientHeight - getZoomedHeaderHeight();
+    const logicalViewportHeight = scrollableScreenHeight / zoomFactor;
     const actualRows = app.sheetInfo?.rowCount ?? 100;
     app.discoveredRows = calculateDiscoveredRows(
       app.scrollY,
-      viewportHeight,
+      logicalViewportHeight,
       app.discoveredRows,
       actualRows
     );

@@ -3,15 +3,14 @@
 
 import type { Position, SelectionRange, Point, EditingState } from "./types.js";
 import {
-  HEADER_HEIGHT,
-  HEADER_WIDTH,
-  DEFAULT_COL_WIDTH,
-  DEFAULT_ROW_HEIGHT,
   PRESENCE_LABEL_FONT,
   PRESENCE_LABEL_PADDING,
   PRESENCE_LABEL_HEIGHT,
+  getZoomedHeaderWidth,
+  getZoomedHeaderHeight,
   type RemotePresenceRender,
 } from "./grid-constants.js";
+import { getCellBounds, getRangeBounds } from "./grid-utils.js";
 
 /** Interface for grid state needed by presence renderer */
 export interface PresenceRendererState {
@@ -38,15 +37,17 @@ export function drawRemotePresence(
 
   const viewWidth = container.clientWidth;
   const viewHeight = container.clientHeight;
+  const zoomedHeaderWidth = getZoomedHeaderWidth();
+  const zoomedHeaderHeight = getZoomedHeaderHeight();
 
   // Clip to cells area (exclude headers)
   ctx.save();
   ctx.beginPath();
   ctx.rect(
-    HEADER_WIDTH,
-    HEADER_HEIGHT,
-    viewWidth - HEADER_WIDTH,
-    viewHeight - HEADER_HEIGHT
+    zoomedHeaderWidth,
+    zoomedHeaderHeight,
+    viewWidth - zoomedHeaderWidth,
+    viewHeight - zoomedHeaderHeight
   );
   ctx.clip();
 
@@ -134,30 +135,15 @@ function drawRemoteSelection(
   const start = selection.start;
   const end = selection.end;
 
-  // Normalize selection bounds
-  const minCol = Math.min(start.col, end.col);
-  const maxCol = Math.max(start.col, end.col);
-  const minRow = Math.min(start.row, end.row);
-  const maxRow = Math.max(start.row, end.row);
-
-  // Calculate position and size
-  let selX = HEADER_WIDTH - state.scrollX;
-  for (let i = 0; i < minCol; i++) {
-    selX += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-  }
-  let selY = HEADER_HEIGHT - state.scrollY;
-  for (let i = 0; i < minRow; i++) {
-    selY += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-  }
-
-  let selW = 0;
-  for (let i = minCol; i <= maxCol; i++) {
-    selW += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-  }
-  let selH = 0;
-  for (let i = minRow; i <= maxRow; i++) {
-    selH += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-  }
+  // Use zoom-aware range bounds calculation
+  const bounds = getRangeBounds(
+    start.col, start.row, end.col, end.row,
+    state.scrollX, state.scrollY,
+    state.colWidths, state.rowHeights
+  );
+  const { x: selX, y: selY, width: selW, height: selH } = bounds;
+  const zoomedHeaderWidth = getZoomedHeaderWidth();
+  const zoomedHeaderHeight = getZoomedHeaderHeight();
 
   // Check if visible
   const container = canvas.parentElement;
@@ -166,34 +152,30 @@ function drawRemoteSelection(
   const viewHeight = container.clientHeight;
 
   if (
-    selX + selW <= HEADER_WIDTH ||
+    selX + selW <= zoomedHeaderWidth ||
     selX >= viewWidth ||
-    selY + selH <= HEADER_HEIGHT ||
+    selY + selH <= zoomedHeaderHeight ||
     selY >= viewHeight
   ) {
     return; // Off screen
   }
 
+  // Clip to visible area
+  const clipX = Math.max(zoomedHeaderWidth, selX);
+  const clipY = Math.max(zoomedHeaderHeight, selY);
+  const clipW = Math.min(selW, selX + selW - clipX);
+  const clipH = Math.min(selH, selY + selH - clipY);
+
   // Draw semi-transparent fill
   ctx.globalAlpha = opacity * 0.15;
   ctx.fillStyle = color;
-  ctx.fillRect(
-    Math.max(HEADER_WIDTH, selX),
-    Math.max(HEADER_HEIGHT, selY),
-    Math.min(selW, selX + selW - Math.max(HEADER_WIDTH, selX)),
-    Math.min(selH, selY + selH - Math.max(HEADER_HEIGHT, selY))
-  );
+  ctx.fillRect(clipX, clipY, clipW, clipH);
 
   // Draw border
   ctx.globalAlpha = opacity * 0.5;
   ctx.strokeStyle = color;
   ctx.lineWidth = 1;
-  ctx.strokeRect(
-    Math.max(HEADER_WIDTH, selX) + 0.5,
-    Math.max(HEADER_HEIGHT, selY) + 0.5,
-    Math.min(selW, selX + selW - Math.max(HEADER_WIDTH, selX)) - 1,
-    Math.min(selH, selY + selH - Math.max(HEADER_HEIGHT, selY)) - 1
-  );
+  ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW - 1, clipH - 1);
 
   ctx.globalAlpha = 1;
 }
@@ -211,24 +193,21 @@ function drawRemoteCursor(
   viewWidth: number,
   viewHeight: number
 ): void {
-  // Calculate cell position
-  let cellX = HEADER_WIDTH - state.scrollX;
-  for (let i = 0; i < cursor.col; i++) {
-    cellX += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-  }
-  let cellY = HEADER_HEIGHT - state.scrollY;
-  for (let i = 0; i < cursor.row; i++) {
-    cellY += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-  }
-
-  const cellW = state.colWidths.get(cursor.col) || DEFAULT_COL_WIDTH;
-  const cellH = state.rowHeights.get(cursor.row) || DEFAULT_ROW_HEIGHT;
+  // Use zoom-aware cell bounds calculation
+  const bounds = getCellBounds(
+    cursor.col, cursor.row,
+    state.scrollX, state.scrollY,
+    state.colWidths, state.rowHeights
+  );
+  const { x: cellX, y: cellY, width: cellW, height: cellH } = bounds;
+  const zoomedHeaderWidth = getZoomedHeaderWidth();
+  const zoomedHeaderHeight = getZoomedHeaderHeight();
 
   // Check if visible
   if (
-    cellX + cellW <= HEADER_WIDTH ||
+    cellX + cellW <= zoomedHeaderWidth ||
     cellX >= viewWidth ||
-    cellY + cellH <= HEADER_HEIGHT ||
+    cellY + cellH <= zoomedHeaderHeight ||
     cellY >= viewHeight
   ) {
     return; // Off screen
@@ -239,8 +218,8 @@ function drawRemoteCursor(
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
 
-  const clipX = Math.max(HEADER_WIDTH, cellX);
-  const clipY = Math.max(HEADER_HEIGHT, cellY);
+  const clipX = Math.max(zoomedHeaderWidth, cellX);
+  const clipY = Math.max(zoomedHeaderHeight, cellY);
   const clipW = Math.min(cellW, cellX + cellW - clipX);
   const clipH = Math.min(cellH, cellY + cellH - clipY);
 
@@ -261,15 +240,17 @@ function drawRemoteMouse(
   viewWidth: number,
   viewHeight: number
 ): void {
-  // Mouse coordinates are relative to canvas
+  // Mouse coordinates are relative to canvas (already in screen space)
   const mouseX = mouse.x;
   const mouseY = mouse.y;
+  const zoomedHeaderWidth = getZoomedHeaderWidth();
+  const zoomedHeaderHeight = getZoomedHeaderHeight();
 
   // Check if visible (within cells area)
   if (
-    mouseX < HEADER_WIDTH ||
+    mouseX < zoomedHeaderWidth ||
     mouseX >= viewWidth ||
-    mouseY < HEADER_HEIGHT ||
+    mouseY < zoomedHeaderHeight ||
     mouseY >= viewHeight
   ) {
     return;
@@ -329,11 +310,11 @@ function drawRemoteMouse(
     if (labelY + labelHeight > viewHeight) {
       labelY = viewHeight - labelHeight - 2;
     }
-    if (labelX < HEADER_WIDTH) {
-      labelX = HEADER_WIDTH + 2;
+    if (labelX < zoomedHeaderWidth) {
+      labelX = zoomedHeaderWidth + 2;
     }
-    if (labelY < HEADER_HEIGHT) {
-      labelY = HEADER_HEIGHT + 2;
+    if (labelY < zoomedHeaderHeight) {
+      labelY = zoomedHeaderHeight + 2;
     }
 
     // Draw label with shadow
@@ -377,32 +358,29 @@ function drawRemoteEditing(
   const row = editing.row;
   const text = editing.text || "";
 
-  // Calculate cell position
-  let cellX = HEADER_WIDTH - state.scrollX;
-  for (let i = 0; i < col; i++) {
-    cellX += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-  }
-  let cellY = HEADER_HEIGHT - state.scrollY;
-  for (let i = 0; i < row; i++) {
-    cellY += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-  }
-
-  const cellW = state.colWidths.get(col) || DEFAULT_COL_WIDTH;
-  const cellH = state.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+  // Use zoom-aware cell bounds calculation
+  const bounds = getCellBounds(
+    col, row,
+    state.scrollX, state.scrollY,
+    state.colWidths, state.rowHeights
+  );
+  const { x: cellX, y: cellY, width: cellW, height: cellH } = bounds;
+  const zoomedHeaderWidth = getZoomedHeaderWidth();
+  const zoomedHeaderHeight = getZoomedHeaderHeight();
 
   // Check if visible
   if (
-    cellX + cellW <= HEADER_WIDTH ||
+    cellX + cellW <= zoomedHeaderWidth ||
     cellX >= viewWidth ||
-    cellY + cellH <= HEADER_HEIGHT ||
+    cellY + cellH <= zoomedHeaderHeight ||
     cellY >= viewHeight
   ) {
     return; // Off screen
   }
 
   // Clip to visible portion
-  const clipX = Math.max(HEADER_WIDTH, cellX);
-  const clipY = Math.max(HEADER_HEIGHT, cellY);
+  const clipX = Math.max(zoomedHeaderWidth, cellX);
+  const clipY = Math.max(zoomedHeaderHeight, cellY);
   const clipW = Math.min(cellW, cellX + cellW - clipX);
   const clipH = Math.min(cellH, cellY + cellH - clipY);
 
