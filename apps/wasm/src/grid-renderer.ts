@@ -24,7 +24,7 @@
 //
 // =============================================================================
 
-import type { SheetInfo, CellData, Position, BorderStyle, CellBorder } from "./types.js";
+import type { SheetInfo, CellData, Position, BorderStyle } from "./types.js";
 import {
   HEADER_HEIGHT,
   HEADER_WIDTH,

@@ -110,7 +110,7 @@ struct BorderEdge {
     std::string color;  // Hex color "#RRGGBB" or empty for default black
 
     BorderEdge() = default;
-    BorderEdge(BorderStyle s, std::string c = "") : style(s), color(std::move(c)) {}
+    explicit BorderEdge(BorderStyle s, std::string c = "") : style(s), color(std::move(c)) {}
 
     [[nodiscard]] bool hasValue() const { return style != BorderStyle::NONE; }
 
@@ -153,7 +153,7 @@ struct CellStyle {
     uint8_t fontSize{0};     // Font size in points, 0 = default (11pt)
     TextAlign hAlign{TextAlign::LEFT};
     VerticalAlign vAlign{VerticalAlign::BOTTOM};
-    CellBorder border;       // Cell borders (top, right, bottom, left)
+    CellBorder border;  // Cell borders (top, right, bottom, left)
 
     CellStyle() = default;
 

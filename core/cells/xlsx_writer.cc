@@ -515,7 +515,8 @@ struct XLSXCellFormatEntry {
 
     bool operator==(const XLSXCellFormatEntry& other) const {
         return fontId == other.fontId && fillId == other.fillId && borderId == other.borderId &&
-               hAlign == other.hAlign && vAlign == other.vAlign && hasAlignment == other.hasAlignment;
+               hAlign == other.hAlign && vAlign == other.vAlign &&
+               hasAlignment == other.hasAlignment;
     }
 };
 
