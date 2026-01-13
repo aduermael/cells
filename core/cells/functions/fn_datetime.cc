@@ -505,6 +505,75 @@ EvalResult fn_SECOND(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
     return EvalResult::Number(second);
 }
 
+EvalResult fn_EOMONTH(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
+    if (args.size() != 2) {
+        return EvalResult::Error(CellError::VALUE);
+    }
+
+    EvalResult startDateResult = evaluateAsNumber(args[0], ctx);
+    if (startDateResult.isError()) {
+        return startDateResult;
+    }
+
+    EvalResult monthsResult = evaluateAsNumber(args[1], ctx);
+    if (monthsResult.isError()) {
+        return monthsResult;
+    }
+
+    const double startDate = startDateResult.getNumber();
+    if (startDate < 1) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    const int months = static_cast<int>(monthsResult.getNumber());
+
+    // Convert serial date to year/month/day
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    serialToDate(startDate, year, month, day);
+
+    // Add months
+    month += months;
+
+    // Handle month overflow/underflow
+    while (month > 12) {
+        year++;
+        month -= 12;
+    }
+    while (month < 1) {
+        year--;
+        month += 12;
+    }
+
+    // Check year range
+    if (year < 1900 || year > 9999) {
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    // Days in each month (non-leap year)
+    static const int daysInMonth[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+
+    // Calculate last day of the target month
+    int lastDay = daysInMonth[month - 1];
+    if (month == 2) {
+        // Check for leap year (with Excel's 1900 bug)
+        const bool isLeap =
+            (year == 1900) || ((year % 4 == 0 && year % 100 != 0) || (year % 400 == 0));
+        if (isLeap) {
+            lastDay = 29;
+        }
+    }
+
+    // Return serial date for the last day of target month
+    const double result = dateToSerial(year, month, lastDay);
+    if (result < 1 || result > 2958465) {  // Excel date range
+        return EvalResult::Error(CellError::NUM);
+    }
+
+    return EvalResult::Number(result);
+}
+
 EvalResult fn_WEEKDAY(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
     if (args.empty() || args.size() > 2) {
         return EvalResult::Error(CellError::VALUE);
@@ -602,6 +671,8 @@ void registerDateTimeFunctions(FunctionRegistry& registry) {
     registry.registerFunction("SECOND", fn_SECOND, "(time)", "Extracts the second (0-59)", "Date");
     registry.registerFunction("WEEKDAY", fn_WEEKDAY, "(date, [return_type])",
                               "Returns the day of the week", "Date");
+    registry.registerFunction("EOMONTH", fn_EOMONTH, "(start_date, months)",
+                              "Returns the last day of the month N months from start_date", "Date");
 }
 
 }  // namespace cells

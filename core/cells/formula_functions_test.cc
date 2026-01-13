@@ -2556,6 +2556,86 @@ TEST_F(FunctionTest, WeekdayInvalidSerial) {
 }
 
 // -----------------------------------------------------------------------------
+// EOMONTH Function Tests
+// -----------------------------------------------------------------------------
+
+TEST_F(FunctionTest, EomonthBasic) {
+    // Jan 15, 2024 + 0 months = Jan 31, 2024
+    EvalResult result = eval("=EOMONTH(DATE(2024,1,15),0)");
+    EvalResult expected = eval("=DATE(2024,1,31)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, EomonthPositiveMonths) {
+    // Jan 15, 2024 + 2 months = Mar 31, 2024
+    EvalResult result = eval("=EOMONTH(DATE(2024,1,15),2)");
+    EvalResult expected = eval("=DATE(2024,3,31)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, EomonthNegativeMonths) {
+    // Mar 15, 2024 - 2 months = Jan 31, 2024
+    EvalResult result = eval("=EOMONTH(DATE(2024,3,15),-2)");
+    EvalResult expected = eval("=DATE(2024,1,31)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, EomonthFebruaryLeapYear) {
+    // Jan 15, 2024 + 1 month = Feb 29, 2024 (leap year)
+    EvalResult result = eval("=EOMONTH(DATE(2024,1,15),1)");
+    EvalResult expected = eval("=DATE(2024,2,29)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, EomonthFebruaryNonLeapYear) {
+    // Jan 15, 2023 + 1 month = Feb 28, 2023 (non-leap year)
+    EvalResult result = eval("=EOMONTH(DATE(2023,1,15),1)");
+    EvalResult expected = eval("=DATE(2023,2,28)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, EomonthCrossYear) {
+    // Nov 15, 2023 + 3 months = Feb 29, 2024
+    EvalResult result = eval("=EOMONTH(DATE(2023,11,15),3)");
+    EvalResult expected = eval("=DATE(2024,2,29)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, EomonthCrossYearNegative) {
+    // Feb 15, 2024 - 3 months = Nov 30, 2023
+    EvalResult result = eval("=EOMONTH(DATE(2024,2,15),-3)");
+    EvalResult expected = eval("=DATE(2023,11,30)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, EomonthFromEndOfMonth) {
+    // Starting from end of month (Jan 31, 2024 + 1 month = Feb 29, 2024)
+    EvalResult result = eval("=EOMONTH(DATE(2024,1,31),1)");
+    EvalResult expected = eval("=DATE(2024,2,29)");
+    EXPECT_TRUE(result.isNumber());
+    EXPECT_DOUBLE_EQ(result.getNumber(), expected.getNumber());
+}
+
+TEST_F(FunctionTest, EomonthInvalidDate) {
+    EvalResult result = eval("=EOMONTH(0,1)");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::NUM);
+}
+
+TEST_F(FunctionTest, EomonthWrongArgCount) {
+    EvalResult result = eval("=EOMONTH(DATE(2024,1,1))");
+    EXPECT_TRUE(result.isError());
+    EXPECT_EQ(result.getError(), CellError::VALUE);
+}
+
+// -----------------------------------------------------------------------------
 // Combined Date/Time Tests
 // -----------------------------------------------------------------------------
 

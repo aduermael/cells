@@ -48,9 +48,9 @@ The Accounting format (aligned currency symbol, negatives in parentheses) is par
 
 The EOMONTH function is not implemented but is used in financial models.
 
-- [ ] 6a: Implement `fn_EOMONTH(start_date, months)` in fn_datetime.cc that returns the serial date of the last day of the month N months from start_date
-- [ ] 6b: Register EOMONTH in registerDateTimeFunctions
-- [ ] 6c: Add unit tests for EOMONTH with various inputs (positive months, negative months, edge cases like month-end inputs)
+- [x] 6a: Implement `fn_EOMONTH(start_date, months)` in fn_datetime.cc that returns the serial date of the last day of the month N months from start_date. Implemented with proper handling of month overflow/underflow and leap years (including Excel's 1900 leap year bug).
+- [x] 6b: Register EOMONTH in registerDateTimeFunctions. Registered with signature "(start_date, months)" in the Date category.
+- [x] 6c: Add unit tests for EOMONTH with various inputs (positive months, negative months, edge cases like month-end inputs). Added 10 tests in formula_functions_test.cc covering: basic (0 months), positive months, negative months, leap year February, non-leap year February, cross-year positive, cross-year negative, starting from end of month, invalid date, and wrong arg count.
 
 ## Phase 7: Dynamic Web Font Loading
 
