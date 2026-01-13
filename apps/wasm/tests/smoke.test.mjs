@@ -157,12 +157,13 @@ const tests = {
     zoomLevel = await ctx.page.$eval('#zoom-level', el => el.textContent);
     assertEqual(zoomLevel, '75%', 'Zoom should decrease to 75%');
 
-    // Verify canvas has CSS transform applied
-    const hasTransform = await ctx.page.$eval('#grid', el => {
-      const transform = window.getComputedStyle(el).transform;
-      return transform !== 'none' && transform !== '';
+    // Verify zoom is applied by checking that zoom scale was stored in renderer
+    // With proper zoom (not CSS transform), we scale dimensions instead of using CSS transform
+    const zoomScale = await ctx.page.evaluate(() => {
+      // @ts-ignore - global window._appContext
+      return window._appContext?.app?.renderer?.getZoomScale?.();
     });
-    assertTrue(hasTransform, 'Canvas should have CSS transform for zoom');
+    assertEqual(zoomScale, 75, 'Renderer should have zoom scale of 75');
   },
 
   'Freeze panes can be set and retrieved': async (ctx) => {

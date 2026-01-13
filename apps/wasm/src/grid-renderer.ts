@@ -30,8 +30,13 @@ import {
   HEADER_WIDTH,
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
-  CELL_PADDING,
   getGridColors,
+  getZoomedHeaderHeight,
+  getZoomedHeaderWidth,
+  getZoomedColWidth,
+  getZoomedRowHeight,
+  getZoomedCellPadding,
+  getZoomedFontSize,
   type GridColors,
   type NormalizedRange,
   type RemotePresenceRender,
@@ -185,7 +190,8 @@ export class GridRenderer {
 
   /**
    * Set the zoom scale (10-400)
-   * Applies CSS transform to the canvas for visual zoom
+   * Zoom is applied by scaling dimensions during rendering, not CSS transform.
+   * This allows crisp rendering at any zoom level.
    */
   setZoomScale(scale: number): void {
     // Clamp to valid range
@@ -194,23 +200,27 @@ export class GridRenderer {
 
     this._zoomScale = scale;
 
-    // Apply CSS transform for zoom effect
-    // transform-origin is top-left so zoom expands to bottom-right
-    const factor = scale / 100;
-    this.canvas.style.transformOrigin = "top left";
-    this.canvas.style.transform = `scale(${factor})`;
+    // Clear any CSS transform (old approach)
+    this.canvas.style.transform = "";
+    this.canvas.style.transformOrigin = "";
+
+    // Re-render with new zoom scale
+    this.render();
+  }
+
+  /** Get the zoom factor (1.0 = 100%) for calculations */
+  getZoomFactor(): number {
+    return this._zoomScale / 100;
   }
 
   /**
-   * Convert screen coordinates to canvas coordinates accounting for zoom
-   * Use this when processing mouse events
+   * Convert screen coordinates to canvas coordinates.
+   * With proper zoom (not CSS transform), screen and canvas coordinates are the same
+   * since zoom is applied to rendering dimensions, not the canvas element.
    */
   screenToCanvas(screenX: number, screenY: number): { x: number; y: number } {
-    const factor = this._zoomScale / 100;
-    return {
-      x: screenX / factor,
-      y: screenY / factor,
-    };
+    // No conversion needed with proper zoom - coordinates are 1:1
+    return { x: screenX, y: screenY };
   }
 
   /** Resize the canvas to fit its container */
@@ -277,6 +287,7 @@ export class GridRenderer {
       dragTargetIndex: this.dragTargetIndex,
       editingColumnIndex: this.editingColumnIndex,
       discoveredRows: this.discoveredRows,
+      zoomFactor: this.getZoomFactor(),
     };
   }
 
@@ -303,18 +314,23 @@ export class GridRenderer {
     const viewWidth = container.clientWidth;
     const viewHeight = container.clientHeight;
     const ctx = this.ctx;
+    const zoomFactor = this.getZoomFactor();
+
+    // Calculate zoomed header dimensions
+    const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+    const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
 
     ctx.clearRect(0, 0, viewWidth, viewHeight);
 
-    // Calculate frozen pane boundaries
+    // Calculate frozen pane boundaries (using zoomed dimensions)
     const freezeCol = this.sheetInfo.freezeCol || 0;
     const freezeRow = this.sheetInfo.freezeRow || 0;
-    const frozenColWidth = getFrozenColWidth(freezeCol, this.colWidths);
-    const frozenRowHeight = getFrozenRowHeight(freezeRow, this.rowHeights);
+    const frozenColWidth = getFrozenColWidth(freezeCol, this.colWidths, zoomFactor);
+    const frozenRowHeight = getFrozenRowHeight(freezeRow, this.rowHeights, zoomFactor);
 
     // The freeze boundary positions (where frozen content ends)
-    const freezeX = HEADER_WIDTH + frozenColWidth;
-    const freezeY = HEADER_HEIGHT + frozenRowHeight;
+    const freezeX = zoomedHeaderWidth + frozenColWidth;
+    const freezeY = zoomedHeaderHeight + frozenRowHeight;
 
     const headerState = this._getHeaderState();
     const colHasMoved =
@@ -328,7 +344,7 @@ export class GridRenderer {
 
     // Fill cell background explicitly (ensures correct theme color on theme switch)
     ctx.fillStyle = this.colors.cellBg;
-    ctx.fillRect(HEADER_WIDTH, HEADER_HEIGHT, viewWidth - HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
+    ctx.fillRect(zoomedHeaderWidth, zoomedHeaderHeight, viewWidth - zoomedHeaderWidth, viewHeight - zoomedHeaderHeight);
 
     // Render the four quadrants of the freeze pane layout:
     // - Q1 (bottom-right): Scrollable in both X and Y
@@ -354,11 +370,11 @@ export class GridRenderer {
     if (freezeRow > 0) {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(freezeX, HEADER_HEIGHT, viewWidth - freezeX, frozenRowHeight);
+      ctx.rect(freezeX, zoomedHeaderHeight, viewWidth - freezeX, frozenRowHeight);
       ctx.clip();
 
       ctx.fillStyle = this.colors.cellBg;
-      ctx.fillRect(freezeX, HEADER_HEIGHT, viewWidth - freezeX, frozenRowHeight);
+      ctx.fillRect(freezeX, zoomedHeaderHeight, viewWidth - freezeX, frozenRowHeight);
 
       this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
@@ -371,11 +387,11 @@ export class GridRenderer {
     if (freezeCol > 0) {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(HEADER_WIDTH, freezeY, frozenColWidth, viewHeight - freezeY);
+      ctx.rect(zoomedHeaderWidth, freezeY, frozenColWidth, viewHeight - freezeY);
       ctx.clip();
 
       ctx.fillStyle = this.colors.cellBg;
-      ctx.fillRect(HEADER_WIDTH, freezeY, frozenColWidth, viewHeight - freezeY);
+      ctx.fillRect(zoomedHeaderWidth, freezeY, frozenColWidth, viewHeight - freezeY);
 
       this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
@@ -388,11 +404,11 @@ export class GridRenderer {
     if (freezeCol > 0 && freezeRow > 0) {
       ctx.save();
       ctx.beginPath();
-      ctx.rect(HEADER_WIDTH, HEADER_HEIGHT, frozenColWidth, frozenRowHeight);
+      ctx.rect(zoomedHeaderWidth, zoomedHeaderHeight, frozenColWidth, frozenRowHeight);
       ctx.clip();
 
       ctx.fillStyle = this.colors.cellBg;
-      ctx.fillRect(HEADER_WIDTH, HEADER_HEIGHT, frozenColWidth, frozenRowHeight);
+      ctx.fillRect(zoomedHeaderWidth, zoomedHeaderHeight, frozenColWidth, frozenRowHeight);
 
       this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
@@ -404,7 +420,7 @@ export class GridRenderer {
     // === Draw selection and other overlays (clipped to entire grid area) ===
     ctx.save();
     ctx.beginPath();
-    ctx.rect(HEADER_WIDTH, HEADER_HEIGHT, viewWidth - HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
+    ctx.rect(zoomedHeaderWidth, zoomedHeaderHeight, viewWidth - zoomedHeaderWidth, viewHeight - zoomedHeaderHeight);
     ctx.clip();
 
     // Formula reference highlights (drawn before selection so selection appears on top)
@@ -488,15 +504,15 @@ export class GridRenderer {
 
     // Corner and header borders
     ctx.fillStyle = this.colors.cornerBg;
-    ctx.fillRect(0, 0, HEADER_WIDTH, HEADER_HEIGHT);
+    ctx.fillRect(0, 0, zoomedHeaderWidth, zoomedHeaderHeight);
 
     ctx.strokeStyle = this.colors.headerBorder;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(0, HEADER_HEIGHT + 0.5);
-    ctx.lineTo(viewWidth, HEADER_HEIGHT + 0.5);
-    ctx.moveTo(HEADER_WIDTH + 0.5, 0);
-    ctx.lineTo(HEADER_WIDTH + 0.5, viewHeight);
+    ctx.moveTo(0, zoomedHeaderHeight + 0.5);
+    ctx.lineTo(viewWidth, zoomedHeaderHeight + 0.5);
+    ctx.moveTo(zoomedHeaderWidth + 0.5, 0);
+    ctx.lineTo(zoomedHeaderWidth + 0.5, viewHeight);
     ctx.stroke();
 
     // Draw freeze pane separator lines
@@ -516,17 +532,23 @@ export class GridRenderer {
 
     if (freezeCol === 0 && freezeRow === 0) return;
 
+    const zoomFactor = this.getZoomFactor();
+    const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+    const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+
     // Calculate freeze pane boundaries
-    // Frozen columns start at HEADER_WIDTH (column header area)
-    let freezeColX = HEADER_WIDTH;
+    // Frozen columns start at zoomedHeaderWidth (column header area)
+    let freezeColX = zoomedHeaderWidth;
     for (let col = 0; col < freezeCol; col++) {
-      freezeColX += this.colWidths.get(col) || DEFAULT_COL_WIDTH;
+      const baseWidth = this.colWidths.get(col) || DEFAULT_COL_WIDTH;
+      freezeColX += getZoomedColWidth(baseWidth, zoomFactor);
     }
 
-    // Frozen rows start at HEADER_HEIGHT (row header area)
-    let freezeRowY = HEADER_HEIGHT;
+    // Frozen rows start at zoomedHeaderHeight (row header area)
+    let freezeRowY = zoomedHeaderHeight;
     for (let row = 0; row < freezeRow; row++) {
-      freezeRowY += this.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+      const baseHeight = this.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+      freezeRowY += getZoomedRowHeight(baseHeight, zoomFactor);
     }
 
     // Draw thick separator lines
@@ -537,7 +559,7 @@ export class GridRenderer {
     if (freezeCol > 0) {
       // Vertical separator after frozen columns
       ctx.beginPath();
-      ctx.moveTo(freezeColX + 0.5, HEADER_HEIGHT);
+      ctx.moveTo(freezeColX + 0.5, zoomedHeaderHeight);
       ctx.lineTo(freezeColX + 0.5, viewHeight);
       ctx.stroke();
     }
@@ -545,7 +567,7 @@ export class GridRenderer {
     if (freezeRow > 0) {
       // Horizontal separator after frozen rows
       ctx.beginPath();
-      ctx.moveTo(HEADER_WIDTH, freezeRowY + 0.5);
+      ctx.moveTo(zoomedHeaderWidth, freezeRowY + 0.5);
       ctx.lineTo(viewWidth, freezeRowY + 0.5);
       ctx.stroke();
     }
@@ -562,6 +584,10 @@ export class GridRenderer {
     rowHasMoved: boolean,
     headerState: HeaderRendererState
   ): void {
+    const zoomFactor = headerState.zoomFactor;
+    const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+    const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+
     for (const cell of this.cells) {
       if (colHasMoved && cell.col === this.dragSourceIndex) continue;
       if (rowHasMoved && cell.row === this.dragSourceIndex) continue;
@@ -581,19 +607,23 @@ export class GridRenderer {
       if (cell.isMergeAnchor && cell.mergeColSpan && cell.mergeRowSpan) {
         // Sum up widths for all columns in the merge
         for (let c = 0; c < cell.mergeColSpan; c++) {
-          totalWidth += this.colWidths.get(cell.col + c) || DEFAULT_COL_WIDTH;
+          const baseW = this.colWidths.get(cell.col + c) || DEFAULT_COL_WIDTH;
+          totalWidth += getZoomedColWidth(baseW, zoomFactor);
         }
         // Sum up heights for all rows in the merge
         for (let r = 0; r < cell.mergeRowSpan; r++) {
-          totalHeight += this.rowHeights.get(cell.row + r) || DEFAULT_ROW_HEIGHT;
+          const baseH = this.rowHeights.get(cell.row + r) || DEFAULT_ROW_HEIGHT;
+          totalHeight += getZoomedRowHeight(baseH, zoomFactor);
         }
       } else {
-        totalWidth = this.colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
-        totalHeight = this.rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
+        const baseW = this.colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
+        const baseH = this.rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
+        totalWidth = getZoomedColWidth(baseW, zoomFactor);
+        totalHeight = getZoomedRowHeight(baseH, zoomFactor);
       }
 
-      if (cellX + totalWidth < HEADER_WIDTH || cellX > viewWidth) continue;
-      if (cellY + totalHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
+      if (cellX + totalWidth < zoomedHeaderWidth || cellX > viewWidth) continue;
+      if (cellY + totalHeight < zoomedHeaderHeight || cellY > viewHeight) continue;
 
       ctx.fillStyle = bgColor;
       ctx.fillRect(cellX + 1, cellY + 1, totalWidth - 1, totalHeight - 1);
@@ -614,6 +644,12 @@ export class GridRenderer {
     // Respect showGridLines sheet property
     if (this.sheetInfo.showGridLines === false) return;
 
+    const zoomFactor = headerState.zoomFactor;
+    const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+    const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+    const zoomedColWidth = getZoomedColWidth(DEFAULT_COL_WIDTH, zoomFactor);
+    const zoomedRowHeight = getZoomedRowHeight(DEFAULT_ROW_HEIGHT, zoomFactor);
+
     ctx.strokeStyle = this.colors.gridLine;
     ctx.lineWidth = 1;
 
@@ -621,16 +657,16 @@ export class GridRenderer {
     const startCol = Math.max(0, Math.floor(this.scrollX / DEFAULT_COL_WIDTH) - 1);
     const endCol = Math.min(
       this.sheetInfo.colCount,
-      startCol + Math.ceil(viewWidth / DEFAULT_COL_WIDTH) + 2
+      startCol + Math.ceil(viewWidth / zoomedColWidth) + 2
     );
 
     // Vertical lines - only iterate through visible columns
     for (let col = startCol; col <= endCol; col++) {
       if (colHasMoved && col === this.dragSourceIndex) continue;
       const lineX = getColX(col, headerState) + 0.5;
-      if (lineX >= HEADER_WIDTH && lineX < viewWidth) {
+      if (lineX >= zoomedHeaderWidth && lineX < viewWidth) {
         ctx.beginPath();
-        ctx.moveTo(lineX, HEADER_HEIGHT);
+        ctx.moveTo(lineX, zoomedHeaderHeight);
         ctx.lineTo(lineX, viewHeight);
         ctx.stroke();
       }
@@ -641,16 +677,16 @@ export class GridRenderer {
     const startRow = Math.max(0, Math.floor(this.scrollY / DEFAULT_ROW_HEIGHT) - 1);
     const endRow = Math.min(
       rowCount,
-      startRow + Math.ceil(viewHeight / DEFAULT_ROW_HEIGHT) + 2
+      startRow + Math.ceil(viewHeight / zoomedRowHeight) + 2
     );
 
     // Horizontal lines - only iterate through visible rows
     for (let row = startRow; row <= endRow; row++) {
       if (rowHasMoved && row === this.dragSourceIndex) continue;
       const lineY = getRowY(row, headerState) + 0.5;
-      if (lineY >= HEADER_HEIGHT && lineY < viewHeight) {
+      if (lineY >= zoomedHeaderHeight && lineY < viewHeight) {
         ctx.beginPath();
-        ctx.moveTo(HEADER_WIDTH, lineY);
+        ctx.moveTo(zoomedHeaderWidth, lineY);
         ctx.lineTo(viewWidth, lineY);
         ctx.stroke();
       }
@@ -830,6 +866,10 @@ export class GridRenderer {
 
     if (edgeMap.size === 0) return;
 
+    const zoomFactor = headerState.zoomFactor;
+    const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+    const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+
     // Draw each unique edge once
     for (const [key, edge] of edgeMap) {
       const parts = key.split(":");
@@ -848,12 +888,13 @@ export class GridRenderer {
         const y = getRowY(row, headerState);
 
         // Skip if outside visible area
-        if (y < HEADER_HEIGHT - width || y > viewHeight + width) continue;
+        if (y < zoomedHeaderHeight - width || y > viewHeight + width) continue;
 
         // For horizontal edges, we need to determine the span
         // Find the cell that owns this edge to determine its column span
         let startX = getColX(col, headerState);
-        let endX = startX + (this.colWidths.get(col) || DEFAULT_COL_WIDTH);
+        const baseColW = this.colWidths.get(col) || DEFAULT_COL_WIDTH;
+        let endX = startX + getZoomedColWidth(baseColW, zoomFactor);
 
         // Check if this edge spans multiple columns (from merged cells)
         // The edge key uses the anchor cell's column, but we need to find the actual span
@@ -867,14 +908,15 @@ export class GridRenderer {
             // This cell owns this edge - calculate full span
             endX = startX;
             for (let c = 0; c < cellColSpan; c++) {
-              endX += this.colWidths.get(col + c) || DEFAULT_COL_WIDTH;
+              const w = this.colWidths.get(col + c) || DEFAULT_COL_WIDTH;
+              endX += getZoomedColWidth(w, zoomFactor);
             }
             break;
           }
         }
 
         // Clamp to visible area
-        startX = Math.max(startX, HEADER_WIDTH);
+        startX = Math.max(startX, zoomedHeaderWidth);
         endX = Math.min(endX, viewWidth);
 
         if (startX >= endX) continue;
@@ -891,11 +933,12 @@ export class GridRenderer {
         const x = getColX(col, headerState);
 
         // Skip if outside visible area
-        if (x < HEADER_WIDTH - width || x > viewWidth + width) continue;
+        if (x < zoomedHeaderWidth - width || x > viewWidth + width) continue;
 
         // For vertical edges, determine the row span
         let startY = getRowY(row, headerState);
-        let endY = startY + (this.rowHeights.get(row) || DEFAULT_ROW_HEIGHT);
+        const baseRowH = this.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+        let endY = startY + getZoomedRowHeight(baseRowH, zoomFactor);
 
         // Check if this edge spans multiple rows (from merged cells)
         for (const cell of this.cells) {
@@ -908,14 +951,15 @@ export class GridRenderer {
             // This cell owns this edge - calculate full span
             endY = startY;
             for (let r = 0; r < cellRowSpan; r++) {
-              endY += this.rowHeights.get(row + r) || DEFAULT_ROW_HEIGHT;
+              const h = this.rowHeights.get(row + r) || DEFAULT_ROW_HEIGHT;
+              endY += getZoomedRowHeight(h, zoomFactor);
             }
             break;
           }
         }
 
         // Clamp to visible area
-        startY = Math.max(startY, HEADER_HEIGHT);
+        startY = Math.max(startY, zoomedHeaderHeight);
         endY = Math.min(endY, viewHeight);
 
         if (startY >= endY) continue;
@@ -942,6 +986,11 @@ export class GridRenderer {
     rowHasMoved: boolean,
     headerState: HeaderRendererState
   ): void {
+    const zoomFactor = headerState.zoomFactor;
+    const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+    const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+    const zoomedCellPadding = getZoomedCellPadding(zoomFactor);
+
     // Build a lookup set of cells with content for overflow checking
     // Key format: "col,row"
     const cellsWithContent = new Set<string>();
@@ -968,19 +1017,23 @@ export class GridRenderer {
       if (cell.isMergeAnchor && cell.mergeColSpan && cell.mergeRowSpan) {
         // Sum up widths for all columns in the merge
         for (let c = 0; c < cell.mergeColSpan; c++) {
-          colWidth += this.colWidths.get(cell.col + c) || DEFAULT_COL_WIDTH;
+          const baseW = this.colWidths.get(cell.col + c) || DEFAULT_COL_WIDTH;
+          colWidth += getZoomedColWidth(baseW, zoomFactor);
         }
         // Sum up heights for all rows in the merge
         for (let r = 0; r < cell.mergeRowSpan; r++) {
-          rowHeight += this.rowHeights.get(cell.row + r) || DEFAULT_ROW_HEIGHT;
+          const baseH = this.rowHeights.get(cell.row + r) || DEFAULT_ROW_HEIGHT;
+          rowHeight += getZoomedRowHeight(baseH, zoomFactor);
         }
       } else {
-        colWidth = this.colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
-        rowHeight = this.rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
+        const baseW = this.colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
+        const baseH = this.rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
+        colWidth = getZoomedColWidth(baseW, zoomFactor);
+        rowHeight = getZoomedRowHeight(baseH, zoomFactor);
       }
 
-      if (cellX + colWidth < HEADER_WIDTH || cellX > viewWidth) continue;
-      if (cellY + rowHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
+      if (cellX + colWidth < zoomedHeaderWidth || cellX > viewWidth) continue;
+      if (cellY + rowHeight < zoomedHeaderHeight || cellY > viewHeight) continue;
 
       const displayValue = cell.display || cell.value || "";
       const style = cell.style;
@@ -988,17 +1041,18 @@ export class GridRenderer {
       // Set text color
       ctx.fillStyle = style?.textColor || this.colors.cellText;
 
-      // Build font string with style properties
+      // Build font string with style properties (zoom font size)
       let fontStyle = "";
       if (style?.italic) fontStyle += "italic ";
       if (style?.bold) fontStyle += "bold ";
-      const fontSize = style?.fontSize || 13;
+      const baseFontSize = style?.fontSize || 13;
+      const zoomedFontSize = getZoomedFontSize(baseFontSize, zoomFactor);
       const fontFamily = style?.fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      ctx.font = fontStyle ? `${fontStyle}${fontSize}px ${fontFamily}` : `${fontSize}px ${fontFamily}`;
+      ctx.font = fontStyle ? `${fontStyle}${zoomedFontSize}px ${fontFamily}` : `${zoomedFontSize}px ${fontFamily}`;
 
       // Measure text width for overflow detection
       const textWidth = ctx.measureText(displayValue).width;
-      const availableWidth = colWidth - 2 * CELL_PADDING;
+      const availableWidth = colWidth - 2 * zoomedCellPadding;
 
       // Set horizontal alignment
       // When hAlign is not set (undefined), use "general" alignment:
@@ -1040,8 +1094,8 @@ export class GridRenderer {
           let extendedWidth = 0;
           for (let c = cell.col + 1; c < (this.sheetInfo?.colCount || 100); c++) {
             if (cellsWithContent.has(`${c},${cell.row}`)) break;
-            const neighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
-            extendedWidth += neighborWidth;
+            const baseNeighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+            extendedWidth += getZoomedColWidth(baseNeighborWidth, zoomFactor);
             clipEndCol = c;
             if (extendedWidth >= overflowNeeded) break;
           }
@@ -1050,8 +1104,8 @@ export class GridRenderer {
           let extendedWidth = 0;
           for (let c = cell.col - 1; c >= 0; c--) {
             if (cellsWithContent.has(`${c},${cell.row}`)) break;
-            const neighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
-            extendedWidth += neighborWidth;
+            const baseNeighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+            extendedWidth += getZoomedColWidth(baseNeighborWidth, zoomFactor);
             clipStartCol = c;
             if (extendedWidth >= overflowNeeded) break;
           }
@@ -1062,8 +1116,8 @@ export class GridRenderer {
           let rightExtend = 0;
           for (let c = cell.col + 1; c < (this.sheetInfo?.colCount || 100); c++) {
             if (cellsWithContent.has(`${c},${cell.row}`)) break;
-            const neighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
-            rightExtend += neighborWidth;
+            const baseNeighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+            rightExtend += getZoomedColWidth(baseNeighborWidth, zoomFactor);
             clipEndCol = c;
             if (rightExtend >= halfOverflow) break;
           }
@@ -1071,8 +1125,8 @@ export class GridRenderer {
           let leftExtend = 0;
           for (let c = cell.col - 1; c >= 0; c--) {
             if (cellsWithContent.has(`${c},${cell.row}`)) break;
-            const neighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
-            leftExtend += neighborWidth;
+            const baseNeighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+            leftExtend += getZoomedColWidth(baseNeighborWidth, zoomFactor);
             clipStartCol = c;
             if (leftExtend >= halfOverflow) break;
           }
@@ -1083,7 +1137,8 @@ export class GridRenderer {
       const clipX = getColX(clipStartCol, headerState);
       let clipWidth = 0;
       for (let c = clipStartCol; c <= clipEndCol; c++) {
-        clipWidth += this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+        const baseW = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+        clipWidth += getZoomedColWidth(baseW, zoomFactor);
       }
 
       ctx.save();
@@ -1099,21 +1154,22 @@ export class GridRenderer {
         textX = Math.round(cellX + colWidth / 2);
       } else if (hAlign === "right") {
         ctx.textAlign = "right";
-        textX = cellX + colWidth - CELL_PADDING;
+        textX = cellX + colWidth - zoomedCellPadding;
       } else {
         ctx.textAlign = "left";
-        textX = cellX + CELL_PADDING;
+        textX = cellX + zoomedCellPadding;
       }
 
       // Set vertical alignment (default matches CellStyle in C++)
       const vAlign = style?.vAlign || "bottom";
+      const zoomedVertPadding = Math.round(2 * zoomFactor);
       let textY: number;
       if (vAlign === "top") {
         ctx.textBaseline = "top";
-        textY = cellY + 2; // Small padding from top
+        textY = cellY + zoomedVertPadding; // Small padding from top
       } else if (vAlign === "bottom") {
         ctx.textBaseline = "bottom";
-        textY = cellY + rowHeight - 2; // Small padding from bottom
+        textY = cellY + rowHeight - zoomedVertPadding; // Small padding from bottom
       } else {
         ctx.textBaseline = "middle";
         textY = cellY + rowHeight / 2;
@@ -1135,11 +1191,11 @@ export class GridRenderer {
         // Adjust Y position based on vertical alignment
         let underlineY: number;
         if (vAlign === "top") {
-          underlineY = textY + fontSize + 1;
+          underlineY = textY + zoomedFontSize + 1;
         } else if (vAlign === "bottom") {
           underlineY = textY + 1;
         } else {
-          underlineY = textY + fontSize / 2 + 1;
+          underlineY = textY + zoomedFontSize / 2 + 1;
         }
         ctx.beginPath();
         ctx.strokeStyle = style?.textColor || this.colors.cellText;

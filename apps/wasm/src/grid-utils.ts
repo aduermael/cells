@@ -28,6 +28,12 @@ import {
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
 } from "./grid-renderer";
+import {
+  getZoomedHeaderWidth,
+  getZoomedHeaderHeight,
+  getZoomedColWidth,
+  getZoomedRowHeight,
+} from "./grid-constants";
 import type { Position, CellData, SheetInfo } from "./types";
 
 // =============================================================================
@@ -48,22 +54,27 @@ export const DRAG_THRESHOLD = 5;
  * Get the column index at a screen X coordinate
  * Uses O(n) linear scan - prefer getColAtXFast with pixel offsets when available
  * @param x Screen X coordinate
- * @param scrollX Current horizontal scroll offset
- * @param colWidths Map of column positions to widths
+ * @param scrollX Current horizontal scroll offset (in logical units)
+ * @param colWidths Map of column positions to base widths
  * @param colCount Total number of columns (from sheetInfo)
+ * @param zoomFactor Zoom factor (1.0 = 100%), defaults to 1.0
  * @returns Column index, or -1 if in header area
  */
 export function getColAtX(
   x: number,
   scrollX: number,
   colWidths: Map<number, number>,
-  colCount: number = 1000
+  colCount: number = 1000,
+  zoomFactor: number = 1.0
 ): number {
-  if (x < HEADER_WIDTH) return -1;
-  let accX = HEADER_WIDTH - scrollX;
+  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomedScrollX = Math.round(scrollX * zoomFactor);
+  if (x < zoomedHeaderWidth) return -1;
+  let accX = zoomedHeaderWidth - zoomedScrollX;
   let col = 0;
   while (accX < x && col < colCount) {
-    accX += colWidths.get(col) ?? DEFAULT_COL_WIDTH;
+    const baseWidth = colWidths.get(col) ?? DEFAULT_COL_WIDTH;
+    accX += getZoomedColWidth(baseWidth, zoomFactor);
     if (accX > x) return col;
     col++;
   }
@@ -74,22 +85,27 @@ export function getColAtX(
  * Get the row index at a screen Y coordinate
  * Uses O(n) linear scan - prefer getRowAtYFast with pixel offsets when available
  * @param y Screen Y coordinate
- * @param scrollY Current vertical scroll offset
- * @param rowHeights Map of row positions to heights
+ * @param scrollY Current vertical scroll offset (in logical units)
+ * @param rowHeights Map of row positions to base heights
  * @param rowCount Total number of rows (from sheetInfo)
+ * @param zoomFactor Zoom factor (1.0 = 100%), defaults to 1.0
  * @returns Row index, or -1 if in header area
  */
 export function getRowAtY(
   y: number,
   scrollY: number,
   rowHeights: Map<number, number>,
-  rowCount: number = 1000
+  rowCount: number = 1000,
+  zoomFactor: number = 1.0
 ): number {
-  if (y < HEADER_HEIGHT) return -1;
-  let accY = HEADER_HEIGHT - scrollY;
+  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+  const zoomedScrollY = Math.round(scrollY * zoomFactor);
+  if (y < zoomedHeaderHeight) return -1;
+  let accY = zoomedHeaderHeight - zoomedScrollY;
   let row = 0;
   while (accY < y && row < rowCount) {
-    accY += rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
+    const baseHeight = rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
+    accY += getZoomedRowHeight(baseHeight, zoomFactor);
     if (accY > y) return row;
     row++;
   }
@@ -193,21 +209,26 @@ export function getColPixelX(
 /**
  * Get the column index whose resize handle is at the given X coordinate
  * @param mouseX Mouse X coordinate
- * @param scrollX Current horizontal scroll offset
- * @param colWidths Map of column positions to widths
+ * @param scrollX Current horizontal scroll offset (in logical units)
+ * @param colWidths Map of column positions to base widths
  * @param sheetInfo Current sheet info (for column count)
+ * @param zoomFactor Zoom factor (1.0 = 100%), defaults to 1.0
  * @returns Column index for resize, or -1 if not over a resize handle
  */
 export function getResizeHandleCol(
   mouseX: number,
   scrollX: number,
   colWidths: Map<number, number>,
-  sheetInfo: SheetInfo | null
+  sheetInfo: SheetInfo | null,
+  zoomFactor: number = 1.0
 ): number {
   if (!sheetInfo) return -1;
-  let x = HEADER_WIDTH - scrollX;
+  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomedScrollX = Math.round(scrollX * zoomFactor);
+  let x = zoomedHeaderWidth - zoomedScrollX;
   for (let col = 0; col < sheetInfo.colCount; col++) {
-    const colW = colWidths.get(col) ?? DEFAULT_COL_WIDTH;
+    const baseW = colWidths.get(col) ?? DEFAULT_COL_WIDTH;
+    const colW = getZoomedColWidth(baseW, zoomFactor);
     const rightEdge = x + colW;
     if (
       mouseX >= rightEdge - RESIZE_HANDLE_WIDTH &&
@@ -223,21 +244,26 @@ export function getResizeHandleCol(
 /**
  * Get the row index whose resize handle is at the given Y coordinate
  * @param mouseY Mouse Y coordinate
- * @param scrollY Current vertical scroll offset
- * @param rowHeights Map of row positions to heights
+ * @param scrollY Current vertical scroll offset (in logical units)
+ * @param rowHeights Map of row positions to base heights
  * @param sheetInfo Current sheet info (for row count)
+ * @param zoomFactor Zoom factor (1.0 = 100%), defaults to 1.0
  * @returns Row index for resize, or -1 if not over a resize handle
  */
 export function getResizeHandleRow(
   mouseY: number,
   scrollY: number,
   rowHeights: Map<number, number>,
-  sheetInfo: SheetInfo | null
+  sheetInfo: SheetInfo | null,
+  zoomFactor: number = 1.0
 ): number {
   if (!sheetInfo) return -1;
-  let y = HEADER_HEIGHT - scrollY;
+  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+  const zoomedScrollY = Math.round(scrollY * zoomFactor);
+  let y = zoomedHeaderHeight - zoomedScrollY;
   for (let row = 0; row < sheetInfo.rowCount; row++) {
-    const rowH = rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
+    const baseH = rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
+    const rowH = getZoomedRowHeight(baseH, zoomFactor);
     const bottomEdge = y + rowH;
     if (
       mouseY >= bottomEdge - RESIZE_HANDLE_WIDTH &&
@@ -253,22 +279,27 @@ export function getResizeHandleRow(
 /**
  * Get the column index for a drop target at the given X coordinate
  * @param mouseX Mouse X coordinate
- * @param scrollX Current horizontal scroll offset
- * @param colWidths Map of column positions to widths
+ * @param scrollX Current horizontal scroll offset (in logical units)
+ * @param colWidths Map of column positions to base widths
  * @param sheetInfo Current sheet info (for column count)
+ * @param zoomFactor Zoom factor (1.0 = 100%), defaults to 1.0
  * @returns Target column index for dropping
  */
 export function getDropTargetCol(
   mouseX: number,
   scrollX: number,
   colWidths: Map<number, number>,
-  sheetInfo: SheetInfo | null
+  sheetInfo: SheetInfo | null,
+  zoomFactor: number = 1.0
 ): number {
-  if (mouseX < HEADER_WIDTH) return 0;
-  let x = HEADER_WIDTH - scrollX;
+  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomedScrollX = Math.round(scrollX * zoomFactor);
+  if (mouseX < zoomedHeaderWidth) return 0;
+  let x = zoomedHeaderWidth - zoomedScrollX;
   const colCount = sheetInfo?.colCount ?? 1000;
   for (let col = 0; col < colCount; col++) {
-    const colW = colWidths.get(col) ?? DEFAULT_COL_WIDTH;
+    const baseW = colWidths.get(col) ?? DEFAULT_COL_WIDTH;
+    const colW = getZoomedColWidth(baseW, zoomFactor);
     const midX = x + colW / 2;
     if (mouseX < midX) return col;
     x += colW;
@@ -279,22 +310,27 @@ export function getDropTargetCol(
 /**
  * Get the row index for a drop target at the given Y coordinate
  * @param mouseY Mouse Y coordinate
- * @param scrollY Current vertical scroll offset
- * @param rowHeights Map of row positions to heights
+ * @param scrollY Current vertical scroll offset (in logical units)
+ * @param rowHeights Map of row positions to base heights
  * @param sheetInfo Current sheet info (for row count)
+ * @param zoomFactor Zoom factor (1.0 = 100%), defaults to 1.0
  * @returns Target row index for dropping
  */
 export function getDropTargetRow(
   mouseY: number,
   scrollY: number,
   rowHeights: Map<number, number>,
-  sheetInfo: SheetInfo | null
+  sheetInfo: SheetInfo | null,
+  zoomFactor: number = 1.0
 ): number {
-  if (mouseY < HEADER_HEIGHT) return 0;
-  let y = HEADER_HEIGHT - scrollY;
+  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+  const zoomedScrollY = Math.round(scrollY * zoomFactor);
+  if (mouseY < zoomedHeaderHeight) return 0;
+  let y = zoomedHeaderHeight - zoomedScrollY;
   const rowCount = sheetInfo?.rowCount ?? 1000;
   for (let row = 0; row < rowCount; row++) {
-    const rowH = rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
+    const baseH = rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
+    const rowH = getZoomedRowHeight(baseH, zoomFactor);
     const midY = y + rowH / 2;
     if (mouseY < midY) return row;
     y += rowH;

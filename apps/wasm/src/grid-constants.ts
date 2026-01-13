@@ -10,12 +10,68 @@ import type {
   EditingState,
 } from "./types.js";
 
-// Grid constants
+// Grid constants (unzoomed, base values)
 export const HEADER_HEIGHT = 24;
 export const HEADER_WIDTH = 50;
 export const DEFAULT_COL_WIDTH = 100;
 export const DEFAULT_ROW_HEIGHT = 24;
 export const CELL_PADDING = 4;
+
+// =============================================================================
+// Zoom-aware dimension helpers
+// =============================================================================
+
+/**
+ * Get zoomed header height
+ * @param zoomFactor Zoom factor (1.0 = 100%)
+ */
+export function getZoomedHeaderHeight(zoomFactor: number): number {
+  return Math.round(HEADER_HEIGHT * zoomFactor);
+}
+
+/**
+ * Get zoomed header width
+ * @param zoomFactor Zoom factor (1.0 = 100%)
+ */
+export function getZoomedHeaderWidth(zoomFactor: number): number {
+  return Math.round(HEADER_WIDTH * zoomFactor);
+}
+
+/**
+ * Get zoomed column width
+ * @param baseWidth Base column width in pixels
+ * @param zoomFactor Zoom factor (1.0 = 100%)
+ */
+export function getZoomedColWidth(baseWidth: number, zoomFactor: number): number {
+  return Math.round(baseWidth * zoomFactor);
+}
+
+/**
+ * Get zoomed row height
+ * @param baseHeight Base row height in pixels
+ * @param zoomFactor Zoom factor (1.0 = 100%)
+ */
+export function getZoomedRowHeight(baseHeight: number, zoomFactor: number): number {
+  return Math.round(baseHeight * zoomFactor);
+}
+
+/**
+ * Get zoomed cell padding
+ * @param zoomFactor Zoom factor (1.0 = 100%)
+ */
+export function getZoomedCellPadding(zoomFactor: number): number {
+  return Math.round(CELL_PADDING * zoomFactor);
+}
+
+/**
+ * Get zoomed font size
+ * @param baseFontSize Base font size in pixels
+ * @param zoomFactor Zoom factor (1.0 = 100%)
+ */
+export function getZoomedFontSize(baseFontSize: number, zoomFactor: number): number {
+  // Don't round font sizes to allow smooth scaling
+  return baseFontSize * zoomFactor;
+}
 
 // Color palette
 // Primary brand colors (should match CSS variables)

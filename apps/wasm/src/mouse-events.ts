@@ -88,20 +88,24 @@ export class MouseEventHandlers {
     // =========================================================================
 
     /**
-     * Convert screen coordinates to canvas coordinates accounting for zoom
+     * Convert screen coordinates to canvas coordinates.
+     * With proper zoom (not CSS transform), screen and canvas coordinates are 1:1
+     * since zoom is applied to rendering dimensions, not the canvas element.
      * @param e Mouse event
      * @returns Canvas-relative x, y coordinates
      */
     protected getCanvasCoords(e: MouseEvent): { x: number; y: number } {
         const rect = this.config.canvas.getBoundingClientRect();
-        const zoomScale = this.config.getZoomScale();
-        const factor = zoomScale / 100;
-        // When CSS transform scale is applied, getBoundingClientRect returns scaled size
-        // We need to divide by the factor to get canvas-relative coordinates
+        // No zoom adjustment needed - coordinates are 1:1 with proper zoom
         return {
-            x: (e.clientX - rect.left) / factor,
-            y: (e.clientY - rect.top) / factor,
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
         };
+    }
+
+    /** Get the current zoom factor (1.0 = 100%) */
+    protected getZoomFactor(): number {
+        return this.config.getZoomScale() / 100;
     }
 
     // =========================================================================
@@ -452,7 +456,7 @@ export class MouseEventHandlers {
 
         // Column header click
         if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
             if (col >= 0) {
                 if (this.isInFormulaEditingMode()) {
                     const colLetter = colToLetter(col);
@@ -578,7 +582,7 @@ export class MouseEventHandlers {
 
         // Cell selection or insert reference
         if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
             const discoveredRows = this.config.getDiscoveredRows();
             const row = getRowAtY(
                 y,
@@ -776,7 +780,7 @@ export class MouseEventHandlers {
             x > HEADER_WIDTH &&
             y > HEADER_HEIGHT
         ) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
             const discoveredRows = this.config.getDiscoveredRows();
             const row = getRowAtY(
                 y,
@@ -839,7 +843,7 @@ export class MouseEventHandlers {
             const clampedX = Math.max(HEADER_WIDTH + 1, x);
             const clampedY = Math.max(HEADER_HEIGHT + 1, y);
 
-            const col = getColAtX(clampedX, scrollX, colWidths, sheetInfo.colCount);
+            const col = getColAtX(clampedX, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
             const discoveredRows = this.config.getDiscoveredRows();
             const row = getRowAtY(
                 clampedY,
@@ -890,7 +894,7 @@ export class MouseEventHandlers {
             render();
         } else if (uiStateMachine.isInState("COLUMN_DRAGGING")) {
             setDragTargetIndex(
-                getDropTargetCol(x, scrollX, colWidths, sheetInfo),
+                getDropTargetCol(x, scrollX, colWidths, sheetInfo, this.getZoomFactor()),
             );
             setDragMouseX(x);
             setDragMouseY(y);
@@ -899,7 +903,7 @@ export class MouseEventHandlers {
             render();
         } else if (uiStateMachine.isInState("ROW_DRAGGING")) {
             setDragTargetIndex(
-                getDropTargetRow(y, scrollY, rowHeights, sheetInfo),
+                getDropTargetRow(y, scrollY, rowHeights, sheetInfo, this.getZoomFactor()),
             );
             setDragMouseX(x);
             setDragMouseY(y);
@@ -1264,7 +1268,7 @@ export class MouseEventHandlers {
 
         // Double-click on column header: start column renaming
         if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
             if (col >= 0) {
                 columnHeaderEditor.startEditingColumnHeader(col);
                 e.preventDefault();
@@ -1274,7 +1278,7 @@ export class MouseEventHandlers {
 
         // Double-click on cell: start cell editing
         if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
             const discoveredRows = this.config.getDiscoveredRows();
             const row = getRowAtY(
                 y,
@@ -1354,7 +1358,7 @@ export class MouseEventHandlers {
         }
 
         if (y <= HEADER_HEIGHT && x > HEADER_WIDTH) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
             if (col >= 0) {
                 const columns = getColumns();
                 const colId = getColumnId(col, columns);
@@ -1380,7 +1384,7 @@ export class MouseEventHandlers {
         }
 
         if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
             const discoveredRows = getDiscoveredRows();
             const row = getRowAtY(
                 y,

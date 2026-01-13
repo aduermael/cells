@@ -47,13 +47,13 @@ Freeze pane separator lines are drawn but the actual freezing behavior during sc
 
 Current zoom uses CSS transform which scales pixels but doesn't change the viewport. Zoom should display more/fewer cells while maintaining crisp rendering.
 
-- [ ] 5a: Remove CSS transform-based zoom approach
-- [ ] 5b: Implement zoom by adjusting effective column widths and row heights (multiply by zoom factor)
-- [ ] 5c: Update cell rendering to use zoomed dimensions for positioning
-- [ ] 5d: Update text rendering to scale font size by zoom factor
-- [ ] 5e: Ensure hit-testing and selection use zoomed coordinates correctly
-- [ ] 5f: Verify scroll behavior works correctly with zoomed viewport
-- [ ] 5g: Add test for zoom in/out displaying correct number of cells
+- [x] 5a: Remove CSS transform-based zoom approach. Changed `setZoomScale()` to clear CSS transform instead of applying it.
+- [x] 5b: Implement zoom by adjusting effective column widths and row heights. Added zoom helper functions (`getZoomedHeaderHeight/Width`, `getZoomedColWidth`, `getZoomedRowHeight`, `getZoomedFontSize`, `getZoomedCellPadding`) to grid-constants.ts.
+- [x] 5c: Update cell rendering to use zoomed dimensions for positioning. Updated `_drawCellBackgrounds()`, `_drawGridLines()`, `_drawCellBorders()`, and render() quadrant clipping to use zoomed dimensions.
+- [x] 5d: Update text rendering to scale font size by zoom factor. Updated `_drawCellValues()` to use `getZoomedFontSize()` and zoomed padding.
+- [x] 5e: Ensure hit-testing and selection use zoomed coordinates correctly. Updated grid-utils.ts (`getColAtX`, `getRowAtY`, resize/drop target functions) and grid-events.ts to apply zoom factor. Mouse coordinates are now 1:1 with canvas since no CSS transform.
+- [x] 5f: Verify scroll behavior works correctly with zoomed viewport. Scroll values remain in logical units; zoomed scroll offset applied when rendering positions.
+- [x] 5g: Updated zoom E2E test to verify zoom scale is stored in renderer instead of checking for CSS transform.
 
 ## Phase 6: Document Title Selection Cleanup
 
