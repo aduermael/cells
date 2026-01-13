@@ -68,9 +68,12 @@ export function setupDataListeners(config: DataListenersConfig): {
       app.sheetInfo = await app.dataSource.getSheetInfo();
       app.elements.sheetName.textContent = app.sheetInfo.name;
       // Ensure discoveredRows is at least as large as the actual row count
-      // This is critical for correct scroll height calculation when loading files
-      if (app.sheetInfo.rowCount > app.discoveredRows) {
-        app.discoveredRows = app.sheetInfo.rowCount;
+      // plus a buffer to fill the viewport with empty rows below the data.
+      // This is critical for correct scroll height calculation when loading files.
+      const viewportBuffer = 100; // Extra rows beyond data to enable scrolling/editing
+      const minDiscoveredRows = app.sheetInfo.rowCount + viewportBuffer;
+      if (minDiscoveredRows > app.discoveredRows) {
+        app.discoveredRows = minDiscoveredRows;
       }
     } catch (e) {
       console.error("Error fetching sheet info:", e);
