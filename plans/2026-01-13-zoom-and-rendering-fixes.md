@@ -61,3 +61,73 @@ When a font like Calibri is specified but not available, dynamically load it fro
 - [x] 7c: Integrate font loader into the renderer - before rendering a cell, ensure its font is loaded or use fallback. Updated `grid-renderer.ts` to use `ensureFont()` and registered font-loaded callback in `init.ts` to trigger re-renders.
 - [x] 7d: Cache loaded fonts to avoid repeated network requests. Font loader uses a Map-based cache and tracks loading state to prevent duplicate requests.
 - [x] 7e: Add test verifying font loading fallback behavior. Created `font-loading.test.mjs` with 5 tests covering module availability, system fonts, fallback behavior, XLSX loading, and re-render callbacks.
+
+## Phase 8: Comprehensive Zoom Architecture Review
+
+Despite previous zoom fixes, rendering issues persist at non-100% zoom levels. Selection boxes are misaligned with cells, and column resize indicators appear at wrong positions. This phase performs a systematic audit and architectural fix of all zoom-dependent rendering.
+
+### 8.1: Audit and Document Current Zoom Usage
+
+Review all code that uses positions, sizes, or coordinates to identify zoom gaps.
+
+- [ ] 8.1a: Audit `grid-renderer.ts` - document all position/size calculations and whether they properly use zoomed vs unzoomed values
+- [ ] 8.1b: Audit `grid-selection-renderer.ts` - verify selection box, fill handle, fill preview all use consistent zoom calculations
+- [ ] 8.1c: Audit `grid-header-renderer.ts` - verify resize indicators, drag ghosts, header highlights use zoom
+- [ ] 8.1d: Audit `mouse-events.ts` - verify all mouse coordinate translations (screen→grid, grid→screen) use zoom correctly
+- [ ] 8.1e: Audit `cell-editor.ts` - verify editor positioning accounts for zoom in all cases
+- [ ] 8.1f: Document findings and create fix list for each file
+
+### 8.2: Fix Column/Row Resize Indicators
+
+The green dashed line shown during column/row resize is positioned incorrectly at non-100% zoom.
+
+- [ ] 8.2a: Write E2E test that verifies resize indicator X position matches the column boundary at 50%, 100%, 200% zoom
+- [ ] 8.2b: Fix resize indicator positioning in header renderer to use zoomed column positions
+- [ ] 8.2c: Verify row resize indicator has same fix applied
+
+### 8.3: Fix Selection Box Alignment
+
+Selection boxes (single cell, range, column, row) don't align with cell boundaries at non-100% zoom.
+
+- [ ] 8.3a: Write E2E test that precisely measures selection box position vs cell position at various zoom levels
+- [ ] 8.3b: Identify root cause - likely mismatch between how cell positions and selection positions are calculated
+- [ ] 8.3c: Fix selection position calculations to use same zoomed position logic as cell rendering
+- [ ] 8.3d: Verify fill handle position is also fixed
+
+### 8.4: Centralize Zoom Coordinate System
+
+If issues stem from inconsistent zoom application, introduce architectural improvements.
+
+- [ ] 8.4a: Create helper functions for coordinate conversion: `screenToGrid(x, y)` and `gridToScreen(x, y)` that handle zoom
+- [ ] 8.4b: Create `getCellBounds(col, row)` that returns zoomed {x, y, width, height} for any cell
+- [ ] 8.4c: Refactor selection renderer to use `getCellBounds()` instead of manual calculations
+- [ ] 8.4d: Refactor resize indicator to use centralized position helpers
+- [ ] 8.4e: Ensure all mouse event handlers use `screenToGrid()` for hit testing
+
+### 8.5: Dynamic Zoom Change Handling
+
+Ensure all rendered entities update correctly when zoom level changes.
+
+- [ ] 8.5a: Review zoom change propagation - verify all components are notified when zoom changes
+- [ ] 8.5b: Write E2E test that changes zoom while selection is active and verifies selection updates
+- [ ] 8.5c: Write E2E test that changes zoom during column resize drag and verifies indicator updates
+- [ ] 8.5d: Fix any components that don't respond to zoom changes dynamically
+
+### 8.6: Additional Zoom-Dependent Elements
+
+Review and fix any remaining zoom-dependent UI elements.
+
+- [ ] 8.6a: Verify scrollbar thumb size/position accounts for zoom
+- [ ] 8.6b: Verify formula reference highlights (colored boxes during formula editing) use zoom
+- [ ] 8.6c: Verify remote presence cursors/selections use zoom
+- [ ] 8.6d: Verify drag-and-drop ghost elements use zoom
+- [ ] 8.6e: Verify frozen pane dividers (if implemented) use zoom
+
+### 8.7: Regression Test Suite
+
+Create comprehensive test coverage to prevent future zoom regressions.
+
+- [ ] 8.7a: Create `zoom-comprehensive.test.mjs` with tests for all zoom-dependent rendering
+- [ ] 8.7b: Add tests at boundary zoom levels (25%, 50%, 75%, 100%, 150%, 200%, 400%)
+- [ ] 8.7c: Add tests for zoom + scroll combinations
+- [ ] 8.7d: Add tests for zoom + frozen rows/columns (if applicable)
