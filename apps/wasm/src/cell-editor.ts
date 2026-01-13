@@ -29,11 +29,15 @@ import type { CppSyncAdapter } from "./cpp-sync-adapter";
 import type { UIStateMachine } from "./ui-state";
 import { UIEvent } from "./ui-state";
 import {
-  HEADER_WIDTH,
-  HEADER_HEIGHT,
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
 } from "./grid-renderer";
+import {
+  getZoomedHeaderWidth,
+  getZoomedHeaderHeight,
+  getZoomedColWidth,
+  getZoomedRowHeight,
+} from "./grid-constants";
 import type { Position, SheetInfo, CellData } from "./types";
 import type { FormulaHighlight } from "./grid-constants";
 import { getNormalizedRange } from "./grid-utils";
@@ -114,6 +118,7 @@ export class CellEditor {
   private getRowHeights: () => Map<number, number>;
   private getScrollX: () => number;
   private getScrollY: () => number;
+  private getZoomFactor: () => number;
   private getFormulaHighlights: () => FormulaHighlight[];
   private getDiscoveredRows: () => number;
   private getCellDataAt: (col: number, row: number) => CellData | null;
@@ -153,6 +158,7 @@ export class CellEditor {
     getRowHeights: () => Map<number, number>;
     getScrollX: () => number;
     getScrollY: () => number;
+    getZoomFactor: () => number;
     getFormulaHighlights: () => FormulaHighlight[];
     getDiscoveredRows: () => number;
     getCellDataAt: (col: number, row: number) => CellData | null;
@@ -178,6 +184,7 @@ export class CellEditor {
     this.getRowHeights = config.getRowHeights;
     this.getScrollX = config.getScrollX;
     this.getScrollY = config.getScrollY;
+    this.getZoomFactor = config.getZoomFactor;
     this.getFormulaHighlights = config.getFormulaHighlights;
     this.getDiscoveredRows = config.getDiscoveredRows;
     this.getCellDataAt = config.getCellDataAt;
@@ -720,12 +727,18 @@ export class CellEditor {
   /**
    * Position the cell editor over the selected cell.
    * For merged cells, positions at the anchor and spans the full merged region.
+   * Uses zoomed dimensions to match the grid rendering at current zoom level.
    */
   private positionEditor(cell: Position): void {
     const scrollX = this.getScrollX();
     const scrollY = this.getScrollY();
     const colWidths = this.getColWidths();
     const rowHeights = this.getRowHeights();
+    const zoomFactor = this.getZoomFactor();
+
+    // Get zoomed header dimensions
+    const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+    const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
 
     // Check if this cell is part of a merge
     const cellData = this.getCellDataAt(cell.col, cell.row);
@@ -748,28 +761,32 @@ export class CellEditor {
       rowSpan = cellData.mergeRowSpan ?? 1;
     }
 
-    // Calculate X position (anchor column)
-    let cellX = HEADER_WIDTH - scrollX;
+    // Calculate X position (anchor column) using zoomed dimensions
+    let cellX = zoomedHeaderWidth - scrollX;
     for (let i = 0; i < anchorCol; i++) {
-      cellX += colWidths.get(i) ?? DEFAULT_COL_WIDTH;
+      const baseWidth = colWidths.get(i) ?? DEFAULT_COL_WIDTH;
+      cellX += getZoomedColWidth(baseWidth, zoomFactor);
     }
 
-    // Calculate Y position (anchor row)
-    let cellY = HEADER_HEIGHT - scrollY;
+    // Calculate Y position (anchor row) using zoomed dimensions
+    let cellY = zoomedHeaderHeight - scrollY;
     for (let i = 0; i < anchorRow; i++) {
-      cellY += rowHeights.get(i) ?? DEFAULT_ROW_HEIGHT;
+      const baseHeight = rowHeights.get(i) ?? DEFAULT_ROW_HEIGHT;
+      cellY += getZoomedRowHeight(baseHeight, zoomFactor);
     }
 
-    // Calculate total width (sum of all columns in span)
+    // Calculate total width (sum of all columns in span) using zoomed dimensions
     let totalWidth = 0;
     for (let i = 0; i < colSpan; i++) {
-      totalWidth += colWidths.get(anchorCol + i) ?? DEFAULT_COL_WIDTH;
+      const baseWidth = colWidths.get(anchorCol + i) ?? DEFAULT_COL_WIDTH;
+      totalWidth += getZoomedColWidth(baseWidth, zoomFactor);
     }
 
-    // Calculate total height (sum of all rows in span)
+    // Calculate total height (sum of all rows in span) using zoomed dimensions
     let totalHeight = 0;
     for (let i = 0; i < rowSpan; i++) {
-      totalHeight += rowHeights.get(anchorRow + i) ?? DEFAULT_ROW_HEIGHT;
+      const baseHeight = rowHeights.get(anchorRow + i) ?? DEFAULT_ROW_HEIGHT;
+      totalHeight += getZoomedRowHeight(baseHeight, zoomFactor);
     }
 
     this.cellEditorContainer.style.left = cellX + "px";

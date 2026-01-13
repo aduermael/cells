@@ -3,12 +3,14 @@
 
 import type { Position } from "./types.js";
 import {
-  HEADER_HEIGHT,
-  HEADER_WIDTH,
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
   getGridColors,
   SPILL_RANGE_COLOR,
+  getZoomedColWidth,
+  getZoomedRowHeight,
+  getZoomedHeaderWidth,
+  getZoomedHeaderHeight,
   type NormalizedRange,
   type SpillRangeHighlight,
 } from "./grid-constants.js";
@@ -25,6 +27,7 @@ export interface SelectionRendererState {
   selectionStart: Position | null;
   selectionEnd: Position | null;
   selectedCell: Position | null;
+  zoomFactor: number;
 }
 
 /** Position and bounds of the fill handle for hit testing */
@@ -56,24 +59,32 @@ export function drawRangeSelection(
   viewWidth: number,
   viewHeight: number
 ): void {
-  // Calculate range bounds
-  let rangeX = HEADER_WIDTH - state.scrollX;
+  const { zoomFactor } = state;
+  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+
+  // Calculate range bounds using zoomed dimensions
+  let rangeX = zoomedHeaderWidth - state.scrollX;
   for (let i = 0; i < range.minCol; i++) {
-    rangeX += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    rangeX += getZoomedColWidth(baseWidth, zoomFactor);
   }
-  let rangeY = HEADER_HEIGHT - state.scrollY;
+  let rangeY = zoomedHeaderHeight - state.scrollY;
   for (let i = 0; i < range.minRow; i++) {
-    rangeY += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    rangeY += getZoomedRowHeight(baseHeight, zoomFactor);
   }
 
-  // Calculate total width and height of range
+  // Calculate total width and height of range using zoomed dimensions
   let rangeW = 0;
   for (let i = range.minCol; i <= range.maxCol; i++) {
-    rangeW += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    rangeW += getZoomedColWidth(baseWidth, zoomFactor);
   }
   let rangeH = 0;
   for (let i = range.minRow; i <= range.maxRow; i++) {
-    rangeH += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    rangeH += getZoomedRowHeight(baseHeight, zoomFactor);
   }
 
   // Get theme-aware colors
@@ -81,55 +92,59 @@ export function drawRangeSelection(
 
   // Draw range fill
   if (
-    rangeX + rangeW > HEADER_WIDTH &&
+    rangeX + rangeW > zoomedHeaderWidth &&
     rangeX < viewWidth &&
-    rangeY + rangeH > HEADER_HEIGHT &&
+    rangeY + rangeH > zoomedHeaderHeight &&
     rangeY < viewHeight
   ) {
     ctx.fillStyle = colors.selectionBg;
     ctx.fillRect(
-      Math.max(HEADER_WIDTH, rangeX),
-      Math.max(HEADER_HEIGHT, rangeY),
-      Math.min(rangeW, rangeX + rangeW - Math.max(HEADER_WIDTH, rangeX)),
-      Math.min(rangeH, rangeY + rangeH - Math.max(HEADER_HEIGHT, rangeY))
+      Math.max(zoomedHeaderWidth, rangeX),
+      Math.max(zoomedHeaderHeight, rangeY),
+      Math.min(rangeW, rangeX + rangeW - Math.max(zoomedHeaderWidth, rangeX)),
+      Math.min(rangeH, rangeY + rangeH - Math.max(zoomedHeaderHeight, rangeY))
     );
 
     // Draw range border (thinner than anchor cell)
     ctx.strokeStyle = colors.selectionBorder;
     ctx.lineWidth = 1;
     ctx.strokeRect(
-      Math.max(HEADER_WIDTH, rangeX) + 0.5,
-      Math.max(HEADER_HEIGHT, rangeY) + 0.5,
-      Math.min(rangeW, rangeX + rangeW - Math.max(HEADER_WIDTH, rangeX)) - 1,
-      Math.min(rangeH, rangeY + rangeH - Math.max(HEADER_HEIGHT, rangeY)) - 1
+      Math.max(zoomedHeaderWidth, rangeX) + 0.5,
+      Math.max(zoomedHeaderHeight, rangeY) + 0.5,
+      Math.min(rangeW, rangeX + rangeW - Math.max(zoomedHeaderWidth, rangeX)) - 1,
+      Math.min(rangeH, rangeY + rangeH - Math.max(zoomedHeaderHeight, rangeY)) - 1
     );
   }
 
   // Draw anchor cell highlight (the cell where selection started)
   // This is only needed for multi-cell ranges to show the "active" cell
   if (hasRangeSelection(state) && state.selectionStart) {
-    let anchorX = HEADER_WIDTH - state.scrollX;
+    let anchorX = zoomedHeaderWidth - state.scrollX;
     for (let i = 0; i < state.selectionStart.col; i++) {
-      anchorX += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+      const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+      anchorX += getZoomedColWidth(baseWidth, zoomFactor);
     }
-    let anchorY = HEADER_HEIGHT - state.scrollY;
+    let anchorY = zoomedHeaderHeight - state.scrollY;
     for (let i = 0; i < state.selectionStart.row; i++) {
-      anchorY += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+      const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+      anchorY += getZoomedRowHeight(baseHeight, zoomFactor);
     }
-    const anchorW =
+    const anchorBaseW =
       state.colWidths.get(state.selectionStart.col) || DEFAULT_COL_WIDTH;
-    const anchorH =
+    const anchorBaseH =
       state.rowHeights.get(state.selectionStart.row) || DEFAULT_ROW_HEIGHT;
+    const anchorW = getZoomedColWidth(anchorBaseW, zoomFactor);
+    const anchorH = getZoomedRowHeight(anchorBaseH, zoomFactor);
 
     // Draw anchor cell with white background, glow, and border
     if (
-      anchorX + anchorW > HEADER_WIDTH &&
+      anchorX + anchorW > zoomedHeaderWidth &&
       anchorX < viewWidth &&
-      anchorY + anchorH > HEADER_HEIGHT &&
+      anchorY + anchorH > zoomedHeaderHeight &&
       anchorY < viewHeight
     ) {
-      const clipX = Math.max(HEADER_WIDTH, anchorX);
-      const clipY = Math.max(HEADER_HEIGHT, anchorY);
+      const clipX = Math.max(zoomedHeaderWidth, anchorX);
+      const clipY = Math.max(zoomedHeaderHeight, anchorY);
       const clipW = Math.min(anchorW, anchorX + anchorW - clipX);
       const clipH = Math.min(anchorH, anchorY + anchorH - clipY);
 
@@ -157,21 +172,29 @@ export function drawSingleCellSelection(
 ): void {
   if (!state.selectedCell) return;
 
-  let selX = HEADER_WIDTH - state.scrollX;
+  const { zoomFactor } = state;
+  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+
+  let selX = zoomedHeaderWidth - state.scrollX;
   for (let i = 0; i < state.selectedCell.col; i++) {
-    selX += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    selX += getZoomedColWidth(baseWidth, zoomFactor);
   }
-  let selY = HEADER_HEIGHT - state.scrollY;
+  let selY = zoomedHeaderHeight - state.scrollY;
   for (let i = 0; i < state.selectedCell.row; i++) {
-    selY += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    selY += getZoomedRowHeight(baseHeight, zoomFactor);
   }
-  const selW = state.colWidths.get(state.selectedCell.col) || DEFAULT_COL_WIDTH;
-  const selH = state.rowHeights.get(state.selectedCell.row) || DEFAULT_ROW_HEIGHT;
+  const selBaseW = state.colWidths.get(state.selectedCell.col) || DEFAULT_COL_WIDTH;
+  const selBaseH = state.rowHeights.get(state.selectedCell.row) || DEFAULT_ROW_HEIGHT;
+  const selW = getZoomedColWidth(selBaseW, zoomFactor);
+  const selH = getZoomedRowHeight(selBaseH, zoomFactor);
 
   if (
-    selX + selW > HEADER_WIDTH &&
+    selX + selW > zoomedHeaderWidth &&
     selX < viewWidth &&
-    selY + selH > HEADER_HEIGHT &&
+    selY + selH > zoomedHeaderHeight &&
     selY < viewHeight
   ) {
     const colors = getGridColors();
@@ -201,22 +224,28 @@ export function drawColumnSelection(
   colWidths: Map<number, number>,
   selectedColumn: number,
   viewWidth: number,
-  viewHeight: number
+  viewHeight: number,
+  zoomFactor: number = 1.0
 ): void {
-  let selX = HEADER_WIDTH - scrollX;
-  for (let i = 0; i < selectedColumn; i++) {
-    selX += colWidths.get(i) || DEFAULT_COL_WIDTH;
-  }
-  const selW = colWidths.get(selectedColumn) || DEFAULT_COL_WIDTH;
+  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
 
-  if (selX + selW > HEADER_WIDTH && selX < viewWidth) {
+  let selX = zoomedHeaderWidth - scrollX;
+  for (let i = 0; i < selectedColumn; i++) {
+    const baseWidth = colWidths.get(i) || DEFAULT_COL_WIDTH;
+    selX += getZoomedColWidth(baseWidth, zoomFactor);
+  }
+  const selBaseW = colWidths.get(selectedColumn) || DEFAULT_COL_WIDTH;
+  const selW = getZoomedColWidth(selBaseW, zoomFactor);
+
+  if (selX + selW > zoomedHeaderWidth && selX < viewWidth) {
     const colors = getGridColors();
     ctx.fillStyle = colors.selectionBg;
     ctx.fillRect(
-      Math.max(HEADER_WIDTH, selX),
-      HEADER_HEIGHT,
-      Math.min(selW, selX + selW - HEADER_WIDTH),
-      viewHeight - HEADER_HEIGHT
+      Math.max(zoomedHeaderWidth, selX),
+      zoomedHeaderHeight,
+      Math.min(selW, selX + selW - zoomedHeaderWidth),
+      viewHeight - zoomedHeaderHeight
     );
   }
 }
@@ -230,22 +259,28 @@ export function drawRowSelection(
   rowHeights: Map<number, number>,
   selectedRow: number,
   viewWidth: number,
-  viewHeight: number
+  viewHeight: number,
+  zoomFactor: number = 1.0
 ): void {
-  let selY = HEADER_HEIGHT - scrollY;
-  for (let i = 0; i < selectedRow; i++) {
-    selY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-  }
-  const selH = rowHeights.get(selectedRow) || DEFAULT_ROW_HEIGHT;
+  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
 
-  if (selY + selH > HEADER_HEIGHT && selY < viewHeight) {
+  let selY = zoomedHeaderHeight - scrollY;
+  for (let i = 0; i < selectedRow; i++) {
+    const baseHeight = rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    selY += getZoomedRowHeight(baseHeight, zoomFactor);
+  }
+  const selBaseH = rowHeights.get(selectedRow) || DEFAULT_ROW_HEIGHT;
+  const selH = getZoomedRowHeight(selBaseH, zoomFactor);
+
+  if (selY + selH > zoomedHeaderHeight && selY < viewHeight) {
     const colors = getGridColors();
     ctx.fillStyle = colors.selectionBg;
     ctx.fillRect(
-      HEADER_WIDTH,
-      Math.max(HEADER_HEIGHT, selY),
-      viewWidth - HEADER_WIDTH,
-      Math.min(selH, selY + selH - HEADER_HEIGHT)
+      zoomedHeaderWidth,
+      Math.max(zoomedHeaderHeight, selY),
+      viewWidth - zoomedHeaderWidth,
+      Math.min(selH, selY + selH - zoomedHeaderHeight)
     );
   }
 }
@@ -271,24 +306,32 @@ export function getSelectionBounds(
     return null;
   }
 
-  // Calculate position
-  let x = HEADER_WIDTH - state.scrollX;
+  const { zoomFactor } = state;
+  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+
+  // Calculate position using zoomed dimensions
+  let x = zoomedHeaderWidth - state.scrollX;
   for (let i = 0; i < minCol; i++) {
-    x += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    x += getZoomedColWidth(baseWidth, zoomFactor);
   }
-  let y = HEADER_HEIGHT - state.scrollY;
+  let y = zoomedHeaderHeight - state.scrollY;
   for (let i = 0; i < minRow; i++) {
-    y += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    y += getZoomedRowHeight(baseHeight, zoomFactor);
   }
 
-  // Calculate size
+  // Calculate size using zoomed dimensions
   let width = 0;
   for (let i = minCol; i <= maxCol; i++) {
-    width += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    width += getZoomedColWidth(baseWidth, zoomFactor);
   }
   let height = 0;
   for (let i = minRow; i <= maxRow; i++) {
-    height += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    height += getZoomedRowHeight(baseHeight, zoomFactor);
   }
 
   return { x, y, width, height };
@@ -309,6 +352,9 @@ export function drawFillHandle(
   if (!bounds) return null;
 
   const { x, y, width, height } = bounds;
+  const { zoomFactor } = state;
+  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
 
   // Calculate fill handle position (bottom-right corner)
   const handleX = x + width - FILL_HANDLE_SIZE / 2;
@@ -319,9 +365,9 @@ export function drawFillHandle(
   const vh = viewHeight ?? ctx.canvas.height;
 
   if (
-    handleX + FILL_HANDLE_SIZE < HEADER_WIDTH ||
+    handleX + FILL_HANDLE_SIZE < zoomedHeaderWidth ||
     handleX > vw ||
-    handleY + FILL_HANDLE_SIZE < HEADER_HEIGHT ||
+    handleY + FILL_HANDLE_SIZE < zoomedHeaderHeight ||
     handleY > vh
   ) {
     return null;
@@ -378,39 +424,47 @@ export function drawFillPreview(
   viewWidth: number,
   viewHeight: number
 ): void {
-  // Calculate preview bounds
-  let previewX = HEADER_WIDTH - state.scrollX;
+  const { zoomFactor } = state;
+  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+
+  // Calculate preview bounds using zoomed dimensions
+  let previewX = zoomedHeaderWidth - state.scrollX;
   for (let i = 0; i < previewRange.minCol; i++) {
-    previewX += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    previewX += getZoomedColWidth(baseWidth, zoomFactor);
   }
-  let previewY = HEADER_HEIGHT - state.scrollY;
+  let previewY = zoomedHeaderHeight - state.scrollY;
   for (let i = 0; i < previewRange.minRow; i++) {
-    previewY += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    previewY += getZoomedRowHeight(baseHeight, zoomFactor);
   }
 
-  // Calculate total width and height of preview
+  // Calculate total width and height of preview using zoomed dimensions
   let previewW = 0;
   for (let i = previewRange.minCol; i <= previewRange.maxCol; i++) {
-    previewW += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    previewW += getZoomedColWidth(baseWidth, zoomFactor);
   }
   let previewH = 0;
   for (let i = previewRange.minRow; i <= previewRange.maxRow; i++) {
-    previewH += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    previewH += getZoomedRowHeight(baseHeight, zoomFactor);
   }
 
   // Check if preview is visible
   if (
-    previewX + previewW <= HEADER_WIDTH ||
+    previewX + previewW <= zoomedHeaderWidth ||
     previewX >= viewWidth ||
-    previewY + previewH <= HEADER_HEIGHT ||
+    previewY + previewH <= zoomedHeaderHeight ||
     previewY >= viewHeight
   ) {
     return;
   }
 
   // Clip to data area
-  const clipX = Math.max(HEADER_WIDTH, previewX);
-  const clipY = Math.max(HEADER_HEIGHT, previewY);
+  const clipX = Math.max(zoomedHeaderWidth, previewX);
+  const clipY = Math.max(zoomedHeaderHeight, previewY);
   const clipW = Math.min(previewW, previewX + previewW - clipX);
   const clipH = Math.min(previewH, previewY + previewH - clipY);
 
@@ -436,39 +490,47 @@ export function drawSpillRangeHighlight(
   viewWidth: number,
   viewHeight: number
 ): void {
-  // Calculate spill range bounds
-  let rangeX = HEADER_WIDTH - state.scrollX;
+  const { zoomFactor } = state;
+  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+
+  // Calculate spill range bounds using zoomed dimensions
+  let rangeX = zoomedHeaderWidth - state.scrollX;
   for (let i = 0; i < spillRange.minCol; i++) {
-    rangeX += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    rangeX += getZoomedColWidth(baseWidth, zoomFactor);
   }
-  let rangeY = HEADER_HEIGHT - state.scrollY;
+  let rangeY = zoomedHeaderHeight - state.scrollY;
   for (let i = 0; i < spillRange.minRow; i++) {
-    rangeY += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    rangeY += getZoomedRowHeight(baseHeight, zoomFactor);
   }
 
-  // Calculate total width and height of spill range
+  // Calculate total width and height of spill range using zoomed dimensions
   let rangeW = 0;
   for (let i = spillRange.minCol; i <= spillRange.maxCol; i++) {
-    rangeW += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+    rangeW += getZoomedColWidth(baseWidth, zoomFactor);
   }
   let rangeH = 0;
   for (let i = spillRange.minRow; i <= spillRange.maxRow; i++) {
-    rangeH += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+    rangeH += getZoomedRowHeight(baseHeight, zoomFactor);
   }
 
   // Check if spill range is visible
   if (
-    rangeX + rangeW <= HEADER_WIDTH ||
+    rangeX + rangeW <= zoomedHeaderWidth ||
     rangeX >= viewWidth ||
-    rangeY + rangeH <= HEADER_HEIGHT ||
+    rangeY + rangeH <= zoomedHeaderHeight ||
     rangeY >= viewHeight
   ) {
     return;
   }
 
   // Clip to data area
-  const clipX = Math.max(HEADER_WIDTH, rangeX);
-  const clipY = Math.max(HEADER_HEIGHT, rangeY);
+  const clipX = Math.max(zoomedHeaderWidth, rangeX);
+  const clipY = Math.max(zoomedHeaderHeight, rangeY);
   const clipW = Math.min(rangeW, rangeX + rangeW - clipX);
   const clipH = Math.min(rangeH, rangeY + rangeH - clipY);
 

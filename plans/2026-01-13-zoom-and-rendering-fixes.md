@@ -6,9 +6,9 @@ Address remaining zoom and rendering issues discovered after implementing Phase 
 
 The cell/range selection highlight and cell editor positioning use unzoomed dimensions, causing misalignment at non-100% zoom levels.
 
-- [ ] 1a: Add zoom factor parameter to selection renderer functions (`drawRangeSelection`, `drawSingleCellSelection`, `drawFillHandle`, etc.) and apply zoom to position calculations using `getZoomedColWidth`/`getZoomedRowHeight`
-- [ ] 1b: Update cell editor positioning in `CellEditor.positionEditor()` to use zoomed dimensions for cell X/Y and width/height
-- [ ] 1c: Add E2E test that verifies selection box aligns with cell at various zoom levels (50%, 100%, 200%)
+- [x] 1a: Add zoom factor parameter to selection renderer functions (`drawRangeSelection`, `drawSingleCellSelection`, `drawFillHandle`, etc.) and apply zoom to position calculations using `getZoomedColWidth`/`getZoomedRowHeight`. Added `zoomFactor` to `SelectionRendererState` interface and updated all selection rendering functions.
+- [x] 1b: Update cell editor positioning in `CellEditor.positionEditor()` to use zoomed dimensions for cell X/Y and width/height. Added `getZoomFactor` accessor to CellEditor.
+- [x] 1c: Add E2E test that verifies selection box aligns with cell at various zoom levels (50%, 100%, 200%). Created `zoom-selection.test.mjs` with 5 tests. Also fixed bug where `getRowAtY` calls in `mouse-events.ts` were missing the zoom factor parameter.
 
 ## Phase 2: Zoom-Aware Row/Column Headers
 

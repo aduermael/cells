@@ -534,6 +534,7 @@ export class MouseEventHandlers {
                 scrollY,
                 rowHeights,
                 Math.max(sheetInfo.rowCount, discoveredRows),
+                this.getZoomFactor(),
             );
             if (row >= 0) {
                 if (this.isInFormulaEditingMode()) {
@@ -595,6 +596,7 @@ export class MouseEventHandlers {
                 scrollY,
                 rowHeights,
                 Math.max(sheetInfo.rowCount, discoveredRows),
+                this.getZoomFactor(),
             );
 
             if (col >= 0 && row >= 0) {
@@ -793,6 +795,7 @@ export class MouseEventHandlers {
                 scrollY,
                 rowHeights,
                 Math.max(sheetInfo.rowCount, discoveredRows),
+                this.getZoomFactor(),
             );
             if (col >= 0 && row >= 0) {
                 if (
@@ -856,6 +859,7 @@ export class MouseEventHandlers {
                 scrollY,
                 rowHeights,
                 Math.max(sheetInfo.rowCount, discoveredRows),
+                this.getZoomFactor(),
             );
             if (col >= 0 && row >= 0) {
                 const selEnd = getSelectionEnd();
@@ -1291,6 +1295,7 @@ export class MouseEventHandlers {
                 scrollY,
                 rowHeights,
                 Math.max(sheetInfo.rowCount, discoveredRows),
+                this.getZoomFactor(),
             );
 
             if (col >= 0 && row >= 0) {
@@ -1380,6 +1385,7 @@ export class MouseEventHandlers {
                 scrollY,
                 rowHeights,
                 Math.max(sheetInfo.rowCount, discoveredRows),
+                this.getZoomFactor(),
             );
             if (row >= 0) {
                 const rows = getRows();
@@ -1397,6 +1403,7 @@ export class MouseEventHandlers {
                 scrollY,
                 rowHeights,
                 Math.max(sheetInfo.rowCount, discoveredRows),
+                this.getZoomFactor(),
             );
             if (col >= 0 && row >= 0) {
                 const columns = getColumns();

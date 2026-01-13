@@ -448,16 +448,17 @@ export class GridRenderer {
         selectionStart: this.selectionStart,
         selectionEnd: this.selectionEnd,
         selectedCell: this.selectedCell,
+        zoomFactor,
       };
       drawSpillRangeHighlight(ctx, spillState, this.spillRangeHighlight, viewWidth, viewHeight);
     }
 
     // Column/row selection highlights
     if (this.selectedColumn !== null && !this.isDraggingColumn) {
-      drawColumnSelection(ctx, this.scrollX, this.colWidths, this.selectedColumn, viewWidth, viewHeight);
+      drawColumnSelection(ctx, this.scrollX, this.colWidths, this.selectedColumn, viewWidth, viewHeight, zoomFactor);
     }
     if (this.selectedRow !== null && !this.isDraggingRow) {
-      drawRowSelection(ctx, this.scrollY, this.rowHeights, this.selectedRow, viewWidth, viewHeight);
+      drawRowSelection(ctx, this.scrollY, this.rowHeights, this.selectedRow, viewWidth, viewHeight, zoomFactor);
     }
 
     // Cell/Range selection
@@ -470,6 +471,7 @@ export class GridRenderer {
       selectionStart: this.selectionStart,
       selectionEnd: this.selectionEnd,
       selectedCell: this.selectedCell,
+      zoomFactor,
     };
     if (range) {
       drawRangeSelection(ctx, selState, range, viewWidth, viewHeight);
