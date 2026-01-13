@@ -321,6 +321,34 @@ struct XLSXStyles {
             }
         }
 
+        // Apply border properties
+        if (xf.applyBorder && xf.borderId >= 0 && xf.borderId < static_cast<int>(borders.size())) {
+            const XLSXBorder& border = borders[xf.borderId];
+            if (border.hasValue()) {
+                // Copy top border
+                if (border.top.style != cells::BorderStyle::NONE) {
+                    outStyle.border.top.style = border.top.style;
+                    outStyle.border.top.color = border.top.color;
+                }
+                // Copy right border
+                if (border.right.style != cells::BorderStyle::NONE) {
+                    outStyle.border.right.style = border.right.style;
+                    outStyle.border.right.color = border.right.color;
+                }
+                // Copy bottom border
+                if (border.bottom.style != cells::BorderStyle::NONE) {
+                    outStyle.border.bottom.style = border.bottom.style;
+                    outStyle.border.bottom.color = border.bottom.color;
+                }
+                // Copy left border
+                if (border.left.style != cells::BorderStyle::NONE) {
+                    outStyle.border.left.style = border.left.style;
+                    outStyle.border.left.color = border.left.color;
+                }
+                hasStyle = true;
+            }
+        }
+
         // Apply alignment
         if (xf.applyAlignment) {
             if (xf.alignment.horizontal != cells::TextAlign::LEFT) {
@@ -344,6 +372,11 @@ std::string cellStyleToKey(const cells::CellStyle& style) {
         << "|" << style.bgColor << "|" << style.textColor << "|" << style.fontFamily << "|"
         << static_cast<int>(style.fontSize) << "|" << static_cast<int>(style.hAlign) << "|"
         << static_cast<int>(style.vAlign);
+    // Add border info to key
+    oss << "|B:" << static_cast<int>(style.border.top.style) << "," << style.border.top.color << ":"
+        << static_cast<int>(style.border.right.style) << "," << style.border.right.color << ":"
+        << static_cast<int>(style.border.bottom.style) << "," << style.border.bottom.color << ":"
+        << static_cast<int>(style.border.left.style) << "," << style.border.left.color;
     return oss.str();
 }
 
