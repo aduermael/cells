@@ -32,9 +32,9 @@ Replace discrete zoom buttons with a slider that allows gradual zoom from 10% to
 
 Move the AI panel to be positioned above the bottom bar so it doesn't overlap zoom controls. Reposition zoom controls to far right with AI button on its left.
 
-- [ ] 4a: Update chat-panel CSS to position above bottom-bar (bottom: calc(var(--bottom-bar-height) + margin))
-- [ ] 4b: Reorder bottom bar elements: sheet tabs | spacer | AI button | zoom controls (zoom controls at far right)
-- [ ] 4c: Test that AI panel opens/closes without covering zoom controls or sheet tabs
+- [x] 4a: Update chat-panel CSS to position above bottom-bar (bottom: calc(32px + var(--spacing-md))). Also adjusted max-height.
+- [x] 4b: Reorder bottom bar elements: sheet tabs | spacer | AI button | zoom controls (zoom controls at far right). Updated HTML and cleaned up margins.
+- [x] 4c: Test that AI panel opens/closes without covering zoom controls or sheet tabs. All E2E tests pass.
 
 ## Phase 5: XLSX Column Width and Row Height Import
 

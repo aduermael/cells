@@ -1343,14 +1343,13 @@ canvas {
     flex: 1;
 }
 
-/* Zoom controls in bottom bar */
+/* Zoom controls in bottom bar - positioned at far right */
 #zoom-controls {
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
     padding: var(--spacing-xs) var(--spacing-sm);
     border-left: 1px solid var(--color-border);
-    margin-right: var(--spacing-xs);
 }
 
 #zoom-level {
@@ -1416,49 +1415,31 @@ canvas {
     height: 4px;
 }
 
-/* Chat open button in bottom bar - styled like a sheet tab but with green accent */
+/* Chat open button in bottom bar - uses btn btn-icon btn-sm base classes, adds green accent */
 .chat-open-btn {
-    padding: var(--spacing-xs) var(--spacing-md);
-    padding-bottom: var(--spacing-sm);
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
     color: var(--color-primary);
-    background: var(--color-bg-primary);
-    border: 1px solid var(--color-border);
-    border-bottom: none;
-    border-radius: var(--border-radius-top);
-    cursor: pointer;
-    white-space: nowrap;
-    transition: all var(--transition-fast);
-    flex-shrink: 0;
-    margin-left: var(--spacing-sm);
+    margin-right: var(--spacing-sm);
+    align-self: center;
 }
 
 .chat-open-btn:hover {
-    background: var(--color-bg-hover);
-}
-
-.chat-open-btn:active {
-    background: var(--color-bg-active);
+    border-color: var(--color-primary);
 }
 
 .chat-open-btn.hidden {
     display: none;
 }
 
-/* Floating chat panel */
+/* Floating chat panel - positioned above bottom bar */
 #chat-panel {
     position: fixed;
-    bottom: var(--spacing-sm);
+    bottom: calc(32px + var(--spacing-md));
     right: var(--spacing-sm);
     display: flex;
     flex-direction: column;
     width: 380px;
     max-width: calc(100vw - 32px);
-    max-height: 60vh;
+    max-height: calc(60vh - 32px);
     background: var(--color-bg-primary);
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
