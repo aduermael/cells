@@ -144,7 +144,7 @@ Review and fix any remaining zoom-dependent UI elements.
 
 Create comprehensive test coverage to prevent future zoom regressions.
 
-- [ ] 8.7a: Create `zoom-comprehensive.test.mjs` with tests for all zoom-dependent rendering
-- [ ] 8.7b: Add tests at boundary zoom levels (25%, 50%, 75%, 100%, 150%, 200%, 400%)
-- [ ] 8.7c: Add tests for zoom + scroll combinations
-- [ ] 8.7d: Add tests for zoom + frozen rows/columns (if applicable)
+- [x] 8.7a: Create `zoom-comprehensive.test.mjs` with tests for all zoom-dependent rendering. Created comprehensive test file with 22 tests covering header dimensions, cell selection, selection alignment, resize indicators, cell editor positioning, and dynamic zoom changes.
+- [x] 8.7b: Add tests at boundary zoom levels (25%, 50%, 75%, 100%, 150%, 200%, 400%). Added `boundaryZoomTests` section testing header scaling at extreme zoom levels and verifying cell selection preservation.
+- [x] 8.7c: Add tests for zoom + scroll combinations. Added `zoomScrollTests` section with 7 tests covering selection alignment, cell editor positioning, and resize indicators at various zoom levels with scroll offsets.
+- [x] 8.7d: Add tests for zoom + frozen rows/columns. Added `zoomFrozenTests` section with 4 tests using client's `setFreezePanes` method to test frozen column/row behavior at 50%, 75%, and 200% zoom levels.
