@@ -24,7 +24,7 @@
 //
 // =============================================================================
 
-import type { SheetInfo, CellData, Position } from "./types.js";
+import type { SheetInfo, CellData, Position, BorderStyle, CellBorder } from "./types.js";
 import {
   HEADER_HEIGHT,
   HEADER_WIDTH,
@@ -330,6 +330,9 @@ export class GridRenderer {
     // Grid lines
     this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
 
+    // Cell borders (drawn after grid lines to overlay them)
+    this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+
     // Cell values
     this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
 
@@ -580,6 +583,163 @@ export class GridRenderer {
         ctx.lineTo(viewWidth, lineY);
         ctx.stroke();
       }
+    }
+  }
+
+  /** Get line width for a border style */
+  private _getBorderWidth(style: BorderStyle): number {
+    switch (style) {
+      case "thin":
+      case "dashed":
+      case "dotted":
+      case "hair":
+        return 1;
+      case "medium":
+      case "mediumDashed":
+      case "dashDot":
+      case "mediumDashDot":
+      case "dashDotDot":
+      case "mediumDashDotDot":
+      case "slantDashDot":
+        return 2;
+      case "thick":
+        return 3;
+      case "double":
+        return 3; // For double, we draw two lines
+      default:
+        return 0;
+    }
+  }
+
+  /** Set line dash pattern for a border style */
+  private _setBorderDash(ctx: CanvasRenderingContext2D, style: BorderStyle): void {
+    switch (style) {
+      case "dashed":
+      case "mediumDashed":
+        ctx.setLineDash([4, 2]);
+        break;
+      case "dotted":
+        ctx.setLineDash([1, 1]);
+        break;
+      case "dashDot":
+      case "mediumDashDot":
+        ctx.setLineDash([4, 2, 1, 2]);
+        break;
+      case "dashDotDot":
+      case "mediumDashDotDot":
+        ctx.setLineDash([4, 2, 1, 2, 1, 2]);
+        break;
+      case "hair":
+        ctx.setLineDash([1, 1]);
+        break;
+      default:
+        ctx.setLineDash([]);
+    }
+  }
+
+  /** Draw cell borders (custom per-cell borders from styles) */
+  private _drawCellBorders(
+    ctx: CanvasRenderingContext2D,
+    viewWidth: number,
+    viewHeight: number,
+    colHasMoved: boolean,
+    rowHasMoved: boolean,
+    headerState: HeaderRendererState
+  ): void {
+    // Only draw borders for cells that have border styles
+    for (const cell of this.cells) {
+      if (colHasMoved && cell.col === this.dragSourceIndex) continue;
+      if (rowHasMoved && cell.row === this.dragSourceIndex) continue;
+
+      const border = cell.style?.border;
+      if (!border) continue;
+
+      // Check if any edge has a non-none border
+      const hasTop = border.top && border.top.style !== "none";
+      const hasRight = border.right && border.right.style !== "none";
+      const hasBottom = border.bottom && border.bottom.style !== "none";
+      const hasLeft = border.left && border.left.style !== "none";
+
+      if (!hasTop && !hasRight && !hasBottom && !hasLeft) continue;
+
+      const cellX = getColX(cell.col, headerState);
+      const cellY = getRowY(cell.row, headerState);
+
+      // Handle merged cells - use merge dimensions
+      let colWidth: number;
+      let rowHeight: number;
+      if (cell.isMergeAnchor && cell.mergeColSpan && cell.mergeRowSpan) {
+        colWidth = 0;
+        for (let c = 0; c < cell.mergeColSpan; c++) {
+          colWidth += this.colWidths.get(cell.col + c) || DEFAULT_COL_WIDTH;
+        }
+        rowHeight = 0;
+        for (let r = 0; r < cell.mergeRowSpan; r++) {
+          rowHeight += this.rowHeights.get(cell.row + r) || DEFAULT_ROW_HEIGHT;
+        }
+      } else {
+        colWidth = this.colWidths.get(cell.col) || DEFAULT_COL_WIDTH;
+        rowHeight = this.rowHeights.get(cell.row) || DEFAULT_ROW_HEIGHT;
+      }
+
+      // Skip if cell is outside visible area
+      if (cellX + colWidth < HEADER_WIDTH || cellX > viewWidth) continue;
+      if (cellY + rowHeight < HEADER_HEIGHT || cellY > viewHeight) continue;
+
+      // Draw top border
+      if (hasTop) {
+        const width = this._getBorderWidth(border.top.style);
+        ctx.strokeStyle = border.top.color || "#000000";
+        ctx.lineWidth = width;
+        this._setBorderDash(ctx, border.top.style);
+        ctx.beginPath();
+        const y = cellY + width / 2;
+        ctx.moveTo(cellX, y);
+        ctx.lineTo(cellX + colWidth, y);
+        ctx.stroke();
+      }
+
+      // Draw right border
+      if (hasRight) {
+        const width = this._getBorderWidth(border.right.style);
+        ctx.strokeStyle = border.right.color || "#000000";
+        ctx.lineWidth = width;
+        this._setBorderDash(ctx, border.right.style);
+        ctx.beginPath();
+        const x = cellX + colWidth - width / 2;
+        ctx.moveTo(x, cellY);
+        ctx.lineTo(x, cellY + rowHeight);
+        ctx.stroke();
+      }
+
+      // Draw bottom border
+      if (hasBottom) {
+        const width = this._getBorderWidth(border.bottom.style);
+        ctx.strokeStyle = border.bottom.color || "#000000";
+        ctx.lineWidth = width;
+        this._setBorderDash(ctx, border.bottom.style);
+        ctx.beginPath();
+        const y = cellY + rowHeight - width / 2;
+        ctx.moveTo(cellX, y);
+        ctx.lineTo(cellX + colWidth, y);
+        ctx.stroke();
+      }
+
+      // Draw left border
+      if (hasLeft) {
+        const width = this._getBorderWidth(border.left.style);
+        ctx.strokeStyle = border.left.color || "#000000";
+        ctx.lineWidth = width;
+        this._setBorderDash(ctx, border.left.style);
+        ctx.beginPath();
+        const x = cellX + width / 2;
+        ctx.moveTo(x, cellY);
+        ctx.lineTo(x, cellY + rowHeight);
+        ctx.stroke();
+      }
+
+      // Reset line dash
+      ctx.setLineDash([]);
     }
   }
 

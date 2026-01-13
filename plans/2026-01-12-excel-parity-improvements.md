@@ -63,7 +63,7 @@ Add per-cell border rendering with customizable thickness, color, and style. Cur
 - [x] 7b: Parse `<border>` elements from XLSX styles.xml (left/right/top/bottom with color and style attributes). Added XLSXBorder/XLSXBorderEdge structs, parseBorderStyle/parseBorderEdge functions, and border parsing in parseStylesXml.
 - [x] 7c: Apply parsed borders to CellStyle during XLSX import. Updated getCellStyle() to copy border properties from XLSXBorder to CellStyle, and updated cellStyleToKey() to include border info for deduplication.
 - [x] 7d: Store border data in CellData type for TypeScript rendering. Added BorderStyle, BorderEdge, CellBorder types to types.ts and cells.d.ts. Updated bindings_viewport.cc to serialize border data in queryViewport response.
-- [ ] 7e: Add border rendering pass in grid-renderer.ts after cell backgrounds, before text (draw borders per-cell based on style)
+- [x] 7e: Add border rendering pass in grid-renderer.ts after cell backgrounds, before text (draw borders per-cell based on style). Added _getBorderWidth, _setBorderDash, and _drawCellBorders methods to draw styled borders for each cell edge.
 - [ ] 7f: Export cell borders to XLSX during write
 
 ## Phase 8: Integration Testing with LBO Model
