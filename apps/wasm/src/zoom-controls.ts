@@ -20,6 +20,7 @@ export class ZoomControls {
   private zoomInBtn: HTMLButtonElement;
   private zoomOutBtn: HTMLButtonElement;
   private zoomLevelSpan: HTMLSpanElement;
+  private zoomSlider: HTMLInputElement;
   private renderer: GridRenderer | null = null;
   private onZoomChange: (() => void) | null = null;
 
@@ -28,11 +29,13 @@ export class ZoomControls {
     const zoomInBtn = document.getElementById("zoom-in-btn") as HTMLButtonElement | null;
     const zoomOutBtn = document.getElementById("zoom-out-btn") as HTMLButtonElement | null;
     const zoomLevelSpan = document.getElementById("zoom-level") as HTMLSpanElement | null;
+    const zoomSlider = document.getElementById("zoom-slider") as HTMLInputElement | null;
 
     // Store whatever elements we found (may be null)
     this.zoomInBtn = zoomInBtn!;
     this.zoomOutBtn = zoomOutBtn!;
     this.zoomLevelSpan = zoomLevelSpan!;
+    this.zoomSlider = zoomSlider!;
 
     // Set up event listeners if elements exist
     if (zoomInBtn) {
@@ -40,6 +43,9 @@ export class ZoomControls {
     }
     if (zoomOutBtn) {
       zoomOutBtn.addEventListener("click", () => this.zoomOut());
+    }
+    if (zoomSlider) {
+      zoomSlider.addEventListener("input", () => this.onSliderInput());
     }
   }
 
@@ -104,12 +110,27 @@ export class ZoomControls {
   }
 
   /**
+   * Handle slider input change
+   */
+  private onSliderInput(): void {
+    if (!this.zoomSlider) return;
+    const level = parseInt(this.zoomSlider.value, 10);
+    this.setZoomLevel(level);
+  }
+
+  /**
    * Update the zoom level display
    */
   updateDisplay(): void {
-    if (!this.zoomLevelSpan) return;
     const level = this.getZoomLevel();
-    this.zoomLevelSpan.textContent = `${level}%`;
+    if (this.zoomLevelSpan) {
+      this.zoomLevelSpan.textContent = `${level}%`;
+    }
+
+    // Sync slider position
+    if (this.zoomSlider) {
+      this.zoomSlider.value = String(level);
+    }
 
     // Update button states
     if (this.zoomInBtn) this.zoomInBtn.disabled = level >= 400;

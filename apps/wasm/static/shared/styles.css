@@ -1369,6 +1369,53 @@ canvas {
     display: block;
 }
 
+/* Zoom slider styling */
+#zoom-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 80px;
+    height: 4px;
+    background: var(--color-border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+}
+
+#zoom-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    background: var(--color-primary);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+#zoom-slider::-webkit-slider-thumb:hover {
+    background: var(--color-primary-hover);
+}
+
+#zoom-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    background: var(--color-primary);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+}
+
+#zoom-slider::-moz-range-thumb:hover {
+    background: var(--color-primary-hover);
+}
+
+#zoom-slider::-moz-range-track {
+    background: var(--color-border);
+    border-radius: 2px;
+    height: 4px;
+}
+
 /* Chat open button in bottom bar - styled like a sheet tab but with green accent */
 .chat-open-btn {
     padding: var(--spacing-xs) var(--spacing-md);

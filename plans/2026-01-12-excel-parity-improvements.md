@@ -23,10 +23,10 @@ The zoom level resets to 100% during scrolling because `setStateRefs` is called 
 
 Replace discrete zoom buttons with a slider that allows gradual zoom from 10% to 400% like Excel.
 
-- [ ] 3a: Add HTML slider element to bottom bar between zoom out/in buttons (`<input type="range" min="10" max="400">`)
-- [ ] 3b: Update zoom-controls.ts to handle slider input events, syncing slider position with zoom level
-- [ ] 3c: Style the slider to match the app theme (compact, fits in bottom bar)
-- [ ] 3d: Keep +/- buttons functional for discrete zoom steps, sync slider position when buttons clicked
+- [x] 3a: Add HTML slider element to bottom bar between zoom out/in buttons (`<input type="range" min="10" max="400">`). Added slider element with id="zoom-slider".
+- [x] 3b: Update zoom-controls.ts to handle slider input events, syncing slider position with zoom level. Added zoomSlider member and onSliderInput handler.
+- [x] 3c: Style the slider to match the app theme (compact, fits in bottom bar). Added CSS styles with theme-aware colors for track and thumb.
+- [x] 3d: Keep +/- buttons functional for discrete zoom steps, sync slider position when buttons clicked. updateDisplay() now syncs slider value.
 
 ## Phase 4: AI Panel Above Bottom Bar
 
