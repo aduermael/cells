@@ -384,10 +384,11 @@ export function drawRowHeaders(
 
   // Calculate visible row range - only iterate through visible rows
   // Use unzoomed values for logical calculation
-  const startRow = Math.max(0, Math.floor(state.scrollY / DEFAULT_ROW_HEIGHT) - 1);
+  // Use larger buffer (-5) to handle custom row heights and rounding at different zoom levels
+  const startRow = Math.max(0, Math.floor(state.scrollY / DEFAULT_ROW_HEIGHT) - 5);
   const endRow = Math.min(
     rowCount,
-    startRow + Math.ceil(viewHeight / (DEFAULT_ROW_HEIGHT * zoomFactor)) + 2
+    startRow + Math.ceil(viewHeight / (DEFAULT_ROW_HEIGHT * zoomFactor)) + 10
   );
 
   ctx.font = `${zoomedFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;

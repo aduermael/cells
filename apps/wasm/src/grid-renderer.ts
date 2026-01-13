@@ -673,10 +673,11 @@ export class GridRenderer {
 
     // Calculate visible row range
     const rowCount = Math.max(this.sheetInfo.rowCount, this.discoveredRows);
-    const startRow = Math.max(0, Math.floor(this.scrollY / DEFAULT_ROW_HEIGHT) - 1);
+    // Use larger buffer (-5) to handle custom row heights and rounding at different zoom levels
+    const startRow = Math.max(0, Math.floor(this.scrollY / DEFAULT_ROW_HEIGHT) - 5);
     const endRow = Math.min(
       rowCount,
-      startRow + Math.ceil(viewHeight / zoomedRowHeight) + 2
+      startRow + Math.ceil(viewHeight / zoomedRowHeight) + 10
     );
 
     // Horizontal lines - only iterate through visible rows
