@@ -1,5 +1,6 @@
 #include "core/cells/xlsx_reader.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 
@@ -1144,9 +1145,11 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
         // Parse column properties (<cols> element) - includes hidden, width, style, etc.
         // XLSX cols use 1-based column indices and can specify ranges (min/max)
+        // Width is in Excel "character width" units (approx 7 pixels per unit)
         start = std::chrono::steady_clock::now();
-        std::unordered_map<int, bool> columnHidden;     // 0-indexed col -> hidden
-        std::unordered_map<int, int> columnStyleIndex;  // 0-indexed col -> XLSX style index
+        std::unordered_map<int, bool> columnHidden;      // 0-indexed col -> hidden
+        std::unordered_map<int, int> columnStyleIndex;   // 0-indexed col -> XLSX style index
+        std::unordered_map<int, uint32_t> columnWidths;  // 0-indexed col -> width in pixels
         auto colsNode = worksheetNode.child("cols");
         if (colsNode) {
             for (auto colNode : colsNode.children("col")) {
@@ -1154,12 +1157,23 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 const int maxColRange = colNode.attribute("max").as_int(1) - 1;
                 const bool hidden = colNode.attribute("hidden").as_bool(false);
                 const int styleIndex = colNode.attribute("style").as_int(0);
+                // Width attribute: character width units (default Excel column is ~8.43 chars)
+                // Only parse if readDimensions is enabled
+                const double widthAttr =
+                    options.readDimensions ? colNode.attribute("width").as_double(0.0) : 0.0;
                 for (int c = minCol; c <= maxColRange; ++c) {
                     if (hidden) {
                         columnHidden[c] = true;
                     }
                     if (styleIndex > 0) {
                         columnStyleIndex[c] = styleIndex;
+                    }
+                    if (widthAttr > 0.0) {
+                        // Convert Excel character-width units to pixels
+                        // Excel's default column width is 8.43 chars = ~64 pixels
+                        // So: pixels = width * 7.5 (rounded)
+                        const auto widthPx = static_cast<uint32_t>(std::lround(widthAttr * 7.5));
+                        columnWidths[c] = widthPx > 0 ? widthPx : DEFAULT_COLUMN_WIDTH;
                     }
                 }
             }
@@ -1171,9 +1185,10 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         int maxRow = 0, maxCol = 0;
         auto sheetData = sheetDoc.child("worksheet").child("sheetData");
 
-        // Also track hidden rows and row styles as we scan
-        std::unordered_map<int, bool> rowHidden;     // 0-indexed row -> hidden
-        std::unordered_map<int, int> rowStyleIndex;  // 0-indexed row -> XLSX style index
+        // Also track hidden rows, row styles, and row heights as we scan
+        std::unordered_map<int, bool> rowHidden;       // 0-indexed row -> hidden
+        std::unordered_map<int, int> rowStyleIndex;    // 0-indexed row -> XLSX style index
+        std::unordered_map<int, uint32_t> rowHeights;  // 0-indexed row -> height in pixels
 
         for (auto row : sheetData.children("row")) {
             const int rowNum = row.attribute("r").as_int() - 1;  // 0-indexed
@@ -1190,6 +1205,17 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             const int styleIndex = row.attribute("s").as_int(0);
             if (styleIndex > 0) {
                 rowStyleIndex[rowNum] = styleIndex;
+            }
+
+            // Parse row height (ht attribute) - in points (1pt = 1.33px approx)
+            // Only parse if readDimensions is enabled
+            if (options.readDimensions) {
+                const double htAttr = row.attribute("ht").as_double(0.0);
+                if (htAttr > 0.0) {
+                    // Convert points to pixels: 1pt = 96/72 = 1.333... px
+                    const auto heightPx = static_cast<uint32_t>(std::lround(htAttr * 96.0 / 72.0));
+                    rowHeights[rowNum] = heightPx > 0 ? heightPx : DEFAULT_ROW_HEIGHT;
+                }
             }
 
             for (auto cell : row.children("c")) {
@@ -1212,7 +1238,9 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         for (int c = 0; c < maxCol; ++c) {
             auto col = std::make_unique<Axis>(generate_id(), true);
             col->position = static_cast<uint32_t>(c);
-            col->size = DEFAULT_COLUMN_WIDTH;
+            // Apply column width from XLSX if available, otherwise use default
+            auto widthIt = columnWidths.find(c);
+            col->size = (widthIt != columnWidths.end()) ? widthIt->second : DEFAULT_COLUMN_WIDTH;
             col->hidden = columnHidden.count(c) > 0;
             // Apply column default style if present
             auto styleIt = columnStyleIndex.find(c);
@@ -1226,7 +1254,9 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         for (int r = 0; r < maxRow; ++r) {
             auto rowAxis = std::make_unique<Axis>(generate_id(), false);
             rowAxis->position = static_cast<uint32_t>(r);
-            rowAxis->size = DEFAULT_ROW_HEIGHT;
+            // Apply row height from XLSX if available, otherwise use default
+            auto heightIt = rowHeights.find(r);
+            rowAxis->size = (heightIt != rowHeights.end()) ? heightIt->second : DEFAULT_ROW_HEIGHT;
             rowAxis->hidden = rowHidden.count(r) > 0;
             // Apply row default style if present
             auto styleIt = rowStyleIndex.find(r);

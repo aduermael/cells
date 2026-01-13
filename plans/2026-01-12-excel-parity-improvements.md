@@ -40,10 +40,10 @@ Move the AI panel to be positioned above the bottom bar so it doesn't overlap zo
 
 The XLSX reader parses `<cols>` elements but ignores the `width` attribute, defaulting all columns to 100px. Similarly, row heights from `ht` attribute are not applied.
 
-- [ ] 5a: Parse `width` attribute from `<col>` elements in xlsx_reader.cc, store in columnWidths map (convert Excel character-width units to pixels: ~7 pixels per character unit)
-- [ ] 5b: Parse `ht` (height) attribute from `<row>` elements, store in rowHeights map (convert from points to pixels: 1pt = 1.33px approximately)
-- [ ] 5c: Apply parsed widths to column Axis objects instead of DEFAULT_COLUMN_WIDTH, apply heights to row Axis objects
-- [ ] 5d: Add tests for column/row dimension import with the LBO model file
+- [x] 5a: Parse `width` attribute from `<col>` elements in xlsx_reader.cc, store in columnWidths map. Converts Excel character-width units to pixels using 7.5px per char unit with std::lround for proper rounding.
+- [x] 5b: Parse `ht` (height) attribute from `<row>` elements, store in rowHeights map. Converts points to pixels using 96/72 ratio with std::lround.
+- [x] 5c: Apply parsed widths to column Axis objects instead of DEFAULT_COLUMN_WIDTH, apply heights to row Axis objects. Both respect the readDimensions option.
+- [x] 5d: Add tests for column/row dimension import with the LBO model file. Added 4 tests verifying dimension import, defaults when disabled, and conversion accuracy.
 
 ## Phase 6: Cell Text Overflow
 

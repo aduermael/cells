@@ -704,5 +704,104 @@ TEST(XLSXReaderTest, NumberFormatsNotImportedWhenStylesDisabled) {
     }
 }
 
+// ============================================================================
+// Column Width and Row Height Import Tests
+// ============================================================================
+
+TEST(XLSXReaderTest, ColumnWidthsImportedFromLBOModel) {
+    // The LBO model file should have varying column widths
+    XLSXReadOptions options;
+    options.readDimensions = true;
+
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // Check that columns have sizes set
+    bool foundNonDefault = false;
+    for (const auto& [id, col] : sheet->columns) {
+        EXPECT_GT(col->size, 0u) << "Column should have a width > 0";
+        // Check if any column has a non-default width
+        if (col->size != DEFAULT_COLUMN_WIDTH) {
+            foundNonDefault = true;
+        }
+    }
+
+    EXPECT_TRUE(foundNonDefault) << "Expected to find columns with non-default widths in LBO model";
+}
+
+TEST(XLSXReaderTest, RowHeightsImportedFromLBOModel) {
+    // The LBO model file should have varying row heights
+    XLSXReadOptions options;
+    options.readDimensions = true;
+
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // Check that rows have sizes set
+    bool foundNonDefault = false;
+    for (const auto& [id, row] : sheet->rows) {
+        EXPECT_GT(row->size, 0u) << "Row should have a height > 0";
+        // Check if any row has a non-default height
+        if (row->size != DEFAULT_ROW_HEIGHT) {
+            foundNonDefault = true;
+        }
+    }
+
+    EXPECT_TRUE(foundNonDefault) << "Expected to find rows with non-default heights in LBO model";
+}
+
+TEST(XLSXReaderTest, DimensionsUseDefaultWhenDisabled) {
+    // When readDimensions is false, columns and rows should use default sizes
+    XLSXReadOptions options;
+    options.readDimensions = false;
+
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // All columns should have default width
+    for (const auto& [id, col] : sheet->columns) {
+        EXPECT_EQ(col->size, DEFAULT_COLUMN_WIDTH)
+            << "Column should have default width when readDimensions=false";
+    }
+
+    // All rows should have default height
+    for (const auto& [id, row] : sheet->rows) {
+        EXPECT_EQ(row->size, DEFAULT_ROW_HEIGHT)
+            << "Row should have default height when readDimensions=false";
+    }
+}
+
+TEST(XLSXReaderTest, ColumnWidthConversionAccuracy) {
+    // Test the conversion from Excel character-width units to pixels
+    // Excel's default column is ~8.43 chars which should be ~63 pixels (8.43 * 7.5)
+    XLSXReadOptions options;
+    options.readDimensions = true;
+
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // Column widths should be reasonable (between 10px and 500px)
+    for (const auto& [id, col] : sheet->columns) {
+        EXPECT_GE(col->size, 10u) << "Column width should be at least 10px";
+        EXPECT_LE(col->size, 500u) << "Column width should not exceed 500px";
+    }
+}
+
 }  // namespace
 }  // namespace cells
