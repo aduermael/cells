@@ -99,19 +99,40 @@ struct XLSXFill {
     std::string bgColor;  // Background color as #RRGGBB
 };
 
+// Parsed border edge from styles.xml
+struct XLSXBorderEdge {
+    cells::BorderStyle style{cells::BorderStyle::NONE};
+    std::string color;  // Color as #RRGGBB
+};
+
+// Parsed border from styles.xml (complete cell border)
+struct XLSXBorder {
+    XLSXBorderEdge left;
+    XLSXBorderEdge right;
+    XLSXBorderEdge top;
+    XLSXBorderEdge bottom;
+
+    [[nodiscard]] bool hasValue() const {
+        return left.style != cells::BorderStyle::NONE || right.style != cells::BorderStyle::NONE ||
+               top.style != cells::BorderStyle::NONE || bottom.style != cells::BorderStyle::NONE;
+    }
+};
+
 // Parsed alignment from styles.xml
 struct XLSXAlignment {
     cells::TextAlign horizontal{cells::TextAlign::LEFT};
     cells::VerticalAlign vertical{cells::VerticalAlign::BOTTOM};
 };
 
-// Cell format record (cellXfs entry) - combines font, fill, alignment
+// Cell format record (cellXfs entry) - combines font, fill, alignment, border
 struct XLSXCellFormat {
     int fontId{0};
     int fillId{0};
+    int borderId{0};
     int numFmtId{0};
     bool applyFont{false};
     bool applyFill{false};
+    bool applyBorder{false};
     bool applyAlignment{false};
     XLSXAlignment alignment;
 };
@@ -165,10 +186,90 @@ cells::VerticalAlign parseVerticalAlign(const char* align) {
     return cells::VerticalAlign::BOTTOM;
 }
 
+// Parse border style string to enum
+// XLSX border styles: thin, medium, thick, dashed, dotted, double, hair,
+// mediumDashed, dashDot, mediumDashDot, dashDotDot, mediumDashDotDot, slantDashDot
+cells::BorderStyle parseBorderStyle(const char* style) {
+    if (style == nullptr || style[0] == '\0' || std::strcmp(style, "none") == 0) {
+        return cells::BorderStyle::NONE;
+    }
+    if (std::strcmp(style, "thin") == 0) {
+        return cells::BorderStyle::THIN;
+    }
+    if (std::strcmp(style, "medium") == 0) {
+        return cells::BorderStyle::MEDIUM;
+    }
+    if (std::strcmp(style, "thick") == 0) {
+        return cells::BorderStyle::THICK;
+    }
+    if (std::strcmp(style, "dashed") == 0) {
+        return cells::BorderStyle::DASHED;
+    }
+    if (std::strcmp(style, "dotted") == 0) {
+        return cells::BorderStyle::DOTTED;
+    }
+    if (std::strcmp(style, "double") == 0) {
+        return cells::BorderStyle::DOUBLE;
+    }
+    if (std::strcmp(style, "hair") == 0) {
+        return cells::BorderStyle::HAIR;
+    }
+    if (std::strcmp(style, "mediumDashed") == 0) {
+        return cells::BorderStyle::MEDIUM_DASHED;
+    }
+    if (std::strcmp(style, "dashDot") == 0) {
+        return cells::BorderStyle::DASH_DOT;
+    }
+    if (std::strcmp(style, "mediumDashDot") == 0) {
+        return cells::BorderStyle::MEDIUM_DASH_DOT;
+    }
+    if (std::strcmp(style, "dashDotDot") == 0) {
+        return cells::BorderStyle::DASH_DOT_DOT;
+    }
+    if (std::strcmp(style, "mediumDashDotDot") == 0) {
+        return cells::BorderStyle::MEDIUM_DASH_DOT_DOT;
+    }
+    if (std::strcmp(style, "slantDashDot") == 0) {
+        return cells::BorderStyle::SLANT_DASH_DOT;
+    }
+    // Default to thin for any unrecognized non-empty style
+    return cells::BorderStyle::THIN;
+}
+
+// Parse a single border edge element (left, right, top, or bottom)
+XLSXBorderEdge parseBorderEdge(pugi::xml_node edgeNode) {
+    XLSXBorderEdge edge;
+    if (!edgeNode) {
+        return edge;
+    }
+
+    // Get style attribute
+    const char* style = edgeNode.attribute("style").value();
+    edge.style = parseBorderStyle(style);
+
+    // Get color (from <color> child element)
+    auto colorNode = edgeNode.child("color");
+    if (colorNode) {
+        const char* rgb = colorNode.attribute("rgb").value();
+        if (rgb && rgb[0] != '\0') {
+            edge.color = argbToRgb(rgb);
+        }
+        // Also check indexed colors (auto maps to black)
+        auto autoAttr = colorNode.attribute("auto");
+        if (autoAttr && autoAttr.as_bool()) {
+            edge.color = "#000000";
+        }
+        // TODO: Support indexed and theme colors
+    }
+
+    return edge;
+}
+
 // Container for all parsed styles from styles.xml
 struct XLSXStyles {
     std::vector<XLSXFont> fonts;
     std::vector<XLSXFill> fills;
+    std::vector<XLSXBorder> borders;
     std::vector<XLSXCellFormat> cellFormats;                // cellXfs entries
     std::unordered_map<int, std::string> customNumFormats;  // numFmtId -> format code
 
@@ -489,6 +590,17 @@ XLSXStyles parseStylesXml(const std::string& content) {
         styles.fills.push_back(fill);
     }
 
+    // Parse borders
+    auto bordersNode = styleSheet.child("borders");
+    for (auto borderNode : bordersNode.children("border")) {
+        XLSXBorder border;
+        border.left = parseBorderEdge(borderNode.child("left"));
+        border.right = parseBorderEdge(borderNode.child("right"));
+        border.top = parseBorderEdge(borderNode.child("top"));
+        border.bottom = parseBorderEdge(borderNode.child("bottom"));
+        styles.borders.push_back(border);
+    }
+
     // Parse cellXfs (cell format records)
     auto cellXfsNode = styleSheet.child("cellXfs");
     for (auto xfNode : cellXfsNode.children("xf")) {
@@ -496,11 +608,13 @@ XLSXStyles parseStylesXml(const std::string& content) {
 
         xf.fontId = xfNode.attribute("fontId").as_int(0);
         xf.fillId = xfNode.attribute("fillId").as_int(0);
+        xf.borderId = xfNode.attribute("borderId").as_int(0);
         xf.numFmtId = xfNode.attribute("numFmtId").as_int(0);
 
         // Check apply* attributes
         xf.applyFont = xfNode.attribute("applyFont").as_bool(false);
         xf.applyFill = xfNode.attribute("applyFill").as_bool(false);
+        xf.applyBorder = xfNode.attribute("applyBorder").as_bool(false);
         xf.applyAlignment = xfNode.attribute("applyAlignment").as_bool(false);
 
         // If fontId > 0 but applyFont is not explicitly set, still apply font
@@ -510,6 +624,9 @@ XLSXStyles parseStylesXml(const std::string& content) {
         }
         if (xf.fillId > 0 && !xf.applyFill) {
             xf.applyFill = true;
+        }
+        if (xf.borderId > 0 && !xf.applyBorder) {
+            xf.applyBorder = true;
         }
 
         // Parse alignment
