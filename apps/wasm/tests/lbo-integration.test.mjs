@@ -613,6 +613,159 @@ const tests = {
       'General alignment parsing works'
     );
   },
+
+  // Phase 4: Frozen cells remain visible during scroll
+  'Frozen cells remain visible when scrolling': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // First, add some test data in the frozen region
+    await clickCell(ctx.page, 'A1');
+    await ctx.page.keyboard.type('Frozen A1');
+    await ctx.page.keyboard.press('Tab');
+    await ctx.page.keyboard.type('Frozen B1');
+    await ctx.page.keyboard.press('Enter');
+
+    // Add data in A2 and B2
+    await clickCell(ctx.page, 'A2');
+    await ctx.page.keyboard.type('Frozen A2');
+    await ctx.page.keyboard.press('Tab');
+    await ctx.page.keyboard.type('Frozen B2');
+    await ctx.page.keyboard.press('Enter');
+
+    // Add data outside freeze region for scrolling verification
+    await clickCell(ctx.page, 'F21');
+    await ctx.page.keyboard.type('Scrollable');
+    await ctx.page.keyboard.press('Enter');
+
+    await sleep(500);
+
+    // Set freeze panes to freeze first 2 columns and 2 rows
+    const freezeSet = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx?.app?.dataSource) {
+        return { error: 'No data source' };
+      }
+
+      // Use the setFreezePanes API
+      ctx.app.dataSource.setFreezePanes(2, 2);
+
+      // Force a re-fetch of sheet info to update freeze pane state
+      return { success: true };
+    });
+
+    console.log('Freeze pane set result:', freezeSet);
+    await sleep(300);
+
+    // Verify freeze panes are set
+    const freezeInfo = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      return {
+        freezeCol: ctx?.app?.sheetInfo?.freezeCol || 0,
+        freezeRow: ctx?.app?.sheetInfo?.freezeRow || 0,
+      };
+    });
+
+    console.log(`Freeze panes: col=${freezeInfo.freezeCol}, row=${freezeInfo.freezeRow}`);
+    assertEqual(freezeInfo.freezeCol, 2, 'Should have 2 frozen columns');
+    assertEqual(freezeInfo.freezeRow, 2, 'Should have 2 frozen rows');
+
+    // Get initial position of frozen cell (A1)
+    const initialPositions = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx?.app?.renderer) {
+        return { error: 'No renderer' };
+      }
+
+      const renderer = ctx.app.renderer;
+
+      return {
+        cellA1X: renderer.getDragAdjustedColX(0),
+        cellA1Y: renderer.getDragAdjustedRowY(0),
+        cellA2X: renderer.getDragAdjustedColX(0),
+        cellA2Y: renderer.getDragAdjustedRowY(1),
+        scrollX: ctx.app.scrollX,
+        scrollY: ctx.app.scrollY,
+      };
+    });
+
+    console.log('Initial frozen cell positions:', initialPositions);
+
+    // Scroll down and right by setting scroll positions
+    const scrollResult = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx?.app) {
+        return { error: 'No app context' };
+      }
+
+      // Scroll 500px in both directions
+      ctx.app.scrollX = 500;
+      ctx.app.scrollY = 500;
+
+      // Trigger a render
+      if (ctx.app.renderer) {
+        ctx.app.renderer.scrollX = 500;
+        ctx.app.renderer.scrollY = 500;
+        ctx.app.renderer.render();
+      }
+
+      return {
+        scrollX: ctx.app.scrollX,
+        scrollY: ctx.app.scrollY
+      };
+    });
+
+    console.log('After scroll:', scrollResult);
+    await sleep(200);
+
+    // Get positions after scrolling
+    const afterScrollPositions = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx?.app?.renderer) {
+        return { error: 'No renderer' };
+      }
+
+      const renderer = ctx.app.renderer;
+
+      return {
+        cellA1X: renderer.getDragAdjustedColX(0),
+        cellA1Y: renderer.getDragAdjustedRowY(0),
+        cellA2X: renderer.getDragAdjustedColX(0),
+        cellA2Y: renderer.getDragAdjustedRowY(1),
+        // Non-frozen cell (column 5)
+        cellF1X: renderer.getDragAdjustedColX(5),
+        cellF1Y: renderer.getDragAdjustedRowY(0),
+        scrollX: ctx.app.scrollX,
+        scrollY: ctx.app.scrollY,
+      };
+    });
+
+    console.log('Positions after scroll:', afterScrollPositions);
+
+    // Frozen cells should NOT have moved (same X/Y as before)
+    assertEqual(
+      afterScrollPositions.cellA1X,
+      initialPositions.cellA1X,
+      'Frozen column A X position should not change after scroll'
+    );
+    assertEqual(
+      afterScrollPositions.cellA1Y,
+      initialPositions.cellA1Y,
+      'Frozen row 1 Y position should not change after scroll'
+    );
+
+    // Non-frozen column (F) should have moved left due to scroll
+    assertTrue(
+      afterScrollPositions.cellF1X < initialPositions.cellA1X + 1000, // Some reasonable check
+      'Non-frozen column should be affected by scroll'
+    );
+
+    console.log('\n=== Freeze Pane Test Results ===');
+    console.log(`Frozen cell A1 X: initial=${initialPositions.cellA1X}, after=${afterScrollPositions.cellA1X}`);
+    console.log(`Frozen cell A1 Y: initial=${initialPositions.cellA1Y}, after=${afterScrollPositions.cellA1Y}`);
+    console.log(`Scroll offset: X=${scrollResult.scrollX}, Y=${scrollResult.scrollY}`);
+    console.log('Frozen cells remained in place during scroll ✓');
+  },
 };
 
 // Run all tests

@@ -141,8 +141,11 @@ void Serializer::serializeStyles(const Workbook& workbook, std::ostream& out) co
         if (style->fontSize > 0) {
             out << ",\"fontSize\":" << static_cast<int>(style->fontSize);
         }
-        // Horizontal alignment
+        // Horizontal alignment (GENERAL is default, omit)
         switch (style->hAlign) {
+            case TextAlign::LEFT:
+                out << ",\"hAlign\":\"left\"";
+                break;
             case TextAlign::CENTER:
                 out << ",\"hAlign\":\"center\"";
                 break;
@@ -153,7 +156,7 @@ void Serializer::serializeStyles(const Workbook& workbook, std::ostream& out) co
                 out << ",\"hAlign\":\"justify\"";
                 break;
             default:
-                break;  // LEFT is default, omit
+                break;  // GENERAL is default, omit
         }
         // Vertical alignment
         switch (style->vAlign) {

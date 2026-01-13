@@ -536,7 +536,8 @@ TEST_F(CRDTTest, CellStyleDefaults) {
     EXPECT_TRUE(style.textColor.empty());
     EXPECT_TRUE(style.fontFamily.empty());
     EXPECT_EQ(style.fontSize, 0);
-    EXPECT_EQ(style.hAlign, TextAlign::LEFT);
+    // Default hAlign is GENERAL (content-type-based alignment, like Excel)
+    EXPECT_EQ(style.hAlign, TextAlign::GENERAL);
     EXPECT_EQ(style.vAlign, VerticalAlign::BOTTOM);
     EXPECT_TRUE(style.isEmpty());
 }

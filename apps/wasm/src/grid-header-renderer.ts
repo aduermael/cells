@@ -36,6 +36,38 @@ export interface HeaderRendererState {
 }
 
 /**
+ * Get the total width of frozen columns (from col 0 to freezeCol-1).
+ * Returns 0 if no columns are frozen.
+ */
+export function getFrozenColWidth(
+  freezeCol: number,
+  colWidths: Map<number, number>
+): number {
+  if (freezeCol <= 0) return 0;
+  let width = 0;
+  for (let col = 0; col < freezeCol; col++) {
+    width += colWidths.get(col) || DEFAULT_COL_WIDTH;
+  }
+  return width;
+}
+
+/**
+ * Get the total height of frozen rows (from row 0 to freezeRow-1).
+ * Returns 0 if no rows are frozen.
+ */
+export function getFrozenRowHeight(
+  freezeRow: number,
+  rowHeights: Map<number, number>
+): number {
+  if (freezeRow <= 0) return 0;
+  let height = 0;
+  for (let row = 0; row < freezeRow; row++) {
+    height += rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+  }
+  return height;
+}
+
+/**
  * Convert column index to Excel-style letter (A, B, ..., Z, AA, AB, ...)
  */
 export function colToLetter(col: number): string {
@@ -63,6 +95,10 @@ export function getColumnHeaderText(
 /**
  * Get the visual X position for a column during drag operations.
  * Uses O(1) lookup via pre-computed pixel offsets when not dragging.
+ *
+ * For frozen panes:
+ * - Frozen columns (col < freezeCol) are not affected by scrollX
+ * - Non-frozen columns scroll normally, but start after the frozen area
  */
 export function getDragAdjustedColX(
   col: number,
@@ -73,8 +109,25 @@ export function getDragAdjustedColX(
     state.dragTargetIndex !== state.dragSourceIndex &&
     state.dragTargetIndex !== state.dragSourceIndex + 1;
 
+  const freezeCol = state.sheetInfo?.freezeCol || 0;
+  const isFrozen = col < freezeCol;
+
   if (!colHasMoved) {
-    // Fast path: use pre-computed pixel offset if available (O(1))
+    // Fast path for frozen columns: no scroll offset
+    if (isFrozen) {
+      // Use cached offset or calculate
+      const cachedOffset = state.colPixelOffsets.get(col);
+      if (cachedOffset !== undefined) {
+        return HEADER_WIDTH + cachedOffset;
+      }
+      let x = HEADER_WIDTH;
+      for (let i = 0; i < col; i++) {
+        x += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
+      }
+      return x;
+    }
+
+    // Non-frozen columns: apply scroll but stay to the right of frozen area
     const cachedOffset = state.colPixelOffsets.get(col);
     if (cachedOffset !== undefined) {
       return HEADER_WIDTH + cachedOffset - state.scrollX;
@@ -87,8 +140,9 @@ export function getDragAdjustedColX(
     return x;
   }
 
+  // Dragging case - maintain existing logic but add freeze awareness
   const sourceW = state.colWidths.get(state.dragSourceIndex) || DEFAULT_COL_WIDTH;
-  let x = HEADER_WIDTH - state.scrollX;
+  let x = isFrozen ? HEADER_WIDTH : HEADER_WIDTH - state.scrollX;
 
   if (state.dragTargetIndex < state.dragSourceIndex) {
     for (let i = 0; i < col; i++) {
@@ -113,6 +167,10 @@ export function getDragAdjustedColX(
 /**
  * Get the visual Y position for a row during drag operations.
  * Uses O(1) lookup via pre-computed pixel offsets when not dragging.
+ *
+ * For frozen panes:
+ * - Frozen rows (row < freezeRow) are not affected by scrollY
+ * - Non-frozen rows scroll normally, but start after the frozen area
  */
 export function getDragAdjustedRowY(
   row: number,
@@ -123,8 +181,25 @@ export function getDragAdjustedRowY(
     state.dragTargetIndex !== state.dragSourceIndex &&
     state.dragTargetIndex !== state.dragSourceIndex + 1;
 
+  const freezeRow = state.sheetInfo?.freezeRow || 0;
+  const isFrozen = row < freezeRow;
+
   if (!rowHasMoved) {
-    // Fast path: use pre-computed pixel offset if available (O(1))
+    // Fast path for frozen rows: no scroll offset
+    if (isFrozen) {
+      // Use cached offset or calculate
+      const cachedOffset = state.rowPixelOffsets.get(row);
+      if (cachedOffset !== undefined) {
+        return HEADER_HEIGHT + cachedOffset;
+      }
+      let y = HEADER_HEIGHT;
+      for (let i = 0; i < row; i++) {
+        y += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+      }
+      return y;
+    }
+
+    // Non-frozen rows: apply scroll
     const cachedOffset = state.rowPixelOffsets.get(row);
     if (cachedOffset !== undefined) {
       return HEADER_HEIGHT + cachedOffset - state.scrollY;
@@ -137,8 +212,9 @@ export function getDragAdjustedRowY(
     return y;
   }
 
+  // Dragging case - maintain existing logic but add freeze awareness
   const sourceH = state.rowHeights.get(state.dragSourceIndex) || DEFAULT_ROW_HEIGHT;
-  let y = HEADER_HEIGHT - state.scrollY;
+  let y = isFrozen ? HEADER_HEIGHT : HEADER_HEIGHT - state.scrollY;
 
   if (state.dragTargetIndex < state.dragSourceIndex) {
     for (let i = 0; i < row; i++) {

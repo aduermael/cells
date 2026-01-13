@@ -1287,7 +1287,8 @@ TEST(StyleZCDRoundtripTest, EmptyStyleRoundtrip) {
     EXPECT_TRUE(parsed->textColor.empty());
     EXPECT_TRUE(parsed->fontFamily.empty());
     EXPECT_EQ(parsed->fontSize, 0);
-    EXPECT_EQ(parsed->hAlign, TextAlign::LEFT);
+    // Default hAlign is GENERAL (content-type-based alignment)
+    EXPECT_EQ(parsed->hAlign, TextAlign::GENERAL);
     EXPECT_EQ(parsed->vAlign, VerticalAlign::BOTTOM);
 }
 

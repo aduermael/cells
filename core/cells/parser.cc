@@ -322,16 +322,18 @@ bool Parser::parseStyle(std::string_view line) {
     style.fontFamily = extractJSONStringValue(json, "fontFamily");
     style.fontSize = static_cast<uint8_t>(extractJSONIntValue(json, "fontSize", 0));
 
-    // Parse alignment enums
+    // Parse alignment enums (default to GENERAL for content-type-based alignment)
     const std::string hAlignStr = extractJSONStringValue(json, "hAlign");
-    if (hAlignStr == "center") {
+    if (hAlignStr == "left") {
+        style.hAlign = TextAlign::LEFT;
+    } else if (hAlignStr == "center") {
         style.hAlign = TextAlign::CENTER;
     } else if (hAlignStr == "right") {
         style.hAlign = TextAlign::RIGHT;
     } else if (hAlignStr == "justify") {
         style.hAlign = TextAlign::JUSTIFY;
     } else {
-        style.hAlign = TextAlign::LEFT;
+        style.hAlign = TextAlign::GENERAL;
     }
 
     const std::string vAlignStr = extractJSONStringValue(json, "vAlign");

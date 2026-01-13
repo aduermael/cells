@@ -37,11 +37,11 @@ Some cells show different alignment in our app vs Excel. Need to verify alignmen
 
 Freeze pane separator lines are drawn but the actual freezing behavior during scroll is not implemented.
 
-- [ ] 4a: Modify scroll handling to keep frozen rows at fixed Y position (offset content area only)
-- [ ] 4b: Modify scroll handling to keep frozen columns at fixed X position
-- [ ] 4c: Adjust cell rendering to draw frozen cells at their fixed positions, not scrolled positions
-- [ ] 4d: Ensure selection and cell editor work correctly with frozen panes
-- [ ] 4e: Add E2E test that scrolls and verifies frozen cells remain visible
+- [x] 4a: Modify scroll handling to keep frozen rows at fixed Y position (offset content area only). Updated `getDragAdjustedRowY()` in grid-header-renderer.ts to not apply scrollY for frozen rows (row < freezeRow).
+- [x] 4b: Modify scroll handling to keep frozen columns at fixed X position. Updated `getDragAdjustedColX()` to not apply scrollX for frozen columns (col < freezeCol).
+- [x] 4c: Adjust cell rendering to draw frozen cells at their fixed positions, not scrolled positions. Modified render() in grid-renderer.ts to draw in 4 quadrants: Q1 (scrollable), Q2 (frozen rows), Q3 (frozen columns), Q4 (frozen corner), with proper clipping regions.
+- [x] 4d: Ensure selection and cell editor work correctly with frozen panes. Position functions handle frozen/non-frozen correctly; selection rendering uses same position calculations.
+- [x] 4e: Add E2E test that scrolls and verifies frozen cells remain visible. Added `'Frozen cells remain visible when scrolling'` test to lbo-integration.test.mjs that sets freeze panes, scrolls, and verifies frozen cell positions don't change.
 
 ## Phase 5: Proper Zoom Implementation
 

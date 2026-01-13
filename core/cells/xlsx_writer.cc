@@ -509,7 +509,7 @@ struct XLSXCellFormatEntry {
     size_t fontId{0};
     size_t fillId{0};
     size_t borderId{0};
-    cells::TextAlign hAlign{cells::TextAlign::LEFT};
+    cells::TextAlign hAlign{cells::TextAlign::GENERAL};
     cells::VerticalAlign vAlign{cells::VerticalAlign::BOTTOM};
     bool hasAlignment{false};
 
@@ -591,7 +591,7 @@ public:
         xf.borderId = borderId;
         xf.hAlign = style.hAlign;
         xf.vAlign = style.vAlign;
-        xf.hasAlignment = (style.hAlign != cells::TextAlign::LEFT ||
+        xf.hasAlignment = (style.hAlign != cells::TextAlign::GENERAL ||
                            style.vAlign != cells::VerticalAlign::BOTTOM);
 
         return getOrAddCellFormat(xf);
@@ -1119,14 +1119,17 @@ std::string generateSharedStrings(const SharedStringTable& sst) {
 // Horizontal alignment enum to XLSX string
 const char* hAlignToXlsx(cells::TextAlign align) {
     switch (align) {
+        case cells::TextAlign::LEFT:
+            return "left";
         case cells::TextAlign::CENTER:
             return "center";
         case cells::TextAlign::RIGHT:
             return "right";
         case cells::TextAlign::JUSTIFY:
             return "justify";
+        case cells::TextAlign::GENERAL:
         default:
-            return "left";
+            return "general";
     }
 }
 
@@ -1285,7 +1288,8 @@ std::string generateStyles(const StyleTable& styles) {
         if (xf.hasAlignment) {
             xml << ">\n";
             xml << "      <alignment";
-            if (xf.hAlign != cells::TextAlign::LEFT) {
+            // Only write horizontal if not GENERAL (GENERAL is Excel's default)
+            if (xf.hAlign != cells::TextAlign::GENERAL) {
                 xml << " horizontal=\"" << hAlignToXlsx(xf.hAlign) << "\"";
             }
             if (xf.vAlign != cells::VerticalAlign::BOTTOM) {

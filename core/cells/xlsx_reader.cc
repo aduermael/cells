@@ -185,24 +185,27 @@ std::string applyTint(const std::string& color, double tint) {
         return color;
     }
 
-    // Parse RGB components
+    // Parse RGB components (not const because they're modified in HSL-to-RGB conversion)
+    // NOLINTNEXTLINE(misc-const-correctness)
     int r = std::stoi(color.substr(1, 2), nullptr, 16);
+    // NOLINTNEXTLINE(misc-const-correctness)
     int g = std::stoi(color.substr(3, 2), nullptr, 16);
+    // NOLINTNEXTLINE(misc-const-correctness)
     int b = std::stoi(color.substr(5, 2), nullptr, 16);
 
     // Convert RGB to HSL
-    double rd = r / 255.0;
-    double gd = g / 255.0;
-    double bd = b / 255.0;
+    const double rd = r / 255.0;
+    const double gd = g / 255.0;
+    const double bd = b / 255.0;
 
-    double maxVal = std::max({rd, gd, bd});
-    double minVal = std::min({rd, gd, bd});
+    const double maxVal = std::max({rd, gd, bd});
+    const double minVal = std::min({rd, gd, bd});
     double h = 0;
     double s = 0;
     double l = (maxVal + minVal) / 2.0;
 
     if (maxVal != minVal) {
-        double d = maxVal - minVal;
+        const double d = maxVal - minVal;
         s = l > 0.5 ? d / (2.0 - maxVal - minVal) : d / (maxVal + minVal);
         if (maxVal == rd) {
             h = (gd - bd) / d + (gd < bd ? 6.0 : 0.0);
@@ -227,21 +230,26 @@ std::string applyTint(const std::string& color, double tint) {
 
     // Convert HSL back to RGB
     auto hueToRgb = [](double p, double q, double t) {
-        if (t < 0)
+        if (t < 0) {
             t += 1;
-        if (t > 1)
+        }
+        if (t > 1) {
             t -= 1;
-        if (t < 1.0 / 6.0)
+        }
+        if (t < 1.0 / 6.0) {
             return p + (q - p) * 6.0 * t;
-        if (t < 0.5)
+        }
+        if (t < 0.5) {
             return q;
-        if (t < 2.0 / 3.0)
+        }
+        if (t < 2.0 / 3.0) {
             return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+        }
         return p;
     };
 
-    double q = l < 0.5 ? l * (1.0 + s) : l + s - l * s;
-    double p = 2.0 * l - q;
+    const double q = l < 0.5 ? l * (1.0 + s) : l + s - l * s;
+    const double p = 2.0 * l - q;
 
     if (s == 0) {
         r = g = b = static_cast<int>(std::round(l * 255));
@@ -282,8 +290,9 @@ XLSXThemeColors parseThemeXml(const std::string& content) {
 
     // Helper to extract color from a color scheme element
     auto extractColor = [](pugi::xml_node node) -> std::string {
-        if (!node)
+        if (!node) {
             return {};
+        }
 
         // Check for srgbClr (direct RGB value)
         auto srgbClr = node.child("a:srgbClr");
@@ -409,10 +418,12 @@ std::string getIndexedColor(int index) {
     // Special indexed values:
     // 64: System foreground (use system text color) - default to black
     // 65: System background (use system background color) - default to white
-    if (index == 64)
+    if (index == 64) {
         return "#000000";
-    if (index == 65)
+    }
+    if (index == 65) {
         return "#FFFFFF";
+    }
     return {};
 }
 
@@ -433,11 +444,11 @@ std::string resolveColor(pugi::xml_node colorNode, const XLSXThemeColors& theme)
     // Check for theme color
     auto themeAttr = colorNode.attribute("theme");
     if (themeAttr) {
-        int themeIndex = themeAttr.as_int(-1);
+        const int themeIndex = themeAttr.as_int(-1);
         std::string baseColor = theme.getColor(themeIndex);
         if (!baseColor.empty()) {
             // Apply tint if present
-            double tint = colorNode.attribute("tint").as_double(0.0);
+            const double tint = colorNode.attribute("tint").as_double(0.0);
             if (tint != 0.0) {
                 return applyTint(baseColor, tint);
             }
@@ -448,7 +459,7 @@ std::string resolveColor(pugi::xml_node colorNode, const XLSXThemeColors& theme)
     // Check for indexed color
     auto indexedAttr = colorNode.attribute("indexed");
     if (indexedAttr) {
-        int colorIndex = indexedAttr.as_int(-1);
+        const int colorIndex = indexedAttr.as_int(-1);
         std::string indexedColor = getIndexedColor(colorIndex);
         if (!indexedColor.empty()) {
             return indexedColor;

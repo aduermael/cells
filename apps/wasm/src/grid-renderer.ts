@@ -56,6 +56,8 @@ import {
   getDragAdjustedRowY as getRowY,
   colToLetter,
   getColumnHeaderText,
+  getFrozenColWidth,
+  getFrozenRowHeight,
   type HeaderRendererState,
 } from "./grid-header-renderer.js";
 import { drawFormulaHighlights } from "./grid-formula-renderer.js";
@@ -304,15 +306,15 @@ export class GridRenderer {
 
     ctx.clearRect(0, 0, viewWidth, viewHeight);
 
-    // Draw cells area (clipped)
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(HEADER_WIDTH, HEADER_HEIGHT, viewWidth - HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
-    ctx.clip();
+    // Calculate frozen pane boundaries
+    const freezeCol = this.sheetInfo.freezeCol || 0;
+    const freezeRow = this.sheetInfo.freezeRow || 0;
+    const frozenColWidth = getFrozenColWidth(freezeCol, this.colWidths);
+    const frozenRowHeight = getFrozenRowHeight(freezeRow, this.rowHeights);
 
-    // Fill cell background explicitly (ensures correct theme color on theme switch)
-    ctx.fillStyle = this.colors.cellBg;
-    ctx.fillRect(HEADER_WIDTH, HEADER_HEIGHT, viewWidth - HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
+    // The freeze boundary positions (where frozen content ends)
+    const freezeX = HEADER_WIDTH + frozenColWidth;
+    const freezeY = HEADER_HEIGHT + frozenRowHeight;
 
     const headerState = this._getHeaderState();
     const colHasMoved =
@@ -324,17 +326,86 @@ export class GridRenderer {
       this.dragTargetIndex !== this.dragSourceIndex &&
       this.dragTargetIndex !== this.dragSourceIndex + 1;
 
-    // Cell background colors (drawn before grid lines so lines appear on top)
+    // Fill cell background explicitly (ensures correct theme color on theme switch)
+    ctx.fillStyle = this.colors.cellBg;
+    ctx.fillRect(HEADER_WIDTH, HEADER_HEIGHT, viewWidth - HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
+
+    // Render the four quadrants of the freeze pane layout:
+    // - Q1 (bottom-right): Scrollable in both X and Y
+    // - Q2 (top-right): Frozen rows, scrollable columns (scrolls in X only)
+    // - Q3 (bottom-left): Frozen columns, scrollable rows (scrolls in Y only)
+    // - Q4 (top-left): Fully frozen corner (no scrolling)
+    //
+    // We render in order Q1 -> Q2 -> Q3 -> Q4 so frozen content is drawn on top.
+
+    // === Q1: Scrollable content (bottom-right) ===
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(freezeX, freezeY, viewWidth - freezeX, viewHeight - freezeY);
+    ctx.clip();
+
     this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-
-    // Grid lines
     this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-
-    // Cell borders (drawn after grid lines to overlay them)
     this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-
-    // Cell values
     this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+    ctx.restore();
+
+    // === Q2: Frozen rows (top-right) ===
+    if (freezeRow > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(freezeX, HEADER_HEIGHT, viewWidth - freezeX, frozenRowHeight);
+      ctx.clip();
+
+      ctx.fillStyle = this.colors.cellBg;
+      ctx.fillRect(freezeX, HEADER_HEIGHT, viewWidth - freezeX, frozenRowHeight);
+
+      this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      ctx.restore();
+    }
+
+    // === Q3: Frozen columns (bottom-left) ===
+    if (freezeCol > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(HEADER_WIDTH, freezeY, frozenColWidth, viewHeight - freezeY);
+      ctx.clip();
+
+      ctx.fillStyle = this.colors.cellBg;
+      ctx.fillRect(HEADER_WIDTH, freezeY, frozenColWidth, viewHeight - freezeY);
+
+      this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      ctx.restore();
+    }
+
+    // === Q4: Frozen corner (top-left) ===
+    if (freezeCol > 0 && freezeRow > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(HEADER_WIDTH, HEADER_HEIGHT, frozenColWidth, frozenRowHeight);
+      ctx.clip();
+
+      ctx.fillStyle = this.colors.cellBg;
+      ctx.fillRect(HEADER_WIDTH, HEADER_HEIGHT, frozenColWidth, frozenRowHeight);
+
+      this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      ctx.restore();
+    }
+
+    // === Draw selection and other overlays (clipped to entire grid area) ===
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(HEADER_WIDTH, HEADER_HEIGHT, viewWidth - HEADER_WIDTH, viewHeight - HEADER_HEIGHT);
+    ctx.clip();
 
     // Formula reference highlights (drawn before selection so selection appears on top)
     if (this.formulaHighlights.length > 0) {
