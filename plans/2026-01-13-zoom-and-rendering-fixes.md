@@ -106,10 +106,10 @@ The green dashed line shown during column/row resize is positioned incorrectly a
 
 Selection boxes (single cell, range, column, row) don't align with cell boundaries at non-100% zoom.
 
-- [ ] 8.3a: Write E2E test that precisely measures selection box position vs cell position at various zoom levels
-- [ ] 8.3b: Identify root cause - likely mismatch between how cell positions and selection positions are calculated
-- [ ] 8.3c: Fix selection position calculations to use same zoomed position logic as cell rendering
-- [ ] 8.3d: Verify fill handle position is also fixed
+- [x] 8.3a: Write E2E test that precisely measures selection box position vs cell position at various zoom levels. Created `zoom-selection-alignment.test.mjs` with 6 tests that verify selection position matches cell position at various zoom levels (50%, 100%, 200%) with and without scroll.
+- [x] 8.3b: Identify root cause - likely mismatch between how cell positions and selection positions are calculated. **Root cause identified:** The selection renderer in `grid-selection-renderer.ts` was using `state.scrollX` and `state.scrollY` directly without applying zoom factor. The cell renderer uses `getDragAdjustedColX/RowY` which correctly zooms scroll values (`zoomedScrollX = Math.round(scrollX * zoomFactor)`).
+- [x] 8.3c: Fix selection position calculations to use same zoomed position logic as cell rendering. Added `getZoomedScrollX()` and `getZoomedScrollY()` helper functions in `grid-selection-renderer.ts` and updated all 10+ locations that use scroll values to apply zoom transformation.
+- [x] 8.3d: Verify fill handle position is also fixed. Fill handle position test passes - it uses `getSelectionBounds()` which was also fixed by the scroll zoom changes.
 
 ### 8.4: Centralize Zoom Coordinate System
 

@@ -7,6 +7,7 @@ import {
   DEFAULT_ROW_HEIGHT,
   getGridColors,
   SPILL_RANGE_COLOR,
+  getZoomFactor,
   getZoomedColWidth,
   getZoomedRowHeight,
   getZoomedHeaderWidth,
@@ -17,6 +18,22 @@ import {
 
 // Fill handle size in pixels
 const FILL_HANDLE_SIZE = 6;
+
+/**
+ * Helper to get zoomed scroll X value.
+ * Scroll values are stored in unzoomed (base) coordinates but need to be
+ * converted to zoomed coordinates for proper rendering at non-100% zoom.
+ */
+function getZoomedScrollX(scrollX: number): number {
+  return Math.round(scrollX * getZoomFactor());
+}
+
+/**
+ * Helper to get zoomed scroll Y value.
+ */
+function getZoomedScrollY(scrollY: number): number {
+  return Math.round(scrollY * getZoomFactor());
+}
 
 /** State needed for selection rendering */
 export interface SelectionRendererState {
@@ -62,12 +79,12 @@ export function drawRangeSelection(
   const zoomedHeaderHeight = getZoomedHeaderHeight();
 
   // Calculate range bounds using zoomed dimensions
-  let rangeX = zoomedHeaderWidth - state.scrollX;
+  let rangeX = zoomedHeaderWidth - getZoomedScrollX(state.scrollX);
   for (let i = 0; i < range.minCol; i++) {
     const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
     rangeX += getZoomedColWidth(baseWidth);
   }
-  let rangeY = zoomedHeaderHeight - state.scrollY;
+  let rangeY = zoomedHeaderHeight - getZoomedScrollY(state.scrollY);
   for (let i = 0; i < range.minRow; i++) {
     const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
     rangeY += getZoomedRowHeight(baseHeight);
@@ -117,12 +134,12 @@ export function drawRangeSelection(
   // Draw anchor cell highlight (the cell where selection started)
   // This is only needed for multi-cell ranges to show the "active" cell
   if (hasRangeSelection(state) && state.selectionStart) {
-    let anchorX = zoomedHeaderWidth - state.scrollX;
+    let anchorX = zoomedHeaderWidth - getZoomedScrollX(state.scrollX);
     for (let i = 0; i < state.selectionStart.col; i++) {
       const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
       anchorX += getZoomedColWidth(baseWidth);
     }
-    let anchorY = zoomedHeaderHeight - state.scrollY;
+    let anchorY = zoomedHeaderHeight - getZoomedScrollY(state.scrollY);
     for (let i = 0; i < state.selectionStart.row; i++) {
       const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
       anchorY += getZoomedRowHeight(baseHeight);
@@ -173,12 +190,12 @@ export function drawSingleCellSelection(
   const zoomedHeaderWidth = getZoomedHeaderWidth();
   const zoomedHeaderHeight = getZoomedHeaderHeight();
 
-  let selX = zoomedHeaderWidth - state.scrollX;
+  let selX = zoomedHeaderWidth - getZoomedScrollX(state.scrollX);
   for (let i = 0; i < state.selectedCell.col; i++) {
     const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
     selX += getZoomedColWidth(baseWidth);
   }
-  let selY = zoomedHeaderHeight - state.scrollY;
+  let selY = zoomedHeaderHeight - getZoomedScrollY(state.scrollY);
   for (let i = 0; i < state.selectedCell.row; i++) {
     const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
     selY += getZoomedRowHeight(baseHeight);
@@ -226,7 +243,7 @@ export function drawColumnSelection(
   const zoomedHeaderWidth = getZoomedHeaderWidth();
   const zoomedHeaderHeight = getZoomedHeaderHeight();
 
-  let selX = zoomedHeaderWidth - scrollX;
+  let selX = zoomedHeaderWidth - getZoomedScrollX(scrollX);
   for (let i = 0; i < selectedColumn; i++) {
     const baseWidth = colWidths.get(i) || DEFAULT_COL_WIDTH;
     selX += getZoomedColWidth(baseWidth);
@@ -260,7 +277,7 @@ export function drawRowSelection(
   const zoomedHeaderWidth = getZoomedHeaderWidth();
   const zoomedHeaderHeight = getZoomedHeaderHeight();
 
-  let selY = zoomedHeaderHeight - scrollY;
+  let selY = zoomedHeaderHeight - getZoomedScrollY(scrollY);
   for (let i = 0; i < selectedRow; i++) {
     const baseHeight = rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
     selY += getZoomedRowHeight(baseHeight);
@@ -305,12 +322,12 @@ export function getSelectionBounds(
   const zoomedHeaderHeight = getZoomedHeaderHeight();
 
   // Calculate position using zoomed dimensions
-  let x = zoomedHeaderWidth - state.scrollX;
+  let x = zoomedHeaderWidth - getZoomedScrollX(state.scrollX);
   for (let i = 0; i < minCol; i++) {
     const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
     x += getZoomedColWidth(baseWidth);
   }
-  let y = zoomedHeaderHeight - state.scrollY;
+  let y = zoomedHeaderHeight - getZoomedScrollY(state.scrollY);
   for (let i = 0; i < minRow; i++) {
     const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
     y += getZoomedRowHeight(baseHeight);
@@ -421,12 +438,12 @@ export function drawFillPreview(
   const zoomedHeaderHeight = getZoomedHeaderHeight();
 
   // Calculate preview bounds using zoomed dimensions
-  let previewX = zoomedHeaderWidth - state.scrollX;
+  let previewX = zoomedHeaderWidth - getZoomedScrollX(state.scrollX);
   for (let i = 0; i < previewRange.minCol; i++) {
     const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
     previewX += getZoomedColWidth(baseWidth);
   }
-  let previewY = zoomedHeaderHeight - state.scrollY;
+  let previewY = zoomedHeaderHeight - getZoomedScrollY(state.scrollY);
   for (let i = 0; i < previewRange.minRow; i++) {
     const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
     previewY += getZoomedRowHeight(baseHeight);
@@ -486,12 +503,12 @@ export function drawSpillRangeHighlight(
   const zoomedHeaderHeight = getZoomedHeaderHeight();
 
   // Calculate spill range bounds using zoomed dimensions
-  let rangeX = zoomedHeaderWidth - state.scrollX;
+  let rangeX = zoomedHeaderWidth - getZoomedScrollX(state.scrollX);
   for (let i = 0; i < spillRange.minCol; i++) {
     const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
     rangeX += getZoomedColWidth(baseWidth);
   }
-  let rangeY = zoomedHeaderHeight - state.scrollY;
+  let rangeY = zoomedHeaderHeight - getZoomedScrollY(state.scrollY);
   for (let i = 0; i < spillRange.minRow; i++) {
     const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
     rangeY += getZoomedRowHeight(baseHeight);
