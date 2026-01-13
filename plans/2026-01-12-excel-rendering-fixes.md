@@ -6,12 +6,12 @@ Fix remaining visual differences between our app and Excel when rendering XLSX f
 
 Excel XLSX files use theme colors (e.g., `theme="4" tint="-0.5"`) and indexed colors instead of direct RGB values. Currently only RGB colors are parsed, causing missing blue/grey backgrounds for section titles.
 
-- [ ] 1a: Parse theme.xml from XLSX to extract the 12 theme colors (dk1, lt1, dk2, lt2, accent1-6, hlink, folHlink)
-- [ ] 1b: Implement tint application algorithm (tint < 0 darkens toward black, tint > 0 lightens toward white)
-- [ ] 1c: Update fill color parsing in xlsx_reader.cc to resolve theme colors with tint
-- [ ] 1d: Update font color parsing to also support theme colors
-- [ ] 1e: Add indexed color lookup table (Excel's 64 standard indexed colors) for `indexed="N"` attributes
-- [ ] 1f: Add tests for theme color parsing with the LBO model file
+- [x] 1a: Parse theme.xml from XLSX to extract the 12 theme colors (dk1, lt1, dk2, lt2, accent1-6, hlink, folHlink). Added `parseThemeXml()` function and `XLSXThemeColors` struct to extract colors from `xl/theme/theme1.xml`.
+- [x] 1b: Implement tint application algorithm (tint < 0 darkens toward black, tint > 0 lightens toward white). Added `applyTint()` function using HSL color space conversion per ECMA-376 spec.
+- [x] 1c: Update fill color parsing in xlsx_reader.cc to resolve theme colors with tint. Updated `parseStylesXml()` to use `resolveColor()` for fill colors.
+- [x] 1d: Update font color parsing to also support theme colors. Updated font and border color parsing to use the unified `resolveColor()` function.
+- [x] 1e: Add indexed color lookup table (Excel's 64 standard indexed colors) for `indexed="N"` attributes. Added `kIndexedColors` array and `getIndexedColor()` function.
+- [x] 1f: Add tests for theme color parsing with the LBO model file. Added `ReadThemeColorsFromLBOModel` and `ReadLightGrayBackgroundFromTheme` tests verifying theme colors are correctly resolved.
 
 ## Phase 2: Border Deduplication
 

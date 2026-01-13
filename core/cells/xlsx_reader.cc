@@ -154,6 +154,316 @@ std::string argbToRgb(const char* argb) {
     return {};
 }
 
+// ---------------------------------------------------------------------------
+// Theme Color Support
+// ---------------------------------------------------------------------------
+
+// Excel theme colors - the 12 standard colors from theme.xml
+// Theme index mapping:
+// 0: lt1 (background 1), 1: dk1 (text 1), 2: lt2 (background 2), 3: dk2 (text 2)
+// 4-9: accent1-6, 10: hlink, 11: folHlink
+struct XLSXThemeColors {
+    std::string colors[12];  // RGB values as "#RRGGBB"
+
+    [[nodiscard]] std::string getColor(int index) const {
+        if (index >= 0 && index < 12) {
+            return colors[index];
+        }
+        return {};
+    }
+};
+
+// Apply tint to a color
+// tint < 0: darken toward black (tint = -1.0 is fully black)
+// tint > 0: lighten toward white (tint = 1.0 is fully white)
+// tint = 0: no change
+std::string applyTint(const std::string& color, double tint) {
+    if (color.empty() || color.length() != 7 || color[0] != '#') {
+        return color;
+    }
+    if (tint == 0.0) {
+        return color;
+    }
+
+    // Parse RGB components
+    int r = std::stoi(color.substr(1, 2), nullptr, 16);
+    int g = std::stoi(color.substr(3, 2), nullptr, 16);
+    int b = std::stoi(color.substr(5, 2), nullptr, 16);
+
+    // Convert RGB to HSL
+    double rd = r / 255.0;
+    double gd = g / 255.0;
+    double bd = b / 255.0;
+
+    double maxVal = std::max({rd, gd, bd});
+    double minVal = std::min({rd, gd, bd});
+    double h = 0;
+    double s = 0;
+    double l = (maxVal + minVal) / 2.0;
+
+    if (maxVal != minVal) {
+        double d = maxVal - minVal;
+        s = l > 0.5 ? d / (2.0 - maxVal - minVal) : d / (maxVal + minVal);
+        if (maxVal == rd) {
+            h = (gd - bd) / d + (gd < bd ? 6.0 : 0.0);
+        } else if (maxVal == gd) {
+            h = (bd - rd) / d + 2.0;
+        } else {
+            h = (rd - gd) / d + 4.0;
+        }
+        h /= 6.0;
+    }
+
+    // Apply tint to lightness
+    // Excel's tint algorithm based on ECMA-376 documentation
+    if (tint < 0) {
+        // Darken: L' = L * (1 + tint)
+        l = l * (1.0 + tint);
+    } else {
+        // Lighten: L' = L * (1 - tint) + tint
+        l = l * (1.0 - tint) + tint;
+    }
+    l = std::max(0.0, std::min(1.0, l));
+
+    // Convert HSL back to RGB
+    auto hueToRgb = [](double p, double q, double t) {
+        if (t < 0)
+            t += 1;
+        if (t > 1)
+            t -= 1;
+        if (t < 1.0 / 6.0)
+            return p + (q - p) * 6.0 * t;
+        if (t < 0.5)
+            return q;
+        if (t < 2.0 / 3.0)
+            return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+        return p;
+    };
+
+    double q = l < 0.5 ? l * (1.0 + s) : l + s - l * s;
+    double p = 2.0 * l - q;
+
+    if (s == 0) {
+        r = g = b = static_cast<int>(std::round(l * 255));
+    } else {
+        r = static_cast<int>(std::round(hueToRgb(p, q, h + 1.0 / 3.0) * 255));
+        g = static_cast<int>(std::round(hueToRgb(p, q, h) * 255));
+        b = static_cast<int>(std::round(hueToRgb(p, q, h - 1.0 / 3.0) * 255));
+    }
+
+    // Clamp values
+    r = std::max(0, std::min(255, r));
+    g = std::max(0, std::min(255, g));
+    b = std::max(0, std::min(255, b));
+
+    // Format result
+    char buf[8];
+    std::snprintf(buf, sizeof(buf), "#%02X%02X%02X", r, g, b);
+    return buf;
+}
+
+// Parse theme.xml to extract the 12 theme colors
+XLSXThemeColors parseThemeXml(const std::string& content) {
+    XLSXThemeColors theme;
+
+    if (content.empty()) {
+        return theme;
+    }
+
+    pugi::xml_document doc;
+    if (!doc.load_buffer(content.data(), content.size())) {
+        return theme;
+    }
+
+    // Navigate to color scheme: theme/themeElements/clrScheme
+    auto themeNode = doc.child("a:theme");
+    auto themeElements = themeNode.child("a:themeElements");
+    auto clrScheme = themeElements.child("a:clrScheme");
+
+    // Helper to extract color from a color scheme element
+    auto extractColor = [](pugi::xml_node node) -> std::string {
+        if (!node)
+            return {};
+
+        // Check for srgbClr (direct RGB value)
+        auto srgbClr = node.child("a:srgbClr");
+        if (srgbClr) {
+            const char* val = srgbClr.attribute("val").value();
+            if (val && val[0] != '\0') {
+                return "#" + std::string(val);
+            }
+        }
+
+        // Check for sysClr (system color with lastClr fallback)
+        auto sysClr = node.child("a:sysClr");
+        if (sysClr) {
+            const char* lastClr = sysClr.attribute("lastClr").value();
+            if (lastClr && lastClr[0] != '\0') {
+                return "#" + std::string(lastClr);
+            }
+        }
+
+        return {};
+    };
+
+    // Extract the 12 theme colors in Excel's index order
+    // Index 0: lt1 (background 1)
+    // Index 1: dk1 (text 1)
+    // Index 2: lt2 (background 2)
+    // Index 3: dk2 (text 2)
+    // Index 4-9: accent1-6
+    // Index 10: hlink
+    // Index 11: folHlink
+    theme.colors[0] = extractColor(clrScheme.child("a:lt1"));
+    theme.colors[1] = extractColor(clrScheme.child("a:dk1"));
+    theme.colors[2] = extractColor(clrScheme.child("a:lt2"));
+    theme.colors[3] = extractColor(clrScheme.child("a:dk2"));
+    theme.colors[4] = extractColor(clrScheme.child("a:accent1"));
+    theme.colors[5] = extractColor(clrScheme.child("a:accent2"));
+    theme.colors[6] = extractColor(clrScheme.child("a:accent3"));
+    theme.colors[7] = extractColor(clrScheme.child("a:accent4"));
+    theme.colors[8] = extractColor(clrScheme.child("a:accent5"));
+    theme.colors[9] = extractColor(clrScheme.child("a:accent6"));
+    theme.colors[10] = extractColor(clrScheme.child("a:hlink"));
+    theme.colors[11] = extractColor(clrScheme.child("a:folHlink"));
+
+    return theme;
+}
+
+// Excel's 64 standard indexed colors (indices 0-63)
+// Based on ECMA-376 Part 1 Section 18.8.27
+// clang-format off
+const char* const kIndexedColors[64] = {
+    "#000000",  // 0: Black
+    "#FFFFFF",  // 1: White
+    "#FF0000",  // 2: Red
+    "#00FF00",  // 3: Bright Green
+    "#0000FF",  // 4: Blue
+    "#FFFF00",  // 5: Yellow
+    "#FF00FF",  // 6: Pink
+    "#00FFFF",  // 7: Turquoise
+    "#000000",  // 8: Black
+    "#FFFFFF",  // 9: White
+    "#FF0000",  // 10: Red
+    "#00FF00",  // 11: Bright Green
+    "#0000FF",  // 12: Blue
+    "#FFFF00",  // 13: Yellow
+    "#FF00FF",  // 14: Pink
+    "#00FFFF",  // 15: Turquoise
+    "#800000",  // 16: Dark Red
+    "#008000",  // 17: Green
+    "#000080",  // 18: Dark Blue
+    "#808000",  // 19: Dark Yellow (Olive)
+    "#800080",  // 20: Violet
+    "#008080",  // 21: Teal
+    "#C0C0C0",  // 22: Silver (25% Gray)
+    "#808080",  // 23: Gray (50% Gray)
+    "#9999FF",  // 24: Periwinkle
+    "#993366",  // 25: Plum
+    "#FFFFCC",  // 26: Ivory
+    "#CCFFFF",  // 27: Light Turquoise
+    "#660066",  // 28: Dark Purple
+    "#FF8080",  // 29: Coral
+    "#0066CC",  // 30: Ocean Blue
+    "#CCCCFF",  // 31: Ice Blue
+    "#000080",  // 32: Dark Blue
+    "#FF00FF",  // 33: Pink
+    "#FFFF00",  // 34: Yellow
+    "#00FFFF",  // 35: Turquoise
+    "#800080",  // 36: Violet
+    "#800000",  // 37: Dark Red
+    "#008080",  // 38: Teal
+    "#0000FF",  // 39: Blue
+    "#00CCFF",  // 40: Sky Blue
+    "#CCFFFF",  // 41: Light Turquoise
+    "#CCFFCC",  // 42: Light Green
+    "#FFFF99",  // 43: Light Yellow
+    "#99CCFF",  // 44: Pale Blue
+    "#FF99CC",  // 45: Rose
+    "#CC99FF",  // 46: Lavender
+    "#FFCC99",  // 47: Tan
+    "#3366FF",  // 48: Light Blue
+    "#33CCCC",  // 49: Aqua
+    "#99CC00",  // 50: Lime
+    "#FFCC00",  // 51: Gold
+    "#FF9900",  // 52: Light Orange
+    "#FF6600",  // 53: Orange
+    "#666699",  // 54: Blue-Gray
+    "#969696",  // 55: Gray (40%)
+    "#003366",  // 56: Dark Teal
+    "#339966",  // 57: Sea Green
+    "#003300",  // 58: Dark Green
+    "#333300",  // 59: Olive Green
+    "#993300",  // 60: Brown
+    "#993366",  // 61: Plum
+    "#333399",  // 62: Indigo
+    "#333333",  // 63: Gray (80%)
+};
+// clang-format on
+
+// Get indexed color by index (returns empty string for invalid indices)
+std::string getIndexedColor(int index) {
+    if (index >= 0 && index < 64) {
+        return kIndexedColors[index];
+    }
+    // Special indexed values:
+    // 64: System foreground (use system text color) - default to black
+    // 65: System background (use system background color) - default to white
+    if (index == 64)
+        return "#000000";
+    if (index == 65)
+        return "#FFFFFF";
+    return {};
+}
+
+// Resolve a color from an XML color node (handles rgb, theme+tint, indexed)
+// colorNode is an element like <color rgb="FF000000"/> or <color theme="1" tint="0.5"/>
+// or <color indexed="5"/>
+std::string resolveColor(pugi::xml_node colorNode, const XLSXThemeColors& theme) {
+    if (!colorNode) {
+        return {};
+    }
+
+    // First check for direct RGB color
+    const char* rgb = colorNode.attribute("rgb").value();
+    if (rgb && rgb[0] != '\0') {
+        return argbToRgb(rgb);
+    }
+
+    // Check for theme color
+    auto themeAttr = colorNode.attribute("theme");
+    if (themeAttr) {
+        int themeIndex = themeAttr.as_int(-1);
+        std::string baseColor = theme.getColor(themeIndex);
+        if (!baseColor.empty()) {
+            // Apply tint if present
+            double tint = colorNode.attribute("tint").as_double(0.0);
+            if (tint != 0.0) {
+                return applyTint(baseColor, tint);
+            }
+            return baseColor;
+        }
+    }
+
+    // Check for indexed color
+    auto indexedAttr = colorNode.attribute("indexed");
+    if (indexedAttr) {
+        int colorIndex = indexedAttr.as_int(-1);
+        std::string indexedColor = getIndexedColor(colorIndex);
+        if (!indexedColor.empty()) {
+            return indexedColor;
+        }
+    }
+
+    // Check for auto color (maps to black)
+    auto autoAttr = colorNode.attribute("auto");
+    if (autoAttr && autoAttr.as_bool()) {
+        return "#000000";
+    }
+
+    return {};
+}
+
 // Parse horizontal alignment string to enum
 cells::TextAlign parseHorizontalAlign(const char* align) {
     if (align == nullptr) {
@@ -237,7 +547,7 @@ cells::BorderStyle parseBorderStyle(const char* style) {
 }
 
 // Parse a single border edge element (left, right, top, or bottom)
-XLSXBorderEdge parseBorderEdge(pugi::xml_node edgeNode) {
+XLSXBorderEdge parseBorderEdge(pugi::xml_node edgeNode, const XLSXThemeColors& theme) {
     XLSXBorderEdge edge;
     if (!edgeNode) {
         return edge;
@@ -250,16 +560,7 @@ XLSXBorderEdge parseBorderEdge(pugi::xml_node edgeNode) {
     // Get color (from <color> child element)
     auto colorNode = edgeNode.child("color");
     if (colorNode) {
-        const char* rgb = colorNode.attribute("rgb").value();
-        if (rgb && rgb[0] != '\0') {
-            edge.color = argbToRgb(rgb);
-        }
-        // Also check indexed colors (auto maps to black)
-        auto autoAttr = colorNode.attribute("auto");
-        if (autoAttr && autoAttr.as_bool()) {
-            edge.color = "#000000";
-        }
-        // TODO: Support indexed and theme colors
+        edge.color = resolveColor(colorNode, theme);
     }
 
     return edge;
@@ -521,7 +822,7 @@ ParsedDefinedNameRef parseDefinedNameRef(const std::string& refStr) {
 }
 
 // Parse xl/styles.xml into XLSXStyles struct
-XLSXStyles parseStylesXml(const std::string& content) {
+XLSXStyles parseStylesXml(const std::string& content, const XLSXThemeColors& theme) {
     XLSXStyles styles;
 
     if (content.empty()) {
@@ -589,11 +890,7 @@ XLSXStyles parseStylesXml(const std::string& content) {
         // Font color: <color rgb="FF000000"/> or <color theme="1"/>
         auto colorNode = fontNode.child("color");
         if (colorNode) {
-            const char* rgb = colorNode.attribute("rgb").value();
-            if (rgb && rgb[0] != '\0') {
-                font.color = argbToRgb(rgb);
-            }
-            // TODO: Support theme colors (requires parsing theme.xml)
+            font.color = resolveColor(colorNode, theme);
         }
 
         styles.fonts.push_back(font);
@@ -611,11 +908,7 @@ XLSXStyles parseStylesXml(const std::string& content) {
             if (patternType && std::strcmp(patternType, "solid") == 0) {
                 auto fgColorNode = patternFill.child("fgColor");
                 if (fgColorNode) {
-                    const char* rgb = fgColorNode.attribute("rgb").value();
-                    if (rgb && rgb[0] != '\0') {
-                        fill.fgColor = argbToRgb(rgb);
-                    }
-                    // TODO: Support theme colors
+                    fill.fgColor = resolveColor(fgColorNode, theme);
                 }
             }
         }
@@ -627,10 +920,10 @@ XLSXStyles parseStylesXml(const std::string& content) {
     auto bordersNode = styleSheet.child("borders");
     for (auto borderNode : bordersNode.children("border")) {
         XLSXBorder border;
-        border.left = parseBorderEdge(borderNode.child("left"));
-        border.right = parseBorderEdge(borderNode.child("right"));
-        border.top = parseBorderEdge(borderNode.child("top"));
-        border.bottom = parseBorderEdge(borderNode.child("bottom"));
+        border.left = parseBorderEdge(borderNode.child("left"), theme);
+        border.right = parseBorderEdge(borderNode.child("right"), theme);
+        border.top = parseBorderEdge(borderNode.child("top"), theme);
+        border.bottom = parseBorderEdge(borderNode.child("bottom"), theme);
         styles.borders.push_back(border);
     }
 
@@ -1150,6 +1443,17 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     }
     logTiming("parse sharedStrings", start);
 
+    // Parse theme.xml for theme colors
+    start = std::chrono::steady_clock::now();
+    XLSXThemeColors themeColors;
+    if (options.readStyles) {
+        const std::string themeContent = zip.readFile("xl/theme/theme1.xml");
+        if (!themeContent.empty()) {
+            themeColors = parseThemeXml(themeContent);
+        }
+    }
+    logTiming("parse theme", start);
+
     // Parse styles if requested
     start = std::chrono::steady_clock::now();
     XLSXStyles xlsxStyles;
@@ -1159,7 +1463,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     if (options.readStyles) {
         const std::string stylesContent = zip.readFile("xl/styles.xml");
         if (!stylesContent.empty()) {
-            xlsxStyles = parseStylesXml(stylesContent);
+            xlsxStyles = parseStylesXml(stylesContent, themeColors);
         }
     }
     logTiming("parse styles", start);

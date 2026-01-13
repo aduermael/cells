@@ -839,5 +839,95 @@ TEST(XLSXReaderTest, CellBordersImportedFromLBOModel) {
     EXPECT_GT(cellsWithBorders, 0u) << "Expected to find cells with borders in LBO model";
 }
 
+// ============================================================================
+// Theme Color Tests
+// ============================================================================
+
+TEST(XLSXReaderTest, ReadThemeColorsFromLBOModel) {
+    // The LBO model file uses theme colors (e.g., theme="4" tint="-0.5")
+    // for section title backgrounds (dark blue)
+    XLSXReadOptions options;
+    options.readStyles = true;
+
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // Count cells with background colors that look like theme colors
+    // Theme colors with tint result in colors like dark blue (#2D4D6E or similar)
+    size_t cellsWithBgColor = 0;
+    size_t cellsWithDarkBgColor = 0;
+
+    for (const auto& [id, cell] : sheet->cells) {
+        if (!cell->styleId.isNull()) {
+            auto* stylePtr = result.workbook->getStyle(cell->styleId);
+            if (stylePtr && !stylePtr->bgColor.empty()) {
+                cellsWithBgColor++;
+                // Check if it's a darkened color (not pure white or very light)
+                // Dark colors typically have hex values where each component is < 0x80
+                if (stylePtr->bgColor.length() == 7 && stylePtr->bgColor[0] == '#') {
+                    int r = std::stoi(stylePtr->bgColor.substr(1, 2), nullptr, 16);
+                    int g = std::stoi(stylePtr->bgColor.substr(3, 2), nullptr, 16);
+                    int b = std::stoi(stylePtr->bgColor.substr(5, 2), nullptr, 16);
+                    // Consider it "dark" if all RGB < 128 or max is < 180
+                    if (std::max({r, g, b}) < 180) {
+                        cellsWithDarkBgColor++;
+                    }
+                }
+            }
+        }
+    }
+
+    std::cout << "Cells with bgColor: " << cellsWithBgColor << std::endl;
+    std::cout << "Cells with dark bgColor (theme colors with tint): " << cellsWithDarkBgColor
+              << std::endl;
+
+    // The LBO model has section headers with dark blue backgrounds from theme colors
+    EXPECT_GT(cellsWithBgColor, 0u) << "Expected to find cells with background colors";
+    EXPECT_GT(cellsWithDarkBgColor, 0u)
+        << "Expected to find cells with dark backgrounds (theme colors with negative tint)";
+}
+
+TEST(XLSXReaderTest, ReadLightGrayBackgroundFromTheme) {
+    // The LBO model uses theme="0" tint="-0.15" for light gray backgrounds
+    XLSXReadOptions options;
+    options.readStyles = true;
+
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    // Look for light gray cells (theme 0 = white with small negative tint = light gray)
+    // Light gray is approximately #D9D9D9 to #E6E6E6
+    size_t cellsWithLightGray = 0;
+
+    for (const auto& [id, cell] : sheet->cells) {
+        if (!cell->styleId.isNull()) {
+            auto* stylePtr = result.workbook->getStyle(cell->styleId);
+            if (stylePtr && !stylePtr->bgColor.empty() && stylePtr->bgColor.length() == 7) {
+                int r = std::stoi(stylePtr->bgColor.substr(1, 2), nullptr, 16);
+                int g = std::stoi(stylePtr->bgColor.substr(3, 2), nullptr, 16);
+                int b = std::stoi(stylePtr->bgColor.substr(5, 2), nullptr, 16);
+                // Light gray: all components similar and > 200 but < 250
+                if (r > 200 && g > 200 && b > 200 && r < 250 && g < 250 && b < 250 &&
+                    std::abs(r - g) < 5 && std::abs(g - b) < 5) {
+                    cellsWithLightGray++;
+                }
+            }
+        }
+    }
+
+    std::cout << "Cells with light gray background: " << cellsWithLightGray << std::endl;
+
+    // The LBO model should have cells with light gray (input cells)
+    EXPECT_GT(cellsWithLightGray, 0u) << "Expected to find cells with light gray backgrounds";
+}
+
 }  // namespace
 }  // namespace cells
