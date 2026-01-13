@@ -70,12 +70,29 @@ Despite previous zoom fixes, rendering issues persist at non-100% zoom levels. S
 
 Review all code that uses positions, sizes, or coordinates to identify zoom gaps.
 
-- [ ] 8.1a: Audit `grid-renderer.ts` - document all position/size calculations and whether they properly use zoomed vs unzoomed values
-- [ ] 8.1b: Audit `grid-selection-renderer.ts` - verify selection box, fill handle, fill preview all use consistent zoom calculations
-- [ ] 8.1c: Audit `grid-header-renderer.ts` - verify resize indicators, drag ghosts, header highlights use zoom
-- [ ] 8.1d: Audit `mouse-events.ts` - verify all mouse coordinate translations (screen→grid, grid→screen) use zoom correctly
-- [ ] 8.1e: Audit `cell-editor.ts` - verify editor positioning accounts for zoom in all cases
-- [ ] 8.1f: Document findings and create fix list for each file
+- [x] 8.1a: Audit `grid-renderer.ts` - document all position/size calculations and whether they properly use zoomed vs unzoomed values. **Findings:** Most rendering is properly zoomed. Issues found in `_drawColumnDragGhost()` and `_drawRowDragGhost()` which use unzoomed HEADER_WIDTH/HEADER_HEIGHT and column/row dimensions. `drawResizePreview()` uses resizePreviewX/Y directly (set by mouse handlers).
+- [x] 8.1b: Audit `grid-selection-renderer.ts` - verify selection box, fill handle, fill preview all use consistent zoom calculations. **Findings:** All properly zoomed! Uses `getZoomedColWidth()`, `getZoomedRowHeight()`, `getZoomedHeaderWidth()`, `getZoomedHeaderHeight()`. Minor issue: `FILL_HANDLE_SIZE` is hardcoded at 6px.
+- [x] 8.1c: Audit `grid-header-renderer.ts` - verify resize indicators, drag ghosts, header highlights use zoom. **Findings:** Fully zoom-aware! All functions use zoomed helpers correctly.
+- [x] 8.1d: Audit `mouse-events.ts` and `grid-utils.ts` - verify all mouse coordinate translations (screen→grid, grid→screen) use zoom correctly. **Major issues found:** (1) `handleWheel()` uses unzoomed constants; (2) `getColAtXMidpoint()`/`getRowAtYMidpoint()` use unzoomed values; (3) Resize preview calculations in `handleMouseDown()` and `handleMouseMove()` don't apply zoom; (4) `checkFormulaHighlightHover()` uses unzoomed calculations; (5) Many places use `HEADER_WIDTH`/`HEADER_HEIGHT` constants instead of zoomed versions. Note: `grid-utils.ts` functions (`getColAtX`, `getRowAtY`, `getResizeHandleCol`, `getResizeHandleRow`, `getDropTargetCol`, `getDropTargetRow`) are all properly zoomed!
+- [x] 8.1e: Audit `cell-editor.ts` - verify editor positioning accounts for zoom in all cases. **Findings:** Fully zoom-aware! `positionEditor()` correctly uses all zoomed helper functions.
+- [x] 8.1f: Document findings and create fix list for each file
+
+**Fix List Summary:**
+
+1. **mouse-events.ts** (critical - most issues):
+   - `handleWheel()`: Use zoomed header dimensions and apply zoom to scroll calculations
+   - `getColAtXMidpoint()` / `getRowAtYMidpoint()`: Use zoomed values
+   - `handleMouseDown()` column/row resize: Apply zoom when calculating `setResizePreviewX`/`setResizePreviewY`
+   - `handleMouseMove()` resize tracking: Apply zoom to preview calculations
+   - `checkFormulaHighlightHover()`: Use zoomed dimensions in getColX/getRowY helpers
+   - Replace `HEADER_WIDTH`/`HEADER_HEIGHT` with `getZoomedHeaderWidth()`/`getZoomedHeaderHeight()` throughout
+
+2. **grid-renderer.ts**:
+   - `_drawColumnDragGhost()`: Use zoomed header height and zoomed column width
+   - `_drawRowDragGhost()`: Use zoomed header width and zoomed row height
+
+3. **grid-selection-renderer.ts** (minor):
+   - Consider scaling `FILL_HANDLE_SIZE` with zoom
 
 ### 8.2: Fix Column/Row Resize Indicators
 
