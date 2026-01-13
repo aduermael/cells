@@ -291,6 +291,16 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 json << "\"mergeRowSpan\":" << mergeRange->rowSpan << ",";
             } else {
                 json << "\"isMergedCell\":true,";
+                // Include anchor position and span for non-anchor merged cells
+                // so the editor can position correctly
+                const Axis* anchorCol = sheet->getColumn(mergeRange->anchorColId);
+                const Axis* anchorRow = sheet->getRow(mergeRange->anchorRowId);
+                if (anchorCol != nullptr && anchorRow != nullptr) {
+                    json << "\"mergeAnchorCol\":" << anchorCol->position << ",";
+                    json << "\"mergeAnchorRow\":" << anchorRow->position << ",";
+                    json << "\"mergeColSpan\":" << mergeRange->colSpan << ",";
+                    json << "\"mergeRowSpan\":" << mergeRange->rowSpan << ",";
+                }
             }
         }
 

@@ -88,8 +88,10 @@ export interface CellData {
   // Merged cell properties
   isMergeAnchor?: boolean; // True if this cell is the anchor (top-left) of a merged region
   isMergedCell?: boolean; // True if this cell is part of a merged region (but not the anchor)
-  mergeColSpan?: number; // Number of columns spanned (only set on anchor)
-  mergeRowSpan?: number; // Number of rows spanned (only set on anchor)
+  mergeColSpan?: number; // Number of columns spanned (set on anchor and non-anchor cells)
+  mergeRowSpan?: number; // Number of rows spanned (set on anchor and non-anchor cells)
+  mergeAnchorCol?: number; // Anchor column position (only set on non-anchor merged cells)
+  mergeAnchorRow?: number; // Anchor row position (only set on non-anchor merged cells)
 }
 
 // ============================================================================

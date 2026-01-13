@@ -718,7 +718,8 @@ export class CellEditor {
   // =========================================================================
 
   /**
-   * Position the cell editor over the selected cell
+   * Position the cell editor over the selected cell.
+   * For merged cells, positions at the anchor and spans the full merged region.
    */
   private positionEditor(cell: Position): void {
     const scrollX = this.getScrollX();
@@ -726,22 +727,55 @@ export class CellEditor {
     const colWidths = this.getColWidths();
     const rowHeights = this.getRowHeights();
 
+    // Check if this cell is part of a merge
+    const cellData = this.getCellDataAt(cell.col, cell.row);
+
+    // Determine anchor position and span
+    let anchorCol = cell.col;
+    let anchorRow = cell.row;
+    let colSpan = 1;
+    let rowSpan = 1;
+
+    if (cellData?.isMergeAnchor) {
+      // This cell is the anchor - use its span
+      colSpan = cellData.mergeColSpan ?? 1;
+      rowSpan = cellData.mergeRowSpan ?? 1;
+    } else if (cellData?.isMergedCell) {
+      // This cell is part of a merge but not the anchor
+      anchorCol = cellData.mergeAnchorCol ?? cell.col;
+      anchorRow = cellData.mergeAnchorRow ?? cell.row;
+      colSpan = cellData.mergeColSpan ?? 1;
+      rowSpan = cellData.mergeRowSpan ?? 1;
+    }
+
+    // Calculate X position (anchor column)
     let cellX = HEADER_WIDTH - scrollX;
-    for (let i = 0; i < cell.col; i++) {
+    for (let i = 0; i < anchorCol; i++) {
       cellX += colWidths.get(i) ?? DEFAULT_COL_WIDTH;
     }
+
+    // Calculate Y position (anchor row)
     let cellY = HEADER_HEIGHT - scrollY;
-    for (let i = 0; i < cell.row; i++) {
+    for (let i = 0; i < anchorRow; i++) {
       cellY += rowHeights.get(i) ?? DEFAULT_ROW_HEIGHT;
     }
 
-    const cellWidth = colWidths.get(cell.col) ?? DEFAULT_COL_WIDTH;
-    const cellHeight = rowHeights.get(cell.row) ?? DEFAULT_ROW_HEIGHT;
+    // Calculate total width (sum of all columns in span)
+    let totalWidth = 0;
+    for (let i = 0; i < colSpan; i++) {
+      totalWidth += colWidths.get(anchorCol + i) ?? DEFAULT_COL_WIDTH;
+    }
+
+    // Calculate total height (sum of all rows in span)
+    let totalHeight = 0;
+    for (let i = 0; i < rowSpan; i++) {
+      totalHeight += rowHeights.get(anchorRow + i) ?? DEFAULT_ROW_HEIGHT;
+    }
 
     this.cellEditorContainer.style.left = cellX + "px";
     this.cellEditorContainer.style.top = cellY + "px";
-    this.cellEditorContainer.style.width = cellWidth + "px";
-    this.cellEditorContainer.style.height = cellHeight + "px";
+    this.cellEditorContainer.style.width = totalWidth + "px";
+    this.cellEditorContainer.style.height = totalHeight + "px";
     this.cellEditorContainer.style.display = "block";
   }
 

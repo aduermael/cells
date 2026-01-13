@@ -80,7 +80,7 @@ Verify all improvements work together with the LBO model file.
 
 When editing a merged cell, the cell editor appears at an offset instead of on top of the cell. The editor should position at the merge anchor and span the full merged area.
 
-- [ ] 9a: In cell-editor.ts `positionEditor`, check if selected cell is part of a merge (via `isMergedCell` or `isMergeAnchor`)
-- [ ] 9b: If merged, find the anchor cell position and use `mergeColSpan`/`mergeRowSpan` to calculate editor size
-- [ ] 9c: Position editor at anchor coordinates, size to span full merged region
-- [ ] 9d: Test editing merged cells of various sizes and positions
+- [x] 9a: In cell-editor.ts `positionEditor`, check if selected cell is part of a merge (via `isMergedCell` or `isMergeAnchor`). Updated bindings_viewport.cc to return mergeAnchorCol, mergeAnchorRow, mergeColSpan, and mergeRowSpan for non-anchor merged cells.
+- [x] 9b: If merged, find the anchor cell position and use `mergeColSpan`/`mergeRowSpan` to calculate editor size. Updated types.ts with new CellData fields.
+- [x] 9c: Position editor at anchor coordinates, size to span full merged region. Rewrote positionEditor() to handle merge anchors and non-anchor merged cells.
+- [x] 9d: Test editing merged cells of various sizes and positions. All E2E tests pass (83/83).
