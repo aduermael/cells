@@ -626,7 +626,8 @@ export class GridRenderer {
       if (cellY + totalHeight < zoomedHeaderHeight || cellY > viewHeight) continue;
 
       ctx.fillStyle = bgColor;
-      ctx.fillRect(cellX + 1, cellY + 1, totalWidth - 1, totalHeight - 1);
+      // Draw backgrounds edge-to-edge (no inset) - grid lines will be drawn on top
+      ctx.fillRect(cellX, cellY, totalWidth, totalHeight);
     }
   }
 

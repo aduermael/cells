@@ -22,9 +22,9 @@ Headers are rendered but positioning may not account for zoom properly, causing 
 
 Thin gaps visible between cells when no border exists because background fill leaves 1px margins for grid lines, but grid lines are drawn after backgrounds.
 
-- [ ] 3a: Change cell background rendering order: draw backgrounds edge-to-edge (no 1px inset), then draw grid lines on top
-- [ ] 3b: Ensure merged cell backgrounds span the full merged region without gaps
-- [ ] 3c: Add visual regression test or E2E test that checks for gaps in adjacent filled cells
+- [x] 3a: Change cell background rendering order: draw backgrounds edge-to-edge (no 1px inset), then draw grid lines on top. Removed the 1px inset from `_drawCellBackgrounds()` in grid-renderer.ts - backgrounds now fill the full cell area and grid lines are drawn on top.
+- [x] 3b: Ensure merged cell backgrounds span the full merged region without gaps. Verified that merged cell handling in `_drawCellBackgrounds()` was already correct - it sums up all spanned columns/rows for merge anchors.
+- [x] 3c: Add visual regression test or E2E test that checks for gaps in adjacent filled cells. Created `cell-background.test.mjs` with 4 tests that verify pixels near cell boundaries have the correct background color.
 
 ## Phase 4: Blue Section Width Fix
 
