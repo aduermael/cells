@@ -49,11 +49,11 @@ The XLSX reader parses `<cols>` elements but ignores the `width` attribute, defa
 
 Implement Excel-style text overflow: when a cell contains text longer than its width and the adjacent cell(s) to the right are empty, the text should visually extend into those cells.
 
-- [ ] 6a: Add overflow detection in grid-renderer.ts _drawCellContent: measure text width vs cell width
-- [ ] 6b: When text overflows right, check if neighbor cells are empty (no value, not part of merge)
-- [ ] 6c: If neighbors are empty, extend clip region to include empty neighbors, draw text with full width
-- [ ] 6d: Handle left-aligned, center-aligned, and right-aligned text overflow correctly
-- [ ] 6e: Ensure overflow text doesn't draw over cells that have content or are selected
+- [x] 6a: Add overflow detection in grid-renderer.ts _drawCellContent: measure text width vs cell width. Measures text width and compares to available cell width minus padding.
+- [x] 6b: When text overflows right, check if neighbor cells are empty (no value, not part of merge). Built lookup set of cells with content.
+- [x] 6c: If neighbors are empty, extend clip region to include empty neighbors, draw text with full width. Extended clip region calculation based on overflow direction.
+- [x] 6d: Handle left-aligned, center-aligned, and right-aligned text overflow correctly. Left overflows right, right overflows left, center overflows both directions.
+- [x] 6e: Ensure overflow text doesn't draw over cells that have content or are selected. Stops extending at cells with value/display/formula/merge.
 
 ## Phase 7: Cell Border Support
 

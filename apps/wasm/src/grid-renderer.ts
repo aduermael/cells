@@ -592,6 +592,16 @@ export class GridRenderer {
     rowHasMoved: boolean,
     headerState: HeaderRendererState
   ): void {
+    // Build a lookup set of cells with content for overflow checking
+    // Key format: "col,row"
+    const cellsWithContent = new Set<string>();
+    for (const cell of this.cells) {
+      // Cell has content if it has a value/display/formula, or is part of a merge
+      if (cell.value || cell.display || cell.formula || cell.isMergedCell || cell.isMergeAnchor) {
+        cellsWithContent.add(`${cell.col},${cell.row}`);
+      }
+    }
+
     for (const cell of this.cells) {
       if (colHasMoved && cell.col === this.dragSourceIndex) continue;
       if (rowHasMoved && cell.row === this.dragSourceIndex) continue;
@@ -625,11 +635,6 @@ export class GridRenderer {
       const displayValue = cell.display || cell.value || "";
       const style = cell.style;
 
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(cellX + 1, cellY + 1, colWidth - 2, rowHeight - 2);
-      ctx.clip();
-
       // Set text color
       ctx.fillStyle = style?.textColor || this.colors.cellText;
 
@@ -641,14 +646,83 @@ export class GridRenderer {
       const fontFamily = style?.fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.font = fontStyle ? `${fontStyle}${fontSize}px ${fontFamily}` : `${fontSize}px ${fontFamily}`;
 
+      // Measure text width for overflow detection
+      const textWidth = ctx.measureText(displayValue).width;
+      const availableWidth = colWidth - 2 * CELL_PADDING;
+
       // Set horizontal alignment
-      // Content area is inset by 1px on each side for grid lines
       const hAlign = style?.hAlign || "left";
+
+      // Calculate overflow clip region (extends into empty neighbor cells)
+      let clipStartCol = cell.col;
+      let clipEndCol = cell.col;
+
+      // Only calculate overflow if text is wider than available space
+      // and the cell is not a merge anchor (merged cells have their own sizing)
+      if (textWidth > availableWidth && !cell.isMergeAnchor && displayValue) {
+        const overflowNeeded = textWidth - availableWidth;
+
+        if (hAlign === "left") {
+          // Overflow to the right
+          let extendedWidth = 0;
+          for (let c = cell.col + 1; c < (this.sheetInfo?.colCount || 100); c++) {
+            if (cellsWithContent.has(`${c},${cell.row}`)) break;
+            const neighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+            extendedWidth += neighborWidth;
+            clipEndCol = c;
+            if (extendedWidth >= overflowNeeded) break;
+          }
+        } else if (hAlign === "right") {
+          // Overflow to the left
+          let extendedWidth = 0;
+          for (let c = cell.col - 1; c >= 0; c--) {
+            if (cellsWithContent.has(`${c},${cell.row}`)) break;
+            const neighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+            extendedWidth += neighborWidth;
+            clipStartCol = c;
+            if (extendedWidth >= overflowNeeded) break;
+          }
+        } else if (hAlign === "center") {
+          // Overflow to both sides equally
+          const halfOverflow = overflowNeeded / 2;
+          // Extend right
+          let rightExtend = 0;
+          for (let c = cell.col + 1; c < (this.sheetInfo?.colCount || 100); c++) {
+            if (cellsWithContent.has(`${c},${cell.row}`)) break;
+            const neighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+            rightExtend += neighborWidth;
+            clipEndCol = c;
+            if (rightExtend >= halfOverflow) break;
+          }
+          // Extend left
+          let leftExtend = 0;
+          for (let c = cell.col - 1; c >= 0; c--) {
+            if (cellsWithContent.has(`${c},${cell.row}`)) break;
+            const neighborWidth = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+            leftExtend += neighborWidth;
+            clipStartCol = c;
+            if (leftExtend >= halfOverflow) break;
+          }
+        }
+      }
+
+      // Calculate the extended clip region
+      const clipX = getColX(clipStartCol, headerState);
+      let clipWidth = 0;
+      for (let c = clipStartCol; c <= clipEndCol; c++) {
+        clipWidth += this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(clipX + 1, cellY + 1, clipWidth - 2, rowHeight - 2);
+      ctx.clip();
+
+      // Set horizontal alignment and calculate text X position
       let textX: number;
       if (hAlign === "center") {
         ctx.textAlign = "center";
-        // Center within the content area (between grid lines: cellX+1 to cellX+colWidth-1)
-        // Round to nearest pixel for crisp rendering
+        // Center within the original cell (between grid lines)
         textX = Math.round(cellX + colWidth / 2);
       } else if (hAlign === "right") {
         ctx.textAlign = "right";
