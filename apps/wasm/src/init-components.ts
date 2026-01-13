@@ -587,7 +587,6 @@ export function createComponents(config: ComponentsConfig): Components {
     getRowHeights: () => app.rowHeights,
     getScrollX: () => app.scrollX,
     getScrollY: () => app.scrollY,
-    getZoomFactor: () => app.renderer.getZoomFactor(),
     getFormulaHighlights: () => app.formulaHighlights,
     getDiscoveredRows: () => app.discoveredRows,
     getCellDataAt: (col, row) => getCellAt(col, row, app.cells) ?? null,

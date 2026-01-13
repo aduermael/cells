@@ -103,10 +103,6 @@ export class MouseEventHandlers {
         };
     }
 
-    /** Get the current zoom factor (1.0 = 100%) */
-    protected getZoomFactor(): number {
-        return this.config.getZoomScale() / 100;
-    }
 
     // =========================================================================
     // Formula Reference Insertion Helpers
@@ -462,7 +458,7 @@ export class MouseEventHandlers {
 
         // Column header click
         if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
             if (col >= 0) {
                 if (this.isInFormulaEditingMode()) {
                     const colLetter = colToLetter(col);
@@ -533,8 +529,7 @@ export class MouseEventHandlers {
                 y,
                 scrollY,
                 rowHeights,
-                Math.max(sheetInfo.rowCount, discoveredRows),
-                this.getZoomFactor(),
+                Math.max(sheetInfo.rowCount, discoveredRows)
             );
             if (row >= 0) {
                 if (this.isInFormulaEditingMode()) {
@@ -589,14 +584,13 @@ export class MouseEventHandlers {
 
         // Cell selection or insert reference
         if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
             const discoveredRows = this.config.getDiscoveredRows();
             const row = getRowAtY(
                 y,
                 scrollY,
                 rowHeights,
-                Math.max(sheetInfo.rowCount, discoveredRows),
-                this.getZoomFactor(),
+                Math.max(sheetInfo.rowCount, discoveredRows)
             );
 
             if (col >= 0 && row >= 0) {
@@ -788,14 +782,13 @@ export class MouseEventHandlers {
             x > HEADER_WIDTH &&
             y > HEADER_HEIGHT
         ) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
             const discoveredRows = this.config.getDiscoveredRows();
             const row = getRowAtY(
                 y,
                 scrollY,
                 rowHeights,
-                Math.max(sheetInfo.rowCount, discoveredRows),
-                this.getZoomFactor(),
+                Math.max(sheetInfo.rowCount, discoveredRows)
             );
             if (col >= 0 && row >= 0) {
                 if (
@@ -852,14 +845,13 @@ export class MouseEventHandlers {
             const clampedX = Math.max(HEADER_WIDTH + 1, x);
             const clampedY = Math.max(HEADER_HEIGHT + 1, y);
 
-            const col = getColAtX(clampedX, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
+            const col = getColAtX(clampedX, scrollX, colWidths, sheetInfo.colCount);
             const discoveredRows = this.config.getDiscoveredRows();
             const row = getRowAtY(
                 clampedY,
                 scrollY,
                 rowHeights,
-                Math.max(sheetInfo.rowCount, discoveredRows),
-                this.getZoomFactor(),
+                Math.max(sheetInfo.rowCount, discoveredRows)
             );
             if (col >= 0 && row >= 0) {
                 const selEnd = getSelectionEnd();
@@ -904,7 +896,7 @@ export class MouseEventHandlers {
             render();
         } else if (uiStateMachine.isInState("COLUMN_DRAGGING")) {
             setDragTargetIndex(
-                getDropTargetCol(x, scrollX, colWidths, sheetInfo, this.getZoomFactor()),
+                getDropTargetCol(x, scrollX, colWidths, sheetInfo),
             );
             setDragMouseX(x);
             setDragMouseY(y);
@@ -913,7 +905,7 @@ export class MouseEventHandlers {
             render();
         } else if (uiStateMachine.isInState("ROW_DRAGGING")) {
             setDragTargetIndex(
-                getDropTargetRow(y, scrollY, rowHeights, sheetInfo, this.getZoomFactor()),
+                getDropTargetRow(y, scrollY, rowHeights, sheetInfo),
             );
             setDragMouseX(x);
             setDragMouseY(y);
@@ -1278,7 +1270,7 @@ export class MouseEventHandlers {
 
         // Double-click on column header: start column renaming
         if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
             if (col >= 0) {
                 columnHeaderEditor.startEditingColumnHeader(col);
                 e.preventDefault();
@@ -1288,14 +1280,13 @@ export class MouseEventHandlers {
 
         // Double-click on cell: start cell editing
         if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
             const discoveredRows = this.config.getDiscoveredRows();
             const row = getRowAtY(
                 y,
                 scrollY,
                 rowHeights,
-                Math.max(sheetInfo.rowCount, discoveredRows),
-                this.getZoomFactor(),
+                Math.max(sheetInfo.rowCount, discoveredRows)
             );
 
             if (col >= 0 && row >= 0) {
@@ -1369,7 +1360,7 @@ export class MouseEventHandlers {
         }
 
         if (y <= HEADER_HEIGHT && x > HEADER_WIDTH) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
             if (col >= 0) {
                 const columns = getColumns();
                 const colId = getColumnId(col, columns);
@@ -1384,8 +1375,7 @@ export class MouseEventHandlers {
                 y,
                 scrollY,
                 rowHeights,
-                Math.max(sheetInfo.rowCount, discoveredRows),
-                this.getZoomFactor(),
+                Math.max(sheetInfo.rowCount, discoveredRows)
             );
             if (row >= 0) {
                 const rows = getRows();
@@ -1396,14 +1386,13 @@ export class MouseEventHandlers {
         }
 
         if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
-            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount, this.getZoomFactor());
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
             const discoveredRows = getDiscoveredRows();
             const row = getRowAtY(
                 y,
                 scrollY,
                 rowHeights,
-                Math.max(sheetInfo.rowCount, discoveredRows),
-                this.getZoomFactor(),
+                Math.max(sheetInfo.rowCount, discoveredRows)
             );
             if (col >= 0 && row >= 0) {
                 const columns = getColumns();

@@ -29,6 +29,7 @@ import {
     DEFAULT_ROW_HEIGHT,
 } from "./grid-renderer.js";
 import {
+    getZoomFactor,
     getZoomedHeaderWidth,
     getZoomedHeaderHeight,
     getZoomedColWidth,
@@ -110,8 +111,6 @@ export interface GridEventHandlerState {
     selectedRow?: number | null;
     isEditing?: boolean;
     fillHandleBounds?: FillHandleBounds | null;
-    /** Zoom factor (1.0 = 100%) */
-    zoomFactor?: number;
 }
 
 /**
@@ -151,7 +150,6 @@ export class GridEventHandler {
     selectedColumn: number | null = null;
     selectedRow: number | null = null;
     fillHandleBounds: FillHandleBounds | null = null;
-    zoomFactor = 1.0;
 
     // Internal state
     isEditing = false;
@@ -194,14 +192,14 @@ export class GridEventHandler {
      * Get column at X coordinate (zoom-aware)
      */
     getColAtX(x: number): number {
-        const zoomedHeaderWidth = getZoomedHeaderWidth(this.zoomFactor);
-        const zoomedScrollX = Math.round(this.scrollX * this.zoomFactor);
+        const zoomedHeaderWidth = getZoomedHeaderWidth();
+        const zoomedScrollX = Math.round(this.scrollX * getZoomFactor());
         if (x < zoomedHeaderWidth) return -1;
         let accX = zoomedHeaderWidth - zoomedScrollX;
         let col = 0;
         while (accX < x && col < (this.sheetInfo?.colCount || 1000)) {
             const baseWidth = this.colWidths.get(col) || DEFAULT_COL_WIDTH;
-            accX += getZoomedColWidth(baseWidth, this.zoomFactor);
+            accX += getZoomedColWidth(baseWidth);
             if (accX > x) return col;
             col++;
         }
@@ -212,14 +210,14 @@ export class GridEventHandler {
      * Get row at Y coordinate (zoom-aware)
      */
     getRowAtY(y: number): number {
-        const zoomedHeaderHeight = getZoomedHeaderHeight(this.zoomFactor);
-        const zoomedScrollY = Math.round(this.scrollY * this.zoomFactor);
+        const zoomedHeaderHeight = getZoomedHeaderHeight();
+        const zoomedScrollY = Math.round(this.scrollY * getZoomFactor());
         if (y < zoomedHeaderHeight) return -1;
         let accY = zoomedHeaderHeight - zoomedScrollY;
         let row = 0;
         while (accY < y && row < (this.sheetInfo?.rowCount || 1000)) {
             const baseHeight = this.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
-            accY += getZoomedRowHeight(baseHeight, this.zoomFactor);
+            accY += getZoomedRowHeight(baseHeight);
             if (accY > y) return row;
             row++;
         }
@@ -231,12 +229,12 @@ export class GridEventHandler {
      */
     getResizeHandleCol(mouseX: number): number {
         if (!this.sheetInfo) return -1;
-        const zoomedHeaderWidth = getZoomedHeaderWidth(this.zoomFactor);
-        const zoomedScrollX = Math.round(this.scrollX * this.zoomFactor);
+        const zoomedHeaderWidth = getZoomedHeaderWidth();
+        const zoomedScrollX = Math.round(this.scrollX * getZoomFactor());
         let x = zoomedHeaderWidth - zoomedScrollX;
         for (let col = 0; col < this.sheetInfo.colCount; col++) {
             const baseW = this.colWidths.get(col) || DEFAULT_COL_WIDTH;
-            const colW = getZoomedColWidth(baseW, this.zoomFactor);
+            const colW = getZoomedColWidth(baseW);
             const rightEdge = x + colW;
             if (
                 mouseX >= rightEdge - RESIZE_HANDLE_WIDTH &&

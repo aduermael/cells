@@ -18,59 +18,82 @@ export const DEFAULT_ROW_HEIGHT = 24;
 export const CELL_PADDING = 4;
 
 // =============================================================================
+// Global Zoom State
+// =============================================================================
+
+/** Current global zoom factor (1.0 = 100%) */
+let currentZoomFactor = 1.0;
+
+/**
+ * Get the current global zoom factor
+ * @returns Zoom factor (1.0 = 100%)
+ */
+export function getZoomFactor(): number {
+  return currentZoomFactor;
+}
+
+/**
+ * Set the global zoom factor
+ * @param zoomFactor Zoom factor (1.0 = 100%)
+ */
+export function setZoomFactor(zoomFactor: number): void {
+  currentZoomFactor = zoomFactor;
+}
+
+// =============================================================================
 // Zoom-aware dimension helpers
 // =============================================================================
 
 /**
  * Get zoomed header height
- * @param zoomFactor Zoom factor (1.0 = 100%)
+ * Uses global zoom factor
  */
-export function getZoomedHeaderHeight(zoomFactor: number): number {
-  return Math.round(HEADER_HEIGHT * zoomFactor);
+export function getZoomedHeaderHeight(): number {
+  return Math.round(HEADER_HEIGHT * currentZoomFactor);
 }
 
 /**
  * Get zoomed header width
- * @param zoomFactor Zoom factor (1.0 = 100%)
+ * Uses global zoom factor
  */
-export function getZoomedHeaderWidth(zoomFactor: number): number {
-  return Math.round(HEADER_WIDTH * zoomFactor);
+export function getZoomedHeaderWidth(): number {
+  return Math.round(HEADER_WIDTH * currentZoomFactor);
 }
 
 /**
  * Get zoomed column width
  * @param baseWidth Base column width in pixels
- * @param zoomFactor Zoom factor (1.0 = 100%)
+ * Uses global zoom factor
  */
-export function getZoomedColWidth(baseWidth: number, zoomFactor: number): number {
-  return Math.round(baseWidth * zoomFactor);
+export function getZoomedColWidth(baseWidth: number): number {
+  return Math.round(baseWidth * currentZoomFactor);
 }
 
 /**
  * Get zoomed row height
  * @param baseHeight Base row height in pixels
- * @param zoomFactor Zoom factor (1.0 = 100%)
+ * Uses global zoom factor
  */
-export function getZoomedRowHeight(baseHeight: number, zoomFactor: number): number {
-  return Math.round(baseHeight * zoomFactor);
+export function getZoomedRowHeight(baseHeight: number): number {
+  return Math.round(baseHeight * currentZoomFactor);
 }
 
 /**
  * Get zoomed cell padding
- * @param zoomFactor Zoom factor (1.0 = 100%)
+ * Uses global zoom factor
  */
-export function getZoomedCellPadding(zoomFactor: number): number {
-  return Math.round(CELL_PADDING * zoomFactor);
+export function getZoomedCellPadding(): number {
+  return Math.round(CELL_PADDING * currentZoomFactor);
 }
 
 /**
  * Get zoomed font size
  * @param baseFontSize Base font size in pixels
- * @param zoomFactor Zoom factor (1.0 = 100%)
+ * Uses global zoom factor
  */
-export function getZoomedFontSize(baseFontSize: number, zoomFactor: number): number {
+export function getZoomedFontSize(baseFontSize: number): number {
   // Don't round font sizes to allow smooth scaling
-  return baseFontSize * zoomFactor;
+  return baseFontSize * currentZoomFactor;
 }
 
 // Color palette

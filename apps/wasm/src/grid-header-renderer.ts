@@ -6,6 +6,7 @@ import {
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
   getGridColors,
+  getZoomFactor,
   getZoomedHeaderHeight,
   getZoomedHeaderWidth,
   getZoomedColWidth,
@@ -36,27 +37,24 @@ export interface HeaderRendererState {
   editingColumnIndex: number;
   /** Virtual scrolling: discovered row count */
   discoveredRows: number;
-  /** Zoom factor (1.0 = 100%, 0.5 = 50%, 2.0 = 200%) */
-  zoomFactor: number;
 }
 
 /**
  * Get the total width of frozen columns (from col 0 to freezeCol-1).
  * Returns 0 if no columns are frozen.
+ * Uses global zoom factor from grid-constants
  * @param freezeCol Number of frozen columns
  * @param colWidths Map of base column widths
- * @param zoomFactor Zoom factor (1.0 = 100%), defaults to 1.0
  */
 export function getFrozenColWidth(
   freezeCol: number,
-  colWidths: Map<number, number>,
-  zoomFactor: number = 1.0
+  colWidths: Map<number, number>
 ): number {
   if (freezeCol <= 0) return 0;
   let width = 0;
   for (let col = 0; col < freezeCol; col++) {
     const baseWidth = colWidths.get(col) || DEFAULT_COL_WIDTH;
-    width += getZoomedColWidth(baseWidth, zoomFactor);
+    width += getZoomedColWidth(baseWidth);
   }
   return width;
 }
@@ -64,20 +62,19 @@ export function getFrozenColWidth(
 /**
  * Get the total height of frozen rows (from row 0 to freezeRow-1).
  * Returns 0 if no rows are frozen.
+ * Uses global zoom factor from grid-constants
  * @param freezeRow Number of frozen rows
  * @param rowHeights Map of base row heights
- * @param zoomFactor Zoom factor (1.0 = 100%), defaults to 1.0
  */
 export function getFrozenRowHeight(
   freezeRow: number,
-  rowHeights: Map<number, number>,
-  zoomFactor: number = 1.0
+  rowHeights: Map<number, number>
 ): number {
   if (freezeRow <= 0) return 0;
   let height = 0;
   for (let row = 0; row < freezeRow; row++) {
     const baseHeight = rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
-    height += getZoomedRowHeight(baseHeight, zoomFactor);
+    height += getZoomedRowHeight(baseHeight);
   }
   return height;
 }
@@ -127,8 +124,8 @@ export function getDragAdjustedColX(
 
   const freezeCol = state.sheetInfo?.freezeCol || 0;
   const isFrozen = col < freezeCol;
-  const zoomFactor = state.zoomFactor;
-  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
+  const zoomFactor = getZoomFactor();
+  const zoomedHeaderWidth = getZoomedHeaderWidth();
   // Convert scroll to zoomed pixels
   const zoomedScrollX = Math.round(state.scrollX * zoomFactor);
 
@@ -143,7 +140,7 @@ export function getDragAdjustedColX(
       let x = zoomedHeaderWidth;
       for (let i = 0; i < col; i++) {
         const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-        x += getZoomedColWidth(baseWidth, zoomFactor);
+        x += getZoomedColWidth(baseWidth);
       }
       return x;
     }
@@ -157,15 +154,14 @@ export function getDragAdjustedColX(
     let x = zoomedHeaderWidth - zoomedScrollX;
     for (let i = 0; i < col; i++) {
       const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-      x += getZoomedColWidth(baseWidth, zoomFactor);
+      x += getZoomedColWidth(baseWidth);
     }
     return x;
   }
 
   // Dragging case - maintain existing logic but add freeze awareness
   const sourceW = getZoomedColWidth(
-    state.colWidths.get(state.dragSourceIndex) || DEFAULT_COL_WIDTH,
-    zoomFactor
+    state.colWidths.get(state.dragSourceIndex) || DEFAULT_COL_WIDTH
   );
   let x = isFrozen ? zoomedHeaderWidth : zoomedHeaderWidth - zoomedScrollX;
 
@@ -173,7 +169,7 @@ export function getDragAdjustedColX(
     for (let i = 0; i < col; i++) {
       if (i === state.dragSourceIndex) continue;
       const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-      x += getZoomedColWidth(baseWidth, zoomFactor);
+      x += getZoomedColWidth(baseWidth);
     }
     if (col >= state.dragTargetIndex && col !== state.dragSourceIndex) {
       x += sourceW;
@@ -182,7 +178,7 @@ export function getDragAdjustedColX(
     for (let i = 0; i < col; i++) {
       if (i === state.dragSourceIndex) continue;
       const baseWidth = state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-      x += getZoomedColWidth(baseWidth, zoomFactor);
+      x += getZoomedColWidth(baseWidth);
       if (i === state.dragTargetIndex - 1) {
         x += sourceW;
       }
@@ -211,8 +207,8 @@ export function getDragAdjustedRowY(
 
   const freezeRow = state.sheetInfo?.freezeRow || 0;
   const isFrozen = row < freezeRow;
-  const zoomFactor = state.zoomFactor;
-  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
+  const zoomFactor = getZoomFactor();
+  const zoomedHeaderHeight = getZoomedHeaderHeight();
   // Convert scroll to zoomed pixels
   const zoomedScrollY = Math.round(state.scrollY * zoomFactor);
 
@@ -227,7 +223,7 @@ export function getDragAdjustedRowY(
       let y = zoomedHeaderHeight;
       for (let i = 0; i < row; i++) {
         const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-        y += getZoomedRowHeight(baseHeight, zoomFactor);
+        y += getZoomedRowHeight(baseHeight);
       }
       return y;
     }
@@ -241,15 +237,14 @@ export function getDragAdjustedRowY(
     let y = zoomedHeaderHeight - zoomedScrollY;
     for (let i = 0; i < row; i++) {
       const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-      y += getZoomedRowHeight(baseHeight, zoomFactor);
+      y += getZoomedRowHeight(baseHeight);
     }
     return y;
   }
 
   // Dragging case - maintain existing logic but add freeze awareness
   const sourceH = getZoomedRowHeight(
-    state.rowHeights.get(state.dragSourceIndex) || DEFAULT_ROW_HEIGHT,
-    zoomFactor
+    state.rowHeights.get(state.dragSourceIndex) || DEFAULT_ROW_HEIGHT
   );
   let y = isFrozen ? zoomedHeaderHeight : zoomedHeaderHeight - zoomedScrollY;
 
@@ -257,7 +252,7 @@ export function getDragAdjustedRowY(
     for (let i = 0; i < row; i++) {
       if (i === state.dragSourceIndex) continue;
       const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-      y += getZoomedRowHeight(baseHeight, zoomFactor);
+      y += getZoomedRowHeight(baseHeight);
     }
     if (row >= state.dragTargetIndex && row !== state.dragSourceIndex) {
       y += sourceH;
@@ -266,7 +261,7 @@ export function getDragAdjustedRowY(
     for (let i = 0; i < row; i++) {
       if (i === state.dragSourceIndex) continue;
       const baseHeight = state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-      y += getZoomedRowHeight(baseHeight, zoomFactor);
+      y += getZoomedRowHeight(baseHeight);
       if (i === state.dragTargetIndex - 1) {
         y += sourceH;
       }
@@ -289,10 +284,10 @@ export function drawColumnHeaders(
   if (!state.sheetInfo) return;
 
   const colors = getGridColors();
-  const zoomFactor = state.zoomFactor;
-  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
-  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
-  const zoomedFontSize = getZoomedFontSize(12, zoomFactor);
+  const zoomFactor = getZoomFactor();
+  const zoomedHeaderWidth = getZoomedHeaderWidth();
+  const zoomedHeaderHeight = getZoomedHeaderHeight();
+  const zoomedFontSize = getZoomedFontSize(12);
 
   ctx.fillStyle = colors.headerBg;
   ctx.fillRect(zoomedHeaderWidth, 0, viewWidth - zoomedHeaderWidth, zoomedHeaderHeight);
@@ -312,7 +307,7 @@ export function drawColumnHeaders(
   for (let col = startCol; col < endCol; col++) {
     if (colHasMoved && col === state.dragSourceIndex) continue;
     const baseColW = state.colWidths.get(col) || DEFAULT_COL_WIDTH;
-    const zoomedColW = getZoomedColWidth(baseColW, zoomFactor);
+    const zoomedColW = getZoomedColWidth(baseColW);
     const headerX = getDragAdjustedColX(col, state);
     if (headerX >= viewWidth || headerX + zoomedColW < zoomedHeaderWidth) continue;
 
@@ -376,10 +371,10 @@ export function drawRowHeaders(
   if (!state.sheetInfo) return;
 
   const colors = getGridColors();
-  const zoomFactor = state.zoomFactor;
-  const zoomedHeaderWidth = getZoomedHeaderWidth(zoomFactor);
-  const zoomedHeaderHeight = getZoomedHeaderHeight(zoomFactor);
-  const zoomedFontSize = getZoomedFontSize(12, zoomFactor);
+  const zoomFactor = getZoomFactor();
+  const zoomedHeaderWidth = getZoomedHeaderWidth();
+  const zoomedHeaderHeight = getZoomedHeaderHeight();
+  const zoomedFontSize = getZoomedFontSize(12);
 
   ctx.fillStyle = colors.headerBg;
   ctx.fillRect(0, zoomedHeaderHeight, zoomedHeaderWidth, viewHeight - zoomedHeaderHeight);
@@ -402,7 +397,7 @@ export function drawRowHeaders(
   for (let row = startRow; row < endRow; row++) {
     if (rowHasMoved && row === state.dragSourceIndex) continue;
     const baseRowH = state.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
-    const zoomedRowH = getZoomedRowHeight(baseRowH, zoomFactor);
+    const zoomedRowH = getZoomedRowHeight(baseRowH);
     const headerY = getDragAdjustedRowY(row, state);
     if (headerY >= viewHeight || headerY + zoomedRowH < zoomedHeaderHeight) continue;
 
