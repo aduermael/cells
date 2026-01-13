@@ -30,9 +30,9 @@ Thin gaps visible between cells when no border exists because background fill le
 
 Blue header sections in LBO model don't fill expected width - likely related to merged cell handling or column width accumulation.
 
-- [ ] 4a: Debug the specific cells with blue backgrounds in the LBO model to identify why they're not spanning the expected width
-- [ ] 4b: Fix merged cell background width calculation to include all spanned columns
-- [ ] 4c: Add test case for merged cell backgrounds spanning multiple columns
+- [x] 4a: Debug the specific cells with blue backgrounds in the LBO model to identify why they're not spanning the expected width. Root cause: XLSX reader was skipping empty cells that had styling but no content. The blue section headers (e.g., row 5 "General Assumptions:") have 12 cells (B5-M5) all with blue backgrounds, but only B5 had text content - the other 11 were empty styled cells that were being skipped.
+- [x] 4b: Fix XLSX reader to not skip empty cells that have styles. Changed the skip condition in xlsx_reader.cc:1815 to check for style index before skipping: `if (value.empty() && !cellNode.child("f") && styleIndexForSkip == 0)` - now empty cells with styles are preserved.
+- [x] 4c: Add test case for styled empty cells from XLSX. Created `styled-empty-cells.test.mjs` with 3 tests verifying that blue section headers now have all 12 cells (B5-M5) with proper backgrounds.
 
 ## Phase 5: Accounting Number Format
 

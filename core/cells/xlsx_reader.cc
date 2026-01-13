@@ -1811,8 +1811,11 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                     }
                 }
 
-                // Skip empty cells
-                if (value.empty() && !cellNode.child("f")) {
+                // Skip empty cells that have no style
+                // We need to keep empty cells if they have styling (e.g., background color)
+                // as they may be part of styled header rows
+                const int styleIndexForSkip = cellNode.attribute("s").as_int(0);
+                if (value.empty() && !cellNode.child("f") && styleIndexForSkip == 0) {
                     continue;
                 }
 
