@@ -987,10 +987,11 @@ export function createComponents(config: ComponentsConfig): Components {
   const zoomControls = new ZoomControls();
   zoomControls.setRenderer(app.renderer);
   zoomControls.setOnZoomChange(() => {
-    // When zoom changes, we don't need to re-render the canvas
-    // CSS transform handles the visual zoom
-    // But we might want to update scrollbar calculations
+    // When zoom changes, update zoom-dependent UI elements
+    // The renderer re-renders in setZoomScale(), but we need to update other components
     updateScrollbars();
+    // Reposition cell editor if currently editing
+    cellEditor.repositionEditor();
   });
   // Set forward reference so render() can sync zoom display
   zoomControlsRef = zoomControls;

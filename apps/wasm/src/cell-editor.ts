@@ -33,6 +33,7 @@ import {
   DEFAULT_ROW_HEIGHT,
 } from "./grid-renderer";
 import {
+  getZoomFactor,
   getZoomedHeaderWidth,
   getZoomedHeaderHeight,
   getZoomedColWidth,
@@ -278,6 +279,18 @@ export class CellEditor {
   isFormulaMode(): boolean {
     if (!this.isEditing()) return false;
     return this.getValue().startsWith("=");
+  }
+
+  /**
+   * Reposition the cell editor overlay.
+   * Called when zoom changes or scroll occurs while editing.
+   * Does nothing if not currently editing.
+   */
+  repositionEditor(): void {
+    if (!this.isEditing()) return;
+    const selectedCell = this.getSelectedCell();
+    if (!selectedCell) return;
+    this.positionEditor(selectedCell);
   }
 
   /**
@@ -736,6 +749,11 @@ export class CellEditor {
     const zoomedHeaderWidth = getZoomedHeaderWidth();
     const zoomedHeaderHeight = getZoomedHeaderHeight();
 
+    // Apply zoom to scroll values for consistent positioning
+    const zoomFactor = getZoomFactor();
+    const zoomedScrollX = Math.round(scrollX * zoomFactor);
+    const zoomedScrollY = Math.round(scrollY * zoomFactor);
+
     // Check if this cell is part of a merge
     const cellData = this.getCellDataAt(cell.col, cell.row);
 
@@ -758,14 +776,14 @@ export class CellEditor {
     }
 
     // Calculate X position (anchor column) using zoomed dimensions
-    let cellX = zoomedHeaderWidth - scrollX;
+    let cellX = zoomedHeaderWidth - zoomedScrollX;
     for (let i = 0; i < anchorCol; i++) {
       const baseWidth = colWidths.get(i) ?? DEFAULT_COL_WIDTH;
       cellX += getZoomedColWidth(baseWidth);
     }
 
     // Calculate Y position (anchor row) using zoomed dimensions
-    let cellY = zoomedHeaderHeight - scrollY;
+    let cellY = zoomedHeaderHeight - zoomedScrollY;
     for (let i = 0; i < anchorRow; i++) {
       const baseHeight = rowHeights.get(i) ?? DEFAULT_ROW_HEIGHT;
       cellY += getZoomedRowHeight(baseHeight);
