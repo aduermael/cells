@@ -28,6 +28,7 @@ import { initTheme } from "./theme";
 import { createComponents, type Components } from "./init-components";
 import { setupDataListeners } from "./init-listeners";
 import { setupCollaboration, clearRoomIdFromUrl } from "./init-collab";
+import { onFontLoaded, preloadCommonFonts } from "./font-loader";
 
 // Re-export types
 import type { CellEditor } from "./cell-editor";
@@ -173,6 +174,12 @@ export function initApp(): AppContext {
   // =========================================================================
 
   async function init(): Promise<void> {
+    // Set up font loading - re-render when fonts are loaded
+    onFontLoaded(() => {
+      components.render();
+    });
+    preloadCommonFonts();
+
     // Set up event listeners
     components.eventManager.setupEventListeners();
     components.fileLoader.setupFileInput();

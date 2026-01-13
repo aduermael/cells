@@ -56,8 +56,8 @@ The EOMONTH function is not implemented but is used in financial models.
 
 When a font like Calibri is specified but not available, dynamically load it from Google Fonts if possible.
 
-- [ ] 7a: Create a font loader module that checks if a font is available via `document.fonts.check()` and loads from Google Fonts API if not
-- [ ] 7b: Build a mapping of common fonts (Calibri, Arial, Times New Roman, etc.) to their Google Fonts equivalents or fallbacks
-- [ ] 7c: Integrate font loader into the renderer - before rendering a cell, ensure its font is loaded or use fallback
-- [ ] 7d: Cache loaded fonts to avoid repeated network requests
-- [ ] 7e: Add test verifying font loading fallback behavior
+- [x] 7a: Create a font loader module that checks if a font is available via `document.fonts.check()` and loads from Google Fonts API if not. Created `font-loader.ts` with `ensureFont()`, `onFontLoaded()`, `preloadCommonFonts()`, and canvas-based fallback detection.
+- [x] 7b: Build a mapping of common fonts (Calibri, Arial, Times New Roman, etc.) to their Google Fonts equivalents or fallbacks. Mapped Calibri→Carlito, Cambria→Caladea, plus many Google Fonts (Roboto, Open Sans, etc.).
+- [x] 7c: Integrate font loader into the renderer - before rendering a cell, ensure its font is loaded or use fallback. Updated `grid-renderer.ts` to use `ensureFont()` and registered font-loaded callback in `init.ts` to trigger re-renders.
+- [x] 7d: Cache loaded fonts to avoid repeated network requests. Font loader uses a Map-based cache and tracks loading state to prevent duplicate requests.
+- [x] 7e: Add test verifying font loading fallback behavior. Created `font-loading.test.mjs` with 5 tests covering module availability, system fonts, fallback behavior, XLSX loading, and re-render callbacks.

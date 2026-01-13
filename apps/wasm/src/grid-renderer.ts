@@ -68,6 +68,7 @@ import {
   type HeaderRendererState,
 } from "./grid-header-renderer.js";
 import { drawFormulaHighlights } from "./grid-formula-renderer.js";
+import { ensureFont, getFallbackFonts } from "./font-loader.js";
 
 // Re-export constants and types for backwards compatibility
 export {
@@ -1045,7 +1046,8 @@ export class GridRenderer {
       if (style?.bold) fontStyle += "bold ";
       const baseFontSize = style?.fontSize || 13;
       const zoomedFontSize = getZoomedFontSize(baseFontSize);
-      const fontFamily = style?.fontFamily || '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      // Use ensureFont to load web fonts dynamically if needed
+      const fontFamily = style?.fontFamily ? ensureFont(style.fontFamily) : getFallbackFonts();
       ctx.font = fontStyle ? `${fontStyle}${zoomedFontSize}px ${fontFamily}` : `${zoomedFontSize}px ${fontFamily}`;
 
       // Measure text width for overflow detection
@@ -1274,7 +1276,7 @@ export class GridRenderer {
     ctx.fillRect(ghostX, 0, colW, HEADER_HEIGHT);
 
     ctx.fillStyle = "#fff";
-    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.font = `12px ${getFallbackFonts()}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(this.getColumnHeaderText(this.dragSourceIndex), ghostX + colW / 2, HEADER_HEIGHT / 2);
@@ -1299,7 +1301,7 @@ export class GridRenderer {
     ctx.fillRect(0, ghostY, HEADER_WIDTH, rowH);
 
     ctx.fillStyle = "#fff";
-    ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.font = `12px ${getFallbackFonts()}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(String(this.dragSourceIndex + 1), HEADER_WIDTH / 2, ghostY + rowH / 2);

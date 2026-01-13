@@ -28,6 +28,7 @@ const COLLECTIONS = {
     'zoom-selection.test.mjs',
     'zoom-headers.test.mjs',
     'cell-background.test.mjs',
+    'font-loading.test.mjs',
   ],
   collab: [
     'collab.test.mjs',
