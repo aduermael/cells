@@ -36,11 +36,13 @@ Blue header sections in LBO model don't fill expected width - likely related to 
 
 ## Phase 5: Accounting Number Format
 
-The Accounting format (aligned currency symbol, negatives in parentheses) is partially implemented but not being applied from XLSX files correctly.
+The Accounting format (aligned currency symbol, negatives in parentheses) is partially implemented but not available in the UI and may not be applied from XLSX files correctly.
 
-- [ ] 5a: Review XLSX format code parsing for accounting formats (format codes with `_*` alignment characters and `_(` negative patterns)
-- [ ] 5b: Update `mapNumFmtIdToFormatId` to correctly identify and map accounting format IDs (37-44 in Excel's built-in formats)
-- [ ] 5c: Add unit test for accounting format display (e.g., `$  2.29` with aligned symbol, `($108.30)` for negatives)
+- [ ] 5a: Add Accounting format option to the number format dropdown in the toolbar UI (style-controls.ts and HTML)
+- [ ] 5b: Review XLSX format code parsing for accounting formats (format codes with `_*` alignment characters and `_(` negative patterns)
+- [ ] 5c: Update `mapNumFmtIdToFormatId` to correctly identify and map accounting format IDs (37-44 in Excel's built-in formats)
+- [ ] 5d: Add unit test for accounting format display (e.g., `$ 2.29` with aligned symbol, `($108.30)` for negatives)
+- [ ] 5e: Add E2E test that applies Accounting format from UI and verifies display
 
 ## Phase 6: EOMONTH Function
 
