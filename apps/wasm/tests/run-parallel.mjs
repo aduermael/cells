@@ -25,6 +25,8 @@ const COLLECTIONS = {
     'initial-sync.test.mjs',
     'collab-demo.test.mjs',
     'lbo-integration.test.mjs',
+    'zoom-selection.test.mjs',
+    'zoom-headers.test.mjs',
   ],
   collab: [
     'collab.test.mjs',

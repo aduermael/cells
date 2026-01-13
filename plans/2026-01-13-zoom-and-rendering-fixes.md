@@ -14,9 +14,9 @@ The cell/range selection highlight and cell editor positioning use unzoomed dime
 
 Headers are rendered but positioning may not account for zoom properly, causing misalignment with the grid.
 
-- [ ] 2a: Review `drawColumnHeaders` and `drawRowHeaders` in grid-header-renderer.ts to ensure they use zoomed dimensions consistently
-- [ ] 2b: Ensure header text font size scales with zoom factor
-- [ ] 2c: Add E2E test verifying header alignment at different zoom levels
+- [x] 2a: Review `drawColumnHeaders` and `drawRowHeaders` in grid-header-renderer.ts to ensure they use zoomed dimensions consistently. Verified that both functions already use `getZoomedHeaderWidth()`, `getZoomedHeaderHeight()`, `getZoomedColWidth()`, `getZoomedRowHeight()`, and `getZoomedFontSize()` via the global zoom factor.
+- [x] 2b: Ensure header text font size scales with zoom factor. Confirmed that font size is already scaled using `getZoomedFontSize(12)` in both header rendering functions.
+- [x] 2c: Add E2E test verifying header alignment at different zoom levels. Created `zoom-headers.test.mjs` with 7 tests covering header dimensions and cell alignment at 50%, 75%, 100%, 150%, and 200% zoom levels.
 
 ## Phase 3: Cell Background Gap Fix
 
