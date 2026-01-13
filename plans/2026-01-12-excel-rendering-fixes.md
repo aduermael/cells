@@ -28,10 +28,10 @@ When adjacent cells both have borders (e.g., cell A has bottom border, cell B be
 
 Some cells show different alignment in our app vs Excel. Need to verify alignment parsing handles all cases.
 
-- [ ] 3a: Debug alignment parsing for specific misaligned cells in the LBO model (identify which cells are wrong)
-- [ ] 3b: Check if default alignment differs (Excel defaults vary by cell content type - numbers right-align, text left-aligns)
-- [ ] 3c: Implement content-type-based default alignment if not already done
-- [ ] 3d: Add tests for alignment edge cases
+- [x] 3a: Debug alignment parsing for specific misaligned cells in the LBO model (identify which cells are wrong). Found that XLSX files use "general" alignment (content-type-aware) when no explicit alignment is set, but we were defaulting to LEFT.
+- [x] 3b: Check if default alignment differs (Excel defaults vary by cell content type - numbers right-align, text left-aligns). Confirmed: Excel uses "general" alignment which means numbers/dates right-align, text left-aligns.
+- [x] 3c: Implement content-type-based default alignment if not already done. Added GENERAL enum value to TextAlign, updated XLSX parser to return GENERAL for missing/empty alignment, updated renderer to resolve alignment based on cell type (n/d/t → right, s/b/e → left, f → depends on result).
+- [x] 3d: Add tests for alignment edge cases. Added C++ unit test `ReadGeneralAlignmentFromLBOModel` and E2E test `Numbers use right alignment by default (general alignment)`.
 
 ## Phase 4: Freeze Pane Scrolling
 

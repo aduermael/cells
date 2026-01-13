@@ -81,7 +81,8 @@ enum class CollabMode : std::uint8_t {
 // =============================================================================
 
 // Horizontal text alignment within cell
-enum class TextAlign : std::uint8_t { LEFT = 0, CENTER = 1, RIGHT = 2, JUSTIFY = 3 };
+// GENERAL means content-type-aware: right for numbers/dates, left for text
+enum class TextAlign : std::uint8_t { LEFT = 0, CENTER = 1, RIGHT = 2, JUSTIFY = 3, GENERAL = 4 };
 
 // Vertical text alignment within cell
 enum class VerticalAlign : std::uint8_t { TOP = 0, MIDDLE = 1, BOTTOM = 2 };
@@ -147,11 +148,11 @@ struct CellStyle {
     bool bold{false};
     bool italic{false};
     bool underline{false};
-    std::string bgColor;     // Background color (hex, e.g. "#FF0000")
-    std::string textColor;   // Text color (hex, e.g. "#000000")
-    std::string fontFamily;  // Font name (e.g. "Arial"), empty = system default
-    uint8_t fontSize{0};     // Font size in points, 0 = default (11pt)
-    TextAlign hAlign{TextAlign::LEFT};
+    std::string bgColor;                   // Background color (hex, e.g. "#FF0000")
+    std::string textColor;                 // Text color (hex, e.g. "#000000")
+    std::string fontFamily;                // Font name (e.g. "Arial"), empty = system default
+    uint8_t fontSize{0};                   // Font size in points, 0 = default (11pt)
+    TextAlign hAlign{TextAlign::GENERAL};  // GENERAL = content-type-aware alignment
     VerticalAlign vAlign{VerticalAlign::BOTTOM};
     CellBorder border;  // Cell borders (top, right, bottom, left)
 
@@ -160,7 +161,7 @@ struct CellStyle {
     // Check if style has any non-default values
     [[nodiscard]] bool isEmpty() const {
         return !bold && !italic && !underline && bgColor.empty() && textColor.empty() &&
-               fontFamily.empty() && fontSize == 0 && hAlign == TextAlign::LEFT &&
+               fontFamily.empty() && fontSize == 0 && hAlign == TextAlign::GENERAL &&
                vAlign == VerticalAlign::BOTTOM && !border.hasValue();
     }
 

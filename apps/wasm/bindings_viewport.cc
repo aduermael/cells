@@ -224,8 +224,11 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             if (style->fontSize > 0) {
                 json << ",\"fontSize\":" << static_cast<int>(style->fontSize);
             }
-            // Alignment - serialize enum values
+            // Alignment - serialize enum values (only if not default GENERAL)
             switch (style->hAlign) {
+                case TextAlign::GENERAL:
+                    // Don't serialize - GENERAL is the default (content-type-aware)
+                    break;
                 case TextAlign::LEFT: json << ",\"hAlign\":\"left\""; break;
                 case TextAlign::CENTER: json << ",\"hAlign\":\"center\""; break;
                 case TextAlign::RIGHT: json << ",\"hAlign\":\"right\""; break;

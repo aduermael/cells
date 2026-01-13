@@ -929,5 +929,55 @@ TEST(XLSXReaderTest, ReadLightGrayBackgroundFromTheme) {
     EXPECT_GT(cellsWithLightGray, 0u) << "Expected to find cells with light gray backgrounds";
 }
 
+TEST(XLSXReaderTest, ReadGeneralAlignmentFromLBOModel) {
+    // Test that cells without explicit alignment use GENERAL (content-type-aware)
+    // The LBO model has many numeric cells that should right-align by default
+    XLSXReadOptions options;
+    options.readStyles = true;
+
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    size_t cellsWithGeneralAlign = 0;
+    size_t cellsWithExplicitAlign = 0;
+    size_t numericCellsWithGeneralAlign = 0;
+
+    for (const auto& [id, cell] : sheet->cells) {
+        if (!cell->styleId.isNull()) {
+            auto* stylePtr = result.workbook->getStyle(cell->styleId);
+            if (stylePtr) {
+                if (stylePtr->hAlign == TextAlign::GENERAL) {
+                    cellsWithGeneralAlign++;
+                    // Check if it's a numeric cell
+                    if (cell->value.type == CellValueType::NUMBER) {
+                        numericCellsWithGeneralAlign++;
+                    }
+                } else {
+                    cellsWithExplicitAlign++;
+                }
+            }
+        } else {
+            // Cells without style also use GENERAL alignment
+            cellsWithGeneralAlign++;
+            if (cell->value.type == CellValueType::NUMBER) {
+                numericCellsWithGeneralAlign++;
+            }
+        }
+    }
+
+    std::cout << "Cells with GENERAL alignment: " << cellsWithGeneralAlign << std::endl;
+    std::cout << "Cells with explicit alignment: " << cellsWithExplicitAlign << std::endl;
+    std::cout << "Numeric cells with GENERAL: " << numericCellsWithGeneralAlign << std::endl;
+
+    // The LBO model should have cells using GENERAL alignment
+    // (numbers without explicit alignment that should right-align when rendered)
+    EXPECT_GT(cellsWithGeneralAlign, 0u)
+        << "Expected some cells with GENERAL alignment in the LBO model";
+}
+
 }  // namespace
 }  // namespace cells

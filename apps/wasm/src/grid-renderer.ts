@@ -930,7 +930,30 @@ export class GridRenderer {
       const availableWidth = colWidth - 2 * CELL_PADDING;
 
       // Set horizontal alignment
-      const hAlign = style?.hAlign || "left";
+      // When hAlign is not set (undefined), use "general" alignment:
+      // - numbers, dates, formulas with numeric results: right-aligned
+      // - text, boolean, errors: left-aligned
+      let hAlign: string;
+      if (style?.hAlign) {
+        hAlign = style.hAlign;
+      } else {
+        // "General" alignment - right for numbers/dates, left for text
+        const type = cell.type;
+        if (type === "n" || type === "d" || type === "t") {
+          // number, date, datetime - right align
+          hAlign = "right";
+        } else if (type === "f") {
+          // formula - check if display is numeric (not an error/text result)
+          const display = cell.display || "";
+          // Numeric formula results look like numbers (possibly with currency/percent)
+          // Text results would have non-numeric characters
+          const isNumericResult = display !== "" && !isNaN(parseFloat(display.replace(/[$,%()]/g, "")));
+          hAlign = isNumericResult ? "right" : "left";
+        } else {
+          // string, boolean, error - left align
+          hAlign = "left";
+        }
+      }
 
       // Calculate overflow clip region (extends into empty neighbor cells)
       let clipStartCol = cell.col;

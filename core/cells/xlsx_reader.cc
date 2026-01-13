@@ -465,8 +465,13 @@ std::string resolveColor(pugi::xml_node colorNode, const XLSXThemeColors& theme)
 }
 
 // Parse horizontal alignment string to enum
+// XLSX uses "general" for content-type-aware alignment (right for numbers, left for text)
+// When no alignment is specified or the value is empty/null, return GENERAL
 cells::TextAlign parseHorizontalAlign(const char* align) {
-    if (align == nullptr) {
+    if (align == nullptr || align[0] == '\0' || std::strcmp(align, "general") == 0) {
+        return cells::TextAlign::GENERAL;
+    }
+    if (std::strcmp(align, "left") == 0) {
         return cells::TextAlign::LEFT;
     }
     if (std::strcmp(align, "center") == 0 || std::strcmp(align, "centerContinuous") == 0) {
@@ -478,7 +483,8 @@ cells::TextAlign parseHorizontalAlign(const char* align) {
     if (std::strcmp(align, "justify") == 0 || std::strcmp(align, "distributed") == 0) {
         return cells::TextAlign::JUSTIFY;
     }
-    return cells::TextAlign::LEFT;
+    // Unknown alignment - default to general
+    return cells::TextAlign::GENERAL;
 }
 
 // Parse vertical alignment string to enum
@@ -652,7 +658,7 @@ struct XLSXStyles {
 
         // Apply alignment
         if (xf.applyAlignment) {
-            if (xf.alignment.horizontal != cells::TextAlign::LEFT) {
+            if (xf.alignment.horizontal != cells::TextAlign::GENERAL) {
                 outStyle.hAlign = xf.alignment.horizontal;
                 hasStyle = true;
             }
