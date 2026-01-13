@@ -32,6 +32,7 @@ import {
     getZoomedHeaderHeight,
     getZoomedColWidth,
     getZoomedRowHeight,
+    getZoomFactor,
 } from "./grid-constants";
 import {
     getColAtX,
@@ -336,23 +337,33 @@ export class MouseEventHandlers {
         if (!sheetInfo) return;
         e.preventDefault();
 
+        // Get zoom factor for coordinate conversion
+        const zoomFactor = getZoomFactor();
+
+        // Convert screen viewport dimensions to logical coordinates
+        const logicalViewportWidth = (canvas.clientWidth - getZoomedHeaderWidth()) / zoomFactor;
+        const logicalViewportHeight = (canvas.clientHeight - getZoomedHeaderHeight()) / zoomFactor;
+
+        // Max scroll in logical coordinates
         const maxScrollX = Math.max(
             0,
-            sheetInfo.colCount * DEFAULT_COL_WIDTH -
-                canvas.clientWidth +
-                HEADER_WIDTH,
+            sheetInfo.colCount * DEFAULT_COL_WIDTH - logicalViewportWidth,
         );
 
-        const viewportHeight = canvas.clientHeight - HEADER_HEIGHT;
-        const newScrollY = getScrollY() + e.deltaY;
+        // Convert wheel delta from screen pixels to logical pixels
+        const logicalDeltaX = e.deltaX / zoomFactor;
+        const logicalDeltaY = e.deltaY / zoomFactor;
+
+        const newScrollY = getScrollY() + logicalDeltaY;
 
         const effectiveRowCount = Math.max(
             sheetInfo.rowCount,
             getDiscoveredRows(),
         );
 
+        // Check if we need to expand discovered rows (using logical coordinates)
         const visibleBottomRow = Math.ceil(
-            (newScrollY + viewportHeight) / DEFAULT_ROW_HEIGHT,
+            (newScrollY + logicalViewportHeight) / DEFAULT_ROW_HEIGHT,
         );
         if (visibleBottomRow > getDiscoveredRows()) {
             const newDiscovered = Math.min(
@@ -364,10 +375,10 @@ export class MouseEventHandlers {
 
         const maxScrollY = Math.max(
             0,
-            effectiveRowCount * DEFAULT_ROW_HEIGHT - viewportHeight,
+            effectiveRowCount * DEFAULT_ROW_HEIGHT - logicalViewportHeight,
         );
 
-        setScrollX(Math.max(0, Math.min(maxScrollX, getScrollX() + e.deltaX)));
+        setScrollX(Math.max(0, Math.min(maxScrollX, getScrollX() + logicalDeltaX)));
         setScrollY(Math.max(0, Math.min(maxScrollY, newScrollY)));
 
         render();
