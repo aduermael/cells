@@ -98,9 +98,9 @@ Review all code that uses positions, sizes, or coordinates to identify zoom gaps
 
 The green dashed line shown during column/row resize is positioned incorrectly at non-100% zoom.
 
-- [ ] 8.2a: Write E2E test that verifies resize indicator X position matches the column boundary at 50%, 100%, 200% zoom
-- [ ] 8.2b: Fix resize indicator positioning in header renderer to use zoomed column positions
-- [ ] 8.2c: Verify row resize indicator has same fix applied
+- [x] 8.2a: Write E2E test that verifies resize indicator X position matches the column boundary at 50%, 100%, 200% zoom. Created `zoom-resize.test.mjs` with 6 tests covering column and row resize indicator alignment at 50%, 100%, and 200% zoom, plus drag behavior at non-100% zoom.
+- [x] 8.2b: Fix resize indicator positioning in mouse-events.ts to use zoomed dimensions. Fixed multiple issues: header area checks now use `getZoomedHeaderWidth()`/`getZoomedHeaderHeight()`, resize preview position calculations now use `getZoomedColWidth()`/`getZoomedRowHeight()`, and scrollX/scrollY are properly zoomed.
+- [x] 8.2c: Verify row resize indicator has same fix applied. Row resize uses the same zoom-aware approach as column resize - both fixed in the same changes to mouse-events.ts.
 
 ### 8.3: Fix Selection Box Alignment
 

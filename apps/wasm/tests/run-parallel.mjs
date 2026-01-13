@@ -27,6 +27,7 @@ const COLLECTIONS = {
     'lbo-integration.test.mjs',
     'zoom-selection.test.mjs',
     'zoom-headers.test.mjs',
+    'zoom-resize.test.mjs',
     'cell-background.test.mjs',
     'font-loading.test.mjs',
   ],

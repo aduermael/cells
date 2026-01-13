@@ -28,6 +28,13 @@ import {
     DEFAULT_ROW_HEIGHT,
 } from "./grid-renderer";
 import {
+    getZoomFactor,
+    getZoomedHeaderWidth,
+    getZoomedHeaderHeight,
+    getZoomedColWidth,
+    getZoomedRowHeight,
+} from "./grid-constants";
+import {
     getColAtX,
     getRowAtY,
     getResizeHandleCol,
@@ -423,8 +430,10 @@ export class MouseEventHandlers {
         const colWidths = getColWidths();
         const rowHeights = getRowHeights();
 
-        // Column resize
-        if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
+        // Column resize - use zoomed dimensions for header area check
+        const zoomedHeaderHeight = getZoomedHeaderHeight();
+        const zoomedHeaderWidth = getZoomedHeaderWidth();
+        if (y < zoomedHeaderHeight && y > 0 && x > zoomedHeaderWidth) {
             const resizeCol = getResizeHandleCol(
                 x,
                 scrollX,
@@ -444,9 +453,12 @@ export class MouseEventHandlers {
                     colWidths.get(resizeCol) || DEFAULT_COL_WIDTH,
                 );
 
-                let colX = HEADER_WIDTH - scrollX;
+                // Calculate zoomed preview position
+                const zoomFactor = getZoomFactor();
+                const zoomedScrollX = Math.round(scrollX * zoomFactor);
+                let colX = zoomedHeaderWidth - zoomedScrollX;
                 for (let i = 0; i <= resizeCol; i++) {
-                    colX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                    colX += getZoomedColWidth(colWidths.get(i) || DEFAULT_COL_WIDTH);
                 }
                 setResizePreviewX(colX);
 
@@ -456,8 +468,8 @@ export class MouseEventHandlers {
             }
         }
 
-        // Column header click
-        if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
+        // Column header click - use zoomed dimensions
+        if (y < zoomedHeaderHeight && y > 0 && x > zoomedHeaderWidth) {
             const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
             if (col >= 0) {
                 if (this.isInFormulaEditingMode()) {
@@ -489,8 +501,8 @@ export class MouseEventHandlers {
             }
         }
 
-        // Row resize
-        if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
+        // Row resize - use zoomed dimensions for header area check
+        if (x < zoomedHeaderWidth && x > 0 && y > zoomedHeaderHeight) {
             const resizeRow = getResizeHandleRow(
                 y,
                 scrollY,
@@ -510,9 +522,12 @@ export class MouseEventHandlers {
                     rowHeights.get(resizeRow) || DEFAULT_ROW_HEIGHT,
                 );
 
-                let rowY = HEADER_HEIGHT - scrollY;
+                // Calculate zoomed preview position
+                const zoomFactor = getZoomFactor();
+                const zoomedScrollY = Math.round(scrollY * zoomFactor);
+                let rowY = zoomedHeaderHeight - zoomedScrollY;
                 for (let i = 0; i <= resizeRow; i++) {
-                    rowY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                    rowY += getZoomedRowHeight(rowHeights.get(i) || DEFAULT_ROW_HEIGHT);
                 }
                 setResizePreviewY(rowY);
 
@@ -522,8 +537,8 @@ export class MouseEventHandlers {
             }
         }
 
-        // Row header click
-        if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
+        // Row header click - use zoomed dimensions
+        if (x < zoomedHeaderWidth && x > 0 && y > zoomedHeaderHeight) {
             const discoveredRows = this.config.getDiscoveredRows();
             const row = getRowAtY(
                 y,
@@ -867,31 +882,38 @@ export class MouseEventHandlers {
         }
 
         if (uiStateMachine.isInState("COLUMN_RESIZING")) {
+            // Delta is in screen (zoomed) pixels - the preview should move
+            // directly by this amount since we're in screen coordinates
+            const zoomFactor = getZoomFactor();
             const delta = e.clientX - getResizeStartX();
-            const newWidth = Math.max(
-                20,
-                Math.min(1000, getResizeStartWidth() + delta),
-            );
 
-            let colX = HEADER_WIDTH - scrollX;
+            // Calculate zoomed preview position
+            // The preview X should be: start of column + current drag position
+            // which is: colX (start of resizing column) + delta (screen pixels dragged)
+            const zoomedHeaderWidth = getZoomedHeaderWidth();
+            const zoomedScrollX = Math.round(scrollX * zoomFactor);
+            let colX = zoomedHeaderWidth - zoomedScrollX;
             for (let i = 0; i < getResizeColIndex(); i++) {
-                colX += colWidths.get(i) || DEFAULT_COL_WIDTH;
+                colX += getZoomedColWidth(colWidths.get(i) || DEFAULT_COL_WIDTH);
             }
-            setResizePreviewX(colX + newWidth);
+            // Add the zoomed start width plus the delta (delta is already in screen pixels)
+            setResizePreviewX(colX + getZoomedColWidth(getResizeStartWidth()) + delta);
 
             render();
         } else if (uiStateMachine.isInState("ROW_RESIZING")) {
+            // Delta is in screen (zoomed) pixels
+            const zoomFactor = getZoomFactor();
             const delta = e.clientY - getResizeStartY();
-            const newHeight = Math.max(
-                16,
-                Math.min(500, getResizeStartHeight() + delta),
-            );
 
-            let rowY = HEADER_HEIGHT - scrollY;
+            // Calculate zoomed preview position
+            const zoomedHeaderHeight = getZoomedHeaderHeight();
+            const zoomedScrollY = Math.round(scrollY * zoomFactor);
+            let rowY = zoomedHeaderHeight - zoomedScrollY;
             for (let i = 0; i < getResizeRowIndex(); i++) {
-                rowY += rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
+                rowY += getZoomedRowHeight(rowHeights.get(i) || DEFAULT_ROW_HEIGHT);
             }
-            setResizePreviewY(rowY + newHeight);
+            // Add the zoomed start height plus the delta (delta is already in screen pixels)
+            setResizePreviewY(rowY + getZoomedRowHeight(getResizeStartHeight()) + delta);
 
             render();
         } else if (uiStateMachine.isInState("COLUMN_DRAGGING")) {
@@ -913,10 +935,12 @@ export class MouseEventHandlers {
             canvas.style.cursor = "grabbing";
             render();
         } else {
-            // Determine cursor based on position
+            // Determine cursor based on position - use zoomed dimensions
+            const zoomedHeaderHeight = getZoomedHeaderHeight();
+            const zoomedHeaderWidth = getZoomedHeaderWidth();
             if (this.isPointInFillHandle(x, y)) {
                 canvas.style.cursor = "crosshair";
-            } else if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
+            } else if (y < zoomedHeaderHeight && y > 0 && x > zoomedHeaderWidth) {
                 const resizeCol = getResizeHandleCol(
                     x,
                     scrollX,
@@ -924,7 +948,7 @@ export class MouseEventHandlers {
                     sheetInfo,
                 );
                 canvas.style.cursor = resizeCol >= 0 ? "col-resize" : "default";
-            } else if (x < HEADER_WIDTH && x > 0 && y > HEADER_HEIGHT) {
+            } else if (x < zoomedHeaderWidth && x > 0 && y > zoomedHeaderHeight) {
                 const resizeRow = getResizeHandleRow(
                     y,
                     scrollY,
@@ -940,8 +964,10 @@ export class MouseEventHandlers {
         // Check for formula highlight hover
         this.checkFormulaHighlightHover(x, y);
 
-        // Broadcast mouse position for collaboration
-        if (x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+        // Broadcast mouse position for collaboration - use zoomed dimensions
+        const zoomedHeaderWidthBroadcast = getZoomedHeaderWidth();
+        const zoomedHeaderHeightBroadcast = getZoomedHeaderHeight();
+        if (x > zoomedHeaderWidthBroadcast && y > zoomedHeaderHeightBroadcast) {
             presenceBroadcaster.broadcastMousePosition(x, y);
         }
     }
