@@ -803,5 +803,41 @@ TEST(XLSXReaderTest, ColumnWidthConversionAccuracy) {
     }
 }
 
+// ============================================================================
+// Cell Border Import Tests
+// ============================================================================
+
+TEST(XLSXReaderTest, CellBordersImportedFromLBOModel) {
+    // The LBO model file has cells with various border styles
+    XLSXReadOptions options;
+    options.readStyles = true;
+
+    auto result = readXLSX(testFilePath("init_lbo_model_60min_is_revenue_cf_only.xlsx"), options);
+    EXPECT_TRUE(result.ok()) << (result.error ? result.error->toString() : "unknown error");
+    ASSERT_NE(result.workbook, nullptr);
+
+    Sheet* sheet = result.workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    size_t cellsWithBorders = 0;
+    size_t cellsWithStyles = 0;
+
+    // Iterate through all cells and check for borders
+    for (const auto& [id, cell] : sheet->cells) {
+        if (cell->styleId != ID()) {
+            cellsWithStyles++;
+            auto* stylePtr = result.workbook->getStyle(cell->styleId);
+            if (stylePtr && stylePtr->border.hasValue()) {
+                cellsWithBorders++;
+            }
+        }
+    }
+
+    std::cout << "Cells with styles: " << cellsWithStyles << std::endl;
+    std::cout << "Cells with borders: " << cellsWithBorders << std::endl;
+
+    EXPECT_GT(cellsWithBorders, 0u) << "Expected to find cells with borders in LBO model";
+}
+
 }  // namespace
 }  // namespace cells

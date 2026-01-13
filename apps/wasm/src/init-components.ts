@@ -183,6 +183,9 @@ export function createComponents(config: ComponentsConfig): Components {
   // Render Functions
   // =========================================================================
 
+  // Forward reference for zoom controls (initialized later)
+  let zoomControlsRef: ZoomControls | null = null;
+
   function render(): void {
     updateRendererState();
     app.renderer.render();
@@ -198,6 +201,9 @@ export function createComponents(config: ComponentsConfig): Components {
       app.selectionStart,
       app.selectionEnd
     );
+    // Sync zoom controls display after renderer state update
+    // This ensures the UI shows the correct zoom from sheetInfo after file load
+    zoomControlsRef?.syncWithRenderer();
   }
 
   function renderPresenceOnly(): void {
@@ -986,6 +992,8 @@ export function createComponents(config: ComponentsConfig): Components {
     // But we might want to update scrollbar calculations
     updateScrollbars();
   });
+  // Set forward reference so render() can sync zoom display
+  zoomControlsRef = zoomControls;
 
   // =========================================================================
   // Return Components
