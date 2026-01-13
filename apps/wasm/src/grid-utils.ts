@@ -38,6 +38,189 @@ import {
 import type { Position, CellData, SheetInfo } from "./types";
 
 // =============================================================================
+// Types for Coordinate Conversion
+// =============================================================================
+
+/** Screen coordinates (pixels on canvas) */
+export interface ScreenCoords {
+  x: number;
+  y: number;
+}
+
+/** Grid coordinates (column/row indices) */
+export interface GridCoords {
+  col: number;
+  row: number;
+}
+
+/** Bounding box in screen coordinates */
+export interface CellBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// =============================================================================
+// Centralized Coordinate Conversion Functions
+// =============================================================================
+
+/**
+ * Convert screen coordinates (pixels) to grid coordinates (col/row).
+ * Handles zoom factor and scroll offset automatically.
+ *
+ * @param screenX Screen X coordinate (pixels)
+ * @param screenY Screen Y coordinate (pixels)
+ * @param scrollX Current horizontal scroll offset (in logical units)
+ * @param scrollY Current vertical scroll offset (in logical units)
+ * @param colWidths Map of column positions to base widths
+ * @param rowHeights Map of row positions to base heights
+ * @param colCount Total number of columns
+ * @param rowCount Total number of rows
+ * @returns Grid coordinates {col, row}, or {col: -1, row: -1} if in header area
+ */
+export function screenToGrid(
+  screenX: number,
+  screenY: number,
+  scrollX: number,
+  scrollY: number,
+  colWidths: Map<number, number>,
+  rowHeights: Map<number, number>,
+  colCount: number = 1000,
+  rowCount: number = 1000
+): GridCoords {
+  const col = getColAtX(screenX, scrollX, colWidths, colCount);
+  const row = getRowAtY(screenY, scrollY, rowHeights, rowCount);
+  return { col, row };
+}
+
+/**
+ * Convert grid coordinates (col/row) to screen coordinates (pixels).
+ * Returns the top-left corner of the cell in screen space.
+ * Handles zoom factor and scroll offset automatically.
+ *
+ * @param col Column index
+ * @param row Row index
+ * @param scrollX Current horizontal scroll offset (in logical units)
+ * @param scrollY Current vertical scroll offset (in logical units)
+ * @param colWidths Map of column positions to base widths
+ * @param rowHeights Map of row positions to base heights
+ * @returns Screen coordinates {x, y} of the cell's top-left corner
+ */
+export function gridToScreen(
+  col: number,
+  row: number,
+  scrollX: number,
+  scrollY: number,
+  colWidths: Map<number, number>,
+  rowHeights: Map<number, number>
+): ScreenCoords {
+  const zoomFactor = getZoomFactor();
+  const zoomedHeaderWidth = getZoomedHeaderWidth();
+  const zoomedHeaderHeight = getZoomedHeaderHeight();
+  const zoomedScrollX = Math.round(scrollX * zoomFactor);
+  const zoomedScrollY = Math.round(scrollY * zoomFactor);
+
+  // Calculate X position by summing all columns before this one
+  let x = zoomedHeaderWidth - zoomedScrollX;
+  for (let c = 0; c < col; c++) {
+    const baseWidth = colWidths.get(c) ?? DEFAULT_COL_WIDTH;
+    x += getZoomedColWidth(baseWidth);
+  }
+
+  // Calculate Y position by summing all rows before this one
+  let y = zoomedHeaderHeight - zoomedScrollY;
+  for (let r = 0; r < row; r++) {
+    const baseHeight = rowHeights.get(r) ?? DEFAULT_ROW_HEIGHT;
+    y += getZoomedRowHeight(baseHeight);
+  }
+
+  return { x, y };
+}
+
+/**
+ * Get the bounding box of a cell in screen coordinates.
+ * Includes position and zoomed dimensions.
+ *
+ * @param col Column index
+ * @param row Row index
+ * @param scrollX Current horizontal scroll offset (in logical units)
+ * @param scrollY Current vertical scroll offset (in logical units)
+ * @param colWidths Map of column positions to base widths
+ * @param rowHeights Map of row positions to base heights
+ * @returns Cell bounds {x, y, width, height} in screen coordinates
+ */
+export function getCellBounds(
+  col: number,
+  row: number,
+  scrollX: number,
+  scrollY: number,
+  colWidths: Map<number, number>,
+  rowHeights: Map<number, number>
+): CellBounds {
+  const { x, y } = gridToScreen(col, row, scrollX, scrollY, colWidths, rowHeights);
+  const baseWidth = colWidths.get(col) ?? DEFAULT_COL_WIDTH;
+  const baseHeight = rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
+
+  return {
+    x,
+    y,
+    width: getZoomedColWidth(baseWidth),
+    height: getZoomedRowHeight(baseHeight),
+  };
+}
+
+/**
+ * Get the bounding box for a range of cells in screen coordinates.
+ * Returns the combined bounds of all cells in the range.
+ *
+ * @param startCol Starting column index
+ * @param startRow Starting row index
+ * @param endCol Ending column index (inclusive)
+ * @param endRow Ending row index (inclusive)
+ * @param scrollX Current horizontal scroll offset (in logical units)
+ * @param scrollY Current vertical scroll offset (in logical units)
+ * @param colWidths Map of column positions to base widths
+ * @param rowHeights Map of row positions to base heights
+ * @returns Combined bounds {x, y, width, height} in screen coordinates
+ */
+export function getRangeBounds(
+  startCol: number,
+  startRow: number,
+  endCol: number,
+  endRow: number,
+  scrollX: number,
+  scrollY: number,
+  colWidths: Map<number, number>,
+  rowHeights: Map<number, number>
+): CellBounds {
+  // Normalize to min/max
+  const minCol = Math.min(startCol, endCol);
+  const maxCol = Math.max(startCol, endCol);
+  const minRow = Math.min(startRow, endRow);
+  const maxRow = Math.max(startRow, endRow);
+
+  // Get position of top-left cell
+  const { x, y } = gridToScreen(minCol, minRow, scrollX, scrollY, colWidths, rowHeights);
+
+  // Calculate total width by summing columns
+  let width = 0;
+  for (let c = minCol; c <= maxCol; c++) {
+    const baseWidth = colWidths.get(c) ?? DEFAULT_COL_WIDTH;
+    width += getZoomedColWidth(baseWidth);
+  }
+
+  // Calculate total height by summing rows
+  let height = 0;
+  for (let r = minRow; r <= maxRow; r++) {
+    const baseHeight = rowHeights.get(r) ?? DEFAULT_ROW_HEIGHT;
+    height += getZoomedRowHeight(baseHeight);
+  }
+
+  return { x, y, width, height };
+}
+
+// =============================================================================
 // Constants
 // =============================================================================
 

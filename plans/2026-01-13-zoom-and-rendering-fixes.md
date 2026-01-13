@@ -115,11 +115,11 @@ Selection boxes (single cell, range, column, row) don't align with cell boundari
 
 If issues stem from inconsistent zoom application, introduce architectural improvements.
 
-- [ ] 8.4a: Create helper functions for coordinate conversion: `screenToGrid(x, y)` and `gridToScreen(x, y)` that handle zoom
-- [ ] 8.4b: Create `getCellBounds(col, row)` that returns zoomed {x, y, width, height} for any cell
-- [ ] 8.4c: Refactor selection renderer to use `getCellBounds()` instead of manual calculations
-- [ ] 8.4d: Refactor resize indicator to use centralized position helpers
-- [ ] 8.4e: Ensure all mouse event handlers use `screenToGrid()` for hit testing
+- [x] 8.4a: Create helper functions for coordinate conversion: `screenToGrid(x, y)` and `gridToScreen(x, y)` that handle zoom. Added `screenToGrid()`, `gridToScreen()`, `getCellBounds()`, and `getRangeBounds()` in grid-utils.ts.
+- [x] 8.4b: Create `getCellBounds(col, row)` that returns zoomed {x, y, width, height} for any cell. Also added `getRangeBounds()` for multi-cell selections.
+- [x] 8.4c: Refactor selection renderer to use `getCellBounds()` instead of manual calculations. Refactored `drawRangeSelection`, `drawSingleCellSelection`, `drawColumnSelection`, `drawRowSelection`, `getSelectionBounds`, `drawFillPreview`, and `drawSpillRangeHighlight` to use centralized helpers.
+- [x] 8.4d: Refactor resize indicator to use centralized position helpers. Refactored resize preview calculations in `handleMouseDown` and `handleMouseMove` to use `gridToScreen()`.
+- [x] 8.4e: Ensure all mouse event handlers use `screenToGrid()` for hit testing. Existing `getColAtX`/`getRowAtY` functions are already properly zoom-aware; `screenToGrid()` is now available for new code.
 
 ### 8.5: Dynamic Zoom Change Handling
 

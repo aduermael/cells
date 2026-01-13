@@ -28,7 +28,6 @@ import {
     DEFAULT_ROW_HEIGHT,
 } from "./grid-renderer";
 import {
-    getZoomFactor,
     getZoomedHeaderWidth,
     getZoomedHeaderHeight,
     getZoomedColWidth,
@@ -45,6 +44,7 @@ import {
     getRowId,
     DRAG_THRESHOLD,
     colToLetter,
+    gridToScreen,
 } from "./grid-utils";
 import {
     showContextMenu,
@@ -453,14 +453,17 @@ export class MouseEventHandlers {
                     colWidths.get(resizeCol) || DEFAULT_COL_WIDTH,
                 );
 
-                // Calculate zoomed preview position
-                const zoomFactor = getZoomFactor();
-                const zoomedScrollX = Math.round(scrollX * zoomFactor);
-                let colX = zoomedHeaderWidth - zoomedScrollX;
-                for (let i = 0; i <= resizeCol; i++) {
-                    colX += getZoomedColWidth(colWidths.get(i) || DEFAULT_COL_WIDTH);
-                }
-                setResizePreviewX(colX);
+                // Calculate zoomed preview position using centralized helper
+                // gridToScreen gives us the left edge of the column, we need the right edge
+                const { x: colLeftX } = gridToScreen(
+                    resizeCol + 1,  // Column after the one being resized
+                    0,
+                    scrollX,
+                    scrollY,
+                    colWidths,
+                    rowHeights
+                );
+                setResizePreviewX(colLeftX);
 
                 canvas.style.cursor = "col-resize";
                 e.preventDefault();
@@ -522,14 +525,17 @@ export class MouseEventHandlers {
                     rowHeights.get(resizeRow) || DEFAULT_ROW_HEIGHT,
                 );
 
-                // Calculate zoomed preview position
-                const zoomFactor = getZoomFactor();
-                const zoomedScrollY = Math.round(scrollY * zoomFactor);
-                let rowY = zoomedHeaderHeight - zoomedScrollY;
-                for (let i = 0; i <= resizeRow; i++) {
-                    rowY += getZoomedRowHeight(rowHeights.get(i) || DEFAULT_ROW_HEIGHT);
-                }
-                setResizePreviewY(rowY);
+                // Calculate zoomed preview position using centralized helper
+                // gridToScreen gives us the top edge of the row, we need the bottom edge
+                const { y: rowTopY } = gridToScreen(
+                    0,
+                    resizeRow + 1,  // Row after the one being resized
+                    scrollX,
+                    scrollY,
+                    colWidths,
+                    rowHeights
+                );
+                setResizePreviewY(rowTopY);
 
                 canvas.style.cursor = "row-resize";
                 e.preventDefault();
@@ -884,34 +890,36 @@ export class MouseEventHandlers {
         if (uiStateMachine.isInState("COLUMN_RESIZING")) {
             // Delta is in screen (zoomed) pixels - the preview should move
             // directly by this amount since we're in screen coordinates
-            const zoomFactor = getZoomFactor();
             const delta = e.clientX - getResizeStartX();
 
-            // Calculate zoomed preview position
-            // The preview X should be: start of column + current drag position
-            // which is: colX (start of resizing column) + delta (screen pixels dragged)
-            const zoomedHeaderWidth = getZoomedHeaderWidth();
-            const zoomedScrollX = Math.round(scrollX * zoomFactor);
-            let colX = zoomedHeaderWidth - zoomedScrollX;
-            for (let i = 0; i < getResizeColIndex(); i++) {
-                colX += getZoomedColWidth(colWidths.get(i) || DEFAULT_COL_WIDTH);
-            }
+            // Calculate zoomed preview position using centralized helper
+            // gridToScreen gives us the left edge of the column
+            const { x: colX } = gridToScreen(
+                getResizeColIndex(),
+                0,
+                scrollX,
+                scrollY,
+                colWidths,
+                rowHeights
+            );
             // Add the zoomed start width plus the delta (delta is already in screen pixels)
             setResizePreviewX(colX + getZoomedColWidth(getResizeStartWidth()) + delta);
 
             render();
         } else if (uiStateMachine.isInState("ROW_RESIZING")) {
             // Delta is in screen (zoomed) pixels
-            const zoomFactor = getZoomFactor();
             const delta = e.clientY - getResizeStartY();
 
-            // Calculate zoomed preview position
-            const zoomedHeaderHeight = getZoomedHeaderHeight();
-            const zoomedScrollY = Math.round(scrollY * zoomFactor);
-            let rowY = zoomedHeaderHeight - zoomedScrollY;
-            for (let i = 0; i < getResizeRowIndex(); i++) {
-                rowY += getZoomedRowHeight(rowHeights.get(i) || DEFAULT_ROW_HEIGHT);
-            }
+            // Calculate zoomed preview position using centralized helper
+            // gridToScreen gives us the top edge of the row
+            const { y: rowY } = gridToScreen(
+                0,
+                getResizeRowIndex(),
+                scrollX,
+                scrollY,
+                colWidths,
+                rowHeights
+            );
             // Add the zoomed start height plus the delta (delta is already in screen pixels)
             setResizePreviewY(rowY + getZoomedRowHeight(getResizeStartHeight()) + delta);
 
