@@ -207,6 +207,8 @@ export class ClipboardManager {
 
   /**
    * Paste from clipboard at the current selection
+   * First tries to read our custom MIME type for internal paste with full formatting,
+   * then falls back to text/plain for external content (TSV parsing).
    * @returns true if paste succeeded
    */
   async paste(): Promise<boolean> {
@@ -216,38 +218,17 @@ export class ClipboardManager {
     if (!targetPos) return false;
 
     try {
-      const text = await navigator.clipboard.readText();
-      if (!text) return false;
-
       let clipboardData: ClipboardData | null = null;
 
-      // Check for our internal format marker
-      if (text.startsWith(ClipboardManager.CLIPBOARD_MARKER)) {
-        // Internal paste: extract JSON from our format
-        // Format: CELLS_CLIPBOARD::<json>\n\n<tsv>
-        const jsonStart = ClipboardManager.CLIPBOARD_MARKER.length;
-        const jsonEnd = text.indexOf("\n\n");
-        if (jsonEnd > jsonStart) {
-          try {
-            const jsonText = text.substring(jsonStart, jsonEnd);
-            clipboardData = JSON.parse(jsonText) as ClipboardData;
-          } catch {
-            // JSON parse failed, fall back to TSV
-          }
-        }
-      }
+      // Try to read our custom MIME type first (internal paste with full formatting)
+      clipboardData = await this.readCustomClipboardData();
 
-      // Fall back to TSV parsing (external paste or parse error)
+      // Fall back to text/plain for external paste (TSV parsing)
       if (!clipboardData) {
-        // If our marker was present but JSON failed, extract TSV portion
-        let tsvText = text;
-        if (text.startsWith(ClipboardManager.CLIPBOARD_MARKER)) {
-          const tsvStart = text.indexOf("\n\n");
-          if (tsvStart > 0) {
-            tsvText = text.substring(tsvStart + 2);
-          }
+        const text = await navigator.clipboard.readText();
+        if (text) {
+          clipboardData = this.parseTSV(text);
         }
-        clipboardData = this.parseTSV(tsvText);
       }
 
       if (!clipboardData) return false;
@@ -259,6 +240,27 @@ export class ClipboardManager {
       console.error("Failed to paste from clipboard:", err);
       return false;
     }
+  }
+
+  /**
+   * Try to read clipboard data from our custom MIME type
+   * Returns null if custom type not available or parsing fails
+   */
+  private async readCustomClipboardData(): Promise<ClipboardData | null> {
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+
+      for (const item of clipboardItems) {
+        if (item.types.includes(ClipboardManager.CUSTOM_MIME_TYPE)) {
+          const blob = await item.getType(ClipboardManager.CUSTOM_MIME_TYPE);
+          const jsonText = await blob.text();
+          return JSON.parse(jsonText) as ClipboardData;
+        }
+      }
+    } catch {
+      // Custom MIME type not available or read failed - this is expected for external paste
+    }
+    return null;
   }
 
   // =========================================================================
