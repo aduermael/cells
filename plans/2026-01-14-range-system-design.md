@@ -196,13 +196,11 @@ For ranges with `RANGE_MERGE` flag:
 ### Phase C: Migrate Existing Features
 - [x] C1: Migrate MergeRange to Range (flags = RANGE_MERGE) - Updated `addMergeRange`/`removeMergeRange` in bindings_core.cc to use CRDT operations; updated XLSX reader/writer to use Range system; updated viewport query to use `getRangesAt()` for merge detection
 - [x] C2: Update merge UI to use new Range system - No changes needed; viewport query provides same JSON fields (isMergeAnchor, isMergedCell, mergeColSpan, mergeRowSpan, mergeAnchorCol, mergeAnchorRow) that UI already consumes
-- [ ] C3: Add range-based styles (RANGE_STYLE flag) - Future work: add range-to-styleId mapping, update viewport to apply range styles
-- [ ] C4: Update style UI to optionally create StyleRanges - Future work: UI for applying styles to ranges
 
 ### Phase D: Viewport & Rendering
-- [ ] D1: Update viewport query to find ranges for each cell
+- [ ] D1: Update viewport query to find ranges for each cell (done for MERGE via C1)
 - [ ] D2: Implement style inheritance from ranges
-- [ ] D3: Update merge rendering
+- [ ] D3: Update merge rendering (done via C1/C2)
 - [ ] D4: Optimize for large numbers of ranges
 
 ### Phase E: Advanced Features
@@ -210,6 +208,12 @@ For ranges with `RANGE_MERGE` flag:
 - [ ] E2: Data validation ranges
 - [ ] E3: Named ranges
 - [ ] E4: Column/row-wide styling
+
+### Phase F: Range-Based Styles (Integration Test)
+- [ ] F1: Add range-to-styleId mapping in Sheet
+- [ ] F2: Update RANGE_SET_STYLE to store style association
+- [ ] F3: Update viewport to apply range styles (CSS-like inheritance)
+- [ ] F4: Add UI for applying styles to ranges
 
 ## Testing Strategy
 
