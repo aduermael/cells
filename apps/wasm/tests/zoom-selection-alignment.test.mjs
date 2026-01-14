@@ -432,6 +432,46 @@ const tests = {
       );
     }
   },
+
+  'Selection aligns at non-standard zoom 72% (rounding accumulation test)': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Set zoom to 72% - a non-standard zoom level that can expose rounding errors
+    await setZoomLevel(ctx.page, 72);
+    await sleep(100);
+
+    // Verify zoom was set
+    const actualZoom = await ctx.page.evaluate(() => {
+      return window._appContext?.app?.renderer?.getZoomScale?.() ?? 100;
+    });
+    console.log(`Actual zoom: ${actualZoom}%`);
+
+    // Click cell F6 (col=5, row=5) - far enough to accumulate rounding errors
+    await clickCellAtPosition(ctx.page, 5, 5);
+    await sleep(100);
+
+    // Get both positions
+    const cellPos = await getCellRendererPosition(ctx.page, 5, 5);
+    const selPos = await getSelectionRendererPosition(ctx.page, 5, 5);
+
+    assertTrue(cellPos !== null, 'Should get cell position');
+    assertTrue(selPos !== null, 'Should get selection position');
+
+    console.log(`At 72% zoom: Cell X=${cellPos.x}, Selection X=${selPos.x}, diff=${cellPos.x - selPos.x}`);
+    console.log(`At 72% zoom: Cell Y=${cellPos.y}, Selection Y=${selPos.y}, diff=${cellPos.y - selPos.y}`);
+
+    // At non-standard zoom, positions should still match exactly
+    // (This test fails without the sum-unzoomed-first fix)
+    assertTrue(
+      Math.abs(cellPos.x - selPos.x) <= 1,
+      `Cell X (${cellPos.x}) and Selection X (${selPos.x}) should match at 72% zoom`
+    );
+    assertTrue(
+      Math.abs(cellPos.y - selPos.y) <= 1,
+      `Cell Y (${cellPos.y}) and Selection Y (${selPos.y}) should match at 72% zoom`
+    );
+  },
 };
 
 // Run all tests

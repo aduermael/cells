@@ -121,19 +121,19 @@ export function gridToScreen(
   const zoomedScrollX = Math.round(scrollX * zoomFactor);
   const zoomedScrollY = Math.round(scrollY * zoomFactor);
 
-  // Calculate X position by summing all columns before this one
-  let x = zoomedHeaderWidth - zoomedScrollX;
+  // Sum unzoomed offsets first, then zoom once to match cell renderer
+  // (avoids rounding accumulation errors at non-standard zoom levels like 72%)
+  let unzoomedOffsetX = 0;
   for (let c = 0; c < col; c++) {
-    const baseWidth = colWidths.get(c) ?? DEFAULT_COL_WIDTH;
-    x += getZoomedColWidth(baseWidth);
+    unzoomedOffsetX += colWidths.get(c) ?? DEFAULT_COL_WIDTH;
   }
+  const x = zoomedHeaderWidth + Math.round(unzoomedOffsetX * zoomFactor) - zoomedScrollX;
 
-  // Calculate Y position by summing all rows before this one
-  let y = zoomedHeaderHeight - zoomedScrollY;
+  let unzoomedOffsetY = 0;
   for (let r = 0; r < row; r++) {
-    const baseHeight = rowHeights.get(r) ?? DEFAULT_ROW_HEIGHT;
-    y += getZoomedRowHeight(baseHeight);
+    unzoomedOffsetY += rowHeights.get(r) ?? DEFAULT_ROW_HEIGHT;
   }
+  const y = zoomedHeaderHeight + Math.round(unzoomedOffsetY * zoomFactor) - zoomedScrollY;
 
   return { x, y };
 }
@@ -203,19 +203,22 @@ export function getRangeBounds(
   // Get position of top-left cell
   const { x, y } = gridToScreen(minCol, minRow, scrollX, scrollY, colWidths, rowHeights);
 
-  // Calculate total width by summing columns
-  let width = 0;
-  for (let c = minCol; c <= maxCol; c++) {
-    const baseWidth = colWidths.get(c) ?? DEFAULT_COL_WIDTH;
-    width += getZoomedColWidth(baseWidth);
-  }
+  const zoomFactor = getZoomFactor();
 
-  // Calculate total height by summing rows
-  let height = 0;
-  for (let r = minRow; r <= maxRow; r++) {
-    const baseHeight = rowHeights.get(r) ?? DEFAULT_ROW_HEIGHT;
-    height += getZoomedRowHeight(baseHeight);
+  // Sum unzoomed widths first, then zoom once to match cell renderer
+  // (avoids rounding accumulation errors at non-standard zoom levels like 72%)
+  let unzoomedWidth = 0;
+  for (let c = minCol; c <= maxCol; c++) {
+    unzoomedWidth += colWidths.get(c) ?? DEFAULT_COL_WIDTH;
   }
+  const width = Math.round(unzoomedWidth * zoomFactor);
+
+  // Sum unzoomed heights first, then zoom once
+  let unzoomedHeight = 0;
+  for (let r = minRow; r <= maxRow; r++) {
+    unzoomedHeight += rowHeights.get(r) ?? DEFAULT_ROW_HEIGHT;
+  }
+  const height = Math.round(unzoomedHeight * zoomFactor);
 
   return { x, y, width, height };
 }
@@ -254,12 +257,17 @@ export function getColAtX(
   const zoomedHeaderWidth = getZoomedHeaderWidth();
   const zoomedScrollX = Math.round(scrollX * zoomFactor);
   if (x < zoomedHeaderWidth) return -1;
-  let accX = zoomedHeaderWidth - zoomedScrollX;
+
+  // Track cumulative unzoomed offset, zoom once per boundary check
+  // (matches gridToScreen approach to avoid rounding accumulation errors)
+  let unzoomedOffset = 0;
   let col = 0;
-  while (accX < x && col < colCount) {
+  while (col < colCount) {
     const baseWidth = colWidths.get(col) ?? DEFAULT_COL_WIDTH;
-    accX += getZoomedColWidth(baseWidth);
-    if (accX > x) return col;
+    const nextOffset = unzoomedOffset + baseWidth;
+    const nextX = zoomedHeaderWidth + Math.round(nextOffset * zoomFactor) - zoomedScrollX;
+    if (nextX > x) return col;
+    unzoomedOffset = nextOffset;
     col++;
   }
   return col;
@@ -285,12 +293,17 @@ export function getRowAtY(
   const zoomedHeaderHeight = getZoomedHeaderHeight();
   const zoomedScrollY = Math.round(scrollY * zoomFactor);
   if (y < zoomedHeaderHeight) return -1;
-  let accY = zoomedHeaderHeight - zoomedScrollY;
+
+  // Track cumulative unzoomed offset, zoom once per boundary check
+  // (matches gridToScreen approach to avoid rounding accumulation errors)
+  let unzoomedOffset = 0;
   let row = 0;
-  while (accY < y && row < rowCount) {
+  while (row < rowCount) {
     const baseHeight = rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
-    accY += getZoomedRowHeight(baseHeight);
-    if (accY > y) return row;
+    const nextOffset = unzoomedOffset + baseHeight;
+    const nextY = zoomedHeaderHeight + Math.round(nextOffset * zoomFactor) - zoomedScrollY;
+    if (nextY > y) return row;
+    unzoomedOffset = nextOffset;
     row++;
   }
   return row;
@@ -409,18 +422,19 @@ export function getResizeHandleCol(
   const zoomFactor = getZoomFactor();
   const zoomedHeaderWidth = getZoomedHeaderWidth();
   const zoomedScrollX = Math.round(scrollX * zoomFactor);
-  let x = zoomedHeaderWidth - zoomedScrollX;
+
+  // Track cumulative unzoomed offset, zoom once per boundary check
+  let unzoomedOffset = 0;
   for (let col = 0; col < sheetInfo.colCount; col++) {
     const baseW = colWidths.get(col) ?? DEFAULT_COL_WIDTH;
-    const colW = getZoomedColWidth(baseW);
-    const rightEdge = x + colW;
+    unzoomedOffset += baseW;
+    const rightEdge = zoomedHeaderWidth + Math.round(unzoomedOffset * zoomFactor) - zoomedScrollX;
     if (
       mouseX >= rightEdge - RESIZE_HANDLE_WIDTH &&
       mouseX <= rightEdge + RESIZE_HANDLE_WIDTH
     ) {
       return col;
     }
-    x = rightEdge;
   }
   return -1;
 }
@@ -444,18 +458,19 @@ export function getResizeHandleRow(
   const zoomFactor = getZoomFactor();
   const zoomedHeaderHeight = getZoomedHeaderHeight();
   const zoomedScrollY = Math.round(scrollY * zoomFactor);
-  let y = zoomedHeaderHeight - zoomedScrollY;
+
+  // Track cumulative unzoomed offset, zoom once per boundary check
+  let unzoomedOffset = 0;
   for (let row = 0; row < sheetInfo.rowCount; row++) {
     const baseH = rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
-    const rowH = getZoomedRowHeight(baseH);
-    const bottomEdge = y + rowH;
+    unzoomedOffset += baseH;
+    const bottomEdge = zoomedHeaderHeight + Math.round(unzoomedOffset * zoomFactor) - zoomedScrollY;
     if (
       mouseY >= bottomEdge - RESIZE_HANDLE_WIDTH &&
       mouseY <= bottomEdge + RESIZE_HANDLE_WIDTH
     ) {
       return row;
     }
-    y = bottomEdge;
   }
   return -1;
 }
@@ -479,14 +494,17 @@ export function getDropTargetCol(
   const zoomedHeaderWidth = getZoomedHeaderWidth();
   const zoomedScrollX = Math.round(scrollX * zoomFactor);
   if (mouseX < zoomedHeaderWidth) return 0;
-  let x = zoomedHeaderWidth - zoomedScrollX;
+
+  // Track cumulative unzoomed offset, zoom once per boundary check
+  let unzoomedOffset = 0;
   const colCount = sheetInfo?.colCount ?? 1000;
   for (let col = 0; col < colCount; col++) {
     const baseW = colWidths.get(col) ?? DEFAULT_COL_WIDTH;
-    const colW = getZoomedColWidth(baseW);
-    const midX = x + colW / 2;
+    const startX = zoomedHeaderWidth + Math.round(unzoomedOffset * zoomFactor) - zoomedScrollX;
+    unzoomedOffset += baseW;
+    const endX = zoomedHeaderWidth + Math.round(unzoomedOffset * zoomFactor) - zoomedScrollX;
+    const midX = (startX + endX) / 2;
     if (mouseX < midX) return col;
-    x += colW;
   }
   return sheetInfo?.colCount ?? 0;
 }
@@ -510,14 +528,17 @@ export function getDropTargetRow(
   const zoomedHeaderHeight = getZoomedHeaderHeight();
   const zoomedScrollY = Math.round(scrollY * zoomFactor);
   if (mouseY < zoomedHeaderHeight) return 0;
-  let y = zoomedHeaderHeight - zoomedScrollY;
+
+  // Track cumulative unzoomed offset, zoom once per boundary check
+  let unzoomedOffset = 0;
   const rowCount = sheetInfo?.rowCount ?? 1000;
   for (let row = 0; row < rowCount; row++) {
     const baseH = rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
-    const rowH = getZoomedRowHeight(baseH);
-    const midY = y + rowH / 2;
+    const startY = zoomedHeaderHeight + Math.round(unzoomedOffset * zoomFactor) - zoomedScrollY;
+    unzoomedOffset += baseH;
+    const endY = zoomedHeaderHeight + Math.round(unzoomedOffset * zoomFactor) - zoomedScrollY;
+    const midY = (startY + endY) / 2;
     if (mouseY < midY) return row;
-    y += rowH;
   }
   return sheetInfo?.rowCount ?? 0;
 }
