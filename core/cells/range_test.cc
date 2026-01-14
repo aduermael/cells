@@ -230,5 +230,185 @@ TEST(RangeOverlapTest, EdgeCases) {
     EXPECT_TRUE(rangesOverlap(2, 2, 0, 0, 1, 1, 3, 3));
 }
 
+// =============================================================================
+// Corner Deletion Tests
+// =============================================================================
+
+class CornerDeletionTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        // Set up a linear column/row sequence: A, B, C, D, E (positions 0-4)
+        colA = ID("colA0000");
+        colB = ID("colB0000");
+        colC = ID("colC0000");
+        colD = ID("colD0000");
+        colE = ID("colE0000");
+
+        rowA = ID("rowA0000");
+        rowB = ID("rowB0000");
+        rowC = ID("rowC0000");
+        rowD = ID("rowD0000");
+        rowE = ID("rowE0000");
+    }
+
+    // Helper functions that simulate axis traversal
+    ID getNextCol(const ID& colId) const {
+        if (colId == colA) return colB;
+        if (colId == colB) return colC;
+        if (colId == colC) return colD;
+        if (colId == colD) return colE;
+        return ID();  // null
+    }
+
+    ID getPrevCol(const ID& colId) const {
+        if (colId == colB) return colA;
+        if (colId == colC) return colB;
+        if (colId == colD) return colC;
+        if (colId == colE) return colD;
+        return ID();  // null
+    }
+
+    ID getNextRow(const ID& rowId) const {
+        if (rowId == rowA) return rowB;
+        if (rowId == rowB) return rowC;
+        if (rowId == rowC) return rowD;
+        if (rowId == rowD) return rowE;
+        return ID();  // null
+    }
+
+    ID getPrevRow(const ID& rowId) const {
+        if (rowId == rowB) return rowA;
+        if (rowId == rowC) return rowB;
+        if (rowId == rowD) return rowC;
+        if (rowId == rowE) return rowD;
+        return ID();  // null
+    }
+
+    ID colA, colB, colC, colD, colE;
+    ID rowA, rowB, rowC, rowD, rowE;
+};
+
+TEST_F(CornerDeletionTest, DeleteStartColumn) {
+    // Range B:D (colB to colD) - delete colB
+    Range range(ID("range001"), colB, rowA, colD, rowC);
+
+    auto result = adjustRangeForColumnDeletion(
+        range, colB, [this](const ID& id) { return getNextCol(id); },
+        [this](const ID& id) { return getPrevCol(id); });
+
+    EXPECT_EQ(result, CornerDeleteResult::SHRUNK);
+    EXPECT_EQ(range.startColId, colC);  // Moved to next column
+    EXPECT_EQ(range.endColId, colD);    // Unchanged
+}
+
+TEST_F(CornerDeletionTest, DeleteEndColumn) {
+    // Range B:D (colB to colD) - delete colD
+    Range range(ID("range001"), colB, rowA, colD, rowC);
+
+    auto result = adjustRangeForColumnDeletion(
+        range, colD, [this](const ID& id) { return getNextCol(id); },
+        [this](const ID& id) { return getPrevCol(id); });
+
+    EXPECT_EQ(result, CornerDeleteResult::SHRUNK);
+    EXPECT_EQ(range.startColId, colB);  // Unchanged
+    EXPECT_EQ(range.endColId, colC);    // Moved to previous column
+}
+
+TEST_F(CornerDeletionTest, DeleteMiddleColumn) {
+    // Range B:D (colB to colD) - delete colC (middle, not a corner)
+    Range range(ID("range001"), colB, rowA, colD, rowC);
+
+    auto result = adjustRangeForColumnDeletion(
+        range, colC, [this](const ID& id) { return getNextCol(id); },
+        [this](const ID& id) { return getPrevCol(id); });
+
+    EXPECT_EQ(result, CornerDeleteResult::UNCHANGED);
+    EXPECT_EQ(range.startColId, colB);  // Unchanged
+    EXPECT_EQ(range.endColId, colD);    // Unchanged
+}
+
+TEST_F(CornerDeletionTest, DeleteSingleColumnRange) {
+    // Single column range C:C - delete colC
+    Range range(ID("range001"), colC, rowA, colC, rowC);
+
+    auto result = adjustRangeForColumnDeletion(
+        range, colC, [this](const ID& id) { return getNextCol(id); },
+        [this](const ID& id) { return getPrevCol(id); });
+
+    EXPECT_EQ(result, CornerDeleteResult::INVALIDATED);
+}
+
+TEST_F(CornerDeletionTest, DeleteStartRow) {
+    // Range rows A:C - delete rowA
+    Range range(ID("range001"), colB, rowA, colD, rowC);
+
+    auto result = adjustRangeForRowDeletion(
+        range, rowA, [this](const ID& id) { return getNextRow(id); },
+        [this](const ID& id) { return getPrevRow(id); });
+
+    EXPECT_EQ(result, CornerDeleteResult::SHRUNK);
+    EXPECT_EQ(range.startRowId, rowB);  // Moved to next row
+    EXPECT_EQ(range.endRowId, rowC);    // Unchanged
+}
+
+TEST_F(CornerDeletionTest, DeleteEndRow) {
+    // Range rows A:C - delete rowC
+    Range range(ID("range001"), colB, rowA, colD, rowC);
+
+    auto result = adjustRangeForRowDeletion(
+        range, rowC, [this](const ID& id) { return getNextRow(id); },
+        [this](const ID& id) { return getPrevRow(id); });
+
+    EXPECT_EQ(result, CornerDeleteResult::SHRUNK);
+    EXPECT_EQ(range.startRowId, rowA);  // Unchanged
+    EXPECT_EQ(range.endRowId, rowB);    // Moved to previous row
+}
+
+TEST_F(CornerDeletionTest, DeleteSingleRowRange) {
+    // Single row range row B - delete rowB
+    Range range(ID("range001"), colB, rowB, colD, rowB);
+
+    auto result = adjustRangeForRowDeletion(
+        range, rowB, [this](const ID& id) { return getNextRow(id); },
+        [this](const ID& id) { return getPrevRow(id); });
+
+    EXPECT_EQ(result, CornerDeleteResult::INVALIDATED);
+}
+
+TEST_F(CornerDeletionTest, DeleteFirstColumnWithNoNext) {
+    // Range A:A (first column, no previous) - delete colA
+    Range range(ID("range001"), colA, rowA, colA, rowC);
+
+    auto result = adjustRangeForColumnDeletion(
+        range, colA, [this](const ID& id) { return getNextCol(id); },
+        [this](const ID& id) { return getPrevCol(id); });
+
+    // Single-column range → invalidated
+    EXPECT_EQ(result, CornerDeleteResult::INVALIDATED);
+}
+
+TEST_F(CornerDeletionTest, DeleteLastColumnWithNoPrev) {
+    // Range E:E (last column) - delete colE
+    Range range(ID("range001"), colE, rowA, colE, rowC);
+
+    auto result = adjustRangeForColumnDeletion(
+        range, colE, [this](const ID& id) { return getNextCol(id); },
+        [this](const ID& id) { return getPrevCol(id); });
+
+    // Single-column range → invalidated
+    EXPECT_EQ(result, CornerDeleteResult::INVALIDATED);
+}
+
+TEST_F(CornerDeletionTest, UnrelatedColumnDelete) {
+    // Range B:D - delete colA (not in range)
+    Range range(ID("range001"), colB, rowA, colD, rowC);
+
+    auto result = adjustRangeForColumnDeletion(
+        range, colA, [this](const ID& id) { return getNextCol(id); },
+        [this](const ID& id) { return getPrevCol(id); });
+
+    EXPECT_EQ(result, CornerDeleteResult::UNCHANGED);
+}
+
 }  // namespace
 }  // namespace cells

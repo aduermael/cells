@@ -201,6 +201,110 @@ inline bool rangesOverlap(uint32_t r1StartCol, uint32_t r1StartRow, uint32_t r1E
            r1MaxRow >= r2MinRow;
 }
 
+// =============================================================================
+// Range Corner Deletion (Shrinking)
+// =============================================================================
+//
+// When a column or row that forms a range corner is deleted, the range shrinks.
+// If both corners in a dimension are deleted, the range becomes invalid.
+//
+// Behavior:
+// - Delete startCol (not equal to endCol) → startCol becomes the next column
+// - Delete endCol (not equal to startCol) → endCol becomes the previous column
+// - Delete startCol == endCol → range invalid (zero-width)
+// - Same logic applies to rows
+//
+// These functions compute the new corner IDs after a deletion.
+// The caller must provide functions to find adjacent columns/rows.
+//
+
+// Result of a corner deletion operation
+enum class CornerDeleteResult : uint8_t {
+    UNCHANGED,       // Deleted ID was not a corner of the range
+    SHRUNK,          // Range shrunk - new corner ID is set
+    INVALIDATED,     // Range became invalid (zero-width or zero-height)
+};
+
+// Adjust a range when a column is deleted
+// deletedColId: the column being deleted
+// getNextColId: function to get the column after a given column (returns null ID if none)
+// getPrevColId: function to get the column before a given column (returns null ID if none)
+// Returns the result status, and modifies range.startColId/endColId if shrinking
+template <typename GetNextFn, typename GetPrevFn>
+CornerDeleteResult adjustRangeForColumnDeletion(Range& range, const ID& deletedColId,
+                                                GetNextFn getNextColId, GetPrevFn getPrevColId) {
+    const bool startsHere = (range.startColId == deletedColId);
+    const bool endsHere = (range.endColId == deletedColId);
+
+    if (!startsHere && !endsHere) {
+        return CornerDeleteResult::UNCHANGED;
+    }
+
+    // Single-column range (start == end == deleted) → invalidated
+    if (startsHere && endsHere) {
+        return CornerDeleteResult::INVALIDATED;
+    }
+
+    // Start column deleted → move start to next column
+    if (startsHere) {
+        ID nextCol = getNextColId(deletedColId);
+        if (nextCol.isNull()) {
+            return CornerDeleteResult::INVALIDATED;  // No next column
+        }
+        range.startColId = nextCol;
+        return CornerDeleteResult::SHRUNK;
+    }
+
+    // End column deleted → move end to previous column
+    // (endsHere must be true here)
+    ID prevCol = getPrevColId(deletedColId);
+    if (prevCol.isNull()) {
+        return CornerDeleteResult::INVALIDATED;  // No previous column
+    }
+    range.endColId = prevCol;
+    return CornerDeleteResult::SHRUNK;
+}
+
+// Adjust a range when a row is deleted
+// deletedRowId: the row being deleted
+// getNextRowId: function to get the row after a given row (returns null ID if none)
+// getPrevRowId: function to get the row before a given row (returns null ID if none)
+// Returns the result status, and modifies range.startRowId/endRowId if shrinking
+template <typename GetNextFn, typename GetPrevFn>
+CornerDeleteResult adjustRangeForRowDeletion(Range& range, const ID& deletedRowId,
+                                             GetNextFn getNextRowId, GetPrevFn getPrevRowId) {
+    const bool startsHere = (range.startRowId == deletedRowId);
+    const bool endsHere = (range.endRowId == deletedRowId);
+
+    if (!startsHere && !endsHere) {
+        return CornerDeleteResult::UNCHANGED;
+    }
+
+    // Single-row range (start == end == deleted) → invalidated
+    if (startsHere && endsHere) {
+        return CornerDeleteResult::INVALIDATED;
+    }
+
+    // Start row deleted → move start to next row
+    if (startsHere) {
+        ID nextRow = getNextRowId(deletedRowId);
+        if (nextRow.isNull()) {
+            return CornerDeleteResult::INVALIDATED;  // No next row
+        }
+        range.startRowId = nextRow;
+        return CornerDeleteResult::SHRUNK;
+    }
+
+    // End row deleted → move end to previous row
+    // (endsHere must be true here)
+    ID prevRow = getPrevRowId(deletedRowId);
+    if (prevRow.isNull()) {
+        return CornerDeleteResult::INVALIDATED;  // No previous row
+    }
+    range.endRowId = prevRow;
+    return CornerDeleteResult::SHRUNK;
+}
+
 }  // namespace cells
 
 #endif  // CELLS_RANGE_H_

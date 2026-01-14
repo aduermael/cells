@@ -183,7 +183,7 @@ For ranges with `RANGE_MERGE` flag:
 - [x] A2: Create RangeFlags enum/bitmask - 7 flags: MERGE, STYLE, CONDITIONAL_FORMAT, DATA_VALIDATION, NAMED, PRINT_AREA, FILTER
 - [x] A3: Implement range containment check - Added `rangeContainsPosition()`, `rangeIsAnchorPosition()`, and `rangesOverlap()` helper functions
 - [x] A4: Add R-tree index for range lookup - Created `RangeIndex` class wrapping R-tree for O(log n + k) spatial queries with flag filtering
-- [ ] A5: Implement corner deletion (range shrinking)
+- [x] A5: Implement corner deletion (range shrinking) - Added `adjustRangeForColumnDeletion()` and `adjustRangeForRowDeletion()` template functions
 
 ### Phase B: CRDT Operations
 - [ ] B1: Design AddRange operation
