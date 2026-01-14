@@ -8,6 +8,7 @@
 
 #include "core/cells/formula_serializer.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/range.h"
 #include "core/cells/ref_converter.h"
 
 #include "miniz.h"
@@ -1198,22 +1199,32 @@ std::string generateWorksheet(
 
     xml << "  </sheetData>\n";
 
-    // Write merged cells
-    const auto& mergeRanges = sheet.getMergeRanges();
+    // Write merged cells from the unified Range system
+    // Collect all ranges with MERGE flag
+    std::vector<const cells::Range*> mergeRanges;
+    for (const auto& [rangeId, range] : sheet.getRanges()) {
+        if (range->hasFlag(cells::RangeFlags::MERGE)) {
+            mergeRanges.push_back(range.get());
+        }
+    }
+
     if (!mergeRanges.empty()) {
         xml << "  <mergeCells count=\"" << mergeRanges.size() << "\">\n";
-        for (const auto& range : mergeRanges) {
-            // Find anchor column and row positions
-            auto anchorColIt = sheet.columns.find(range.anchorColId);
-            auto anchorRowIt = sheet.rows.find(range.anchorRowId);
-            if (anchorColIt == sheet.columns.end() || anchorRowIt == sheet.rows.end()) {
+        for (const auto* range : mergeRanges) {
+            // Find corner column and row positions
+            auto startColIt = sheet.columns.find(range->startColId);
+            auto startRowIt = sheet.rows.find(range->startRowId);
+            auto endColIt = sheet.columns.find(range->endColId);
+            auto endRowIt = sheet.rows.find(range->endRowId);
+            if (startColIt == sheet.columns.end() || startRowIt == sheet.rows.end() ||
+                endColIt == sheet.columns.end() || endRowIt == sheet.rows.end()) {
                 continue;  // Skip invalid merge ranges
             }
 
-            const uint32_t startColPos = anchorColIt->second->position;
-            const uint32_t startRowPos = anchorRowIt->second->position;
-            const uint32_t endColPos = startColPos + range.colSpan - 1;
-            const uint32_t endRowPos = startRowPos + range.rowSpan - 1;
+            const uint32_t startColPos = startColIt->second->position;
+            const uint32_t startRowPos = startRowIt->second->position;
+            const uint32_t endColPos = endColIt->second->position;
+            const uint32_t endRowPos = endRowIt->second->position;
 
             // Convert to A1 notation (1-indexed rows)
             const std::string startRef =

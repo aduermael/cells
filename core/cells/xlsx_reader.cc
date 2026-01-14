@@ -13,6 +13,7 @@
 #include "core/cells/formula_parser.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/range.h"
 #include "core/cells/types.h"
 
 #include "miniz.h"
@@ -2042,7 +2043,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                     sheet->addRow(std::move(row));
                 }
 
-                // Calculate spans
+                // Calculate spans for validation
                 const int colSpan = endCol - startCol + 1;
                 const int rowSpan = endRow - startRow + 1;
 
@@ -2051,13 +2052,17 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                     continue;
                 }
 
-                // Get anchor column and row IDs
-                const ID& anchorColId = columnIds[startCol];
-                const ID& anchorRowId = rowIds[startRow];
+                // Get corner column and row IDs
+                const ID& startColId = columnIds[startCol];
+                const ID& startRowId = rowIds[startRow];
+                const ID& endColId = columnIds[endCol];
+                const ID& endRowId = rowIds[endRow];
 
-                // Add merge range to sheet
-                sheet->addMergeRange(anchorColId, anchorRowId, static_cast<uint16_t>(colSpan),
-                                     static_cast<uint16_t>(rowSpan));
+                // Create merge range using unified Range system
+                ID rangeId = generate_id();
+                auto range = std::make_unique<cells::Range>(
+                    rangeId, startColId, startRowId, endColId, endRowId, cells::RangeFlags::MERGE);
+                sheet->addRange(std::move(range));
             }
         }
         logTiming("parse merged cells", start);

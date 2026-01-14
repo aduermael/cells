@@ -30,6 +30,7 @@
 #include "core/cells/named_ranges.h"
 #include "core/cells/number_formatter.h"
 #include "core/cells/operation.h"
+#include "core/cells/range.h"
 #include "core/log/include/Logger.h"
 
 namespace cells::wasm {
@@ -1505,42 +1506,72 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
         return "{\"error\":\"Cannot merge a single cell\"}";
     }
 
-    // Get or create the anchor column
-    ID anchorColId;
+    // Get or create the start column (anchor)
+    ID startColId;
     for (const auto& [id, axis] : sheet->columns) {
         if (axis->position == minCol) {
-            anchorColId = id;
+            startColId = id;
             break;
         }
     }
-    if (anchorColId.isNull()) {
-        // Create the column if it doesn't exist
-        anchorColId = generate_id();
+    if (startColId.isNull()) {
+        startColId = generate_id();
         std::string colPayload = "{\"pos\":" + std::to_string(minCol) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, anchorColId, colPayload);
+        Operation colOp = makeColInsertOp(*_workbook, startColId, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
-    // Get or create the anchor row
-    ID anchorRowId;
+    // Get or create the start row (anchor)
+    ID startRowId;
     for (const auto& [id, axis] : sheet->rows) {
         if (axis->position == minRow) {
-            anchorRowId = id;
+            startRowId = id;
             break;
         }
     }
-    if (anchorRowId.isNull()) {
-        // Create the row if it doesn't exist
-        anchorRowId = generate_id();
+    if (startRowId.isNull()) {
+        startRowId = generate_id();
         std::string rowPayload = "{\"pos\":" + std::to_string(minRow) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, anchorRowId, rowPayload);
+        Operation rowOp = makeRowInsertOp(*_workbook, startRowId, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
-    // Ensure all columns in the range exist
-    for (uint32_t c = minCol; c <= maxCol; c++) {
+    // Get or create the end column
+    ID endColId;
+    for (const auto& [id, axis] : sheet->columns) {
+        if (axis->position == maxCol) {
+            endColId = id;
+            break;
+        }
+    }
+    if (endColId.isNull()) {
+        endColId = generate_id();
+        std::string colPayload = "{\"pos\":" + std::to_string(maxCol) +
+                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        Operation colOp = makeColInsertOp(*_workbook, endColId, colPayload);
+        applyOperation(*_workbook, colOp);
+    }
+
+    // Get or create the end row
+    ID endRowId;
+    for (const auto& [id, axis] : sheet->rows) {
+        if (axis->position == maxRow) {
+            endRowId = id;
+            break;
+        }
+    }
+    if (endRowId.isNull()) {
+        endRowId = generate_id();
+        std::string rowPayload = "{\"pos\":" + std::to_string(maxRow) +
+                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        Operation rowOp = makeRowInsertOp(*_workbook, endRowId, rowPayload);
+        applyOperation(*_workbook, rowOp);
+    }
+
+    // Ensure all intermediate columns exist (for proper range expansion on insert)
+    for (uint32_t c = minCol + 1; c < maxCol; c++) {
         bool found = false;
         for (const auto& [id, axis] : sheet->columns) {
             if (axis->position == c) {
@@ -1557,8 +1588,8 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
         }
     }
 
-    // Ensure all rows in the range exist
-    for (uint32_t r = minRow; r <= maxRow; r++) {
+    // Ensure all intermediate rows exist
+    for (uint32_t r = minRow + 1; r < maxRow; r++) {
         bool found = false;
         for (const auto& [id, axis] : sheet->rows) {
             if (axis->position == r) {
@@ -1575,14 +1606,25 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
         }
     }
 
-    // Add the merge range
-    sheet->addMergeRange(anchorColId, anchorRowId, colSpan, rowSpan);
+    // Create the merge range using the unified Range system with CRDT operation
+    ID rangeId = generate_id();
+    std::ostringstream payload;
+    payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
+    payload << "\"start_col_id\":\"" << startColId.toString() << "\",";
+    payload << "\"start_row_id\":\"" << startRowId.toString() << "\",";
+    payload << "\"end_col_id\":\"" << endColId.toString() << "\",";
+    payload << "\"end_row_id\":\"" << endRowId.toString() << "\",";
+    payload << "\"flags\":" << static_cast<int>(RangeFlags::MERGE) << "}";
+
+    Operation rangeOp = makeRangeAddOp(*_workbook, rangeId, payload.str());
+    applyOperation(*_workbook, rangeOp);
 
     rebuildViewportIndex();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
     return "{\"success\":true,\"colSpan\":" + std::to_string(colSpan) +
-           ",\"rowSpan\":" + std::to_string(rowSpan) + "}";
+           ",\"rowSpan\":" + std::to_string(rowSpan) +
+           ",\"rangeId\":\"" + rangeId.toString() + "\"}";
 }
 
 std::string CellsEngine::removeMergeRange(uint32_t col, uint32_t row) {
@@ -1619,14 +1661,21 @@ std::string CellsEngine::removeMergeRange(uint32_t col, uint32_t row) {
         return "{\"error\":\"Row not found\"}";
     }
 
-    // Check if this cell is part of a merge range
-    const MergeRange* range = sheet->getMergeRange(colId, rowId);
-    if (!range) {
+    // Find merge ranges containing this cell using the unified Range system
+    std::vector<Range*> mergeRanges =
+        sheet->getRangesAt(col, row, RangeFlags::MERGE);
+
+    if (mergeRanges.empty()) {
         return "{\"error\":\"Cell is not part of a merged region\"}";
     }
 
-    // Remove the merge range using its anchor
-    sheet->removeMergeRange(range->anchorColId, range->anchorRowId);
+    // Remove the first merge range found (typically there should be only one)
+    Range* mergeRange = mergeRanges[0];
+    std::ostringstream payload;
+    payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
+
+    Operation removeOp = makeRangeRemoveOp(*_workbook, mergeRange->id, payload.str());
+    applyOperation(*_workbook, removeOp);
 
     rebuildViewportIndex();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);

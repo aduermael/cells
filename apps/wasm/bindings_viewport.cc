@@ -23,6 +23,7 @@
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/number_formatter.h"
+#include "core/cells/range.h"
 
 namespace cells::wasm {
 
@@ -285,24 +286,37 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             json << "\"isSpillMaster\":true,";
         }
 
-        // Check if this cell is part of a merged cell region
-        const MergeRange* mergeRange = sheet->getMergeRange(entry.cell->colId, entry.cell->rowId);
-        if (mergeRange != nullptr) {
-            if (sheet->isMergeAnchor(entry.cell->colId, entry.cell->rowId)) {
-                json << "\"isMergeAnchor\":true,";
-                json << "\"mergeColSpan\":" << mergeRange->colSpan << ",";
-                json << "\"mergeRowSpan\":" << mergeRange->rowSpan << ",";
-            } else {
-                json << "\"isMergedCell\":true,";
-                // Include anchor position and span for non-anchor merged cells
-                // so the editor can position correctly
-                const Axis* anchorCol = sheet->getColumn(mergeRange->anchorColId);
-                const Axis* anchorRow = sheet->getRow(mergeRange->anchorRowId);
-                if (anchorCol != nullptr && anchorRow != nullptr) {
-                    json << "\"mergeAnchorCol\":" << anchorCol->position << ",";
-                    json << "\"mergeAnchorRow\":" << anchorRow->position << ",";
-                    json << "\"mergeColSpan\":" << mergeRange->colSpan << ",";
-                    json << "\"mergeRowSpan\":" << mergeRange->rowSpan << ",";
+        // Check if this cell is part of a merged cell region using Range system
+        std::vector<Range*> mergeRanges = sheet->getRangesAt(colPos, rowPos, RangeFlags::MERGE);
+        if (!mergeRanges.empty()) {
+            // Use the first merge range found (typically only one merge per cell)
+            Range* mergeRange = mergeRanges[0];
+
+            // Get corner positions for the merge range
+            const Axis* startCol = sheet->getColumn(mergeRange->startColId);
+            const Axis* startRow = sheet->getRow(mergeRange->startRowId);
+            const Axis* endCol = sheet->getColumn(mergeRange->endColId);
+            const Axis* endRow = sheet->getRow(mergeRange->endRowId);
+
+            if (startCol && startRow && endCol && endRow) {
+                uint32_t anchorColPos = startCol->position;
+                uint32_t anchorRowPos = startRow->position;
+                uint32_t colSpan = endCol->position - startCol->position + 1;
+                uint32_t rowSpan = endRow->position - startRow->position + 1;
+
+                // Check if this cell is the anchor (top-left)
+                if (colPos == anchorColPos && rowPos == anchorRowPos) {
+                    json << "\"isMergeAnchor\":true,";
+                    json << "\"mergeColSpan\":" << colSpan << ",";
+                    json << "\"mergeRowSpan\":" << rowSpan << ",";
+                } else {
+                    json << "\"isMergedCell\":true,";
+                    // Include anchor position and span for non-anchor merged cells
+                    // so the editor can position correctly
+                    json << "\"mergeAnchorCol\":" << anchorColPos << ",";
+                    json << "\"mergeAnchorRow\":" << anchorRowPos << ",";
+                    json << "\"mergeColSpan\":" << colSpan << ",";
+                    json << "\"mergeRowSpan\":" << rowSpan << ",";
                 }
             }
         }

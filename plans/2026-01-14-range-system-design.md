@@ -194,7 +194,7 @@ For ranges with `RANGE_MERGE` flag:
 - [x] B6: Handle CRDT conflicts for overlapping ranges - LWW for same ID; overlapping ranges coexist (UI resolves display conflicts)
 
 ### Phase C: Migrate Existing Features
-- [ ] C1: Migrate MergeRange to Range (flags = RANGE_MERGE)
+- [x] C1: Migrate MergeRange to Range (flags = RANGE_MERGE) - Updated `addMergeRange`/`removeMergeRange` in bindings_core.cc to use CRDT operations; updated XLSX reader/writer to use Range system; updated viewport query to use `getRangesAt()` for merge detection
 - [ ] C2: Update merge UI to use new Range system
 - [ ] C3: Migrate cell-by-cell styles to Range (flags = RANGE_STYLE)
 - [ ] C4: Update style UI to create StyleRanges

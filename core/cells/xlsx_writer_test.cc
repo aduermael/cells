@@ -9,6 +9,7 @@
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/range.h"
 #include "core/cells/xlsx_reader.h"
 
 #include "gtest/gtest.h"
@@ -2859,9 +2860,9 @@ TEST(XLSXWriterTest, RowDefaultStyleRoundTrip) {
 // Merged Cells Tests
 // ============================================================================
 
-// Simple test to verify Sheet API works
+// Test to verify Range-based merged cells API works
 TEST(XLSXWriterTest, MergedCellsApiWorks) {
-    // Create a sheet and add merged cells directly
+    // Create a sheet and add merged cells using Range system
     Sheet sheet(generate_id(), "Test");
 
     std::vector<ID> colIds, rowIds;
@@ -2880,28 +2881,35 @@ TEST(XLSXWriterTest, MergedCellsApiWorks) {
     ASSERT_EQ(sheet.columnCount(), 5u);
     ASSERT_EQ(sheet.rowCount(), 5u);
 
-    // Add merge range
-    sheet.addMergeRange(colIds[0], rowIds[0], 3, 1);
+    // Add merge range using unified Range system (cols 0-2, row 0)
+    auto mergeRange = std::make_unique<Range>(
+        generate_id(), colIds[0], rowIds[0], colIds[2], rowIds[0], RangeFlags::MERGE);
+    sheet.addRange(std::move(mergeRange));
 
-    // Verify it was added
-    const auto& merges = sheet.getMergeRanges();
-    ASSERT_EQ(merges.size(), 1u) << "Merge range should be added";
-    EXPECT_EQ(merges[0].colSpan, 3u);
-    EXPECT_EQ(merges[0].rowSpan, 1u);
+    // Verify it was added by querying ranges
+    std::vector<Range*> mergesAtAnchor = sheet.getRangesAt(0, 0, RangeFlags::MERGE);
+    ASSERT_EQ(mergesAtAnchor.size(), 1u) << "Merge range should be found at anchor";
 
-    // Verify anchor lookup
-    EXPECT_TRUE(sheet.isMergeAnchor(colIds[0], rowIds[0])) << "(0,0) should be anchor";
-    EXPECT_FALSE(sheet.isMergeAnchor(colIds[1], rowIds[0])) << "(1,0) should not be anchor";
+    // Verify range contains expected cells
+    std::vector<Range*> mergesAt1_0 = sheet.getRangesAt(1, 0, RangeFlags::MERGE);
+    EXPECT_EQ(mergesAt1_0.size(), 1u) << "(1,0) should be in merge range";
 
-    // Verify merged cell lookup
-    EXPECT_FALSE(sheet.isMergedCell(colIds[0], rowIds[0])) << "(0,0) anchor is not a merged cell";
-    EXPECT_TRUE(sheet.isMergedCell(colIds[1], rowIds[0])) << "(1,0) should be merged cell";
-    EXPECT_TRUE(sheet.isMergedCell(colIds[2], rowIds[0])) << "(2,0) should be merged cell";
-    EXPECT_FALSE(sheet.isMergedCell(colIds[3], rowIds[0])) << "(3,0) should not be merged";
+    std::vector<Range*> mergesAt2_0 = sheet.getRangesAt(2, 0, RangeFlags::MERGE);
+    EXPECT_EQ(mergesAt2_0.size(), 1u) << "(2,0) should be in merge range";
+
+    std::vector<Range*> mergesAt3_0 = sheet.getRangesAt(3, 0, RangeFlags::MERGE);
+    EXPECT_EQ(mergesAt3_0.size(), 0u) << "(3,0) should not be in merge range";
+
+    // Verify range corners
+    Range* mergeRangePtr = mergesAtAnchor[0];
+    EXPECT_EQ(mergeRangePtr->startColId, colIds[0]);
+    EXPECT_EQ(mergeRangePtr->startRowId, rowIds[0]);
+    EXPECT_EQ(mergeRangePtr->endColId, colIds[2]);
+    EXPECT_EQ(mergeRangePtr->endRowId, rowIds[0]);
 }
 
 TEST(XLSXWriterTest, RoundtripMergedCells) {
-    // Create a workbook with merged cells
+    // Create a workbook with merged cells using Range system
     auto workbook = std::make_unique<Workbook>(generate_id(), "MergedCells");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
 
@@ -2930,15 +2938,25 @@ TEST(XLSXWriterTest, RoundtripMergedCells) {
     cell2->value = CellValue("Another Merge");
     sheet->addCell(std::move(cell2));
 
-    // Add merge ranges
-    // A1:C1 (3 cols, 1 row)
-    sheet->addMergeRange(colIds[0], rowIds[0], 3, 1);
+    // Add merge ranges using unified Range system
+    // A1:C1 (cols 0-2, row 0)
+    auto merge1 = std::make_unique<Range>(
+        generate_id(), colIds[0], rowIds[0], colIds[2], rowIds[0], RangeFlags::MERGE);
+    sheet->addRange(std::move(merge1));
 
-    // B3:C4 (2 cols, 2 rows)
-    sheet->addMergeRange(colIds[1], rowIds[2], 2, 2);
+    // B3:C4 (cols 1-2, rows 2-3)
+    auto merge2 = std::make_unique<Range>(
+        generate_id(), colIds[1], rowIds[2], colIds[2], rowIds[3], RangeFlags::MERGE);
+    sheet->addRange(std::move(merge2));
 
-    // Verify merges were added before writing
-    ASSERT_EQ(sheet->getMergeRanges().size(), 2u) << "Merges should be in sheet before write";
+    // Verify merges were added before writing by counting MERGE ranges
+    size_t mergeCount = 0;
+    for (const auto& [rangeId, range] : sheet->getRanges()) {
+        if (range->hasFlag(RangeFlags::MERGE)) {
+            mergeCount++;
+        }
+    }
+    ASSERT_EQ(mergeCount, 2u) << "Merges should be in sheet before write";
 
     workbook->addSheet(std::move(sheet));
 
@@ -2957,30 +2975,42 @@ TEST(XLSXWriterTest, RoundtripMergedCells) {
     Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
     ASSERT_NE(readSheet, nullptr);
 
-    // Verify merge ranges were preserved
-    const auto& merges = readSheet->getMergeRanges();
+    // Verify merge ranges were preserved by collecting MERGE ranges
+    std::vector<const Range*> merges;
+    for (const auto& [rangeId, range] : readSheet->getRanges()) {
+        if (range->hasFlag(RangeFlags::MERGE)) {
+            merges.push_back(range.get());
+        }
+    }
     EXPECT_EQ(merges.size(), 2u) << "Should have 2 merge ranges";
 
     // Find and verify each merge
     bool foundMerge1 = false;
     bool foundMerge2 = false;
 
-    for (const auto& merge : merges) {
-        // Get anchor position
-        Axis* anchorCol = readSheet->getColumn(merge.anchorColId);
-        Axis* anchorRow = readSheet->getRow(merge.anchorRowId);
-        ASSERT_NE(anchorCol, nullptr);
-        ASSERT_NE(anchorRow, nullptr);
+    for (const auto* merge : merges) {
+        // Get corner positions
+        Axis* startCol = readSheet->getColumn(merge->startColId);
+        Axis* startRow = readSheet->getRow(merge->startRowId);
+        Axis* endCol = readSheet->getColumn(merge->endColId);
+        Axis* endRow = readSheet->getRow(merge->endRowId);
+        ASSERT_NE(startCol, nullptr);
+        ASSERT_NE(startRow, nullptr);
+        ASSERT_NE(endCol, nullptr);
+        ASSERT_NE(endRow, nullptr);
 
-        if (anchorCol->position == 0 && anchorRow->position == 0) {
+        uint32_t colSpan = endCol->position - startCol->position + 1;
+        uint32_t rowSpan = endRow->position - startRow->position + 1;
+
+        if (startCol->position == 0 && startRow->position == 0) {
             // A1:C1 merge
-            EXPECT_EQ(merge.colSpan, 3u) << "First merge should span 3 columns";
-            EXPECT_EQ(merge.rowSpan, 1u) << "First merge should span 1 row";
+            EXPECT_EQ(colSpan, 3u) << "First merge should span 3 columns";
+            EXPECT_EQ(rowSpan, 1u) << "First merge should span 1 row";
             foundMerge1 = true;
-        } else if (anchorCol->position == 1 && anchorRow->position == 2) {
+        } else if (startCol->position == 1 && startRow->position == 2) {
             // B3:C4 merge
-            EXPECT_EQ(merge.colSpan, 2u) << "Second merge should span 2 columns";
-            EXPECT_EQ(merge.rowSpan, 2u) << "Second merge should span 2 rows";
+            EXPECT_EQ(colSpan, 2u) << "Second merge should span 2 columns";
+            EXPECT_EQ(rowSpan, 2u) << "Second merge should span 2 rows";
             foundMerge2 = true;
         }
     }
@@ -2990,7 +3020,7 @@ TEST(XLSXWriterTest, RoundtripMergedCells) {
 }
 
 TEST(XLSXWriterTest, MergedCellsWithStyles) {
-    // Test that merged cells with styles are preserved
+    // Test that merged cells with styles are preserved using Range system
     auto workbook = std::make_unique<Workbook>(generate_id(), "StyledMerge");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
 
@@ -3021,8 +3051,10 @@ TEST(XLSXWriterTest, MergedCellsWithStyles) {
     cell->styleId = styleId;
     sheet->addCell(std::move(cell));
 
-    // Add merge range A1:C3
-    sheet->addMergeRange(colIds[0], rowIds[0], 3, 3);
+    // Add merge range A1:C3 using unified Range system
+    auto merge = std::make_unique<Range>(
+        generate_id(), colIds[0], rowIds[0], colIds[2], rowIds[2], RangeFlags::MERGE);
+    sheet->addRange(std::move(merge));
 
     workbook->addSheet(std::move(sheet));
 
@@ -3042,12 +3074,27 @@ TEST(XLSXWriterTest, MergedCellsWithStyles) {
     Sheet* readSheet = readResult.workbook->getSheetByIndex(0);
     ASSERT_NE(readSheet, nullptr);
 
-    // Verify merge
-    const auto& merges = readSheet->getMergeRanges();
+    // Verify merge using Range system
+    std::vector<const Range*> merges;
+    for (const auto& [rangeId, range] : readSheet->getRanges()) {
+        if (range->hasFlag(RangeFlags::MERGE)) {
+            merges.push_back(range.get());
+        }
+    }
     EXPECT_EQ(merges.size(), 1u);
     if (!merges.empty()) {
-        EXPECT_EQ(merges[0].colSpan, 3u);
-        EXPECT_EQ(merges[0].rowSpan, 3u);
+        Axis* startCol = readSheet->getColumn(merges[0]->startColId);
+        Axis* endCol = readSheet->getColumn(merges[0]->endColId);
+        Axis* startRow = readSheet->getRow(merges[0]->startRowId);
+        Axis* endRow = readSheet->getRow(merges[0]->endRowId);
+        ASSERT_NE(startCol, nullptr);
+        ASSERT_NE(endCol, nullptr);
+        ASSERT_NE(startRow, nullptr);
+        ASSERT_NE(endRow, nullptr);
+        uint32_t colSpan = endCol->position - startCol->position + 1;
+        uint32_t rowSpan = endRow->position - startRow->position + 1;
+        EXPECT_EQ(colSpan, 3u);
+        EXPECT_EQ(rowSpan, 3u);
     }
 
     // Verify anchor cell has style
