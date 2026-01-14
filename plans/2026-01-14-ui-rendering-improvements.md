@@ -49,116 +49,27 @@ Add toolbar buttons to merge and unmerge selected cells.
 - [x] 4e: Wire up merge button click handlers to call `mergeCells()` with current selection range. Created MergeControls class in merge-controls.ts and integrated into init-components.ts.
 - [x] 4f: Add E2E tests for merge/unmerge operations. Added 4 new tests to merged-cells.test.mjs covering merge all, unmerge, merge horizontally, and dropdown behavior.
 
-## Phase 5: Design Range-Based Operations for CRDT
+## Phase 5: Range System Implementation
 
-**Problem Statement:** The current cell merge implementation (Phase 4) revealed a fundamental design challenge: how to efficiently represent and handle range-based operations (merges, background colors, borders) in a CRDT context where cells can be moved concurrently by different users.
+**Status:** Blocked - requires Range System design and implementation first.
 
-### Chosen Design: Range as First-Class Citizen
+The current cell merge implementation (Phase 4) revealed a fundamental design challenge that affects merges, styles, borders, and all range-based operations. This is a large architectural change that has been moved to a dedicated plan.
 
-**Range** is a unified primitive. Merge, Style, ConditionalFormat, etc. are just range types:
+**See:** [Range System Design](./2026-01-14-range-system-design.md)
 
-```cpp
-enum class RangeType : uint8_t {
-    Merge = 0,              // Merged cells
-    Style = 1,              // Background, borders, font
-    ConditionalFormat = 2,  // Conditional formatting rules
-    DataValidation = 3,     // Data validation rules
-    // Future: PrintArea, Filter, NamedRange, etc.
-};
+### Summary of Design
 
-struct Range {
-    ID id;            // Range's own UUID (for CRDT operations)
-    ID startColId;    // Column UUID for left edge
-    ID startRowId;    // Row UUID for top edge
-    ID endColId;      // Column UUID for right edge
-    ID endRowId;      // Row UUID for bottom edge
-    RangeType type;   // 1 byte - what kind of range
-    // Payload stored separately, keyed by range ID
-};
+- **Range** is a first-class primitive with column/row UUID corners
+- **Bitmask flags** (not enum) - a single range can be merge AND style
+- **Metadata** stored in hash maps keyed by range UUID (keeps Range struct small)
+- **R-tree index** for O(log n) range lookup
+- **Unified CRDT operations:** AddRange, RemoveRange, UpdateRange
 
-// Payloads by type (could be in separate maps or a variant)
-struct MergePayload {};  // No extra data needed, anchor is (startCol, startRow)
-struct StylePayload { CellStyle style; };
-struct ConditionalFormatPayload { /* rules */ };
-```
+### Dependency
 
-**Benefits:**
-- One R-tree index for ALL ranges
-- Unified CRDT operations: `AddRange`, `RemoveRange`, `UpdateRange`
-- Query: "all ranges containing cell (col, row)" returns merge + style + conditional format
-- Single code path for range containment, corner deletion, etc.
-
-### Why Column/Row UUIDs Work
-
-1. **Column insertion expands ranges automatically:**
-   ```
-   Range: (colA_UUID, row1_UUID, colC_UUID, row3_UUID) = "A1:C3" with red background
-   Insert column B' between B and C
-   → Range still spans colA to colC, B' is automatically included
-   → Matches Excel behavior - no gap!
-   ```
-
-2. **Cell movement is clean:**
-   - Cell at B2 moved to E5
-   - Cell leaves the range (colA:colC × row1:row3)
-   - Cell loses the range style (unless it has cell-level override)
-   - Range unchanged - no "hole" to track
-
-3. **R-tree spatial indexing:**
-   - Each range is a rectangle in (col_position, row_position) space
-   - Query: "which ranges contain cell at position (3, 5)?"
-   - O(log n) lookup; index updates when col/row positions change
-
-### Design Decisions
-
-**Corner deletion → Range shrinks:**
-- Delete colC from range (colA, row1, colC, row3)
-- Range shrinks to (colA, row1, colB, row3) - colB is now the rightmost
-- If both corners on an axis deleted, range collapses to a line or point
-
-**Moving cells out of merge is disallowed:**
-- Same constraint as Excel - must unmerge first
-- "Moving merged cells" in Excel is actually: move cell content + delete old merge + create new merge at destination
-
-**Style inheritance (CSS-like cascading):**
-- Cells inherit styles from all ranges they belong to
-- Cell-level styles override range styles
-- Multiple overlapping ranges: later/more-specific wins (need ordering strategy)
-
-**Merge semantics:**
-- Any cell whose (colId, rowId) falls within merge rectangle is part of the merge
-- Anchor cell (startCol, startRow) displays content and is editable
-- Other cells in merge region are visually hidden/absorbed
-
-### Phase 5 Steps
-
-**Research & Documentation:**
-- [ ] 5a: Document current Column/Row UUID system - how axes are stored, how cells reference them
-- [ ] 5b: Document current MergeRange implementation and why it fails (uses cell colId/rowId lookup)
-- [ ] 5c: Verify Excel behavior: insert column in colored range, move cell out of colored range
-
-**Core Range Implementation:**
-- [ ] 5d: Create `Range` struct with (id, startColId, startRowId, endColId, endRowId, type)
-- [ ] 5e: Create `RangeType` enum (Merge, Style, ConditionalFormat, DataValidation)
-- [ ] 5f: Implement range containment check: does cell at (colId, rowId) fall within range?
-- [ ] 5g: Add R-tree index for efficient range lookup by position
-- [ ] 5h: Implement corner deletion logic (range shrinks to adjacent col/row)
-
-**CRDT Operations:**
-- [ ] 5i: Design `AddRange` CRDT operation (creates range with UUID)
-- [ ] 5j: Design `RemoveRange` CRDT operation (by range UUID)
-- [ ] 5k: Design `UpdateRange` CRDT operation (modify corners or payload)
-
-**Viewport & Rendering:**
-- [ ] 5l: Update viewport query to find all ranges containing each cell
-- [ ] 5m: Implement style inheritance: cell style = cell overrides + range styles (by type priority)
-- [ ] 5n: Update merge rendering to use new Range structure
-
-**Merge UI Fix:**
-- [ ] 5o: Migrate existing MergeRange to new Range (type=Merge)
-- [ ] 5p: Update addMergeRange() WASM binding to create Range
-- [ ] 5q: Verify merge UI works end-to-end
-- [ ] 5r: Add E2E tests for merge with column insertion
+Phase 5 steps will be executed as part of the Range System plan. Once complete:
+- [ ] 5a: Merge UI will work with new Range system
+- [ ] 5b: E2E tests for merge with column insertion will pass
 
 ## Phase 6: Add Border UI Controls
 
