@@ -198,10 +198,10 @@ For ranges with `RANGE_MERGE` flag:
 - [x] C2: Update merge UI to use new Range system - No changes needed; viewport query provides same JSON fields (isMergeAnchor, isMergedCell, mergeColSpan, mergeRowSpan, mergeAnchorCol, mergeAnchorRow) that UI already consumes
 
 ### Phase D: Viewport & Rendering
-- [ ] D1: Update viewport query to find ranges for each cell (done for MERGE via C1)
-- [ ] D2: Implement style inheritance from ranges
-- [ ] D3: Update merge rendering (done via C1/C2)
-- [ ] D4: Optimize for large numbers of ranges
+- [x] D1: Update viewport query to find ranges for each cell - Done via C1; viewport uses `getRangesAt()` for MERGE flag queries
+- [ ] D2: Implement style inheritance from ranges - Depends on Phase F (range-to-styleId mapping)
+- [x] D3: Update merge rendering - Done via C1/C2; merge info included in viewport JSON
+- [ ] D4: Optimize for large numbers of ranges - Deferred until style inheritance is implemented
 
 ### Phase E: Advanced Features
 - [ ] E1: Conditional formatting ranges
