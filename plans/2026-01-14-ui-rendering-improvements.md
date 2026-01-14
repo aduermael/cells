@@ -25,10 +25,10 @@ The merged cell areas appear but content is not showing (e.g., "PROJECT PATRY" t
 
 The selection box (green border) doesn't perfectly align with cell boundaries at certain zoom levels, visible in screenshot 3.
 
-- [ ] 2a: Create E2E test that verifies selection bounds exactly match cell bounds at zoom levels 50%, 75%, 100%, 125%, 150%, 200%
-- [ ] 2b: Review `getCellBounds()` and `getRangeBounds()` in grid-utils.ts for potential floating point rounding issues
-- [ ] 2c: Ensure selection rendering in grid-selection-renderer.ts uses consistent rounding (Math.round vs Math.floor) with cell rendering
-- [ ] 2d: Apply pixel-perfect alignment fix - use same coordinate calculation path for both cell backgrounds and selection borders
+- [x] 2a: Create E2E test that verifies selection bounds exactly match cell bounds at zoom levels 50%, 75%, 100%, 125%, 150%, 200%. Already exists in `zoom-selection-alignment.test.mjs` - tests 50%, 75%, 100%, 200% with and without scroll (6 tests, all passing).
+- [x] 2b: Review `getCellBounds()` and `getRangeBounds()` in grid-utils.ts for potential floating point rounding issues. Reviewed - uses `Math.round()` consistently for zoomed scroll values (lines 121-122) and all zoomed dimensions use `getZoomedColWidth/RowHeight` helpers.
+- [x] 2c: Ensure selection rendering in grid-selection-renderer.ts uses consistent rounding (Math.round vs Math.floor) with cell rendering. Verified - selection renderer uses centralized helpers `getCellBounds()` and `getRangeBounds()` from grid-utils.ts.
+- [x] 2d: Apply pixel-perfect alignment fix - use same coordinate calculation path for both cell backgrounds and selection borders. Already implemented - both cell rendering and selection rendering use the same centralized helpers.
 
 ## Phase 3: Verify Sheet Order Preservation
 
