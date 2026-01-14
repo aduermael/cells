@@ -250,7 +250,7 @@ ApplyResult applyRangeSetStyle(Workbook& workbook, const Operation& op) {
         return ApplyResult::INVALID_TARGET;
     }
 
-    Range* range = sheet->getRange(op.target_id);
+    const Range* range = sheet->getRange(op.target_id);
     if (range == nullptr) {
         return ApplyResult::INVALID_TARGET;
     }
@@ -261,7 +261,7 @@ ApplyResult applyRangeSetStyle(Workbook& workbook, const Operation& op) {
     // Set the style association (or remove if styleId is empty/null)
     // setRangeStyleId handles both the mapping and the RANGE_STYLE flag
     if (styleIdStr.empty() || styleIdStr == "~") {
-        sheet->setRangeStyleId(range->id, ID());  // Remove style
+        sheet->setRangeStyleId(range->id, {});  // Remove style
     } else {
         sheet->setRangeStyleId(range->id, ID(styleIdStr));
     }

@@ -2059,7 +2059,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 const ID& endRowId = rowIds[endRow];
 
                 // Create merge range using unified Range system
-                ID rangeId = generate_id();
+                const ID rangeId = generate_id();
                 auto range = std::make_unique<cells::Range>(
                     rangeId, startColId, startRowId, endColId, endRowId, cells::RangeFlags::MERGE);
                 sheet->addRange(std::move(range));

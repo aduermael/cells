@@ -1168,7 +1168,7 @@ ID Sheet::getRangeStyleId(const ID& rangeId) const {
     if (it != _rangeStyles.end()) {
         return it->second;
     }
-    return ID();  // Return null ID if no style association
+    return {};  // Return null ID if no style association
 }
 
 void Sheet::setRangeStyleId(const ID& rangeId, const ID& styleId) {
