@@ -37,7 +37,7 @@ The keyboard handler should check if the active element is an input/textarea BEF
 ## Phase 1: Fix Clipboard MIME Type Handling
 - [x] 1a: Update `ClipboardManager.copy()` to use `navigator.clipboard.write()` with `ClipboardItem` containing both `text/plain` (TSV only) and `web application/x-cells-clipboard` (JSON metadata). Added fallback to text-only for older browsers.
 - [x] 1b: Update `ClipboardManager.paste()` to first try reading custom MIME type via `navigator.clipboard.read()`, falling back to `text/plain` for external content. Added `readCustomClipboardData()` helper method.
-- [ ] 1c: Remove the `CELLS_CLIPBOARD::` marker prefix system (no longer needed)
+- [x] 1c: Remove the `CELLS_CLIPBOARD::` marker prefix system (already removed in 1a/1b - no longer needed)
 
 ## Phase 2: Fix AI Input Paste Interception
 - [ ] 2a: Move the active element input/textarea check to occur BEFORE clipboard shortcut handling in `keyboard-events.ts`
