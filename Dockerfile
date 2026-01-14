@@ -24,18 +24,8 @@ RUN apk --no-cache add ca-certificates
 # Copy the server binary
 COPY --from=builder /build/server .
 
-# Copy the WASM distribution files (only the web assets, not source code)
-# Static files from apps/wasm/static/
-COPY apps/wasm/static/index.html dist/
-COPY apps/wasm/static/shared/ dist/shared/
-# Shared assets (favicons, icons)
-COPY apps/shared/favicons/ dist/favicons/
-COPY apps/shared/icon.svg dist/
-# Built files from dist/ (output of make wasm-dist)
-COPY dist/main.js dist/
-COPY dist/cells_wasm_bin.js dist/
-COPY dist/cells_wasm_bin.wasm dist/
-COPY dist/worker.js dist/
+# Copy the WASM distribution files (output of make wasm-dist)
+COPY dist/wasm/ dist/
 
 # Expose the port
 EXPOSE 8080
