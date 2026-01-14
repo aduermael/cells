@@ -1088,6 +1088,9 @@ bool Sheet::removeRange(const ID& rangeId) {
         _rangeIndex->removeById(rangeId);
     }
 
+    // Remove style association if any
+    _rangeStyles.erase(rangeId);
+
     _ranges.erase(it);
     return true;
 }
@@ -1150,8 +1153,39 @@ void Sheet::updateRangeIndex(Range* range) {
 
 void Sheet::clearAllRanges() {
     _ranges.clear();
+    _rangeStyles.clear();
     if (_rangeIndex) {
         _rangeIndex->clear();
+    }
+}
+
+// ============================================================================
+// Range Style Mapping
+// ============================================================================
+
+ID Sheet::getRangeStyleId(const ID& rangeId) const {
+    auto it = _rangeStyles.find(rangeId);
+    if (it != _rangeStyles.end()) {
+        return it->second;
+    }
+    return ID();  // Return null ID if no style association
+}
+
+void Sheet::setRangeStyleId(const ID& rangeId, const ID& styleId) {
+    // Get the range to update its flags
+    Range* range = getRange(rangeId);
+    if (!range) {
+        return;  // Range doesn't exist
+    }
+
+    if (styleId.isNull()) {
+        // Remove style association
+        _rangeStyles.erase(rangeId);
+        range->flags = range->flags & ~RangeFlags::STYLE;
+    } else {
+        // Set style association
+        _rangeStyles[rangeId] = styleId;
+        range->flags = range->flags | RangeFlags::STYLE;
     }
 }
 

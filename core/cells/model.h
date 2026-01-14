@@ -681,6 +681,22 @@ struct Sheet {
     // Clear all ranges
     void clearAllRanges();
 
+    // ========================================================================
+    // Range Style Mapping
+    // ========================================================================
+
+    // Get the style ID associated with a range (returns null ID if no style)
+    [[nodiscard]] ID getRangeStyleId(const ID& rangeId) const;
+
+    // Set the style ID for a range (also sets RANGE_STYLE flag on the range)
+    // Pass null ID to remove the style association
+    void setRangeStyleId(const ID& rangeId, const ID& styleId);
+
+    // Get all range-style mappings (for serialization)
+    [[nodiscard]] const std::unordered_map<ID, ID, IDHash>& getRangeStyles() const {
+        return _rangeStyles;
+    }
+
 private:
     // Parent workbook (set by Workbook::addSheet)
     Workbook* _workbook{nullptr};
@@ -729,6 +745,10 @@ private:
 
     // Range storage (maps range ID → Range)
     std::unordered_map<ID, std::unique_ptr<Range>, IDHash> _ranges;
+
+    // Range-to-styleId mapping (for ranges with RANGE_STYLE flag)
+    // Key: range ID, Value: style ID from Workbook::styles
+    std::unordered_map<ID, ID, IDHash> _rangeStyles;
 
     // Spatial index for range queries (stores Range pointers)
     std::unique_ptr<RangeIndex> _rangeIndex;

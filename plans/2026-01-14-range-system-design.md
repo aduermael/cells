@@ -210,7 +210,7 @@ For ranges with `RANGE_MERGE` flag:
 - [ ] E4: Column/row-wide styling
 
 ### Phase F: Range-Based Styles (Integration Test)
-- [ ] F1: Add range-to-styleId mapping in Sheet
+- [x] F1: Add range-to-styleId mapping in Sheet - Added `_rangeStyles` map (rangeId → styleId), `getRangeStyleId()`/`setRangeStyleId()` methods, and cleanup in `removeRange()`/`clearAllRanges()`
 - [ ] F2: Update RANGE_SET_STYLE to store style association
 - [ ] F3: Update viewport to apply range styles (CSS-like inheritance)
 - [ ] F4: Add UI for applying styles to ranges
