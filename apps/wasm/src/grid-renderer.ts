@@ -1132,12 +1132,21 @@ export class GridRenderer {
         }
       }
 
-      // Calculate the extended clip region
-      const clipX = getColX(clipStartCol, headerState);
-      let clipWidth = 0;
-      for (let c = clipStartCol; c <= clipEndCol; c++) {
-        const baseW = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
-        clipWidth += getZoomedColWidth(baseW);
+      // Calculate the clip region
+      // For merge anchors, use the full merged region for clipping
+      // For regular cells, use the extended clip region (for overflow)
+      let clipX: number;
+      let clipWidth: number;
+      if (cell.isMergeAnchor) {
+        clipX = cellX;
+        clipWidth = colWidth;
+      } else {
+        clipX = getColX(clipStartCol, headerState);
+        clipWidth = 0;
+        for (let c = clipStartCol; c <= clipEndCol; c++) {
+          const baseW = this.colWidths.get(c) || DEFAULT_COL_WIDTH;
+          clipWidth += getZoomedColWidth(baseW);
+        }
       }
 
       ctx.save();
