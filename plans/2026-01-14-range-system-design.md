@@ -186,12 +186,12 @@ For ranges with `RANGE_MERGE` flag:
 - [x] A5: Implement corner deletion (range shrinking) - Added `adjustRangeForColumnDeletion()` and `adjustRangeForRowDeletion()` template functions
 
 ### Phase B: CRDT Operations
-- [ ] B1: Design AddRange operation
-- [ ] B2: Design RemoveRange operation
-- [ ] B3: Design UpdateRangeCorners operation
-- [ ] B4: Design UpdateRangeFlags operation
-- [ ] B5: Design UpdateRangeMetadata operation
-- [ ] B6: Handle CRDT conflicts for overlapping ranges
+- [x] B1: Design AddRange operation - Added RANGE_ADD OpType, `makeRangeAddOp()`, and `applyRangeAdd()` in crdt_range.cc
+- [x] B2: Design RemoveRange operation - Added RANGE_REMOVE OpType, `makeRangeRemoveOp()`, and `applyRangeRemove()` (idempotent deletion)
+- [x] B3: Design UpdateRangeCorners operation - Added RANGE_UPDATE_CORNERS OpType for resizing; resurrects deleted ranges (no data loss)
+- [x] B4: Design UpdateRangeFlags operation - Added RANGE_UPDATE_FLAGS OpType for changing range purposes
+- [x] B5: Design UpdateRangeMetadata operation - Added RANGE_SET_STYLE OpType for style association
+- [x] B6: Handle CRDT conflicts for overlapping ranges - LWW for same ID; overlapping ranges coexist (UI resolves display conflicts)
 
 ### Phase C: Migrate Existing Features
 - [ ] C1: Migrate MergeRange to Range (flags = RANGE_MERGE)

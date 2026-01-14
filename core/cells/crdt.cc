@@ -352,6 +352,27 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
         case OpType::NAMED_RANGE_DELETE:
             result = internal::applyNamedRangeDelete(workbook, op);
             break;
+
+        // Range operations (unified range system)
+        case OpType::RANGE_ADD:
+            result = internal::applyRangeAdd(workbook, op);
+            break;
+
+        case OpType::RANGE_REMOVE:
+            result = internal::applyRangeRemove(workbook, op);
+            break;
+
+        case OpType::RANGE_UPDATE_CORNERS:
+            result = internal::applyRangeUpdateCorners(workbook, op);
+            break;
+
+        case OpType::RANGE_UPDATE_FLAGS:
+            result = internal::applyRangeUpdateFlags(workbook, op);
+            break;
+
+        case OpType::RANGE_SET_STYLE:
+            result = internal::applyRangeSetStyle(workbook, op);
+            break;
     }
 
     // Add to OpLog regardless of result (for history/sync)
@@ -529,6 +550,37 @@ Operation makeNamedRangeDeleteOp(Workbook& workbook, const std::string& payload)
     const HLC hlc = workbook.getCurrentHLC();
     // Use workbook ID as target since named ranges are workbook-level entities
     return {hlc, OpType::NAMED_RANGE_DELETE, workbook.id, payload};
+}
+
+// =============================================================================
+// Range Operations (Unified Range System)
+// =============================================================================
+
+Operation makeRangeAddOp(Workbook& workbook, const ID& rangeId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::RANGE_ADD, rangeId, payload};
+}
+
+Operation makeRangeRemoveOp(Workbook& workbook, const ID& rangeId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::RANGE_REMOVE, rangeId, payload};
+}
+
+Operation makeRangeUpdateCornersOp(Workbook& workbook, const ID& rangeId,
+                                   const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::RANGE_UPDATE_CORNERS, rangeId, payload};
+}
+
+Operation makeRangeUpdateFlagsOp(Workbook& workbook, const ID& rangeId,
+                                 const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::RANGE_UPDATE_FLAGS, rangeId, payload};
+}
+
+Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::RANGE_SET_STYLE, rangeId, payload};
 }
 
 // =============================================================================

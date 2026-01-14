@@ -84,6 +84,13 @@ enum class OpType : uint8_t {
     NAMED_RANGE_DEFINE = 50,  // Define a named range
     NAMED_RANGE_DELETE = 51,  // Delete a named range
 
+    // Range operations (unified range system)
+    RANGE_ADD = 60,             // Add a new range
+    RANGE_REMOVE = 61,          // Remove a range by ID
+    RANGE_UPDATE_CORNERS = 62,  // Update range corner IDs (resize)
+    RANGE_UPDATE_FLAGS = 63,    // Update range flags bitmask
+    RANGE_SET_STYLE = 64,       // Set style metadata for a style range
+
     // Legacy operations (deprecated, kept for backwards compatibility parsing)
     // These map to COL_* or ROW_* based on isCol payload field
     DIM_INSERT_AXIS = 100,  // Use COL_INSERT or ROW_INSERT instead

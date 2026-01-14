@@ -73,6 +73,17 @@ const char* opTypeToString(OpType type) {
             return "DIM_RESIZE_AXIS";
         case OpType::DIM_RENAME_AXIS:
             return "DIM_RENAME_AXIS";
+        // Range operations
+        case OpType::RANGE_ADD:
+            return "RANGE_ADD";
+        case OpType::RANGE_REMOVE:
+            return "RANGE_REMOVE";
+        case OpType::RANGE_UPDATE_CORNERS:
+            return "RANGE_UPDATE_CORNERS";
+        case OpType::RANGE_UPDATE_FLAGS:
+            return "RANGE_UPDATE_FLAGS";
+        case OpType::RANGE_SET_STYLE:
+            return "RANGE_SET_STYLE";
     }
     return "CELL_SET_VALUE";
 }
@@ -167,6 +178,22 @@ OpType stringToOpType(const std::string& str) {
     }
     if (str == "AXIS_SET_STYLE") {
         return OpType::AXIS_SET_STYLE;
+    }
+    // Range operations
+    if (str == "RANGE_ADD") {
+        return OpType::RANGE_ADD;
+    }
+    if (str == "RANGE_REMOVE") {
+        return OpType::RANGE_REMOVE;
+    }
+    if (str == "RANGE_UPDATE_CORNERS") {
+        return OpType::RANGE_UPDATE_CORNERS;
+    }
+    if (str == "RANGE_UPDATE_FLAGS") {
+        return OpType::RANGE_UPDATE_FLAGS;
+    }
+    if (str == "RANGE_SET_STYLE") {
+        return OpType::RANGE_SET_STYLE;
     }
     return OpType::CELL_SET_VALUE;  // Default
 }

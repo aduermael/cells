@@ -232,6 +232,8 @@ cc_library(
         ":id",
         ":named_ranges",
         ":oplog",
+        ":range",
+        ":range_index",
         ":types",
     ],
 )
@@ -242,6 +244,7 @@ cc_library(
         "crdt.cc",
         "crdt_axis.cc",
         "crdt_cell.cc",
+        "crdt_range.cc",
     ],
     hdrs = [
         "crdt.h",
@@ -253,6 +256,7 @@ cc_library(
         ":model",
         ":number_format",
         ":operation",
+        ":range",
     ],
 )
 
@@ -288,6 +292,17 @@ cc_test(
     deps = [
         ":crdt",
         ":id",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "crdt_range_test",
+    srcs = ["crdt_range_test.cc"],
+    deps = [
+        ":crdt",
+        ":id",
+        ":range",
         "@googletest//:gtest_main",
     ],
 )

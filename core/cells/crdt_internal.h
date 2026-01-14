@@ -105,6 +105,13 @@ ApplyResult applyStyleDefine(Workbook& workbook, const Operation& op);
 ApplyResult applyNamedRangeDefine(Workbook& workbook, const Operation& op);
 ApplyResult applyNamedRangeDelete(Workbook& workbook, const Operation& op);
 
+// Range operations (unified range system)
+ApplyResult applyRangeAdd(Workbook& workbook, const Operation& op);
+ApplyResult applyRangeRemove(Workbook& workbook, const Operation& op);
+ApplyResult applyRangeUpdateCorners(Workbook& workbook, const Operation& op);
+ApplyResult applyRangeUpdateFlags(Workbook& workbook, const Operation& op);
+ApplyResult applyRangeSetStyle(Workbook& workbook, const Operation& op);
+
 }  // namespace internal
 }  // namespace cells
 

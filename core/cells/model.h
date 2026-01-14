@@ -46,6 +46,9 @@ struct Workbook;
 struct SharedFormulaInfo;
 struct OpLog;
 struct SpillInfo;
+struct Range;
+class RangeIndex;
+enum class RangeFlags : uint8_t;
 
 // Collaboration mode for the workbook
 // Determines how edits are tracked and synchronized
@@ -638,6 +641,46 @@ struct Sheet {
     // Clear all merged cell regions
     void clearAllMergeRanges();
 
+    // ========================================================================
+    // Unified Range System
+    // ========================================================================
+
+    // Get a range by ID (returns nullptr if not found)
+    [[nodiscard]] Range* getRange(const ID& rangeId);
+    [[nodiscard]] const Range* getRange(const ID& rangeId) const;
+
+    // Add a new range (takes ownership)
+    // Returns the range pointer, or nullptr if a range with this ID already exists
+    Range* addRange(std::unique_ptr<Range> range);
+
+    // Remove a range by ID
+    // Returns true if the range was found and removed
+    bool removeRange(const ID& rangeId);
+
+    // Get all ranges containing a cell position
+    // Requires column/row positions to be resolved first
+    [[nodiscard]] std::vector<Range*> getRangesAt(uint32_t colPos, uint32_t rowPos) const;
+
+    // Get all ranges containing a cell position with specific flag(s)
+    [[nodiscard]] std::vector<Range*> getRangesAt(uint32_t colPos, uint32_t rowPos,
+                                                  RangeFlags flagMask) const;
+
+    // Get the range index for direct spatial queries
+    [[nodiscard]] RangeIndex* getRangeIndex() { return _rangeIndex.get(); }
+    [[nodiscard]] const RangeIndex* getRangeIndex() const { return _rangeIndex.get(); }
+
+    // Get all ranges (for serialization/export)
+    [[nodiscard]] const std::unordered_map<ID, std::unique_ptr<Range>, IDHash>& getRanges() const {
+        return _ranges;
+    }
+
+    // Update the spatial index for a range (call after column/row positions change)
+    // Resolves column/row UUIDs to positions and updates the R-tree entry
+    void updateRangeIndex(Range* range);
+
+    // Clear all ranges
+    void clearAllRanges();
+
 private:
     // Parent workbook (set by Workbook::addSheet)
     Workbook* _workbook{nullptr};
@@ -679,6 +722,16 @@ private:
     // Index: (colId, rowId) composite key → index into _mergeRanges
     // Contains entries for ALL positions in merged ranges (including anchors)
     std::unordered_map<std::string, size_t> _mergeIndex;
+
+    // ========================================================================
+    // Unified Range System (persisted)
+    // ========================================================================
+
+    // Range storage (maps range ID → Range)
+    std::unordered_map<ID, std::unique_ptr<Range>, IDHash> _ranges;
+
+    // Spatial index for range queries (stores Range pointers)
+    std::unique_ptr<RangeIndex> _rangeIndex;
 
     // Build composite key for cell index
     static std::string makeCellKey(const ID& colId, const ID& rowId);

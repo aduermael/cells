@@ -26,6 +26,8 @@
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/model.h"
+#include "core/cells/range.h"
+#include "core/cells/range_index.h"
 
 namespace cells {
 
@@ -1040,6 +1042,117 @@ void Sheet::removeMergeRange(const ID& anchorColId, const ID& anchorRowId) {
 void Sheet::clearAllMergeRanges() {
     _mergeRanges.clear();
     _mergeIndex.clear();
+}
+
+// ============================================================================
+// Unified Range System
+// ============================================================================
+
+Range* Sheet::getRange(const ID& rangeId) {
+    auto it = _ranges.find(rangeId);
+    return (it != _ranges.end()) ? it->second.get() : nullptr;
+}
+
+const Range* Sheet::getRange(const ID& rangeId) const {
+    auto it = _ranges.find(rangeId);
+    return (it != _ranges.end()) ? it->second.get() : nullptr;
+}
+
+Range* Sheet::addRange(std::unique_ptr<Range> range) {
+    if (!range || range->id.isNull()) {
+        return nullptr;
+    }
+
+    // Check for duplicate ID
+    if (_ranges.find(range->id) != _ranges.end()) {
+        return nullptr;
+    }
+
+    Range* rangePtr = range.get();
+    _ranges[range->id] = std::move(range);
+
+    // Update spatial index
+    updateRangeIndex(rangePtr);
+
+    return rangePtr;
+}
+
+bool Sheet::removeRange(const ID& rangeId) {
+    auto it = _ranges.find(rangeId);
+    if (it == _ranges.end()) {
+        return false;
+    }
+
+    // Remove from spatial index
+    if (_rangeIndex) {
+        _rangeIndex->removeById(rangeId);
+    }
+
+    _ranges.erase(it);
+    return true;
+}
+
+std::vector<Range*> Sheet::getRangesAt(uint32_t colPos, uint32_t rowPos) const {
+    if (!_rangeIndex) {
+        return {};
+    }
+    return _rangeIndex->queryAt(colPos, rowPos);
+}
+
+std::vector<Range*> Sheet::getRangesAt(uint32_t colPos, uint32_t rowPos,
+                                       RangeFlags flagMask) const {
+    if (!_rangeIndex) {
+        return {};
+    }
+    return _rangeIndex->queryAt(colPos, rowPos, flagMask);
+}
+
+void Sheet::updateRangeIndex(Range* range) {
+    if (!range) {
+        return;
+    }
+
+    // Create index if it doesn't exist yet
+    if (!_rangeIndex) {
+        _rangeIndex = std::make_unique<RangeIndex>();
+    }
+
+    // Resolve corner UUIDs to positions
+    const Axis* startCol = getColumn(range->startColId);
+    const Axis* startRow = getRow(range->startRowId);
+    const Axis* endCol = getColumn(range->endColId);
+    const Axis* endRow = getRow(range->endRowId);
+
+    // If any corner is missing, remove from index (range is temporarily invalid)
+    if (!startCol || !startRow || !endCol || !endRow) {
+        _rangeIndex->removeById(range->id);
+        return;
+    }
+
+    // Normalize positions (ensure start <= end)
+    const uint32_t minCol =
+        startCol->position <= endCol->position ? startCol->position : endCol->position;
+    const uint32_t maxCol =
+        startCol->position <= endCol->position ? endCol->position : startCol->position;
+    const uint32_t minRow =
+        startRow->position <= endRow->position ? startRow->position : endRow->position;
+    const uint32_t maxRow =
+        startRow->position <= endRow->position ? endRow->position : startRow->position;
+
+    // Check if already indexed (update bounds) or new (insert)
+    const RangePositionBounds* existingBounds = _rangeIndex->getBounds(range->id);
+    if (existingBounds) {
+        _rangeIndex->updateBounds(range, minCol, minRow, maxCol, maxRow);
+    } else {
+        _rangeIndex->insert(range, minCol, minRow, maxCol, maxRow);
+    }
+}
+
+void Sheet::clearAllRanges() {
+    _ranges.clear();
+    if (_rangeIndex) {
+        _rangeIndex->clear();
+    }
 }
 
 }  // namespace cells

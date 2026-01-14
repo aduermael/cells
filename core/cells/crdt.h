@@ -146,6 +146,38 @@ Operation makeNamedRangeDefineOp(Workbook& workbook, const std::string& payload)
 // Payload: {"name":"MyRange","scope":"W","scopeSheetId":"-"}
 Operation makeNamedRangeDeleteOp(Workbook& workbook, const std::string& payload);
 
+// =============================================================================
+// Range Operations (Unified Range System)
+// =============================================================================
+
+// Generate a RANGE_ADD operation for adding a new range.
+// Payload: {"sheet_id":"...","start_col_id":"...","start_row_id":"...",
+//           "end_col_id":"...","end_row_id":"...","flags":N}
+// target_id: the range's own UUID
+Operation makeRangeAddOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
+
+// Generate a RANGE_REMOVE operation for removing a range.
+// Payload: {"sheet_id":"..."} - sheet where range exists
+// target_id: the range's UUID
+Operation makeRangeRemoveOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
+
+// Generate a RANGE_UPDATE_CORNERS operation for updating range bounds.
+// Payload: {"sheet_id":"...","start_col_id":"...","start_row_id":"...",
+//           "end_col_id":"...","end_row_id":"..."}
+// target_id: the range's UUID
+Operation makeRangeUpdateCornersOp(Workbook& workbook, const ID& rangeId,
+                                   const std::string& payload);
+
+// Generate a RANGE_UPDATE_FLAGS operation for updating range flags.
+// Payload: {"sheet_id":"...","flags":N}
+// target_id: the range's UUID
+Operation makeRangeUpdateFlagsOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
+
+// Generate a RANGE_SET_STYLE operation for setting range style metadata.
+// Payload: {"sheet_id":"...","style_id":"..."}
+// target_id: the range's UUID
+Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
+
 // Bootstrap the OpLog with the current workbook state.
 // Called when transitioning from OFFLINE to COLLABORATING mode.
 // Generates operations for all existing axes and cells in HLC order.
