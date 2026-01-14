@@ -13,22 +13,22 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Language | Lines |
 |----------|------:|
-| C++ | 37,441 |
-| TypeScript | 20,840 |
-| CSS | 2,577 |
+| C++ | 37,567 |
+| TypeScript | 21,079 |
+| CSS | 2,606 |
 | Starlark | 1,561 |
 | Go | 1,363 |
 | JavaScript | 1,196 |
 | Shell | 1,052 |
 | Objective-C++ | 1,007 |
-| HTML | 875 |
+| HTML | 912 |
 
 ### Test Code
 
 | Language | Lines |
 |----------|------:|
 | C++ | 27,407 |
-| JavaScript | 8,334 |
+| JavaScript | 8,510 |
 | Go | 315 |
 
 ### Documentation
@@ -44,12 +44,12 @@ A high-performance, collaborative spreadsheet engine with:
 | Unit (C++) | 2475 |
 | Unit (Go) | 13 |
 | Unit (JavaScript) | 30 |
-| E2E (Puppeteer) | 249 |
-| **Total** | **2767** |
+| E2E (Puppeteer) | 256 |
+| **Total** | **2774** |
 
-- **Commits**: 1078
+- **Commits**: 1081
 - **WASM Module**: Not built
-- **Total Web Bundle**: 19.67 MB
+- **Total Web Bundle**: 19.70 MB
 
 <sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./scripts/generate-stats.sh`</sub>
 
