@@ -99,9 +99,10 @@ std::vector<Range*> RangeIndex::queryAt(uint32_t col, uint32_t row, RangeFlags f
     // Filter by flags
     std::vector<Range*> result;
     result.reserve(all.size());
-    for (Range* r : all) {
+    for (const Range* r : all) {
         if (r != nullptr && hasFlag(r->flags, flagMask)) {
-            result.push_back(r);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) - API returns non-const
+            result.push_back(const_cast<Range*>(r));
         }
     }
     return result;
@@ -120,9 +121,10 @@ std::vector<Range*> RangeIndex::queryRange(uint32_t startCol, uint32_t startRow,
     // Filter by flags
     std::vector<Range*> result;
     result.reserve(all.size());
-    for (Range* r : all) {
+    for (const Range* r : all) {
         if (r != nullptr && hasFlag(r->flags, flagMask)) {
-            result.push_back(r);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) - API returns non-const
+            result.push_back(const_cast<Range*>(r));
         }
     }
     return result;

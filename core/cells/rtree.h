@@ -98,7 +98,7 @@ struct BoundingRect {
 template <typename T>
 struct RTreeEntry {
     BoundingRect bounds;
-    T value;
+    T value{};  // Value-initialize to satisfy lint
 
     RTreeEntry() = default;
     RTreeEntry(const BoundingRect& b, const T& v) : bounds(b), value(v) {}

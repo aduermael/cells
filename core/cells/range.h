@@ -92,11 +92,11 @@ inline bool hasFlag(RangeFlags flags, RangeFlags flag) {
 //
 
 struct Range {
-    ID id;          // Range's own UUID (for CRDT operations)
-    ID startColId;  // Column UUID for left edge
-    ID startRowId;  // Row UUID for top edge
-    ID endColId;    // Column UUID for right edge
-    ID endRowId;    // Row UUID for bottom edge
+    ID id;                               // Range's own UUID (for CRDT operations)
+    ID startColId;                       // Column UUID for left edge
+    ID startRowId;                       // Row UUID for top edge
+    ID endColId;                         // Column UUID for right edge
+    ID endRowId;                         // Row UUID for bottom edge
     RangeFlags flags{RangeFlags::NONE};  // Bitmask of purposes
 
     Range() = default;
@@ -113,17 +113,20 @@ struct Range {
 
     // Create a single-cell range (start == end)
     Range(const ID& rangeId, const ID& colId, const ID& rowId, RangeFlags f = RangeFlags::NONE)
-        : id(rangeId), startColId(colId), startRowId(rowId), endColId(colId), endRowId(rowId), flags(f) {}
+        : id(rangeId),
+          startColId(colId),
+          startRowId(rowId),
+          endColId(colId),
+          endRowId(rowId),
+          flags(f) {}
 
     // Check if this range has a specific flag
-    [[nodiscard]] bool hasFlag(RangeFlags flag) const {
-        return cells::hasFlag(flags, flag);
-    }
+    [[nodiscard]] bool hasFlag(RangeFlags flag) const { return cells::hasFlag(flags, flag); }
 
     // Check if range is valid (has non-null ID and corners)
     [[nodiscard]] bool isValid() const {
-        return !id.isNull() && !startColId.isNull() && !startRowId.isNull() &&
-               !endColId.isNull() && !endRowId.isNull();
+        return !id.isNull() && !startColId.isNull() && !startRowId.isNull() && !endColId.isNull() &&
+               !endRowId.isNull();
     }
 
     // Check if this is a single-cell range
@@ -220,9 +223,9 @@ inline bool rangesOverlap(uint32_t r1StartCol, uint32_t r1StartRow, uint32_t r1E
 
 // Result of a corner deletion operation
 enum class CornerDeleteResult : uint8_t {
-    UNCHANGED,       // Deleted ID was not a corner of the range
-    SHRUNK,          // Range shrunk - new corner ID is set
-    INVALIDATED,     // Range became invalid (zero-width or zero-height)
+    UNCHANGED,    // Deleted ID was not a corner of the range
+    SHRUNK,       // Range shrunk - new corner ID is set
+    INVALIDATED,  // Range became invalid (zero-width or zero-height)
 };
 
 // Adjust a range when a column is deleted

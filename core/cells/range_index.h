@@ -103,7 +103,8 @@ public:
 
     // Find all ranges containing the cell at (col, row) with specific flag(s)
     // flagMask: bitmask of flags to filter by (range must have at least one)
-    [[nodiscard]] std::vector<Range*> queryAt(uint32_t col, uint32_t row, RangeFlags flagMask) const;
+    [[nodiscard]] std::vector<Range*> queryAt(uint32_t col, uint32_t row,
+                                              RangeFlags flagMask) const;
 
     // Find all ranges intersecting the given rectangle
     [[nodiscard]] std::vector<Range*> queryRange(uint32_t startCol, uint32_t startRow,

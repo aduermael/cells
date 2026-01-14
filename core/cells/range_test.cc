@@ -253,34 +253,50 @@ protected:
 
     // Helper functions that simulate axis traversal
     ID getNextCol(const ID& colId) const {
-        if (colId == colA) return colB;
-        if (colId == colB) return colC;
-        if (colId == colC) return colD;
-        if (colId == colD) return colE;
+        if (colId == colA)
+            return colB;
+        if (colId == colB)
+            return colC;
+        if (colId == colC)
+            return colD;
+        if (colId == colD)
+            return colE;
         return ID();  // null
     }
 
     ID getPrevCol(const ID& colId) const {
-        if (colId == colB) return colA;
-        if (colId == colC) return colB;
-        if (colId == colD) return colC;
-        if (colId == colE) return colD;
+        if (colId == colB)
+            return colA;
+        if (colId == colC)
+            return colB;
+        if (colId == colD)
+            return colC;
+        if (colId == colE)
+            return colD;
         return ID();  // null
     }
 
     ID getNextRow(const ID& rowId) const {
-        if (rowId == rowA) return rowB;
-        if (rowId == rowB) return rowC;
-        if (rowId == rowC) return rowD;
-        if (rowId == rowD) return rowE;
+        if (rowId == rowA)
+            return rowB;
+        if (rowId == rowB)
+            return rowC;
+        if (rowId == rowC)
+            return rowD;
+        if (rowId == rowD)
+            return rowE;
         return ID();  // null
     }
 
     ID getPrevRow(const ID& rowId) const {
-        if (rowId == rowB) return rowA;
-        if (rowId == rowC) return rowB;
-        if (rowId == rowD) return rowC;
-        if (rowId == rowE) return rowD;
+        if (rowId == rowB)
+            return rowA;
+        if (rowId == rowC)
+            return rowB;
+        if (rowId == rowD)
+            return rowC;
+        if (rowId == rowE)
+            return rowD;
         return ID();  // null
     }
 
