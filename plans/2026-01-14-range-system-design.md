@@ -181,7 +181,7 @@ For ranges with `RANGE_MERGE` flag:
 ### Phase A: Core Range Infrastructure
 - [x] A1: Create Range struct with UUID corners and flags - Created `range.h` with Range struct using 5 UUIDs (id, startColId, startRowId, endColId, endRowId) + flags byte
 - [x] A2: Create RangeFlags enum/bitmask - 7 flags: MERGE, STYLE, CONDITIONAL_FORMAT, DATA_VALIDATION, NAMED, PRINT_AREA, FILTER
-- [ ] A3: Implement range containment check
+- [x] A3: Implement range containment check - Added `rangeContainsPosition()`, `rangeIsAnchorPosition()`, and `rangesOverlap()` helper functions
 - [ ] A4: Add R-tree index for range lookup
 - [ ] A5: Implement corner deletion (range shrinking)
 

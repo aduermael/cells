@@ -142,6 +142,65 @@ struct Range {
     bool operator!=(const Range& other) const { return !(*this == other); }
 };
 
+// =============================================================================
+// Range Containment Check
+// =============================================================================
+//
+// Check if a cell position is contained within a range.
+// This requires knowing the positions of the range corners and the cell.
+// Since Range stores UUIDs, the caller must provide the resolved positions.
+//
+// The positions are column/row indices (0-based), not pixel coordinates.
+//
+
+// Check if a cell at (cellCol, cellRow) is contained within the range bounds
+// defined by [startCol, endCol] x [startRow, endRow].
+//
+// All parameters are 0-based position indices.
+// The range is inclusive on both ends: a cell at startCol or endCol is inside.
+//
+// Returns true if startCol <= cellCol <= endCol AND startRow <= cellRow <= endRow
+inline bool rangeContainsPosition(uint32_t startCol, uint32_t startRow, uint32_t endCol,
+                                  uint32_t endRow, uint32_t cellCol, uint32_t cellRow) {
+    // Handle case where start > end (shouldn't happen with valid ranges, but be safe)
+    const uint32_t minCol = startCol <= endCol ? startCol : endCol;
+    const uint32_t maxCol = startCol <= endCol ? endCol : startCol;
+    const uint32_t minRow = startRow <= endRow ? startRow : endRow;
+    const uint32_t maxRow = startRow <= endRow ? endRow : startRow;
+
+    return cellCol >= minCol && cellCol <= maxCol && cellRow >= minRow && cellRow <= maxRow;
+}
+
+// Check if a cell at (cellCol, cellRow) is the anchor (top-left) of the range
+// The anchor is the cell at (min(startCol, endCol), min(startRow, endRow))
+inline bool rangeIsAnchorPosition(uint32_t startCol, uint32_t startRow, uint32_t endCol,
+                                  uint32_t endRow, uint32_t cellCol, uint32_t cellRow) {
+    const uint32_t anchorCol = startCol <= endCol ? startCol : endCol;
+    const uint32_t anchorRow = startRow <= endRow ? startRow : endRow;
+    return cellCol == anchorCol && cellRow == anchorRow;
+}
+
+// Check if two ranges overlap (share at least one cell)
+// Both ranges defined by their corner positions
+inline bool rangesOverlap(uint32_t r1StartCol, uint32_t r1StartRow, uint32_t r1EndCol,
+                          uint32_t r1EndRow, uint32_t r2StartCol, uint32_t r2StartRow,
+                          uint32_t r2EndCol, uint32_t r2EndRow) {
+    // Normalize ranges (ensure start <= end)
+    const uint32_t r1MinCol = r1StartCol <= r1EndCol ? r1StartCol : r1EndCol;
+    const uint32_t r1MaxCol = r1StartCol <= r1EndCol ? r1EndCol : r1StartCol;
+    const uint32_t r1MinRow = r1StartRow <= r1EndRow ? r1StartRow : r1EndRow;
+    const uint32_t r1MaxRow = r1StartRow <= r1EndRow ? r1EndRow : r1StartRow;
+
+    const uint32_t r2MinCol = r2StartCol <= r2EndCol ? r2StartCol : r2EndCol;
+    const uint32_t r2MaxCol = r2StartCol <= r2EndCol ? r2EndCol : r2StartCol;
+    const uint32_t r2MinRow = r2StartRow <= r2EndRow ? r2StartRow : r2EndRow;
+    const uint32_t r2MaxRow = r2StartRow <= r2EndRow ? r2EndRow : r2StartRow;
+
+    // Check for overlap: ranges overlap if they intersect in both dimensions
+    return r1MinCol <= r2MaxCol && r1MaxCol >= r2MinCol && r1MinRow <= r2MaxRow &&
+           r1MaxRow >= r2MinRow;
+}
+
 }  // namespace cells
 
 #endif  // CELLS_RANGE_H_
