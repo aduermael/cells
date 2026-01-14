@@ -258,18 +258,12 @@ ApplyResult applyRangeSetStyle(Workbook& workbook, const Operation& op) {
     // Extract style ID
     const std::string styleIdStr = extractJSONString(op.payload, "style_id");
 
-    // For now, we track style association via the RANGE_STYLE flag
-    // The actual style ID association would need additional storage
-    // (e.g., a map from range ID to style ID in the sheet)
-    //
-    // If style_id is empty or "~", remove the STYLE flag
-    // Otherwise, add the STYLE flag
+    // Set the style association (or remove if styleId is empty/null)
+    // setRangeStyleId handles both the mapping and the RANGE_STYLE flag
     if (styleIdStr.empty() || styleIdStr == "~") {
-        range->flags = range->flags & ~RangeFlags::STYLE;
+        sheet->setRangeStyleId(range->id, ID());  // Remove style
     } else {
-        range->flags = range->flags | RangeFlags::STYLE;
-        // TODO: Store the actual style ID association
-        // sheet->setRangeStyleId(range->id, ID(styleIdStr));
+        sheet->setRangeStyleId(range->id, ID(styleIdStr));
     }
 
     return ApplyResult::SUCCESS;

@@ -211,7 +211,7 @@ For ranges with `RANGE_MERGE` flag:
 
 ### Phase F: Range-Based Styles (Integration Test)
 - [x] F1: Add range-to-styleId mapping in Sheet - Added `_rangeStyles` map (rangeId → styleId), `getRangeStyleId()`/`setRangeStyleId()` methods, and cleanup in `removeRange()`/`clearAllRanges()`
-- [ ] F2: Update RANGE_SET_STYLE to store style association
+- [x] F2: Update RANGE_SET_STYLE to store style association - `applyRangeSetStyle()` now calls `sheet->setRangeStyleId()` instead of just setting the flag
 - [ ] F3: Update viewport to apply range styles (CSS-like inheritance)
 - [ ] F4: Add UI for applying styles to ranges
 
