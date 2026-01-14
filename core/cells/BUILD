@@ -21,6 +21,27 @@ cc_test(
 )
 
 cc_library(
+    name = "range_index",
+    srcs = ["range_index.cc"],
+    hdrs = ["range_index.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":range",
+        ":rtree",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "range_index_test",
+    srcs = ["range_index_test.cc"],
+    deps = [
+        ":range_index",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "id",
     srcs = ["id.cc"],
     hdrs = ["id.h"],
