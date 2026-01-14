@@ -91,6 +91,7 @@ export function handleLoad(
 
 export function handleExport(
     engine: CellsEngine,
+    Module: CellsModule,
     params: Record<string, unknown>,
     respond: RespondFn,
 ): void {
@@ -117,20 +118,33 @@ export function handleExport(
         data = new TextEncoder().encode(content).buffer;
         filename = workbookName + ".csv";
     } else if (format === "xlsx") {
-        const binaryStr = engine.exportToXLSX();
-        if (!binaryStr) {
+        // Use pointer-based export to avoid UTF-8 encoding corruption
+        // Binary data (ZIP files) contains bytes >= 128 that get corrupted
+        // when passed as std::string through Embind (interpreted as UTF-8)
+        const result = JSON.parse(engine.exportToXLSXPtr()) as {
+            ptr?: number;
+            size?: number;
+            error?: string;
+        };
+        if (result.error) {
             respond({
                 type: "error",
-                error: "XLSX export not available or failed",
+                error: result.error,
             });
             return;
         }
-        // Convert binary string to ArrayBuffer
-        const bytes = new Uint8Array(binaryStr.length);
-        for (let i = 0; i < binaryStr.length; i++) {
-            bytes[i] = binaryStr.charCodeAt(i);
+        if (result.ptr === undefined || result.size === undefined) {
+            respond({
+                type: "error",
+                error: "XLSX export failed: invalid response",
+            });
+            return;
         }
+        // Copy binary data directly from WASM heap - no string encoding involved
+        const bytes = Module.HEAPU8.slice(result.ptr, result.ptr + result.size);
         data = bytes.buffer;
+        // Release the C++ buffer memory
+        engine.freeExportBuffer();
         filename = workbookName + ".xlsx";
     } else {
         respond({ type: "error", error: "Unknown export format: " + format });

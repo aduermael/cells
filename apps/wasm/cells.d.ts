@@ -617,8 +617,24 @@ declare module 'cells-wasm' {
      * Export workbook to XLSX format
      * Note: Only available in cells_wasm_full build
      * @returns XLSX binary data as string, or empty on error
+     * @deprecated Use exportToXLSXPtr() for binary-safe transfer
      */
     exportToXLSX(): string;
+
+    /**
+     * Export workbook to XLSX format using pointer-based binary transfer
+     * This method avoids UTF-8 encoding corruption that occurs with string transfer.
+     * After calling this, use Module.HEAPU8.slice(ptr, ptr + size) to copy the data,
+     * then call freeExportBuffer() to release the memory.
+     * @returns JSON string with {ptr: number, size: number} or {error: string}
+     */
+    exportToXLSXPtr(): string;
+
+    /**
+     * Release the export buffer memory after copying data from exportToXLSXPtr()
+     * Must be called after each exportToXLSXPtr() call to avoid memory leaks
+     */
+    freeExportBuffer(): void;
 
     // ========================================================================
     // Workbook management

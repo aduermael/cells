@@ -167,6 +167,8 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("exportToCells", &cells::wasm::CellsEngine::exportToCells)
         .function("exportToCSV", &cells::wasm::CellsEngine::exportToCSV)
         .function("exportToXLSX", &cells::wasm::CellsEngine::exportToXLSX)
+        .function("exportToXLSXPtr", &cells::wasm::CellsEngine::exportToXLSXPtr)
+        .function("freeExportBuffer", &cells::wasm::CellsEngine::freeExportBuffer)
         .function("hasFormulas", &cells::wasm::CellsEngine::hasFormulas)
         // Workbook management
         .function("getWorkbookName", &cells::wasm::CellsEngine::getWorkbookName)

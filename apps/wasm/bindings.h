@@ -213,6 +213,8 @@ public:
     std::string exportToCells();
     std::string exportToCSV();
     std::string exportToXLSX();
+    std::string exportToXLSXPtr();  // Returns {ptr, size} for binary-safe transfer
+    void freeExportBuffer();        // Release memory after JS copies the data
     bool hasFormulas();
 
     // ========================================================================
@@ -427,6 +429,9 @@ private:
     LuauSandbox _luauSandbox;
     LuauAutocomplete _luauAutocomplete;
     NumberFormatRegistry _formatRegistry;
+
+    // Binary export buffer - used by exportToXLSXPtr() for binary-safe transfer
+    std::vector<uint8_t> _exportBuffer;
 
     static inline const std::unordered_map<ID, std::string, IDHash> _emptyCustomFormats{};
 

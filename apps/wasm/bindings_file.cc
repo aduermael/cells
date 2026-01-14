@@ -226,6 +226,55 @@ std::string CellsEngine::exportToXLSX() {
     return data;
 }
 
+std::string CellsEngine::exportToXLSXPtr() {
+    // Binary-safe XLSX export that avoids UTF-8 encoding corruption.
+    // Returns a JSON object with {ptr, size} pointing to the WASM heap.
+    // JavaScript should use Module.HEAPU8.slice(ptr, ptr + size) to copy the data,
+    // then call freeExportBuffer() to release the memory.
+
+    if (!_workbook) {
+        return "{\"error\":\"No workbook\"}";
+    }
+
+    // Ensure /tmp directory exists in Emscripten's virtual filesystem
+    mkdir("/tmp", 0777);
+
+    const char* tempPath = "/tmp/export.xlsx";
+    auto result = writeXLSX(*_workbook, tempPath);
+    if (!result.ok()) {
+        return "{\"error\":\"" + jsonEscape(result.error->message) + "\"}";
+    }
+
+    // Read back the file into the member buffer
+    FILE* f = fopen(tempPath, "rb");
+    if (!f) {
+        return "{\"error\":\"Failed to read exported file\"}";
+    }
+
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    _exportBuffer.resize(size);
+    size_t bytesRead = fread(_exportBuffer.data(), 1, size, f);
+    fclose(f);
+    remove(tempPath);
+
+    if (bytesRead != static_cast<size_t>(size)) {
+        _exportBuffer.clear();
+        return "{\"error\":\"Failed to read complete file\"}";
+    }
+
+    // Return pointer and size as JSON - JS will read directly from WASM heap
+    return "{\"ptr\":" + std::to_string(reinterpret_cast<uintptr_t>(_exportBuffer.data())) +
+           ",\"size\":" + std::to_string(_exportBuffer.size()) + "}";
+}
+
+void CellsEngine::freeExportBuffer() {
+    _exportBuffer.clear();
+    _exportBuffer.shrink_to_fit();
+}
+
 bool CellsEngine::hasFormulas() {
     if (!_workbook) {
         return false;

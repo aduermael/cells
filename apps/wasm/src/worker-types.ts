@@ -112,6 +112,8 @@ export interface CellsEngine {
     exportToCells(): string;
     exportToCSV(): string;
     exportToXLSX(): string;
+    exportToXLSXPtr(): string;
+    freeExportBuffer(): void;
     hasFormulas(): boolean;
 
     // Workbook management

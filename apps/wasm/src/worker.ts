@@ -366,7 +366,7 @@ function handleMessage(msg: WorkerRequest): void {
                 handleLoad(engine, Module, params, respond);
                 break;
             case "export":
-                handleExport(engine, params, respond);
+                handleExport(engine, Module, params, respond);
                 break;
 
             // ================================================================

@@ -32,17 +32,18 @@ Fix the binary data transfer between WASM and JavaScript by using proper binary 
 
 The core issue is the transfer of binary data across the WASM boundary.
 
-- [ ] 1a: Create `exportToXLSXPtr()` C++ function that returns binary data via WASM heap pointer
-  - In `bindings_file.cc`, add a method that writes XLSX and stores the binary data in a member variable
-  - Return the size and allow JS to read directly from WASM heap
-  - Pattern: similar to how `loadFromXLSXDataPtr` accepts binary data via pointer
+- [x] 1a: Create `exportToXLSXPtr()` C++ function that returns binary data via WASM heap pointer
+  - Added `exportToXLSXPtr()` in `bindings_file.cc` - stores binary data in `_exportBuffer` member, returns JSON `{ptr, size}`
+  - Added `_exportBuffer` member variable in `bindings.h`
+  - Registered in Embind bindings
 
-- [ ] 1b: Update TypeScript worker handler to use pointer-based export
-  - In `worker-handlers.ts`, use `Module.HEAPU8.slice(ptr, ptr + size)` to copy binary data
-  - This avoids string encoding entirely
+- [x] 1b: Update TypeScript worker handler to use pointer-based export
+  - Updated `handleExport()` in `worker-handlers.ts` to use `Module.HEAPU8.slice(ptr, ptr + size)`
+  - Handler now passes `Module` parameter for WASM heap access
 
-- [ ] 1c: Add cleanup method for exported binary data
-  - Add `freeExportBuffer()` to release memory after JS copies it
+- [x] 1c: Add cleanup method for exported binary data
+  - Added `freeExportBuffer()` in `bindings_file.cc` - clears and shrinks `_exportBuffer`
+  - Called in worker handler after copying data from WASM heap
 
 ---
 
