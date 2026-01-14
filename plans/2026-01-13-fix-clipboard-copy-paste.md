@@ -35,7 +35,7 @@ The keyboard handler should check if the active element is an input/textarea BEF
 ---
 
 ## Phase 1: Fix Clipboard MIME Type Handling
-- [ ] 1a: Update `ClipboardManager.copy()` to use `navigator.clipboard.write()` with `ClipboardItem` containing both `text/plain` (TSV only) and `web application/x-cells-clipboard` (JSON metadata)
+- [x] 1a: Update `ClipboardManager.copy()` to use `navigator.clipboard.write()` with `ClipboardItem` containing both `text/plain` (TSV only) and `web application/x-cells-clipboard` (JSON metadata). Added fallback to text-only for older browsers.
 - [ ] 1b: Update `ClipboardManager.paste()` to first try reading `web application/x-cells-clipboard`, falling back to `text/plain` for external content
 - [ ] 1c: Remove the `CELLS_CLIPBOARD::` marker prefix system (no longer needed)
 

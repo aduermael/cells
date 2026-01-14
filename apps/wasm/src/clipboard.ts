@@ -122,11 +122,13 @@ export class ClipboardManager {
   // Copy
   // =========================================================================
 
-  // Marker prefix for internal clipboard data (JSON embedded in text/plain)
-  private static readonly CLIPBOARD_MARKER = "CELLS_CLIPBOARD::";
+  // Custom MIME type for internal clipboard data (must use "web " prefix per spec)
+  private static readonly CUSTOM_MIME_TYPE = "web application/x-cells-clipboard";
 
   /**
    * Copy the current selection to clipboard
+   * Uses ClipboardItem API to write both custom MIME type (for internal use)
+   * and text/plain (for external apps like text editors).
    * @returns true if copy succeeded
    */
   async copy(): Promise<boolean> {
@@ -139,17 +141,31 @@ export class ClipboardManager {
     const tsvText = this.toTSV(clipboardData);
     const jsonText = JSON.stringify(clipboardData);
 
-    // Embed JSON in text/plain with a marker for reliable internal paste detection.
-    // Format: CELLS_CLIPBOARD::<json>\n\n<tsv>
-    // This ensures format preservation works even when custom MIME types fail.
-    const combinedText = `${ClipboardManager.CLIPBOARD_MARKER}${jsonText}\n\n${tsvText}`;
-
     try {
-      await navigator.clipboard.writeText(combinedText);
+      // Use ClipboardItem API to write multiple MIME types:
+      // - text/plain: Clean TSV for external apps (what users see when pasting elsewhere)
+      // - Custom MIME type: JSON metadata for internal paste with full formatting
+      const clipboardItem = new ClipboardItem({
+        "text/plain": new Blob([tsvText], { type: "text/plain" }),
+        [ClipboardManager.CUSTOM_MIME_TYPE]: new Blob([jsonText], {
+          type: ClipboardManager.CUSTOM_MIME_TYPE,
+        }),
+      });
+      await navigator.clipboard.write([clipboardItem]);
       return true;
     } catch (err) {
-      console.error("Failed to copy to clipboard:", err);
-      return false;
+      // Fall back to text-only if ClipboardItem API fails (e.g., older browsers)
+      console.warn(
+        "ClipboardItem API failed, falling back to text-only:",
+        err
+      );
+      try {
+        await navigator.clipboard.writeText(tsvText);
+        return true;
+      } catch (fallbackErr) {
+        console.error("Failed to copy to clipboard:", fallbackErr);
+        return false;
+      }
     }
   }
 
