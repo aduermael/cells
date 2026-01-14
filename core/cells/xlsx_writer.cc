@@ -72,9 +72,18 @@ std::string generateContentTypes(size_t sheetCount) {
     xml << "  <Default Extension=\"rels\" "
            "ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>\n";
     xml << "  <Default Extension=\"xml\" ContentType=\"application/xml\"/>\n";
+    // Core document properties
+    xml << "  <Override PartName=\"/docProps/core.xml\" "
+           "ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>\n";
+    xml << "  <Override PartName=\"/docProps/app.xml\" "
+           "ContentType=\"application/vnd.openxmlformats-officedocument.extended-properties+xml\"/"
+           ">\n";
+    // Workbook parts
     xml << "  <Override PartName=\"/xl/workbook.xml\" "
            "ContentType=\"application/"
            "vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>\n";
+    xml << "  <Override PartName=\"/xl/theme/theme1.xml\" "
+           "ContentType=\"application/vnd.openxmlformats-officedocument.theme+xml\"/>\n";
     xml << "  <Override PartName=\"/xl/styles.xml\" "
            "ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/"
            ">\n";
@@ -100,6 +109,12 @@ std::string generateRootRels() {
     xml << "  <Relationship Id=\"rId1\" "
            "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
            "officeDocument\" Target=\"xl/workbook.xml\"/>\n";
+    xml << "  <Relationship Id=\"rId2\" "
+           "Type=\"http://schemas.openxmlformats.org/package/2006/relationships/metadata/"
+           "core-properties\" Target=\"docProps/core.xml\"/>\n";
+    xml << "  <Relationship Id=\"rId3\" "
+           "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+           "extended-properties\" Target=\"docProps/app.xml\"/>\n";
     xml << "</Relationships>";
     return xml.str();
 }
@@ -422,7 +437,108 @@ std::string generateWorkbookRels(size_t sheetCount) {
            "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
            "sharedStrings\" "
            "Target=\"sharedStrings.xml\"/>\n";
+    // Theme relationship
+    xml << "  <Relationship Id=\"rId" << (sheetCount + 3)
+        << "\" "
+           "Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+           "theme\" "
+           "Target=\"theme/theme1.xml\"/>\n";
     xml << "</Relationships>";
+    return xml.str();
+}
+
+// Generate docProps/core.xml (core document properties)
+std::string generateCoreProps() {
+    std::ostringstream xml;
+    xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
+    xml << "<cp:coreProperties "
+           "xmlns:cp=\"http://schemas.openxmlformats.org/package/2006/metadata/core-properties\" "
+           "xmlns:dc=\"http://purl.org/dc/elements/1.1/\" "
+           "xmlns:dcterms=\"http://purl.org/dc/terms/\" "
+           "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n";
+    xml << "  <dc:creator>Cells</dc:creator>\n";
+    xml << "  <cp:lastModifiedBy>Cells</cp:lastModifiedBy>\n";
+    xml << "</cp:coreProperties>";
+    return xml.str();
+}
+
+// Generate docProps/app.xml (application properties)
+std::string generateAppProps() {
+    std::ostringstream xml;
+    xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
+    xml << "<Properties "
+           "xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\">\n";
+    xml << "  <Application>Cells</Application>\n";
+    xml << "</Properties>";
+    return xml.str();
+}
+
+// Generate xl/theme/theme1.xml (minimal Office theme required by Excel)
+std::string generateTheme() {
+    // This is a minimal theme that Excel requires to open files without errors
+    std::ostringstream xml;
+    xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
+    xml << "<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" "
+           "name=\"Office Theme\">\n";
+    xml << "  <a:themeElements>\n";
+    // Color scheme - required
+    xml << "    <a:clrScheme name=\"Office\">\n";
+    xml << "      <a:dk1><a:sysClr val=\"windowText\" lastClr=\"000000\"/></a:dk1>\n";
+    xml << "      <a:lt1><a:sysClr val=\"window\" lastClr=\"FFFFFF\"/></a:lt1>\n";
+    xml << "      <a:dk2><a:srgbClr val=\"44546A\"/></a:dk2>\n";
+    xml << "      <a:lt2><a:srgbClr val=\"E7E6E6\"/></a:lt2>\n";
+    xml << "      <a:accent1><a:srgbClr val=\"4472C4\"/></a:accent1>\n";
+    xml << "      <a:accent2><a:srgbClr val=\"ED7D31\"/></a:accent2>\n";
+    xml << "      <a:accent3><a:srgbClr val=\"A5A5A5\"/></a:accent3>\n";
+    xml << "      <a:accent4><a:srgbClr val=\"FFC000\"/></a:accent4>\n";
+    xml << "      <a:accent5><a:srgbClr val=\"5B9BD5\"/></a:accent5>\n";
+    xml << "      <a:accent6><a:srgbClr val=\"70AD47\"/></a:accent6>\n";
+    xml << "      <a:hlink><a:srgbClr val=\"0563C1\"/></a:hlink>\n";
+    xml << "      <a:folHlink><a:srgbClr val=\"954F72\"/></a:folHlink>\n";
+    xml << "    </a:clrScheme>\n";
+    // Font scheme - required
+    xml << "    <a:fontScheme name=\"Office\">\n";
+    xml << "      <a:majorFont>\n";
+    xml << "        <a:latin typeface=\"Calibri Light\"/>\n";
+    xml << "        <a:ea typeface=\"\"/>\n";
+    xml << "        <a:cs typeface=\"\"/>\n";
+    xml << "      </a:majorFont>\n";
+    xml << "      <a:minorFont>\n";
+    xml << "        <a:latin typeface=\"Calibri\"/>\n";
+    xml << "        <a:ea typeface=\"\"/>\n";
+    xml << "        <a:cs typeface=\"\"/>\n";
+    xml << "      </a:minorFont>\n";
+    xml << "    </a:fontScheme>\n";
+    // Format scheme - required
+    xml << "    <a:fmtScheme name=\"Office\">\n";
+    xml << "      <a:fillStyleLst>\n";
+    xml << "        <a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill>\n";
+    xml << "        <a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill>\n";
+    xml << "        <a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill>\n";
+    xml << "      </a:fillStyleLst>\n";
+    xml << "      <a:lnStyleLst>\n";
+    xml << "        <a:ln w=\"6350\"><a:solidFill><a:schemeClr "
+           "val=\"phClr\"/></a:solidFill></a:ln>\n";
+    xml << "        <a:ln w=\"12700\"><a:solidFill><a:schemeClr "
+           "val=\"phClr\"/></a:solidFill></a:ln>\n";
+    xml << "        <a:ln w=\"19050\"><a:solidFill><a:schemeClr "
+           "val=\"phClr\"/></a:solidFill></a:ln>\n";
+    xml << "      </a:lnStyleLst>\n";
+    xml << "      <a:effectStyleLst>\n";
+    xml << "        <a:effectStyle><a:effectLst/></a:effectStyle>\n";
+    xml << "        <a:effectStyle><a:effectLst/></a:effectStyle>\n";
+    xml << "        <a:effectStyle><a:effectLst/></a:effectStyle>\n";
+    xml << "      </a:effectStyleLst>\n";
+    xml << "      <a:bgFillStyleLst>\n";
+    xml << "        <a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill>\n";
+    xml << "        <a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill>\n";
+    xml << "        <a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill>\n";
+    xml << "      </a:bgFillStyleLst>\n";
+    xml << "    </a:fmtScheme>\n";
+    xml << "  </a:themeElements>\n";
+    xml << "  <a:objectDefaults/>\n";
+    xml << "  <a:extraClrSchemeLst/>\n";
+    xml << "</a:theme>";
     return xml.str();
 }
 
@@ -979,6 +1095,19 @@ std::string generateWorksheet(
 
             // Handle formula cells
             if (writeFormulas && formula != nullptr && formula->ast != nullptr) {
+                // Set cell type based on cached value type
+                // Formula cells need t="str" for string results, t="e" for errors, etc.
+                if (value.type == cells::CellValueType::FORMULA_STRING ||
+                    value.type == cells::CellValueType::STRING) {
+                    xml << " t=\"str\"";
+                } else if (value.type == cells::CellValueType::FORMULA_ERROR ||
+                           value.type == cells::CellValueType::ERROR) {
+                    xml << " t=\"e\"";
+                } else if (value.type == cells::CellValueType::FORMULA_BOOLEAN ||
+                           value.type == cells::CellValueType::BOOLEAN) {
+                    xml << " t=\"b\"";
+                }
+                // NUMBER types don't need a t attribute (it's the default)
                 xml << ">\n";
 
                 // Generate UUID-format formula text from AST, then convert to A1
@@ -1303,6 +1432,11 @@ std::string generateStyles(const StyleTable& styles) {
     }
     xml << "  </cellXfs>\n";
 
+    // Cell styles - defines the "Normal" style that Excel requires
+    xml << "  <cellStyles count=\"1\">\n";
+    xml << "    <cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/>\n";
+    xml << "  </cellStyles>\n";
+
     xml << "</styleSheet>";
     return xml.str();
 }
@@ -1422,6 +1556,23 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
 
     if (!zip.addFile("_rels/.rels", generateRootRels())) {
         result.error = XLSXWriteError("Failed to write _rels/.rels");
+        return result;
+    }
+
+    // Write document properties
+    if (!zip.addFile("docProps/core.xml", generateCoreProps())) {
+        result.error = XLSXWriteError("Failed to write docProps/core.xml");
+        return result;
+    }
+
+    if (!zip.addFile("docProps/app.xml", generateAppProps())) {
+        result.error = XLSXWriteError("Failed to write docProps/app.xml");
+        return result;
+    }
+
+    // Write theme
+    if (!zip.addFile("xl/theme/theme1.xml", generateTheme())) {
+        result.error = XLSXWriteError("Failed to write xl/theme/theme1.xml");
         return result;
     }
 
