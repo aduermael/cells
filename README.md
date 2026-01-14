@@ -13,51 +13,51 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Language | Lines |
 |----------|------:|
-| C++ | 32,705 |
-| TypeScript | 19,043 |
-| CSS | 2,445 |
-| Starlark | 1,492 |
+| C++ | 37,441 |
+| TypeScript | 20,840 |
+| CSS | 2,577 |
+| Starlark | 1,561 |
 | Go | 1,363 |
-| JavaScript | 1,188 |
+| JavaScript | 1,196 |
+| Shell | 1,052 |
 | Objective-C++ | 1,007 |
-| HTML | 854 |
-| Shell | 781 |
+| HTML | 875 |
 
 ### Test Code
 
 | Language | Lines |
 |----------|------:|
-| C++ | 23,851 |
-| JavaScript | 4,631 |
+| C++ | 27,407 |
+| JavaScript | 8,334 |
 | Go | 315 |
 
 ### Documentation
 
 | Language | Lines |
 |----------|------:|
-| Markdown | 13,074 |
+| Markdown | 14,344 |
 
 ### Test Counts
 
 | Category | Tests |
 |----------|------:|
-| Unit (C++) | 2249 |
+| Unit (C++) | 2475 |
 | Unit (Go) | 13 |
 | Unit (JavaScript) | 30 |
-| E2E (Puppeteer) | 153 |
-| **Total** | **2445** |
+| E2E (Puppeteer) | 249 |
+| **Total** | **2767** |
 
-- **Commits**: 918
-- **WASM Module**: 4.70 MB
-- **Total Web Bundle**: 6.39 MB
+- **Commits**: 1078
+- **WASM Module**: Not built
+- **Total Web Bundle**: 19.67 MB
 
-<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./tools/generate-stats.sh`</sub>
+<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./scripts/generate-stats.sh`</sub>
 
 ### LOC Evolution
 
 <img src="stats/loc-evolution.svg" alt="Lines of Code Evolution" width="100%">
 
-<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with `./tools/loc-tracker.sh && node tools/generate-loc-svg.mjs`</sub>
+<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with `./scripts/loc-tracker.sh && node scripts/generate-loc-svg.mjs`</sub>
 ## Architecture Overview
 
 ```

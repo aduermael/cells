@@ -32,13 +32,13 @@
     <line x1="75" y1="340.0" x2="80" y2="340.0" stroke="#333333"/>
     <text x="70" y="344.0" text-anchor="end" class="tick-label">0</text>
     <line x1="75" y1="267.5" x2="80" y2="267.5" stroke="#333333"/>
-    <text x="70" y="271.5" text-anchor="end" class="tick-label">17k</text>
+    <text x="70" y="271.5" text-anchor="end" class="tick-label">19k</text>
     <line x1="75" y1="195.0" x2="80" y2="195.0" stroke="#333333"/>
-    <text x="70" y="199.0" text-anchor="end" class="tick-label">35k</text>
+    <text x="70" y="199.0" text-anchor="end" class="tick-label">39k</text>
     <line x1="75" y1="122.5" x2="80" y2="122.5" stroke="#333333"/>
-    <text x="70" y="126.5" text-anchor="end" class="tick-label">52k</text>
+    <text x="70" y="126.5" text-anchor="end" class="tick-label">58k</text>
     <line x1="75" y1="50.0" x2="80" y2="50.0" stroke="#333333"/>
-    <text x="70" y="54.0" text-anchor="end" class="tick-label">70k</text>
+    <text x="70" y="54.0" text-anchor="end" class="tick-label">78k</text>
 
     <!-- Y-axis label -->
     <text x="20" y="195" text-anchor="middle" transform="rotate(-90, 20, 195)" class="axis-label">Lines of Code</text>
@@ -51,49 +51,49 @@
     <line x1="80.0" y1="340" x2="80.0" y2="345" stroke="#333333"/>
     <text x="80.0" y="360" text-anchor="middle" class="tick-label">12/15</text>
     <line x1="200.0" y1="340" x2="200.0" y2="345" stroke="#333333"/>
-    <text x="200.0" y="360" text-anchor="middle" class="tick-label">12/20</text>
+    <text x="200.0" y="360" text-anchor="middle" class="tick-label">12/21</text>
     <line x1="320.0" y1="340" x2="320.0" y2="345" stroke="#333333"/>
-    <text x="320.0" y="360" text-anchor="middle" class="tick-label">12/25</text>
+    <text x="320.0" y="360" text-anchor="middle" class="tick-label">12/27</text>
     <line x1="440.0" y1="340" x2="440.0" y2="345" stroke="#333333"/>
-    <text x="440.0" y="360" text-anchor="middle" class="tick-label">12/30</text>
+    <text x="440.0" y="360" text-anchor="middle" class="tick-label">01/02</text>
     <line x1="560.0" y1="340" x2="560.0" y2="345" stroke="#333333"/>
-    <text x="560.0" y="360" text-anchor="middle" class="tick-label">01/04</text>
+    <text x="560.0" y="360" text-anchor="middle" class="tick-label">01/08</text>
     <line x1="680.0" y1="340" x2="680.0" y2="345" stroke="#333333"/>
-    <text x="680.0" y="360" text-anchor="middle" class="tick-label">01/09</text>
+    <text x="680.0" y="360" text-anchor="middle" class="tick-label">01/14</text>
 
     <!-- Area fills -->
-    <path d="M 80.0 340.0 L 104.0 338.1 L 128.0 327.4 L 152.0 318.3 L 176.0 300.1 L 200.0 265.1 L 224.0 264.0 L 248.0 236.4 L 272.0 238.8 L 296.0 215.4 L 320.0 185.6 L 344.0 176.2 L 368.0 168.6 L 392.0 166.8 L 416.0 156.8 L 440.0 143.6 L 464.0 136.6 L 488.0 130.6 L 512.0 111.5 L 536.0 108.8 L 560.0 108.2 L 584.0 107.6 L 608.0 105.5 L 632.0 99.8 L 656.0 92.7 L 680.0 76.4 L 680.0 340.0 L 80.0 340.0 Z" fill="#058601" fill-opacity="0.1"/>
-    <path d="M 80.0 340.0 L 104.0 340.0 L 128.0 330.6 L 152.0 325.7 L 176.0 323.3 L 200.0 317.6 L 224.0 317.5 L 248.0 312.8 L 272.0 312.8 L 296.0 308.7 L 320.0 273.2 L 344.0 273.0 L 368.0 270.3 L 392.0 268.9 L 416.0 261.0 L 440.0 255.3 L 464.0 250.3 L 488.0 246.4 L 512.0 241.8 L 536.0 239.4 L 560.0 238.1 L 584.0 236.7 L 608.0 234.8 L 632.0 228.7 L 656.0 227.2 L 680.0 220.4 L 680.0 340.0 L 80.0 340.0 Z" fill="#2196F3" fill-opacity="0.1"/>
-    <path d="M 80.0 327.5 L 104.0 321.4 L 128.0 332.0 L 152.0 330.6 L 176.0 326.4 L 200.0 320.8 L 224.0 318.9 L 248.0 315.8 L 272.0 315.2 L 296.0 312.1 L 320.0 305.9 L 344.0 304.9 L 368.0 304.2 L 392.0 303.7 L 416.0 302.3 L 440.0 299.8 L 464.0 297.7 L 488.0 294.9 L 512.0 293.9 L 536.0 292.2 L 560.0 292.1 L 584.0 291.2 L 608.0 290.5 L 632.0 289.6 L 656.0 286.5 L 680.0 285.7 L 680.0 340.0 L 80.0 340.0 Z" fill="#FF9800" fill-opacity="0.1"/>
+    <path d="M 80.0 340.0 L 100.0 338.3 L 120.0 328.6 L 140.0 320.4 L 160.0 304.1 L 180.0 272.5 L 200.0 271.6 L 220.0 246.7 L 240.0 248.8 L 260.0 227.7 L 280.0 200.9 L 300.0 192.4 L 320.0 185.5 L 340.0 184.0 L 360.0 174.9 L 380.0 163.0 L 400.0 156.7 L 420.0 151.3 L 440.0 134.1 L 460.0 131.7 L 480.0 131.1 L 500.0 130.6 L 520.0 128.7 L 540.0 123.6 L 560.0 117.2 L 580.0 102.4 L 600.0 93.2 L 620.0 88.0 L 640.0 78.7 L 660.0 76.9 L 680.0 76.4 L 680.0 340.0 L 80.0 340.0 Z" fill="#058601" fill-opacity="0.1"/>
+    <path d="M 80.0 340.0 L 100.0 340.0 L 120.0 331.6 L 140.0 327.1 L 160.0 325.0 L 180.0 319.8 L 200.0 319.8 L 220.0 315.5 L 240.0 315.5 L 260.0 311.8 L 280.0 279.8 L 300.0 279.6 L 320.0 277.2 L 340.0 275.9 L 360.0 268.8 L 380.0 263.7 L 400.0 259.2 L 420.0 255.6 L 440.0 251.5 L 460.0 249.4 L 480.0 248.2 L 500.0 246.9 L 520.0 245.2 L 540.0 239.7 L 560.0 238.3 L 580.0 232.3 L 600.0 226.2 L 620.0 221.9 L 640.0 215.8 L 660.0 205.6 L 680.0 205.1 L 680.0 340.0 L 80.0 340.0 Z" fill="#2196F3" fill-opacity="0.1"/>
+    <path d="M 80.0 328.8 L 100.0 323.3 L 120.0 332.8 L 140.0 331.5 L 160.0 327.8 L 180.0 322.7 L 200.0 320.9 L 220.0 318.2 L 240.0 317.7 L 260.0 314.8 L 280.0 309.3 L 300.0 308.4 L 320.0 307.7 L 340.0 307.3 L 360.0 306.1 L 380.0 303.7 L 400.0 301.9 L 420.0 299.4 L 440.0 298.5 L 460.0 296.9 L 480.0 296.8 L 500.0 296.0 L 520.0 295.4 L 540.0 294.6 L 560.0 291.8 L 580.0 291.1 L 600.0 289.3 L 620.0 288.4 L 640.0 287.3 L 660.0 286.6 L 680.0 286.3 L 680.0 340.0 L 80.0 340.0 Z" fill="#FF9800" fill-opacity="0.1"/>
 
     <!-- Lines -->
-    <path d="M 80.0 340.0 L 104.0 338.1 L 128.0 327.4 L 152.0 318.3 L 176.0 300.1 L 200.0 265.1 L 224.0 264.0 L 248.0 236.4 L 272.0 238.8 L 296.0 215.4 L 320.0 185.6 L 344.0 176.2 L 368.0 168.6 L 392.0 166.8 L 416.0 156.8 L 440.0 143.6 L 464.0 136.6 L 488.0 130.6 L 512.0 111.5 L 536.0 108.8 L 560.0 108.2 L 584.0 107.6 L 608.0 105.5 L 632.0 99.8 L 656.0 92.7 L 680.0 76.4" fill="none" stroke="#058601" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M 80.0 340.0 L 104.0 340.0 L 128.0 330.6 L 152.0 325.7 L 176.0 323.3 L 200.0 317.6 L 224.0 317.5 L 248.0 312.8 L 272.0 312.8 L 296.0 308.7 L 320.0 273.2 L 344.0 273.0 L 368.0 270.3 L 392.0 268.9 L 416.0 261.0 L 440.0 255.3 L 464.0 250.3 L 488.0 246.4 L 512.0 241.8 L 536.0 239.4 L 560.0 238.1 L 584.0 236.7 L 608.0 234.8 L 632.0 228.7 L 656.0 227.2 L 680.0 220.4" fill="none" stroke="#2196F3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <path d="M 80.0 327.5 L 104.0 321.4 L 128.0 332.0 L 152.0 330.6 L 176.0 326.4 L 200.0 320.8 L 224.0 318.9 L 248.0 315.8 L 272.0 315.2 L 296.0 312.1 L 320.0 305.9 L 344.0 304.9 L 368.0 304.2 L 392.0 303.7 L 416.0 302.3 L 440.0 299.8 L 464.0 297.7 L 488.0 294.9 L 512.0 293.9 L 536.0 292.2 L 560.0 292.1 L 584.0 291.2 L 608.0 290.5 L 632.0 289.6 L 656.0 286.5 L 680.0 285.7" fill="none" stroke="#FF9800" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 80.0 340.0 L 100.0 338.3 L 120.0 328.6 L 140.0 320.4 L 160.0 304.1 L 180.0 272.5 L 200.0 271.6 L 220.0 246.7 L 240.0 248.8 L 260.0 227.7 L 280.0 200.9 L 300.0 192.4 L 320.0 185.5 L 340.0 184.0 L 360.0 174.9 L 380.0 163.0 L 400.0 156.7 L 420.0 151.3 L 440.0 134.1 L 460.0 131.7 L 480.0 131.1 L 500.0 130.6 L 520.0 128.7 L 540.0 123.6 L 560.0 117.2 L 580.0 102.4 L 600.0 93.2 L 620.0 88.0 L 640.0 78.7 L 660.0 76.9 L 680.0 76.4" fill="none" stroke="#058601" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 80.0 340.0 L 100.0 340.0 L 120.0 331.6 L 140.0 327.1 L 160.0 325.0 L 180.0 319.8 L 200.0 319.8 L 220.0 315.5 L 240.0 315.5 L 260.0 311.8 L 280.0 279.8 L 300.0 279.6 L 320.0 277.2 L 340.0 275.9 L 360.0 268.8 L 380.0 263.7 L 400.0 259.2 L 420.0 255.6 L 440.0 251.5 L 460.0 249.4 L 480.0 248.2 L 500.0 246.9 L 520.0 245.2 L 540.0 239.7 L 560.0 238.3 L 580.0 232.3 L 600.0 226.2 L 620.0 221.9 L 640.0 215.8 L 660.0 205.6 L 680.0 205.1" fill="none" stroke="#2196F3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M 80.0 328.8 L 100.0 323.3 L 120.0 332.8 L 140.0 331.5 L 160.0 327.8 L 180.0 322.7 L 200.0 320.9 L 220.0 318.2 L 240.0 317.7 L 260.0 314.8 L 280.0 309.3 L 300.0 308.4 L 320.0 307.7 L 340.0 307.3 L 360.0 306.1 L 380.0 303.7 L 400.0 301.9 L 420.0 299.4 L 440.0 298.5 L 460.0 296.9 L 480.0 296.8 L 500.0 296.0 L 520.0 295.4 L 540.0 294.6 L 560.0 291.8 L 580.0 291.1 L 600.0 289.3 L 620.0 288.4 L 640.0 287.3 L 660.0 286.6 L 680.0 286.3" fill="none" stroke="#FF9800" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 
     <!-- Data point dots (latest only) -->
     <circle cx="680.0" cy="76.4" r="4" fill="#058601"/>
-    <circle cx="680.0" cy="220.4" r="4" fill="#2196F3"/>
-    <circle cx="680.0" cy="285.7" r="4" fill="#FF9800"/>
+    <circle cx="680.0" cy="205.1" r="4" fill="#2196F3"/>
+    <circle cx="680.0" cy="286.3" r="4" fill="#FF9800"/>
   </g>
 
   <!-- Legend -->
   <g transform="translate(695, 60)">
     <rect x="0" y="0" width="14" height="14" fill="#058601" rx="2"/>
     <text x="20" y="12" class="legend-text">Product</text>
-    <text x="20" y="26" class="legend-value" fill="#058601">63,499</text>
+    <text x="20" y="26" class="legend-value" fill="#058601">70,472</text>
 
     <rect x="0" y="42" width="14" height="14" fill="#2196F3" rx="2"/>
     <text x="20" y="54" class="legend-text">Test</text>
-    <text x="20" y="68" class="legend-value" fill="#2196F3">28,797</text>
+    <text x="20" y="68" class="legend-value" fill="#2196F3">36,056</text>
 
     <rect x="0" y="84" width="14" height="14" fill="#FF9800" rx="2"/>
     <text x="20" y="96" class="legend-text">Docs</text>
-    <text x="20" y="110" class="legend-value" fill="#FF9800">13,074</text>
+    <text x="20" y="110" class="legend-value" fill="#FF9800">14,344</text>
   </g>
 
   <!-- Footer -->
   <text x="400" y="390" text-anchor="middle" class="tick-label">
-    2025-12-15 to 2026-01-09 (26 days with commits)
+    2025-12-15 to 2026-01-14 (31 days with commits)
   </text>
 </svg>
