@@ -53,27 +53,40 @@ Add toolbar buttons to merge and unmerge selected cells.
 
 **Problem Statement:** The current cell merge implementation (Phase 4) revealed a fundamental design challenge: how to efficiently represent and handle range-based operations (merges, background colors, borders) in a CRDT context where cells can be moved concurrently by different users.
 
-### Chosen Design: Column/Row UUID Corners
+### Chosen Design: Range as First-Class Citizen
 
-Ranges are defined by **column and row UUIDs**, not cell UUIDs or positions:
+**Range** is a unified primitive. Merge, Style, ConditionalFormat, etc. are just range types:
 
 ```cpp
-struct StyleRange {
-    ID startColId;   // Column UUID for left edge
-    ID startRowId;   // Row UUID for top edge
-    ID endColId;     // Column UUID for right edge
-    ID endRowId;     // Row UUID for bottom edge
-    CellStyle style; // Style to apply (bgColor, borders, etc.)
+enum class RangeType : uint8_t {
+    Merge = 0,              // Merged cells
+    Style = 1,              // Background, borders, font
+    ConditionalFormat = 2,  // Conditional formatting rules
+    DataValidation = 3,     // Data validation rules
+    // Future: PrintArea, Filter, NamedRange, etc.
 };
 
-struct MergeRange {
-    ID startColId;   // Anchor column
-    ID startRowId;   // Anchor row
-    ID endColId;     // End column
-    ID endRowId;     // End row
-    // Anchor cell is at (startCol, startRow) intersection
+struct Range {
+    ID id;            // Range's own UUID (for CRDT operations)
+    ID startColId;    // Column UUID for left edge
+    ID startRowId;    // Row UUID for top edge
+    ID endColId;      // Column UUID for right edge
+    ID endRowId;      // Row UUID for bottom edge
+    RangeType type;   // 1 byte - what kind of range
+    // Payload stored separately, keyed by range ID
 };
+
+// Payloads by type (could be in separate maps or a variant)
+struct MergePayload {};  // No extra data needed, anchor is (startCol, startRow)
+struct StylePayload { CellStyle style; };
+struct ConditionalFormatPayload { /* rules */ };
 ```
+
+**Benefits:**
+- One R-tree index for ALL ranges
+- Unified CRDT operations: `AddRange`, `RemoveRange`, `UpdateRange`
+- Query: "all ranges containing cell (col, row)" returns merge + style + conditional format
+- Single code path for range containment, corner deletion, etc.
 
 ### Why Column/Row UUIDs Work
 
@@ -124,21 +137,28 @@ struct MergeRange {
 - [ ] 5b: Document current MergeRange implementation and why it fails (uses cell colId/rowId lookup)
 - [ ] 5c: Verify Excel behavior: insert column in colored range, move cell out of colored range
 
-**Core Implementation:**
-- [ ] 5d: Refactor MergeRange to use (startColId, startRowId, endColId, endRowId) instead of anchor + span
-- [ ] 5e: Implement range containment check: does cell at (colId, rowId) fall within range?
-- [ ] 5f: Add R-tree (or interval tree) index for efficient range lookup by position
-- [ ] 5g: Update viewport query to compute merge info from new MergeRange structure
+**Core Range Implementation:**
+- [ ] 5d: Create `Range` struct with (id, startColId, startRowId, endColId, endRowId, type)
+- [ ] 5e: Create `RangeType` enum (Merge, Style, ConditionalFormat, DataValidation)
+- [ ] 5f: Implement range containment check: does cell at (colId, rowId) fall within range?
+- [ ] 5g: Add R-tree index for efficient range lookup by position
+- [ ] 5h: Implement corner deletion logic (range shrinks to adjacent col/row)
 
-**Style Ranges:**
-- [ ] 5h: Create StyleRange struct for range-based styles (bgColor, borders, format)
-- [ ] 5i: Implement style inheritance: cell style = cell overrides + range styles
-- [ ] 5j: Add CRDT operation for creating/updating StyleRanges
+**CRDT Operations:**
+- [ ] 5i: Design `AddRange` CRDT operation (creates range with UUID)
+- [ ] 5j: Design `RemoveRange` CRDT operation (by range UUID)
+- [ ] 5k: Design `UpdateRange` CRDT operation (modify corners or payload)
+
+**Viewport & Rendering:**
+- [ ] 5l: Update viewport query to find all ranges containing each cell
+- [ ] 5m: Implement style inheritance: cell style = cell overrides + range styles (by type priority)
+- [ ] 5n: Update merge rendering to use new Range structure
 
 **Merge UI Fix:**
-- [ ] 5k: Update addMergeRange() to use col/row UUID corners
-- [ ] 5l: Verify merge UI works end-to-end with new implementation
-- [ ] 5m: Add E2E tests for merge with column insertion
+- [ ] 5o: Migrate existing MergeRange to new Range (type=Merge)
+- [ ] 5p: Update addMergeRange() WASM binding to create Range
+- [ ] 5q: Verify merge UI works end-to-end
+- [ ] 5r: Add E2E tests for merge with column insertion
 
 ## Phase 6: Add Border UI Controls
 
