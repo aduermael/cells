@@ -32,20 +32,23 @@ namespace cells::wasm {
 // =============================================================================
 // Resolves the effective style for a cell following the hierarchy:
 // 1. Cell's own style (highest priority)
-// 2. Column's default style
-// 3. Row's default style
-// 4. No style (null)
+// 2. Range styles (for ranges with RANGE_STYLE flag)
+// 3. Column's default style
+// 4. Row's default style
+// 5. No style (null)
 
 struct EffectiveStyleResult {
     ID styleId;                   // The resolved style ID
     const CellStyle* style;       // The resolved style pointer (may be null)
     bool fromCell;                // true if style came from cell itself
+    bool fromRange;               // true if style came from a range
     bool fromColumn;              // true if style came from column default
     bool fromRow;                 // true if style came from row default
 };
 
-EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, const Workbook& workbook) {
-    EffectiveStyleResult result = {{}, nullptr, false, false, false};
+EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, const Workbook& workbook,
+                                       uint32_t colPos, uint32_t rowPos) {
+    EffectiveStyleResult result = {{}, nullptr, false, false, false, false};
 
     // Priority 1: Cell's own style
     if (!cell.styleId.isNull()) {
@@ -55,7 +58,26 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
         return result;
     }
 
-    // Priority 2: Column's default style
+    // Priority 2: Range styles (for ranges with RANGE_STYLE flag)
+    // Use the first style range found (ranges are returned in spatial query order)
+    std::vector<Range*> styleRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::STYLE);
+    if (!styleRanges.empty()) {
+        // Use the first range with a valid style association
+        for (Range* range : styleRanges) {
+            ID rangeStyleId = sheet.getRangeStyleId(range->id);
+            if (!rangeStyleId.isNull()) {
+                const CellStyle* rangeStyle = workbook.getStyle(rangeStyleId);
+                if (rangeStyle != nullptr) {
+                    result.styleId = rangeStyleId;
+                    result.style = rangeStyle;
+                    result.fromRange = true;
+                    return result;
+                }
+            }
+        }
+    }
+
+    // Priority 3: Column's default style
     const Axis* col = sheet.columns.count(cell.colId) > 0
         ? sheet.columns.at(cell.colId).get()
         : nullptr;
@@ -66,7 +88,7 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
         return result;
     }
 
-    // Priority 3: Row's default style
+    // Priority 4: Row's default style
     const Axis* row = sheet.rows.count(cell.rowId) > 0
         ? sheet.rows.at(cell.rowId).get()
         : nullptr;
@@ -203,8 +225,8 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             json << "\"formatId\":\"" << entry.cell->formatId.toString() << "\",";
         }
 
-        // Include effective style (resolves cell > column > row hierarchy)
-        EffectiveStyleResult effectiveStyle = getEffectiveStyle(*entry.cell, *sheet, *_workbook);
+        // Include effective style (resolves cell > range > column > row hierarchy)
+        EffectiveStyleResult effectiveStyle = getEffectiveStyle(*entry.cell, *sheet, *_workbook, colPos, rowPos);
         if (!effectiveStyle.styleId.isNull() && effectiveStyle.style != nullptr) {
             json << "\"styleId\":\"" << effectiveStyle.styleId.toString() << "\",";
             // Include inline style properties for efficient rendering
@@ -252,8 +274,10 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 serializeBorderEdge(json, "left", style->border.left);
                 json << "}";
             }
-            // Indicate if style is inherited from axis (column or row)
-            if (effectiveStyle.fromColumn) {
+            // Indicate if style is inherited (from range, column, or row)
+            if (effectiveStyle.fromRange) {
+                json << ",\"inheritedFrom\":\"range\"";
+            } else if (effectiveStyle.fromColumn) {
                 json << ",\"inheritedFrom\":\"column\"";
             } else if (effectiveStyle.fromRow) {
                 json << ",\"inheritedFrom\":\"row\"";
