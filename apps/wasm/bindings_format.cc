@@ -16,10 +16,12 @@
 
 #include "apps/wasm/bindings.h"
 
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
 #include "core/cells/crdt.h"
+#include "core/cells/range.h"
 #include "core/cells/format_code_formatter.h"
 #include "core/cells/format_code_parser.h"
 #include "core/cells/formula_functions.h"
@@ -1012,6 +1014,180 @@ std::string CellsEngine::getAvailableStyles() {
 
     ss << "]";
     return ss.str();
+}
+
+// =============================================================================
+// Range Style Operations
+// =============================================================================
+
+std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uint32_t endCol,
+                                       uint32_t endRow, const std::string& styleJson) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Normalize coordinates (ensure start <= end)
+    const uint32_t minCol = std::min(startCol, endCol);
+    const uint32_t maxCol = std::max(startCol, endCol);
+    const uint32_t minRow = std::min(startRow, endRow);
+    const uint32_t maxRow = std::max(startRow, endRow);
+
+    // Find or create columns/rows at the corner positions
+    ID startColId, endColId, startRowId, endRowId;
+
+    // Find start column
+    for (const auto& [id, axis] : sheet->columns) {
+        if (axis->position == minCol) {
+            startColId = id;
+            break;
+        }
+    }
+    if (startColId.isNull()) {
+        startColId = generate_id();
+        std::string payload =
+            "{\"pos\":" + std::to_string(minCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        Operation op = makeColInsertOp(*_workbook, startColId, payload);
+        applyOperation(*_workbook, op);
+    }
+
+    // Find end column
+    for (const auto& [id, axis] : sheet->columns) {
+        if (axis->position == maxCol) {
+            endColId = id;
+            break;
+        }
+    }
+    if (endColId.isNull()) {
+        endColId = generate_id();
+        std::string payload =
+            "{\"pos\":" + std::to_string(maxCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        Operation op = makeColInsertOp(*_workbook, endColId, payload);
+        applyOperation(*_workbook, op);
+    }
+
+    // Find start row
+    for (const auto& [id, axis] : sheet->rows) {
+        if (axis->position == minRow) {
+            startRowId = id;
+            break;
+        }
+    }
+    if (startRowId.isNull()) {
+        startRowId = generate_id();
+        std::string payload =
+            "{\"pos\":" + std::to_string(minRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        Operation op = makeRowInsertOp(*_workbook, startRowId, payload);
+        applyOperation(*_workbook, op);
+    }
+
+    // Find end row
+    for (const auto& [id, axis] : sheet->rows) {
+        if (axis->position == maxRow) {
+            endRowId = id;
+            break;
+        }
+    }
+    if (endRowId.isNull()) {
+        endRowId = generate_id();
+        std::string payload =
+            "{\"pos\":" + std::to_string(maxRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        Operation op = makeRowInsertOp(*_workbook, endRowId, payload);
+        applyOperation(*_workbook, op);
+    }
+
+    // Create or find the style
+    CellStyle defaultStyle;
+    CellStyle style = mergeStyleJson(defaultStyle, styleJson);
+
+    ID styleId;
+    if (!style.isEmpty()) {
+        // Check if this style already exists
+        const auto& existingStyles = _workbook->getStyles();
+        for (const auto& [id, existingStyle] : existingStyles) {
+            if (existingStyle == style) {
+                styleId = id;
+                break;
+            }
+        }
+
+        // Create new style if not found
+        if (styleId.isNull()) {
+            styleId = generate_id();
+            _workbook->registerStyle(styleId, style);
+
+            // Create STYLE_DEFINE operation for sync
+            if (_workbook->isCollaborating()) {
+                std::string fullStyleJson = styleToJson(style);
+                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
+                applyOperation(*_workbook, styleOp);
+            }
+        }
+    }
+
+    if (styleId.isNull()) {
+        return "{\"error\":\"Empty style\"}";
+    }
+
+    // Create a new Range with RANGE_STYLE flag
+    ID rangeId = generate_id();
+    std::ostringstream rangePayload;
+    rangePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
+    rangePayload << "\"start_col_id\":\"" << startColId.toString() << "\",";
+    rangePayload << "\"start_row_id\":\"" << startRowId.toString() << "\",";
+    rangePayload << "\"end_col_id\":\"" << endColId.toString() << "\",";
+    rangePayload << "\"end_row_id\":\"" << endRowId.toString() << "\",";
+    rangePayload << "\"flags\":" << static_cast<int>(RangeFlags::STYLE) << "}";
+
+    Operation rangeOp = makeRangeAddOp(*_workbook, rangeId, rangePayload.str());
+    applyOperation(*_workbook, rangeOp);
+
+    // Associate the style with the range
+    std::ostringstream stylePayload;
+    stylePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
+    stylePayload << "\"style_id\":\"" << styleId.toString() << "\"}";
+
+    Operation setStyleOp = makeRangeSetStyleOp(*_workbook, rangeId, stylePayload.str());
+    applyOperation(*_workbook, setStyleOp);
+
+    rebuildViewportIndex();
+    notifyListeners(ChangeType::CELL_CHANGED);
+
+    return "{\"success\":true,\"rangeId\":\"" + rangeId.toString() + "\",\"styleId\":\"" + styleId.toString() + "\"}";
+}
+
+std::string CellsEngine::removeRangeStyle(uint32_t col, uint32_t row) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Find style ranges at this position
+    std::vector<Range*> styleRanges = sheet->getRangesAt(col, row, RangeFlags::STYLE);
+    if (styleRanges.empty()) {
+        return "{\"error\":\"No style range found at this position\"}";
+    }
+
+    // Remove the first style range found
+    Range* range = styleRanges[0];
+    std::ostringstream payload;
+    payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
+
+    Operation removeOp = makeRangeRemoveOp(*_workbook, range->id, payload.str());
+    applyOperation(*_workbook, removeOp);
+
+    rebuildViewportIndex();
+    notifyListeners(ChangeType::CELL_CHANGED);
+
+    return "{\"success\":true}";
 }
 
 }  // namespace cells::wasm

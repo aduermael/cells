@@ -163,6 +163,11 @@ public:
     std::string createStyle(const std::string& styleJson);
     std::string getAvailableStyles();
 
+    // Range style operations (creates a Range with RANGE_STYLE flag)
+    std::string setRangeStyle(uint32_t startCol, uint32_t startRow, uint32_t endCol, uint32_t endRow,
+                              const std::string& styleJson);
+    std::string removeRangeStyle(uint32_t col, uint32_t row);
+
     // ========================================================================
     // Column/row resize operations (bindings_core.cc)
     // ========================================================================

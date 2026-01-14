@@ -506,6 +506,30 @@ declare module 'cells-wasm' {
     getAvailableStyles(): string;
 
     // ========================================================================
+    // Range styles
+    // ========================================================================
+
+    /**
+     * Apply a style to a range of cells using the Range system
+     * Creates a Range with RANGE_STYLE flag and associates the style
+     * @param startCol - Start column position (0-based)
+     * @param startRow - Start row position (0-based)
+     * @param endCol - End column position (0-based)
+     * @param endRow - End row position (0-based)
+     * @param styleJson - JSON string with style properties
+     * @returns JSON string with {success, rangeId, styleId}
+     */
+    setRangeStyle(startCol: number, startRow: number, endCol: number, endRow: number, styleJson: string): string;
+
+    /**
+     * Remove a style range at the given position
+     * @param col - Column position (0-based)
+     * @param row - Row position (0-based)
+     * @returns JSON string with OperationResult
+     */
+    removeRangeStyle(col: number, row: number): string;
+
+    // ========================================================================
     // Column/row resize
     // ========================================================================
 

@@ -72,6 +72,8 @@ import {
     handleGetCellStyleAt,
     handleCreateStyle,
     handleGetAvailableStyles,
+    handleSetRangeStyle,
+    handleRemoveRangeStyle,
     handleResizeColumn,
     handleResizeColumnByPos,
     handleResizeRow,
@@ -487,6 +489,16 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "getAvailableStyles":
                 handleGetAvailableStyles(engine, params, respond);
+                break;
+
+            // ================================================================
+            // Range Style Operations
+            // ================================================================
+            case "setRangeStyle":
+                handleSetRangeStyle(engine, params, respond);
+                break;
+            case "removeRangeStyle":
+                handleRemoveRangeStyle(engine, params, respond);
                 break;
 
             // ================================================================

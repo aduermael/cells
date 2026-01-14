@@ -667,6 +667,46 @@ export function handleGetAvailableStyles(
 }
 
 // ============================================================================
+// Range Style Operations
+// ============================================================================
+
+export function handleSetRangeStyle(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { startCol, startRow, endCol, endRow, styleJson } = params as {
+        startCol: number;
+        startRow: number;
+        endCol: number;
+        endRow: number;
+        styleJson: string;
+    };
+    const result = JSON.parse(
+        engine.setRangeStyle(startCol, startRow, endCol, endRow, styleJson),
+    ) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "rangeStyleSet", success: true, rangeId: result.rangeId, styleId: result.styleId });
+    }
+}
+
+export function handleRemoveRangeStyle(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { col, row } = params as { col: number; row: number };
+    const result = JSON.parse(engine.removeRangeStyle(col, row)) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "rangeStyleRemoved", success: true });
+    }
+}
+
+// ============================================================================
 // Column/Row Operations
 // ============================================================================
 

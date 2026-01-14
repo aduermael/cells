@@ -143,6 +143,9 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getCellStyleAt", &cells::wasm::CellsEngine::getCellStyleAt)
         .function("createStyle", &cells::wasm::CellsEngine::createStyle)
         .function("getAvailableStyles", &cells::wasm::CellsEngine::getAvailableStyles)
+        // Range styles
+        .function("setRangeStyle", &cells::wasm::CellsEngine::setRangeStyle)
+        .function("removeRangeStyle", &cells::wasm::CellsEngine::removeRangeStyle)
         // Column/row resize
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)
         .function("resizeColumnByPos", &cells::wasm::CellsEngine::resizeColumnByPos)

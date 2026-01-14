@@ -82,6 +82,16 @@ export interface CellsEngine {
     createStyle(styleJson: string): string;
     getAvailableStyles(): string;
 
+    // Range style operations
+    setRangeStyle(
+        startCol: number,
+        startRow: number,
+        endCol: number,
+        endRow: number,
+        styleJson: string
+    ): string;
+    removeRangeStyle(col: number, row: number): string;
+
     // Column/row operations
     resizeColumn(colId: string, width: number): string;
     resizeColumnByPos(pos: number, width: number): string;

@@ -259,25 +259,51 @@ export class WasmDataSource {
     return this._client.getAvailableStyles();
   }
 
-  /** Set style for a range of cells */
+  // ==========================================================================
+  // Range Style Operations
+  // ==========================================================================
+
+  /**
+   * Apply a style to a range using the Range system.
+   * Creates a Range with RANGE_STYLE flag for efficient range-based styling.
+   */
+  async setRangeStyle(
+    startCol: number,
+    startRow: number,
+    endCol: number,
+    endRow: number,
+    style: Partial<CellStyle>,
+  ): Promise<{ success: boolean; rangeId?: string; styleId?: string }> {
+    return this._client.setRangeStyle(startCol, startRow, endCol, endRow, style);
+  }
+
+  /**
+   * Remove a style range at the given position.
+   */
+  async removeRangeStyle(col: number, row: number): Promise<{ success: boolean }> {
+    return this._client.removeRangeStyle(col, row);
+  }
+
+  /**
+   * Set style for a range of cells.
+   * Uses the Range system for efficient styling.
+   */
   async setStyleForRange(
     startCol: number,
     startRow: number,
     endCol: number,
     endRow: number,
-    style: Partial<CellStyle>
+    style: Partial<CellStyle>,
   ): Promise<{ success: boolean; cellsStyled: number }> {
-    // Apply style to each cell in the range
-    let cellsStyled = 0;
-    for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col++) {
-      for (let row = Math.min(startRow, endRow); row <= Math.max(startRow, endRow); row++) {
-        const result = await this._client.setCellStyleAt(col, row, style);
-        if (result.success) {
-          cellsStyled++;
-        }
-      }
+    // Use the Range system for efficient range-based styling
+    const result = await this.setRangeStyle(startCol, startRow, endCol, endRow, style);
+    if (result.success) {
+      // Calculate the number of cells in the range
+      const cols = Math.abs(endCol - startCol) + 1;
+      const rows = Math.abs(endRow - startRow) + 1;
+      return { success: true, cellsStyled: cols * rows };
     }
-    return { success: true, cellsStyled };
+    return { success: false, cellsStyled: 0 };
   }
 
   // ==========================================================================

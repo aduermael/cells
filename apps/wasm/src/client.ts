@@ -610,6 +610,49 @@ export class CellsClient {
     return (response as unknown as { styles: RegisteredStyle[] }).styles || [];
   }
 
+  // ========== Range Style Operations API ==========
+
+  /**
+   * Apply a style to a range of cells using the Range system.
+   * Creates a Range with RANGE_STYLE flag and associates the style.
+   * @param startCol Start column position (0-indexed)
+   * @param startRow Start row position (0-indexed)
+   * @param endCol End column position (0-indexed)
+   * @param endRow End row position (0-indexed)
+   * @param style Style properties to apply
+   * @returns Result with rangeId and styleId on success
+   */
+  async setRangeStyle(
+    startCol: number,
+    startRow: number,
+    endCol: number,
+    endRow: number,
+    style: Partial<CellStyle>,
+  ): Promise<{ success: boolean; rangeId?: string; styleId?: string }> {
+    const response = await this._send("setRangeStyle", {
+      startCol,
+      startRow,
+      endCol,
+      endRow,
+      styleJson: JSON.stringify(style),
+    });
+    return {
+      success: true,
+      rangeId: String(response.rangeId),
+      styleId: String(response.styleId),
+    };
+  }
+
+  /**
+   * Remove a style range at the given position.
+   * @param col Column position (0-indexed)
+   * @param row Row position (0-indexed)
+   */
+  async removeRangeStyle(col: number, row: number): Promise<{ success: boolean }> {
+    await this._send("removeRangeStyle", { col, row });
+    return { success: true };
+  }
+
   // ========== Column/Row Operations API ==========
 
   async resizeColumn(colId: string, width: number): Promise<{ success: boolean }> {

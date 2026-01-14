@@ -213,7 +213,7 @@ For ranges with `RANGE_MERGE` flag:
 - [x] F1: Add range-to-styleId mapping in Sheet - Added `_rangeStyles` map (rangeId → styleId), `getRangeStyleId()`/`setRangeStyleId()` methods, and cleanup in `removeRange()`/`clearAllRanges()`
 - [x] F2: Update RANGE_SET_STYLE to store style association - `applyRangeSetStyle()` now calls `sheet->setRangeStyleId()` instead of just setting the flag
 - [x] F3: Update viewport to apply range styles (CSS-like inheritance) - Extended `getEffectiveStyle()` to query RANGE_STYLE ranges between cell and column priorities; added `fromRange` field and `"inheritedFrom":"range"` JSON output
-- [ ] F4: Add UI for applying styles to ranges
+- [x] F4: Add UI for applying styles to ranges - Added `setRangeStyle()`/`removeRangeStyle()` bindings in C++, TypeScript, and client; updated `setStyleForRange()` to use Range system
 
 ## Testing Strategy
 
