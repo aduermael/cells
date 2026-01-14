@@ -18,8 +18,8 @@ The merged cell areas appear but content is not showing (e.g., "PROJECT PATRY" t
 
 - [x] 1a: Create E2E test that loads `many-tabs.xlsx` and verifies the "PROJECT PATRY" title is visible in merged region B2:M2. Created `merged-cells.test.mjs` - tests confirm B2 is a merge anchor (14 cols) with value "PROJECT PATRY".
 - [x] 1b: Debug `_drawCellValues()` in grid-renderer.ts - found bug where clip region for merge anchors only used the anchor column, not the full merged region. Fixed by using `colWidth` (full merged width) for clip region.
-- [ ] 1c: Verify XLSX reader correctly parses merged cell content (the anchor cell should have the text value)
-- [ ] 1d: Fix content rendering for merged cells - ensure text is drawn at correct position spanning the full merged width
+- [x] 1c: Verify XLSX reader correctly parses merged cell content - verified that `xlsx_reader.cc:1994-2063` correctly parses `<mergeCells>` and calls `sheet->addMergeRange()`. Test confirms B2 is correctly marked as anchor with 14-column span.
+- [x] 1d: Fix content rendering for merged cells - done in step 1b (clip region now uses full merged width)
 
 ## Phase 2: Fix Cell Selection Alignment
 
