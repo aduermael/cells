@@ -16,7 +16,7 @@ From screenshots comparing the app vs Excel rendering of `many-tabs.xlsx`:
 
 The merged cell areas appear but content is not showing (e.g., "PROJECT PATRY" title). Need to investigate why anchor cell content isn't rendering.
 
-- [ ] 1a: Create E2E test that loads `many-tabs.xlsx` and verifies the "PROJECT PATRY" title is visible in merged region B2:M2
+- [x] 1a: Create E2E test that loads `many-tabs.xlsx` and verifies the "PROJECT PATRY" title is visible in merged region B2:M2. Created `merged-cells.test.mjs` - tests confirm B2 is a merge anchor (14 cols) with value "PROJECT PATRY".
 - [ ] 1b: Debug `_drawCellValues()` in grid-renderer.ts - check if merged anchor cells are being correctly identified and rendered with proper spans
 - [ ] 1c: Verify XLSX reader correctly parses merged cell content (the anchor cell should have the text value)
 - [ ] 1d: Fix content rendering for merged cells - ensure text is drawn at correct position spanning the full merged width
