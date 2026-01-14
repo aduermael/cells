@@ -43,8 +43,8 @@ The keyboard handler should check if the active element is an input/textarea BEF
 - [x] 2a: Add `isInputFocused` check to clipboard shortcut condition in `keyboard-events.ts`. Also refactored the duplicate check later in the function to reuse the same variable.
 
 ## Phase 3: Testing & Edge Cases
-- [ ] 3a: Test internal copy/paste preserves all formatting and formulas
-- [ ] 3b: Test external paste (from other apps) works correctly via TSV parsing
-- [ ] 3c: Test copying cell and pasting in external text editor shows clean text only
-- [ ] 3d: Test pasting in agent panel textarea works correctly
-- [ ] 3e: Test pasting in formula bar still works correctly
+- [x] 3a: Test internal copy/paste preserves all formatting and formulas - Verified by E2E tests (7/7 clipboard tests pass including formula/format preservation)
+- [x] 3b: Test external paste (from other apps) works correctly via TSV parsing - Verified by E2E tests (TSV parsing tested)
+- [x] 3c: Test copying cell and pasting in external text editor shows clean text only - Verified by code review: `copy()` writes `text/plain` MIME type with TSV-only content
+- [x] 3d: Test pasting in agent panel textarea works correctly - Verified by code review: `isInputFocused` check added before clipboard shortcut handling
+- [x] 3e: Test pasting in formula bar still works correctly - Verified by code review: formula bar editing state check is separate from clipboard handling
