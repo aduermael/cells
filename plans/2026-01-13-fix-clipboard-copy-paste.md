@@ -40,7 +40,7 @@ The keyboard handler should check if the active element is an input/textarea BEF
 - [x] 1c: Remove the `CELLS_CLIPBOARD::` marker prefix system (already removed in 1a/1b - no longer needed)
 
 ## Phase 2: Fix AI Input Paste Interception
-- [ ] 2a: Move the active element input/textarea check to occur BEFORE clipboard shortcut handling in `keyboard-events.ts`
+- [x] 2a: Add `isInputFocused` check to clipboard shortcut condition in `keyboard-events.ts`. Also refactored the duplicate check later in the function to reuse the same variable.
 
 ## Phase 3: Testing & Edge Cases
 - [ ] 3a: Test internal copy/paste preserves all formatting and formulas

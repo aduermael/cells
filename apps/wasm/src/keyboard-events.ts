@@ -99,12 +99,22 @@ export class KeyboardEventHandlers {
         const hasTextSelection = selection && selection.toString().length > 0;
         const selectionInCanvas = selection?.anchorNode?.parentElement?.closest("canvas");
 
+        // Check if focus is on an input/textarea (e.g., agent panel)
+        const activeEl = document.activeElement;
+        const isInputFocused =
+            activeEl &&
+            activeEl !== canvas &&
+            (activeEl.tagName.toLowerCase() === "input" ||
+                activeEl.tagName.toLowerCase() === "textarea" ||
+                (activeEl as HTMLElement).isContentEditable);
+
         if (
             isMod &&
             !cellEditor.isEditing() &&
             !uiStateMachine.isInState("FORMULA_BAR_EDITING") &&
             !uiStateMachine.isInState("COLUMN_HEADER_EDITING") &&
             !scriptPanel.isEditorFocused() &&
+            !isInputFocused &&
             !(hasTextSelection && !selectionInCanvas)
         ) {
             const { clipboardManager } = this.config;
@@ -133,18 +143,9 @@ export class KeyboardEventHandlers {
         }
 
         // Ignore keyboard events when focus is on other editable elements
-        const activeEl = document.activeElement;
-        if (activeEl && activeEl !== canvas) {
-            const tagName = activeEl.tagName.toLowerCase();
-            const isContentEditable = (activeEl as HTMLElement)
-                .isContentEditable;
-            if (
-                tagName === "input" ||
-                tagName === "textarea" ||
-                isContentEditable
-            ) {
-                return;
-            }
+        // (reuses isInputFocused check from clipboard shortcuts above)
+        if (isInputFocused) {
+            return;
         }
 
         const selectedCell = getSelectedCell();
