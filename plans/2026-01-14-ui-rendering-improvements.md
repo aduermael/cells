@@ -34,9 +34,9 @@ The selection box (green border) doesn't perfectly align with cell boundaries at
 
 Ensure sheets are loaded and displayed in the same order as they appear in Excel.
 
-- [ ] 3a: Create test that opens `many-tabs.xlsx` and verifies sheet tab order matches expected Excel order
-- [ ] 3b: Audit XLSX reader to confirm sheets are added to the workbook in XML document order (workbook.xml `<sheets>` order)
-- [ ] 3c: Verify TypeScript sheet tabs component renders sheets in the order received from C++ core
+- [x] 3a: Create test that opens `many-tabs.xlsx` and verifies sheet tab order matches expected Excel order. Created `sheet-order.test.mjs` with 5 tests verifying all 42 sheets are in correct order from workbook.xml.
+- [x] 3b: Audit XLSX reader to confirm sheets are added to the workbook in XML document order (workbook.xml `<sheets>` order). Verified: `xlsx_reader.cc:1433` iterates sheets in XML order, adds to vector via `push_back`, and `getSheetByIndex()` returns them in insertion order.
+- [x] 3c: Verify TypeScript sheet tabs component renders sheets in the order received from C++ core. Verified: `worker-handlers.ts:handleGetSheets()` iterates by index, and `sheet-tabs.ts:renderSheetTabs()` uses `forEach` maintaining order.
 
 ## Phase 4: Add Cell Merge UI Controls
 
