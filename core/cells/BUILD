@@ -5,6 +5,22 @@ cc_library(
 )
 
 cc_library(
+    name = "range",
+    hdrs = ["range.h"],
+    visibility = ["//visibility:public"],
+    deps = [":types"],
+)
+
+cc_test(
+    name = "range_test",
+    srcs = ["range_test.cc"],
+    deps = [
+        ":range",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "id",
     srcs = ["id.cc"],
     hdrs = ["id.h"],
