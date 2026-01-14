@@ -30,6 +30,7 @@ import { ColumnHeaderEditor, FormulaBarEditor } from "./header-editor";
 import { ClipboardManager } from "./clipboard";
 import { FormatControls } from "./format-controls";
 import { StyleControls } from "./style-controls";
+import { MergeControls } from "./merge-controls";
 import { NamedRangesDropdown } from "./named-ranges-dropdown";
 import { SheetTabsManager } from "./sheet-tabs";
 import { FileLoader } from "./file-loader";
@@ -777,6 +778,23 @@ export function createComponents(config: ComponentsConfig): Components {
   );
   styleControlsRef = styleControls;
 
+  const mergeControls = new MergeControls(
+    {
+      mergeDropdown: elements.mergeDropdown,
+      mergeBtn: elements.mergeBtn,
+      mergeAllBtn: elements.mergeAllBtn,
+      mergeHorizontalBtn: elements.mergeHorizontalBtn,
+      unmergeBtn: elements.unmergeBtn,
+    },
+    {
+      getSelectedCell: () => app.selectedCell,
+      getSelectionRange: () => ({
+        start: app.selectionStart,
+        end: app.selectionEnd,
+      }),
+      requestRender: render,
+    }
+  );
   elements.settingsBtn.addEventListener("click", () => {
     alert("Settings - Coming Soon!");
   });
@@ -850,6 +868,7 @@ export function createComponents(config: ComponentsConfig): Components {
       clipboardManager.setDataSource(dataSource);
       formatControls.setDataSource(dataSource);
       styleControls.setDataSource(dataSource);
+      mergeControls.setDataSource(dataSource);
       namedRangesDropdown.setDataSource(dataSource);
       workbookTitleEditor.setTitle(dataSource.workbookName);
     },

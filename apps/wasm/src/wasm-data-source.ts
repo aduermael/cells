@@ -409,6 +409,29 @@ export class WasmDataSource {
   }
 
   // ==========================================================================
+  // Merge Cell Operations
+  // ==========================================================================
+
+  /**
+   * Merge cells in the specified range.
+   * The content of the top-left cell becomes the content of the merged cell.
+   */
+  async mergeCells(
+    startCol: number, startRow: number,
+    endCol: number, endRow: number
+  ): Promise<{ success: boolean; colSpan: number; rowSpan: number }> {
+    return this._client.addMergeRange(startCol, startRow, endCol, endRow);
+  }
+
+  /**
+   * Unmerge cells at the specified position.
+   * If the cell is part of a merged region, the entire region will be unmerged.
+   */
+  async unmergeCells(col: number, row: number): Promise<{ success: boolean }> {
+    return this._client.removeMergeRange(col, row);
+  }
+
+  // ==========================================================================
   // Sheet Management
   // ==========================================================================
 

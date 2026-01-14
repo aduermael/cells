@@ -3147,6 +3147,43 @@ canvas {
     transform: rotate(180deg);
 }
 
+/* Merge Cells Dropdown */
+.merge-dropdown {
+    display: inline-flex;
+}
+
+.merge-dropdown #merge-btn {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+}
+
+.merge-dropdown #merge-btn svg:first-child {
+    width: 14px;
+    height: 14px;
+}
+
+.merge-dropdown-menu {
+    left: auto;
+    right: 0;
+    min-width: 160px;
+}
+
+.merge-dropdown-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.merge-dropdown-menu .dropdown-item svg {
+    flex-shrink: 0;
+}
+
+.merge-dropdown.open .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
 /* Alignment button groups */
 .align-btn-group {
     display: flex;

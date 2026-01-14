@@ -207,6 +207,14 @@ public:
                           int targetMaxCol, int targetMaxRow);
 
     // ========================================================================
+    // Merge cell operations (bindings_core.cc)
+    // ========================================================================
+
+    std::string addMergeRange(uint32_t startCol, uint32_t startRow,
+                              uint32_t endCol, uint32_t endRow);
+    std::string removeMergeRange(uint32_t col, uint32_t row);
+
+    // ========================================================================
     // Export methods (bindings_file.cc)
     // ========================================================================
 

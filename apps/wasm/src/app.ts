@@ -180,6 +180,12 @@ export interface DOMElements {
   valignTopBtn: HTMLButtonElement;
   valignMiddleBtn: HTMLButtonElement;
   valignBottomBtn: HTMLButtonElement;
+  // Merge controls
+  mergeDropdown: HTMLElement;
+  mergeBtn: HTMLButtonElement;
+  mergeAllBtn: HTMLButtonElement;
+  mergeHorizontalBtn: HTMLButtonElement;
+  unmergeBtn: HTMLButtonElement;
 }
 
 // =============================================================================
@@ -637,6 +643,12 @@ export function createApp(): App {
     valignTopBtn: getElement<HTMLButtonElement>("valign-top-btn"),
     valignMiddleBtn: getElement<HTMLButtonElement>("valign-middle-btn"),
     valignBottomBtn: getElement<HTMLButtonElement>("valign-bottom-btn"),
+    // Merge controls
+    mergeDropdown: getElement("merge-dropdown"),
+    mergeBtn: getElement<HTMLButtonElement>("merge-btn"),
+    mergeAllBtn: getElement<HTMLButtonElement>("merge-all-btn"),
+    mergeHorizontalBtn: getElement<HTMLButtonElement>("merge-horizontal-btn"),
+    unmergeBtn: getElement<HTMLButtonElement>("unmerge-btn"),
   };
 
   return new App(elements);

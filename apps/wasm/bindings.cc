@@ -163,6 +163,9 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("deleteRowById", &cells::wasm::CellsEngine::deleteRowById)
         // Fill range
         .function("fillRange", &cells::wasm::CellsEngine::fillRange)
+        // Merge cell operations
+        .function("addMergeRange", &cells::wasm::CellsEngine::addMergeRange)
+        .function("removeMergeRange", &cells::wasm::CellsEngine::removeMergeRange)
         // Export
         .function("exportToCells", &cells::wasm::CellsEngine::exportToCells)
         .function("exportToCSV", &cells::wasm::CellsEngine::exportToCSV)

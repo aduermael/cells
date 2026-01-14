@@ -1,5 +1,6 @@
 // Test for merged cell content rendering
 // Verifies that content in merged cells displays correctly
+// Also tests merge/unmerge UI operations
 
 import { runTests } from './harness.mjs';
 import {
@@ -7,7 +8,10 @@ import {
   loadTestFile,
   getCellDisplayValue,
   clickCell,
+  selectRange,
+  setCellValue,
   getCurrentCellRef,
+  createNewWorkbook,
   assertEqual,
   assertTrue,
   sleep,
@@ -134,6 +138,61 @@ const tests = {
     assertTrue(tabs.length > 0, 'Should have at least one sheet tab');
     // The first sheet should be the dashboard/cover sheet
     assertTrue(tabs[0].length > 0, 'First sheet tab should have a name');
+  },
+
+  // ==========================================================================
+  // UI Merge/Unmerge Tests
+  // ==========================================================================
+
+  'Merge button and dropdown exist in toolbar': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Check merge button exists
+    const mergeBtn = await ctx.page.$('#merge-btn');
+    assertTrue(mergeBtn !== null, 'Merge button should exist in toolbar');
+
+    // Open dropdown
+    await mergeBtn.click();
+    await sleep(100);
+
+    // Check dropdown options exist
+    const mergeAllBtn = await ctx.page.$('#merge-all-btn');
+    const mergeHorizontalBtn = await ctx.page.$('#merge-horizontal-btn');
+    const unmergeBtn = await ctx.page.$('#unmerge-btn');
+
+    assertTrue(mergeAllBtn !== null, 'Merge All button should exist');
+    assertTrue(mergeHorizontalBtn !== null, 'Merge Horizontally button should exist');
+    assertTrue(unmergeBtn !== null, 'Unmerge button should exist');
+  },
+
+  'Merge dropdown closes when clicking outside': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+    await createNewWorkbook(ctx.page);
+    await sleep(200);
+
+    // Open the merge dropdown
+    await ctx.page.click('#merge-btn');
+    await sleep(100);
+
+    // Check that dropdown is open (has 'open' class)
+    let isOpen = await ctx.page.evaluate(() => {
+      const dropdown = document.getElementById('merge-dropdown');
+      return dropdown && dropdown.classList.contains('open');
+    });
+    assertTrue(isOpen, 'Dropdown should be open after clicking button');
+
+    // Click on the canvas (outside the dropdown)
+    await clickCell(ctx.page, 'E5');
+    await sleep(200);
+
+    // Check that dropdown is closed
+    isOpen = await ctx.page.evaluate(() => {
+      const dropdown = document.getElementById('merge-dropdown');
+      return dropdown && dropdown.classList.contains('open');
+    });
+    assertTrue(!isOpen, 'Dropdown should be closed after clicking outside');
   },
 };
 

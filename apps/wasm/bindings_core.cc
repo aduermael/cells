@@ -1476,6 +1476,165 @@ std::string CellsEngine::fillRange(int sourceMinCol, int sourceMinRow, int sourc
 }
 
 // ============================================================================
+// Merge cell operations
+// ============================================================================
+
+std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
+                                        uint32_t endCol, uint32_t endRow) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Normalize range (ensure start <= end)
+    uint32_t minCol = std::min(startCol, endCol);
+    uint32_t maxCol = std::max(startCol, endCol);
+    uint32_t minRow = std::min(startRow, endRow);
+    uint32_t maxRow = std::max(startRow, endRow);
+
+    // Calculate span
+    uint16_t colSpan = static_cast<uint16_t>(maxCol - minCol + 1);
+    uint16_t rowSpan = static_cast<uint16_t>(maxRow - minRow + 1);
+
+    // Need at least a 2-cell merge
+    if (colSpan == 1 && rowSpan == 1) {
+        return "{\"error\":\"Cannot merge a single cell\"}";
+    }
+
+    // Get or create the anchor column
+    ID anchorColId;
+    for (const auto& [id, axis] : sheet->columns) {
+        if (axis->position == minCol) {
+            anchorColId = id;
+            break;
+        }
+    }
+    if (anchorColId.isNull()) {
+        // Create the column if it doesn't exist
+        anchorColId = generate_id();
+        std::string colPayload = "{\"pos\":" + std::to_string(minCol) +
+                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        Operation colOp = makeColInsertOp(*_workbook, anchorColId, colPayload);
+        applyOperation(*_workbook, colOp);
+    }
+
+    // Get or create the anchor row
+    ID anchorRowId;
+    for (const auto& [id, axis] : sheet->rows) {
+        if (axis->position == minRow) {
+            anchorRowId = id;
+            break;
+        }
+    }
+    if (anchorRowId.isNull()) {
+        // Create the row if it doesn't exist
+        anchorRowId = generate_id();
+        std::string rowPayload = "{\"pos\":" + std::to_string(minRow) +
+                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        Operation rowOp = makeRowInsertOp(*_workbook, anchorRowId, rowPayload);
+        applyOperation(*_workbook, rowOp);
+    }
+
+    // Ensure all columns in the range exist
+    for (uint32_t c = minCol; c <= maxCol; c++) {
+        bool found = false;
+        for (const auto& [id, axis] : sheet->columns) {
+            if (axis->position == c) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            ID newColId = generate_id();
+            std::string colPayload = "{\"pos\":" + std::to_string(c) +
+                                     ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+            Operation colOp = makeColInsertOp(*_workbook, newColId, colPayload);
+            applyOperation(*_workbook, colOp);
+        }
+    }
+
+    // Ensure all rows in the range exist
+    for (uint32_t r = minRow; r <= maxRow; r++) {
+        bool found = false;
+        for (const auto& [id, axis] : sheet->rows) {
+            if (axis->position == r) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            ID newRowId = generate_id();
+            std::string rowPayload = "{\"pos\":" + std::to_string(r) +
+                                     ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+            Operation rowOp = makeRowInsertOp(*_workbook, newRowId, rowPayload);
+            applyOperation(*_workbook, rowOp);
+        }
+    }
+
+    // Add the merge range
+    sheet->addMergeRange(anchorColId, anchorRowId, colSpan, rowSpan);
+
+    rebuildViewportIndex();
+    notifyListeners(ChangeType::STRUCTURE_CHANGED);
+
+    return "{\"success\":true,\"colSpan\":" + std::to_string(colSpan) +
+           ",\"rowSpan\":" + std::to_string(rowSpan) + "}";
+}
+
+std::string CellsEngine::removeMergeRange(uint32_t col, uint32_t row) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Find the column ID at this position
+    ID colId;
+    for (const auto& [id, axis] : sheet->columns) {
+        if (axis->position == col) {
+            colId = id;
+            break;
+        }
+    }
+    if (colId.isNull()) {
+        return "{\"error\":\"Column not found\"}";
+    }
+
+    // Find the row ID at this position
+    ID rowId;
+    for (const auto& [id, axis] : sheet->rows) {
+        if (axis->position == row) {
+            rowId = id;
+            break;
+        }
+    }
+    if (rowId.isNull()) {
+        return "{\"error\":\"Row not found\"}";
+    }
+
+    // Check if this cell is part of a merge range
+    const MergeRange* range = sheet->getMergeRange(colId, rowId);
+    if (!range) {
+        return "{\"error\":\"Cell is not part of a merged region\"}";
+    }
+
+    // Remove the merge range using its anchor
+    sheet->removeMergeRange(range->anchorColId, range->anchorRowId);
+
+    rebuildViewportIndex();
+    notifyListeners(ChangeType::STRUCTURE_CHANGED);
+
+    return "{\"success\":true}";
+}
+
+// ============================================================================
 // Workbook name
 // ============================================================================
 

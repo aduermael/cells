@@ -87,6 +87,8 @@ import {
     handleDeleteColumnById,
     handleDeleteRowById,
     handleFillRange,
+    handleAddMergeRange,
+    handleRemoveMergeRange,
     handleHasFormulas,
     handleCreateEmpty,
     handleSetWorkbookName,
@@ -534,6 +536,12 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "fillRange":
                 handleFillRange(engine, params, respond);
+                break;
+            case "addMergeRange":
+                handleAddMergeRange(engine, params, respond);
+                break;
+            case "removeMergeRange":
+                handleRemoveMergeRange(engine, params, respond);
                 break;
 
             // ================================================================

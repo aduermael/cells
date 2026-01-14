@@ -956,6 +956,50 @@ export function handleFillRange(
 }
 
 // ============================================================================
+// Merge Cell Operations
+// ============================================================================
+
+export function handleAddMergeRange(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { startCol, startRow, endCol, endRow } = params as {
+        startCol: number;
+        startRow: number;
+        endCol: number;
+        endRow: number;
+    };
+    const result = JSON.parse(
+        engine.addMergeRange(startCol, startRow, endCol, endRow),
+    ) as JsonResult & { colSpan?: number; rowSpan?: number };
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({
+            type: "mergeRangeAdded",
+            success: true,
+            colSpan: result.colSpan ?? 0,
+            rowSpan: result.rowSpan ?? 0,
+        });
+    }
+}
+
+export function handleRemoveMergeRange(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { col, row } = params as { col: number; row: number };
+    const result = JSON.parse(engine.removeMergeRange(col, row)) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "mergeRangeRemoved", success: true });
+    }
+}
+
+// ============================================================================
 // Workbook Operations
 // ============================================================================
 

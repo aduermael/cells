@@ -685,6 +685,40 @@ export class CellsClient {
     return { success: true, cellsFilled: result.cellsFilled as number };
   }
 
+  // ========== Merge Cell Operations API ==========
+
+  /**
+   * Add a merge range covering the specified cells.
+   * All cells in the range will be merged into a single cell.
+   * @param startCol Start column position (0-indexed)
+   * @param startRow Start row position (0-indexed)
+   * @param endCol End column position (0-indexed)
+   * @param endRow End row position (0-indexed)
+   */
+  async addMergeRange(
+    startCol: number, startRow: number,
+    endCol: number, endRow: number
+  ): Promise<{ success: boolean; colSpan: number; rowSpan: number }> {
+    const result = await this._send("addMergeRange", {
+      startCol, startRow, endCol, endRow
+    });
+    return {
+      success: true,
+      colSpan: result.colSpan as number,
+      rowSpan: result.rowSpan as number
+    };
+  }
+
+  /**
+   * Remove a merge range containing the specified cell position.
+   * @param col Column position (0-indexed)
+   * @param row Row position (0-indexed)
+   */
+  async removeMergeRange(col: number, row: number): Promise<{ success: boolean }> {
+    await this._send("removeMergeRange", { col, row });
+    return { success: true };
+  }
+
   async renameColumn(colId: string, name: string): Promise<{ success: boolean }> {
     await this._send("renameColumn", { colId, name });
     return { success: true };

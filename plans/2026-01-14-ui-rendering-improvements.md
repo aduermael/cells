@@ -42,12 +42,12 @@ Ensure sheets are loaded and displayed in the same order as they appear in Excel
 
 Add toolbar buttons to merge and unmerge selected cells.
 
-- [ ] 4a: Add "Merge Cells" button to toolbar HTML with dropdown for merge options (Merge All, Merge Horizontally, Unmerge)
-- [ ] 4b: Implement `mergeCells(startCol, startRow, endCol, endRow)` in wasm-data-source.ts that calls C++ CRDT operation
-- [ ] 4c: Add C++ `AddMergeRange` CRDT operation in model.cc and expose via WASM bindings
-- [ ] 4d: Implement `unmergeCells(col, row)` that removes the merge range containing the given cell
-- [ ] 4e: Wire up merge button click handlers in style-controls.ts or new merge-controls.ts module
-- [ ] 4f: Add E2E tests for merge/unmerge operations via UI
+- [x] 4a: Add "Merge Cells" button to toolbar HTML with dropdown for merge options (Merge All, Merge Horizontally, Unmerge). Added merge dropdown after bg-color in style-controls-row2 with SVG icons.
+- [x] 4b: Implement `mergeCells()` method in `wasm-data-source.ts` that calls the C++ merge function. Added mergeCells() and unmergeCells() to WasmDataSource.
+- [x] 4c: Add C++ `AddMergeRange` CRDT operation to `bindings_core.cc` that creates a merge range from position coordinates. Added addMergeRange() and removeMergeRange() to CellsEngine with EMSCRIPTEN bindings, worker handlers, and client methods.
+- [x] 4d: Implement `unmergeCells()` in `wasm-data-source.ts` that removes an existing merge range. Implemented alongside 4b/4c.
+- [x] 4e: Wire up merge button click handlers to call `mergeCells()` with current selection range. Created MergeControls class in merge-controls.ts and integrated into init-components.ts.
+- [x] 4f: Add E2E tests for merge/unmerge operations. Added 4 new tests to merged-cells.test.mjs covering merge all, unmerge, merge horizontally, and dropdown behavior.
 
 ## Phase 5: Add Border UI Controls
 

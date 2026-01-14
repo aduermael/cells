@@ -108,6 +108,10 @@ export interface CellsEngine {
         targetMaxRow: number,
     ): string;
 
+    // Merge operations
+    addMergeRange(startCol: number, startRow: number, endCol: number, endRow: number): string;
+    removeMergeRange(col: number, row: number): string;
+
     // Export
     exportToCells(): string;
     exportToCSV(): string;
