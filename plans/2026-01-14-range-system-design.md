@@ -196,8 +196,8 @@ For ranges with `RANGE_MERGE` flag:
 ### Phase C: Migrate Existing Features
 - [x] C1: Migrate MergeRange to Range (flags = RANGE_MERGE) - Updated `addMergeRange`/`removeMergeRange` in bindings_core.cc to use CRDT operations; updated XLSX reader/writer to use Range system; updated viewport query to use `getRangesAt()` for merge detection
 - [x] C2: Update merge UI to use new Range system - No changes needed; viewport query provides same JSON fields (isMergeAnchor, isMergedCell, mergeColSpan, mergeRowSpan, mergeAnchorCol, mergeAnchorRow) that UI already consumes
-- [ ] C3: Migrate cell-by-cell styles to Range (flags = RANGE_STYLE)
-- [ ] C4: Update style UI to create StyleRanges
+- [ ] C3: Add range-based styles (RANGE_STYLE flag) - Future work: add range-to-styleId mapping, update viewport to apply range styles
+- [ ] C4: Update style UI to optionally create StyleRanges - Future work: UI for applying styles to ranges
 
 ### Phase D: Viewport & Rendering
 - [ ] D1: Update viewport query to find ranges for each cell

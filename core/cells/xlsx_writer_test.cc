@@ -2882,8 +2882,8 @@ TEST(XLSXWriterTest, MergedCellsApiWorks) {
     ASSERT_EQ(sheet.rowCount(), 5u);
 
     // Add merge range using unified Range system (cols 0-2, row 0)
-    auto mergeRange = std::make_unique<Range>(
-        generate_id(), colIds[0], rowIds[0], colIds[2], rowIds[0], RangeFlags::MERGE);
+    auto mergeRange = std::make_unique<Range>(generate_id(), colIds[0], rowIds[0], colIds[2],
+                                              rowIds[0], RangeFlags::MERGE);
     sheet.addRange(std::move(mergeRange));
 
     // Verify it was added by querying ranges
@@ -2940,13 +2940,13 @@ TEST(XLSXWriterTest, RoundtripMergedCells) {
 
     // Add merge ranges using unified Range system
     // A1:C1 (cols 0-2, row 0)
-    auto merge1 = std::make_unique<Range>(
-        generate_id(), colIds[0], rowIds[0], colIds[2], rowIds[0], RangeFlags::MERGE);
+    auto merge1 = std::make_unique<Range>(generate_id(), colIds[0], rowIds[0], colIds[2], rowIds[0],
+                                          RangeFlags::MERGE);
     sheet->addRange(std::move(merge1));
 
     // B3:C4 (cols 1-2, rows 2-3)
-    auto merge2 = std::make_unique<Range>(
-        generate_id(), colIds[1], rowIds[2], colIds[2], rowIds[3], RangeFlags::MERGE);
+    auto merge2 = std::make_unique<Range>(generate_id(), colIds[1], rowIds[2], colIds[2], rowIds[3],
+                                          RangeFlags::MERGE);
     sheet->addRange(std::move(merge2));
 
     // Verify merges were added before writing by counting MERGE ranges
@@ -3052,8 +3052,8 @@ TEST(XLSXWriterTest, MergedCellsWithStyles) {
     sheet->addCell(std::move(cell));
 
     // Add merge range A1:C3 using unified Range system
-    auto merge = std::make_unique<Range>(
-        generate_id(), colIds[0], rowIds[0], colIds[2], rowIds[2], RangeFlags::MERGE);
+    auto merge = std::make_unique<Range>(generate_id(), colIds[0], rowIds[0], colIds[2], rowIds[2],
+                                         RangeFlags::MERGE);
     sheet->addRange(std::move(merge));
 
     workbook->addSheet(std::move(sheet));
