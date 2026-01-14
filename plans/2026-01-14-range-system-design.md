@@ -199,7 +199,7 @@ For ranges with `RANGE_MERGE` flag:
 
 ### Phase D: Viewport & Rendering
 - [x] D1: Update viewport query to find ranges for each cell - Done via C1; viewport uses `getRangesAt()` for MERGE flag queries
-- [ ] D2: Implement style inheritance from ranges - Depends on Phase F (range-to-styleId mapping)
+- [x] D2: Implement style inheritance from ranges - Done via F3; `getEffectiveStyle()` queries RANGE_STYLE ranges (range-to-styleId mapping)
 - [x] D3: Update merge rendering - Done via C1/C2; merge info included in viewport JSON
 - [ ] D4: Optimize for large numbers of ranges - Deferred until style inheritance is implemented
 
