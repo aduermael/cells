@@ -234,10 +234,58 @@ Complex behaviors for how ranges interact with cell operations and each other.
 
 - [x] I1: Range edge adjustment on column/row deletion - When deleting a column/row that is a range's corner, shrink the range to the adjacent column/row; if the range becomes invalid (single-col/row), remove it. Integrated `adjustRangeForColumnDeletion` and `adjustRangeForRowDeletion` into `applyColDelete`/`applyRowDelete` CRDT operations. Added 7 unit tests in `crdt_test.cc`.
 - [x] I2: Range style clears cell styles - Added `stripMatchingStyleProperties()` helper and integrated into `setRangeStyle()` in bindings_format.cc. When applying a range style, cells within the range have matching style properties cleared (or entire cell style removed if all properties match). This avoids redundant cell-level styles.
-- [x] I3: Overlapping ranges combine styles - Added `mergeStyles()` helper in bindings_viewport.cc and updated `getEffectiveStyle()` to combine styles from all overlapping ranges. When a cell is covered by multiple style ranges, properties from all ranges are merged (first range's non-default properties win, subsequent ranges fill in missing properties).
+- [ ] I3: Overlapping ranges - rectangle splitting **(REVISED)** - Original approach (layer ranges and merge at render time) was incorrect. When applying a new range style with the **same property** as an existing range, the old range must be **split** to avoid overlap. See Phase J for the correct implementation.
 - [x] I4: E2E tests for range modification behaviors - Added 3 tests to `range-styles.test.mjs`: "Range style provides correct rendering" (I2), "Overlapping ranges combine styles" (I3), "Range creation and rendering works" (I1). Also updated `deleteColumnById`/`deleteRowById` to use CRDT operations so range adjustment is triggered.
 
-**Phase I Complete** - All range modification behaviors implemented with passing tests.
+### Phase J: Rectangle Splitting for Overlapping Range Styles
+
+**Problem**: When user applies red bgColor to C4:D10, and blue bgColor already exists at B2:D8, the overlapping cells (C4:D8) should become red. The blue range must be split to avoid having two bgColor values for the same cells.
+
+**Excel behavior** (verified): Moving a cell from the red area reveals white/empty, NOT the underlying blue. This confirms ranges don't "layer" - the new style replaces the old in the overlap area.
+
+**Correct approach - Rectangle Subtraction**:
+When applying a new range style, for each property being set (e.g., bgColor):
+1. Find all existing ranges that have the same property set
+2. For each overlapping range, compute the rectangle subtraction (old - new)
+3. This produces 0-4 non-overlapping rectangles from the old range
+4. Delete the old range, create the new split ranges
+5. Create the new range
+
+```
+Example: Blue B2:D8, then Red C4:D10
+
+Before:                 After splitting:
+┌─────────────┐         ┌──────┐
+│   BLUE      │         │BLUE 1│ (B2:B8) - left strip
+│   B2:D8     │    →    └──────┘
+│      ┌──────┼───┐     ┌──────┐
+│      │ RED  │   │     │BLUE 2│ (C2:D3) - top strip
+└──────┼──────┘   │     └──────┘
+       │ C4:D10   │     ┌──────────┐
+       └──────────┘     │   RED    │ (C4:D10)
+                        └──────────┘
+```
+
+**Rectangle subtraction algorithm** (A - B):
+```
+Given rectangles A and B that overlap:
+Result can be 0-4 rectangles:
+- Left strip:   if B.left > A.left
+- Right strip:  if B.right < A.right
+- Top strip:    if B.top > A.top (clipped to not include left/right strips)
+- Bottom strip: if B.bottom < A.bottom (clipped to not include left/right strips)
+```
+
+**When to split vs. when to layer**:
+- **Same property** (both have bgColor): Split - no overlap allowed
+- **Different properties** (one bgColor, one bold): Layer - overlap OK, merge at render
+
+**Steps**:
+- [ ] J1: Implement `subtractRectangle(oldRange, newRange)` → vector of up to 4 rectangles
+- [ ] J2: In `setRangeStyle`, before creating new range, find and split overlapping ranges with same properties
+- [ ] J3: Update CRDT operations to handle range splitting (may need RANGE_SPLIT op or multiple RANGE_ADD/RANGE_REMOVE)
+- [ ] J4: E2E test: apply blue, apply overlapping red, move red cell → should reveal white not blue
+- [ ] J5: E2E test: apply bgColor range, apply overlapping bold range → both should render (different properties OK)
 
 ## Testing Strategy
 
