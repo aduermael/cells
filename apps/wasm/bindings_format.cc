@@ -645,41 +645,42 @@ CellStyle mergeStyleJson(const CellStyle& baseStyle, const std::string& json) {
     return style;
 }
 
-// Helper to strip style properties that match a range style from a cell style.
-// This removes redundant cell-level styles when a range style covers the same properties.
-// Returns the modified cell style with matching properties reset to defaults.
-CellStyle stripMatchingStyleProperties(const CellStyle& cellStyle, const CellStyle& rangeStyle,
+// Helper to strip style properties covered by a range style from a cell style.
+// When a range style sets a property, that property is cleared from cells within the range
+// to avoid redundancy (the range will provide the style, cell-level overrides are removed).
+// Returns the modified cell style with covered properties reset to defaults.
+CellStyle stripMatchingStyleProperties(const CellStyle& cellStyle, const CellStyle& /* rangeStyle */,
                                         const std::string& styleJson) {
     CellStyle result = cellStyle;
 
-    // Only clear properties that were specified in the original styleJson (not all range style properties)
-    // This preserves cell properties that weren't part of the range style application
+    // Clear properties that the range style is setting (specified in styleJson)
+    // This removes cell-level overrides when a range style provides the same property
 
-    if (hasJsonField(styleJson, "bold") && cellStyle.bold == rangeStyle.bold) {
+    if (hasJsonField(styleJson, "bold")) {
         result.bold = false;  // Reset to default
     }
-    if (hasJsonField(styleJson, "italic") && cellStyle.italic == rangeStyle.italic) {
+    if (hasJsonField(styleJson, "italic")) {
         result.italic = false;
     }
-    if (hasJsonField(styleJson, "underline") && cellStyle.underline == rangeStyle.underline) {
+    if (hasJsonField(styleJson, "underline")) {
         result.underline = false;
     }
-    if (hasJsonField(styleJson, "bgColor") && cellStyle.bgColor == rangeStyle.bgColor) {
+    if (hasJsonField(styleJson, "bgColor")) {
         result.bgColor = "";  // Reset to default (empty)
     }
-    if (hasJsonField(styleJson, "textColor") && cellStyle.textColor == rangeStyle.textColor) {
+    if (hasJsonField(styleJson, "textColor")) {
         result.textColor = "";
     }
-    if (hasJsonField(styleJson, "fontFamily") && cellStyle.fontFamily == rangeStyle.fontFamily) {
+    if (hasJsonField(styleJson, "fontFamily")) {
         result.fontFamily = "";
     }
-    if (hasJsonField(styleJson, "fontSize") && cellStyle.fontSize == rangeStyle.fontSize) {
+    if (hasJsonField(styleJson, "fontSize")) {
         result.fontSize = 0;  // Reset to default (0 = system default)
     }
-    if (hasJsonField(styleJson, "hAlign") && cellStyle.hAlign == rangeStyle.hAlign) {
+    if (hasJsonField(styleJson, "hAlign")) {
         result.hAlign = TextAlign::GENERAL;
     }
-    if (hasJsonField(styleJson, "vAlign") && cellStyle.vAlign == rangeStyle.vAlign) {
+    if (hasJsonField(styleJson, "vAlign")) {
         result.vAlign = VerticalAlign::BOTTOM;
     }
 

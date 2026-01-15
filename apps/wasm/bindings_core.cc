@@ -1409,12 +1409,20 @@ std::string CellsEngine::deleteColumnById(const std::string& colIdStr) {
     }
     ID colId(colIdStr);
 
-    _viewportIndex.onAxisDeleted(colId, true);
-
-    if (!sheet->deleteColumn(colId)) {
+    // Verify column exists
+    if (sheet->getColumn(colId) == nullptr) {
         return "{\"error\":\"Column not found\"}";
     }
 
+    // Use CRDT operation to delete column (this triggers range adjustment)
+    Operation op = makeColDeleteOp(*_workbook, colId);
+    ApplyResult result = applyOperation(*_workbook, op);
+
+    if (result != ApplyResult::SUCCESS && result != ApplyResult::ALREADY_APPLIED) {
+        return "{\"error\":\"Failed to delete column\"}";
+    }
+
+    _viewportIndex.onAxisDeleted(colId, true);
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
     return "{\"success\":true}";
@@ -1435,12 +1443,20 @@ std::string CellsEngine::deleteRowById(const std::string& rowIdStr) {
     }
     ID rowId(rowIdStr);
 
-    _viewportIndex.onAxisDeleted(rowId, false);
-
-    if (!sheet->deleteRow(rowId)) {
+    // Verify row exists
+    if (sheet->getRow(rowId) == nullptr) {
         return "{\"error\":\"Row not found\"}";
     }
 
+    // Use CRDT operation to delete row (this triggers range adjustment)
+    Operation op = makeRowDeleteOp(*_workbook, rowId);
+    ApplyResult result = applyOperation(*_workbook, op);
+
+    if (result != ApplyResult::SUCCESS && result != ApplyResult::ALREADY_APPLIED) {
+        return "{\"error\":\"Failed to delete row\"}";
+    }
+
+    _viewportIndex.onAxisDeleted(rowId, false);
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
     return "{\"success\":true}";
