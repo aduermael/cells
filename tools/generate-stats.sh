@@ -172,8 +172,8 @@ commit_count=$(git rev-list --count HEAD)
 # Build sizes
 wasm_size="Not built"
 bundle_size="Not built"
-if [ -d "$PROJECT_ROOT/dist" ]; then
-    wasm_file="$PROJECT_ROOT/dist/cells_wasm_bin.wasm"
+if [ -d "$PROJECT_ROOT/dist/wasm" ]; then
+    wasm_file="$PROJECT_ROOT/dist/wasm/cells_wasm_bin.wasm"
     if [ -f "$wasm_file" ]; then
         wasm_bytes=$(stat -f%z "$wasm_file" 2>/dev/null || stat -c%s "$wasm_file" 2>/dev/null)
         wasm_size=$(format_size $wasm_bytes)
@@ -183,7 +183,7 @@ if [ -d "$PROJECT_ROOT/dist" ]; then
     while IFS= read -r file; do
         size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
         total_bytes=$((total_bytes + size))
-    done < <(find "$PROJECT_ROOT/dist" -type f)
+    done < <(find "$PROJECT_ROOT/dist/wasm" -type f)
 
     if [ "$total_bytes" -gt 0 ]; then
         bundle_size=$(format_size $total_bytes)
