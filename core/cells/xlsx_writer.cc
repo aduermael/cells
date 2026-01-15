@@ -628,11 +628,12 @@ struct XLSXCellFormatEntry {
     size_t borderId{0};
     cells::TextAlign hAlign{cells::TextAlign::GENERAL};
     cells::VerticalAlign vAlign{cells::VerticalAlign::BOTTOM};
+    bool wrapText{false};
     bool hasAlignment{false};
 
     bool operator==(const XLSXCellFormatEntry& other) const {
         return fontId == other.fontId && fillId == other.fillId && borderId == other.borderId &&
-               hAlign == other.hAlign && vAlign == other.vAlign &&
+               hAlign == other.hAlign && vAlign == other.vAlign && wrapText == other.wrapText &&
                hasAlignment == other.hasAlignment;
     }
 };
@@ -708,8 +709,9 @@ public:
         xf.borderId = borderId;
         xf.hAlign = style.hAlign;
         xf.vAlign = style.vAlign;
+        xf.wrapText = style.wrapText;
         xf.hasAlignment = (style.hAlign != cells::TextAlign::GENERAL ||
-                           style.vAlign != cells::VerticalAlign::BOTTOM);
+                           style.vAlign != cells::VerticalAlign::BOTTOM || style.wrapText);
 
         return getOrAddCellFormat(xf);
     }
@@ -749,7 +751,7 @@ private:
         std::ostringstream oss;
         oss << xf.fontId << "|" << xf.fillId << "|" << xf.borderId << "|"
             << static_cast<int>(xf.hAlign) << "|" << static_cast<int>(xf.vAlign) << "|"
-            << xf.hasAlignment;
+            << xf.wrapText << "|" << xf.hasAlignment;
         return oss.str();
     }
 
@@ -1434,6 +1436,9 @@ std::string generateStyles(const StyleTable& styles) {
             }
             if (xf.vAlign != cells::VerticalAlign::BOTTOM) {
                 xml << " vertical=\"" << vAlignToXlsx(xf.vAlign) << "\"";
+            }
+            if (xf.wrapText) {
+                xml << " wrapText=\"1\"";
             }
             xml << "/>\n";
             xml << "    </xf>\n";
