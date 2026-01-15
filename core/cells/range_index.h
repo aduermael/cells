@@ -2,14 +2,20 @@
 // Range Index - Spatial Index for Range Lookup
 // =============================================================================
 //
-// Uses an R-tree to efficiently find ranges containing a given cell position.
+// Uses R-trees to efficiently find ranges containing a given cell position.
 // This is the bridge between UUID-based Range storage and position-based queries.
 //
 // Key responsibilities:
 // - Store Range objects with their resolved position bounds
 // - Query ranges at a specific cell position: O(log n + k)
-// - Query ranges by position AND flag filter
+// - Query ranges by position AND flag filter (using flag-specific indices)
 // - Update index when columns/rows are inserted/deleted (positions change)
+//
+// Performance optimization:
+// - Maintains separate R-tree indices for each flag type (MERGE, STYLE, etc.)
+// - Queries with flag filters use the flag-specific R-tree directly
+// - Avoids post-query filtering that would iterate all ranges
+// - Critical for viewports with many ranges (10k+)
 //
 // Architecture notes:
 // - Range objects store UUIDs; this index stores position bounds
@@ -142,7 +148,14 @@ public:
 
 private:
     // R-tree for spatial queries (stores Range pointers)
+    // This main tree contains ALL ranges regardless of flags
     RTree<Range*> _rtree;
+
+    // Flag-specific R-trees for efficient filtered queries
+    // Each tree only contains ranges that have the corresponding flag set
+    // This avoids post-query filtering which is O(n) for all ranges
+    RTree<Range*> _mergeTrees;  // MERGE flag
+    RTree<Range*> _styleTrees;  // STYLE flag
 
     // Track position bounds for each range (needed for removal/update)
     // Maps range ID -> position bounds
@@ -151,6 +164,12 @@ private:
     // Helper to create BoundingRect from position bounds
     static BoundingRect makeBounds(uint32_t startCol, uint32_t startRow, uint32_t endCol,
                                    uint32_t endRow);
+
+    // Helper to insert into flag-specific trees based on range flags
+    void insertIntoFlagTrees(Range* range, const BoundingRect& rect);
+
+    // Helper to remove from flag-specific trees based on range flags
+    void removeFromFlagTrees(Range* range, const BoundingRect& rect);
 };
 
 }  // namespace cells
