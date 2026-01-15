@@ -123,6 +123,7 @@ struct XLSXBorder {
 struct XLSXAlignment {
     cells::TextAlign horizontal{cells::TextAlign::LEFT};
     cells::VerticalAlign vertical{cells::VerticalAlign::BOTTOM};
+    bool wrapText{false};
 };
 
 // Cell format record (cellXfs entry) - combines font, fill, alignment, border
@@ -678,6 +679,10 @@ struct XLSXStyles {
                 outStyle.vAlign = xf.alignment.vertical;
                 hasStyle = true;
             }
+            if (xf.alignment.wrapText) {
+                outStyle.wrapText = true;
+                hasStyle = true;
+            }
         }
 
         return hasStyle;
@@ -688,9 +693,9 @@ struct XLSXStyles {
 std::string cellStyleToKey(const cells::CellStyle& style) {
     std::ostringstream oss;
     oss << (style.bold ? "B" : "b") << (style.italic ? "I" : "i") << (style.underline ? "U" : "u")
-        << "|" << style.bgColor << "|" << style.textColor << "|" << style.fontFamily << "|"
-        << static_cast<int>(style.fontSize) << "|" << static_cast<int>(style.hAlign) << "|"
-        << static_cast<int>(style.vAlign);
+        << (style.wrapText ? "W" : "w") << "|" << style.bgColor << "|" << style.textColor << "|"
+        << style.fontFamily << "|" << static_cast<int>(style.fontSize) << "|"
+        << static_cast<int>(style.hAlign) << "|" << static_cast<int>(style.vAlign);
     // Add border info to key
     oss << "|B:" << static_cast<int>(style.border.top.style) << "," << style.border.top.color << ":"
         << static_cast<int>(style.border.right.style) << "," << style.border.right.color << ":"
@@ -980,6 +985,11 @@ XLSXStyles parseStylesXml(const std::string& content, const XLSXThemeColors& the
             xf.alignment.horizontal =
                 parseHorizontalAlign(alignmentNode.attribute("horizontal").value());
             xf.alignment.vertical = parseVerticalAlign(alignmentNode.attribute("vertical").value());
+            // wrapText="1" or wrapText="true" means text should wrap
+            const char* wrapTextVal = alignmentNode.attribute("wrapText").value();
+            xf.alignment.wrapText =
+                wrapTextVal != nullptr &&
+                (std::strcmp(wrapTextVal, "1") == 0 || std::strcmp(wrapTextVal, "true") == 0);
         }
 
         styles.cellFormats.push_back(xf);
