@@ -13,13 +13,13 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Language | Lines |
 |----------|------:|
-| C++ | 37,567 |
-| TypeScript | 21,079 |
-| CSS | 2,606 |
-| Starlark | 1,561 |
+| C++ | 39,837 |
+| TypeScript | 21,266 |
+| CSS | 2,604 |
+| Starlark | 1,637 |
+| JavaScript | 1,363 |
 | Go | 1,363 |
-| JavaScript | 1,196 |
-| Shell | 1,052 |
+| Shell | 1,181 |
 | Objective-C++ | 1,007 |
 | HTML | 912 |
 
@@ -27,37 +27,43 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Language | Lines |
 |----------|------:|
-| C++ | 27,407 |
-| JavaScript | 8,510 |
+| C++ | 28,737 |
+| JavaScript | 9,229 |
 | Go | 315 |
 
 ### Documentation
 
 | Language | Lines |
 |----------|------:|
-| Markdown | 14,344 |
+| Markdown | 14,782 |
 
 ### Test Counts
 
 | Category | Tests |
 |----------|------:|
-| Unit (C++) | 2475 |
+| Unit (C++) | 2566 |
 | Unit (Go) | 13 |
 | Unit (JavaScript) | 30 |
-| E2E (Puppeteer) | 256 |
-| **Total** | **2774** |
+| E2E (Puppeteer) | 269 |
+| **Total** | **2878** |
 
-- **Commits**: 1081
+- **Commits**: 1128
 - **WASM Module**: Not built
-- **Total Web Bundle**: 19.70 MB
+- **Total Web Bundle**: 19.83 MB
 
-<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./scripts/generate-stats.sh`</sub>
+<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./tools/generate-stats.sh`</sub>
 
 ### LOC Evolution
 
 <img src="stats/loc-evolution.svg" alt="Lines of Code Evolution" width="100%">
 
-<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with `./scripts/loc-tracker.sh && node scripts/generate-loc-svg.mjs`</sub>
+<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with `./tools/loc-tracker.sh && node tools/generate-loc-svg.mjs`</sub>
+
+### Diff Size Evolution
+
+<img src="stats/diff-size-evolution.svg" alt="Diff Size Evolution" width="100%">
+
+<sub>Average diff size per commit (lines added + removed, code files only). Generate with `./tools/diff-tracker.sh && node tools/generate-diff-svg.mjs`</sub>
 ## Architecture Overview
 
 ```
