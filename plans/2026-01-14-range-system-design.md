@@ -235,7 +235,7 @@ Complex behaviors for how ranges interact with cell operations and each other.
 - [x] I1: Range edge adjustment on column/row deletion - When deleting a column/row that is a range's corner, shrink the range to the adjacent column/row; if the range becomes invalid (single-col/row), remove it. Integrated `adjustRangeForColumnDeletion` and `adjustRangeForRowDeletion` into `applyColDelete`/`applyRowDelete` CRDT operations. Added 7 unit tests in `crdt_test.cc`.
 - [x] I2: Range style clears cell styles - Added `stripMatchingStyleProperties()` helper and integrated into `setRangeStyle()` in bindings_format.cc. When applying a range style, cells within the range have matching style properties cleared (or entire cell style removed if all properties match). This avoids redundant cell-level styles.
 - [x] I3: Overlapping ranges combine styles - Added `mergeStyles()` helper in bindings_viewport.cc and updated `getEffectiveStyle()` to combine styles from all overlapping ranges. When a cell is covered by multiple style ranges, properties from all ranges are merged (first range's non-default properties win, subsequent ranges fill in missing properties).
-- [ ] I4: E2E tests for range modification behaviors
+- [x] I4: E2E tests for range modification behaviors - Added 3 tests to `range-styles.test.mjs`: "Range style clears redundant cell-level styles" (I2), "Overlapping ranges combine styles" (I3), "Range shrinks when edge column is deleted" (I1)
 
 ## Testing Strategy
 

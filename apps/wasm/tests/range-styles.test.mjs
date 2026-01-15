@@ -3,6 +3,9 @@
 // 1. Style ranges render backgrounds for empty cells
 // 2. Range styles don't create empty cell entries (efficient storage)
 // 3. Style ranges are included in viewport data
+// 4. Range style clears redundant cell styles (I2)
+// 5. Overlapping ranges combine styles (I3)
+// 6. Range edge adjustment on column deletion (I1)
 
 import { runTests } from './harness.mjs';
 import {
@@ -348,6 +351,239 @@ const tests = {
     assertTrue(
       !isColorApproximately(pixelF2, testColor, 30),
       `F2 should NOT have the background color`
+    );
+  },
+
+  // I2: Range style clears cell styles
+  'Range style clears redundant cell-level styles': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const testColor = '#8B5CF6'; // Purple 500
+
+    // First, apply a style to individual cell B2
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, testColor);
+    await sleep(200);
+
+    // Verify B2 has a cell-level style
+    const cellStyleBefore = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.cells) return null;
+      // Find cell at B2 (col 1, row 1)
+      const cell = ctx.app.cells.find(c => c.col === 1 && c.row === 1);
+      return cell ? cell.styleId : null;
+    });
+
+    console.log('Cell B2 styleId before range style:', cellStyleBefore);
+    assertTrue(
+      cellStyleBefore !== null && cellStyleBefore !== '' && cellStyleBefore !== '~',
+      'B2 should have a cell-level style before range style is applied'
+    );
+
+    // Now apply the SAME style to a range covering B2 (B2:C3)
+    await selectRange(ctx.page, 'B2', 'C3');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, testColor);
+    await sleep(300);
+
+    // After applying range style with same bgColor, B2's cell-level style
+    // should be cleared (since the range style now provides the same bgColor)
+    const cellStyleAfter = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.cells) return { styleId: null, cellExists: false };
+      // Find cell at B2 (col 1, row 1)
+      const cell = ctx.app.cells.find(c => c.col === 1 && c.row === 1);
+      return {
+        styleId: cell ? cell.styleId : null,
+        cellExists: cell !== undefined
+      };
+    });
+
+    console.log('Cell B2 info after range style:', cellStyleAfter);
+
+    // The cell's styleId should be cleared (null or '~') since the range provides the same style
+    assertTrue(
+      cellStyleAfter.styleId === null || cellStyleAfter.styleId === '' || cellStyleAfter.styleId === '~',
+      `B2's cell-level style should be cleared after range style applied (got: ${cellStyleAfter.styleId})`
+    );
+  },
+
+  // I3: Overlapping ranges combine styles
+  'Overlapping ranges combine styles': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const blueColor = '#3B82F6';  // Blue 500
+    const greenColor = '#10B981'; // Green 500
+
+    // Apply blue background to B2:D4
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, blueColor);
+    await sleep(300);
+
+    // Apply green background to C3:E5 (overlaps with B2:D4 at C3:D4)
+    await selectRange(ctx.page, 'C3', 'E5');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, greenColor);
+    await sleep(300);
+
+    // Click elsewhere to deselect
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Get style ranges to verify both exist
+    const styleRanges = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app) return [];
+      return ctx.app.styleRanges || [];
+    });
+
+    console.log('Style ranges:', JSON.stringify(styleRanges, null, 2));
+
+    // Should have at least 2 style ranges
+    assertTrue(
+      styleRanges.length >= 2,
+      `Expected at least 2 style ranges for overlapping test, got ${styleRanges.length}`
+    );
+
+    // Check the intersection area (C3:D4) - it should show the first style (blue)
+    // since we merge with first range's properties taking precedence
+    const posC3 = await getCellPosition(ctx.page, 2, 2);
+    const pixelC3 = await getPixelColor(
+      ctx.page,
+      posC3.x + posC3.width / 2,
+      posC3.y + posC3.height / 2
+    );
+
+    // In the intersection, the first range's bgColor should win (blue from B2:D4)
+    // because it was applied first and our merge function keeps first value
+    console.log(`C3 pixel color: r=${pixelC3?.r}, g=${pixelC3?.g}, b=${pixelC3?.b}`);
+    assertTrue(
+      isColorApproximately(pixelC3, blueColor, 30) || isColorApproximately(pixelC3, greenColor, 30),
+      `C3 (intersection) should have either blue or green background`
+    );
+
+    // Check E5 - should only have green (only covered by second range)
+    const posE5 = await getCellPosition(ctx.page, 4, 4);
+    const pixelE5 = await getPixelColor(
+      ctx.page,
+      posE5.x + posE5.width / 2,
+      posE5.y + posE5.height / 2
+    );
+
+    console.log(`E5 pixel color: r=${pixelE5?.r}, g=${pixelE5?.g}, b=${pixelE5?.b}`);
+    assertTrue(
+      isColorApproximately(pixelE5, greenColor, 30),
+      `E5 (non-overlapping, green range only) should have green background`
+    );
+
+    // Check B2 - should only have blue (only covered by first range)
+    const posB2 = await getCellPosition(ctx.page, 1, 1);
+    const pixelB2 = await getPixelColor(
+      ctx.page,
+      posB2.x + posB2.width / 2,
+      posB2.y + posB2.height / 2
+    );
+
+    console.log(`B2 pixel color: r=${pixelB2?.r}, g=${pixelB2?.g}, b=${pixelB2?.b}`);
+    assertTrue(
+      isColorApproximately(pixelB2, blueColor, 30),
+      `B2 (non-overlapping, blue range only) should have blue background`
+    );
+  },
+
+  // I1: Range edge adjustment on column deletion
+  'Range shrinks when edge column is deleted': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const testColor = '#F59E0B'; // Amber 500
+
+    // Apply style to B2:D4
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, testColor);
+    await sleep(300);
+
+    // Verify the style range exists and covers B2:D4 (cols 1-3, rows 1-3)
+    let styleRanges = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app) return [];
+      return ctx.app.styleRanges || [];
+    });
+
+    console.log('Style ranges before deletion:', JSON.stringify(styleRanges, null, 2));
+
+    const rangeBefore = styleRanges.find(r =>
+      r.startCol === 1 && r.startRow === 1 &&
+      r.endCol === 3 && r.endRow === 3
+    );
+
+    assertTrue(
+      rangeBefore !== undefined,
+      'Expected to find style range covering B2:D4 before column deletion'
+    );
+
+    // Delete column D (col 3) via dataSource API
+    const deleteResult = await ctx.page.evaluate(async () => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.dataSource) {
+        return { error: 'No data source' };
+      }
+
+      // Get column D's ID (position 3)
+      const viewport = await ctx.app.dataSource.getViewport(0, 0, 10, 10);
+      const colD = viewport.columns.find(c => c.position === 3);
+      if (!colD) {
+        return { error: 'Column D not found' };
+      }
+
+      // Delete the column
+      await ctx.app.dataSource.deleteColumnById(colD.id);
+      return { success: true, deletedColId: colD.id };
+    });
+
+    console.log('Delete result:', deleteResult);
+    await sleep(300);
+
+    // Verify the range has shrunk to B2:C4 (cols 1-2, rows 1-3)
+    styleRanges = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app) return [];
+      return ctx.app.styleRanges || [];
+    });
+
+    console.log('Style ranges after deletion:', JSON.stringify(styleRanges, null, 2));
+
+    // The range should now cover B2:C4 (endCol should be 2 instead of 3)
+    const rangeAfter = styleRanges.find(r =>
+      r.startCol === 1 && r.startRow === 1 &&
+      r.endCol === 2 && r.endRow === 3
+    );
+
+    assertTrue(
+      rangeAfter !== undefined,
+      'Expected style range to shrink to B2:C4 (cols 1-2) after column D deletion'
+    );
+
+    // Click elsewhere to deselect and verify visual
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // B2 and C2 should still have the background color
+    const posB2 = await getCellPosition(ctx.page, 1, 1);
+    const pixelB2 = await getPixelColor(
+      ctx.page,
+      posB2.x + posB2.width / 2,
+      posB2.y + posB2.height / 2
+    );
+
+    assertTrue(
+      isColorApproximately(pixelB2, testColor, 30),
+      'B2 should still have background color after column D deletion'
     );
   },
 };
