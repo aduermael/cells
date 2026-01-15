@@ -38,17 +38,51 @@ namespace cells::wasm {
 // 5. No style (null)
 
 struct EffectiveStyleResult {
-    ID styleId;                   // The resolved style ID
+    ID styleId;                   // The resolved style ID (for single source)
     const CellStyle* style;       // The resolved style pointer (may be null)
+    CellStyle mergedStyle;        // Combined style from multiple ranges (used when fromRange is true)
+    bool hasMergedStyle;          // true if mergedStyle is valid
     bool fromCell;                // true if style came from cell itself
     bool fromRange;               // true if style came from a range
     bool fromColumn;              // true if style came from column default
     bool fromRow;                 // true if style came from row default
 };
 
+// Helper to merge two CellStyle objects. Properties from 'overlay' fill in
+// properties not set (at default) in 'base'. This supports CSS-like cascading
+// where multiple ranges can contribute different properties.
+CellStyle mergeStyles(const CellStyle& base, const CellStyle& overlay) {
+    CellStyle result = base;
+
+    // Merge boolean properties (overlay wins if base is false/default)
+    if (!result.bold && overlay.bold) result.bold = true;
+    if (!result.italic && overlay.italic) result.italic = true;
+    if (!result.underline && overlay.underline) result.underline = true;
+
+    // Merge string properties (overlay wins if base is empty)
+    if (result.bgColor.empty() && !overlay.bgColor.empty()) result.bgColor = overlay.bgColor;
+    if (result.textColor.empty() && !overlay.textColor.empty()) result.textColor = overlay.textColor;
+    if (result.fontFamily.empty() && !overlay.fontFamily.empty()) result.fontFamily = overlay.fontFamily;
+
+    // Merge numeric properties (overlay wins if base is 0/default)
+    if (result.fontSize == 0 && overlay.fontSize != 0) result.fontSize = overlay.fontSize;
+
+    // Merge alignment (overlay wins if base is default)
+    if (result.hAlign == TextAlign::GENERAL && overlay.hAlign != TextAlign::GENERAL) result.hAlign = overlay.hAlign;
+    if (result.vAlign == VerticalAlign::BOTTOM && overlay.vAlign != VerticalAlign::BOTTOM) result.vAlign = overlay.vAlign;
+
+    // Merge borders (each edge individually)
+    if (!result.border.top.hasValue() && overlay.border.top.hasValue()) result.border.top = overlay.border.top;
+    if (!result.border.right.hasValue() && overlay.border.right.hasValue()) result.border.right = overlay.border.right;
+    if (!result.border.bottom.hasValue() && overlay.border.bottom.hasValue()) result.border.bottom = overlay.border.bottom;
+    if (!result.border.left.hasValue() && overlay.border.left.hasValue()) result.border.left = overlay.border.left;
+
+    return result;
+}
+
 EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, const Workbook& workbook,
                                        uint32_t colPos, uint32_t rowPos) {
-    EffectiveStyleResult result = {{}, nullptr, false, false, false, false};
+    EffectiveStyleResult result = {{}, nullptr, {}, false, false, false, false, false};
 
     // Priority 1: Cell's own style
     if (!cell.styleId.isNull()) {
@@ -59,21 +93,37 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
     }
 
     // Priority 2: Range styles (for ranges with RANGE_STYLE flag)
-    // Use the first style range found (ranges are returned in spatial query order)
+    // Combine styles from all overlapping ranges (I3: Overlapping ranges combine styles)
+    // e.g., if Range A has bgColor and Range B has bold, the cell gets both properties
     std::vector<Range*> styleRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::STYLE);
     if (!styleRanges.empty()) {
-        // Use the first range with a valid style association
+        CellStyle combinedStyle;
+        bool hasAnyStyle = false;
+
+        // Iterate through all ranges and merge their styles
         for (Range* range : styleRanges) {
             ID rangeStyleId = sheet.getRangeStyleId(range->id);
             if (!rangeStyleId.isNull()) {
                 const CellStyle* rangeStyle = workbook.getStyle(rangeStyleId);
                 if (rangeStyle != nullptr) {
-                    result.styleId = rangeStyleId;
-                    result.style = rangeStyle;
-                    result.fromRange = true;
-                    return result;
+                    if (!hasAnyStyle) {
+                        // First style found - use it as base
+                        combinedStyle = *rangeStyle;
+                        result.styleId = rangeStyleId;  // Keep first styleId for reference
+                        hasAnyStyle = true;
+                    } else {
+                        // Merge additional range's style into combined style
+                        combinedStyle = mergeStyles(combinedStyle, *rangeStyle);
+                    }
                 }
             }
+        }
+
+        if (hasAnyStyle) {
+            result.mergedStyle = combinedStyle;
+            result.hasMergedStyle = true;
+            result.fromRange = true;
+            return result;
         }
     }
 
@@ -227,10 +277,13 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
 
         // Include effective style (resolves cell > range > column > row hierarchy)
         EffectiveStyleResult effectiveStyle = getEffectiveStyle(*entry.cell, *sheet, *_workbook, colPos, rowPos);
-        if (!effectiveStyle.styleId.isNull() && effectiveStyle.style != nullptr) {
+        // Get style pointer: use merged style if available, otherwise use the single style pointer
+        const CellStyle* style = effectiveStyle.hasMergedStyle
+            ? &effectiveStyle.mergedStyle
+            : effectiveStyle.style;
+        if (!effectiveStyle.styleId.isNull() && style != nullptr) {
             json << "\"styleId\":\"" << effectiveStyle.styleId.toString() << "\",";
             // Include inline style properties for efficient rendering
-            const CellStyle* style = effectiveStyle.style;
             json << "\"style\":{";
             json << "\"bold\":" << (style->bold ? "true" : "false");
             json << ",\"italic\":" << (style->italic ? "true" : "false");
@@ -587,6 +640,72 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             json << "\"hidden\":" << (row->hidden ? "true" : "false");
             json << "}";
         }
+    }
+
+    json << "],\"styleRanges\":[";
+
+    // Include style ranges that overlap with the viewport
+    // These allow the frontend to render backgrounds for empty cells
+    bool firstRange = true;
+    const auto& ranges = sheet->getRanges();
+    for (const auto& [rangeId, range] : ranges) {
+        // Only include RANGE_STYLE ranges
+        if (!range->hasFlag(RangeFlags::STYLE)) {
+            continue;
+        }
+
+        // Get the style for this range
+        ID styleId = sheet->getRangeStyleId(rangeId);
+        if (styleId.isNull()) {
+            continue;
+        }
+        const CellStyle* style = _workbook->getStyle(styleId);
+        if (style == nullptr) {
+            continue;
+        }
+
+        // Get position bounds from corner IDs
+        auto startColIt = sheet->columns.find(range->startColId);
+        auto startRowIt = sheet->rows.find(range->startRowId);
+        auto endColIt = sheet->columns.find(range->endColId);
+        auto endRowIt = sheet->rows.find(range->endRowId);
+
+        if (startColIt == sheet->columns.end() || startRowIt == sheet->rows.end() ||
+            endColIt == sheet->columns.end() || endRowIt == sheet->rows.end()) {
+            continue;
+        }
+
+        uint32_t rangeCol1 = std::min(startColIt->second->position, endColIt->second->position);
+        uint32_t rangeCol2 = std::max(startColIt->second->position, endColIt->second->position);
+        uint32_t rangeRow1 = std::min(startRowIt->second->position, endRowIt->second->position);
+        uint32_t rangeRow2 = std::max(startRowIt->second->position, endRowIt->second->position);
+
+        // Check if range overlaps with viewport
+        if (rangeCol2 < col1 || rangeCol1 >= col2 || rangeRow2 < row1 || rangeRow1 >= row2) {
+            continue;
+        }
+
+        if (!firstRange) {
+            json << ",";
+        }
+        firstRange = false;
+
+        json << "{";
+        json << "\"startCol\":" << rangeCol1 << ",";
+        json << "\"startRow\":" << rangeRow1 << ",";
+        json << "\"endCol\":" << rangeCol2 << ",";
+        json << "\"endRow\":" << rangeRow2 << ",";
+        json << "\"styleId\":\"" << styleId.toString() << "\",";
+        json << "\"style\":{";
+        if (!style->bgColor.empty()) {
+            json << "\"bgColor\":\"" << style->bgColor << "\"";
+        }
+        // Add other style properties that affect rendering
+        if (!style->textColor.empty()) {
+            if (!style->bgColor.empty()) json << ",";
+            json << "\"textColor\":\"" << style->textColor << "\"";
+        }
+        json << "}}";
     }
 
     json << "]}";
