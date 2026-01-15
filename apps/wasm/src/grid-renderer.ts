@@ -1035,6 +1035,71 @@ export class GridRenderer {
     ctx.setLineDash([]);
   }
 
+  /**
+   * Break text into lines that fit within the given width.
+   * Breaks on word boundaries when possible, otherwise breaks mid-word.
+   */
+  private _wrapText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    maxWidth: number
+  ): string[] {
+    if (!text || maxWidth <= 0) return [text];
+
+    // If the text fits on one line, return it as-is
+    if (ctx.measureText(text).width <= maxWidth) {
+      return [text];
+    }
+
+    const lines: string[] = [];
+    // Split on whitespace while preserving the whitespace
+    const words = text.split(/(\s+)/);
+    let currentLine = "";
+
+    for (const word of words) {
+      const testLine = currentLine + word;
+      const testWidth = ctx.measureText(testLine).width;
+
+      if (testWidth <= maxWidth) {
+        currentLine = testLine;
+      } else {
+        // If current line has content, push it
+        if (currentLine.trim()) {
+          lines.push(currentLine);
+          currentLine = "";
+        }
+
+        // Check if the word itself is too long (needs to be broken)
+        if (ctx.measureText(word).width > maxWidth) {
+          // Break the word character by character
+          let partialWord = "";
+          for (const char of word) {
+            const testPartial = partialWord + char;
+            if (ctx.measureText(testPartial).width <= maxWidth) {
+              partialWord = testPartial;
+            } else {
+              if (partialWord) {
+                lines.push(partialWord);
+              }
+              partialWord = char;
+            }
+          }
+          currentLine = partialWord;
+        } else {
+          // Word fits, start new line with it
+          currentLine = word;
+        }
+      }
+    }
+
+    // Don't forget the last line
+    if (currentLine.trim()) {
+      lines.push(currentLine);
+    }
+
+    return lines.length > 0 ? lines : [text];
+  }
+
   /** Draw cell values */
   private _drawCellValues(
     ctx: CanvasRenderingContext2D,
@@ -1138,13 +1203,18 @@ export class GridRenderer {
         }
       }
 
+      // Check if text wrapping is enabled
+      const wrapText = style?.wrapText === true;
+
       // Calculate overflow clip region (extends into empty neighbor cells)
+      // Only used when wrapText is false
       let clipStartCol = cell.col;
       let clipEndCol = cell.col;
 
       // Only calculate overflow if text is wider than available space
       // and the cell is not a merge anchor (merged cells have their own sizing)
-      if (textWidth > availableWidth && !cell.isMergeAnchor && displayValue) {
+      // and text wrapping is not enabled (wrapped text stays within the cell)
+      if (!wrapText && textWidth > availableWidth && !cell.isMergeAnchor && displayValue) {
         const overflowNeeded = textWidth - availableWidth;
 
         if (hAlign === "left") {
@@ -1192,11 +1262,11 @@ export class GridRenderer {
       }
 
       // Calculate the clip region
-      // For merge anchors, use the full merged region for clipping
-      // For regular cells, use the extended clip region (for overflow)
+      // For merge anchors or wrapped text, use the cell bounds for clipping
+      // For regular cells without wrapping, use the extended clip region (for overflow)
       let clipX: number;
       let clipWidth: number;
-      if (cell.isMergeAnchor) {
+      if (cell.isMergeAnchor || wrapText) {
         clipX = cellX;
         clipWidth = colWidth;
       } else {
@@ -1230,46 +1300,103 @@ export class GridRenderer {
       // Set vertical alignment (default matches CellStyle in C++)
       const vAlign = style?.vAlign || "bottom";
       const zoomedVertPadding = Math.round(2 * getZoomFactor());
-      let textY: number;
-      if (vAlign === "top") {
-        ctx.textBaseline = "top";
-        textY = cellY + zoomedVertPadding; // Small padding from top
-      } else if (vAlign === "bottom") {
-        ctx.textBaseline = "bottom";
-        textY = cellY + rowHeight - zoomedVertPadding; // Small padding from bottom
-      } else {
-        ctx.textBaseline = "middle";
-        textY = cellY + rowHeight / 2;
-      }
 
-      ctx.fillText(displayValue, textX, textY);
+      // Handle wrapped text vs single-line text
+      if (wrapText && displayValue) {
+        // Break text into lines
+        const lines = this._wrapText(ctx, displayValue, availableWidth);
+        const lineHeight = zoomedFontSize * 1.2; // Standard line height multiplier
+        const totalTextHeight = lines.length * lineHeight;
 
-      // Draw underline if enabled
-      if (style?.underline) {
-        const textMetrics = ctx.measureText(displayValue);
-        let underlineX: number;
-        if (hAlign === "center") {
-          underlineX = textX - textMetrics.width / 2;
-        } else if (hAlign === "right") {
-          underlineX = textX - textMetrics.width;
-        } else {
-          underlineX = textX;
-        }
-        // Adjust Y position based on vertical alignment
-        let underlineY: number;
+        // Calculate starting Y position based on vertical alignment
+        let startY: number;
         if (vAlign === "top") {
-          underlineY = textY + zoomedFontSize + 1;
+          ctx.textBaseline = "top";
+          startY = cellY + zoomedVertPadding;
         } else if (vAlign === "bottom") {
-          underlineY = textY + 1;
+          ctx.textBaseline = "top";
+          // Position so the last line ends at the bottom (with padding)
+          startY = cellY + rowHeight - zoomedVertPadding - totalTextHeight;
+          // Ensure we don't go above the cell top
+          startY = Math.max(startY, cellY + zoomedVertPadding);
         } else {
-          underlineY = textY + zoomedFontSize / 2 + 1;
+          // middle alignment
+          ctx.textBaseline = "top";
+          startY = cellY + (rowHeight - totalTextHeight) / 2;
         }
-        ctx.beginPath();
-        ctx.strokeStyle = style?.textColor || this.colors.cellText;
-        ctx.lineWidth = 1;
-        ctx.moveTo(underlineX, underlineY);
-        ctx.lineTo(underlineX + textMetrics.width, underlineY);
-        ctx.stroke();
+
+        // Draw each line
+        for (let i = 0; i < lines.length; i++) {
+          const lineY = startY + i * lineHeight;
+          // Only draw if line is within the cell bounds (visible)
+          if (lineY + lineHeight > cellY && lineY < cellY + rowHeight) {
+            ctx.fillText(lines[i] ?? "", textX, lineY);
+
+            // Draw underline for each line if enabled
+            if (style?.underline && lines[i]) {
+              const lineText = lines[i] ?? "";
+              const lineTextMetrics = ctx.measureText(lineText);
+              let underlineX: number;
+              if (hAlign === "center") {
+                underlineX = textX - lineTextMetrics.width / 2;
+              } else if (hAlign === "right") {
+                underlineX = textX - lineTextMetrics.width;
+              } else {
+                underlineX = textX;
+              }
+              const underlineY = lineY + zoomedFontSize + 1;
+              ctx.beginPath();
+              ctx.strokeStyle = style?.textColor || this.colors.cellText;
+              ctx.lineWidth = 1;
+              ctx.moveTo(underlineX, underlineY);
+              ctx.lineTo(underlineX + lineTextMetrics.width, underlineY);
+              ctx.stroke();
+            }
+          }
+        }
+      } else {
+        // Single-line text (existing behavior)
+        let textY: number;
+        if (vAlign === "top") {
+          ctx.textBaseline = "top";
+          textY = cellY + zoomedVertPadding; // Small padding from top
+        } else if (vAlign === "bottom") {
+          ctx.textBaseline = "bottom";
+          textY = cellY + rowHeight - zoomedVertPadding; // Small padding from bottom
+        } else {
+          ctx.textBaseline = "middle";
+          textY = cellY + rowHeight / 2;
+        }
+
+        ctx.fillText(displayValue, textX, textY);
+
+        // Draw underline if enabled
+        if (style?.underline) {
+          const textMetrics = ctx.measureText(displayValue);
+          let underlineX: number;
+          if (hAlign === "center") {
+            underlineX = textX - textMetrics.width / 2;
+          } else if (hAlign === "right") {
+            underlineX = textX - textMetrics.width;
+          } else {
+            underlineX = textX;
+          }
+          // Adjust Y position based on vertical alignment
+          let underlineY: number;
+          if (vAlign === "top") {
+            underlineY = textY + zoomedFontSize + 1;
+          } else if (vAlign === "bottom") {
+            underlineY = textY + 1;
+          } else {
+            underlineY = textY + zoomedFontSize / 2 + 1;
+          }
+          ctx.beginPath();
+          ctx.strokeStyle = style?.textColor || this.colors.cellText;
+          ctx.lineWidth = 1;
+          ctx.moveTo(underlineX, underlineY);
+          ctx.lineTo(underlineX + textMetrics.width, underlineY);
+          ctx.stroke();
+        }
       }
 
       ctx.restore();

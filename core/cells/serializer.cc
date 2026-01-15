@@ -130,6 +130,7 @@ void Serializer::serializeStyles(const Workbook& workbook, std::ostream& out) co
         out << "\"bold\":" << (style->bold ? "true" : "false");
         out << ",\"italic\":" << (style->italic ? "true" : "false");
         out << ",\"underline\":" << (style->underline ? "true" : "false");
+        out << ",\"wrapText\":" << (style->wrapText ? "true" : "false");
         if (!style->bgColor.empty()) {
             out << ",\"bgColor\":\"" << escapeString(style->bgColor) << "\"";
         }

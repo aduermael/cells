@@ -89,10 +89,10 @@ Add support for text wrapping within cells, reading from XLSX and exposing in UI
 - [x] 7a: Add `wrapText: boolean` property to CellStyle in model.h - added to style_types.h with isEmpty(), operator==, hash(), and JSON serialization/parsing in crdt.cc, crdt_axis.cc, parser.cc, luau_api.cc, luau_types.cc, bindings_viewport.cc, bindings_format.cc, and TypeScript types
 - [x] 7b: Parse `wrapText` attribute from XLSX alignment element (`<alignment wrapText="1"/>`) in xlsx_reader.cc - added wrapText to XLSXAlignment struct, parsed from alignment node, applied to CellStyle
 - [x] 7c: Write `wrapText` attribute back to XLSX in xlsx_writer.cc - added wrapText to XLSXCellFormatEntry, writes wrapText="1" in alignment element
-- [ ] 7d: Update grid-renderer.ts `_drawCellValues()` to perform line breaking when wrapText is true
-- [ ] 7e: Implement text measurement and line breaking algorithm (break on word boundaries, handle long words)
-- [ ] 7f: Add "Wrap Text" toggle button to toolbar in style-controls.ts
-- [ ] 7g: Add E2E test for text wrapping display and toggle
+- [x] 7d: Update grid-renderer.ts `_drawCellValues()` to perform line breaking when wrapText is true - added `_wrapText()` helper method to grid-renderer.ts, modified `_drawCellValues()` to check `style?.wrapText` and render multiple lines with proper vertical alignment
+- [x] 7e: Implement text measurement and line breaking algorithm (break on word boundaries, handle long words) - implemented in `_wrapText()` method: breaks on whitespace, handles long words by character, uses 1.2x line height multiplier
+- [x] 7f: Add "Wrap Text" toggle button to toolbar in style-controls.ts - added wrap text button to index.html, wired up in StyleControls class with toggle behavior
+- [x] 7g: Add E2E test for text wrapping display and toggle - created text-wrapping.test.mjs with 5 tests for button existence, toggle behavior, style application, and button state reflection. Also fixed ZCD serializer.cc to include wrapText field.
 
 ## Phase 8: Implement Auto-Fit Column Width
 

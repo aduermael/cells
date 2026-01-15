@@ -736,6 +736,7 @@ export function createComponents(config: ComponentsConfig): Components {
       boldBtn: elements.styleBoldBtn,
       italicBtn: elements.styleItalicBtn,
       underlineBtn: elements.styleUnderlineBtn,
+      wrapTextBtn: elements.styleWrapTextBtn,
       bgColorWrapper: elements.bgColorWrapper,
       bgColorBtn: elements.bgColorBtn,
       bgColorSwatch: elements.bgColorSwatch,

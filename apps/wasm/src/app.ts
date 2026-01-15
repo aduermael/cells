@@ -152,6 +152,7 @@ export interface DOMElements {
   styleBoldBtn: HTMLButtonElement;
   styleItalicBtn: HTMLButtonElement;
   styleUnderlineBtn: HTMLButtonElement;
+  styleWrapTextBtn: HTMLButtonElement;
   bgColorWrapper: HTMLElement;
   bgColorBtn: HTMLButtonElement;
   bgColorSwatch: HTMLElement;
@@ -633,6 +634,7 @@ export function createApp(): App {
     styleBoldBtn: getElement<HTMLButtonElement>("style-bold-btn"),
     styleItalicBtn: getElement<HTMLButtonElement>("style-italic-btn"),
     styleUnderlineBtn: getElement<HTMLButtonElement>("style-underline-btn"),
+    styleWrapTextBtn: getElement<HTMLButtonElement>("style-wrap-text-btn"),
     bgColorWrapper: getElement("bg-color-wrapper"),
     bgColorBtn: getElement<HTMLButtonElement>("style-bg-color-btn"),
     bgColorSwatch: getElement("bg-color-swatch"),

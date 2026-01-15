@@ -34,6 +34,7 @@ export interface StyleControlsConfig {
   boldBtn: HTMLButtonElement;
   italicBtn: HTMLButtonElement;
   underlineBtn: HTMLButtonElement;
+  wrapTextBtn: HTMLButtonElement;
   bgColorWrapper: HTMLElement;
   bgColorBtn: HTMLButtonElement;
   bgColorSwatch: HTMLElement;
@@ -99,6 +100,7 @@ export class StyleControls {
   private boldBtn: HTMLButtonElement;
   private italicBtn: HTMLButtonElement;
   private underlineBtn: HTMLButtonElement;
+  private wrapTextBtn: HTMLButtonElement;
   private bgColorWrapper: HTMLElement;
   private bgColorBtn: HTMLButtonElement;
   private bgColorSwatch: HTMLElement;
@@ -158,6 +160,7 @@ export class StyleControls {
     this.boldBtn = config.boldBtn;
     this.italicBtn = config.italicBtn;
     this.underlineBtn = config.underlineBtn;
+    this.wrapTextBtn = config.wrapTextBtn;
     this.bgColorWrapper = config.bgColorWrapper;
     this.bgColorBtn = config.bgColorBtn;
     this.bgColorSwatch = config.bgColorSwatch;
@@ -270,6 +273,11 @@ export class StyleControls {
     // Underline button
     this.underlineBtn.addEventListener("click", () => {
       this.toggleStyle("underline");
+    });
+
+    // Wrap text button
+    this.wrapTextBtn.addEventListener("click", () => {
+      this.toggleStyle("wrapText");
     });
 
     // Background color button - toggle popup
@@ -444,7 +452,7 @@ export class StyleControls {
   // Private Methods - Style Operations
   // =========================================================================
 
-  private async toggleStyle(property: "bold" | "italic" | "underline"): Promise<void> {
+  private async toggleStyle(property: "bold" | "italic" | "underline" | "wrapText"): Promise<void> {
     const position = this.getSelectedCell();
     if (!position || !this.dataSource) return;
 
@@ -593,6 +601,7 @@ export class StyleControls {
     this.updateButtonState("bold", !!style.bold, mixed?.bold);
     this.updateButtonState("italic", !!style.italic, mixed?.italic);
     this.updateButtonState("underline", !!style.underline, mixed?.underline);
+    this.updateButtonState("wrapText", !!style.wrapText, mixed?.wrapText);
 
     // Update color swatches (show mixed indicator if colors differ)
     this.updateBgColorSwatch(style.bgColor || "", mixed?.bgColor);
@@ -609,16 +618,25 @@ export class StyleControls {
   }
 
   private updateButtonState(
-    property: "bold" | "italic" | "underline",
+    property: "bold" | "italic" | "underline" | "wrapText",
     active: boolean,
     isMixed?: boolean
   ): void {
-    const btn =
-      property === "bold"
-        ? this.boldBtn
-        : property === "italic"
-          ? this.italicBtn
-          : this.underlineBtn;
+    let btn: HTMLButtonElement;
+    switch (property) {
+      case "bold":
+        btn = this.boldBtn;
+        break;
+      case "italic":
+        btn = this.italicBtn;
+        break;
+      case "underline":
+        btn = this.underlineBtn;
+        break;
+      case "wrapText":
+        btn = this.wrapTextBtn;
+        break;
+    }
 
     btn.classList.toggle("active", active && !isMixed);
     btn.classList.toggle("mixed", !!isMixed);
