@@ -10,10 +10,10 @@ Add a new graph showing average diff size over time, tracking code changes only 
   - Store results in `stats/diff-history.json` with rolling average data
 
 ## Phase 2: SVG Graph Generation
-- [ ] 2a: Create `tools/generate-diff-svg.mjs` to generate the diff size graph
+- [x] 2a: Create `tools/generate-diff-svg.mjs` to generate the diff size graph
   - Read from `stats/diff-history.json`
-  - Calculate rolling average (e.g., 7-day or 10-commit window)
-  - Generate SVG similar to `loc-evolution.svg` showing avg diff size over time
+  - Calculate rolling average (10-commit window)
+  - Generate SVG showing per-commit diff dots and rolling average line
   - Output to `stats/diff-size-evolution.svg`
 
 ## Phase 3: Integration and Path Fix
