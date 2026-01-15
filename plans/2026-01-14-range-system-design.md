@@ -233,7 +233,7 @@ The toolbar still applies styles cell-by-cell via `setCellStyleAt()`. To use ran
 Complex behaviors for how ranges interact with cell operations and each other.
 
 - [x] I1: Range edge adjustment on column/row deletion - When deleting a column/row that is a range's corner, shrink the range to the adjacent column/row; if the range becomes invalid (single-col/row), remove it. Integrated `adjustRangeForColumnDeletion` and `adjustRangeForRowDeletion` into `applyColDelete`/`applyRowDelete` CRDT operations. Added 7 unit tests in `crdt_test.cc`.
-- [ ] I2: Range style clears cell styles - When applying a style property to a range, remove that same property from all individual cells within the range (avoid redundant cell-level styles)
+- [x] I2: Range style clears cell styles - Added `stripMatchingStyleProperties()` helper and integrated into `setRangeStyle()` in bindings_format.cc. When applying a range style, cells within the range have matching style properties cleared (or entire cell style removed if all properties match). This avoids redundant cell-level styles.
 - [ ] I3: Overlapping ranges combine styles - Multiple ranges can overlap; styles are combined where they intersect (e.g., A1:C3 has bgColor, B2:D4 has bold → B2:C3 gets both)
 - [ ] I4: E2E tests for range modification behaviors
 

@@ -645,6 +645,47 @@ CellStyle mergeStyleJson(const CellStyle& baseStyle, const std::string& json) {
     return style;
 }
 
+// Helper to strip style properties that match a range style from a cell style.
+// This removes redundant cell-level styles when a range style covers the same properties.
+// Returns the modified cell style with matching properties reset to defaults.
+CellStyle stripMatchingStyleProperties(const CellStyle& cellStyle, const CellStyle& rangeStyle,
+                                        const std::string& styleJson) {
+    CellStyle result = cellStyle;
+
+    // Only clear properties that were specified in the original styleJson (not all range style properties)
+    // This preserves cell properties that weren't part of the range style application
+
+    if (hasJsonField(styleJson, "bold") && cellStyle.bold == rangeStyle.bold) {
+        result.bold = false;  // Reset to default
+    }
+    if (hasJsonField(styleJson, "italic") && cellStyle.italic == rangeStyle.italic) {
+        result.italic = false;
+    }
+    if (hasJsonField(styleJson, "underline") && cellStyle.underline == rangeStyle.underline) {
+        result.underline = false;
+    }
+    if (hasJsonField(styleJson, "bgColor") && cellStyle.bgColor == rangeStyle.bgColor) {
+        result.bgColor = "";  // Reset to default (empty)
+    }
+    if (hasJsonField(styleJson, "textColor") && cellStyle.textColor == rangeStyle.textColor) {
+        result.textColor = "";
+    }
+    if (hasJsonField(styleJson, "fontFamily") && cellStyle.fontFamily == rangeStyle.fontFamily) {
+        result.fontFamily = "";
+    }
+    if (hasJsonField(styleJson, "fontSize") && cellStyle.fontSize == rangeStyle.fontSize) {
+        result.fontSize = 0;  // Reset to default (0 = system default)
+    }
+    if (hasJsonField(styleJson, "hAlign") && cellStyle.hAlign == rangeStyle.hAlign) {
+        result.hAlign = TextAlign::GENERAL;
+    }
+    if (hasJsonField(styleJson, "vAlign") && cellStyle.vAlign == rangeStyle.vAlign) {
+        result.vAlign = VerticalAlign::BOTTOM;
+    }
+
+    return result;
+}
+
 }  // namespace
 
 std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::string& styleJson) {
@@ -1153,6 +1194,75 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
 
     Operation setStyleOp = makeRangeSetStyleOp(*_workbook, rangeId, stylePayload.str());
     applyOperation(*_workbook, setStyleOp);
+
+    // Clear redundant cell-level styles within the range (I2: Range style clears cell styles)
+    // When applying a range style, remove matching properties from individual cells to avoid redundancy
+    for (const auto& [cellId, cell] : sheet->cells) {
+        if (cell->styleId.isNull()) {
+            continue;  // Cell has no style, skip
+        }
+
+        // Check if cell is within the range bounds
+        const Axis* cellCol = sheet->getColumn(cell->colId);
+        const Axis* cellRow = sheet->getRow(cell->rowId);
+        if (cellCol == nullptr || cellRow == nullptr) {
+            continue;
+        }
+
+        const uint32_t cellColPos = cellCol->position;
+        const uint32_t cellRowPos = cellRow->position;
+        if (cellColPos < minCol || cellColPos > maxCol || cellRowPos < minRow || cellRowPos > maxRow) {
+            continue;  // Cell is outside the range
+        }
+
+        // Get the cell's current style
+        const CellStyle* cellStylePtr = _workbook->getStyle(cell->styleId);
+        if (cellStylePtr == nullptr) {
+            continue;
+        }
+
+        // Strip properties that match the range style
+        CellStyle strippedStyle = stripMatchingStyleProperties(*cellStylePtr, style, styleJson);
+
+        // If the stripped style is empty, clear the cell's styleId
+        // Otherwise, create/find the stripped style and update the cell
+        if (strippedStyle.isEmpty()) {
+            // Clear the cell's style
+            std::string clearPayload = "{\"style_id\":\"~\"}";
+            Operation clearOp = makeCellSetStyleOp(*_workbook, cellId, clearPayload);
+            applyOperation(*_workbook, clearOp);
+        } else if (strippedStyle != *cellStylePtr) {
+            // Style changed, need to update the cell
+            ID newStyleId;
+
+            // Check if this stripped style already exists
+            const auto& existingStyles = _workbook->getStyles();
+            for (const auto& [id, existingStyle] : existingStyles) {
+                if (existingStyle == strippedStyle) {
+                    newStyleId = id;
+                    break;
+                }
+            }
+
+            // Create new style if not found
+            if (newStyleId.isNull()) {
+                newStyleId = generate_id();
+                _workbook->registerStyle(newStyleId, strippedStyle);
+
+                // Create STYLE_DEFINE operation for sync
+                if (_workbook->isCollaborating()) {
+                    std::string fullStyleJson = styleToJson(strippedStyle);
+                    Operation styleDefineOp = makeStyleDefineOp(*_workbook, newStyleId, fullStyleJson);
+                    applyOperation(*_workbook, styleDefineOp);
+                }
+            }
+
+            // Update the cell's styleId
+            std::string updatePayload = "{\"style_id\":\"" + newStyleId.toString() + "\"}";
+            Operation updateOp = makeCellSetStyleOp(*_workbook, cellId, updatePayload);
+            applyOperation(*_workbook, updateOp);
+        }
+    }
 
     rebuildViewportIndex();
     notifyListeners(ChangeType::CELL_CHANGED);
