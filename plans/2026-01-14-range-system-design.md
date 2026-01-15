@@ -229,6 +229,14 @@ The toolbar still applies styles cell-by-cell via `setCellStyleAt()`. To use ran
 - [x] H3: Update StyleControls.applyStyleToSelection() to use setStyleForRange() - Multi-cell selections now use Range system
 - [x] H4: Add E2E test verifying range styles render correctly and don't create empty cell entries - Created `range-styles.test.mjs` with 4 tests: verifies styleRanges in viewport data, background rendering for empty cells, no wasteful cell object creation, and proper range bounds
 
+### Phase I: Range Modification Behaviors
+Complex behaviors for how ranges interact with cell operations and each other.
+
+- [ ] I1: Cell deletion breaks range - When deleting a cell within a range, the range should be split/subdivided (Excel-like behavior: may create smaller rectangles + single cells)
+- [ ] I2: Range style clears cell styles - When applying a style property to a range, remove that same property from all individual cells within the range (avoid redundant cell-level styles)
+- [ ] I3: Overlapping ranges combine styles - Multiple ranges can overlap; styles are combined where they intersect (e.g., A1:C3 has bgColor, B2:D4 has bold → B2:C3 gets both)
+- [ ] I4: E2E tests for range modification behaviors
+
 ## Testing Strategy
 
 - Unit tests for range containment with various corner positions
