@@ -75,12 +75,12 @@ Phase 5 steps will be executed as part of the Range System plan. Once complete:
 
 Add toolbar button with dropdown to set cell borders (all borders, outline, top, bottom, left, right, no border).
 
-- [ ] 6a: Add "Borders" button to toolbar HTML with dropdown showing border options and preview icons
-- [ ] 6b: Implement `setCellBorder(col, row, borderSpec)` in wasm-data-source.ts that calls C++ style operation
-- [ ] 6c: Ensure C++ `setCellStyleAt` can update just the border property of CellStyle without affecting other properties
-- [ ] 6d: Create border-controls.ts module with BorderControls class to handle border button/dropdown interactions
-- [ ] 6e: Support applying borders to range selection (all cells in selection)
-- [ ] 6f: Add E2E tests for border operations via UI
+- [x] 6a: Add "Borders" button to toolbar HTML with dropdown showing border options and preview icons
+- [x] 6b: Implement `setCellBorder(col, row, borderSpec)` in wasm-data-source.ts that calls C++ style operation (using existing setCellStyleAt with border property)
+- [x] 6c: Ensure C++ `setCellStyleAt` can update just the border property of CellStyle without affecting other properties (added border JSON serialization/parsing)
+- [x] 6d: Create border-controls.ts module with BorderControls class to handle border button/dropdown interactions
+- [x] 6e: Support applying borders to range selection (all cells in selection)
+- [x] 6f: Add E2E tests for border operations via UI (borders.test.mjs)
 
 ## Phase 7: Implement Text Wrapping
 

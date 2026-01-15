@@ -3182,6 +3182,43 @@ canvas {
     transform: rotate(180deg);
 }
 
+/* Border Dropdown */
+.border-dropdown {
+    display: inline-flex;
+}
+
+.border-dropdown #border-btn {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+}
+
+.border-dropdown #border-btn svg:first-child {
+    width: 14px;
+    height: 14px;
+}
+
+.border-dropdown-menu {
+    left: auto;
+    right: 0;
+    min-width: 160px;
+}
+
+.border-dropdown-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+}
+
+.border-dropdown-menu .dropdown-item svg {
+    flex-shrink: 0;
+}
+
+.border-dropdown.open .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
 /* Alignment button groups */
 .align-btn-group {
     display: flex;

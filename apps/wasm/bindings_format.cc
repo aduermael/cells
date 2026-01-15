@@ -31,6 +31,7 @@
 #include "core/cells/input_parser.h"
 #include "core/cells/number_formatter.h"
 #include "core/cells/operation.h"
+#include "core/cells/style_registry.h"
 
 namespace cells::wasm {
 
@@ -467,6 +468,58 @@ std::string CellsEngine::makeFormatId(const std::string& category, int decimals,
 
 namespace {
 
+// Helper to convert BorderStyle enum to string
+std::string borderStyleToString(BorderStyle style) {
+    switch (style) {
+        case BorderStyle::THIN: return "thin";
+        case BorderStyle::MEDIUM: return "medium";
+        case BorderStyle::THICK: return "thick";
+        case BorderStyle::DASHED: return "dashed";
+        case BorderStyle::DOTTED: return "dotted";
+        case BorderStyle::DOUBLE: return "double";
+        case BorderStyle::HAIR: return "hair";
+        case BorderStyle::MEDIUM_DASHED: return "mediumDashed";
+        case BorderStyle::DASH_DOT: return "dashDot";
+        case BorderStyle::MEDIUM_DASH_DOT: return "mediumDashDot";
+        case BorderStyle::DASH_DOT_DOT: return "dashDotDot";
+        case BorderStyle::MEDIUM_DASH_DOT_DOT: return "mediumDashDotDot";
+        case BorderStyle::SLANT_DASH_DOT: return "slantDashDot";
+        default: return "none";
+    }
+}
+
+// Helper to convert string to BorderStyle enum
+BorderStyle stringToBorderStyle(const std::string& str) {
+    if (str == "thin") return BorderStyle::THIN;
+    if (str == "medium") return BorderStyle::MEDIUM;
+    if (str == "thick") return BorderStyle::THICK;
+    if (str == "dashed") return BorderStyle::DASHED;
+    if (str == "dotted") return BorderStyle::DOTTED;
+    if (str == "double") return BorderStyle::DOUBLE;
+    if (str == "hair") return BorderStyle::HAIR;
+    if (str == "mediumDashed") return BorderStyle::MEDIUM_DASHED;
+    if (str == "dashDot") return BorderStyle::DASH_DOT;
+    if (str == "mediumDashDot") return BorderStyle::MEDIUM_DASH_DOT;
+    if (str == "dashDotDot") return BorderStyle::DASH_DOT_DOT;
+    if (str == "mediumDashDotDot") return BorderStyle::MEDIUM_DASH_DOT_DOT;
+    if (str == "slantDashDot") return BorderStyle::SLANT_DASH_DOT;
+    return BorderStyle::NONE;
+}
+
+// Helper to serialize a border edge to JSON
+void serializeBorderEdge(std::ostringstream& ss, const std::string& name, const BorderEdge& edge, bool& first) {
+    if (edge.hasValue()) {
+        if (!first) ss << ",";
+        ss << "\"" << name << "\":{";
+        ss << "\"style\":\"" << borderStyleToString(edge.style) << "\"";
+        if (!edge.color.empty()) {
+            ss << ",\"color\":\"" << jsonEscape(edge.color) << "\"";
+        }
+        ss << "}";
+        first = false;
+    }
+}
+
 // Helper to serialize CellStyle to JSON (sparse representation - only non-default values)
 std::string styleToJson(const CellStyle& style) {
     std::ostringstream ss;
@@ -549,6 +602,18 @@ std::string styleToJson(const CellStyle& style) {
         ss << "\"";
         first = false;
     }
+    // Include border if any edge has a value
+    if (style.border.hasValue()) {
+        if (!first) ss << ",";
+        ss << "\"border\":{";
+        bool borderFirst = true;
+        serializeBorderEdge(ss, "top", style.border.top, borderFirst);
+        serializeBorderEdge(ss, "right", style.border.right, borderFirst);
+        serializeBorderEdge(ss, "bottom", style.border.bottom, borderFirst);
+        serializeBorderEdge(ss, "left", style.border.left, borderFirst);
+        ss << "}";
+        first = false;
+    }
 
     ss << "}";
     return ss.str();
@@ -606,6 +671,66 @@ int extractIntField(const std::string& json, const std::string& key, int default
     return negative ? -value : value;
 }
 
+// Helper to extract a nested border edge from JSON
+// Looking for pattern like: "top":{"style":"thin","color":"#000000"}
+BorderEdge extractBorderEdge(const std::string& json, const std::string& edgeName) {
+    BorderEdge edge;
+
+    // Look for "border":{...} section
+    std::string borderKey = "\"border\":";
+    size_t borderPos = json.find(borderKey);
+    if (borderPos == std::string::npos) {
+        return edge;
+    }
+
+    // Find the border object
+    size_t braceStart = json.find('{', borderPos + borderKey.length());
+    if (braceStart == std::string::npos) {
+        return edge;
+    }
+
+    // Find the matching closing brace
+    int braceCount = 1;
+    size_t braceEnd = braceStart + 1;
+    while (braceEnd < json.size() && braceCount > 0) {
+        if (json[braceEnd] == '{') braceCount++;
+        else if (json[braceEnd] == '}') braceCount--;
+        braceEnd++;
+    }
+
+    std::string borderJson = json.substr(braceStart, braceEnd - braceStart);
+
+    // Look for the edge within the border object
+    std::string edgeKey = "\"" + edgeName + "\":";
+    size_t edgePos = borderJson.find(edgeKey);
+    if (edgePos == std::string::npos) {
+        return edge;
+    }
+
+    // Find the edge object
+    size_t edgeBraceStart = borderJson.find('{', edgePos + edgeKey.length());
+    if (edgeBraceStart == std::string::npos) {
+        return edge;
+    }
+
+    int edgeBraceCount = 1;
+    size_t edgeBraceEnd = edgeBraceStart + 1;
+    while (edgeBraceEnd < borderJson.size() && edgeBraceCount > 0) {
+        if (borderJson[edgeBraceEnd] == '{') edgeBraceCount++;
+        else if (borderJson[edgeBraceEnd] == '}') edgeBraceCount--;
+        edgeBraceEnd++;
+    }
+
+    std::string edgeJson = borderJson.substr(edgeBraceStart, edgeBraceEnd - edgeBraceStart);
+
+    // Extract style and color from edge JSON
+    std::string styleStr = extractPayloadField(edgeJson, "style");
+    edge.style = stringToBorderStyle(styleStr);
+    edge.color = extractPayloadField(edgeJson, "color");
+
+    return edge;
+}
+
 // Helper to parse CellStyle from JSON
 CellStyle parseStyleJson(const std::string& json) {
     CellStyle style;
@@ -635,6 +760,14 @@ CellStyle parseStyleJson(const std::string& json) {
         style.vAlign = VerticalAlign::MIDDLE;
     } else {
         style.vAlign = VerticalAlign::BOTTOM;
+    }
+
+    // Parse border if present
+    if (hasJsonField(json, "border")) {
+        style.border.top = extractBorderEdge(json, "top");
+        style.border.right = extractBorderEdge(json, "right");
+        style.border.bottom = extractBorderEdge(json, "bottom");
+        style.border.left = extractBorderEdge(json, "left");
     }
 
     return style;
@@ -688,6 +821,26 @@ CellStyle mergeStyleJson(const CellStyle& baseStyle, const std::string& json) {
             style.vAlign = VerticalAlign::BOTTOM;
         }
     }
+    // Merge border properties if present
+    if (hasJsonField(json, "border")) {
+        BorderEdge topEdge = extractBorderEdge(json, "top");
+        BorderEdge rightEdge = extractBorderEdge(json, "right");
+        BorderEdge bottomEdge = extractBorderEdge(json, "bottom");
+        BorderEdge leftEdge = extractBorderEdge(json, "left");
+        // Only update edges that are specified in the JSON
+        if (topEdge.hasValue() || topEdge.style != BorderStyle::NONE) {
+            style.border.top = topEdge;
+        }
+        if (rightEdge.hasValue() || rightEdge.style != BorderStyle::NONE) {
+            style.border.right = rightEdge;
+        }
+        if (bottomEdge.hasValue() || bottomEdge.style != BorderStyle::NONE) {
+            style.border.bottom = bottomEdge;
+        }
+        if (leftEdge.hasValue() || leftEdge.style != BorderStyle::NONE) {
+            style.border.left = leftEdge;
+        }
+    }
 
     return style;
 }
@@ -725,6 +878,9 @@ CellStyle mergeStyles(const CellStyle& baseStyle, const CellStyle& newStyle,
     }
     if (hasJsonField(newStyleJson, "vAlign")) {
         result.vAlign = newStyle.vAlign;
+    }
+    if (hasJsonField(newStyleJson, "border")) {
+        result.border = newStyle.border;
     }
 
     return result;
@@ -765,6 +921,9 @@ std::pair<CellStyle, bool> stripConflictingProperties(const CellStyle& existingS
     if (hasJsonField(newStyleJson, "vAlign")) {
         result.vAlign = VerticalAlign::BOTTOM;
     }
+    if (hasJsonField(newStyleJson, "border")) {
+        result.border = CellBorder();  // Reset to default (no borders)
+    }
 
     return {result, result.isEmpty()};
 }
@@ -799,6 +958,9 @@ bool stylesHaveConflictingProperties(const std::string& styleJson1, const std::s
         return true;
     }
     if (hasJsonField(styleJson1, "vAlign") && hasJsonField(styleJson2, "vAlign")) {
+        return true;
+    }
+    if (hasJsonField(styleJson1, "border") && hasJsonField(styleJson2, "border")) {
         return true;
     }
     // No conflicting properties
@@ -884,6 +1046,11 @@ std::string getStylePropertiesJson(const CellStyle& style) {
         ss << "\"";
         first = false;
     }
+    if (style.border.hasValue()) {
+        if (!first) ss << ",";
+        ss << "\"border\":true";
+        first = false;
+    }
     ss << "}";
     return ss.str();
 }
@@ -925,6 +1092,9 @@ CellStyle stripMatchingStyleProperties(const CellStyle& cellStyle, const CellSty
     }
     if (hasJsonField(styleJson, "vAlign")) {
         result.vAlign = VerticalAlign::BOTTOM;
+    }
+    if (hasJsonField(styleJson, "border")) {
+        result.border = CellBorder();  // Reset to default (no borders)
     }
 
     return result;
@@ -1627,7 +1797,18 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
 
     // Execute split operations: delete old ranges, create new split ranges
     for (const SplitOperation& splitOp : splitOps) {
-        // Delete the old range
+        // IMPORTANT: Add a temporary reference to the old style BEFORE deleting the old range.
+        // When removeRange() is called, it releases the style reference. If the style's
+        // refcount drops to 0, it gets garbage collected before we can use it for the
+        // new split ranges. By adding a temp ref first, we keep the style alive during the split.
+        StyleRegistry* registry = _workbook->getStyleRegistry();
+        const bool needsTempRef = (registry != nullptr && !splitOp.oldStyleId.isNull() &&
+                                   !splitOp.newRects.empty());
+        if (needsTempRef) {
+            registry->addRef(splitOp.oldStyleId);
+        }
+
+        // Delete the old range (this releases one ref to the style)
         std::ostringstream removePayload;
         removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
         Operation removeOp = makeRangeRemoveOp(*_workbook, splitOp.oldRangeId, removePayload.str());
@@ -1719,6 +1900,12 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
             Operation newSetStyleOp =
                 makeRangeSetStyleOp(*_workbook, newRangeId, newStylePayload.str());
             applyOperation(*_workbook, newSetStyleOp);
+        }
+
+        // Release the temporary reference now that all split ranges have been created
+        // (setRangeStyleId added permanent refs for each new range)
+        if (needsTempRef) {
+            registry->release(splitOp.oldStyleId);
         }
     }
 

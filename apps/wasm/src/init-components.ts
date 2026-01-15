@@ -31,6 +31,7 @@ import { ClipboardManager } from "./clipboard";
 import { FormatControls } from "./format-controls";
 import { StyleControls } from "./style-controls";
 import { MergeControls } from "./merge-controls";
+import { BorderControls } from "./border-controls";
 import { NamedRangesDropdown } from "./named-ranges-dropdown";
 import { SheetTabsManager } from "./sheet-tabs";
 import { FileLoader } from "./file-loader";
@@ -796,6 +797,29 @@ export function createComponents(config: ComponentsConfig): Components {
       requestRender: render,
     }
   );
+
+  const borderControls = new BorderControls(
+    {
+      borderDropdown: elements.borderDropdown,
+      borderBtn: elements.borderBtn,
+      borderAllBtn: elements.borderAllBtn,
+      borderOuterBtn: elements.borderOuterBtn,
+      borderTopBtn: elements.borderTopBtn,
+      borderBottomBtn: elements.borderBottomBtn,
+      borderLeftBtn: elements.borderLeftBtn,
+      borderRightBtn: elements.borderRightBtn,
+      borderNoneBtn: elements.borderNoneBtn,
+    },
+    {
+      getSelectedCell: () => app.selectedCell,
+      getSelectionRange: () => ({
+        start: app.selectionStart,
+        end: app.selectionEnd,
+      }),
+      requestRender: render,
+    }
+  );
+
   elements.settingsBtn.addEventListener("click", () => {
     alert("Settings - Coming Soon!");
   });
@@ -870,6 +894,7 @@ export function createComponents(config: ComponentsConfig): Components {
       formatControls.setDataSource(dataSource);
       styleControls.setDataSource(dataSource);
       mergeControls.setDataSource(dataSource);
+      borderControls.setDataSource(dataSource);
       namedRangesDropdown.setDataSource(dataSource);
       workbookTitleEditor.setTitle(dataSource.workbookName);
     },

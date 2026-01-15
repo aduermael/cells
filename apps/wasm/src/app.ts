@@ -186,6 +186,16 @@ export interface DOMElements {
   mergeAllBtn: HTMLButtonElement;
   mergeHorizontalBtn: HTMLButtonElement;
   unmergeBtn: HTMLButtonElement;
+  // Border controls
+  borderDropdown: HTMLElement;
+  borderBtn: HTMLButtonElement;
+  borderAllBtn: HTMLButtonElement;
+  borderOuterBtn: HTMLButtonElement;
+  borderTopBtn: HTMLButtonElement;
+  borderBottomBtn: HTMLButtonElement;
+  borderLeftBtn: HTMLButtonElement;
+  borderRightBtn: HTMLButtonElement;
+  borderNoneBtn: HTMLButtonElement;
 }
 
 // =============================================================================
@@ -657,6 +667,16 @@ export function createApp(): App {
     mergeAllBtn: getElement<HTMLButtonElement>("merge-all-btn"),
     mergeHorizontalBtn: getElement<HTMLButtonElement>("merge-horizontal-btn"),
     unmergeBtn: getElement<HTMLButtonElement>("unmerge-btn"),
+    // Border controls
+    borderDropdown: getElement("border-dropdown"),
+    borderBtn: getElement<HTMLButtonElement>("border-btn"),
+    borderAllBtn: getElement<HTMLButtonElement>("border-all-btn"),
+    borderOuterBtn: getElement<HTMLButtonElement>("border-outer-btn"),
+    borderTopBtn: getElement<HTMLButtonElement>("border-top-btn"),
+    borderBottomBtn: getElement<HTMLButtonElement>("border-bottom-btn"),
+    borderLeftBtn: getElement<HTMLButtonElement>("border-left-btn"),
+    borderRightBtn: getElement<HTMLButtonElement>("border-right-btn"),
+    borderNoneBtn: getElement<HTMLButtonElement>("border-none-btn"),
   };
 
   return new App(elements);

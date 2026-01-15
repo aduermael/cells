@@ -291,6 +291,69 @@
                             </button>
                         </div>
                     </div>
+                    <div class="dropdown border-dropdown" id="border-dropdown">
+                        <button class="btn btn-icon btn-sm" id="border-btn" title="Borders">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="1"/>
+                            </svg>
+                            <svg class="dropdown-arrow" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M6 9l6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div class="dropdown-menu border-dropdown-menu">
+                            <button class="dropdown-item" id="border-all-btn" data-border="all">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18"/>
+                                    <line x1="12" y1="3" x2="12" y2="21"/>
+                                    <line x1="3" y1="12" x2="21" y2="12"/>
+                                </svg>
+                                All Borders
+                            </button>
+                            <button class="dropdown-item" id="border-outer-btn" data-border="outer">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18"/>
+                                </svg>
+                                Outline
+                            </button>
+                            <div class="dropdown-separator"></div>
+                            <button class="dropdown-item" id="border-top-btn" data-border="top">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="3" y1="3" x2="21" y2="3"/>
+                                    <rect x="3" y="3" width="18" height="18" stroke-opacity="0.3"/>
+                                </svg>
+                                Top Border
+                            </button>
+                            <button class="dropdown-item" id="border-bottom-btn" data-border="bottom">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="3" y1="21" x2="21" y2="21"/>
+                                    <rect x="3" y="3" width="18" height="18" stroke-opacity="0.3"/>
+                                </svg>
+                                Bottom Border
+                            </button>
+                            <button class="dropdown-item" id="border-left-btn" data-border="left">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="3" y1="3" x2="3" y2="21"/>
+                                    <rect x="3" y="3" width="18" height="18" stroke-opacity="0.3"/>
+                                </svg>
+                                Left Border
+                            </button>
+                            <button class="dropdown-item" id="border-right-btn" data-border="right">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="21" y1="3" x2="21" y2="21"/>
+                                    <rect x="3" y="3" width="18" height="18" stroke-opacity="0.3"/>
+                                </svg>
+                                Right Border
+                            </button>
+                            <div class="dropdown-separator"></div>
+                            <button class="dropdown-item" id="border-none-btn" data-border="none">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" stroke-opacity="0.3"/>
+                                    <line x1="4" y1="4" x2="20" y2="20"/>
+                                </svg>
+                                No Border
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="style-separator"></div>

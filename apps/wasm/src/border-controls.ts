@@ -1,0 +1,322 @@
+// =============================================================================
+// Border Controls
+// =============================================================================
+//
+// Toolbar UI for cell borders (all borders, outline, top, bottom, left, right, none).
+// Provides dropdown button for border operations.
+//
+// This is a UI-ONLY module. All data mutations go through CRDT operations
+// in the C++ core via the WASM bridge.
+//
+// =============================================================================
+
+import type { WasmDataSource } from "./wasm-data-source";
+import type { Position, BorderStyle, CellBorder } from "./types";
+
+// =============================================================================
+// Types
+// =============================================================================
+
+/** Border controls configuration - DOM element references */
+export interface BorderControlsConfig {
+  borderDropdown: HTMLElement;
+  borderBtn: HTMLButtonElement;
+  borderAllBtn: HTMLButtonElement;
+  borderOuterBtn: HTMLButtonElement;
+  borderTopBtn: HTMLButtonElement;
+  borderBottomBtn: HTMLButtonElement;
+  borderLeftBtn: HTMLButtonElement;
+  borderRightBtn: HTMLButtonElement;
+  borderNoneBtn: HTMLButtonElement;
+}
+
+/** Callback signatures */
+export interface BorderControlsCallbacks {
+  /** Get the currently selected cell position */
+  getSelectedCell: () => Position | null;
+  /** Get the current selection range (start and end) */
+  getSelectionRange: () => { start: Position | null; end: Position | null };
+  /** Request render after border operation */
+  requestRender: () => void;
+}
+
+/** Border type for dropdown actions */
+export type BorderType = "all" | "outer" | "top" | "bottom" | "left" | "right" | "none";
+
+// =============================================================================
+// BorderControls Class
+// =============================================================================
+
+/**
+ * BorderControls manages the border dropdown in the toolbar.
+ */
+export class BorderControls {
+  private borderDropdown: HTMLElement;
+  private borderBtn: HTMLButtonElement;
+  private borderAllBtn: HTMLButtonElement;
+  private borderOuterBtn: HTMLButtonElement;
+  private borderTopBtn: HTMLButtonElement;
+  private borderBottomBtn: HTMLButtonElement;
+  private borderLeftBtn: HTMLButtonElement;
+  private borderRightBtn: HTMLButtonElement;
+  private borderNoneBtn: HTMLButtonElement;
+
+  private dataSource: WasmDataSource | null = null;
+
+  private getSelectedCell: () => Position | null;
+  private getSelectionRange: () => { start: Position | null; end: Position | null };
+  private requestRender: () => void;
+
+  constructor(config: BorderControlsConfig, callbacks: BorderControlsCallbacks) {
+    this.borderDropdown = config.borderDropdown;
+    this.borderBtn = config.borderBtn;
+    this.borderAllBtn = config.borderAllBtn;
+    this.borderOuterBtn = config.borderOuterBtn;
+    this.borderTopBtn = config.borderTopBtn;
+    this.borderBottomBtn = config.borderBottomBtn;
+    this.borderLeftBtn = config.borderLeftBtn;
+    this.borderRightBtn = config.borderRightBtn;
+    this.borderNoneBtn = config.borderNoneBtn;
+
+    this.getSelectedCell = callbacks.getSelectedCell;
+    this.getSelectionRange = callbacks.getSelectionRange;
+    this.requestRender = callbacks.requestRender;
+
+    this.setupEventListeners();
+  }
+
+  /** Set the data source after WASM initialization */
+  setDataSource(dataSource: WasmDataSource): void {
+    this.dataSource = dataSource;
+  }
+
+  private setupEventListeners(): void {
+    // Toggle dropdown
+    this.borderBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.toggleDropdown();
+    });
+
+    // Border options
+    this.borderAllBtn.addEventListener("click", async () => {
+      await this.applyBorder("all");
+      this.closeDropdown();
+    });
+
+    this.borderOuterBtn.addEventListener("click", async () => {
+      await this.applyBorder("outer");
+      this.closeDropdown();
+    });
+
+    this.borderTopBtn.addEventListener("click", async () => {
+      await this.applyBorder("top");
+      this.closeDropdown();
+    });
+
+    this.borderBottomBtn.addEventListener("click", async () => {
+      await this.applyBorder("bottom");
+      this.closeDropdown();
+    });
+
+    this.borderLeftBtn.addEventListener("click", async () => {
+      await this.applyBorder("left");
+      this.closeDropdown();
+    });
+
+    this.borderRightBtn.addEventListener("click", async () => {
+      await this.applyBorder("right");
+      this.closeDropdown();
+    });
+
+    this.borderNoneBtn.addEventListener("click", async () => {
+      await this.applyBorder("none");
+      this.closeDropdown();
+    });
+
+    // Close dropdown on outside click
+    document.addEventListener("click", (e) => {
+      const target = e.target as Node;
+      if (!this.borderDropdown.contains(target)) {
+        this.closeDropdown();
+      }
+    });
+  }
+
+  private toggleDropdown(): void {
+    const isOpen = this.borderDropdown.classList.contains("open");
+    if (isOpen) {
+      this.closeDropdown();
+    } else {
+      this.borderDropdown.classList.add("open");
+    }
+  }
+
+  private closeDropdown(): void {
+    this.borderDropdown.classList.remove("open");
+  }
+
+  /**
+   * Create a border edge object with thin style and black color.
+   */
+  private createBorderEdge(): { style: BorderStyle; color: string } {
+    return { style: "thin" as BorderStyle, color: "#000000" };
+  }
+
+  /**
+   * Create a border object with no borders (all edges set to none).
+   */
+  private createNoBorderEdge(): { style: BorderStyle; color: string } {
+    return { style: "none" as BorderStyle, color: "" };
+  }
+
+  /**
+   * Apply borders to the current selection.
+   * Uses Range system for multi-cell selections (except outline which needs per-cell logic).
+   * Uses cell-level styling for single-cell selections.
+   */
+  private async applyBorder(borderType: BorderType): Promise<void> {
+    if (!this.dataSource) {
+      console.error("BorderControls: dataSource is null, cannot apply border");
+      return;
+    }
+
+    const { start, end } = this.getSelectionRange();
+    const cell = this.getSelectedCell();
+
+    // Check if this is a single cell or range selection
+    const isSingleCell =
+      !start || !end || (start.col === end.col && start.row === end.row);
+
+    if (isSingleCell) {
+      // Single cell: use cell-level styling
+      if (cell) {
+        await this.applySingleCellBorder(cell.col, cell.row, borderType);
+      }
+    } else {
+      // Range selection: use Range system where possible
+      const minCol = Math.min(start!.col, end!.col);
+      const maxCol = Math.max(start!.col, end!.col);
+      const minRow = Math.min(start!.row, end!.row);
+      const maxRow = Math.max(start!.row, end!.row);
+
+      await this.applyRangeBorder(minCol, minRow, maxCol, maxRow, borderType);
+    }
+
+    this.requestRender();
+  }
+
+  /**
+   * Apply border to a single cell.
+   */
+  private async applySingleCellBorder(
+    col: number,
+    row: number,
+    borderType: BorderType,
+  ): Promise<void> {
+    const edge = this.createBorderEdge();
+    const noEdge = this.createNoBorderEdge();
+
+    let border: CellBorder;
+
+    switch (borderType) {
+      case "all":
+      case "outer":
+        // For single cell, all and outer are the same
+        border = { top: edge, right: edge, bottom: edge, left: edge };
+        break;
+      case "none":
+        border = { top: noEdge, right: noEdge, bottom: noEdge, left: noEdge };
+        break;
+      case "top":
+        border = { top: edge, right: noEdge, bottom: noEdge, left: noEdge };
+        break;
+      case "bottom":
+        border = { top: noEdge, right: noEdge, bottom: edge, left: noEdge };
+        break;
+      case "left":
+        border = { top: noEdge, right: noEdge, bottom: noEdge, left: edge };
+        break;
+      case "right":
+        border = { top: noEdge, right: edge, bottom: noEdge, left: noEdge };
+        break;
+    }
+
+    await this.dataSource!.setCellStyleAt(col, row, { border });
+  }
+
+  /**
+   * Apply border to a range using the Range system.
+   * For uniform borders (all, none, single edges), uses setStyleForRange.
+   * For outline, falls back to per-cell logic since edge cells need different borders.
+   */
+  private async applyRangeBorder(
+    minCol: number,
+    minRow: number,
+    maxCol: number,
+    maxRow: number,
+    borderType: BorderType,
+  ): Promise<void> {
+    const edge = this.createBorderEdge();
+    const noEdge = this.createNoBorderEdge();
+
+    if (borderType === "outer") {
+      // Outline requires different borders on different cells - use per-cell logic
+      await this.applyOutlineBorder(minCol, minRow, maxCol, maxRow);
+      return;
+    }
+
+    // For uniform styles, use Range system
+    let border: CellBorder;
+
+    switch (borderType) {
+      case "all":
+        border = { top: edge, right: edge, bottom: edge, left: edge };
+        break;
+      case "none":
+        border = { top: noEdge, right: noEdge, bottom: noEdge, left: noEdge };
+        break;
+      case "top":
+        border = { top: edge, right: noEdge, bottom: noEdge, left: noEdge };
+        break;
+      case "bottom":
+        border = { top: noEdge, right: noEdge, bottom: edge, left: noEdge };
+        break;
+      case "left":
+        border = { top: noEdge, right: noEdge, bottom: noEdge, left: edge };
+        break;
+      case "right":
+        border = { top: noEdge, right: edge, bottom: noEdge, left: noEdge };
+        break;
+    }
+
+    // Use Range system for efficient range-based styling
+    await this.dataSource!.setStyleForRange(minCol, minRow, maxCol, maxRow, { border });
+  }
+
+  /**
+   * Apply outline border to a range.
+   * This requires per-cell logic since edge cells get different borders than interior cells.
+   * Only edge cells of the range get borders on their outer edges.
+   */
+  private async applyOutlineBorder(
+    minCol: number,
+    minRow: number,
+    maxCol: number,
+    maxRow: number,
+  ): Promise<void> {
+    const edge = this.createBorderEdge();
+    const noEdge = this.createNoBorderEdge();
+
+    for (let col = minCol; col <= maxCol; col++) {
+      for (let row = minRow; row <= maxRow; row++) {
+        const border: CellBorder = {
+          top: row === minRow ? edge : noEdge,
+          bottom: row === maxRow ? edge : noEdge,
+          left: col === minCol ? edge : noEdge,
+          right: col === maxCol ? edge : noEdge,
+        };
+        await this.dataSource!.setCellStyleAt(col, row, { border });
+      }
+    }
+  }
+}
