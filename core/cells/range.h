@@ -22,6 +22,8 @@
 
 #include <cstdint>
 
+#include <vector>
+
 #include "core/cells/types.h"
 
 namespace cells {
@@ -306,6 +308,125 @@ CornerDeleteResult adjustRangeForRowDeletion(Range& range, const ID& deletedRowI
     }
     range.endRowId = prevRow;
     return CornerDeleteResult::SHRUNK;
+}
+
+// =============================================================================
+// Rectangle Subtraction for Overlapping Range Styles
+// =============================================================================
+//
+// When applying a new range style with the same property as an existing range,
+// the overlapping area must be removed from the old range. This is done by
+// computing the "rectangle subtraction" A - B, which produces 0-4 non-overlapping
+// rectangles that represent the parts of A not covered by B.
+//
+// Example: Old range A (blue bgColor) and new range B (red bgColor) overlap.
+// After subtraction, A becomes 0-4 smaller rectangles with blue bgColor,
+// and B covers the overlapping area with red bgColor.
+//
+// These functions work with position-based rectangles (uint32_t coordinates).
+// The caller is responsible for converting Range UUID corners to positions
+// and creating new Range objects from the result rectangles.
+//
+
+// A simple rectangle defined by position coordinates (inclusive bounds)
+struct PositionRect {
+    uint32_t minCol{0};
+    uint32_t minRow{0};
+    uint32_t maxCol{0};
+    uint32_t maxRow{0};
+
+    // Check if this rectangle is valid (non-empty)
+    [[nodiscard]] bool isValid() const { return minCol <= maxCol && minRow <= maxRow; }
+
+    // Check if this rectangle overlaps with another
+    [[nodiscard]] bool overlaps(const PositionRect& other) const {
+        return minCol <= other.maxCol && maxCol >= other.minCol && minRow <= other.maxRow &&
+               maxRow >= other.minRow;
+    }
+};
+
+// Compute the rectangle subtraction A - B.
+// Returns a vector of 0-4 rectangles representing the parts of A not covered by B.
+//
+// If A and B don't overlap, returns a single rectangle equal to A.
+// If B completely covers A, returns an empty vector.
+// Otherwise, returns up to 4 rectangles (left, right, top, bottom strips).
+//
+// The algorithm prioritizes left/right strips (full height of A where applicable),
+// then top/bottom strips (clipped to not include left/right areas).
+//
+// Example:
+//   A = (0,0)-(10,10), B = (3,3)-(7,7)
+//   Result: Left (0,0)-(2,10), Right (8,0)-(10,10), Top (3,0)-(7,2), Bottom (3,8)-(7,10)
+//
+inline std::vector<PositionRect> subtractRectangle(const PositionRect& a, const PositionRect& b) {
+    std::vector<PositionRect> result;
+
+    // If no overlap, return A unchanged
+    if (!a.overlaps(b)) {
+        result.push_back(a);
+        return result;
+    }
+
+    // If B completely covers A, return empty
+    if (b.minCol <= a.minCol && b.maxCol >= a.maxCol && b.minRow <= a.minRow &&
+        b.maxRow >= a.maxRow) {
+        return result;  // Empty - A is fully covered
+    }
+
+    // Left strip: part of A to the left of B (full height of A)
+    if (b.minCol > a.minCol) {
+        PositionRect left;
+        left.minCol = a.minCol;
+        left.maxCol = b.minCol - 1;
+        left.minRow = a.minRow;
+        left.maxRow = a.maxRow;
+        if (left.isValid()) {
+            result.push_back(left);
+        }
+    }
+
+    // Right strip: part of A to the right of B (full height of A)
+    if (b.maxCol < a.maxCol) {
+        PositionRect right;
+        right.minCol = b.maxCol + 1;
+        right.maxCol = a.maxCol;
+        right.minRow = a.minRow;
+        right.maxRow = a.maxRow;
+        if (right.isValid()) {
+            result.push_back(right);
+        }
+    }
+
+    // Compute the horizontal overlap region (for top/bottom strips)
+    const uint32_t overlapMinCol = (b.minCol > a.minCol) ? b.minCol : a.minCol;
+    const uint32_t overlapMaxCol = (b.maxCol < a.maxCol) ? b.maxCol : a.maxCol;
+
+    // Top strip: part of A above B (clipped to overlap columns to avoid including left/right)
+    if (b.minRow > a.minRow) {
+        PositionRect top;
+        top.minCol = overlapMinCol;
+        top.maxCol = overlapMaxCol;
+        top.minRow = a.minRow;
+        top.maxRow = b.minRow - 1;
+        if (top.isValid()) {
+            result.push_back(top);
+        }
+    }
+
+    // Bottom strip: part of A below B (clipped to overlap columns)
+    if (b.maxRow < a.maxRow) {
+        PositionRect bottom;
+        bottom.minCol = overlapMinCol;
+        bottom.maxCol = overlapMaxCol;
+        bottom.minRow = b.maxRow + 1;
+        bottom.maxRow = a.maxRow;
+        if (bottom.isValid()) {
+            result.push_back(bottom);
+        }
+    }
+
+    return result;
 }
 
 }  // namespace cells

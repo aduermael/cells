@@ -426,5 +426,221 @@ TEST_F(CornerDeletionTest, UnrelatedColumnDelete) {
     EXPECT_EQ(result, CornerDeleteResult::UNCHANGED);
 }
 
+// =============================================================================
+// Rectangle Subtraction Tests
+// =============================================================================
+
+TEST(PositionRectTest, BasicOperations) {
+    PositionRect r1{0, 0, 5, 5};
+    EXPECT_TRUE(r1.isValid());
+
+    // Invalid rect (minCol > maxCol)
+    PositionRect invalid{5, 0, 3, 5};
+    EXPECT_FALSE(invalid.isValid());
+}
+
+TEST(PositionRectTest, Overlap) {
+    PositionRect r1{0, 0, 5, 5};
+    PositionRect r2{3, 3, 8, 8};
+
+    EXPECT_TRUE(r1.overlaps(r2));
+    EXPECT_TRUE(r2.overlaps(r1));
+
+    // Non-overlapping
+    PositionRect r3{10, 10, 15, 15};
+    EXPECT_FALSE(r1.overlaps(r3));
+
+    // Adjacent (touching but not overlapping)
+    PositionRect r4{6, 0, 10, 5};
+    EXPECT_FALSE(r1.overlaps(r4));
+}
+
+TEST(SubtractRectangleTest, NoOverlap) {
+    // A and B don't overlap - should return A unchanged
+    PositionRect a{0, 0, 5, 5};
+    PositionRect b{10, 10, 15, 15};
+
+    auto result = subtractRectangle(a, b);
+    ASSERT_EQ(result.size(), 1u);
+    EXPECT_EQ(result[0].minCol, 0u);
+    EXPECT_EQ(result[0].maxCol, 5u);
+    EXPECT_EQ(result[0].minRow, 0u);
+    EXPECT_EQ(result[0].maxRow, 5u);
+}
+
+TEST(SubtractRectangleTest, BCoversA) {
+    // B completely covers A - should return empty
+    PositionRect a{2, 2, 5, 5};
+    PositionRect b{0, 0, 10, 10};
+
+    auto result = subtractRectangle(a, b);
+    EXPECT_TRUE(result.empty());
+}
+
+TEST(SubtractRectangleTest, BInsideA) {
+    // B is inside A - should return 4 strips (left, right, top, bottom)
+    PositionRect a{0, 0, 10, 10};
+    PositionRect b{3, 3, 7, 7};
+
+    auto result = subtractRectangle(a, b);
+    ASSERT_EQ(result.size(), 4u);
+
+    // Find each strip by checking its bounds
+    bool foundLeft = false, foundRight = false, foundTop = false, foundBottom = false;
+    for (const auto& r : result) {
+        if (r.minCol == 0 && r.maxCol == 2 && r.minRow == 0 && r.maxRow == 10) {
+            foundLeft = true;  // Left strip: (0,0)-(2,10)
+        }
+        if (r.minCol == 8 && r.maxCol == 10 && r.minRow == 0 && r.maxRow == 10) {
+            foundRight = true;  // Right strip: (8,0)-(10,10)
+        }
+        if (r.minCol == 3 && r.maxCol == 7 && r.minRow == 0 && r.maxRow == 2) {
+            foundTop = true;  // Top strip: (3,0)-(7,2)
+        }
+        if (r.minCol == 3 && r.maxCol == 7 && r.minRow == 8 && r.maxRow == 10) {
+            foundBottom = true;  // Bottom strip: (3,8)-(7,10)
+        }
+    }
+    EXPECT_TRUE(foundLeft) << "Left strip not found";
+    EXPECT_TRUE(foundRight) << "Right strip not found";
+    EXPECT_TRUE(foundTop) << "Top strip not found";
+    EXPECT_TRUE(foundBottom) << "Bottom strip not found";
+}
+
+TEST(SubtractRectangleTest, BOverlapsCorner) {
+    // B overlaps top-left corner of A
+    // A: (0,0)-(10,10), B: (-5,-5)-(3,3) (but we use uint32, so B: (0,0)-(3,3))
+    PositionRect a{0, 0, 10, 10};
+    PositionRect b{0, 0, 3, 3};
+
+    auto result = subtractRectangle(a, b);
+    ASSERT_EQ(result.size(), 2u);
+
+    // Should have right strip and bottom strip
+    bool foundRight = false, foundBottom = false;
+    for (const auto& r : result) {
+        if (r.minCol == 4 && r.maxCol == 10 && r.minRow == 0 && r.maxRow == 10) {
+            foundRight = true;  // Right strip: (4,0)-(10,10)
+        }
+        if (r.minCol == 0 && r.maxCol == 3 && r.minRow == 4 && r.maxRow == 10) {
+            foundBottom = true;  // Bottom strip: (0,4)-(3,10)
+        }
+    }
+    EXPECT_TRUE(foundRight) << "Right strip not found";
+    EXPECT_TRUE(foundBottom) << "Bottom strip not found";
+}
+
+TEST(SubtractRectangleTest, BOverlapsBottomRight) {
+    // B overlaps bottom-right corner of A
+    PositionRect a{0, 0, 10, 10};
+    PositionRect b{7, 7, 15, 15};
+
+    auto result = subtractRectangle(a, b);
+    ASSERT_EQ(result.size(), 2u);
+
+    // Should have left strip and top strip
+    bool foundLeft = false, foundTop = false;
+    for (const auto& r : result) {
+        if (r.minCol == 0 && r.maxCol == 6 && r.minRow == 0 && r.maxRow == 10) {
+            foundLeft = true;  // Left strip: (0,0)-(6,10)
+        }
+        if (r.minCol == 7 && r.maxCol == 10 && r.minRow == 0 && r.maxRow == 6) {
+            foundTop = true;  // Top strip: (7,0)-(10,6)
+        }
+    }
+    EXPECT_TRUE(foundLeft) << "Left strip not found";
+    EXPECT_TRUE(foundTop) << "Top strip not found";
+}
+
+TEST(SubtractRectangleTest, VerticalStrip) {
+    // B is a vertical stripe through the middle of A
+    PositionRect a{0, 0, 10, 10};
+    PositionRect b{4, 0, 6, 10};
+
+    auto result = subtractRectangle(a, b);
+    ASSERT_EQ(result.size(), 2u);
+
+    // Should have left strip and right strip (no top/bottom since B spans full height)
+    bool foundLeft = false, foundRight = false;
+    for (const auto& r : result) {
+        if (r.minCol == 0 && r.maxCol == 3 && r.minRow == 0 && r.maxRow == 10) {
+            foundLeft = true;
+        }
+        if (r.minCol == 7 && r.maxCol == 10 && r.minRow == 0 && r.maxRow == 10) {
+            foundRight = true;
+        }
+    }
+    EXPECT_TRUE(foundLeft);
+    EXPECT_TRUE(foundRight);
+}
+
+TEST(SubtractRectangleTest, HorizontalStrip) {
+    // B is a horizontal stripe through the middle of A
+    PositionRect a{0, 0, 10, 10};
+    PositionRect b{0, 4, 10, 6};
+
+    auto result = subtractRectangle(a, b);
+    ASSERT_EQ(result.size(), 2u);
+
+    // Should have top strip and bottom strip (no left/right since B spans full width)
+    bool foundTop = false, foundBottom = false;
+    for (const auto& r : result) {
+        if (r.minCol == 0 && r.maxCol == 10 && r.minRow == 0 && r.maxRow == 3) {
+            foundTop = true;
+        }
+        if (r.minCol == 0 && r.maxCol == 10 && r.minRow == 7 && r.maxRow == 10) {
+            foundBottom = true;
+        }
+    }
+    EXPECT_TRUE(foundTop);
+    EXPECT_TRUE(foundBottom);
+}
+
+TEST(SubtractRectangleTest, RealWorldExample) {
+    // From the plan: Blue B2:D8 (1,1 - 3,7), Red C4:D10 (2,3 - 3,9)
+    // Blue range should split into:
+    // - Left strip: B2:B8 (1,1 - 1,7)
+    // - Top strip: C2:D3 (2,1 - 3,2)
+    PositionRect blue{1, 1, 3, 7};  // B2:D8 as 0-indexed positions
+    PositionRect red{2, 3, 3, 9};   // C4:D10 as 0-indexed positions
+
+    auto result = subtractRectangle(blue, red);
+
+    // Blue should produce 2 rectangles (left and top, no right/bottom since red extends beyond)
+    ASSERT_EQ(result.size(), 2u);
+
+    bool foundLeft = false, foundTop = false;
+    for (const auto& r : result) {
+        // Left strip: column 1 (B), rows 1-7
+        if (r.minCol == 1 && r.maxCol == 1 && r.minRow == 1 && r.maxRow == 7) {
+            foundLeft = true;
+        }
+        // Top strip: columns 2-3 (C-D), rows 1-2
+        if (r.minCol == 2 && r.maxCol == 3 && r.minRow == 1 && r.maxRow == 2) {
+            foundTop = true;
+        }
+    }
+    EXPECT_TRUE(foundLeft) << "Left strip (B2:B8) not found";
+    EXPECT_TRUE(foundTop) << "Top strip (C2:D3) not found";
+}
+
+TEST(SubtractRectangleTest, SingleCellRanges) {
+    // Single cell A overlapped by larger B
+    PositionRect a{5, 5, 5, 5};
+    PositionRect b{4, 4, 6, 6};
+
+    auto result = subtractRectangle(a, b);
+    EXPECT_TRUE(result.empty());  // A is completely covered
+
+    // Single cell A with adjacent single cell B (no overlap)
+    PositionRect a2{5, 5, 5, 5};
+    PositionRect b2{6, 5, 6, 5};
+
+    auto result2 = subtractRectangle(a2, b2);
+    ASSERT_EQ(result2.size(), 1u);
+    EXPECT_EQ(result2[0].minCol, 5u);
+    EXPECT_EQ(result2[0].maxCol, 5u);
+}
+
 }  // namespace
 }  // namespace cells

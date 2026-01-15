@@ -234,10 +234,10 @@ Complex behaviors for how ranges interact with cell operations and each other.
 
 - [x] I1: Range edge adjustment on column/row deletion - When deleting a column/row that is a range's corner, shrink the range to the adjacent column/row; if the range becomes invalid (single-col/row), remove it. Integrated `adjustRangeForColumnDeletion` and `adjustRangeForRowDeletion` into `applyColDelete`/`applyRowDelete` CRDT operations. Added 7 unit tests in `crdt_test.cc`.
 - [x] I2: Range style clears cell styles - Added `stripMatchingStyleProperties()` helper and integrated into `setRangeStyle()` in bindings_format.cc. When applying a range style, cells within the range have matching style properties cleared (or entire cell style removed if all properties match). This avoids redundant cell-level styles.
-- [ ] I3: Overlapping ranges - rectangle splitting **(REVISED)** - Original approach (layer ranges and merge at render time) was incorrect. When applying a new range style with the **same property** as an existing range, the old range must be **split** to avoid overlap. See Phase J for the correct implementation.
+- [x] I3: Overlapping ranges - rectangle splitting **(REVISED)** - Implemented via Phase J. Original approach (layer ranges and merge at render time) was incorrect. When applying a new range style with the **same property** as an existing range, the old range is now **split** to avoid overlap. Different properties (e.g., bgColor + textColor) can layer without splitting.
 - [x] I4: E2E tests for range modification behaviors - Added 3 tests to `range-styles.test.mjs`: "Range style provides correct rendering" (I2), "Overlapping ranges combine styles" (I3), "Range creation and rendering works" (I1). Also updated `deleteColumnById`/`deleteRowById` to use CRDT operations so range adjustment is triggered.
 
-### Phase J: Rectangle Splitting for Overlapping Range Styles
+### Phase J: Rectangle Splitting for Overlapping Range Styles ✓ COMPLETE
 
 **Problem**: When user applies red bgColor to C4:D10, and blue bgColor already exists at B2:D8, the overlapping cells (C4:D8) should become red. The blue range must be split to avoid having two bgColor values for the same cells.
 
@@ -281,11 +281,11 @@ Result can be 0-4 rectangles:
 - **Different properties** (one bgColor, one bold): Layer - overlap OK, merge at render
 
 **Steps**:
-- [ ] J1: Implement `subtractRectangle(oldRange, newRange)` → vector of up to 4 rectangles
-- [ ] J2: In `setRangeStyle`, before creating new range, find and split overlapping ranges with same properties
-- [ ] J3: Update CRDT operations to handle range splitting (may need RANGE_SPLIT op or multiple RANGE_ADD/RANGE_REMOVE)
-- [ ] J4: E2E test: apply blue, apply overlapping red, move red cell → should reveal white not blue
-- [ ] J5: E2E test: apply bgColor range, apply overlapping bold range → both should render (different properties OK)
+- [x] J1: Implement `subtractRectangle(oldRange, newRange)` → vector of up to 4 rectangles - Added `PositionRect` struct and `subtractRectangle()` function to range.h with 12 unit tests
+- [x] J2: In `setRangeStyle`, before creating new range, find and split overlapping ranges with same properties - Implemented in bindings_format.cc with helper functions `stylesHaveConflictingProperties()` and `getStylePropertiesJson()`
+- [x] J3: Update CRDT operations to handle range splitting (may need RANGE_SPLIT op or multiple RANGE_ADD/RANGE_REMOVE) - Uses existing RANGE_ADD/RANGE_REMOVE ops; split ranges inherit original style
+- [x] J4: E2E test: apply blue, apply overlapping red, move red cell → should reveal white not blue - Added "Overlapping ranges with same property splits the old range" test verifying rectangle splitting
+- [x] J5: E2E test: apply bgColor range, apply overlapping bold range → both should render (different properties OK) - Added "Overlapping ranges with different properties can layer" test verifying non-conflicting properties don't trigger split
 
 ## Testing Strategy
 

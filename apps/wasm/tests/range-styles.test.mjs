@@ -405,47 +405,49 @@ const tests = {
     assertTrue(hasRange, 'Should have a style range covering B2:C3');
   },
 
-  // I3: Overlapping ranges combine styles
-  'Overlapping ranges combine styles': async (ctx) => {
+  // J4: Overlapping ranges with same property - new range replaces overlap area
+  // When applying red to C3:E5 over existing blue at B2:D4, the overlap area (C3:D4)
+  // should become red, and the blue range should be split to not overlap.
+  'Overlapping ranges with same property splits the old range': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
     const blueColor = '#3B82F6';  // Blue 500
-    const greenColor = '#10B981'; // Green 500
+    const redColor = '#EF4444';   // Red 500
 
-    // Apply blue background to B2:D4
+    // Apply blue background to B2:D4 (cols 1-3, rows 1-3)
     await selectRange(ctx.page, 'B2', 'D4');
     await sleep(100);
     await applyBackgroundColor(ctx.page, blueColor);
     await sleep(300);
 
-    // Apply green background to C3:E5 (overlaps with B2:D4 at C3:D4)
+    // Apply red background to C3:E5 (cols 2-4, rows 2-4)
+    // This overlaps with B2:D4 at C3:D4 (cols 2-3, rows 2-3)
     await selectRange(ctx.page, 'C3', 'E5');
     await sleep(100);
-    await applyBackgroundColor(ctx.page, greenColor);
+    await applyBackgroundColor(ctx.page, redColor);
     await sleep(300);
 
     // Click elsewhere to deselect
     await clickCell(ctx.page, 'A1');
     await sleep(100);
 
-    // Get style ranges to verify both exist
+    // Get style ranges to verify the split happened
     const styleRanges = await ctx.page.evaluate(() => {
       const ctx = window._appContext;
       if (!ctx || !ctx.app) return [];
       return ctx.app.styleRanges || [];
     });
 
-    console.log('Style ranges:', JSON.stringify(styleRanges, null, 2));
+    console.log('Style ranges after split:', JSON.stringify(styleRanges, null, 2));
 
-    // Should have at least 2 style ranges
-    assertTrue(
-      styleRanges.length >= 2,
-      `Expected at least 2 style ranges for overlapping test, got ${styleRanges.length}`
-    );
+    // The blue range should have been split into non-overlapping parts
+    // Original blue B2:D4 minus C3:E5 intersection produces:
+    // - Left strip: B2:B4 (col 1, rows 1-3)
+    // - Top strip: C2:D2 (cols 2-3, row 1)
+    // Plus the red range at C3:E5
 
-    // Check the intersection area (C3:D4) - it should show the first style (blue)
-    // since we merge with first range's properties taking precedence
+    // Check the overlap area C3 - should now be RED (new range wins)
     const posC3 = await getCellPosition(ctx.page, 2, 2);
     const pixelC3 = await getPixelColor(
       ctx.page,
@@ -453,40 +455,196 @@ const tests = {
       posC3.y + posC3.height / 2
     );
 
-    // In the intersection, the first range's bgColor should win (blue from B2:D4)
-    // because it was applied first and our merge function keeps first value
     console.log(`C3 pixel color: r=${pixelC3?.r}, g=${pixelC3?.g}, b=${pixelC3?.b}`);
     assertTrue(
-      isColorApproximately(pixelC3, blueColor, 30) || isColorApproximately(pixelC3, greenColor, 30),
-      `C3 (intersection) should have either blue or green background`
+      isColorApproximately(pixelC3, redColor, 30),
+      `C3 (overlap area) should have RED background after new range applied (got r=${pixelC3?.r}, g=${pixelC3?.g}, b=${pixelC3?.b})`
     );
 
-    // Check E5 - should only have green (only covered by second range)
+    // Check D4 (also in overlap) - should be RED
+    const posD4 = await getCellPosition(ctx.page, 3, 3);
+    const pixelD4 = await getPixelColor(
+      ctx.page,
+      posD4.x + posD4.width / 2,
+      posD4.y + posD4.height / 2
+    );
+    console.log(`D4 pixel color: r=${pixelD4?.r}, g=${pixelD4?.g}, b=${pixelD4?.b}`);
+    assertTrue(
+      isColorApproximately(pixelD4, redColor, 30),
+      `D4 (overlap area) should have RED background`
+    );
+
+    // Check E5 - should have RED (only in red range)
     const posE5 = await getCellPosition(ctx.page, 4, 4);
     const pixelE5 = await getPixelColor(
       ctx.page,
       posE5.x + posE5.width / 2,
       posE5.y + posE5.height / 2
     );
-
     console.log(`E5 pixel color: r=${pixelE5?.r}, g=${pixelE5?.g}, b=${pixelE5?.b}`);
     assertTrue(
-      isColorApproximately(pixelE5, greenColor, 30),
-      `E5 (non-overlapping, green range only) should have green background`
+      isColorApproximately(pixelE5, redColor, 30),
+      `E5 (red range only) should have RED background`
     );
 
-    // Check B2 - should only have blue (only covered by first range)
+    // Check B2 - should still have BLUE (in split blue range)
     const posB2 = await getCellPosition(ctx.page, 1, 1);
     const pixelB2 = await getPixelColor(
       ctx.page,
       posB2.x + posB2.width / 2,
       posB2.y + posB2.height / 2
     );
-
     console.log(`B2 pixel color: r=${pixelB2?.r}, g=${pixelB2?.g}, b=${pixelB2?.b}`);
     assertTrue(
       isColorApproximately(pixelB2, blueColor, 30),
-      `B2 (non-overlapping, blue range only) should have blue background`
+      `B2 (split blue range) should have BLUE background`
+    );
+
+    // Check C2 - should still have BLUE (in split blue range - top strip)
+    const posC2 = await getCellPosition(ctx.page, 2, 1);
+    const pixelC2 = await getPixelColor(
+      ctx.page,
+      posC2.x + posC2.width / 2,
+      posC2.y + posC2.height / 2
+    );
+    console.log(`C2 pixel color: r=${pixelC2?.r}, g=${pixelC2?.g}, b=${pixelC2?.b}`);
+    assertTrue(
+      isColorApproximately(pixelC2, blueColor, 30),
+      `C2 (split blue range - top) should have BLUE background`
+    );
+
+    // Check B4 - should still have BLUE (in split blue range - left strip)
+    const posB4 = await getCellPosition(ctx.page, 1, 3);
+    const pixelB4 = await getPixelColor(
+      ctx.page,
+      posB4.x + posB4.width / 2,
+      posB4.y + posB4.height / 2
+    );
+    console.log(`B4 pixel color: r=${pixelB4?.r}, g=${pixelB4?.g}, b=${pixelB4?.b}`);
+    assertTrue(
+      isColorApproximately(pixelB4, blueColor, 30),
+      `B4 (split blue range - left) should have BLUE background`
+    );
+  },
+
+  // J5: Overlapping ranges with DIFFERENT properties can layer (no splitting)
+  // When applying textColor to an overlapping range, bgColor range should NOT be split
+  'Overlapping ranges with different properties can layer': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const blueColor = '#3B82F6';  // Blue 500 for background
+    const redColor = '#EF4444';   // Red 500 for text color
+
+    // Apply blue background to B2:D4 (cols 1-3, rows 1-3)
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, blueColor);
+    await sleep(300);
+
+    // Get style ranges after first application
+    const rangesAfterFirst = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app) return [];
+      return ctx.app.styleRanges || [];
+    });
+    console.log('Style ranges after blue background:', JSON.stringify(rangesAfterFirst, null, 2));
+
+    // Apply red TEXT color to C3:E5 (cols 2-4, rows 2-4) - different property!
+    await selectRange(ctx.page, 'C3', 'E5');
+    await sleep(100);
+
+    // Click the text color button to open the color picker popup
+    await ctx.page.click('#style-text-color-btn');
+    await sleep(100);
+    const textColorSelector = `#text-color-popup .color-option[data-color="${redColor.toUpperCase()}"]`;
+    const hasTextColor = await ctx.page.$(textColorSelector);
+    if (hasTextColor) {
+      await ctx.page.click(textColorSelector);
+    } else {
+      // Use the hex input field if the color isn't in the palette
+      const hexInput = await ctx.page.$('#text-color-popup .color-hex-input');
+      if (hexInput) {
+        await hexInput.click({ clickCount: 3 });
+        await ctx.page.keyboard.type(redColor);
+        await ctx.page.keyboard.press('Enter');
+      }
+    }
+    await sleep(300);
+
+    // Get style ranges after second application
+    const rangesAfterSecond = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app) return [];
+      return ctx.app.styleRanges || [];
+    });
+    console.log('Style ranges after text color:', JSON.stringify(rangesAfterSecond, null, 2));
+
+    // Click elsewhere to deselect
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // The blue background range should NOT have been split (different property)
+    // We should have:
+    // 1. The original B2:D4 background range (unchanged)
+    // 2. The new C3:E5 text color range
+
+    // Verify blue background is still visible at B2
+    const posB2 = await getCellPosition(ctx.page, 1, 1);
+    const pixelB2 = await getPixelColor(
+      ctx.page,
+      posB2.x + posB2.width / 2,
+      posB2.y + posB2.height / 2
+    );
+    console.log(`B2 pixel color: r=${pixelB2?.r}, g=${pixelB2?.g}, b=${pixelB2?.b}`);
+    assertTrue(
+      isColorApproximately(pixelB2, blueColor, 30),
+      `B2 should have BLUE background`
+    );
+
+    // The overlap area C3 should ALSO have blue background (both ranges apply)
+    // The text color range doesn't override the background color range
+    const posC3 = await getCellPosition(ctx.page, 2, 2);
+    const pixelC3 = await getPixelColor(
+      ctx.page,
+      posC3.x + posC3.width / 2,
+      posC3.y + posC3.height / 2
+    );
+    console.log(`C3 pixel color (overlap): r=${pixelC3?.r}, g=${pixelC3?.g}, b=${pixelC3?.b}`);
+    assertTrue(
+      isColorApproximately(pixelC3, blueColor, 30),
+      `C3 (overlap) should still have BLUE background (text color is different property)`
+    );
+
+    // E5 should NOT have blue background (only text color range, no background)
+    const posE5 = await getCellPosition(ctx.page, 4, 4);
+    const pixelE5 = await getPixelColor(
+      ctx.page,
+      posE5.x + posE5.width / 2,
+      posE5.y + posE5.height / 2
+    );
+    console.log(`E5 pixel color: r=${pixelE5?.r}, g=${pixelE5?.g}, b=${pixelE5?.b}`);
+    // E5 should have default background (white or gray), not blue
+    assertTrue(
+      !isColorApproximately(pixelE5, blueColor, 30),
+      `E5 should NOT have blue background (only covered by text color range)`
+    );
+
+    // Verify both ranges still exist (bgColor range was NOT split)
+    const bgColorRanges = rangesAfterSecond.filter(r => r.style && r.style.bgColor);
+    const textColorRanges = rangesAfterSecond.filter(r => r.style && r.style.textColor);
+
+    // We should have 1 bgColor range (not split) and 1 textColor range
+    console.log(`bgColor ranges: ${bgColorRanges.length}, textColor ranges: ${textColorRanges.length}`);
+
+    // The original B2:D4 bgColor range should still exist as-is (not split)
+    const originalBgRange = bgColorRanges.find(r =>
+      r.startCol === 1 && r.startRow === 1 &&
+      r.endCol === 3 && r.endRow === 3
+    );
+    assertTrue(
+      originalBgRange !== undefined,
+      'Original B2:D4 bgColor range should NOT have been split (different properties can layer)'
     );
   },
 

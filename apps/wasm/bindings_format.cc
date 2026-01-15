@@ -22,6 +22,7 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/range.h"
+#include "core/cells/range_index.h"
 #include "core/cells/format_code_formatter.h"
 #include "core/cells/format_code_parser.h"
 #include "core/cells/formula_functions.h"
@@ -645,6 +646,125 @@ CellStyle mergeStyleJson(const CellStyle& baseStyle, const std::string& json) {
     return style;
 }
 
+// Helper to check if two style JSONs have conflicting properties (same property set in both).
+// Returns true if at least one property is set in both styles (they would overlap).
+// Used to determine if existing range styles need to be split when a new range style is applied.
+bool stylesHaveConflictingProperties(const std::string& styleJson1, const std::string& styleJson2) {
+    // Check each style property - if both styles set the same property, they conflict
+    if (hasJsonField(styleJson1, "bgColor") && hasJsonField(styleJson2, "bgColor")) {
+        return true;
+    }
+    if (hasJsonField(styleJson1, "textColor") && hasJsonField(styleJson2, "textColor")) {
+        return true;
+    }
+    if (hasJsonField(styleJson1, "bold") && hasJsonField(styleJson2, "bold")) {
+        return true;
+    }
+    if (hasJsonField(styleJson1, "italic") && hasJsonField(styleJson2, "italic")) {
+        return true;
+    }
+    if (hasJsonField(styleJson1, "underline") && hasJsonField(styleJson2, "underline")) {
+        return true;
+    }
+    if (hasJsonField(styleJson1, "fontFamily") && hasJsonField(styleJson2, "fontFamily")) {
+        return true;
+    }
+    if (hasJsonField(styleJson1, "fontSize") && hasJsonField(styleJson2, "fontSize")) {
+        return true;
+    }
+    if (hasJsonField(styleJson1, "hAlign") && hasJsonField(styleJson2, "hAlign")) {
+        return true;
+    }
+    if (hasJsonField(styleJson1, "vAlign") && hasJsonField(styleJson2, "vAlign")) {
+        return true;
+    }
+    // No conflicting properties
+    return false;
+}
+
+// Helper to check which properties are set in a CellStyle (compared to default).
+// Returns a JSON-like string of the set properties (used for conflict detection).
+std::string getStylePropertiesJson(const CellStyle& style) {
+    std::ostringstream ss;
+    ss << "{";
+    bool first = true;
+    if (style.bold) {
+        if (!first) ss << ",";
+        ss << "\"bold\":true";
+        first = false;
+    }
+    if (style.italic) {
+        if (!first) ss << ",";
+        ss << "\"italic\":true";
+        first = false;
+    }
+    if (style.underline) {
+        if (!first) ss << ",";
+        ss << "\"underline\":true";
+        first = false;
+    }
+    if (!style.bgColor.empty()) {
+        if (!first) ss << ",";
+        ss << "\"bgColor\":\"" << style.bgColor << "\"";
+        first = false;
+    }
+    if (!style.textColor.empty()) {
+        if (!first) ss << ",";
+        ss << "\"textColor\":\"" << style.textColor << "\"";
+        first = false;
+    }
+    if (!style.fontFamily.empty()) {
+        if (!first) ss << ",";
+        ss << "\"fontFamily\":\"" << style.fontFamily << "\"";
+        first = false;
+    }
+    if (style.fontSize != 0) {
+        if (!first) ss << ",";
+        ss << "\"fontSize\":" << static_cast<int>(style.fontSize);
+        first = false;
+    }
+    if (style.hAlign != TextAlign::GENERAL) {
+        if (!first) ss << ",";
+        ss << "\"hAlign\":\"";
+        switch (style.hAlign) {
+            case TextAlign::LEFT:
+                ss << "left";
+                break;
+            case TextAlign::CENTER:
+                ss << "center";
+                break;
+            case TextAlign::RIGHT:
+                ss << "right";
+                break;
+            case TextAlign::JUSTIFY:
+                ss << "justify";
+                break;
+            default:
+                break;
+        }
+        ss << "\"";
+        first = false;
+    }
+    if (style.vAlign != VerticalAlign::BOTTOM) {
+        if (!first) ss << ",";
+        ss << "\"vAlign\":\"";
+        switch (style.vAlign) {
+            case VerticalAlign::TOP:
+                ss << "top";
+                break;
+            case VerticalAlign::MIDDLE:
+                ss << "middle";
+                break;
+            default:
+                break;
+        }
+        ss << "\"";
+        first = false;
+    }
+    ss << "}";
+    return ss.str();
+}
+
 // Helper to strip style properties covered by a range style from a cell style.
 // When a range style sets a property, that property is cleared from cells within the range
 // to avoid redundancy (the range will provide the style, cell-level overrides are removed).
@@ -1173,6 +1293,183 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
 
     if (styleId.isNull()) {
         return "{\"error\":\"Empty style\"}";
+    }
+
+    // =========================================================================
+    // Split overlapping ranges with conflicting properties (J2/J3)
+    // =========================================================================
+    // Before creating the new range, find all existing style ranges that overlap
+    // and have conflicting properties (same property type). Split them to avoid
+    // having overlapping ranges with the same property.
+
+    // Query for overlapping style ranges using the R-tree index
+    std::vector<Range*> overlappingRanges;
+    const RangeIndex* rangeIndex = sheet->getRangeIndex();
+    if (rangeIndex) {
+        overlappingRanges = rangeIndex->queryRange(minCol, minRow, maxCol, maxRow, RangeFlags::STYLE);
+    }
+
+    // The new range's rectangle
+    PositionRect newRect{minCol, minRow, maxCol, maxRow};
+
+    // Track ranges to delete and create (we can't modify while iterating)
+    struct SplitOperation {
+        ID oldRangeId;
+        ID oldStyleId;
+        std::vector<PositionRect> newRects;
+    };
+    std::vector<SplitOperation> splitOps;
+
+    for (Range* existingRange : overlappingRanges) {
+        if (!existingRange || !existingRange->hasFlag(RangeFlags::STYLE)) {
+            continue;
+        }
+
+        // Get the existing range's style
+        ID existingStyleId = sheet->getRangeStyleId(existingRange->id);
+        if (existingStyleId.isNull()) {
+            continue;
+        }
+
+        const CellStyle* existingStyle = _workbook->getStyle(existingStyleId);
+        if (!existingStyle) {
+            continue;
+        }
+
+        // Check if the existing style has conflicting properties with the new style
+        std::string existingStyleJson = getStylePropertiesJson(*existingStyle);
+        if (!stylesHaveConflictingProperties(styleJson, existingStyleJson)) {
+            // No conflict - different properties, can layer (skip splitting)
+            continue;
+        }
+
+        // Get the existing range's position bounds
+        const Axis* existingStartCol = sheet->getColumn(existingRange->startColId);
+        const Axis* existingStartRow = sheet->getRow(existingRange->startRowId);
+        const Axis* existingEndCol = sheet->getColumn(existingRange->endColId);
+        const Axis* existingEndRow = sheet->getRow(existingRange->endRowId);
+
+        if (!existingStartCol || !existingStartRow || !existingEndCol || !existingEndRow) {
+            continue;
+        }
+
+        PositionRect existingRect{
+            std::min(existingStartCol->position, existingEndCol->position),
+            std::min(existingStartRow->position, existingEndRow->position),
+            std::max(existingStartCol->position, existingEndCol->position),
+            std::max(existingStartRow->position, existingEndRow->position)};
+
+        // Check if they actually overlap
+        if (!existingRect.overlaps(newRect)) {
+            continue;
+        }
+
+        // Compute rectangle subtraction: existingRect - newRect
+        std::vector<PositionRect> splitRects = subtractRectangle(existingRect, newRect);
+
+        // Record this split operation
+        SplitOperation op;
+        op.oldRangeId = existingRange->id;
+        op.oldStyleId = existingStyleId;
+        op.newRects = std::move(splitRects);
+        splitOps.push_back(std::move(op));
+    }
+
+    // Execute split operations: delete old ranges, create new split ranges
+    for (const SplitOperation& splitOp : splitOps) {
+        // Delete the old range
+        std::ostringstream removePayload;
+        removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
+        Operation removeOp = makeRangeRemoveOp(*_workbook, splitOp.oldRangeId, removePayload.str());
+        applyOperation(*_workbook, removeOp);
+
+        // Create new ranges for each split rectangle
+        for (const PositionRect& rect : splitOp.newRects) {
+            // Find or create column/row IDs for the rectangle corners
+            ID rectStartColId, rectEndColId, rectStartRowId, rectEndRowId;
+
+            // Find start column
+            for (const auto& [id, axis] : sheet->columns) {
+                if (axis->position == rect.minCol) {
+                    rectStartColId = id;
+                    break;
+                }
+            }
+            if (rectStartColId.isNull()) {
+                rectStartColId = generate_id();
+                std::string payload = "{\"pos\":" + std::to_string(rect.minCol) +
+                                      ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+                Operation op = makeColInsertOp(*_workbook, rectStartColId, payload);
+                applyOperation(*_workbook, op);
+            }
+
+            // Find end column
+            for (const auto& [id, axis] : sheet->columns) {
+                if (axis->position == rect.maxCol) {
+                    rectEndColId = id;
+                    break;
+                }
+            }
+            if (rectEndColId.isNull()) {
+                rectEndColId = generate_id();
+                std::string payload = "{\"pos\":" + std::to_string(rect.maxCol) +
+                                      ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+                Operation op = makeColInsertOp(*_workbook, rectEndColId, payload);
+                applyOperation(*_workbook, op);
+            }
+
+            // Find start row
+            for (const auto& [id, axis] : sheet->rows) {
+                if (axis->position == rect.minRow) {
+                    rectStartRowId = id;
+                    break;
+                }
+            }
+            if (rectStartRowId.isNull()) {
+                rectStartRowId = generate_id();
+                std::string payload = "{\"pos\":" + std::to_string(rect.minRow) +
+                                      ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+                Operation op = makeRowInsertOp(*_workbook, rectStartRowId, payload);
+                applyOperation(*_workbook, op);
+            }
+
+            // Find end row
+            for (const auto& [id, axis] : sheet->rows) {
+                if (axis->position == rect.maxRow) {
+                    rectEndRowId = id;
+                    break;
+                }
+            }
+            if (rectEndRowId.isNull()) {
+                rectEndRowId = generate_id();
+                std::string payload = "{\"pos\":" + std::to_string(rect.maxRow) +
+                                      ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+                Operation op = makeRowInsertOp(*_workbook, rectEndRowId, payload);
+                applyOperation(*_workbook, op);
+            }
+
+            // Create the new split range
+            ID newRangeId = generate_id();
+            std::ostringstream newRangePayload;
+            newRangePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
+            newRangePayload << "\"start_col_id\":\"" << rectStartColId.toString() << "\",";
+            newRangePayload << "\"start_row_id\":\"" << rectStartRowId.toString() << "\",";
+            newRangePayload << "\"end_col_id\":\"" << rectEndColId.toString() << "\",";
+            newRangePayload << "\"end_row_id\":\"" << rectEndRowId.toString() << "\",";
+            newRangePayload << "\"flags\":" << static_cast<int>(RangeFlags::STYLE) << "}";
+
+            Operation newRangeOp = makeRangeAddOp(*_workbook, newRangeId, newRangePayload.str());
+            applyOperation(*_workbook, newRangeOp);
+
+            // Associate the OLD style with the new split range (preserving the style)
+            std::ostringstream newStylePayload;
+            newStylePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
+            newStylePayload << "\"style_id\":\"" << splitOp.oldStyleId.toString() << "\"}";
+
+            Operation newSetStyleOp =
+                makeRangeSetStyleOp(*_workbook, newRangeId, newStylePayload.str());
+            applyOperation(*_workbook, newSetStyleOp);
+        }
     }
 
     // Create a new Range with RANGE_STYLE flag
