@@ -327,6 +327,171 @@ RG SWccgRXF B1:E7 sty:{bgColor:"#818CF8", bold:true}
 - **Superset** (new range contains existing): Create new range. Existing ranges fully contained lose conflicting properties (stripped from their style). Partially overlapping ranges are split (Phase J behavior).
 - **Exact match**: Merge into existing range's style (no new range created)
 
+### Phase L: UI Effective Style Display
+
+**Problem**: When selecting a cell that's inside a range with styles, the toolbar doesn't reflect the effective style. For example, selecting a cell with green background and italic text from a range doesn't show the italic button as active or the background color swatch as green.
+
+The toolbar should display the **effective merged style** considering:
+1. Default style (base)
+2. Column default style
+3. Row default style (TODO: not implemented yet)
+4. Range styles (merged from all overlapping ranges, CSS-like cascade)
+5. Cell-level style override (highest priority)
+
+**Current behavior**: The UI reads `cell.style` directly, which doesn't include range styles.
+
+**Solution**: The viewport query already computes `getEffectiveStyle()` for rendering. We need to expose this to the UI when a cell is selected.
+
+**Architecture**: All style computation logic lives in C++ (headless clients need it too). TypeScript UI just calls bindings and displays results.
+
+**Steps**:
+- [ ] L1: Add C++ `getEffectiveCellStyle(col, row)` method in CellsEngine (reuses existing `getEffectiveStyle` from viewport)
+- [ ] L2: Add WASM binding to expose `getEffectiveCellStyle` as JSON
+- [ ] L3: Add C++ `getEffectiveStyleForRange(col1, row1, col2, row2)` that returns merged style + mixed flags for multi-cell selection
+- [ ] L4: Add WASM binding for `getEffectiveStyleForRange` returning `{style: CellStyle, mixed: {bold: bool, italic: bool, ...}}`
+- [ ] L5: Update TypeScript `StyleControls` to call these bindings instead of reading cell.style directly
+- [ ] L6: E2E test: apply range style, select cell within range, verify toolbar reflects range style
+- [ ] L7: E2E test: apply range style + cell override, verify toolbar shows cell override values
+- [ ] L8: E2E test: select range with mixed styles, verify mixed indicators show correctly
+
+**Design consideration**: When the user changes a style on a cell that inherits from a range:
+- Option A: Always create cell-level override (simple, current behavior)
+- Option B: If whole range is selected, modify range style; otherwise cell override (smarter, matches user intent)
+
+### Phase M: Content-Addressed Style Registry
+
+**Problem**: Styles are getting duplicated in the registry:
+```
+Y BhUpbxBv {"bold":false,"italic":true,"underline":false}
+Y NBBKD1LW {"bold":false,"italic":false,"underline":false,"bgColor":"#34D399"}
+Y oSonVbqo {"bold":true,"italic":true,"underline":false,"bgColor":"#34D399"}
+Y rLRDOH2N {"bold":true,"italic":false,"underline":false}
+Y rbHBvj4m {"bold":false,"italic":true,"underline":false,"bgColor":"#34D399"}
+```
+
+Multiple identical styles can exist with different IDs. This wastes memory and makes style comparison harder.
+
+**Solution**: Content-addressed style registry with reference counting:
+1. Hash styles by their content to detect duplicates
+2. Return existing style ID when registering a duplicate
+3. Track usage count (cells + ranges referencing each style)
+4. Support copy-on-write: when modifying a shared style, clone if refcount > 1
+
+**Architecture**: All registry logic lives in C++ (`core/cells/`). This ensures:
+- Headless clients get the same deduplication behavior
+- Single source of truth for style management
+- CRDT operations work correctly with deduplicated styles
+- WASM bindings are thin wrappers that just call C++ methods
+
+**Design** (in `core/cells/style_registry.h`):
+```cpp
+class StyleRegistry {
+    // Primary storage: ID → Style
+    std::unordered_map<ID, CellStyle> _styles;
+
+    // Content hash → ID for deduplication
+    std::unordered_map<size_t, ID> _hashToId;
+
+    // Reference counting
+    std::unordered_map<ID, uint32_t> _refCount;
+
+public:
+    // Register style, returns existing ID if duplicate
+    ID registerStyle(const CellStyle& style);
+
+    // Increment/decrement ref count
+    void addRef(ID styleId);
+    void release(ID styleId);  // Deletes if refcount hits 0
+
+    // Get style for modification (clones if shared)
+    ID getOrCloneForModification(ID styleId, const CellStyle& newStyle);
+
+    // Lookup
+    const CellStyle* getStyle(ID styleId) const;
+};
+```
+
+**Hash function** for CellStyle (in `core/cells/model.h`):
+- Add `size_t hash() const` method to CellStyle
+- Combine hashes of all non-default properties
+- Use sparse representation (only hash set properties)
+
+**Steps**:
+- [ ] M1: Add `CellStyle::hash()` method in `core/cells/model.h` for content-based hashing
+- [ ] M2: Create `StyleRegistry` class in `core/cells/style_registry.h/.cc`
+- [ ] M3: Migrate Workbook's style storage to use StyleRegistry
+- [ ] M4: Update `registerStyle()` to check hash first, return existing ID if duplicate
+- [ ] M5: Add reference counting (`addRef`/`release`) called from cell/range style assignment
+- [ ] M6: Update CRDT `CELL_SET_STYLE` operation to use `addRef`/`release`
+- [ ] M7: Update CRDT `RANGE_SET_STYLE` operation to use `addRef`/`release`
+- [ ] M8: Implement `getOrCloneForModification()` - returns new ID if style is shared
+- [ ] M9: Garbage collect unreferenced styles on `release()` when refcount hits 0
+- [ ] M10: Unit test: register duplicate style returns same ID
+- [ ] M11: Unit test: reference counting increments/decrements correctly
+- [ ] M12: Unit test: modifying shared style clones it (returns different ID)
+- [ ] M13: E2E test: apply same style to multiple ranges, verify single style entry in debug output
+
+**Migration**: On document load, scan all cells and ranges to initialize refcounts for existing styles.
+
+### Phase N: Architecture Audit - Thin UI Layer
+
+**Goal**: Review the entire codebase to ensure all business logic lives in C++, with TypeScript/UI being a thin presentation layer only.
+
+**Philosophy**:
+- **C++ owns all logic**: Computations, validations, transformations, state management
+- **UI is display-only**: Receives data, renders it, sends user actions back to C++
+- **Headless-first**: Every feature must work without a browser (CLI, server-side, tests)
+- **Single source of truth**: No duplicated logic between C++ and TypeScript
+
+**Benefits**:
+- Easier maintenance (one place to fix bugs)
+- Consistent behavior across all clients (WASM, native, headless)
+- Better testability (unit test C++ directly)
+- Smaller WASM bundle (less JS code)
+
+**Audit checklist** - Review each area and migrate logic to C++ if needed:
+
+**Clipboard operations**:
+- [ ] N1: Review clipboard copy logic - ensure cell serialization is in C++
+- [ ] N2: Review clipboard paste logic - ensure parsing/validation is in C++
+- [ ] N3: Add C++ `copyRangeToClipboard(col1, row1, col2, row2)` returning serialized data
+- [ ] N4: Add C++ `pasteFromClipboard(col, row, data)` handling all formats
+
+**Selection & navigation**:
+- [ ] N5: Review selection expansion logic (Shift+Arrow) - should be in C++
+- [ ] N6: Review "select all" / "select column" / "select row" - should be in C++
+- [ ] N7: Add C++ `expandSelection(direction, modifier)` returning new selection bounds
+
+**Formula bar & editing**:
+- [ ] N8: Review formula parsing - ensure it's fully in C++ (likely already is)
+- [ ] N9: Review input validation (date detection, number parsing) - should be in C++
+- [ ] N10: Review autocomplete suggestions - should come from C++
+
+**Formatting & display**:
+- [ ] N11: Review number formatting - ensure format application is in C++
+- [ ] N12: Review date/time formatting - should use C++ formatter
+- [ ] N13: Review cell display value computation - should be in C++
+
+**Undo/Redo**:
+- [ ] N14: Review undo/redo stack management - should be in C++
+- [ ] N15: Ensure UI just calls `undo()`/`redo()` bindings
+
+**File operations**:
+- [ ] N16: Review import logic (CSV, XLSX) - should be in C++
+- [ ] N17: Review export logic - should be in C++
+
+**Collaboration**:
+- [ ] N18: Review presence/cursor display - data should come from C++
+- [ ] N19: Review conflict resolution display - should be computed in C++
+
+**General patterns to fix**:
+- TypeScript computing derived state → Move to C++, expose via binding
+- TypeScript validating input → Move validation to C++
+- TypeScript transforming data → Move transformation to C++
+- Duplicated constants (e.g., DEFAULT_COL_WIDTH) → Single source in C++
+
+**Outcome**: Document in code comments which bindings exist and their purpose. Create a "Bindings API" reference showing the clean C++/TypeScript boundary.
+
 ## Testing Strategy
 
 - Unit tests for range containment with various corner positions
