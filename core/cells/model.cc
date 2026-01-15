@@ -31,6 +31,7 @@
 #include "core/cells/formula_ast.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/style_registry.h"
 
 namespace cells {
 
@@ -300,14 +301,16 @@ Workbook::Workbook()
       name("Untitled"),
       _oplog(std::make_unique<OpLog>()),
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
-      _nodeId(generate_id()) {}
+      _nodeId(generate_id()),
+      _styleRegistry(std::make_unique<StyleRegistry>()) {}
 
 Workbook::Workbook(const ID& id, std::string name)
     : id(id),
       name(std::move(name)),
       _oplog(std::make_unique<OpLog>()),
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
-      _nodeId(generate_id()) {}
+      _nodeId(generate_id()),
+      _styleRegistry(std::make_unique<StyleRegistry>()) {}
 
 Workbook::~Workbook() = default;
 
@@ -462,24 +465,33 @@ const std::unordered_map<ID, std::string, IDHash>& Workbook::getCustomFormats() 
 }
 
 bool Workbook::registerStyle(const ID& styleId, const CellStyle& style) {
-    auto [it, inserted] = _styles.try_emplace(styleId, style);
-    return inserted;
+    // Direct registration with specific ID (for CRDT replay)
+    return _styleRegistry->registerStyleDirect(styleId, style);
+}
+
+ID Workbook::findOrRegisterStyle(const CellStyle& style) {
+    // Content-addressed registration with deduplication
+    return _styleRegistry->registerStyle(style);
 }
 
 bool Workbook::hasStyle(const ID& styleId) const {
-    return _styles.find(styleId) != _styles.end();
+    return _styleRegistry->hasStyle(styleId);
 }
 
 const CellStyle* Workbook::getStyle(const ID& styleId) const {
-    auto it = _styles.find(styleId);
-    if (it != _styles.end()) {
-        return &it->second;
-    }
-    return nullptr;
+    return _styleRegistry->getStyle(styleId);
 }
 
 const std::unordered_map<ID, CellStyle, IDHash>& Workbook::getStyles() const {
-    return _styles;
+    return _styleRegistry->getStyles();
+}
+
+StyleRegistry* Workbook::getStyleRegistry() {
+    return _styleRegistry.get();
+}
+
+const StyleRegistry* Workbook::getStyleRegistry() const {
+    return _styleRegistry.get();
 }
 
 }  // namespace cells

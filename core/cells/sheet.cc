@@ -28,6 +28,7 @@
 #include "core/cells/model.h"
 #include "core/cells/range.h"
 #include "core/cells/range_index.h"
+#include "core/cells/style_registry.h"
 
 namespace cells {
 
@@ -1088,6 +1089,15 @@ bool Sheet::removeRange(const ID& rangeId) {
         _rangeIndex->removeById(rangeId);
     }
 
+    // Release style reference if any
+    const ID styleId = getRangeStyleId(rangeId);
+    if (!styleId.isNull() && _workbook != nullptr) {
+        StyleRegistry* registry = _workbook->getStyleRegistry();
+        if (registry != nullptr) {
+            registry->release(styleId);
+        }
+    }
+
     // Remove style association if any
     _rangeStyles.erase(rangeId);
 
@@ -1152,6 +1162,18 @@ void Sheet::updateRangeIndex(Range* range) {
 }
 
 void Sheet::clearAllRanges() {
+    // Release all style references before clearing
+    if (_workbook != nullptr) {
+        StyleRegistry* registry = _workbook->getStyleRegistry();
+        if (registry != nullptr) {
+            for (const auto& [rangeId, styleId] : _rangeStyles) {
+                if (!styleId.isNull()) {
+                    registry->release(styleId);
+                }
+            }
+        }
+    }
+
     _ranges.clear();
     _rangeStyles.clear();
     if (_rangeIndex) {
@@ -1178,6 +1200,15 @@ void Sheet::setRangeStyleId(const ID& rangeId, const ID& styleId) {
         return;  // Range doesn't exist
     }
 
+    // Get style registry for reference counting
+    StyleRegistry* registry = nullptr;
+    if (_workbook != nullptr) {
+        registry = _workbook->getStyleRegistry();
+    }
+
+    // Get the old style ID (if any) for reference counting
+    const ID oldStyleId = getRangeStyleId(rangeId);
+
     if (styleId.isNull()) {
         // Remove style association
         _rangeStyles.erase(rangeId);
@@ -1186,6 +1217,18 @@ void Sheet::setRangeStyleId(const ID& rangeId, const ID& styleId) {
         // Set style association
         _rangeStyles[rangeId] = styleId;
         range->flags = range->flags | RangeFlags::STYLE;
+    }
+
+    // Update reference counts
+    if (registry != nullptr) {
+        // Release old style reference (if any)
+        if (!oldStyleId.isNull()) {
+            registry->release(oldStyleId);
+        }
+        // Add reference to new style (if not null)
+        if (!styleId.isNull()) {
+            registry->addRef(styleId);
+        }
     }
 }
 

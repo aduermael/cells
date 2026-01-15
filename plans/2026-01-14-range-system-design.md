@@ -417,21 +417,21 @@ public:
 - Use sparse representation (only hash set properties)
 
 **Steps**:
-- [ ] M1: Add `CellStyle::hash()` method in `core/cells/model.h` for content-based hashing
-- [ ] M2: Create `StyleRegistry` class in `core/cells/style_registry.h/.cc`
-- [ ] M3: Migrate Workbook's style storage to use StyleRegistry
-- [ ] M4: Update `registerStyle()` to check hash first, return existing ID if duplicate
-- [ ] M5: Add reference counting (`addRef`/`release`) called from cell/range style assignment
-- [ ] M6: Update CRDT `CELL_SET_STYLE` operation to use `addRef`/`release`
-- [ ] M7: Update CRDT `RANGE_SET_STYLE` operation to use `addRef`/`release`
-- [ ] M8: Implement `getOrCloneForModification()` - returns new ID if style is shared
-- [ ] M9: Garbage collect unreferenced styles on `release()` when refcount hits 0
-- [ ] M10: Unit test: register duplicate style returns same ID
-- [ ] M11: Unit test: reference counting increments/decrements correctly
-- [ ] M12: Unit test: modifying shared style clones it (returns different ID)
-- [ ] M13: E2E test: apply same style to multiple ranges, verify single style entry in debug output
+- [x] M1: Add `CellStyle::hash()` method in `core/cells/model.h` for content-based hashing - Moved to `style_types.h`
+- [x] M2: Create `StyleRegistry` class in `core/cells/style_registry.h/.cc` - Full implementation with hash-based deduplication
+- [x] M3: Migrate Workbook's style storage to use StyleRegistry - Workbook now owns `StyleRegistry`, extracted CellStyle to `style_types.h` to break circular dependency
+- [x] M4: Update `registerStyle()` to check hash first, return existing ID if duplicate - Done in `StyleRegistry::registerStyle()`; `registerStyleDirect()` preserves IDs for CRDT
+- [x] M5: Add reference counting (`addRef`/`release`) called from cell/range style assignment - Implemented in StyleRegistry
+- [x] M6: Update CRDT `CELL_SET_STYLE` operation to use `addRef`/`release` - Added in `applyCellSetStyle()` in crdt_cell.cc
+- [x] M7: Update CRDT `RANGE_SET_STYLE` operation to use `addRef`/`release` - Added in `Sheet::setRangeStyleId()`, `removeRange()`, and `clearAllRanges()`
+- [x] M8: Implement `getOrCloneForModification()` - returns new ID if style is shared - Done in StyleRegistry
+- [x] M9: Garbage collect unreferenced styles on `release()` when refcount hits 0 - Done in StyleRegistry
+- [x] M10: Unit test: register duplicate style returns same ID - `StyleRegistryTest.RegisterDuplicateReturnsExistingId`
+- [x] M11: Unit test: reference counting increments/decrements correctly - `StyleRegistryTest.ReferenceCountingBasic`
+- [x] M12: Unit test: modifying shared style clones it (returns different ID) - `StyleRegistryTest.ModifySharedStyleClonesIt`
+- [ ] M13: E2E test - Deferred. The infrastructure for deduplication exists (`findOrRegisterStyle()`), but the UI layer needs to be updated to use it. Current CRDT ops use `registerStyleDirect()` which preserves IDs for sync consistency.
 
-**Migration**: On document load, scan all cells and ranges to initialize refcounts for existing styles.
+**Note**: The `findOrRegisterStyle()` method on Workbook provides content-addressed style deduplication. To enable deduplication at the UI layer, bindings/app code should call this instead of creating new style IDs. The migration step (scanning existing styles for refcounts) is not implemented - styles created before this phase won't have accurate refcounts.
 
 ### Phase N: Architecture Audit - Thin UI Layer
 

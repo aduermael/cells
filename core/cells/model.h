@@ -34,6 +34,7 @@
 
 #include "core/cells/operation.h"
 #include "core/cells/oplog.h"
+#include "core/cells/style_types.h"
 #include "core/cells/types.h"
 
 namespace cells {
@@ -48,6 +49,7 @@ struct OpLog;
 struct SpillInfo;
 struct Range;
 class RangeIndex;
+class StyleRegistry;
 enum class RangeFlags : uint8_t;
 
 // Collaboration mode for the workbook
@@ -79,105 +81,8 @@ enum class CollabMode : std::uint8_t {
 // Then apply with applyOperation() to both mutate the model AND add to OpLog.
 // =============================================================================
 
-// =============================================================================
-// Cell Style Types
-// =============================================================================
-
-// Horizontal text alignment within cell
-// GENERAL means content-type-aware: right for numbers/dates, left for text
-enum class TextAlign : std::uint8_t { LEFT = 0, CENTER = 1, RIGHT = 2, JUSTIFY = 3, GENERAL = 4 };
-
-// Vertical text alignment within cell
-enum class VerticalAlign : std::uint8_t { TOP = 0, MIDDLE = 1, BOTTOM = 2 };
-
-// Border style for cell edges
-enum class BorderStyle : std::uint8_t {
-    NONE = 0,
-    THIN = 1,
-    MEDIUM = 2,
-    THICK = 3,
-    DASHED = 4,
-    DOTTED = 5,
-    DOUBLE = 6,
-    HAIR = 7,
-    MEDIUM_DASHED = 8,
-    DASH_DOT = 9,
-    MEDIUM_DASH_DOT = 10,
-    DASH_DOT_DOT = 11,
-    MEDIUM_DASH_DOT_DOT = 12,
-    SLANT_DASH_DOT = 13
-};
-
-// Single border edge definition
-struct BorderEdge {
-    BorderStyle style{BorderStyle::NONE};
-    std::string color;  // Hex color "#RRGGBB" or empty for default black
-
-    BorderEdge() = default;
-    explicit BorderEdge(BorderStyle s, std::string c = "") : style(s), color(std::move(c)) {}
-
-    [[nodiscard]] bool hasValue() const { return style != BorderStyle::NONE; }
-
-    bool operator==(const BorderEdge& other) const {
-        return style == other.style && color == other.color;
-    }
-    bool operator!=(const BorderEdge& other) const { return !(*this == other); }
-};
-
-// Complete cell border (all four edges)
-struct CellBorder {
-    BorderEdge top;
-    BorderEdge right;
-    BorderEdge bottom;
-    BorderEdge left;
-
-    CellBorder() = default;
-
-    [[nodiscard]] bool hasValue() const {
-        return top.hasValue() || right.hasValue() || bottom.hasValue() || left.hasValue();
-    }
-
-    bool operator==(const CellBorder& other) const {
-        return top == other.top && right == other.right && bottom == other.bottom &&
-               left == other.left;
-    }
-    bool operator!=(const CellBorder& other) const { return !(*this == other); }
-};
-
-// Cell style properties for formatting
-// Each property is optional - empty string or 0 means "use default"
-// Colors use CSS hex format: "#RRGGBB" or "" for transparent/default
-struct CellStyle {
-    bool bold{false};
-    bool italic{false};
-    bool underline{false};
-    std::string bgColor;                   // Background color (hex, e.g. "#FF0000")
-    std::string textColor;                 // Text color (hex, e.g. "#000000")
-    std::string fontFamily;                // Font name (e.g. "Arial"), empty = system default
-    uint8_t fontSize{0};                   // Font size in points, 0 = default (11pt)
-    TextAlign hAlign{TextAlign::GENERAL};  // GENERAL = content-type-aware alignment
-    VerticalAlign vAlign{VerticalAlign::BOTTOM};
-    CellBorder border;  // Cell borders (top, right, bottom, left)
-
-    CellStyle() = default;
-
-    // Check if style has any non-default values
-    [[nodiscard]] bool isEmpty() const {
-        return !bold && !italic && !underline && bgColor.empty() && textColor.empty() &&
-               fontFamily.empty() && fontSize == 0 && hAlign == TextAlign::GENERAL &&
-               vAlign == VerticalAlign::BOTTOM && !border.hasValue();
-    }
-
-    // Equality comparison
-    bool operator==(const CellStyle& other) const {
-        return bold == other.bold && italic == other.italic && underline == other.underline &&
-               bgColor == other.bgColor && textColor == other.textColor &&
-               fontFamily == other.fontFamily && fontSize == other.fontSize &&
-               hAlign == other.hAlign && vAlign == other.vAlign && border == other.border;
-    }
-
-    bool operator!=(const CellStyle& other) const { return !(*this == other); }
-};
+// Cell Style Types are defined in style_types.h (included above)
+// This provides TextAlign, VerticalAlign, BorderStyle, BorderEdge, CellBorder, CellStyle
 
 // =============================================================================
 // Cell Value Types
@@ -840,9 +745,16 @@ struct Workbook {
     // Cell styles (CRDT-synced)
     // ========================================================================
 
-    // Register a style definition (called by CRDT when applying STYLE_DEFINE)
+    // Register a style definition with a specific ID (called by CRDT when applying STYLE_DEFINE)
     // Returns true if the style was newly added, false if it already existed
+    // Note: This preserves the exact ID - no deduplication. For deduplication, use
+    // findOrRegisterStyle.
     bool registerStyle(const ID& styleId, const CellStyle& style);
+
+    // Find an existing style matching the content, or register a new one
+    // Returns the ID of the matching/new style (may differ from any proposed ID)
+    // This provides content-addressed deduplication - identical styles share one ID.
+    ID findOrRegisterStyle(const CellStyle& style);
 
     // Check if a style is defined
     [[nodiscard]] bool hasStyle(const ID& styleId) const;
@@ -852,6 +764,10 @@ struct Workbook {
 
     // Get all styles (for bootstrapOpLog and sync)
     [[nodiscard]] const std::unordered_map<ID, CellStyle, IDHash>& getStyles() const;
+
+    // Get the style registry for advanced operations (ref counting, etc.)
+    [[nodiscard]] StyleRegistry* getStyleRegistry();
+    [[nodiscard]] const StyleRegistry* getStyleRegistry() const;
 
 private:
     // Sheet lookup by ID
@@ -876,9 +792,9 @@ private:
     // Synced via FORMAT_DEFINE operations
     std::unordered_map<ID, std::string, IDHash> _customFormats;
 
-    // Cell style definitions (style ID -> CellStyle)
+    // Cell style registry with deduplication and reference counting
     // Synced via STYLE_DEFINE operations
-    std::unordered_map<ID, CellStyle, IDHash> _styles;
+    std::unique_ptr<StyleRegistry> _styleRegistry;
 };
 
 }  // namespace cells

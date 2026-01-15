@@ -21,6 +21,7 @@
 #include "core/cells/dependency_graph.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/number_format.h"
+#include "core/cells/style_registry.h"
 
 namespace cells {
 namespace internal {
@@ -268,8 +269,21 @@ ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op) {
         return ApplyResult::INVALID_PAYLOAD;
     }
 
+    const ID newStyleId(styleIdStr);
+    StyleRegistry* registry = workbook.getStyleRegistry();
+
+    // Release old style reference (if any)
+    if (!cell->styleId.isNull() && registry != nullptr) {
+        registry->release(cell->styleId);
+    }
+
     // Set the style ID (null ID "~" means clear style / use default)
-    cell->styleId = ID(styleIdStr);
+    cell->styleId = newStyleId;
+
+    // Add reference to new style (if not null)
+    if (!newStyleId.isNull() && registry != nullptr) {
+        registry->addRef(newStyleId);
+    }
 
     return ApplyResult::SUCCESS;
 }
