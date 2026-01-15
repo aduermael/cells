@@ -7,6 +7,7 @@
 
 #include "core/cells/formula_parser.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/range.h"
 
 namespace cells {
 
@@ -129,7 +130,11 @@ bool Parser::parseLine(std::string_view line) {
         case 'C':  // Column
             return parseColumn(line.substr(firstNonSpace));
 
-        case 'R':  // Row
+        case 'R':  // Row or Range
+            // Check if it's "RG" (Range) or "R " (Row)
+            if (line.size() > firstNonSpace + 1 && line[firstNonSpace + 1] == 'G') {
+                return parseRange(line.substr(firstNonSpace));
+            }
             return parseRow(line.substr(firstNonSpace));
 
         case 'X':  // Cell
@@ -1206,6 +1211,92 @@ bool Parser::resolveSharedFormulas() {
     // Register shared formula groups at Sheet level
     for (const auto& [masterId, subscriberIds] : masterToSubscribers) {
         currentSheet_->registerSharedFormulaGroup(masterId, subscriberIds);
+    }
+
+    return true;
+}
+
+bool Parser::parseRange(std::string_view line) {
+    // Format: RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<styleId>]
+    // Example: RG r8KjP2mN c1AbC2dE r1FgH2iJ c2KlM3nO r2PqR3sT 1 sty:s5WxY6zA
+
+    if (line.size() < 3 || line[0] != 'R' || line[1] != 'G' || line[2] != ' ') {
+        return setError("Invalid range line");
+    }
+
+    if (currentSheet_ == nullptr) {
+        return setError("Range line before sheet definition");
+    }
+
+    line = line.substr(3);  // Skip "RG "
+
+    // Parse range ID
+    size_t spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos) {
+        return setError("Missing range ID");
+    }
+    const ID rangeId(std::string(line.substr(0, spacePos)));
+    line = line.substr(spacePos + 1);
+
+    // Parse start column ID
+    spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos) {
+        return setError("Missing start column ID");
+    }
+    const ID startColId(std::string(line.substr(0, spacePos)));
+    line = line.substr(spacePos + 1);
+
+    // Parse start row ID
+    spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos) {
+        return setError("Missing start row ID");
+    }
+    const ID startRowId(std::string(line.substr(0, spacePos)));
+    line = line.substr(spacePos + 1);
+
+    // Parse end column ID
+    spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos) {
+        return setError("Missing end column ID");
+    }
+    const ID endColId(std::string(line.substr(0, spacePos)));
+    line = line.substr(spacePos + 1);
+
+    // Parse end row ID
+    spacePos = line.find(' ');
+    if (spacePos == std::string_view::npos) {
+        return setError("Missing end row ID");
+    }
+    const ID endRowId(std::string(line.substr(0, spacePos)));
+    line = line.substr(spacePos + 1);
+
+    // Parse flags (integer)
+    spacePos = line.find(' ');
+    const std::string_view flagsStr =
+        (spacePos == std::string_view::npos) ? line : line.substr(0, spacePos);
+    int flagsInt = 0;
+    auto [ptr, ec] = std::from_chars(flagsStr.data(), flagsStr.data() + flagsStr.size(), flagsInt);
+    if (ec != std::errc()) {
+        return setError("Invalid range flags");
+    }
+    const auto flags = static_cast<RangeFlags>(flagsInt);
+
+    // Create the range
+    auto range =
+        std::make_unique<Range>(rangeId, startColId, startRowId, endColId, endRowId, flags);
+    const Range* rangePtr = range.get();
+    currentSheet_->addRange(std::move(range));
+
+    // Parse optional style reference
+    if (spacePos != std::string_view::npos) {
+        line = line.substr(spacePos + 1);
+        // Look for "sty:" property
+        if (line.substr(0, 4) == "sty:") {
+            const ID styleId(std::string(line.substr(4)));
+            if (!styleId.isNull()) {
+                currentSheet_->setRangeStyleId(rangePtr->id, styleId);
+            }
+        }
     }
 
     return true;

@@ -7,6 +7,7 @@
 
 #include "core/cells/formula_serializer.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/range.h"
 
 namespace cells {
 
@@ -273,10 +274,11 @@ void Serializer::serializeSheet(const Sheet& sheet, std::ostream& out) const {
         out << "\n";
     }
 
-    // Columns, rows, cells
+    // Columns, rows, cells, ranges
     serializeColumns(sheet, out);
     serializeRows(sheet, out);
     serializeCells(sheet, out);
+    serializeRanges(sheet, out);
 }
 
 void Serializer::serializeColumns(const Sheet& sheet, std::ostream& out) const {
@@ -336,6 +338,41 @@ void Serializer::serializeCells(const Sheet& sheet, std::ostream& out) const {
     // Serialize in order
     for (const auto& item : ordered) {
         serializeCell(*item.second, sheet, out);
+    }
+}
+
+void Serializer::serializeRanges(const Sheet& sheet, std::ostream& out) const {
+    // Collect ranges for alphabetical ordering by UUID
+    std::vector<std::pair<std::string, const Range*>> ordered;
+    const auto& ranges = sheet.getRanges();
+    ordered.reserve(ranges.size());
+
+    for (const auto& pair : ranges) {
+        const Range* range = pair.second.get();
+        ordered.emplace_back(range->id.toString(), range);
+    }
+
+    // Sort alphabetically by UUID for deterministic output
+    std::sort(ordered.begin(), ordered.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    // Serialize each range
+    // Format: RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<styleId>]
+    for (const auto& item : ordered) {
+        const Range* range = item.second;
+        out << "RG " << range->id.toString() << " " << range->startColId.toString() << " "
+            << range->startRowId.toString() << " " << range->endColId.toString() << " "
+            << range->endRowId.toString() << " " << static_cast<int>(range->flags);
+
+        // Add style reference if RANGE_STYLE flag is set
+        if (range->hasFlag(RangeFlags::STYLE)) {
+            const ID styleId = sheet.getRangeStyleId(range->id);
+            if (!styleId.isNull()) {
+                out << " sty:" << styleId.toString();
+            }
+        }
+
+        out << "\n";
     }
 }
 

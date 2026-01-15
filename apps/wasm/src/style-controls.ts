@@ -601,6 +601,11 @@ export class StyleControls {
 
   /**
    * Apply a style update to all cells in the current selection range.
+   *
+   * NOTE: Currently uses cell-by-cell styling because the frontend renderer
+   * doesn't yet support rendering backgrounds from Range objects (only from
+   * cell styles). Once the renderer is updated to query and render style
+   * ranges, this can use setStyleForRange() for better efficiency.
    */
   private async applyStyleToSelection(styleUpdate: Partial<CellStyle>): Promise<void> {
     if (!this.dataSource) return;

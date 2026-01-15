@@ -81,6 +81,9 @@ private:
     // Serialize cells section
     void serializeCells(const Sheet& sheet, std::ostream& out) const;
 
+    // Serialize ranges section (unified range system)
+    void serializeRanges(const Sheet& sheet, std::ostream& out) const;
+
     // Serialize a single axis (column or row)
     void serializeAxis(const Axis& axis, char prefix, std::ostream& out) const;
 

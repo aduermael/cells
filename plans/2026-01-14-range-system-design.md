@@ -215,6 +215,20 @@ For ranges with `RANGE_MERGE` flag:
 - [x] F3: Update viewport to apply range styles (CSS-like inheritance) - Extended `getEffectiveStyle()` to query RANGE_STYLE ranges between cell and column priorities; added `fromRange` field and `"inheritedFrom":"range"` JSON output
 - [x] F4: Add UI for applying styles to ranges - Added `setRangeStyle()`/`removeRangeStyle()` bindings in C++, TypeScript, and client; updated `setStyleForRange()` to use Range system
 
+### Phase G: Range Serialization/Parsing
+Add ZCD format support for the Range system, enabling persistence of range-based styles and other range features.
+
+- [x] G1: Add Range serialization to ZCD format - `RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<styleId>]`
+- [x] G2: Add Range parsing from ZCD format - Parses RG lines and recreates Range objects with style associations
+
+### Phase H: UI Range Style Integration (Deferred)
+The toolbar still applies styles cell-by-cell via `setCellStyleAt()`. To use range-based styling for empty cells, the frontend renderer needs to be updated to query and render style ranges (currently it only renders styles from existing cell objects).
+
+- [ ] H1: Update viewport query to return style ranges covering the visible area
+- [ ] H2: Update GridRenderer to render backgrounds for style ranges (not just cells)
+- [ ] H3: Update StyleControls.applyStyleToSelection() to use setStyleForRange()
+- [ ] H4: Add E2E test verifying range styles render correctly and don't create empty cell entries
+
 ## Testing Strategy
 
 - Unit tests for range containment with various corner positions
