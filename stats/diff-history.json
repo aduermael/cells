@@ -1,0 +1,7866 @@
+{
+  "generated": "2026-01-15T20:29:14Z",
+  "history": [
+    {
+      "date": "2025-12-15",
+      "commit": "c9b8d15",
+      "added": 119986,
+      "removed": 0,
+      "total": 119986
+    },
+    {
+      "date": "2025-12-15",
+      "commit": "3c73535",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "7ec0609",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "7579846",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "86eaa5e",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "d3dee92",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "dbea598",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "09accf5",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "c0e2adf",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "b9ade29",
+      "added": 137,
+      "removed": 0,
+      "total": 137
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "5f4ff63",
+      "added": 146,
+      "removed": 0,
+      "total": 146
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "01b6b43",
+      "added": 214,
+      "removed": 0,
+      "total": 214
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "15d9b26",
+      "added": 4,
+      "removed": 4,
+      "total": 8
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "830bd66",
+      "added": 70,
+      "removed": 18,
+      "total": 88
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "ff34066",
+      "added": 7,
+      "removed": 9,
+      "total": 16
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "f90e437",
+      "added": 184,
+      "removed": 183,
+      "total": 367
+    },
+    {
+      "date": "2025-12-16",
+      "commit": "8850484",
+      "added": 126,
+      "removed": 7,
+      "total": 133
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "7470991",
+      "added": 10,
+      "removed": 15,
+      "total": 25
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "70a4fb8",
+      "added": 61,
+      "removed": 35,
+      "total": 96
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "6045a8d",
+      "added": 34,
+      "removed": 61,
+      "total": 95
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "5a2c193",
+      "added": 583,
+      "removed": 11,
+      "total": 594
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "da6f1f8",
+      "added": 0,
+      "removed": 43,
+      "total": 43
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "094d090",
+      "added": 7,
+      "removed": 4,
+      "total": 11
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "5afbf3c",
+      "added": 124,
+      "removed": 87,
+      "total": 211
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "8bad6e5",
+      "added": 70,
+      "removed": 58,
+      "total": 128
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "747ea88",
+      "added": 15,
+      "removed": 6,
+      "total": 21
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "70c5c03",
+      "added": 9,
+      "removed": 2,
+      "total": 11
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "6f1752e",
+      "added": 1417,
+      "removed": 9,
+      "total": 1426
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "526bc30",
+      "added": 9,
+      "removed": 0,
+      "total": 9
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "862b34a",
+      "added": 6,
+      "removed": 0,
+      "total": 6
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "95e51af",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "3d5bc2a",
+      "added": 11,
+      "removed": 0,
+      "total": 11
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "55ddc7d",
+      "added": 2,
+      "removed": 0,
+      "total": 2
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "9733509",
+      "added": 7,
+      "removed": 7,
+      "total": 14
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "47c7f76",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "12fc370",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "177e3e2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "439db8c",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "a4d660b",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "0e5529a",
+      "added": 16,
+      "removed": 0,
+      "total": 16
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "e94e657",
+      "added": 172,
+      "removed": 1,
+      "total": 173
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "ec9843e",
+      "added": 92,
+      "removed": 28,
+      "total": 120
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "1a64cef",
+      "added": 72,
+      "removed": 1,
+      "total": 73
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "1b6e452",
+      "added": 13,
+      "removed": 2,
+      "total": 15
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "2f3d5d8",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "f300dd2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "8a29d1c",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "8ebcee1",
+      "added": 8981,
+      "removed": 10,
+      "total": 8991
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "16692be",
+      "added": 557,
+      "removed": 15,
+      "total": 572
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "f224cad",
+      "added": 300,
+      "removed": 0,
+      "total": 300
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "085bf96",
+      "added": 14,
+      "removed": 2,
+      "total": 16
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "1140801",
+      "added": 12,
+      "removed": 14,
+      "total": 26
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "2b2f855",
+      "added": 13,
+      "removed": 12,
+      "total": 25
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "063fc33",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "c6ddd14",
+      "added": 309,
+      "removed": 3,
+      "total": 312
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "fbc7b68",
+      "added": 31,
+      "removed": 12,
+      "total": 43
+    },
+    {
+      "date": "2025-12-17",
+      "commit": "18fef3b",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "f14de87",
+      "added": 5330,
+      "removed": 9118,
+      "total": 14448
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "c083142",
+      "added": 8723,
+      "removed": 5000,
+      "total": 13723
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "c0c9069",
+      "added": 34,
+      "removed": 0,
+      "total": 34
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "e7ba87f",
+      "added": 363,
+      "removed": 0,
+      "total": 363
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "c254e32",
+      "added": 203,
+      "removed": 0,
+      "total": 203
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "a1b4e9c",
+      "added": 13,
+      "removed": 4,
+      "total": 17
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "cf8f1b9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "06ca8c4",
+      "added": 12,
+      "removed": 9,
+      "total": 21
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "50838fc",
+      "added": 23,
+      "removed": 16,
+      "total": 39
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "3bc9c66",
+      "added": 4,
+      "removed": 6,
+      "total": 10
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "ee7c147",
+      "added": 437,
+      "removed": 0,
+      "total": 437
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "dca9493",
+      "added": 15,
+      "removed": 0,
+      "total": 15
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "3122fd9",
+      "added": 13,
+      "removed": 12,
+      "total": 25
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "265f19c",
+      "added": 4,
+      "removed": 2,
+      "total": 6
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "01a86f4",
+      "added": 659,
+      "removed": 0,
+      "total": 659
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "040dc07",
+      "added": 14,
+      "removed": 6,
+      "total": 20
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "bd57ddb",
+      "added": 39,
+      "removed": 39,
+      "total": 78
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "71757d5",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "2bc49fc",
+      "added": 155,
+      "removed": 27,
+      "total": 182
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "8c4dc24",
+      "added": 6,
+      "removed": 44,
+      "total": 50
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "52e6de0",
+      "added": 139,
+      "removed": 0,
+      "total": 139
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "73cbbd9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "bb0e649",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "a724e4e",
+      "added": 24,
+      "removed": 18,
+      "total": 42
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "b49f802",
+      "added": 10,
+      "removed": 0,
+      "total": 10
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "bc780a0",
+      "added": 37,
+      "removed": 5,
+      "total": 42
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "c62fe59",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "c98efe7",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "c223c4a",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "fea93d9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "1cc097f",
+      "added": 138,
+      "removed": 0,
+      "total": 138
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "fbfce36",
+      "added": 40,
+      "removed": 26,
+      "total": 66
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "a73aa71",
+      "added": 93,
+      "removed": 0,
+      "total": 93
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "4055936",
+      "added": 92,
+      "removed": 0,
+      "total": 92
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "27f03a4",
+      "added": 369,
+      "removed": 6,
+      "total": 375
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "ec6410e",
+      "added": 121,
+      "removed": 0,
+      "total": 121
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "25c979c",
+      "added": 474,
+      "removed": 340,
+      "total": 814
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "3d96d31",
+      "added": 0,
+      "removed": 243,
+      "total": 243
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "51150dc",
+      "added": 24,
+      "removed": 24,
+      "total": 48
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "20ed962",
+      "added": 2,
+      "removed": 8,
+      "total": 10
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "7a62e48",
+      "added": 19,
+      "removed": 21,
+      "total": 40
+    },
+    {
+      "date": "2025-12-18",
+      "commit": "1d979b2",
+      "added": 10136,
+      "removed": 554,
+      "total": 10690
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "b27a43c",
+      "added": 0,
+      "removed": 1067,
+      "total": 1067
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "4af5dfc",
+      "added": 0,
+      "removed": 102,
+      "total": 102
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "58909af",
+      "added": 0,
+      "removed": 79,
+      "total": 79
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "45df369",
+      "added": 1,
+      "removed": 1,
+      "total": 2
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "cdbae16",
+      "added": 1,
+      "removed": 1,
+      "total": 2
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "ed740ce",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "01060be",
+      "added": 26,
+      "removed": 17,
+      "total": 43
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "4d9a1c5",
+      "added": 31,
+      "removed": 15,
+      "total": 46
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "f9f01fb",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "8ab0bd3",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "cd0115a",
+      "added": 5,
+      "removed": 1,
+      "total": 6
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "7391216",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "05e6995",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "fdfa98f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "83b6282",
+      "added": 23,
+      "removed": 9,
+      "total": 32
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "a8c0738",
+      "added": 189,
+      "removed": 10,
+      "total": 199
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "83cd763",
+      "added": 50,
+      "removed": 0,
+      "total": 50
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "dfa32f3",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "8693ba9",
+      "added": 71,
+      "removed": 4,
+      "total": 75
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "9af72f7",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "efb649d",
+      "added": 25,
+      "removed": 10,
+      "total": 35
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "6c5b338",
+      "added": 4,
+      "removed": 6,
+      "total": 10
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "cfa668f",
+      "added": 2,
+      "removed": 1,
+      "total": 3
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "53141ea",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "cf9eee2",
+      "added": 54,
+      "removed": 0,
+      "total": 54
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "9a92c96",
+      "added": 32,
+      "removed": 0,
+      "total": 32
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "42276d2",
+      "added": 40,
+      "removed": 0,
+      "total": 40
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "c3e2080",
+      "added": 226,
+      "removed": 0,
+      "total": 226
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "73e1214",
+      "added": 15,
+      "removed": 0,
+      "total": 15
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "3df52de",
+      "added": 27,
+      "removed": 0,
+      "total": 27
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "d83fed0",
+      "added": 88,
+      "removed": 3,
+      "total": 91
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "12c097e",
+      "added": 66,
+      "removed": 9,
+      "total": 75
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "b9147ad",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "aa748cf",
+      "added": 30,
+      "removed": 13,
+      "total": 43
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "cc09ffc",
+      "added": 12,
+      "removed": 12,
+      "total": 24
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "56fdc44",
+      "added": 5,
+      "removed": 27,
+      "total": 32
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "ef93be0",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "658c370",
+      "added": 288,
+      "removed": 35,
+      "total": 323
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "b61a6ec",
+      "added": 44,
+      "removed": 157,
+      "total": 201
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "0e89874",
+      "added": 419,
+      "removed": 0,
+      "total": 419
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "cc827b8",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "fe0dd8f",
+      "added": 10956,
+      "removed": 2,
+      "total": 10958
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "bfd5631",
+      "added": 644,
+      "removed": 237,
+      "total": 881
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "d43eb79",
+      "added": 9,
+      "removed": 1,
+      "total": 10
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "cd69f97",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "9233be3",
+      "added": 291,
+      "removed": 2,
+      "total": 293
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "3f17b2d",
+      "added": 16,
+      "removed": 3,
+      "total": 19
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "da593e3",
+      "added": 1,
+      "removed": 0,
+      "total": 1
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "917a8fe",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "b73b764",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "9ebbb54",
+      "added": 139,
+      "removed": 5,
+      "total": 144
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "6bacda8",
+      "added": 331,
+      "removed": 5,
+      "total": 336
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "6025297",
+      "added": 23,
+      "removed": 17,
+      "total": 40
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "2e48345",
+      "added": 5,
+      "removed": 5,
+      "total": 10
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "4934cce",
+      "added": 534,
+      "removed": 12,
+      "total": 546
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "70f3d94",
+      "added": 248,
+      "removed": 118,
+      "total": 366
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "b771334",
+      "added": 41,
+      "removed": 13,
+      "total": 54
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "1f0c924",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "a8194f6",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "bff1519",
+      "added": 64,
+      "removed": 0,
+      "total": 64
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "b8fe2c1",
+      "added": 93,
+      "removed": 0,
+      "total": 93
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "7d4b7bb",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "c92bcaa",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "667f07c",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "a96fbe6",
+      "added": 58,
+      "removed": 0,
+      "total": 58
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "c98c0a2",
+      "added": 1484,
+      "removed": 1,
+      "total": 1485
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "852c5d3",
+      "added": 1000,
+      "removed": 0,
+      "total": 1000
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "35edef3",
+      "added": 559,
+      "removed": 109,
+      "total": 668
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "98e051e",
+      "added": 1490,
+      "removed": 1,
+      "total": 1491
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "0e4cede",
+      "added": 72,
+      "removed": 5,
+      "total": 77
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "a87367a",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "5e4ef01",
+      "added": 24,
+      "removed": 6,
+      "total": 30
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "885db04",
+      "added": 5,
+      "removed": 49,
+      "total": 54
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "d662850",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "c0dd988",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "df338ab",
+      "added": 8,
+      "removed": 0,
+      "total": 8
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "ee7cbef",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "04ea27b",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "13ef12f",
+      "added": 239,
+      "removed": 0,
+      "total": 239
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "8a81d54",
+      "added": 401,
+      "removed": 0,
+      "total": 401
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "6da9e26",
+      "added": 534,
+      "removed": 0,
+      "total": 534
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "7388500",
+      "added": 175,
+      "removed": 0,
+      "total": 175
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "08070c1",
+      "added": 1411,
+      "removed": 576,
+      "total": 1987
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "99ebe2f",
+      "added": 1486,
+      "removed": 950,
+      "total": 2436
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "4632cae",
+      "added": 41,
+      "removed": 0,
+      "total": 41
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "ea2a168",
+      "added": 12,
+      "removed": 2,
+      "total": 14
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "fc4c37d",
+      "added": 57,
+      "removed": 0,
+      "total": 57
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "67410ef",
+      "added": 87,
+      "removed": 1,
+      "total": 88
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "99d737b",
+      "added": 150,
+      "removed": 2,
+      "total": 152
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "21e6115",
+      "added": 52,
+      "removed": 19,
+      "total": 71
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "f8bec35",
+      "added": 152,
+      "removed": 27,
+      "total": 179
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "8ca177d",
+      "added": 2,
+      "removed": 1289,
+      "total": 1291
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "62f62bb",
+      "added": 0,
+      "removed": 2653,
+      "total": 2653
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "cd0df95",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "0e7b2f6",
+      "added": 0,
+      "removed": 10261,
+      "total": 10261
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "0d47b39",
+      "added": 207,
+      "removed": 15,
+      "total": 222
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "685a819",
+      "added": 13,
+      "removed": 13,
+      "total": 26
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "bbcc3de",
+      "added": 17,
+      "removed": 13,
+      "total": 30
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "2f94148",
+      "added": 46,
+      "removed": 4,
+      "total": 50
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "b096348",
+      "added": 30,
+      "removed": 14,
+      "total": 44
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "0f46fc5",
+      "added": 149,
+      "removed": 7,
+      "total": 156
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "bd95521",
+      "added": 140,
+      "removed": 1540,
+      "total": 1680
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "2450c78",
+      "added": 104,
+      "removed": 9,
+      "total": 113
+    },
+    {
+      "date": "2025-12-19",
+      "commit": "62decb8",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "a1deba5",
+      "added": 215,
+      "removed": 3,
+      "total": 218
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "0b2c2bb",
+      "added": 93,
+      "removed": 11,
+      "total": 104
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "b8f6c4d",
+      "added": 9,
+      "removed": 2,
+      "total": 11
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "f98bcb4",
+      "added": 118,
+      "removed": 17,
+      "total": 135
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "5792488",
+      "added": 185,
+      "removed": 50,
+      "total": 235
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "83bea58",
+      "added": 11,
+      "removed": 3,
+      "total": 14
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "440bdaa",
+      "added": 40,
+      "removed": 14,
+      "total": 54
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "77ee7bd",
+      "added": 202,
+      "removed": 38,
+      "total": 240
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "b32d2c6",
+      "added": 283,
+      "removed": 23,
+      "total": 306
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "bb6a4b8",
+      "added": 73,
+      "removed": 16,
+      "total": 89
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "bdd0ba5",
+      "added": 9,
+      "removed": 9,
+      "total": 18
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "3f002f5",
+      "added": 153,
+      "removed": 0,
+      "total": 153
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "7599b53",
+      "added": 619,
+      "removed": 1,
+      "total": 620
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "406beac",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "fb32c37",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "cb6fac0",
+      "added": 68,
+      "removed": 48,
+      "total": 116
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "6e5b4ae",
+      "added": 79,
+      "removed": 1,
+      "total": 80
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "ef82699",
+      "added": 87,
+      "removed": 11,
+      "total": 98
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "3197993",
+      "added": 7,
+      "removed": 22,
+      "total": 29
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "b39eac9",
+      "added": 62,
+      "removed": 0,
+      "total": 62
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "632f508",
+      "added": 472,
+      "removed": 0,
+      "total": 472
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "f24285f",
+      "added": 9,
+      "removed": 0,
+      "total": 9
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "9fb2511",
+      "added": 108,
+      "removed": 97,
+      "total": 205
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "dc7fa10",
+      "added": 62,
+      "removed": 68,
+      "total": 130
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "8da0c4a",
+      "added": 64,
+      "removed": 52,
+      "total": 116
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "558cbe2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "6dcc1e7",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "e743133",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "5cd0119",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "dc72ef2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "14fde62",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "70d6ee2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "32015ec",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "54e7ba0",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "10119ac",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "56e52a7",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "6b9cf04",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "dc49f35",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "30075df",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "870e434",
+      "added": 263,
+      "removed": 1,
+      "total": 264
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "7bf0ba0",
+      "added": 387,
+      "removed": 0,
+      "total": 387
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "d8f1492",
+      "added": 222,
+      "removed": 0,
+      "total": 222
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "910577f",
+      "added": 63,
+      "removed": 3,
+      "total": 66
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "874143a",
+      "added": 424,
+      "removed": 0,
+      "total": 424
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "c7acccd",
+      "added": 100,
+      "removed": 9,
+      "total": 109
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "186264e",
+      "added": 113,
+      "removed": 124,
+      "total": 237
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "acad311",
+      "added": 282,
+      "removed": 0,
+      "total": 282
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "4653876",
+      "added": 227,
+      "removed": 3,
+      "total": 230
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "2fa615c",
+      "added": 50,
+      "removed": 0,
+      "total": 50
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "c0da220",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "39141a1",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "0f374de",
+      "added": 586,
+      "removed": 0,
+      "total": 586
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "fee0e05",
+      "added": 424,
+      "removed": 0,
+      "total": 424
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "414ce65",
+      "added": 256,
+      "removed": 0,
+      "total": 256
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "d2f097b",
+      "added": 446,
+      "removed": 0,
+      "total": 446
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "13ea409",
+      "added": 315,
+      "removed": 15,
+      "total": 330
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "08d0ad3",
+      "added": 52,
+      "removed": 0,
+      "total": 52
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "11a49fa",
+      "added": 2,
+      "removed": 2,
+      "total": 4
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "6a3b349",
+      "added": 360,
+      "removed": 1,
+      "total": 361
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "be4e363",
+      "added": 766,
+      "removed": 0,
+      "total": 766
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "6bf0dc8",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "04f9727",
+      "added": 544,
+      "removed": 0,
+      "total": 544
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "8b54fec",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "6a17bb5",
+      "added": 593,
+      "removed": 0,
+      "total": 593
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "99ab1bc",
+      "added": 192,
+      "removed": 0,
+      "total": 192
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "167260a",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "c97fe71",
+      "added": 174,
+      "removed": 0,
+      "total": 174
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "f6d3117",
+      "added": 15,
+      "removed": 0,
+      "total": 15
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "5e11dc0",
+      "added": 242,
+      "removed": 0,
+      "total": 242
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "7d6e0de",
+      "added": 4,
+      "removed": 0,
+      "total": 4
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "e2df7b5",
+      "added": 43,
+      "removed": 2,
+      "total": 45
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "d6bff93",
+      "added": 296,
+      "removed": 0,
+      "total": 296
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "1018519",
+      "added": 327,
+      "removed": 0,
+      "total": 327
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "c14623e",
+      "added": 488,
+      "removed": 101,
+      "total": 589
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "20b5030",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "c16b1f9",
+      "added": 590,
+      "removed": 0,
+      "total": 590
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "42f9fd8",
+      "added": 189,
+      "removed": 26,
+      "total": 215
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "3a9dc80",
+      "added": 483,
+      "removed": 293,
+      "total": 776
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "6ae3ac1",
+      "added": 160,
+      "removed": 360,
+      "total": 520
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "ed74fa5",
+      "added": 188,
+      "removed": 0,
+      "total": 188
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "7275669",
+      "added": 34,
+      "removed": 14,
+      "total": 48
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "d2ce783",
+      "added": 45,
+      "removed": 16,
+      "total": 61
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "f544a0f",
+      "added": 74,
+      "removed": 1,
+      "total": 75
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "513ac96",
+      "added": 11,
+      "removed": 0,
+      "total": 11
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "9ef303d",
+      "added": 118,
+      "removed": 17,
+      "total": 135
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "6c6ffda",
+      "added": 111,
+      "removed": 1,
+      "total": 112
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "0696d8e",
+      "added": 189,
+      "removed": 96,
+      "total": 285
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "823adaf",
+      "added": 119,
+      "removed": 4,
+      "total": 123
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "51f5eee",
+      "added": 19,
+      "removed": 12,
+      "total": 31
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "a273252",
+      "added": 257,
+      "removed": 0,
+      "total": 257
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "7643a82",
+      "added": 54,
+      "removed": 1,
+      "total": 55
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "42ce016",
+      "added": 43,
+      "removed": 22,
+      "total": 65
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "63d05ce",
+      "added": 27,
+      "removed": 3,
+      "total": 30
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "403002d",
+      "added": 142,
+      "removed": 52,
+      "total": 194
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "19bc873",
+      "added": 6,
+      "removed": 11,
+      "total": 17
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "83165dc",
+      "added": 26,
+      "removed": 0,
+      "total": 26
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "e89b7ea",
+      "added": 43,
+      "removed": 2,
+      "total": 45
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "e55faf7",
+      "added": 1,
+      "removed": 4,
+      "total": 5
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "5349b6a",
+      "added": 235,
+      "removed": 38,
+      "total": 273
+    },
+    {
+      "date": "2025-12-20",
+      "commit": "1044aeb",
+      "added": 12,
+      "removed": 3,
+      "total": 15
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "ea5be6c",
+      "added": 291,
+      "removed": 370,
+      "total": 661
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "cb660db",
+      "added": 160,
+      "removed": 0,
+      "total": 160
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "161cbe9",
+      "added": 11,
+      "removed": 1,
+      "total": 12
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "d9ed94a",
+      "added": 163,
+      "removed": 37,
+      "total": 200
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "00524e9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "487ce6d",
+      "added": 43,
+      "removed": 36,
+      "total": 79
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "a9fc879",
+      "added": 292,
+      "removed": 19,
+      "total": 311
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "86a7917",
+      "added": 95,
+      "removed": 1,
+      "total": 96
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "878a092",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "9d0ca19",
+      "added": 0,
+      "removed": 1,
+      "total": 1
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "0ff1255",
+      "added": 96,
+      "removed": 188,
+      "total": 284
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "127ff80",
+      "added": 4,
+      "removed": 7,
+      "total": 11
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "eee4cad",
+      "added": 9,
+      "removed": 308,
+      "total": 317
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "af32e27",
+      "added": 8,
+      "removed": 5,
+      "total": 13
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "d17d69f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "25daeb0",
+      "added": 5,
+      "removed": 5,
+      "total": 10
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "6bf8f04",
+      "added": 4,
+      "removed": 4,
+      "total": 8
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "11ac20e",
+      "added": 17,
+      "removed": 17,
+      "total": 34
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "9ec38c3",
+      "added": 23,
+      "removed": 23,
+      "total": 46
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "da5f9c3",
+      "added": 14,
+      "removed": 14,
+      "total": 28
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "47f0956",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "2c6615e",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "51dcad9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "7af0159",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "e62b1d9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "234a6d3",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "f8dde62",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "ed01379",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "98c1dae",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "89f8a82",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "1c61459",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "bf98268",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "c15682b",
+      "added": 2,
+      "removed": 2,
+      "total": 4
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "9dd76dd",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "8c95f5c",
+      "added": 4,
+      "removed": 4,
+      "total": 8
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "0107741",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "8d4d762",
+      "added": 1,
+      "removed": 1,
+      "total": 2
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "1254cf5",
+      "added": 15,
+      "removed": 15,
+      "total": 30
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "8e0111b",
+      "added": 0,
+      "removed": 3,
+      "total": 3
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "158bfb2",
+      "added": 55,
+      "removed": 23,
+      "total": 78
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "07fa390",
+      "added": 81,
+      "removed": 24,
+      "total": 105
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "1ab531a",
+      "added": 73,
+      "removed": 26,
+      "total": 99
+    },
+    {
+      "date": "2025-12-21",
+      "commit": "315985a",
+      "added": 11,
+      "removed": 10,
+      "total": 21
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "cd16cdb",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "c3a2a5b",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "8039bd8",
+      "added": 372,
+      "removed": 1,
+      "total": 373
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "2e77190",
+      "added": 21,
+      "removed": 5,
+      "total": 26
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "fc4c201",
+      "added": 32,
+      "removed": 37,
+      "total": 69
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "48b9d01",
+      "added": 1120,
+      "removed": 1,
+      "total": 1121
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "a5f9904",
+      "added": 715,
+      "removed": 1,
+      "total": 716
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "99b1c38",
+      "added": 2702,
+      "removed": 1,
+      "total": 2703
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "74c25e0",
+      "added": 1066,
+      "removed": 9,
+      "total": 1075
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "c3509ef",
+      "added": 1085,
+      "removed": 1,
+      "total": 1086
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "2574d94",
+      "added": 973,
+      "removed": 3,
+      "total": 976
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "5361f40",
+      "added": 340,
+      "removed": 14,
+      "total": 354
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "1dd753b",
+      "added": 262,
+      "removed": 3,
+      "total": 265
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "36a46ca",
+      "added": 674,
+      "removed": 1,
+      "total": 675
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "3250338",
+      "added": 99,
+      "removed": 2,
+      "total": 101
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "113884f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-22",
+      "commit": "f8931d3",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "ad5ab31",
+      "added": 367,
+      "removed": 2,
+      "total": 369
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "1218780",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "0194403",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "f8b001e",
+      "added": 30,
+      "removed": 71,
+      "total": 101
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "b74f4ae",
+      "added": 6,
+      "removed": 2,
+      "total": 8
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "72d2172",
+      "added": 0,
+      "removed": 754,
+      "total": 754
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "89b8195",
+      "added": 0,
+      "removed": 2328,
+      "total": 2328
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "94ad560",
+      "added": 5,
+      "removed": 507,
+      "total": 512
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "02a1580",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "06c4ec6",
+      "added": 25,
+      "removed": 4,
+      "total": 29
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "1b422a3",
+      "added": 54,
+      "removed": 52,
+      "total": 106
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "115a3c0",
+      "added": 1140,
+      "removed": 571,
+      "total": 1711
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "bab7da9",
+      "added": 3,
+      "removed": 0,
+      "total": 3
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "a52b574",
+      "added": 39,
+      "removed": 0,
+      "total": 39
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "ee617a8",
+      "added": 300,
+      "removed": 80,
+      "total": 380
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "d7ea4bf",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "c437321",
+      "added": 40,
+      "removed": 5,
+      "total": 45
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "b86ceef",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "5d3fa08",
+      "added": 68,
+      "removed": 0,
+      "total": 68
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "2c39316",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "a4b63b3",
+      "added": 4,
+      "removed": 0,
+      "total": 4
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "24dc5dc",
+      "added": 599,
+      "removed": 17,
+      "total": 616
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "cc2da70",
+      "added": 146,
+      "removed": 18,
+      "total": 164
+    },
+    {
+      "date": "2025-12-23",
+      "commit": "cbef867",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "868b4d6",
+      "added": 389,
+      "removed": 149,
+      "total": 538
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "2a54c8c",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "3c557eb",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "19220da",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "9998afa",
+      "added": 69,
+      "removed": 0,
+      "total": 69
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "b9db193",
+      "added": 443,
+      "removed": 0,
+      "total": 443
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "9072896",
+      "added": 452,
+      "removed": 0,
+      "total": 452
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "94d3c83",
+      "added": 681,
+      "removed": 0,
+      "total": 681
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "121f4c8",
+      "added": 1177,
+      "removed": 0,
+      "total": 1177
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "a7eeef5",
+      "added": 651,
+      "removed": 0,
+      "total": 651
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "ffc419f",
+      "added": 641,
+      "removed": 0,
+      "total": 641
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "6fe139f",
+      "added": 809,
+      "removed": 0,
+      "total": 809
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "38d5163",
+      "added": 871,
+      "removed": 0,
+      "total": 871
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "9db33ad",
+      "added": 2,
+      "removed": 2,
+      "total": 4
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "f29b576",
+      "added": 990,
+      "removed": 2,
+      "total": 992
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "2a2297e",
+      "added": 939,
+      "removed": 0,
+      "total": 939
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "c9508ff",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "da5f2ce",
+      "added": 0,
+      "removed": 6188,
+      "total": 6188
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "648a7a1",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "effa898",
+      "added": 40,
+      "removed": 15,
+      "total": 55
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "f943f34",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "bd4f651",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "0a35467",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "ffdc23d",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "3f50494",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "b1bdefd",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "8be874d",
+      "added": 584,
+      "removed": 0,
+      "total": 584
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "1a097b7",
+      "added": 1584,
+      "removed": 71,
+      "total": 1655
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "b907512",
+      "added": 28,
+      "removed": 22,
+      "total": 50
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "11fca08",
+      "added": 320,
+      "removed": 3,
+      "total": 323
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "ccebb86",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "350dbb1",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "f0866ea",
+      "added": 636,
+      "removed": 0,
+      "total": 636
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "c6277d6",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "dbea64d",
+      "added": 399,
+      "removed": 0,
+      "total": 399
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "cdf98e7",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "13ebbe6",
+      "added": 334,
+      "removed": 0,
+      "total": 334
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "bf5a35f",
+      "added": 494,
+      "removed": 0,
+      "total": 494
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "26b3aff",
+      "added": 590,
+      "removed": 0,
+      "total": 590
+    },
+    {
+      "date": "2025-12-24",
+      "commit": "046771f",
+      "added": 451,
+      "removed": 0,
+      "total": 451
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "91855ce",
+      "added": 8,
+      "removed": 16,
+      "total": 24
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "0930611",
+      "added": 933,
+      "removed": 0,
+      "total": 933
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "952e548",
+      "added": 475,
+      "removed": 0,
+      "total": 475
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "ee209bf",
+      "added": 154,
+      "removed": 0,
+      "total": 154
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "33b6257",
+      "added": 226,
+      "removed": 0,
+      "total": 226
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "8785291",
+      "added": 829,
+      "removed": 34,
+      "total": 863
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "cf028a0",
+      "added": 8,
+      "removed": 3005,
+      "total": 3013
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "9dacc90",
+      "added": 16,
+      "removed": 55,
+      "total": 71
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "a41b2f2",
+      "added": 6,
+      "removed": 5,
+      "total": 11
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "5c3412b",
+      "added": 2,
+      "removed": 2,
+      "total": 4
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "ca3ce09",
+      "added": 1224,
+      "removed": 924,
+      "total": 2148
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "81ae9db",
+      "added": 198,
+      "removed": 534,
+      "total": 732
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "ef321ca",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "1348405",
+      "added": 9,
+      "removed": 0,
+      "total": 9
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "d39e331",
+      "added": 123,
+      "removed": 0,
+      "total": 123
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "7302cc0",
+      "added": 356,
+      "removed": 0,
+      "total": 356
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "fa4872b",
+      "added": 985,
+      "removed": 33,
+      "total": 1018
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "7ad726f",
+      "added": 44,
+      "removed": 29,
+      "total": 73
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "fdc03bd",
+      "added": 505,
+      "removed": 0,
+      "total": 505
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "9fc3797",
+      "added": 610,
+      "removed": 41,
+      "total": 651
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "a81f4b6",
+      "added": 99,
+      "removed": 2,
+      "total": 101
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "6bfc660",
+      "added": 190,
+      "removed": 4,
+      "total": 194
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "dcca28f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "6bc0202",
+      "added": 17,
+      "removed": 2,
+      "total": 19
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "35e98d1",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "91fa17a",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "4751e5c",
+      "added": 403,
+      "removed": 0,
+      "total": 403
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "9390061",
+      "added": 115,
+      "removed": 0,
+      "total": 115
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "80e27a1",
+      "added": 130,
+      "removed": 0,
+      "total": 130
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "e6a81a2",
+      "added": 9,
+      "removed": 6,
+      "total": 15
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "564b6d4",
+      "added": 13,
+      "removed": 3,
+      "total": 16
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "865f52c",
+      "added": 447,
+      "removed": 407,
+      "total": 854
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "f5ffb0c",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "05e1e48",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "523be00",
+      "added": 225,
+      "removed": 0,
+      "total": 225
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "953f37f",
+      "added": 47,
+      "removed": 26,
+      "total": 73
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "a524667",
+      "added": 522,
+      "removed": 0,
+      "total": 522
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "22d3a26",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "d436e05",
+      "added": 706,
+      "removed": 2,
+      "total": 708
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "f579a14",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "f7eedf3",
+      "added": 21,
+      "removed": 0,
+      "total": 21
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "564870d",
+      "added": 23,
+      "removed": 1,
+      "total": 24
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "ebe798e",
+      "added": 16,
+      "removed": 3,
+      "total": 19
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "bf43d78",
+      "added": 36,
+      "removed": 2,
+      "total": 38
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "df2b64c",
+      "added": 11,
+      "removed": 10,
+      "total": 21
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "e0cdb1e",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "5919465",
+      "added": 8,
+      "removed": 0,
+      "total": 8
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "573b3bf",
+      "added": 138,
+      "removed": 77,
+      "total": 215
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "4414dd0",
+      "added": 15,
+      "removed": 15,
+      "total": 30
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "d614f43",
+      "added": 29,
+      "removed": 2,
+      "total": 31
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "117ca89",
+      "added": 6,
+      "removed": 2,
+      "total": 8
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "3afcc7a",
+      "added": 5,
+      "removed": 0,
+      "total": 5
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "e36e84b",
+      "added": 5,
+      "removed": 1,
+      "total": 6
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "467c588",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "8e3f7ce",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "6e00962",
+      "added": 35,
+      "removed": 0,
+      "total": 35
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "7728027",
+      "added": 68,
+      "removed": 7,
+      "total": 75
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "008604f",
+      "added": 22,
+      "removed": 0,
+      "total": 22
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "012d002",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "25b4251",
+      "added": 36,
+      "removed": 0,
+      "total": 36
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "130d844",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "1dccf08",
+      "added": 66,
+      "removed": 1,
+      "total": 67
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "7da2d2e",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "1903472",
+      "added": 3,
+      "removed": 2,
+      "total": 5
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "063fd83",
+      "added": 12,
+      "removed": 1,
+      "total": 13
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "bca7152",
+      "added": 113,
+      "removed": 8,
+      "total": 121
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "13806e2",
+      "added": 11,
+      "removed": 3,
+      "total": 14
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "ff23975",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "3da09b1",
+      "added": 634,
+      "removed": 0,
+      "total": 634
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "c38c395",
+      "added": 579,
+      "removed": 5,
+      "total": 584
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "29deb89",
+      "added": 82,
+      "removed": 46,
+      "total": 128
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "f92daa6",
+      "added": 616,
+      "removed": 7,
+      "total": 623
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "2f82030",
+      "added": 314,
+      "removed": 3,
+      "total": 317
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "f3e3e8d",
+      "added": 770,
+      "removed": 0,
+      "total": 770
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "91b9294",
+      "added": 588,
+      "removed": 0,
+      "total": 588
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "1fabc84",
+      "added": 503,
+      "removed": 6,
+      "total": 509
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "8ee5e95",
+      "added": 12,
+      "removed": 0,
+      "total": 12
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "8927655",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "db945da",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "d8ffad4",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "e713534",
+      "added": 329,
+      "removed": 12,
+      "total": 341
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "86e79ee",
+      "added": 4,
+      "removed": 1,
+      "total": 5
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "3eaeaa5",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "bb7032a",
+      "added": 182,
+      "removed": 0,
+      "total": 182
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "905ac59",
+      "added": 284,
+      "removed": 0,
+      "total": 284
+    },
+    {
+      "date": "2025-12-25",
+      "commit": "c08bfea",
+      "added": 582,
+      "removed": 0,
+      "total": 582
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "4fdd33e",
+      "added": 73,
+      "removed": 22,
+      "total": 95
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "a01c278",
+      "added": 110,
+      "removed": 87,
+      "total": 197
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "b2f059a",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "4a3c037",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "e06539c",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "39f3f67",
+      "added": 2370,
+      "removed": 2024,
+      "total": 4394
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "8ff484f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "a47f525",
+      "added": 1,
+      "removed": 0,
+      "total": 1
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "6120dad",
+      "added": 34,
+      "removed": 45,
+      "total": 79
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "ded44b5",
+      "added": 290,
+      "removed": 83,
+      "total": 373
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "5465a4b",
+      "added": 61,
+      "removed": 24,
+      "total": 85
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "8cb8ffc",
+      "added": 4,
+      "removed": 5,
+      "total": 9
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "aeee8dc",
+      "added": 8,
+      "removed": 0,
+      "total": 8
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "87d4368",
+      "added": 172,
+      "removed": 7,
+      "total": 179
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "b2392cb",
+      "added": 24,
+      "removed": 3,
+      "total": 27
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "8e8aba1",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "0f05f29",
+      "added": 153,
+      "removed": 24,
+      "total": 177
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "5049f16",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "86855c4",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "aba9e7c",
+      "added": 42,
+      "removed": 42,
+      "total": 84
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "a09f5b9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "7992fad",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "e98cef8",
+      "added": 631,
+      "removed": 115,
+      "total": 746
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "9f96455",
+      "added": 93,
+      "removed": 17,
+      "total": 110
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "f411130",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "00e0c72",
+      "added": 554,
+      "removed": 1,
+      "total": 555
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "4d4952b",
+      "added": 13,
+      "removed": 19,
+      "total": 32
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "d15fa3a",
+      "added": 25,
+      "removed": 3,
+      "total": 28
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "a21e70f",
+      "added": 588,
+      "removed": 139,
+      "total": 727
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "c2987fd",
+      "added": 40,
+      "removed": 9,
+      "total": 49
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "11b681a",
+      "added": 6,
+      "removed": 1,
+      "total": 7
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "d53399a",
+      "added": 636,
+      "removed": 0,
+      "total": 636
+    },
+    {
+      "date": "2025-12-26",
+      "commit": "09394ec",
+      "added": 274,
+      "removed": 20,
+      "total": 294
+    },
+    {
+      "date": "2025-12-27",
+      "commit": "f1b53e0",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-27",
+      "commit": "2b72252",
+      "added": 205,
+      "removed": 9,
+      "total": 214
+    },
+    {
+      "date": "2025-12-27",
+      "commit": "a2728e5",
+      "added": 9,
+      "removed": 9,
+      "total": 18
+    },
+    {
+      "date": "2025-12-27",
+      "commit": "4446cee",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-27",
+      "commit": "35d58fc",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-27",
+      "commit": "a9d6f68",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-27",
+      "commit": "af4f5b7",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-27",
+      "commit": "0054e47",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-27",
+      "commit": "b01b16b",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-27",
+      "commit": "98075c0",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-27",
+      "commit": "87f073e",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "762e763",
+      "added": 86,
+      "removed": 15,
+      "total": 101
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "508ab7f",
+      "added": 40,
+      "removed": 0,
+      "total": 40
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "22539d9",
+      "added": 16,
+      "removed": 10,
+      "total": 26
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "0ca29ac",
+      "added": 52,
+      "removed": 0,
+      "total": 52
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "fc6f3e6",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "2c84df0",
+      "added": 14,
+      "removed": 3,
+      "total": 17
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "60f4a01",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "6f40da7",
+      "added": 276,
+      "removed": 7,
+      "total": 283
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "c1672f0",
+      "added": 13,
+      "removed": 2,
+      "total": 15
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "7aa8a6d",
+      "added": 135,
+      "removed": 17,
+      "total": 152
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "1e0e739",
+      "added": 47,
+      "removed": 21,
+      "total": 68
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "5c615d6",
+      "added": 11,
+      "removed": 0,
+      "total": 11
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "bf91776",
+      "added": 26,
+      "removed": 35,
+      "total": 61
+    },
+    {
+      "date": "2025-12-28",
+      "commit": "88f9f32",
+      "added": 12,
+      "removed": 12,
+      "total": 24
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "ba40bd4",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "7aa9f70",
+      "added": 631,
+      "removed": 88,
+      "total": 719
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "34c9add",
+      "added": 10,
+      "removed": 1,
+      "total": 11
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "2b89f49",
+      "added": 433,
+      "removed": 5,
+      "total": 438
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "749049d",
+      "added": 589,
+      "removed": 16,
+      "total": 605
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "00169b1",
+      "added": 5,
+      "removed": 0,
+      "total": 5
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "8464594",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "3f10e11",
+      "added": 1048,
+      "removed": 0,
+      "total": 1048
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "f74129e",
+      "added": 356,
+      "removed": 56,
+      "total": 412
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "5e1dbf7",
+      "added": 580,
+      "removed": 10,
+      "total": 590
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "5f68bdd",
+      "added": 143,
+      "removed": 39,
+      "total": 182
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "7abf6ad",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "988180d",
+      "added": 157,
+      "removed": 3,
+      "total": 160
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "28ce699",
+      "added": 4,
+      "removed": 4,
+      "total": 8
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "0869196",
+      "added": 1,
+      "removed": 419,
+      "total": 420
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "d537724",
+      "added": 74,
+      "removed": 191,
+      "total": 265
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "e4e99a1",
+      "added": 64,
+      "removed": 4,
+      "total": 68
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "d152d15",
+      "added": 89,
+      "removed": 11,
+      "total": 100
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "41c86e9",
+      "added": 95,
+      "removed": 64,
+      "total": 159
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "d380c19",
+      "added": 7,
+      "removed": 2,
+      "total": 9
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "b03d19a",
+      "added": 29,
+      "removed": 7,
+      "total": 36
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "ca02091",
+      "added": 26,
+      "removed": 0,
+      "total": 26
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "65c4842",
+      "added": 92,
+      "removed": 85,
+      "total": 177
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "ed37e38",
+      "added": 209,
+      "removed": 62,
+      "total": 271
+    },
+    {
+      "date": "2025-12-29",
+      "commit": "3d8e9bb",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "93497b1",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "b912cb5",
+      "added": 11,
+      "removed": 1,
+      "total": 12
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "0c4abb5",
+      "added": 183,
+      "removed": 141,
+      "total": 324
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "f58aba3",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "1f01bf7",
+      "added": 37,
+      "removed": 10,
+      "total": 47
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "8460486",
+      "added": 7,
+      "removed": 3,
+      "total": 10
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "da5842d",
+      "added": 730,
+      "removed": 162,
+      "total": 892
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "6a0a0d9",
+      "added": 56,
+      "removed": 6,
+      "total": 62
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "aac4091",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "97a1689",
+      "added": 9,
+      "removed": 0,
+      "total": 9
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "0e1cd28",
+      "added": 129,
+      "removed": 0,
+      "total": 129
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "fd0c0c9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "77cd17b",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "04a5bd2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "4ea988d",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "261d0d6",
+      "added": 421,
+      "removed": 0,
+      "total": 421
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "acc3190",
+      "added": 821,
+      "removed": 5,
+      "total": 826
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "edae2c3",
+      "added": 76,
+      "removed": 1,
+      "total": 77
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "06535b5",
+      "added": 52,
+      "removed": 0,
+      "total": 52
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "e7d91af",
+      "added": 108,
+      "removed": 1,
+      "total": 109
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "2ed825b",
+      "added": 6,
+      "removed": 2,
+      "total": 8
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "d29ec2b",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "4549ca1",
+      "added": 466,
+      "removed": 84,
+      "total": 550
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "1276d12",
+      "added": 8,
+      "removed": 5,
+      "total": 13
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "0d181e3",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "0193ae1",
+      "added": 13,
+      "removed": 1,
+      "total": 14
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "761fc55",
+      "added": 160,
+      "removed": 1,
+      "total": 161
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "b92fa53",
+      "added": 283,
+      "removed": 9,
+      "total": 292
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "0e14587",
+      "added": 148,
+      "removed": 1,
+      "total": 149
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "cb4c4c2",
+      "added": 72,
+      "removed": 130,
+      "total": 202
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "ef497d5",
+      "added": 186,
+      "removed": 43,
+      "total": 229
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "38dfc96",
+      "added": 1,
+      "removed": 1,
+      "total": 2
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "488581f",
+      "added": 13,
+      "removed": 61,
+      "total": 74
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "ede2644",
+      "added": 1,
+      "removed": 1,
+      "total": 2
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "747d610",
+      "added": 82,
+      "removed": 25,
+      "total": 107
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "3a6f6fe",
+      "added": 43,
+      "removed": 3,
+      "total": 46
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "868581b",
+      "added": 10,
+      "removed": 2,
+      "total": 12
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "c57ecde",
+      "added": 4,
+      "removed": 0,
+      "total": 4
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "28867e1",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "7f4a06a",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "ff06715",
+      "added": 6,
+      "removed": 10,
+      "total": 16
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "82460dd",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "7942a70",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "1a8357f",
+      "added": 44,
+      "removed": 4,
+      "total": 48
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "a962f99",
+      "added": 109,
+      "removed": 17,
+      "total": 126
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "e336b72",
+      "added": 164,
+      "removed": 22,
+      "total": 186
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "7b6bb1d",
+      "added": 177,
+      "removed": 0,
+      "total": 177
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "f958e9a",
+      "added": 2477,
+      "removed": 1938,
+      "total": 4415
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "80a1024",
+      "added": 150,
+      "removed": 21,
+      "total": 171
+    },
+    {
+      "date": "2025-12-30",
+      "commit": "b160f2f",
+      "added": 3,
+      "removed": 2,
+      "total": 5
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "7085b86",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "d084d39",
+      "added": 171,
+      "removed": 47,
+      "total": 218
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "a9cbb45",
+      "added": 6,
+      "removed": 6,
+      "total": 12
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "332e226",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "24896a0",
+      "added": 793,
+      "removed": 5,
+      "total": 798
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "ef1b84a",
+      "added": 363,
+      "removed": 18,
+      "total": 381
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "8480d2f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "d61dc5e",
+      "added": 359,
+      "removed": 5,
+      "total": 364
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "0d72b02",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "0e7aa05",
+      "added": 0,
+      "removed": 61,
+      "total": 61
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "a2f4695",
+      "added": 243,
+      "removed": 0,
+      "total": 243
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "31dac81",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "48c00b5",
+      "added": 51,
+      "removed": 89,
+      "total": 140
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "8e06e19",
+      "added": 18,
+      "removed": 14,
+      "total": 32
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "101eeec",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "ba8c6a5",
+      "added": 2,
+      "removed": 133,
+      "total": 135
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "9362c58",
+      "added": 25,
+      "removed": 5,
+      "total": 30
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "60eb683",
+      "added": 26,
+      "removed": 75,
+      "total": 101
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "65ec669",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "a939c4f",
+      "added": 33,
+      "removed": 33,
+      "total": 66
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "2cca5aa",
+      "added": 19,
+      "removed": 4,
+      "total": 23
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "d2ab107",
+      "added": 53,
+      "removed": 22,
+      "total": 75
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "773af95",
+      "added": 113,
+      "removed": 1,
+      "total": 114
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "f5c67d9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "a5a6ee6",
+      "added": 91,
+      "removed": 42,
+      "total": 133
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "d4a8c28",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "96388bb",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "0a570e7",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "86291e4",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "3960ad2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "aa7141f",
+      "added": 92,
+      "removed": 25,
+      "total": 117
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "50106b2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "27ce05f",
+      "added": 66,
+      "removed": 36,
+      "total": 102
+    },
+    {
+      "date": "2025-12-31",
+      "commit": "f3ae0e4",
+      "added": 18,
+      "removed": 9,
+      "total": 27
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "89b0e21",
+      "added": 20,
+      "removed": 12,
+      "total": 32
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "b933de3",
+      "added": 1,
+      "removed": 1,
+      "total": 2
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "9f78338",
+      "added": 48,
+      "removed": 30,
+      "total": 78
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "adffd05",
+      "added": 5,
+      "removed": 5,
+      "total": 10
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "8d5eab4",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "f53d8ff",
+      "added": 12,
+      "removed": 12,
+      "total": 24
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "1bd667e",
+      "added": 4,
+      "removed": 4,
+      "total": 8
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "0d2f7b5",
+      "added": 14,
+      "removed": 14,
+      "total": 28
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "19a0f1a",
+      "added": 7,
+      "removed": 7,
+      "total": 14
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "06cba4a",
+      "added": 20,
+      "removed": 20,
+      "total": 40
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "4aa3ce5",
+      "added": 1,
+      "removed": 1,
+      "total": 2
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "55953bf",
+      "added": 72,
+      "removed": 4,
+      "total": 76
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "1c5b069",
+      "added": 261,
+      "removed": 49,
+      "total": 310
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "70dbe77",
+      "added": 13,
+      "removed": 2,
+      "total": 15
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "a993f6c",
+      "added": 1,
+      "removed": 1,
+      "total": 2
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "58afec1",
+      "added": 41,
+      "removed": 0,
+      "total": 41
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "882d4ac",
+      "added": 336,
+      "removed": 0,
+      "total": 336
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "813830d",
+      "added": 32,
+      "removed": 1,
+      "total": 33
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "1e6143c",
+      "added": 93,
+      "removed": 0,
+      "total": 93
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "e163d30",
+      "added": 26,
+      "removed": 33,
+      "total": 59
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "42c8d6f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "a8dd2ae",
+      "added": 419,
+      "removed": 2,
+      "total": 421
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "aa5080b",
+      "added": 21,
+      "removed": 17,
+      "total": 38
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "219cff5",
+      "added": 11,
+      "removed": 2,
+      "total": 13
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "07a1267",
+      "added": 192,
+      "removed": 1,
+      "total": 193
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "91c1656",
+      "added": 8,
+      "removed": 4,
+      "total": 12
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "d92cd32",
+      "added": 26,
+      "removed": 6,
+      "total": 32
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "5486aa0",
+      "added": 79,
+      "removed": 2,
+      "total": 81
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "b628b7d",
+      "added": 12,
+      "removed": 4,
+      "total": 16
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "21607ba",
+      "added": 32,
+      "removed": 0,
+      "total": 32
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "b62dc27",
+      "added": 22,
+      "removed": 5,
+      "total": 27
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "e40ce69",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "41633ee",
+      "added": 133,
+      "removed": 0,
+      "total": 133
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "d8314e2",
+      "added": 38,
+      "removed": 0,
+      "total": 38
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "47f59cb",
+      "added": 55,
+      "removed": 3,
+      "total": 58
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "4904024",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "33fd3c3",
+      "added": 28,
+      "removed": 0,
+      "total": 28
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "e434d60",
+      "added": 5,
+      "removed": 0,
+      "total": 5
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "ff8d2ff",
+      "added": 20,
+      "removed": 1,
+      "total": 21
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "ed36853",
+      "added": 0,
+      "removed": 5,
+      "total": 5
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "924fa6e",
+      "added": 0,
+      "removed": 3,
+      "total": 3
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "757a7e6",
+      "added": 1,
+      "removed": 3,
+      "total": 4
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "356d990",
+      "added": 3,
+      "removed": 0,
+      "total": 3
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "2c70a11",
+      "added": 12,
+      "removed": 3,
+      "total": 15
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "facbbe6",
+      "added": 18,
+      "removed": 0,
+      "total": 18
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "4a49dc9",
+      "added": 170,
+      "removed": 106,
+      "total": 276
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "419f9d0",
+      "added": 6,
+      "removed": 1,
+      "total": 7
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "9636d09",
+      "added": 42,
+      "removed": 28,
+      "total": 70
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "4216d89",
+      "added": 87,
+      "removed": 2,
+      "total": 89
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "752119a",
+      "added": 35,
+      "removed": 0,
+      "total": 35
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "4a44de2",
+      "added": 5,
+      "removed": 0,
+      "total": 5
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "5e981de",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-01",
+      "commit": "8a15b91",
+      "added": 31,
+      "removed": 0,
+      "total": 31
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "ae6776c",
+      "added": 182,
+      "removed": 0,
+      "total": 182
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "e6e3fb2",
+      "added": 683,
+      "removed": 0,
+      "total": 683
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "8efb158",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "298a015",
+      "added": 721,
+      "removed": 3,
+      "total": 724
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "2eb2afe",
+      "added": 884,
+      "removed": 80,
+      "total": 964
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "41ddb5c",
+      "added": 3,
+      "removed": 2,
+      "total": 5
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "f982bd3",
+      "added": 749,
+      "removed": 52,
+      "total": 801
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "29d1d6b",
+      "added": 29,
+      "removed": 10,
+      "total": 39
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "f98ed1c",
+      "added": 6,
+      "removed": 1,
+      "total": 7
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "ba1c07b",
+      "added": 10,
+      "removed": 0,
+      "total": 10
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "e7b77a3",
+      "added": 51,
+      "removed": 1,
+      "total": 52
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "ced2389",
+      "added": 49,
+      "removed": 27,
+      "total": 76
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "3d7eddd",
+      "added": 125,
+      "removed": 0,
+      "total": 125
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "fc6b24f",
+      "added": 19,
+      "removed": 3,
+      "total": 22
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "d307e86",
+      "added": 14,
+      "removed": 6,
+      "total": 20
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "ea044a9",
+      "added": 399,
+      "removed": 0,
+      "total": 399
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "c53e35d",
+      "added": 1,
+      "removed": 0,
+      "total": 1
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "6286e56",
+      "added": 60,
+      "removed": 3,
+      "total": 63
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "beec6cf",
+      "added": 6,
+      "removed": 1,
+      "total": 7
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "f79b522",
+      "added": 92,
+      "removed": 15,
+      "total": 107
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "1ca5eaa",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "6cacf85",
+      "added": 22,
+      "removed": 22,
+      "total": 44
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "dafec50",
+      "added": 660,
+      "removed": 0,
+      "total": 660
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "352a839",
+      "added": 527,
+      "removed": 0,
+      "total": 527
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "552163f",
+      "added": 111,
+      "removed": 87,
+      "total": 198
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "66c5bba",
+      "added": 723,
+      "removed": 10,
+      "total": 733
+    },
+    {
+      "date": "2026-01-02",
+      "commit": "e78e3cd",
+      "added": 592,
+      "removed": 6,
+      "total": 598
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "d1c3ed2",
+      "added": 658,
+      "removed": 77,
+      "total": 735
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "f4e582b",
+      "added": 77,
+      "removed": 2,
+      "total": 79
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "ba03ece",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "a37fb87",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "51a1235",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "1c872d2",
+      "added": 238,
+      "removed": 0,
+      "total": 238
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "bc6f4fc",
+      "added": 106,
+      "removed": 84,
+      "total": 190
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "d6c85e9",
+      "added": 119,
+      "removed": 109,
+      "total": 228
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "0986844",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "52813cb",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "39ed2f4",
+      "added": 47,
+      "removed": 16,
+      "total": 63
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "a51ad5b",
+      "added": 159,
+      "removed": 104,
+      "total": 263
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "ec42f8d",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "9e268bd",
+      "added": 26,
+      "removed": 1,
+      "total": 27
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "0c585f0",
+      "added": 17,
+      "removed": 4,
+      "total": 21
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "623c63a",
+      "added": 29,
+      "removed": 12,
+      "total": 41
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "47a98f8",
+      "added": 111,
+      "removed": 54,
+      "total": 165
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "86467f6",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-03",
+      "commit": "ab8baa2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-04",
+      "commit": "74c317f",
+      "added": 166,
+      "removed": 15,
+      "total": 181
+    },
+    {
+      "date": "2026-01-04",
+      "commit": "06a89b3",
+      "added": 15,
+      "removed": 6,
+      "total": 21
+    },
+    {
+      "date": "2026-01-04",
+      "commit": "466fb98",
+      "added": 22,
+      "removed": 16,
+      "total": 38
+    },
+    {
+      "date": "2026-01-04",
+      "commit": "f03b531",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-04",
+      "commit": "fd17398",
+      "added": 17,
+      "removed": 30,
+      "total": 47
+    },
+    {
+      "date": "2026-01-04",
+      "commit": "2052ab8",
+      "added": 54,
+      "removed": 11,
+      "total": 65
+    },
+    {
+      "date": "2026-01-04",
+      "commit": "321eca6",
+      "added": 52,
+      "removed": 36,
+      "total": 88
+    },
+    {
+      "date": "2026-01-05",
+      "commit": "14f6371",
+      "added": 2,
+      "removed": 12,
+      "total": 14
+    },
+    {
+      "date": "2026-01-05",
+      "commit": "b208a23",
+      "added": 34,
+      "removed": 3,
+      "total": 37
+    },
+    {
+      "date": "2026-01-05",
+      "commit": "19260ba",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-05",
+      "commit": "065ccc7",
+      "added": 9,
+      "removed": 6,
+      "total": 15
+    },
+    {
+      "date": "2026-01-05",
+      "commit": "8241b2d",
+      "added": 38,
+      "removed": 5,
+      "total": 43
+    },
+    {
+      "date": "2026-01-05",
+      "commit": "99e9ee5",
+      "added": 54,
+      "removed": 20,
+      "total": 74
+    },
+    {
+      "date": "2026-01-05",
+      "commit": "4b81391",
+      "added": 97,
+      "removed": 11,
+      "total": 108
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "2a0c8f6",
+      "added": 34,
+      "removed": 5,
+      "total": 39
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "10f5249",
+      "added": 18,
+      "removed": 2,
+      "total": 20
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "7a00fb9",
+      "added": 327,
+      "removed": 23,
+      "total": 350
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "5234d62",
+      "added": 1,
+      "removed": 1,
+      "total": 2
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "b00ac36",
+      "added": 30,
+      "removed": 7,
+      "total": 37
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "3b13f47",
+      "added": 2,
+      "removed": 2,
+      "total": 4
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "22b143f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "f9cd1c8",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "63d21bc",
+      "added": 10,
+      "removed": 0,
+      "total": 10
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "6e15d46",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "245e36a",
+      "added": 361,
+      "removed": 76,
+      "total": 437
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "ac0b231",
+      "added": 25,
+      "removed": 0,
+      "total": 25
+    },
+    {
+      "date": "2026-01-06",
+      "commit": "96bfd80",
+      "added": 12,
+      "removed": 4,
+      "total": 16
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "fc8af19",
+      "added": 31,
+      "removed": 65,
+      "total": 96
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "915f973",
+      "added": 837,
+      "removed": 776,
+      "total": 1613
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "071394c",
+      "added": 756,
+      "removed": 0,
+      "total": 756
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "8be381e",
+      "added": 30,
+      "removed": 5,
+      "total": 35
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "8a8e46b",
+      "added": 122,
+      "removed": 4,
+      "total": 126
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "6fc07ad",
+      "added": 170,
+      "removed": 5,
+      "total": 175
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "f0b78d4",
+      "added": 65,
+      "removed": 0,
+      "total": 65
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "d738976",
+      "added": 143,
+      "removed": 68,
+      "total": 211
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "e678f04",
+      "added": 38,
+      "removed": 13,
+      "total": 51
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "fb3d0d8",
+      "added": 48,
+      "removed": 0,
+      "total": 48
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "a85b514",
+      "added": 10,
+      "removed": 11,
+      "total": 21
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "d74efca",
+      "added": 387,
+      "removed": 5,
+      "total": 392
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "75b9369",
+      "added": 2,
+      "removed": 2,
+      "total": 4
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "188cfd9",
+      "added": 2,
+      "removed": 2,
+      "total": 4
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "2dfd80e",
+      "added": 58,
+      "removed": 9,
+      "total": 67
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "b99482e",
+      "added": 5,
+      "removed": 5,
+      "total": 10
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "5bce0f4",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "ef48b21",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "cb5ef01",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "7e7bd14",
+      "added": 14,
+      "removed": 19,
+      "total": 33
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "8fd2ec6",
+      "added": 109,
+      "removed": 144,
+      "total": 253
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "ff37849",
+      "added": 282,
+      "removed": 199,
+      "total": 481
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "d9c16c7",
+      "added": 4,
+      "removed": 4,
+      "total": 8
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "184bfe4",
+      "added": 34,
+      "removed": 17,
+      "total": 51
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "1be86ec",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "0babea6",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "a8ac23e",
+      "added": 232,
+      "removed": 0,
+      "total": 232
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "93db1a2",
+      "added": 23,
+      "removed": 0,
+      "total": 23
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "69b8606",
+      "added": 1,
+      "removed": 0,
+      "total": 1
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "a569c2c",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-07",
+      "commit": "9d4579d",
+      "added": 3,
+      "removed": 3,
+      "total": 6
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "be7a6c9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "dbe831d",
+      "added": 197,
+      "removed": 114,
+      "total": 311
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "b6a06e9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "37e1cc2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "1062e03",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "c328570",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "b9d3d59",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "1d2d071",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "ccdc28f",
+      "added": 152,
+      "removed": 0,
+      "total": 152
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "64c2e8b",
+      "added": 82,
+      "removed": 0,
+      "total": 82
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "053aa30",
+      "added": 255,
+      "removed": 0,
+      "total": 255
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "1ad9441",
+      "added": 85,
+      "removed": 0,
+      "total": 85
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "cf28071",
+      "added": 163,
+      "removed": 0,
+      "total": 163
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "69b6486",
+      "added": 133,
+      "removed": 0,
+      "total": 133
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "69c0aa9",
+      "added": 122,
+      "removed": 2,
+      "total": 124
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "fcb2107",
+      "added": 138,
+      "removed": 0,
+      "total": 138
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "5dbfbf6",
+      "added": 72,
+      "removed": 7,
+      "total": 79
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "d838821",
+      "added": 73,
+      "removed": 9,
+      "total": 82
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "3c891c8",
+      "added": 71,
+      "removed": 7,
+      "total": 78
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "0525a48",
+      "added": 73,
+      "removed": 8,
+      "total": 81
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "269e958",
+      "added": 78,
+      "removed": 6,
+      "total": 84
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "a2fdaa2",
+      "added": 70,
+      "removed": 12,
+      "total": 82
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "f857ef1",
+      "added": 73,
+      "removed": 6,
+      "total": 79
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "c70383a",
+      "added": 71,
+      "removed": 8,
+      "total": 79
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "b1fe18c",
+      "added": 425,
+      "removed": 0,
+      "total": 425
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "cbcc972",
+      "added": 4286,
+      "removed": 4638,
+      "total": 8924
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "d32da1a",
+      "added": 1647,
+      "removed": 1499,
+      "total": 3146
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "0828623",
+      "added": 1141,
+      "removed": 1008,
+      "total": 2149
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "975d3ce",
+      "added": 593,
+      "removed": 539,
+      "total": 1132
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "1e7ba91",
+      "added": 1993,
+      "removed": 2007,
+      "total": 4000
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "45403f4",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "2f43243",
+      "added": 1697,
+      "removed": 1492,
+      "total": 3189
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "22bb7ea",
+      "added": 2455,
+      "removed": 1479,
+      "total": 3934
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "fdd7e0e",
+      "added": 502,
+      "removed": 391,
+      "total": 893
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "79d6629",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "99b90b6",
+      "added": 16,
+      "removed": 17,
+      "total": 33
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "6357246",
+      "added": 61,
+      "removed": 0,
+      "total": 61
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "9ae7897",
+      "added": 17,
+      "removed": 3,
+      "total": 20
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "e1ea52f",
+      "added": 23,
+      "removed": 6,
+      "total": 29
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "97eb66e",
+      "added": 122,
+      "removed": 10,
+      "total": 132
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "8b455a7",
+      "added": 18,
+      "removed": 4,
+      "total": 22
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "16994bf",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "5deaa66",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "1fb28b9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "2194e42",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-08",
+      "commit": "b202998",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "0ab6b87",
+      "added": 104,
+      "removed": 0,
+      "total": 104
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "a910621",
+      "added": 193,
+      "removed": 2,
+      "total": 195
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "48cdb0e",
+      "added": 224,
+      "removed": 5,
+      "total": 229
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "11add64",
+      "added": 21,
+      "removed": 33,
+      "total": 54
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "daf6e0a",
+      "added": 382,
+      "removed": 5,
+      "total": 387
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "f403145",
+      "added": 320,
+      "removed": 30,
+      "total": 350
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "7a2adcb",
+      "added": 25,
+      "removed": 33,
+      "total": 58
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "f6762f7",
+      "added": 51,
+      "removed": 0,
+      "total": 51
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "779bfd9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "c8d8fda",
+      "added": 29,
+      "removed": 4,
+      "total": 33
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "87a2ccd",
+      "added": 5,
+      "removed": 5,
+      "total": 10
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "89c79ff",
+      "added": 476,
+      "removed": 0,
+      "total": 476
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "f9abfab",
+      "added": 137,
+      "removed": 0,
+      "total": 137
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "5358b85",
+      "added": 235,
+      "removed": 0,
+      "total": 235
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "6138bc2",
+      "added": 895,
+      "removed": 2,
+      "total": 897
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "0c388f0",
+      "added": 273,
+      "removed": 0,
+      "total": 273
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "b6ae144",
+      "added": 99,
+      "removed": 0,
+      "total": 99
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "b27b300",
+      "added": 109,
+      "removed": 0,
+      "total": 109
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "a0d63b2",
+      "added": 142,
+      "removed": 6,
+      "total": 148
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "bceb84e",
+      "added": 45,
+      "removed": 7,
+      "total": 52
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "5472380",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "1a8df07",
+      "added": 192,
+      "removed": 42,
+      "total": 234
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "24fdb8a",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "4c55d13",
+      "added": 6,
+      "removed": 16,
+      "total": 22
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "5c1022f",
+      "added": 0,
+      "removed": 5,
+      "total": 5
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "2d4ecff",
+      "added": 127,
+      "removed": 28,
+      "total": 155
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "8227209",
+      "added": 712,
+      "removed": 1,
+      "total": 713
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "8b0d251",
+      "added": 36,
+      "removed": 2,
+      "total": 38
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "062a33e",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "ddb7da2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "ff3f871",
+      "added": 92,
+      "removed": 0,
+      "total": 92
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "ba9c028",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "8314b23",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "99bbb5e",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "f389756",
+      "added": 440,
+      "removed": 55,
+      "total": 495
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "0c4a004",
+      "added": 21,
+      "removed": 14,
+      "total": 35
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "b81d441",
+      "added": 52,
+      "removed": 11,
+      "total": 63
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "a6ad505",
+      "added": 32,
+      "removed": 1,
+      "total": 33
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "da3b88e",
+      "added": 43,
+      "removed": 36,
+      "total": 79
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "0ccd7fe",
+      "added": 238,
+      "removed": 4,
+      "total": 242
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "4840191",
+      "added": 270,
+      "removed": 0,
+      "total": 270
+    },
+    {
+      "date": "2026-01-09",
+      "commit": "2a99d5e",
+      "added": 381,
+      "removed": 0,
+      "total": 381
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "05ab6f2",
+      "added": 229,
+      "removed": 0,
+      "total": 229
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "4ebad06",
+      "added": 162,
+      "removed": 0,
+      "total": 162
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "c1a33e0",
+      "added": 76,
+      "removed": 0,
+      "total": 76
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "c74f6c1",
+      "added": 73,
+      "removed": 0,
+      "total": 73
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "20f4eaf",
+      "added": 24,
+      "removed": 24,
+      "total": 48
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "5ab52a2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "e526fc5",
+      "added": 5,
+      "removed": 1,
+      "total": 6
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "f4ff1ba",
+      "added": 76,
+      "removed": 1,
+      "total": 77
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "5bfba07",
+      "added": 111,
+      "removed": 2,
+      "total": 113
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "a635bb6",
+      "added": 224,
+      "removed": 0,
+      "total": 224
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "05404b9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "d7493bf",
+      "added": 73,
+      "removed": 13,
+      "total": 86
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "d5c5700",
+      "added": 222,
+      "removed": 1,
+      "total": 223
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "61612e5",
+      "added": 163,
+      "removed": 72,
+      "total": 235
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "567468a",
+      "added": 22,
+      "removed": 0,
+      "total": 22
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "a095e26",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "bc1165b",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "c917320",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "52bae77",
+      "added": 4,
+      "removed": 136,
+      "total": 140
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "8b0ca15",
+      "added": 203,
+      "removed": 0,
+      "total": 203
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "2f8438d",
+      "added": 37,
+      "removed": 2,
+      "total": 39
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "1d6948a",
+      "added": 25,
+      "removed": 2,
+      "total": 27
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "76535e4",
+      "added": 13,
+      "removed": 0,
+      "total": 13
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "f503a16",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "071997e",
+      "added": 15,
+      "removed": 0,
+      "total": 15
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "9122ea5",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "bb2ae4f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "a6c03db",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "cdaaf4b",
+      "added": 13,
+      "removed": 1,
+      "total": 14
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "f7dd601",
+      "added": 97,
+      "removed": 23,
+      "total": 120
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "a43b62d",
+      "added": 37,
+      "removed": 18,
+      "total": 55
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "1b03e1d",
+      "added": 74,
+      "removed": 12,
+      "total": 86
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "1a45b27",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "522a040",
+      "added": 20,
+      "removed": 2,
+      "total": 22
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "2108c93",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "29b2935",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "616455c",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "2a8ad20",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "541cb72",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "838e40f",
+      "added": 734,
+      "removed": 0,
+      "total": 734
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "140f3c3",
+      "added": 97,
+      "removed": 16,
+      "total": 113
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "ff01037",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "d6dca11",
+      "added": 28,
+      "removed": 11,
+      "total": 39
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "d04e33b",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-10",
+      "commit": "8cd85a1",
+      "added": 11,
+      "removed": 27,
+      "total": 38
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "df753b6",
+      "added": 2,
+      "removed": 455,
+      "total": 457
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "033f6ce",
+      "added": 115,
+      "removed": 0,
+      "total": 115
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "13c1283",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "ea06e0b",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "1ca38a7",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "8d00ac2",
+      "added": 0,
+      "removed": 115,
+      "total": 115
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "ab6f042",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "89362d9",
+      "added": 2,
+      "removed": 0,
+      "total": 2
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "568daf7",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "8d50bbf",
+      "added": 272,
+      "removed": 0,
+      "total": 272
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "bdb84de",
+      "added": 224,
+      "removed": 5,
+      "total": 229
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "9807799",
+      "added": 23,
+      "removed": 18,
+      "total": 41
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "41e7a38",
+      "added": 293,
+      "removed": 12,
+      "total": 305
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "a700ac9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "707125e",
+      "added": 543,
+      "removed": 8,
+      "total": 551
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "4cf8dc1",
+      "added": 436,
+      "removed": 7,
+      "total": 443
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "4608243",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "4b4cf6f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "9b27c3c",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "ceb2873",
+      "added": 164,
+      "removed": 1,
+      "total": 165
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "575da28",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "93fe6b5",
+      "added": 376,
+      "removed": 21,
+      "total": 397
+    },
+    {
+      "date": "2026-01-11",
+      "commit": "fa4f8d4",
+      "added": 297,
+      "removed": 16,
+      "total": 313
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "23d5e5e",
+      "added": 455,
+      "removed": 83,
+      "total": 538
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "1eb289a",
+      "added": 273,
+      "removed": 4,
+      "total": 277
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "9543134",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "dadc5e1",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "57b2f59",
+      "added": 97,
+      "removed": 13,
+      "total": 110
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "b6814ff",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "3d9c448",
+      "added": 14,
+      "removed": 4,
+      "total": 18
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "1666c84",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "6a9208e",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "eaeaf71",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "3f2997b",
+      "added": 292,
+      "removed": 1,
+      "total": 293
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "5b3b01f",
+      "added": 216,
+      "removed": 0,
+      "total": 216
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "9ae9e21",
+      "added": 50,
+      "removed": 0,
+      "total": 50
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "56cdc20",
+      "added": 60,
+      "removed": 7,
+      "total": 67
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "8a22aee",
+      "added": 28,
+      "removed": 0,
+      "total": 28
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "5689b72",
+      "added": 29,
+      "removed": 7,
+      "total": 36
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "e98aef7",
+      "added": 39,
+      "removed": 23,
+      "total": 62
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "c23c4d1",
+      "added": 2,
+      "removed": 1,
+      "total": 3
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "e420957",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "c2a7682",
+      "added": 6,
+      "removed": 5,
+      "total": 11
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "df45de6",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "04ace0e",
+      "added": 318,
+      "removed": 3,
+      "total": 321
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "28be946",
+      "added": 3,
+      "removed": 39,
+      "total": 42
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "28ba5be",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "19613b7",
+      "added": 6,
+      "removed": 2,
+      "total": 8
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "735c49a",
+      "added": 71,
+      "removed": 2,
+      "total": 73
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "6d256d8",
+      "added": 14,
+      "removed": 33,
+      "total": 47
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "3a3de56",
+      "added": 37,
+      "removed": 7,
+      "total": 44
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "16e780c",
+      "added": 82,
+      "removed": 8,
+      "total": 90
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "83d0054",
+      "added": 57,
+      "removed": 2,
+      "total": 59
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "0e2be14",
+      "added": 118,
+      "removed": 1,
+      "total": 119
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "e8b1863",
+      "added": 33,
+      "removed": 0,
+      "total": 33
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "604f4a2",
+      "added": 102,
+      "removed": 0,
+      "total": 102
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "53a7da1",
+      "added": 161,
+      "removed": 1,
+      "total": 162
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "09a2334",
+      "added": 149,
+      "removed": 9,
+      "total": 158
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "c66d72f",
+      "added": 5,
+      "removed": 4,
+      "total": 9
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "a17ddab",
+      "added": 8,
+      "removed": 0,
+      "total": 8
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "0b5b3f4",
+      "added": 55,
+      "removed": 9,
+      "total": 64
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "5640ef0",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "02dea9b",
+      "added": 331,
+      "removed": 27,
+      "total": 358
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "2f15c4d",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "97354b7",
+      "added": 203,
+      "removed": 84,
+      "total": 287
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "a6edb0a",
+      "added": 45,
+      "removed": 12,
+      "total": 57
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "d526de9",
+      "added": 225,
+      "removed": 50,
+      "total": 275
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "8773a93",
+      "added": 424,
+      "removed": 199,
+      "total": 623
+    },
+    {
+      "date": "2026-01-12",
+      "commit": "2df0c99",
+      "added": 6,
+      "removed": 0,
+      "total": 6
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "d7464d3",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "8b8050f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "12c4998",
+      "added": 193,
+      "removed": 104,
+      "total": 297
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "1c52ada",
+      "added": 229,
+      "removed": 242,
+      "total": 471
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "99d1f51",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "139b8b3",
+      "added": 2,
+      "removed": 1,
+      "total": 3
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "e4284c8",
+      "added": 5,
+      "removed": 2,
+      "total": 7
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "da70386",
+      "added": 44,
+      "removed": 4,
+      "total": 48
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "0ce992d",
+      "added": 74,
+      "removed": 0,
+      "total": 74
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "a4f7729",
+      "added": 294,
+      "removed": 3,
+      "total": 297
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "2b63ab9",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "ae5d74e",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "e43f01d",
+      "added": 57,
+      "removed": 31,
+      "total": 88
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "3a984fe",
+      "added": 31,
+      "removed": 14,
+      "total": 45
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "544091e",
+      "added": 319,
+      "removed": 195,
+      "total": 514
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "056769b",
+      "added": 24,
+      "removed": 5,
+      "total": 29
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "690c20e",
+      "added": 241,
+      "removed": 187,
+      "total": 428
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "8af8dc0",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "6a8c300",
+      "added": 6,
+      "removed": 3,
+      "total": 9
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "6de249c",
+      "added": 6,
+      "removed": 4,
+      "total": 10
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "61cba8f",
+      "added": 19,
+      "removed": 8,
+      "total": 27
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "733f68b",
+      "added": 44,
+      "removed": 42,
+      "total": 86
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "eb18446",
+      "added": 2,
+      "removed": 12,
+      "total": 14
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "39893f7",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "05b611f",
+      "added": 96,
+      "removed": 8,
+      "total": 104
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "259f916",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "d3a0fd9",
+      "added": 26,
+      "removed": 10,
+      "total": 36
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "022fcdf",
+      "added": 29,
+      "removed": 27,
+      "total": 56
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "eafd663",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "728d7e9",
+      "added": 13,
+      "removed": 12,
+      "total": 25
+    },
+    {
+      "date": "2026-01-13",
+      "commit": "01cd44e",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "d2b8ee8",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "0e2d42d",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "0bd776f",
+      "added": 15,
+      "removed": 6,
+      "total": 21
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "ca7c17c",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "92e01b0",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "0c27094",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "ba1ec53",
+      "added": 151,
+      "removed": 0,
+      "total": 151
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "de4b88a",
+      "added": 61,
+      "removed": 40,
+      "total": 101
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "75fc388",
+      "added": 21,
+      "removed": 21,
+      "total": 42
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "f96a57d",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "ae32b0f",
+      "added": 608,
+      "removed": 0,
+      "total": 608
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "dd712ee",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "5e09479",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "f98d3ac",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "b400b65",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "22c2955",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "aab9eed",
+      "added": 163,
+      "removed": 0,
+      "total": 163
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "6852797",
+      "added": 59,
+      "removed": 0,
+      "total": 59
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "3969917",
+      "added": 342,
+      "removed": 0,
+      "total": 342
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "fe1962c",
+      "added": 104,
+      "removed": 0,
+      "total": 104
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "43d0ca3",
+      "added": 26,
+      "removed": 20,
+      "total": 46
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "8e3055d",
+      "added": 585,
+      "removed": 0,
+      "total": 585
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "ba48423",
+      "added": 142,
+      "removed": 63,
+      "total": 205
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "1880425",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "d654d7c",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "78be0ac",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "d11c144",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "3fb174d",
+      "added": 54,
+      "removed": 0,
+      "total": 54
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "cb9e520",
+      "added": 4,
+      "removed": 10,
+      "total": 14
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "cfcd6f0",
+      "added": 35,
+      "removed": 11,
+      "total": 46
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "f861bad",
+      "added": 351,
+      "removed": 12,
+      "total": 363
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "da436e7",
+      "added": 4,
+      "removed": 4,
+      "total": 8
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "e562cf5",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "8712a68",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "2811c94",
+      "added": 81,
+      "removed": 8,
+      "total": 89
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "4c11a63",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "a1793b3",
+      "added": 139,
+      "removed": 2,
+      "total": 141
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "41c9e18",
+      "added": 3,
+      "removed": 1,
+      "total": 4
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "e7dbbd3",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "d73fbbe",
+      "added": 67,
+      "removed": 4,
+      "total": 71
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "fa3d97e",
+      "added": 110,
+      "removed": 0,
+      "total": 110
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "bf0e1c9",
+      "added": 129,
+      "removed": 10,
+      "total": 139
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "c35b5ad",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "eab2dd2",
+      "added": 38,
+      "removed": 21,
+      "total": 59
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "733cd6f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "a95b032",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-14",
+      "commit": "ceea097",
+      "added": 120,
+      "removed": 15,
+      "total": 135
+    },
+    {
+      "date": "2026-01-15",
+      "commit": "0270eeb",
+      "added": 418,
+      "removed": 0,
+      "total": 418
+    },
+    {
+      "date": "2026-01-15",
+      "commit": "360aa3a",
+      "added": 335,
+      "removed": 44,
+      "total": 379
+    },
+    {
+      "date": "2026-01-15",
+      "commit": "84b92b2",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-15",
+      "commit": "27605fd",
+      "added": 394,
+      "removed": 83,
+      "total": 477
+    },
+    {
+      "date": "2026-01-15",
+      "commit": "021d52f",
+      "added": 0,
+      "removed": 0,
+      "total": 0
+    },
+    {
+      "date": "2026-01-15",
+      "commit": "c4f405f",
+      "added": 641,
+      "removed": 114,
+      "total": 755
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 Add a new graph showing average diff size over time, tracking code changes only (excluding tests, docs, etc.) as a project maturity indicator.
 
 ## Phase 1: Diff Size Data Collection
-- [ ] 1a: Create `tools/diff-tracker.sh` to collect historical diff sizes
+- [x] 1a: Create `tools/diff-tracker.sh` to collect historical diff sizes
   - Iterate through commits (similar pattern to `loc-tracker.sh`)
   - For each commit, compute diff size (lines added + removed) using `git diff --stat`
   - Filter to only code files (exclude `*_test.cc`, `*.test.mjs`, `*.spec.ts`, `*.md`, etc.)
