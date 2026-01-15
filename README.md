@@ -47,9 +47,9 @@ A high-performance, collaborative spreadsheet engine with:
 | E2E (Puppeteer) | 269 |
 | **Total** | **2878** |
 
-- **Commits**: 1129
-- **WASM Module**: Not built
-- **Total Web Bundle**: 19.83 MB
+- **Commits**: 1131
+- **WASM Module**: 5.05 MB
+- **Total Web Bundle**: 6.93 MB
 
 <sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./tools/generate-stats.sh`</sub>
 
