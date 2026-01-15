@@ -642,5 +642,55 @@ TEST(SubtractRectangleTest, SingleCellRanges) {
     EXPECT_EQ(result2[0].maxCol, 5u);
 }
 
+// =============================================================================
+// PositionRect Contains and Equality Tests (Phase K)
+// =============================================================================
+
+TEST(PositionRectTest, Contains) {
+    PositionRect outer{0, 0, 10, 10};
+    PositionRect inner{3, 3, 7, 7};
+    PositionRect same{0, 0, 10, 10};
+    PositionRect partial{5, 5, 15, 15};
+    PositionRect outside{20, 20, 25, 25};
+
+    // Outer contains inner
+    EXPECT_TRUE(outer.contains(inner));
+    EXPECT_FALSE(inner.contains(outer));
+
+    // Same bounds - contains itself
+    EXPECT_TRUE(outer.contains(same));
+    EXPECT_TRUE(same.contains(outer));
+
+    // Partial overlap - neither contains the other
+    EXPECT_FALSE(outer.contains(partial));
+    EXPECT_FALSE(partial.contains(outer));
+
+    // Outside - no containment
+    EXPECT_FALSE(outer.contains(outside));
+    EXPECT_FALSE(outside.contains(outer));
+
+    // Edge cases - touch at boundary
+    PositionRect touching{10, 10, 15, 15};
+    EXPECT_FALSE(outer.contains(touching));  // Only shares one point
+}
+
+TEST(PositionRectTest, Equality) {
+    PositionRect a{1, 2, 3, 4};
+    PositionRect b{1, 2, 3, 4};
+    PositionRect c{0, 2, 3, 4};  // Different minCol
+    PositionRect d{1, 0, 3, 4};  // Different minRow
+    PositionRect e{1, 2, 5, 4};  // Different maxCol
+    PositionRect f{1, 2, 3, 5};  // Different maxRow
+
+    EXPECT_EQ(a, b);
+    EXPECT_NE(a, c);
+    EXPECT_NE(a, d);
+    EXPECT_NE(a, e);
+    EXPECT_NE(a, f);
+
+    // Self equality
+    EXPECT_EQ(a, a);
+}
+
 }  // namespace
 }  // namespace cells

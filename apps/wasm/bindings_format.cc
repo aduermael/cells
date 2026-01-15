@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
+#include <utility>
 
 #include "core/cells/crdt.h"
 #include "core/cells/range.h"
@@ -466,45 +467,90 @@ std::string CellsEngine::makeFormatId(const std::string& category, int decimals,
 
 namespace {
 
-// Helper to serialize CellStyle to JSON
+// Helper to serialize CellStyle to JSON (sparse representation - only non-default values)
 std::string styleToJson(const CellStyle& style) {
     std::ostringstream ss;
     ss << "{";
-    ss << "\"bold\":" << (style.bold ? "true" : "false");
-    ss << ",\"italic\":" << (style.italic ? "true" : "false");
-    ss << ",\"underline\":" << (style.underline ? "true" : "false");
-    ss << ",\"bgColor\":\"" << jsonEscape(style.bgColor) << "\"";
-    ss << ",\"textColor\":\"" << jsonEscape(style.textColor) << "\"";
-    ss << ",\"fontFamily\":\"" << jsonEscape(style.fontFamily) << "\"";
-    ss << ",\"fontSize\":" << static_cast<int>(style.fontSize);
-    ss << ",\"hAlign\":\"";
-    switch (style.hAlign) {
-        case TextAlign::LEFT:
-            ss << "left";
-            break;
-        case TextAlign::CENTER:
-            ss << "center";
-            break;
-        case TextAlign::RIGHT:
-            ss << "right";
-            break;
-        case TextAlign::JUSTIFY:
-            ss << "justify";
-            break;
+    bool first = true;
+
+    // Only include non-default values (sparse representation)
+    if (style.bold) {
+        if (!first) ss << ",";
+        ss << "\"bold\":true";
+        first = false;
     }
-    ss << "\",\"vAlign\":\"";
-    switch (style.vAlign) {
-        case VerticalAlign::TOP:
-            ss << "top";
-            break;
-        case VerticalAlign::MIDDLE:
-            ss << "middle";
-            break;
-        case VerticalAlign::BOTTOM:
-            ss << "bottom";
-            break;
+    if (style.italic) {
+        if (!first) ss << ",";
+        ss << "\"italic\":true";
+        first = false;
     }
-    ss << "\"}";
+    if (style.underline) {
+        if (!first) ss << ",";
+        ss << "\"underline\":true";
+        first = false;
+    }
+    if (!style.bgColor.empty()) {
+        if (!first) ss << ",";
+        ss << "\"bgColor\":\"" << jsonEscape(style.bgColor) << "\"";
+        first = false;
+    }
+    if (!style.textColor.empty()) {
+        if (!first) ss << ",";
+        ss << "\"textColor\":\"" << jsonEscape(style.textColor) << "\"";
+        first = false;
+    }
+    if (!style.fontFamily.empty()) {
+        if (!first) ss << ",";
+        ss << "\"fontFamily\":\"" << jsonEscape(style.fontFamily) << "\"";
+        first = false;
+    }
+    if (style.fontSize != 0) {
+        if (!first) ss << ",";
+        ss << "\"fontSize\":" << static_cast<int>(style.fontSize);
+        first = false;
+    }
+    // Only include hAlign if not GENERAL (the default)
+    if (style.hAlign != TextAlign::GENERAL) {
+        if (!first) ss << ",";
+        ss << "\"hAlign\":\"";
+        switch (style.hAlign) {
+            case TextAlign::LEFT:
+                ss << "left";
+                break;
+            case TextAlign::CENTER:
+                ss << "center";
+                break;
+            case TextAlign::RIGHT:
+                ss << "right";
+                break;
+            case TextAlign::JUSTIFY:
+                ss << "justify";
+                break;
+            default:
+                break;
+        }
+        ss << "\"";
+        first = false;
+    }
+    // Only include vAlign if not BOTTOM (the default)
+    if (style.vAlign != VerticalAlign::BOTTOM) {
+        if (!first) ss << ",";
+        ss << "\"vAlign\":\"";
+        switch (style.vAlign) {
+            case VerticalAlign::TOP:
+                ss << "top";
+                break;
+            case VerticalAlign::MIDDLE:
+                ss << "middle";
+                break;
+            default:
+                break;
+        }
+        ss << "\"";
+        first = false;
+    }
+
+    ss << "}";
     return ss.str();
 }
 
@@ -644,6 +690,83 @@ CellStyle mergeStyleJson(const CellStyle& baseStyle, const std::string& json) {
     }
 
     return style;
+}
+
+// Helper to merge two CellStyles - newStyle properties override baseStyle properties.
+// Used for exact match case: when new range matches existing range, merge their styles.
+CellStyle mergeStyles(const CellStyle& baseStyle, const CellStyle& newStyle,
+                      const std::string& newStyleJson) {
+    CellStyle result = baseStyle;
+
+    // Only merge properties that are actually set in the new style (present in JSON)
+    if (hasJsonField(newStyleJson, "bold")) {
+        result.bold = newStyle.bold;
+    }
+    if (hasJsonField(newStyleJson, "italic")) {
+        result.italic = newStyle.italic;
+    }
+    if (hasJsonField(newStyleJson, "underline")) {
+        result.underline = newStyle.underline;
+    }
+    if (hasJsonField(newStyleJson, "bgColor")) {
+        result.bgColor = newStyle.bgColor;
+    }
+    if (hasJsonField(newStyleJson, "textColor")) {
+        result.textColor = newStyle.textColor;
+    }
+    if (hasJsonField(newStyleJson, "fontFamily")) {
+        result.fontFamily = newStyle.fontFamily;
+    }
+    if (hasJsonField(newStyleJson, "fontSize")) {
+        result.fontSize = newStyle.fontSize;
+    }
+    if (hasJsonField(newStyleJson, "hAlign")) {
+        result.hAlign = newStyle.hAlign;
+    }
+    if (hasJsonField(newStyleJson, "vAlign")) {
+        result.vAlign = newStyle.vAlign;
+    }
+
+    return result;
+}
+
+// Helper to strip conflicting properties from a style based on what's set in another style's JSON.
+// Used for contained case: when existing range is fully inside new range, strip conflicting props.
+// Returns the stripped style and a bool indicating if the style is now empty.
+std::pair<CellStyle, bool> stripConflictingProperties(const CellStyle& existingStyle,
+                                                       const std::string& newStyleJson) {
+    CellStyle result = existingStyle;
+
+    // Strip properties that are set in the new style JSON
+    if (hasJsonField(newStyleJson, "bold")) {
+        result.bold = false;  // Reset to default
+    }
+    if (hasJsonField(newStyleJson, "italic")) {
+        result.italic = false;
+    }
+    if (hasJsonField(newStyleJson, "underline")) {
+        result.underline = false;
+    }
+    if (hasJsonField(newStyleJson, "bgColor")) {
+        result.bgColor = "";  // Reset to default
+    }
+    if (hasJsonField(newStyleJson, "textColor")) {
+        result.textColor = "";
+    }
+    if (hasJsonField(newStyleJson, "fontFamily")) {
+        result.fontFamily = "";
+    }
+    if (hasJsonField(newStyleJson, "fontSize")) {
+        result.fontSize = 0;
+    }
+    if (hasJsonField(newStyleJson, "hAlign")) {
+        result.hAlign = TextAlign::GENERAL;
+    }
+    if (hasJsonField(newStyleJson, "vAlign")) {
+        result.vAlign = VerticalAlign::BOTTOM;
+    }
+
+    return {result, result.isEmpty()};
 }
 
 // Helper to check if two style JSONs have conflicting properties (same property set in both).
@@ -1296,11 +1419,12 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
     }
 
     // =========================================================================
-    // Split overlapping ranges with conflicting properties (J2/J3)
+    // Handle overlapping ranges with conflicting properties (Phase K)
     // =========================================================================
-    // Before creating the new range, find all existing style ranges that overlap
-    // and have conflicting properties (same property type). Split them to avoid
-    // having overlapping ranges with the same property.
+    // Three cases:
+    // 1. EXACT MATCH: existing range has same bounds → merge styles into existing (K3/K4)
+    // 2. CONTAINED: existing range is fully inside new range → strip conflicting props (K5)
+    // 3. PARTIAL OVERLAP: split the existing range to avoid conflict (J2/J3)
 
     // Query for overlapping style ranges using the R-tree index
     std::vector<Range*> overlappingRanges;
@@ -1312,13 +1436,91 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
     // The new range's rectangle
     PositionRect newRect{minCol, minRow, maxCol, maxRow};
 
-    // Track ranges to delete and create (we can't modify while iterating)
+    // Check for exact match first - if found, merge and return early
+    for (Range* existingRange : overlappingRanges) {
+        if (!existingRange || !existingRange->hasFlag(RangeFlags::STYLE)) {
+            continue;
+        }
+
+        // Get the existing range's position bounds
+        const Axis* existingStartCol = sheet->getColumn(existingRange->startColId);
+        const Axis* existingStartRow = sheet->getRow(existingRange->startRowId);
+        const Axis* existingEndCol = sheet->getColumn(existingRange->endColId);
+        const Axis* existingEndRow = sheet->getRow(existingRange->endRowId);
+
+        if (!existingStartCol || !existingStartRow || !existingEndCol || !existingEndRow) {
+            continue;
+        }
+
+        PositionRect existingRect{
+            std::min(existingStartCol->position, existingEndCol->position),
+            std::min(existingStartRow->position, existingEndRow->position),
+            std::max(existingStartCol->position, existingEndCol->position),
+            std::max(existingStartRow->position, existingEndRow->position)};
+
+        // Case 1: EXACT MATCH - merge styles into existing range
+        if (existingRect == newRect) {
+            ID existingStyleId = sheet->getRangeStyleId(existingRange->id);
+            const CellStyle* existingStyle = existingStyleId.isNull() ? nullptr : _workbook->getStyle(existingStyleId);
+
+            // Merge new style properties into existing style
+            CellStyle mergedStyle = existingStyle ? mergeStyles(*existingStyle, style, styleJson) : style;
+
+            // Find or create the merged style
+            ID mergedStyleId;
+            const auto& existingStyles = _workbook->getStyles();
+            for (const auto& [id, s] : existingStyles) {
+                if (s == mergedStyle) {
+                    mergedStyleId = id;
+                    break;
+                }
+            }
+            if (mergedStyleId.isNull()) {
+                mergedStyleId = generate_id();
+                _workbook->registerStyle(mergedStyleId, mergedStyle);
+                if (_workbook->isCollaborating()) {
+                    std::string fullStyleJson = styleToJson(mergedStyle);
+                    Operation styleOp = makeStyleDefineOp(*_workbook, mergedStyleId, fullStyleJson);
+                    applyOperation(*_workbook, styleOp);
+                }
+            }
+
+            // Update the existing range's style
+            std::ostringstream updatePayload;
+            updatePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
+            updatePayload << "\"style_id\":\"" << mergedStyleId.toString() << "\"}";
+            Operation updateOp = makeRangeSetStyleOp(*_workbook, existingRange->id, updatePayload.str());
+            applyOperation(*_workbook, updateOp);
+
+            if (_syncManager) {
+                _syncManager->queueOperationsBroadcast();
+                _syncManager->pruneOpLog();
+            }
+
+            rebuildViewportIndex();
+            notifyListeners(ChangeType::CELL_CHANGED);
+
+            // Return early - no new range needed, we merged into existing
+            return "{\"success\":true,\"rangeId\":\"" + existingRange->id.toString() +
+                   "\",\"styleId\":\"" + mergedStyleId.toString() + "\",\"merged\":true}";
+        }
+    }
+
+    // Track operations to perform after iteration (can't modify while iterating)
     struct SplitOperation {
         ID oldRangeId;
         ID oldStyleId;
         std::vector<PositionRect> newRects;
     };
     std::vector<SplitOperation> splitOps;
+
+    struct ContainedOperation {
+        ID rangeId;
+        ID existingStyleId;
+        CellStyle strippedStyle;  // Style with conflicting props removed
+        bool deleteRange;          // True if stripped style is empty
+    };
+    std::vector<ContainedOperation> containedOps;
 
     for (Range* existingRange : overlappingRanges) {
         if (!existingRange || !existingRange->hasFlag(RangeFlags::STYLE)) {
@@ -1339,7 +1541,7 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
         // Check if the existing style has conflicting properties with the new style
         std::string existingStyleJson = getStylePropertiesJson(*existingStyle);
         if (!stylesHaveConflictingProperties(styleJson, existingStyleJson)) {
-            // No conflict - different properties, can layer (skip splitting)
+            // No conflict - different properties, can layer (skip)
             continue;
         }
 
@@ -1364,15 +1566,63 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
             continue;
         }
 
-        // Compute rectangle subtraction: existingRect - newRect
+        // Case 2: CONTAINED - existing range is fully inside new range
+        // Strip conflicting properties from the existing range's style
+        if (newRect.contains(existingRect)) {
+            auto [strippedStyle, isEmpty] = stripConflictingProperties(*existingStyle, styleJson);
+            ContainedOperation op;
+            op.rangeId = existingRange->id;
+            op.existingStyleId = existingStyleId;
+            op.strippedStyle = strippedStyle;
+            op.deleteRange = isEmpty;
+            containedOps.push_back(std::move(op));
+            continue;  // Don't also split
+        }
+
+        // Case 3: PARTIAL OVERLAP - split the existing range
         std::vector<PositionRect> splitRects = subtractRectangle(existingRect, newRect);
 
-        // Record this split operation
         SplitOperation op;
         op.oldRangeId = existingRange->id;
         op.oldStyleId = existingStyleId;
         op.newRects = std::move(splitRects);
         splitOps.push_back(std::move(op));
+    }
+
+    // Execute contained operations: update or delete ranges
+    for (const ContainedOperation& containedOp : containedOps) {
+        if (containedOp.deleteRange) {
+            // Style is now empty, delete the range
+            std::ostringstream removePayload;
+            removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
+            Operation removeOp = makeRangeRemoveOp(*_workbook, containedOp.rangeId, removePayload.str());
+            applyOperation(*_workbook, removeOp);
+        } else {
+            // Update the range with stripped style
+            ID newStyleId;
+            const auto& existingStyles = _workbook->getStyles();
+            for (const auto& [id, s] : existingStyles) {
+                if (s == containedOp.strippedStyle) {
+                    newStyleId = id;
+                    break;
+                }
+            }
+            if (newStyleId.isNull()) {
+                newStyleId = generate_id();
+                _workbook->registerStyle(newStyleId, containedOp.strippedStyle);
+                if (_workbook->isCollaborating()) {
+                    std::string fullStyleJson = styleToJson(containedOp.strippedStyle);
+                    Operation styleOp = makeStyleDefineOp(*_workbook, newStyleId, fullStyleJson);
+                    applyOperation(*_workbook, styleOp);
+                }
+            }
+
+            std::ostringstream updatePayload;
+            updatePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
+            updatePayload << "\"style_id\":\"" << newStyleId.toString() << "\"}";
+            Operation updateOp = makeRangeSetStyleOp(*_workbook, containedOp.rangeId, updatePayload.str());
+            applyOperation(*_workbook, updateOp);
+        }
     }
 
     // Execute split operations: delete old ranges, create new split ranges

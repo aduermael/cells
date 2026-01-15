@@ -697,13 +697,41 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         json << "\"endRow\":" << rangeRow2 << ",";
         json << "\"styleId\":\"" << styleId.toString() << "\",";
         json << "\"style\":{";
+        bool firstProp = true;
+        // Add all non-default style properties
         if (!style->bgColor.empty()) {
             json << "\"bgColor\":\"" << style->bgColor << "\"";
+            firstProp = false;
         }
-        // Add other style properties that affect rendering
         if (!style->textColor.empty()) {
-            if (!style->bgColor.empty()) json << ",";
+            if (!firstProp) json << ",";
             json << "\"textColor\":\"" << style->textColor << "\"";
+            firstProp = false;
+        }
+        if (style->bold) {
+            if (!firstProp) json << ",";
+            json << "\"bold\":true";
+            firstProp = false;
+        }
+        if (style->italic) {
+            if (!firstProp) json << ",";
+            json << "\"italic\":true";
+            firstProp = false;
+        }
+        if (style->underline) {
+            if (!firstProp) json << ",";
+            json << "\"underline\":true";
+            firstProp = false;
+        }
+        if (!style->fontFamily.empty()) {
+            if (!firstProp) json << ",";
+            json << "\"fontFamily\":\"" << style->fontFamily << "\"";
+            firstProp = false;
+        }
+        if (style->fontSize != 0) {
+            if (!firstProp) json << ",";
+            json << "\"fontSize\":" << static_cast<int>(style->fontSize);
+            firstProp = false;
         }
         json << "}}";
     }

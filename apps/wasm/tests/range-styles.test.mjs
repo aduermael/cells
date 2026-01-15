@@ -648,6 +648,197 @@ const tests = {
     );
   },
 
+  // K8: Exact match style merging - apply multiple styles to same range
+  // When applying bold to the same range that already has bgColor,
+  // the styles should be merged into the existing range (no new range created)
+  'Same-area style merging creates single range with merged properties': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const testColor = '#818CF8'; // Purple 400
+
+    // Apply blue background to B2:D4 (cols 1-3, rows 1-3)
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, testColor);
+    await sleep(300);
+
+    // Get ranges after first application
+    const rangesAfterBgColor = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app) return [];
+      return ctx.app.styleRanges || [];
+    });
+    console.log('Style ranges after bgColor:', JSON.stringify(rangesAfterBgColor, null, 2));
+
+    // Count ranges covering B2:D4 (cols 1-3, rows 1-3)
+    const bgColorRangeCount = rangesAfterBgColor.filter(r =>
+      r.startCol === 1 && r.startRow === 1 &&
+      r.endCol === 3 && r.endRow === 3
+    ).length;
+
+    assertTrue(
+      bgColorRangeCount === 1,
+      `Should have exactly 1 range covering B2:D4 after bgColor, got ${bgColorRangeCount}`
+    );
+
+    // Now apply bold to the EXACT same range B2:D4
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+
+    // Click bold button
+    await ctx.page.click('#style-bold-btn');
+    await sleep(300);
+
+    // Get ranges after bold application
+    const rangesAfterBold = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app) return [];
+      return ctx.app.styleRanges || [];
+    });
+    console.log('Style ranges after bold:', JSON.stringify(rangesAfterBold, null, 2));
+
+    // Count total ranges covering B2:D4
+    const rangesCoveringArea = rangesAfterBold.filter(r =>
+      r.startCol === 1 && r.startRow === 1 &&
+      r.endCol === 3 && r.endRow === 3
+    );
+
+    console.log('Ranges covering B2:D4 after bold:', JSON.stringify(rangesCoveringArea, null, 2));
+
+    // With K3/K4 implemented, we should have EXACTLY 1 range covering B2:D4
+    // The bold should have been merged into the existing bgColor range
+    assertTrue(
+      rangesCoveringArea.length === 1,
+      `Should have exactly 1 merged range covering B2:D4, got ${rangesCoveringArea.length}`
+    );
+
+    // The single range should have BOTH bgColor AND bold
+    const mergedRange = rangesCoveringArea[0];
+    assertTrue(
+      mergedRange.style && mergedRange.style.bgColor,
+      'Merged range should have bgColor property'
+    );
+    assertTrue(
+      mergedRange.style && mergedRange.style.bold === true,
+      'Merged range should have bold property'
+    );
+
+    console.log('Merged range style:', JSON.stringify(mergedRange.style, null, 2));
+  },
+
+  // K9: Superset range strips conflicting properties from contained ranges
+  // When applying bgColor to A1:E5 (superset of B2:D4), the contained B2:D4 range
+  // should lose its bgColor (same property) but the new range takes over
+  'Superset range strips conflicting properties from contained range': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const blueColor = '#3B82F6';   // Blue 500
+    const greenColor = '#10B981'; // Green 500
+
+    // Apply blue background to B2:D4 (cols 1-3, rows 1-3)
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, blueColor);
+    await sleep(300);
+
+    // Get ranges after first application
+    const rangesAfterBlue = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app) return [];
+      return ctx.app.styleRanges || [];
+    });
+    console.log('Style ranges after blue (B2:D4):', JSON.stringify(rangesAfterBlue, null, 2));
+
+    // Now apply GREEN background to A1:F6 - a SUPERSET of B2:D4
+    await selectRange(ctx.page, 'A1', 'F6');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, greenColor);
+    await sleep(300);
+
+    // Get ranges after superset application
+    const rangesAfterGreen = await ctx.page.evaluate(() => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app) return [];
+      return ctx.app.styleRanges || [];
+    });
+    console.log('Style ranges after green (A1:F6 superset):', JSON.stringify(rangesAfterGreen, null, 2));
+
+    // Click elsewhere to deselect
+    await clickCell(ctx.page, 'G7');
+    await sleep(100);
+
+    // The old B2:D4 blue range should have been handled:
+    // Option 1: Deleted entirely (if only had bgColor, now empty after stripping)
+    // Option 2: Style stripped of bgColor (if had other props, which it doesn't)
+    // Since B2:D4 only had bgColor, it should be deleted
+
+    // Count ranges with blue bgColor
+    const blueRanges = rangesAfterGreen.filter(r =>
+      r.style && r.style.bgColor === blueColor.toUpperCase()
+    );
+    console.log(`Blue bgColor ranges remaining: ${blueRanges.length}`);
+
+    // There should be NO blue ranges anymore - the superset took over
+    // (The contained range's bgColor was stripped, making it empty, so it was deleted)
+    assertEqual(
+      blueRanges.length,
+      0,
+      `Should have 0 blue bgColor ranges after superset, got ${blueRanges.length}`
+    );
+
+    // There should be exactly one green range covering A1:F6
+    const greenRange = rangesAfterGreen.find(r =>
+      r.startCol === 0 && r.startRow === 0 &&
+      r.endCol === 5 && r.endRow === 5 &&
+      r.style && r.style.bgColor === greenColor.toUpperCase()
+    );
+    assertTrue(
+      greenRange !== undefined,
+      'Should have the green A1:F6 range'
+    );
+
+    // Verify B2 (was blue, inside superset) now renders GREEN
+    const posB2 = await getCellPosition(ctx.page, 1, 1);
+    const pixelB2 = await getPixelColor(
+      ctx.page,
+      posB2.x + posB2.width / 2,
+      posB2.y + posB2.height / 2
+    );
+    console.log(`B2 pixel color: r=${pixelB2?.r}, g=${pixelB2?.g}, b=${pixelB2?.b}`);
+    assertTrue(
+      isColorApproximately(pixelB2, greenColor, 30),
+      `B2 (inside superset) should have GREEN background, not blue`
+    );
+
+    // Verify A1 (corner of superset) renders GREEN
+    const posA1 = await getCellPosition(ctx.page, 0, 0);
+    const pixelA1 = await getPixelColor(
+      ctx.page,
+      posA1.x + posA1.width / 2,
+      posA1.y + posA1.height / 2
+    );
+    console.log(`A1 pixel color: r=${pixelA1?.r}, g=${pixelA1?.g}, b=${pixelA1?.b}`);
+    assertTrue(
+      isColorApproximately(pixelA1, greenColor, 30),
+      `A1 (corner of superset) should have GREEN background`
+    );
+
+    // Verify F6 (corner of superset) renders GREEN
+    const posF6 = await getCellPosition(ctx.page, 5, 5);
+    const pixelF6 = await getPixelColor(
+      ctx.page,
+      posF6.x + posF6.width / 2,
+      posF6.y + posF6.height / 2
+    );
+    console.log(`F6 pixel color: r=${pixelF6?.r}, g=${pixelF6?.g}, b=${pixelF6?.b}`);
+    assertTrue(
+      isColorApproximately(pixelF6, greenColor, 30),
+      `F6 (corner of superset) should have GREEN background`
+    );
+  },
+
   // I1: Range edge adjustment on column deletion (unit test coverage in crdt_test.cc)
   // This E2E test verifies a basic range creation scenario
   'Range creation and rendering works': async (ctx) => {

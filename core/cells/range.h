@@ -343,6 +343,19 @@ struct PositionRect {
         return minCol <= other.maxCol && maxCol >= other.minCol && minRow <= other.maxRow &&
                maxRow >= other.minRow;
     }
+
+    // Check if this rectangle fully contains another
+    [[nodiscard]] bool contains(const PositionRect& other) const {
+        return minCol <= other.minCol && maxCol >= other.maxCol && minRow <= other.minRow &&
+               maxRow >= other.maxRow;
+    }
+
+    // Equality comparison
+    bool operator==(const PositionRect& other) const {
+        return minCol == other.minCol && maxCol == other.maxCol && minRow == other.minRow &&
+               maxRow == other.maxRow;
+    }
+    bool operator!=(const PositionRect& other) const { return !(*this == other); }
 };
 
 // Compute the rectangle subtraction A - B.

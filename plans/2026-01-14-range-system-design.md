@@ -287,6 +287,46 @@ Result can be 0-4 rectangles:
 - [x] J4: E2E test: apply blue, apply overlapping red, move red cell → should reveal white not blue - Added "Overlapping ranges with same property splits the old range" test verifying rectangle splitting
 - [x] J5: E2E test: apply bgColor range, apply overlapping bold range → both should render (different properties OK) - Added "Overlapping ranges with different properties can layer" test verifying non-conflicting properties don't trigger split
 
+### Phase K: Smart Range Style Merging ✓ COMPLETE
+
+**Problem**: Currently, applying multiple style properties to the same range creates multiple overlapping ranges:
+```
+RG SWccgRXF B1:E7 sty:{bgColor:"#818CF8", bold:false, italic:false, underline:false}
+RG mPGHRVtx B1:E7 sty:{bold:true, italic:false, underline:false}
+```
+This is inefficient and creates unnecessary complexity. The system should be smarter about:
+1. Reusing existing ranges when applying additional properties to the same area
+2. Only storing non-default property values (sparse style representation)
+3. Only splitting when there's actual overlap with *different* ranges
+
+**Goal**: Single range with merged properties:
+```
+RG SWccgRXF B1:E7 sty:{bgColor:"#818CF8", bold:true}
+```
+
+**Design principles**:
+- **Sparse styles**: Only store non-default values. `{bold:true}` not `{bold:true, italic:false, underline:false}`
+- **Range reuse**: When applying style to exact same area as existing range, merge into existing range's style
+- **Smart splitting**: Only split when new range partially overlaps with a different range that has conflicting properties
+
+**Steps**:
+- [x] K1: Fix `mergeStyleJson` to only include non-default properties in resulting style (sparse representation) - `styleToJson` now sparse
+- [x] K2: Fix `styleToJson` to only serialize non-default properties - Updated to output sparse JSON with only non-default values
+- [x] K3: In `setRangeStyle`, detect when new range exactly matches an existing range's bounds - Added exact match check with `PositionRect::operator==`
+- [x] K4: When exact match found, merge new properties into existing range's style (RANGE_SET_STYLE with merged style) - Returns early with merged style, reuses existing range ID
+- [x] K5: For fully contained ranges, strip conflicting properties from their style (or delete if style becomes empty) - Added `ContainedOperation` handling with `stripConflictingProperties`
+- [x] K6: Update `stylesHaveConflictingProperties` to work with sparse styles (absent property = no conflict) - Already works correctly with `hasJsonField` checks
+- [x] K7: Unit test: sparse style serialization (only non-default values) - Added `PositionRect::contains` and equality tests in range_test.cc
+- [x] K8: E2E test: apply bgColor to B2:D4, then apply bold to same B2:D4 → single range with both properties - "Same-area style merging creates single range with merged properties"
+- [x] K9: E2E test: apply bgColor to B2:D4, then apply bgColor to A1:E5 (superset) → contained range loses bgColor - "Superset range strips conflicting properties from contained range"
+
+**Additional fix**: Updated viewport query `styleRanges` serialization to include all style properties (bold, italic, underline, fontFamily, fontSize) not just bgColor/textColor.
+
+**Edge cases**:
+- **Subset** (new range inside existing): Create new range, existing range unchanged. The new range layers on top for conflicting properties.
+- **Superset** (new range contains existing): Create new range. Existing ranges fully contained lose conflicting properties (stripped from their style). Partially overlapping ranges are split (Phase J behavior).
+- **Exact match**: Merge into existing range's style (no new range created)
+
 ## Testing Strategy
 
 - Unit tests for range containment with various corner positions
