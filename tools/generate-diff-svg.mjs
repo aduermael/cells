@@ -17,6 +17,9 @@ const OUTPUT_FILE = path.join(STATS_DIR, 'diff-size-evolution.svg');
 // Rolling average window (number of commits)
 const ROLLING_WINDOW = 10;
 
+// Y-axis cap (values above this are clamped for readability)
+const MAX_Y_CAP = 1000;
+
 // SVG dimensions
 const WIDTH = 800;
 const HEIGHT = 400;
@@ -75,16 +78,19 @@ function generateSVG(history) {
     const dates = dataWithAvg.map(h => h.date);
     const maxTotal = Math.max(...dataWithAvg.map(h => h.total));
     const maxAvg = Math.max(...dataWithAvg.map(h => h.rollingAvg));
-    const maxY = Math.max(maxTotal, maxAvg) * 1.1; // 10% padding
+    const rawMax = Math.max(maxTotal, maxAvg) * 1.1; // 10% padding
+    const maxY = Math.min(rawMax, MAX_Y_CAP); // Cap for readability
+    const hasCappedValues = rawMax > MAX_Y_CAP;
 
     const xScale = (index) => MARGIN.left + (index / (dataWithAvg.length - 1 || 1)) * CHART_WIDTH;
-    const yScale = (value) => MARGIN.top + CHART_HEIGHT - (value / maxY) * CHART_HEIGHT;
+    const yScale = (value) => MARGIN.top + CHART_HEIGHT - (Math.min(value, maxY) / maxY) * CHART_HEIGHT;
 
     // Generate path data for individual diff sizes (as dots/scatter)
     const diffDots = dataWithAvg.map((h, i) => ({
         x: xScale(i),
         y: yScale(h.total),
-        total: h.total
+        total: h.total,
+        capped: h.total > maxY
     }));
 
     // Generate path for rolling average line
@@ -160,8 +166,11 @@ function generateSVG(history) {
     <!-- Area fill for rolling average -->
     <path d="${avgAreaPath}" fill="${AVG_COLOR}" fill-opacity="0.1"/>
 
-    <!-- Individual diff dots (semi-transparent) -->
-    ${diffDots.map(d => `<circle cx="${d.x.toFixed(1)}" cy="${d.y.toFixed(1)}" r="2" fill="${DIFF_COLOR}" fill-opacity="0.3"/>`).join('\n    ')}
+    <!-- Individual diff dots (semi-transparent, triangles for capped values) -->
+    ${diffDots.map(d => d.capped
+        ? `<polygon points="${d.x.toFixed(1)},${(d.y - 4).toFixed(1)} ${(d.x - 3).toFixed(1)},${(d.y + 2).toFixed(1)} ${(d.x + 3).toFixed(1)},${(d.y + 2).toFixed(1)}" fill="${DIFF_COLOR}" fill-opacity="0.5"/>`
+        : `<circle cx="${d.x.toFixed(1)}" cy="${d.y.toFixed(1)}" r="2" fill="${DIFF_COLOR}" fill-opacity="0.3"/>`
+    ).join('\n    ')}
 
     <!-- Rolling average line -->
     <path d="${avgPath}" fill="none" stroke="${AVG_COLOR}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -183,7 +192,7 @@ function generateSVG(history) {
 
   <!-- Footer -->
   <text x="${WIDTH/2}" y="${HEIGHT - 10}" text-anchor="middle" class="tick-label">
-    ${dates[0]} to ${dates[dates.length - 1]} (${dataWithAvg.length} commits)
+    ${dates[0]} to ${dates[dates.length - 1]} (${dataWithAvg.length} commits)${hasCappedValues ? ` · Y-axis capped at ${MAX_Y_CAP}` : ''}
   </text>
 </svg>`;
 }
