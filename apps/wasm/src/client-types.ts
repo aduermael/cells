@@ -1,7 +1,7 @@
 // Client Types Module
 // Type definitions for CellsClient worker communication
 
-import type { CellData, ColumnInfo, RowInfo, PeerPresence } from "./types";
+import type { CellData, ColumnInfo, RowInfo, PeerPresence, StyleRangeInfo } from "./types";
 
 // ============================================================================
 // Worker Message Types
@@ -59,6 +59,7 @@ export interface ViewportResult {
   cells: CellData[];
   columns: ColumnInfo[];
   rows: RowInfo[];
+  styleRanges?: StyleRangeInfo[];
 }
 
 /** Create cell result */

@@ -33,6 +33,7 @@ const COLLECTIONS = {
     'zoom-comprehensive.test.mjs',
     'cell-background.test.mjs',
     'font-loading.test.mjs',
+    'range-styles.test.mjs',
   ],
   collab: [
     'collab.test.mjs',

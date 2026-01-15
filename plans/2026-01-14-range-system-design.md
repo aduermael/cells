@@ -221,13 +221,13 @@ Add ZCD format support for the Range system, enabling persistence of range-based
 - [x] G1: Add Range serialization to ZCD format - `RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<styleId>]`
 - [x] G2: Add Range parsing from ZCD format - Parses RG lines and recreates Range objects with style associations
 
-### Phase H: UI Range Style Integration (Deferred)
+### Phase H: UI Range Style Integration
 The toolbar still applies styles cell-by-cell via `setCellStyleAt()`. To use range-based styling for empty cells, the frontend renderer needs to be updated to query and render style ranges (currently it only renders styles from existing cell objects).
 
-- [ ] H1: Update viewport query to return style ranges covering the visible area
-- [ ] H2: Update GridRenderer to render backgrounds for style ranges (not just cells)
-- [ ] H3: Update StyleControls.applyStyleToSelection() to use setStyleForRange()
-- [ ] H4: Add E2E test verifying range styles render correctly and don't create empty cell entries
+- [x] H1: Update viewport query to return style ranges covering the visible area - Added `styleRanges` array to viewport JSON with range bounds and styles
+- [x] H2: Update GridRenderer to render backgrounds for style ranges (not just cells) - Added `_drawStyleRangeBackgrounds()` method called before cell backgrounds
+- [x] H3: Update StyleControls.applyStyleToSelection() to use setStyleForRange() - Multi-cell selections now use Range system
+- [x] H4: Add E2E test verifying range styles render correctly and don't create empty cell entries - Created `range-styles.test.mjs` with 4 tests: verifies styleRanges in viewport data, background rendering for empty cells, no wasteful cell object creation, and proper range bounds
 
 ## Testing Strategy
 

@@ -350,6 +350,7 @@ export class CellsClient {
       cells: (response.cells as ViewportResult["cells"]) || [],
       columns: (response.columns as ViewportResult["columns"]) || [],
       rows: (response.rows as ViewportResult["rows"]) || [],
+      styleRanges: (response.styleRanges as ViewportResult["styleRanges"]) || [],
     };
   }
 
