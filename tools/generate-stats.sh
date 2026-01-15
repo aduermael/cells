@@ -1,6 +1,6 @@
 #!/bin/bash
 # Generate project stats for README
-# Usage: ./scripts/generate-stats.sh [--build] [--update]
+# Usage: ./tools/generate-stats.sh [--build] [--update]
 # Use --build to rebuild WASM before calculating sizes
 # Use --update to update README.md and commit
 
@@ -275,13 +275,19 @@ generate_readme_section() {
     echo "- **WASM Module**: $wasm_size"
     echo "- **Total Web Bundle**: $bundle_size"
     echo ""
-    echo "<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with \`./scripts/generate-stats.sh\`</sub>"
+    echo "<sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with \`./tools/generate-stats.sh\`</sub>"
     echo ""
     echo "### LOC Evolution"
     echo ""
     echo '<img src="stats/loc-evolution.svg" alt="Lines of Code Evolution" width="100%">'
     echo ""
-    echo "<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with \`./scripts/loc-tracker.sh && node scripts/generate-loc-svg.mjs\`</sub>"
+    echo "<sub>Actual lines of code (excluding comments and blanks), tracked with [CLOC](https://github.com/AlDanial/cloc). Generate with \`./tools/loc-tracker.sh && node tools/generate-loc-svg.mjs\`</sub>"
+    echo ""
+    echo "### Diff Size Evolution"
+    echo ""
+    echo '<img src="stats/diff-size-evolution.svg" alt="Diff Size Evolution" width="100%">'
+    echo ""
+    echo "<sub>Average diff size per commit (lines added + removed, code files only). Generate with \`./tools/diff-tracker.sh && node tools/generate-diff-svg.mjs\`</sub>"
 }
 
 # -----------------------------------------------------------------------------
@@ -315,6 +321,11 @@ if [ "$UPDATE_README" = true ]; then
     "$SCRIPT_DIR/loc-tracker.sh"
     node "$SCRIPT_DIR/generate-loc-svg.mjs"
 
+    # Update diff size evolution graph
+    echo "Updating diff size evolution graph..."
+    "$SCRIPT_DIR/diff-tracker.sh"
+    node "$SCRIPT_DIR/generate-diff-svg.mjs"
+
     # Commit all changes
     git add README.md stats/
     git commit -m "Update project stats
@@ -340,5 +351,5 @@ else
     echo ""
     echo "---"
     echo ""
-    echo "To update README and commit: \`./scripts/generate-stats.sh --update\`"
+    echo "To update README and commit: \`./tools/generate-stats.sh --update\`"
 fi

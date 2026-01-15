@@ -17,9 +17,10 @@ Add a new graph showing average diff size over time, tracking code changes only 
   - Output to `stats/diff-size-evolution.svg`
 
 ## Phase 3: Integration and Path Fix
-- [ ] 3a: Update `tools/generate-stats.sh` to include diff size graph in output
+- [x] 3a: Update `tools/generate-stats.sh` to include diff size graph in output
   - Add calls to `diff-tracker.sh` and `generate-diff-svg.mjs` in `--update` mode
   - Add the new graph reference to the generated README section
-- [ ] 3b: Fix the two `./scripts/generate-stats.sh` references to `./tools/generate-stats.sh`
+- [x] 3b: Fix the two `./scripts/generate-stats.sh` references to `./tools/generate-stats.sh`
   - Line 278: Update the `<sub>` footer text
   - Line 343: Update the CLI hint at end of script
+  - Also fixed the usage comment at line 3
