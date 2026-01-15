@@ -202,6 +202,7 @@ export interface CellStyle {
   bold: boolean;
   italic: boolean;
   underline: boolean;
+  wrapText: boolean; // Wrap text within cell
   bgColor: string; // Background color (hex, e.g. "#FF0000"), empty for default
   textColor: string; // Text color (hex, e.g. "#000000"), empty for default
   fontFamily: string; // Font name (e.g. "Arial"), empty for system default

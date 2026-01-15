@@ -714,6 +714,12 @@ int LuauSandbox::luaSetColumnStyle(lua_State* L) {
     }
     lua_pop(L, 1);
 
+    lua_getfield(L, 2, "wrapText");
+    if (lua_isboolean(L, -1) != 0) {
+        style.wrapText = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
     lua_getfield(L, 2, "bgColor");
     if (lua_isstring(L, -1) != 0) {
         style.bgColor = lua_tostring(L, -1);
@@ -790,6 +796,12 @@ int LuauSandbox::luaSetRowStyle(lua_State* L) {
     lua_getfield(L, 2, "underline");
     if (lua_isboolean(L, -1) != 0) {
         style.underline = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
+    lua_getfield(L, 2, "wrapText");
+    if (lua_isboolean(L, -1) != 0) {
+        style.wrapText = lua_toboolean(L, -1) != 0;
     }
     lua_pop(L, 1);
 
@@ -1386,6 +1398,12 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
     }
     lua_pop(L, 1);
 
+    lua_getfield(L, 2, "wrapText");
+    if (lua_isboolean(L, -1) != 0) {
+        style.wrapText = lua_toboolean(L, -1) != 0;
+    }
+    lua_pop(L, 1);
+
     lua_getfield(L, 2, "bgColor");
     if (lua_isstring(L, -1) != 0) {
         style.bgColor = lua_tostring(L, -1);
@@ -1462,6 +1480,7 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
     stylePayload += R"("bold":)" + std::string(style.bold ? "true" : "false");
     stylePayload += R"(,"italic":)" + std::string(style.italic ? "true" : "false");
     stylePayload += R"(,"underline":)" + std::string(style.underline ? "true" : "false");
+    stylePayload += R"(,"wrapText":)" + std::string(style.wrapText ? "true" : "false");
     if (!style.bgColor.empty()) {
         stylePayload += R"(,"bgColor":")" + jsonEscape(style.bgColor) + R"(")";
     }

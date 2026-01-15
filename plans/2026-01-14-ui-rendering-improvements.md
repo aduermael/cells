@@ -86,7 +86,7 @@ Add toolbar button with dropdown to set cell borders (all borders, outline, top,
 
 Add support for text wrapping within cells, reading from XLSX and exposing in UI.
 
-- [ ] 7a: Add `wrapText: boolean` property to CellStyle in model.h
+- [x] 7a: Add `wrapText: boolean` property to CellStyle in model.h - added to style_types.h with isEmpty(), operator==, hash(), and JSON serialization/parsing in crdt.cc, crdt_axis.cc, parser.cc, luau_api.cc, luau_types.cc, bindings_viewport.cc, bindings_format.cc, and TypeScript types
 - [ ] 7b: Parse `wrapText` attribute from XLSX alignment element (`<alignment wrapText="1"/>`) in xlsx_reader.cc
 - [ ] 7c: Write `wrapText` attribute back to XLSX in xlsx_writer.cc
 - [ ] 7d: Update grid-renderer.ts `_drawCellValues()` to perform line breaking when wrapText is true

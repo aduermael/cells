@@ -86,6 +86,7 @@ struct CellStyle {
     bool bold{false};
     bool italic{false};
     bool underline{false};
+    bool wrapText{false};                  // Wrap text within cell
     std::string bgColor;                   // Background color (hex, e.g. "#FF0000")
     std::string textColor;                 // Text color (hex, e.g. "#000000")
     std::string fontFamily;                // Font name (e.g. "Arial"), empty = system default
@@ -98,17 +99,19 @@ struct CellStyle {
 
     // Check if style has any non-default values
     [[nodiscard]] bool isEmpty() const {
-        return !bold && !italic && !underline && bgColor.empty() && textColor.empty() &&
-               fontFamily.empty() && fontSize == 0 && hAlign == TextAlign::GENERAL &&
-               vAlign == VerticalAlign::BOTTOM && !border.hasValue();
+        return !bold && !italic && !underline && !wrapText && bgColor.empty() &&
+               textColor.empty() && fontFamily.empty() && fontSize == 0 &&
+               hAlign == TextAlign::GENERAL && vAlign == VerticalAlign::BOTTOM &&
+               !border.hasValue();
     }
 
     // Equality comparison
     bool operator==(const CellStyle& other) const {
         return bold == other.bold && italic == other.italic && underline == other.underline &&
-               bgColor == other.bgColor && textColor == other.textColor &&
-               fontFamily == other.fontFamily && fontSize == other.fontSize &&
-               hAlign == other.hAlign && vAlign == other.vAlign && border == other.border;
+               wrapText == other.wrapText && bgColor == other.bgColor &&
+               textColor == other.textColor && fontFamily == other.fontFamily &&
+               fontSize == other.fontSize && hAlign == other.hAlign && vAlign == other.vAlign &&
+               border == other.border;
     }
 
     bool operator!=(const CellStyle& other) const { return !(*this == other); }
@@ -134,6 +137,7 @@ struct CellStyle {
         constexpr size_t TAG_BORDER_RIGHT = 11;
         constexpr size_t TAG_BORDER_BOTTOM = 12;
         constexpr size_t TAG_BORDER_LEFT = 13;
+        constexpr size_t TAG_WRAPTEXT = 14;
 
         // Hash non-default values with their property tags
         if (bold) {
@@ -147,6 +151,10 @@ struct CellStyle {
         if (underline) {
             hashCombine(TAG_UNDERLINE);
             hashCombine(std::hash<bool>{}(underline));
+        }
+        if (wrapText) {
+            hashCombine(TAG_WRAPTEXT);
+            hashCombine(std::hash<bool>{}(wrapText));
         }
         if (!bgColor.empty()) {
             hashCombine(TAG_BGCOLOR);

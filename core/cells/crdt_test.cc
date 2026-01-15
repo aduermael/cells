@@ -533,6 +533,7 @@ TEST_F(CRDTTest, CellStyleDefaults) {
     EXPECT_FALSE(style.bold);
     EXPECT_FALSE(style.italic);
     EXPECT_FALSE(style.underline);
+    EXPECT_FALSE(style.wrapText);
     EXPECT_TRUE(style.bgColor.empty());
     EXPECT_TRUE(style.textColor.empty());
     EXPECT_TRUE(style.fontFamily.empty());
@@ -617,6 +618,7 @@ TEST_F(CRDTTest, StyleDefineAllProperties) {
         "bold":true,
         "italic":true,
         "underline":true,
+        "wrapText":true,
         "bgColor":"#FFFF00",
         "textColor":"#000000",
         "fontFamily":"Arial",
@@ -632,6 +634,7 @@ TEST_F(CRDTTest, StyleDefineAllProperties) {
     EXPECT_TRUE(style->bold);
     EXPECT_TRUE(style->italic);
     EXPECT_TRUE(style->underline);
+    EXPECT_TRUE(style->wrapText);
     EXPECT_EQ(style->bgColor, "#FFFF00");
     EXPECT_EQ(style->textColor, "#000000");
     EXPECT_EQ(style->fontFamily, "Arial");

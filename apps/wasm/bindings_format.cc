@@ -542,6 +542,11 @@ std::string styleToJson(const CellStyle& style) {
         ss << "\"underline\":true";
         first = false;
     }
+    if (style.wrapText) {
+        if (!first) ss << ",";
+        ss << "\"wrapText\":true";
+        first = false;
+    }
     if (!style.bgColor.empty()) {
         if (!first) ss << ",";
         ss << "\"bgColor\":\"" << jsonEscape(style.bgColor) << "\"";
@@ -737,6 +742,7 @@ CellStyle parseStyleJson(const std::string& json) {
     style.bold = extractBoolField(json, "bold", false);
     style.italic = extractBoolField(json, "italic", false);
     style.underline = extractBoolField(json, "underline", false);
+    style.wrapText = extractBoolField(json, "wrapText", false);
     style.bgColor = extractPayloadField(json, "bgColor");
     style.textColor = extractPayloadField(json, "textColor");
     style.fontFamily = extractPayloadField(json, "fontFamily");
@@ -786,6 +792,9 @@ CellStyle mergeStyleJson(const CellStyle& baseStyle, const std::string& json) {
     }
     if (hasJsonField(json, "underline")) {
         style.underline = extractBoolField(json, "underline", baseStyle.underline);
+    }
+    if (hasJsonField(json, "wrapText")) {
+        style.wrapText = extractBoolField(json, "wrapText", baseStyle.wrapText);
     }
     if (hasJsonField(json, "bgColor")) {
         style.bgColor = extractPayloadField(json, "bgColor");
@@ -861,6 +870,9 @@ CellStyle mergeStyles(const CellStyle& baseStyle, const CellStyle& newStyle,
     if (hasJsonField(newStyleJson, "underline")) {
         result.underline = newStyle.underline;
     }
+    if (hasJsonField(newStyleJson, "wrapText")) {
+        result.wrapText = newStyle.wrapText;
+    }
     if (hasJsonField(newStyleJson, "bgColor")) {
         result.bgColor = newStyle.bgColor;
     }
@@ -902,6 +914,9 @@ std::pair<CellStyle, bool> stripConflictingProperties(const CellStyle& existingS
     }
     if (hasJsonField(newStyleJson, "underline")) {
         result.underline = false;
+    }
+    if (hasJsonField(newStyleJson, "wrapText")) {
+        result.wrapText = false;
     }
     if (hasJsonField(newStyleJson, "bgColor")) {
         result.bgColor = "";  // Reset to default
@@ -948,6 +963,9 @@ bool stylesHaveConflictingProperties(const std::string& styleJson1, const std::s
     if (hasJsonField(styleJson1, "underline") && hasJsonField(styleJson2, "underline")) {
         return true;
     }
+    if (hasJsonField(styleJson1, "wrapText") && hasJsonField(styleJson2, "wrapText")) {
+        return true;
+    }
     if (hasJsonField(styleJson1, "fontFamily") && hasJsonField(styleJson2, "fontFamily")) {
         return true;
     }
@@ -986,6 +1004,11 @@ std::string getStylePropertiesJson(const CellStyle& style) {
     if (style.underline) {
         if (!first) ss << ",";
         ss << "\"underline\":true";
+        first = false;
+    }
+    if (style.wrapText) {
+        if (!first) ss << ",";
+        ss << "\"wrapText\":true";
         first = false;
     }
     if (!style.bgColor.empty()) {
@@ -1074,6 +1097,9 @@ CellStyle stripMatchingStyleProperties(const CellStyle& cellStyle, const CellSty
     }
     if (hasJsonField(styleJson, "underline")) {
         result.underline = false;
+    }
+    if (hasJsonField(styleJson, "wrapText")) {
+        result.wrapText = false;
     }
     if (hasJsonField(styleJson, "bgColor")) {
         result.bgColor = "";  // Reset to default (empty)
@@ -2056,6 +2082,7 @@ CellStyle mergeEffectiveStyles(const CellStyle& base, const CellStyle& overlay) 
     if (!result.bold && overlay.bold) result.bold = true;
     if (!result.italic && overlay.italic) result.italic = true;
     if (!result.underline && overlay.underline) result.underline = true;
+    if (!result.wrapText && overlay.wrapText) result.wrapText = true;
 
     // Merge string properties (overlay wins if base is empty)
     if (result.bgColor.empty() && !overlay.bgColor.empty()) result.bgColor = overlay.bgColor;
@@ -2206,6 +2233,7 @@ std::string CellsEngine::getEffectiveStyleForRange(uint32_t col1, uint32_t row1,
     bool mixedBold = false;
     bool mixedItalic = false;
     bool mixedUnderline = false;
+    bool mixedWrapText = false;
     bool mixedBgColor = false;
     bool mixedTextColor = false;
     bool mixedFontFamily = false;
@@ -2226,6 +2254,7 @@ std::string CellsEngine::getEffectiveStyleForRange(uint32_t col1, uint32_t row1,
             if (cellStyle.bold != firstStyle.bold) mixedBold = true;
             if (cellStyle.italic != firstStyle.italic) mixedItalic = true;
             if (cellStyle.underline != firstStyle.underline) mixedUnderline = true;
+            if (cellStyle.wrapText != firstStyle.wrapText) mixedWrapText = true;
             if (cellStyle.bgColor != firstStyle.bgColor) mixedBgColor = true;
             if (cellStyle.textColor != firstStyle.textColor) mixedTextColor = true;
             if (cellStyle.fontFamily != firstStyle.fontFamily) mixedFontFamily = true;
@@ -2242,6 +2271,7 @@ std::string CellsEngine::getEffectiveStyleForRange(uint32_t col1, uint32_t row1,
     if (mixedBold) { ss << "\"bold\":true"; first = false; }
     if (mixedItalic) { if (!first) ss << ","; ss << "\"italic\":true"; first = false; }
     if (mixedUnderline) { if (!first) ss << ","; ss << "\"underline\":true"; first = false; }
+    if (mixedWrapText) { if (!first) ss << ","; ss << "\"wrapText\":true"; first = false; }
     if (mixedBgColor) { if (!first) ss << ","; ss << "\"bgColor\":true"; first = false; }
     if (mixedTextColor) { if (!first) ss << ","; ss << "\"textColor\":true"; first = false; }
     if (mixedFontFamily) { if (!first) ss << ","; ss << "\"fontFamily\":true"; first = false; }

@@ -1186,6 +1186,7 @@ TEST(StyleSerializationTest, RoundtripStyles) {
     style.bold = true;
     style.italic = true;
     style.underline = true;
+    style.wrapText = true;
     style.bgColor = "#FFFF00";
     style.textColor = "#000000";
     style.fontFamily = "Arial";
@@ -1208,6 +1209,7 @@ TEST(StyleSerializationTest, RoundtripStyles) {
     EXPECT_TRUE(parsed->bold);
     EXPECT_TRUE(parsed->italic);
     EXPECT_TRUE(parsed->underline);
+    EXPECT_TRUE(parsed->wrapText);
     EXPECT_EQ(parsed->bgColor, "#FFFF00");
     EXPECT_EQ(parsed->textColor, "#000000");
     EXPECT_EQ(parsed->fontFamily, "Arial");
@@ -1283,6 +1285,7 @@ TEST(StyleZCDRoundtripTest, EmptyStyleRoundtrip) {
     EXPECT_FALSE(parsed->bold);
     EXPECT_FALSE(parsed->italic);
     EXPECT_FALSE(parsed->underline);
+    EXPECT_FALSE(parsed->wrapText);
     EXPECT_TRUE(parsed->bgColor.empty());
     EXPECT_TRUE(parsed->textColor.empty());
     EXPECT_TRUE(parsed->fontFamily.empty());
@@ -1321,6 +1324,7 @@ TEST(StyleZCDRoundtripTest, PartialStyleBoldOnly) {
     EXPECT_TRUE(parsed->bold);
     EXPECT_FALSE(parsed->italic);
     EXPECT_FALSE(parsed->underline);
+    EXPECT_FALSE(parsed->wrapText);
 }
 
 TEST(StyleZCDRoundtripTest, PartialStyleColorOnly) {

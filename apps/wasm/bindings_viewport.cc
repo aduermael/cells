@@ -58,6 +58,7 @@ CellStyle mergeStyles(const CellStyle& base, const CellStyle& overlay) {
     if (!result.bold && overlay.bold) result.bold = true;
     if (!result.italic && overlay.italic) result.italic = true;
     if (!result.underline && overlay.underline) result.underline = true;
+    if (!result.wrapText && overlay.wrapText) result.wrapText = true;
 
     // Merge string properties (overlay wins if base is empty)
     if (result.bgColor.empty() && !overlay.bgColor.empty()) result.bgColor = overlay.bgColor;
@@ -288,6 +289,7 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             json << "\"bold\":" << (style->bold ? "true" : "false");
             json << ",\"italic\":" << (style->italic ? "true" : "false");
             json << ",\"underline\":" << (style->underline ? "true" : "false");
+            json << ",\"wrapText\":" << (style->wrapText ? "true" : "false");
             if (!style->bgColor.empty()) {
                 json << ",\"bgColor\":\"" << style->bgColor << "\"";
             }
@@ -721,6 +723,11 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         if (style->underline) {
             if (!firstProp) json << ",";
             json << "\"underline\":true";
+            firstProp = false;
+        }
+        if (style->wrapText) {
+            if (!firstProp) json << ",";
+            json << "\"wrapText\":true";
             firstProp = false;
         }
         if (!style->fontFamily.empty()) {

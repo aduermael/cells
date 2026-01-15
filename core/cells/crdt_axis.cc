@@ -849,6 +849,7 @@ ApplyResult applyStyleDefine(Workbook& workbook, const Operation& op) {
     style.bold = extractJSONBool(op.payload, "bold", false);
     style.italic = extractJSONBool(op.payload, "italic", false);
     style.underline = extractJSONBool(op.payload, "underline", false);
+    style.wrapText = extractJSONBool(op.payload, "wrapText", false);
     style.bgColor = extractJSONString(op.payload, "bgColor");
     style.textColor = extractJSONString(op.payload, "textColor");
     style.fontFamily = extractJSONString(op.payload, "fontFamily");

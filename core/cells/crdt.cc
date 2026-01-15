@@ -687,6 +687,7 @@ size_t bootstrapOpLog(Workbook& workbook) {
         payload += "\"bold\":" + std::string(style.bold ? "true" : "false");
         payload += ",\"italic\":" + std::string(style.italic ? "true" : "false");
         payload += ",\"underline\":" + std::string(style.underline ? "true" : "false");
+        payload += ",\"wrapText\":" + std::string(style.wrapText ? "true" : "false");
         if (!style.bgColor.empty()) {
             payload += ",\"bgColor\":\"" + internal::jsonEscape(style.bgColor) + "\"";
         }

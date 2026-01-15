@@ -322,6 +322,7 @@ bool Parser::parseStyle(std::string_view line) {
     style.bold = extractJSONBoolValue(json, "bold", false);
     style.italic = extractJSONBoolValue(json, "italic", false);
     style.underline = extractJSONBoolValue(json, "underline", false);
+    style.wrapText = extractJSONBoolValue(json, "wrapText", false);
     style.bgColor = extractJSONStringValue(json, "bgColor");
     style.textColor = extractJSONStringValue(json, "textColor");
     style.fontFamily = extractJSONStringValue(json, "fontFamily");
