@@ -123,6 +123,12 @@ export function setupDataListeners(config: DataListenersConfig): {
       app.cells = data.cells || [];
       app.columns = data.columns || [];
       app.rows = data.rows || [];
+      app.styleRanges = data.styleRanges || [];
+
+      // DEBUG: Log style ranges from viewport
+      if (app.styleRanges.length > 0) {
+        console.log("[DEBUG] Viewport returned styleRanges:", JSON.stringify(app.styleRanges, null, 2));
+      }
 
       // Clear caches for viewport range before repopulating
       for (let col = startCol; col < endCol; col++) {

@@ -120,6 +120,13 @@ export class WasmDataSource {
     cells: CellData[];
     columns: ColumnInfo[];
     rows: RowInfo[];
+    styleRanges?: Array<{
+      startCol: number;
+      startRow: number;
+      endCol: number;
+      endRow: number;
+      style: { bgColor?: string; textColor?: string };
+    }>;
   }> {
     const result = await this._client.queryViewport(x1, y1, x2, y2);
     // Cast cells since WASM returns string type but runtime values are valid
@@ -127,6 +134,13 @@ export class WasmDataSource {
       cells: result.cells as CellData[],
       columns: result.columns as ColumnInfo[],
       rows: result.rows as RowInfo[],
+      styleRanges: (result as { styleRanges?: unknown }).styleRanges as Array<{
+        startCol: number;
+        startRow: number;
+        endCol: number;
+        endRow: number;
+        style: { bgColor?: string; textColor?: string };
+      }> | undefined,
     };
   }
 

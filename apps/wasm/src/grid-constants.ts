@@ -294,4 +294,12 @@ export interface GridRendererState {
   fillPreviewRange?: { minCol: number; maxCol: number; minRow: number; maxRow: number } | null;
   /** Spill range highlight (shown when selected cell is part of a spill range) */
   spillRangeHighlight?: SpillRangeHighlight | null;
+  /** Style ranges for rendering backgrounds on empty cells */
+  styleRanges?: Array<{
+    startCol: number;
+    startRow: number;
+    endCol: number;
+    endRow: number;
+    style: { bgColor?: string; textColor?: string };
+  }>;
 }

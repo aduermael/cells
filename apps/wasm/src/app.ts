@@ -241,6 +241,14 @@ export class App {
   cells: CellData[] = [];
   columns: ColumnInfo[] = [];
   rows: RowInfo[] = [];
+  /** Style ranges for rendering backgrounds on empty cells */
+  styleRanges: Array<{
+    startCol: number;
+    startRow: number;
+    endCol: number;
+    endRow: number;
+    style: { bgColor?: string; textColor?: string };
+  }> = [];
 
   // Scroll position
   scrollX: number = 0;

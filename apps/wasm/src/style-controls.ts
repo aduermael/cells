@@ -602,10 +602,9 @@ export class StyleControls {
   /**
    * Apply a style update to all cells in the current selection range.
    *
-   * NOTE: Currently uses cell-by-cell styling because the frontend renderer
-   * doesn't yet support rendering backgrounds from Range objects (only from
-   * cell styles). Once the renderer is updated to query and render style
-   * ranges, this can use setStyleForRange() for better efficiency.
+   * Uses Range-based styling for multi-cell selections, which creates a single
+   * Range object with RANGE_STYLE flag instead of creating empty cell entries.
+   * Single-cell selections still use cell-level styling.
    */
   private async applyStyleToSelection(styleUpdate: Partial<CellStyle>): Promise<void> {
     if (!this.dataSource) return;
@@ -621,17 +620,15 @@ export class StyleControls {
       return;
     }
 
-    // Apply to all cells in range
+    // For multi-cell ranges, use the Range system for efficient styling
+    // This creates a single Range with RANGE_STYLE flag instead of
+    // individual cell style entries
     const minCol = Math.min(start.col, end.col);
     const maxCol = Math.max(start.col, end.col);
     const minRow = Math.min(start.row, end.row);
     const maxRow = Math.max(start.row, end.row);
 
-    for (let col = minCol; col <= maxCol; col++) {
-      for (let row = minRow; row <= maxRow; row++) {
-        await this.dataSource.setCellStyleAt(col, row, styleUpdate);
-      }
-    }
+    await this.dataSource.setStyleForRange(minCol, minRow, maxCol, maxRow, styleUpdate);
   }
 
   // =========================================================================

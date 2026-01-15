@@ -102,6 +102,14 @@ export class GridRenderer {
   cells: CellData[] = [];
   columns: Array<{ id: string; pos: number; width: number; name: string }> = [];
   rows: Array<{ id: string; pos: number; height: number; name: string }> = [];
+  /** Style ranges for rendering backgrounds on empty cells */
+  styleRanges: Array<{
+    startCol: number;
+    startRow: number;
+    endCol: number;
+    endRow: number;
+    style: { bgColor?: string; textColor?: string };
+  }> = [];
   colWidths: Map<number, number> = new Map();
   rowHeights: Map<number, number> = new Map();
   colNames: Map<number, string> = new Map();
@@ -361,6 +369,7 @@ export class GridRenderer {
     ctx.rect(freezeX, freezeY, viewWidth - freezeX, viewHeight - freezeY);
     ctx.clip();
 
+    this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
     this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
     this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
     this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
@@ -377,6 +386,7 @@ export class GridRenderer {
       ctx.fillStyle = this.colors.cellBg;
       ctx.fillRect(freezeX, zoomedHeaderHeight, viewWidth - freezeX, frozenRowHeight);
 
+      this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
       this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
@@ -394,6 +404,7 @@ export class GridRenderer {
       ctx.fillStyle = this.colors.cellBg;
       ctx.fillRect(zoomedHeaderWidth, freezeY, frozenColWidth, viewHeight - freezeY);
 
+      this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
       this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
@@ -411,6 +422,7 @@ export class GridRenderer {
       ctx.fillStyle = this.colors.cellBg;
       ctx.fillRect(zoomedHeaderWidth, zoomedHeaderHeight, frozenColWidth, frozenRowHeight);
 
+      this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
       this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
@@ -627,6 +639,53 @@ export class GridRenderer {
       ctx.fillStyle = bgColor;
       // Draw backgrounds edge-to-edge (no inset) - grid lines will be drawn on top
       ctx.fillRect(cellX, cellY, totalWidth, totalHeight);
+    }
+  }
+
+  /** Draw style range backgrounds (for empty cells within styled ranges) */
+  private _drawStyleRangeBackgrounds(
+    ctx: CanvasRenderingContext2D,
+    viewWidth: number,
+    viewHeight: number,
+    headerState: HeaderRendererState
+  ): void {
+    const zoomedHeaderWidth = getZoomedHeaderWidth();
+    const zoomedHeaderHeight = getZoomedHeaderHeight();
+
+    // DEBUG: Log style ranges
+    if (this.styleRanges.length > 0) {
+      console.log("[DEBUG] styleRanges:", JSON.stringify(this.styleRanges, null, 2));
+    }
+
+    for (const range of this.styleRanges) {
+      const bgColor = range.style?.bgColor;
+      console.log("[DEBUG] Processing range:", range, "bgColor:", bgColor);
+      if (!bgColor) continue;
+
+      // Calculate pixel bounds for the range
+      const startX = getColX(range.startCol, headerState);
+      const startY = getRowY(range.startRow, headerState);
+
+      // Calculate total width of the range
+      let totalWidth = 0;
+      for (let col = range.startCol; col <= range.endCol; col++) {
+        const baseW = this.colWidths.get(col) || DEFAULT_COL_WIDTH;
+        totalWidth += getZoomedColWidth(baseW);
+      }
+
+      // Calculate total height of the range
+      let totalHeight = 0;
+      for (let row = range.startRow; row <= range.endRow; row++) {
+        const baseH = this.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+        totalHeight += getZoomedRowHeight(baseH);
+      }
+
+      // Skip if entirely outside viewport
+      if (startX + totalWidth < zoomedHeaderWidth || startX > viewWidth) continue;
+      if (startY + totalHeight < zoomedHeaderHeight || startY > viewHeight) continue;
+
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(startX, startY, totalWidth, totalHeight);
     }
   }
 

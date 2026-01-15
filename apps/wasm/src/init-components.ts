@@ -176,6 +176,7 @@ export function createComponents(config: ComponentsConfig): Components {
       isFillDragging: app.isFillDragging,
       fillPreviewRange: app.fillPreviewRange,
       spillRangeHighlight: app.spillRangeHighlight,
+      styleRanges: app.styleRanges,
     });
   }
 

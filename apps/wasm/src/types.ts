@@ -274,11 +274,25 @@ export interface RowInfo {
   hidden: boolean; // Whether row is hidden
 }
 
+/** Style range info for rendering backgrounds on empty cells */
+export interface StyleRangeInfo {
+  startCol: number;
+  startRow: number;
+  endCol: number;
+  endRow: number;
+  styleId: string;
+  style: {
+    bgColor?: string;
+    textColor?: string;
+  };
+}
+
 /** Viewport query result */
 export interface ViewportResult {
   cells: CellData[];
   columns: ColumnInfo[];
   rows: RowInfo[];
+  styleRanges?: StyleRangeInfo[]; // Ranges with RANGE_STYLE flag for background rendering
 }
 
 // ============================================================================
