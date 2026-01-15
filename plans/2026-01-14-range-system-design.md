@@ -345,14 +345,14 @@ The toolbar should display the **effective merged style** considering:
 **Architecture**: All style computation logic lives in C++ (headless clients need it too). TypeScript UI just calls bindings and displays results.
 
 **Steps**:
-- [ ] L1: Add C++ `getEffectiveCellStyle(col, row)` method in CellsEngine (reuses existing `getEffectiveStyle` from viewport)
-- [ ] L2: Add WASM binding to expose `getEffectiveCellStyle` as JSON
-- [ ] L3: Add C++ `getEffectiveStyleForRange(col1, row1, col2, row2)` that returns merged style + mixed flags for multi-cell selection
-- [ ] L4: Add WASM binding for `getEffectiveStyleForRange` returning `{style: CellStyle, mixed: {bold: bool, italic: bool, ...}}`
-- [ ] L5: Update TypeScript `StyleControls` to call these bindings instead of reading cell.style directly
-- [ ] L6: E2E test: apply range style, select cell within range, verify toolbar reflects range style
-- [ ] L7: E2E test: apply range style + cell override, verify toolbar shows cell override values
-- [ ] L8: E2E test: select range with mixed styles, verify mixed indicators show correctly
+- [x] L1: Add C++ `getEffectiveCellStyle(col, row)` method in CellsEngine (reuses existing `getEffectiveStyle` from viewport)
+- [x] L2: Add WASM binding to expose `getEffectiveCellStyle` as JSON
+- [x] L3: Add C++ `getEffectiveStyleForRange(col1, row1, col2, row2)` that returns merged style + mixed flags for multi-cell selection
+- [x] L4: Add WASM binding for `getEffectiveStyleForRange` returning `{style: CellStyle, mixed: {bold: bool, italic: bool, ...}}`
+- [x] L5: Update TypeScript `StyleControls` to call these bindings instead of reading cell.style directly
+- [x] L6: E2E test: apply range style, select cell within range, verify toolbar reflects range style
+- [x] L7: E2E test: apply range style + cell override, verify toolbar shows cell override values
+- [x] L8: E2E test: select range with mixed styles, verify mixed indicators show correctly
 
 **Design consideration**: When the user changes a style on a cell that inherits from a range:
 - Option A: Always create cell-level override (simple, current behavior)

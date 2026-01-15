@@ -74,6 +74,8 @@ import {
     handleGetAvailableStyles,
     handleSetRangeStyle,
     handleRemoveRangeStyle,
+    handleGetEffectiveCellStyle,
+    handleGetEffectiveStyleForRange,
     handleResizeColumn,
     handleResizeColumnByPos,
     handleResizeRow,
@@ -499,6 +501,16 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "removeRangeStyle":
                 handleRemoveRangeStyle(engine, params, respond);
+                break;
+
+            // ================================================================
+            // Effective Style Operations
+            // ================================================================
+            case "getEffectiveCellStyle":
+                handleGetEffectiveCellStyle(engine, params, respond);
+                break;
+            case "getEffectiveStyleForRange":
+                handleGetEffectiveStyleForRange(engine, params, respond);
                 break;
 
             // ================================================================

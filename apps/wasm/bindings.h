@@ -168,6 +168,11 @@ public:
                               const std::string& styleJson);
     std::string removeRangeStyle(uint32_t col, uint32_t row);
 
+    // Effective style operations (resolves cell > range > column > row hierarchy)
+    // Used by UI to show the actual style in the toolbar
+    std::string getEffectiveCellStyle(uint32_t col, uint32_t row);
+    std::string getEffectiveStyleForRange(uint32_t col1, uint32_t row1, uint32_t col2, uint32_t row2);
+
     // ========================================================================
     // Column/row resize operations (bindings_core.cc)
     // ========================================================================

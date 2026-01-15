@@ -298,6 +298,31 @@ export class WasmDataSource {
     return this._client.removeRangeStyle(col, row);
   }
 
+  // ==========================================================================
+  // Effective Style Operations
+  // ==========================================================================
+
+  /**
+   * Get effective style for a cell, resolving the full style hierarchy.
+   * Returns the computed style from cell > range > column > row precedence.
+   */
+  async getEffectiveCellStyle(col: number, row: number): Promise<CellStyle> {
+    return this._client.getEffectiveCellStyle(col, row);
+  }
+
+  /**
+   * Get effective style for a range with mixed indicators.
+   * Returns the anchor cell's style plus which properties differ across the range.
+   */
+  async getEffectiveStyleForRange(
+    col1: number,
+    row1: number,
+    col2: number,
+    row2: number,
+  ): Promise<{ style: CellStyle; mixed: Partial<Record<keyof CellStyle, boolean>> }> {
+    return this._client.getEffectiveStyleForRange(col1, row1, col2, row2);
+  }
+
   /**
    * Set style for a range of cells.
    * Uses the Range system for efficient styling.

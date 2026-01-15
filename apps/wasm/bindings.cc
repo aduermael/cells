@@ -146,6 +146,9 @@ EMSCRIPTEN_BINDINGS(cells) {
         // Range styles
         .function("setRangeStyle", &cells::wasm::CellsEngine::setRangeStyle)
         .function("removeRangeStyle", &cells::wasm::CellsEngine::removeRangeStyle)
+        // Effective style (resolves cell > range > column > row hierarchy)
+        .function("getEffectiveCellStyle", &cells::wasm::CellsEngine::getEffectiveCellStyle)
+        .function("getEffectiveStyleForRange", &cells::wasm::CellsEngine::getEffectiveStyleForRange)
         // Column/row resize
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)
         .function("resizeColumnByPos", &cells::wasm::CellsEngine::resizeColumnByPos)

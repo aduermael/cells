@@ -136,7 +136,6 @@ export class StyleControls {
   // =========================================================================
 
   private getSelectedCell: () => Position | null;
-  private getSelectedCellData: () => CellData | null;
   private getSelectionRange: () => { start: Position | null; end: Position | null };
   private requestRender: () => void;
   private updateFormulaBar: () => void;
@@ -186,7 +185,8 @@ export class StyleControls {
     this.valignBottomBtn = config.valignBottomBtn;
 
     this.getSelectedCell = callbacks.getSelectedCell;
-    this.getSelectedCellData = callbacks.getSelectedCellData;
+    // Note: getSelectedCellData from callbacks is no longer used - we now use
+    // getEffectiveCellStyle which resolves the full style hierarchy
     this.getSelectionRange = callbacks.getSelectionRange;
     this.requestRender = callbacks.requestRender;
     this.updateFormulaBar = callbacks.updateFormulaBar;
@@ -203,11 +203,22 @@ export class StyleControls {
     this.dataSource = dataSource;
   }
 
-  /** Update the displayed style for the current cell selection */
+  /**
+   * Update the displayed style for the current cell selection.
+   *
+   * Uses the effective style API which resolves the full style hierarchy:
+   * 1. Cell's own style (highest priority)
+   * 2. Range styles (merged from overlapping RANGE_STYLE ranges)
+   * 3. Column's default style
+   * 4. Row's default style
+   *
+   * This ensures the toolbar shows the actual rendered style, including
+   * styles inherited from ranges.
+   */
   async updateForCurrentCell(): Promise<void> {
-    const cellData = this.getSelectedCellData();
+    const position = this.getSelectedCell();
 
-    if (!cellData || !this.dataSource) {
+    if (!position || !this.dataSource) {
       // No cell selected or no data source - reset to defaults
       this.setDisplayedStyle({
         bold: false,
@@ -219,89 +230,26 @@ export class StyleControls {
       return;
     }
 
-    // Check if selection has mixed styles
+    // Check if selection spans multiple cells
     const { start, end } = this.getSelectionRange();
     if (start && end && (start.col !== end.col || start.row !== end.row)) {
-      const mixedProps = await this.checkMixedStyles(start, end);
-      if (mixedProps) {
-        this.setDisplayedStyle(mixedProps.style, mixedProps.mixed);
-        return;
-      }
-    }
-
-    // Get style from cell data via WASM
-    if (cellData.styleId && cellData.styleId !== "~") {
-      const styleJson = await this.dataSource.getCellStyleAt(
-        cellData.col,
-        cellData.row
+      // Multi-cell selection - use the efficient range query
+      const result = await this.dataSource.getEffectiveStyleForRange(
+        start.col,
+        start.row,
+        end.col,
+        end.row,
       );
-      if (styleJson) {
-        this.setDisplayedStyle(styleJson);
-        return;
-      }
+      this.setDisplayedStyle(result.style, result.mixed);
+      return;
     }
 
-    // No style - show defaults
-    this.setDisplayedStyle({
-      bold: false,
-      italic: false,
-      underline: false,
-      bgColor: "",
-      textColor: "",
-    });
-  }
-
-  /**
-   * Check if cells in the selection range have different styles.
-   * Returns the style of the first cell and which properties are mixed.
-   */
-  private async checkMixedStyles(start: Position, end: Position): Promise<{
-    style: Partial<CellStyle>;
-    mixed: Partial<Record<keyof CellStyle, boolean>>;
-  } | null> {
-    if (!this.dataSource) return null;
-
-    const minCol = Math.min(start.col, end.col);
-    const maxCol = Math.max(start.col, end.col);
-    const minRow = Math.min(start.row, end.row);
-    const maxRow = Math.max(start.row, end.row);
-
-    // Get the style of the first cell (anchor)
-    // Always query the style via WASM - it returns correct defaults for unstyled cells
-    const firstStyle: Partial<CellStyle> =
-      await this.dataSource.getCellStyleAt(minCol, minRow) || {};
-
-    // Track which properties are mixed
-    const mixed: Partial<Record<keyof CellStyle, boolean>> = {};
-
-    // Check all cells in range
-    for (let col = minCol; col <= maxCol; col++) {
-      for (let row = minRow; row <= maxRow; row++) {
-        if (col === minCol && row === minRow) continue; // Skip first cell
-
-        // Always query the style - WASM returns correct defaults
-        const cellStyle: Partial<CellStyle> =
-          await this.dataSource.getCellStyleAt(col, row) || {};
-
-        // Compare each style property
-        if (!!cellStyle.bold !== !!firstStyle.bold) mixed.bold = true;
-        if (!!cellStyle.italic !== !!firstStyle.italic) mixed.italic = true;
-        if (!!cellStyle.underline !== !!firstStyle.underline) mixed.underline = true;
-        if ((cellStyle.bgColor || "") !== (firstStyle.bgColor || "")) mixed.bgColor = true;
-        if ((cellStyle.textColor || "") !== (firstStyle.textColor || "")) mixed.textColor = true;
-        if ((cellStyle.fontFamily || "") !== (firstStyle.fontFamily || "")) mixed.fontFamily = true;
-        if ((cellStyle.fontSize || 0) !== (firstStyle.fontSize || 0)) mixed.fontSize = true;
-        if ((cellStyle.hAlign || "left") !== (firstStyle.hAlign || "left")) mixed.hAlign = true;
-        if ((cellStyle.vAlign || "bottom") !== (firstStyle.vAlign || "bottom")) mixed.vAlign = true;
-      }
-    }
-
-    // If any property is mixed, return the result
-    if (Object.keys(mixed).length > 0) {
-      return { style: firstStyle, mixed };
-    }
-
-    return null;
+    // Single cell - get effective style (resolves cell > range > column > row hierarchy)
+    const effectiveStyle = await this.dataSource.getEffectiveCellStyle(
+      position.col,
+      position.row,
+    );
+    this.setDisplayedStyle(effectiveStyle);
   }
 
   // =========================================================================

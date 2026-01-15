@@ -92,6 +92,10 @@ export interface CellsEngine {
     ): string;
     removeRangeStyle(col: number, row: number): string;
 
+    // Effective style operations (resolves style hierarchy)
+    getEffectiveCellStyle(col: number, row: number): string;
+    getEffectiveStyleForRange(col1: number, row1: number, col2: number, row2: number): string;
+
     // Column/row operations
     resizeColumn(colId: string, width: number): string;
     resizeColumnByPos(pos: number, width: number): string;

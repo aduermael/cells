@@ -1848,4 +1848,222 @@ std::string CellsEngine::removeRangeStyle(uint32_t col, uint32_t row) {
     return "{\"success\":true}";
 }
 
+// =============================================================================
+// Effective Style Operations (Phase L)
+// =============================================================================
+// Computes the effective style for a cell or range, resolving the style hierarchy:
+// 1. Cell's own style (highest priority)
+// 2. Range styles (merged from all overlapping RANGE_STYLE ranges)
+// 3. Column's default style
+// 4. Row's default style
+// 5. Default style (empty)
+
+namespace {
+
+// Helper to merge two CellStyles - overlay properties fill in properties not set in base.
+// Used for CSS-like cascading where multiple sources contribute different properties.
+CellStyle mergeEffectiveStyles(const CellStyle& base, const CellStyle& overlay) {
+    CellStyle result = base;
+
+    // Merge boolean properties (overlay wins if base is false/default)
+    if (!result.bold && overlay.bold) result.bold = true;
+    if (!result.italic && overlay.italic) result.italic = true;
+    if (!result.underline && overlay.underline) result.underline = true;
+
+    // Merge string properties (overlay wins if base is empty)
+    if (result.bgColor.empty() && !overlay.bgColor.empty()) result.bgColor = overlay.bgColor;
+    if (result.textColor.empty() && !overlay.textColor.empty()) result.textColor = overlay.textColor;
+    if (result.fontFamily.empty() && !overlay.fontFamily.empty()) result.fontFamily = overlay.fontFamily;
+
+    // Merge numeric properties (overlay wins if base is 0/default)
+    if (result.fontSize == 0 && overlay.fontSize != 0) result.fontSize = overlay.fontSize;
+
+    // Merge alignment (overlay wins if base is default)
+    if (result.hAlign == TextAlign::GENERAL && overlay.hAlign != TextAlign::GENERAL) result.hAlign = overlay.hAlign;
+    if (result.vAlign == VerticalAlign::BOTTOM && overlay.vAlign != VerticalAlign::BOTTOM) result.vAlign = overlay.vAlign;
+
+    // Merge borders (each edge individually)
+    if (!result.border.top.hasValue() && overlay.border.top.hasValue()) result.border.top = overlay.border.top;
+    if (!result.border.right.hasValue() && overlay.border.right.hasValue()) result.border.right = overlay.border.right;
+    if (!result.border.bottom.hasValue() && overlay.border.bottom.hasValue()) result.border.bottom = overlay.border.bottom;
+    if (!result.border.left.hasValue() && overlay.border.left.hasValue()) result.border.left = overlay.border.left;
+
+    return result;
+}
+
+// Computes the effective style at a position, considering all style sources.
+// Does not require a Cell object - works for empty cells too.
+// Note: sheet is non-const because getCellAt/getRangesAt are non-const
+CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
+                                   uint32_t colPos, uint32_t rowPos,
+                                   ID colId, ID rowId) {
+    CellStyle result;
+
+    // Find cell at this position (may be null)
+    Cell* cell = nullptr;
+    if (!colId.isNull() && !rowId.isNull()) {
+        cell = sheet.getCellAt(colId, rowId);
+    }
+
+    // Priority 1: Cell's own style
+    if (cell && !cell->styleId.isNull()) {
+        const CellStyle* cellStyle = workbook.getStyle(cell->styleId);
+        if (cellStyle) {
+            return *cellStyle;  // Cell style overrides everything
+        }
+    }
+
+    // Priority 2: Range styles (merge all overlapping RANGE_STYLE ranges)
+    std::vector<Range*> styleRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::STYLE);
+    for (Range* range : styleRanges) {
+        ID rangeStyleId = sheet.getRangeStyleId(range->id);
+        if (!rangeStyleId.isNull()) {
+            const CellStyle* rangeStyle = workbook.getStyle(rangeStyleId);
+            if (rangeStyle) {
+                result = mergeEffectiveStyles(result, *rangeStyle);
+            }
+        }
+    }
+
+    // Priority 3: Column's default style
+    if (!colId.isNull()) {
+        auto colIt = sheet.columns.find(colId);
+        if (colIt != sheet.columns.end() && !colIt->second->defaultStyleId.isNull()) {
+            const CellStyle* colStyle = workbook.getStyle(colIt->second->defaultStyleId);
+            if (colStyle) {
+                result = mergeEffectiveStyles(result, *colStyle);
+            }
+        }
+    }
+
+    // Priority 4: Row's default style
+    if (!rowId.isNull()) {
+        auto rowIt = sheet.rows.find(rowId);
+        if (rowIt != sheet.rows.end() && !rowIt->second->defaultStyleId.isNull()) {
+            const CellStyle* rowStyle = workbook.getStyle(rowIt->second->defaultStyleId);
+            if (rowStyle) {
+                result = mergeEffectiveStyles(result, *rowStyle);
+            }
+        }
+    }
+
+    return result;
+}
+
+}  // namespace
+
+std::string CellsEngine::getEffectiveCellStyle(uint32_t col, uint32_t row) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{}";
+    }
+
+    // Find column and row IDs at positions
+    ID colId, rowId;
+    for (const auto& [id, axis] : sheet->columns) {
+        if (axis->position == col) {
+            colId = id;
+            break;
+        }
+    }
+    for (const auto& [id, axis] : sheet->rows) {
+        if (axis->position == row) {
+            rowId = id;
+            break;
+        }
+    }
+
+    CellStyle effectiveStyle = computeEffectiveStyleAt(*sheet, *_workbook, col, row, colId, rowId);
+    return styleToJson(effectiveStyle);
+}
+
+std::string CellsEngine::getEffectiveStyleForRange(uint32_t col1, uint32_t row1, uint32_t col2, uint32_t row2) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"style\":{},\"mixed\":{}}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"style\":{},\"mixed\":{}}";
+    }
+
+    const uint32_t minCol = std::min(col1, col2);
+    const uint32_t maxCol = std::max(col1, col2);
+    const uint32_t minRow = std::min(row1, row2);
+    const uint32_t maxRow = std::max(row1, row2);
+
+    // Build lookup tables for column/row IDs by position
+    std::unordered_map<uint32_t, ID> colIdByPos;
+    std::unordered_map<uint32_t, ID> rowIdByPos;
+    for (const auto& [id, axis] : sheet->columns) {
+        if (axis->position >= minCol && axis->position <= maxCol) {
+            colIdByPos[axis->position] = id;
+        }
+    }
+    for (const auto& [id, axis] : sheet->rows) {
+        if (axis->position >= minRow && axis->position <= maxRow) {
+            rowIdByPos[axis->position] = id;
+        }
+    }
+
+    // Get style of first cell (anchor)
+    ID firstColId = colIdByPos.count(minCol) > 0 ? colIdByPos[minCol] : ID();
+    ID firstRowId = rowIdByPos.count(minRow) > 0 ? rowIdByPos[minRow] : ID();
+    CellStyle firstStyle = computeEffectiveStyleAt(*sheet, *_workbook, minCol, minRow, firstColId, firstRowId);
+
+    // Track which properties differ across the range
+    bool mixedBold = false;
+    bool mixedItalic = false;
+    bool mixedUnderline = false;
+    bool mixedBgColor = false;
+    bool mixedTextColor = false;
+    bool mixedFontFamily = false;
+    bool mixedFontSize = false;
+    bool mixedHAlign = false;
+    bool mixedVAlign = false;
+
+    // Check all cells in range
+    for (uint32_t c = minCol; c <= maxCol; ++c) {
+        for (uint32_t r = minRow; r <= maxRow; ++r) {
+            if (c == minCol && r == minRow) continue;  // Skip anchor
+
+            ID colId = colIdByPos.count(c) > 0 ? colIdByPos[c] : ID();
+            ID rowId = rowIdByPos.count(r) > 0 ? rowIdByPos[r] : ID();
+            CellStyle cellStyle = computeEffectiveStyleAt(*sheet, *_workbook, c, r, colId, rowId);
+
+            // Compare each property
+            if (cellStyle.bold != firstStyle.bold) mixedBold = true;
+            if (cellStyle.italic != firstStyle.italic) mixedItalic = true;
+            if (cellStyle.underline != firstStyle.underline) mixedUnderline = true;
+            if (cellStyle.bgColor != firstStyle.bgColor) mixedBgColor = true;
+            if (cellStyle.textColor != firstStyle.textColor) mixedTextColor = true;
+            if (cellStyle.fontFamily != firstStyle.fontFamily) mixedFontFamily = true;
+            if (cellStyle.fontSize != firstStyle.fontSize) mixedFontSize = true;
+            if (cellStyle.hAlign != firstStyle.hAlign) mixedHAlign = true;
+            if (cellStyle.vAlign != firstStyle.vAlign) mixedVAlign = true;
+        }
+    }
+
+    // Build JSON response
+    std::ostringstream ss;
+    ss << "{\"style\":" << styleToJson(firstStyle) << ",\"mixed\":{";
+    bool first = true;
+    if (mixedBold) { ss << "\"bold\":true"; first = false; }
+    if (mixedItalic) { if (!first) ss << ","; ss << "\"italic\":true"; first = false; }
+    if (mixedUnderline) { if (!first) ss << ","; ss << "\"underline\":true"; first = false; }
+    if (mixedBgColor) { if (!first) ss << ","; ss << "\"bgColor\":true"; first = false; }
+    if (mixedTextColor) { if (!first) ss << ","; ss << "\"textColor\":true"; first = false; }
+    if (mixedFontFamily) { if (!first) ss << ","; ss << "\"fontFamily\":true"; first = false; }
+    if (mixedFontSize) { if (!first) ss << ","; ss << "\"fontSize\":true"; first = false; }
+    if (mixedHAlign) { if (!first) ss << ","; ss << "\"hAlign\":true"; first = false; }
+    if (mixedVAlign) { if (!first) ss << ","; ss << "\"vAlign\":true"; first = false; }
+    ss << "}}";
+
+    return ss.str();
+}
+
 }  // namespace cells::wasm

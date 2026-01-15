@@ -654,6 +654,44 @@ export class CellsClient {
     return { success: true };
   }
 
+  // ========== Effective Style Operations API ==========
+
+  /**
+   * Get the effective style for a cell, resolving the style hierarchy:
+   * 1. Cell's own style (highest priority)
+   * 2. Range styles (merged from overlapping RANGE_STYLE ranges)
+   * 3. Column's default style
+   * 4. Row's default style
+   * Used by UI to display the actual style in the toolbar.
+   * @param col Column position (0-indexed)
+   * @param row Row position (0-indexed)
+   * @returns Effective cell style properties
+   */
+  async getEffectiveCellStyle(col: number, row: number): Promise<CellStyle> {
+    const response = await this._send("getEffectiveCellStyle", { col, row });
+    return response as unknown as CellStyle;
+  }
+
+  /**
+   * Get the effective style for a range of cells, with mixed indicators.
+   * Returns the style of the anchor cell plus which properties differ across the range.
+   * Used by UI to display style state for multi-cell selections.
+   * @param col1 Start column position (0-indexed)
+   * @param row1 Start row position (0-indexed)
+   * @param col2 End column position (0-indexed)
+   * @param row2 End row position (0-indexed)
+   * @returns Object with style and mixed flags
+   */
+  async getEffectiveStyleForRange(
+    col1: number,
+    row1: number,
+    col2: number,
+    row2: number,
+  ): Promise<{ style: CellStyle; mixed: Partial<Record<keyof CellStyle, boolean>> }> {
+    const response = await this._send("getEffectiveStyleForRange", { col1, row1, col2, row2 });
+    return response as unknown as { style: CellStyle; mixed: Partial<Record<keyof CellStyle, boolean>> };
+  }
+
   // ========== Column/Row Operations API ==========
 
   async resizeColumn(colId: string, width: number): Promise<{ success: boolean }> {

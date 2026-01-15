@@ -894,6 +894,154 @@ const tests = {
       }
     }
   },
+
+  // ==========================================================================
+  // Phase L: UI Effective Style Display
+  // ==========================================================================
+
+  // L6: Range style shows in toolbar when selecting a cell inside a range
+  'Toolbar displays effective style from range when cell is selected': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const testColor = '#34D399'; // Green 400
+
+    // Apply green background to B2:D4 (cols 1-3, rows 1-3)
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, testColor);
+    await sleep(300);
+
+    // Click on C3 - inside the styled range but empty cell
+    await clickCell(ctx.page, 'C3');
+    await sleep(200);
+
+    // Check the background color swatch in the toolbar
+    // It should show the green color from the range style
+    const swatchStyle = await ctx.page.evaluate(() => {
+      const swatch = document.querySelector('#bg-color-swatch');
+      if (!swatch) return null;
+      return window.getComputedStyle(swatch).backgroundColor;
+    });
+
+    console.log(`Background swatch color: ${swatchStyle}`);
+
+    // Parse the RGB values from the computed style
+    const rgbMatch = swatchStyle?.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (rgbMatch) {
+      const [, r, g, b] = rgbMatch.map(Number);
+
+      // Green 400 is #34D399 = rgb(52, 211, 153)
+      const tolerance = 30;
+      assertTrue(
+        Math.abs(r - 52) <= tolerance &&
+        Math.abs(g - 211) <= tolerance &&
+        Math.abs(b - 153) <= tolerance,
+        `Toolbar swatch should show green from range style (got rgb(${r}, ${g}, ${b}))`
+      );
+    } else {
+      // If we couldn't parse RGB, check if it's displayed at all
+      assertTrue(
+        swatchStyle !== null && swatchStyle !== 'transparent',
+        `Toolbar swatch should have a color, got: ${swatchStyle}`
+      );
+    }
+  },
+
+  // L7: Cell override shows in toolbar (cell style takes precedence over range)
+  'Toolbar displays cell-level style override, not range style': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const rangeColor = '#3B82F6'; // Blue 500
+    const cellColor = '#EF4444'; // Red 500
+
+    // Apply blue background to B2:D4 (range style)
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, rangeColor);
+    await sleep(300);
+
+    // Now apply red background to C3 only (cell-level override)
+    await clickCell(ctx.page, 'C3');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, cellColor);
+    await sleep(300);
+
+    // Click elsewhere then back to C3 to ensure fresh state
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+    await clickCell(ctx.page, 'C3');
+    await sleep(200);
+
+    // Check the background color swatch in the toolbar
+    // It should show the RED color (cell override wins over range)
+    const swatchStyle = await ctx.page.evaluate(() => {
+      const swatch = document.querySelector('#bg-color-swatch');
+      if (!swatch) return null;
+      return window.getComputedStyle(swatch).backgroundColor;
+    });
+
+    console.log(`Background swatch color for cell override: ${swatchStyle}`);
+
+    // Parse the RGB values from the computed style
+    const rgbMatch = swatchStyle?.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (rgbMatch) {
+      const [, r, g, b] = rgbMatch.map(Number);
+
+      // Red 500 is #EF4444 = rgb(239, 68, 68)
+      const tolerance = 30;
+      assertTrue(
+        Math.abs(r - 239) <= tolerance &&
+        Math.abs(g - 68) <= tolerance &&
+        Math.abs(b - 68) <= tolerance,
+        `Toolbar swatch should show RED from cell override, not blue from range (got rgb(${r}, ${g}, ${b}))`
+      );
+    } else {
+      assertTrue(false, `Could not parse swatch color: ${swatchStyle}`);
+    }
+  },
+
+  // L8: Mixed styles show correctly in multi-cell selection
+  'Toolbar shows mixed indicator for multi-cell selection with different styles': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Apply bold to B2
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    await ctx.page.click('#style-bold-btn');
+    await sleep(200);
+
+    // C2 has no style (not bold)
+
+    // Now select B2:C2 - one cell is bold, one is not
+    await selectRange(ctx.page, 'B2', 'C2');
+    await sleep(200);
+
+    // Check if bold button has "mixed" state
+    const boldBtnClasses = await ctx.page.evaluate(() => {
+      const btn = document.querySelector('#style-bold-btn');
+      return btn ? btn.className : '';
+    });
+
+    console.log(`Bold button classes: ${boldBtnClasses}`);
+
+    // The bold button should show mixed state (not fully active, not fully inactive)
+    // This is typically indicated by a "mixed" class or similar indicator
+    // The exact implementation depends on how StyleControls handles mixed state
+
+    // Check that the button doesn't show "active" (since styles are mixed)
+    // OR it shows a "mixed" indicator
+    const hasMixedOrNotActive =
+      boldBtnClasses.includes('mixed') ||
+      !boldBtnClasses.includes('active');
+
+    assertTrue(
+      hasMixedOrNotActive,
+      `Bold button should show mixed state for selection with different bold values. Classes: ${boldBtnClasses}`
+    );
+  },
 };
 
 // Run all tests

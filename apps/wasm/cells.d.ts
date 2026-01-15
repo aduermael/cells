@@ -530,6 +530,35 @@ declare module 'cells-wasm' {
     removeRangeStyle(col: number, row: number): string;
 
     // ========================================================================
+    // Effective style (UI display)
+    // ========================================================================
+
+    /**
+     * Get the effective style for a cell, resolving the style hierarchy:
+     * 1. Cell's own style (highest priority)
+     * 2. Range styles (merged from overlapping RANGE_STYLE ranges)
+     * 3. Column's default style
+     * 4. Row's default style
+     * Used by UI to display the actual style in the toolbar.
+     * @param col - Column position (0-based)
+     * @param row - Row position (0-based)
+     * @returns JSON string with CellStyle properties
+     */
+    getEffectiveCellStyle(col: number, row: number): string;
+
+    /**
+     * Get the effective style for a range of cells, with mixed indicators.
+     * Returns the style of the anchor cell plus which properties differ across the range.
+     * Used by UI to display style state for multi-cell selections.
+     * @param col1 - Start column position (0-based)
+     * @param row1 - Start row position (0-based)
+     * @param col2 - End column position (0-based)
+     * @param row2 - End row position (0-based)
+     * @returns JSON string with {style: CellStyle, mixed: {bold?: boolean, ...}}
+     */
+    getEffectiveStyleForRange(col1: number, row1: number, col2: number, row2: number): string;
+
+    // ========================================================================
     // Column/row resize
     // ========================================================================
 

@@ -707,6 +707,35 @@ export function handleRemoveRangeStyle(
 }
 
 // ============================================================================
+// Effective Style Operations
+// ============================================================================
+
+export function handleGetEffectiveCellStyle(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { col, row } = params as { col: number; row: number };
+    const result = JSON.parse(engine.getEffectiveCellStyle(col, row));
+    respond({ type: "effectiveCellStyle", ...result });
+}
+
+export function handleGetEffectiveStyleForRange(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { col1, row1, col2, row2 } = params as {
+        col1: number;
+        row1: number;
+        col2: number;
+        row2: number;
+    };
+    const result = JSON.parse(engine.getEffectiveStyleForRange(col1, row1, col2, row2));
+    respond({ type: "effectiveStyleForRange", ...result });
+}
+
+// ============================================================================
 // Column/Row Operations
 // ============================================================================
 
