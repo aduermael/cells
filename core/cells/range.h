@@ -250,7 +250,7 @@ CornerDeleteResult adjustRangeForColumnDeletion(Range& range, const ID& deletedC
 
     // Start column deleted → move start to next column
     if (startsHere) {
-        ID nextCol = getNextColId(deletedColId);
+        const ID nextCol = getNextColId(deletedColId);
         if (nextCol.isNull()) {
             return CornerDeleteResult::INVALIDATED;  // No next column
         }
@@ -260,7 +260,7 @@ CornerDeleteResult adjustRangeForColumnDeletion(Range& range, const ID& deletedC
 
     // End column deleted → move end to previous column
     // (endsHere must be true here)
-    ID prevCol = getPrevColId(deletedColId);
+    const ID prevCol = getPrevColId(deletedColId);
     if (prevCol.isNull()) {
         return CornerDeleteResult::INVALIDATED;  // No previous column
     }
@@ -290,7 +290,7 @@ CornerDeleteResult adjustRangeForRowDeletion(Range& range, const ID& deletedRowI
 
     // Start row deleted → move start to next row
     if (startsHere) {
-        ID nextRow = getNextRowId(deletedRowId);
+        const ID nextRow = getNextRowId(deletedRowId);
         if (nextRow.isNull()) {
             return CornerDeleteResult::INVALIDATED;  // No next row
         }
@@ -300,7 +300,7 @@ CornerDeleteResult adjustRangeForRowDeletion(Range& range, const ID& deletedRowI
 
     // End row deleted → move end to previous row
     // (endsHere must be true here)
-    ID prevRow = getPrevRowId(deletedRowId);
+    const ID prevRow = getPrevRowId(deletedRowId);
     if (prevRow.isNull()) {
         return CornerDeleteResult::INVALIDATED;  // No previous row
     }

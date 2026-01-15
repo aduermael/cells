@@ -1,6 +1,7 @@
 #include "core/cells/crdt.h"
 
 #include "core/cells/id.h"
+#include "core/cells/range.h"
 
 #include "gtest/gtest.h"
 
@@ -645,6 +646,184 @@ TEST_F(CRDTTest, CellSetStyleNonExistentCell) {
     Operation op = makeCellSetStyleOp(*workbook, fakeCell, R"({"style_id":"STY_bold"})");
     ApplyResult result = applyOperation(*workbook, op);
     EXPECT_EQ(result, ApplyResult::INVALID_TARGET);
+}
+
+// =============================================================================
+// Range adjustment on column/row deletion tests
+// =============================================================================
+
+class RangeAdjustmentTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        workbook = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
+        workbook->setNodeId(generate_id());
+
+        auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+        sheet_ptr = sheet.get();
+
+        // Create 5 columns (A, B, C, D, E) at positions 0-4
+        for (int i = 0; i < 5; i++) {
+            auto col = std::make_unique<Axis>(generate_id(), true);
+            col->position = static_cast<uint32_t>(i);
+            colIds[i] = col->id;
+            sheet->addColumn(std::move(col));
+        }
+
+        // Create 5 rows at positions 0-4
+        for (int i = 0; i < 5; i++) {
+            auto row = std::make_unique<Axis>(generate_id(), false);
+            row->position = static_cast<uint32_t>(i);
+            rowIds[i] = row->id;
+            sheet->addRow(std::move(row));
+        }
+
+        workbook->addSheet(std::move(sheet));
+    }
+
+    std::unique_ptr<Workbook> workbook;
+    Sheet* sheet_ptr;
+    ID colIds[5];
+    ID rowIds[5];
+};
+
+TEST_F(RangeAdjustmentTest, DeleteStartColumnShrinksRange) {
+    // Create a range from col B (1) to col D (3), row 0 to row 2
+    ID rangeId = generate_id();
+    auto range = std::make_unique<Range>(rangeId, colIds[1], rowIds[0], colIds[3], rowIds[2]);
+    range->flags = RangeFlags::STYLE;
+    sheet_ptr->addRange(std::move(range));
+
+    ASSERT_EQ(sheet_ptr->getRanges().size(), 1);
+    EXPECT_EQ(sheet_ptr->getRange(rangeId)->startColId, colIds[1]);
+
+    // Delete column B (start column)
+    HLC hlc = workbook->getCurrentHLC();
+    Operation op(hlc, OpType::COL_DELETE, colIds[1], "{}");
+    ApplyResult result = applyOperation(*workbook, op);
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    // Range should still exist but start at column C
+    ASSERT_EQ(sheet_ptr->getRanges().size(), 1);
+    Range* r = sheet_ptr->getRange(rangeId);
+    ASSERT_NE(r, nullptr);
+    EXPECT_EQ(r->startColId, colIds[2]);  // Now starts at C
+    EXPECT_EQ(r->endColId, colIds[3]);    // Still ends at D
+}
+
+TEST_F(RangeAdjustmentTest, DeleteEndColumnShrinksRange) {
+    // Create a range from col B (1) to col D (3)
+    ID rangeId = generate_id();
+    auto range = std::make_unique<Range>(rangeId, colIds[1], rowIds[0], colIds[3], rowIds[2]);
+    range->flags = RangeFlags::STYLE;
+    sheet_ptr->addRange(std::move(range));
+
+    // Delete column D (end column)
+    HLC hlc = workbook->getCurrentHLC();
+    Operation op(hlc, OpType::COL_DELETE, colIds[3], "{}");
+    applyOperation(*workbook, op);
+
+    // Range should still exist but end at column C
+    Range* r = sheet_ptr->getRange(rangeId);
+    ASSERT_NE(r, nullptr);
+    EXPECT_EQ(r->startColId, colIds[1]);  // Still starts at B
+    EXPECT_EQ(r->endColId, colIds[2]);    // Now ends at C
+}
+
+TEST_F(RangeAdjustmentTest, DeleteSingleColumnRangeRemovesRange) {
+    // Create a single-column range at col C (2)
+    ID rangeId = generate_id();
+    auto range = std::make_unique<Range>(rangeId, colIds[2], rowIds[0], colIds[2], rowIds[2]);
+    range->flags = RangeFlags::STYLE;
+    sheet_ptr->addRange(std::move(range));
+
+    ASSERT_EQ(sheet_ptr->getRanges().size(), 1);
+
+    // Delete column C (the only column in the range)
+    HLC hlc = workbook->getCurrentHLC();
+    Operation op(hlc, OpType::COL_DELETE, colIds[2], "{}");
+    applyOperation(*workbook, op);
+
+    // Range should be removed
+    EXPECT_EQ(sheet_ptr->getRanges().size(), 0);
+    EXPECT_EQ(sheet_ptr->getRange(rangeId), nullptr);
+}
+
+TEST_F(RangeAdjustmentTest, DeleteStartRowShrinksRange) {
+    // Create a range from row 1 to row 3
+    ID rangeId = generate_id();
+    auto range = std::make_unique<Range>(rangeId, colIds[0], rowIds[1], colIds[2], rowIds[3]);
+    range->flags = RangeFlags::STYLE;
+    sheet_ptr->addRange(std::move(range));
+
+    // Delete row 1 (start row)
+    HLC hlc = workbook->getCurrentHLC();
+    Operation op(hlc, OpType::ROW_DELETE, rowIds[1], "{}");
+    applyOperation(*workbook, op);
+
+    // Range should still exist but start at row 2
+    Range* r = sheet_ptr->getRange(rangeId);
+    ASSERT_NE(r, nullptr);
+    EXPECT_EQ(r->startRowId, rowIds[2]);  // Now starts at row 2
+    EXPECT_EQ(r->endRowId, rowIds[3]);    // Still ends at row 3
+}
+
+TEST_F(RangeAdjustmentTest, DeleteEndRowShrinksRange) {
+    // Create a range from row 1 to row 3
+    ID rangeId = generate_id();
+    auto range = std::make_unique<Range>(rangeId, colIds[0], rowIds[1], colIds[2], rowIds[3]);
+    range->flags = RangeFlags::STYLE;
+    sheet_ptr->addRange(std::move(range));
+
+    // Delete row 3 (end row)
+    HLC hlc = workbook->getCurrentHLC();
+    Operation op(hlc, OpType::ROW_DELETE, rowIds[3], "{}");
+    applyOperation(*workbook, op);
+
+    // Range should still exist but end at row 2
+    Range* r = sheet_ptr->getRange(rangeId);
+    ASSERT_NE(r, nullptr);
+    EXPECT_EQ(r->startRowId, rowIds[1]);  // Still starts at row 1
+    EXPECT_EQ(r->endRowId, rowIds[2]);    // Now ends at row 2
+}
+
+TEST_F(RangeAdjustmentTest, DeleteSingleRowRangeRemovesRange) {
+    // Create a single-row range at row 2
+    ID rangeId = generate_id();
+    auto range = std::make_unique<Range>(rangeId, colIds[0], rowIds[2], colIds[2], rowIds[2]);
+    range->flags = RangeFlags::STYLE;
+    sheet_ptr->addRange(std::move(range));
+
+    ASSERT_EQ(sheet_ptr->getRanges().size(), 1);
+
+    // Delete row 2 (the only row in the range)
+    HLC hlc = workbook->getCurrentHLC();
+    Operation op(hlc, OpType::ROW_DELETE, rowIds[2], "{}");
+    applyOperation(*workbook, op);
+
+    // Range should be removed
+    EXPECT_EQ(sheet_ptr->getRanges().size(), 0);
+}
+
+TEST_F(RangeAdjustmentTest, DeleteMiddleColumnKeepsRangeUnchanged) {
+    // Create a range from col A (0) to col E (4)
+    ID rangeId = generate_id();
+    auto range = std::make_unique<Range>(rangeId, colIds[0], rowIds[0], colIds[4], rowIds[2]);
+    range->flags = RangeFlags::STYLE;
+    sheet_ptr->addRange(std::move(range));
+
+    ID originalStartCol = colIds[0];
+    ID originalEndCol = colIds[4];
+
+    // Delete column C (middle column, not an edge)
+    HLC hlc = workbook->getCurrentHLC();
+    Operation op(hlc, OpType::COL_DELETE, colIds[2], "{}");
+    applyOperation(*workbook, op);
+
+    // Range should be unchanged (still spans A to E by UUID)
+    Range* r = sheet_ptr->getRange(rangeId);
+    ASSERT_NE(r, nullptr);
+    EXPECT_EQ(r->startColId, originalStartCol);
+    EXPECT_EQ(r->endColId, originalEndCol);
 }
 
 }  // namespace

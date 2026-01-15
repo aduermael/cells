@@ -22,6 +22,7 @@
 #include "core/cells/crdt_internal.h"
 #include "core/cells/format_code_parser.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/range.h"
 
 namespace cells {
 namespace internal {
@@ -141,6 +142,37 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
         }
     }
 
+    // Adjust ranges that have this column as a corner
+    const uint32_t deletedPos = axis->position;
+    auto getNextColId = [targetSheet, deletedPos](const ID& /*colId*/) -> ID {
+        // Next column is at position + 1
+        const Axis* next = targetSheet->getColumnByPosition(deletedPos + 1);
+        return next != nullptr ? next->id : ID{};
+    };
+    auto getPrevColId = [targetSheet, deletedPos](const ID& /*colId*/) -> ID {
+        // Previous column is at position - 1 (guard against underflow)
+        if (deletedPos == 0) {
+            return {};
+        }
+        const Axis* prev = targetSheet->getColumnByPosition(deletedPos - 1);
+        return prev != nullptr ? prev->id : ID{};
+    };
+
+    std::vector<ID> rangesToRemove;
+    for (auto& [rangeId, range] : targetSheet->getRanges()) {
+        const CornerDeleteResult result =
+            adjustRangeForColumnDeletion(*range, op.target_id, getNextColId, getPrevColId);
+        if (result == CornerDeleteResult::INVALIDATED) {
+            rangesToRemove.push_back(rangeId);
+        } else if (result == CornerDeleteResult::SHRUNK) {
+            // Update the range index with new bounds
+            targetSheet->updateRangeIndex(range.get());
+        }
+    }
+    for (const ID& rangeId : rangesToRemove) {
+        targetSheet->removeRange(rangeId);
+    }
+
     // Delete all cells in this column
     std::vector<ID> cellsToRemove;
     for (const auto& [cellId, cell] : targetSheet->cells) {
@@ -182,6 +214,37 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
         if (latest.type == OpType::ROW_INSERT || latest.type == OpType::ROW_RESIZE) {
             return ApplyResult::RESURRECTED;
         }
+    }
+
+    // Adjust ranges that have this row as a corner
+    const uint32_t deletedPos = axis->position;
+    auto getNextRowId = [targetSheet, deletedPos](const ID& /*rowId*/) -> ID {
+        // Next row is at position + 1
+        const Axis* next = targetSheet->getRowByPosition(deletedPos + 1);
+        return next != nullptr ? next->id : ID{};
+    };
+    auto getPrevRowId = [targetSheet, deletedPos](const ID& /*rowId*/) -> ID {
+        // Previous row is at position - 1 (guard against underflow)
+        if (deletedPos == 0) {
+            return {};
+        }
+        const Axis* prev = targetSheet->getRowByPosition(deletedPos - 1);
+        return prev != nullptr ? prev->id : ID{};
+    };
+
+    std::vector<ID> rangesToRemove;
+    for (auto& [rangeId, range] : targetSheet->getRanges()) {
+        const CornerDeleteResult result =
+            adjustRangeForRowDeletion(*range, op.target_id, getNextRowId, getPrevRowId);
+        if (result == CornerDeleteResult::INVALIDATED) {
+            rangesToRemove.push_back(rangeId);
+        } else if (result == CornerDeleteResult::SHRUNK) {
+            // Update the range index with new bounds
+            targetSheet->updateRangeIndex(range.get());
+        }
+    }
+    for (const ID& rangeId : rangesToRemove) {
+        targetSheet->removeRange(rangeId);
     }
 
     // Delete all cells in this row
