@@ -204,8 +204,8 @@ For ranges with `RANGE_MERGE` flag:
 - [ ] D4: Optimize for large numbers of ranges - Deferred until style inheritance is implemented
 
 ### Phase E: Advanced Features
-- [ ] E1: Conditional formatting ranges
-- [ ] E2: Data validation ranges
+- [ ] E1: Conditional formatting ranges - Deferred
+- [ ] E2: Data validation ranges - Deferred
 - [ ] E3: Named ranges
 - [ ] E4: Column/row-wide styling
 
