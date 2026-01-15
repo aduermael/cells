@@ -206,8 +206,8 @@ For ranges with `RANGE_MERGE` flag:
 ### Phase E: Advanced Features
 - [ ] E1: Conditional formatting ranges - Deferred
 - [ ] E2: Data validation ranges - Deferred
-- [ ] E3: Named ranges
-- [ ] E4: Column/row-wide styling
+- [x] E3: Named ranges - Already implemented via NamedRangeRegistry with full CRDT support; kept separate from Range system since it uses cell UUIDs for corners (appropriate for formula references)
+- [x] E4: Column/row-wide styling - Already implemented via `Axis::defaultStyleId` with `AXIS_SET_STYLE` CRDT operation; more efficient than Range-based approach (O(1) vs R-tree query); Luau API `setColumnStyle()`/`setRowStyle()` available
 
 ### Phase F: Range-Based Styles (Integration Test)
 - [x] F1: Add range-to-styleId mapping in Sheet - Added `_rangeStyles` map (rangeId → styleId), `getRangeStyleId()`/`setRangeStyleId()` methods, and cleanup in `removeRange()`/`clearAllRanges()`
