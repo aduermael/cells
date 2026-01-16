@@ -109,18 +109,23 @@ OpType stringToOpType(const std::string& str);
 
 // Operation represents a single CRDT operation on the workbook.
 // Operations are immutable and identified by their HLC timestamp.
-// Format for serialization: "wall.logical.node OP_TYPE target_id payload"
+// Format for serialization: "wall.logical.node OP_TYPE target_id sheetId payload"
 struct Operation {
     HLC hlc;              // Hybrid logical clock timestamp (unique identifier)
     OpType type;          // Type of operation
     ID target_id;         // ID of entity being modified (cell, axis, or sheet)
+    ID sheetId;           // Sheet context for multi-sheet operations (null for workbook-level ops)
     std::string payload;  // JSON payload with operation-specific data
 
     // Default constructor
     Operation();
 
-    // Construct with all fields
+    // Construct with all fields (backwards compatible - no sheetId)
     Operation(const HLC& hlc, OpType type, const ID& target, std::string payload);
+
+    // Construct with all fields including sheetId
+    Operation(const HLC& hlc, OpType type, const ID& target, const ID& sheetId,
+              std::string payload);
 
     // Check if this is a null/empty operation
     [[nodiscard]] bool isNull() const;

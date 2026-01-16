@@ -414,6 +414,12 @@ Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const std::st
     return {hlc, OpType::CELL_SET_VALUE, cellId, payload};
 }
 
+Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const ID& sheetId,
+                             const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::CELL_SET_VALUE, cellId, sheetId, payload};
+}
+
 Operation makeCellClearOp(Workbook& workbook, const ID& cellId) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::CELL_CLEAR, cellId, "{}"};
@@ -460,6 +466,12 @@ Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const std::strin
     return {hlc, OpType::COL_INSERT, axisId, payload};
 }
 
+Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const ID& sheetId,
+                          const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::COL_INSERT, axisId, sheetId, payload};
+}
+
 Operation makeColDeleteOp(Workbook& workbook, const ID& axisId) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::COL_DELETE, axisId, "{}"};
@@ -483,6 +495,12 @@ Operation makeColRenameOp(Workbook& workbook, const ID& axisId, const std::strin
 Operation makeRowInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::ROW_INSERT, axisId, payload};
+}
+
+Operation makeRowInsertOp(Workbook& workbook, const ID& axisId, const ID& sheetId,
+                          const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::ROW_INSERT, axisId, sheetId, payload};
 }
 
 Operation makeRowDeleteOp(Workbook& workbook, const ID& axisId) {

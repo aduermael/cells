@@ -83,13 +83,15 @@ TEST(OperationTest, ToStringAndFromString) {
     Operation original(hlc, OpType::CELL_SET_VALUE, target, R"({"type":"n","value":"42"})");
 
     std::string str = original.toString();
+    // New format includes sheetId field (~ for null ID)
     EXPECT_EQ(str,
-              R"(1705312200000.42.Kj7mXp2Q CELL_SET_VALUE nP6kR2mW {"type":"n","value":"42"})");
+              R"(1705312200000.42.Kj7mXp2Q CELL_SET_VALUE nP6kR2mW ~ {"type":"n","value":"42"})");
 
     Operation parsed = Operation::fromString(str);
     EXPECT_EQ(parsed.hlc, original.hlc);
     EXPECT_EQ(parsed.type, original.type);
     EXPECT_EQ(parsed.target_id.toString(), original.target_id.toString());
+    EXPECT_EQ(parsed.sheetId.isNull(), original.sheetId.isNull());
     EXPECT_EQ(parsed.payload, original.payload);
 }
 

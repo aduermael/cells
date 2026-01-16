@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include <algorithm>
 #include <sstream>
 
 namespace cells {
@@ -198,10 +199,14 @@ OpType stringToOpType(const std::string& str) {
     return OpType::CELL_SET_VALUE;  // Default
 }
 
-Operation::Operation() : hlc(), type(OpType::CELL_SET_VALUE), target_id(), payload() {}
+Operation::Operation() : hlc(), type(OpType::CELL_SET_VALUE), target_id(), sheetId(), payload() {}
 
 Operation::Operation(const HLC& hlc, OpType type, const ID& target, std::string payload)
-    : hlc(hlc), type(type), target_id(target), payload(std::move(payload)) {}
+    : hlc(hlc), type(type), target_id(target), sheetId(), payload(std::move(payload)) {}
+
+Operation::Operation(const HLC& hlc, OpType type, const ID& target, const ID& sheetId,
+                     std::string payload)
+    : hlc(hlc), type(type), target_id(target), sheetId(sheetId), payload(std::move(payload)) {}
 
 bool Operation::isNull() const {
     return hlc.isZero() && target_id.isNull();
@@ -217,15 +222,17 @@ bool Operation::operator==(const Operation& other) const {
 }
 
 std::string Operation::toString() const {
-    // Format: "wall.logical.node OP_TYPE target_id payload"
+    // Format: "wall.logical.node OP_TYPE target_id sheetId payload"
+    // sheetId uses "~" for null ID (same as ID::toString())
     std::ostringstream oss;
     oss << hlc.toString() << " " << opTypeToString(type) << " " << target_id.toString() << " "
-        << payload;
+        << sheetId.toString() << " " << payload;
     return oss.str();
 }
 
 Operation Operation::fromString(const std::string& str) {
-    // Parse: "wall.logical.node OP_TYPE target_id payload"
+    // Parse: "wall.logical.node OP_TYPE target_id sheetId payload"
+    // Also supports legacy format without sheetId: "wall.logical.node OP_TYPE target_id payload"
 
     // Find first space (after HLC)
     const size_t first_space = str.find(' ');
@@ -260,9 +267,33 @@ Operation Operation::fromString(const std::string& str) {
     const std::string target_str = str.substr(second_space + 1, third_space - second_space - 1);
     const ID target(target_str);
 
-    // Rest is payload
-    const std::string payload = str.substr(third_space + 1);
+    // Check if next field is sheetId or payload (for backwards compatibility)
+    // sheetId is 8 alphanumeric chars or "~" for null
+    // payload starts with "{" or is empty
+    const size_t fourth_space = str.find(' ', third_space + 1);
+    if (fourth_space == std::string::npos) {
+        // No fourth space - rest is payload (legacy format without sheetId)
+        const std::string payload = str.substr(third_space + 1);
+        return {hlc, type, target, payload};
+    }
 
+    // Check what's between third and fourth space
+    const std::string maybe_sheet = str.substr(third_space + 1, fourth_space - third_space - 1);
+
+    // If it looks like a sheetId (8 chars alphanumeric or "~"), parse it as such
+    // Otherwise treat as legacy format where this is the start of payload
+    const bool is_sheet_id =
+        (maybe_sheet == "~") ||
+        (maybe_sheet.size() == 8 && std::all_of(maybe_sheet.begin(), maybe_sheet.end(), ::isalnum));
+    if (is_sheet_id) {
+        // New format with sheetId
+        const ID sheetId(maybe_sheet);
+        const std::string payload = str.substr(fourth_space + 1);
+        return {hlc, type, target, sheetId, payload};
+    }
+
+    // Legacy format - treat everything after target_id as payload
+    const std::string payload = str.substr(third_space + 1);
     return {hlc, type, target, payload};
 }
 
@@ -415,6 +446,7 @@ std::string Operation::toJSON() const {
     oss << "\"hlc\":\"" << hlc.toString() << "\",";
     oss << "\"op\":\"" << opTypeToString(type) << "\",";
     oss << "\"target\":\"" << target_id.toString() << "\",";
+    oss << "\"sheet\":\"" << sheetId.toString() << "\",";
     oss << "\"payload\":" << payload;  // payload is already JSON
     oss << "}";
     return oss.str();
@@ -424,6 +456,7 @@ Operation Operation::fromJSON(const std::string& json) {
     const std::string hlc_str = findJSONValue(json, "hlc");
     const std::string op_str = findJSONValue(json, "op");
     const std::string target_str = findJSONValue(json, "target");
+    const std::string sheet_str = findJSONValue(json, "sheet");  // Optional, may be empty
     const std::string payload_str = findJSONValue(json, "payload");
 
     if (hlc_str.empty() || op_str.empty() || target_str.empty()) {
@@ -433,8 +466,9 @@ Operation Operation::fromJSON(const std::string& json) {
     const HLC hlc = HLC::fromString(hlc_str);
     const OpType type = stringToOpType(op_str);
     const ID target(target_str);
+    const ID sheet(sheet_str);  // Will be null ID if empty
 
-    return {hlc, type, target, payload_str};
+    return {hlc, type, target, sheet, payload_str};
 }
 
 }  // namespace cells

@@ -38,7 +38,15 @@ ApplyResult applyColInsert(Workbook& workbook, const Operation& op) {
     if (workbook.sheets.empty()) {
         return ApplyResult::INVALID_TARGET;
     }
-    Sheet* sheet = workbook.sheets[0].get();
+
+    // Use sheetId from operation if available, otherwise fall back to first sheet
+    Sheet* sheet = nullptr;
+    if (!op.sheetId.isNull()) {
+        sheet = workbook.getSheet(op.sheetId);
+    }
+    if (sheet == nullptr) {
+        sheet = workbook.sheets[0].get();
+    }
 
     if (sheet->getColumn(op.target_id) != nullptr) {
         return ApplyResult::ALREADY_APPLIED;
@@ -63,7 +71,15 @@ ApplyResult applyRowInsert(Workbook& workbook, const Operation& op) {
     if (workbook.sheets.empty()) {
         return ApplyResult::INVALID_TARGET;
     }
-    Sheet* sheet = workbook.sheets[0].get();
+
+    // Use sheetId from operation if available, otherwise fall back to first sheet
+    Sheet* sheet = nullptr;
+    if (!op.sheetId.isNull()) {
+        sheet = workbook.getSheet(op.sheetId);
+    }
+    if (sheet == nullptr) {
+        sheet = workbook.sheets[0].get();
+    }
 
     if (sheet->getRow(op.target_id) != nullptr) {
         return ApplyResult::ALREADY_APPLIED;
@@ -92,7 +108,15 @@ ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op) {
     if (workbook.sheets.empty()) {
         return ApplyResult::INVALID_TARGET;
     }
-    Sheet* sheet = workbook.sheets[0].get();
+
+    // Use sheetId from operation if available, otherwise fall back to first sheet
+    Sheet* sheet = nullptr;
+    if (!op.sheetId.isNull()) {
+        sheet = workbook.getSheet(op.sheetId);
+    }
+    if (sheet == nullptr) {
+        sheet = workbook.sheets[0].get();
+    }
 
     if (isColumn) {
         if (sheet->getColumn(op.target_id) != nullptr) {

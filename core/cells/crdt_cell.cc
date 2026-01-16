@@ -97,16 +97,22 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
             return ApplyResult::INVALID_TARGET;
         }
 
-        // Use the first sheet for now
         if (workbook.sheets.empty()) {
             return ApplyResult::INVALID_TARGET;
         }
-        targetSheet = workbook.sheets[0].get();
+
+        // Use sheetId from operation if available, otherwise fall back to first sheet
+        if (!op.sheetId.isNull()) {
+            targetSheet = workbook.getSheet(op.sheetId);
+        }
+        if (targetSheet == nullptr) {
+            targetSheet = workbook.sheets[0].get();
+        }
 
         const ID colId(col_id_str);
         const ID rowId(row_id_str);
 
-        // Verify the column and row exist (they should have been created by DIM_INSERT_AXIS)
+        // Verify the column and row exist (they should have been created by COL_INSERT/ROW_INSERT)
         if (targetSheet->getColumn(colId) == nullptr || targetSheet->getRow(rowId) == nullptr) {
             return ApplyResult::INVALID_TARGET;
         }

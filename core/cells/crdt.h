@@ -67,7 +67,10 @@ bool isSuperseded(const Workbook& workbook, const Operation& op);
 
 // Generate a CELL_SET_VALUE operation for a cell.
 // Creates the operation with current HLC from the workbook.
+// The sheetId version specifies which sheet the cell belongs to.
 Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const std::string& payload);
+Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const ID& sheetId,
+                             const std::string& payload);
 
 // Generate a CELL_CLEAR operation for a cell.
 Operation makeCellClearOp(Workbook& workbook, const ID& cellId);
@@ -97,14 +100,20 @@ Operation makeDimMoveAxisOp(Workbook& workbook, const ID& axisId, const std::str
 Operation makeDimRenameAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
 
 // Column operations (preferred over DIM_* operations)
+// The sheetId version specifies which sheet the column belongs to.
 Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const ID& sheetId,
+                          const std::string& payload);
 Operation makeColDeleteOp(Workbook& workbook, const ID& axisId);
 Operation makeColResizeOp(Workbook& workbook, const ID& axisId, const std::string& payload);
 Operation makeColMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload);
 Operation makeColRenameOp(Workbook& workbook, const ID& axisId, const std::string& payload);
 
 // Row operations
+// The sheetId version specifies which sheet the row belongs to.
 Operation makeRowInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload);
+Operation makeRowInsertOp(Workbook& workbook, const ID& axisId, const ID& sheetId,
+                          const std::string& payload);
 Operation makeRowDeleteOp(Workbook& workbook, const ID& axisId);
 Operation makeRowResizeOp(Workbook& workbook, const ID& axisId, const std::string& payload);
 Operation makeRowMoveOp(Workbook& workbook, const ID& axisId, const std::string& payload);

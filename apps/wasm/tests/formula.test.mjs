@@ -340,15 +340,14 @@ const tests = {
 
   // ============================================================================
   // Cross-Sheet Reference Tests (Phase 2)
-  // NOTE: These tests are BLOCKED by a bug in CRDT operation application.
-  // CRDT operations (COL_INSERT, ROW_INSERT, CELL_SET_VALUE) always apply to
-  // sheets[0] instead of the active sheet. See crdt_axis.cc lines 41, 66, etc.
-  // Unit tests pass because they set up cells directly on Sheet objects.
-  // Fix requires adding sheet context to CRDT operations.
+  // These tests verify that cross-sheet references (e.g., =Sheet2!B5) work
+  // correctly. CRDT operations now include sheet context to ensure cells are
+  // created on the correct sheet.
   // ============================================================================
 
   'Cross-sheet reference formula parses and evaluates': async (ctx) => {
-    // Test that =Sheet2!B27 syntax works correctly
+    // Test that =Sheet2!B5 syntax works correctly
+    // Note: Use B5 instead of B27 to stay within default viewport (row 27 would be ~684px which exceeds 600px height)
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
@@ -356,11 +355,10 @@ const tests = {
     await ctx.page.click('#add-sheet-btn');
     await sleep(300);
 
-    // Now we should be on Sheet2. Enter a value in B27.
-    // NOTE: Due to CRDT bug, this cell is actually created on Sheet1, not Sheet2
-    await clickCell(ctx.page, 'B27');
+    // Now we should be on Sheet2. Enter a value in B5.
+    await clickCell(ctx.page, 'B5');
     await sleep(100);
-    await setCellValue(ctx.page, 'B27', '42');
+    await setCellValue(ctx.page, 'B5', '42');
     await sleep(200);
 
     // Switch back to Sheet1 by clicking its tab
@@ -372,8 +370,8 @@ const tests = {
     });
     await sleep(300);
 
-    // Now on Sheet1, enter a formula that references Sheet2!B27
-    await setCellValue(ctx.page, 'A1', '=Sheet2!B27');
+    // Now on Sheet1, enter a formula that references Sheet2!B5
+    await setCellValue(ctx.page, 'A1', '=Sheet2!B5');
     await sleep(300);
 
     // Click A1 to verify formula bar shows the cross-sheet reference
@@ -381,12 +379,11 @@ const tests = {
     await sleep(200);
 
     const content = await getFormulaBarContent(ctx.page);
-    assertEqual(content, '=Sheet2!B27', 'Formula bar should show =Sheet2!B27');
+    assertEqual(content, '=Sheet2!B5', 'Formula bar should show =Sheet2!B5');
 
-    // NOTE: The computed value test is expected to fail due to CRDT bug
-    // The cell on Sheet2 has no value because it was created on Sheet1
+    // The cross-sheet reference should now evaluate correctly with the CRDT fix
     const displayValue = await getCellDisplayValue(ctx.page, 'A1');
-    assertEqual(displayValue, '42', 'A1 should display 42 (the value from Sheet2!B27)');
+    assertEqual(displayValue, '42', 'A1 should display 42 (the value from Sheet2!B5)');
   },
 
   'Cross-sheet reference with SUM function': async (ctx) => {
@@ -399,7 +396,6 @@ const tests = {
     await sleep(300);
 
     // Enter values in A1:A3 on Sheet2
-    // NOTE: Due to CRDT bug, these cells are actually created on Sheet1
     await setCellValue(ctx.page, 'A1', '10');
     await setCellValue(ctx.page, 'A2', '20');
     await setCellValue(ctx.page, 'A3', '30');
@@ -425,7 +421,7 @@ const tests = {
     const content = await getFormulaBarContent(ctx.page);
     assertEqual(content, '=SUM(Sheet2!A1:A3)', 'Formula bar should show =SUM(Sheet2!A1:A3)');
 
-    // NOTE: The computed value test is expected to fail due to CRDT bug
+    // The cross-sheet SUM should evaluate correctly
     const displayValue = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(displayValue, '60', 'A1 should display 60 (sum of Sheet2!A1:A3)');
   },

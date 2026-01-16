@@ -565,7 +565,7 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
     // If so, the spill master will need to be recalculated after the update
     const ID spillMasterIdBeforeUpdate = sheet->getSpillMaster(cell->colId, cell->rowId);
 
-    Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
+    Operation op = makeCellSetValueOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
 
     if (!detectedFormatId.isNull() && detectedFormatId != cell->formatId) {
@@ -631,7 +631,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
         colCreated = true;
         std::string colPayload = "{\"pos\":" + std::to_string(col) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
+        Operation colOp = makeColInsertOp(*_workbook, colId, sheet->id, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
@@ -648,7 +648,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
         rowCreated = true;
         std::string rowPayload = "{\"pos\":" + std::to_string(row) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
+        Operation rowOp = makeRowInsertOp(*_workbook, rowId, sheet->id, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
@@ -706,7 +706,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
         payload = "{\"type\":\"s\",\"value\":\"\"" + idSuffix;
     }
 
-    Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
+    Operation op = makeCellSetValueOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
 
     if (_syncManager) {
@@ -767,7 +767,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
         colCreated = true;
         std::string colPayload = "{\"pos\":" + std::to_string(col) +
                                  ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
+        Operation colOp = makeColInsertOp(*_workbook, colId, sheet->id, colPayload);
         applyOperation(*_workbook, colOp);
     }
 
@@ -784,7 +784,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
         rowCreated = true;
         std::string rowPayload = "{\"pos\":" + std::to_string(row) +
                                  ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
+        Operation rowOp = makeRowInsertOp(*_workbook, rowId, sheet->id, rowPayload);
         applyOperation(*_workbook, rowOp);
     }
 
@@ -833,7 +833,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
     std::string payload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" + colId.toString() +
                           "\",\"row_id\":\"" + rowId.toString() + "\"}";
 
-    Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
+    Operation op = makeCellSetValueOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
 
     if (_syncManager) {
