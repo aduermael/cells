@@ -62,23 +62,54 @@ The parser architecture supports cross-sheet references (verified in formula_par
   - Modified serializer to output sheet prefix once for ranges (not twice per cell)
   - Fixed `formulaToA1` to keep cross-sheet context for the second cell of a range
   - Formula bar now correctly shows `=SUM(Sheet2!A1:A3)`
-- [ ] 2g: **BLOCKER** - Debug E2E cross-sheet evaluation failure:
-  - Unit tests pass but E2E tests fail (empty/0 values instead of expected)
-  - Formula bar displays correctly (`=Sheet2!B27`, `=SUM(Sheet2!A1:A3)`)
-  - Hypotheses to investigate:
-    1. Cell created via UI click may have different ID than cell found by formula resolver
-    2. Row/column axes may not exist on new Sheet2 when clicking B27
-    3. Value may not be committed before formula is entered
-    4. Recalculation may not be triggered after formula entry
-    5. Viewport cache may not be updated after recalc
-  - Debug approach:
-    1. Add logging to bindings to trace cell creation and formula resolution
-    2. Run headed E2E test to observe visual behavior
-    3. Compare cell IDs between UI-created cell and formula-resolved cell
-    4. Verify recalculation is triggered and produces correct result
+- [x] 2g: **ROOT CAUSE FOUND** - CRDT operations always apply to sheets[0]:
+  - Unit tests pass because they set up cells directly on Sheet objects
+  - E2E tests fail because CRDT operations (`COL_INSERT`, `ROW_INSERT`, `CELL_SET_VALUE`) are hardcoded to apply to `workbook.sheets[0]` (Sheet1), NOT the active sheet
+  - The issue is in `core/cells/crdt_axis.cc`:
+    - `applyColInsert()` line 41: `Sheet* sheet = workbook.sheets[0].get();`
+    - `applyRowInsert()` line 66: `Sheet* sheet = workbook.sheets[0].get();`
+    - Similar pattern in other axis operations
+  - Impact: When on Sheet2, `getOrCreateCellAt()` creates cells on Sheet1, so:
+    1. Cell ID returned is for Sheet1 cell
+    2. `updateCellWithFormatDetection()` looks on Sheet2 (active) - "Cell not found"
+    3. Cell value never gets set
+  - **Fix needed**: Operations need sheet context. Two options:
+    - A) Add sheetId to Operation structure (significant refactor)
+    - B) Add active sheet parameter to operation handlers (simpler but less clean)
+  - This is a structural issue affecting ALL multi-sheet editing via CRDT operations
 - [ ] 2h: Test sheet names with spaces (should use `'Sheet Name'!A1` syntax)
+  - **BLOCKED by 2g**: Cannot test E2E until CRDT multi-sheet bug is fixed
+  - Can add unit tests for parsing/serializing quoted sheet names
+  - Parser should handle `'Sheet Name'!A1` and `'Sheet-2'!B5` syntax
+  - Serializer should quote sheet names containing spaces, hyphens, or special chars
+
+### CRDT Multi-Sheet Bug Fix (Required before E2E tests can pass)
+
+Before Phase 2 E2E tests or Phase 3 can work, the CRDT multi-sheet bug must be fixed:
+
+**Option A - Add sheetId to Operation structure** (recommended):
+1. Add `sheetId` field to `Operation` struct in `operation.h`
+2. Update all `make*Op` functions to accept and store sheetId
+3. Update all `apply*` handlers to look up sheet by ID instead of using `sheets[0]`
+4. Update serialization/deserialization for sync protocol
+5. This is the clean solution and future-proofs for multi-sheet collaboration
+
+**Option B - Pass active sheet to handlers** (simpler but hacky):
+1. Add sheet parameter to `applyOperation()`
+2. Thread through to all handlers
+3. Requires workbook to track "current operation context"
+4. Less clean but faster to implement
+
+**Files to modify for Option A**:
+- `core/cells/operation.h` - add sheetId field
+- `core/cells/crdt.cc` - update operation makers
+- `core/cells/crdt_axis.cc` - update apply handlers (COL/ROW INSERT, DELETE, etc.)
+- `core/cells/crdt_cell.cc` - update cell operation handlers
+- `core/cells/sync_manager.cc` - update serialization
 
 ## Phase 3: Formula Editing Across Sheets
+
+**NOTE**: Phase 3 E2E tests will also be blocked by the CRDT multi-sheet bug until it's fixed.
 
 Excel-like behavior: when editing a formula, the user can navigate to other sheets and click cells to insert cross-sheet references. The formula bar stays active and shows the building formula with proper sheet prefixes.
 
