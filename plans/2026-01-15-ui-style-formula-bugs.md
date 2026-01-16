@@ -29,6 +29,7 @@ The bug is architectural: when `setRangeStyle()` is called with a border, it che
   Both had early return when cell had cell-level style, ignoring range styles. Fixed both to merge styles.
 - [x] 1d: Bold button state now reflects effective style correctly. After fix, bold from range style merges with border from cell style.
 - [x] 1e: Border and bold now coexist correctly - edge cells show both `bold: true` and `border` in both toolbar display AND viewport rendering data. Added viewport-specific test.
+- [x] 1f: Fixed toggle bold OFF: `setRangeStyle` was checking if style is empty BEFORE looking for exact-match ranges. Moved exact-match handling FIRST so `{bold: false}` can properly merge with existing `{bold: true}` range. Also added range deletion when merged style is empty.
 
 ## Phase 2: Fix Cross-Sheet Reference Parsing
 

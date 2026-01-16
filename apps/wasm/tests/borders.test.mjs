@@ -383,6 +383,101 @@ const tests = {
     );
   },
 
+  // Test toggling bold OFF after outline border + bold applied
+  'Toggle bold off removes bold from all cells in range': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+    await createNewWorkbook(ctx.page);
+    await sleep(200);
+
+    // Step 1: Apply outline border to B2:D4
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+    await applyBorder(ctx.page, 'outer');
+    await sleep(300);
+
+    // Step 2: Apply bold to the same range
+    await ctx.page.click('#style-bold-btn');
+    await sleep(300);
+
+    // Verify bold was applied
+    const styleAfterBold = await getCellStyle(ctx.page, 1, 1); // B2
+    console.log('B2 after bold ON:', JSON.stringify(styleAfterBold, null, 2));
+    assertTrue(
+      styleAfterBold !== null && styleAfterBold.bold === true,
+      'B2 should have bold=true after applying bold'
+    );
+
+    // Step 3: Toggle bold OFF by clicking bold button again
+    // Need to ensure the range is still selected
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+
+    // Verify bold button is active (showing current state)
+    const boldBtnBeforeToggle = await ctx.page.evaluate(() => {
+      const btn = document.querySelector('#style-bold-btn');
+      return btn ? btn.classList.contains('active') : null;
+    });
+    console.log('Bold button active before toggle:', boldBtnBeforeToggle);
+
+    // Check the effective style for the range before toggle
+    const effectiveStyleBefore = await ctx.page.evaluate(async () => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.dataSource) return null;
+      return await ctx.app.dataSource.client.getEffectiveStyleForRange(1, 1, 3, 3);
+    });
+    console.log('Effective style for range before toggle:', JSON.stringify(effectiveStyleBefore, null, 2));
+
+    // Click bold to toggle it OFF (via UI button)
+    console.log('Clicking bold button to toggle OFF...');
+    await ctx.page.click('#style-bold-btn');
+    await sleep(300);
+
+    // Check the effective style for the range after toggle
+    const effectiveStyleAfter = await ctx.page.evaluate(async () => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.dataSource) return null;
+      return await ctx.app.dataSource.client.getEffectiveStyleForRange(1, 1, 3, 3);
+    });
+    console.log('Effective style for range after toggle:', JSON.stringify(effectiveStyleAfter, null, 2));
+
+    // Step 4: Verify ALL cells no longer have bold
+    const cellsToCheck = [
+      { col: 1, row: 1, name: 'B2' },
+      { col: 2, row: 1, name: 'C2' },
+      { col: 3, row: 1, name: 'D2' },
+      { col: 1, row: 2, name: 'B3' },
+      { col: 2, row: 2, name: 'C3' },
+      { col: 3, row: 2, name: 'D3' },
+      { col: 1, row: 3, name: 'B4' },
+      { col: 2, row: 3, name: 'C4' },
+      { col: 3, row: 3, name: 'D4' },
+    ];
+
+    let nonBoldCount = 0;
+    for (const cell of cellsToCheck) {
+      const style = await getCellStyle(ctx.page, cell.col, cell.row);
+      console.log(`${cell.name} after toggle OFF:`, JSON.stringify(style, null, 2));
+      if (!style || style.bold !== true) {
+        nonBoldCount++;
+      }
+    }
+
+    console.log(`Non-bold cells: ${nonBoldCount} / ${cellsToCheck.length}`);
+    assertEqual(
+      nonBoldCount,
+      cellsToCheck.length,
+      `All ${cellsToCheck.length} cells should NOT be bold after toggle, but ${cellsToCheck.length - nonBoldCount} still are`
+    );
+
+    // Verify borders are still present on B2
+    const styleAfterToggle = await getCellStyle(ctx.page, 1, 1); // B2
+    assertTrue(
+      styleAfterToggle !== null && styleAfterToggle.border !== undefined,
+      'B2 should still have border after toggling bold off'
+    );
+  },
+
   // Additional test: Bold button state after OUTLINE border application
   'Bold button not disabled after outline border application': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);

@@ -1581,38 +1581,9 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
         applyOperation(*_workbook, op);
     }
 
-    // Create or find the style
+    // Parse the new style from JSON
     CellStyle defaultStyle;
     CellStyle style = mergeStyleJson(defaultStyle, styleJson);
-
-    ID styleId;
-    if (!style.isEmpty()) {
-        // Check if this style already exists
-        const auto& existingStyles = _workbook->getStyles();
-        for (const auto& [id, existingStyle] : existingStyles) {
-            if (existingStyle == style) {
-                styleId = id;
-                break;
-            }
-        }
-
-        // Create new style if not found
-        if (styleId.isNull()) {
-            styleId = generate_id();
-            _workbook->registerStyle(styleId, style);
-
-            // Create STYLE_DEFINE operation for sync
-            if (_workbook->isCollaborating()) {
-                std::string fullStyleJson = styleToJson(style);
-                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
-                applyOperation(*_workbook, styleOp);
-            }
-        }
-    }
-
-    if (styleId.isNull()) {
-        return "{\"error\":\"Empty style\"}";
-    }
 
     // =========================================================================
     // Handle overlapping ranges with conflicting properties (Phase K)
@@ -1621,6 +1592,10 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
     // 1. EXACT MATCH: existing range has same bounds → merge styles into existing (K3/K4)
     // 2. CONTAINED: existing range is fully inside new range → strip conflicting props (K5)
     // 3. PARTIAL OVERLAP: split the existing range to avoid conflict (J2/J3)
+    //
+    // IMPORTANT: Check for exact-match BEFORE checking if style is empty.
+    // This allows toggling off a property (e.g., bold: false) to properly
+    // merge with an existing range that has that property set.
 
     // Query for overlapping style ranges using the R-tree index
     std::vector<Range*> overlappingRanges;
@@ -1662,6 +1637,25 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
             // Merge new style properties into existing style
             CellStyle mergedStyle = existingStyle ? mergeStyles(*existingStyle, style, styleJson) : style;
 
+            // If merged style is empty (all defaults), delete the range instead
+            if (mergedStyle.isEmpty()) {
+                std::ostringstream removePayload;
+                removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
+                Operation removeOp = makeRangeRemoveOp(*_workbook, existingRange->id, removePayload.str());
+                applyOperation(*_workbook, removeOp);
+
+                if (_syncManager) {
+                    _syncManager->queueOperationsBroadcast();
+                    _syncManager->pruneOpLog();
+                }
+
+                rebuildViewportIndex();
+                notifyListeners(ChangeType::CELL_CHANGED);
+
+                return "{\"success\":true,\"rangeId\":\"" + existingRange->id.toString() +
+                       "\",\"deleted\":true}";
+            }
+
             // Find or create the merged style
             ID mergedStyleId;
             const auto& existingStyles = _workbook->getStyles();
@@ -1700,6 +1694,41 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
             return "{\"success\":true,\"rangeId\":\"" + existingRange->id.toString() +
                    "\",\"styleId\":\"" + mergedStyleId.toString() + "\",\"merged\":true}";
         }
+    }
+
+    // After checking for exact matches, now validate the style for new range creation.
+    // If the style is empty (all defaults like bold:false), we can't create a new range.
+    // The only way to "clear" a style is to have an exact-match range that gets merged
+    // to empty (handled above with range deletion).
+    ID styleId;
+    if (!style.isEmpty()) {
+        // Check if this style already exists
+        const auto& existingStyles = _workbook->getStyles();
+        for (const auto& [id, existingStyle] : existingStyles) {
+            if (existingStyle == style) {
+                styleId = id;
+                break;
+            }
+        }
+
+        // Create new style if not found
+        if (styleId.isNull()) {
+            styleId = generate_id();
+            _workbook->registerStyle(styleId, style);
+
+            // Create STYLE_DEFINE operation for sync
+            if (_workbook->isCollaborating()) {
+                std::string fullStyleJson = styleToJson(style);
+                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
+                applyOperation(*_workbook, styleOp);
+            }
+        }
+    }
+
+    if (styleId.isNull()) {
+        // Style is empty (all defaults) and no exact-match range was found.
+        // This can happen when trying to "clear" a style on a range that doesn't exist.
+        return "{\"error\":\"Empty style\"}";
     }
 
     // Track operations to perform after iteration (can't modify while iterating)
