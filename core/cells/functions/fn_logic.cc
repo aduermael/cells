@@ -50,8 +50,7 @@ EvalResult fn_AND(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 
         // Handle ranges by checking all values
         if (result.isRange()) {
-            const std::vector<EvalResult> rangeValues =
-                collectRangeValues(result.getRangeBounds(), ctx);
+            const std::vector<EvalResult> rangeValues = collectRangeValues(result, ctx);
             for (const EvalResult& val : rangeValues) {
                 if (val.isError()) {
                     return val;
@@ -94,8 +93,7 @@ EvalResult fn_OR(const std::vector<const ASTNode*>& args, EvalContext& ctx) {
 
         // Handle ranges by checking all values
         if (result.isRange()) {
-            const std::vector<EvalResult> rangeValues =
-                collectRangeValues(result.getRangeBounds(), ctx);
+            const std::vector<EvalResult> rangeValues = collectRangeValues(result, ctx);
             for (const EvalResult& val : rangeValues) {
                 if (val.isError()) {
                     return val;

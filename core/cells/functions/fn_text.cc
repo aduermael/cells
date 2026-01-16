@@ -470,8 +470,7 @@ EvalResult fn_CONCAT(const std::vector<const ASTNode*>& args, EvalContext& ctx) 
 
         if (val.isRange()) {
             // Expand range and concatenate all values
-            const std::vector<EvalResult> rangeValues =
-                collectRangeValues(val.getRangeBounds(), ctx);
+            const std::vector<EvalResult> rangeValues = collectRangeValues(val, ctx);
             for (const EvalResult& rv : rangeValues) {
                 if (rv.isError()) {
                     return rv;

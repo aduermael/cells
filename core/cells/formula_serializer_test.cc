@@ -280,5 +280,105 @@ TEST_F(FormulaSerializerTest, SerializePrecedence) {
     EXPECT_TRUE(serialized.find(")") != std::string::npos);
 }
 
+TEST_F(FormulaSerializerTest, SerializeCrossSheetCellRef) {
+    // Add a second sheet
+    auto sheet2Ptr = std::make_unique<Sheet>(generate_id(), "Sheet2");
+    Sheet* sheet2 = sheet2Ptr.get();
+    workbook->addSheet(std::move(sheet2Ptr));
+
+    // Create cell B27 on Sheet2
+    const Axis* colB = sheet2->getOrCreateColumnByPosition(1);  // B = position 1
+    const Axis* row27 = sheet2->getOrCreateRowByPosition(26);   // Row 27 = position 26
+    Cell* cellB27 = sheet2->getOrCreateCellAt(colB->id, row27->id);
+
+    // Parse cross-sheet reference from Sheet1's perspective
+    FormulaParser parser("=Sheet2!B27");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    // Resolve (should set sheetId and cellId)
+    FormulaResolver resolver(*workbook, *sheet);
+    auto result = resolver.resolve(ast.get());
+    ASSERT_TRUE(result.success) << result.errorMessage;
+
+    // Check the AST has sheetId set
+    auto* cellRef = static_cast<CellRefNode*>(ast.get());
+    EXPECT_EQ(cellRef->sheetId, sheet2->id.toString()) << "sheetId should be Sheet2's ID";
+    EXPECT_EQ(cellRef->cellId, cellB27->id.toString()) << "cellId should be B27's ID";
+
+    // Serialize and verify format
+    std::string serialized = FormulaSerializer::serialize(ast.get());
+    // Should be: =!<8-char-sheet-id>~~<8-char-cell-id>
+    EXPECT_TRUE(serialized.find("=!" + sheet2->id.toString()) != std::string::npos)
+        << "Should contain sheet ID prefix: " << serialized;
+    EXPECT_TRUE(serialized.find(cellB27->id.toString()) != std::string::npos)
+        << "Should contain cell ID: " << serialized;
+
+    // Parse the serialized formula back
+    FormulaParser parser2(serialized);
+    auto ast2 = parser2.parse();
+    ASSERT_NE(ast2, nullptr) << "Failed to parse serialized formula: " << serialized;
+    ASSERT_FALSE(parser2.hasErrors());
+
+    // The parsed AST should have sheetId set correctly
+    auto* cellRef2 = dynamic_cast<CellRefNode*>(ast2.get());
+    ASSERT_NE(cellRef2, nullptr);
+    EXPECT_EQ(cellRef2->sheetId, sheet2->id.toString()) << "Round-trip should preserve sheetId";
+    EXPECT_EQ(cellRef2->cellId, cellB27->id.toString()) << "Round-trip should preserve cellId";
+}
+
+TEST_F(FormulaSerializerTest, SerializeCrossSheetRange) {
+    // Add a second sheet
+    auto sheet2Ptr = std::make_unique<Sheet>(generate_id(), "Sheet2");
+    Sheet* sheet2 = sheet2Ptr.get();
+    workbook->addSheet(std::move(sheet2Ptr));
+
+    // Create cells A1, A2, A3 on Sheet2
+    const Axis* colA = sheet2->getOrCreateColumnByPosition(0);
+    const Axis* row1 = sheet2->getOrCreateRowByPosition(0);
+    const Axis* row2 = sheet2->getOrCreateRowByPosition(1);
+    const Axis* row3 = sheet2->getOrCreateRowByPosition(2);
+    Cell* cellA1 = sheet2->getOrCreateCellAt(colA->id, row1->id);
+    Cell* cellA3 = sheet2->getOrCreateCellAt(colA->id, row3->id);
+
+    // Parse cross-sheet range from Sheet1's perspective
+    FormulaParser parser("=SUM(Sheet2!A1:A3)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+
+    // Resolve
+    FormulaResolver resolver(*workbook, *sheet);
+    auto result = resolver.resolve(ast.get());
+    ASSERT_TRUE(result.success) << result.errorMessage;
+
+    // Serialize
+    std::string serialized = FormulaSerializer::serialize(ast.get());
+
+    // Should contain sheet ID prefix only ONCE for the range (not twice)
+    size_t firstSheetPrefix = serialized.find("!" + sheet2->id.toString());
+    EXPECT_NE(firstSheetPrefix, std::string::npos)
+        << "Should contain sheet ID prefix: " << serialized;
+
+    // Parse the serialized formula back
+    FormulaParser parser2(serialized);
+    auto ast2 = parser2.parse();
+    ASSERT_NE(ast2, nullptr) << "Failed to parse serialized formula: " << serialized;
+    ASSERT_FALSE(parser2.hasErrors());
+
+    // Find the range ref inside the SUM function
+    auto* func = dynamic_cast<FunctionCallNode*>(ast2.get());
+    ASSERT_NE(func, nullptr);
+    ASSERT_EQ(func->args.size(), 1u);
+
+    auto* rangeRef = dynamic_cast<RangeRefNode*>(func->args[0].get());
+    ASSERT_NE(rangeRef, nullptr);
+
+    // Both cells should have sheetId set
+    EXPECT_EQ(rangeRef->topLeft->sheetId, sheet2->id.toString())
+        << "topLeft should have sheetId after round-trip";
+    EXPECT_EQ(rangeRef->bottomRight->sheetId, sheet2->id.toString())
+        << "bottomRight should have sheetId after round-trip";
+}
+
 }  // namespace
 }  // namespace cells

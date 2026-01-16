@@ -724,6 +724,10 @@ struct Workbook {
     [[nodiscard]] Sheet* getSheetByName(const std::string& name);
     [[nodiscard]] const Sheet* getSheetByName(const std::string& name) const;
 
+    // Get sheet by ID (for cross-sheet references with UUID storage)
+    [[nodiscard]] Sheet* getSheetById(const ID& sheetId);
+    [[nodiscard]] const Sheet* getSheetById(const ID& sheetId) const;
+
     // ========================================================================
     // Custom formats (CRDT-synced)
     // ========================================================================

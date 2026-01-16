@@ -77,7 +77,8 @@ struct EvalResult {
     std::string stringValue;
     bool boolValue{false};
     CellError error{CellError::NONE};
-    RangeBounds rangeBounds;  // For RANGE type
+    RangeBounds rangeBounds;      // For RANGE type
+    Sheet* targetSheet{nullptr};  // For cross-sheet range references
 
     // For ARRAY type: row-major 2D array of results
     // arrayValue[row][col] - outer vector is rows, inner is columns
@@ -400,6 +401,10 @@ size_t iterateRange(const RangeBounds& bounds, Sheet* sheet, const RangeCellCall
 // Empty cells are included as EvalResult::Empty()
 // For whole column/row ranges, only includes populated cells
 std::vector<EvalResult> collectRangeValues(const RangeBounds& bounds, EvalContext& ctx);
+
+// Overload that accepts EvalResult directly and uses targetSheet if set
+// This is the preferred way to call for cross-sheet range references
+std::vector<EvalResult> collectRangeValues(const EvalResult& rangeResult, EvalContext& ctx);
 
 // Get the count of cells in a range (for pre-allocation)
 // For bounded ranges (A1:C3), returns exact count

@@ -111,8 +111,42 @@ std::string FormulaSerializer::cellRefToUuidString(const CellRefNode* node) {
 }
 
 std::string FormulaSerializer::rangeRefToUuidString(const RangeRefNode* node) {
-    return cellRefToUuidString(node->topLeft.get()) + ":" +
-           cellRefToUuidString(node->bottomRight.get());
+    std::string result;
+
+    // Add sheet prefix once at the beginning (ranges belong to a single sheet)
+    // Check topLeft for sheet reference since both cells should be on the same sheet
+    if (!node->topLeft->sheetId.empty()) {
+        result += "!" + node->topLeft->sheetId;
+    } else if (!node->topLeft->sheetName.empty()) {
+        result += node->topLeft->sheetName + "!";
+    }
+
+    // For the cell refs, we need to skip the sheet prefix since we already added it
+    // Use a helper that outputs just the cell reference part
+    auto cellRefWithoutSheet = [](const CellRefNode* cell) {
+        std::string cellResult;
+        if (!cell->cellId.empty()) {
+            cellResult += FormulaSerializer::refPrefix(cell->colAbsolute, cell->rowAbsolute);
+            cellResult += cell->cellId;
+            return cellResult;
+        }
+        // Fall back to A1 notation
+        if (cell->colAbsolute) {
+            cellResult += "$";
+        }
+        cellResult += cell->column;
+        if (cell->rowAbsolute) {
+            cellResult += "$";
+        }
+        cellResult += std::to_string(cell->row);
+        return cellResult;
+    };
+
+    result += cellRefWithoutSheet(node->topLeft.get());
+    result += ":";
+    result += cellRefWithoutSheet(node->bottomRight.get());
+
+    return result;
 }
 
 std::string FormulaSerializer::columnRefToUuidString(const ColumnRefNode* node) {

@@ -1555,5 +1555,118 @@ TEST_F(FormulaEvalTest, NamedRange_CaseInsensitive) {
     EXPECT_DOUBLE_EQ(123.0, r.getNumber());
 }
 
+// =============================================================================
+// CROSS-SHEET REFERENCE EVALUATION TESTS
+// =============================================================================
+
+TEST_F(FormulaEvalTest, CrossSheetCellRef_Evaluates) {
+    // Add a second sheet
+    workbook->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet2"));
+    Sheet* sheet2 = workbook->getSheetByName("Sheet2");
+    ASSERT_NE(sheet2, nullptr);
+
+    // Create column B and row 27 on Sheet2
+    auto colB = std::make_unique<Axis>(generate_id(), true);
+    colB->position = 1;  // B = position 1
+    colB->name = "B";
+    ID sheet2ColBId = colB->id;
+    sheet2->addColumn(std::move(colB));
+
+    auto row27 = std::make_unique<Axis>(generate_id(), false);
+    row27->position = 26;  // Row 27 = position 26 (0-indexed)
+    ID sheet2Row27Id = row27->id;
+    sheet2->addRow(std::move(row27));
+
+    // Create cell B27 on Sheet2 with value 42
+    Cell* cellB27 = sheet2->getOrCreateCellAt(sheet2ColBId, sheet2Row27Id);
+    cellB27->value = CellValue(42.0);
+
+    // Now evaluate =Sheet2!B27 from Sheet1's perspective
+    FormulaParser parser("=Sheet2!B27");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    ASSERT_FALSE(parser.hasErrors());
+
+    // Resolve - this should find Sheet2 and set sheetId
+    FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
+    auto result = resolver.resolve(ast.get());
+    ASSERT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
+
+    // The AST should be a CellRefNode with sheetId set
+    ASSERT_EQ(ast->type, ASTNodeType::CELL_REF);
+    auto* cellRef = static_cast<CellRefNode*>(ast.get());
+    EXPECT_FALSE(cellRef->sheetId.empty()) << "sheetId should be set for cross-sheet ref";
+    EXPECT_EQ(cellRef->sheetId, sheet2->id.toString()) << "sheetId should match Sheet2";
+
+    // Evaluate
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.namedRanges = workbook->getNamedRanges();
+    ctx.evaluatingCells = &evaluating;
+    ctx.recursionDepth = 0;
+
+    EvalResult evalResult = evaluate(ast.get(), ctx);
+
+    // Should return number 42
+    ASSERT_TRUE(evalResult.isNumber())
+        << "Expected NUMBER, got type " << static_cast<int>(evalResult.type);
+    EXPECT_DOUBLE_EQ(42.0, evalResult.getNumber());
+}
+
+TEST_F(FormulaEvalTest, CrossSheetRange_SUMEvaluates) {
+    // Add a second sheet
+    workbook->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet2"));
+    Sheet* sheet2 = workbook->getSheetByName("Sheet2");
+    ASSERT_NE(sheet2, nullptr);
+
+    // Create column A on Sheet2
+    auto colA = std::make_unique<Axis>(generate_id(), true);
+    colA->position = 0;
+    colA->name = "A";
+    ID sheet2ColAId = colA->id;
+    sheet2->addColumn(std::move(colA));
+
+    // Create rows 1-3 on Sheet2
+    ID sheet2RowIds[3];
+    for (uint32_t i = 0; i < 3; i++) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        sheet2RowIds[i] = row->id;
+        sheet2->addRow(std::move(row));
+    }
+
+    // Set values A1=10, A2=20, A3=30 on Sheet2
+    sheet2->getOrCreateCellAt(sheet2ColAId, sheet2RowIds[0])->value = CellValue(10.0);
+    sheet2->getOrCreateCellAt(sheet2ColAId, sheet2RowIds[1])->value = CellValue(20.0);
+    sheet2->getOrCreateCellAt(sheet2ColAId, sheet2RowIds[2])->value = CellValue(30.0);
+
+    // Evaluate =SUM(Sheet2!A1:A3) from Sheet1
+    FormulaParser parser("=SUM(Sheet2!A1:A3)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    ASSERT_FALSE(parser.hasErrors());
+
+    FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
+    auto result = resolver.resolve(ast.get());
+    ASSERT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
+
+    std::unordered_set<ID> evaluating;
+    EvalContext ctx;
+    ctx.sheet = sheet;
+    ctx.workbook = workbook.get();
+    ctx.namedRanges = workbook->getNamedRanges();
+    ctx.evaluatingCells = &evaluating;
+    ctx.recursionDepth = 0;
+
+    EvalResult evalResult = evaluate(ast.get(), ctx);
+
+    // Should return number 60 (10+20+30)
+    ASSERT_TRUE(evalResult.isNumber())
+        << "Expected NUMBER, got type " << static_cast<int>(evalResult.type);
+    EXPECT_DOUBLE_EQ(60.0, evalResult.getNumber());
+}
+
 }  // namespace
 }  // namespace cells

@@ -587,6 +587,39 @@ TEST(FormulaParserTest, CrossSheetCellRef) {
     EXPECT_EQ(cell->row, 1);
 }
 
+TEST(FormulaParserTest, CrossSheetUuidCellRef) {
+    // UUID format: !<8-char-sheet-id>~~<8-char-cell-id>
+    FormulaParser parser("=!abc12345~~def67890");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr) << "Parser returned null";
+    ASSERT_FALSE(parser.hasErrors()) << "Parser had errors";
+
+    auto* cell = dynamic_cast<CellRefNode*>(ast.get());
+    ASSERT_NE(cell, nullptr) << "Expected CellRefNode";
+    EXPECT_EQ(cell->sheetId, "abc12345") << "sheetId should be set";
+    EXPECT_EQ(cell->cellId, "def67890") << "cellId should be set";
+}
+
+TEST(FormulaParserTest, CrossSheetUuidRange) {
+    // UUID format for range: !<8-char-sheet-id>~~<cell1>:~~<cell2>
+    // The sheet prefix applies to the entire range, not duplicated per cell
+    FormulaParser parser("=!abc12345~~def67890:~~ghi01234");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr) << "Parser returned null";
+    ASSERT_FALSE(parser.hasErrors()) << "Parser had errors";
+
+    auto* range = dynamic_cast<RangeRefNode*>(ast.get());
+    ASSERT_NE(range, nullptr) << "Expected RangeRefNode";
+
+    // Both cells should have sheetId set to the sheet prefix
+    ASSERT_NE(range->topLeft, nullptr);
+    ASSERT_NE(range->bottomRight, nullptr);
+    EXPECT_EQ(range->topLeft->sheetId, "abc12345") << "topLeft should have sheetId";
+    EXPECT_EQ(range->topLeft->cellId, "def67890") << "topLeft should have cellId";
+    EXPECT_EQ(range->bottomRight->sheetId, "abc12345") << "bottomRight should also have sheetId";
+    EXPECT_EQ(range->bottomRight->cellId, "ghi01234") << "bottomRight should have cellId";
+}
+
 // ============================================================================
 // Function Call Tests
 // ============================================================================

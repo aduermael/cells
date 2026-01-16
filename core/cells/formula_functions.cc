@@ -120,7 +120,8 @@ std::vector<EvalResult> expandArguments(const std::vector<const ASTNode*>& args,
 
         if (result.isRange()) {
             // Expand range into individual cell values
-            std::vector<EvalResult> rangeValues = collectRangeValues(result.getRangeBounds(), ctx);
+            // Use the new overload that handles cross-sheet references
+            std::vector<EvalResult> rangeValues = collectRangeValues(result, ctx);
             results.insert(results.end(), rangeValues.begin(), rangeValues.end());
         } else {
             results.push_back(result);

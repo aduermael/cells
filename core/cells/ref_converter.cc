@@ -604,8 +604,11 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
                         found = true;
                     }
                 }
-                // Clear cross-sheet context after processing the reference
-                currentSheetContext = nullptr;
+                // Keep cross-sheet context if next char is ':' (for range second part)
+                // Otherwise clear it
+                if (i + len >= formula.size() || formula[i + len] != ':') {
+                    currentSheetContext = nullptr;
+                }
             }
 
             // Fall back to current sheet context

@@ -443,6 +443,24 @@ const Sheet* Workbook::getSheetByName(const std::string& sheetName) const {
     return nullptr;
 }
 
+Sheet* Workbook::getSheetById(const ID& sheetId) {
+    for (auto& sheet : sheets) {
+        if (sheet->id == sheetId) {
+            return sheet.get();
+        }
+    }
+    return nullptr;
+}
+
+const Sheet* Workbook::getSheetById(const ID& sheetId) const {
+    for (const auto& sheet : sheets) {
+        if (sheet->id == sheetId) {
+            return sheet.get();
+        }
+    }
+    return nullptr;
+}
+
 bool Workbook::registerCustomFormat(const ID& formatId, const std::string& formatCode) {
     auto [it, inserted] = _customFormats.try_emplace(formatId, formatCode);
     return inserted;

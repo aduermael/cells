@@ -107,11 +107,20 @@ static EvalResult evaluateCellRef(const CellRefNode* node, EvalContext& ctx) {
 
     // Get the target sheet (may be different from ctx.sheet for cross-sheet refs)
     Sheet* targetSheet = ctx.sheet;
-    if (!node->sheetName.empty() && ctx.workbook) {
-        targetSheet = ctx.workbook->getSheetByName(node->sheetName);
-        if (!targetSheet) {
-            // Referenced sheet doesn't exist
-            return EvalResult::Error(CellError::REF);
+    if (ctx.workbook) {
+        // Try sheetId first (UUID-based storage), then fall back to sheetName (A1 notation)
+        if (!node->sheetId.empty()) {
+            targetSheet = ctx.workbook->getSheetById(ID(node->sheetId));
+            if (!targetSheet) {
+                // Referenced sheet doesn't exist
+                return EvalResult::Error(CellError::REF);
+            }
+        } else if (!node->sheetName.empty()) {
+            targetSheet = ctx.workbook->getSheetByName(node->sheetName);
+            if (!targetSheet) {
+                // Referenced sheet doesn't exist
+                return EvalResult::Error(CellError::REF);
+            }
         }
     }
 
@@ -451,6 +460,23 @@ static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
         return EvalResult::Error(CellError::REF);
     }
 
+    // Determine the target sheet (may be different for cross-sheet refs)
+    Sheet* targetSheet = ctx.sheet;
+    if (ctx.workbook) {
+        // Check topLeft for sheet reference (both cells should reference the same sheet)
+        if (!node->topLeft->sheetId.empty()) {
+            targetSheet = ctx.workbook->getSheetById(ID(node->topLeft->sheetId));
+            if (!targetSheet) {
+                return EvalResult::Error(CellError::REF);
+            }
+        } else if (!node->topLeft->sheetName.empty()) {
+            targetSheet = ctx.workbook->getSheetByName(node->topLeft->sheetName);
+            if (!targetSheet) {
+                return EvalResult::Error(CellError::REF);
+            }
+        }
+    }
+
     // Try to look up columns using resolved cell IDs first (from UUID formula),
     // then fall back to column name lookup (for A1 notation formulas)
     const Axis* startCol = nullptr;
@@ -460,20 +486,20 @@ static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
 
     // Try resolved cell IDs first
     if (!node->topLeft->cellId.empty()) {
-        const Cell* startCell = ctx.sheet->getCell(ID(node->topLeft->cellId));
+        const Cell* startCell = targetSheet->getCell(ID(node->topLeft->cellId));
         if (startCell) {
-            startCol = ctx.sheet->getColumn(startCell->colId);
-            const Axis* startRow = ctx.sheet->getRow(startCell->rowId);
+            startCol = targetSheet->getColumn(startCell->colId);
+            const Axis* startRow = targetSheet->getRow(startCell->rowId);
             if (startRow) {
                 startRowPos = startRow->position;
             }
         }
     }
     if (!node->bottomRight->cellId.empty()) {
-        const Cell* endCell = ctx.sheet->getCell(ID(node->bottomRight->cellId));
+        const Cell* endCell = targetSheet->getCell(ID(node->bottomRight->cellId));
         if (endCell) {
-            endCol = ctx.sheet->getColumn(endCell->colId);
-            const Axis* endRow = ctx.sheet->getRow(endCell->rowId);
+            endCol = targetSheet->getColumn(endCell->colId);
+            const Axis* endRow = targetSheet->getRow(endCell->rowId);
             if (endRow) {
                 endRowPos = endRow->position;
             }
@@ -482,12 +508,12 @@ static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
 
     // Fall back to column name lookup if cell IDs weren't resolved
     if (!startCol) {
-        startCol = ctx.sheet->getColumnByName(node->topLeft->column);
+        startCol = targetSheet->getColumnByName(node->topLeft->column);
         // Use row position from AST (1-based in AST, 0-based for storage)
         startRowPos = static_cast<uint32_t>(node->topLeft->row - 1);
     }
     if (!endCol) {
-        endCol = ctx.sheet->getColumnByName(node->bottomRight->column);
+        endCol = targetSheet->getColumnByName(node->bottomRight->column);
         endRowPos = static_cast<uint32_t>(node->bottomRight->row - 1);
     }
 
@@ -506,7 +532,13 @@ static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
         std::swap(startRowPos, endRowPos);
     }
 
-    return EvalResult::CellRange(startColId, endColId, startRowPos, endRowPos);
+    // For cross-sheet ranges, we need to store the target sheet in the result
+    // so that collectRangeValues can iterate on the correct sheet
+    EvalResult result = EvalResult::CellRange(startColId, endColId, startRowPos, endRowPos);
+    if (targetSheet != ctx.sheet) {
+        result.targetSheet = targetSheet;
+    }
+    return result;
 }
 
 // Evaluate a whole column reference (A:A)
@@ -871,6 +903,40 @@ std::vector<EvalResult> collectRangeValues(const RangeBounds& bounds, EvalContex
 
     iterateRange(bounds, ctx.sheet, [&results, &ctx](Cell* cell, uint32_t, uint32_t) {
         results.push_back(getCellEvalResult(cell, ctx));
+        return true;  // Continue iteration
+    });
+
+    return results;
+}
+
+// Overload that accepts EvalResult directly and uses targetSheet if set
+std::vector<EvalResult> collectRangeValues(const EvalResult& rangeResult, EvalContext& ctx) {
+    std::vector<EvalResult> results;
+
+    if (!rangeResult.isRange()) {
+        return results;
+    }
+
+    // Use the target sheet from the result if set (for cross-sheet refs), otherwise use ctx.sheet
+    Sheet* sheet = rangeResult.targetSheet ? rangeResult.targetSheet : ctx.sheet;
+    if (!sheet) {
+        return results;
+    }
+
+    const RangeBounds& bounds = rangeResult.getRangeBounds();
+
+    // Pre-allocate if we can estimate size
+    const size_t estimatedSize = getRangeSize(bounds, sheet);
+    if (estimatedSize > 0) {
+        results.reserve(estimatedSize);
+    }
+
+    // Create a temporary context for the target sheet
+    EvalContext subCtx = ctx;
+    subCtx.sheet = sheet;
+
+    iterateRange(bounds, sheet, [&results, &subCtx](Cell* cell, uint32_t, uint32_t) {
+        results.push_back(getCellEvalResult(cell, subCtx));
         return true;  // Continue iteration
     });
 
