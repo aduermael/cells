@@ -327,6 +327,62 @@ const tests = {
     );
   },
 
+  // Test that edge cells with cell-level borders render bold text when range has bold
+  'Edge cell with border renders bold text from range style': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+    await createNewWorkbook(ctx.page);
+    await sleep(200);
+
+    // Step 1: Apply outline border to B2:D4
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+    await applyBorder(ctx.page, 'outer');
+    await sleep(300);
+
+    // Step 2: Apply bold to the same range
+    await ctx.page.click('#style-bold-btn');
+    await sleep(300);
+
+    // Step 3: Enter text in B2 (edge cell with border)
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    await ctx.page.keyboard.type('Test');
+    await ctx.page.keyboard.press('Enter');
+    await sleep(200);
+
+    // Step 4: Check that B2's viewport data includes bold=true
+    // The viewport data is what the renderer uses
+    const viewportData = await ctx.page.evaluate(async () => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.dataSource) {
+        return null;
+      }
+      // Get viewport data for the visible area using queryViewport
+      const viewportResult = await ctx.app.dataSource.client.queryViewport(0, 0, 10, 10);
+      return viewportResult;
+    });
+
+    // Find B2 in the viewport data
+    const b2Cell = viewportData?.cells?.find(c => c.col === 1 && c.row === 1);
+    console.log('B2 viewport cell:', JSON.stringify(b2Cell, null, 2));
+
+    assertTrue(
+      b2Cell !== null && b2Cell !== undefined,
+      'B2 should be in viewport data'
+    );
+    assertTrue(
+      b2Cell.style !== undefined && b2Cell.style.bold === true,
+      `B2 should have bold=true in viewport style (got: ${JSON.stringify(b2Cell?.style)})`
+    );
+
+    // Verify border is also present
+    assertTrue(
+      b2Cell.style.border !== undefined,
+      'B2 should also have border in viewport style'
+    );
+  },
+
   // Additional test: Bold button state after OUTLINE border application
   'Bold button not disabled after outline border application': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);

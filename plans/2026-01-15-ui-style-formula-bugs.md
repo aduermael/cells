@@ -23,9 +23,12 @@ The bug is architectural: when `setRangeStyle()` is called with a border, it che
 
 - [x] 1a: Create E2E test reproducing the bug: apply OUTLINE border to B2:D4, then apply bold. Bug confirmed - only interior cells got bold, edge cells with cell-level border styles did not. Tests added to `borders.test.mjs`.
 - [x] 1b: Debug `StyleControls.applyStyleToSelection()` - uses `getSelectionRange()` correctly and calls `setStyleForRange()` for range-level styling. Issue was in C++ effective style computation.
-- [x] 1c: Found root cause in `computeEffectiveStyleAt()` (bindings_format.cc:2111): cell-level styles did an early return, completely ignoring range styles. Fixed to merge cell style with range/column/row styles instead.
+- [x] 1c: Found root cause in TWO places:
+  - `computeEffectiveStyleAt()` in `bindings_format.cc:2111` - used for toolbar style display
+  - `getEffectiveStyle()` in `bindings_viewport.cc:84` - used for cell rendering
+  Both had early return when cell had cell-level style, ignoring range styles. Fixed both to merge styles.
 - [x] 1d: Bold button state now reflects effective style correctly. After fix, bold from range style merges with border from cell style.
-- [x] 1e: Border and bold now coexist correctly - edge cells show both `bold: true` and their `border` properties.
+- [x] 1e: Border and bold now coexist correctly - edge cells show both `bold: true` and `border` in both toolbar display AND viewport rendering data. Added viewport-specific test.
 
 ## Phase 2: Fix Cross-Sheet Reference Parsing
 

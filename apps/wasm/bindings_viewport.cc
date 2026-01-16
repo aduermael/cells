@@ -84,73 +84,87 @@ CellStyle mergeStyles(const CellStyle& base, const CellStyle& overlay) {
 EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, const Workbook& workbook,
                                        uint32_t colPos, uint32_t rowPos) {
     EffectiveStyleResult result = {{}, nullptr, {}, false, false, false, false, false};
+    CellStyle combinedStyle;
+    bool hasAnyStyle = false;
 
-    // Priority 1: Cell's own style
+    // Priority 1: Cell's own style (highest priority - start with this as base)
+    // Note: We don't return early - we continue to merge lower-priority styles
+    // to fill in any properties not explicitly set at the cell level.
     if (!cell.styleId.isNull()) {
-        result.styleId = cell.styleId;
-        result.style = workbook.getStyle(cell.styleId);
-        result.fromCell = true;
-        return result;
+        const CellStyle* cellStyle = workbook.getStyle(cell.styleId);
+        if (cellStyle != nullptr) {
+            combinedStyle = *cellStyle;
+            result.styleId = cell.styleId;
+            result.fromCell = true;
+            hasAnyStyle = true;
+        }
     }
 
     // Priority 2: Range styles (for ranges with RANGE_STYLE flag)
-    // Combine styles from all overlapping ranges (I3: Overlapping ranges combine styles)
-    // e.g., if Range A has bgColor and Range B has bold, the cell gets both properties
+    // Merge styles from all overlapping ranges to fill gaps from cell style
+    // e.g., if cell has border and Range has bold, the cell gets both properties
     std::vector<Range*> styleRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::STYLE);
-    if (!styleRanges.empty()) {
-        CellStyle combinedStyle;
-        bool hasAnyStyle = false;
-
-        // Iterate through all ranges and merge their styles
-        for (Range* range : styleRanges) {
-            ID rangeStyleId = sheet.getRangeStyleId(range->id);
-            if (!rangeStyleId.isNull()) {
-                const CellStyle* rangeStyle = workbook.getStyle(rangeStyleId);
-                if (rangeStyle != nullptr) {
-                    if (!hasAnyStyle) {
-                        // First style found - use it as base
-                        combinedStyle = *rangeStyle;
-                        result.styleId = rangeStyleId;  // Keep first styleId for reference
-                        hasAnyStyle = true;
-                    } else {
-                        // Merge additional range's style into combined style
-                        combinedStyle = mergeStyles(combinedStyle, *rangeStyle);
-                    }
+    for (Range* range : styleRanges) {
+        ID rangeStyleId = sheet.getRangeStyleId(range->id);
+        if (!rangeStyleId.isNull()) {
+            const CellStyle* rangeStyle = workbook.getStyle(rangeStyleId);
+            if (rangeStyle != nullptr) {
+                if (!hasAnyStyle) {
+                    // First style found - use it as base
+                    combinedStyle = *rangeStyle;
+                    result.styleId = rangeStyleId;
+                    hasAnyStyle = true;
+                } else {
+                    // Merge range's style into combined style (fills gaps)
+                    combinedStyle = mergeStyles(combinedStyle, *rangeStyle);
                 }
+                result.fromRange = true;
             }
-        }
-
-        if (hasAnyStyle) {
-            result.mergedStyle = combinedStyle;
-            result.hasMergedStyle = true;
-            result.fromRange = true;
-            return result;
         }
     }
 
-    // Priority 3: Column's default style
+    // Priority 3: Column's default style (fills remaining gaps)
     const Axis* col = sheet.columns.count(cell.colId) > 0
         ? sheet.columns.at(cell.colId).get()
         : nullptr;
     if (col && !col->defaultStyleId.isNull()) {
-        result.styleId = col->defaultStyleId;
-        result.style = workbook.getStyle(col->defaultStyleId);
-        result.fromColumn = true;
-        return result;
+        const CellStyle* colStyle = workbook.getStyle(col->defaultStyleId);
+        if (colStyle != nullptr) {
+            if (!hasAnyStyle) {
+                combinedStyle = *colStyle;
+                result.styleId = col->defaultStyleId;
+                hasAnyStyle = true;
+            } else {
+                combinedStyle = mergeStyles(combinedStyle, *colStyle);
+            }
+            result.fromColumn = true;
+        }
     }
 
-    // Priority 4: Row's default style
+    // Priority 4: Row's default style (fills remaining gaps)
     const Axis* row = sheet.rows.count(cell.rowId) > 0
         ? sheet.rows.at(cell.rowId).get()
         : nullptr;
     if (row && !row->defaultStyleId.isNull()) {
-        result.styleId = row->defaultStyleId;
-        result.style = workbook.getStyle(row->defaultStyleId);
-        result.fromRow = true;
-        return result;
+        const CellStyle* rowStyle = workbook.getStyle(row->defaultStyleId);
+        if (rowStyle != nullptr) {
+            if (!hasAnyStyle) {
+                combinedStyle = *rowStyle;
+                result.styleId = row->defaultStyleId;
+                hasAnyStyle = true;
+            } else {
+                combinedStyle = mergeStyles(combinedStyle, *rowStyle);
+            }
+            result.fromRow = true;
+        }
     }
 
-    // No style found
+    // Return result with merged style if we found any styles
+    if (hasAnyStyle) {
+        result.mergedStyle = combinedStyle;
+        result.hasMergedStyle = true;
+    }
+
     return result;
 }
 
