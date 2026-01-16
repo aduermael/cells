@@ -541,7 +541,7 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
             bool validSheetUuid = true;
             for (size_t j = 1; j <= 8 && validSheetUuid; ++j) {
                 const char c = formula[i + j];
-                if (!std::isalnum(static_cast<unsigned char>(c))) {
+                if (std::isalnum(static_cast<unsigned char>(c)) == 0) {
                     validSheetUuid = false;
                 }
             }
@@ -567,6 +567,129 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
 
                 i += 9;  // Skip !<sheetId>
                 continue;
+            }
+        }
+
+        // Check for column UUID ref: @$ or @~ followed by 8 alphanumeric chars
+        if (formula[i] == '@' && i + 10 <= formula.size()) {
+            const char absMarker = formula[i + 1];
+            if (absMarker == '$' || absMarker == '~') {
+                bool validColUuid = true;
+                for (size_t j = 2; j < 10 && validColUuid; ++j) {
+                    if (std::isalnum(static_cast<unsigned char>(formula[i + j])) == 0) {
+                        validColUuid = false;
+                    }
+                }
+                if (validColUuid) {
+                    const std::string colId = formula.substr(i + 2, 8);
+                    const bool isAbsolute = (absMarker == '$');
+                    bool found = false;
+
+                    // Look up column in cross-sheet context first
+                    if (currentSheetContext != nullptr) {
+                        const ID colIdObj(colId);
+                        auto colIt = currentSheetContext->columns.find(colIdObj);
+                        if (colIt != currentSheetContext->columns.end()) {
+                            const std::string colName =
+                                columnIndexToLetter(colIt->second->position);
+                            if (isAbsolute) {
+                                result += '$';
+                            }
+                            result += colName;
+                            result += ':';
+                            result += colName;
+                            found = true;
+                        }
+                    }
+
+                    // Fall back to current sheet context (using lookup maps)
+                    if (!found) {
+                        auto colIt = colIdToIndex_.find(colId);
+                        if (colIt != colIdToIndex_.end()) {
+                            const std::string colName = columnIndexToLetter(colIt->second);
+                            if (isAbsolute) {
+                                result += '$';
+                            }
+                            result += colName;
+                            result += ':';
+                            result += colName;
+                            found = true;
+                        }
+                    }
+
+                    if (!found) {
+                        // Column not found - output #REF!
+                        result += "#REF!";
+                    }
+
+                    i += 10;  // Skip @<abs><8-char-id>
+                    // Clear cross-sheet context unless next is ':'
+                    if (i >= formula.size() || formula[i] != ':') {
+                        currentSheetContext = nullptr;
+                    }
+                    continue;
+                }
+            }
+        }
+
+        // Check for row UUID ref: #$ or #~ followed by 8 alphanumeric chars
+        if (formula[i] == '#' && i + 10 <= formula.size()) {
+            const char absMarker = formula[i + 1];
+            if (absMarker == '$' || absMarker == '~') {
+                bool validRowUuid = true;
+                for (size_t j = 2; j < 10 && validRowUuid; ++j) {
+                    if (std::isalnum(static_cast<unsigned char>(formula[i + j])) == 0) {
+                        validRowUuid = false;
+                    }
+                }
+                if (validRowUuid) {
+                    const std::string rowId = formula.substr(i + 2, 8);
+                    const bool isAbsolute = (absMarker == '$');
+                    bool found = false;
+
+                    // Look up row in cross-sheet context first
+                    if (currentSheetContext != nullptr) {
+                        const ID rowIdObj(rowId);
+                        auto rowIt = currentSheetContext->rows.find(rowIdObj);
+                        if (rowIt != currentSheetContext->rows.end()) {
+                            const std::string rowNum = std::to_string(rowIt->second->position + 1);
+                            if (isAbsolute) {
+                                result += '$';
+                            }
+                            result += rowNum;
+                            result += ':';
+                            result += rowNum;
+                            found = true;
+                        }
+                    }
+
+                    // Fall back to current sheet context (using lookup maps)
+                    if (!found) {
+                        auto rowIt = rowIdToIndex_.find(rowId);
+                        if (rowIt != rowIdToIndex_.end()) {
+                            const std::string rowNum = std::to_string(rowIt->second + 1);
+                            if (isAbsolute) {
+                                result += '$';
+                            }
+                            result += rowNum;
+                            result += ':';
+                            result += rowNum;
+                            found = true;
+                        }
+                    }
+
+                    if (!found) {
+                        // Row not found - output #REF!
+                        result += "#REF!";
+                    }
+
+                    i += 10;  // Skip #<abs><8-char-id>
+                    // Clear cross-sheet context unless next is ':'
+                    if (i >= formula.size() || formula[i] != ':') {
+                        currentSheetContext = nullptr;
+                    }
+                    continue;
+                }
             }
         }
 

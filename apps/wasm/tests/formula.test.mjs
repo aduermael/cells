@@ -286,7 +286,7 @@ const tests = {
 
     // Click B1 to show formula in formula bar
     await clickCell(ctx.page, 'B1');
-    await sleep(200);
+    await sleep(300);
 
     // Check if column reference is colored
     const hasColoredRef = await ctx.page.evaluate(() => {

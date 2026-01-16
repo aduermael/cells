@@ -84,7 +84,8 @@ The parser architecture supports cross-sheet references (verified in formula_par
   - Updated `applyCellSetValue` to use sheetId when creating new cells
   - Updated `bindings_core.cc` to pass active sheet ID in `getOrCreateCellAt`, `setValueAtPosition`, `updateCellWithFormatDetection`
   - Fixed E2E test to use B5 instead of B27 (viewport issue unrelated to CRDT fix)
-  - Both cross-sheet E2E tests now pass!
+  - Fixed `RefConverter::formulaToA1` to handle column/row UUID refs (`@~`/`#~` format) - was showing `@~#REF!` for column/row references
+  - All 181 E2E tests pass!
 - [ ] 2i: Test sheet names with spaces (should use `'Sheet Name'!A1` syntax)
   - Parser should handle `'Sheet Name'!A1` and `'Sheet-2'!B5` syntax
   - Serializer should quote sheet names containing spaces, hyphens, or special chars
