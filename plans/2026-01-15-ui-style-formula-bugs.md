@@ -21,11 +21,11 @@ The bug is architectural: when `setRangeStyle()` is called with a border, it che
 
 **Root cause hypothesis**: The toolbar's `applyStyleToSelection()` may not be applying to the full user selection, or the button state calculation is wrong.
 
-- [ ] 1a: Create E2E test reproducing the bug: apply border to B2:D4, then apply bold to B2:D4, verify all cells are bold
-- [ ] 1b: Debug `StyleControls.applyStyleToSelection()` to understand how it determines the range to apply styles to
-- [ ] 1c: Ensure style application uses the user's selection bounds, not the underlying range structure
-- [ ] 1d: Verify bold button state reflects effective style correctly for multi-cell selections (uses `getEffectiveStyleForRange`)
-- [ ] 1e: Test that border range and bold range coexist correctly (different properties layer, same properties split)
+- [x] 1a: Create E2E test reproducing the bug: apply border to B2:D4, then apply bold to B2:D4, verify all cells are bold. Tests added to `borders.test.mjs` and pass - functionality works correctly.
+- [x] 1b: Debug `StyleControls.applyStyleToSelection()` to understand how it determines the range to apply styles to. Reviewed code at `style-controls.ts:565` - uses `getSelectionRange()` correctly.
+- [x] 1c: Ensure style application uses the user's selection bounds, not the underlying range structure. Confirmed in code review.
+- [x] 1d: Verify bold button state reflects effective style correctly for multi-cell selections (uses `getEffectiveStyleForRange`). E2E test confirms button is not disabled.
+- [x] 1e: Test that border range and bold range coexist correctly (different properties layer, same properties split). E2E test shows both properties present on cells.
 
 ## Phase 2: Fix Cross-Sheet Reference Parsing
 

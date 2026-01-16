@@ -227,6 +227,132 @@ const tests = {
        style.border.right?.style === 'thin');
     assertTrue(!hasBorders, 'Cell should have no borders after applying No Border');
   },
+  // Border + Bold bug test: After applying border to a range, bold should still work
+  // Bug: when setting a border for a range, then clicking "bold" for the same range,
+  // the bold button becomes disabled and not all cells get bold styling
+  'Border then bold on same range applies bold to all cells': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+    await createNewWorkbook(ctx.page);
+    await sleep(200);
+
+    // Step 1: Select range B2:D4
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+
+    // Step 2: Apply all borders to the selection
+    await applyBorder(ctx.page, 'all');
+    await sleep(300);
+
+    // Verify borders were applied to at least one cell
+    const styleAfterBorder = await getCellStyle(ctx.page, 1, 1); // B2
+    console.log('B2 style after border:', JSON.stringify(styleAfterBorder, null, 2));
+    assertTrue(
+      styleAfterBorder !== null && styleAfterBorder.border !== undefined,
+      'B2 should have border after applying all borders'
+    );
+
+    // Bug scenario: DON'T re-select, immediately click bold
+    // (keeping same selection from border operation)
+    // This tests if the selection state is preserved after border application
+
+    // Check bold button is NOT disabled before clicking
+    const boldBtnDisabledBefore = await ctx.page.evaluate(() => {
+      const btn = document.querySelector('#style-bold-btn');
+      return btn ? btn.disabled : null;
+    });
+    console.log('Bold button disabled before click:', boldBtnDisabledBefore);
+    assertTrue(
+      boldBtnDisabledBefore === false,
+      `Bold button should NOT be disabled when range is selected (got disabled=${boldBtnDisabledBefore})`
+    );
+
+    // Click bold button
+    await ctx.page.click('#style-bold-btn');
+    await sleep(300);
+
+    // Step 4: Verify ALL cells in B2:D4 now have bold styling
+    // Check each cell in the 3x3 range (cols 1-3, rows 1-3)
+    const cellsToCheck = [
+      { col: 1, row: 1, name: 'B2' },
+      { col: 2, row: 1, name: 'C2' },
+      { col: 3, row: 1, name: 'D2' },
+      { col: 1, row: 2, name: 'B3' },
+      { col: 2, row: 2, name: 'C3' },
+      { col: 3, row: 2, name: 'D3' },
+      { col: 1, row: 3, name: 'B4' },
+      { col: 2, row: 3, name: 'C4' },
+      { col: 3, row: 3, name: 'D4' },
+    ];
+
+    let boldCount = 0;
+    for (const cell of cellsToCheck) {
+      const style = await getCellStyle(ctx.page, cell.col, cell.row);
+      console.log(`${cell.name} style:`, JSON.stringify(style, null, 2));
+      if (style && style.bold === true) {
+        boldCount++;
+      }
+    }
+
+    console.log(`Bold cells: ${boldCount} / ${cellsToCheck.length}`);
+    assertEqual(
+      boldCount,
+      cellsToCheck.length,
+      `All ${cellsToCheck.length} cells should be bold, but only ${boldCount} are bold`
+    );
+
+    // Step 5: Verify border is still present on B2 (styles should coexist)
+    const styleAfterBold = await getCellStyle(ctx.page, 1, 1); // B2
+    console.log('B2 style after bold:', JSON.stringify(styleAfterBold, null, 2));
+    assertTrue(
+      styleAfterBold !== null && styleAfterBold.border !== undefined,
+      'B2 should still have border after applying bold (different properties should layer)'
+    );
+    assertTrue(
+      styleAfterBold !== null && styleAfterBold.bold === true,
+      'B2 should have bold after applying bold'
+    );
+  },
+
+  // Additional test: Bold button state after border application
+  'Bold button not disabled after border application': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+    await createNewWorkbook(ctx.page);
+    await sleep(200);
+
+    // Apply border to B2:D4
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+    await applyBorder(ctx.page, 'all');
+    await sleep(300);
+
+    // Re-select the range
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+
+    // Check bold button state
+    const boldBtnState = await ctx.page.evaluate(() => {
+      const btn = document.querySelector('#style-bold-btn');
+      if (!btn) return null;
+      return {
+        disabled: btn.disabled,
+        className: btn.className,
+        ariaDisabled: btn.getAttribute('aria-disabled'),
+      };
+    });
+
+    console.log('Bold button state after border:', JSON.stringify(boldBtnState, null, 2));
+
+    assertTrue(
+      boldBtnState !== null,
+      'Bold button should exist'
+    );
+    assertTrue(
+      boldBtnState.disabled === false,
+      `Bold button should not be disabled after border application (disabled=${boldBtnState.disabled})`
+    );
+  },
 };
 
 // Run all tests
