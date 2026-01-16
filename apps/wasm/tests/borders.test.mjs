@@ -227,10 +227,13 @@ const tests = {
        style.border.right?.style === 'thin');
     assertTrue(!hasBorders, 'Cell should have no borders after applying No Border');
   },
-  // Border + Bold bug test: After applying border to a range, bold should still work
-  // Bug: when setting a border for a range, then clicking "bold" for the same range,
-  // the bold button becomes disabled and not all cells get bold styling
-  'Border then bold on same range applies bold to all cells': async (ctx) => {
+  // Border + Bold bug test: After applying OUTLINE border to a range, bold should still work
+  // Bug: when setting an OUTLINE border for a range, then clicking "bold" for the same range,
+  // the bold button becomes disabled (shows mixed state) and not all cells get bold styling.
+  // Root cause: Outline border only applies borders to edge cells, creating mixed styles,
+  // which causes getEffectiveStyleForRange to return mixed=true for border property,
+  // incorrectly affecting the bold button state.
+  'Outline border then bold on same range applies bold to all cells': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
     await createNewWorkbook(ctx.page);
@@ -240,31 +243,41 @@ const tests = {
     await selectRange(ctx.page, 'B2', 'D4');
     await sleep(100);
 
-    // Step 2: Apply all borders to the selection
-    await applyBorder(ctx.page, 'all');
+    // Step 2: Apply OUTLINE border (not "all borders") - this only styles edge cells
+    await applyBorder(ctx.page, 'outer');
     await sleep(300);
 
-    // Verify borders were applied to at least one cell
-    const styleAfterBorder = await getCellStyle(ctx.page, 1, 1); // B2
-    console.log('B2 style after border:', JSON.stringify(styleAfterBorder, null, 2));
+    // Verify outline borders were applied to edge cells
+    const styleB2 = await getCellStyle(ctx.page, 1, 1); // B2 - top-left corner
+    console.log('B2 style after outline border:', JSON.stringify(styleB2, null, 2));
     assertTrue(
-      styleAfterBorder !== null && styleAfterBorder.border !== undefined,
-      'B2 should have border after applying all borders'
+      styleB2 !== null && styleB2.border !== undefined,
+      'B2 (corner) should have border after applying outline'
     );
 
-    // Bug scenario: DON'T re-select, immediately click bold
-    // (keeping same selection from border operation)
-    // This tests if the selection state is preserved after border application
+    // Interior cell C3 should NOT have borders (outline only applies to edges)
+    const styleC3Interior = await getCellStyle(ctx.page, 2, 2); // C3 - interior cell
+    console.log('C3 (interior) style after outline border:', JSON.stringify(styleC3Interior, null, 2));
 
-    // Check bold button is NOT disabled before clicking
-    const boldBtnDisabledBefore = await ctx.page.evaluate(() => {
+    // Bug scenario: DON'T re-select, immediately check bold button and click it
+    // (keeping same selection from border operation)
+
+    // Check bold button state - it should NOT be disabled/mixed just because
+    // border property is mixed (bold is a DIFFERENT property)
+    const boldBtnStateBefore = await ctx.page.evaluate(() => {
       const btn = document.querySelector('#style-bold-btn');
-      return btn ? btn.disabled : null;
+      if (!btn) return null;
+      return {
+        disabled: btn.disabled,
+        className: btn.className,
+      };
     });
-    console.log('Bold button disabled before click:', boldBtnDisabledBefore);
+    console.log('Bold button state before click:', JSON.stringify(boldBtnStateBefore, null, 2));
+
+    // The bold button should be clickable (not disabled)
     assertTrue(
-      boldBtnDisabledBefore === false,
-      `Bold button should NOT be disabled when range is selected (got disabled=${boldBtnDisabledBefore})`
+      boldBtnStateBefore !== null && boldBtnStateBefore.disabled === false,
+      `Bold button should NOT be disabled when range is selected (got disabled=${boldBtnStateBefore?.disabled})`
     );
 
     // Click bold button
@@ -301,7 +314,7 @@ const tests = {
       `All ${cellsToCheck.length} cells should be bold, but only ${boldCount} are bold`
     );
 
-    // Step 5: Verify border is still present on B2 (styles should coexist)
+    // Step 5: Verify edge cell B2 still has border (styles should coexist)
     const styleAfterBold = await getCellStyle(ctx.page, 1, 1); // B2
     console.log('B2 style after bold:', JSON.stringify(styleAfterBold, null, 2));
     assertTrue(
@@ -314,24 +327,21 @@ const tests = {
     );
   },
 
-  // Additional test: Bold button state after border application
-  'Bold button not disabled after border application': async (ctx) => {
+  // Additional test: Bold button state after OUTLINE border application
+  'Bold button not disabled after outline border application': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
     await createNewWorkbook(ctx.page);
     await sleep(200);
 
-    // Apply border to B2:D4
+    // Apply OUTLINE border to B2:D4 (creates mixed border styles - edge vs interior)
     await selectRange(ctx.page, 'B2', 'D4');
     await sleep(100);
-    await applyBorder(ctx.page, 'all');
+    await applyBorder(ctx.page, 'outer');
     await sleep(300);
 
-    // Re-select the range
-    await selectRange(ctx.page, 'B2', 'D4');
-    await sleep(100);
-
-    // Check bold button state
+    // WITHOUT re-selecting, check bold button state
+    // The selection should still be B2:D4
     const boldBtnState = await ctx.page.evaluate(() => {
       const btn = document.querySelector('#style-bold-btn');
       if (!btn) return null;
@@ -342,15 +352,22 @@ const tests = {
       };
     });
 
-    console.log('Bold button state after border:', JSON.stringify(boldBtnState, null, 2));
+    console.log('Bold button state after outline border:', JSON.stringify(boldBtnState, null, 2));
 
     assertTrue(
       boldBtnState !== null,
       'Bold button should exist'
     );
+    // Bold button should NOT be disabled just because border is mixed
+    // Bold is a different property and all cells have bold=false (consistent)
     assertTrue(
       boldBtnState.disabled === false,
-      `Bold button should not be disabled after border application (disabled=${boldBtnState.disabled})`
+      `Bold button should not be disabled after outline border (disabled=${boldBtnState.disabled})`
+    );
+    // Bold button should NOT show "mixed" class - bold is uniformly false
+    assertTrue(
+      !boldBtnState.className.includes('mixed'),
+      `Bold button should not show mixed state after outline border (class=${boldBtnState.className})`
     );
   },
 };

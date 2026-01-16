@@ -2119,15 +2119,19 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
         cell = sheet.getCellAt(colId, rowId);
     }
 
-    // Priority 1: Cell's own style
+    // Priority 1: Cell's own style (highest priority - properties set here take precedence)
+    // Note: We start with cell style but continue to merge lower-priority styles
+    // to fill in any properties not explicitly set at the cell level.
     if (cell && !cell->styleId.isNull()) {
         const CellStyle* cellStyle = workbook.getStyle(cell->styleId);
         if (cellStyle) {
-            return *cellStyle;  // Cell style overrides everything
+            result = *cellStyle;  // Start with cell style as base
+            // Don't return early - merge with range/column/row styles below
         }
     }
 
     // Priority 2: Range styles (merge all overlapping RANGE_STYLE ranges)
+    // These fill in any properties not set by the cell style
     std::vector<Range*> styleRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::STYLE);
     for (Range* range : styleRanges) {
         ID rangeStyleId = sheet.getRangeStyleId(range->id);
