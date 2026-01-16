@@ -83,8 +83,10 @@ std::string FormulaSerializer::nodeToUuidString(const ASTNode* node) {
 std::string FormulaSerializer::cellRefToUuidString(const CellRefNode* node) {
     std::string result;
 
-    // Add sheet prefix if present
-    if (!node->sheetName.empty()) {
+    // Add sheet prefix if present (prefer sheetId for storage, fall back to sheetName)
+    if (!node->sheetId.empty()) {
+        result += "!" + node->sheetId;
+    } else if (!node->sheetName.empty()) {
         result += node->sheetName + "!";
     }
 
@@ -116,7 +118,10 @@ std::string FormulaSerializer::rangeRefToUuidString(const RangeRefNode* node) {
 std::string FormulaSerializer::columnRefToUuidString(const ColumnRefNode* node) {
     std::string result;
 
-    if (!node->sheetName.empty()) {
+    // Add sheet prefix if present (prefer sheetId for storage)
+    if (!node->sheetId.empty()) {
+        result += "!" + node->sheetId;
+    } else if (!node->sheetName.empty()) {
         result += node->sheetName + "!";
     }
 
@@ -140,7 +145,10 @@ std::string FormulaSerializer::columnRefToUuidString(const ColumnRefNode* node) 
 std::string FormulaSerializer::rowRefToUuidString(const RowRefNode* node) {
     std::string result;
 
-    if (!node->sheetName.empty()) {
+    // Add sheet prefix if present (prefer sheetId for storage)
+    if (!node->sheetId.empty()) {
+        result += "!" + node->sheetId;
+    } else if (!node->sheetName.empty()) {
         result += node->sheetName + "!";
     }
 
@@ -165,7 +173,10 @@ std::string FormulaSerializer::rowRefToUuidString(const RowRefNode* node) {
 std::string FormulaSerializer::columnRangeRefToUuidString(const ColumnRangeRefNode* node) {
     std::string result;
 
-    if (!node->sheetName.empty()) {
+    // Add sheet prefix if present (prefer sheetId for storage)
+    if (!node->sheetId.empty()) {
+        result += "!" + node->sheetId;
+    } else if (!node->sheetName.empty()) {
         result += node->sheetName + "!";
     }
 
@@ -196,7 +207,10 @@ std::string FormulaSerializer::columnRangeRefToUuidString(const ColumnRangeRefNo
 std::string FormulaSerializer::rowRangeRefToUuidString(const RowRangeRefNode* node) {
     std::string result;
 
-    if (!node->sheetName.empty()) {
+    // Add sheet prefix if present (prefer sheetId for storage)
+    if (!node->sheetId.empty()) {
+        result += "!" + node->sheetId;
+    } else if (!node->sheetName.empty()) {
         result += node->sheetName + "!";
     }
 

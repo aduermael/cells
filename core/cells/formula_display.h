@@ -30,6 +30,7 @@ namespace cells {
 
 // Forward declarations
 struct Sheet;
+struct Workbook;
 
 // Convert AST back to display string (A1 notation)
 // Used for showing formulas in the UI
@@ -37,7 +38,8 @@ struct Sheet;
 class FormulaDisplayConverter {
 public:
     // Construct converter for a specific sheet context
-    explicit FormulaDisplayConverter(const Sheet& sheet);
+    // Optionally accepts a workbook for looking up sheet names from sheet IDs
+    explicit FormulaDisplayConverter(const Sheet& sheet, const Workbook* workbook = nullptr);
 
     // Convert AST to display string
     // If the AST contains resolved UUIDs, converts them back to A1 notation
@@ -59,11 +61,16 @@ private:
     [[nodiscard]] std::string functionCallToString(const FunctionCallNode* node) const;
     [[nodiscard]] std::string errorNodeToString(const ErrorNode* node) const;
 
+    // Helper: get sheet name prefix from sheetId or sheetName
+    [[nodiscard]] std::string getSheetPrefix(const std::string& sheetId,
+                                             const std::string& sheetName) const;
+
     // Helper: check if node needs parentheses
     [[nodiscard]] static bool needsParentheses(const ASTNode* parent, const ASTNode* child,
                                                bool isRight);
 
     const Sheet& _sheet;
+    const Workbook* _workbook;
 };
 
 }  // namespace cells

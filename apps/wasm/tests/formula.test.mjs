@@ -421,6 +421,91 @@ const tests = {
 
     assertTrue(hasColoredRef, 'Row reference 1:1 should be fully colored in formula bar');
   },
+
+  // ============================================================================
+  // Cross-Sheet Reference Tests (Phase 2)
+  // ============================================================================
+
+  'Cross-sheet reference formula parses and evaluates': async (ctx) => {
+    // Test that =Sheet2!B27 syntax works correctly
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // The default sheet is "Sheet1". Add a second sheet.
+    await ctx.page.click('#add-sheet-btn');
+    await sleep(300);
+
+    // Now we should be on Sheet2. Enter a value in B27.
+    // First click on B27
+    await clickCell(ctx.page, 'B27');
+    await sleep(100);
+    await setCellValue(ctx.page, 'B27', '42');
+    await sleep(200);
+
+    // Switch back to Sheet1 by clicking its tab
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+    });
+    await sleep(300);
+
+    // Now on Sheet1, enter a formula that references Sheet2!B27
+    await setCellValue(ctx.page, 'A1', '=Sheet2!B27');
+    await sleep(300);
+
+    // Click A1 to verify formula bar shows the cross-sheet reference
+    await clickCell(ctx.page, 'A1');
+    await sleep(200);
+
+    const content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=Sheet2!B27', 'Formula bar should show =Sheet2!B27');
+
+    // Also verify the computed value is 42
+    const displayValue = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(displayValue, '42', 'A1 should display 42 (the value from Sheet2!B27)');
+  },
+
+  'Cross-sheet reference with SUM function': async (ctx) => {
+    // Test =SUM(Sheet2!A1:A3) syntax
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Add a second sheet
+    await ctx.page.click('#add-sheet-btn');
+    await sleep(300);
+
+    // On Sheet2, enter values in A1:A3
+    await setCellValue(ctx.page, 'A1', '10');
+    await setCellValue(ctx.page, 'A2', '20');
+    await setCellValue(ctx.page, 'A3', '30');
+    await sleep(200);
+
+    // Switch back to Sheet1
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+    });
+    await sleep(300);
+
+    // Enter SUM formula referencing Sheet2
+    await setCellValue(ctx.page, 'A1', '=SUM(Sheet2!A1:A3)');
+    await sleep(300);
+
+    // Verify formula
+    await clickCell(ctx.page, 'A1');
+    await sleep(200);
+
+    const content = await getFormulaBarContent(ctx.page);
+    assertEqual(content, '=SUM(Sheet2!A1:A3)', 'Formula bar should show =SUM(Sheet2!A1:A3)');
+
+    // Verify computed value
+    const displayValue = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(displayValue, '60', 'A1 should display 60 (sum of Sheet2!A1:A3)');
+  },
 };
 
 // Run all tests

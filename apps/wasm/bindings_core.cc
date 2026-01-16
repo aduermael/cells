@@ -23,7 +23,9 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/fill_range.h"
+#include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
+#include "core/cells/formula_resolver.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/id.h"
 #include "core/cells/input_parser.h"
@@ -85,6 +87,7 @@ void CellsEngine::rebuildViewportIndex() {
     _viewportIndex.clear();
     _viewportIndex.build(*sheet);
     _refConverter.setContext(*sheet);
+    _refConverter.setWorkbook(_workbook.get());
 }
 
 void CellsEngine::notifyListeners(ChangeType type) {
@@ -510,9 +513,35 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
     ID detectedFormatId;
 
     if (!value.empty() && value[0] == '=') {
-        _refConverter.setContext(*sheet);
-        std::string uuidFormula = _refConverter.formulaToUuid(value);
-        payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+        // Use AST-based conversion to properly handle cross-sheet references
+        FormulaParser parser(value);
+        auto ast = parser.parse();
+
+        if (ast && ast->type != ASTNodeType::ERROR_NODE) {
+            // Resolve references to UUIDs (handles cross-sheet refs via getTargetSheet)
+            FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
+            ResolveResult resolveResult = resolver.resolve(ast.get());
+
+            if (resolveResult.success) {
+                // Serialize AST to UUID format for storage
+                std::string uuidFormula = FormulaSerializer::serialize(ast.get());
+                payload =
+                    "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+            } else {
+                // Resolution failed (e.g., sheet not found) - store as error formula
+                // Fall back to string-based conversion for the formula text
+                _refConverter.setContext(*sheet);
+                std::string uuidFormula = _refConverter.formulaToUuid(value);
+                payload =
+                    "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+            }
+        } else {
+            // Parse failed - store original formula text (will show as error)
+            _refConverter.setContext(*sheet);
+            std::string uuidFormula = _refConverter.formulaToUuid(value);
+            payload =
+                "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+        }
     } else if (value == "TRUE" || value == "true") {
         payload = "{\"type\":\"b\",\"value\":\"true\"" + idSuffix;
     } else if (value == "FALSE" || value == "false") {
@@ -633,9 +662,34 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
 
     std::string payload;
     if (!value.empty() && value[0] == '=') {
-        _refConverter.setContext(*sheet);
-        std::string uuidFormula = _refConverter.formulaToUuid(value);
-        payload = "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+        // Use AST-based conversion to properly handle cross-sheet references
+        FormulaParser parser(value);
+        auto ast = parser.parse();
+
+        if (ast && ast->type != ASTNodeType::ERROR_NODE) {
+            // Resolve references to UUIDs (handles cross-sheet refs via getTargetSheet)
+            FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
+            ResolveResult resolveResult = resolver.resolve(ast.get());
+
+            if (resolveResult.success) {
+                // Serialize AST to UUID format for storage
+                std::string uuidFormula = FormulaSerializer::serialize(ast.get());
+                payload =
+                    "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+            } else {
+                // Resolution failed - fall back to string-based conversion
+                _refConverter.setContext(*sheet);
+                std::string uuidFormula = _refConverter.formulaToUuid(value);
+                payload =
+                    "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+            }
+        } else {
+            // Parse failed - fall back to string-based conversion
+            _refConverter.setContext(*sheet);
+            std::string uuidFormula = _refConverter.formulaToUuid(value);
+            payload =
+                "{\"type\":\"f\",\"value\":\"" + jsonEscape(uuidFormula) + "\"" + idSuffix;
+        }
     } else if (value == "TRUE" || value == "true") {
         payload = "{\"type\":\"b\",\"value\":\"true\"" + idSuffix;
     } else if (value == "FALSE" || value == "false") {

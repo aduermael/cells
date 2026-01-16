@@ -123,6 +123,8 @@ const char* FormulaLexer::tokenTypeName(TokenType type) {
             return "COLUMN";
         case TokenType::ROW:
             return "ROW";
+        case TokenType::UUID_SHEET_REF:
+            return "UUID_SHEET_REF";
         case TokenType::UUID_CELL_REF:
             return "UUID_CELL_REF";
         case TokenType::UUID_COLUMN_REF:
@@ -283,6 +285,30 @@ Token FormulaLexer::scanToken() {
         case ':':
             return makeToken(TokenType::COLON, start);
         case '!':
+            // Check for UUID sheet ref: ! followed by exactly 8 alphanumeric chars
+            // We need to look ahead 8 chars to distinguish from A1 notation like Sheet2!A1
+            if (pos_ + 8 <= source_.size()) {
+                bool isSheetUuid = true;
+                for (size_t j = 0; j < 8 && isSheetUuid; ++j) {
+                    if (!isAlphaNumeric(source_[pos_ + j])) {
+                        isSheetUuid = false;
+                    }
+                }
+                // Also check that it's followed by a cell/column/row UUID prefix or end
+                // This ensures we don't match things like !SEQUENCE( as a sheet UUID
+                if (isSheetUuid && pos_ + 8 < source_.size()) {
+                    const char nextChar = source_[pos_ + 8];
+                    // Valid follows: $, ~, @, # (UUID prefixes), or non-alphanumeric (operators,
+                    // etc)
+                    if (isAlphaNumeric(nextChar) && nextChar != '$' && nextChar != '~' &&
+                        nextChar != '@' && nextChar != '#') {
+                        isSheetUuid = false;
+                    }
+                }
+                if (isSheetUuid) {
+                    return scanUuidSheetRef(start);
+                }
+            }
             return makeToken(TokenType::BANG, start);
         case '$':
             // Check for UUID cell ref: $$ or $~
@@ -518,6 +544,29 @@ Token FormulaLexer::scanRowNumber() {
     }
 
     return makeToken(TokenType::ROW, start);
+}
+
+Token FormulaLexer::scanUuidSheetRef(size_t start) {
+    // After '!', consume 8 alphanumeric chars for sheet UUID
+    constexpr size_t UUID_LENGTH = 8;
+    size_t count = 0;
+
+    while (count < UUID_LENGTH && !isAtEndInternal()) {
+        const char c = peek();
+        if (isAlphaNumeric(c)) {
+            advance();
+            ++count;
+        } else {
+            break;
+        }
+    }
+
+    if (count != UUID_LENGTH) {
+        return makeErrorToken("Invalid UUID sheet reference: expected 8 alphanumeric characters",
+                              start);
+    }
+
+    return makeToken(TokenType::UUID_SHEET_REF, start);
 }
 
 Token FormulaLexer::scanUuidCellRef(size_t start, bool /*colAbsolute*/, bool /*rowAbsolute*/) {

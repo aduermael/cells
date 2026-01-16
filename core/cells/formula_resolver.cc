@@ -141,6 +141,11 @@ ResolveResult FormulaResolver::resolveCellRef(CellRefNode* node) {
     // Store the cell ID
     node->cellId = cell->id.toString();
 
+    // Store the sheet ID for cross-sheet references (when targeting a different sheet)
+    if (!node->sheetName.empty() && targetSheet != &_sheet) {
+        node->sheetId = targetSheet->id.toString();
+    }
+
     return ResolveResult::ok();
 }
 
@@ -173,6 +178,11 @@ ResolveResult FormulaResolver::resolveColumnRef(ColumnRefNode* node) {
     // Store the column ID
     node->columnId = col->id.toString();
 
+    // Store the sheet ID for cross-sheet references
+    if (!node->sheetName.empty() && targetSheet != &_sheet) {
+        node->sheetId = targetSheet->id.toString();
+    }
+
     return ResolveResult::ok();
 }
 
@@ -194,6 +204,11 @@ ResolveResult FormulaResolver::resolveRowRef(RowRefNode* node) {
 
     // Store the row ID
     node->rowId = row->id.toString();
+
+    // Store the sheet ID for cross-sheet references
+    if (!node->sheetName.empty() && targetSheet != &_sheet) {
+        node->sheetId = targetSheet->id.toString();
+    }
 
     return ResolveResult::ok();
 }
@@ -225,6 +240,11 @@ ResolveResult FormulaResolver::resolveColumnRangeRef(ColumnRangeRefNode* node) {
     node->startColumnId = startCol->id.toString();
     node->endColumnId = endCol->id.toString();
 
+    // Store the sheet ID for cross-sheet references
+    if (!node->sheetName.empty() && targetSheet != &_sheet) {
+        node->sheetId = targetSheet->id.toString();
+    }
+
     return ResolveResult::ok();
 }
 
@@ -249,6 +269,11 @@ ResolveResult FormulaResolver::resolveRowRangeRef(RowRangeRefNode* node) {
     // Store the row IDs
     node->startRowId = startRow->id.toString();
     node->endRowId = endRow->id.toString();
+
+    // Store the sheet ID for cross-sheet references
+    if (!node->sheetName.empty() && targetSheet != &_sheet) {
+        node->sheetId = targetSheet->id.toString();
+    }
 
     return ResolveResult::ok();
 }

@@ -52,6 +52,8 @@ enum class TokenType : std::uint8_t {
     ROW,         // Row number (1, 100, 1048576)
 
     // UUID-based references (for internal storage format)
+    // Sheet ref: ! followed by 8-char sheet UUID (for cross-sheet references)
+    UUID_SHEET_REF,
     // Cell ref: $$, $~, ~$, ~~ followed by 8-char cell UUID
     UUID_CELL_REF,
     // Column ref: @$ or @~ followed by 8-char column UUID
@@ -174,6 +176,7 @@ private:
     Token scanIdentifierOrColumn();
     Token scanRowNumber();
     Token scanErrorLiteral(size_t start);  // #REF!, #VALUE!, etc.
+    Token scanUuidSheetRef(size_t start);  // !<8-char-uuid> for cross-sheet refs
     Token scanUuidCellRef(size_t start, bool colAbsolute, bool rowAbsolute);
     Token scanUuidColumnRef(size_t start, bool absolute);
     Token scanUuidRowRef(size_t start, bool absolute);

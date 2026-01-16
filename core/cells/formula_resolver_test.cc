@@ -541,5 +541,68 @@ TEST_F(FormulaResolverTest, RoundTrip_ParseResolveDisplay) {
     }
 }
 
+// ===========================================================================
+// Cross-sheet reference tests
+// ===========================================================================
+
+TEST_F(FormulaResolverTest, ResolveCrossSheetRef_SheetFound) {
+    // Add a second sheet
+    auto sheet2 = std::make_unique<Sheet>(generate_id(), "Sheet2");
+    Sheet* sheet2Ptr = sheet2.get();
+    workbook->addSheet(std::move(sheet2));
+
+    // Parse a cross-sheet reference formula
+    auto ast = parseFormula("=Sheet2!A1");
+    ASSERT_NE(ast, nullptr);
+    ASSERT_EQ(ast->type, ASTNodeType::CELL_REF);
+
+    // Verify the sheetName was parsed correctly
+    auto* cellRef = static_cast<CellRefNode*>(ast.get());
+    EXPECT_EQ(cellRef->sheetName, "Sheet2");
+    EXPECT_EQ(cellRef->column, "A");
+    EXPECT_EQ(cellRef->row, 1);
+
+    // Resolve the reference (from Sheet1's perspective)
+    FormulaResolver resolver(*workbook, *sheet1);
+    auto result = resolver.resolve(ast.get());
+
+    EXPECT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
+
+    // The cell should have been auto-created on Sheet2
+    EXPECT_FALSE(cellRef->cellId.empty());
+
+    // Verify the cell exists on Sheet2 (not Sheet1)
+    Cell* createdCell = sheet2Ptr->getCell(ID(cellRef->cellId));
+    EXPECT_NE(createdCell, nullptr) << "Cell was not created on Sheet2";
+}
+
+TEST_F(FormulaResolverTest, ResolveCrossSheetRef_SheetNotFound) {
+    // Parse a cross-sheet reference to a non-existent sheet
+    auto ast = parseFormula("=NonExistent!A1");
+    ASSERT_NE(ast, nullptr);
+
+    // Resolve should fail
+    FormulaResolver resolver(*workbook, *sheet1);
+    auto result = resolver.resolve(ast.get());
+
+    EXPECT_FALSE(result.success);
+    EXPECT_TRUE(result.errorMessage.find("not found") != std::string::npos);
+}
+
+TEST_F(FormulaResolverTest, ResolveCrossSheetRange) {
+    // Add a second sheet
+    auto sheet2 = std::make_unique<Sheet>(generate_id(), "Sheet2");
+    workbook->addSheet(std::move(sheet2));
+
+    // Parse a cross-sheet range reference
+    auto ast = parseFormula("=SUM(Sheet2!A1:A3)");
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1);
+    auto result = resolver.resolve(ast.get());
+
+    EXPECT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
+}
+
 }  // namespace
 }  // namespace cells

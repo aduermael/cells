@@ -106,6 +106,7 @@ private:
     std::unique_ptr<ASTNode> parseFunctionCall(const std::string& name);
 
     // UUID reference parsing (for stored formula format)
+    std::unique_ptr<ASTNode> parseUuidSheetRef();  // !sheetId followed by cell/col/row ref
     std::unique_ptr<ASTNode> parseUuidCellRef();
     std::unique_ptr<ASTNode> parseUuidColumnRef();
     std::unique_ptr<ASTNode> parseUuidRowRef();

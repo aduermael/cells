@@ -241,6 +241,9 @@ std::unique_ptr<ASTNode> FormulaParser::primary() {
     // primary = literal | reference | function_call | "(" expression ")"
 
     // UUID reference tokens (stored formula format)
+    if (check(TokenType::UUID_SHEET_REF)) {
+        return parseUuidSheetRef();
+    }
     if (check(TokenType::UUID_CELL_REF)) {
         return parseUuidCellRef();
     }
@@ -705,6 +708,57 @@ bool FormulaParser::isValidColumnName(const std::string& name) {
 // ============================================================================
 // UUID Reference Parsing (stored formula format)
 // ============================================================================
+
+std::unique_ptr<ASTNode> FormulaParser::parseUuidSheetRef() {
+    // Token text format: !<8-char-sheetUUID>
+    const Token tok = current_;
+    const std::string text(tok.text);
+    advance();
+
+    if (text.size() != 9 || text[0] != '!') {
+        return errorNode("Invalid UUID sheet reference: expected !<8-char-uuid>");
+    }
+
+    const std::string sheetId = text.substr(1, 8);
+
+    // Now parse the following reference (cell, column, or row)
+    std::unique_ptr<ASTNode> refNode;
+
+    if (check(TokenType::UUID_CELL_REF)) {
+        refNode = parseUuidCellRef();
+        if (auto* cellRef = dynamic_cast<CellRefNode*>(refNode.get())) {
+            cellRef->sheetId = sheetId;
+        }
+    } else if (check(TokenType::UUID_COLUMN_REF)) {
+        refNode = parseUuidColumnRef();
+        if (auto* colRef = dynamic_cast<ColumnRefNode*>(refNode.get())) {
+            colRef->sheetId = sheetId;
+        } else if (auto* colRangeRef = dynamic_cast<ColumnRangeRefNode*>(refNode.get())) {
+            colRangeRef->sheetId = sheetId;
+        }
+    } else if (check(TokenType::UUID_ROW_REF)) {
+        refNode = parseUuidRowRef();
+        if (auto* rowRef = dynamic_cast<RowRefNode*>(refNode.get())) {
+            rowRef->sheetId = sheetId;
+        } else if (auto* rowRangeRef = dynamic_cast<RowRangeRefNode*>(refNode.get())) {
+            rowRangeRef->sheetId = sheetId;
+        }
+    } else {
+        return errorNode("Expected UUID reference after sheet ID");
+    }
+
+    // Handle range reference - need to set sheetId on both cells
+    if (auto* rangeRef = dynamic_cast<RangeRefNode*>(refNode.get())) {
+        if (rangeRef->topLeft) {
+            rangeRef->topLeft->sheetId = sheetId;
+        }
+        if (rangeRef->bottomRight) {
+            rangeRef->bottomRight->sheetId = sheetId;
+        }
+    }
+
+    return refNode;
+}
 
 std::unique_ptr<ASTNode> FormulaParser::parseUuidCellRef() {
     // Token text format: PREFIX + 8-char UUID

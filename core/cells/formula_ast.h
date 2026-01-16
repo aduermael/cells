@@ -177,7 +177,8 @@ struct CellRefNode : public ASTNode {
     int row;                // Row number (1-based)
     bool colAbsolute;       // $A1 or $A$1
     bool rowAbsolute;       // A$1 or $A$1
-    std::string sheetName;  // Empty if same sheet
+    std::string sheetName;  // Empty if same sheet (for A1 display)
+    std::string sheetId;    // Sheet UUID for cross-sheet refs (for storage)
 
     // After resolution, stores the cell UUID
     std::string cellId;
@@ -200,6 +201,7 @@ struct CellRefNode : public ASTNode {
         auto n = std::make_unique<CellRefNode>(column, row, colAbsolute, rowAbsolute);
         n->position = position;
         n->sheetName = sheetName;
+        n->sheetId = sheetId;
         n->cellId = cellId;
         return n;
     }
@@ -242,7 +244,8 @@ struct RangeRefNode : public ASTNode {
 struct ColumnRefNode : public ASTNode {
     std::string column;
     bool absolute;
-    std::string sheetName;
+    std::string sheetName;  // For A1 display
+    std::string sheetId;    // Sheet UUID for storage
 
     // After resolution
     std::string columnId;
@@ -257,6 +260,7 @@ struct ColumnRefNode : public ASTNode {
         auto n = std::make_unique<ColumnRefNode>(column, absolute);
         n->position = position;
         n->sheetName = sheetName;
+        n->sheetId = sheetId;
         n->columnId = columnId;
         return n;
     }
@@ -268,7 +272,8 @@ struct ColumnRefNode : public ASTNode {
 struct RowRefNode : public ASTNode {
     int row;
     bool absolute;
-    std::string sheetName;
+    std::string sheetName;  // For A1 display
+    std::string sheetId;    // Sheet UUID for storage
 
     // After resolution
     std::string rowId;
@@ -282,6 +287,7 @@ struct RowRefNode : public ASTNode {
         auto n = std::make_unique<RowRefNode>(row, absolute);
         n->position = position;
         n->sheetName = sheetName;
+        n->sheetId = sheetId;
         n->rowId = rowId;
         return n;
     }
@@ -295,7 +301,8 @@ struct ColumnRangeRefNode : public ASTNode {
     std::string endColumn;
     bool startAbsolute;
     bool endAbsolute;
-    std::string sheetName;
+    std::string sheetName;  // For A1 display
+    std::string sheetId;    // Sheet UUID for storage
 
     // After resolution
     std::string startColumnId;
@@ -313,6 +320,7 @@ struct ColumnRangeRefNode : public ASTNode {
                                                       endAbsolute);
         n->position = position;
         n->sheetName = sheetName;
+        n->sheetId = sheetId;
         n->startColumnId = startColumnId;
         n->endColumnId = endColumnId;
         return n;
@@ -327,7 +335,8 @@ struct RowRangeRefNode : public ASTNode {
     int endRow;
     bool startAbsolute;
     bool endAbsolute;
-    std::string sheetName;
+    std::string sheetName;  // For A1 display
+    std::string sheetId;    // Sheet UUID for storage
 
     // After resolution
     std::string startRowId;
@@ -344,6 +353,7 @@ struct RowRangeRefNode : public ASTNode {
         auto n = std::make_unique<RowRangeRefNode>(startRow, endRow, startAbsolute, endAbsolute);
         n->position = position;
         n->sheetName = sheetName;
+        n->sheetId = sheetId;
         n->startRowId = startRowId;
         n->endRowId = endRowId;
         return n;

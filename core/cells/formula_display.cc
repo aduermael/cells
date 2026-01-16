@@ -9,7 +9,27 @@
 
 namespace cells {
 
-FormulaDisplayConverter::FormulaDisplayConverter(const Sheet& sheet) : _sheet(sheet) {}
+FormulaDisplayConverter::FormulaDisplayConverter(const Sheet& sheet, const Workbook* workbook)
+    : _sheet(sheet), _workbook(workbook) {}
+
+std::string FormulaDisplayConverter::getSheetPrefix(const std::string& sheetId,
+                                                    const std::string& sheetName) const {
+    // Prefer sheetId lookup (more stable across renames)
+    if (!sheetId.empty() && _workbook != nullptr) {
+        const ID sheetIdObj(sheetId);
+        const Sheet* sheet = _workbook->getSheet(sheetIdObj);
+        if (sheet != nullptr) {
+            return sheet->name + "!";
+        }
+    }
+
+    // Fall back to sheetName
+    if (!sheetName.empty()) {
+        return sheetName + "!";
+    }
+
+    return "";
+}
 
 std::string FormulaDisplayConverter::toDisplayString(const ASTNode* ast) const {
     if (ast == nullptr) {
@@ -70,23 +90,31 @@ std::string FormulaDisplayConverter::nodeToString(const ASTNode* node) const {
 std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) const {
     std::string result;
 
-    // Add sheet prefix if present
-    if (!node->sheetName.empty()) {
-        result += node->sheetName + "!";
+    // Add sheet prefix if present (prefer sheetId for stability)
+    result += getSheetPrefix(node->sheetId, node->sheetName);
+
+    // Determine which sheet to look up the cell on
+    const Sheet* lookupSheet = &_sheet;
+    if (!node->sheetId.empty() && _workbook != nullptr) {
+        const ID sheetIdObj(node->sheetId);
+        const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
+        if (crossSheet != nullptr) {
+            lookupSheet = crossSheet;
+        }
     }
 
     // If we have a resolved cellId, look up the current position
     if (!node->cellId.empty()) {
         const ID cellIdObj(node->cellId);
         // Find the cell to get its column and row
-        for (const auto& [id, cell] : _sheet.cells) {
+        for (const auto& [id, cell] : lookupSheet->cells) {
             if (id == cellIdObj) {
                 // Get column position
-                const Axis* col = _sheet.columns.count(cell->colId) != 0u
-                                      ? _sheet.columns.at(cell->colId).get()
+                const Axis* col = lookupSheet->columns.count(cell->colId) != 0u
+                                      ? lookupSheet->columns.at(cell->colId).get()
                                       : nullptr;
-                const Axis* row = _sheet.rows.count(cell->rowId) != 0u
-                                      ? _sheet.rows.at(cell->rowId).get()
+                const Axis* row = lookupSheet->rows.count(cell->rowId) != 0u
+                                      ? lookupSheet->rows.at(cell->rowId).get()
                                       : nullptr;
 
                 if (col != nullptr && row != nullptr) {
@@ -128,14 +156,23 @@ std::string FormulaDisplayConverter::rangeRefToString(const RangeRefNode* node) 
 std::string FormulaDisplayConverter::columnRefToString(const ColumnRefNode* node) const {
     std::string result;
 
-    if (!node->sheetName.empty()) {
-        result += node->sheetName + "!";
+    // Add sheet prefix if present (prefer sheetId for stability)
+    result += getSheetPrefix(node->sheetId, node->sheetName);
+
+    // Determine which sheet to look up on
+    const Sheet* lookupSheet = &_sheet;
+    if (!node->sheetId.empty() && _workbook != nullptr) {
+        const ID sheetIdObj(node->sheetId);
+        const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
+        if (crossSheet != nullptr) {
+            lookupSheet = crossSheet;
+        }
     }
 
     // If we have a resolved columnId, look up the current position
     if (!node->columnId.empty()) {
         const ID colIdObj(node->columnId);
-        for (const auto& [id, col] : _sheet.columns) {
+        for (const auto& [id, col] : lookupSheet->columns) {
             if (id == colIdObj) {
                 if (node->absolute) {
                     result += "$";
@@ -164,14 +201,23 @@ std::string FormulaDisplayConverter::columnRefToString(const ColumnRefNode* node
 std::string FormulaDisplayConverter::rowRefToString(const RowRefNode* node) const {
     std::string result;
 
-    if (!node->sheetName.empty()) {
-        result += node->sheetName + "!";
+    // Add sheet prefix if present (prefer sheetId for stability)
+    result += getSheetPrefix(node->sheetId, node->sheetName);
+
+    // Determine which sheet to look up on
+    const Sheet* lookupSheet = &_sheet;
+    if (!node->sheetId.empty() && _workbook != nullptr) {
+        const ID sheetIdObj(node->sheetId);
+        const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
+        if (crossSheet != nullptr) {
+            lookupSheet = crossSheet;
+        }
     }
 
     // If we have a resolved rowId, look up the current position
     if (!node->rowId.empty()) {
         const ID rowIdObj(node->rowId);
-        for (const auto& [id, row] : _sheet.rows) {
+        for (const auto& [id, row] : lookupSheet->rows) {
             if (id == rowIdObj) {
                 if (node->absolute) {
                     result += "$";
@@ -201,8 +247,17 @@ std::string FormulaDisplayConverter::rowRefToString(const RowRefNode* node) cons
 std::string FormulaDisplayConverter::columnRangeRefToString(const ColumnRangeRefNode* node) const {
     std::string result;
 
-    if (!node->sheetName.empty()) {
-        result += node->sheetName + "!";
+    // Add sheet prefix if present (prefer sheetId for stability)
+    result += getSheetPrefix(node->sheetId, node->sheetName);
+
+    // Determine which sheet to look up on
+    const Sheet* lookupSheet = &_sheet;
+    if (!node->sheetId.empty() && _workbook != nullptr) {
+        const ID sheetIdObj(node->sheetId);
+        const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
+        if (crossSheet != nullptr) {
+            lookupSheet = crossSheet;
+        }
     }
 
     std::string startCol = node->startColumn;
@@ -211,7 +266,7 @@ std::string FormulaDisplayConverter::columnRangeRefToString(const ColumnRangeRef
     // If resolved, look up current positions
     if (!node->startColumnId.empty()) {
         const ID startColIdObj(node->startColumnId);
-        for (const auto& [id, col] : _sheet.columns) {
+        for (const auto& [id, col] : lookupSheet->columns) {
             if (id == startColIdObj) {
                 startCol = Sheet::positionToColumnName(col->position);
                 break;
@@ -220,7 +275,7 @@ std::string FormulaDisplayConverter::columnRangeRefToString(const ColumnRangeRef
     }
     if (!node->endColumnId.empty()) {
         const ID endColIdObj(node->endColumnId);
-        for (const auto& [id, col] : _sheet.columns) {
+        for (const auto& [id, col] : lookupSheet->columns) {
             if (id == endColIdObj) {
                 endCol = Sheet::positionToColumnName(col->position);
                 break;
@@ -250,8 +305,17 @@ std::string FormulaDisplayConverter::columnRangeRefToString(const ColumnRangeRef
 std::string FormulaDisplayConverter::rowRangeRefToString(const RowRangeRefNode* node) const {
     std::string result;
 
-    if (!node->sheetName.empty()) {
-        result += node->sheetName + "!";
+    // Add sheet prefix if present (prefer sheetId for stability)
+    result += getSheetPrefix(node->sheetId, node->sheetName);
+
+    // Determine which sheet to look up on
+    const Sheet* lookupSheet = &_sheet;
+    if (!node->sheetId.empty() && _workbook != nullptr) {
+        const ID sheetIdObj(node->sheetId);
+        const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
+        if (crossSheet != nullptr) {
+            lookupSheet = crossSheet;
+        }
     }
 
     int startRow = node->startRow;
@@ -260,7 +324,7 @@ std::string FormulaDisplayConverter::rowRangeRefToString(const RowRangeRefNode* 
     // If resolved, look up current positions
     if (!node->startRowId.empty()) {
         const ID startRowIdObj(node->startRowId);
-        for (const auto& [id, row] : _sheet.rows) {
+        for (const auto& [id, row] : lookupSheet->rows) {
             if (id == startRowIdObj) {
                 startRow = static_cast<int>(row->position + 1);  // Convert to 1-indexed
                 break;
@@ -269,7 +333,7 @@ std::string FormulaDisplayConverter::rowRangeRefToString(const RowRangeRefNode* 
     }
     if (!node->endRowId.empty()) {
         const ID endRowIdObj(node->endRowId);
-        for (const auto& [id, row] : _sheet.rows) {
+        for (const auto& [id, row] : lookupSheet->rows) {
             if (id == endRowIdObj) {
                 endRow = static_cast<int>(row->position + 1);  // Convert to 1-indexed
                 break;

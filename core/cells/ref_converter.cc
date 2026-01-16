@@ -80,6 +80,11 @@ void RefConverter::clearContext() {
     indexToRowId_.clear();
     cellIdToLocation_.clear();
     locationToCellId_.clear();
+    _workbook = nullptr;
+}
+
+void RefConverter::setWorkbook(const Workbook* workbook) {
+    _workbook = workbook;
 }
 
 std::string RefConverter::makeLocationKey(const std::string& colId, const std::string& rowId) {
@@ -527,36 +532,112 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
     result.reserve(formula.size());
 
     size_t i = 0;
+    const Sheet* currentSheetContext = nullptr;  // Track cross-sheet context
+
     while (i < formula.size()) {
+        // Check for sheet UUID prefix: !<8-char-uuid>
+        if (formula[i] == '!' && i + 9 <= formula.size()) {
+            // Check if followed by 8 alphanumeric characters (sheet UUID)
+            bool validSheetUuid = true;
+            for (size_t j = 1; j <= 8 && validSheetUuid; ++j) {
+                const char c = formula[i + j];
+                if (!std::isalnum(static_cast<unsigned char>(c))) {
+                    validSheetUuid = false;
+                }
+            }
+
+            if (validSheetUuid) {
+                // Extract sheet UUID
+                const std::string sheetId = formula.substr(i + 1, 8);
+
+                // Look up sheet from workbook for both name and cell lookups
+                if (_workbook != nullptr) {
+                    const ID sheetIdObj(sheetId);
+                    const Sheet* sheet = _workbook->getSheet(sheetIdObj);
+                    if (sheet != nullptr) {
+                        result += sheet->name + "!";
+                        currentSheetContext = sheet;  // Use this sheet for subsequent cell lookups
+                    } else {
+                        // Sheet not found, keep the raw format
+                        result += "!" + sheetId;
+                    }
+                } else {
+                    result += "!" + sheetId;
+                }
+
+                i += 9;  // Skip !<sheetId>
+                continue;
+            }
+        }
+
         std::string cellId;
         ReferenceType refType = ReferenceType::RELATIVE;
         const size_t len = extractCellRef(formula, i, cellId, refType);
 
         if (len > 0) {
-            // Found a cell UUID ref, look up the cell
-            auto cellIt = cellIdToLocation_.find(cellId);
-            if (cellIt != cellIdToLocation_.end()) {
-                const CellLocation& loc = cellIt->second;
-                auto colIt = colIdToIndex_.find(loc.colId);
-                auto rowIt = rowIdToIndex_.find(loc.rowId);
+            bool found = false;
 
-                if (colIt != colIdToIndex_.end() && rowIt != rowIdToIndex_.end()) {
-                    // Build A1 notation with absolute markers
-                    if (refType == ReferenceType::ABSOLUTE || refType == ReferenceType::COL_ABS) {
-                        result += '$';
+            // If we have a cross-sheet context, look up in that sheet
+            if (currentSheetContext != nullptr) {
+                const ID cellIdObj(cellId);
+                // Use the cells map directly since getCell isn't const
+                auto cellIt = currentSheetContext->cells.find(cellIdObj);
+                if (cellIt != currentSheetContext->cells.end()) {
+                    const Cell* cell = cellIt->second.get();
+                    // Look up column and row positions from the cross-sheet
+                    auto colIt = currentSheetContext->columns.find(cell->colId);
+                    auto rowIt = currentSheetContext->rows.find(cell->rowId);
+
+                    if (colIt != currentSheetContext->columns.end() &&
+                        rowIt != currentSheetContext->rows.end()) {
+                        // Build A1 notation with absolute markers
+                        if (refType == ReferenceType::ABSOLUTE ||
+                            refType == ReferenceType::COL_ABS) {
+                            result += '$';
+                        }
+                        result += columnIndexToLetter(colIt->second->position);
+                        if (refType == ReferenceType::ABSOLUTE ||
+                            refType == ReferenceType::ROW_ABS) {
+                            result += '$';
+                        }
+                        result += std::to_string(rowIt->second->position + 1);
+                        found = true;
                     }
-                    result += columnIndexToLetter(colIt->second);
-                    if (refType == ReferenceType::ABSOLUTE || refType == ReferenceType::ROW_ABS) {
-                        result += '$';
+                }
+                // Clear cross-sheet context after processing the reference
+                currentSheetContext = nullptr;
+            }
+
+            // Fall back to current sheet context
+            if (!found) {
+                auto cellIt = cellIdToLocation_.find(cellId);
+                if (cellIt != cellIdToLocation_.end()) {
+                    const CellLocation& loc = cellIt->second;
+                    auto colIt = colIdToIndex_.find(loc.colId);
+                    auto rowIt = rowIdToIndex_.find(loc.rowId);
+
+                    if (colIt != colIdToIndex_.end() && rowIt != rowIdToIndex_.end()) {
+                        // Build A1 notation with absolute markers
+                        if (refType == ReferenceType::ABSOLUTE ||
+                            refType == ReferenceType::COL_ABS) {
+                            result += '$';
+                        }
+                        result += columnIndexToLetter(colIt->second);
+                        if (refType == ReferenceType::ABSOLUTE ||
+                            refType == ReferenceType::ROW_ABS) {
+                            result += '$';
+                        }
+                        result += std::to_string(rowIt->second + 1);
+                        found = true;
                     }
-                    result += std::to_string(rowIt->second + 1);
-                    i += len;
-                    continue;
                 }
             }
-            // Cell not found - output #REF! (standard Excel error for broken references)
-            // This prevents raw UUIDs from leaking to UI
-            result += "#REF!";
+
+            if (!found) {
+                // Cell not found - output #REF! (standard Excel error for broken references)
+                result += "#REF!";
+            }
+
             i += len;
             continue;
         }

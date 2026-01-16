@@ -33,16 +33,27 @@ The bug is architectural: when `setRangeStyle()` is called with a border, it che
 
 ## Phase 2: Fix Cross-Sheet Reference Parsing
 
-The parser architecture supports cross-sheet references (verified in formula_parser.cc:316-435). The issue may be:
-- Sheet name with spaces not quoted properly
-- A1 resolution not finding the target sheet
-- Lexer not recognizing sheet prefix pattern
+The parser architecture supports cross-sheet references (verified in formula_parser.cc:316-435). The issue was that the formula storage format used sheet names but the display/resolution needed UUID-based storage for stability.
 
-- [ ] 2a: Create E2E test: enter `=Sheet2!B27` formula, verify it parses and evaluates correctly
-- [ ] 2b: Add unit test for cross-sheet reference parsing in formula_parser_test.cc
-- [ ] 2c: Debug the formula entry flow - trace from input to AST to resolution
-- [ ] 2d: Fix the identified issue (likely in lexer tokenization or parser sheet prefix handling)
-- [ ] 2e: Test sheet names with spaces (should use `'Sheet Name'!A1` syntax)
+**Implementation approach**: Store sheet references using UUID format (`!sheetId~~cellId`) similar to how cell references use UUIDs. This provides:
+- Stability when sheets are renamed
+- Consistency with cell reference storage format
+- Clean separation between A1 notation (user-facing) and UUID format (storage)
+
+- [x] 2a: Create E2E test: enter `=Sheet2!B27` formula. Added tests for both simple cell ref and SUM with range.
+- [x] 2b: Add unit test for cross-sheet reference parsing. Added `ResolveCrossSheetRef_SheetFound`, `ResolveCrossSheetRef_SheetNotFound`, and `ResolveCrossSheetRange` tests.
+- [x] 2c: Debug the formula entry flow. Found that `RefConverter::formulaToUuid` didn't handle sheet prefixes, leading to incorrect storage.
+- [x] 2d: Implemented UUID-based sheet reference storage:
+  - Added `UUID_SHEET_REF` token type to lexer for `!sheetId` format
+  - Added `parseUuidSheetRef()` to parser to handle sheet UUID tokens
+  - Added `sheetId` field to AST reference nodes (CellRefNode, ColumnRefNode, etc.)
+  - Updated FormulaResolver to set `sheetId` when resolving cross-sheet refs
+  - Updated FormulaSerializer to output `!sheetId` prefix for cross-sheet refs
+  - Updated `RefConverter::formulaToA1` to convert `!sheetId` back to sheet name
+  - Fixed lexer to only match `!` + 8 alphanumeric chars as UUID sheet ref (not break A1 notation)
+- [ ] 2e: Formula bar shows correct reference (`=Sheet2!B27`), but evaluation returns 0 instead of 42. Need to debug formula evaluation for cross-sheet refs.
+- [ ] 2f: Cross-sheet ranges (`=SUM(Sheet2!A1:A3)`) show `#ERROR!`. Need to debug range parsing/display.
+- [ ] 2g: Test sheet names with spaces (should use `'Sheet Name'!A1` syntax)
 
 ## Phase 3: Formula Editing Across Sheets
 

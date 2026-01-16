@@ -92,6 +92,9 @@ public:
     // Must be called before conversion if using UUID refs
     void setContext(const Sheet& sheet);
 
+    // Set workbook for cross-sheet lookups (optional)
+    void setWorkbook(const Workbook* workbook);
+
     // Clear context
     void clearContext();
 
@@ -161,6 +164,9 @@ public:
                                                                       int colOffset, int rowOffset);
 
 private:
+    // Optional workbook for cross-sheet lookups
+    const Workbook* _workbook{nullptr};
+
     // Column ID to position mapping
     std::unordered_map<std::string, size_t> colIdToIndex_;
     // Row ID to position mapping
