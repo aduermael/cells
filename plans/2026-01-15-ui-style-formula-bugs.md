@@ -62,9 +62,21 @@ The parser architecture supports cross-sheet references (verified in formula_par
   - Modified serializer to output sheet prefix once for ranges (not twice per cell)
   - Fixed `formulaToA1` to keep cross-sheet context for the second cell of a range
   - Formula bar now correctly shows `=SUM(Sheet2!A1:A3)`
-- [ ] 2g: Test sheet names with spaces (should use `'Sheet Name'!A1` syntax)
-
-**NOTE**: E2E tests for cross-sheet evaluation still fail (empty/0 values) despite unit tests passing. The formula bar displays are correct. This may be related to how cells/values are created through the UI vs. directly in tests. Needs further investigation.
+- [ ] 2g: **BLOCKER** - Debug E2E cross-sheet evaluation failure:
+  - Unit tests pass but E2E tests fail (empty/0 values instead of expected)
+  - Formula bar displays correctly (`=Sheet2!B27`, `=SUM(Sheet2!A1:A3)`)
+  - Hypotheses to investigate:
+    1. Cell created via UI click may have different ID than cell found by formula resolver
+    2. Row/column axes may not exist on new Sheet2 when clicking B27
+    3. Value may not be committed before formula is entered
+    4. Recalculation may not be triggered after formula entry
+    5. Viewport cache may not be updated after recalc
+  - Debug approach:
+    1. Add logging to bindings to trace cell creation and formula resolution
+    2. Run headed E2E test to observe visual behavior
+    3. Compare cell IDs between UI-created cell and formula-resolved cell
+    4. Verify recalculation is triggered and produces correct result
+- [ ] 2h: Test sheet names with spaces (should use `'Sheet Name'!A1` syntax)
 
 ## Phase 3: Formula Editing Across Sheets
 
