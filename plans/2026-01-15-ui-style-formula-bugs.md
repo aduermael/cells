@@ -77,39 +77,26 @@ The parser architecture supports cross-sheet references (verified in formula_par
     - A) Add sheetId to Operation structure (significant refactor)
     - B) Add active sheet parameter to operation handlers (simpler but less clean)
   - This is a structural issue affecting ALL multi-sheet editing via CRDT operations
-- [ ] 2h: Test sheet names with spaces (should use `'Sheet Name'!A1` syntax)
-  - **BLOCKED by 2g**: Cannot test E2E until CRDT multi-sheet bug is fixed
-  - Can add unit tests for parsing/serializing quoted sheet names
+- [ ] 2h: **Fix CRDT multi-sheet bug** - Operations must apply to correct sheet
+  - Currently all axis/cell operations apply to `sheets[0]` regardless of active sheet
+  - This blocks all multi-sheet E2E tests and real-world multi-sheet editing
+  - **Implementation (Option A - add sheetId to Operation)**:
+    1. Add `sheetId` field to `Operation` struct in `core/cells/operation.h`
+    2. Update `make*Op` functions in `core/cells/crdt.cc` to accept and store sheetId
+    3. Update `apply*` handlers in `core/cells/crdt_axis.cc` to look up sheet by ID
+    4. Update `apply*` handlers in `core/cells/crdt_cell.cc` similarly
+    5. Update serialization in `core/cells/sync_manager.cc` for sync protocol
+    6. Update bindings (`apps/wasm/bindings_core.cc`) to pass active sheet ID to makers
+  - Add unit test verifying cell created on Sheet2 stays on Sheet2
+  - Verify existing unit tests still pass
+- [ ] 2i: Test sheet names with spaces (should use `'Sheet Name'!A1` syntax)
   - Parser should handle `'Sheet Name'!A1` and `'Sheet-2'!B5` syntax
   - Serializer should quote sheet names containing spaces, hyphens, or special chars
-
-### CRDT Multi-Sheet Bug Fix (Required before E2E tests can pass)
-
-Before Phase 2 E2E tests or Phase 3 can work, the CRDT multi-sheet bug must be fixed:
-
-**Option A - Add sheetId to Operation structure** (recommended):
-1. Add `sheetId` field to `Operation` struct in `operation.h`
-2. Update all `make*Op` functions to accept and store sheetId
-3. Update all `apply*` handlers to look up sheet by ID instead of using `sheets[0]`
-4. Update serialization/deserialization for sync protocol
-5. This is the clean solution and future-proofs for multi-sheet collaboration
-
-**Option B - Pass active sheet to handlers** (simpler but hacky):
-1. Add sheet parameter to `applyOperation()`
-2. Thread through to all handlers
-3. Requires workbook to track "current operation context"
-4. Less clean but faster to implement
-
-**Files to modify for Option A**:
-- `core/cells/operation.h` - add sheetId field
-- `core/cells/crdt.cc` - update operation makers
-- `core/cells/crdt_axis.cc` - update apply handlers (COL/ROW INSERT, DELETE, etc.)
-- `core/cells/crdt_cell.cc` - update cell operation handlers
-- `core/cells/sync_manager.cc` - update serialization
+  - Add unit tests for parsing/serializing quoted sheet names
+  - Add E2E test (now possible after 2h fix)
+- [ ] 2j: Run all tests (unit, E2E) to verify Phase 2 complete
 
 ## Phase 3: Formula Editing Across Sheets
-
-**NOTE**: Phase 3 E2E tests will also be blocked by the CRDT multi-sheet bug until it's fixed.
 
 Excel-like behavior: when editing a formula, the user can navigate to other sheets and click cells to insert cross-sheet references. The formula bar stays active and shows the building formula with proper sheet prefixes.
 
