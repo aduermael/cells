@@ -109,7 +109,7 @@ Add ability to auto-fit column width based on content.
 
 The screenshot shows "$0" and "0.0" values where Excel shows actual numbers. Need to investigate.
 
-- [ ] 9a: Debug specific cells in `many-tabs.xlsx` that show wrong values - check if it's a formula evaluation issue or display issue
-- [ ] 9b: Check if formulas with external references or unsupported functions return 0
-- [ ] 9c: Verify number formatting is correctly applied (currency format showing $0 instead of actual value)
-- [ ] 9d: Fix identified issues with formula evaluation or value display
+- [x] 9a: Debug specific cells in `many-tabs.xlsx` that show wrong values - Found two issues: (1) cross-sheet references were evaluating on wrong sheet returning 0, (2) error literals like #REF! in formulas weren't being parsed as ERROR_LITERAL tokens
+- [x] 9b: Fix cross-sheet cell reference evaluation - Modified `evaluateCellRef()` in formula_eval.cc to look up the target sheet by name using `ctx.workbook->getSheetByName()` and use the correct sheet when getting cell values and for recursive formula evaluation
+- [x] 9c: Add ERROR_LITERAL token type to formula lexer - Added scanErrorLiteral() to recognize #REF!, #VALUE!, #DIV/0!, etc. as single tokens, update parser to create ErrorNode from ERROR_LITERAL tokens
+- [x] 9d: Fix ErrorNode evaluation to return correct error type - Modified formula_eval.cc to use stringToError() on ErrorNode's message to return the proper CellError (e.g., CellError::REF for "#REF!") instead of always returning CellError::VALUE

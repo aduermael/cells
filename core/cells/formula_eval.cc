@@ -105,7 +105,17 @@ static EvalResult evaluateCellRef(const CellRefNode* node, EvalContext& ctx) {
         return EvalResult::Error(CellError::CIRCULAR);
     }
 
-    Cell* cell = ctx.sheet->getCell(cellId);
+    // Get the target sheet (may be different from ctx.sheet for cross-sheet refs)
+    Sheet* targetSheet = ctx.sheet;
+    if (!node->sheetName.empty() && ctx.workbook) {
+        targetSheet = ctx.workbook->getSheetByName(node->sheetName);
+        if (!targetSheet) {
+            // Referenced sheet doesn't exist
+            return EvalResult::Error(CellError::REF);
+        }
+    }
+
+    Cell* cell = targetSheet->getCell(cellId);
     if (!cell) {
         // Empty cell reference returns 0
         return EvalResult::Number(0.0);
@@ -129,8 +139,9 @@ static EvalResult evaluateCellRef(const CellRefNode* node, EvalContext& ctx) {
             return EvalResult::Error(CellError::CIRCULAR);
         }
 
-        // Recursively evaluate
+        // Recursively evaluate on the target sheet
         EvalContext subCtx = ctx;
+        subCtx.sheet = targetSheet;  // Evaluate on the cell's sheet, not the caller's
         subCtx.currentCellId = cellId;
         subCtx.recursionDepth++;
 
@@ -968,9 +979,17 @@ EvalResult evaluate(const ASTNode* node, EvalContext& ctx) {
         case ASTNodeType::NAMED_REF:
             return evaluateNamedRef(static_cast<const NamedRefNode*>(node), ctx);
 
-        // Error node
-        case ASTNodeType::ERROR_NODE:
-            return EvalResult::Error(CellError::VALUE);
+        // Error node - parse the error message to determine the correct error type
+        case ASTNodeType::ERROR_NODE: {
+            const auto* errorNode = static_cast<const ErrorNode*>(node);
+            // Use stringToError to convert the error message (e.g., "#REF!") to CellError
+            CellError error = stringToError(errorNode->message);
+            // Default to VALUE error if the message doesn't match a known error type
+            if (error == CellError::NONE) {
+                error = CellError::VALUE;
+            }
+            return EvalResult::Error(error);
+        }
     }
 
     return EvalResult::Error(CellError::VALUE);

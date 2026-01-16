@@ -115,6 +115,8 @@ const char* FormulaLexer::tokenTypeName(TokenType type) {
             return "STRING";
         case TokenType::BOOLEAN:
             return "BOOLEAN";
+        case TokenType::ERROR_LITERAL:
+            return "ERROR_LITERAL";
         case TokenType::IDENTIFIER:
             return "IDENTIFIER";
         case TokenType::COLUMN:
@@ -312,6 +314,10 @@ Token FormulaLexer::scanToken() {
                 const bool absolute = (peek() == '$');
                 advance();  // Consume second char
                 return scanUuidRowRef(start, absolute);
+            }
+            // Check for error literals: #REF!, #VALUE!, #DIV/0!, etc.
+            if (isAlpha(peek())) {
+                return scanErrorLiteral(start);
             }
             // Otherwise it's the spill range operator (e.g., A1#)
             return makeToken(TokenType::HASH, start);
@@ -581,6 +587,43 @@ Token FormulaLexer::scanUuidRowRef(size_t start, bool /*absolute*/) {
     }
 
     return makeToken(TokenType::UUID_ROW_REF, start);
+}
+
+Token FormulaLexer::scanErrorLiteral(size_t start) {
+    // We've already consumed '#' and confirmed peek() is a letter
+    // Scan letters (and special chars like / for #DIV/0!)
+    while (!isAtEndInternal()) {
+        const char c = peek();
+        if (isAlpha(c) || c == '/') {
+            advance();
+        } else {
+            break;
+        }
+    }
+
+    // Check for trailing ! or ? (e.g., #REF!, #NAME?)
+    if (!isAtEndInternal() && (peek() == '!' || peek() == '?')) {
+        advance();
+    }
+
+    // Get the error text (including the leading #)
+    const std::string_view errorText = source_.substr(start, pos_ - start);
+
+    // Validate that this is a known error type
+    // Valid errors: #REF!, #VALUE!, #DIV/0!, #NAME?, #N/A, #NULL!, #NUM!, #SPILL!, #CALC!
+    std::string upper(errorText);
+    std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+
+    if (upper == "#REF!" || upper == "#VALUE!" || upper == "#DIV/0!" || upper == "#NAME?" ||
+        upper == "#N/A" || upper == "#NULL!" || upper == "#NUM!" || upper == "#SPILL!" ||
+        upper == "#CALC!") {
+        return makeToken(TokenType::ERROR_LITERAL, start);
+    }
+
+    // Not a recognized error - return it as HASH followed by letters
+    // Rewind to just after the # and let the parser handle it
+    pos_ = start + 1;
+    return makeToken(TokenType::HASH, start);
 }
 
 }  // namespace cells

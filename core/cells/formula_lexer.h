@@ -44,6 +44,7 @@ enum class TokenType : std::uint8_t {
     PERCENT_LITERAL,  // 15%, 12.5% (value is stored divided by 100)
     STRING,           // "Hello", "with ""quotes"""
     BOOLEAN,          // TRUE, FALSE (case-insensitive)
+    ERROR_LITERAL,    // #REF!, #VALUE!, #DIV/0!, #NAME?, #N/A, #NULL!, #NUM!, #SPILL!, #CALC!
 
     // Identifiers and references
     IDENTIFIER,  // Function names, named ranges (SUM, myRange)
@@ -172,6 +173,7 @@ private:
     Token scanString();
     Token scanIdentifierOrColumn();
     Token scanRowNumber();
+    Token scanErrorLiteral(size_t start);  // #REF!, #VALUE!, etc.
     Token scanUuidCellRef(size_t start, bool colAbsolute, bool rowAbsolute);
     Token scanUuidColumnRef(size_t start, bool absolute);
     Token scanUuidRowRef(size_t start, bool absolute);

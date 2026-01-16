@@ -289,6 +289,12 @@ std::unique_ptr<ASTNode> FormulaParser::primary() {
         return std::make_unique<BooleanLiteralNode>(boolToken.booleanValue(), boolToken.position);
     }
 
+    // Error literal (#REF!, #VALUE!, #DIV/0!, etc.)
+    if (match(TokenType::ERROR_LITERAL)) {
+        // Return an ErrorNode with the error text (e.g., "#REF!")
+        return std::make_unique<ErrorNode>(std::string(previous_.text), previous_.position);
+    }
+
     // Parenthesized expression
     if (match(TokenType::LPAREN)) {
         auto expr = expression();
