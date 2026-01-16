@@ -12,6 +12,34 @@ namespace cells {
 FormulaDisplayConverter::FormulaDisplayConverter(const Sheet& sheet, const Workbook* workbook)
     : _sheet(sheet), _workbook(workbook) {}
 
+// Helper: check if sheet name needs quoting (contains spaces, quotes, !, or [)
+static bool sheetNameNeedsQuotes(const std::string& name) {
+    for (const char c : name) {
+        if (c == ' ' || c == '\'' || c == '!' || c == '[') {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Helper: format sheet name with proper quoting for A1 notation
+static std::string formatSheetName(const std::string& name) {
+    if (!sheetNameNeedsQuotes(name)) {
+        return name + "!";
+    }
+    // Quote the name and escape single quotes by doubling them
+    std::string result = "'";
+    for (const char c : name) {
+        if (c == '\'') {
+            result += "''";  // Escape ' as ''
+        } else {
+            result += c;
+        }
+    }
+    result += "'!";
+    return result;
+}
+
 std::string FormulaDisplayConverter::getSheetPrefix(const std::string& sheetId,
                                                     const std::string& sheetName) const {
     // Prefer sheetId lookup (more stable across renames)
@@ -19,13 +47,13 @@ std::string FormulaDisplayConverter::getSheetPrefix(const std::string& sheetId,
         const ID sheetIdObj(sheetId);
         const Sheet* sheet = _workbook->getSheet(sheetIdObj);
         if (sheet != nullptr) {
-            return sheet->name + "!";
+            return formatSheetName(sheet->name);
         }
     }
 
     // Fall back to sheetName
     if (!sheetName.empty()) {
-        return sheetName + "!";
+        return formatSheetName(sheetName);
     }
 
     return "";

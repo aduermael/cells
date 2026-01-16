@@ -620,6 +620,67 @@ TEST(FormulaParserTest, CrossSheetUuidRange) {
     EXPECT_EQ(range->bottomRight->cellId, "ghi01234") << "bottomRight should have cellId";
 }
 
+TEST(FormulaParserTest, QuotedSheetNameWithSpace) {
+    // Sheet name with space: 'Sheet Name'!A1
+    FormulaParser parser("='Sheet Name'!A1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr) << "Parser returned null";
+    ASSERT_FALSE(parser.hasErrors()) << "Parser had errors: " << parser.errors()[0];
+
+    auto* cell = dynamic_cast<CellRefNode*>(ast.get());
+    ASSERT_NE(cell, nullptr) << "Expected CellRefNode";
+    EXPECT_EQ(cell->sheetName, "Sheet Name") << "sheetName should be unquoted";
+    EXPECT_EQ(cell->column, "A");
+    EXPECT_EQ(cell->row, 1);
+}
+
+TEST(FormulaParserTest, QuotedSheetNameWithHyphen) {
+    // Sheet name with hyphen: 'Sheet-2'!B5
+    FormulaParser parser("='Sheet-2'!B5");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr) << "Parser returned null";
+    ASSERT_FALSE(parser.hasErrors()) << "Parser had errors: " << parser.errors()[0];
+
+    auto* cell = dynamic_cast<CellRefNode*>(ast.get());
+    ASSERT_NE(cell, nullptr) << "Expected CellRefNode";
+    EXPECT_EQ(cell->sheetName, "Sheet-2") << "sheetName should be unquoted";
+    EXPECT_EQ(cell->column, "B");
+    EXPECT_EQ(cell->row, 5);
+}
+
+TEST(FormulaParserTest, QuotedSheetNameWithEscapedQuote) {
+    // Sheet name with escaped quote: 'It''s here'!C10
+    FormulaParser parser("='It''s here'!C10");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr) << "Parser returned null";
+    ASSERT_FALSE(parser.hasErrors()) << "Parser had errors: " << parser.errors()[0];
+
+    auto* cell = dynamic_cast<CellRefNode*>(ast.get());
+    ASSERT_NE(cell, nullptr) << "Expected CellRefNode";
+    EXPECT_EQ(cell->sheetName, "It's here") << "sheetName should have single quote unescaped";
+    EXPECT_EQ(cell->column, "C");
+    EXPECT_EQ(cell->row, 10);
+}
+
+TEST(FormulaParserTest, QuotedSheetNameRange) {
+    // Range with quoted sheet name: 'My Data'!A1:B5
+    FormulaParser parser("='My Data'!A1:B5");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr) << "Parser returned null";
+    ASSERT_FALSE(parser.hasErrors()) << "Parser had errors: " << parser.errors()[0];
+
+    auto* range = dynamic_cast<RangeRefNode*>(ast.get());
+    ASSERT_NE(range, nullptr) << "Expected RangeRefNode";
+    ASSERT_NE(range->topLeft, nullptr);
+    ASSERT_NE(range->bottomRight, nullptr);
+    EXPECT_EQ(range->topLeft->sheetName, "My Data") << "topLeft should have sheetName";
+    EXPECT_EQ(range->topLeft->column, "A");
+    EXPECT_EQ(range->topLeft->row, 1);
+    EXPECT_EQ(range->bottomRight->sheetName, "My Data") << "bottomRight should also have sheetName";
+    EXPECT_EQ(range->bottomRight->column, "B");
+    EXPECT_EQ(range->bottomRight->row, 5);
+}
+
 // ============================================================================
 // Function Call Tests
 // ============================================================================

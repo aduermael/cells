@@ -320,8 +320,22 @@ std::unique_ptr<ASTNode> FormulaParser::parseReference() {
     // Check for sheet prefix: SheetName! or 'Sheet Name'!
     std::string sheetName;
 
-    // IDENTIFIER followed by ! is a sheet prefix
-    if (check(TokenType::IDENTIFIER)) {
+    // QUOTED_SHEET_NAME followed by ! is a sheet prefix (for names with spaces/special chars)
+    if (check(TokenType::QUOTED_SHEET_NAME)) {
+        const Token quotedName = current_;
+        advance();
+        if (check(TokenType::BANG)) {
+            // It's a quoted sheet prefix like 'Sheet Name'!
+            sheetName = quotedName.quotedSheetNameValue();
+            advance();  // Consume !
+            // Fall through to parse the cell/range reference after the sheet prefix
+        } else {
+            // Invalid - quoted string must be followed by !
+            return errorNode("Expected '!' after quoted sheet name");
+        }
+    }
+    // IDENTIFIER followed by ! is a sheet prefix (for simple names)
+    else if (check(TokenType::IDENTIFIER)) {
         // Peek ahead to see if this is SheetName!ref
         const Token id = current_;
         advance();

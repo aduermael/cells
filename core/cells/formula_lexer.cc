@@ -65,6 +65,28 @@ std::string Token::stringValue() const {
     return result;
 }
 
+std::string Token::quotedSheetNameValue() const {
+    if (type != TokenType::QUOTED_SHEET_NAME || text.size() < 2) {
+        return std::string(text);
+    }
+    // Remove surrounding single quotes and process escape sequences
+    // 'Sheet Name' -> "Sheet Name", 'It''s here' -> "It's here"
+    std::string result;
+    result.reserve(text.size() - 2);
+
+    // Skip first and last quote
+    for (size_t i = 1; i < text.size() - 1; ++i) {
+        if (text[i] == '\'' && i + 1 < text.size() - 1 && text[i + 1] == '\'') {
+            // Escaped quote '' -> '
+            result += '\'';
+            ++i;  // Skip the second quote
+        } else {
+            result += text[i];
+        }
+    }
+    return result;
+}
+
 // ============================================================================
 // FormulaLexer implementation
 // ============================================================================
@@ -123,6 +145,8 @@ const char* FormulaLexer::tokenTypeName(TokenType type) {
             return "COLUMN";
         case TokenType::ROW:
             return "ROW";
+        case TokenType::QUOTED_SHEET_NAME:
+            return "QUOTED_SHEET_NAME";
         case TokenType::UUID_SHEET_REF:
             return "UUID_SHEET_REF";
         case TokenType::UUID_CELL_REF:
@@ -368,6 +392,10 @@ Token FormulaLexer::scanToken() {
         case '"':
             pos_ = start;  // Rewind to include the quote
             return scanString();
+        case '\'':
+            // Quoted sheet name: 'Sheet Name' (for cross-sheet references with spaces)
+            pos_ = start;  // Rewind to include the quote
+            return scanQuotedSheetName(start);
         default:
             break;
     }
@@ -457,6 +485,28 @@ Token FormulaLexer::scanString() {
     }
 
     return makeErrorToken("Unterminated string", start);
+}
+
+Token FormulaLexer::scanQuotedSheetName(size_t start) {
+    advance();  // Consume opening '
+
+    while (!isAtEndInternal()) {
+        const char c = peek();
+        if (c == '\'') {
+            // Check for escaped quote ''
+            if (peekNext() == '\'') {
+                advance();  // Consume first '
+                advance();  // Consume second '
+            } else {
+                advance();  // Consume closing '
+                return makeToken(TokenType::QUOTED_SHEET_NAME, start);
+            }
+        } else {
+            advance();
+        }
+    }
+
+    return makeErrorToken("Unterminated quoted sheet name", start);
 }
 
 Token FormulaLexer::scanIdentifierOrColumn() {

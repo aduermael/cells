@@ -8,9 +8,11 @@ Address several bugs related to border/style application, cross-sheet references
 
 2. **Cross-sheet reference parsing**: Formulas like `=Sheet2!B27` don't work. The parser supports cross-sheet references syntactically, but the issue is likely in A1-to-UUID resolution when the sheet name contains certain characters or the parsing flow.
 
-3. **Formula editing sheet switch**: When editing a formula, clicking another sheet tab loses focus and cancels the edit. Should allow selecting cells from other sheets while maintaining formula edit mode.
+3. **Cross-sheet dependency graph (CRITICAL)**: The dependency graph only tracks dependencies within the same sheet. When a formula references a cell on another sheet, changing that cell does NOT trigger re-evaluation of the dependent formula. Cross-sheet formulas show correct initial values but become stale.
 
-4. **Column/row-wide styling**: Can't set a style for an entire column or row via the UI. The backend supports this via `Axis.defaultStyleId` (Phase E4 of range-system-design), but no UI exposes it.
+4. **Formula editing sheet switch**: When editing a formula, clicking another sheet tab loses focus and cancels the edit. Should allow selecting cells from other sheets while maintaining formula edit mode.
+
+5. **Column/row-wide styling**: Can't set a style for an entire column or row via the UI. The backend supports this via `Axis.defaultStyleId` (Phase E4 of range-system-design), but no UI exposes it.
 
 ## Phase 1: Investigate and Fix Border + Bold Bug
 
@@ -86,14 +88,57 @@ The parser architecture supports cross-sheet references (verified in formula_par
   - Fixed E2E test to use B5 instead of B27 (viewport issue unrelated to CRDT fix)
   - Fixed `RefConverter::formulaToA1` to handle column/row UUID refs (`@~`/`#~` format) - was showing `@~#REF!` for column/row references
   - All 181 E2E tests pass!
-- [ ] 2i: Test sheet names with spaces (should use `'Sheet Name'!A1` syntax)
-  - Parser should handle `'Sheet Name'!A1` and `'Sheet-2'!B5` syntax
-  - Serializer should quote sheet names containing spaces, hyphens, or special chars
-  - Add unit tests for parsing/serializing quoted sheet names
-  - Add E2E test (now possible after 2h fix)
-- [ ] 2j: Run all tests (unit, E2E) to verify Phase 2 complete
+- [x] 2i: Test sheet names with spaces (should use `'Sheet Name'!A1` syntax)
+  - Added `QUOTED_SHEET_NAME` token type to lexer for `'Sheet Name'` syntax
+  - Added `scanQuotedSheetName()` method to lexer with escaped quote support (`''` -> `'`)
+  - Updated parser to handle `QUOTED_SHEET_NAME` token followed by `!`
+  - Updated `FormulaDisplayConverter::getSheetPrefix()` to quote sheet names with spaces, quotes, `!`, or `[`
+  - Added unit tests: `QuotedSheetNameWithSpace`, `QuotedSheetNameWithHyphen`, `QuotedSheetNameWithEscapedQuote`, `QuotedSheetNameRange`
+  - Added integration tests: `QuotedSheetNameDisplay`, `QuotedSheetNameWithQuoteDisplay`
+  - E2E tests blocked on sheet renaming UI (not yet implemented)
+- [x] 2j: Run all tests (unit, E2E) to verify Phase 2 complete
+  - All 54 unit tests pass
+  - All 181 E2E tests pass
+  - Lint, type-check, and format checks pass
 
-## Phase 3: Formula Editing Across Sheets
+## Phase 3: Cross-Sheet Dependency Graph (CRITICAL)
+
+**Bug**: The dependency graph currently only tracks dependencies within the same sheet. When a formula references a cell on another sheet (e.g., `=Sheet2!A1`), changing the source cell does NOT trigger re-evaluation of the dependent formula.
+
+**Root cause hypothesis**: The dependency graph likely uses cell IDs without sheet context, or the dependency registration doesn't account for cross-sheet references when building the graph.
+
+**Impact**: Cross-sheet formulas show correct initial values but become stale when source cells change, leading to incorrect calculations and user confusion.
+
+- [ ] 3a: Create E2E test reproducing the bug:
+  - Set Sheet2!A1 = 10
+  - In Sheet1!B1, enter formula `=Sheet2!A1`
+  - Verify Sheet1!B1 shows 10
+  - Change Sheet2!A1 to 20
+  - Verify Sheet1!B1 updates to 20 (currently fails - shows stale 10)
+- [ ] 3b: Investigate current dependency graph implementation
+  - Locate where dependencies are registered during formula parsing
+  - Check if sheetId is included in dependency keys
+  - Trace what happens when a cell value changes (dirty propagation)
+- [ ] 3c: Fix dependency registration to include sheetId
+  - When formula references cross-sheet cell, register dependency with (sheetId, cellId) tuple
+  - Update dependency graph data structure if needed
+- [ ] 3d: Fix dirty propagation to check cross-sheet dependents
+  - When cell changes, look up dependents across all sheets
+  - Ensure re-evaluation cascades correctly
+- [ ] 3e: Add E2E test for cross-sheet range dependency:
+  - Set Sheet2!A1:A3 = [1, 2, 3]
+  - In Sheet1!B1, enter `=SUM(Sheet2!A1:A3)`
+  - Change Sheet2!A2 to 10
+  - Verify Sheet1!B1 updates from 6 to 14
+- [ ] 3f: Add E2E test for multi-hop cross-sheet dependencies:
+  - Sheet3!A1 = 5
+  - Sheet2!A1 = `=Sheet3!A1 * 2` (should be 10)
+  - Sheet1!A1 = `=Sheet2!A1 + 1` (should be 11)
+  - Change Sheet3!A1 to 10
+  - Verify Sheet2!A1 = 20 and Sheet1!A1 = 21
+- [ ] 3g: Run all tests to verify cross-sheet reactivity works
+
+## Phase 4: Formula Editing Across Sheets
 
 Excel-like behavior: when editing a formula, the user can navigate to other sheets and click cells to insert cross-sheet references. The formula bar stays active and shows the building formula with proper sheet prefixes.
 
@@ -107,17 +152,17 @@ Current behavior: `uiStateMachine.reset()` is called on sheet switch, which tran
 5. User clicks cell C3 → formula becomes `=SUM(Sheet2!B5,C3` (no prefix needed, same sheet as formula)
 6. User types `)` and presses Enter → formula commits to A1 in Sheet1
 
-- [ ] 3a: Create E2E test: start editing formula in Sheet1, click Sheet2 tab, click cell B5, verify formula shows `=Sheet2!B5`
-- [ ] 3b: Track "formula origin sheet" in EditingSession when formula editing starts
-- [ ] 3c: Modify sheet tab click handler: when in formula edit mode, switch view but preserve edit state
-- [ ] 3d: Update cell click handler: when editing formula from different sheet, insert `SheetName!` prefix
-- [ ] 3e: When clicking cells on the formula's origin sheet, insert reference without prefix
-- [ ] 3f: Add subtle visual indicator in formula bar showing origin sheet (e.g., "Editing in: Sheet1")
-- [ ] 3g: Handle Enter to commit formula and return view to origin sheet
-- [ ] 3h: Handle Escape to cancel and return view to origin sheet
-- [ ] 3i: Handle clicking outside grid (not on sheet tabs) to commit formula
+- [ ] 4a: Create E2E test: start editing formula in Sheet1, click Sheet2 tab, click cell B5, verify formula shows `=Sheet2!B5`
+- [ ] 4b: Track "formula origin sheet" in EditingSession when formula editing starts
+- [ ] 4c: Modify sheet tab click handler: when in formula edit mode, switch view but preserve edit state
+- [ ] 4d: Update cell click handler: when editing formula from different sheet, insert `SheetName!` prefix
+- [ ] 4e: When clicking cells on the formula's origin sheet, insert reference without prefix
+- [ ] 4f: Add subtle visual indicator in formula bar showing origin sheet (e.g., "Editing in: Sheet1")
+- [ ] 4g: Handle Enter to commit formula and return view to origin sheet
+- [ ] 4h: Handle Escape to cancel and return view to origin sheet
+- [ ] 4i: Handle clicking outside grid (not on sheet tabs) to commit formula
 
-## Phase 4: Column/Row-Wide Style UI
+## Phase 5: Column/Row-Wide Style UI
 
 The backend already supports column/row default styles via `Axis.defaultStyleId` with `AXIS_SET_STYLE` CRDT operation. The Luau API exposes `setColumnStyle()`/`setRowStyle()`. Need to add UI.
 
@@ -128,16 +173,16 @@ The backend already supports column/row default styles via `Axis.defaultStyleId`
 - "Entire row" = selection starts at col 0 and extends to max col (or a special flag)
 - Could use sentinel values like `startRow = 0, endRow = MAX_ROWS` or a dedicated selection type
 
-- [ ] 4a: Create E2E test: click column A header, apply bold, verify new cells in column A inherit bold
-- [ ] 4b: Add selection type or flags to distinguish "entire column/row" from regular range selection
-- [ ] 4c: Update column header click to create "entire column" selection
-- [ ] 4d: Update row header click to create "entire row" selection
-- [ ] 4e: In `StyleControls.applyStyleToSelection()`, detect entire column/row selection
-- [ ] 4f: When entire column selected, call `setColumnStyle()` instead of `setStyleForRange()`
-- [ ] 4g: When entire row selected, call `setRowStyle()` instead of `setStyleForRange()`
-- [ ] 4h: Update effective style display to show column/row default styles correctly
-- [ ] 4i: Add E2E test: set column style, then override single cell, verify cell shows override while others show column style
-- [ ] 4j: Visual feedback: highlight entire column/row when selected (not just visible cells)
+- [ ] 5a: Create E2E test: click column A header, apply bold, verify new cells in column A inherit bold
+- [ ] 5b: Add selection type or flags to distinguish "entire column/row" from regular range selection
+- [ ] 5c: Update column header click to create "entire column" selection
+- [ ] 5d: Update row header click to create "entire row" selection
+- [ ] 5e: In `StyleControls.applyStyleToSelection()`, detect entire column/row selection
+- [ ] 5f: When entire column selected, call `setColumnStyle()` instead of `setStyleForRange()`
+- [ ] 5g: When entire row selected, call `setRowStyle()` instead of `setStyleForRange()`
+- [ ] 5h: Update effective style display to show column/row default styles correctly
+- [ ] 5i: Add E2E test: set column style, then override single cell, verify cell shows override while others show column style
+- [ ] 5j: Visual feedback: highlight entire column/row when selected (not just visible cells)
 
 ## Architecture Notes
 

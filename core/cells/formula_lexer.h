@@ -51,6 +51,10 @@ enum class TokenType : std::uint8_t {
     COLUMN,      // Column letters (A, AA, XFD)
     ROW,         // Row number (1, 100, 1048576)
 
+    // Quoted sheet name for cross-sheet refs: 'Sheet Name'
+    // This includes the quotes but NOT the trailing !
+    QUOTED_SHEET_NAME,
+
     // UUID-based references (for internal storage format)
     // Sheet ref: ! followed by 8-char sheet UUID (for cross-sheet references)
     UUID_SHEET_REF,
@@ -122,6 +126,10 @@ struct Token {
 
     // Get the string value with quotes removed and escapes processed (for STRING tokens)
     [[nodiscard]] std::string stringValue() const;
+
+    // Get the sheet name with quotes removed and escapes processed (for QUOTED_SHEET_NAME tokens)
+    // 'Sheet Name' -> "Sheet Name", 'It''s here' -> "It's here"
+    [[nodiscard]] std::string quotedSheetNameValue() const;
 };
 
 // Lexer for Excel-style formulas
@@ -175,8 +183,9 @@ private:
     Token scanString();
     Token scanIdentifierOrColumn();
     Token scanRowNumber();
-    Token scanErrorLiteral(size_t start);  // #REF!, #VALUE!, etc.
-    Token scanUuidSheetRef(size_t start);  // !<8-char-uuid> for cross-sheet refs
+    Token scanErrorLiteral(size_t start);     // #REF!, #VALUE!, etc.
+    Token scanQuotedSheetName(size_t start);  // 'Sheet Name' for cross-sheet refs
+    Token scanUuidSheetRef(size_t start);     // !<8-char-uuid> for cross-sheet refs
     Token scanUuidCellRef(size_t start, bool colAbsolute, bool rowAbsolute);
     Token scanUuidColumnRef(size_t start, bool absolute);
     Token scanUuidRowRef(size_t start, bool absolute);

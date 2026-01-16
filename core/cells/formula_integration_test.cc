@@ -1297,5 +1297,71 @@ TEST(FormulaNormalizationTest, LowercaseAbsoluteRef) {
     EXPECT_EQ(display, "=$A$1") << "Lowercase absolute ref should be normalized to uppercase";
 }
 
+TEST(FormulaIntegrationTest, QuotedSheetNameDisplay) {
+    // Test that sheet names with spaces are properly quoted in display
+    auto wb = std::make_unique<Workbook>(ID("testWBId"), "TestWorkbook");
+    auto sheet1 = std::make_unique<Sheet>(ID("sheet101"), "Sheet1");
+    auto sheet2 = std::make_unique<Sheet>(ID("sheet202"), "My Data");  // Sheet with space in name
+
+    // Create cells in Sheet2 (My Data)
+    auto col = std::make_unique<Axis>(ID("colA0001"), true);
+    col->position = 0;
+    auto row = std::make_unique<Axis>(ID("row10001"), false);
+    row->position = 0;
+    auto cell = std::make_unique<Cell>(ID("cellA101"), col->id, row->id);
+    cell->value = CellValue(42.0);
+
+    sheet2->addColumn(std::move(col));
+    sheet2->addRow(std::move(row));
+    sheet2->addCell(std::move(cell));
+
+    wb->addSheet(std::move(sheet1));
+    wb->addSheet(std::move(sheet2));
+
+    // Parse formula referencing sheet with space
+    FormulaParser parser("='My Data'!A1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr) << "Parser returned null";
+    ASSERT_FALSE(parser.hasErrors()) << "Parser had errors";
+
+    // Display converter should quote the sheet name
+    FormulaDisplayConverter converter(*wb->sheets[0], wb.get());
+    std::string display = converter.toDisplayString(ast.get());
+    EXPECT_EQ(display, "='My Data'!A1") << "Sheet name with space should be quoted in display";
+}
+
+TEST(FormulaIntegrationTest, QuotedSheetNameWithQuoteDisplay) {
+    // Test that sheet names with quotes are properly escaped in display
+    auto wb = std::make_unique<Workbook>(ID("testWBId"), "TestWorkbook");
+    auto sheet1 = std::make_unique<Sheet>(ID("sheet101"), "Sheet1");
+    auto sheet2 = std::make_unique<Sheet>(ID("sheet202"), "It's here");  // Sheet with quote in name
+
+    // Create cells in Sheet2
+    auto col = std::make_unique<Axis>(ID("colA0001"), true);
+    col->position = 0;
+    auto row = std::make_unique<Axis>(ID("row10001"), false);
+    row->position = 0;
+    auto cell = std::make_unique<Cell>(ID("cellA101"), col->id, row->id);
+    cell->value = CellValue(42.0);
+
+    sheet2->addColumn(std::move(col));
+    sheet2->addRow(std::move(row));
+    sheet2->addCell(std::move(cell));
+
+    wb->addSheet(std::move(sheet1));
+    wb->addSheet(std::move(sheet2));
+
+    // Parse formula with escaped quote
+    FormulaParser parser("='It''s here'!A1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr) << "Parser returned null";
+    ASSERT_FALSE(parser.hasErrors()) << "Parser had errors";
+
+    // Display converter should quote and escape the sheet name
+    FormulaDisplayConverter converter(*wb->sheets[0], wb.get());
+    std::string display = converter.toDisplayString(ast.get());
+    EXPECT_EQ(display, "='It''s here'!A1") << "Sheet name with quote should be escaped in display";
+}
+
 }  // namespace
 }  // namespace cells
