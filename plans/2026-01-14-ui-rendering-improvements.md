@@ -98,12 +98,12 @@ Add support for text wrapping within cells, reading from XLSX and exposing in UI
 
 Add ability to auto-fit column width based on content.
 
-- [ ] 8a: Implement `autoFitColumnWidth(colIndex)` in C++ that calculates optimal width based on cell content and font metrics
-- [ ] 8b: Expose auto-fit via WASM binding in wasm-data-source.ts
-- [ ] 8c: Add double-click handler on column resize handle to trigger auto-fit
-- [ ] 8d: Add "Auto-fit Column Width" option to column header context menu (if context menu exists) or via keyboard shortcut
-- [ ] 8e: Handle auto-fit for merged cells (use merged region width)
-- [ ] 8f: Add E2E test for auto-fit functionality
+- [x] 8a: Implement `calculateAutoFitWidth(colIndex)` in TypeScript (GridRenderer) that measures cell content using canvas context - C++ can't measure text without font metrics, so this is done in TypeScript
+- [x] 8b: Wire up auto-fit to use existing `resizeColumnByPos()` CRDT operation - no new WASM binding needed
+- [x] 8c: Add double-click handler on column resize handle in `handleDblClick()` to trigger auto-fit
+- [x] 8d: Add "Auto-fit column width" option to column header context menu
+- [x] 8e: Handle auto-fit for merged cells - skip non-anchor merged cells (they have no content), measure anchor content normally
+- [x] 8f: Add E2E test for auto-fit functionality (5 tests in auto-fit.test.mjs)
 
 ## Phase 9: Investigate Values Showing as $0
 

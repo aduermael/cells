@@ -1302,6 +1302,8 @@ export class MouseEventHandlers {
             updateFormulaBar,
             cellEditor,
             columnHeaderEditor,
+            getGridRenderer,
+            getDataSource,
         } = this.config;
 
         const sheetInfo = getSheetInfo();
@@ -1312,6 +1314,35 @@ export class MouseEventHandlers {
         const scrollY = getScrollY();
         const colWidths = getColWidths();
         const rowHeights = getRowHeights();
+
+        // Double-click on column resize handle: auto-fit column width
+        const zoomedHeaderHeight = getZoomedHeaderHeight();
+        const zoomedHeaderWidth = getZoomedHeaderWidth();
+        if (y < zoomedHeaderHeight && y > 0 && x > zoomedHeaderWidth) {
+            const resizeCol = getResizeHandleCol(
+                x,
+                scrollX,
+                colWidths,
+                sheetInfo,
+            );
+            if (resizeCol >= 0) {
+                // Auto-fit the column to the left of the resize handle
+                const gridRenderer = getGridRenderer();
+                const dataSource = getDataSource();
+                const optimalWidth = gridRenderer.calculateAutoFitWidth(resizeCol);
+                if (optimalWidth !== null && dataSource) {
+                    // Update local state immediately for responsive UI
+                    colWidths.set(resizeCol, optimalWidth);
+                    render();
+                    // Persist to CRDT
+                    dataSource.resizeColumnByPos(resizeCol, optimalWidth).catch((err) => {
+                        console.error("Error auto-fitting column:", err);
+                    });
+                }
+                e.preventDefault();
+                return;
+            }
+        }
 
         // Double-click on column header: start column renaming
         if (y < HEADER_HEIGHT && y > 0 && x > HEADER_WIDTH) {
@@ -1456,7 +1487,7 @@ export class MouseEventHandlers {
      */
     private buildContextMenuItems(context: ContextType): ContextMenuEntry[] {
         const items: ContextMenuEntry[] = [];
-        const { getDataSource, fetchViewportNow, render } = this.config;
+        const { getDataSource, fetchViewportNow, render, getGridRenderer, getColWidths } = this.config;
 
         switch (context.type) {
             case "column-header":
@@ -1478,6 +1509,24 @@ export class MouseEventHandlers {
                         await ds.insertColumnAt(context.col, false);
                         fetchViewportNow();
                         render();
+                    },
+                });
+                items.push({ type: "separator" });
+                items.push({
+                    label: "Auto-fit column width",
+                    action: async () => {
+                        const ds = getDataSource();
+                        if (!ds) return;
+                        const gridRenderer = getGridRenderer();
+                        const colWidths = getColWidths();
+                        const optimalWidth = gridRenderer.calculateAutoFitWidth(context.col);
+                        if (optimalWidth !== null) {
+                            // Update local state immediately for responsive UI
+                            colWidths.set(context.col, optimalWidth);
+                            render();
+                            // Persist to CRDT
+                            await ds.resizeColumnByPos(context.col, optimalWidth);
+                        }
                     },
                 });
                 items.push({ type: "separator" });

@@ -28,6 +28,7 @@ import type { ColumnHeaderEditor, FormulaBarEditor } from "./header-editor";
 import type { PresenceBroadcaster } from "./presence-broadcast";
 import type { ClipboardManager } from "./clipboard";
 import type { ScriptPanel } from "./script-panel";
+import type { GridRenderer } from "./grid-renderer";
 import { MouseEventHandlers } from "./mouse-events";
 import { KeyboardEventHandlers } from "./keyboard-events";
 
@@ -70,6 +71,7 @@ export interface AppEventManagerConfig {
     getDataSource: () => WasmDataSource | null;
     getSyncAdapter: () => CppSyncAdapter | null;
     getFillHandleBounds: () => FillHandleBounds | null;
+    getGridRenderer: () => GridRenderer;
 
     // Resize state accessors/mutators
     getResizeColIndex: () => number;

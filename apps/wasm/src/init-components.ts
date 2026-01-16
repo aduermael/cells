@@ -951,6 +951,7 @@ export function createComponents(config: ComponentsConfig): Components {
     getDataSource: () => app.dataSource,
     getSyncAdapter: () => app.syncAdapter,
     getFillHandleBounds: () => app.renderer.fillHandleBounds,
+    getGridRenderer: () => app.renderer,
     getResizeColIndex: () => app.resizeColIndex,
     setResizeColIndex: (v) => { app.resizeColIndex = v; },
     getResizeStartX: () => app.resizeStartX,

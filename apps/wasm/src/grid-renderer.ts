@@ -1530,4 +1530,71 @@ export class GridRenderer {
       this.remotePresence
     );
   }
+
+  /**
+   * Calculate the optimal width for a column based on its content.
+   * Measures all visible cells in the column plus the header text.
+   *
+   * @param colIndex Column index to measure
+   * @returns Optimal width in base (unzoomed) pixels, or null if no cells
+   */
+  calculateAutoFitWidth(colIndex: number): number | null {
+    const ctx = this.ctx;
+    if (!ctx) return null;
+
+    // Save context state
+    ctx.save();
+
+    // Minimum width and padding
+    const MIN_WIDTH = 20;
+    const CELL_PADDING = 8; // Padding on each side
+
+    let maxWidth = MIN_WIDTH;
+
+    // Measure header text
+    const headerText = this.getColumnHeaderText(colIndex);
+    ctx.font = `bold 12px ${getFallbackFonts()}`;
+    const headerWidth = ctx.measureText(headerText).width + CELL_PADDING * 2;
+    maxWidth = Math.max(maxWidth, headerWidth);
+
+    // Measure all cells in this column
+    for (const cell of this.cells) {
+      if (cell.col !== colIndex) continue;
+
+      // Skip merged cells that are not anchors (they don't have content)
+      if (cell.isMergedCell && !cell.isMergeAnchor) continue;
+
+      const displayValue = cell.display || cell.value || "";
+      if (!displayValue) continue;
+
+      const style = cell.style;
+
+      // Build font string matching _drawCellValues
+      let fontStyle = "";
+      if (style?.italic) fontStyle += "italic ";
+      if (style?.bold) fontStyle += "bold ";
+      const baseFontSize = style?.fontSize || 13;
+      const fontFamily = style?.fontFamily
+        ? ensureFont(style.fontFamily)
+        : getFallbackFonts();
+      ctx.font = fontStyle
+        ? `${fontStyle}${baseFontSize}px ${fontFamily}`
+        : `${baseFontSize}px ${fontFamily}`;
+
+      // Measure text width
+      const textWidth = ctx.measureText(displayValue).width;
+
+      // For merge anchors, we only care about the content width, not the merged span
+      // The auto-fit should expand the column to fit the content if it's the anchor column
+      const cellWidth = textWidth + CELL_PADDING * 2;
+      maxWidth = Math.max(maxWidth, cellWidth);
+    }
+
+    // Restore context state
+    ctx.restore();
+
+    // Cap at reasonable maximum
+    const MAX_WIDTH = 500;
+    return Math.min(Math.ceil(maxWidth), MAX_WIDTH);
+  }
 }
