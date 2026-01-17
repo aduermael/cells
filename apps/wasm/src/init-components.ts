@@ -587,6 +587,7 @@ export function createComponents(config: ComponentsConfig): Components {
 
   const focusManager = new FocusManager({
     container: elements.canvasContainer,
+    sheetTabsContainer: elements.sheetTabsContainer,
     isEditingCell: () => app.uiStateMachine.isInState("CELL_EDITING"),
     isEditingFormulaBar: () => app.uiStateMachine.isInState("FORMULA_BAR_EDITING"),
   });

@@ -5,6 +5,9 @@
 // 1. Clicking anywhere in the grid (canvas, scrollbars, editors) preserves editing mode
 // 2. Blur commits only happen when focus moves OUTSIDE the grid container
 // 3. Formula editing can click on cells to insert references without losing focus
+// 4. Cross-sheet formula editing allows clicking sheet tabs without losing focus
+
+import { editingSession } from "./editing-session";
 
 /**
  * FocusManager handles focus boundaries for the grid container.
@@ -14,9 +17,11 @@
  * - Any mousedown inside the container suppresses blur commits
  * - Blur handlers use relatedTarget to check if focus stays in container
  * - Scrollbar interactions preserve editing focus
+ * - Sheet tab clicks during formula editing also suppress blur
  */
 export class FocusManager {
   private container: HTMLElement;
+  private sheetTabsContainer: HTMLElement | null = null;
   private suppressBlurCommit = false;
   private activeEditor: HTMLElement | null = null;
 
@@ -26,10 +31,12 @@ export class FocusManager {
 
   constructor(config: {
     container: HTMLElement;
+    sheetTabsContainer?: HTMLElement;
     isEditingCell: () => boolean;
     isEditingFormulaBar: () => boolean;
   }) {
     this.container = config.container;
+    this.sheetTabsContainer = config.sheetTabsContainer ?? null;
     this.isEditingCellFn = config.isEditingCell;
     this.isEditingFormulaBarFn = config.isEditingFormulaBar;
 
@@ -51,6 +58,23 @@ export class FocusManager {
       },
       { capture: true }
     );
+
+    // Also listen for mousedown on sheet tabs container during formula editing
+    // This enables cross-sheet reference picking (Excel-like behavior)
+    // Note: We use capture phase so this runs BEFORE the blur event fires
+    if (this.sheetTabsContainer) {
+      this.sheetTabsContainer.addEventListener(
+        "mousedown",
+        () => {
+          // Only suppress blur if we're editing a formula
+          // (clicking sheet tabs during non-formula editing should commit)
+          if (editingSession.isFormulaEditing()) {
+            this.suppressBlurCommit = true;
+          }
+        },
+        { capture: true }
+      );
+    }
 
     // Reset suppress flag on mouseup (after all blur handlers have run)
     document.addEventListener("mouseup", () => {
@@ -84,6 +108,16 @@ export class FocusManager {
     // If focus is moving to another element inside the container, suppress
     if (relatedTarget instanceof HTMLElement) {
       if (this.container.contains(relatedTarget)) {
+        return true;
+      }
+
+      // During formula editing, clicking on sheet tabs should also suppress blur
+      // This enables cross-sheet reference picking (Excel-like behavior)
+      if (
+        this.sheetTabsContainer &&
+        editingSession.isFormulaEditing() &&
+        this.sheetTabsContainer.contains(relatedTarget)
+      ) {
         return true;
       }
     }
