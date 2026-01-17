@@ -169,7 +169,7 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
             // Register cross-sheet dependencies at workbook level
             Workbook* wb = targetSheet->getWorkbook();
             if (wb != nullptr) {
-                std::vector<CrossSheetRef> crossRefs = extractCrossSheetRefs(formula->ast);
+                const std::vector<CrossSheetRef> crossRefs = extractCrossSheetRefs(formula->ast);
                 for (const auto& ref : crossRefs) {
                     if (ref.type == CrossSheetRef::Type::CELL) {
                         wb->addCrossSheetDep(ref.cellId, targetSheet->id, cell->id);
@@ -178,8 +178,8 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
                         // We need to look up the cell positions from their IDs
                         Sheet* sourceSheet = wb->getSheetById(ref.sheetId);
                         if (sourceSheet != nullptr) {
-                            Cell* startCell = sourceSheet->getCell(ref.startCellId);
-                            Cell* endCell = sourceSheet->getCell(ref.endCellId);
+                            const Cell* startCell = sourceSheet->getCell(ref.startCellId);
+                            const Cell* endCell = sourceSheet->getCell(ref.endCellId);
                             if (startCell != nullptr && endCell != nullptr) {
                                 wb->addCrossSheetRangeDep(
                                     ref.sheetId, startCell->colId, startCell->rowId, endCell->colId,

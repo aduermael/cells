@@ -303,7 +303,7 @@ void recalculateCrossSheet(Workbook* workbook, Sheet* changedSheet,
 
     // Check range dependencies - formulas that reference ranges containing the changed cells
     for (const ID& cellId : changedCells) {
-        Cell* cell = changedSheet->getCell(cellId);
+        const Cell* cell = changedSheet->getCell(cellId);
         if (!cell) {
             continue;
         }
@@ -329,7 +329,7 @@ void recalculateCrossSheet(Workbook* workbook, Sheet* changedSheet,
 
         // Mark formula cells as dirty and recalculate
         for (const ID& formulaCellId : formulaCells) {
-            Cell* cell = targetSheet->getCell(formulaCellId);
+            const Cell* cell = targetSheet->getCell(formulaCellId);
             if (cell) {
                 Formula* formula = cell->getFormula();
                 if (formula) {

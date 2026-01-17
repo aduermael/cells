@@ -117,23 +117,46 @@ std::string FormulaDisplayConverter::nodeToString(const ASTNode* node) const {
 
 std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) const {
     std::string result;
-
-    // Add sheet prefix if present (prefer sheetId for stability)
-    result += getSheetPrefix(node->sheetId, node->sheetName);
+    std::string sheetPrefix;
 
     // Determine which sheet to look up the cell on
     const Sheet* lookupSheet = &_sheet;
+
+    // If sheetId is explicitly set, use it (existing storage format)
     if (!node->sheetId.empty() && _workbook != nullptr) {
         const ID sheetIdObj(node->sheetId);
         const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
         if (crossSheet != nullptr) {
             lookupSheet = crossSheet;
+            // Add sheet prefix since it's explicitly a cross-sheet ref
+            sheetPrefix = getSheetPrefix(node->sheetId, node->sheetName);
         }
+    } else if (!node->sheetName.empty()) {
+        // Legacy sheetName reference
+        sheetPrefix = getSheetPrefix("", node->sheetName);
     }
 
     // If we have a resolved cellId, look up the current position
     if (!node->cellId.empty()) {
         const ID cellIdObj(node->cellId);
+
+        // For simplified storage: search all sheets if sheetId is empty
+        if (node->sheetId.empty() && _workbook != nullptr) {
+            auto [foundCell, foundSheet] = _workbook->findCell(cellIdObj);
+            if (foundCell && foundSheet) {
+                lookupSheet = foundSheet;
+                // Check if this is a cross-sheet reference by comparing the cell's column sheetId
+                // with the formula's sheet
+                const Axis* col = lookupSheet->columns.count(foundCell->colId) != 0u
+                                      ? lookupSheet->columns.at(foundCell->colId).get()
+                                      : nullptr;
+                if (col != nullptr && col->sheetId != _sheet.id) {
+                    // Cross-sheet reference - add sheet prefix
+                    sheetPrefix = formatSheetName(lookupSheet->name);
+                }
+            }
+        }
+
         // Find the cell to get its column and row
         for (const auto& [id, cell] : lookupSheet->cells) {
             if (id == cellIdObj) {
@@ -146,6 +169,7 @@ std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) co
                                       : nullptr;
 
                 if (col != nullptr && row != nullptr) {
+                    result += sheetPrefix;
                     if (node->colAbsolute) {
                         result += "$";
                     }
@@ -162,6 +186,7 @@ std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) co
     }
 
     // Fall back to original column/row (uppercase column for normalization)
+    result += sheetPrefix;
     if (node->colAbsolute) {
         result += "$";
     }
@@ -183,25 +208,43 @@ std::string FormulaDisplayConverter::rangeRefToString(const RangeRefNode* node) 
 
 std::string FormulaDisplayConverter::columnRefToString(const ColumnRefNode* node) const {
     std::string result;
-
-    // Add sheet prefix if present (prefer sheetId for stability)
-    result += getSheetPrefix(node->sheetId, node->sheetName);
+    std::string sheetPrefix;
 
     // Determine which sheet to look up on
     const Sheet* lookupSheet = &_sheet;
+
+    // If sheetId is explicitly set, use it (existing storage format)
     if (!node->sheetId.empty() && _workbook != nullptr) {
         const ID sheetIdObj(node->sheetId);
         const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
         if (crossSheet != nullptr) {
             lookupSheet = crossSheet;
+            sheetPrefix = getSheetPrefix(node->sheetId, node->sheetName);
         }
+    } else if (!node->sheetName.empty()) {
+        sheetPrefix = getSheetPrefix("", node->sheetName);
     }
 
     // If we have a resolved columnId, look up the current position
     if (!node->columnId.empty()) {
         const ID colIdObj(node->columnId);
+
+        // For simplified storage: search all sheets if sheetId is empty
+        if (node->sheetId.empty() && _workbook != nullptr) {
+            const Sheet* foundSheet = _workbook->findAxisSheet(colIdObj);
+            if (foundSheet) {
+                lookupSheet = foundSheet;
+                // Check if cross-sheet by comparing column's sheetId with formula's sheet
+                auto colIt = lookupSheet->columns.find(colIdObj);
+                if (colIt != lookupSheet->columns.end() && colIt->second->sheetId != _sheet.id) {
+                    sheetPrefix = formatSheetName(lookupSheet->name);
+                }
+            }
+        }
+
         for (const auto& [id, col] : lookupSheet->columns) {
             if (id == colIdObj) {
+                result += sheetPrefix;
                 if (node->absolute) {
                     result += "$";
                 }
@@ -215,6 +258,7 @@ std::string FormulaDisplayConverter::columnRefToString(const ColumnRefNode* node
     }
 
     // Fall back to original (uppercase column for normalization)
+    result += sheetPrefix;
     if (node->absolute) {
         result += "$";
     }
@@ -228,25 +272,43 @@ std::string FormulaDisplayConverter::columnRefToString(const ColumnRefNode* node
 
 std::string FormulaDisplayConverter::rowRefToString(const RowRefNode* node) const {
     std::string result;
-
-    // Add sheet prefix if present (prefer sheetId for stability)
-    result += getSheetPrefix(node->sheetId, node->sheetName);
+    std::string sheetPrefix;
 
     // Determine which sheet to look up on
     const Sheet* lookupSheet = &_sheet;
+
+    // If sheetId is explicitly set, use it (existing storage format)
     if (!node->sheetId.empty() && _workbook != nullptr) {
         const ID sheetIdObj(node->sheetId);
         const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
         if (crossSheet != nullptr) {
             lookupSheet = crossSheet;
+            sheetPrefix = getSheetPrefix(node->sheetId, node->sheetName);
         }
+    } else if (!node->sheetName.empty()) {
+        sheetPrefix = getSheetPrefix("", node->sheetName);
     }
 
     // If we have a resolved rowId, look up the current position
     if (!node->rowId.empty()) {
         const ID rowIdObj(node->rowId);
+
+        // For simplified storage: search all sheets if sheetId is empty
+        if (node->sheetId.empty() && _workbook != nullptr) {
+            const Sheet* foundSheet = _workbook->findAxisSheet(rowIdObj);
+            if (foundSheet) {
+                lookupSheet = foundSheet;
+                // Check if cross-sheet by comparing row's sheetId with formula's sheet
+                auto rowIt = lookupSheet->rows.find(rowIdObj);
+                if (rowIt != lookupSheet->rows.end() && rowIt->second->sheetId != _sheet.id) {
+                    sheetPrefix = formatSheetName(lookupSheet->name);
+                }
+            }
+        }
+
         for (const auto& [id, row] : lookupSheet->rows) {
             if (id == rowIdObj) {
+                result += sheetPrefix;
                 if (node->absolute) {
                     result += "$";
                 }
@@ -261,6 +323,7 @@ std::string FormulaDisplayConverter::rowRefToString(const RowRefNode* node) cons
     }
 
     // Fall back to original
+    result += sheetPrefix;
     if (node->absolute) {
         result += "$";
     }
@@ -274,17 +337,34 @@ std::string FormulaDisplayConverter::rowRefToString(const RowRefNode* node) cons
 
 std::string FormulaDisplayConverter::columnRangeRefToString(const ColumnRangeRefNode* node) const {
     std::string result;
-
-    // Add sheet prefix if present (prefer sheetId for stability)
-    result += getSheetPrefix(node->sheetId, node->sheetName);
+    std::string sheetPrefix;
 
     // Determine which sheet to look up on
     const Sheet* lookupSheet = &_sheet;
+
+    // If sheetId is explicitly set, use it (existing storage format)
     if (!node->sheetId.empty() && _workbook != nullptr) {
         const ID sheetIdObj(node->sheetId);
         const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
         if (crossSheet != nullptr) {
             lookupSheet = crossSheet;
+            sheetPrefix = getSheetPrefix(node->sheetId, node->sheetName);
+        }
+    } else if (!node->sheetName.empty()) {
+        sheetPrefix = getSheetPrefix("", node->sheetName);
+    }
+
+    // For simplified storage: search all sheets if sheetId is empty
+    if (node->sheetId.empty() && !node->startColumnId.empty() && _workbook != nullptr) {
+        const ID startColIdObj(node->startColumnId);
+        const Sheet* foundSheet = _workbook->findAxisSheet(startColIdObj);
+        if (foundSheet) {
+            lookupSheet = foundSheet;
+            // Check if cross-sheet
+            auto colIt = lookupSheet->columns.find(startColIdObj);
+            if (colIt != lookupSheet->columns.end() && colIt->second->sheetId != _sheet.id) {
+                sheetPrefix = formatSheetName(lookupSheet->name);
+            }
         }
     }
 
@@ -317,6 +397,7 @@ std::string FormulaDisplayConverter::columnRangeRefToString(const ColumnRangeRef
     std::transform(endCol.begin(), endCol.end(), endCol.begin(),
                    [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
 
+    result += sheetPrefix;
     if (node->startAbsolute) {
         result += "$";
     }
@@ -332,17 +413,34 @@ std::string FormulaDisplayConverter::columnRangeRefToString(const ColumnRangeRef
 
 std::string FormulaDisplayConverter::rowRangeRefToString(const RowRangeRefNode* node) const {
     std::string result;
-
-    // Add sheet prefix if present (prefer sheetId for stability)
-    result += getSheetPrefix(node->sheetId, node->sheetName);
+    std::string sheetPrefix;
 
     // Determine which sheet to look up on
     const Sheet* lookupSheet = &_sheet;
+
+    // If sheetId is explicitly set, use it (existing storage format)
     if (!node->sheetId.empty() && _workbook != nullptr) {
         const ID sheetIdObj(node->sheetId);
         const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
         if (crossSheet != nullptr) {
             lookupSheet = crossSheet;
+            sheetPrefix = getSheetPrefix(node->sheetId, node->sheetName);
+        }
+    } else if (!node->sheetName.empty()) {
+        sheetPrefix = getSheetPrefix("", node->sheetName);
+    }
+
+    // For simplified storage: search all sheets if sheetId is empty
+    if (node->sheetId.empty() && !node->startRowId.empty() && _workbook != nullptr) {
+        const ID startRowIdObj(node->startRowId);
+        const Sheet* foundSheet = _workbook->findAxisSheet(startRowIdObj);
+        if (foundSheet) {
+            lookupSheet = foundSheet;
+            // Check if cross-sheet
+            auto rowIt = lookupSheet->rows.find(startRowIdObj);
+            if (rowIt != lookupSheet->rows.end() && rowIt->second->sheetId != _sheet.id) {
+                sheetPrefix = formatSheetName(lookupSheet->name);
+            }
         }
     }
 
@@ -369,6 +467,7 @@ std::string FormulaDisplayConverter::rowRangeRefToString(const RowRangeRefNode* 
         }
     }
 
+    result += sheetPrefix;
     if (node->startAbsolute) {
         result += "$";
     }

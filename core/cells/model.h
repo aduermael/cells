@@ -734,6 +734,25 @@ struct Workbook {
     [[nodiscard]] const Sheet* getSheetById(const ID& sheetId) const;
 
     // ========================================================================
+    // Cross-sheet cell lookup
+    // ========================================================================
+
+    // Find a cell by ID across all sheets. Returns {cell, sheet} or {nullptr, nullptr} if not
+    // found. Used for evaluating formulas that reference cells by UUID without explicit sheet
+    // prefix.
+    struct CellLookupResult {
+        Cell* cell;
+        Sheet* sheet;
+    };
+    [[nodiscard]] CellLookupResult findCell(const ID& cellId);
+    [[nodiscard]] std::pair<const Cell*, const Sheet*> findCell(const ID& cellId) const;
+
+    // Find a column/row axis by ID across all sheets. Returns the sheet it belongs to.
+    // Returns nullptr if not found.
+    [[nodiscard]] Sheet* findAxisSheet(const ID& axisId);
+    [[nodiscard]] const Sheet* findAxisSheet(const ID& axisId) const;
+
+    // ========================================================================
     // Custom formats (CRDT-synced)
     // ========================================================================
 

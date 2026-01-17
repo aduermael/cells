@@ -107,6 +107,8 @@ static EvalResult evaluateCellRef(const CellRefNode* node, EvalContext& ctx) {
 
     // Get the target sheet (may be different from ctx.sheet for cross-sheet refs)
     Sheet* targetSheet = ctx.sheet;
+    Cell* cell = nullptr;
+
     if (ctx.workbook) {
         // Try sheetId first (UUID-based storage), then fall back to sheetName (A1 notation)
         if (!node->sheetId.empty()) {
@@ -115,16 +117,30 @@ static EvalResult evaluateCellRef(const CellRefNode* node, EvalContext& ctx) {
                 // Referenced sheet doesn't exist
                 return EvalResult::Error(CellError::REF);
             }
+            cell = targetSheet->getCell(cellId);
         } else if (!node->sheetName.empty()) {
             targetSheet = ctx.workbook->getSheetByName(node->sheetName);
             if (!targetSheet) {
                 // Referenced sheet doesn't exist
                 return EvalResult::Error(CellError::REF);
             }
+            cell = targetSheet->getCell(cellId);
+        } else {
+            // No explicit sheet reference - search all sheets for the cell
+            // This supports the simplified formula storage where only cellId is stored
+            auto [foundCell, foundSheet] = ctx.workbook->findCell(cellId);
+            if (foundCell) {
+                cell = foundCell;
+                targetSheet = foundSheet;
+            }
         }
     }
 
-    Cell* cell = targetSheet->getCell(cellId);
+    // If workbook lookup didn't find the cell, try the current sheet as fallback
+    if (!cell) {
+        cell = targetSheet->getCell(cellId);
+    }
+
     if (!cell) {
         // Empty cell reference returns 0
         return EvalResult::Number(0.0);
@@ -474,6 +490,13 @@ static EvalResult evaluateRangeRef(const RangeRefNode* node, EvalContext& ctx) {
             if (!targetSheet) {
                 return EvalResult::Error(CellError::REF);
             }
+        } else if (!node->topLeft->cellId.empty()) {
+            // No explicit sheet - search all sheets for the cell
+            // This supports simplified formula storage with only cellId
+            auto [foundCell, foundSheet] = ctx.workbook->findCell(ID(node->topLeft->cellId));
+            if (foundSheet) {
+                targetSheet = foundSheet;
+            }
         }
     }
 
@@ -547,13 +570,22 @@ static EvalResult evaluateColumnRef(const ColumnRefNode* node, EvalContext& ctx)
         return EvalResult::Error(CellError::REF);
     }
 
-    // Look up column by name or resolved ID
+    // Determine target sheet (may be cross-sheet via sheetId or columnId lookup)
+    Sheet* targetSheet = ctx.sheet;
     const Axis* col = nullptr;
-    if (!node->columnId.empty()) {
-        col = ctx.sheet->getColumn(ID(node->columnId));
+
+    if (ctx.workbook && !node->columnId.empty()) {
+        // Try to find the column across all sheets (simplified formula storage)
+        Sheet* foundSheet = ctx.workbook->findAxisSheet(ID(node->columnId));
+        if (foundSheet) {
+            targetSheet = foundSheet;
+            col = targetSheet->getColumn(ID(node->columnId));
+        }
     }
+
+    // Fall back to column name lookup on target sheet
     if (!col) {
-        col = ctx.sheet->getColumnByName(node->column);
+        col = targetSheet->getColumnByName(node->column);
     }
 
     if (!col) {
@@ -569,13 +601,22 @@ static EvalResult evaluateRowRef(const RowRefNode* node, EvalContext& ctx) {
         return EvalResult::Error(CellError::REF);
     }
 
-    // Look up row by position or resolved ID
+    // Determine target sheet (may be cross-sheet via rowId lookup)
+    Sheet* targetSheet = ctx.sheet;
     const Axis* row = nullptr;
-    if (!node->rowId.empty()) {
-        row = ctx.sheet->getRow(ID(node->rowId));
+
+    if (ctx.workbook && !node->rowId.empty()) {
+        // Try to find the row across all sheets (simplified formula storage)
+        Sheet* foundSheet = ctx.workbook->findAxisSheet(ID(node->rowId));
+        if (foundSheet) {
+            targetSheet = foundSheet;
+            row = targetSheet->getRow(ID(node->rowId));
+        }
     }
+
+    // Fall back to row position lookup on target sheet
     if (!row) {
-        row = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->row - 1));
+        row = targetSheet->getRowByPosition(static_cast<uint32_t>(node->row - 1));
     }
 
     if (!row) {
@@ -591,22 +632,29 @@ static EvalResult evaluateColumnRangeRef(const ColumnRangeRefNode* node, EvalCon
         return EvalResult::Error(CellError::REF);
     }
 
-    // Look up columns by name or resolved ID
+    // Determine target sheet (may be cross-sheet via column ID lookup)
+    Sheet* targetSheet = ctx.sheet;
     const Axis* startCol = nullptr;
     const Axis* endCol = nullptr;
 
-    if (!node->startColumnId.empty()) {
-        startCol = ctx.sheet->getColumn(ID(node->startColumnId));
+    // Try to find columns across all sheets (simplified formula storage)
+    if (ctx.workbook && !node->startColumnId.empty()) {
+        Sheet* foundSheet = ctx.workbook->findAxisSheet(ID(node->startColumnId));
+        if (foundSheet) {
+            targetSheet = foundSheet;
+            startCol = targetSheet->getColumn(ID(node->startColumnId));
+        }
     }
     if (!startCol) {
-        startCol = ctx.sheet->getColumnByName(node->startColumn);
+        startCol = targetSheet->getColumnByName(node->startColumn);
     }
 
-    if (!node->endColumnId.empty()) {
-        endCol = ctx.sheet->getColumn(ID(node->endColumnId));
+    if (ctx.workbook && !node->endColumnId.empty()) {
+        // endColumnId should be on same sheet as startColumnId
+        endCol = targetSheet->getColumn(ID(node->endColumnId));
     }
     if (!endCol) {
-        endCol = ctx.sheet->getColumnByName(node->endColumn);
+        endCol = targetSheet->getColumnByName(node->endColumn);
     }
 
     if (!startCol || !endCol) {
@@ -627,22 +675,29 @@ static EvalResult evaluateRowRangeRef(const RowRangeRefNode* node, EvalContext& 
         return EvalResult::Error(CellError::REF);
     }
 
-    // Look up rows by position or resolved ID
+    // Determine target sheet (may be cross-sheet via row ID lookup)
+    Sheet* targetSheet = ctx.sheet;
     const Axis* startRow = nullptr;
     const Axis* endRow = nullptr;
 
-    if (!node->startRowId.empty()) {
-        startRow = ctx.sheet->getRow(ID(node->startRowId));
+    // Try to find rows across all sheets (simplified formula storage)
+    if (ctx.workbook && !node->startRowId.empty()) {
+        Sheet* foundSheet = ctx.workbook->findAxisSheet(ID(node->startRowId));
+        if (foundSheet) {
+            targetSheet = foundSheet;
+            startRow = targetSheet->getRow(ID(node->startRowId));
+        }
     }
     if (!startRow) {
-        startRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->startRow - 1));
+        startRow = targetSheet->getRowByPosition(static_cast<uint32_t>(node->startRow - 1));
     }
 
-    if (!node->endRowId.empty()) {
-        endRow = ctx.sheet->getRow(ID(node->endRowId));
+    if (ctx.workbook && !node->endRowId.empty()) {
+        // endRowId should be on same sheet as startRowId
+        endRow = targetSheet->getRow(ID(node->endRowId));
     }
     if (!endRow) {
-        endRow = ctx.sheet->getRowByPosition(static_cast<uint32_t>(node->endRow - 1));
+        endRow = targetSheet->getRowByPosition(static_cast<uint32_t>(node->endRow - 1));
     }
 
     if (!startRow || !endRow) {

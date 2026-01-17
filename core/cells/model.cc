@@ -470,6 +470,58 @@ const Sheet* Workbook::getSheetById(const ID& sheetId) const {
     return nullptr;
 }
 
+// =============================================================================
+// Cross-sheet cell lookup
+// =============================================================================
+
+Workbook::CellLookupResult Workbook::findCell(const ID& cellId) {
+    for (auto& sheet : sheets) {
+        Cell* cell = sheet->getCell(cellId);
+        if (cell) {
+            return {cell, sheet.get()};
+        }
+    }
+    return {nullptr, nullptr};
+}
+
+std::pair<const Cell*, const Sheet*> Workbook::findCell(const ID& cellId) const {
+    for (const auto& sheet : sheets) {
+        const Cell* cell = sheet->getCell(cellId);
+        if (cell) {
+            return {cell, sheet.get()};
+        }
+    }
+    return {nullptr, nullptr};
+}
+
+Sheet* Workbook::findAxisSheet(const ID& axisId) {
+    for (auto& sheet : sheets) {
+        // Check columns
+        if (sheet->getColumn(axisId)) {
+            return sheet.get();
+        }
+        // Check rows
+        if (sheet->getRow(axisId)) {
+            return sheet.get();
+        }
+    }
+    return nullptr;
+}
+
+const Sheet* Workbook::findAxisSheet(const ID& axisId) const {
+    for (const auto& sheet : sheets) {
+        // Check columns
+        if (sheet->getColumn(axisId)) {
+            return sheet.get();
+        }
+        // Check rows
+        if (sheet->getRow(axisId)) {
+            return sheet.get();
+        }
+    }
+    return nullptr;
+}
+
 bool Workbook::registerCustomFormat(const ID& formatId, const std::string& formatCode) {
     auto [it, inserted] = _customFormats.try_emplace(formatId, formatCode);
     return inserted;
@@ -528,7 +580,7 @@ const StyleRegistry* Workbook::getStyleRegistry() const {
 void Workbook::addCrossSheetDep(const ID& sourceCellId, const ID& formulaSheetId,
                                 const ID& formulaCellId) {
     // Add to forward index (source -> formula)
-    CrossSheetDep dep{formulaSheetId, formulaCellId};
+    const CrossSheetDep dep{formulaSheetId, formulaCellId};
     _crossSheetDeps[sourceCellId].push_back(dep);
 
     // Add to reverse index (formula -> source) for cleanup
@@ -538,8 +590,8 @@ void Workbook::addCrossSheetDep(const ID& sourceCellId, const ID& formulaSheetId
 void Workbook::addCrossSheetRangeDep(const ID& sourceSheetId, const ID& startColId,
                                      const ID& startRowId, const ID& endColId, const ID& endRowId,
                                      const ID& formulaSheetId, const ID& formulaCellId) {
-    CrossSheetRangeDep dep{sourceSheetId, startColId,     startRowId,   endColId,
-                           endRowId,      formulaSheetId, formulaCellId};
+    const CrossSheetRangeDep dep{sourceSheetId, startColId,     startRowId,   endColId,
+                                 endRowId,      formulaSheetId, formulaCellId};
     _crossSheetRangeDeps[formulaCellId].push_back(dep);
 }
 
