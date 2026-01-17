@@ -305,34 +305,6 @@ struct Axis {
     [[nodiscard]] const ID& getSheetId() const { return sheetId; }
 };
 
-// =============================================================================
-// Merged Cell Range
-// =============================================================================
-//
-// Represents a merged cell region where multiple cells are displayed as one.
-// Only the top-left (anchor) cell contains the value; other cells in the range
-// are visually merged but remain as separate cells in the data model.
-//
-
-// MergeRange - defines a rectangular region of merged cells
-// Stored by anchor position (top-left cell's col/row IDs)
-struct MergeRange {
-    ID anchorColId;       // Top-left column ID (leftmost column)
-    ID anchorRowId;       // Top-left row ID (topmost row)
-    uint16_t colSpan{1};  // Number of columns in merge (>= 1)
-    uint16_t rowSpan{1};  // Number of rows in merge (>= 1)
-
-    MergeRange() = default;
-    MergeRange(const ID& col, const ID& row, uint16_t cols, uint16_t rows)
-        : anchorColId(col), anchorRowId(row), colSpan(cols), rowSpan(rows) {}
-
-    // Check if this is a valid merge (spans more than one cell)
-    [[nodiscard]] bool isValid() const { return colSpan > 1 || rowSpan > 1; }
-
-    // Get total cell count in the merged region
-    [[nodiscard]] size_t cellCount() const { return static_cast<size_t>(colSpan) * rowSpan; }
-};
-
 // Forward declarations for formula management
 class DependencyGraph;
 class NamedRangeRegistry;
@@ -523,35 +495,6 @@ struct Sheet {
     void clearAllSharedFormulaGroups();
 
     // ========================================================================
-    // Merged Cells
-    // ========================================================================
-
-    // Get merged cell range for a position (returns nullptr if not in a merge)
-    // For any cell in a merged region, returns the MergeRange with anchor info
-    [[nodiscard]] const MergeRange* getMergeRange(const ID& colId, const ID& rowId) const;
-
-    // Check if a position is the anchor (top-left) of a merged region
-    [[nodiscard]] bool isMergeAnchor(const ID& colId, const ID& rowId) const;
-
-    // Check if a position is part of a merged region (but not the anchor)
-    [[nodiscard]] bool isMergedCell(const ID& colId, const ID& rowId) const;
-
-    // Add a merged cell region (anchor is top-left, spans colSpan x rowSpan)
-    // The anchorColId/anchorRowId identify the top-left cell
-    // Requires columns/rows to exist at these positions
-    void addMergeRange(const ID& anchorColId, const ID& anchorRowId, uint16_t colSpan,
-                       uint16_t rowSpan);
-
-    // Remove a merged cell region by its anchor position
-    void removeMergeRange(const ID& anchorColId, const ID& anchorRowId);
-
-    // Get all merge ranges (for serialization/export)
-    [[nodiscard]] const std::vector<MergeRange>& getMergeRanges() const { return _mergeRanges; }
-
-    // Clear all merged cell regions
-    void clearAllMergeRanges();
-
-    // ========================================================================
     // Unified Range System
     // ========================================================================
 
@@ -637,17 +580,6 @@ private:
 
     // Reverse lookup: subscriber cell ID → master cell ID
     std::unordered_map<ID, ID, IDHash> _sharedFormulaFrom;
-
-    // ========================================================================
-    // Merged cells (persisted)
-    // ========================================================================
-
-    // All merged cell ranges in this sheet
-    std::vector<MergeRange> _mergeRanges;
-
-    // Index: (colId, rowId) composite key → index into _mergeRanges
-    // Contains entries for ALL positions in merged ranges (including anchors)
-    std::unordered_map<std::string, size_t> _mergeIndex;
 
     // ========================================================================
     // Unified Range System (persisted)
