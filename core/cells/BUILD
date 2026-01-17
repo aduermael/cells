@@ -485,6 +485,21 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "workbook_benchmark_test",
+    srcs = ["workbook_benchmark_test.cc"],
+    deps = [
+        ":crdt",
+        ":formula_eval",
+        ":formula_parser",
+        ":formula_recalc",
+        ":formula_resolver",
+        ":id",
+        ":model",
+        "@googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "xlsx_writer",
     srcs = ["xlsx_writer.cc"],
