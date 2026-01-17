@@ -10,7 +10,13 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 5 COMPLETE - ranges moved to Workbook level.
+**Current status:** Phase 6 COMPLETE - context-aware address display.
+
+**Progress Jan 17 (session 8):**
+- Phase 6: Context-aware address display
+- `FormulaDisplayConverter` already had the logic to compare cell's sheet with context sheet
+- Updated `CellsEngine::getFormulaDisplay` to use `FormulaDisplayConverter` directly
+- All 54 unit tests and 184 E2E tests pass
 
 **Progress Jan 17 (session 7):**
 - Moved range storage from Sheet to Workbook level
@@ -221,14 +227,12 @@ Move range storage from Sheet to Workbook level. Keep per-sheet R-tree index.
 
 Implement dynamic address display based on context (current sheet vs. other sheets).
 
-- [ ] 6a: Create `AddressDisplayContext` struct with `currentSheetId` field
-- [ ] 6b: Add `getDisplayAddress(cellId, context)` method to Workbook
-- [ ] 6c: For cells on current sheet: return just `B2` (column + row position)
-- [ ] 6d: For cells on other sheets: return `Sheet2!B2` (sheet name + position)
-- [ ] 6e: Update `FormulaSerializer` to accept display context and use dynamic addressing
-- [ ] 6f: Update formula bar display to use context-aware address formatting
-- [ ] 6g: Update UI formula display in cells to use context-aware formatting
-- [ ] 6h: Run tests to verify address display works in all contexts
+**Implementation note:** `FormulaDisplayConverter` already had context-aware display logic implemented. The only change needed was updating `CellsEngine::getFormulaDisplay` to use `FormulaDisplayConverter` directly instead of going through the `FormulaSerializer` → `RefConverter::formulaToA1` path.
+
+- [x] 6a-6d: Context-aware display already implemented in `FormulaDisplayConverter::cellRefToString()` - it compares a cell's column's sheetId with the context sheet's id and adds sheet prefix when they differ
+- [x] 6e: Not needed - `FormulaDisplayConverter` handles this at AST level, no need to modify `FormulaSerializer`
+- [x] 6f-6g: Updated `CellsEngine::getFormulaDisplay` to use `FormulaDisplayConverter` instead of `RefConverter::formulaToA1`
+- [x] 6h: Run tests to verify address display works in all contexts - ALL PASS (54 unit + 184 E2E)
 
 ## Phase 7: CRDT Operation Updates
 

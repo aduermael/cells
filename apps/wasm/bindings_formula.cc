@@ -25,6 +25,7 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/dependency_graph.h"
+#include "core/cells/formula_display.h"
 #include "core/cells/formula_eval.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
@@ -113,19 +114,30 @@ std::string CellsEngine::getFormulaDisplay(const std::string& cellIdStr) {
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) return "";
+    if (!sheet) {
+        return "";
+    }
 
-    if (cellIdStr.size() != ID_LENGTH) return "";
+    if (cellIdStr.size() != ID_LENGTH) {
+        return "";
+    }
     ID cellId(cellIdStr);
 
     Cell* cell = sheet->getCell(cellId);
-    if (!cell || !cell->isFormula()) return "";
+    if (!cell || !cell->isFormula()) {
+        return "";
+    }
 
     Formula* formula = cell->getFormula();
-    if (!formula || !formula->ast) return "";
+    if (!formula || !formula->ast) {
+        return "";
+    }
 
-    const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
-    return _refConverter.formulaToA1(uuidFormula);
+    // Use FormulaDisplayConverter for context-aware display:
+    // - For refs on the current sheet: shows "B2"
+    // - For refs on other sheets: shows "Sheet2!B2"
+    FormulaDisplayConverter converter(*sheet, _workbook.get());
+    return converter.toDisplayString(formula->ast.get());
 }
 
 std::string CellsEngine::getCellDependencies(const std::string& cellIdStr) {
