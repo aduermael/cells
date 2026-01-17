@@ -10,7 +10,15 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 8 COMPLETE - Formula engine already supports workbook-level storage.
+**Current status:** Phase 9 COMPLETE - Migration and cleanup done.
+
+**Progress Jan 17 (session 11):**
+- Phase 9: Migration and Cleanup
+- Analyzed parser/serializer - migration code NOT needed (Sheet methods delegate to Workbook)
+- Cross-sheet dependency removal deferred (R-tree uses sheet-local positions)
+- No obsolete per-sheet storage fields to remove
+- Updated header comments in model.h to document storage architecture
+- All 54 unit tests and 184 E2E tests pass
 
 **Progress Jan 17 (session 10):**
 - Phase 8: Formula Engine Integration
@@ -286,12 +294,14 @@ Update formula resolution and evaluation for Workbook-level entities.
 
 Handle migration of existing data and clean up obsolete code.
 
-- [ ] 9a: Add migration code in file parser to move cells from Sheet to Workbook storage
-- [ ] 9b: Add migration code for ranges from Sheet to Workbook storage
-- [ ] 9c: Remove obsolete cross-sheet dependency code from Workbook
-- [ ] 9d: Remove obsolete per-sheet storage fields that are now at Workbook level
-- [ ] 9e: Update documentation and comments to reflect new architecture
-- [ ] 9f: Run full E2E test suite to verify everything works
+**Analysis:** Migration code is NOT needed. The file format remains unchanged - cells and ranges are serialized under their sheet sections, but when parsed, the Sheet::addCell/addRange methods automatically delegate to Workbook-level storage. This provides transparent backward compatibility.
+
+- [x] 9a: Migration NOT needed - Sheet methods delegate to Workbook during parsing
+- [x] 9b: Migration NOT needed - same pattern for ranges
+- [~] 9c: Cross-sheet dependency removal deferred (needed while R-tree uses sheet-local positions)
+- [x] 9d: No obsolete fields - all Sheet members needed (_cellIndex for positions, _rangeIds, _rangeIndex)
+- [x] 9e: Updated header comments in model.h to document workbook-level storage architecture
+- [x] 9f: All 54 unit tests and 184/184 E2E tests pass
 
 ## Phase 10: Workbook-Level Axis Storage
 

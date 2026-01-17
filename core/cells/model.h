@@ -12,10 +12,18 @@
 // - Track collaboration mode and custom format definitions
 //
 // Architecture notes:
-// - UUIDs are the source of truth; positions are derived via Order Statistic Tree
+// - UUIDs are the source of truth; positions are derived
 // - When CollabMode is COLLABORATING, all mutations MUST go through CRDT operations
 // - Direct mutations are only valid for file loading or applying peer operations
 // - Formula AST is owned by Cell; text is serialized on-demand
+//
+// Storage architecture (workbook-level entities):
+// - Cells: Owned by Workbook::_cells; Sheets keep position index (_cellIndex)
+// - Ranges: Owned by Workbook::_ranges; Sheets keep ID set and R-tree index
+// - Dependency Graph: Single global graph in Workbook::_depGraph
+// - Shared Formulas: Workbook::_sharedFormulaMasters, _sharedFormulaFrom
+// - Spill Regions: Workbook::_spillMasters, _spilledFrom
+// - Columns/Rows (Axis): Currently per-sheet (Sheet::columns, Sheet::rows)
 //
 // Dependencies: types.h, operation.h, oplog.h
 // Used by: crdt.cc, formula_eval.cc, bindings.cc, all persistence modules
