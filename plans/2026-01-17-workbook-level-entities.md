@@ -95,21 +95,24 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 
 ## Current Architecture
 
-- **Cells**: Owned by Sheet (`Sheet::cells` map keyed by UUID)
-- **Dependency Graph**: Per-sheet (`Sheet::_depGraph`)
-- **Shared Formulas**: Per-sheet (`Sheet::_sharedFormulaMasters`, `Sheet::_sharedFormulaFrom`)
-- **Spill Regions**: Per-sheet (`Sheet::_spillMasters`, `Sheet::_spilledFrom`)
-- **Ranges**: Per-sheet (`Sheet::_ranges`) with per-sheet R-tree index (`Sheet::_rangeIndex`)
-- **Cross-sheet Dependencies**: Already at Workbook level (`Workbook::_crossSheetDeps`, `_crossSheetRangeDeps`)
+- **Cells**: ✅ Workbook level (`Workbook::_cells`), Sheet has `_cellIndex` for position lookups
+- **Columns/Rows**: Per-sheet (`Sheet::columns`, `Sheet::rows` maps keyed by UUID)
+- **Dependency Graph**: ✅ Workbook level (`Workbook::_depGraph`)
+- **Shared Formulas**: ✅ Workbook level (`Workbook::_sharedFormulaMasters`, `_sharedFormulaFrom`)
+- **Spill Regions**: ✅ Workbook level (`Workbook::_spillMasters`, `_spilledFrom`)
+- **Ranges**: ✅ Workbook level (`Workbook::_ranges`), Sheet has `_rangeIds` set and `_rangeIndex` R-tree
+- **Cross-sheet Dependencies**: Workbook level (`Workbook::_crossSheetDeps`, `_crossSheetRangeDeps`) - to be removed when R-tree is workbook-aware
 
 ## Target Architecture
 
-- **Cells**: Indexed by UUID at Workbook level; Sheets maintain secondary (colId, rowId) index for fast 2D access
-- **Dependency Graph**: Global to Workbook (no more cross-sheet tracking needed - it's all one graph)
-- **Shared Formulas**: Global to Workbook
-- **Spill Regions**: Global to Workbook (master cell links back to sheet via its column/row refs)
-- **Ranges**: Global to Workbook (link back to sheet via column/row UUIDs)
+- **Cells**: ✅ Indexed by UUID at Workbook level; Sheets maintain `_cellIndex` for fast 2D access
+- **Columns/Rows**: Indexed by UUID at Workbook level; Sheets maintain position indices for fast position lookups
+- **Dependency Graph**: ✅ Global to Workbook (cross-sheet tracking can be removed when R-tree is workbook-aware)
+- **Shared Formulas**: ✅ Global to Workbook
+- **Spill Regions**: ✅ Global to Workbook (master cell links back to sheet via its column/row refs)
+- **Ranges**: ✅ Global to Workbook; `_rangeIds` also global (link back to sheet via axis's sheetId)
 - **Range Index**: Remains per-sheet (R-tree for fast viewport queries by position)
+- **Position Indices**: Remain per-sheet (column/row position → ID lookups)
 
 ## Benefits
 
@@ -290,37 +293,108 @@ Handle migration of existing data and clean up obsolete code.
 - [ ] 9e: Update documentation and comments to reflect new architecture
 - [ ] 9f: Run full E2E test suite to verify everything works
 
-## Phase 10: Performance Validation
+## Phase 10: Workbook-Level Axis Storage
+
+Move columns and rows (Axis objects) from Sheet to Workbook level. Each Axis already has a `sheetId` field, so it can link back to its sheet.
+
+**Benefits:**
+- Simpler cell-to-axis lookups: `workbook->getColumn(colId)` instead of finding the sheet first
+- Consistent with cell/range storage pattern
+- Enables future cross-sheet axis references
+
+**What moves to Workbook:**
+- `Sheet::columns` → `Workbook::_columns` (primary storage)
+- `Sheet::rows` → `Workbook::_rows` (primary storage)
+
+**What stays in Sheet:**
+- `_columnIndex` (position → ID) for fast position-based lookups
+- `_rowIndex` (position → ID) for fast position-based lookups
+
+- [ ] 10a: Add `Workbook::_columns` map (ID → unique_ptr<Axis>) as primary column storage
+- [ ] 10b: Add `Workbook::_rows` map (ID → unique_ptr<Axis>) as primary row storage
+- [ ] 10c: Add `Workbook::getColumn(colId)`, `addColumn()`, `removeColumn()` methods
+- [ ] 10d: Add `Workbook::getRow(rowId)`, `addRow()`, `removeRow()` methods
+- [ ] 10e: Change `Sheet::columns` to `_columnIds` set (just IDs, not ownership)
+- [ ] 10f: Change `Sheet::rows` to `_rowIds` set (just IDs, not ownership)
+- [ ] 10g: Update `Sheet::getColumn()`, `getRow()` to delegate to Workbook
+- [ ] 10h: Update all CRDT axis operations for Workbook-level storage
+- [ ] 10i: Update serializer/parser for new storage pattern
+- [ ] 10j: Run tests to verify axis operations work correctly
+
+## Phase 11: Global Range ID Tracking
+
+Move `_rangeIds` from Sheet to Workbook level for consistency with other entities.
+
+**What moves to Workbook:**
+- `Sheet::_rangeIds` → `Workbook::_rangeIds` (global set of all range IDs)
+
+**What stays in Sheet:**
+- `_rangeIndex` (R-tree) for fast spatial queries - positions are sheet-local
+
+- [ ] 11a: Add `Workbook::_rangeIds` set as global range ID tracking
+- [ ] 11b: Update `Sheet::_rangeIds` to be removed (Workbook has the global set)
+- [ ] 11c: Update `Sheet::addRange()`, `removeRange()` to update Workbook's `_rangeIds`
+- [ ] 11d: Update code that iterates `sheet->getRangeIds()` to use Workbook
+- [ ] 11e: Run tests to verify range operations work correctly
+
+## Phase 12: Performance Validation
 
 Verify performance is maintained or improved with new architecture.
 
-- [ ] 10a: Benchmark cell lookup performance (should be similar - still O(1) hash lookup)
-- [ ] 10b: Benchmark recalculation with cross-sheet formulas (should be faster - no separate tracking)
-- [ ] 10c: Benchmark viewport query performance (still uses per-sheet R-tree)
-- [ ] 10d: Benchmark CRDT operation application speed
-- [ ] 10e: Document any performance changes
+- [ ] 12a: Benchmark cell lookup performance (should be similar - still O(1) hash lookup)
+- [ ] 12b: Benchmark axis lookup performance (should be similar - still O(1) hash lookup)
+- [ ] 12c: Benchmark recalculation with cross-sheet formulas (should be faster - no separate tracking)
+- [ ] 12d: Benchmark viewport query performance (still uses per-sheet R-tree)
+- [ ] 12e: Benchmark CRDT operation application speed
+- [ ] 12f: Document any performance changes
 
 ## Design Notes
 
+### Target Architecture Summary
+
+**Workbook-level storage (global by UUID):**
+- `_cells` - all Cell objects
+- `_columns` - all column Axis objects (future Phase 10)
+- `_rows` - all row Axis objects (future Phase 10)
+- `_ranges` - all Range objects
+- `_rangeIds` - global set of range IDs (future Phase 11)
+- `_rangeStyles` - range style mappings
+- `_depGraph` - single global dependency graph
+- `_sharedFormulaMasters`, `_sharedFormulaFrom` - shared formula tracking
+- `_spillMasters`, `_spilledFrom` - spill range tracking
+
+**Sheet-level storage (position-based indices):**
+- `_cellIndex` - (colId:rowId → cellId) for fast position lookups
+- `_columnIndex` - (position → colId) for fast column position lookups (future)
+- `_rowIndex` - (position → rowId) for fast row position lookups (future)
+- `_rangeIndex` - R-tree for fast spatial queries (positions are sheet-local)
+
 ### Cell Ownership
 - Workbook owns all Cell objects via `_cells` map
-- Sheet maintains `_cellIds` set (just IDs) and `_cellIndex` map (colId:rowId → cellId)
-- Cell still has `colId` and `rowId` which implicitly link it to a Sheet via those Axis UUIDs
+- Sheet maintains `_cellIndex` map (colId:rowId → cellId) for position-based lookups
+- Cell has `colId` and `rowId` which link to Axis objects (will be in Workbook after Phase 10)
 
 ### Finding a Cell's Sheet
 Given a cell UUID, to find its sheet:
 1. Get cell from `Workbook::getCell(cellId)`
-2. Get column axis and read its `sheetId` field (`Axis::sheetId` already stores this)
-3. Look up sheet via `Workbook::getSheet(sheetId)`
+2. Get column axis from `Workbook::getColumn(cell->colId)` (after Phase 10)
+3. Read axis's `sheetId` field (`Axis::sheetId` already stores this)
+4. Look up sheet via `Workbook::getSheet(sheetId)`
+
+### Axis Ownership (Target - Phase 10)
+- Workbook owns all Axis objects via `_columns` and `_rows` maps
+- Each Axis has a `sheetId` field linking back to its sheet
+- Sheet maintains position indices for fast position-to-ID lookups
 
 ### Range Ownership
-- Workbook owns all Range objects
+- Workbook owns all Range objects via `_ranges` map
+- Workbook tracks all range IDs globally via `_rangeIds` (after Phase 11)
 - Ranges reference column/row UUIDs which belong to specific sheets
 - Sheet maintains R-tree index for fast spatial queries during viewport rendering
-- A range's "sheet" is determined by its startColId's sheet
+- A range's "sheet" is determined by its startColId's axis's sheetId
 
-### Why Keep R-tree Per-Sheet?
-- Viewport queries need to quickly find ranges in a visible area
+### Why Keep R-tree and Position Indices Per-Sheet?
+- Viewport queries need to quickly find entities in a visible area
 - R-tree uses (col_position, row_position) coordinates which are sheet-local
 - Having separate R-trees per sheet avoids coordinate namespace collisions
 - Performance: smaller R-trees = faster queries
