@@ -143,7 +143,7 @@ The parser architecture supports cross-sheet references (verified in formula_par
 
 ## Known Bugs (discovered during testing, to be addressed)
 
-### Bug A: Cross-sheet formula becomes #VALUE! on re-edit
+### Bug A: Cross-sheet formula becomes #VALUE! on re-edit ✅ FIXED
 
 **Repro**:
 1. Enter `=Sheet2!A1` in cell A1 (Sheet1)
@@ -158,6 +158,8 @@ The parser architecture supports cross-sheet references (verified in formula_par
 4. Context is lost or lookup fails, resulting in invalid formula
 
 **Fix**: **Phase 5** - Architectural change where Axis knows its Sheet. Formulas only store Cell UUIDs, and cross-sheet prefixes are added dynamically during display. This eliminates the complex A1↔UUID round-trip that loses context.
+
+**Status**: FIXED as of Phase 5b. E2E tests added in `tests/cross-sheet-reedit.test.mjs` verify that cross-sheet formulas survive re-editing without changes.
 
 ### Bug B: Error formulas display #ERROR! suffix incorrectly
 
@@ -303,17 +305,17 @@ Formula evaluation was updated to work without explicit sheetId:
 
 #### Phase 5e: Migration & Testing
 
-- [ ] 5e1: Write migration logic for existing files with `!sheetId` prefixes:
-  - Parse old format formulas
-  - Convert to new cell-only format
-  - Re-serialize
-- [ ] 5e2: Update all affected unit tests
-- [ ] 5e3: Run full E2E test suite
-- [ ] 5e4: Manual testing of cross-sheet formula scenarios:
-  - Enter cross-sheet formula
-  - Re-edit without changes → should still work
-  - Rename sheet → formula display updates
-  - Delete referenced sheet → proper error handling
+- [x] 5e1: Migration logic deferred - system is backward-compatible with both formats:
+  - Old format (`!sheetId~~cellId`) continues to work via explicit sheetId lookup
+  - New format (`~~cellId` only) works via `Axis.sheetId` detection
+  - No migration needed; files will continue to work as-is
+- [x] 5e2: Unit tests already updated during 5b implementation - all 54 tests pass
+- [x] 5e3: Full E2E test suite passes (184/184 tests)
+- [x] 5e4: Testing cross-sheet formula scenarios:
+  - Enter cross-sheet formula ✅ (covered by existing E2E tests)
+  - Re-edit without changes → works ✅ (new E2E tests in `cross-sheet-reedit.test.mjs`)
+  - Rename sheet → deferred (sheet renaming UI not yet implemented)
+  - Delete referenced sheet → deferred (sheet deletion not yet implemented)
 
 ### Benefits Summary
 
