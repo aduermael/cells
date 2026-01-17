@@ -27,6 +27,7 @@ import type { WasmDataSource } from "./wasm-data-source";
 import type { UIStateMachine } from "./ui-state";
 import { UIEvent } from "./ui-state";
 import type { SheetData } from "./app";
+import { editingSession } from "./editing-session";
 
 // =============================================================================
 // SheetTabsManager Class
@@ -266,18 +267,40 @@ export class SheetTabsManager {
   // =========================================================================
 
   /**
-   * Switch to a different sheet
+   * Switch to a different sheet.
+   *
+   * When in formula editing mode (value starts with "="), preserve the editing state
+   * to allow cross-sheet reference picking (Excel-like behavior).
    */
   async switchToSheet(index: number): Promise<void> {
     if (!this.dataSource || index === this.activeSheetIndex) return;
-    try {
-      // Reset view state before switching
-      this.onResetViewState();
-      this.uiStateMachine.reset(); // Reset to IDLE state
 
-      await this.dataSource.setActiveSheet(index);
-      this.setActiveSheetIndex(index);
-      // Listener handles fetchSheetInfo, fetchSheets, fetchViewport, render, updateFormulaBar
+    // Check if we're in formula editing mode - if so, preserve the edit state
+    const isFormulaEditing = editingSession.isActive() && editingSession.isFormulaEditing();
+
+    try {
+      if (isFormulaEditing) {
+        // Cross-sheet formula editing mode:
+        // - Keep the editing session active
+        // - Don't reset the UI state
+        // - Just switch the view to the new sheet
+        // The user can click cells on this sheet to insert cross-sheet references
+        await this.dataSource.setActiveSheet(index);
+        this.setActiveSheetIndex(index);
+        // Update UI state machine's active sheet tracking (but don't reset state)
+        this.uiStateMachine.setActiveSheet(index);
+        // Note: we don't call onResetViewState() to preserve formula editor state
+        // The listener will handle fetchSheetInfo, fetchSheets, fetchViewport, render
+      } else {
+        // Normal sheet switching:
+        // Reset view state and UI state before switching
+        this.onResetViewState();
+        this.uiStateMachine.reset(); // Reset to IDLE state
+
+        await this.dataSource.setActiveSheet(index);
+        this.setActiveSheetIndex(index);
+        // Listener handles fetchSheetInfo, fetchSheets, fetchViewport, render, updateFormulaBar
+      }
     } catch (e) {
       console.error("Error switching sheet:", e);
     }

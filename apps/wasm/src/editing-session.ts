@@ -24,6 +24,12 @@ export interface EditingSessionState {
   cursorEnd: number;
   /** Which editor initiated this session */
   activeEditor: ActiveEditorType;
+  /**
+   * Origin sheet index where formula editing started.
+   * Used to track which sheet to return to after cross-sheet reference picking.
+   * -1 if not in cross-sheet editing mode.
+   */
+  originSheetIndex: number;
 }
 
 /** Listener callback for session state changes */
@@ -75,13 +81,15 @@ export class EditingSession {
    * @param row Row index of the cell
    * @param initialValue Initial value/formula text
    * @param activeEditor Which editor initiated this session ("cell" or "formula")
+   * @param originSheetIndex The sheet index where editing started (for cross-sheet reference tracking)
    */
   start(
     sheetId: string,
     col: number,
     row: number,
     initialValue: string,
-    activeEditor: ActiveEditorType = "cell"
+    activeEditor: ActiveEditorType = "cell",
+    originSheetIndex: number = -1
   ): void {
     this.state = {
       sheetId,
@@ -91,9 +99,36 @@ export class EditingSession {
       cursorStart: initialValue.length,
       cursorEnd: initialValue.length,
       activeEditor,
+      originSheetIndex,
     };
-    this.log("START", { sheetId, col, row, initialValue, activeEditor });
+    this.log("START", { sheetId, col, row, initialValue, activeEditor, originSheetIndex });
     this.notifyListeners();
+  }
+
+  /**
+   * Check if currently editing a formula (starts with "=").
+   */
+  isFormulaEditing(): boolean {
+    if (!this.state) return false;
+    return this.state.value.startsWith("=");
+  }
+
+  /**
+   * Get the origin sheet index for cross-sheet editing.
+   * Returns -1 if not tracking cross-sheet editing.
+   */
+  getOriginSheetIndex(): number {
+    return this.state?.originSheetIndex ?? -1;
+  }
+
+  /**
+   * Set the origin sheet index for cross-sheet editing.
+   * Called when formula editing begins to track where to return after cross-sheet reference picking.
+   */
+  setOriginSheetIndex(index: number): void {
+    if (!this.state) return;
+    this.state.originSheetIndex = index;
+    this.log("SET_ORIGIN_SHEET", { originSheetIndex: index });
   }
 
   /**

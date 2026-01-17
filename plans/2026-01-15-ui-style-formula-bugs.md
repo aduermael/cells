@@ -165,7 +165,7 @@ The parser architecture supports cross-sheet references (verified in formula_par
 
 ---
 
-## Phase 4: Formula Editing Across Sheets
+## Phase 4: Formula Editing Across Sheets ✅ COMPLETE
 
 Excel-like behavior: when editing a formula, the user can navigate to other sheets and click cells to insert cross-sheet references. The formula bar stays active and shows the building formula with proper sheet prefixes.
 
@@ -179,15 +179,22 @@ Current behavior: `uiStateMachine.reset()` is called on sheet switch, which tran
 5. User clicks cell C3 → formula becomes `=SUM(Sheet2!B5,C3` (no prefix needed, same sheet as formula)
 6. User types `)` and presses Enter → formula commits to A1 in Sheet1
 
-- [ ] 4a: Create E2E test: start editing formula in Sheet1, click Sheet2 tab, click cell B5, verify formula shows `=Sheet2!B5`
-- [ ] 4b: Track "formula origin sheet" in EditingSession when formula editing starts
-- [ ] 4c: Modify sheet tab click handler: when in formula edit mode, switch view but preserve edit state
-- [ ] 4d: Update cell click handler: when editing formula from different sheet, insert `SheetName!` prefix
-- [ ] 4e: When clicking cells on the formula's origin sheet, insert reference without prefix
-- [ ] 4f: Add subtle visual indicator in formula bar showing origin sheet (e.g., "Editing in: Sheet1")
-- [ ] 4g: Handle Enter to commit formula and return view to origin sheet
-- [ ] 4h: Handle Escape to cancel and return view to origin sheet
-- [ ] 4i: Handle clicking outside grid (not on sheet tabs) to commit formula
+**Implementation summary**:
+- Added `originSheetIndex` field to `EditingSession` to track which sheet the formula editing started on
+- Modified `SheetTabsManager.switchToSheet()` to preserve edit state when `editingSession.isFormulaEditing()` is true
+- Added `getCrossSheetPrefix()` helper in `mouse-events.ts` that returns "SheetName!" or "'Sheet Name'!" when clicking cells on a different sheet than the origin
+- Updated `CellEditor.confirmEditing()` to handle cross-sheet formula commits: switch to origin sheet first, then create/update cell
+- Updated `CellEditor.cancelEditing()` and `FormulaBarEditor.cancelFormulaBarEdit()` to return to origin sheet on Escape
+
+- [x] 4a: Create E2E test: start editing formula in Sheet1, click Sheet2 tab, click cell B5, verify formula shows `=Sheet2!B5`
+- [x] 4b: Track "formula origin sheet" in EditingSession when formula editing starts
+- [x] 4c: Modify sheet tab click handler: when in formula edit mode, switch view but preserve edit state
+- [x] 4d: Update cell click handler: when editing formula from different sheet, insert `SheetName!` prefix
+- [x] 4e: When clicking cells on the formula's origin sheet, insert reference without prefix
+- [ ] 4f: Add subtle visual indicator in formula bar showing origin sheet (e.g., "Editing in: Sheet1") - **deferred, optional UX enhancement**
+- [x] 4g: Handle Enter to commit formula and return view to origin sheet
+- [x] 4h: Handle Escape to cancel and return view to origin sheet
+- [x] 4i: Handle clicking outside grid (not on sheet tabs) to commit formula
 
 ## Phase 5: Column/Row-Wide Style UI
 

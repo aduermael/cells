@@ -330,6 +330,7 @@ export class FormulaBarEditor {
   private isEditing: () => boolean;
   private onPositionCellEditor: (cell: Position) => void;
   private onFocusCanvas: () => void;
+  private onSwitchToSheet: (index: number) => Promise<void>;
 
   // =========================================================================
   // Constructor
@@ -357,6 +358,7 @@ export class FormulaBarEditor {
     isEditing: () => boolean;
     onPositionCellEditor: (cell: Position) => void;
     onFocusCanvas: () => void;
+    onSwitchToSheet: (index: number) => Promise<void>;
   }) {
     this.uiStateMachine = config.uiStateMachine;
     this.formulaInput = config.formulaInput;
@@ -379,6 +381,7 @@ export class FormulaBarEditor {
     this.isEditing = config.isEditing;
     this.onPositionCellEditor = config.onPositionCellEditor;
     this.onFocusCanvas = config.onFocusCanvas;
+    this.onSwitchToSheet = config.onSwitchToSheet;
 
     this.setupEventListeners();
   }
@@ -618,9 +621,23 @@ export class FormulaBarEditor {
     // Hide autocomplete
     this.formulaAutocomplete?.hide();
 
-    // Use anchor cell (selectionStart) for editing, not selectedCell
-    const editCell = this.getSelectionStart() || this.getSelectedCell();
-    if (!editCell || !this.dataSource) return;
+    if (!this.dataSource) return;
+
+    // Get origin sheet index for cross-sheet editing before we do anything else
+    const originSheetIndex = editingSession.getOriginSheetIndex();
+    const currentSheetIndex = this.uiStateMachine.getActiveSheet();
+    const needsSheetSwitch = originSheetIndex >= 0 && originSheetIndex !== currentSheetIndex;
+
+    // Get the cell position from EditingSession (preserves original cell during cross-sheet editing)
+    // Fall back to UI selection if EditingSession doesn't have a position
+    let editCell: { col: number; row: number } | null = null;
+    const sessionState = editingSession.isActive() ? { col: editingSession.getState()?.col, row: editingSession.getState()?.row } : null;
+    if (sessionState && sessionState.col !== undefined && sessionState.row !== undefined) {
+      editCell = { col: sessionState.col, row: sessionState.row };
+    } else {
+      editCell = this.getSelectionStart() || this.getSelectedCell();
+    }
+    if (!editCell) return;
 
     // Hide cell editor if it's showing
     if (this.isEditing()) {
@@ -630,6 +647,12 @@ export class FormulaBarEditor {
     }
 
     const newValue = this.getValue();
+
+    // If we're on a different sheet, we need to switch to the origin sheet first
+    // so that the dataSource operations work on the correct sheet
+    if (needsSheetSwitch) {
+      await this.onSwitchToSheet(originSheetIndex);
+    }
 
     const cells = this.getCells();
     let cell = getCellAt(editCell.col, editCell.row, cells);
@@ -668,7 +691,8 @@ export class FormulaBarEditor {
   }
 
   /**
-   * Cleanup formula bar state after edit
+   * Cleanup formula bar state after edit.
+   * Note: Sheet switching is handled by commitFormulaBarEdit before calling this.
    */
   private cleanupAfterEdit(): void {
     // Clear EditingSession
@@ -695,11 +719,17 @@ export class FormulaBarEditor {
   }
 
   /**
-   * Cancel the current formula bar edit, discarding changes
+   * Cancel the current formula bar edit, discarding changes.
+   * If cross-sheet editing was active, switches back to the origin sheet.
    */
   cancelFormulaBarEdit(): void {
     // Hide autocomplete
     this.formulaAutocomplete?.hide();
+
+    // Get origin sheet index before clearing EditingSession
+    const originSheetIndex = editingSession.getOriginSheetIndex();
+    const currentSheetIndex = this.uiStateMachine.getActiveSheet();
+    const needsSheetSwitch = originSheetIndex >= 0 && originSheetIndex !== currentSheetIndex;
 
     // Clear EditingSession
     editingSession.clear();
@@ -731,6 +761,11 @@ export class FormulaBarEditor {
       this.onUpdateFormulaBar();
     });
     this.onFocusCanvas();
+
+    // Switch back to origin sheet if we were doing cross-sheet formula editing
+    if (needsSheetSwitch) {
+      this.onSwitchToSheet(originSheetIndex);
+    }
   }
 
   /**
@@ -830,8 +865,9 @@ export class FormulaBarEditor {
         const selectedCell = this.getSelectedCell();
         const sheetInfo = this.getSheetInfo();
         const sheetId = sheetInfo?.name ?? "default";
+        const originSheetIndex = this.uiStateMachine.getActiveSheet();
         if (selectedCell) {
-          editingSession.start(sheetId, selectedCell.col, selectedCell.row, cellEditorValue, "formula");
+          editingSession.start(sheetId, selectedCell.col, selectedCell.row, cellEditorValue, "formula", originSheetIndex);
         }
         this.formulaInput.value = cellEditorValue;
         this.updateColoredDisplay();
@@ -841,8 +877,9 @@ export class FormulaBarEditor {
         const selectedCell = this.getSelectedCell();
         const sheetInfo = this.getSheetInfo();
         const sheetId = sheetInfo?.name ?? "default";
+        const originSheetIndex = this.uiStateMachine.getActiveSheet();
         if (selectedCell) {
-          editingSession.start(sheetId, selectedCell.col, selectedCell.row, currentValue, "formula");
+          editingSession.start(sheetId, selectedCell.col, selectedCell.row, currentValue, "formula", originSheetIndex);
         }
       }
 

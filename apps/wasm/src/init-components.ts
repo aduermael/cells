@@ -595,6 +595,16 @@ export function createComponents(config: ComponentsConfig): Components {
     elements.canvas.focus();
   }
 
+  // Sheet switching function for cross-sheet formula editing in CellEditor.
+  // This is defined here because sheetTabsManager is created later.
+  // Uses a reference that will be populated after sheetTabsManager creation.
+  let sheetTabsManagerRefForCellEditor: SheetTabsManager | null = null;
+  const switchToSheetForCellEdit = async (index: number): Promise<void> => {
+    if (sheetTabsManagerRefForCellEditor) {
+      await sheetTabsManagerRefForCellEditor.switchToSheet(index);
+    }
+  };
+
   const cellEditor = new CellEditor({
     uiStateMachine: app.uiStateMachine,
     cellEditorContainer: elements.cellEditorContainer,
@@ -620,6 +630,7 @@ export function createComponents(config: ComponentsConfig): Components {
     onSetSelection: setSelection,
     onUpdateFormulaHighlights: updateFormulaHighlights,
     onFocusCanvas: focusCanvas,
+    onSwitchToSheet: switchToSheetForCellEdit,
   });
 
   const columnHeaderEditor = new ColumnHeaderEditor({
@@ -654,6 +665,17 @@ export function createComponents(config: ComponentsConfig): Components {
     elements.cellEditorContainer.style.height = cellHeight + "px";
   }
 
+  // Sheet switching function for cross-sheet formula editing.
+  // This is defined here and passed to FormulaBarEditor because
+  // sheetTabsManager is created later in the initialization flow.
+  // The function captures sheetTabsManagerRef which is populated after creation.
+  let sheetTabsManagerRef: SheetTabsManager | null = null;
+  const switchToSheetForFormulaEdit = async (index: number): Promise<void> => {
+    if (sheetTabsManagerRef) {
+      await sheetTabsManagerRef.switchToSheet(index);
+    }
+  };
+
   const formulaBarEditor = new FormulaBarEditor({
     uiStateMachine: app.uiStateMachine,
     formulaInput: elements.formulaInput,
@@ -676,6 +698,7 @@ export function createComponents(config: ComponentsConfig): Components {
     isEditing: () => cellEditor.isEditing(),
     onPositionCellEditor: positionCellEditor,
     onFocusCanvas: focusCanvas,
+    onSwitchToSheet: switchToSheetForFormulaEdit,
   });
 
   formulaBarEditor.setFormulaBarContainer(elements.formulaBar);
@@ -869,6 +892,10 @@ export function createComponents(config: ComponentsConfig): Components {
       app.uiStateMachine.reset();
     },
   });
+
+  // Populate the references for cross-sheet formula editing
+  sheetTabsManagerRef = sheetTabsManager;
+  sheetTabsManagerRefForCellEditor = sheetTabsManager;
 
   const fileLoader = new FileLoader({
     loading: elements.loading,

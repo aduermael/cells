@@ -146,44 +146,106 @@ export class MouseEventHandlers {
     }
 
     /**
-     * Insert a reference into the active formula editor
+     * Check if a sheet name needs quoting (contains spaces, quotes, !, or [)
+     */
+    protected sheetNameNeedsQuotes(name: string): boolean {
+        return /[ '!\[]/.test(name);
+    }
+
+    /**
+     * Format a sheet name with proper quoting for A1 notation.
+     * Returns "SheetName!" or "'Sheet Name'!" depending on whether quoting is needed.
+     */
+    protected formatSheetPrefix(name: string): string {
+        if (!this.sheetNameNeedsQuotes(name)) {
+            return name + "!";
+        }
+        // Quote the name and escape single quotes by doubling them
+        const escapedName = name.replace(/'/g, "''");
+        return `'${escapedName}'!`;
+    }
+
+    /**
+     * Get the sheet prefix for a cross-sheet reference, if needed.
+     * Returns empty string if on the same sheet as the formula origin.
+     * Returns "SheetName!" or "'Sheet Name'!" if on a different sheet.
+     */
+    protected getCrossSheetPrefix(): string {
+        const { uiStateMachine, getSheetInfo } = this.config;
+
+        // Get the origin sheet index (where formula editing started)
+        const originSheetIndex = editingSession.getOriginSheetIndex();
+        if (originSheetIndex < 0) {
+            // Not tracking cross-sheet editing, no prefix needed
+            return "";
+        }
+
+        // Get the current sheet index
+        const currentSheetIndex = uiStateMachine.getActiveSheet();
+        if (currentSheetIndex === originSheetIndex) {
+            // Same sheet as origin, no prefix needed
+            return "";
+        }
+
+        // Different sheet - need to add sheet prefix
+        const sheetInfo = getSheetInfo();
+        if (!sheetInfo) {
+            return "";
+        }
+
+        return this.formatSheetPrefix(sheetInfo.name);
+    }
+
+    /**
+     * Insert a reference into the active formula editor.
+     * Automatically adds sheet prefix if clicking on a different sheet during cross-sheet formula editing.
      */
     protected insertFormulaReference(ref: string, position: Position): void {
         const { cellEditor, formulaBarEditor, render } = this.config;
+
+        // Add sheet prefix if on a different sheet
+        const sheetPrefix = this.getCrossSheetPrefix();
+        const fullRef = sheetPrefix + ref;
 
         const activeEditor = editingSession.getActiveEditor();
         const cursorStart = editingSession.getSelection().start;
 
         if (activeEditor === "cell") {
-            cellEditor.insertReferenceAtCursor(ref);
+            cellEditor.insertReferenceAtCursor(fullRef);
             cellEditor.getDisplayElement().focus();
         } else {
-            formulaBarEditor.insertReferenceAtCursor(ref);
+            formulaBarEditor.insertReferenceAtCursor(fullRef);
             formulaBarEditor.getDisplayElement().focus();
         }
 
         this.lastFormulaRef = {
             position,
             cursorStart,
-            cursorEnd: cursorStart + ref.length,
+            cursorEnd: cursorStart + fullRef.length,
+            sheetPrefix,
         };
 
         render();
     }
 
     /**
-     * Insert a column or row reference
+     * Insert a column or row reference.
+     * Automatically adds sheet prefix if clicking on a different sheet during cross-sheet formula editing.
      */
     protected insertColumnOrRowReference(ref: string): void {
         const { cellEditor, formulaBarEditor, render } = this.config;
 
+        // Add sheet prefix if on a different sheet
+        const sheetPrefix = this.getCrossSheetPrefix();
+        const fullRef = sheetPrefix + ref;
+
         const activeEditor = editingSession.getActiveEditor();
 
         if (activeEditor === "cell") {
-            cellEditor.insertReferenceAtCursor(ref);
+            cellEditor.insertReferenceAtCursor(fullRef);
             cellEditor.getDisplayElement().focus();
         } else {
-            formulaBarEditor.insertReferenceAtCursor(ref);
+            formulaBarEditor.insertReferenceAtCursor(fullRef);
             formulaBarEditor.getDisplayElement().focus();
         }
 
@@ -191,7 +253,8 @@ export class MouseEventHandlers {
     }
 
     /**
-     * Replace the last inserted reference with a range
+     * Replace the last inserted reference with a range.
+     * Preserves the sheet prefix from the original reference for cross-sheet ranges.
      */
     protected replaceLastRefWithRange(endCol: number, endRow: number): void {
         const { cellEditor, formulaBarEditor, render } = this.config;
@@ -202,7 +265,8 @@ export class MouseEventHandlers {
         const startRow = this.lastFormulaRef.position.row + 1;
         const endColLetter = colToLetter(endCol);
         const endRowNum = endRow + 1;
-        const rangeRef = `${startCol}${startRow}:${endColLetter}${endRowNum}`;
+        // Include the sheet prefix (e.g., "Sheet2!A1:B3")
+        const rangeRef = `${this.lastFormulaRef.sheetPrefix}${startCol}${startRow}:${endColLetter}${endRowNum}`;
 
         const activeEditor = editingSession.getActiveEditor();
 
@@ -1772,4 +1836,6 @@ interface FormulaRefState {
     position: Position;
     cursorStart: number;
     cursorEnd: number;
+    /** Sheet prefix (e.g., "Sheet2!" or "'My Sheet'!") for cross-sheet references */
+    sheetPrefix: string;
 }

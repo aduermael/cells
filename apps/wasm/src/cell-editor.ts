@@ -137,6 +137,7 @@ export class CellEditor {
   ) => void;
   private onUpdateFormulaHighlights: (value: string, cursorPos?: number) => void;
   private onFocusCanvas: () => void;
+  private onSwitchToSheet: (index: number) => Promise<void>;
 
   // =========================================================================
   // Constructor
@@ -167,6 +168,7 @@ export class CellEditor {
     onSetSelection: (cell: Position, start: Position, end: Position) => void;
     onUpdateFormulaHighlights: (value: string, cursorPos?: number) => void;
     onFocusCanvas: () => void;
+    onSwitchToSheet: (index: number) => Promise<void>;
   }) {
     this.uiStateMachine = config.uiStateMachine;
     this.cellEditorContainer = config.cellEditorContainer;
@@ -192,6 +194,7 @@ export class CellEditor {
     this.onSetSelection = config.onSetSelection;
     this.onUpdateFormulaHighlights = config.onUpdateFormulaHighlights;
     this.onFocusCanvas = config.onFocusCanvas;
+    this.onSwitchToSheet = config.onSwitchToSheet;
 
     this.setupEventListeners();
   }
@@ -491,10 +494,12 @@ export class CellEditor {
     // Use sheet name from sheetInfo as identifier
     const sheetInfo = this.getSheetInfo();
     const sheetId = sheetInfo?.name ?? "default";
+    // Track origin sheet index for cross-sheet formula editing
+    const originSheetIndex = this.uiStateMachine.getActiveSheet();
 
     if (mode === "replace") {
       // Replace mode: start with the initial character (clears existing content)
-      editingSession.start(sheetId, selectedCell.col, selectedCell.row, initialChar);
+      editingSession.start(sheetId, selectedCell.col, selectedCell.row, initialChar, "cell", originSheetIndex);
       editingSession.setCursor(initialChar.length);
       this.cellEditorInput.value = initialChar;
       this.cellDisplay.textContent = initialChar;
@@ -505,7 +510,7 @@ export class CellEditor {
       }
     } else if (mode === "append") {
       // Append mode: cursor at end of existing content
-      editingSession.start(sheetId, selectedCell.col, selectedCell.row, initialValue);
+      editingSession.start(sheetId, selectedCell.col, selectedCell.row, initialValue, "cell", originSheetIndex);
       editingSession.setCursor(initialValue.length);
       this.cellEditorInput.value = initialValue;
       this.cellDisplay.textContent = initialValue;
@@ -515,7 +520,7 @@ export class CellEditor {
       }
     } else {
       // Select mode: select all content (default for F2/Enter)
-      editingSession.start(sheetId, selectedCell.col, selectedCell.row, initialValue);
+      editingSession.start(sheetId, selectedCell.col, selectedCell.row, initialValue, "cell", originSheetIndex);
       editingSession.setCursor(0, initialValue.length);
       this.cellEditorInput.value = initialValue;
       this.cellDisplay.textContent = initialValue;
@@ -551,13 +556,19 @@ export class CellEditor {
   }
 
   /**
-   * Cancel the current cell edit, discarding changes
+   * Cancel the current cell edit, discarding changes.
+   * If cross-sheet editing was active, switches back to the origin sheet.
    */
   cancelEditing(): void {
     // Hide autocomplete
     this.formulaAutocomplete?.hide();
 
     if (!this.isEditing()) return;
+
+    // Get origin sheet index before clearing EditingSession
+    const originSheetIndex = editingSession.getOriginSheetIndex();
+    const currentSheetIndex = this.uiStateMachine.getActiveSheet();
+    const needsSheetSwitch = originSheetIndex >= 0 && originSheetIndex !== currentSheetIndex;
 
     // Clear EditingSession
     editingSession.clear();
@@ -575,10 +586,16 @@ export class CellEditor {
     // Clear active editor from focus manager
     this.focusManager.setActiveEditor(null);
     this.onFocusCanvas();
+
+    // Switch back to origin sheet if we were doing cross-sheet formula editing
+    if (needsSheetSwitch) {
+      this.onSwitchToSheet(originSheetIndex);
+    }
   }
 
   /**
-   * Commit the current cell edit, saving changes
+   * Commit the current cell edit, saving changes.
+   * If cross-sheet editing was active, switches back to the origin sheet.
    */
   async confirmEditing(): Promise<void> {
     // Hide autocomplete
@@ -586,10 +603,22 @@ export class CellEditor {
 
     if (!this.isEditing() || !this.dataSource) return;
 
-    // Get cellId from state machine context before transitioning
+    // Get origin sheet index and cell position before clearing EditingSession
+    const originSheetIndex = editingSession.getOriginSheetIndex();
+    const currentSheetIndex = this.uiStateMachine.getActiveSheet();
+    const needsSheetSwitch = originSheetIndex >= 0 && originSheetIndex !== currentSheetIndex;
+
+    // Get cell position from EditingSession (preserves original cell during cross-sheet editing)
+    const sessionState = editingSession.getState();
+    const editCell = sessionState ? { col: sessionState.col, row: sessionState.row } : null;
+
+    // Get cellId from state machine context (may not exist for new cells)
     const context = this.uiStateMachine.getStateContext();
     const cellId = context.cellId as string | undefined;
-    if (!cellId) return;
+
+    // For cross-sheet formula editing, we need the cell position from EditingSession
+    // For regular editing, we need the cellId
+    if (!cellId && !editCell) return;
 
     const newValue = this.getValue();
 
@@ -612,13 +641,24 @@ export class CellEditor {
     // Clear active editor from focus manager
     this.focusManager.setActiveEditor(null);
 
+    // If we're on a different sheet, switch to the origin sheet first
+    if (needsSheetSwitch) {
+      await this.onSwitchToSheet(originSheetIndex);
+    }
+
     try {
       if (newValue === "" || newValue.trim() === "") {
         // Delete cell when content is completely cleared
-        await this.dataSource.deleteCell(cellId);
-      } else {
-        // Use format detection for user input (handles %, $, dates, etc.)
+        if (cellId) {
+          await this.dataSource.deleteCell(cellId);
+        }
+        // If no cellId and value is empty, nothing to do
+      } else if (cellId) {
+        // Update existing cell
         await this.dataSource.updateCellWithFormatDetection(cellId, newValue);
+      } else if (editCell) {
+        // Create new cell at the position from EditingSession
+        await this.dataSource.createCell(editCell.col, editCell.row, newValue);
       }
       // Listener handles refresh automatically
     } catch (e) {
