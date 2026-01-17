@@ -10,7 +10,7 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 1 in progress - most files updated, fixing remaining test failures.
+**Current status:** Phase 1 COMPLETE - all tests passing.
 
 **Progress Jan 17 (session 2):**
 - Updated all `sheet->cells` iterations in test and app files
@@ -19,9 +19,19 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - xlsx_reader_test.cc and xlsx_writer_test.cc still failing - need to ensure XLSX reader sets sheet's workbook pointer before adding cells
 - Identified issue: XLSX reader adds cells before sheet is added to workbook, so sheet's `_workbook` is null
 
+**Progress Jan 17 (session 3):**
+- Fixed XLSX reader to call `sheet->setWorkbook(workbook.get())` early before adding cells
+- Fixed CSV reader with the same pattern
+- Fixed all test files that add cells to sheets before calling addSheet() - 42+ occurrences in xlsx_writer_test.cc, plus serializer_test.cc, csv_writer_test.cc, formula_integration_test.cc, formula_move_test.cc, crdt_test.cc, sync_formula_test.cc, sync_manager_test.cc, viewport_index_test.cc, ref_converter_test.cc, luau_sandbox_test.cc
+- Fixed FormulaDisplayConverter calls in formula_integration_test.cc and formula_move_test.cc to pass workbook parameter for proper cell lookup
+- Fixed lint errors (braces around single statements, const correctness)
+- All 47 core/cells unit tests pass
+- All 184 E2E tests pass
+- bazel run :check passes all checks
+
 **Next steps:**
-1. Fix XLSX reader to set sheet's workbook pointer before adding cells
-2. Run all tests to verify Phase 1 complete
+1. Commit Phase 1 completion
+2. Begin Phase 2: Workbook-Level Dependency Graph
 
 ## Current Architecture
 
@@ -99,11 +109,14 @@ Add primary cell storage at Workbook level. Sheets keep a lightweight secondary 
 - [x] apps/cli/converter.cc - 4 occurrences
 - [x] apps/cli/main.cc - 1 occurrence
 
-**Remaining issues:**
-- [ ] Fix XLSX reader: sheet's `_workbook` is null when addCell is called (cells added before sheet added to workbook)
-- [ ] Fix lint errors introduced by clang-format (braces around single statements)
+**Session 3 completed issues:**
+- [x] Fixed XLSX reader: call `sheet->setWorkbook()` early before adding cells
+- [x] Fixed CSV reader with same pattern
+- [x] Fixed all test files with cell storage patterns
+- [x] Fixed FormulaDisplayConverter calls to pass workbook parameter
+- [x] Fixed lint errors (braces around single statements, const correctness)
 
-- [ ] 1i: Run all tests to verify cell operations work correctly
+- [x] 1i: Run all tests to verify cell operations work correctly - ALL PASS
 
 ## Phase 2: Workbook-Level Dependency Graph
 

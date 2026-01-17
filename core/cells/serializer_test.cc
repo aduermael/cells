@@ -34,6 +34,7 @@ std::unique_ptr<Workbook> createMinimalWorkbook() {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test Workbook");
 
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     // Add one column
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
@@ -103,6 +104,7 @@ TEST(SerializerTest, SerializeToStream) {
 TEST(SerializerTest, SerializeNumberCell) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
 
@@ -121,6 +123,7 @@ TEST(SerializerTest, SerializeNumberCell) {
 TEST(SerializerTest, SerializeStringCell) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
 
@@ -139,6 +142,7 @@ TEST(SerializerTest, SerializeStringCell) {
 TEST(SerializerTest, SerializeBooleanCell) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     col->position = 0;
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
@@ -167,6 +171,7 @@ TEST(SerializerTest, SerializeBooleanCell) {
 TEST(SerializerTest, SerializeFormulaCell) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
 
@@ -185,6 +190,7 @@ TEST(SerializerTest, SerializeFormulaCell) {
 TEST(SerializerTest, SerializeErrorCell) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
 
@@ -602,6 +608,7 @@ TEST(SharedFormulaTest, SerializeSharedFormulaMaster) {
     // Master cell should serialize with full formula text
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
 
@@ -623,6 +630,7 @@ TEST(SharedFormulaTest, SerializeSharedFormulaSubscriber) {
     // Subscriber cell should serialize with =@masterUUID
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row1 = std::make_unique<Axis>(ID("rA1bC2dE"), false);
     row1->position = 0;
@@ -662,6 +670,7 @@ TEST(SharedFormulaTest, RoundtripSharedFormulas) {
     // Create workbook with shared formulas
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row1 = std::make_unique<Axis>(ID("rA1bC2dE"), false);
     row1->position = 0;
@@ -796,6 +805,7 @@ TEST(FormulaRoundtripTest, FormulaPreservedAfterEvaluation) {
     // Create a workbook with a formula cell
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     // Create column A at position 0
     auto colA = std::make_unique<Axis>(ID("cA1bC2dE"), true);
@@ -873,6 +883,7 @@ TEST(FormulaRoundtripTest, FormulaPreservedAfterEvaluation) {
 TEST(CellFormatTest, SerializeCellWithFormat) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
 
@@ -896,6 +907,7 @@ TEST(CellFormatTest, SerializeCellWithFormat) {
 TEST(CellFormatTest, SerializeCellWithoutFormat) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
 
@@ -917,6 +929,7 @@ TEST(CellFormatTest, SerializeCellWithoutFormat) {
 TEST(CellFormatTest, RoundtripCellWithFormat) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
 
@@ -1116,6 +1129,7 @@ TEST(StyleSerializationTest, SerializeStyleDefinition) {
 TEST(StyleSerializationTest, SerializeCellWithStyle) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
@@ -1179,6 +1193,7 @@ X xA1bC2dE cA1bC2dE rA1bC2dE n 42 sty:STYbold1
 TEST(StyleSerializationTest, RoundtripStyles) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
@@ -1266,6 +1281,7 @@ TEST(StyleZCDRoundtripTest, EmptyStyleRoundtrip) {
     // Test that an empty style (all defaults) serializes and deserializes correctly
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
@@ -1314,6 +1330,7 @@ TEST(StyleZCDRoundtripTest, PartialStyleBoldOnly) {
     // Test style with only bold set
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
@@ -1348,6 +1365,7 @@ TEST(StyleZCDRoundtripTest, PartialStyleColorOnly) {
     // Test style with only colors set
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
@@ -1383,6 +1401,7 @@ TEST(StyleZCDRoundtripTest, PartialStyleAlignmentOnly) {
     // Test style with only alignment set
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
@@ -1417,6 +1436,7 @@ TEST(StyleZCDRoundtripTest, PartialStyleFontOnly) {
     // Test style with only font properties set
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
@@ -1451,6 +1471,7 @@ TEST(StyleZCDRoundtripTest, MultipleCellsDifferentStyles) {
     // Test multiple cells with different styles
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     // Create grid
     auto col1 = std::make_unique<Axis>(ID("cA1bC2dE"), true);
@@ -1756,6 +1777,7 @@ X xF1mN2pQ cB3dE4fG rC5fG6hJ n -500 fmt:FMT_C002 sty:STYwarn0
 TEST(NamedRangeZCDTest, SerializeWorkbookScopedNamedRange) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
@@ -1806,6 +1828,7 @@ TEST(NamedRangeZCDTest, SerializeSheetScopedNamedRange) {
 TEST(NamedRangeZCDTest, SerializeRangeTarget) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     auto col1 = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     col1->position = 0;
@@ -1919,6 +1942,7 @@ X xB3dE4fG cB3dE4fG rB3dE4fG n 2
 TEST(NamedRangeZCDTest, RoundtripNamedRanges) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     auto col1 = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     col1->position = 0;

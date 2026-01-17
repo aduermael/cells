@@ -29,6 +29,7 @@ protected:
 
         auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
         sheet_id = sheet->id;
+        sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
         // Create a column and row
         col_id = generate_id();

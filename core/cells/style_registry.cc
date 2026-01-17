@@ -21,8 +21,9 @@ ID StyleRegistry::registerStyle(const CellStyle& style, const ID& proposedId, bo
         auto styleIt = _styles.find(existingId);
         if (styleIt != _styles.end() && styleIt->second == style) {
             // Exact match - return existing ID
-            if (wasCreated)
+            if (wasCreated) {
                 *wasCreated = false;
+            }
             return existingId;
         }
         // Hash collision - different style with same hash, continue to create new
@@ -36,8 +37,9 @@ ID StyleRegistry::registerStyle(const CellStyle& style, const ID& proposedId, bo
         // ID already taken, update the existing style
         _styles[proposedId] = style;
         updateHashIndex(proposedId, style);
-        if (wasCreated)
+        if (wasCreated) {
             *wasCreated = false;
+        }
         return proposedId;
     }
 
@@ -47,8 +49,9 @@ ID StyleRegistry::registerStyle(const CellStyle& style, const ID& proposedId, bo
     // Initialize refcount to 0 (caller should call addRef when applying)
     _refCount[styleId] = 0;
 
-    if (wasCreated)
+    if (wasCreated) {
         *wasCreated = true;
+    }
     return styleId;
 }
 

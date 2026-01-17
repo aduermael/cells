@@ -18,6 +18,7 @@ namespace {
 std::unique_ptr<Workbook> createTestWorkbook() {
     auto wb = std::make_unique<Workbook>(ID("testWBId"), "TestWorkbook");
     auto sheet = std::make_unique<Sheet>(ID("testShId"), "Sheet1");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     // Create columns A-F (positions 0-5)
     std::vector<std::pair<const char*, int>> columns = {{"colA0001", 0}, {"colB0002", 1},
@@ -87,7 +88,7 @@ std::string getFormulaDisplay(Sheet& sheet, const ID& cellId) {
     if (formula == nullptr || formula->ast == nullptr) {
         return "";
     }
-    FormulaDisplayConverter converter(sheet);
+    FormulaDisplayConverter converter(sheet, sheet.getWorkbook());
     return converter.toDisplayString(formula->ast);
 }
 

@@ -568,7 +568,9 @@ TEST(RefConverterTest, RoundtripComplexFormula) {
 // indexed by loop counter instead of maps indexed by actual position.
 // When positions don't start at 0, vector indexing fails.
 TEST(RefConverterTest, SparsePositionsA1ToUuid) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
     auto sheet = std::make_unique<Sheet>(generate_id(), "SparseSheet");
+    sheet->setWorkbook(workbook.get());
 
     // Create column at position 0 (like column A)
     auto colA = std::make_unique<Axis>(generate_id(), true);
@@ -588,8 +590,10 @@ TEST(RefConverterTest, SparsePositionsA1ToUuid) {
     std::string cellA2Id = cellA2->id.toString();
     sheet->addCell(std::move(cellA2));
 
+    workbook->addSheet(std::move(sheet));
+    Sheet* sheetPtr = workbook->getSheetByIndex(0);
     RefConverter converter;
-    converter.setContext(*sheet);
+    converter.setContext(*sheetPtr);
 
     // Converting "A2" should find the cell at (col 0, row 1)
     // Before the fix, this would fail because indexToRowId_ was a vector
@@ -604,7 +608,9 @@ TEST(RefConverterTest, SparsePositionsA1ToUuid) {
 }
 
 TEST(RefConverterTest, SparsePositionsFormulaRoundtrip) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
     auto sheet = std::make_unique<Sheet>(generate_id(), "SparseSheet");
+    sheet->setWorkbook(workbook.get());
 
     // Create columns at positions 0 and 1
     auto colA = std::make_unique<Axis>(generate_id(), true);
@@ -630,8 +636,10 @@ TEST(RefConverterTest, SparsePositionsFormulaRoundtrip) {
     auto cellB2 = std::make_unique<Cell>(generate_id(), colBId, row2Id);
     sheet->addCell(std::move(cellB2));
 
+    workbook->addSheet(std::move(sheet));
+    Sheet* sheetPtr = workbook->getSheetByIndex(0);
     RefConverter converter;
-    converter.setContext(*sheet);
+    converter.setContext(*sheetPtr);
 
     // Formula =A2*10 should roundtrip correctly
     std::string formula = "=A2*10";
@@ -643,7 +651,9 @@ TEST(RefConverterTest, SparsePositionsFormulaRoundtrip) {
 }
 
 TEST(RefConverterTest, GappedPositions) {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
     auto sheet = std::make_unique<Sheet>(generate_id(), "GappedSheet");
+    sheet->setWorkbook(workbook.get());
 
     // Create columns at positions 0 and 5 (gap at 1-4)
     auto colA = std::make_unique<Axis>(generate_id(), true);
@@ -671,8 +681,10 @@ TEST(RefConverterTest, GappedPositions) {
     std::string cellF1Id = cellF1->id.toString();
     sheet->addCell(std::move(cellF1));
 
+    workbook->addSheet(std::move(sheet));
+    Sheet* sheetPtr = workbook->getSheetByIndex(0);
     RefConverter converter;
-    converter.setContext(*sheet);
+    converter.setContext(*sheetPtr);
 
     // A1 should convert correctly (relative refs use ~~ prefix)
     EXPECT_EQ(converter.a1RefToUuid("A1"), "~~" + cellA1Id);

@@ -897,8 +897,9 @@ std::string generateWorksheet(
     std::unordered_map<const cells::Cell*, CellPosition> cellPositions;
     for (const auto& cellId : sheet.getCellIds()) {
         const cells::Cell* cell = workbook.getCell(cellId);
-        if (!cell)
+        if (!cell) {
             continue;
+        }
         auto colIt = colIdToIndex.find(cell->colId.toString());
         auto rowIt = rowIdToIndex.find(cell->rowId.toString());
         if (colIt != colIdToIndex.end() && rowIt != rowIdToIndex.end()) {
@@ -917,8 +918,9 @@ std::string generateWorksheet(
     if (writeFormulas) {
         for (const auto& cellId : sheet.getCellIds()) {
             const cells::Cell* cell = workbook.getCell(cellId);
-            if (!cell)
+            if (!cell) {
                 continue;
+            }
             // Check if this cell is a shared formula master
             if (cell->isSharedFormulaMaster()) {
                 masterToSi[cell] = nextSi++;
@@ -928,16 +930,18 @@ std::string generateWorksheet(
         std::unordered_map<std::string, const cells::Cell*> cellIdToCell;
         for (const auto& cellId : sheet.getCellIds()) {
             const cells::Cell* cell = workbook.getCell(cellId);
-            if (!cell)
+            if (!cell) {
                 continue;
+            }
             cellIdToCell[cell->id.toString()] = cell;
         }
 
         // Map subscribers to their master's si using Sheet-level tracking
         for (const auto& cellId : sheet.getCellIds()) {
             const cells::Cell* cell = workbook.getCell(cellId);
-            if (!cell)
+            if (!cell) {
                 continue;
+            }
             if (cell->isSharedFormula()) {
                 const cells::ID masterId = sheet.getSharedFormulaMaster(cell->id);
                 if (!masterId.isNull()) {
@@ -1615,8 +1619,9 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         // Collect cell styles (read from workbook map)
         for (const auto& cellId : sheet->getCellIds()) {
             const Cell* cell = workbook.getCell(cellId);
-            if (!cell)
+            if (!cell) {
                 continue;
+            }
             const ID cellStyleId = workbook.getCellStyleId(cellId);
             if (!cellStyleId.isNull()) {
                 // Look up the CellStyle in the workbook

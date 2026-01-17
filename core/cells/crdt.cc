@@ -651,8 +651,9 @@ size_t bootstrapOpLog(Workbook& workbook) {
         // Generate CELL_SET_VALUE operations for all cells
         for (const ID& cellId : sheet->getCellIds()) {
             const Cell* cell = workbook.getCell(cellId);
-            if (!cell)
+            if (!cell) {
                 continue;
+            }
 
             // Skip empty cells
             if (cell->value.type == CellValueType::STRING && cell->value.raw.empty() &&

@@ -17,6 +17,7 @@ protected:
 
         auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
         sheet_id = sheet->id;
+        sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
         // Create columns
         col1 = generate_id();
@@ -268,6 +269,7 @@ protected:
         wb->setNodeId(node_id);
 
         auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+        sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
         // Create a column and row
         ID col = generate_id();

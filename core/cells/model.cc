@@ -494,9 +494,9 @@ Cell* Workbook::addCell(std::unique_ptr<Cell> cell) {
         return nullptr;
     }
 
-    Cell* rawPtr = cell.get();
+    const Cell* rawPtr = cell.get();
     _cells[cell->id] = std::move(cell);
-    return rawPtr;
+    return _cells[rawPtr->id].get();
 }
 
 std::unique_ptr<Cell> Workbook::removeCell(const ID& cellId) {
@@ -523,7 +523,7 @@ Workbook::CellLookupResult Workbook::findCell(const ID& cellId) {
 
     // Find the sheet by looking up the column's sheetId
     for (auto& sheet : sheets) {
-        Axis* col = sheet->getColumn(cell->colId);
+        const Axis* col = sheet->getColumn(cell->colId);
         if (col) {
             return {cell, sheet.get()};
         }

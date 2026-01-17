@@ -202,6 +202,9 @@ CSVReadResult CSVReader::read(std::string_view content) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Imported");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
 
+    // Set workbook pointer early so addCell() can delegate to workbook storage
+    sheet->setWorkbook(workbook.get());
+
     // Parse all records
     std::vector<std::vector<std::string>> records;
     while (!content.empty()) {

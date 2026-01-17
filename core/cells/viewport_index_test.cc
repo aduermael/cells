@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "core/cells/id.h"
+#include "core/cells/model.h"
 
 #include "gtest/gtest.h"
 
@@ -16,8 +17,10 @@ namespace {
 class ViewportIndexTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Create a simple sheet for testing
+        // Create a simple workbook and sheet for testing
+        workbook_ = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
         sheet_ = std::make_unique<Sheet>(generate_id(), "TestSheet");
+        sheet_->setWorkbook(workbook_.get());  // Set workbook early so cells get stored properly
     }
 
     // Add columns with specified widths (default 100px each)
@@ -56,6 +59,7 @@ protected:
         EXPECT_TRUE(index.verify()) << "ViewportIndex invariants violated";
     }
 
+    std::unique_ptr<Workbook> workbook_;
     std::unique_ptr<Sheet> sheet_;
     std::vector<ID> colIds_;
     std::vector<ID> rowIds_;

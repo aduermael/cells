@@ -1612,6 +1612,10 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         // Create our Sheet
         auto sheet = std::make_unique<Sheet>(generate_id(), sheetName);
 
+        // Set workbook pointer early so addCell() can delegate to workbook storage
+        // (This is normally set in addSheet(), but we need it before adding cells)
+        sheet->setWorkbook(workbook.get());
+
         // Parse sheet view properties (grid lines, zoom, etc.)
         auto worksheetNode = sheetDoc.child("worksheet");
         auto sheetViewsNode = worksheetNode.child("sheetViews");

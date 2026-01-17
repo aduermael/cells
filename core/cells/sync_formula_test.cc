@@ -89,6 +89,7 @@ protected:
         wb->setNodeId(nodeId);
 
         auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+        sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
         // Create columns A and B (positions 0 and 1)
         auto colA = std::make_unique<Axis>(ID("ColAAAAA"), true);

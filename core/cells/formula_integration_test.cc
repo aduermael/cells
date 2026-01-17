@@ -30,6 +30,7 @@ Formula* createFormula(const std::string& text) {
 std::unique_ptr<Workbook> createTestWorkbook() {
     auto wb = std::make_unique<Workbook>(ID("testWBId"), "TestWorkbook");
     auto sheet = std::make_unique<Sheet>(ID("testShId"), "Sheet1");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     // Create columns A, B, C (positions 0, 1, 2)
     auto colA = std::make_unique<Axis>(ID("colA0001"), true);
@@ -307,7 +308,7 @@ TEST(FormulaIntegrationTest, DisplayConversionSimple) {
     resolver.resolve(ast.get());
 
     // Use FormulaDisplayConverter to convert back to A1
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(ast.get());
 
     // Should display as A1 notation
@@ -325,7 +326,7 @@ TEST(FormulaIntegrationTest, DisplayConversionAbsolute) {
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
     resolver.resolve(ast.get());
 
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(ast.get());
 
     EXPECT_EQ(display, "=$A$1");
@@ -354,7 +355,7 @@ TEST(FormulaIntegrationTest, DisplayConversionRoundTrip) {
     ASSERT_NE(cell->getFormula()->ast, nullptr);
 
     // Convert the stored AST to display format
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(cell->getFormula()->ast);
 
     // Should display as A1 notation even though stored as UUID
@@ -372,7 +373,7 @@ TEST(FormulaIntegrationTest, DisplayConversionFunctionCall) {
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
     resolver.resolve(ast.get());
 
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(ast.get());
 
     EXPECT_EQ(display, "=SUM(A1,B1)");
@@ -577,7 +578,7 @@ TEST(FormulaIntegrationTest, UuidFormatSerializationRoundTrip) {
         << "Loaded formula should be UUID format, got: " << loadedSerialized;
 
     // Convert the loaded AST to display format - should show A1 notation
-    FormulaDisplayConverter converter(*loadedSheet);
+    FormulaDisplayConverter converter(*loadedSheet, parseResult.workbook.get());
     std::string display = converter.toDisplayString(loadedFormula->ast);
     EXPECT_EQ(display, "=A1+B1") << "Display should be A1 notation, got: " << display;
 }
@@ -614,7 +615,7 @@ TEST(FormulaIntegrationTest, UuidFormatAbsoluteRefRoundTrip) {
     // AST is already parsed (stored directly in formula)
     EXPECT_NE(loadedFormula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*loadedSheet);
+    FormulaDisplayConverter converter(*loadedSheet, parseResult.workbook.get());
     std::string display = converter.toDisplayString(loadedFormula->ast);
     EXPECT_EQ(display, "=$A$1+B$2");
 }
@@ -646,7 +647,7 @@ TEST(FormulaIntegrationTest, UuidFormatRangeRefRoundTrip) {
     // AST is already parsed (stored directly in formula)
     EXPECT_NE(loadedFormula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*loadedSheet);
+    FormulaDisplayConverter converter(*loadedSheet, parseResult.workbook.get());
     std::string display = converter.toDisplayString(loadedFormula->ast);
     EXPECT_EQ(display, "=SUM(A1:B2)");
 }
@@ -675,7 +676,7 @@ TEST(FormulaIntegrationTest, UuidFormatFunctionCallRoundTrip) {
     // AST is already parsed (stored directly in formula)
     EXPECT_NE(loadedFormula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*loadedSheet);
+    FormulaDisplayConverter converter(*loadedSheet, parseResult.workbook.get());
     std::string display = converter.toDisplayString(loadedFormula->ast);
     EXPECT_EQ(display, "=IF(A1>0,B1,0)");
 }
@@ -713,6 +714,7 @@ TEST(FormulaIntegrationTest, GetSheetByNameConst) {
 std::unique_ptr<Workbook> createLargeTestWorkbook() {
     auto wb = std::make_unique<Workbook>(ID("testWBId"), "TestWorkbook");
     auto sheet = std::make_unique<Sheet>(ID("testShId"), "Sheet1");
+    sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     // Create columns A-F (positions 0-5)
     std::vector<std::pair<const char*, int>> columns = {{"colA0001", 0}, {"colB0002", 1},
@@ -840,7 +842,7 @@ std::pair<bool, std::string> testFormulaRoundTrip(const std::string& formulaA1,
     }
 
     // Step 8: Convert to A1 display
-    FormulaDisplayConverter converter(*loadedSheet);
+    FormulaDisplayConverter converter(*loadedSheet, parseResult.workbook.get());
     std::string display = converter.toDisplayString(loadedFormula->ast);
 
     if (display != expected) {
@@ -980,7 +982,7 @@ TEST(UuidRoundTripTest, PureLiteralFormula) {
     // AST is already parsed (stored directly in formula)
     EXPECT_NE(loadedFormula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*loadedSheet);
+    FormulaDisplayConverter converter(*loadedSheet, parseResult.workbook.get());
     std::string display = converter.toDisplayString(loadedFormula->ast);
     EXPECT_EQ(display, "=1+2+3");
 }
@@ -1016,7 +1018,7 @@ TEST(UuidRoundTripTest, ComplexCombined) {
     // AST is already parsed (stored directly in formula)
     EXPECT_NE(loadedFormula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*loadedSheet);
+    FormulaDisplayConverter converter(*loadedSheet, parseResult.workbook.get());
     std::string display = converter.toDisplayString(loadedFormula->ast);
     EXPECT_EQ(display, formula);
 }
@@ -1059,7 +1061,7 @@ TEST(UuidRoundTripTest, AllAbsoluteMarkerCombinations) {
     // AST is already parsed (stored directly in formula)
     EXPECT_NE(loadedFormula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*loadedSheet);
+    FormulaDisplayConverter converter(*loadedSheet, parseResult.workbook.get());
     std::string display = converter.toDisplayString(loadedFormula->ast);
     EXPECT_EQ(display, formula);
 }
@@ -1095,7 +1097,7 @@ TEST(UuidRoundTripTest, RangeAbsoluteMarkerCombinations) {
     // AST is already parsed (stored directly in formula)
     EXPECT_NE(loadedFormula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*loadedSheet);
+    FormulaDisplayConverter converter(*loadedSheet, parseResult.workbook.get());
     std::string display = converter.toDisplayString(loadedFormula->ast);
     EXPECT_EQ(display, formula);
 }
@@ -1119,7 +1121,7 @@ TEST(FormulaNormalizationTest, WhitespaceAfterEquals) {
     ASSERT_NE(formula, nullptr);
     ASSERT_NE(formula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(formula->ast);
     EXPECT_EQ(display, "=A1") << "Whitespace after = should be normalized";
 }
@@ -1138,7 +1140,7 @@ TEST(FormulaNormalizationTest, LowercaseColumnToUppercase) {
     ASSERT_NE(formula, nullptr);
     ASSERT_NE(formula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(formula->ast);
     EXPECT_EQ(display, "=A1") << "Lowercase column should be normalized to uppercase";
 }
@@ -1174,7 +1176,7 @@ TEST(FormulaNormalizationTest, LowercaseMultipleRefs) {
     ASSERT_NE(formula, nullptr);
     ASSERT_NE(formula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(formula->ast);
     EXPECT_EQ(display, "=A1+B1") << "Lowercase refs should be normalized to uppercase";
 }
@@ -1193,7 +1195,7 @@ TEST(FormulaNormalizationTest, FunctionWhitespaceNormalization) {
     ASSERT_NE(formula, nullptr);
     ASSERT_NE(formula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(formula->ast);
     EXPECT_EQ(display, "=SUM(A1,B1)") << "Whitespace in function args should be normalized";
 }
@@ -1212,7 +1214,7 @@ TEST(FormulaNormalizationTest, RangeWhitespaceNormalization) {
     ASSERT_NE(formula, nullptr);
     ASSERT_NE(formula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(formula->ast);
     EXPECT_EQ(display, "=SUM(A1:B2)") << "Whitespace in range should be normalized";
 }
@@ -1231,7 +1233,7 @@ TEST(FormulaNormalizationTest, ComplexWhitespaceNormalization) {
     ASSERT_NE(formula, nullptr);
     ASSERT_NE(formula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(formula->ast);
     EXPECT_EQ(display, "=IF(A1>0,B1,C1)") << "Complex whitespace should be normalized";
 }
@@ -1250,7 +1252,7 @@ TEST(FormulaNormalizationTest, LowercaseFunctionName) {
     ASSERT_NE(formula, nullptr);
     ASSERT_NE(formula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(formula->ast);
     // Note: Function names are stored as-is in AST, so they may remain lowercase
     // unless we add explicit normalization. Check what the actual behavior is.
@@ -1273,7 +1275,7 @@ TEST(FormulaNormalizationTest, AbsoluteRefWithWhitespace) {
     ASSERT_NE(formula, nullptr);
     ASSERT_NE(formula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(formula->ast);
     EXPECT_EQ(display, "=$A$1") << "Whitespace with absolute refs should be normalized";
 }
@@ -1292,7 +1294,7 @@ TEST(FormulaNormalizationTest, LowercaseAbsoluteRef) {
     ASSERT_NE(formula, nullptr);
     ASSERT_NE(formula->ast, nullptr);
 
-    FormulaDisplayConverter converter(*sheet);
+    FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(formula->ast);
     EXPECT_EQ(display, "=$A$1") << "Lowercase absolute ref should be normalized to uppercase";
 }
@@ -1302,6 +1304,7 @@ TEST(FormulaIntegrationTest, QuotedSheetNameDisplay) {
     auto wb = std::make_unique<Workbook>(ID("testWBId"), "TestWorkbook");
     auto sheet1 = std::make_unique<Sheet>(ID("sheet101"), "Sheet1");
     auto sheet2 = std::make_unique<Sheet>(ID("sheet202"), "My Data");  // Sheet with space in name
+    sheet2->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     // Create cells in Sheet2 (My Data)
     auto col = std::make_unique<Axis>(ID("colA0001"), true);
@@ -1335,6 +1338,7 @@ TEST(FormulaIntegrationTest, QuotedSheetNameWithQuoteDisplay) {
     auto wb = std::make_unique<Workbook>(ID("testWBId"), "TestWorkbook");
     auto sheet1 = std::make_unique<Sheet>(ID("sheet101"), "Sheet1");
     auto sheet2 = std::make_unique<Sheet>(ID("sheet202"), "It's here");  // Sheet with quote in name
+    sheet2->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
     // Create cells in Sheet2
     auto col = std::make_unique<Axis>(ID("colA0001"), true);

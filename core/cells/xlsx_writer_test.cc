@@ -71,53 +71,56 @@ std::unique_ptr<Workbook> createSimpleWorkbook() {
         sheet->addRow(std::move(row));
     }
 
+    // Add sheet to workbook first (so cells get stored properly)
+    workbook->addSheet(std::move(sheet));
+    Sheet* sheetPtr = workbook->getSheetByIndex(0);
+
     // Add cells with different values
     // (0,0) = "Name"
     auto cell1 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[0]);
     cell1->value = CellValue("Name");
-    sheet->addCell(std::move(cell1));
+    sheetPtr->addCell(std::move(cell1));
 
     // (1,0) = "Value"
     auto cell2 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[0]);
     cell2->value = CellValue("Value");
-    sheet->addCell(std::move(cell2));
+    sheetPtr->addCell(std::move(cell2));
 
     // (2,0) = "Active"
     auto cell3 = std::make_unique<Cell>(generate_id(), colIds[2], rowIds[0]);
     cell3->value = CellValue("Active");
-    sheet->addCell(std::move(cell3));
+    sheetPtr->addCell(std::move(cell3));
 
     // (0,1) = "Alice"
     auto cell4 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[1]);
     cell4->value = CellValue("Alice");
-    sheet->addCell(std::move(cell4));
+    sheetPtr->addCell(std::move(cell4));
 
     // (1,1) = 100
     auto cell5 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[1]);
     cell5->value = CellValue(100.0);
-    sheet->addCell(std::move(cell5));
+    sheetPtr->addCell(std::move(cell5));
 
     // (2,1) = true
     auto cell6 = std::make_unique<Cell>(generate_id(), colIds[2], rowIds[1]);
     cell6->value = CellValue(true);
-    sheet->addCell(std::move(cell6));
+    sheetPtr->addCell(std::move(cell6));
 
     // (0,2) = "Bob"
     auto cell7 = std::make_unique<Cell>(generate_id(), colIds[0], rowIds[2]);
     cell7->value = CellValue("Bob");
-    sheet->addCell(std::move(cell7));
+    sheetPtr->addCell(std::move(cell7));
 
     // (1,2) = 200
     auto cell8 = std::make_unique<Cell>(generate_id(), colIds[1], rowIds[2]);
     cell8->value = CellValue(200.0);
-    sheet->addCell(std::move(cell8));
+    sheetPtr->addCell(std::move(cell8));
 
     // (2,2) = false
     auto cell9 = std::make_unique<Cell>(generate_id(), colIds[2], rowIds[2]);
     cell9->value = CellValue(false);
-    sheet->addCell(std::move(cell9));
+    sheetPtr->addCell(std::move(cell9));
 
-    workbook->addSheet(std::move(sheet));
     return workbook;
 }
 
@@ -165,6 +168,7 @@ TEST(XLSXWriterTest, WriteToInvalidPath) {
 TEST(XLSXWriterTest, WriteNumbers) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Numbers");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -209,6 +213,7 @@ TEST(XLSXWriterTest, WriteNumbers) {
 TEST(XLSXWriterTest, WriteStrings) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Strings");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -259,6 +264,7 @@ TEST(XLSXWriterTest, WriteStrings) {
 TEST(XLSXWriterTest, WriteBooleans) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Booleans");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -325,6 +331,7 @@ TEST(XLSXWriterTest, WriteMultipleSheets) {
     // Add 3 sheets
     for (int i = 0; i < 3; ++i) {
         auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet" + std::to_string(i + 1));
+        sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
         auto col = std::make_unique<Axis>(generate_id(), true);
         col->position = 0;
@@ -405,6 +412,7 @@ TEST(XLSXWriterTest, SheetNamesPreserved) {
 TEST(XLSXWriterTest, WriteColumnWidths) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Widths");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create columns with different widths
     std::vector<uint32_t> widths = {50, 100, 200};
@@ -462,6 +470,7 @@ TEST(XLSXWriterTest, WriteColumnWidths) {
 TEST(XLSXWriterTest, SkipDimensionsWhenDisabled) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "NoDimensions");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -524,6 +533,7 @@ TEST(XLSXWriterTest, RoundtripSimple) {
 TEST(XLSXWriterTest, RoundtripPreservesNumberValues) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Numbers");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -572,6 +582,7 @@ TEST(XLSXWriterTest, RoundtripPreservesNumberValues) {
 TEST(XLSXWriterTest, RoundtripPreservesStringValues) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Strings");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -654,6 +665,7 @@ TEST(XLSXWriterTest, CustomOptions) {
 TEST(XLSXWriterTest, WriteFormulas) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Formulas");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create 2 columns, 2 rows
     std::vector<ID> colIds;
@@ -733,6 +745,7 @@ TEST(XLSXWriterTest, WriteFormulas) {
 TEST(XLSXWriterTest, WriteSharedFormulas) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "SharedFormulas");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create 2 columns, 3 rows
     std::vector<ID> colIds;
@@ -826,6 +839,7 @@ TEST(XLSXWriterTest, WriteSharedFormulas) {
 TEST(XLSXWriterTest, WriteFormulaWithSpecialChars) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "FormulaSpecialChars");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -862,6 +876,7 @@ TEST(XLSXWriterTest, WriteFormulaWithSpecialChars) {
 TEST(XLSXWriterTest, WriteFormulasWithEvaluatedTypes) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "EvaluatedFormulas");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create 2 columns, 4 rows
     std::vector<ID> colIds;
@@ -967,6 +982,7 @@ TEST(XLSXWriterTest, WriteFormulasWithEvaluatedTypes) {
 TEST(XLSXWriterTest, WriteFormulasDisabledWithDifferentTypes) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "ValuesOnly");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create column
     auto col = std::make_unique<Axis>(generate_id(), true);
@@ -1022,6 +1038,7 @@ TEST(XLSXWriterTest, WriteFormulasDisabledWithDifferentTypes) {
 TEST(XLSXWriterTest, SkipFormulasWhenDisabled) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "NoFormulas");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -1078,6 +1095,7 @@ TEST(XLSXWriterTest, SkipFormulasWhenDisabled) {
 TEST(XLSXWriterTest, WriteStringWithXmlSpecialChars) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "XmlEscape");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -1142,6 +1160,7 @@ TEST(XLSXWriterTest, WriteStringWithXmlSpecialChars) {
 TEST(XLSXWriterTest, WriteStylesBold) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Styles");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -1202,6 +1221,7 @@ TEST(XLSXWriterTest, WriteStylesBold) {
 TEST(XLSXWriterTest, WriteStylesBackgroundColor) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Styles");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -1263,6 +1283,7 @@ TEST(XLSXWriterTest, WriteStylesBackgroundColor) {
 TEST(XLSXWriterTest, WriteStylesAlignment) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Styles");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -1483,6 +1504,7 @@ TEST(XLSXStyleRoundtripTest, RoundtripAllStyleProperties) {
     // Create a workbook with all style properties and verify roundtrip
     auto workbook = std::make_unique<Workbook>(generate_id(), "AllStyles");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     std::vector<ID> colIds;
     for (int i = 0; i < 3; ++i) {
@@ -1666,6 +1688,7 @@ TEST(XLSXStyleRoundtripTest, RoundtripMultipleSheetsWithStyles) {
     std::vector<std::pair<ID, ID>> cellStylePairs;  // cellId -> styleId pairs
     for (const auto& [name, style] : sheetStyles) {
         auto sheet = std::make_unique<Sheet>(generate_id(), name);
+        sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
         auto col = std::make_unique<Axis>(generate_id(), true);
         col->position = 0;
@@ -1741,6 +1764,7 @@ TEST(XLSXStyleRoundtripTest, StyleDeduplication) {
     // Test that identical styles are deduplicated during export
     auto workbook = std::make_unique<Workbook>(generate_id(), "StyleDedup");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     std::vector<ID> colIds;
     auto col = std::make_unique<Axis>(generate_id(), true);
@@ -1826,6 +1850,7 @@ TEST(XLSXStyleRoundtripTest, EmptyStyleNotWritten) {
     // Test that cells with empty (default) styles don't create unnecessary style entries
     auto workbook = std::make_unique<Workbook>(generate_id(), "EmptyStyle");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -1902,6 +1927,7 @@ TEST(XLSXNamedRangeRoundtripTest, RoundtripSingleCellNamedRange) {
     // Create a workbook with a single-cell named range and verify round-trip
     auto workbook = std::make_unique<Workbook>(generate_id(), "NamedRanges");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create 3x3 grid
     std::vector<ID> colIds;
@@ -1979,6 +2005,7 @@ TEST(XLSXNamedRangeRoundtripTest, RoundtripRangeNamedRange) {
     // Create a workbook with a range named range (A1:C3)
     auto workbook = std::make_unique<Workbook>(generate_id(), "NamedRanges");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create 3x3 grid
     std::vector<ID> colIds;
@@ -2063,6 +2090,7 @@ TEST(XLSXNamedRangeRoundtripTest, RoundtripSheetScopedNamedRange) {
     // Create a workbook with a sheet-scoped named range
     auto workbook = std::make_unique<Workbook>(generate_id(), "NamedRanges");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -2118,6 +2146,7 @@ TEST(XLSXNamedRangeRoundtripTest, RoundtripMultipleNamedRanges) {
     // Create a workbook with multiple named ranges
     auto workbook = std::make_unique<Workbook>(generate_id(), "NamedRanges");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create 3x3 grid
     std::vector<ID> colIds;
@@ -2239,6 +2268,7 @@ TEST(XLSXNamedRangeRoundtripTest, RoundtripNameWithSpecialChars) {
     // Test named range with underscores (common in Excel)
     auto workbook = std::make_unique<Workbook>(generate_id(), "NamedRanges");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     col->position = 0;
@@ -2295,6 +2325,7 @@ TEST(XLSXNamedRangeRoundtripTest, RoundtripNameWithSpecialChars) {
 TEST(XLSXWriterTest, WriteShowGridLinesDefault) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
     // showGridLines defaults to true
 
     auto col = std::make_unique<Axis>(generate_id(), true);
@@ -2330,7 +2361,8 @@ TEST(XLSXWriterTest, WriteShowGridLinesDefault) {
 TEST(XLSXWriterTest, WriteShowGridLinesFalse) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
-    sheet->showGridLines = false;  // Hide grid lines
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
+    sheet->showGridLines = false;        // Hide grid lines
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     ID colId = col->id;
@@ -2369,6 +2401,7 @@ TEST(XLSXWriterTest, WriteShowGridLinesFalse) {
 TEST(XLSXWriterTest, WriteZoomScaleDefault) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
     // zoomScale defaults to 100
 
     auto col = std::make_unique<Axis>(generate_id(), true);
@@ -2404,7 +2437,8 @@ TEST(XLSXWriterTest, WriteZoomScaleDefault) {
 TEST(XLSXWriterTest, WriteZoomScale150) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
-    sheet->zoomScale = 150;  // 150% zoom
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
+    sheet->zoomScale = 150;              // 150% zoom
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     ID colId = col->id;
@@ -2439,8 +2473,9 @@ TEST(XLSXWriterTest, WriteZoomScale150) {
 TEST(XLSXWriterTest, WriteMultipleViewProperties) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
-    sheet->showGridLines = false;  // Hide grid lines
-    sheet->zoomScale = 75;         // 75% zoom
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
+    sheet->showGridLines = false;        // Hide grid lines
+    sheet->zoomScale = 75;               // 75% zoom
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     ID colId = col->id;
@@ -2480,6 +2515,7 @@ TEST(XLSXWriterTest, WriteMultipleViewProperties) {
 TEST(XLSXWriterTest, WriteFreezePanesDefault) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
     // freezeCol/freezeRow default to 0
 
     auto col = std::make_unique<Axis>(generate_id(), true);
@@ -2516,7 +2552,8 @@ TEST(XLSXWriterTest, WriteFreezePanesDefault) {
 TEST(XLSXWriterTest, WriteFreezePanesColumnOnly) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
-    sheet->freezeCol = 1;  // Freeze column A
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
+    sheet->freezeCol = 1;                // Freeze column A
     sheet->freezeRow = 0;
 
     auto col = std::make_unique<Axis>(generate_id(), true);
@@ -2553,6 +2590,7 @@ TEST(XLSXWriterTest, WriteFreezePanesColumnOnly) {
 TEST(XLSXWriterTest, WriteFreezePanesRowOnly) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
     sheet->freezeCol = 0;
     sheet->freezeRow = 2;  // Freeze rows 1-2
 
@@ -2590,8 +2628,9 @@ TEST(XLSXWriterTest, WriteFreezePanesRowOnly) {
 TEST(XLSXWriterTest, WriteFreezePanesBothColAndRow) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
-    sheet->freezeCol = 2;  // Freeze columns A-B
-    sheet->freezeRow = 3;  // Freeze rows 1-3
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
+    sheet->freezeCol = 2;                // Freeze columns A-B
+    sheet->freezeRow = 3;                // Freeze rows 1-3
 
     auto col = std::make_unique<Axis>(generate_id(), true);
     ID colId = col->id;
@@ -2631,6 +2670,7 @@ TEST(XLSXWriterTest, WriteFreezePanesBothColAndRow) {
 TEST(XLSXWriterTest, HiddenColumnRoundTrip) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Hidden Column Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create 3 columns, hide the middle one
     auto col1 = std::make_unique<Axis>(generate_id(), true);
@@ -2703,6 +2743,7 @@ TEST(XLSXWriterTest, HiddenColumnRoundTrip) {
 TEST(XLSXWriterTest, HiddenRowRoundTrip) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Hidden Row Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Add a column
     auto col = std::make_unique<Axis>(generate_id(), true);
@@ -2775,6 +2816,7 @@ TEST(XLSXWriterTest, HiddenRowRoundTrip) {
 TEST(XLSXWriterTest, ColumnDefaultStyleRoundTrip) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Column Style Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Register a style
     CellStyle boldStyle;
@@ -2855,6 +2897,7 @@ TEST(XLSXWriterTest, ColumnDefaultStyleRoundTrip) {
 TEST(XLSXWriterTest, RowDefaultStyleRoundTrip) {
     auto workbook = std::make_unique<Workbook>(generate_id(), "Row Style Test");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Register a style
     CellStyle italicStyle;
@@ -2987,6 +3030,7 @@ TEST(XLSXWriterTest, RoundtripMergedCells) {
     // Create a workbook with merged cells using Range system
     auto workbook = std::make_unique<Workbook>(generate_id(), "MergedCells");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create 5 columns and 5 rows
     std::vector<ID> colIds;
@@ -3098,6 +3142,7 @@ TEST(XLSXWriterTest, MergedCellsWithStyles) {
     // Test that merged cells with styles are preserved using Range system
     auto workbook = std::make_unique<Workbook>(generate_id(), "StyledMerge");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create columns and rows
     std::vector<ID> colIds;

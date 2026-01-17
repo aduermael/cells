@@ -15,6 +15,7 @@ std::unique_ptr<Workbook> createTestWorkbook() {
 
     ID sheetId = generate_id();
     auto sheet = std::make_unique<Sheet>(sheetId, "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early so cells get stored properly
 
     // Create columns A, B, C (positions 0, 1, 2)
     for (uint32_t i = 0; i < 3; i++) {
