@@ -90,11 +90,13 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
     // Priority 1: Cell's own style (highest priority - start with this as base)
     // Note: We don't return early - we continue to merge lower-priority styles
     // to fill in any properties not explicitly set at the cell level.
-    if (!cell.styleId.isNull()) {
-        const CellStyle* cellStyle = workbook.getStyle(cell.styleId);
+    // Read style from workbook map (not from cell field)
+    const ID cellStyleId = workbook.getCellStyleId(cell.id);
+    if (!cellStyleId.isNull()) {
+        const CellStyle* cellStyle = workbook.getStyle(cellStyleId);
         if (cellStyle != nullptr) {
             combinedStyle = *cellStyle;
-            result.styleId = cell.styleId;
+            result.styleId = cellStyleId;
             result.fromCell = true;
             hasAnyStyle = true;
         }
@@ -285,9 +287,10 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         json << "\"col\":" << colPos << ",";
         json << "\"row\":" << rowPos << ",";
 
-        // Include formatId if cell has a format
-        if (!entry.cell->formatId.isNull()) {
-            json << "\"formatId\":\"" << entry.cell->formatId.toString() << "\",";
+        // Include formatId if cell has a format (read from workbook map)
+        const ID cellFormatId = _workbook->getCellFormatId(entry.cell->id);
+        if (!cellFormatId.isNull()) {
+            json << "\"formatId\":\"" << cellFormatId.toString() << "\",";
         }
 
         // Include effective style (resolves cell > range > column > row hierarchy)
@@ -434,11 +437,11 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 json << "\"isError\":true,";
             } else if (result.isNumber()) {
                 const double num = result.getNumber();
-                // Compute edit value for formula results
-                editValue = formatEditValue(_formatRegistry, num, entry.cell->formatId);
-                if (!entry.cell->formatId.isNull()) {
+                // Compute edit value for formula results (using cellFormatId from workbook map)
+                editValue = formatEditValue(_formatRegistry, num, cellFormatId);
+                if (!cellFormatId.isNull()) {
                     FormattedValue formatted = formatNumber(
-                        _formatRegistry, _workbook->getCustomFormats(), num, entry.cell->formatId);
+                        _formatRegistry, _workbook->getCustomFormats(), num, cellFormatId);
                     if (!formatted.isError) {
                         displayValue = formatted.text;
                     } else {
@@ -483,18 +486,18 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             std::string displayValue;
             std::string editValue;
 
-            if (!entry.cell->formatId.isNull() &&
+            if (!cellFormatId.isNull() &&
                 (entry.cell->value.type == CellValueType::NUMBER)) {
                 const double numValue = entry.cell->value.asNumber();
                 FormattedValue formatted =
                     formatNumber(_formatRegistry, _workbook->getCustomFormats(),
-                                 numValue, entry.cell->formatId);
+                                 numValue, cellFormatId);
                 if (!formatted.isError) {
                     displayValue = formatted.text;
                     useFormattedValue = true;
                 }
-                // Compute edit value for formatted numbers
-                editValue = formatEditValue(_formatRegistry, numValue, entry.cell->formatId);
+                // Compute edit value for formatted numbers (using cellFormatId from workbook map)
+                editValue = formatEditValue(_formatRegistry, numValue, cellFormatId);
             }
 
             if (useFormattedValue) {

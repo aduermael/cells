@@ -324,7 +324,8 @@ std::string CellsEngine::getCellFormatId(const std::string& cellIdStr) {
         return "{\"error\":\"Cell not found\"}";
     }
 
-    std::string formatIdStr = cell->formatId.isNull() ? "~" : cell->formatId.toString();
+    const ID formatId = _workbook->getCellFormatId(cell->id);
+    std::string formatIdStr = formatId.isNull() ? "~" : formatId.toString();
     return "{\"formatId\":\"" + formatIdStr + "\"}";
 }
 
@@ -437,8 +438,9 @@ std::string CellsEngine::formatCellById(const std::string& cellIdStr) {
         return "{\"text\":\"" + jsonEscape(text) + "\"}";
     }
 
+    const ID cellFormatId = _workbook->getCellFormatId(cell->id);
     FormattedValue result =
-        formatNumber(_formatRegistry, _workbook->getCustomFormats(), numericValue, cell->formatId);
+        formatNumber(_formatRegistry, _workbook->getCustomFormats(), numericValue, cellFormatId);
 
     std::ostringstream ss;
     if (result.isError) {
@@ -1148,10 +1150,11 @@ std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::s
         return "{\"error\":\"Cell not found\"}";
     }
 
-    // Get existing style (if any) and merge with incoming JSON
+    // Get existing style (if any) and merge with incoming JSON (read from workbook map)
     CellStyle baseStyle;  // Uses CellStyle defaults from model.h
-    if (!cell->styleId.isNull()) {
-        const CellStyle* existingStyle = _workbook->getStyle(cell->styleId);
+    const ID existingStyleId = _workbook->getCellStyleId(cell->id);
+    if (!existingStyleId.isNull()) {
+        const CellStyle* existingStyle = _workbook->getStyle(existingStyleId);
         if (existingStyle) {
             baseStyle = *existingStyle;
         }
@@ -1370,13 +1373,15 @@ std::string CellsEngine::getCellStyle(const std::string& cellIdStr) {
         return "{\"error\":\"Cell not found\"}";
     }
 
-    if (cell->styleId.isNull()) {
+    // Read style from workbook map
+    const ID styleId = _workbook->getCellStyleId(cell->id);
+    if (styleId.isNull()) {
         // Return empty/default style
         CellStyle defaultStyle;
         return styleToJson(defaultStyle);
     }
 
-    const CellStyle* style = _workbook->getStyle(cell->styleId);
+    const CellStyle* style = _workbook->getStyle(styleId);
     if (!style) {
         // Style ID is set but not found in registry - return default
         CellStyle defaultStyle;
@@ -1426,13 +1431,15 @@ std::string CellsEngine::getCellStyleAt(uint32_t col, uint32_t row) {
         }
     }
 
-    if (!cell || cell->styleId.isNull()) {
+    // Read style from workbook map
+    const ID styleId = cell ? _workbook->getCellStyleId(cell->id) : ID();
+    if (!cell || styleId.isNull()) {
         // No cell or no style - return default
         CellStyle defaultStyle;
         return styleToJson(defaultStyle);
     }
 
-    const CellStyle* style = _workbook->getStyle(cell->styleId);
+    const CellStyle* style = _workbook->getStyle(styleId);
     if (!style) {
         CellStyle defaultStyle;
         return styleToJson(defaultStyle);
@@ -1988,7 +1995,9 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
     // Clear redundant cell-level styles within the range (I2: Range style clears cell styles)
     // When applying a range style, remove matching properties from individual cells to avoid redundancy
     for (const auto& [cellId, cell] : sheet->cells) {
-        if (cell->styleId.isNull()) {
+        // Read style from workbook map
+        const ID cellStyleId = _workbook->getCellStyleId(cell->id);
+        if (cellStyleId.isNull()) {
             continue;  // Cell has no style, skip
         }
 
@@ -2006,7 +2015,7 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
         }
 
         // Get the cell's current style
-        const CellStyle* cellStylePtr = _workbook->getStyle(cell->styleId);
+        const CellStyle* cellStylePtr = _workbook->getStyle(cellStyleId);
         if (cellStylePtr == nullptr) {
             continue;
         }
@@ -2151,8 +2160,10 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
     // Priority 1: Cell's own style (highest priority - properties set here take precedence)
     // Note: We start with cell style but continue to merge lower-priority styles
     // to fill in any properties not explicitly set at the cell level.
-    if (cell && !cell->styleId.isNull()) {
-        const CellStyle* cellStyle = workbook.getStyle(cell->styleId);
+    // Read style from workbook map
+    const ID cellStyleId = cell ? workbook.getCellStyleId(cell->id) : ID();
+    if (cell && !cellStyleId.isNull()) {
+        const CellStyle* cellStyle = workbook.getStyle(cellStyleId);
         if (cellStyle) {
             result = *cellStyle;  // Start with cell style as base
             // Don't return early - merge with range/column/row styles below

@@ -198,25 +198,28 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
 
         // Phase 7: Format inheritance
         // If cell has GENERAL format, inherit format from referenced cells
-        const std::string currentFormat = cell->formatId.toString();
+        const ID currentFormatId = workbook.getCellFormatId(cell->id);
+        const std::string currentFormat = currentFormatId.toString();
         const bool isGeneralFormat =
             currentFormat.empty() || currentFormat == "~" || currentFormat == "FMT_GEN0";
 
         if (isGeneralFormat && formula->ast != nullptr && targetSheet != nullptr) {
-            // Create a format lookup for this sheet
+            // Create a format lookup for this sheet (reads from workbook map)
             const FormatLookup formatLookup =
-                [targetSheet](const std::string& cellIdStr) -> std::string {
+                [targetSheet, &workbook](const std::string& cellIdStr) -> std::string {
                 const ID cellId(cellIdStr);
                 const Cell* refCell = targetSheet->getCell(cellId);
                 if (refCell == nullptr) {
                     return "";
                 }
-                return refCell->formatId.toString();
+                return workbook.getCellFormatId(refCell->id).toString();
             };
 
             const std::string inheritedFormat = inferFormatFromFormula(formula->ast, formatLookup);
             if (!inheritedFormat.empty()) {
-                cell->formatId = ID(inheritedFormat);
+                const ID inheritedFormatId(inheritedFormat);
+                workbook.setCellFormatId(cell->id, inheritedFormatId);
+                cell->markHasFormat();
             }
         }
     } else {
@@ -273,8 +276,18 @@ ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op) {
         return ApplyResult::INVALID_PAYLOAD;
     }
 
-    // Set the format ID (null ID "~" means clear format / use default)
-    cell->formatId = ID(formatIdStr);
+    const ID formatId(formatIdStr);
+
+    // Store format in workbook-level map and update cell flag
+    if (formatId.isNull()) {
+        // Clear format - remove from map and clear flag
+        workbook.setCellFormatId(cell->id, formatId);
+        cell->clearHasFormat();
+    } else {
+        // Set format - store in map and set flag
+        workbook.setCellFormatId(cell->id, formatId);
+        cell->markHasFormat();
+    }
 
     return ApplyResult::SUCCESS;
 }
@@ -312,17 +325,26 @@ ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op) {
     const ID newStyleId(styleIdStr);
     StyleRegistry* registry = workbook.getStyleRegistry();
 
-    // Release old style reference (if any)
-    if (!cell->styleId.isNull() && registry != nullptr) {
-        registry->release(cell->styleId);
+    // Release old style reference (if any) - read from workbook map
+    const ID oldStyleId = workbook.getCellStyleId(cell->id);
+    if (!oldStyleId.isNull() && registry != nullptr) {
+        registry->release(oldStyleId);
     }
 
-    // Set the style ID (null ID "~" means clear style / use default)
-    cell->styleId = newStyleId;
+    // Store style in workbook-level map and update cell flag
+    if (newStyleId.isNull()) {
+        // Clear style - remove from map and clear flag
+        workbook.setCellStyleId(cell->id, newStyleId);
+        cell->clearHasStyle();
+    } else {
+        // Set style - store in map and set flag
+        workbook.setCellStyleId(cell->id, newStyleId);
+        cell->markHasStyle();
 
-    // Add reference to new style (if not null)
-    if (!newStyleId.isNull() && registry != nullptr) {
-        registry->addRef(newStyleId);
+        // Add reference to new style
+        if (registry != nullptr) {
+            registry->addRef(newStyleId);
+        }
     }
 
     return ApplyResult::SUCCESS;

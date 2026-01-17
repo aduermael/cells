@@ -1127,12 +1127,13 @@ TEST(XLSXWriterTest, WriteStylesBold) {
     auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
     cell->value = CellValue("Bold Text");
 
-    // Create and register bold style
+    // Create and register bold style (store in workbook map)
     CellStyle boldStyle;
     boldStyle.bold = true;
     ID styleId = generate_id();
     workbook->registerStyle(styleId, boldStyle);
-    cell->styleId = styleId;
+    workbook->setCellStyleId(cell->id, styleId);
+    cell->markHasStyle();
 
     sheet->addCell(std::move(cell));
     workbook->addSheet(std::move(sheet));
@@ -1160,9 +1161,11 @@ TEST(XLSXWriterTest, WriteStylesBold) {
 
     Cell* readCell = readSheet->getCellAt(readCol->id, readRow->id);
     ASSERT_NE(readCell, nullptr) << "Cell should exist";
-    EXPECT_FALSE(readCell->styleId.isNull()) << "Cell should have style";
+    // Read style from workbook map
+    const ID readCellStyleId = readResult.workbook->getCellStyleId(readCell->id);
+    EXPECT_FALSE(readCellStyleId.isNull()) << "Cell should have style";
 
-    const CellStyle* readStyle = readResult.workbook->getStyle(readCell->styleId);
+    const CellStyle* readStyle = readResult.workbook->getStyle(readCellStyleId);
     ASSERT_NE(readStyle, nullptr) << "Style should be registered";
     EXPECT_TRUE(readStyle->bold) << "Cell should be bold";
 }

@@ -1609,11 +1609,12 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
     std::unordered_map<const Axis*, size_t> axisStyleIndices;
 
     for (const auto& sheet : workbook.sheets) {
-        // Collect cell styles
+        // Collect cell styles (read from workbook map)
         for (const auto& [id, cell] : sheet->cells) {
-            if (!cell->styleId.isNull()) {
+            const ID cellStyleId = workbook.getCellStyleId(cell->id);
+            if (!cellStyleId.isNull()) {
                 // Look up the CellStyle in the workbook
-                const CellStyle* style = workbook.getStyle(cell->styleId);
+                const CellStyle* style = workbook.getStyle(cellStyleId);
                 if (style != nullptr) {
                     const size_t styleIdx = styleTable.getOrAddFormat(*style);
                     cellStyleIndices[cell.get()] = styleIdx;

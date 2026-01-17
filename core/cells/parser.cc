@@ -1049,20 +1049,28 @@ bool Parser::parseCellProps(std::string_view props, Cell& cell) {
 
         // Parse value based on key
         if (key == "fmt") {
-            // Format ID: 8 characters
+            // Format ID: 8 characters - store in workbook map, not cell
             size_t end = props.find_first_of(" \t");
             if (end == std::string_view::npos) {
                 end = props.size();
             }
-            cell.formatId = ID(std::string(props.substr(0, end)));
+            const ID formatId(std::string(props.substr(0, end)));
+            if (workbook_ != nullptr && !formatId.isNull()) {
+                workbook_->setCellFormatId(cell.id, formatId);
+                cell.markHasFormat();
+            }
             props = (end < props.size()) ? props.substr(end) : "";
         } else if (key == "sty") {
-            // Style ID: 8 characters
+            // Style ID: 8 characters - store in workbook map, not cell
             size_t end = props.find_first_of(" \t");
             if (end == std::string_view::npos) {
                 end = props.size();
             }
-            cell.styleId = ID(std::string(props.substr(0, end)));
+            const ID styleId(std::string(props.substr(0, end)));
+            if (workbook_ != nullptr && !styleId.isNull()) {
+                workbook_->setCellStyleId(cell.id, styleId);
+                cell.markHasStyle();
+            }
             props = (end < props.size()) ? props.substr(end) : "";
         } else {
             // Unknown property - skip value

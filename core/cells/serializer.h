@@ -70,7 +70,7 @@ private:
     void serializeNamedRanges(const Workbook& workbook, std::ostream& out) const;
 
     // Serialize a single sheet
-    void serializeSheet(const Sheet& sheet, std::ostream& out) const;
+    void serializeSheet(const Workbook& workbook, const Sheet& sheet, std::ostream& out) const;
 
     // Serialize columns section
     void serializeColumns(const Sheet& sheet, std::ostream& out) const;
@@ -79,7 +79,7 @@ private:
     void serializeRows(const Sheet& sheet, std::ostream& out) const;
 
     // Serialize cells section
-    void serializeCells(const Sheet& sheet, std::ostream& out) const;
+    void serializeCells(const Workbook& workbook, const Sheet& sheet, std::ostream& out) const;
 
     // Serialize ranges section (unified range system)
     void serializeRanges(const Sheet& sheet, std::ostream& out) const;
@@ -87,8 +87,9 @@ private:
     // Serialize a single axis (column or row)
     void serializeAxis(const Axis& axis, char prefix, std::ostream& out) const;
 
-    // Serialize a single cell
-    void serializeCell(const Cell& cell, const Sheet& sheet, std::ostream& out) const;
+    // Serialize a single cell (reads format/style from workbook map)
+    void serializeCell(const Workbook& workbook, const Cell& cell, const Sheet& sheet,
+                       std::ostream& out) const;
 
     // Serialize cell value based on type
     void serializeCellValue(const CellValue& value, const Cell& cell, const Sheet& sheet,

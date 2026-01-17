@@ -574,10 +574,10 @@ TEST_F(CRDTTest, ApplyCellSetStyle) {
     ApplyResult result = applyOperation(*workbook, op);
     EXPECT_EQ(result, ApplyResult::SUCCESS);
 
-    // Verify the style ID was set
+    // Verify the style ID was set (read from workbook map)
     Sheet* sheet = workbook->getSheetByIndex(0);
     Cell* cell = sheet->getCell(cell1);
-    EXPECT_EQ(cell->styleId.toString(), "STY_bold");
+    EXPECT_EQ(workbook->getCellStyleId(cell->id).toString(), "STY_bold");
 }
 
 TEST_F(CRDTTest, ApplyStyleDefine) {

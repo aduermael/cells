@@ -169,8 +169,8 @@ CSVWriteResult CSVWriter::write(const Sheet& sheet) {
                 std::string const value = formatValue(cell->value);
                 oss << escapeField(value);
 
-                // Check if cell has styles that will be lost
-                if (!foundStyledCell && !cell->styleId.isNull()) {
+                // Check if cell has styles that will be lost (use hasStyle flag)
+                if (!foundStyledCell && cell->hasStyle()) {
                     foundStyledCell = true;
                 }
             }

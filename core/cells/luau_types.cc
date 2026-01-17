@@ -167,29 +167,34 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
         return 1;
     }
 
-    // Handle .format property - returns format ID string or nil
+    // Handle .format property - returns format ID string or nil (read from workbook map)
     if (strcmp(key, "format") == 0) {
-        if (!cell->formatId.isNull()) {
-            lua_pushstring(L, cell->formatId.toString().c_str());
-            return 1;
+        const Workbook* workbook = getWorkbook(L);
+        if (workbook != nullptr) {
+            const ID formatId = workbook->getCellFormatId(cell->id);
+            if (!formatId.isNull()) {
+                lua_pushstring(L, formatId.toString().c_str());
+                return 1;
+            }
         }
         lua_pushnil(L);
         return 1;
     }
 
-    // Handle .style property - returns style table or nil
+    // Handle .style property - returns style table or nil (read from workbook map)
     if (strcmp(key, "style") == 0) {
-        if (cell->styleId.isNull()) {
-            lua_pushnil(L);
-            return 1;
-        }
         // Get workbook to look up style
         const Workbook* workbook = getWorkbook(L);
         if (workbook == nullptr) {
             lua_pushnil(L);
             return 1;
         }
-        const CellStyle* style = workbook->getStyle(cell->styleId);
+        const ID styleId = workbook->getCellStyleId(cell->id);
+        if (styleId.isNull()) {
+            lua_pushnil(L);
+            return 1;
+        }
+        const CellStyle* style = workbook->getStyle(styleId);
         if (style == nullptr) {
             lua_pushnil(L);
             return 1;
@@ -560,9 +565,10 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
         // Build style from table
         CellStyle style;
 
-        // Get existing style to merge with (if any)
-        if (!cell->styleId.isNull()) {
-            const CellStyle* existing = workbook->getStyle(cell->styleId);
+        // Get existing style to merge with (if any) - read from workbook map
+        const ID existingStyleId = workbook->getCellStyleId(cell->id);
+        if (!existingStyleId.isNull()) {
+            const CellStyle* existing = workbook->getStyle(existingStyleId);
             if (existing != nullptr) {
                 style = *existing;
             }

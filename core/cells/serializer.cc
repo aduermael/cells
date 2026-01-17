@@ -67,7 +67,7 @@ void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
 
     // Serialize each sheet
     for (const auto& sheet : workbook.sheets) {
-        serializeSheet(*sheet, out);
+        serializeSheet(workbook, *sheet, out);
     }
 
     // Serialize operation log if it has operations
@@ -247,7 +247,8 @@ void Serializer::serializeNamedRanges(const Workbook& workbook, std::ostream& ou
     }
 }
 
-void Serializer::serializeSheet(const Sheet& sheet, std::ostream& out) const {
+void Serializer::serializeSheet(const Workbook& workbook, const Sheet& sheet,
+                                std::ostream& out) const {
     // Sheet ID and name
     out << "S " << sheet.id.toString() << " \"" << escapeString(sheet.name) << "\"\n";
 
@@ -278,7 +279,7 @@ void Serializer::serializeSheet(const Sheet& sheet, std::ostream& out) const {
     // Columns, rows, cells, ranges
     serializeColumns(sheet, out);
     serializeRows(sheet, out);
-    serializeCells(sheet, out);
+    serializeCells(workbook, sheet, out);
     serializeRanges(sheet, out);
 }
 
@@ -322,7 +323,8 @@ void Serializer::serializeRows(const Sheet& sheet, std::ostream& out) const {
     }
 }
 
-void Serializer::serializeCells(const Sheet& sheet, std::ostream& out) const {
+void Serializer::serializeCells(const Workbook& workbook, const Sheet& sheet,
+                                std::ostream& out) const {
     // Collect cells for alphabetical ordering by UUID
     std::vector<std::pair<std::string, const Cell*>> ordered;
     ordered.reserve(sheet.cells.size());
@@ -338,7 +340,7 @@ void Serializer::serializeCells(const Sheet& sheet, std::ostream& out) const {
 
     // Serialize in order
     for (const auto& item : ordered) {
-        serializeCell(*item.second, sheet, out);
+        serializeCell(workbook, *item.second, sheet, out);
     }
 }
 
@@ -403,21 +405,24 @@ void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out)
     out << "\n";
 }
 
-void Serializer::serializeCell(const Cell& cell, const Sheet& sheet, std::ostream& out) const {
+void Serializer::serializeCell(const Workbook& workbook, const Cell& cell, const Sheet& sheet,
+                               std::ostream& out) const {
     // Format: X <id> <col> <row> <type> <value> [fmt:<formatId>] [sty:<styleId>]
     out << "X " << cell.id.toString() << " " << cell.colId.toString() << " "
         << cell.rowId.toString() << " ";
 
     serializeCellValue(cell.value, cell, sheet, out);
 
-    // Optional format property (only if not null/default)
-    if (!cell.formatId.isNull()) {
-        out << " fmt:" << cell.formatId.toString();
+    // Optional format property (only if not null/default) - read from workbook map
+    const ID formatId = workbook.getCellFormatId(cell.id);
+    if (!formatId.isNull()) {
+        out << " fmt:" << formatId.toString();
     }
 
-    // Optional style property (only if not null/default)
-    if (!cell.styleId.isNull()) {
-        out << " sty:" << cell.styleId.toString();
+    // Optional style property (only if not null/default) - read from workbook map
+    const ID styleId = workbook.getCellStyleId(cell.id);
+    if (!styleId.isNull()) {
+        out << " sty:" << styleId.toString();
     }
 
     out << "\n";

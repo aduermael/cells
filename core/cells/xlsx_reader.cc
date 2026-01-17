@@ -1868,17 +1868,19 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 // Create cell
                 auto cell = std::make_unique<Cell>(generate_id(), columnIds[col], rowIds[rowNum]);
 
-                // Apply style if present
+                // Apply style if present - store in workbook map
                 const int styleIndex = cellNode.attribute("s").as_int(0);
                 const ID styleId = getOrCreateStyleId(styleIndex);
                 if (!styleId.isNull()) {
-                    cell->styleId = styleId;
+                    workbook->setCellStyleId(cell->id, styleId);
+                    cell->markHasStyle();
                 }
 
-                // Apply number format if present
+                // Apply number format if present - store in workbook map
                 const ID formatId = getFormatId(styleIndex);
                 if (!formatId.isNull()) {
-                    cell->formatId = formatId;
+                    workbook->setCellFormatId(cell->id, formatId);
+                    cell->markHasFormat();
                 }
 
                 // Parse value based on type (type was read earlier)
