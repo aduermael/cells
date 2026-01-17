@@ -2,26 +2,21 @@
 // Range Index - Spatial Index for Range Lookup
 // =============================================================================
 //
-// Uses R-trees to efficiently find ranges containing a given cell position.
+// Uses an R-tree to efficiently find ranges containing a given cell position.
 // This is the bridge between UUID-based Range storage and position-based queries.
 //
 // Key responsibilities:
 // - Store Range objects with their resolved position bounds
 // - Query ranges at a specific cell position: O(log n + k)
-// - Query ranges by position AND flag filter (using flag-specific indices)
+// - Query ranges by position with optional flag filtering (post-filter)
 // - Update index when columns/rows are inserted/deleted (positions change)
-//
-// Performance optimization:
-// - Maintains separate R-tree indices for each flag type (MERGE, STYLE, etc.)
-// - Queries with flag filters use the flag-specific R-tree directly
-// - Avoids post-query filtering that would iterate all ranges
-// - Critical for viewports with many ranges (10k+)
 //
 // Architecture notes:
 // - Range objects store UUIDs; this index stores position bounds
 // - When column/row positions change, ranges must be re-indexed
 // - The R-tree stores Range pointers; the actual Range objects are owned elsewhere
 // - For sheets: Sheet owns Ranges in a map, RangeIndex indexes them
+// - Flag filtering is done via cheap O(k) post-filtering where k is typically 1-5
 //
 // Dependencies: range.h, rtree.h, types.h
 // Used by: Sheet (for range queries during rendering)
