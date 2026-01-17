@@ -10,7 +10,15 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 2 COMPLETE - dependency graph moved to Workbook level.
+**Current status:** Phase 3 COMPLETE - shared formulas moved to Workbook level.
+
+**Progress Jan 17 (session 5):**
+- Moved shared formula tracking from Sheet to Workbook level
+- Added `Workbook::_sharedFormulaMasters` and `_sharedFormulaFrom` maps
+- Added Workbook methods: `getSharedFormulaInfo()`, `getSharedFormulaMaster()`, `getEffectiveFormula()`, `isInSharedFormulaGroup()`, `registerSharedFormulaGroup()`, `addSharedFormulaSubscriber()`, `removeSharedFormulaSubscriber()`, `clearSharedFormulaGroup()`, `clearAllSharedFormulaGroups()`
+- Removed `_sharedFormulaMasters` and `_sharedFormulaFrom` from Sheet
+- Updated all Sheet shared formula methods to delegate to Workbook
+- All 47 unit tests and 184 E2E tests pass
 
 **Progress Jan 17 (session 4):**
 - Moved dependency graph from Sheet to Workbook level
@@ -153,14 +161,14 @@ Note: Cross-sheet dependency tracking is kept for now because:
 
 Move shared formula tracking from Sheet to Workbook level.
 
-- [ ] 3a: Add `Workbook::_sharedFormulaMasters` and `Workbook::_sharedFormulaFrom` maps
-- [ ] 3b: Add `Workbook::getSharedFormulaInfo()`, `getSharedFormulaMaster()` methods
-- [ ] 3c: Add `Workbook::registerSharedFormulaGroup()`, `addSharedFormulaSubscriber()`, etc.
-- [ ] 3d: Add `Workbook::getEffectiveFormula(Cell*)` method
-- [ ] 3e: Remove shared formula tracking from Sheet (keep delegating methods for convenience)
-- [ ] 3f: Update `Sheet::getEffectiveFormula()` to delegate to Workbook
-- [ ] 3g: Update shared formula CRDT operations to use Workbook-level tracking
-- [ ] 3h: Run tests to verify shared formulas work correctly
+- [x] 3a: Add `Workbook::_sharedFormulaMasters` and `Workbook::_sharedFormulaFrom` maps
+- [x] 3b: Add `Workbook::getSharedFormulaInfo()`, `getSharedFormulaMaster()` methods
+- [x] 3c: Add `Workbook::registerSharedFormulaGroup()`, `addSharedFormulaSubscriber()`, etc.
+- [x] 3d: Add `Workbook::getEffectiveFormula(Cell*)` method
+- [x] 3e: Remove shared formula tracking from Sheet (keep delegating methods for convenience)
+- [x] 3f: Update `Sheet::getEffectiveFormula()` to delegate to Workbook
+- [x] 3g: CRDT operations use Sheet methods which now delegate to Workbook - no changes needed
+- [x] 3h: Run tests to verify shared formulas work correctly - ALL PASS (47 unit + 184 E2E)
 
 ## Phase 4: Workbook-Level Spill Regions
 

@@ -486,39 +486,45 @@ struct Sheet {
 
     // ========================================================================
     // Shared Formula Tracking (Runtime-Only)
+    // All these methods delegate to Workbook-level storage for convenience.
     // ========================================================================
 
     // Get shared formula info for a master cell (returns nullptr if not a master)
+    // Delegates to Workbook::getSharedFormulaInfo()
     [[nodiscard]] SharedFormulaInfo* getSharedFormulaInfo(const ID& masterCellId);
     [[nodiscard]] const SharedFormulaInfo* getSharedFormulaInfo(const ID& masterCellId) const;
 
     // Get the master cell ID if this cell is a shared formula subscriber (returns null ID if not)
+    // Delegates to Workbook::getSharedFormulaMaster()
     [[nodiscard]] ID getSharedFormulaMaster(const ID& subscriberId) const;
 
     // Get the effective formula for a cell (follows shared formula reference if needed)
-    // For regular cells, returns cell->formula
-    // For shared formula subscribers, returns the master cell's formula
-    // Returns nullptr if cell has no formula
+    // Delegates to Workbook::getEffectiveFormula()
     [[nodiscard]] Formula* getEffectiveFormula(Cell* cell);
     [[nodiscard]] const Formula* getEffectiveFormula(const Cell* cell) const;
 
     // Check if a cell is part of any shared formula group (master or subscriber)
+    // Delegates to Workbook::isInSharedFormulaGroup()
     [[nodiscard]] bool isInSharedFormulaGroup(const ID& cellId) const;
 
     // Register a new shared formula group (masterId owns the formula, subscribers reference it)
+    // Delegates to Workbook::registerSharedFormulaGroup()
     void registerSharedFormulaGroup(const ID& masterCellId, const std::vector<ID>& subscriberIds);
 
     // Add a subscriber to an existing shared formula group
+    // Delegates to Workbook::addSharedFormulaSubscriber()
     void addSharedFormulaSubscriber(const ID& masterCellId, const ID& subscriberId);
 
     // Remove a subscriber from a shared formula group
-    // If no subscribers remain, removes the group entirely
+    // Delegates to Workbook::removeSharedFormulaSubscriber()
     void removeSharedFormulaSubscriber(const ID& subscriberId);
 
     // Clear the shared formula group for a master (removes master and all subscribers)
+    // Delegates to Workbook::clearSharedFormulaGroup()
     void clearSharedFormulaGroup(const ID& masterCellId);
 
     // Clear all shared formula tracking data
+    // Delegates to Workbook::clearAllSharedFormulaGroups()
     void clearAllSharedFormulaGroups();
 
     // ========================================================================
@@ -594,16 +600,6 @@ private:
     // Reverse lookup: (colId, rowId) composite key → master cell ID
     // Only contains spilled positions, not the master position itself
     std::unordered_map<std::string, ID> _spilledFrom;
-
-    // ========================================================================
-    // Shared formula tracking (runtime-only, not persisted)
-    // ========================================================================
-
-    // Maps master cell ID → shared formula info (subscriber list)
-    std::unordered_map<ID, SharedFormulaInfo, IDHash> _sharedFormulaMasters;
-
-    // Reverse lookup: subscriber cell ID → master cell ID
-    std::unordered_map<ID, ID, IDHash> _sharedFormulaFrom;
 
     // ========================================================================
     // Unified Range System (persisted)
@@ -855,6 +851,43 @@ struct Workbook {
     [[nodiscard]] std::vector<CrossSheetDep> getCrossSheetRangeDependents(
         const ID& changedSheetId, const ID& changedColId, const ID& changedRowId) const;
 
+    // ========================================================================
+    // Workbook-level shared formula tracking (runtime-only)
+    // ========================================================================
+
+    // Get shared formula info for a master cell (returns nullptr if not a master)
+    [[nodiscard]] SharedFormulaInfo* getSharedFormulaInfo(const ID& masterCellId);
+    [[nodiscard]] const SharedFormulaInfo* getSharedFormulaInfo(const ID& masterCellId) const;
+
+    // Get the master cell ID if this cell is a shared formula subscriber (returns null ID if not)
+    [[nodiscard]] ID getSharedFormulaMaster(const ID& subscriberId) const;
+
+    // Get the effective formula for a cell (follows shared formula reference if needed)
+    // For regular cells, returns cell->formula
+    // For shared formula subscribers, returns the master cell's formula
+    // Returns nullptr if cell has no formula
+    [[nodiscard]] Formula* getEffectiveFormula(Cell* cell);
+    [[nodiscard]] const Formula* getEffectiveFormula(const Cell* cell) const;
+
+    // Check if a cell is part of any shared formula group (master or subscriber)
+    [[nodiscard]] bool isInSharedFormulaGroup(const ID& cellId) const;
+
+    // Register a new shared formula group (masterId owns the formula, subscribers reference it)
+    void registerSharedFormulaGroup(const ID& masterCellId, const std::vector<ID>& subscriberIds);
+
+    // Add a subscriber to an existing shared formula group
+    void addSharedFormulaSubscriber(const ID& masterCellId, const ID& subscriberId);
+
+    // Remove a subscriber from a shared formula group
+    // If no subscribers remain, removes the group entirely
+    void removeSharedFormulaSubscriber(const ID& subscriberId);
+
+    // Clear the shared formula group for a master (removes master and all subscribers)
+    void clearSharedFormulaGroup(const ID& masterCellId);
+
+    // Clear all shared formula tracking data
+    void clearAllSharedFormulaGroups();
+
 private:
     // Sheet lookup by ID
     std::unordered_map<ID, Sheet*, IDHash> _sheetIndex;
@@ -907,6 +940,16 @@ private:
     // Primary cell storage: cell ID -> Cell
     // Cells are owned by Workbook; Sheets maintain lightweight ID sets and position indexes
     std::unordered_map<ID, std::unique_ptr<Cell>, IDHash> _cells;
+
+    // ========================================================================
+    // Workbook-level shared formula tracking (runtime-only)
+    // ========================================================================
+
+    // Maps master cell ID → shared formula info (subscriber list)
+    std::unordered_map<ID, SharedFormulaInfo, IDHash> _sharedFormulaMasters;
+
+    // Reverse lookup: subscriber cell ID → master cell ID
+    std::unordered_map<ID, ID, IDHash> _sharedFormulaFrom;
 
     // ========================================================================
     // Cross-sheet dependency tracking (runtime-only)

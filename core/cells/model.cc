@@ -12,8 +12,9 @@
 // - Axis: Column/row metadata (position, size)
 // - Workbook: Top-level container with sheets, OpLog, and collaboration mode
 //
-// Shared formula master/subscriber relationships are managed at Sheet level
+// Shared formula master/subscriber relationships are managed at Workbook level
 // via SharedFormulaInfo and the _sharedFormulaMasters/_sharedFormulaFrom maps.
+// Sheet methods delegate to Workbook for convenience.
 //
 // Dependencies: types.h, operation.h, oplog.h, formula_ast.h
 // Used by: crdt.cc (applies operations), bindings.cc (WASM API), sheet.cc
@@ -839,6 +840,219 @@ std::vector<Workbook::CrossSheetDep> Workbook::getCrossSheetRangeDependents(
     }
 
     return result;
+}
+
+// =============================================================================
+// Workbook-level shared formula tracking
+// =============================================================================
+
+SharedFormulaInfo* Workbook::getSharedFormulaInfo(const ID& masterCellId) {
+    auto it = _sharedFormulaMasters.find(masterCellId);
+    return (it != _sharedFormulaMasters.end()) ? &it->second : nullptr;
+}
+
+const SharedFormulaInfo* Workbook::getSharedFormulaInfo(const ID& masterCellId) const {
+    auto it = _sharedFormulaMasters.find(masterCellId);
+    return (it != _sharedFormulaMasters.end()) ? &it->second : nullptr;
+}
+
+ID Workbook::getSharedFormulaMaster(const ID& subscriberId) const {
+    auto it = _sharedFormulaFrom.find(subscriberId);
+    return (it != _sharedFormulaFrom.end()) ? it->second : ID();
+}
+
+Formula* Workbook::getEffectiveFormula(Cell* cell) {
+    if (cell == nullptr) {
+        return nullptr;
+    }
+
+    // If cell has its own formula, return it
+    if (cell->formula != nullptr) {
+        return cell->formula;
+    }
+
+    // If cell is a shared formula subscriber, look up the master
+    if (cell->hasFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER)) {
+        const ID masterId = getSharedFormulaMaster(cell->id);
+        if (!masterId.isNull()) {
+            // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
+            Cell* const master = getCell(masterId);
+            if (master != nullptr) {
+                return master->formula;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+const Formula* Workbook::getEffectiveFormula(const Cell* cell) const {
+    if (cell == nullptr) {
+        return nullptr;
+    }
+
+    // If cell has its own formula, return it
+    if (cell->formula != nullptr) {
+        return cell->formula;
+    }
+
+    // If cell is a shared formula subscriber, look up the master
+    if (cell->hasFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER)) {
+        const ID masterId = getSharedFormulaMaster(cell->id);
+        if (!masterId.isNull()) {
+            const Cell* master = getCell(masterId);
+            if (master != nullptr) {
+                return master->formula;
+            }
+        }
+    }
+
+    return nullptr;
+}
+
+bool Workbook::isInSharedFormulaGroup(const ID& cellId) const {
+    // Check if it's a master
+    if (_sharedFormulaMasters.find(cellId) != _sharedFormulaMasters.end()) {
+        return true;
+    }
+    // Check if it's a subscriber
+    return _sharedFormulaFrom.find(cellId) != _sharedFormulaFrom.end();
+}
+
+void Workbook::registerSharedFormulaGroup(const ID& masterCellId,
+                                          const std::vector<ID>& subscriberIds) {
+    // Clear any existing group for this master
+    clearSharedFormulaGroup(masterCellId);
+
+    // Create new shared formula info
+    SharedFormulaInfo info(masterCellId);
+    info.subscribers = subscriberIds;
+
+    // Register in sharedFormulaMasters
+    _sharedFormulaMasters[masterCellId] = std::move(info);
+
+    // Build reverse lookup for each subscriber
+    for (const ID& subId : subscriberIds) {
+        _sharedFormulaFrom[subId] = masterCellId;
+    }
+
+    // Set the master flag on the master cell
+    Cell* master = getCell(masterCellId);
+    if (master != nullptr) {
+        master->setFlag(CellFlags::SHARED_FORMULA_MASTER);
+    }
+
+    // Set subscriber flags on subscriber cells
+    for (const ID& subId : subscriberIds) {
+        Cell* sub = getCell(subId);
+        if (sub != nullptr) {
+            sub->setFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
+        }
+    }
+}
+
+void Workbook::addSharedFormulaSubscriber(const ID& masterCellId, const ID& subscriberId) {
+    auto it = _sharedFormulaMasters.find(masterCellId);
+    if (it == _sharedFormulaMasters.end()) {
+        // No existing group - create one with just this subscriber
+        SharedFormulaInfo info(masterCellId);
+        info.subscribers.push_back(subscriberId);
+        _sharedFormulaMasters[masterCellId] = std::move(info);
+
+        // Set master flag
+        Cell* master = getCell(masterCellId);
+        if (master != nullptr) {
+            master->setFlag(CellFlags::SHARED_FORMULA_MASTER);
+        }
+    } else {
+        // Add to existing group
+        it->second.subscribers.push_back(subscriberId);
+    }
+
+    // Add reverse lookup
+    _sharedFormulaFrom[subscriberId] = masterCellId;
+
+    // Set subscriber flag
+    Cell* sub = getCell(subscriberId);
+    if (sub != nullptr) {
+        sub->setFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
+    }
+}
+
+void Workbook::removeSharedFormulaSubscriber(const ID& subscriberId) {
+    auto fromIt = _sharedFormulaFrom.find(subscriberId);
+    if (fromIt == _sharedFormulaFrom.end()) {
+        return;  // Not a subscriber
+    }
+
+    const ID masterId = fromIt->second;
+    _sharedFormulaFrom.erase(fromIt);
+
+    // Clear subscriber flag
+    Cell* sub = getCell(subscriberId);
+    if (sub != nullptr) {
+        sub->clearFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
+    }
+
+    // Remove from master's subscriber list
+    auto masterIt = _sharedFormulaMasters.find(masterId);
+    if (masterIt != _sharedFormulaMasters.end()) {
+        auto& subs = masterIt->second.subscribers;
+        subs.erase(std::remove(subs.begin(), subs.end(), subscriberId), subs.end());
+
+        // If no more subscribers, remove the group entirely
+        if (subs.empty()) {
+            Cell* master = getCell(masterId);
+            if (master != nullptr) {
+                master->clearFlag(CellFlags::SHARED_FORMULA_MASTER);
+            }
+            _sharedFormulaMasters.erase(masterIt);
+        }
+    }
+}
+
+void Workbook::clearSharedFormulaGroup(const ID& masterCellId) {
+    auto it = _sharedFormulaMasters.find(masterCellId);
+    if (it == _sharedFormulaMasters.end()) {
+        return;
+    }
+
+    // Clear subscriber flags and reverse lookups
+    for (const ID& subId : it->second.subscribers) {
+        _sharedFormulaFrom.erase(subId);
+        Cell* sub = getCell(subId);
+        if (sub != nullptr) {
+            sub->clearFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
+        }
+    }
+
+    // Clear master flag
+    Cell* master = getCell(masterCellId);
+    if (master != nullptr) {
+        master->clearFlag(CellFlags::SHARED_FORMULA_MASTER);
+    }
+
+    // Remove the master entry
+    _sharedFormulaMasters.erase(it);
+}
+
+void Workbook::clearAllSharedFormulaGroups() {
+    // Clear all flags before clearing the maps
+    for (const auto& [masterId, info] : _sharedFormulaMasters) {
+        Cell* master = getCell(masterId);
+        if (master != nullptr) {
+            master->clearFlag(CellFlags::SHARED_FORMULA_MASTER);
+        }
+        for (const ID& subId : info.subscribers) {
+            Cell* sub = getCell(subId);
+            if (sub != nullptr) {
+                sub->clearFlag(CellFlags::SHARED_FORMULA_SUBSCRIBER);
+            }
+        }
+    }
+
+    _sharedFormulaMasters.clear();
+    _sharedFormulaFrom.clear();
 }
 
 }  // namespace cells
