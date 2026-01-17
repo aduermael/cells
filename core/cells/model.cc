@@ -283,11 +283,20 @@ void Cell::clearFlag(CellFlags flag) {
 // Axis
 // ============================================================================
 
-Axis::Axis() : name(), id(), position(0), size(DEFAULT_COLUMN_WIDTH), isColumn(true) {}
+Axis::Axis() : name(), id(), sheetId(), position(0), size(DEFAULT_COLUMN_WIDTH), isColumn(true) {}
 
 Axis::Axis(const ID& id, bool isColumn)
     : name(),
       id(id),
+      sheetId(),
+      position(0),
+      size(isColumn ? DEFAULT_COLUMN_WIDTH : DEFAULT_ROW_HEIGHT),
+      isColumn(isColumn) {}
+
+Axis::Axis(const ID& id, const ID& sheetId, bool isColumn)
+    : name(),
+      id(id),
+      sheetId(sheetId),
       position(0),
       size(isColumn ? DEFAULT_COLUMN_WIDTH : DEFAULT_ROW_HEIGHT),
       isColumn(isColumn) {}

@@ -131,6 +131,7 @@ void Sheet::addColumn(std::unique_ptr<Axis> col) {
     }
 
     col->isColumn = true;
+    col->sheetId = id;  // Set the sheet ID for reverse lookup
     columns[col->id] = std::move(col);
 }
 
@@ -140,6 +141,7 @@ void Sheet::addRow(std::unique_ptr<Axis> row) {
     }
 
     row->isColumn = false;
+    row->sheetId = id;  // Set the sheet ID for reverse lookup
     rows[row->id] = std::move(row);
 }
 
@@ -194,8 +196,8 @@ Axis* Sheet::getOrCreateColumnByPosition(uint32_t position) {
         return existing;
     }
 
-    // Create new column
-    auto col = std::make_unique<Axis>(generate_id(), true);
+    // Create new column with sheet ID
+    auto col = std::make_unique<Axis>(generate_id(), id, true);
     col->position = position;
     // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const rawPtr = col.get();
@@ -211,8 +213,8 @@ Axis* Sheet::getOrCreateRowByPosition(uint32_t position) {
         return existing;
     }
 
-    // Create new row
-    auto row = std::make_unique<Axis>(generate_id(), false);
+    // Create new row with sheet ID
+    auto row = std::make_unique<Axis>(generate_id(), id, false);
     row->position = position;
     // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const rawPtr = row.get();
@@ -349,14 +351,14 @@ bool Sheet::moveRow(const ID& rowId, uint32_t newPosition) {
 
 Axis* Sheet::insertColumnAt(uint32_t position) {
     // Shift all columns at position or greater to the right
-    for (auto& [id, axis] : columns) {
+    for (auto& [colId, axis] : columns) {
         if (axis->position >= position) {
             axis->position++;
         }
     }
 
-    // Create new column at the specified position
-    auto col = std::make_unique<Axis>(generate_id(), true);
+    // Create new column at the specified position with sheet ID
+    auto col = std::make_unique<Axis>(generate_id(), id, true);
     col->position = position;
     // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const rawPtr = col.get();
@@ -370,14 +372,14 @@ Axis* Sheet::insertColumnAt(uint32_t position) {
 
 Axis* Sheet::insertRowAt(uint32_t position) {
     // Shift all rows at position or greater down
-    for (auto& [id, axis] : rows) {
+    for (auto& [rowId, axis] : rows) {
         if (axis->position >= position) {
             axis->position++;
         }
     }
 
-    // Create new row at the specified position
-    auto row = std::make_unique<Axis>(generate_id(), false);
+    // Create new row at the specified position with sheet ID
+    auto row = std::make_unique<Axis>(generate_id(), id, false);
     row->position = position;
     // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const rawPtr = row.get();

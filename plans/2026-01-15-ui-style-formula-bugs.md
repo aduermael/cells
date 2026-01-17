@@ -252,18 +252,19 @@ Benefits:           One simple rule, no special cross-sheet parsing
 
 ### Implementation Phases
 
-#### Phase 5a: Add sheetId to Axis
+#### Phase 5a: Add sheetId to Axis ✅ COMPLETE
 
-- [ ] 5a1: Add `sheetId` field to `Axis` struct in `core/cells/types.h`
-- [ ] 5a2: Update `Axis` constructor to require sheetId
-- [ ] 5a3: Update all places that create Axis objects to pass sheetId:
-  - `Sheet::getOrCreateColumnByPosition()`
-  - `Sheet::getOrCreateRowByPosition()`
-  - `Sheet::addColumn()` / `Sheet::addRow()`
-  - CRDT operation handlers (`applyColInsert`, `applyRowInsert`)
-- [ ] 5a4: Update CRDT serialization to include sheetId in axis operations
-- [ ] 5a5: Add `Axis::getSheetId()` helper method
-- [ ] 5a6: Add helper `Cell::getSheetId()` that looks up via column
+- [x] 5a1: Add `sheetId` field to `Axis` struct in `core/cells/model.h`
+- [x] 5a2: Update `Axis` constructor to accept sheetId (3-arg constructor)
+- [x] 5a3: Update all places that create Axis objects to pass sheetId:
+  - `Sheet::getOrCreateColumnByPosition()` - uses 3-arg constructor
+  - `Sheet::getOrCreateRowByPosition()` - uses 3-arg constructor
+  - `Sheet::addColumn()` / `Sheet::addRow()` - sets sheetId on axis
+  - `Sheet::insertColumnAt()` / `Sheet::insertRowAt()` - uses 3-arg constructor
+  - CRDT operation handlers (`applyColInsert`, `applyRowInsert`, `applyDimInsertAxis`) - uses sheet->id
+- [x] 5a4: CRDT serialization unchanged - sheetId already in Operation struct
+- [x] 5a5: Add `Axis::getSheetId()` inline helper method
+- [x] 5a6: Cell does NOT store sheetId (memory efficiency for millions of cells) - look up via column when needed
 
 #### Phase 5b: Simplify Formula Storage
 

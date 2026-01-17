@@ -52,7 +52,7 @@ ApplyResult applyColInsert(Workbook& workbook, const Operation& op) {
         return ApplyResult::ALREADY_APPLIED;
     }
 
-    auto newAxis = std::make_unique<Axis>(op.target_id, true);
+    auto newAxis = std::make_unique<Axis>(op.target_id, sheet->id, true);
     newAxis->position = static_cast<uint32_t>(pos);
     newAxis->size = static_cast<uint32_t>(size);
     sheet->addColumn(std::move(newAxis));
@@ -85,7 +85,7 @@ ApplyResult applyRowInsert(Workbook& workbook, const Operation& op) {
         return ApplyResult::ALREADY_APPLIED;
     }
 
-    auto newAxis = std::make_unique<Axis>(op.target_id, false);
+    auto newAxis = std::make_unique<Axis>(op.target_id, sheet->id, false);
     newAxis->position = static_cast<uint32_t>(pos);
     newAxis->size = static_cast<uint32_t>(size);
     sheet->addRow(std::move(newAxis));
@@ -122,7 +122,7 @@ ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op) {
         if (sheet->getColumn(op.target_id) != nullptr) {
             return ApplyResult::ALREADY_APPLIED;
         }
-        auto newAxis = std::make_unique<Axis>(op.target_id, true);
+        auto newAxis = std::make_unique<Axis>(op.target_id, sheet->id, true);
         newAxis->position = static_cast<uint32_t>(pos);
         newAxis->size = static_cast<uint32_t>(size);
         sheet->addColumn(std::move(newAxis));
@@ -130,7 +130,7 @@ ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op) {
         if (sheet->getRow(op.target_id) != nullptr) {
             return ApplyResult::ALREADY_APPLIED;
         }
-        auto newAxis = std::make_unique<Axis>(op.target_id, false);
+        auto newAxis = std::make_unique<Axis>(op.target_id, sheet->id, false);
         newAxis->position = static_cast<uint32_t>(pos);
         newAxis->size = static_cast<uint32_t>(size);
         sheet->addRow(std::move(newAxis));

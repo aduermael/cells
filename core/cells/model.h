@@ -290,6 +290,7 @@ struct SharedFormulaInfo {
 struct Axis {
     std::string name;    // Custom name (empty = compute from position)
     ID id;               // Unique identifier (8-char base62)
+    ID sheetId;          // ID of the sheet this axis belongs to
     uint32_t position;   // Visual position (0-indexed)
     uint32_t size;       // Width (column) or height (row) in pixels
     bool isColumn;       // true = column (x), false = row (y)
@@ -298,6 +299,10 @@ struct Axis {
 
     Axis();
     explicit Axis(const ID& id, bool isColumn = true);
+    Axis(const ID& id, const ID& sheetId, bool isColumn);
+
+    // Get the sheet ID this axis belongs to
+    [[nodiscard]] const ID& getSheetId() const { return sheetId; }
 };
 
 // =============================================================================
