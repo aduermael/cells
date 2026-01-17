@@ -22,32 +22,33 @@ struct Cell {
 
 ### Proposed Change
 
-Remove `formatId` and `styleId` from Cell, storing them in a workbook-level hash map keyed by cell ID. Add a `HAS_FORMAT` flag to CellFlags for quick lookup avoidance.
+Remove `formatId` and `styleId` from Cell, storing them in two workbook-level hash maps keyed by cell ID. Add `HAS_FORMAT` and `HAS_STYLE` flags to CellFlags for quick lookup avoidance.
 
 **Memory savings**: 16 bytes per cell = 16MB per million cells.
 
-### Design Decision: Merge Styles and Formats
+### Design Decision: Keep Formats and Styles Separate
 
-Rather than having separate `formatId` and `styleId`, merge them into a unified **format** concept at the workbook level. A "format" encompasses both:
-- Number formatting (decimals, currency, percentage, date display)
-- Visual styling (bold, italic, colors, alignment, borders)
+Formats (number formatting) and styles (visual styling) remain separate concepts:
+- **Formats**: How values are displayed (decimals, currency, percentage, dates)
+- **Styles**: Visual appearance (bold, italic, colors, alignment, borders)
 
-This simplifies:
-- Storage: One hash map instead of two
-- API: `cell.format` instead of `cell.format` + `cell.style`
-- CRDT operations: One operation type instead of two
+Two maps, two flags:
+- `_cellFormats` map + `HAS_FORMAT` flag
+- `_cellStyles` map + `HAS_STYLE` flag
 
-**Note**: The underlying `NumberFormat` and `CellStyle` structs remain separate internally (they serve different purposes in rendering), but cells reference a combined "Format" that may include both.
+This matches the existing architecture and keeps concerns separated.
 
 ---
 
-## Phase 1: Add HAS_FORMAT Flag to CellFlags
+## Phase 1: Add HAS_FORMAT and HAS_STYLE Flags to CellFlags
 
-Add a flag to quickly check if a cell has a custom format without hash map lookup.
+Add flags to quickly check if a cell has custom format/style without hash map lookup.
 
 - [ ] 1a: Add `HAS_FORMAT = 1 << 4` to CellFlags enum in `model.h`
-- [ ] 1b: Add helper methods to Cell: `hasFormat()`, `markHasFormat()`, `clearHasFormat()`
-- [ ] 1c: Update CellFlags documentation comment
+- [ ] 1b: Add `HAS_STYLE = 1 << 5` to CellFlags enum in `model.h`
+- [ ] 1c: Add helper methods to Cell: `hasFormat()`, `markHasFormat()`, `clearHasFormat()`
+- [ ] 1d: Add helper methods to Cell: `hasStyle()`, `markHasStyle()`, `clearHasStyle()`
+- [ ] 1e: Update CellFlags documentation comment (bits 4-5 now used, 6-7 reserved)
 
 ---
 
@@ -68,13 +69,14 @@ Create the hash map and accessors at the Workbook level.
 Update CRDT operation handlers to use workbook-level storage.
 
 - [ ] 3a: Update `applyCellSetFormat()` in `crdt_cell.cc`:
-  - Get cell, set HAS_FORMAT flag
+  - Get cell, set/clear HAS_FORMAT flag based on formatId
   - Store formatId in workbook map instead of cell
-  - Handle null formatId (clear format case)
+  - Handle null formatId (clear format case - remove from map, clear flag)
 - [ ] 3b: Update `applyCellSetStyle()` in `crdt_cell.cc`:
-  - Get cell, update workbook map
+  - Get cell, set/clear HAS_STYLE flag based on styleId
+  - Store styleId in workbook map instead of cell
   - Update StyleRegistry ref counting (already done, keep)
-  - Handle null styleId (clear style case)
+  - Handle null styleId (clear style case - remove from map, clear flag)
 - [ ] 3c: Update any code reading `cell->formatId` directly to use `workbook.getCellFormatId(cell->id)`
 - [ ] 3d: Update any code reading `cell->styleId` directly to use `workbook.getCellStyleId(cell->id)`
 
@@ -131,19 +133,6 @@ Final cleanup - remove the now-unused fields.
 
 ---
 
-## Phase 8: Optional - Unify Format and Style
-
-If desired, merge the concepts further.
-
-- [ ] 8a: Create unified `CellFormat` struct containing both NumberFormat reference and CellStyle
-- [ ] 8b: Single `_cellFormats` map storing combined format
-- [ ] 8c: Update all APIs to use unified format concept
-- [ ] 8d: Deprecate separate `CELL_SET_FORMAT` and `CELL_SET_STYLE` ops in favor of single `CELL_SET_FORMAT` that handles both
-
-**Note**: This phase is optional. The current dual-map approach (Phase 2-7) works well and matches how rendering treats them separately. Unification is a simplification that can be done later if desired.
-
----
-
 ## Technical Notes
 
 ### Memory Impact
@@ -168,7 +157,7 @@ In practice, typically <5% of cells have custom formats, so this is a big win.
 - Old: Direct field access O(1)
 - New: Hash map lookup O(1) average, but with hash computation overhead
 
-Mitigation: The `HAS_FORMAT` flag allows skipping the hash lookup for cells without formats (the common case). This makes the common path (no format) actually faster since we just check a bit.
+Mitigation: The `HAS_FORMAT` and `HAS_STYLE` flags allow skipping the hash lookup for cells without formats/styles (the common case). This makes the common path actually faster since we just check a bit flag.
 
 ### CRDT Considerations
 
