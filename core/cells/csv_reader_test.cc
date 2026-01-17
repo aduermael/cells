@@ -166,7 +166,9 @@ TEST(CSVReaderTest, DetectNumbers) {
     EXPECT_EQ(sheet->cellCount(), 3u);
 
     // Check that values are detected as numbers
-    for (const auto& [id, cell] : sheet->cells) {
+    for (const ID& cellId : sheet->getCellIds()) {
+        const Cell* cell = result.workbook->getCell(cellId);
+        ASSERT_NE(cell, nullptr);
         EXPECT_EQ(cell->value.type, CellValueType::NUMBER);
     }
 }
@@ -178,7 +180,9 @@ TEST(CSVReaderTest, DetectStrings) {
     ASSERT_NE(result.workbook, nullptr);
 
     Sheet* sheet = result.workbook->getSheetByIndex(0);
-    for (const auto& [id, cell] : sheet->cells) {
+    for (const ID& cellId : sheet->getCellIds()) {
+        const Cell* cell = result.workbook->getCell(cellId);
+        ASSERT_NE(cell, nullptr);
         EXPECT_EQ(cell->value.type, CellValueType::STRING);
     }
 }
@@ -192,7 +196,9 @@ TEST(CSVReaderTest, DetectBooleans) {
     Sheet* sheet = result.workbook->getSheetByIndex(0);
     EXPECT_EQ(sheet->cellCount(), 4u);
 
-    for (const auto& [id, cell] : sheet->cells) {
+    for (const ID& cellId : sheet->getCellIds()) {
+        const Cell* cell = result.workbook->getCell(cellId);
+        ASSERT_NE(cell, nullptr);
         EXPECT_EQ(cell->value.type, CellValueType::BOOLEAN);
     }
 }
@@ -207,7 +213,9 @@ TEST(CSVReaderTest, DisableAutoDetect) {
     ASSERT_NE(result.workbook, nullptr);
 
     Sheet* sheet = result.workbook->getSheetByIndex(0);
-    for (const auto& [id, cell] : sheet->cells) {
+    for (const ID& cellId : sheet->getCellIds()) {
+        const Cell* cell = result.workbook->getCell(cellId);
+        ASSERT_NE(cell, nullptr);
         EXPECT_EQ(cell->value.type, CellValueType::STRING);
     }
 }

@@ -60,10 +60,13 @@ void RefConverter::setContext(const Sheet& sheet) {
     }
 
     // Build cell lookup maps
-    cellIdToLocation_.reserve(sheet.cells.size());
-    locationToCellId_.reserve(sheet.cells.size());
-    for (const auto& pair : sheet.cells) {
-        const Cell* cell = pair.second.get();
+    const std::vector<ID> cellIds = sheet.getCellIds();
+    const Workbook* wb = sheet.getWorkbook();
+    cellIdToLocation_.reserve(cellIds.size());
+    locationToCellId_.reserve(cellIds.size());
+    for (const ID& cellId : cellIds) {
+        const Cell* cell = wb ? wb->getCell(cellId) : nullptr;
+        if (!cell) continue;
         const std::string cellIdStr = cell->id.toString();
         const std::string colIdStr = cell->colId.toString();
         const std::string rowIdStr = cell->rowId.toString();
@@ -701,12 +704,10 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
             bool found = false;
 
             // If we have a cross-sheet context, look up in that sheet
-            if (currentSheetContext != nullptr) {
+            if (currentSheetContext != nullptr && _workbook != nullptr) {
                 const ID cellIdObj(cellId);
-                // Use the cells map directly since getCell isn't const
-                auto cellIt = currentSheetContext->cells.find(cellIdObj);
-                if (cellIt != currentSheetContext->cells.end()) {
-                    const Cell* cell = cellIt->second.get();
+                const Cell* cell = _workbook->getCell(cellIdObj);
+                if (cell != nullptr) {
                     // Look up column and row positions from the cross-sheet
                     auto colIt = currentSheetContext->columns.find(cell->colId);
                     auto rowIt = currentSheetContext->rows.find(cell->rowId);

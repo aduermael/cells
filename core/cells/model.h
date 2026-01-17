@@ -355,8 +355,6 @@ struct Sheet {
     std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> columns;
     std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> rows;
 
-    // Cell storage (maps ID -> Cell)
-    std::unordered_map<ID, std::unique_ptr<Cell>, IDHash> cells;
 
     Sheet();
     explicit Sheet(const ID& id, std::string name = "Sheet1");
@@ -368,6 +366,7 @@ struct Sheet {
     Cell* getOrCreateCellAt(const ID& colId, const ID& rowId);  // Auto-creates if needed
     void addCell(std::unique_ptr<Cell> cell);
     void reserveCells(size_t count);  // Pre-allocate capacity for bulk imports
+    void removeCellFromIndex(const ID& cellId);  // Remove cell from position index (for CRDT ops)
 
     // Axis operations
     Axis* getColumn(const ID& colId);
@@ -383,7 +382,11 @@ struct Sheet {
     // Count accessors
     [[nodiscard]] size_t columnCount() const { return columns.size(); }
     [[nodiscard]] size_t rowCount() const { return rows.size(); }
-    [[nodiscard]] size_t cellCount() const { return cells.size(); }
+    [[nodiscard]] size_t cellCount() const { return _cellIndex.size(); }
+
+    // Get all cell IDs in this sheet (for iteration)
+    // Returns cell IDs from the position index
+    [[nodiscard]] std::vector<ID> getCellIds() const;
 
     // Axis movement operations (for move stability testing)
     // Moves column to new position, shifting other columns as needed
@@ -690,6 +693,24 @@ struct Workbook {
     [[nodiscard]] const Sheet* getSheetById(const ID& sheetId) const;
 
     // ========================================================================
+    // Workbook-level cell storage
+    // ========================================================================
+
+    // Get a cell by ID from workbook-level storage (O(1) lookup)
+    // Returns nullptr if cell not found
+    [[nodiscard]] Cell* getCell(const ID& cellId);
+    [[nodiscard]] const Cell* getCell(const ID& cellId) const;
+
+    // Add a cell to workbook-level storage (takes ownership)
+    // The cell must have a valid ID set
+    // Returns the cell pointer, or nullptr if cell is null or ID already exists
+    Cell* addCell(std::unique_ptr<Cell> cell);
+
+    // Remove a cell from workbook-level storage
+    // Returns the removed cell (ownership transferred to caller), or nullptr if not found
+    std::unique_ptr<Cell> removeCell(const ID& cellId);
+
+    // ========================================================================
     // Cross-sheet cell lookup
     // ========================================================================
 
@@ -864,6 +885,14 @@ private:
 
     // Cell ID -> style ID mapping (only cells with custom styles are stored)
     std::unordered_map<ID, ID, IDHash> _cellStyles;
+
+    // ========================================================================
+    // Workbook-level cell storage (primary storage, sheets keep secondary index)
+    // ========================================================================
+
+    // Primary cell storage: cell ID -> Cell
+    // Cells are owned by Workbook; Sheets maintain lightweight ID sets and position indexes
+    std::unordered_map<ID, std::unique_ptr<Cell>, IDHash> _cells;
 
     // ========================================================================
     // Cross-sheet dependency tracking (runtime-only)

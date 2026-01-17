@@ -51,9 +51,14 @@ void ViewportIndex::build(const Sheet& sheet) {
     }
 
     // Index all cells
-    for (const auto& [id, cell] : sheet.cells) {
-        const std::string key = makeCellKey(cell->colId, cell->rowId);
-        _cells[key] = cell.get();
+    const Workbook* wb = sheet.getWorkbook();
+    for (const ID& cellId : sheet.getCellIds()) {
+        const Cell* cell = wb ? wb->getCell(cellId) : nullptr;
+        if (cell) {
+            const std::string key = makeCellKey(cell->colId, cell->rowId);
+            // const_cast is safe here - the cell storage is mutable at runtime
+            _cells[key] = const_cast<Cell*>(cell);
+        }
     }
 }
 

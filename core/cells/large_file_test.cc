@@ -45,8 +45,9 @@ TEST(LargeFileTest, StressTestLoadStatistics) {
 
     // Count formulas
     size_t formulaCount = 0;
-    for (const auto& [id, cell] : sheet->cells) {
-        if (cell->isFormula()) {
+    for (const ID& cellId : sheet->getCellIds()) {
+        const Cell* cell = result.workbook->getCell(cellId);
+        if (cell && cell->isFormula()) {
             formulaCount++;
         }
     }

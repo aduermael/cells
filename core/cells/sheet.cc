@@ -80,8 +80,23 @@ Sheet::Sheet(const ID& id, std::string name)
 Sheet::~Sheet() = default;
 
 Cell* Sheet::getCell(const ID& cellId) {
-    auto it = cells.find(cellId);
-    return (it != cells.end()) ? it->second.get() : nullptr;
+    // Delegate to workbook for actual cell storage
+    // The cell belongs to this sheet if it exists and its column is in this sheet
+    if (!_workbook) return nullptr;
+    Cell* cell = _workbook->getCell(cellId);
+    if (!cell) return nullptr;
+    // Verify the cell belongs to this sheet by checking its column
+    if (columns.find(cell->colId) == columns.end()) return nullptr;
+    return cell;
+}
+
+std::vector<ID> Sheet::getCellIds() const {
+    std::vector<ID> ids;
+    ids.reserve(_cellIndex.size());
+    for (const auto& [key, cellId] : _cellIndex) {
+        ids.push_back(cellId);
+    }
+    return ids;
 }
 
 Cell* Sheet::getCellAt(const ID& colId, const ID& rowId) {
@@ -94,7 +109,7 @@ Cell* Sheet::getCellAt(const ID& colId, const ID& rowId) {
 }
 
 void Sheet::addCell(std::unique_ptr<Cell> cell) {
-    if (!cell) {
+    if (!cell || !_workbook) {
         return;
     }
 
@@ -102,17 +117,26 @@ void Sheet::addCell(std::unique_ptr<Cell> cell) {
     const ID& colId = cell->colId;
     const ID& rowId = cell->rowId;
 
-    // Update secondary index
+    // Update position index (colId:rowId -> cellId)
     auto key = makeCellKey(colId, rowId);
     _cellIndex[key] = cellId;
 
-    // Store cell
-    cells[cellId] = std::move(cell);
+    // Store cell at workbook level (takes ownership)
+    _workbook->addCell(std::move(cell));
 }
 
 void Sheet::reserveCells(size_t count) {
-    cells.reserve(count);
     _cellIndex.reserve(count);
+}
+
+void Sheet::removeCellFromIndex(const ID& cellId) {
+    // Get the cell to find its position key
+    if (!_workbook) return;
+    const Cell* cell = _workbook->getCell(cellId);
+    if (!cell) return;
+
+    auto key = makeCellKey(cell->colId, cell->rowId);
+    _cellIndex.erase(key);
 }
 
 Axis* Sheet::getColumn(const ID& colId) {
@@ -400,21 +424,22 @@ bool Sheet::deleteColumn(const ID& colId) {
     const uint32_t deletedPosition = it->second->position;
 
     // Delete all cells in this column
-    std::vector<ID> cellsToDelete;
-    for (const auto& [cellId, cell] : cells) {
-        if (cell->colId == colId) {
-            cellsToDelete.push_back(cellId);
+    // Collect keys and cell IDs to delete (can't modify _cellIndex while iterating)
+    std::vector<std::pair<std::string, ID>> toDelete;
+    for (const auto& [key, cellId] : _cellIndex) {
+        const Cell* cell = _workbook ? _workbook->getCell(cellId) : nullptr;
+        if (cell && cell->colId == colId) {
+            toDelete.emplace_back(key, cellId);
         }
     }
-    for (const ID& cellId : cellsToDelete) {
+    for (const auto& [key, cellId] : toDelete) {
         // Clear formula dependencies before removing
         clearCellFormula(cellId);
-        // Remove from cell index
-        const Cell* const cell = getCell(cellId);
-        if (cell != nullptr) {
-            _cellIndex.erase(makeCellKey(cell->colId, cell->rowId));
+        // Remove from position index and workbook storage
+        _cellIndex.erase(key);
+        if (_workbook) {
+            _workbook->removeCell(cellId);
         }
-        cells.erase(cellId);
     }
 
     // Remove the column
@@ -442,21 +467,22 @@ bool Sheet::deleteRow(const ID& rowId) {
     const uint32_t deletedPosition = it->second->position;
 
     // Delete all cells in this row
-    std::vector<ID> cellsToDelete;
-    for (const auto& [cellId, cell] : cells) {
-        if (cell->rowId == rowId) {
-            cellsToDelete.push_back(cellId);
+    // Collect keys and cell IDs to delete (can't modify _cellIndex while iterating)
+    std::vector<std::pair<std::string, ID>> toDelete;
+    for (const auto& [key, cellId] : _cellIndex) {
+        const Cell* cell = _workbook ? _workbook->getCell(cellId) : nullptr;
+        if (cell && cell->rowId == rowId) {
+            toDelete.emplace_back(key, cellId);
         }
     }
-    for (const ID& cellId : cellsToDelete) {
+    for (const auto& [key, cellId] : toDelete) {
         // Clear formula dependencies before removing
         clearCellFormula(cellId);
-        // Remove from cell index
-        const Cell* const cell = getCell(cellId);
-        if (cell != nullptr) {
-            _cellIndex.erase(makeCellKey(cell->colId, cell->rowId));
+        // Remove from position index and workbook storage
+        _cellIndex.erase(key);
+        if (_workbook) {
+            _workbook->removeCell(cellId);
         }
-        cells.erase(cellId);
     }
 
     // Remove the row
@@ -538,11 +564,9 @@ FormulaResult Sheet::setCellFormulaUnresolved(const ID& cellId, const std::strin
 }
 
 std::string Sheet::getCellFormulaText(const ID& cellId) const {
-    const Cell* cell = nullptr;
-    auto it = cells.find(cellId);
-    if (it != cells.end()) {
-        cell = it->second.get();
-    }
+    // Get cell from workbook (getCell validates it belongs to this sheet)
+    // Note: const_cast needed because getCell is non-const
+    const Cell* cell = const_cast<Sheet*>(this)->getCell(cellId);
 
     if (cell == nullptr || !cell->isFormula()) {
         return "";

@@ -139,12 +139,14 @@ std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) co
     // If we have a resolved cellId, look up the current position
     if (!node->cellId.empty()) {
         const ID cellIdObj(node->cellId);
+        const Cell* foundCell = nullptr;
 
         // For simplified storage: search all sheets if sheetId is empty
         if (node->sheetId.empty() && _workbook != nullptr) {
-            auto [foundCell, foundSheet] = _workbook->findCell(cellIdObj);
-            if (foundCell && foundSheet) {
-                lookupSheet = foundSheet;
+            auto [cell, sheet] = _workbook->findCell(cellIdObj);
+            if (cell && sheet) {
+                foundCell = cell;
+                lookupSheet = sheet;
                 // Check if this is a cross-sheet reference by comparing the cell's column sheetId
                 // with the formula's sheet
                 const Axis* col = lookupSheet->columns.count(foundCell->colId) != 0u
@@ -155,32 +157,31 @@ std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) co
                     sheetPrefix = formatSheetName(lookupSheet->name);
                 }
             }
+        } else if (_workbook != nullptr) {
+            // Explicit sheet or same sheet - look up directly
+            foundCell = _workbook->getCell(cellIdObj);
         }
 
-        // Find the cell to get its column and row
-        for (const auto& [id, cell] : lookupSheet->cells) {
-            if (id == cellIdObj) {
-                // Get column position
-                const Axis* col = lookupSheet->columns.count(cell->colId) != 0u
-                                      ? lookupSheet->columns.at(cell->colId).get()
-                                      : nullptr;
-                const Axis* row = lookupSheet->rows.count(cell->rowId) != 0u
-                                      ? lookupSheet->rows.at(cell->rowId).get()
-                                      : nullptr;
+        // If we found the cell, get its column and row positions
+        if (foundCell) {
+            const Axis* col = lookupSheet->columns.count(foundCell->colId) != 0u
+                                  ? lookupSheet->columns.at(foundCell->colId).get()
+                                  : nullptr;
+            const Axis* row = lookupSheet->rows.count(foundCell->rowId) != 0u
+                                  ? lookupSheet->rows.at(foundCell->rowId).get()
+                                  : nullptr;
 
-                if (col != nullptr && row != nullptr) {
-                    result += sheetPrefix;
-                    if (node->colAbsolute) {
-                        result += "$";
-                    }
-                    result += Sheet::positionToColumnName(col->position);
-                    if (node->rowAbsolute) {
-                        result += "$";
-                    }
-                    result += std::to_string(row->position + 1);  // Convert to 1-indexed
-                    return result;
+            if (col != nullptr && row != nullptr) {
+                result += sheetPrefix;
+                if (node->colAbsolute) {
+                    result += "$";
                 }
-                break;
+                result += Sheet::positionToColumnName(col->position);
+                if (node->rowAbsolute) {
+                    result += "$";
+                }
+                result += std::to_string(row->position + 1);  // Convert to 1-indexed
+                return result;
             }
         }
     }

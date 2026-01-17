@@ -327,11 +327,13 @@ void Serializer::serializeCells(const Workbook& workbook, const Sheet& sheet,
                                 std::ostream& out) const {
     // Collect cells for alphabetical ordering by UUID
     std::vector<std::pair<std::string, const Cell*>> ordered;
-    ordered.reserve(sheet.cells.size());
+    ordered.reserve(sheet.getCellIds().size());
 
-    for (const auto& pair : sheet.cells) {
-        const Cell* cell = pair.second.get();
-        ordered.emplace_back(cell->id.toString(), cell);
+    for (const ID& cellId : sheet.getCellIds()) {
+        const Cell* cell = workbook.getCell(cellId);
+        if (cell) {
+            ordered.emplace_back(cell->id.toString(), cell);
+        }
     }
 
     // Sort alphabetically by UUID (required for deterministic shared formula masters)

@@ -2,6 +2,16 @@
 
 Move cells, ranges, dependency graph, shared formulas, and spill tracking from Sheet-level to Workbook-level ownership. This enables simpler formula addressing (no need for sheet prefixes), unified calculation engine, and dynamic address display (UUID_SHEET2_B2 displayed as `Sheet2!B2` in Sheet1 vs just `B2` in Sheet2).
 
+## Process Notes
+
+**Working approach:**
+- Commit every 5-10 files/tests fixed
+- Take breaks after commits to allow resuming later
+- Update this plan after each commit to track exactly where we left off
+- Run `bazel build //core/cells/...` after each batch to check progress
+
+**Current status:** Phase 1 in progress - updating test files to use new cell storage pattern.
+
 ## Current Architecture
 
 - **Cells**: Owned by Sheet (`Sheet::cells` map keyed by UUID)
@@ -31,15 +41,51 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 
 Add primary cell storage at Workbook level. Sheets keep a lightweight secondary index.
 
-- [ ] 1a: Add `Workbook::_cells` map (ID → unique_ptr<Cell>) as primary cell storage
-- [ ] 1b: Add `Workbook::getCell(cellId)` method for O(1) lookup
-- [ ] 1c: Add `Workbook::addCell(cell)` that takes ownership and adds to map
-- [ ] 1d: Add `Workbook::removeCell(cellId)` that removes and returns ownership
-- [ ] 1e: Change `Sheet::cells` from `unordered_map<ID, unique_ptr<Cell>>` to `unordered_set<ID>` (just cell IDs)
-- [ ] 1f: Update `Sheet::getCell()` to delegate to `Workbook::getCell()`
-- [ ] 1g: Update `Sheet::addCell()` to add to Workbook storage, then add ID to Sheet's set
-- [ ] 1h: Update `Sheet::getCellAt()` to use `_cellIndex` → cellId → `Workbook::getCell()`
-- [ ] 1i: Run tests to verify cell operations work correctly
+**Core implementation (done):**
+- [x] 1a: Add `Workbook::_cells` map (ID → unique_ptr<Cell>) as primary cell storage
+- [x] 1b: Add `Workbook::getCell(cellId)` method for O(1) lookup
+- [x] 1c: Add `Workbook::addCell(cell)` that takes ownership and adds to map
+- [x] 1d: Add `Workbook::removeCell(cellId)` that removes and returns ownership
+- [x] 1e: Removed `Sheet::cells` - cells now stored only at Workbook level. Sheet uses `_cellIndex` (position→ID) only.
+- [x] 1f: Update `Sheet::getCell()` to delegate to `Workbook::getCell()`
+- [x] 1g: Update `Sheet::addCell()` to add to Workbook storage, then update `_cellIndex`
+- [x] 1h: Update `Sheet::getCellAt()` to use `_cellIndex` → cellId → `Workbook::getCell()`
+- [x] 1i-core: Added `Sheet::getCellIds()` helper to iterate over cell IDs in a sheet
+- [x] 1i-core: Added `Sheet::removeCellFromIndex()` helper for CRDT operations
+
+**Files updated (core implementation):**
+- [x] core/cells/model.h - Added Workbook cell storage, removed Sheet::cells
+- [x] core/cells/model.cc - Implemented Workbook::getCell/addCell/removeCell, updated findCell
+- [x] core/cells/sheet.cc - Updated all Sheet cell methods to use Workbook storage
+- [x] core/cells/crdt_axis.cc - Updated deleteColumn/deleteRow to use new pattern
+- [x] core/cells/crdt_cell.cc - Updated applyCellClear to use new pattern
+- [x] core/cells/formula_eval.cc - Updated range iteration functions
+- [x] core/cells/formula_recalc.cc - Updated hasDirtyCells/getDirtyCells
+- [x] core/cells/formula_display.cc - Updated cell lookup
+- [x] core/cells/serializer.cc - Updated serializeCells
+- [x] core/cells/crdt.cc - Updated generateInitialOps cell iteration
+- [x] core/cells/ref_converter.cc - Updated setContext and cell lookups
+- [x] core/cells/viewport_index.cc - Updated build() cell iteration
+
+**Test files updated:**
+- [x] core/cells/csv_reader_test.cc - 4 occurrences fixed
+- [x] core/cells/crdt_test.cc - 3 occurrences fixed
+- [x] core/cells/ref_converter_test.cc - Refactored to use createTestWorkbook()
+- [x] core/cells/large_file_test.cc - 1 occurrence fixed
+
+**Test files remaining (need to update `sheet->cells` iterations):**
+- [ ] core/cells/xlsx_reader_test.cc - 14 occurrences
+- [ ] core/cells/xlsx_writer_test.cc - check count
+- [ ] core/cells/fill_range_test.cc - check count
+
+**App files remaining:**
+- [ ] apps/wasm/bindings_*.cc - multiple files
+- [ ] apps/cli/converter.cc
+- [ ] apps/cli/main.cc
+- [ ] apps/cli/converter_test.cc
+- [ ] core/cells/luau_api.cc
+
+- [ ] 1i: Run all tests to verify cell operations work correctly
 
 ## Phase 2: Workbook-Level Dependency Graph
 

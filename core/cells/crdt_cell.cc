@@ -388,8 +388,9 @@ ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
         }
     }
 
-    // Remove the cell from the sheet entirely
-    targetSheet->cells.erase(op.target_id);
+    // Remove the cell from the sheet's position index and workbook storage
+    targetSheet->removeCellFromIndex(op.target_id);
+    workbook.removeCell(op.target_id);
 
     return ApplyResult::SUCCESS;
 }

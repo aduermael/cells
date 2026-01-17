@@ -260,7 +260,7 @@ protected:
         workbook_b = createWorkbook(node_b);
 
         // Store shared IDs for use across both workbooks
-        cell_id = workbook_a->getSheetByIndex(0)->cells.begin()->first;
+        cell_id = workbook_a->getSheetByIndex(0)->getCellIds().front();
     }
 
     std::unique_ptr<Workbook> createWorkbook(const ID& node_id) {
@@ -305,8 +305,8 @@ TEST_F(CRDTConvergenceTest, TwoPeersConvergeOnConcurrentEdits) {
     // Get cell IDs from both workbooks (they have different IDs since created separately)
     auto* sheet_a = workbook_a->getSheetByIndex(0);
     auto* sheet_b = workbook_b->getSheetByIndex(0);
-    ID cell_a = sheet_a->cells.begin()->first;
-    ID cell_b = sheet_b->cells.begin()->first;
+    ID cell_a = sheet_a->getCellIds().front();
+    ID cell_b = sheet_b->getCellIds().front();
 
     // Peer A makes an edit
     Operation op_a = makeCellSetValueOp(*workbook_a, cell_a, R"({"type":"n","value":"100"})");

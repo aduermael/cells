@@ -471,27 +471,81 @@ const Sheet* Workbook::getSheetById(const ID& sheetId) const {
 }
 
 // =============================================================================
+// Workbook-level cell storage
+// =============================================================================
+
+Cell* Workbook::getCell(const ID& cellId) {
+    auto it = _cells.find(cellId);
+    return (it != _cells.end()) ? it->second.get() : nullptr;
+}
+
+const Cell* Workbook::getCell(const ID& cellId) const {
+    auto it = _cells.find(cellId);
+    return (it != _cells.end()) ? it->second.get() : nullptr;
+}
+
+Cell* Workbook::addCell(std::unique_ptr<Cell> cell) {
+    if (!cell || cell->id.isNull()) {
+        return nullptr;
+    }
+
+    // Check if cell with this ID already exists
+    if (_cells.find(cell->id) != _cells.end()) {
+        return nullptr;
+    }
+
+    Cell* rawPtr = cell.get();
+    _cells[cell->id] = std::move(cell);
+    return rawPtr;
+}
+
+std::unique_ptr<Cell> Workbook::removeCell(const ID& cellId) {
+    auto it = _cells.find(cellId);
+    if (it == _cells.end()) {
+        return nullptr;
+    }
+
+    std::unique_ptr<Cell> cell = std::move(it->second);
+    _cells.erase(it);
+    return cell;
+}
+
+// =============================================================================
 // Cross-sheet cell lookup
 // =============================================================================
 
 Workbook::CellLookupResult Workbook::findCell(const ID& cellId) {
+    // Look up cell directly from workbook storage
+    Cell* cell = getCell(cellId);
+    if (!cell) {
+        return {nullptr, nullptr};
+    }
+
+    // Find the sheet by looking up the column's sheetId
     for (auto& sheet : sheets) {
-        Cell* cell = sheet->getCell(cellId);
-        if (cell) {
+        Axis* col = sheet->getColumn(cell->colId);
+        if (col) {
             return {cell, sheet.get()};
         }
     }
-    return {nullptr, nullptr};
+    return {cell, nullptr};  // Cell exists but sheet not found (shouldn't happen)
 }
 
 std::pair<const Cell*, const Sheet*> Workbook::findCell(const ID& cellId) const {
+    // Look up cell directly from workbook storage
+    const Cell* cell = getCell(cellId);
+    if (!cell) {
+        return {nullptr, nullptr};
+    }
+
+    // Find the sheet by looking up the column's sheetId
     for (const auto& sheet : sheets) {
-        const Cell* cell = sheet->getCell(cellId);
-        if (cell) {
+        const Axis* col = sheet->getColumn(cell->colId);
+        if (col) {
             return {cell, sheet.get()};
         }
     }
-    return {nullptr, nullptr};
+    return {cell, nullptr};  // Cell exists but sheet not found (shouldn't happen)
 }
 
 Sheet* Workbook::findAxisSheet(const ID& axisId) {

@@ -791,8 +791,9 @@ static size_t iterateSingleColumn(const RangeBounds& bounds, Sheet* sheet,
     size_t count = 0;
     // Collect all cells in this column: (row position, cell ID)
     std::vector<std::pair<uint32_t, ID>> cellsInCol;
-    for (const auto& [id, cell] : sheet->cells) {
-        if (cell->colId == col->id) {
+    for (const ID& cellId : sheet->getCellIds()) {
+        const Cell* cell = sheet->getCell(cellId);
+        if (cell && cell->colId == col->id) {
             const Axis* row = sheet->getRow(cell->rowId);
             if (row) {
                 cellsInCol.emplace_back(row->position, cell->id);
@@ -825,8 +826,9 @@ static size_t iterateSingleRow(const RangeBounds& bounds, Sheet* sheet,
     size_t count = 0;
     // Collect all cells in this row: (col position, cell ID)
     std::vector<std::pair<uint32_t, ID>> cellsInRow;
-    for (const auto& [id, cell] : sheet->cells) {
-        if (cell->rowId == row->id) {
+    for (const ID& cellId : sheet->getCellIds()) {
+        const Cell* cell = sheet->getCell(cellId);
+        if (cell && cell->rowId == row->id) {
             const Axis* col = sheet->getColumn(cell->colId);
             if (col) {
                 cellsInRow.emplace_back(col->position, cell->id);
@@ -860,7 +862,9 @@ static size_t iterateColumnRange(const RangeBounds& bounds, Sheet* sheet,
     size_t count = 0;
     // Collect all cells in these columns: (row, col, cell ID)
     std::vector<std::tuple<uint32_t, uint32_t, ID>> cellsInRange;
-    for (const auto& [id, cell] : sheet->cells) {
+    for (const ID& cellId : sheet->getCellIds()) {
+        const Cell* cell = sheet->getCell(cellId);
+        if (!cell) continue;
         const Axis* col = sheet->getColumn(cell->colId);
         if (col && col->position >= startCol->position && col->position <= endCol->position) {
             const Axis* row = sheet->getRow(cell->rowId);
@@ -896,7 +900,9 @@ static size_t iterateRowRange(const RangeBounds& bounds, Sheet* sheet,
     size_t count = 0;
     // Collect all cells in these rows: (row, col, cell ID)
     std::vector<std::tuple<uint32_t, uint32_t, ID>> cellsInRange;
-    for (const auto& [id, cell] : sheet->cells) {
+    for (const ID& cellId : sheet->getCellIds()) {
+        const Cell* cell = sheet->getCell(cellId);
+        if (!cell) continue;
         const Axis* row = sheet->getRow(cell->rowId);
         if (row && row->position >= startRow->position && row->position <= endRow->position) {
             const Axis* col = sheet->getColumn(cell->colId);

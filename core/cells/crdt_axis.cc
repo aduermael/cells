@@ -199,13 +199,19 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
 
     // Delete all cells in this column
     std::vector<ID> cellsToRemove;
-    for (const auto& [cellId, cell] : targetSheet->cells) {
-        if (cell->colId == op.target_id) {
+    for (const ID& cellId : targetSheet->getCellIds()) {
+        const Cell* cell = workbook.getCell(cellId);
+        if (cell && cell->colId == op.target_id) {
             cellsToRemove.push_back(cellId);
         }
     }
     for (const auto& cellId : cellsToRemove) {
-        targetSheet->cells.erase(cellId);
+        // Remove from sheet's position index
+        const Cell* cell = workbook.getCell(cellId);
+        if (cell) {
+            targetSheet->removeCellFromIndex(cellId);
+        }
+        workbook.removeCell(cellId);
     }
 
     // Remove the column
@@ -273,13 +279,19 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
 
     // Delete all cells in this row
     std::vector<ID> cellsToRemove;
-    for (const auto& [cellId, cell] : targetSheet->cells) {
-        if (cell->rowId == op.target_id) {
+    for (const ID& cellId : targetSheet->getCellIds()) {
+        const Cell* cell = workbook.getCell(cellId);
+        if (cell && cell->rowId == op.target_id) {
             cellsToRemove.push_back(cellId);
         }
     }
     for (const auto& cellId : cellsToRemove) {
-        targetSheet->cells.erase(cellId);
+        // Remove from sheet's position index
+        const Cell* cell = workbook.getCell(cellId);
+        if (cell) {
+            targetSheet->removeCellFromIndex(cellId);
+        }
+        workbook.removeCell(cellId);
     }
 
     // Remove the row

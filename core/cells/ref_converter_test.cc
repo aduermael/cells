@@ -233,7 +233,8 @@ TEST(RefConverterTest, FormatA1RefInvalid) {
 // Helper to create test sheet with columns/rows and cells
 // ============================================================================
 
-std::unique_ptr<Sheet> createTestSheet() {
+std::unique_ptr<Workbook> createTestWorkbook() {
+    auto workbook = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
     auto sheet = std::make_unique<Sheet>(generate_id(), "TestSheet");
 
     // Create 5 columns (A-E)
@@ -254,19 +255,23 @@ std::unique_ptr<Sheet> createTestSheet() {
         sheet->addRow(std::move(row));
     }
 
+    // Add sheet to workbook first (so cells get stored properly)
+    workbook->addSheet(std::move(sheet));
+    Sheet* sheetPtr = workbook->getSheetByIndex(0);
+
     // Create cells at each intersection for testing cell UUID format
     for (size_t c = 0; c < colIds.size(); ++c) {
         for (size_t r = 0; r < rowIds.size(); ++r) {
             auto cell = std::make_unique<Cell>(generate_id(), colIds[c], rowIds[r]);
-            sheet->addCell(std::move(cell));
+            sheetPtr->addCell(std::move(cell));
         }
     }
 
-    return sheet;
+    return workbook;
 }
 
 // Helper to get cell ID at a given col/row position
-std::string getCellIdAt(const Sheet& sheet, size_t colPos, size_t rowPos) {
+std::string getCellIdAt(const Workbook& workbook, const Sheet& sheet, size_t colPos, size_t rowPos) {
     // Find col and row IDs by position
     ID colId, rowId;
     for (const auto& pair : sheet.columns) {
@@ -281,10 +286,11 @@ std::string getCellIdAt(const Sheet& sheet, size_t colPos, size_t rowPos) {
             break;
         }
     }
-    // Find cell at this col/row
-    for (const auto& pair : sheet.cells) {
-        if (pair.second->colId == colId && pair.second->rowId == rowId) {
-            return pair.second->id.toString();
+    // Find cell at this col/row using workbook's cell storage
+    for (const ID& cellId : sheet.getCellIds()) {
+        const Cell* cell = workbook.getCell(cellId);
+        if (cell && cell->colId == colId && cell->rowId == rowId) {
+            return cell->id.toString();
         }
     }
     return "";
@@ -295,17 +301,18 @@ std::string getCellIdAt(const Sheet& sheet, size_t colPos, size_t rowPos) {
 // ============================================================================
 
 TEST(RefConverterTest, UuidRefToA1WithContext) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
     // Get cell ID at A1 (col 0, row 0)
-    std::string cellIdA1 = getCellIdAt(*sheet, 0, 0);
+    std::string cellIdA1 = getCellIdAt(*workbook, *sheet, 0, 0);
     EXPECT_FALSE(cellIdA1.empty());
     EXPECT_EQ(converter.uuidRefToA1(cellIdA1), "A1");
 
     // Get cell ID at C5 (col 2, row 4)
-    std::string cellIdC5 = getCellIdAt(*sheet, 2, 4);
+    std::string cellIdC5 = getCellIdAt(*workbook, *sheet, 2, 4);
     EXPECT_FALSE(cellIdC5.empty());
     EXPECT_EQ(converter.uuidRefToA1(cellIdC5), "C5");
 
@@ -324,13 +331,14 @@ TEST(RefConverterTest, UuidRefToA1InvalidRef) {
 }
 
 TEST(RefConverterTest, FormulaToA1Simple) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
     // Get cell IDs
-    std::string cellIdA1 = getCellIdAt(*sheet, 0, 0);
-    std::string cellIdB2 = getCellIdAt(*sheet, 1, 1);
+    std::string cellIdA1 = getCellIdAt(*workbook, *sheet, 0, 0);
+    std::string cellIdB2 = getCellIdAt(*workbook, *sheet, 1, 1);
 
     // Create a formula using cell UUIDs: =A1+B2
     std::string formula = cellIdA1 + "+" + cellIdB2;
@@ -339,13 +347,14 @@ TEST(RefConverterTest, FormulaToA1Simple) {
 }
 
 TEST(RefConverterTest, FormulaToA1WithFunctions) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
     // Get cell IDs
-    std::string cellIdA1 = getCellIdAt(*sheet, 0, 0);
-    std::string cellIdB2 = getCellIdAt(*sheet, 1, 1);
+    std::string cellIdA1 = getCellIdAt(*workbook, *sheet, 0, 0);
+    std::string cellIdB2 = getCellIdAt(*workbook, *sheet, 1, 1);
 
     // Create a formula using cell UUIDs: =SUM(A1,B2)
     std::string formula = "SUM(" + cellIdA1 + "," + cellIdB2 + ")";
@@ -365,7 +374,8 @@ TEST(RefConverterTest, FormulaToA1NoRefs) {
 // ============================================================================
 
 TEST(RefConverterTest, A1RefToUuidWithContext) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
@@ -403,7 +413,8 @@ TEST(RefConverterTest, A1RefToUuidWithContext) {
 }
 
 TEST(RefConverterTest, A1RefToUuidOutOfRange) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
@@ -413,7 +424,8 @@ TEST(RefConverterTest, A1RefToUuidOutOfRange) {
 }
 
 TEST(RefConverterTest, FormulaToUuidSimple) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
@@ -430,7 +442,8 @@ TEST(RefConverterTest, FormulaToUuidSimple) {
 }
 
 TEST(RefConverterTest, FormulaToUuidWithFunctions) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
@@ -441,7 +454,8 @@ TEST(RefConverterTest, FormulaToUuidWithFunctions) {
 }
 
 TEST(RefConverterTest, FormulaToUuidRange) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
@@ -455,7 +469,8 @@ TEST(RefConverterTest, FormulaToUuidRange) {
 }
 
 TEST(RefConverterTest, FormulaToUuidStringLiteral) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
@@ -479,7 +494,8 @@ TEST(RefConverterTest, FormulaToUuidNoRefs) {
 }
 
 TEST(RefConverterTest, FormulaToUuidNotAlphanumPrefix) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
@@ -494,7 +510,8 @@ TEST(RefConverterTest, FormulaToUuidNotAlphanumPrefix) {
 // ============================================================================
 
 TEST(RefConverterTest, ClearContext) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
@@ -513,7 +530,8 @@ TEST(RefConverterTest, ClearContext) {
 // ============================================================================
 
 TEST(RefConverterTest, RoundtripSimpleFormula) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
@@ -529,7 +547,8 @@ TEST(RefConverterTest, RoundtripSimpleFormula) {
 }
 
 TEST(RefConverterTest, RoundtripComplexFormula) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
@@ -678,7 +697,8 @@ TEST(RefConverterTest, ExcelMaxColumn) {
 }
 
 TEST(RefConverterTest, FormulaWithNumbers) {
-    auto sheet = createTestSheet();
+    auto workbook = createTestWorkbook();
+    Sheet* sheet = workbook->getSheetByIndex(0);
     RefConverter converter;
     converter.setContext(*sheet);
 
