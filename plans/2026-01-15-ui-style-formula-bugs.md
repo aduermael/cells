@@ -139,6 +139,32 @@ The parser architecture supports cross-sheet references (verified in formula_par
 - [x] 3g: Run all tests to verify cross-sheet reactivity works ✅
   - All 184 E2E tests pass
 
+---
+
+## Known Bugs (discovered during testing, to be addressed)
+
+### Bug A: Cross-sheet formula becomes #VALUE! on re-edit
+
+**Repro**:
+1. Enter `=Sheet2!A1` in cell A1 (Sheet1)
+2. Observe: correct value from Sheet2!A1 is displayed ✓
+3. Click on A1 to edit, don't change anything, press Enter
+4. Observe: cell now shows `#VALUE!` instead of the original value
+
+**Hypothesis**: The formula re-parsing or re-resolution during edit-commit may be losing the cross-sheet context (sheetId) or failing to resolve the cell reference properly.
+
+### Bug B: Error formulas display #ERROR! suffix incorrectly
+
+**Repro**:
+1. Enter `=B1++` (invalid formula) in a cell
+2. Observe: cell shows error as expected
+3. Click on the cell to edit
+4. Observe: formula bar shows `=B1++#ERROR!` instead of just `=B1++`
+
+**Expected**: The formula bar should show the original formula text `=B1++`, not with `#ERROR!` appended. The AST's `partialText` should preserve the original input for display, but the error marker is being concatenated during display conversion.
+
+---
+
 ## Phase 4: Formula Editing Across Sheets
 
 Excel-like behavior: when editing a formula, the user can navigate to other sheets and click cells to insert cross-sheet references. The formula bar stays active and shows the building formula with proper sheet prefixes.
