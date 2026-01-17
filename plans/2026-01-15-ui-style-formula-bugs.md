@@ -1,5 +1,7 @@
 # UI, Style, and Formula Bugs
 
+**Status: COMPLETE** - Phases 1-5 implemented, Phases 6-8 deferred for architectural review.
+
 Address several bugs related to border/style application, cross-sheet references, formula editing UX, and column/row-level styling.
 
 ## Issues
@@ -324,7 +326,7 @@ Formula evaluation was updated to work without explicit sheetId:
 
 ---
 
-## Phase 6: Column/Row-Wide Style UI
+## Phase 6: Column/Row-Wide Style UI (DEFERRED)
 
 The backend already supports column/row default styles via `Axis.defaultStyleId` with `AXIS_SET_STYLE` CRDT operation. The Luau API exposes `setColumnStyle()`/`setRowStyle()`. Need to add UI.
 
@@ -346,7 +348,7 @@ The backend already supports column/row default styles via `Axis.defaultStyleId`
 - [ ] 6i: Add E2E test: set column style, then override single cell, verify cell shows override while others show column style
 - [ ] 6j: Visual feedback: highlight entire column/row when selected (not just visible cells)
 
-## Phase 7: Cross-Sheet Formula UX Fixes
+## Phase 7: Cross-Sheet Formula UX Fixes (DEFERRED)
 
 This phase addresses remaining cross-sheet formula issues to verify the architecture is correct. The fix should be simple if the architecture is sound.
 
@@ -381,7 +383,7 @@ This phase addresses remaining cross-sheet formula issues to verify the architec
 
 ---
 
-## Phase 8: Cell Struct Optimization (formatId/styleId removal)
+## Phase 8: Cell Struct Optimization (formatId/styleId removal) (DEFERRED)
 
 Currently, `Cell` stores `formatId` and `styleId` directly. This increases memory usage since most cells don't have custom styles/formats.
 
