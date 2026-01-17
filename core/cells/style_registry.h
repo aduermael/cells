@@ -49,7 +49,8 @@ public:
     // Otherwise creates a new style entry with the provided ID (or generates one).
     // Returns the style ID (existing or newly assigned).
     // If wasCreated is provided, it will be set to true if a new style was created.
-    ID registerStyle(const CellStyle& style, const ID& proposedId = ID(), bool* wasCreated = nullptr);
+    ID registerStyle(const CellStyle& style, const ID& proposedId = ID(),
+                     bool* wasCreated = nullptr);
 
     // Check if a style is registered
     [[nodiscard]] bool hasStyle(const ID& styleId) const;
