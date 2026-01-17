@@ -888,41 +888,47 @@ void Sheet::clearAllSharedFormulaGroups() {
 
 // ============================================================================
 // Unified Range System
-// Range objects are stored at Workbook level. Sheet tracks which range IDs
-// belong to it and maintains a spatial index for fast viewport queries.
+// Range objects are stored at Workbook level. Sheet maintains only a spatial
+// index (R-tree) for viewport queries. Range ownership is fully at Workbook level.
 // ============================================================================
 
-Range* Sheet::getRange(const ID& rangeId) {
-    // Check if this range belongs to this sheet
-    if (_rangeIds.find(rangeId) == _rangeIds.end()) {
-        return nullptr;
+// Helper to check if a range belongs to this sheet by checking its axis's sheetId
+static bool rangeInSheet(const Range* range, const Sheet* sheet, const Workbook* workbook) {
+    if (range == nullptr || sheet == nullptr || workbook == nullptr) {
+        return false;
     }
-    // Delegate to Workbook for actual storage
+    const Axis* startCol = workbook->getColumn(range->startColId);
+    return startCol != nullptr && startCol->sheetId == sheet->id;
+}
+
+Range* Sheet::getRange(const ID& rangeId) {
     if (_workbook == nullptr) {
         return nullptr;
     }
-    return _workbook->getRange(rangeId);
+    // Use non-const pointer since we need to return it as non-const
+    // NOLINTNEXTLINE(misc-const-correctness)
+    Range* range = _workbook->getRange(rangeId);
+    // Check if this range belongs to this sheet
+    if (!rangeInSheet(range, this, _workbook)) {
+        return nullptr;
+    }
+    return range;
 }
 
 const Range* Sheet::getRange(const ID& rangeId) const {
-    // Check if this range belongs to this sheet
-    if (_rangeIds.find(rangeId) == _rangeIds.end()) {
-        return nullptr;
-    }
-    // Delegate to Workbook for actual storage
     if (_workbook == nullptr) {
         return nullptr;
     }
-    return _workbook->getRange(rangeId);
+    const Range* range = _workbook->getRange(rangeId);
+    // Check if this range belongs to this sheet
+    if (!rangeInSheet(range, this, _workbook)) {
+        return nullptr;
+    }
+    return range;
 }
 
 Range* Sheet::addRange(std::unique_ptr<Range> range) {
     if (!range || range->id.isNull()) {
-        return nullptr;
-    }
-
-    // Check for duplicate ID in this sheet
-    if (_rangeIds.find(range->id) != _rangeIds.end()) {
         return nullptr;
     }
 
@@ -931,25 +937,31 @@ Range* Sheet::addRange(std::unique_ptr<Range> range) {
         return nullptr;
     }
 
-    // Add to Workbook storage
+    // Check for duplicate ID (workbook checks this too, but we can fail fast)
+    if (_workbook->getRange(range->id) != nullptr) {
+        return nullptr;
+    }
+
+    // Add to Workbook storage (this also adds to _rangeIds set)
     Range* rangePtr = _workbook->addRange(std::move(range));
     if (rangePtr == nullptr) {
         return nullptr;  // Failed to add to workbook (e.g., duplicate ID)
     }
 
-    // Add to this sheet's range set
-    _rangeIds.insert(rangePtr->id);
-
-    // Update spatial index
+    // Update spatial index for this sheet
     updateRangeIndex(rangePtr);
 
     return rangePtr;
 }
 
 bool Sheet::removeRange(const ID& rangeId) {
-    // Check if this range belongs to this sheet
-    auto it = _rangeIds.find(rangeId);
-    if (it == _rangeIds.end()) {
+    if (_workbook == nullptr) {
+        return false;
+    }
+
+    // Get the range and verify it belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
         return false;
     }
 
@@ -958,15 +970,17 @@ bool Sheet::removeRange(const ID& rangeId) {
         _rangeIndex->removeById(rangeId);
     }
 
-    // Remove from sheet's set
-    _rangeIds.erase(it);
-
-    // Remove from Workbook (this also handles style reference cleanup)
-    if (_workbook != nullptr) {
-        _workbook->removeRange(rangeId);
-    }
+    // Remove from Workbook (this also removes from _rangeIds and handles style cleanup)
+    _workbook->removeRange(rangeId);
 
     return true;
+}
+
+std::vector<ID> Sheet::getRangeIds() const {
+    if (_workbook == nullptr) {
+        return {};
+    }
+    return _workbook->getRangeIdsForSheet(id);
 }
 
 std::vector<Range*> Sheet::getRangesAt(uint32_t colPos, uint32_t rowPos) const {
@@ -1026,14 +1040,15 @@ void Sheet::updateRangeIndex(Range* range) {
 }
 
 void Sheet::clearAllRanges() {
-    // Remove all ranges from Workbook (handles style reference cleanup)
+    // Get all range IDs for this sheet and remove them
     if (_workbook != nullptr) {
-        for (const ID& rangeId : _rangeIds) {
+        const std::vector<ID> rangeIds = getRangeIds();
+        for (const ID& rangeId : rangeIds) {
             _workbook->removeRange(rangeId);
         }
     }
 
-    _rangeIds.clear();
+    // Clear spatial index
     if (_rangeIndex) {
         _rangeIndex->clear();
     }
@@ -1044,26 +1059,27 @@ void Sheet::clearAllRanges() {
 // ============================================================================
 
 ID Sheet::getRangeStyleId(const ID& rangeId) const {
-    // Verify range belongs to this sheet
-    if (_rangeIds.find(rangeId) == _rangeIds.end()) {
+    if (_workbook == nullptr) {
         return {};
     }
-    // Delegate to Workbook
-    if (_workbook == nullptr) {
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
         return {};
     }
     return _workbook->getRangeStyleId(rangeId);
 }
 
 void Sheet::setRangeStyleId(const ID& rangeId, const ID& styleId) {
-    // Verify range belongs to this sheet
-    if (_rangeIds.find(rangeId) == _rangeIds.end()) {
+    if (_workbook == nullptr) {
         return;
     }
-    // Delegate to Workbook
-    if (_workbook != nullptr) {
-        _workbook->setRangeStyleId(rangeId, styleId);
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
+        return;
     }
+    _workbook->setRangeStyleId(rangeId, styleId);
 }
 
 }  // namespace cells

@@ -1276,6 +1276,10 @@ Range* Workbook::addRange(std::unique_ptr<Range> range) {
 
     const Range* rawPtr = range.get();
     _ranges[range->id] = std::move(range);
+
+    // Add to global range ID set
+    _rangeIds.insert(rawPtr->id);
+
     return _ranges[rawPtr->id].get();
 }
 
@@ -1288,10 +1292,30 @@ std::unique_ptr<Range> Workbook::removeRange(const ID& rangeId) {
     std::unique_ptr<Range> removed = std::move(it->second);
     _ranges.erase(it);
 
+    // Remove from global range ID set
+    _rangeIds.erase(rangeId);
+
     // Also remove any style association
     _rangeStyles.erase(rangeId);
 
     return removed;
+}
+
+std::vector<ID> Workbook::getRangeIdsForSheet(const ID& sheetId) const {
+    std::vector<ID> result;
+    for (const ID& rangeId : _rangeIds) {
+        const Range* range = getRange(rangeId);
+        if (range == nullptr) {
+            continue;
+        }
+        // Check if this range belongs to the specified sheet by looking up its start column's
+        // sheetId
+        const Axis* startCol = getColumn(range->startColId);
+        if (startCol != nullptr && startCol->sheetId == sheetId) {
+            result.push_back(rangeId);
+        }
+    }
+    return result;
 }
 
 // ============================================================================

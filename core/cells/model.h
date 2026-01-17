@@ -579,8 +579,9 @@ struct Sheet {
     [[nodiscard]] RangeIndex* getRangeIndex() { return _rangeIndex.get(); }
     [[nodiscard]] const RangeIndex* getRangeIndex() const { return _rangeIndex.get(); }
 
-    // Get all range IDs belonging to this sheet
-    [[nodiscard]] const std::unordered_set<ID, IDHash>& getRangeIds() const { return _rangeIds; }
+    // Get all range IDs belonging to this sheet (delegates to Workbook)
+    // Returns a vector because it's computed by filtering all workbook ranges
+    [[nodiscard]] std::vector<ID> getRangeIds() const;
 
     // Update the spatial index for a range (call after column/row positions change)
     // Resolves column/row UUIDs to positions and updates the R-tree entry
@@ -623,15 +624,13 @@ private:
 
     // ========================================================================
     // Unified Range System
-    // Range objects are stored at Workbook level. Sheet tracks which range IDs
-    // belong to it and maintains a spatial index for fast viewport queries.
+    // Range objects are stored at Workbook level. Sheet maintains only a
+    // spatial index (R-tree) for fast viewport queries. Range ownership and
+    // tracking is fully at Workbook level.
     // ========================================================================
 
-    // Set of range IDs belonging to this sheet
-    // Range objects themselves are stored in Workbook::_ranges
-    std::unordered_set<ID, IDHash> _rangeIds;
-
     // Spatial index for range queries (stores Range pointers from Workbook)
+    // Positions are sheet-local, so R-tree must remain per-sheet
     std::unique_ptr<RangeIndex> _rangeIndex;
 
     // Build composite key for cell index
@@ -986,6 +985,13 @@ struct Workbook {
     // Returns the removed range (ownership transferred to caller), or nullptr if not found
     std::unique_ptr<Range> removeRange(const ID& rangeId);
 
+    // Get all range IDs in the workbook (global set)
+    [[nodiscard]] const std::unordered_set<ID, IDHash>& getRangeIds() const { return _rangeIds; }
+
+    // Get all range IDs belonging to a specific sheet
+    // Iterates ranges and checks axis sheetId - O(n) where n is total ranges
+    [[nodiscard]] std::vector<ID> getRangeIdsForSheet(const ID& sheetId) const;
+
     // ========================================================================
     // Range style storage (moved from Sheet for consistency)
     // ========================================================================
@@ -1112,8 +1118,11 @@ private:
     // ========================================================================
 
     // Primary range storage: range ID -> Range
-    // Ranges are owned by Workbook; Sheets maintain lightweight ID sets and spatial indexes
+    // Ranges are owned by Workbook; Sheets maintain spatial indexes for viewport queries
     std::unordered_map<ID, std::unique_ptr<Range>, IDHash> _ranges;
+
+    // Global set of all range IDs for fast iteration
+    std::unordered_set<ID, IDHash> _rangeIds;
 
     // Range-to-styleId mapping (for ranges with RANGE_STYLE flag)
     // Key: range ID, Value: style ID from Workbook::styles

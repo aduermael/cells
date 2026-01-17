@@ -353,7 +353,7 @@ void Serializer::serializeCells(const Workbook& workbook, const Sheet& sheet,
 void Serializer::serializeRanges(const Sheet& sheet, std::ostream& out) const {
     // Collect ranges for alphabetical ordering by UUID
     std::vector<std::pair<std::string, const Range*>> ordered;
-    const auto& rangeIds = sheet.getRangeIds();
+    const auto rangeIds = sheet.getRangeIds();  // Returns vector by value
     ordered.reserve(rangeIds.size());
 
     for (const ID& rangeId : rangeIds) {

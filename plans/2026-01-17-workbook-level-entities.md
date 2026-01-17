@@ -10,7 +10,18 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 10 COMPLETE - All WASM bindings updated for workbook-level axis storage.
+**Current status:** Phase 11 COMPLETE - Global range ID tracking moved to Workbook level.
+
+**Progress Jan 17 (session 16):**
+- Phase 11: Global Range ID Tracking
+- Added `Workbook::_rangeIds` set for global range tracking
+- Added `Workbook::getRangeIds()` to get all range IDs and `getRangeIdsForSheet(sheetId)` for per-sheet iteration
+- Removed `Sheet::_rangeIds` - range ownership now fully at Workbook level
+- Updated `Sheet::getRangeIds()` to return `std::vector<ID>` (delegates to Workbook)
+- Updated `Sheet::getRange()`, `removeRange()`, `clearAllRanges()`, `getRangeStyleId()`, `setRangeStyleId()` to use `rangeInSheet()` helper
+- Fixed serializer.cc to handle new return type (const auto instead of const auto&)
+- All 54 unit tests pass
+- All 184 E2E tests pass
 
 **Progress Jan 17 (session 15):**
 - Fixed all remaining `sheet->columns` and `sheet->rows` usages in WASM bindings
@@ -137,7 +148,7 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - **Dependency Graph**: ✅ Workbook level (`Workbook::_depGraph`)
 - **Shared Formulas**: ✅ Workbook level (`Workbook::_sharedFormulaMasters`, `_sharedFormulaFrom`)
 - **Spill Regions**: ✅ Workbook level (`Workbook::_spillMasters`, `_spilledFrom`)
-- **Ranges**: ✅ Workbook level (`Workbook::_ranges`), Sheet has `_rangeIds` set and `_rangeIndex` R-tree
+- **Ranges**: ✅ Workbook level (`Workbook::_ranges`, `_rangeIds`), Sheet has `_rangeIndex` R-tree only
 - **Cross-sheet Dependencies**: Workbook level (`Workbook::_crossSheetDeps`, `_crossSheetRangeDeps`) - to be removed when R-tree is workbook-aware
 
 ## Target Architecture
@@ -147,7 +158,7 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - **Dependency Graph**: ✅ Global to Workbook (cross-sheet tracking can be removed when R-tree is workbook-aware)
 - **Shared Formulas**: ✅ Global to Workbook
 - **Spill Regions**: ✅ Global to Workbook (master cell links back to sheet via its column/row refs)
-- **Ranges**: ✅ Global to Workbook; `_rangeIds` also global (link back to sheet via axis's sheetId)
+- **Ranges**: ✅ Global to Workbook; `_rangeIds` ✅ global (link back to sheet via axis's sheetId)
 - **Range Index**: Remains per-sheet (R-tree for fast viewport queries by position)
 - **Position Indices**: ✅ Per-sheet (`_columnIndex`, `_rowIndex` for position → ID lookups)
 
@@ -370,11 +381,11 @@ Move `_rangeIds` from Sheet to Workbook level for consistency with other entitie
 **What stays in Sheet:**
 - `_rangeIndex` (R-tree) for fast spatial queries - positions are sheet-local
 
-- [ ] 11a: Add `Workbook::_rangeIds` set as global range ID tracking
-- [ ] 11b: Update `Sheet::_rangeIds` to be removed (Workbook has the global set)
-- [ ] 11c: Update `Sheet::addRange()`, `removeRange()` to update Workbook's `_rangeIds`
-- [ ] 11d: Update code that iterates `sheet->getRangeIds()` to use Workbook
-- [ ] 11e: Run tests to verify range operations work correctly
+- [x] 11a: Add `Workbook::_rangeIds` set as global range ID tracking - added set and `getRangeIds()`, `getRangeIdsForSheet()` methods
+- [x] 11b: Update `Sheet::_rangeIds` to be removed (Workbook has the global set) - removed member, updated all methods
+- [x] 11c: Update `Sheet::addRange()`, `removeRange()` to update Workbook's `_rangeIds` - addRange/removeRange now fully delegate to Workbook
+- [x] 11d: Update code that iterates `sheet->getRangeIds()` to use new return type - updated serializer.cc
+- [x] 11e: Run tests to verify range operations work correctly - All 54 unit + 184 E2E tests pass
 
 ## Phase 12: Performance Validation
 
@@ -392,21 +403,21 @@ Verify performance is maintained or improved with new architecture.
 ### Target Architecture Summary
 
 **Workbook-level storage (global by UUID):**
-- `_cells` - all Cell objects
-- `_columns` - all column Axis objects (future Phase 10)
-- `_rows` - all row Axis objects (future Phase 10)
-- `_ranges` - all Range objects
-- `_rangeIds` - global set of range IDs (future Phase 11)
-- `_rangeStyles` - range style mappings
-- `_depGraph` - single global dependency graph
-- `_sharedFormulaMasters`, `_sharedFormulaFrom` - shared formula tracking
-- `_spillMasters`, `_spilledFrom` - spill range tracking
+- `_cells` - all Cell objects ✅
+- `_columns` - all column Axis objects ✅
+- `_rows` - all row Axis objects ✅
+- `_ranges` - all Range objects ✅
+- `_rangeIds` - global set of range IDs ✅
+- `_rangeStyles` - range style mappings ✅
+- `_depGraph` - single global dependency graph ✅
+- `_sharedFormulaMasters`, `_sharedFormulaFrom` - shared formula tracking ✅
+- `_spillMasters`, `_spilledFrom` - spill range tracking ✅
 
 **Sheet-level storage (position-based indices):**
-- `_cellIndex` - (colId:rowId → cellId) for fast position lookups
-- `_columnIndex` - (position → colId) for fast column position lookups (future)
-- `_rowIndex` - (position → rowId) for fast row position lookups (future)
-- `_rangeIndex` - R-tree for fast spatial queries (positions are sheet-local)
+- `_cellIndex` - (colId:rowId → cellId) for fast position lookups ✅
+- `_columnIndex` - (position → colId) for fast column position lookups ✅
+- `_rowIndex` - (position → rowId) for fast row position lookups ✅
+- `_rangeIndex` - R-tree for fast spatial queries (positions are sheet-local) ✅
 
 ### Cell Ownership
 - Workbook owns all Cell objects via `_cells` map
@@ -426,11 +437,11 @@ Given a cell UUID, to find its sheet:
 - Sheet maintains position indices for fast position-to-ID lookups
 
 ### Range Ownership
-- Workbook owns all Range objects via `_ranges` map
-- Workbook tracks all range IDs globally via `_rangeIds` (after Phase 11)
+- Workbook owns all Range objects via `_ranges` map ✅
+- Workbook tracks all range IDs globally via `_rangeIds` ✅
 - Ranges reference column/row UUIDs which belong to specific sheets
 - Sheet maintains R-tree index for fast spatial queries during viewport rendering
-- A range's "sheet" is determined by its startColId's axis's sheetId
+- A range's "sheet" is determined by its startColId's axis's sheetId (via `rangeInSheet()` helper)
 
 ### Why Keep R-tree and Position Indices Per-Sheet?
 - Viewport queries need to quickly find entities in a visible area
