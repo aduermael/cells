@@ -137,15 +137,18 @@ Ensure scripting API continues to work.
 
 ---
 
-## Phase 7: Remove Fields from Cell Struct
+## Phase 7: Remove Fields from Cell Struct ✓
 
 Final cleanup - remove the now-unused fields.
 
-- [ ] 7a: Remove `ID formatId` from Cell struct
-- [ ] 7b: Remove `ID styleId` from Cell struct
-- [ ] 7c: Update Cell constructors (no formatId/styleId params needed)
-- [ ] 7d: Fix any remaining compilation errors from removed fields
-- [ ] 7e: Run full test suite (unit + E2E)
+- [x] 7a: Remove `ID formatId` from Cell struct
+- [x] 7b: Remove `ID styleId` from Cell struct
+- [x] 7c: Update Cell constructors (no formatId/styleId params needed)
+  - Constructors didn't explicitly initialize these fields, so no changes needed
+- [x] 7d: Fix any remaining compilation errors from removed fields
+  - Fixed one remaining usage in bindings_format.cc (setCellStyleAt function)
+- [x] 7e: Run full test suite (unit + E2E)
+  - All 54 unit tests pass, all 184 E2E tests pass
 
 ---
 

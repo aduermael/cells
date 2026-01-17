@@ -168,14 +168,14 @@ inline CellFlags& operator&=(CellFlags& a, CellFlags b) {
 
 // Cell - fundamental unit of data
 // Either a direct value OR a formula with cached result
+// Note: formatId and styleId are stored at the Workbook level (see Workbook::_cellFormats,
+// _cellStyles) to save memory - most cells don't have custom formats/styles.
 struct Cell {
     ID id;             // Unique identifier (8-char base62)
     ID colId;          // Column axis ID
     ID rowId;          // Row axis ID
     CellValue value;   // Direct value OR cached formula result
     Formula* formula;  // null = value cell, non-null = formula cell (owned)
-    ID formatId;       // Number format ID (null = use default/General format)
-    ID styleId;        // Cell style ID (null = use default style)
 
     Cell();
     explicit Cell(const ID& id);

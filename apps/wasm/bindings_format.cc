@@ -1243,11 +1243,14 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
         }
     }
 
-    // Get existing style if cell has one
-    if (existingCell && !existingCell->styleId.isNull()) {
-        const CellStyle* existingStyle = _workbook->getStyle(existingCell->styleId);
-        if (existingStyle) {
-            baseStyle = *existingStyle;
+    // Get existing style if cell has one (from workbook map)
+    if (existingCell && existingCell->hasStyle()) {
+        const ID existingStyleId = _workbook->getCellStyleId(existingCell->id);
+        if (!existingStyleId.isNull()) {
+            const CellStyle* existingStyle = _workbook->getStyle(existingStyleId);
+            if (existingStyle) {
+                baseStyle = *existingStyle;
+            }
         }
     }
 
