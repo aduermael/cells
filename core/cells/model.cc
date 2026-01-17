@@ -574,6 +574,84 @@ const StyleRegistry* Workbook::getStyleRegistry() const {
 }
 
 // =============================================================================
+// Cell format storage
+// =============================================================================
+
+ID Workbook::getCellFormatId(const ID& cellId) const {
+    auto it = _cellFormats.find(cellId);
+    if (it != _cellFormats.end()) {
+        return it->second;
+    }
+    return {};  // null ID
+}
+
+ID Workbook::setCellFormatId(const ID& cellId, const ID& formatId) {
+    // If clearing the format (null ID), remove from map
+    if (formatId.isNull()) {
+        auto it = _cellFormats.find(cellId);
+        if (it != _cellFormats.end()) {
+            ID oldId = it->second;
+            _cellFormats.erase(it);
+            return oldId;
+        }
+        return {};  // No previous format
+    }
+
+    // Check if exists first, get old value before overwriting
+    auto existing = _cellFormats.find(cellId);
+    if (existing != _cellFormats.end()) {
+        ID oldId = existing->second;
+        existing->second = formatId;
+        return oldId;
+    }
+    _cellFormats[cellId] = formatId;
+    return {};  // No previous format
+}
+
+bool Workbook::clearCellFormat(const ID& cellId) {
+    return _cellFormats.erase(cellId) > 0;
+}
+
+// =============================================================================
+// Cell style storage
+// =============================================================================
+
+ID Workbook::getCellStyleId(const ID& cellId) const {
+    auto it = _cellStyles.find(cellId);
+    if (it != _cellStyles.end()) {
+        return it->second;
+    }
+    return {};  // null ID
+}
+
+ID Workbook::setCellStyleId(const ID& cellId, const ID& styleId) {
+    // If clearing the style (null ID), remove from map
+    if (styleId.isNull()) {
+        auto it = _cellStyles.find(cellId);
+        if (it != _cellStyles.end()) {
+            ID oldId = it->second;
+            _cellStyles.erase(it);
+            return oldId;
+        }
+        return {};  // No previous style
+    }
+
+    // Check if exists first, get old value before overwriting
+    auto existing = _cellStyles.find(cellId);
+    if (existing != _cellStyles.end()) {
+        ID oldId = existing->second;
+        existing->second = styleId;
+        return oldId;
+    }
+    _cellStyles[cellId] = styleId;
+    return {};  // No previous style
+}
+
+bool Workbook::clearCellStyle(const ID& cellId) {
+    return _cellStyles.erase(cellId) > 0;
+}
+
+// =============================================================================
 // Cross-sheet dependency tracking
 // =============================================================================
 

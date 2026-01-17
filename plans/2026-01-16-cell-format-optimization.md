@@ -52,15 +52,15 @@ Add flags to quickly check if a cell has custom format/style without hash map lo
 
 ---
 
-## Phase 2: Add Workbook-Level Format Storage
+## Phase 2: Add Workbook-Level Format Storage ✓
 
 Create the hash map and accessors at the Workbook level.
 
-- [ ] 2a: Add `std::unordered_map<ID, ID, IDHash> _cellFormats` to Workbook (cellId → formatId)
-- [ ] 2b: Add `getCellFormatId(cellId)` method - returns formatId or null ID
-- [ ] 2c: Add `setCellFormatId(cellId, formatId)` method - updates map and returns old formatId
-- [ ] 2d: Add `clearCellFormat(cellId)` method - removes from map, returns true if existed
-- [ ] 2e: Add same for styles: `_cellStyles` map, `getCellStyleId()`, `setCellStyleId()`, `clearCellStyle()`
+- [x] 2a: Add `std::unordered_map<ID, ID, IDHash> _cellFormats` to Workbook (cellId → formatId)
+- [x] 2b: Add `getCellFormatId(cellId)` method - returns formatId or null ID
+- [x] 2c: Add `setCellFormatId(cellId, formatId)` method - updates map and returns old formatId
+- [x] 2d: Add `clearCellFormat(cellId)` method - removes from map, returns true if existed
+- [x] 2e: Add same for styles: `_cellStyles` map, `getCellStyleId()`, `setCellStyleId()`, `clearCellStyle()`
 
 ---
 

@@ -754,6 +754,34 @@ struct Workbook {
     [[nodiscard]] const StyleRegistry* getStyleRegistry() const;
 
     // ========================================================================
+    // Cell format storage (moved from Cell struct for memory efficiency)
+    // ========================================================================
+
+    // Get the format ID for a cell (returns null ID if no custom format)
+    [[nodiscard]] ID getCellFormatId(const ID& cellId) const;
+
+    // Set the format ID for a cell. Returns the old format ID (null if none).
+    // Pass null ID to clear the format (same as clearCellFormat).
+    ID setCellFormatId(const ID& cellId, const ID& formatId);
+
+    // Clear the format for a cell. Returns true if the cell had a format.
+    bool clearCellFormat(const ID& cellId);
+
+    // ========================================================================
+    // Cell style storage (moved from Cell struct for memory efficiency)
+    // ========================================================================
+
+    // Get the style ID for a cell (returns null ID if no custom style)
+    [[nodiscard]] ID getCellStyleId(const ID& cellId) const;
+
+    // Set the style ID for a cell. Returns the old style ID (null if none).
+    // Pass null ID to clear the style (same as clearCellStyle).
+    ID setCellStyleId(const ID& cellId, const ID& styleId);
+
+    // Clear the style for a cell. Returns true if the cell had a style.
+    bool clearCellStyle(const ID& cellId);
+
+    // ========================================================================
     // Cross-sheet dependency tracking
     // ========================================================================
 
@@ -825,6 +853,16 @@ private:
     // Cell style registry with deduplication and reference counting
     // Synced via STYLE_DEFINE operations
     std::unique_ptr<StyleRegistry> _styleRegistry;
+
+    // ========================================================================
+    // Cell format/style storage (moved from Cell struct for memory efficiency)
+    // ========================================================================
+
+    // Cell ID -> format ID mapping (only cells with custom formats are stored)
+    std::unordered_map<ID, ID, IDHash> _cellFormats;
+
+    // Cell ID -> style ID mapping (only cells with custom styles are stored)
+    std::unordered_map<ID, ID, IDHash> _cellStyles;
 
     // ========================================================================
     // Cross-sheet dependency tracking (runtime-only)
