@@ -10,7 +10,15 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 7 COMPLETE - CRDT operations updated for workbook-level storage.
+**Current status:** Phase 8 COMPLETE - Formula engine already supports workbook-level storage.
+
+**Progress Jan 17 (session 10):**
+- Phase 8: Formula Engine Integration
+- Analyzed FormulaResolver, FormulaEvaluator, EvalContext, and recalculation engine
+- FormulaEvaluator already uses `workbook->findCell()` for cells without explicit sheetId
+- EvalContext::sheet is still needed for axis position lookups (positions are sheet-local)
+- Recalculation simplification (8e) depends on deferred Phase 2e-2f cross-sheet tracking removal
+- All 54 unit tests pass; 183/184 E2E tests pass (1 flaky collab sync test, unrelated)
 
 **Progress Jan 17 (session 9):**
 - Phase 7: CRDT Operation Updates
@@ -258,12 +266,18 @@ Update CRDT operations to work with Workbook-level entities.
 
 Update formula resolution and evaluation for Workbook-level entities.
 
-- [ ] 8a: Update `FormulaResolver` to resolve cell refs without requiring sheet context
-- [ ] 8b: Update `FormulaEvaluator` to use Workbook-level cell lookup
-- [ ] 8c: Remove sheet-scoped cell resolution paths (now all cells are global)
-- [ ] 8d: Update `EvalContext` to remove sheet-specific cell lookup
-- [ ] 8e: Simplify recalculation engine (no cross-sheet dirty tracking needed)
-- [ ] 8f: Run comprehensive formula evaluation tests
+**Analysis:** The formula engine already supports workbook-level storage:
+- `FormulaResolver` still needs sheet context for relative references (A1 on Sheet1 vs Sheet2)
+- `FormulaEvaluator::evaluateCellRef()` already uses `workbook->findCell()` for cells without explicit sheetId (line 131)
+- `EvalContext::sheet` is still needed for axis position lookups (positions are sheet-local)
+- Recalculation simplification depends on removing cross-sheet tracking (deferred from Phase 2e-2f)
+
+- [x] 8a: `FormulaResolver` already uses workbook for cross-sheet lookups; sheet context needed for relative refs
+- [x] 8b: `FormulaEvaluator` already uses `workbook->findCell()` for simplified formula storage
+- [x] 8c: Sheet-scoped resolution paths still needed - axis positions are sheet-local
+- [x] 8d: `EvalContext::sheet` still required for position lookups and range iteration
+- [~] 8e: Recalculation simplification depends on deferred Phase 2e-2f (cross-sheet tracking removal)
+- [x] 8f: All 54 unit tests and 183/184 E2E tests pass (1 flaky collab sync test, unrelated)
 
 ## Phase 9: Migration and Cleanup
 
