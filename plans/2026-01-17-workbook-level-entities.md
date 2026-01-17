@@ -10,7 +10,15 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 3 COMPLETE - shared formulas moved to Workbook level.
+**Current status:** Phase 4 COMPLETE - spill regions moved to Workbook level.
+
+**Progress Jan 17 (session 6):**
+- Moved spill tracking from Sheet to Workbook level
+- Added `Workbook::_spillMasters` and `_spilledFrom` maps
+- Added Workbook methods: `getSpillInfo()`, `getSpillMaster()`, `getSpilledValue()`, `isSpilledPosition()`, `registerSpillRange()`, `clearSpillRange()`, `clearAllSpillRanges()`
+- Removed `_spillMasters` and `_spilledFrom` from Sheet
+- Updated all Sheet spill methods to delegate to Workbook
+- All 54 unit tests and 184 E2E tests pass
 
 **Progress Jan 17 (session 5):**
 - Moved shared formula tracking from Sheet to Workbook level
@@ -174,14 +182,14 @@ Move shared formula tracking from Sheet to Workbook level.
 
 Move spill tracking from Sheet to Workbook level.
 
-- [ ] 4a: Add `Workbook::_spillMasters` and `Workbook::_spilledFrom` maps
-- [ ] 4b: Add `Workbook::getSpillInfo()`, `getSpillMaster()` methods
-- [ ] 4c: Add `Workbook::registerSpillRange()`, `clearSpillRange()`, `clearAllSpillRanges()`
-- [ ] 4d: Add `Workbook::getSpilledValue()`, `isSpilledPosition()` methods
-- [ ] 4e: Remove spill tracking from Sheet (keep delegating methods)
-- [ ] 4f: Update `Sheet::getSpilledValue()` etc. to delegate to Workbook
-- [ ] 4g: Update formula evaluation spill logic to use Workbook-level tracking
-- [ ] 4h: Run tests to verify spill regions work correctly
+- [x] 4a: Add `Workbook::_spillMasters` and `Workbook::_spilledFrom` maps
+- [x] 4b: Add `Workbook::getSpillInfo()`, `getSpillMaster()` methods
+- [x] 4c: Add `Workbook::registerSpillRange()`, `clearSpillRange()`, `clearAllSpillRanges()`
+- [x] 4d: Add `Workbook::getSpilledValue()`, `isSpilledPosition()` methods
+- [x] 4e: Remove spill tracking from Sheet (keep delegating methods)
+- [x] 4f: Update `Sheet::getSpilledValue()` etc. to delegate to Workbook
+- [x] 4g: Formula evaluation spill logic already uses Sheet methods which now delegate to Workbook - no changes needed
+- [x] 4h: Run tests to verify spill regions work correctly - ALL PASS (54 unit + 184 E2E)
 
 ## Phase 5: Workbook-Level Ranges
 

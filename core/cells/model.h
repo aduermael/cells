@@ -459,29 +459,37 @@ struct Sheet {
 
     // ========================================================================
     // Spill Range Management (Runtime-Only)
+    // All these methods delegate to Workbook-level storage for convenience.
     // ========================================================================
 
     // Get spill info for a master cell (returns nullptr if not a spill master)
+    // Delegates to Workbook::getSpillInfo()
     [[nodiscard]] SpillInfo* getSpillInfo(const ID& masterCellId);
     [[nodiscard]] const SpillInfo* getSpillInfo(const ID& masterCellId) const;
 
     // Get the master cell ID if this position is spilled into (returns null ID if not spilled)
+    // Delegates to Workbook::getSpillMaster()
     [[nodiscard]] ID getSpillMaster(const ID& colId, const ID& rowId) const;
 
-    // Check if a position is part of any spill range (including master position)
+    // Check if a position is part of any spill range (spilled position only, not master)
+    // Delegates to Workbook::isSpilledPosition()
     [[nodiscard]] bool isSpilledPosition(const ID& colId, const ID& rowId) const;
 
     // Get spilled value at a position (returns nullptr if not a spilled position)
+    // Delegates to Workbook::getSpilledValue()
     [[nodiscard]] const CellValue* getSpilledValue(const ID& colId, const ID& rowId) const;
 
     // Register a new spill range (clears any existing spill for this master first)
+    // Delegates to Workbook::registerSpillRange()
     void registerSpillRange(const ID& masterCellId, const std::vector<std::pair<ID, ID>>& positions,
                             const std::vector<CellValue>& values);
 
     // Clear the spill range for a master cell
+    // Delegates to Workbook::clearSpillRange()
     void clearSpillRange(const ID& masterCellId);
 
     // Clear all spill data (called during full recalculation)
+    // Delegates to Workbook::clearAllSpillRanges()
     void clearAllSpillRanges();
 
     // ========================================================================
@@ -589,17 +597,6 @@ private:
 
     // Secondary index: (colId, rowId) -> cellId
     std::unordered_map<std::string, ID> _cellIndex;
-
-    // ========================================================================
-    // Spill range tracking (runtime-only, not persisted)
-    // ========================================================================
-
-    // Maps master cell ID → spill info (positions and values)
-    std::unordered_map<ID, SpillInfo, IDHash> _spillMasters;
-
-    // Reverse lookup: (colId, rowId) composite key → master cell ID
-    // Only contains spilled positions, not the master position itself
-    std::unordered_map<std::string, ID> _spilledFrom;
 
     // ========================================================================
     // Unified Range System (persisted)
@@ -888,6 +885,34 @@ struct Workbook {
     // Clear all shared formula tracking data
     void clearAllSharedFormulaGroups();
 
+    // ========================================================================
+    // Workbook-level spill range tracking (runtime-only)
+    // ========================================================================
+
+    // Get spill info for a master cell (returns nullptr if not a spill master)
+    [[nodiscard]] SpillInfo* getSpillInfo(const ID& masterCellId);
+    [[nodiscard]] const SpillInfo* getSpillInfo(const ID& masterCellId) const;
+
+    // Get the master cell ID if this position is spilled into (returns null ID if not spilled)
+    // colId and rowId identify the position
+    [[nodiscard]] ID getSpillMaster(const ID& colId, const ID& rowId) const;
+
+    // Check if a position is part of any spill range (spilled position only, not master)
+    [[nodiscard]] bool isSpilledPosition(const ID& colId, const ID& rowId) const;
+
+    // Get spilled value at a position (returns nullptr if not a spilled position)
+    [[nodiscard]] const CellValue* getSpilledValue(const ID& colId, const ID& rowId) const;
+
+    // Register a new spill range (clears any existing spill for this master first)
+    void registerSpillRange(const ID& masterCellId, const std::vector<std::pair<ID, ID>>& positions,
+                            const std::vector<CellValue>& values);
+
+    // Clear the spill range for a master cell
+    void clearSpillRange(const ID& masterCellId);
+
+    // Clear all spill data (called during full recalculation)
+    void clearAllSpillRanges();
+
 private:
     // Sheet lookup by ID
     std::unordered_map<ID, Sheet*, IDHash> _sheetIndex;
@@ -950,6 +975,20 @@ private:
 
     // Reverse lookup: subscriber cell ID → master cell ID
     std::unordered_map<ID, ID, IDHash> _sharedFormulaFrom;
+
+    // ========================================================================
+    // Workbook-level spill range tracking (runtime-only)
+    // ========================================================================
+
+    // Maps master cell ID → spill info (positions and values)
+    std::unordered_map<ID, SpillInfo, IDHash> _spillMasters;
+
+    // Reverse lookup: (colId, rowId) composite key → master cell ID
+    // Only contains spilled positions, not the master position itself
+    std::unordered_map<std::string, ID> _spilledFrom;
+
+    // Helper for building composite position keys
+    static std::string makePositionKey(const ID& colId, const ID& rowId);
 
     // ========================================================================
     // Cross-sheet dependency tracking (runtime-only)

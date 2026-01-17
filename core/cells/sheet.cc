@@ -634,116 +634,47 @@ const DependencyGraph* Sheet::getDependencyGraph() const {
 }
 
 // ============================================================================
-// Spill Range Management
+// Spill Range Management (delegates to Workbook)
 // ============================================================================
 
 SpillInfo* Sheet::getSpillInfo(const ID& masterCellId) {
-    auto it = _spillMasters.find(masterCellId);
-    return (it != _spillMasters.end()) ? &it->second : nullptr;
+    return _workbook ? _workbook->getSpillInfo(masterCellId) : nullptr;
 }
 
 const SpillInfo* Sheet::getSpillInfo(const ID& masterCellId) const {
-    auto it = _spillMasters.find(masterCellId);
-    return (it != _spillMasters.end()) ? &it->second : nullptr;
+    return _workbook ? _workbook->getSpillInfo(masterCellId) : nullptr;
 }
 
 ID Sheet::getSpillMaster(const ID& colId, const ID& rowId) const {
-    auto key = makeCellKey(colId, rowId);
-    auto it = _spilledFrom.find(key);
-    return (it != _spilledFrom.end()) ? it->second : ID();
+    return _workbook ? _workbook->getSpillMaster(colId, rowId) : ID();
 }
 
 bool Sheet::isSpilledPosition(const ID& colId, const ID& rowId) const {
-    auto key = makeCellKey(colId, rowId);
-    return _spilledFrom.find(key) != _spilledFrom.end();
+    return _workbook ? _workbook->isSpilledPosition(colId, rowId) : false;
 }
 
 const CellValue* Sheet::getSpilledValue(const ID& colId, const ID& rowId) const {
-    auto key = makeCellKey(colId, rowId);
-    auto it = _spilledFrom.find(key);
-    if (it == _spilledFrom.end()) {
-        return nullptr;
-    }
-
-    const ID& masterId = it->second;
-    const SpillInfo* info = getSpillInfo(masterId);
-    if (info == nullptr) {
-        return nullptr;
-    }
-
-    // Find the index in spilledPositions
-    for (size_t i = 0; i < info->spilledPositions.size(); ++i) {
-        const auto& [pColId, pRowId] = info->spilledPositions[i];
-        if (pColId == colId && pRowId == rowId) {
-            return (i < info->spilledValues.size()) ? &info->spilledValues[i] : nullptr;
-        }
-    }
-
-    return nullptr;
+    return _workbook ? _workbook->getSpilledValue(colId, rowId) : nullptr;
 }
 
 void Sheet::registerSpillRange(const ID& masterCellId,
                                const std::vector<std::pair<ID, ID>>& positions,
                                const std::vector<CellValue>& values) {
-    // Clear any existing spill for this master first
-    clearSpillRange(masterCellId);
-
-    // Create new spill info
-    SpillInfo info(masterCellId);
-    info.spilledPositions = positions;
-    info.spilledValues = values;
-
-    // Register in spillMasters
-    _spillMasters[masterCellId] = std::move(info);
-
-    // Set SPILL_MASTER flag on the master cell for O(1) lookup
-    Cell* master = getCell(masterCellId);
-    if (master != nullptr) {
-        master->setFlag(CellFlags::SPILL_MASTER);
-    }
-
-    // Build reverse lookup for each spilled position
-    // Note: SPILLED_FROM flag is not set on cells because spilled positions
-    // are virtual (no actual Cell object) - we track them in the _spilledFrom map only
-    for (const auto& [colId, rowId] : positions) {
-        auto key = makeCellKey(colId, rowId);
-        _spilledFrom[key] = masterCellId;
+    if (_workbook) {
+        _workbook->registerSpillRange(masterCellId, positions, values);
     }
 }
 
 void Sheet::clearSpillRange(const ID& masterCellId) {
-    auto it = _spillMasters.find(masterCellId);
-    if (it == _spillMasters.end()) {
-        return;
+    if (_workbook) {
+        _workbook->clearSpillRange(masterCellId);
     }
-
-    // Remove all reverse lookups for this master's spilled positions
-    for (const auto& [colId, rowId] : it->second.spilledPositions) {
-        auto key = makeCellKey(colId, rowId);
-        _spilledFrom.erase(key);
-    }
-
-    // Clear SPILL_MASTER flag on the master cell
-    Cell* master = getCell(masterCellId);
-    if (master != nullptr) {
-        master->clearFlag(CellFlags::SPILL_MASTER);
-    }
-
-    // Remove the master entry
-    _spillMasters.erase(it);
 }
 
 void Sheet::clearAllSpillRanges() {
-    // Clear SPILL_MASTER flags on all master cells before clearing the maps
-    for (const auto& [masterId, info] : _spillMasters) {
-        Cell* master = getCell(masterId);
-        if (master != nullptr) {
-            master->clearFlag(CellFlags::SPILL_MASTER);
-        }
+    if (_workbook) {
+        _workbook->clearAllSpillRanges();
     }
-
-    _spillMasters.clear();
-    _spilledFrom.clear();
 }
 
 // ============================================================================
