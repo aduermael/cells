@@ -512,4 +512,125 @@ const StyleRegistry* Workbook::getStyleRegistry() const {
     return _styleRegistry.get();
 }
 
+// =============================================================================
+// Cross-sheet dependency tracking
+// =============================================================================
+
+void Workbook::addCrossSheetDep(const ID& sourceCellId, const ID& formulaSheetId,
+                                const ID& formulaCellId) {
+    // Add to forward index (source -> formula)
+    CrossSheetDep dep{formulaSheetId, formulaCellId};
+    _crossSheetDeps[sourceCellId].push_back(dep);
+
+    // Add to reverse index (formula -> source) for cleanup
+    _crossSheetDepReverse[formulaCellId].push_back(sourceCellId);
+}
+
+void Workbook::addCrossSheetRangeDep(const ID& sourceSheetId, const ID& startColId,
+                                     const ID& startRowId, const ID& endColId, const ID& endRowId,
+                                     const ID& formulaSheetId, const ID& formulaCellId) {
+    CrossSheetRangeDep dep{sourceSheetId, startColId,     startRowId,   endColId,
+                           endRowId,      formulaSheetId, formulaCellId};
+    _crossSheetRangeDeps[formulaCellId].push_back(dep);
+}
+
+void Workbook::removeCrossSheetDeps(const ID& formulaCellId) {
+    // Look up what source cells this formula depends on
+    auto revIt = _crossSheetDepReverse.find(formulaCellId);
+    if (revIt != _crossSheetDepReverse.end()) {
+        // Remove from forward index for each source cell
+        for (const ID& sourceCellId : revIt->second) {
+            auto fwdIt = _crossSheetDeps.find(sourceCellId);
+            if (fwdIt != _crossSheetDeps.end()) {
+                auto& deps = fwdIt->second;
+                deps.erase(std::remove_if(deps.begin(), deps.end(),
+                                          [&formulaCellId](const CrossSheetDep& d) {
+                                              return d.formulaCellId == formulaCellId;
+                                          }),
+                           deps.end());
+                // Clean up empty vectors
+                if (deps.empty()) {
+                    _crossSheetDeps.erase(fwdIt);
+                }
+            }
+        }
+
+        // Remove from reverse index
+        _crossSheetDepReverse.erase(revIt);
+    }
+
+    // Also remove range dependencies for this formula cell
+    _crossSheetRangeDeps.erase(formulaCellId);
+}
+
+std::vector<Workbook::CrossSheetDep> Workbook::getCrossSheetDependents(
+    const ID& sourceCellId) const {
+    auto it = _crossSheetDeps.find(sourceCellId);
+    if (it != _crossSheetDeps.end()) {
+        return it->second;
+    }
+    return {};
+}
+
+std::vector<Workbook::CrossSheetDep> Workbook::getCrossSheetRangeDependents(
+    const ID& changedSheetId, const ID& changedColId, const ID& changedRowId) const {
+    std::vector<CrossSheetDep> result;
+
+    // Get the sheet to look up positions
+    // const_cast is safe here because getColumn/getRow are read-only lookups
+    Sheet* changedSheet = const_cast<Workbook*>(this)->getSheetById(changedSheetId);
+    if (!changedSheet) {
+        return result;
+    }
+
+    // Get the position of the changed cell
+    const Axis* changedCol = changedSheet->getColumn(changedColId);
+    const Axis* changedRow = changedSheet->getRow(changedRowId);
+    if (!changedCol || !changedRow) {
+        return result;
+    }
+    const uint32_t changedColPos = changedCol->position;
+    const uint32_t changedRowPos = changedRow->position;
+
+    // Check all range dependencies
+    for (const auto& [formulaCellId, rangeDeps] : _crossSheetRangeDeps) {
+        for (const auto& dep : rangeDeps) {
+            // Only check ranges on the same sheet where the change occurred
+            if (dep.sourceSheetId != changedSheetId) {
+                continue;
+            }
+
+            // Get the target sheet to look up range positions
+            // const_cast is safe here because getColumn/getRow are read-only lookups
+            Sheet* targetSheet = const_cast<Workbook*>(this)->getSheetById(dep.sourceSheetId);
+            if (!targetSheet) {
+                continue;
+            }
+
+            // Get range corner positions
+            const Axis* startCol = targetSheet->getColumn(dep.startColId);
+            const Axis* startRow = targetSheet->getRow(dep.startRowId);
+            const Axis* endCol = targetSheet->getColumn(dep.endColId);
+            const Axis* endRow = targetSheet->getRow(dep.endRowId);
+
+            if (!startCol || !startRow || !endCol || !endRow) {
+                continue;
+            }
+
+            const uint32_t minCol = std::min(startCol->position, endCol->position);
+            const uint32_t maxCol = std::max(startCol->position, endCol->position);
+            const uint32_t minRow = std::min(startRow->position, endRow->position);
+            const uint32_t maxRow = std::max(startRow->position, endRow->position);
+
+            // Check if the changed cell is within this range
+            if (changedColPos >= minCol && changedColPos <= maxCol && changedRowPos >= minRow &&
+                changedRowPos <= maxRow) {
+                result.push_back({dep.formulaSheetId, dep.formulaCellId});
+            }
+        }
+    }
+
+    return result;
+}
+
 }  // namespace cells

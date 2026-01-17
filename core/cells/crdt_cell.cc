@@ -138,6 +138,11 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
             if (depGraph != nullptr) {
                 depGraph->removeFormula(cell->id);
             }
+            // Also clear cross-sheet dependencies at workbook level
+            Workbook* wb = targetSheet->getWorkbook();
+            if (wb != nullptr) {
+                wb->removeCrossSheetDeps(cell->id);
+            }
         }
 
         // Parse the UUID formula text to create the AST
@@ -158,6 +163,30 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
                 // Track volatile functions
                 if (formula->hasVolatile()) {
                     depGraph->markVolatile(cell->id);
+                }
+            }
+
+            // Register cross-sheet dependencies at workbook level
+            Workbook* wb = targetSheet->getWorkbook();
+            if (wb != nullptr) {
+                std::vector<CrossSheetRef> crossRefs = extractCrossSheetRefs(formula->ast);
+                for (const auto& ref : crossRefs) {
+                    if (ref.type == CrossSheetRef::Type::CELL) {
+                        wb->addCrossSheetDep(ref.cellId, targetSheet->id, cell->id);
+                    } else if (ref.type == CrossSheetRef::Type::RANGE) {
+                        // For ranges, register as a range dependency
+                        // We need to look up the cell positions from their IDs
+                        Sheet* sourceSheet = wb->getSheetById(ref.sheetId);
+                        if (sourceSheet != nullptr) {
+                            Cell* startCell = sourceSheet->getCell(ref.startCellId);
+                            Cell* endCell = sourceSheet->getCell(ref.endCellId);
+                            if (startCell != nullptr && endCell != nullptr) {
+                                wb->addCrossSheetRangeDep(
+                                    ref.sheetId, startCell->colId, startCell->rowId, endCell->colId,
+                                    endCell->rowId, targetSheet->id, cell->id);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -199,6 +228,11 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
                 if (depGraph != nullptr) {
                     depGraph->removeFormula(cell->id);
                     depGraph->unmarkVolatile(cell->id);
+                }
+                // Also clear cross-sheet dependencies at workbook level
+                Workbook* wb = targetSheet->getWorkbook();
+                if (wb != nullptr) {
+                    wb->removeCrossSheetDeps(cell->id);
                 }
             }
             cell->clearFormula();

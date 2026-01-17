@@ -101,42 +101,43 @@ The parser architecture supports cross-sheet references (verified in formula_par
   - All 181 E2E tests pass
   - Lint, type-check, and format checks pass
 
-## Phase 3: Cross-Sheet Dependency Graph (CRITICAL)
+## Phase 3: Cross-Sheet Dependency Graph (CRITICAL) ✅ COMPLETE
 
 **Bug**: The dependency graph currently only tracks dependencies within the same sheet. When a formula references a cell on another sheet (e.g., `=Sheet2!A1`), changing the source cell does NOT trigger re-evaluation of the dependent formula.
 
-**Root cause hypothesis**: The dependency graph likely uses cell IDs without sheet context, or the dependency registration doesn't account for cross-sheet references when building the graph.
+**Root cause**: Each sheet has its own DependencyGraph. When Sheet1!B1 has formula `=Sheet2!A1`, the dependency was registered in Sheet1's graph, but when Sheet2!A1 changed, only Sheet2's graph was checked for dependents. Sheet2 had no knowledge that Sheet1's formula depended on it.
 
-**Impact**: Cross-sheet formulas show correct initial values but become stale when source cells change, leading to incorrect calculations and user confusion.
+**Solution implemented**:
+1. Added workbook-level cross-sheet dependency tracking (`Workbook::_crossSheetDeps` and `Workbook::_crossSheetRangeDeps`)
+2. When a formula with cross-sheet references is created, register the dependency at the workbook level
+3. When a cell changes, call `recalculateCrossSheet()` which queries both direct cell dependencies and range dependencies
+4. Range dependencies use position-based checking to handle formulas like `=SUM(Sheet2!A1:A3)` where any cell in the range can trigger recalc
 
-- [ ] 3a: Create E2E test reproducing the bug:
+- [x] 3a: Create E2E test reproducing the bug:
   - Set Sheet2!A1 = 10
   - In Sheet1!B1, enter formula `=Sheet2!A1`
   - Verify Sheet1!B1 shows 10
   - Change Sheet2!A1 to 20
-  - Verify Sheet1!B1 updates to 20 (currently fails - shows stale 10)
-- [ ] 3b: Investigate current dependency graph implementation
-  - Locate where dependencies are registered during formula parsing
-  - Check if sheetId is included in dependency keys
-  - Trace what happens when a cell value changes (dirty propagation)
-- [ ] 3c: Fix dependency registration to include sheetId
-  - When formula references cross-sheet cell, register dependency with (sheetId, cellId) tuple
-  - Update dependency graph data structure if needed
-- [ ] 3d: Fix dirty propagation to check cross-sheet dependents
-  - When cell changes, look up dependents across all sheets
-  - Ensure re-evaluation cascades correctly
-- [ ] 3e: Add E2E test for cross-sheet range dependency:
-  - Set Sheet2!A1:A3 = [1, 2, 3]
-  - In Sheet1!B1, enter `=SUM(Sheet2!A1:A3)`
-  - Change Sheet2!A2 to 10
-  - Verify Sheet1!B1 updates from 6 to 14
-- [ ] 3f: Add E2E test for multi-hop cross-sheet dependencies:
-  - Sheet3!A1 = 5
-  - Sheet2!A1 = `=Sheet3!A1 * 2` (should be 10)
-  - Sheet1!A1 = `=Sheet2!A1 + 1` (should be 11)
-  - Change Sheet3!A1 to 10
-  - Verify Sheet2!A1 = 20 and Sheet1!A1 = 21
-- [ ] 3g: Run all tests to verify cross-sheet reactivity works
+  - Verify Sheet1!B1 updates to 20 ✅ Now passes
+- [x] 3b: Investigate current dependency graph implementation
+  - Each sheet has its own `DependencyGraph` in `core/cells/dependency_graph.cc`
+  - Dependencies registered via `depGraph->addFormula()` only in the formula's sheet
+  - Recalculation called only on the changed cell's sheet
+- [x] 3c: Fix dependency registration to include sheetId
+  - Added `CrossSheetRef` struct to extract cross-sheet references from AST
+  - Added `Workbook::addCrossSheetDep()` and `addCrossSheetRangeDep()`
+  - Modified `crdt_cell.cc` to register cross-sheet deps at workbook level
+- [x] 3d: Fix dirty propagation to check cross-sheet dependents
+  - Added `recalculateCrossSheet()` function in `formula_recalc.cc`
+  - Queries workbook cross-sheet index for dependent formulas on other sheets
+  - Handles recursive multi-hop dependencies
+  - Called from all cell modification paths in `bindings_core.cc`
+- [x] 3e: Add E2E test for cross-sheet range dependency ✅
+  - Tests `=SUM(Sheet2!A1:A3)` updating when middle cell (A2) changes
+- [x] 3f: Add E2E test for multi-hop cross-sheet dependencies ✅
+  - Tests Sheet3!A1 → Sheet2!A1 → Sheet1!A1 dependency chain
+- [x] 3g: Run all tests to verify cross-sheet reactivity works ✅
+  - All 184 E2E tests pass
 
 ## Phase 4: Formula Editing Across Sheets
 

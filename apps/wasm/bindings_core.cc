@@ -478,6 +478,7 @@ std::string CellsEngine::updateCell(const std::string& cellIdStr, const std::str
     markDirty(sheet, cellId);
     std::vector<ID> changed = {cellId};
     cells::recalculate(sheet, changed);
+    cells::recalculateCrossSheet(_workbook.get(), sheet, changed);
     cells::recalculateVolatile(sheet);
 
     notifyListeners(ChangeType::CELL_CHANGED);
@@ -600,6 +601,7 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
     }
 
     cells::recalculate(sheet, changed);
+    cells::recalculateCrossSheet(_workbook.get(), sheet, changed);
     cells::recalculateVolatile(sheet);
 
     notifyListeners(ChangeType::CELL_CHANGED);
@@ -735,6 +737,7 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
     }
 
     cells::recalculate(sheet, changed);
+    cells::recalculateCrossSheet(_workbook.get(), sheet, changed);
     cells::recalculateVolatile(sheet);
 
     notifyListeners(ChangeType::CELL_CHANGED);
@@ -903,6 +906,7 @@ std::string CellsEngine::deleteCell(const std::string& cellIdStr) {
     }
     if (!spillErrorCells.empty()) {
         cells::recalculate(sheet, spillErrorCells);
+        cells::recalculateCrossSheet(_workbook.get(), sheet, spillErrorCells);
     }
 
     notifyListeners(ChangeType::CELL_CHANGED);
@@ -966,6 +970,7 @@ std::string CellsEngine::deleteCellAt(uint32_t col, uint32_t row) {
             }
             if (!spillErrorCells.empty()) {
                 cells::recalculate(sheet, spillErrorCells);
+                cells::recalculateCrossSheet(_workbook.get(), sheet, spillErrorCells);
             }
 
             notifyListeners(ChangeType::CELL_CHANGED);

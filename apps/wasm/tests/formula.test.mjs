@@ -425,6 +425,219 @@ const tests = {
     const displayValue = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(displayValue, '60', 'A1 should display 60 (sum of Sheet2!A1:A3)');
   },
+
+  // ============================================================================
+  // Cross-Sheet Dependency Tests (Phase 3)
+  // These tests verify that cross-sheet dependencies trigger re-evaluation
+  // when source cells change.
+  // ============================================================================
+
+  'Cross-sheet dependency updates when source cell changes': async (ctx) => {
+    // BUG TEST: Cross-sheet formulas should update when their source changes
+    // Currently, the dependency graph only tracks within-sheet dependencies
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Add a second sheet
+    await ctx.page.click('#add-sheet-btn');
+    await sleep(300);
+
+    // Set Sheet2!A1 = 10
+    await setCellValue(ctx.page, 'A1', '10');
+    await sleep(200);
+
+    // Switch to Sheet1
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+    });
+    await sleep(300);
+
+    // In Sheet1!B1, enter formula =Sheet2!A1
+    await setCellValue(ctx.page, 'B1', '=Sheet2!A1');
+    await sleep(300);
+
+    // Verify Sheet1!B1 shows 10
+    const initialValue = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(initialValue, '10', 'B1 should initially show 10 from Sheet2!A1');
+
+    // Switch to Sheet2 and change A1 to 20
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 1) {
+        tabs[1].click();
+      }
+    });
+    await sleep(300);
+
+    await setCellValue(ctx.page, 'A1', '20');
+    await sleep(200);
+
+    // Switch back to Sheet1
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+    });
+    await sleep(300);
+
+    // Verify Sheet1!B1 updates to 20
+    const updatedValue = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(updatedValue, '20', 'B1 should update to 20 when Sheet2!A1 changes');
+  },
+
+  'Cross-sheet range dependency updates when source cell changes': async (ctx) => {
+    // Test that cross-sheet range formulas update when ANY cell in the range changes
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Add a second sheet
+    await ctx.page.click('#add-sheet-btn');
+    await sleep(300);
+
+    // Set Sheet2!A1:A3 = [1, 2, 3]
+    await setCellValue(ctx.page, 'A1', '1');
+    await setCellValue(ctx.page, 'A2', '2');
+    await setCellValue(ctx.page, 'A3', '3');
+    await sleep(200);
+
+    // Switch to Sheet1
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+    });
+    await sleep(300);
+
+    // In Sheet1!B1, enter formula =SUM(Sheet2!A1:A3)
+    await setCellValue(ctx.page, 'B1', '=SUM(Sheet2!A1:A3)');
+    await sleep(300);
+
+    // Verify Sheet1!B1 shows 6 (1+2+3)
+    const initialValue = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(initialValue, '6', 'B1 should initially show 6 (sum of 1+2+3)');
+
+    // Switch to Sheet2 and change A2 to 10
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 1) {
+        tabs[1].click();
+      }
+    });
+    await sleep(300);
+
+    await setCellValue(ctx.page, 'A2', '10');
+    await sleep(200);
+
+    // Switch back to Sheet1
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+    });
+    await sleep(300);
+
+    // Verify Sheet1!B1 updates to 14 (1+10+3)
+    const updatedValue = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(updatedValue, '14', 'B1 should update to 14 when Sheet2!A2 changes (1+10+3)');
+  },
+
+  'Multi-hop cross-sheet dependencies update correctly': async (ctx) => {
+    // Test chain: Sheet3!A1 -> Sheet2!A1 -> Sheet1!A1
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Add Sheet2
+    await ctx.page.click('#add-sheet-btn');
+    await sleep(300);
+
+    // Add Sheet3
+    await ctx.page.click('#add-sheet-btn');
+    await sleep(300);
+
+    // Now on Sheet3, set A1 = 5
+    await setCellValue(ctx.page, 'A1', '5');
+    await sleep(200);
+
+    // Switch to Sheet2 (second tab)
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 1) {
+        tabs[1].click();
+      }
+    });
+    await sleep(300);
+
+    // In Sheet2!A1, enter =Sheet3!A1 * 2 (should be 10)
+    await setCellValue(ctx.page, 'A1', '=Sheet3!A1*2');
+    await sleep(300);
+
+    // Verify Sheet2!A1 shows 10
+    const sheet2Value = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(sheet2Value, '10', 'Sheet2!A1 should show 10 (Sheet3!A1=5 * 2)');
+
+    // Switch to Sheet1 (first tab)
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+    });
+    await sleep(300);
+
+    // In Sheet1!A1, enter =Sheet2!A1 + 1 (should be 11)
+    await setCellValue(ctx.page, 'A1', '=Sheet2!A1+1');
+    await sleep(300);
+
+    // Verify Sheet1!A1 shows 11
+    const sheet1InitialValue = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(sheet1InitialValue, '11', 'Sheet1!A1 should show 11 (Sheet2!A1=10 + 1)');
+
+    // Switch to Sheet3 and change A1 to 10
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 2) {
+        tabs[2].click();
+      }
+    });
+    await sleep(300);
+
+    await setCellValue(ctx.page, 'A1', '10');
+    await sleep(300);
+
+    // Verify Sheet3!A1 shows 10
+    const sheet3Value = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(sheet3Value, '10', 'Sheet3!A1 should show 10');
+
+    // Switch to Sheet2 and verify it updated
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 1) {
+        tabs[1].click();
+      }
+    });
+    await sleep(300);
+
+    const sheet2UpdatedValue = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(sheet2UpdatedValue, '20', 'Sheet2!A1 should update to 20 (Sheet3!A1=10 * 2)');
+
+    // Switch to Sheet1 and verify it updated
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+    });
+    await sleep(300);
+
+    const sheet1UpdatedValue = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(sheet1UpdatedValue, '21', 'Sheet1!A1 should update to 21 (Sheet2!A1=20 + 1)');
+  },
 };
 
 // Run tests

@@ -37,6 +37,7 @@ namespace cells {
 
 // Forward declarations
 struct Sheet;
+struct Workbook;
 struct Cell;
 struct EvalResult;
 
@@ -58,11 +59,20 @@ EvalResult evaluateCell(Sheet* sheet, Cell* cell);
 // Convenience overload that looks up the cell first
 EvalResult evaluateCell(Sheet* sheet, const ID& cellId);
 
-// Recalculate cells in response to changes
+// Recalculate cells in response to changes (same-sheet only)
 // changedCells: cells whose values have changed (triggers dependent recalc)
 // Uses the dependency graph to determine recalculation order
 // Handles circular references by marking cells with #CIRCULAR! error
+// NOTE: This only recalculates formulas on the same sheet. For cross-sheet
+// dependencies, use recalculateCrossSheet() as well.
 void recalculate(Sheet* sheet, const std::vector<ID>& changedCells);
+
+// Recalculate cross-sheet dependents for changed cells
+// Looks up the workbook's cross-sheet dependency index and triggers
+// recalculation on other sheets that have formulas depending on changedCells.
+// This handles cases like Sheet1!A1 containing =Sheet2!B1.
+void recalculateCrossSheet(Workbook* workbook, Sheet* changedSheet,
+                           const std::vector<ID>& changedCells);
 
 // Recalculate all volatile cells and their dependents
 // Call this when any edit occurs to ensure NOW(), TODAY(), etc. are updated

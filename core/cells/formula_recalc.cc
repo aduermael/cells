@@ -274,6 +274,80 @@ void recalculate(Sheet* sheet, const std::vector<ID>& changedCells) {
 }
 
 // =============================================================================
+// Cross-Sheet Recalculation
+// =============================================================================
+
+void recalculateCrossSheet(Workbook* workbook, Sheet* changedSheet,
+                           const std::vector<ID>& changedCells) {
+    if (!workbook || !changedSheet || changedCells.empty()) {
+        return;
+    }
+
+    // Collect all cross-sheet dependents grouped by target sheet
+    // This avoids recalculating the same sheet multiple times
+    std::unordered_map<ID, std::vector<ID>, IDHash> depsBySheet;
+    std::unordered_set<ID> addedFormulas;  // Avoid duplicates
+
+    // Check direct cell dependencies
+    for (const ID& cellId : changedCells) {
+        auto crossDeps = workbook->getCrossSheetDependents(cellId);
+        for (const auto& dep : crossDeps) {
+            // Only process deps on OTHER sheets (not the sheet where the change occurred)
+            if (dep.formulaSheetId != changedSheet->id) {
+                if (addedFormulas.insert(dep.formulaCellId).second) {
+                    depsBySheet[dep.formulaSheetId].push_back(dep.formulaCellId);
+                }
+            }
+        }
+    }
+
+    // Check range dependencies - formulas that reference ranges containing the changed cells
+    for (const ID& cellId : changedCells) {
+        Cell* cell = changedSheet->getCell(cellId);
+        if (!cell) {
+            continue;
+        }
+
+        auto rangeDeps =
+            workbook->getCrossSheetRangeDependents(changedSheet->id, cell->colId, cell->rowId);
+        for (const auto& dep : rangeDeps) {
+            // Only process deps on OTHER sheets (not the sheet where the change occurred)
+            if (dep.formulaSheetId != changedSheet->id) {
+                if (addedFormulas.insert(dep.formulaCellId).second) {
+                    depsBySheet[dep.formulaSheetId].push_back(dep.formulaCellId);
+                }
+            }
+        }
+    }
+
+    // Recalculate each affected sheet
+    for (auto& [sheetId, formulaCells] : depsBySheet) {
+        Sheet* targetSheet = workbook->getSheetById(sheetId);
+        if (!targetSheet) {
+            continue;
+        }
+
+        // Mark formula cells as dirty and recalculate
+        for (const ID& formulaCellId : formulaCells) {
+            Cell* cell = targetSheet->getCell(formulaCellId);
+            if (cell) {
+                Formula* formula = cell->getFormula();
+                if (formula) {
+                    formula->dirty = true;
+                }
+            }
+        }
+
+        // Recalculate the target sheet with the cross-sheet dependent cells
+        recalculate(targetSheet, formulaCells);
+
+        // Recursively handle cross-sheet deps from this sheet
+        // This handles chains like Sheet3!A1 -> Sheet2!B1 -> Sheet1!C1
+        recalculateCrossSheet(workbook, targetSheet, formulaCells);
+    }
+}
+
+// =============================================================================
 // Volatile Cell Recalculation
 // =============================================================================
 
