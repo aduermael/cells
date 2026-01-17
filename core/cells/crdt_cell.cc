@@ -59,17 +59,10 @@ static PositionResolver makePositionResolver(Sheet* sheet) {
 }
 
 ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
-    // Find the target cell across all sheets
-    Cell* cell = nullptr;
-    Sheet* targetSheet = nullptr;
-
-    for (auto& s : workbook.sheets) {
-        cell = s->getCell(op.target_id);
-        if (cell != nullptr) {
-            targetSheet = s.get();
-            break;
-        }
-    }
+    // Find the target cell from workbook-level storage
+    auto result = workbook.findCell(op.target_id);
+    Cell* cell = result.cell;
+    Sheet* targetSheet = result.sheet;
 
     // Check if there's a newer operation for this cell
     const OpLog* oplog = workbook.getOpLog();
@@ -133,17 +126,12 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         // Note: display field is ignored - we generate display strings from AST
 
         // Clear old formula dependencies before setting new formula
-        if (targetSheet != nullptr) {
-            DependencyGraph* depGraph = targetSheet->getDependencyGraph();
-            if (depGraph != nullptr) {
-                depGraph->removeFormula(cell->id);
-            }
-            // Also clear cross-sheet dependencies at workbook level
-            Workbook* wb = targetSheet->getWorkbook();
-            if (wb != nullptr) {
-                wb->removeCrossSheetDeps(cell->id);
-            }
+        DependencyGraph* depGraph = workbook.getDependencyGraph();
+        if (depGraph != nullptr) {
+            depGraph->removeFormula(cell->id);
         }
+        // Also clear cross-sheet dependencies at workbook level
+        workbook.removeCrossSheetDeps(cell->id);
 
         // Parse the UUID formula text to create the AST
         FormulaParser parser(value_str);
@@ -156,7 +144,7 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
 
         // Add to dependency graph for recalculation tracking if we have valid AST
         if (formula->ast != nullptr && targetSheet != nullptr) {
-            DependencyGraph* depGraph = targetSheet->getDependencyGraph();
+            DependencyGraph* depGraph = workbook.getDependencyGraph();
             if (depGraph != nullptr) {
                 depGraph->addFormula(cell->id, formula->ast, makePositionResolver(targetSheet));
 
@@ -167,24 +155,21 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
             }
 
             // Register cross-sheet dependencies at workbook level
-            Workbook* wb = targetSheet->getWorkbook();
-            if (wb != nullptr) {
-                const std::vector<CrossSheetRef> crossRefs = extractCrossSheetRefs(formula->ast);
-                for (const auto& ref : crossRefs) {
-                    if (ref.type == CrossSheetRef::Type::CELL) {
-                        wb->addCrossSheetDep(ref.cellId, targetSheet->id, cell->id);
-                    } else if (ref.type == CrossSheetRef::Type::RANGE) {
-                        // For ranges, register as a range dependency
-                        // We need to look up the cell positions from their IDs
-                        Sheet* sourceSheet = wb->getSheetById(ref.sheetId);
-                        if (sourceSheet != nullptr) {
-                            const Cell* startCell = sourceSheet->getCell(ref.startCellId);
-                            const Cell* endCell = sourceSheet->getCell(ref.endCellId);
-                            if (startCell != nullptr && endCell != nullptr) {
-                                wb->addCrossSheetRangeDep(
-                                    ref.sheetId, startCell->colId, startCell->rowId, endCell->colId,
-                                    endCell->rowId, targetSheet->id, cell->id);
-                            }
+            const std::vector<CrossSheetRef> crossRefs = extractCrossSheetRefs(formula->ast);
+            for (const auto& ref : crossRefs) {
+                if (ref.type == CrossSheetRef::Type::CELL) {
+                    workbook.addCrossSheetDep(ref.cellId, targetSheet->id, cell->id);
+                } else if (ref.type == CrossSheetRef::Type::RANGE) {
+                    // For ranges, register as a range dependency
+                    // We need to look up the cell positions from their IDs
+                    const Sheet* sourceSheet = workbook.getSheetById(ref.sheetId);
+                    if (sourceSheet != nullptr) {
+                        const Cell* startCell = workbook.getCell(ref.startCellId);
+                        const Cell* endCell = workbook.getCell(ref.endCellId);
+                        if (startCell != nullptr && endCell != nullptr) {
+                            workbook.addCrossSheetRangeDep(
+                                ref.sheetId, startCell->colId, startCell->rowId, endCell->colId,
+                                endCell->rowId, targetSheet->id, cell->id);
                         }
                     }
                 }
@@ -203,12 +188,12 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         const bool isGeneralFormat =
             currentFormat.empty() || currentFormat == "~" || currentFormat == "FMT_GEN0";
 
-        if (isGeneralFormat && formula->ast != nullptr && targetSheet != nullptr) {
-            // Create a format lookup for this sheet (reads from workbook map)
+        if (isGeneralFormat && formula->ast != nullptr) {
+            // Create a format lookup using workbook-level cell storage
             const FormatLookup formatLookup =
-                [targetSheet, &workbook](const std::string& cellIdStr) -> std::string {
+                [&workbook](const std::string& cellIdStr) -> std::string {
                 const ID cellId(cellIdStr);
-                const Cell* refCell = targetSheet->getCell(cellId);
+                const Cell* refCell = workbook.getCell(cellId);
                 if (refCell == nullptr) {
                     return "";
                 }
@@ -226,18 +211,13 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         // Clear formula if it was a formula cell
         if (cell->formula != nullptr) {
             // Remove from dependency graph first
-            if (targetSheet != nullptr) {
-                DependencyGraph* depGraph = targetSheet->getDependencyGraph();
-                if (depGraph != nullptr) {
-                    depGraph->removeFormula(cell->id);
-                    depGraph->unmarkVolatile(cell->id);
-                }
-                // Also clear cross-sheet dependencies at workbook level
-                Workbook* wb = targetSheet->getWorkbook();
-                if (wb != nullptr) {
-                    wb->removeCrossSheetDeps(cell->id);
-                }
+            DependencyGraph* depGraph = workbook.getDependencyGraph();
+            if (depGraph != nullptr) {
+                depGraph->removeFormula(cell->id);
+                depGraph->unmarkVolatile(cell->id);
             }
+            // Also clear cross-sheet dependencies at workbook level
+            workbook.removeCrossSheetDeps(cell->id);
             cell->clearFormula();
         }
         cell->value.raw = value_str;
@@ -247,16 +227,8 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
 }
 
 ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op) {
-    // Find the target cell across all sheets
-    Cell* cell = nullptr;
-
-    for (auto& s : workbook.sheets) {
-        cell = s->getCell(op.target_id);
-        if (cell != nullptr) {
-            break;
-        }
-    }
-
+    // Find the target cell from workbook-level storage
+    Cell* cell = workbook.getCell(op.target_id);
     if (cell == nullptr) {
         return ApplyResult::INVALID_TARGET;
     }
@@ -293,16 +265,8 @@ ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op) {
 }
 
 ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op) {
-    // Find the target cell across all sheets
-    Cell* cell = nullptr;
-
-    for (auto& s : workbook.sheets) {
-        cell = s->getCell(op.target_id);
-        if (cell != nullptr) {
-            break;
-        }
-    }
-
+    // Find the target cell from workbook-level storage
+    Cell* cell = workbook.getCell(op.target_id);
     if (cell == nullptr) {
         return ApplyResult::INVALID_TARGET;
     }
@@ -351,18 +315,12 @@ ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op) {
 }
 
 ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
-    Sheet* targetSheet = nullptr;
-    const Cell* cell = nullptr;
+    // Find the target cell from workbook-level storage
+    auto result = workbook.findCell(op.target_id);
+    const Cell* cell = result.cell;
+    Sheet* targetSheet = result.sheet;
 
-    for (auto& s : workbook.sheets) {
-        cell = s->getCell(op.target_id);
-        if (cell != nullptr) {
-            targetSheet = s.get();
-            break;
-        }
-    }
-
-    if (targetSheet == nullptr) {
+    if (cell == nullptr || targetSheet == nullptr) {
         // Cell doesn't exist - nothing to clear
         // Still return SUCCESS so the operation is recorded in OpLog
         return ApplyResult::SUCCESS;
@@ -381,7 +339,7 @@ ApplyResult applyCellClear(Workbook& workbook, const Operation& op) {
 
     // Remove from dependency graph if it was a formula cell
     if (cell->isFormula()) {
-        DependencyGraph* depGraph = targetSheet->getDependencyGraph();
+        DependencyGraph* depGraph = workbook.getDependencyGraph();
         if (depGraph != nullptr) {
             depGraph->removeFormula(op.target_id);
             depGraph->unmarkVolatile(op.target_id);

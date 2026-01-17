@@ -10,7 +10,16 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 6 COMPLETE - context-aware address display.
+**Current status:** Phase 7 COMPLETE - CRDT operations updated for workbook-level storage.
+
+**Progress Jan 17 (session 9):**
+- Phase 7: CRDT Operation Updates
+- Updated `applyCellSetValue` to use `workbook.findCell()` instead of looping through sheets
+- Updated `applyCellSetFormat` and `applyCellSetStyle` to use `workbook.getCell()` directly
+- Updated `applyCellClear` to use `workbook.findCell()` and `workbook.getDependencyGraph()`
+- All formula dependency operations now use workbook-level graph
+- Range CRDT operations already compatible (Sheet methods delegate to Workbook from Phase 5)
+- All 54 unit tests and 184 E2E tests pass
 
 **Progress Jan 17 (session 8):**
 - Phase 6: Context-aware address display
@@ -238,12 +247,12 @@ Implement dynamic address display based on context (current sheet vs. other shee
 
 Update CRDT operations to work with Workbook-level entities.
 
-- [ ] 7a: Update `CELL_SET_VALUE` to use Workbook cell storage (no sheetId needed in op)
-- [ ] 7b: Update `CELL_SET_FORMULA` to use Workbook cell storage and global dep graph
-- [ ] 7c: Update `CELL_DELETE` to use Workbook cell storage
-- [ ] 7d: Update `RANGE_ADD`, `RANGE_REMOVE`, etc. for Workbook-level ranges
-- [ ] 7e: Verify backward compatibility with existing saved files (migration if needed)
-- [ ] 7f: Run CRDT sync tests to verify collaboration still works
+- [x] 7a: Update `CELL_SET_VALUE` to use Workbook cell storage - uses `workbook.findCell()` instead of looping through sheets
+- [x] 7b: Update `CELL_SET_FORMULA` to use Workbook cell storage and global dep graph - uses `workbook.getDependencyGraph()`
+- [x] 7c: Update `CELL_DELETE` to use Workbook cell storage - uses `workbook.findCell()` and `workbook.getDependencyGraph()`
+- [x] 7d: Update `RANGE_ADD`, `RANGE_REMOVE`, etc. for Workbook-level ranges - already compatible (Sheet methods delegate to Workbook from Phase 5)
+- [x] 7e: Backward compatibility skipped per user request
+- [x] 7f: Run CRDT sync tests to verify collaboration still works - ALL PASS (54 unit + 184 E2E)
 
 ## Phase 8: Formula Engine Integration
 
