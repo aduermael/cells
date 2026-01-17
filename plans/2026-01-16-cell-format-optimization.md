@@ -127,11 +127,13 @@ Update the TypeScript/WASM bridge to use the new storage.
 Ensure scripting API continues to work.
 
 - [x] 6a: Update `luaCellIndex` in `luau_types.cc` for `cell.format` property - read from workbook map
-- [ ] 6b: Update `luaCellNewindex` for `cell.format = ...` - write to workbook map (done via CRDT)
+- [x] 6b: Update `luaCellNewindex` for `cell.format = ...` - write to workbook map (done via CRDT)
+  - Already uses `makeCellSetFormatOp()` which writes through CRDT layer to workbook map
 - [x] 6c: Update `luaCellIndex` for `cell.style` property - read from workbook map
 - [x] 6d: Update `luaCellNewindex` for `cell.style = ...` - read existing from workbook map
-- [ ] 6e: Update `setFormat()` and `setStyle()` functions - write to workbook map (done via CRDT)
-- [ ] 6f: Run Luau unit tests
+- [x] 6e: Update `setFormat()` and `setStyle()` functions - write to workbook map (done via CRDT)
+  - Already use `makeCellSetFormatOp()`/`makeCellSetStyleOp()` via CRDT layer
+- [x] 6f: Run Luau unit tests + updated xlsx_writer_test.cc to use workbook map for style storage
 
 ---
 
