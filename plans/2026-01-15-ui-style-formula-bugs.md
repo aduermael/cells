@@ -151,7 +151,13 @@ The parser architecture supports cross-sheet references (verified in formula_par
 3. Click on A1 to edit, don't change anything, press Enter
 4. Observe: cell now shows `#VALUE!` instead of the original value
 
-**Hypothesis**: The formula re-parsing or re-resolution during edit-commit may be losing the cross-sheet context (sheetId) or failing to resolve the cell reference properly.
+**Root Cause**: The current architecture stores formulas with `!sheetId + cellRef` format. When re-editing:
+1. Formula is converted to A1 notation for display (`=Sheet2!A1`)
+2. On commit, `updateCell()` calls `formulaToUuid()` which tries to convert back
+3. The conversion requires looking up Sheet2's columns/rows to find the cell
+4. Context is lost or lookup fails, resulting in invalid formula
+
+**Fix**: **Phase 5** - Architectural change where Axis knows its Sheet. Formulas only store Cell UUIDs, and cross-sheet prefixes are added dynamically during display. This eliminates the complex A1↔UUID round-trip that loses context.
 
 ### Bug B: Error formulas display #ERROR! suffix incorrectly
 
@@ -196,7 +202,128 @@ Current behavior: `uiStateMachine.reset()` is called on sheet switch, which tran
 - [x] 4h: Handle Escape to cancel and return view to origin sheet
 - [x] 4i: Handle clicking outside grid (not on sheet tabs) to commit formula
 
-## Phase 5: Column/Row-Wide Style UI
+## Phase 5: Architectural Fix - Axis Knows Its Sheet (CRITICAL)
+
+### The Problem
+
+The current cross-sheet reference implementation has fundamental issues:
+
+1. **Redundant storage**: Formulas store `!sheetId + cellRef` (e.g., `!abc12345~~xyz67890`)
+2. **Complex conversion**: Converting between A1 notation (`=Sheet2!A1`) and UUID format requires:
+   - Parsing sheet names from formulas
+   - Looking up sheets by name
+   - Setting the right "context" for cell resolution
+   - Re-serializing with sheet prefixes
+3. **Context loss**: When re-editing a formula, the sheet context can be lost during the A1→UUID→A1 round-trip, causing `#VALUE!` or `#REF!` errors
+4. **Duplicate code paths**: The `RefConverter`, `FormulaResolver`, `FormulaSerializer`, and evaluator all have separate cross-sheet handling logic
+
+### The Solution
+
+**Key insight**: A Cell already knows its Column and Row (via `colId` and `rowId`). If an Axis knows which Sheet it belongs to, then any Cell can indirectly determine its Sheet.
+
+```
+Cell → colId → Column (Axis) → sheetId → Sheet
+```
+
+This means:
+- **Formulas only need to store Cell UUIDs** - no sheet prefix required
+- **Cross-sheet detection is dynamic** - when displaying a formula, compare the referenced cell's sheet to the formula's sheet
+- **Sheet renames work automatically** - UUIDs don't change when sheets are renamed
+
+### Current vs Proposed Architecture
+
+**Current (Complex)**:
+```
+Formula storage:    "=!sheet2Id~~cell1Id + !sheet3Id~~cell2Id"
+Display conversion: Parse !sheetId, lookup sheet name, output "Sheet2!A1 + Sheet3!B2"
+Problems:           Many places need special cross-sheet handling
+```
+
+**Proposed (Simple)**:
+```
+Formula storage:    "=~~cell1Id + ~~cell2Id"
+Display conversion: For each cellId:
+                    1. Look up cell → get colId/rowId
+                    2. Look up column → get sheetId
+                    3. If sheetId != formula's sheetId → prefix with sheet name
+                    4. Convert to A1 notation
+Benefits:           One simple rule, no special cross-sheet parsing
+```
+
+### Implementation Phases
+
+#### Phase 5a: Add sheetId to Axis
+
+- [ ] 5a1: Add `sheetId` field to `Axis` struct in `core/cells/types.h`
+- [ ] 5a2: Update `Axis` constructor to require sheetId
+- [ ] 5a3: Update all places that create Axis objects to pass sheetId:
+  - `Sheet::getOrCreateColumnByPosition()`
+  - `Sheet::getOrCreateRowByPosition()`
+  - `Sheet::addColumn()` / `Sheet::addRow()`
+  - CRDT operation handlers (`applyColInsert`, `applyRowInsert`)
+- [ ] 5a4: Update CRDT serialization to include sheetId in axis operations
+- [ ] 5a5: Add `Axis::getSheetId()` helper method
+- [ ] 5a6: Add helper `Cell::getSheetId()` that looks up via column
+
+#### Phase 5b: Simplify Formula Storage
+
+- [ ] 5b1: Remove `sheetId` field from AST reference nodes (`CellRefNode`, `RangeRefNode`, etc.)
+- [ ] 5b2: Remove `UUID_SHEET_REF` token handling from lexer/parser
+- [ ] 5b3: Update `FormulaSerializer` to output only cell UUIDs (no sheet prefix)
+- [ ] 5b4: Update `FormulaResolver` to not set sheetId on nodes (cell lookup is sufficient)
+- [ ] 5b5: Remove cross-sheet handling from `RefConverter::formulaToUuid()`
+- [ ] 5b6: Verify all unit tests still pass (may need updates)
+
+#### Phase 5c: Update Formula Display (A1 Conversion)
+
+- [ ] 5c1: Create `CellResolver` utility class:
+  ```cpp
+  class CellResolver {
+      // Given a cellId, return the Sheet it belongs to
+      Sheet* getSheetForCell(const ID& cellId);
+      // Given a cellId, return A1 notation with optional sheet prefix
+      string cellIdToA1(const ID& cellId, const Sheet* formulaSheet);
+  };
+  ```
+- [ ] 5c2: Update `FormulaDisplayConverter` to use `CellResolver`:
+  - For each cell reference in formula, look up its sheet
+  - If different from formula's sheet → add `SheetName!` prefix
+  - If same sheet → no prefix
+- [ ] 5c3: Remove `formulaToA1` from `RefConverter` (replaced by CellResolver)
+- [ ] 5c4: Update `getFormulaDisplay()` in bindings to use new converter
+
+#### Phase 5d: Update Formula Evaluation
+
+- [ ] 5d1: Update `evaluateCellRef()` to look up sheet via cell's axis
+- [ ] 5d2: Update `evaluateRangeRef()` similarly
+- [ ] 5d3: Remove workbook-level cross-sheet dependency tracking (no longer needed - dependencies are cell-based)
+- [ ] 5d4: Verify cross-sheet evaluation still works with new architecture
+
+#### Phase 5e: Migration & Testing
+
+- [ ] 5e1: Write migration logic for existing files with `!sheetId` prefixes:
+  - Parse old format formulas
+  - Convert to new cell-only format
+  - Re-serialize
+- [ ] 5e2: Update all affected unit tests
+- [ ] 5e3: Run full E2E test suite
+- [ ] 5e4: Manual testing of cross-sheet formula scenarios:
+  - Enter cross-sheet formula
+  - Re-edit without changes → should still work
+  - Rename sheet → formula display updates
+  - Delete referenced sheet → proper error handling
+
+### Benefits Summary
+
+1. **Simpler code**: Remove ~500 lines of cross-sheet special-casing
+2. **Fewer bugs**: One code path instead of many
+3. **Sheet rename support**: Automatic, no formula rewriting needed
+4. **Better performance**: Less parsing/serialization overhead
+5. **Cleaner architecture**: Cells know their location, formulas just reference cells
+
+---
+
+## Phase 6: Column/Row-Wide Style UI
 
 The backend already supports column/row default styles via `Axis.defaultStyleId` with `AXIS_SET_STYLE` CRDT operation. The Luau API exposes `setColumnStyle()`/`setRowStyle()`. Need to add UI.
 
@@ -207,16 +334,16 @@ The backend already supports column/row default styles via `Axis.defaultStyleId`
 - "Entire row" = selection starts at col 0 and extends to max col (or a special flag)
 - Could use sentinel values like `startRow = 0, endRow = MAX_ROWS` or a dedicated selection type
 
-- [ ] 5a: Create E2E test: click column A header, apply bold, verify new cells in column A inherit bold
-- [ ] 5b: Add selection type or flags to distinguish "entire column/row" from regular range selection
-- [ ] 5c: Update column header click to create "entire column" selection
-- [ ] 5d: Update row header click to create "entire row" selection
-- [ ] 5e: In `StyleControls.applyStyleToSelection()`, detect entire column/row selection
-- [ ] 5f: When entire column selected, call `setColumnStyle()` instead of `setStyleForRange()`
-- [ ] 5g: When entire row selected, call `setRowStyle()` instead of `setStyleForRange()`
-- [ ] 5h: Update effective style display to show column/row default styles correctly
-- [ ] 5i: Add E2E test: set column style, then override single cell, verify cell shows override while others show column style
-- [ ] 5j: Visual feedback: highlight entire column/row when selected (not just visible cells)
+- [ ] 6a: Create E2E test: click column A header, apply bold, verify new cells in column A inherit bold
+- [ ] 6b: Add selection type or flags to distinguish "entire column/row" from regular range selection
+- [ ] 6c: Update column header click to create "entire column" selection
+- [ ] 6d: Update row header click to create "entire row" selection
+- [ ] 6e: In `StyleControls.applyStyleToSelection()`, detect entire column/row selection
+- [ ] 6f: When entire column selected, call `setColumnStyle()` instead of `setStyleForRange()`
+- [ ] 6g: When entire row selected, call `setRowStyle()` instead of `setStyleForRange()`
+- [ ] 6h: Update effective style display to show column/row default styles correctly
+- [ ] 6i: Add E2E test: set column style, then override single cell, verify cell shows override while others show column style
+- [ ] 6j: Visual feedback: highlight entire column/row when selected (not just visible cells)
 
 ## Architecture Notes
 
