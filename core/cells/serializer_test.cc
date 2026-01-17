@@ -244,6 +244,7 @@ TEST(SerializerTest, NoEscapeUnicode) {
 TEST(SerializerTest, SerializeColumnPositions) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
 
     auto col1 = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     col1->position = 0;
@@ -269,6 +270,7 @@ TEST(SerializerTest, SerializeColumnPositions) {
 TEST(SerializerTest, SerializeColumnWidth) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     col->size = 200;
@@ -284,6 +286,7 @@ TEST(SerializerTest, SerializeColumnWidth) {
 TEST(SerializerTest, SerializeColumnName) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     col->name = "Revenue";
@@ -299,6 +302,7 @@ TEST(SerializerTest, SerializeColumnName) {
 TEST(SerializerTest, SerializeRowHeight) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
 
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
     row->size = 48;
@@ -315,6 +319,7 @@ TEST(SerializerTest, SerializeShowGridLinesDefault) {
     // When showGridLines is true (default), V line should not be emitted
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
     // showGridLines defaults to true
     sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
     sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
@@ -328,6 +333,7 @@ TEST(SerializerTest, SerializeShowGridLinesDefault) {
 TEST(SerializerTest, SerializeShowGridLinesFalse) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
     sheet->showGridLines = false;
     sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
     sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
@@ -342,6 +348,7 @@ TEST(SerializerTest, SerializeZoomScaleDefault) {
     // When zoomScale is 100 (default), V line should not be emitted
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
     // zoomScale defaults to 100
     sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
     sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
@@ -355,6 +362,7 @@ TEST(SerializerTest, SerializeZoomScaleDefault) {
 TEST(SerializerTest, SerializeZoomScaleNonDefault) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
     sheet->zoomScale = 150;
     sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
     sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
@@ -368,6 +376,7 @@ TEST(SerializerTest, SerializeZoomScaleNonDefault) {
 TEST(SerializerTest, SerializeMultipleViewProperties) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
     sheet->showGridLines = false;
     sheet->zoomScale = 75;
     sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
@@ -384,6 +393,7 @@ TEST(SerializerTest, SerializeFreezePanesDefault) {
     // When freezeCol/freezeRow are 0 (default), V line should not be emitted
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
     // freezeCol/freezeRow default to 0
     sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
     sheet->addRow(std::make_unique<Axis>(ID("rA1bC2dE"), false));
@@ -397,6 +407,7 @@ TEST(SerializerTest, SerializeFreezePanesDefault) {
 TEST(SerializerTest, SerializeFreezePanesNonDefault) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
     sheet->freezeCol = 2;
     sheet->freezeRow = 3;
     sheet->addColumn(std::make_unique<Axis>(ID("cA1bC2dE"), true));
@@ -412,6 +423,7 @@ TEST(SerializerTest, SerializeFreezePanesNonDefault) {
 TEST(SerializerTest, SerializeAllViewProperties) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
+    sheet->setWorkbook(wb.get());
     sheet->showGridLines = false;
     sheet->zoomScale = 115;
     sheet->freezeCol = 1;
@@ -2090,6 +2102,7 @@ X xA1bC2dE cA1bC2dE rA1bC2dE n 100
 TEST(SerializerTest, SerializeHiddenColumn) {
     Workbook wb(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+    sheet->setWorkbook(&wb);
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     col->hidden = true;
@@ -2107,6 +2120,7 @@ TEST(SerializerTest, SerializeHiddenColumn) {
 TEST(SerializerTest, SerializeHiddenRow) {
     Workbook wb(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+    sheet->setWorkbook(&wb);
 
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
     row->hidden = true;
@@ -2124,6 +2138,7 @@ TEST(SerializerTest, SerializeHiddenRow) {
 TEST(SerializerTest, VisibleColumnNoHiddenProperty) {
     Workbook wb(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+    sheet->setWorkbook(&wb);
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     col->hidden = false;  // Not hidden (default)
@@ -2193,6 +2208,7 @@ TEST(SerializerTest, HiddenAxisRoundTrip) {
     // Create workbook with hidden column and row
     Workbook wb(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+    sheet->setWorkbook(&wb);
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
     col->hidden = true;
@@ -2228,6 +2244,7 @@ TEST(SerializerTest, AxisDefaultStyleRoundTrip) {
     // Create workbook with styled column and row
     Workbook wb(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet1");
+    sheet->setWorkbook(&wb);
 
     // Register styles in workbook
     CellStyle boldStyle;

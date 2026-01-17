@@ -306,8 +306,7 @@ std::string FormulaDisplayConverter::rowRefToString(const RowRefNode* node) cons
             if (node->absolute) {
                 result += "$";
             }
-            const std::string rowNum =
-                std::to_string(row->position + 1);  // Convert to 1-indexed
+            const std::string rowNum = std::to_string(row->position + 1);  // Convert to 1-indexed
             result += rowNum;
             result += ":";
             result += rowNum;

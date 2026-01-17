@@ -415,7 +415,7 @@ bool Sheet::moveColumn(const ID& colId, uint32_t newPosition) {
 
     // Rebuild position index
     for (const ID& cid : _columnIds) {
-        Axis* axis = _workbook ? _workbook->getColumn(cid) : nullptr;
+        const Axis* axis = _workbook ? _workbook->getColumn(cid) : nullptr;
         if (axis) {
             _columnIndex[axis->position] = cid;
         }
@@ -472,7 +472,7 @@ bool Sheet::moveRow(const ID& rowId, uint32_t newPosition) {
 
     // Rebuild position index
     for (const ID& rid : _rowIds) {
-        Axis* axis = _workbook ? _workbook->getRow(rid) : nullptr;
+        const Axis* axis = _workbook ? _workbook->getRow(rid) : nullptr;
         if (axis) {
             _rowIndex[axis->position] = rid;
         }
@@ -506,7 +506,7 @@ Axis* Sheet::insertColumnAt(uint32_t position) {
 
     // Rebuild position index for all columns
     for (const ID& cid : _columnIds) {
-        Axis* axis = _workbook ? _workbook->getColumn(cid) : nullptr;
+        const Axis* axis = _workbook ? _workbook->getColumn(cid) : nullptr;
         if (axis) {
             _columnIndex[axis->position] = cid;
         }
@@ -540,7 +540,7 @@ Axis* Sheet::insertRowAt(uint32_t position) {
 
     // Rebuild position index for all rows
     for (const ID& rid : _rowIds) {
-        Axis* axis = _workbook ? _workbook->getRow(rid) : nullptr;
+        const Axis* axis = _workbook ? _workbook->getRow(rid) : nullptr;
         if (axis) {
             _rowIndex[axis->position] = rid;
         }
@@ -561,7 +561,7 @@ bool Sheet::deleteColumn(const ID& colId) {
         return false;
     }
 
-    Axis* col = getColumn(colId);
+    const Axis* col = getColumn(colId);
     if (!col) {
         return false;
     }
@@ -622,7 +622,7 @@ bool Sheet::deleteRow(const ID& rowId) {
         return false;
     }
 
-    Axis* row = getRow(rowId);
+    const Axis* row = getRow(rowId);
     if (!row) {
         return false;
     }

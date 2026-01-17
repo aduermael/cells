@@ -615,9 +615,9 @@ size_t bootstrapOpLog(Workbook& workbook) {
     // Iterate through all sheets
     for (const auto& sheet : workbook.sheets) {
         // Collect and sort columns by position
-        std::vector<std::pair<uint32_t, Axis*>> columns;
+        std::vector<std::pair<uint32_t, const Axis*>> columns;
         for (const ID& colId : sheet->getColumnIds()) {
-            Axis* axis = workbook.getColumn(colId);
+            const Axis* axis = workbook.getColumn(colId);
             if (axis) {
                 columns.emplace_back(axis->position, axis);
             }
@@ -635,9 +635,9 @@ size_t bootstrapOpLog(Workbook& workbook) {
         }
 
         // Collect and sort rows by position
-        std::vector<std::pair<uint32_t, Axis*>> rows;
+        std::vector<std::pair<uint32_t, const Axis*>> rows;
         for (const ID& rowId : sheet->getRowIds()) {
-            Axis* axis = workbook.getRow(rowId);
+            const Axis* axis = workbook.getRow(rowId);
             if (axis) {
                 rows.emplace_back(axis->position, axis);
             }

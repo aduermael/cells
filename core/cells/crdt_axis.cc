@@ -456,7 +456,7 @@ ApplyResult applyAxisSetStyle(Workbook& workbook, const Operation& op) {
 
 ApplyResult applyColMove(Workbook& workbook, const Operation& op) {
     Axis* axis = nullptr;
-    Sheet* targetSheet = nullptr;
+    const Sheet* targetSheet = nullptr;
 
     for (auto& s : workbook.sheets) {
         axis = s->getColumn(op.target_id);
@@ -522,7 +522,7 @@ ApplyResult applyColMove(Workbook& workbook, const Operation& op) {
 
 ApplyResult applyRowMove(Workbook& workbook, const Operation& op) {
     Axis* axis = nullptr;
-    Sheet* targetSheet = nullptr;
+    const Sheet* targetSheet = nullptr;
 
     for (auto& s : workbook.sheets) {
         axis = s->getRow(op.target_id);
@@ -655,7 +655,7 @@ ApplyResult applyDimResizeAxis(Workbook& workbook, const Operation& op) {
 
 ApplyResult applyDimMoveAxis(Workbook& workbook, const Operation& op) {
     Axis* axis = nullptr;
-    Sheet* targetSheet = nullptr;
+    const Sheet* targetSheet = nullptr;
     bool isColumn = false;
 
     for (auto& s : workbook.sheets) {

@@ -384,8 +384,9 @@ struct Sheet {
     Axis* getOrCreateRowByPosition(uint32_t position);     // Auto-creates if needed
     void addColumn(std::unique_ptr<Axis> col);
     void addRow(std::unique_ptr<Axis> row);
-    void removeColumnFromIndex(const ID& colId);  // Remove column from sheet tracking (for CRDT ops)
-    void removeRowFromIndex(const ID& rowId);     // Remove row from sheet tracking (for CRDT ops)
+    void removeColumnFromIndex(
+        const ID& colId);                      // Remove column from sheet tracking (for CRDT ops)
+    void removeRowFromIndex(const ID& rowId);  // Remove row from sheet tracking (for CRDT ops)
 
     // Count accessors
     [[nodiscard]] size_t columnCount() const { return _columnIds.size(); }

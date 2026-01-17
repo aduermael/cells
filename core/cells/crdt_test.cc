@@ -665,6 +665,7 @@ protected:
 
         auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
         sheet_ptr = sheet.get();
+        sheet->setWorkbook(workbook.get());  // Set workbook early for axis storage
 
         // Create 5 columns (A, B, C, D, E) at positions 0-4
         for (int i = 0; i < 5; i++) {

@@ -19,6 +19,7 @@ protected:
 
         auto s = std::make_unique<Sheet>(generate_id(), "Sheet1");
         sheet = s.get();
+        s->setWorkbook(workbook.get());  // Set workbook early for axis/cell storage
 
         // Create columns A-E (positions 0-4)
         for (int i = 0; i < 5; ++i) {

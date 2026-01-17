@@ -10,7 +10,14 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 10 IN PROGRESS - Workbook-level axis storage implemented, tests need verification.
+**Current status:** Phase 10 COMPLETED - Workbook-level axis storage fully implemented and verified.
+
+**Progress Jan 17 (session 13):**
+- Phase 10: Completed test verification
+- Fixed all tests that add columns/rows before sheet has workbook set (setWorkbook pattern)
+- Updated serializer_test.cc, crdt_test.cc, ref_converter_test.cc, xlsx_writer_test.cc, fill_range_test.cc
+- Fixed lint errors (const pointer correctness in sheet.cc, crdt_axis.cc, crdt.cc)
+- All 54 unit tests and 184 E2E tests pass
 
 **Progress Jan 17 (session 12):**
 - Phase 10: Workbook-Level Axis Storage
@@ -22,7 +29,6 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Updated all consumers: formula_display.cc, formula_eval.cc, serializer.cc, csv_writer.cc, xlsx_writer.cc, ref_converter.cc, viewport_index.cc
 - Updated all test files: csv_reader_test.cc, ref_converter_test.cc, xlsx_reader_test.cc, xlsx_writer_test.cc
 - Build passes for //core/cells/...
-- **TODO:** Run `bazel run :check` to verify unit tests, then E2E tests
 
 **Progress Jan 17 (session 11):**
 - Phase 9: Migration and Cleanup
@@ -341,7 +347,7 @@ Move columns and rows (Axis objects) from Sheet to Workbook level. Each Axis alr
 - [x] 10g: Update `Sheet::getColumn()`, `getRow()` to delegate to Workbook
 - [x] 10h: Update all CRDT axis operations for Workbook-level storage
 - [x] 10i: Update serializer/parser for new storage pattern - updated serializer.cc to use getColumnIds()/getRowIds()
-- [ ] 10j: Run tests to verify axis operations work correctly - **TODO: run bazel run :check and :e2e**
+- [x] 10j: Run tests to verify axis operations work correctly - All 54 unit tests and 184 E2E tests pass
 
 ## Phase 11: Global Range ID Tracking
 

@@ -236,6 +236,7 @@ TEST(RefConverterTest, FormatA1RefInvalid) {
 std::unique_ptr<Workbook> createTestWorkbook() {
     auto workbook = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
     auto sheet = std::make_unique<Sheet>(generate_id(), "TestSheet");
+    sheet->setWorkbook(workbook.get());  // Set workbook early for axis/cell storage
 
     // Create 5 columns (A-E)
     std::vector<ID> colIds;
@@ -255,7 +256,7 @@ std::unique_ptr<Workbook> createTestWorkbook() {
         sheet->addRow(std::move(row));
     }
 
-    // Add sheet to workbook first (so cells get stored properly)
+    // Add sheet to workbook
     workbook->addSheet(std::move(sheet));
     Sheet* sheetPtr = workbook->getSheetByIndex(0);
 

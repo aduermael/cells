@@ -50,6 +50,7 @@ private:
 std::unique_ptr<Workbook> createSimpleWorkbook() {
     auto workbook = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
     auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
+    sheet->setWorkbook(workbook.get());  // Set workbook early for axis/cell storage
 
     // Create 3 columns
     std::vector<ID> colIds;
