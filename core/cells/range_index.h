@@ -148,14 +148,8 @@ public:
 
 private:
     // R-tree for spatial queries (stores Range pointers)
-    // This main tree contains ALL ranges regardless of flags
+    // Contains ALL ranges regardless of flags
     RTree<Range*> _rtree;
-
-    // Flag-specific R-trees for efficient filtered queries
-    // Each tree only contains ranges that have the corresponding flag set
-    // This avoids post-query filtering which is O(n) for all ranges
-    RTree<Range*> _mergeTrees;  // MERGE flag
-    RTree<Range*> _styleTrees;  // STYLE flag
 
     // Track position bounds for each range (needed for removal/update)
     // Maps range ID -> position bounds
@@ -164,12 +158,6 @@ private:
     // Helper to create BoundingRect from position bounds
     static BoundingRect makeBounds(uint32_t startCol, uint32_t startRow, uint32_t endCol,
                                    uint32_t endRow);
-
-    // Helper to insert into flag-specific trees based on range flags
-    void insertIntoFlagTrees(Range* range, const BoundingRect& rect);
-
-    // Helper to remove from flag-specific trees based on range flags
-    void removeFromFlagTrees(Range* range, const BoundingRect& rect);
 };
 
 }  // namespace cells

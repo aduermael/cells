@@ -14,24 +14,6 @@ BoundingRect RangeIndex::makeBounds(uint32_t startCol, uint32_t startRow, uint32
     return {minCol, minRow, maxCol, maxRow};
 }
 
-void RangeIndex::insertIntoFlagTrees(Range* range, const BoundingRect& rect) {
-    if (hasFlag(range->flags, RangeFlags::MERGE)) {
-        _mergeTrees.insert(rect, range);
-    }
-    if (hasFlag(range->flags, RangeFlags::STYLE)) {
-        _styleTrees.insert(rect, range);
-    }
-}
-
-void RangeIndex::removeFromFlagTrees(Range* range, const BoundingRect& rect) {
-    if (hasFlag(range->flags, RangeFlags::MERGE)) {
-        _mergeTrees.remove(rect, range);
-    }
-    if (hasFlag(range->flags, RangeFlags::STYLE)) {
-        _styleTrees.remove(rect, range);
-    }
-}
-
 void RangeIndex::insert(Range* range, uint32_t startCol, uint32_t startRow, uint32_t endCol,
                         uint32_t endRow) {
     if (range == nullptr) {
@@ -49,9 +31,6 @@ void RangeIndex::insert(Range* range, uint32_t startCol, uint32_t startRow, uint
     // Insert into R-tree
     const BoundingRect rect = makeBounds(startCol, startRow, endCol, endRow);
     _rtree.insert(rect, range);
-
-    // Also insert into flag-specific trees
-    insertIntoFlagTrees(range, rect);
 }
 
 bool RangeIndex::remove(Range* range) {
@@ -81,10 +60,7 @@ bool RangeIndex::removeById(const ID& rangeId) {
     });
 
     if (found && foundRange != nullptr) {
-        // Remove from main R-tree
         _rtree.remove(foundBounds, foundRange);
-        // Remove from flag-specific trees
-        removeFromFlagTrees(foundRange, foundBounds);
         _bounds.erase(it);
     }
 
@@ -102,20 +78,18 @@ bool RangeIndex::updateBounds(Range* range, uint32_t newStartCol, uint32_t newSt
         return false;  // Not indexed
     }
 
-    // Remove old entry from all trees
+    // Remove old entry
     const auto& oldBounds = it->second;
     const BoundingRect oldRect =
         makeBounds(oldBounds.startCol, oldBounds.startRow, oldBounds.endCol, oldBounds.endRow);
     _rtree.remove(oldRect, range);
-    removeFromFlagTrees(range, oldRect);
 
     // Update stored bounds
     it->second = RangePositionBounds(newStartCol, newStartRow, newEndCol, newEndRow);
 
-    // Insert with new bounds into all trees
+    // Insert with new bounds
     const BoundingRect newRect = makeBounds(newStartCol, newStartRow, newEndCol, newEndRow);
     _rtree.insert(newRect, range);
-    insertIntoFlagTrees(range, newRect);
 
     return true;
 }
@@ -125,19 +99,9 @@ std::vector<Range*> RangeIndex::queryAt(uint32_t col, uint32_t row) const {
 }
 
 std::vector<Range*> RangeIndex::queryAt(uint32_t col, uint32_t row, RangeFlags flagMask) const {
-    // Use flag-specific trees for common single-flag queries (fast path)
-    // This avoids iterating through all ranges at the position
-    if (flagMask == RangeFlags::MERGE) {
-        return _mergeTrees.query(static_cast<int32_t>(col), static_cast<int32_t>(row));
-    }
-    if (flagMask == RangeFlags::STYLE) {
-        return _styleTrees.query(static_cast<int32_t>(col), static_cast<int32_t>(row));
-    }
-
-    // Fall back to filtering for other/combined flags
     auto all = queryAt(col, row);
 
-    // Filter by flags
+    // Post-filter by flags (O(k) where k is typically 1-5 ranges)
     std::vector<Range*> result;
     result.reserve(all.size());
     for (const Range* r : all) {
@@ -157,20 +121,9 @@ std::vector<Range*> RangeIndex::queryRange(uint32_t startCol, uint32_t startRow,
 
 std::vector<Range*> RangeIndex::queryRange(uint32_t startCol, uint32_t startRow, uint32_t endCol,
                                            uint32_t endRow, RangeFlags flagMask) const {
-    const BoundingRect rect = makeBounds(startCol, startRow, endCol, endRow);
+    auto all = queryRange(startCol, startRow, endCol, endRow);
 
-    // Use flag-specific trees for common single-flag queries (fast path)
-    if (flagMask == RangeFlags::MERGE) {
-        return _mergeTrees.queryRange(rect);
-    }
-    if (flagMask == RangeFlags::STYLE) {
-        return _styleTrees.queryRange(rect);
-    }
-
-    // Fall back to filtering for other/combined flags
-    auto all = _rtree.queryRange(rect);
-
-    // Filter by flags
+    // Post-filter by flags (O(k) where k is typically small)
     std::vector<Range*> result;
     result.reserve(all.size());
     for (const Range* r : all) {
@@ -200,8 +153,6 @@ const RangePositionBounds* RangeIndex::getBounds(const ID& rangeId) const {
 
 void RangeIndex::clear() {
     _rtree.clear();
-    _mergeTrees.clear();
-    _styleTrees.clear();
     _bounds.clear();
 }
 

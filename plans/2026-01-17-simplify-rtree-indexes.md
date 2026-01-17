@@ -17,14 +17,14 @@ The rationale was to optimize queries like `queryAt(col, row, RangeFlags::MERGE)
 
 ## Phase 1: Remove Flag-Specific RTrees
 
-- [ ] 1a: Remove `_mergeTrees` and `_styleTrees` member variables from `RangeIndex` class in `range_index.h`
-- [ ] 1b: Remove `insertIntoFlagTrees()` and `removeFromFlagTrees()` helper methods
-- [ ] 1c: Update `insert()` to only insert into `_rtree`
-- [ ] 1d: Update `removeById()` to only remove from `_rtree`
-- [ ] 1e: Update `updateBounds()` to only update `_rtree`
-- [ ] 1f: Update `queryAt(col, row, RangeFlags)` to always use post-filtering (remove fast-path)
-- [ ] 1g: Update `queryRange(...)` with flags to always use post-filtering (remove fast-path)
-- [ ] 1h: Update `clear()` to only clear `_rtree` and `_bounds`
+- [x] 1a: Remove `_mergeTrees` and `_styleTrees` member variables from `RangeIndex` class in `range_index.h`
+- [x] 1b: Remove `insertIntoFlagTrees()` and `removeFromFlagTrees()` helper methods
+- [x] 1c: Update `insert()` to only insert into `_rtree`
+- [x] 1d: Update `removeById()` to only remove from `_rtree`
+- [x] 1e: Update `updateBounds()` to only update `_rtree`
+- [x] 1f: Update `queryAt(col, row, RangeFlags)` to always use post-filtering (remove fast-path)
+- [x] 1g: Update `queryRange(...)` with flags to always use post-filtering (remove fast-path)
+- [x] 1h: Update `clear()` to only clear `_rtree` and `_bounds`
 
 ## Phase 2: Update Documentation and Tests
 
