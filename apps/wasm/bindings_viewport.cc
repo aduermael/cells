@@ -669,8 +669,12 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
     // Include style ranges that overlap with the viewport
     // These allow the frontend to render backgrounds for empty cells
     bool firstRange = true;
-    const auto& ranges = sheet->getRanges();
-    for (const auto& [rangeId, range] : ranges) {
+    for (const ID& rangeId : sheet->getRangeIds()) {
+        const Range* range = sheet->getRange(rangeId);
+        if (range == nullptr) {
+            continue;
+        }
+
         // Only include RANGE_STYLE ranges
         if (!range->hasFlag(RangeFlags::STYLE)) {
             continue;

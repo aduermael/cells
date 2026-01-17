@@ -183,14 +183,18 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
     };
 
     std::vector<ID> rangesToRemove;
-    for (auto& [rangeId, range] : targetSheet->getRanges()) {
+    for (const ID& rangeId : targetSheet->getRangeIds()) {
+        Range* range = targetSheet->getRange(rangeId);
+        if (range == nullptr) {
+            continue;
+        }
         const CornerDeleteResult result =
             adjustRangeForColumnDeletion(*range, op.target_id, getNextColId, getPrevColId);
         if (result == CornerDeleteResult::INVALIDATED) {
             rangesToRemove.push_back(rangeId);
         } else if (result == CornerDeleteResult::SHRUNK) {
             // Update the range index with new bounds
-            targetSheet->updateRangeIndex(range.get());
+            targetSheet->updateRangeIndex(range);
         }
     }
     for (const ID& rangeId : rangesToRemove) {
@@ -263,14 +267,18 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
     };
 
     std::vector<ID> rangesToRemove;
-    for (auto& [rangeId, range] : targetSheet->getRanges()) {
+    for (const ID& rangeId : targetSheet->getRangeIds()) {
+        Range* range = targetSheet->getRange(rangeId);
+        if (range == nullptr) {
+            continue;
+        }
         const CornerDeleteResult result =
             adjustRangeForRowDeletion(*range, op.target_id, getNextRowId, getPrevRowId);
         if (result == CornerDeleteResult::INVALIDATED) {
             rangesToRemove.push_back(rangeId);
         } else if (result == CornerDeleteResult::SHRUNK) {
             // Update the range index with new bounds
-            targetSheet->updateRangeIndex(range.get());
+            targetSheet->updateRangeIndex(range);
         }
     }
     for (const ID& rangeId : rangesToRemove) {

@@ -698,7 +698,7 @@ TEST_F(RangeAdjustmentTest, DeleteStartColumnShrinksRange) {
     range->flags = RangeFlags::STYLE;
     sheet_ptr->addRange(std::move(range));
 
-    ASSERT_EQ(sheet_ptr->getRanges().size(), 1);
+    ASSERT_EQ(sheet_ptr->getRangeIds().size(), 1);
     EXPECT_EQ(sheet_ptr->getRange(rangeId)->startColId, colIds[1]);
 
     // Delete column B (start column)
@@ -708,7 +708,7 @@ TEST_F(RangeAdjustmentTest, DeleteStartColumnShrinksRange) {
     EXPECT_EQ(result, ApplyResult::SUCCESS);
 
     // Range should still exist but start at column C
-    ASSERT_EQ(sheet_ptr->getRanges().size(), 1);
+    ASSERT_EQ(sheet_ptr->getRangeIds().size(), 1);
     Range* r = sheet_ptr->getRange(rangeId);
     ASSERT_NE(r, nullptr);
     EXPECT_EQ(r->startColId, colIds[2]);  // Now starts at C
@@ -741,7 +741,7 @@ TEST_F(RangeAdjustmentTest, DeleteSingleColumnRangeRemovesRange) {
     range->flags = RangeFlags::STYLE;
     sheet_ptr->addRange(std::move(range));
 
-    ASSERT_EQ(sheet_ptr->getRanges().size(), 1);
+    ASSERT_EQ(sheet_ptr->getRangeIds().size(), 1);
 
     // Delete column C (the only column in the range)
     HLC hlc = workbook->getCurrentHLC();
@@ -749,7 +749,7 @@ TEST_F(RangeAdjustmentTest, DeleteSingleColumnRangeRemovesRange) {
     applyOperation(*workbook, op);
 
     // Range should be removed
-    EXPECT_EQ(sheet_ptr->getRanges().size(), 0);
+    EXPECT_EQ(sheet_ptr->getRangeIds().size(), 0);
     EXPECT_EQ(sheet_ptr->getRange(rangeId), nullptr);
 }
 
@@ -798,7 +798,7 @@ TEST_F(RangeAdjustmentTest, DeleteSingleRowRangeRemovesRange) {
     range->flags = RangeFlags::STYLE;
     sheet_ptr->addRange(std::move(range));
 
-    ASSERT_EQ(sheet_ptr->getRanges().size(), 1);
+    ASSERT_EQ(sheet_ptr->getRangeIds().size(), 1);
 
     // Delete row 2 (the only row in the range)
     HLC hlc = workbook->getCurrentHLC();
@@ -806,7 +806,7 @@ TEST_F(RangeAdjustmentTest, DeleteSingleRowRangeRemovesRange) {
     applyOperation(*workbook, op);
 
     // Range should be removed
-    EXPECT_EQ(sheet_ptr->getRanges().size(), 0);
+    EXPECT_EQ(sheet_ptr->getRangeIds().size(), 0);
 }
 
 TEST_F(RangeAdjustmentTest, DeleteMiddleColumnKeepsRangeUnchanged) {

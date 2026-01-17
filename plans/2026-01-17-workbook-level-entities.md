@@ -10,7 +10,19 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 4 COMPLETE - spill regions moved to Workbook level.
+**Current status:** Phase 5 COMPLETE - ranges moved to Workbook level.
+
+**Progress Jan 17 (session 7):**
+- Moved range storage from Sheet to Workbook level
+- Added `Workbook::_ranges` and `_rangeStyles` maps
+- Added Workbook methods: `getRange()`, `addRange()`, `removeRange()`, `getRangeStyleId()`, `setRangeStyleId()`
+- Changed `Sheet::_ranges` from `unordered_map<ID, unique_ptr<Range>>` to `unordered_set<ID>` (renamed to `_rangeIds`)
+- Updated Sheet methods to delegate to Workbook: `getRange()`, `addRange()`, `removeRange()`, `getRangeStyleId()`, `setRangeStyleId()`
+- Sheet keeps `_rangeIndex` (R-tree) per-sheet for fast viewport queries
+- Updated all files using `sheet->getRanges()` to use `sheet->getRangeIds()` and lookup from workbook
+- Updated crdt_axis.cc, serializer.cc, xlsx_writer.cc, xlsx_writer_test.cc, crdt_test.cc, bindings_viewport.cc
+- Fixed test that creates Sheet without Workbook (MergedCellsApiWorks)
+- All 54 unit tests and 184 E2E tests pass
 
 **Progress Jan 17 (session 6):**
 - Moved spill tracking from Sheet to Workbook level
@@ -195,15 +207,15 @@ Move spill tracking from Sheet to Workbook level.
 
 Move range storage from Sheet to Workbook level. Keep per-sheet R-tree index.
 
-- [ ] 5a: Add `Workbook::_ranges` map (ID → unique_ptr<Range>) as primary range storage
-- [ ] 5b: Add `Workbook::getRange()`, `addRange()`, `removeRange()` methods
-- [ ] 5c: Change `Sheet::_ranges` from `unordered_map<ID, unique_ptr<Range>>` to `unordered_set<ID>`
-- [ ] 5d: Update `Sheet::getRange()` to delegate to Workbook
-- [ ] 5e: Update `Sheet::addRange()` to add to Workbook, then add ID to Sheet's set and update R-tree
-- [ ] 5f: Keep `Sheet::_rangeIndex` (R-tree) per-sheet for fast viewport queries
-- [ ] 5g: Update range CRDT operations for Workbook-level storage
-- [ ] 5h: Update `Sheet::_rangeStyles` to move to Workbook level (ranges are global, so styles should be too)
-- [ ] 5i: Run tests to verify range operations work correctly
+- [x] 5a: Add `Workbook::_ranges` map (ID → unique_ptr<Range>) as primary range storage
+- [x] 5b: Add `Workbook::getRange()`, `addRange()`, `removeRange()` methods
+- [x] 5c: Change `Sheet::_ranges` from `unordered_map<ID, unique_ptr<Range>>` to `unordered_set<ID>` (renamed to `_rangeIds`)
+- [x] 5d: Update `Sheet::getRange()` to delegate to Workbook
+- [x] 5e: Update `Sheet::addRange()` to add to Workbook, then add ID to Sheet's set and update R-tree
+- [x] 5f: Keep `Sheet::_rangeIndex` (R-tree) per-sheet for fast viewport queries
+- [x] 5g: Update range CRDT operations for Workbook-level storage (crdt_axis.cc range adjustment)
+- [x] 5h: Update `Sheet::_rangeStyles` to move to Workbook level (ranges are global, so styles should be too)
+- [x] 5i: Run tests to verify range operations work correctly - ALL PASS (54 unit + 184 E2E)
 
 ## Phase 6: Address Display System
 

@@ -2981,7 +2981,11 @@ TEST(XLSXWriterTest, RowDefaultStyleRoundTrip) {
 // Test to verify Range-based merged cells API works
 TEST(XLSXWriterTest, MergedCellsApiWorks) {
     // Create a sheet and add merged cells using Range system
-    Sheet sheet(generate_id(), "Test");
+    // Ranges require a workbook, so we create one
+    auto workbook = std::make_unique<Workbook>(generate_id(), "Test");
+    auto sheetPtr = std::make_unique<Sheet>(generate_id(), "Test");
+    sheetPtr->setWorkbook(workbook.get());
+    Sheet& sheet = *sheetPtr;
 
     std::vector<ID> colIds, rowIds;
     for (int i = 0; i < 5; i++) {
@@ -3070,8 +3074,9 @@ TEST(XLSXWriterTest, RoundtripMergedCells) {
 
     // Verify merges were added before writing by counting MERGE ranges
     size_t mergeCount = 0;
-    for (const auto& [rangeId, range] : sheet->getRanges()) {
-        if (range->hasFlag(RangeFlags::MERGE)) {
+    for (const ID& rangeId : sheet->getRangeIds()) {
+        const Range* range = sheet->getRange(rangeId);
+        if (range != nullptr && range->hasFlag(RangeFlags::MERGE)) {
             mergeCount++;
         }
     }
@@ -3096,9 +3101,10 @@ TEST(XLSXWriterTest, RoundtripMergedCells) {
 
     // Verify merge ranges were preserved by collecting MERGE ranges
     std::vector<const Range*> merges;
-    for (const auto& [rangeId, range] : readSheet->getRanges()) {
-        if (range->hasFlag(RangeFlags::MERGE)) {
-            merges.push_back(range.get());
+    for (const ID& rangeId : readSheet->getRangeIds()) {
+        const Range* range = readSheet->getRange(rangeId);
+        if (range != nullptr && range->hasFlag(RangeFlags::MERGE)) {
+            merges.push_back(range);
         }
     }
     EXPECT_EQ(merges.size(), 2u) << "Should have 2 merge ranges";
@@ -3199,9 +3205,10 @@ TEST(XLSXWriterTest, MergedCellsWithStyles) {
 
     // Verify merge using Range system
     std::vector<const Range*> merges;
-    for (const auto& [rangeId, range] : readSheet->getRanges()) {
-        if (range->hasFlag(RangeFlags::MERGE)) {
-            merges.push_back(range.get());
+    for (const ID& rangeId : readSheet->getRangeIds()) {
+        const Range* range = readSheet->getRange(rangeId);
+        if (range != nullptr && range->hasFlag(RangeFlags::MERGE)) {
+            merges.push_back(range);
         }
     }
     EXPECT_EQ(merges.size(), 1u);

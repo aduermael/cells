@@ -33,6 +33,7 @@
 #include "core/cells/formula_ast.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/range.h"
 #include "core/cells/style_registry.h"
 
 namespace cells {
@@ -1171,6 +1172,96 @@ void Workbook::clearAllSpillRanges() {
 
     _spillMasters.clear();
     _spilledFrom.clear();
+}
+
+// ============================================================================
+// Workbook-Level Range Storage
+// ============================================================================
+
+Range* Workbook::getRange(const ID& rangeId) {
+    auto it = _ranges.find(rangeId);
+    return (it != _ranges.end()) ? it->second.get() : nullptr;
+}
+
+const Range* Workbook::getRange(const ID& rangeId) const {
+    auto it = _ranges.find(rangeId);
+    return (it != _ranges.end()) ? it->second.get() : nullptr;
+}
+
+Range* Workbook::addRange(std::unique_ptr<Range> range) {
+    if (!range || range->id.isNull()) {
+        return nullptr;
+    }
+
+    // Check for duplicate ID
+    if (_ranges.find(range->id) != _ranges.end()) {
+        return nullptr;
+    }
+
+    const Range* rawPtr = range.get();
+    _ranges[range->id] = std::move(range);
+    return _ranges[rawPtr->id].get();
+}
+
+std::unique_ptr<Range> Workbook::removeRange(const ID& rangeId) {
+    auto it = _ranges.find(rangeId);
+    if (it == _ranges.end()) {
+        return nullptr;
+    }
+
+    std::unique_ptr<Range> removed = std::move(it->second);
+    _ranges.erase(it);
+
+    // Also remove any style association
+    _rangeStyles.erase(rangeId);
+
+    return removed;
+}
+
+// ============================================================================
+// Workbook-Level Range Style Storage
+// ============================================================================
+
+ID Workbook::getRangeStyleId(const ID& rangeId) const {
+    auto it = _rangeStyles.find(rangeId);
+    if (it != _rangeStyles.end()) {
+        return it->second;
+    }
+    return {};  // Return null ID if no style association
+}
+
+void Workbook::setRangeStyleId(const ID& rangeId, const ID& styleId) {
+    // Get the range to update its flags
+    Range* range = getRange(rangeId);
+    if (!range) {
+        return;  // Range doesn't exist
+    }
+
+    // Get the old style ID (if any) for reference counting
+    const ID oldStyleId = getRangeStyleId(rangeId);
+
+    if (styleId.isNull()) {
+        // Remove style association
+        _rangeStyles.erase(rangeId);
+        range->flags = range->flags & ~RangeFlags::STYLE;
+    } else {
+        // Set style association
+        _rangeStyles[rangeId] = styleId;
+        range->flags = range->flags | RangeFlags::STYLE;
+    }
+
+    // Update reference counts
+    StyleRegistry* registry = getStyleRegistry();
+    if (registry != nullptr) {
+        // Release old style reference (if any)
+        if (!oldStyleId.isNull()) {
+            registry->release(oldStyleId);
+        }
+        // Add reference to new style (if not null)
+        if (!styleId.isNull()) {
+            registry->addRef(styleId);
+        }
+    }
 }
 
 }  // namespace cells

@@ -1211,9 +1211,10 @@ std::string generateWorksheet(
     // Write merged cells from the unified Range system
     // Collect all ranges with MERGE flag
     std::vector<const cells::Range*> mergeRanges;
-    for (const auto& [rangeId, range] : sheet.getRanges()) {
-        if (range->hasFlag(cells::RangeFlags::MERGE)) {
-            mergeRanges.push_back(range.get());
+    for (const cells::ID& rangeId : sheet.getRangeIds()) {
+        const cells::Range* range = sheet.getRange(rangeId);
+        if (range != nullptr && range->hasFlag(cells::RangeFlags::MERGE)) {
+            mergeRanges.push_back(range);
         }
     }
 

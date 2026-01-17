@@ -738,16 +738,32 @@ void Sheet::clearAllSharedFormulaGroups() {
 
 // ============================================================================
 // Unified Range System
+// Range objects are stored at Workbook level. Sheet tracks which range IDs
+// belong to it and maintains a spatial index for fast viewport queries.
 // ============================================================================
 
 Range* Sheet::getRange(const ID& rangeId) {
-    auto it = _ranges.find(rangeId);
-    return (it != _ranges.end()) ? it->second.get() : nullptr;
+    // Check if this range belongs to this sheet
+    if (_rangeIds.find(rangeId) == _rangeIds.end()) {
+        return nullptr;
+    }
+    // Delegate to Workbook for actual storage
+    if (_workbook == nullptr) {
+        return nullptr;
+    }
+    return _workbook->getRange(rangeId);
 }
 
 const Range* Sheet::getRange(const ID& rangeId) const {
-    auto it = _ranges.find(rangeId);
-    return (it != _ranges.end()) ? it->second.get() : nullptr;
+    // Check if this range belongs to this sheet
+    if (_rangeIds.find(rangeId) == _rangeIds.end()) {
+        return nullptr;
+    }
+    // Delegate to Workbook for actual storage
+    if (_workbook == nullptr) {
+        return nullptr;
+    }
+    return _workbook->getRange(rangeId);
 }
 
 Range* Sheet::addRange(std::unique_ptr<Range> range) {
@@ -755,13 +771,24 @@ Range* Sheet::addRange(std::unique_ptr<Range> range) {
         return nullptr;
     }
 
-    // Check for duplicate ID
-    if (_ranges.find(range->id) != _ranges.end()) {
+    // Check for duplicate ID in this sheet
+    if (_rangeIds.find(range->id) != _rangeIds.end()) {
         return nullptr;
     }
 
-    Range* rangePtr = range.get();
-    _ranges[range->id] = std::move(range);
+    // Need workbook for storage
+    if (_workbook == nullptr) {
+        return nullptr;
+    }
+
+    // Add to Workbook storage
+    Range* rangePtr = _workbook->addRange(std::move(range));
+    if (rangePtr == nullptr) {
+        return nullptr;  // Failed to add to workbook (e.g., duplicate ID)
+    }
+
+    // Add to this sheet's range set
+    _rangeIds.insert(rangePtr->id);
 
     // Update spatial index
     updateRangeIndex(rangePtr);
@@ -770,8 +797,9 @@ Range* Sheet::addRange(std::unique_ptr<Range> range) {
 }
 
 bool Sheet::removeRange(const ID& rangeId) {
-    auto it = _ranges.find(rangeId);
-    if (it == _ranges.end()) {
+    // Check if this range belongs to this sheet
+    auto it = _rangeIds.find(rangeId);
+    if (it == _rangeIds.end()) {
         return false;
     }
 
@@ -780,19 +808,14 @@ bool Sheet::removeRange(const ID& rangeId) {
         _rangeIndex->removeById(rangeId);
     }
 
-    // Release style reference if any
-    const ID styleId = getRangeStyleId(rangeId);
-    if (!styleId.isNull() && _workbook != nullptr) {
-        StyleRegistry* registry = _workbook->getStyleRegistry();
-        if (registry != nullptr) {
-            registry->release(styleId);
-        }
+    // Remove from sheet's set
+    _rangeIds.erase(it);
+
+    // Remove from Workbook (this also handles style reference cleanup)
+    if (_workbook != nullptr) {
+        _workbook->removeRange(rangeId);
     }
 
-    // Remove style association if any
-    _rangeStyles.erase(rangeId);
-
-    _ranges.erase(it);
     return true;
 }
 
@@ -853,73 +876,43 @@ void Sheet::updateRangeIndex(Range* range) {
 }
 
 void Sheet::clearAllRanges() {
-    // Release all style references before clearing
+    // Remove all ranges from Workbook (handles style reference cleanup)
     if (_workbook != nullptr) {
-        StyleRegistry* registry = _workbook->getStyleRegistry();
-        if (registry != nullptr) {
-            for (const auto& [rangeId, styleId] : _rangeStyles) {
-                if (!styleId.isNull()) {
-                    registry->release(styleId);
-                }
-            }
+        for (const ID& rangeId : _rangeIds) {
+            _workbook->removeRange(rangeId);
         }
     }
 
-    _ranges.clear();
-    _rangeStyles.clear();
+    _rangeIds.clear();
     if (_rangeIndex) {
         _rangeIndex->clear();
     }
 }
 
 // ============================================================================
-// Range Style Mapping
+// Range Style Mapping (delegates to Workbook)
 // ============================================================================
 
 ID Sheet::getRangeStyleId(const ID& rangeId) const {
-    auto it = _rangeStyles.find(rangeId);
-    if (it != _rangeStyles.end()) {
-        return it->second;
+    // Verify range belongs to this sheet
+    if (_rangeIds.find(rangeId) == _rangeIds.end()) {
+        return {};
     }
-    return {};  // Return null ID if no style association
+    // Delegate to Workbook
+    if (_workbook == nullptr) {
+        return {};
+    }
+    return _workbook->getRangeStyleId(rangeId);
 }
 
 void Sheet::setRangeStyleId(const ID& rangeId, const ID& styleId) {
-    // Get the range to update its flags
-    Range* range = getRange(rangeId);
-    if (!range) {
-        return;  // Range doesn't exist
+    // Verify range belongs to this sheet
+    if (_rangeIds.find(rangeId) == _rangeIds.end()) {
+        return;
     }
-
-    // Get style registry for reference counting
-    StyleRegistry* registry = nullptr;
+    // Delegate to Workbook
     if (_workbook != nullptr) {
-        registry = _workbook->getStyleRegistry();
-    }
-
-    // Get the old style ID (if any) for reference counting
-    const ID oldStyleId = getRangeStyleId(rangeId);
-
-    if (styleId.isNull()) {
-        // Remove style association
-        _rangeStyles.erase(rangeId);
-        range->flags = range->flags & ~RangeFlags::STYLE;
-    } else {
-        // Set style association
-        _rangeStyles[rangeId] = styleId;
-        range->flags = range->flags | RangeFlags::STYLE;
-    }
-
-    // Update reference counts
-    if (registry != nullptr) {
-        // Release old style reference (if any)
-        if (!oldStyleId.isNull()) {
-            registry->release(oldStyleId);
-        }
-        // Add reference to new style (if not null)
-        if (!styleId.isNull()) {
-            registry->addRef(styleId);
-        }
+        _workbook->setRangeStyleId(rangeId, styleId);
     }
 }
 
