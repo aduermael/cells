@@ -1,0 +1,14 @@
+CompileFlags:
+  Add:
+    - "-Wno-unknown-warning-option"
+  Remove:
+    - "-Wno-free-nonheap-object"
+    - "-frandom-seed=*"
+
+Diagnostics:
+  UnusedIncludes: None
+  ClangTidy:
+    Remove: "*"
+
+Index:
+  Background: Build
