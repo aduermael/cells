@@ -126,9 +126,7 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
     }
 
     // Priority 3: Column's default style (fills remaining gaps)
-    const Axis* col = sheet.columns.count(cell.colId) > 0
-        ? sheet.columns.at(cell.colId).get()
-        : nullptr;
+    const Axis* col = sheet.getColumn(cell.colId);
     if (col && !col->defaultStyleId.isNull()) {
         const CellStyle* colStyle = workbook.getStyle(col->defaultStyleId);
         if (colStyle != nullptr) {
@@ -144,9 +142,7 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
     }
 
     // Priority 4: Row's default style (fills remaining gaps)
-    const Axis* row = sheet.rows.count(cell.rowId) > 0
-        ? sheet.rows.at(cell.rowId).get()
-        : nullptr;
+    const Axis* row = sheet.getRow(cell.rowId);
     if (row && !row->defaultStyleId.isNull()) {
         const CellStyle* rowStyle = workbook.getStyle(row->defaultStyleId);
         if (rowStyle != nullptr) {
@@ -273,13 +269,13 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         // Get logical column/row positions from the sheet's axes
         uint32_t colPos = 0;
         uint32_t rowPos = 0;
-        auto colIt = sheet->columns.find(entry.cell->colId);
-        if (colIt != sheet->columns.end()) {
-            colPos = colIt->second->position;
+        const Axis* col = sheet->getColumn(entry.cell->colId);
+        if (col) {
+            colPos = col->position;
         }
-        auto rowIt = sheet->rows.find(entry.cell->rowId);
-        if (rowIt != sheet->rows.end()) {
-            rowPos = rowIt->second->position;
+        const Axis* row = sheet->getRow(entry.cell->rowId);
+        if (row) {
+            rowPos = row->position;
         }
 
         json << "{";
@@ -548,14 +544,14 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             }
 
             // Check if position is within the viewport
-            auto colIt = sheet->columns.find(colId);
-            auto rowIt = sheet->rows.find(rowId);
-            if (colIt == sheet->columns.end() || rowIt == sheet->rows.end()) {
+            const Axis* col = sheet->getColumn(colId);
+            const Axis* row = sheet->getRow(rowId);
+            if (!col || !row) {
                 continue;
             }
 
-            uint32_t colPos = colIt->second->position;
-            uint32_t rowPos = rowIt->second->position;
+            uint32_t colPos = col->position;
+            uint32_t rowPos = row->position;
 
             if (colPos < col1 || colPos >= col2 || rowPos < row1 || rowPos >= row2) {
                 continue;
@@ -624,7 +620,11 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
 
     // Include column info for the viewport
     bool firstCol = true;
-    for (const auto& [id, col] : sheet->columns) {
+    for (const ID& id : sheet->getColumnIds()) {
+        const Axis* col = sheet->getColumn(id);
+        if (!col) {
+            continue;
+        }
         if (col->position >= col1 && col->position < col2) {
             if (!firstCol) {
                 json << ",";
@@ -646,7 +646,11 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
 
     // Include row info for the viewport
     bool firstRow = true;
-    for (const auto& [id, row] : sheet->rows) {
+    for (const ID& id : sheet->getRowIds()) {
+        const Axis* row = sheet->getRow(id);
+        if (!row) {
+            continue;
+        }
         if (row->position >= row1 && row->position < row2) {
             if (!firstRow) {
                 json << ",";
@@ -691,20 +695,19 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         }
 
         // Get position bounds from corner IDs
-        auto startColIt = sheet->columns.find(range->startColId);
-        auto startRowIt = sheet->rows.find(range->startRowId);
-        auto endColIt = sheet->columns.find(range->endColId);
-        auto endRowIt = sheet->rows.find(range->endRowId);
+        const Axis* startCol = sheet->getColumn(range->startColId);
+        const Axis* startRow = sheet->getRow(range->startRowId);
+        const Axis* endCol = sheet->getColumn(range->endColId);
+        const Axis* endRow = sheet->getRow(range->endRowId);
 
-        if (startColIt == sheet->columns.end() || startRowIt == sheet->rows.end() ||
-            endColIt == sheet->columns.end() || endRowIt == sheet->rows.end()) {
+        if (!startCol || !startRow || !endCol || !endRow) {
             continue;
         }
 
-        uint32_t rangeCol1 = std::min(startColIt->second->position, endColIt->second->position);
-        uint32_t rangeCol2 = std::max(startColIt->second->position, endColIt->second->position);
-        uint32_t rangeRow1 = std::min(startRowIt->second->position, endRowIt->second->position);
-        uint32_t rangeRow2 = std::max(startRowIt->second->position, endRowIt->second->position);
+        uint32_t rangeCol1 = std::min(startCol->position, endCol->position);
+        uint32_t rangeCol2 = std::max(startCol->position, endCol->position);
+        uint32_t rangeRow1 = std::min(startRow->position, endRow->position);
+        uint32_t rangeRow2 = std::max(startRow->position, endRow->position);
 
         // Check if range overlaps with viewport
         if (rangeCol2 < col1 || rangeCol1 >= col2 || rangeRow2 < row1 || rangeRow1 >= row2) {

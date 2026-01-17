@@ -10,14 +10,20 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 10 COMPLETED - Workbook-level axis storage fully implemented and verified.
+**Current status:** Phase 10 IN PROGRESS - WASM bindings need updating for workbook-level axis storage.
+
+**Progress Jan 17 (session 14):**
+- Discovered bindings_viewport.cc still uses old `sheet->columns`/`sheet->rows` patterns
+- Partially fixed bindings_viewport.cc (lines 129, 145, 272-279, 547-554, 623-669, 698-710)
+- **TODO:** Fix remaining usages at lines 863-881 in bindings_viewport.cc
+- **TODO:** Run `bazel run :wasm-dist` then `bazel run :e2e` to verify
 
 **Progress Jan 17 (session 13):**
 - Phase 10: Completed test verification
 - Fixed all tests that add columns/rows before sheet has workbook set (setWorkbook pattern)
 - Updated serializer_test.cc, crdt_test.cc, ref_converter_test.cc, xlsx_writer_test.cc, fill_range_test.cc
 - Fixed lint errors (const pointer correctness in sheet.cc, crdt_axis.cc, crdt.cc)
-- All 54 unit tests and 184 E2E tests pass
+- All 54 unit tests pass (E2E tests used cached WASM build)
 
 **Progress Jan 17 (session 12):**
 - Phase 10: Workbook-Level Axis Storage
