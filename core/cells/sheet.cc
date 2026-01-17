@@ -88,7 +88,7 @@ Cell* Sheet::getCell(const ID& cellId) {
         return nullptr;
     }
     // Verify the cell belongs to this sheet by checking its column
-    if (columns.find(cell->colId) == columns.end()) {
+    if (_columnIds.find(cell->colId) == _columnIds.end()) {
         return nullptr;
     }
     return _workbook->getCell(cellId);
@@ -148,33 +148,105 @@ void Sheet::removeCellFromIndex(const ID& cellId) {
 }
 
 Axis* Sheet::getColumn(const ID& colId) {
-    auto it = columns.find(colId);
-    return (it != columns.end()) ? it->second.get() : nullptr;
+    // Check if this column belongs to this sheet
+    if (_columnIds.find(colId) == _columnIds.end()) {
+        return nullptr;
+    }
+    // Delegate to workbook for actual storage
+    return _workbook ? _workbook->getColumn(colId) : nullptr;
+}
+
+const Axis* Sheet::getColumn(const ID& colId) const {
+    // Check if this column belongs to this sheet
+    if (_columnIds.find(colId) == _columnIds.end()) {
+        return nullptr;
+    }
+    // Delegate to workbook for actual storage
+    return _workbook ? _workbook->getColumn(colId) : nullptr;
 }
 
 Axis* Sheet::getRow(const ID& rowId) {
-    auto it = rows.find(rowId);
-    return (it != rows.end()) ? it->second.get() : nullptr;
+    // Check if this row belongs to this sheet
+    if (_rowIds.find(rowId) == _rowIds.end()) {
+        return nullptr;
+    }
+    // Delegate to workbook for actual storage
+    return _workbook ? _workbook->getRow(rowId) : nullptr;
+}
+
+const Axis* Sheet::getRow(const ID& rowId) const {
+    // Check if this row belongs to this sheet
+    if (_rowIds.find(rowId) == _rowIds.end()) {
+        return nullptr;
+    }
+    // Delegate to workbook for actual storage
+    return _workbook ? _workbook->getRow(rowId) : nullptr;
 }
 
 void Sheet::addColumn(std::unique_ptr<Axis> col) {
-    if (!col) {
+    if (!col || !_workbook) {
         return;
     }
 
     col->isColumn = true;
     col->sheetId = id;  // Set the sheet ID for reverse lookup
-    columns[col->id] = std::move(col);
+
+    const ID colId = col->id;
+    const uint32_t position = col->position;
+
+    // Add to workbook storage (takes ownership)
+    if (_workbook->addColumn(std::move(col)) == nullptr) {
+        return;  // Failed to add (e.g., duplicate ID)
+    }
+
+    // Add to this sheet's column set
+    _columnIds.insert(colId);
+
+    // Update position index
+    _columnIndex[position] = colId;
 }
 
 void Sheet::addRow(std::unique_ptr<Axis> row) {
-    if (!row) {
+    if (!row || !_workbook) {
         return;
     }
 
     row->isColumn = false;
     row->sheetId = id;  // Set the sheet ID for reverse lookup
-    rows[row->id] = std::move(row);
+
+    const ID rowId = row->id;
+    const uint32_t position = row->position;
+
+    // Add to workbook storage (takes ownership)
+    if (_workbook->addRow(std::move(row)) == nullptr) {
+        return;  // Failed to add (e.g., duplicate ID)
+    }
+
+    // Add to this sheet's row set
+    _rowIds.insert(rowId);
+
+    // Update position index
+    _rowIndex[position] = rowId;
+}
+
+void Sheet::removeColumnFromIndex(const ID& colId) {
+    // Get the column to find its position
+    const Axis* col = getColumn(colId);
+    if (col) {
+        _columnIndex.erase(col->position);
+    }
+    // Remove from column ID set
+    _columnIds.erase(colId);
+}
+
+void Sheet::removeRowFromIndex(const ID& rowId) {
+    // Get the row to find its position
+    const Axis* row = getRow(rowId);
+    if (row) {
+        _rowIndex.erase(row->position);
+    }
+    // Remove from row ID set
+    _rowIds.erase(rowId);
 }
 
 Cell* Sheet::getOrCreateCellAt(const ID& colId, const ID& rowId) {
@@ -194,21 +266,21 @@ Cell* Sheet::getOrCreateCellAt(const ID& colId, const ID& rowId) {
 }
 
 Axis* Sheet::getColumnByPosition(uint32_t position) {
-    for (auto& [id, col] : columns) {
-        if (col->position == position) {
-            return col.get();
-        }
+    // Use position index for O(1) lookup
+    auto it = _columnIndex.find(position);
+    if (it == _columnIndex.end()) {
+        return nullptr;
     }
-    return nullptr;
+    return getColumn(it->second);
 }
 
 Axis* Sheet::getRowByPosition(uint32_t position) {
-    for (auto& [id, row] : rows) {
-        if (row->position == position) {
-            return row.get();
-        }
+    // Use position index for O(1) lookup
+    auto it = _rowIndex.find(position);
+    if (it == _rowIndex.end()) {
+        return nullptr;
     }
-    return nullptr;
+    return getRow(it->second);
 }
 
 Axis* Sheet::getColumnByName(const std::string& name) {
@@ -302,31 +374,37 @@ std::string Sheet::makeCellKey(const ID& colId, const ID& rowId) {
 }
 
 bool Sheet::moveColumn(const ID& colId, uint32_t newPosition) {
-    // Find the column to move
-    auto it = columns.find(colId);
-    if (it == columns.end()) {
+    // Check if this column belongs to this sheet
+    if (_columnIds.find(colId) == _columnIds.end()) {
         return false;
     }
 
-    Axis* col = it->second.get();
+    Axis* col = getColumn(colId);
+    if (!col) {
+        return false;
+    }
+
     const uint32_t oldPosition = col->position;
 
     if (oldPosition == newPosition) {
         return true;  // No-op
     }
 
-    // Shift other columns
+    // Shift other columns and rebuild position index
+    _columnIndex.clear();
     if (newPosition < oldPosition) {
         // Moving left: shift columns in [newPosition, oldPosition) right by 1
-        for (auto& [id, axis] : columns) {
-            if (axis->position >= newPosition && axis->position < oldPosition) {
+        for (const ID& cid : _columnIds) {
+            Axis* axis = _workbook ? _workbook->getColumn(cid) : nullptr;
+            if (axis && axis->position >= newPosition && axis->position < oldPosition) {
                 axis->position++;
             }
         }
     } else {
         // Moving right: shift columns in (oldPosition, newPosition] left by 1
-        for (auto& [id, axis] : columns) {
-            if (axis->position > oldPosition && axis->position <= newPosition) {
+        for (const ID& cid : _columnIds) {
+            Axis* axis = _workbook ? _workbook->getColumn(cid) : nullptr;
+            if (axis && axis->position > oldPosition && axis->position <= newPosition) {
                 axis->position--;
             }
         }
@@ -334,6 +412,14 @@ bool Sheet::moveColumn(const ID& colId, uint32_t newPosition) {
 
     // Set the new position
     col->position = newPosition;
+
+    // Rebuild position index
+    for (const ID& cid : _columnIds) {
+        Axis* axis = _workbook ? _workbook->getColumn(cid) : nullptr;
+        if (axis) {
+            _columnIndex[axis->position] = cid;
+        }
+    }
 
     // Rebuild R-tree with updated positions (positions are now stale)
     DependencyGraph* depGraph = getDependencyGraph();
@@ -345,31 +431,37 @@ bool Sheet::moveColumn(const ID& colId, uint32_t newPosition) {
 }
 
 bool Sheet::moveRow(const ID& rowId, uint32_t newPosition) {
-    // Find the row to move
-    auto it = rows.find(rowId);
-    if (it == rows.end()) {
+    // Check if this row belongs to this sheet
+    if (_rowIds.find(rowId) == _rowIds.end()) {
         return false;
     }
 
-    Axis* row = it->second.get();
+    Axis* row = getRow(rowId);
+    if (!row) {
+        return false;
+    }
+
     const uint32_t oldPosition = row->position;
 
     if (oldPosition == newPosition) {
         return true;  // No-op
     }
 
-    // Shift other rows
+    // Shift other rows and rebuild position index
+    _rowIndex.clear();
     if (newPosition < oldPosition) {
         // Moving up: shift rows in [newPosition, oldPosition) down by 1
-        for (auto& [id, axis] : rows) {
-            if (axis->position >= newPosition && axis->position < oldPosition) {
+        for (const ID& rid : _rowIds) {
+            Axis* axis = _workbook ? _workbook->getRow(rid) : nullptr;
+            if (axis && axis->position >= newPosition && axis->position < oldPosition) {
                 axis->position++;
             }
         }
     } else {
         // Moving down: shift rows in (oldPosition, newPosition] up by 1
-        for (auto& [id, axis] : rows) {
-            if (axis->position > oldPosition && axis->position <= newPosition) {
+        for (const ID& rid : _rowIds) {
+            Axis* axis = _workbook ? _workbook->getRow(rid) : nullptr;
+            if (axis && axis->position > oldPosition && axis->position <= newPosition) {
                 axis->position--;
             }
         }
@@ -377,6 +469,14 @@ bool Sheet::moveRow(const ID& rowId, uint32_t newPosition) {
 
     // Set the new position
     row->position = newPosition;
+
+    // Rebuild position index
+    for (const ID& rid : _rowIds) {
+        Axis* axis = _workbook ? _workbook->getRow(rid) : nullptr;
+        if (axis) {
+            _rowIndex[axis->position] = rid;
+        }
+    }
 
     // Rebuild R-tree with updated positions (positions are now stale)
     DependencyGraph* depGraph = getDependencyGraph();
@@ -388,9 +488,11 @@ bool Sheet::moveRow(const ID& rowId, uint32_t newPosition) {
 }
 
 Axis* Sheet::insertColumnAt(uint32_t position) {
-    // Shift all columns at position or greater to the right
-    for (auto& [colId, axis] : columns) {
-        if (axis->position >= position) {
+    // Shift all columns at position or greater to the right and rebuild position index
+    _columnIndex.clear();
+    for (const ID& cid : _columnIds) {
+        Axis* axis = _workbook ? _workbook->getColumn(cid) : nullptr;
+        if (axis && axis->position >= position) {
             axis->position++;
         }
     }
@@ -402,6 +504,14 @@ Axis* Sheet::insertColumnAt(uint32_t position) {
     Axis* const rawPtr = col.get();
     addColumn(std::move(col));
 
+    // Rebuild position index for all columns
+    for (const ID& cid : _columnIds) {
+        Axis* axis = _workbook ? _workbook->getColumn(cid) : nullptr;
+        if (axis) {
+            _columnIndex[axis->position] = cid;
+        }
+    }
+
     // Rebuild R-tree with updated positions
     DependencyGraph* depGraph = getDependencyGraph();
     if (depGraph != nullptr) {
@@ -412,9 +522,11 @@ Axis* Sheet::insertColumnAt(uint32_t position) {
 }
 
 Axis* Sheet::insertRowAt(uint32_t position) {
-    // Shift all rows at position or greater down
-    for (auto& [rowId, axis] : rows) {
-        if (axis->position >= position) {
+    // Shift all rows at position or greater down and rebuild position index
+    _rowIndex.clear();
+    for (const ID& rid : _rowIds) {
+        Axis* axis = _workbook ? _workbook->getRow(rid) : nullptr;
+        if (axis && axis->position >= position) {
             axis->position++;
         }
     }
@@ -426,6 +538,14 @@ Axis* Sheet::insertRowAt(uint32_t position) {
     Axis* const rawPtr = row.get();
     addRow(std::move(row));
 
+    // Rebuild position index for all rows
+    for (const ID& rid : _rowIds) {
+        Axis* axis = _workbook ? _workbook->getRow(rid) : nullptr;
+        if (axis) {
+            _rowIndex[axis->position] = rid;
+        }
+    }
+
     // Rebuild R-tree with updated positions
     DependencyGraph* depGraph = getDependencyGraph();
     if (depGraph != nullptr) {
@@ -436,12 +556,17 @@ Axis* Sheet::insertRowAt(uint32_t position) {
 }
 
 bool Sheet::deleteColumn(const ID& colId) {
-    auto it = columns.find(colId);
-    if (it == columns.end()) {
+    // Check if this column belongs to this sheet
+    if (_columnIds.find(colId) == _columnIds.end()) {
         return false;
     }
 
-    const uint32_t deletedPosition = it->second->position;
+    Axis* col = getColumn(colId);
+    if (!col) {
+        return false;
+    }
+
+    const uint32_t deletedPosition = col->position;
 
     // Delete all cells in this column
     // Collect keys and cell IDs to delete (can't modify _cellIndex while iterating)
@@ -462,13 +587,23 @@ bool Sheet::deleteColumn(const ID& colId) {
         }
     }
 
-    // Remove the column
-    columns.erase(it);
+    // Remove from this sheet's column set
+    _columnIds.erase(colId);
 
-    // Shift columns to the right of the deleted one left by 1
-    for (auto& [id, axis] : columns) {
-        if (axis->position > deletedPosition) {
-            axis->position--;
+    // Remove from workbook storage
+    if (_workbook) {
+        _workbook->removeColumn(colId);
+    }
+
+    // Shift columns to the right of the deleted one left by 1 and rebuild position index
+    _columnIndex.clear();
+    for (const ID& cid : _columnIds) {
+        Axis* axis = _workbook ? _workbook->getColumn(cid) : nullptr;
+        if (axis) {
+            if (axis->position > deletedPosition) {
+                axis->position--;
+            }
+            _columnIndex[axis->position] = cid;
         }
     }
 
@@ -482,12 +617,17 @@ bool Sheet::deleteColumn(const ID& colId) {
 }
 
 bool Sheet::deleteRow(const ID& rowId) {
-    auto it = rows.find(rowId);
-    if (it == rows.end()) {
+    // Check if this row belongs to this sheet
+    if (_rowIds.find(rowId) == _rowIds.end()) {
         return false;
     }
 
-    const uint32_t deletedPosition = it->second->position;
+    Axis* row = getRow(rowId);
+    if (!row) {
+        return false;
+    }
+
+    const uint32_t deletedPosition = row->position;
 
     // Delete all cells in this row
     // Collect keys and cell IDs to delete (can't modify _cellIndex while iterating)
@@ -508,13 +648,23 @@ bool Sheet::deleteRow(const ID& rowId) {
         }
     }
 
-    // Remove the row
-    rows.erase(it);
+    // Remove from this sheet's row set
+    _rowIds.erase(rowId);
 
-    // Shift rows below the deleted one up by 1
-    for (auto& [id, axis] : rows) {
-        if (axis->position > deletedPosition) {
-            axis->position--;
+    // Remove from workbook storage
+    if (_workbook) {
+        _workbook->removeRow(rowId);
+    }
+
+    // Shift rows below the deleted one up by 1 and rebuild position index
+    _rowIndex.clear();
+    for (const ID& rid : _rowIds) {
+        Axis* axis = _workbook ? _workbook->getRow(rid) : nullptr;
+        if (axis) {
+            if (axis->position > deletedPosition) {
+                axis->position--;
+            }
+            _rowIndex[axis->position] = rid;
         }
     }
 

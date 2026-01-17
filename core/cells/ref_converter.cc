@@ -22,18 +22,24 @@ namespace cells {
 void RefConverter::setContext(const Sheet& sheet) {
     // Build ordered column list
     std::vector<std::pair<uint32_t, ID>> columns;
-    columns.reserve(sheet.columns.size());
-    for (const auto& pair : sheet.columns) {
-        columns.emplace_back(pair.second->position, pair.first);
+    columns.reserve(sheet.columnCount());
+    for (const ID& colId : sheet.getColumnIds()) {
+        const Axis* col = sheet.getColumn(colId);
+        if (col) {
+            columns.emplace_back(col->position, colId);
+        }
     }
     std::sort(columns.begin(), columns.end(),
               [](const auto& a, const auto& b) { return a.first < b.first; });
 
     // Build ordered row list
     std::vector<std::pair<uint32_t, ID>> rows;
-    rows.reserve(sheet.rows.size());
-    for (const auto& pair : sheet.rows) {
-        rows.emplace_back(pair.second->position, pair.first);
+    rows.reserve(sheet.rowCount());
+    for (const ID& rowId : sheet.getRowIds()) {
+        const Axis* row = sheet.getRow(rowId);
+        if (row) {
+            rows.emplace_back(row->position, rowId);
+        }
     }
     std::sort(rows.begin(), rows.end(),
               [](const auto& a, const auto& b) { return a.first < b.first; });
@@ -593,10 +599,9 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
                     // Look up column in cross-sheet context first
                     if (currentSheetContext != nullptr) {
                         const ID colIdObj(colId);
-                        auto colIt = currentSheetContext->columns.find(colIdObj);
-                        if (colIt != currentSheetContext->columns.end()) {
-                            const std::string colName =
-                                columnIndexToLetter(colIt->second->position);
+                        const Axis* col = currentSheetContext->getColumn(colIdObj);
+                        if (col != nullptr) {
+                            const std::string colName = columnIndexToLetter(col->position);
                             if (isAbsolute) {
                                 result += '$';
                             }
@@ -655,9 +660,9 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
                     // Look up row in cross-sheet context first
                     if (currentSheetContext != nullptr) {
                         const ID rowIdObj(rowId);
-                        auto rowIt = currentSheetContext->rows.find(rowIdObj);
-                        if (rowIt != currentSheetContext->rows.end()) {
-                            const std::string rowNum = std::to_string(rowIt->second->position + 1);
+                        const Axis* row = currentSheetContext->getRow(rowIdObj);
+                        if (row != nullptr) {
+                            const std::string rowNum = std::to_string(row->position + 1);
                             if (isAbsolute) {
                                 result += '$';
                             }
@@ -711,22 +716,21 @@ std::string RefConverter::formulaToA1(const std::string& formula) const {
                 const Cell* cell = _workbook->getCell(cellIdObj);
                 if (cell != nullptr) {
                     // Look up column and row positions from the cross-sheet
-                    auto colIt = currentSheetContext->columns.find(cell->colId);
-                    auto rowIt = currentSheetContext->rows.find(cell->rowId);
+                    const Axis* col = currentSheetContext->getColumn(cell->colId);
+                    const Axis* row = currentSheetContext->getRow(cell->rowId);
 
-                    if (colIt != currentSheetContext->columns.end() &&
-                        rowIt != currentSheetContext->rows.end()) {
+                    if (col != nullptr && row != nullptr) {
                         // Build A1 notation with absolute markers
                         if (refType == ReferenceType::ABSOLUTE ||
                             refType == ReferenceType::COL_ABS) {
                             result += '$';
                         }
-                        result += columnIndexToLetter(colIt->second->position);
+                        result += columnIndexToLetter(col->position);
                         if (refType == ReferenceType::ABSOLUTE ||
                             refType == ReferenceType::ROW_ABS) {
                             result += '$';
                         }
-                        result += std::to_string(rowIt->second->position + 1);
+                        result += std::to_string(row->position + 1);
                         found = true;
                     }
                 }

@@ -616,8 +616,11 @@ size_t bootstrapOpLog(Workbook& workbook) {
     for (const auto& sheet : workbook.sheets) {
         // Collect and sort columns by position
         std::vector<std::pair<uint32_t, Axis*>> columns;
-        for (const auto& [id, axis] : sheet->columns) {
-            columns.emplace_back(axis->position, axis.get());
+        for (const ID& colId : sheet->getColumnIds()) {
+            Axis* axis = workbook.getColumn(colId);
+            if (axis) {
+                columns.emplace_back(axis->position, axis);
+            }
         }
         std::sort(columns.begin(), columns.end(),
                   [](const auto& a, const auto& b) { return a.first < b.first; });
@@ -633,8 +636,11 @@ size_t bootstrapOpLog(Workbook& workbook) {
 
         // Collect and sort rows by position
         std::vector<std::pair<uint32_t, Axis*>> rows;
-        for (const auto& [id, axis] : sheet->rows) {
-            rows.emplace_back(axis->position, axis.get());
+        for (const ID& rowId : sheet->getRowIds()) {
+            Axis* axis = workbook.getRow(rowId);
+            if (axis) {
+                rows.emplace_back(axis->position, axis);
+            }
         }
         std::sort(rows.begin(), rows.end(),
                   [](const auto& a, const auto& b) { return a.first < b.first; });

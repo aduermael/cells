@@ -12,10 +12,13 @@ CSVWriter::CSVWriter(const CSVWriteOptions& options) : options_(options) {}
 std::vector<ID> CSVWriter::getOrderedColumns(const Sheet& sheet) const {
     // Collect all columns and sort by position
     std::vector<std::pair<uint32_t, ID>> columns;
-    columns.reserve(sheet.columns.size());
+    columns.reserve(sheet.columnCount());
 
-    for (const auto& pair : sheet.columns) {
-        columns.emplace_back(pair.second->position, pair.first);
+    for (const ID& colId : sheet.getColumnIds()) {
+        const Axis* col = sheet.getColumn(colId);
+        if (col) {
+            columns.emplace_back(col->position, colId);
+        }
     }
 
     std::sort(columns.begin(), columns.end(),
@@ -32,10 +35,13 @@ std::vector<ID> CSVWriter::getOrderedColumns(const Sheet& sheet) const {
 std::vector<ID> CSVWriter::getOrderedRows(const Sheet& sheet) const {
     // Collect all rows and sort by position
     std::vector<std::pair<uint32_t, ID>> rows;
-    rows.reserve(sheet.rows.size());
+    rows.reserve(sheet.rowCount());
 
-    for (const auto& pair : sheet.rows) {
-        rows.emplace_back(pair.second->position, pair.first);
+    for (const ID& rowId : sheet.getRowIds()) {
+        const Axis* row = sheet.getRow(rowId);
+        if (row) {
+            rows.emplace_back(row->position, rowId);
+        }
     }
 
     std::sort(rows.begin(), rows.end(),
@@ -131,9 +137,9 @@ CSVWriteResult CSVWriter::write(const Sheet& sheet) {
             }
 
             // Get column name
-            auto it = sheet.columns.find(columns[c]);
-            if (it != sheet.columns.end() && !it->second->name.empty()) {
-                oss << escapeField(it->second->name);
+            const Axis* col = sheet.getColumn(columns[c]);
+            if (col && !col->name.empty()) {
+                oss << escapeField(col->name);
             } else {
                 // Generate default column name (A, B, ..., Z, AA, AB, ...)
                 std::string name;

@@ -462,7 +462,9 @@ TEST(XLSXWriterTest, WriteColumnWidths) {
     EXPECT_EQ(readSheet->columnCount(), 3u);
 
     // Verify columns have sizes set
-    for (const auto& [id, col] : readSheet->columns) {
+    for (const ID& colId : readSheet->getColumnIds()) {
+        const Axis* col = readSheet->getColumn(colId);
+        ASSERT_NE(col, nullptr);
         EXPECT_GT(col->size, 0u) << "Column should have width > 0";
     }
 }

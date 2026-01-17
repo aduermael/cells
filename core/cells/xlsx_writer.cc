@@ -128,14 +128,14 @@ std::string cellIdToXlsxRef(const cells::Cell* cell, const cells::Sheet* sheet) 
     }
 
     // Find column and row positions
-    auto colIt = sheet->columns.find(cell->colId);
-    auto rowIt = sheet->rows.find(cell->rowId);
-    if (colIt == sheet->columns.end() || rowIt == sheet->rows.end()) {
+    const cells::Axis* col = sheet->getColumn(cell->colId);
+    const cells::Axis* row = sheet->getRow(cell->rowId);
+    if (col == nullptr || row == nullptr) {
         return "";
     }
 
-    const uint32_t colPos = colIt->second->position;
-    const uint32_t rowPos = rowIt->second->position;
+    const uint32_t colPos = col->position;
+    const uint32_t rowPos = row->position;
 
     // Convert to A1 notation (1-indexed row)
     const std::string colLetter = colIndexToLetter(colPos);
@@ -175,23 +175,23 @@ std::string rangeToXlsxRef(const cells::Cell* startCell, const cells::Cell* endC
     }
 
     // Find positions for start cell
-    auto startColIt = sheet->columns.find(startCell->colId);
-    auto startRowIt = sheet->rows.find(startCell->rowId);
-    if (startColIt == sheet->columns.end() || startRowIt == sheet->rows.end()) {
+    const cells::Axis* startCol = sheet->getColumn(startCell->colId);
+    const cells::Axis* startRow = sheet->getRow(startCell->rowId);
+    if (startCol == nullptr || startRow == nullptr) {
         return "";
     }
 
     // Find positions for end cell
-    auto endColIt = sheet->columns.find(endCell->colId);
-    auto endRowIt = sheet->rows.find(endCell->rowId);
-    if (endColIt == sheet->columns.end() || endRowIt == sheet->rows.end()) {
+    const cells::Axis* endCol = sheet->getColumn(endCell->colId);
+    const cells::Axis* endRow = sheet->getRow(endCell->rowId);
+    if (endCol == nullptr || endRow == nullptr) {
         return "";
     }
 
-    const uint32_t startColPos = startColIt->second->position;
-    const uint32_t startRowPos = startRowIt->second->position;
-    const uint32_t endColPos = endColIt->second->position;
-    const uint32_t endRowPos = endRowIt->second->position;
+    const uint32_t startColPos = startCol->position;
+    const uint32_t startRowPos = startRow->position;
+    const uint32_t endColPos = endCol->position;
+    const uint32_t endRowPos = endRow->position;
 
     // Format with sheet name
     std::ostringstream ref;
@@ -345,37 +345,24 @@ std::string generateWorkbook(const cells::Workbook& workbook) {
                         break;
                     }
                     case cells::NamedRangeTarget::Type::COLUMN: {
-                        const cells::Axis* col = targetSheet->columns.count(target.id1) != 0
-                                                     ? targetSheet->columns.at(target.id1).get()
-                                                     : nullptr;
+                        const cells::Axis* col = targetSheet->getColumn(target.id1);
                         xlsxRef = columnRangeToXlsxRef(col, col, targetSheet);
                         break;
                     }
                     case cells::NamedRangeTarget::Type::ROW: {
-                        const cells::Axis* row = targetSheet->rows.count(target.id1) != 0
-                                                     ? targetSheet->rows.at(target.id1).get()
-                                                     : nullptr;
+                        const cells::Axis* row = targetSheet->getRow(target.id1);
                         xlsxRef = rowRangeToXlsxRef(row, row, targetSheet);
                         break;
                     }
                     case cells::NamedRangeTarget::Type::COLUMN_RANGE: {
-                        const cells::Axis* startCol =
-                            targetSheet->columns.count(target.id1) != 0
-                                ? targetSheet->columns.at(target.id1).get()
-                                : nullptr;
-                        const cells::Axis* endCol = targetSheet->columns.count(target.id2) != 0
-                                                        ? targetSheet->columns.at(target.id2).get()
-                                                        : nullptr;
+                        const cells::Axis* startCol = targetSheet->getColumn(target.id1);
+                        const cells::Axis* endCol = targetSheet->getColumn(target.id2);
                         xlsxRef = columnRangeToXlsxRef(startCol, endCol, targetSheet);
                         break;
                     }
                     case cells::NamedRangeTarget::Type::ROW_RANGE: {
-                        const cells::Axis* startRow = targetSheet->rows.count(target.id1) != 0
-                                                          ? targetSheet->rows.at(target.id1).get()
-                                                          : nullptr;
-                        const cells::Axis* endRow = targetSheet->rows.count(target.id2) != 0
-                                                        ? targetSheet->rows.at(target.id2).get()
-                                                        : nullptr;
+                        const cells::Axis* startRow = targetSheet->getRow(target.id1);
+                        const cells::Axis* endRow = targetSheet->getRow(target.id2);
                         xlsxRef = rowRangeToXlsxRef(startRow, endRow, targetSheet);
                         break;
                     }
@@ -866,17 +853,23 @@ std::string generateWorksheet(
 
     // Get ordered columns and rows
     std::vector<std::pair<uint32_t, cells::ID>> columns;
-    columns.reserve(sheet.columns.size());
-    for (const auto& pair : sheet.columns) {
-        columns.emplace_back(pair.second->position, pair.first);
+    columns.reserve(sheet.columnCount());
+    for (const cells::ID& colId : sheet.getColumnIds()) {
+        const cells::Axis* col = sheet.getColumn(colId);
+        if (col) {
+            columns.emplace_back(col->position, colId);
+        }
     }
     std::sort(columns.begin(), columns.end(),
               [](const auto& a, const auto& b) { return a.first < b.first; });
 
     std::vector<std::pair<uint32_t, cells::ID>> rows;
-    rows.reserve(sheet.rows.size());
-    for (const auto& pair : sheet.rows) {
-        rows.emplace_back(pair.second->position, pair.first);
+    rows.reserve(sheet.rowCount());
+    for (const cells::ID& rowId : sheet.getRowIds()) {
+        const cells::Axis* row = sheet.getRow(rowId);
+        if (row) {
+            rows.emplace_back(row->position, rowId);
+        }
     }
     std::sort(rows.begin(), rows.end(),
               [](const auto& a, const auto& b) { return a.first < b.first; });
@@ -1005,9 +998,9 @@ std::string generateWorksheet(
     // Write cols element if any columns have hidden or style attributes
     bool needColsElement = false;
     for (const auto& colPair : columns) {
-        auto it = sheet.columns.find(colPair.second);
-        if (it != sheet.columns.end()) {
-            if (it->second->hidden || axisStyleIndices.count(it->second.get()) > 0) {
+        const cells::Axis* col = sheet.getColumn(colPair.second);
+        if (col != nullptr) {
+            if (col->hidden || axisStyleIndices.count(col) > 0) {
                 needColsElement = true;
                 break;
             }
@@ -1016,10 +1009,10 @@ std::string generateWorksheet(
     if (needColsElement) {
         xml << "  <cols>\n";
         for (size_t i = 0; i < columns.size(); ++i) {
-            auto it = sheet.columns.find(columns[i].second);
-            if (it != sheet.columns.end()) {
-                const bool hidden = it->second->hidden;
-                auto styleIt = axisStyleIndices.find(it->second.get());
+            const cells::Axis* col = sheet.getColumn(columns[i].second);
+            if (col != nullptr) {
+                const bool hidden = col->hidden;
+                auto styleIt = axisStyleIndices.find(col);
                 const bool hasStyle = styleIt != axisStyleIndices.end() && styleIt->second > 0;
 
                 if (hidden || hasStyle) {
@@ -1056,12 +1049,12 @@ std::string generateWorksheet(
         // Check if row is hidden and/or has style
         bool rowHidden = false;
         size_t rowStyleIdx = 0;
-        auto rowIt = sheet.rows.find(rows[rowIdx].second);
-        if (rowIt != sheet.rows.end()) {
-            if (rowIt->second->hidden) {
+        const cells::Axis* row = sheet.getRow(rows[rowIdx].second);
+        if (row != nullptr) {
+            if (row->hidden) {
                 rowHidden = true;
             }
-            auto styleIt = axisStyleIndices.find(rowIt->second.get());
+            auto styleIt = axisStyleIndices.find(row);
             if (styleIt != axisStyleIndices.end()) {
                 rowStyleIdx = styleIt->second;
             }
@@ -1222,19 +1215,19 @@ std::string generateWorksheet(
         xml << "  <mergeCells count=\"" << mergeRanges.size() << "\">\n";
         for (const auto* range : mergeRanges) {
             // Find corner column and row positions
-            auto startColIt = sheet.columns.find(range->startColId);
-            auto startRowIt = sheet.rows.find(range->startRowId);
-            auto endColIt = sheet.columns.find(range->endColId);
-            auto endRowIt = sheet.rows.find(range->endRowId);
-            if (startColIt == sheet.columns.end() || startRowIt == sheet.rows.end() ||
-                endColIt == sheet.columns.end() || endRowIt == sheet.rows.end()) {
+            const cells::Axis* startCol = sheet.getColumn(range->startColId);
+            const cells::Axis* startRow = sheet.getRow(range->startRowId);
+            const cells::Axis* endCol = sheet.getColumn(range->endColId);
+            const cells::Axis* endRow = sheet.getRow(range->endRowId);
+            if (startCol == nullptr || startRow == nullptr || endCol == nullptr ||
+                endRow == nullptr) {
                 continue;  // Skip invalid merge ranges
             }
 
-            const uint32_t startColPos = startColIt->second->position;
-            const uint32_t startRowPos = startRowIt->second->position;
-            const uint32_t endColPos = endColIt->second->position;
-            const uint32_t endRowPos = endRowIt->second->position;
+            const uint32_t startColPos = startCol->position;
+            const uint32_t startRowPos = startRow->position;
+            const uint32_t endColPos = endCol->position;
+            const uint32_t endRowPos = endRow->position;
 
             // Convert to A1 notation (1-indexed rows)
             const std::string startRef =
@@ -1500,10 +1493,13 @@ void XLSXWriter::addWarning(const std::string& msg) {
 
 std::vector<ID> XLSXWriter::getOrderedColumns(const Sheet& sheet) const {
     std::vector<std::pair<uint32_t, ID>> columns;
-    columns.reserve(sheet.columns.size());
+    columns.reserve(sheet.columnCount());
 
-    for (const auto& pair : sheet.columns) {
-        columns.emplace_back(pair.second->position, pair.first);
+    for (const ID& colId : sheet.getColumnIds()) {
+        const Axis* col = sheet.getColumn(colId);
+        if (col) {
+            columns.emplace_back(col->position, colId);
+        }
     }
 
     std::sort(columns.begin(), columns.end(),
@@ -1519,10 +1515,13 @@ std::vector<ID> XLSXWriter::getOrderedColumns(const Sheet& sheet) const {
 
 std::vector<ID> XLSXWriter::getOrderedRows(const Sheet& sheet) const {
     std::vector<std::pair<uint32_t, ID>> rows;
-    rows.reserve(sheet.rows.size());
+    rows.reserve(sheet.rowCount());
 
-    for (const auto& pair : sheet.rows) {
-        rows.emplace_back(pair.second->position, pair.first);
+    for (const ID& rowId : sheet.getRowIds()) {
+        const Axis* row = sheet.getRow(rowId);
+        if (row) {
+            rows.emplace_back(row->position, rowId);
+        }
     }
 
     std::sort(rows.begin(), rows.end(),
@@ -1634,22 +1633,24 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
             }
         }
         // Collect column default styles
-        for (const auto& [id, col] : sheet->columns) {
-            if (!col->defaultStyleId.isNull()) {
+        for (const ID& colId : sheet->getColumnIds()) {
+            const Axis* col = sheet->getColumn(colId);
+            if (col && !col->defaultStyleId.isNull()) {
                 const CellStyle* style = workbook.getStyle(col->defaultStyleId);
                 if (style != nullptr) {
                     const size_t styleIdx = styleTable.getOrAddFormat(*style);
-                    axisStyleIndices[col.get()] = styleIdx;
+                    axisStyleIndices[col] = styleIdx;
                 }
             }
         }
         // Collect row default styles
-        for (const auto& [id, row] : sheet->rows) {
-            if (!row->defaultStyleId.isNull()) {
+        for (const ID& rowId : sheet->getRowIds()) {
+            const Axis* row = sheet->getRow(rowId);
+            if (row && !row->defaultStyleId.isNull()) {
                 const CellStyle* style = workbook.getStyle(row->defaultStyleId);
                 if (style != nullptr) {
                     const size_t styleIdx = styleTable.getOrAddFormat(*style);
-                    axisStyleIndices[row.get()] = styleIdx;
+                    axisStyleIndices[row] = styleIdx;
                 }
             }
         }

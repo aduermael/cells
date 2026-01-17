@@ -295,7 +295,9 @@ TEST(XLSXReaderTest, ColumnWidthsRead) {
     ASSERT_NE(sheet, nullptr);
 
     // Check that columns have sizes
-    for (const auto& [id, col] : sheet->columns) {
+    for (const ID& colId : sheet->getColumnIds()) {
+        const Axis* col = sheet->getColumn(colId);
+        ASSERT_NE(col, nullptr);
         EXPECT_GT(col->size, 0u) << "Column should have a width > 0";
     }
 }
@@ -738,7 +740,9 @@ TEST(XLSXReaderTest, ColumnWidthsImportedFromLBOModel) {
 
     // Check that columns have sizes set
     bool foundNonDefault = false;
-    for (const auto& [id, col] : sheet->columns) {
+    for (const ID& colId : sheet->getColumnIds()) {
+        const Axis* col = sheet->getColumn(colId);
+        ASSERT_NE(col, nullptr);
         EXPECT_GT(col->size, 0u) << "Column should have a width > 0";
         // Check if any column has a non-default width
         if (col->size != DEFAULT_COLUMN_WIDTH) {
@@ -763,7 +767,9 @@ TEST(XLSXReaderTest, RowHeightsImportedFromLBOModel) {
 
     // Check that rows have sizes set
     bool foundNonDefault = false;
-    for (const auto& [id, row] : sheet->rows) {
+    for (const ID& rowId : sheet->getRowIds()) {
+        const Axis* row = sheet->getRow(rowId);
+        ASSERT_NE(row, nullptr);
         EXPECT_GT(row->size, 0u) << "Row should have a height > 0";
         // Check if any row has a non-default height
         if (row->size != DEFAULT_ROW_HEIGHT) {
@@ -787,13 +793,17 @@ TEST(XLSXReaderTest, DimensionsUseDefaultWhenDisabled) {
     ASSERT_NE(sheet, nullptr);
 
     // All columns should have default width
-    for (const auto& [id, col] : sheet->columns) {
+    for (const ID& colId : sheet->getColumnIds()) {
+        const Axis* col = sheet->getColumn(colId);
+        ASSERT_NE(col, nullptr);
         EXPECT_EQ(col->size, DEFAULT_COLUMN_WIDTH)
             << "Column should have default width when readDimensions=false";
     }
 
     // All rows should have default height
-    for (const auto& [id, row] : sheet->rows) {
+    for (const ID& rowId : sheet->getRowIds()) {
+        const Axis* row = sheet->getRow(rowId);
+        ASSERT_NE(row, nullptr);
         EXPECT_EQ(row->size, DEFAULT_ROW_HEIGHT)
             << "Row should have default height when readDimensions=false";
     }
@@ -813,7 +823,9 @@ TEST(XLSXReaderTest, ColumnWidthConversionAccuracy) {
     ASSERT_NE(sheet, nullptr);
 
     // Column widths should be reasonable (between 10px and 500px)
-    for (const auto& [id, col] : sheet->columns) {
+    for (const ID& colId : sheet->getColumnIds()) {
+        const Axis* col = sheet->getColumn(colId);
+        ASSERT_NE(col, nullptr);
         EXPECT_GE(col->size, 10u) << "Column width should be at least 10px";
         EXPECT_LE(col->size, 500u) << "Column width should not exceed 500px";
     }

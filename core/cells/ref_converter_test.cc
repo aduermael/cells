@@ -273,20 +273,17 @@ std::unique_ptr<Workbook> createTestWorkbook() {
 // Helper to get cell ID at a given col/row position
 std::string getCellIdAt(const Workbook& workbook, const Sheet& sheet, size_t colPos,
                         size_t rowPos) {
-    // Find col and row IDs by position
-    ID colId, rowId;
-    for (const auto& pair : sheet.columns) {
-        if (pair.second->position == colPos) {
-            colId = pair.first;
-            break;
-        }
+    // Find col and row IDs by position using the Sheet's position-based lookup
+    const Axis* col = const_cast<Sheet&>(sheet).getColumnByPosition(static_cast<uint32_t>(colPos));
+    const Axis* row = const_cast<Sheet&>(sheet).getRowByPosition(static_cast<uint32_t>(rowPos));
+
+    if (!col || !row) {
+        return "";
     }
-    for (const auto& pair : sheet.rows) {
-        if (pair.second->position == rowPos) {
-            rowId = pair.first;
-            break;
-        }
-    }
+
+    const ID& colId = col->id;
+    const ID& rowId = row->id;
+
     // Find cell at this col/row using workbook's cell storage
     for (const ID& cellId : sheet.getCellIds()) {
         const Cell* cell = workbook.getCell(cellId);

@@ -286,11 +286,13 @@ void Serializer::serializeSheet(const Workbook& workbook, const Sheet& sheet,
 void Serializer::serializeColumns(const Sheet& sheet, std::ostream& out) const {
     // Collect columns for alphabetical ordering by UUID
     std::vector<std::pair<std::string, const Axis*>> ordered;
-    ordered.reserve(sheet.columns.size());
+    ordered.reserve(sheet.columnCount());
 
-    for (const auto& pair : sheet.columns) {
-        const Axis* axis = pair.second.get();
-        ordered.emplace_back(axis->id.toString(), axis);
+    for (const ID& colId : sheet.getColumnIds()) {
+        const Axis* axis = sheet.getColumn(colId);
+        if (axis) {
+            ordered.emplace_back(axis->id.toString(), axis);
+        }
     }
 
     // Sort alphabetically by UUID (required for deterministic shared formula masters)
@@ -306,11 +308,13 @@ void Serializer::serializeColumns(const Sheet& sheet, std::ostream& out) const {
 void Serializer::serializeRows(const Sheet& sheet, std::ostream& out) const {
     // Collect rows for alphabetical ordering by UUID
     std::vector<std::pair<std::string, const Axis*>> ordered;
-    ordered.reserve(sheet.rows.size());
+    ordered.reserve(sheet.rowCount());
 
-    for (const auto& pair : sheet.rows) {
-        const Axis* axis = pair.second.get();
-        ordered.emplace_back(axis->id.toString(), axis);
+    for (const ID& rowId : sheet.getRowIds()) {
+        const Axis* axis = sheet.getRow(rowId);
+        if (axis) {
+            ordered.emplace_back(axis->id.toString(), axis);
+        }
     }
 
     // Sort alphabetically by UUID (required for deterministic shared formula masters)

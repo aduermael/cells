@@ -22,9 +22,12 @@ void ViewportIndex::build(const Sheet& sheet) {
 
     // Collect columns and sort by position
     std::vector<AxisSortEntry> columns;
-    columns.reserve(sheet.columns.size());
-    for (const auto& [id, col] : sheet.columns) {
-        columns.push_back({col->id, col->position, col->size});
+    columns.reserve(sheet.columnCount());
+    for (const ID& colId : sheet.getColumnIds()) {
+        const Axis* col = sheet.getColumn(colId);
+        if (col) {
+            columns.push_back({col->id, col->position, col->size});
+        }
     }
     std::sort(columns.begin(), columns.end(), [](const AxisSortEntry& a, const AxisSortEntry& b) {
         return a.position < b.position;
@@ -37,9 +40,12 @@ void ViewportIndex::build(const Sheet& sheet) {
 
     // Collect rows and sort by position
     std::vector<AxisSortEntry> rows;
-    rows.reserve(sheet.rows.size());
-    for (const auto& [id, row] : sheet.rows) {
-        rows.push_back({row->id, row->position, row->size});
+    rows.reserve(sheet.rowCount());
+    for (const ID& rowId : sheet.getRowIds()) {
+        const Axis* row = sheet.getRow(rowId);
+        if (row) {
+            rows.push_back({row->id, row->position, row->size});
+        }
     }
     std::sort(rows.begin(), rows.end(), [](const AxisSortEntry& a, const AxisSortEntry& b) {
         return a.position < b.position;
@@ -253,8 +259,9 @@ void ViewportIndex::onAxisInserted(const ID& axisId, bool isColumn, size_t sheet
     if (isColumn) {
         size_t treePos = 0;
         if (_sheet != nullptr) {
-            for (const auto& [id, col] : _sheet->columns) {
-                if (id != axisId && col->position < sheetPosition) {
+            for (const ID& colId : _sheet->getColumnIds()) {
+                const Axis* col = _sheet->getColumn(colId);
+                if (col && colId != axisId && col->position < sheetPosition) {
                     treePos++;
                 }
             }
@@ -263,8 +270,9 @@ void ViewportIndex::onAxisInserted(const ID& axisId, bool isColumn, size_t sheet
     } else {
         size_t treePos = 0;
         if (_sheet != nullptr) {
-            for (const auto& [id, row] : _sheet->rows) {
-                if (id != axisId && row->position < sheetPosition) {
+            for (const ID& rowId : _sheet->getRowIds()) {
+                const Axis* row = _sheet->getRow(rowId);
+                if (row && rowId != axisId && row->position < sheetPosition) {
                     treePos++;
                 }
             }

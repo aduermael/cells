@@ -746,8 +746,9 @@ static size_t iterateCellRange(const RangeBounds& bounds, Sheet* sheet,
 
     // Collect columns in the range, sorted by position
     std::vector<std::pair<uint32_t, ID>> cols;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position >= startCol->position && axis->position <= endCol->position) {
+    for (const ID& colId : sheet->getColumnIds()) {
+        const Axis* axis = sheet->getColumn(colId);
+        if (axis && axis->position >= startCol->position && axis->position <= endCol->position) {
             cols.emplace_back(axis->position, axis->id);
         }
     }
@@ -755,8 +756,9 @@ static size_t iterateCellRange(const RangeBounds& bounds, Sheet* sheet,
     // Collect rows in the position range (use position bounds, not row IDs)
     // This allows ranges to work even with sparse rows
     std::vector<std::pair<uint32_t, ID>> rows;
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position >= bounds.startRowPos && axis->position <= bounds.endRowPos) {
+    for (const ID& rowId : sheet->getRowIds()) {
+        const Axis* axis = sheet->getRow(rowId);
+        if (axis && axis->position >= bounds.startRowPos && axis->position <= bounds.endRowPos) {
             rows.emplace_back(axis->position, axis->id);
         }
     }
@@ -1025,16 +1027,20 @@ size_t getRangeSize(const RangeBounds& bounds, Sheet* sheet) {
 
             // Count columns in range
             size_t colCount = 0;
-            for (const auto& [id, axis] : sheet->columns) {
-                if (axis->position >= startCol->position && axis->position <= endCol->position) {
+            for (const ID& colId : sheet->getColumnIds()) {
+                const Axis* axis = sheet->getColumn(colId);
+                if (axis && axis->position >= startCol->position &&
+                    axis->position <= endCol->position) {
                     colCount++;
                 }
             }
 
             // Count rows in position range (using position bounds, not row IDs)
             size_t rowCount = 0;
-            for (const auto& [id, axis] : sheet->rows) {
-                if (axis->position >= bounds.startRowPos && axis->position <= bounds.endRowPos) {
+            for (const ID& rowId : sheet->getRowIds()) {
+                const Axis* axis = sheet->getRow(rowId);
+                if (axis && axis->position >= bounds.startRowPos &&
+                    axis->position <= bounds.endRowPos) {
                     rowCount++;
                 }
             }

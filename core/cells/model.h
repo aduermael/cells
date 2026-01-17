@@ -20,10 +20,10 @@
 // Storage architecture (workbook-level entities):
 // - Cells: Owned by Workbook::_cells; Sheets keep position index (_cellIndex)
 // - Ranges: Owned by Workbook::_ranges; Sheets keep ID set and R-tree index
+// - Columns/Rows: Owned by Workbook::_columns/_rows; Sheets keep ID sets and position indexes
 // - Dependency Graph: Single global graph in Workbook::_depGraph
 // - Shared Formulas: Workbook::_sharedFormulaMasters, _sharedFormulaFrom
 // - Spill Regions: Workbook::_spillMasters, _spilledFrom
-// - Columns/Rows (Axis): Currently per-sheet (Sheet::columns, Sheet::rows)
 //
 // Dependencies: types.h, operation.h, oplog.h
 // Used by: crdt.cc, formula_eval.cc, bindings.cc, all persistence modules
@@ -360,10 +360,6 @@ struct Sheet {
     uint16_t freezeCol{0};     // Number of frozen columns (0 = none, 1 = column A frozen, etc.)
     uint16_t freezeRow{0};     // Number of frozen rows (0 = none, 1 = row 1 frozen, etc.)
 
-    // Axis storage (maps ID -> Axis)
-    std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> columns;
-    std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> rows;
-
     Sheet();
     explicit Sheet(const ID& id, std::string name = "Sheet1");
     ~Sheet();
@@ -378,7 +374,9 @@ struct Sheet {
 
     // Axis operations
     Axis* getColumn(const ID& colId);
+    [[nodiscard]] const Axis* getColumn(const ID& colId) const;
     Axis* getRow(const ID& rowId);
+    [[nodiscard]] const Axis* getRow(const ID& rowId) const;
     Axis* getColumnByPosition(uint32_t position);
     Axis* getRowByPosition(uint32_t position);
     Axis* getColumnByName(const std::string& name);        // A, B, ..., Z, AA, AB, ...
@@ -386,11 +384,17 @@ struct Sheet {
     Axis* getOrCreateRowByPosition(uint32_t position);     // Auto-creates if needed
     void addColumn(std::unique_ptr<Axis> col);
     void addRow(std::unique_ptr<Axis> row);
+    void removeColumnFromIndex(const ID& colId);  // Remove column from sheet tracking (for CRDT ops)
+    void removeRowFromIndex(const ID& rowId);     // Remove row from sheet tracking (for CRDT ops)
 
     // Count accessors
-    [[nodiscard]] size_t columnCount() const { return columns.size(); }
-    [[nodiscard]] size_t rowCount() const { return rows.size(); }
+    [[nodiscard]] size_t columnCount() const { return _columnIds.size(); }
+    [[nodiscard]] size_t rowCount() const { return _rowIds.size(); }
     [[nodiscard]] size_t cellCount() const { return _cellIndex.size(); }
+
+    // Get all column/row IDs belonging to this sheet (for iteration)
+    [[nodiscard]] const std::unordered_set<ID, IDHash>& getColumnIds() const { return _columnIds; }
+    [[nodiscard]] const std::unordered_set<ID, IDHash>& getRowIds() const { return _rowIds; }
 
     // Get all cell IDs in this sheet (for iteration)
     // Returns cell IDs from the position index
@@ -598,6 +602,21 @@ private:
     // Parent workbook (set by Workbook::addSheet)
     Workbook* _workbook{nullptr};
 
+    // ========================================================================
+    // Axis ID sets and position indexes
+    // Axis objects are stored at Workbook level. Sheet tracks which axis IDs
+    // belong to it and maintains position indexes for fast position lookups.
+    // ========================================================================
+
+    // Sets of column/row IDs belonging to this sheet
+    // Axis objects themselves are stored in Workbook::_columns/_rows
+    std::unordered_set<ID, IDHash> _columnIds;
+    std::unordered_set<ID, IDHash> _rowIds;
+
+    // Position-to-ID indexes for fast position-based lookups
+    std::unordered_map<uint32_t, ID> _columnIndex;  // position -> colId
+    std::unordered_map<uint32_t, ID> _rowIndex;     // position -> rowId
+
     // Secondary index: (colId, rowId) -> cellId
     std::unordered_map<std::string, ID> _cellIndex;
 
@@ -725,10 +744,43 @@ struct Workbook {
     [[nodiscard]] CellLookupResult findCell(const ID& cellId);
     [[nodiscard]] std::pair<const Cell*, const Sheet*> findCell(const ID& cellId) const;
 
-    // Find a column/row axis by ID across all sheets. Returns the sheet it belongs to.
+    // Find a column/row axis by ID. Returns the sheet it belongs to.
+    // Uses the axis's sheetId field for O(1) lookup.
     // Returns nullptr if not found.
     [[nodiscard]] Sheet* findAxisSheet(const ID& axisId);
     [[nodiscard]] const Sheet* findAxisSheet(const ID& axisId) const;
+
+    // ========================================================================
+    // Workbook-level axis storage
+    // ========================================================================
+
+    // Get a column by ID from workbook-level storage (O(1) lookup)
+    // Returns nullptr if column not found
+    [[nodiscard]] Axis* getColumn(const ID& colId);
+    [[nodiscard]] const Axis* getColumn(const ID& colId) const;
+
+    // Get a row by ID from workbook-level storage (O(1) lookup)
+    // Returns nullptr if row not found
+    [[nodiscard]] Axis* getRow(const ID& rowId);
+    [[nodiscard]] const Axis* getRow(const ID& rowId) const;
+
+    // Add a column to workbook-level storage (takes ownership)
+    // The column must have a valid ID set
+    // Returns the column pointer, or nullptr if column is null or ID already exists
+    Axis* addColumn(std::unique_ptr<Axis> col);
+
+    // Add a row to workbook-level storage (takes ownership)
+    // The row must have a valid ID set
+    // Returns the row pointer, or nullptr if row is null or ID already exists
+    Axis* addRow(std::unique_ptr<Axis> row);
+
+    // Remove a column from workbook-level storage
+    // Returns the removed column (ownership transferred to caller), or nullptr if not found
+    std::unique_ptr<Axis> removeColumn(const ID& colId);
+
+    // Remove a row from workbook-level storage
+    // Returns the removed row (ownership transferred to caller), or nullptr if not found
+    std::unique_ptr<Axis> removeRow(const ID& rowId);
 
     // ========================================================================
     // Custom formats (CRDT-synced)
@@ -1001,6 +1053,18 @@ private:
     // Primary cell storage: cell ID -> Cell
     // Cells are owned by Workbook; Sheets maintain lightweight ID sets and position indexes
     std::unordered_map<ID, std::unique_ptr<Cell>, IDHash> _cells;
+
+    // ========================================================================
+    // Workbook-level axis storage (primary storage, sheets keep position indexes)
+    // ========================================================================
+
+    // Primary column storage: column ID -> Axis
+    // Columns are owned by Workbook; Sheets maintain ID sets and position indexes
+    std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> _columns;
+
+    // Primary row storage: row ID -> Axis
+    // Rows are owned by Workbook; Sheets maintain ID sets and position indexes
+    std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> _rows;
 
     // ========================================================================
     // Workbook-level shared formula tracking (runtime-only)

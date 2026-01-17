@@ -218,8 +218,10 @@ ApplyResult applyColDelete(Workbook& workbook, const Operation& op) {
         workbook.removeCell(cellId);
     }
 
-    // Remove the column
-    targetSheet->columns.erase(op.target_id);
+    // Remove the column from sheet tracking
+    targetSheet->removeColumnFromIndex(op.target_id);
+    // Remove from workbook storage
+    workbook.removeColumn(op.target_id);
 
     return ApplyResult::SUCCESS;
 }
@@ -302,8 +304,10 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
         workbook.removeCell(cellId);
     }
 
-    // Remove the row
-    targetSheet->rows.erase(op.target_id);
+    // Remove the row from sheet tracking
+    targetSheet->removeRowFromIndex(op.target_id);
+    // Remove from workbook storage
+    workbook.removeRow(op.target_id);
 
     return ApplyResult::SUCCESS;
 }
@@ -493,8 +497,12 @@ ApplyResult applyColMove(Workbook& workbook, const Operation& op) {
     }
 
     // Update other columns' positions
-    for (auto& [id, ax] : targetSheet->columns) {
-        if (id == op.target_id) {
+    for (const ID& colId : targetSheet->getColumnIds()) {
+        if (colId == op.target_id) {
+            continue;
+        }
+        Axis* ax = workbook.getColumn(colId);
+        if (!ax) {
             continue;
         }
         if (currentPos < newPos) {
@@ -555,8 +563,12 @@ ApplyResult applyRowMove(Workbook& workbook, const Operation& op) {
     }
 
     // Update other rows' positions
-    for (auto& [id, ax] : targetSheet->rows) {
-        if (id == op.target_id) {
+    for (const ID& rowId : targetSheet->getRowIds()) {
+        if (rowId == op.target_id) {
+            continue;
+        }
+        Axis* ax = workbook.getRow(rowId);
+        if (!ax) {
             continue;
         }
         if (currentPos < newPos) {
@@ -692,9 +704,14 @@ ApplyResult applyDimMoveAxis(Workbook& workbook, const Operation& op) {
     }
 
     // Update other axes' positions
-    auto& axisMap = isColumn ? targetSheet->columns : targetSheet->rows;
-    for (auto& [id, ax] : axisMap) {
-        if (id == op.target_id) {
+    const auto& axisIds = isColumn ? targetSheet->getColumnIds() : targetSheet->getRowIds();
+    for (const ID& axisId : axisIds) {
+        if (axisId == op.target_id) {
+            continue;
+        }
+
+        Axis* ax = isColumn ? workbook.getColumn(axisId) : workbook.getRow(axisId);
+        if (!ax) {
             continue;
         }
 

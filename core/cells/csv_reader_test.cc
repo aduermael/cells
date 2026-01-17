@@ -268,13 +268,7 @@ TEST(CSVReaderTest, SkipUTF8BOM) {
 
     // First column should be named "A", not "\xEF\xBB\xBFA"
     // Find column at position 0
-    Axis* firstCol = nullptr;
-    for (const auto& pair : sheet->columns) {
-        if (pair.second->position == 0) {
-            firstCol = pair.second.get();
-            break;
-        }
-    }
+    Axis* firstCol = sheet->getColumnByPosition(0);
     ASSERT_NE(firstCol, nullptr);
     EXPECT_EQ(firstCol->name, "A");
 }
@@ -292,10 +286,8 @@ TEST(CSVReaderTest, ColumnNamesFromHeader) {
 
     // Find columns by position and verify names
     std::vector<Axis*> cols(3, nullptr);
-    for (const auto& pair : sheet->columns) {
-        if (pair.second->position < 3) {
-            cols[pair.second->position] = pair.second.get();
-        }
+    for (size_t pos = 0; pos < 3; pos++) {
+        cols[pos] = sheet->getColumnByPosition(static_cast<uint32_t>(pos));
     }
 
     ASSERT_NE(cols[0], nullptr);
@@ -468,13 +460,7 @@ TEST(SampleCSVFileTest, ParseBOMCSV) {
     Sheet* sheet = result.workbook->getSheetByIndex(0);
     // First column should be "Name", not with BOM
     // Find column at position 0
-    Axis* firstCol = nullptr;
-    for (const auto& pair : sheet->columns) {
-        if (pair.second->position == 0) {
-            firstCol = pair.second.get();
-            break;
-        }
-    }
+    Axis* firstCol = sheet->getColumnByPosition(0);
     ASSERT_NE(firstCol, nullptr);
     EXPECT_EQ(firstCol->name, "Name");
 }

@@ -554,31 +554,107 @@ std::pair<const Cell*, const Sheet*> Workbook::findCell(const ID& cellId) const 
 }
 
 Sheet* Workbook::findAxisSheet(const ID& axisId) {
-    for (auto& sheet : sheets) {
-        // Check columns
-        if (sheet->getColumn(axisId)) {
-            return sheet.get();
-        }
-        // Check rows
-        if (sheet->getRow(axisId)) {
-            return sheet.get();
-        }
+    // Try columns first
+    const Axis* col = getColumn(axisId);
+    if (col) {
+        return getSheetById(col->sheetId);
+    }
+    // Try rows
+    const Axis* row = getRow(axisId);
+    if (row) {
+        return getSheetById(row->sheetId);
     }
     return nullptr;
 }
 
 const Sheet* Workbook::findAxisSheet(const ID& axisId) const {
-    for (const auto& sheet : sheets) {
-        // Check columns
-        if (sheet->getColumn(axisId)) {
-            return sheet.get();
-        }
-        // Check rows
-        if (sheet->getRow(axisId)) {
-            return sheet.get();
-        }
+    // Try columns first
+    const Axis* col = getColumn(axisId);
+    if (col) {
+        return getSheetById(col->sheetId);
+    }
+    // Try rows
+    const Axis* row = getRow(axisId);
+    if (row) {
+        return getSheetById(row->sheetId);
     }
     return nullptr;
+}
+
+// =============================================================================
+// Workbook-level axis storage
+// =============================================================================
+
+Axis* Workbook::getColumn(const ID& colId) {
+    auto it = _columns.find(colId);
+    return (it != _columns.end()) ? it->second.get() : nullptr;
+}
+
+const Axis* Workbook::getColumn(const ID& colId) const {
+    auto it = _columns.find(colId);
+    return (it != _columns.end()) ? it->second.get() : nullptr;
+}
+
+Axis* Workbook::getRow(const ID& rowId) {
+    auto it = _rows.find(rowId);
+    return (it != _rows.end()) ? it->second.get() : nullptr;
+}
+
+const Axis* Workbook::getRow(const ID& rowId) const {
+    auto it = _rows.find(rowId);
+    return (it != _rows.end()) ? it->second.get() : nullptr;
+}
+
+Axis* Workbook::addColumn(std::unique_ptr<Axis> col) {
+    if (!col || col->id.isNull()) {
+        return nullptr;
+    }
+
+    // Check if column with this ID already exists
+    if (_columns.find(col->id) != _columns.end()) {
+        return nullptr;
+    }
+
+    const Axis* rawPtr = col.get();
+    _columns[col->id] = std::move(col);
+    return _columns[rawPtr->id].get();
+}
+
+Axis* Workbook::addRow(std::unique_ptr<Axis> row) {
+    if (!row || row->id.isNull()) {
+        return nullptr;
+    }
+
+    // Check if row with this ID already exists
+    if (_rows.find(row->id) != _rows.end()) {
+        return nullptr;
+    }
+
+    const Axis* rawPtr = row.get();
+    _rows[row->id] = std::move(row);
+    return _rows[rawPtr->id].get();
+}
+
+std::unique_ptr<Axis> Workbook::removeColumn(const ID& colId) {
+    auto it = _columns.find(colId);
+    if (it == _columns.end()) {
+        return nullptr;
+    }
+
+    std::unique_ptr<Axis> col = std::move(it->second);
+    _columns.erase(it);
+    return col;
+}
+
+std::unique_ptr<Axis> Workbook::removeRow(const ID& rowId) {
+    auto it = _rows.find(rowId);
+    if (it == _rows.end()) {
+        return nullptr;
+    }
+
+    std::unique_ptr<Axis> row = std::move(it->second);
+    _rows.erase(it);
+    return row;
 }
 
 bool Workbook::registerCustomFormat(const ID& formatId, const std::string& formatCode) {
