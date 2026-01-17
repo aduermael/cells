@@ -10,7 +10,7 @@
 
 namespace cells {
 
-ID StyleRegistry::registerStyle(const CellStyle& style, const ID& proposedId) {
+ID StyleRegistry::registerStyle(const CellStyle& style, const ID& proposedId, bool* wasCreated) {
     // Check if an identical style already exists via content hash
     const size_t hash = style.hash();
     auto it = _hashToId.find(hash);
@@ -21,6 +21,7 @@ ID StyleRegistry::registerStyle(const CellStyle& style, const ID& proposedId) {
         auto styleIt = _styles.find(existingId);
         if (styleIt != _styles.end() && styleIt->second == style) {
             // Exact match - return existing ID
+            if (wasCreated) *wasCreated = false;
             return existingId;
         }
         // Hash collision - different style with same hash, continue to create new
@@ -34,6 +35,7 @@ ID StyleRegistry::registerStyle(const CellStyle& style, const ID& proposedId) {
         // ID already taken, update the existing style
         _styles[proposedId] = style;
         updateHashIndex(proposedId, style);
+        if (wasCreated) *wasCreated = false;
         return proposedId;
     }
 
@@ -43,6 +45,7 @@ ID StyleRegistry::registerStyle(const CellStyle& style, const ID& proposedId) {
     // Initialize refcount to 0 (caller should call addRef when applying)
     _refCount[styleId] = 0;
 
+    if (wasCreated) *wasCreated = true;
     return styleId;
 }
 

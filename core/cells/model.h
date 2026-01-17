@@ -738,7 +738,8 @@ struct Workbook {
     // Find an existing style matching the content, or register a new one
     // Returns the ID of the matching/new style (may differ from any proposed ID)
     // This provides content-addressed deduplication - identical styles share one ID.
-    ID findOrRegisterStyle(const CellStyle& style);
+    // If wasCreated is provided, it will be set to true if a new style was created.
+    ID findOrRegisterStyle(const CellStyle& style, bool* wasCreated = nullptr);
 
     // Check if a style is defined
     [[nodiscard]] bool hasStyle(const ID& styleId) const;

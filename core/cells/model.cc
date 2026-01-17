@@ -548,9 +548,9 @@ bool Workbook::registerStyle(const ID& styleId, const CellStyle& style) {
     return _styleRegistry->registerStyleDirect(styleId, style);
 }
 
-ID Workbook::findOrRegisterStyle(const CellStyle& style) {
+ID Workbook::findOrRegisterStyle(const CellStyle& style, bool* wasCreated) {
     // Content-addressed registration with deduplication
-    return _styleRegistry->registerStyle(style);
+    return _styleRegistry->registerStyle(style, ID(), wasCreated);
 }
 
 bool Workbook::hasStyle(const ID& styleId) const {

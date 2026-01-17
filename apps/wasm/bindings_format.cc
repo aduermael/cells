@@ -781,22 +781,20 @@ CellStyle parseStyleJson(const std::string& json) {
     return style;
 }
 
-// Helper to merge style JSON into an existing style (only updates fields present in JSON)
-CellStyle mergeStyleJson(const CellStyle& baseStyle, const std::string& json) {
-    CellStyle style = baseStyle;
-
+// Merges style JSON into an existing style in-place (only updates fields present in JSON)
+void mergeStyleJson(CellStyle& style, const std::string& json) {
     // Only update fields that are actually present in the JSON
     if (hasJsonField(json, "bold")) {
-        style.bold = extractBoolField(json, "bold", baseStyle.bold);
+        style.bold = extractBoolField(json, "bold", style.bold);
     }
     if (hasJsonField(json, "italic")) {
-        style.italic = extractBoolField(json, "italic", baseStyle.italic);
+        style.italic = extractBoolField(json, "italic", style.italic);
     }
     if (hasJsonField(json, "underline")) {
-        style.underline = extractBoolField(json, "underline", baseStyle.underline);
+        style.underline = extractBoolField(json, "underline", style.underline);
     }
     if (hasJsonField(json, "wrapText")) {
-        style.wrapText = extractBoolField(json, "wrapText", baseStyle.wrapText);
+        style.wrapText = extractBoolField(json, "wrapText", style.wrapText);
     }
     if (hasJsonField(json, "bgColor")) {
         style.bgColor = extractPayloadField(json, "bgColor");
@@ -808,7 +806,7 @@ CellStyle mergeStyleJson(const CellStyle& baseStyle, const std::string& json) {
         style.fontFamily = extractPayloadField(json, "fontFamily");
     }
     if (hasJsonField(json, "fontSize")) {
-        style.fontSize = static_cast<uint8_t>(extractIntField(json, "fontSize", baseStyle.fontSize));
+        style.fontSize = static_cast<uint8_t>(extractIntField(json, "fontSize", style.fontSize));
     }
     if (hasJsonField(json, "hAlign")) {
         std::string hAlignStr = extractPayloadField(json, "hAlign");
@@ -852,8 +850,6 @@ CellStyle mergeStyleJson(const CellStyle& baseStyle, const std::string& json) {
             style.border.left = leftEdge;
         }
     }
-
-    return style;
 }
 
 // Helper to merge two CellStyles - newStyle properties override baseStyle properties.
@@ -1151,39 +1147,27 @@ std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::s
     }
 
     // Get existing style (if any) and merge with incoming JSON (read from workbook map)
-    CellStyle baseStyle;  // Uses CellStyle defaults from model.h
+    CellStyle style;
     const ID existingStyleId = _workbook->getCellStyleId(cell->id);
     if (!existingStyleId.isNull()) {
         const CellStyle* existingStyle = _workbook->getStyle(existingStyleId);
         if (existingStyle) {
-            baseStyle = *existingStyle;
+            style = *existingStyle;
         }
     }
-    CellStyle style = mergeStyleJson(baseStyle, styleJson);
+    mergeStyleJson(style, styleJson);
 
     ID styleId;
     if (!style.isEmpty()) {
-        // Check if this style already exists
-        const auto& existingStyles = _workbook->getStyles();
-        for (const auto& [id, existingStyle] : existingStyles) {
-            if (existingStyle == style) {
-                styleId = id;
-                break;
-            }
-        }
+        // Use hash-based O(1) lookup for deduplication
+        bool isNewStyle = false;
+        styleId = _workbook->findOrRegisterStyle(style, &isNewStyle);
 
-        // Create new style if not found
-        if (styleId.isNull()) {
-            styleId = generate_id();
-            _workbook->registerStyle(styleId, style);
-
-            // Create STYLE_DEFINE operation for sync
-            if (_workbook->isCollaborating()) {
-                // Store full merged style for sync (not partial styleJson)
-                std::string fullStyleJson = styleToJson(style);
-                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
-                applyOperation(*_workbook, styleOp);
-            }
+        // Create STYLE_DEFINE operation for sync if this is a new style
+        if (isNewStyle && _workbook->isCollaborating()) {
+            std::string fullStyleJson = styleToJson(style);
+            Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
+            applyOperation(*_workbook, styleOp);
         }
     }
 
@@ -1213,7 +1197,7 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
     }
 
     // First, try to find existing cell to get its current style
-    CellStyle baseStyle;  // Uses CellStyle defaults from model.h
+    CellStyle style;
     ID existingColId, existingRowId;
     Cell* existingCell = nullptr;
 
@@ -1249,37 +1233,25 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
         if (!existingStyleId.isNull()) {
             const CellStyle* existingStyle = _workbook->getStyle(existingStyleId);
             if (existingStyle) {
-                baseStyle = *existingStyle;
+                style = *existingStyle;
             }
         }
     }
 
     // Merge incoming JSON with existing style
-    CellStyle style = mergeStyleJson(baseStyle, styleJson);
+    mergeStyleJson(style, styleJson);
 
     ID styleId;
     if (!style.isEmpty()) {
-        // Check if this style already exists
-        const auto& existingStyles = _workbook->getStyles();
-        for (const auto& [id, existingStyle] : existingStyles) {
-            if (existingStyle == style) {
-                styleId = id;
-                break;
-            }
-        }
+        // Use hash-based O(1) lookup for deduplication
+        bool isNewStyle = false;
+        styleId = _workbook->findOrRegisterStyle(style, &isNewStyle);
 
-        // Create new style if not found
-        if (styleId.isNull()) {
-            styleId = generate_id();
-            _workbook->registerStyle(styleId, style);
-
-            // Create STYLE_DEFINE operation for sync
-            if (_workbook->isCollaborating()) {
-                // Store full merged style for sync (not partial styleJson)
-                std::string fullStyleJson = styleToJson(style);
-                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
-                applyOperation(*_workbook, styleOp);
-            }
+        // Create STYLE_DEFINE operation for sync if this is a new style
+        if (isNewStyle && _workbook->isCollaborating()) {
+            std::string fullStyleJson = styleToJson(style);
+            Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
+            applyOperation(*_workbook, styleOp);
         }
     }
 
@@ -1458,19 +1430,15 @@ std::string CellsEngine::createStyle(const std::string& styleJson) {
 
     CellStyle style = parseStyleJson(styleJson);
 
-    // Check if this style already exists
-    const auto& existingStyles = _workbook->getStyles();
-    for (const auto& [id, existingStyle] : existingStyles) {
-        if (existingStyle == style) {
-            return "{\"success\":true,\"styleId\":\"" + id.toString() + "\",\"existing\":true}";
-        }
+    // Use hash-based O(1) lookup for deduplication
+    bool isNewStyle = false;
+    ID styleId = _workbook->findOrRegisterStyle(style, &isNewStyle);
+
+    if (!isNewStyle) {
+        return "{\"success\":true,\"styleId\":\"" + styleId.toString() + "\",\"existing\":true}";
     }
 
-    // Create new style
-    ID styleId = generate_id();
-    _workbook->registerStyle(styleId, style);
-
-    // Create STYLE_DEFINE operation for sync
+    // Create STYLE_DEFINE operation for sync (new style)
     if (_workbook->isCollaborating()) {
         Operation styleOp = makeStyleDefineOp(*_workbook, styleId, styleJson);
         applyOperation(*_workbook, styleOp);
@@ -1592,8 +1560,8 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
     }
 
     // Parse the new style from JSON
-    CellStyle defaultStyle;
-    CellStyle style = mergeStyleJson(defaultStyle, styleJson);
+    CellStyle style;
+    mergeStyleJson(style, styleJson);
 
     // =========================================================================
     // Handle overlapping ranges with conflicting properties (Phase K)
@@ -1712,26 +1680,15 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
     // to empty (handled above with range deletion).
     ID styleId;
     if (!style.isEmpty()) {
-        // Check if this style already exists
-        const auto& existingStyles = _workbook->getStyles();
-        for (const auto& [id, existingStyle] : existingStyles) {
-            if (existingStyle == style) {
-                styleId = id;
-                break;
-            }
-        }
+        // Use hash-based O(1) lookup for deduplication
+        bool isNewStyle = false;
+        styleId = _workbook->findOrRegisterStyle(style, &isNewStyle);
 
-        // Create new style if not found
-        if (styleId.isNull()) {
-            styleId = generate_id();
-            _workbook->registerStyle(styleId, style);
-
-            // Create STYLE_DEFINE operation for sync
-            if (_workbook->isCollaborating()) {
-                std::string fullStyleJson = styleToJson(style);
-                Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
-                applyOperation(*_workbook, styleOp);
-            }
+        // Create STYLE_DEFINE operation for sync if this is a new style
+        if (isNewStyle && _workbook->isCollaborating()) {
+            std::string fullStyleJson = styleToJson(style);
+            Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
+            applyOperation(*_workbook, styleOp);
         }
     }
 
@@ -2035,28 +1992,15 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
             applyOperation(*_workbook, clearOp);
         } else if (strippedStyle != *cellStylePtr) {
             // Style changed, need to update the cell
-            ID newStyleId;
+            // Use hash-based O(1) lookup for deduplication
+            bool isNewStyle = false;
+            ID newStyleId = _workbook->findOrRegisterStyle(strippedStyle, &isNewStyle);
 
-            // Check if this stripped style already exists
-            const auto& existingStyles = _workbook->getStyles();
-            for (const auto& [id, existingStyle] : existingStyles) {
-                if (existingStyle == strippedStyle) {
-                    newStyleId = id;
-                    break;
-                }
-            }
-
-            // Create new style if not found
-            if (newStyleId.isNull()) {
-                newStyleId = generate_id();
-                _workbook->registerStyle(newStyleId, strippedStyle);
-
-                // Create STYLE_DEFINE operation for sync
-                if (_workbook->isCollaborating()) {
-                    std::string fullStyleJson = styleToJson(strippedStyle);
-                    Operation styleDefineOp = makeStyleDefineOp(*_workbook, newStyleId, fullStyleJson);
-                    applyOperation(*_workbook, styleDefineOp);
-                }
+            // Create STYLE_DEFINE operation for sync if this is a new style
+            if (isNewStyle && _workbook->isCollaborating()) {
+                std::string fullStyleJson = styleToJson(strippedStyle);
+                Operation styleDefineOp = makeStyleDefineOp(*_workbook, newStyleId, fullStyleJson);
+                applyOperation(*_workbook, styleDefineOp);
             }
 
             // Update the cell's styleId
