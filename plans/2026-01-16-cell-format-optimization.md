@@ -40,15 +40,15 @@ This matches the existing architecture and keeps concerns separated.
 
 ---
 
-## Phase 1: Add HAS_FORMAT and HAS_STYLE Flags to CellFlags
+## Phase 1: Add HAS_FORMAT and HAS_STYLE Flags to CellFlags ✓
 
 Add flags to quickly check if a cell has custom format/style without hash map lookup.
 
-- [ ] 1a: Add `HAS_FORMAT = 1 << 4` to CellFlags enum in `model.h`
-- [ ] 1b: Add `HAS_STYLE = 1 << 5` to CellFlags enum in `model.h`
-- [ ] 1c: Add helper methods to Cell: `hasFormat()`, `markHasFormat()`, `clearHasFormat()`
-- [ ] 1d: Add helper methods to Cell: `hasStyle()`, `markHasStyle()`, `clearHasStyle()`
-- [ ] 1e: Update CellFlags documentation comment (bits 4-5 now used, 6-7 reserved)
+- [x] 1a: Add `HAS_FORMAT = 1 << 4` to CellFlags enum in `model.h`
+- [x] 1b: Add `HAS_STYLE = 1 << 5` to CellFlags enum in `model.h`
+- [x] 1c: Add helper methods to Cell: `hasFormat()`, `markHasFormat()`, `clearHasFormat()`
+- [x] 1d: Add helper methods to Cell: `hasStyle()`, `markHasStyle()`, `clearHasStyle()`
+- [x] 1e: Update CellFlags documentation comment (bits 4-5 now used, 6-7 reserved)
 
 ---
 

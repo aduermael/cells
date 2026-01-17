@@ -135,14 +135,16 @@ struct Formula {
 };
 
 // Cell flags for runtime state tracking (not persisted)
-// Combines shared formula and spill state in a single byte
+// Combines shared formula, spill state, and format/style presence in a single byte
 enum class CellFlags : uint8_t {
     NONE = 0,
     SHARED_FORMULA_MASTER = 1 << 0,      // bit 0: This cell is a shared formula master
     SHARED_FORMULA_SUBSCRIBER = 1 << 1,  // bit 1: This cell subscribes to another's formula
     SPILL_MASTER = 1 << 2,               // bit 2: This cell is a spill range master
     SPILLED_FROM = 1 << 3,               // bit 3: This position has spilled data
-    // bits 4-7: reserved for future use
+    HAS_FORMAT = 1 << 4,                 // bit 4: This cell has a custom format in workbook map
+    HAS_STYLE = 1 << 5,                  // bit 5: This cell has a custom style in workbook map
+    // bits 6-7: reserved for future use
 };
 
 // Bitwise operators for CellFlags
@@ -230,6 +232,28 @@ struct Cell {
 
     // Get all flags (for debugging/testing)
     [[nodiscard]] uint8_t getFlags() const { return _flags; }
+
+    // ========================================================================
+    // Format/Style flag helpers (for workbook-level storage optimization)
+    // ========================================================================
+
+    // Check if cell has a custom format in workbook map
+    [[nodiscard]] bool hasFormat() const { return hasFlag(CellFlags::HAS_FORMAT); }
+
+    // Mark cell as having a custom format
+    void markHasFormat() { setFlag(CellFlags::HAS_FORMAT); }
+
+    // Clear the has-format flag
+    void clearHasFormat() { clearFlag(CellFlags::HAS_FORMAT); }
+
+    // Check if cell has a custom style in workbook map
+    [[nodiscard]] bool hasStyle() const { return hasFlag(CellFlags::HAS_STYLE); }
+
+    // Mark cell as having a custom style
+    void markHasStyle() { setFlag(CellFlags::HAS_STYLE); }
+
+    // Clear the has-style flag
+    void clearHasStyle() { clearFlag(CellFlags::HAS_STYLE); }
 
 private:
     // Runtime flags (not persisted) - combines multiple bool fields
