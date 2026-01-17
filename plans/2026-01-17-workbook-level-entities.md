@@ -160,9 +160,9 @@ Verify performance is maintained or improved with new architecture.
 
 ### Finding a Cell's Sheet
 Given a cell UUID, to find its sheet:
-1. Get cell's `colId` from `Workbook::getCell(cellId)`
-2. Look up `Axis* col = findAxisSheet(colId)` → returns the Sheet that owns that column
-3. The sheet owns the column, so the cell "belongs" to that sheet for display purposes
+1. Get cell from `Workbook::getCell(cellId)`
+2. Get column axis and read its `sheetId` field (`Axis::sheetId` already stores this)
+3. Look up sheet via `Workbook::getSheet(sheetId)`
 
 ### Range Ownership
 - Workbook owns all Range objects
