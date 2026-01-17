@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "core/cells/dependency_graph.h"
 #include "core/cells/formula_ast.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
@@ -311,7 +312,8 @@ Workbook::Workbook()
       _oplog(std::make_unique<OpLog>()),
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
-      _styleRegistry(std::make_unique<StyleRegistry>()) {}
+      _styleRegistry(std::make_unique<StyleRegistry>()),
+      _depGraph(std::make_unique<DependencyGraph>()) {}
 
 Workbook::Workbook(const ID& id, std::string name)
     : id(id),
@@ -319,7 +321,8 @@ Workbook::Workbook(const ID& id, std::string name)
       _oplog(std::make_unique<OpLog>()),
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
-      _styleRegistry(std::make_unique<StyleRegistry>()) {}
+      _styleRegistry(std::make_unique<StyleRegistry>()),
+      _depGraph(std::make_unique<DependencyGraph>()) {}
 
 Workbook::~Workbook() = default;
 
@@ -625,6 +628,18 @@ StyleRegistry* Workbook::getStyleRegistry() {
 
 const StyleRegistry* Workbook::getStyleRegistry() const {
     return _styleRegistry.get();
+}
+
+// =============================================================================
+// Workbook-level dependency graph
+// =============================================================================
+
+DependencyGraph* Workbook::getDependencyGraph() {
+    return _depGraph.get();
+}
+
+const DependencyGraph* Workbook::getDependencyGraph() const {
+    return _depGraph.get();
 }
 
 // =============================================================================

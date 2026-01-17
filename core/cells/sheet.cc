@@ -72,10 +72,9 @@ PositionResolver makePositionResolver(Sheet* sheet) {
 // Sheet
 // ============================================================================
 
-Sheet::Sheet() : id(), name("Sheet1"), _depGraph(std::make_unique<DependencyGraph>()) {}
+Sheet::Sheet() : id(), name("Sheet1") {}
 
-Sheet::Sheet(const ID& id, std::string name)
-    : id(id), name(std::move(name)), _depGraph(std::make_unique<DependencyGraph>()) {}
+Sheet::Sheet(const ID& id, std::string name) : id(id), name(std::move(name)) {}
 
 Sheet::~Sheet() = default;
 
@@ -338,7 +337,10 @@ bool Sheet::moveColumn(const ID& colId, uint32_t newPosition) {
     col->position = newPosition;
 
     // Rebuild R-tree with updated positions (positions are now stale)
-    _depGraph->rebuildRTree(makePositionResolver(this));
+    DependencyGraph* depGraph = getDependencyGraph();
+    if (depGraph != nullptr) {
+        depGraph->rebuildRTree(makePositionResolver(this));
+    }
 
     return true;
 }
@@ -378,7 +380,10 @@ bool Sheet::moveRow(const ID& rowId, uint32_t newPosition) {
     row->position = newPosition;
 
     // Rebuild R-tree with updated positions (positions are now stale)
-    _depGraph->rebuildRTree(makePositionResolver(this));
+    DependencyGraph* depGraph = getDependencyGraph();
+    if (depGraph != nullptr) {
+        depGraph->rebuildRTree(makePositionResolver(this));
+    }
 
     return true;
 }
@@ -399,7 +404,10 @@ Axis* Sheet::insertColumnAt(uint32_t position) {
     addColumn(std::move(col));
 
     // Rebuild R-tree with updated positions
-    _depGraph->rebuildRTree(makePositionResolver(this));
+    DependencyGraph* depGraph = getDependencyGraph();
+    if (depGraph != nullptr) {
+        depGraph->rebuildRTree(makePositionResolver(this));
+    }
 
     return rawPtr;
 }
@@ -420,7 +428,10 @@ Axis* Sheet::insertRowAt(uint32_t position) {
     addRow(std::move(row));
 
     // Rebuild R-tree with updated positions
-    _depGraph->rebuildRTree(makePositionResolver(this));
+    DependencyGraph* depGraph = getDependencyGraph();
+    if (depGraph != nullptr) {
+        depGraph->rebuildRTree(makePositionResolver(this));
+    }
 
     return rawPtr;
 }
@@ -463,7 +474,10 @@ bool Sheet::deleteColumn(const ID& colId) {
     }
 
     // Rebuild R-tree with updated positions
-    _depGraph->rebuildRTree(makePositionResolver(this));
+    DependencyGraph* depGraph = getDependencyGraph();
+    if (depGraph != nullptr) {
+        depGraph->rebuildRTree(makePositionResolver(this));
+    }
 
     return true;
 }
@@ -506,7 +520,10 @@ bool Sheet::deleteRow(const ID& rowId) {
     }
 
     // Rebuild R-tree with updated positions
-    _depGraph->rebuildRTree(makePositionResolver(this));
+    DependencyGraph* depGraph = getDependencyGraph();
+    if (depGraph != nullptr) {
+        depGraph->rebuildRTree(makePositionResolver(this));
+    }
 
     return true;
 }
@@ -530,12 +547,13 @@ FormulaResult Sheet::setCellFormula(const ID& cellId, const std::string& /* form
 
     // Add to dependency graph (AST should already be resolved)
     // Use position resolver to populate R-tree for range queries
-    if (ast != nullptr) {
-        _depGraph->addFormula(cellId, ast, makePositionResolver(this));
+    DependencyGraph* depGraph = getDependencyGraph();
+    if (ast != nullptr && depGraph != nullptr) {
+        depGraph->addFormula(cellId, ast, makePositionResolver(this));
 
         // Track volatile functions
         if (formula->hasVolatile()) {
-            _depGraph->markVolatile(cellId);
+            depGraph->markVolatile(cellId);
         }
     }
 
@@ -597,12 +615,23 @@ void Sheet::clearCellFormula(const ID& cellId) {
         return;
     }
 
-    // Remove from dependency graph
-    _depGraph->removeFormula(cellId);
-    _depGraph->unmarkVolatile(cellId);
+    // Remove from dependency graph (uses workbook's global graph)
+    DependencyGraph* depGraph = getDependencyGraph();
+    if (depGraph != nullptr) {
+        depGraph->removeFormula(cellId);
+        depGraph->unmarkVolatile(cellId);
+    }
 
     // Clear the formula
     cell->clearFormula();
+}
+
+DependencyGraph* Sheet::getDependencyGraph() {
+    return _workbook ? _workbook->getDependencyGraph() : nullptr;
+}
+
+const DependencyGraph* Sheet::getDependencyGraph() const {
+    return _workbook ? _workbook->getDependencyGraph() : nullptr;
 }
 
 // ============================================================================

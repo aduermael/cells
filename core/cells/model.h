@@ -452,9 +452,10 @@ struct Sheet {
     // Clear a cell's formula (removes from dependency graph)
     void clearCellFormula(const ID& cellId);
 
-    // Get the dependency graph for this sheet
-    [[nodiscard]] DependencyGraph* getDependencyGraph() { return _depGraph.get(); }
-    [[nodiscard]] const DependencyGraph* getDependencyGraph() const { return _depGraph.get(); }
+    // Get the dependency graph (delegates to workbook's global graph)
+    // Returns nullptr if sheet has no workbook set
+    [[nodiscard]] DependencyGraph* getDependencyGraph();
+    [[nodiscard]] const DependencyGraph* getDependencyGraph() const;
 
     // ========================================================================
     // Spill Range Management (Runtime-Only)
@@ -583,9 +584,6 @@ private:
     // Secondary index: (colId, rowId) -> cellId
     std::unordered_map<std::string, ID> _cellIndex;
 
-    // Dependency graph for tracking formula dependencies
-    std::unique_ptr<DependencyGraph> _depGraph;
-
     // ========================================================================
     // Spill range tracking (runtime-only, not persisted)
     // ========================================================================
@@ -690,6 +688,15 @@ struct Workbook {
     // Get sheet by ID (for cross-sheet references with UUID storage)
     [[nodiscard]] Sheet* getSheetById(const ID& sheetId);
     [[nodiscard]] const Sheet* getSheetById(const ID& sheetId) const;
+
+    // ========================================================================
+    // Workbook-level dependency graph
+    // ========================================================================
+
+    // Get the global dependency graph (shared by all sheets)
+    // All formula dependencies are tracked in this single graph
+    [[nodiscard]] DependencyGraph* getDependencyGraph();
+    [[nodiscard]] const DependencyGraph* getDependencyGraph() const;
 
     // ========================================================================
     // Workbook-level cell storage
@@ -884,6 +891,14 @@ private:
 
     // Cell ID -> style ID mapping (only cells with custom styles are stored)
     std::unordered_map<ID, ID, IDHash> _cellStyles;
+
+    // ========================================================================
+    // Workbook-level dependency graph (global, shared by all sheets)
+    // ========================================================================
+
+    // Global dependency graph for tracking formula dependencies across all sheets
+    // This replaces per-sheet _depGraph - all deps in one unified graph
+    std::unique_ptr<DependencyGraph> _depGraph;
 
     // ========================================================================
     // Workbook-level cell storage (primary storage, sheets keep secondary index)
