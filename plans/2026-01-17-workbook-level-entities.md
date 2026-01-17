@@ -10,7 +10,19 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 9 COMPLETE - Migration and cleanup done.
+**Current status:** Phase 10 IN PROGRESS - Workbook-level axis storage implemented, tests need verification.
+
+**Progress Jan 17 (session 12):**
+- Phase 10: Workbook-Level Axis Storage
+- Added `Workbook::_columns` and `_rows` maps as primary axis storage
+- Added Workbook methods: `getColumn()`, `addColumn()`, `removeColumn()`, `getRow()`, `addRow()`, `removeRow()`
+- Changed `Sheet::columns`/`rows` to `_columnIds`/`_rowIds` sets with `_columnIndex`/`_rowIndex` position maps
+- Updated Sheet axis methods to delegate to Workbook
+- Updated all CRDT axis operations for workbook-level storage
+- Updated all consumers: formula_display.cc, formula_eval.cc, serializer.cc, csv_writer.cc, xlsx_writer.cc, ref_converter.cc, viewport_index.cc
+- Updated all test files: csv_reader_test.cc, ref_converter_test.cc, xlsx_reader_test.cc, xlsx_writer_test.cc
+- Build passes for //core/cells/...
+- **TODO:** Run `bazel run :check` to verify unit tests, then E2E tests
 
 **Progress Jan 17 (session 11):**
 - Phase 9: Migration and Cleanup
@@ -104,7 +116,7 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 ## Current Architecture
 
 - **Cells**: ✅ Workbook level (`Workbook::_cells`), Sheet has `_cellIndex` for position lookups
-- **Columns/Rows**: Per-sheet (`Sheet::columns`, `Sheet::rows` maps keyed by UUID)
+- **Columns/Rows**: ✅ Workbook level (`Workbook::_columns`, `_rows`), Sheet has `_columnIds`/`_rowIds` sets and `_columnIndex`/`_rowIndex` position maps
 - **Dependency Graph**: ✅ Workbook level (`Workbook::_depGraph`)
 - **Shared Formulas**: ✅ Workbook level (`Workbook::_sharedFormulaMasters`, `_sharedFormulaFrom`)
 - **Spill Regions**: ✅ Workbook level (`Workbook::_spillMasters`, `_spilledFrom`)
@@ -114,13 +126,13 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 ## Target Architecture
 
 - **Cells**: ✅ Indexed by UUID at Workbook level; Sheets maintain `_cellIndex` for fast 2D access
-- **Columns/Rows**: Indexed by UUID at Workbook level; Sheets maintain position indices for fast position lookups
+- **Columns/Rows**: ✅ Indexed by UUID at Workbook level; Sheets maintain `_columnIndex`/`_rowIndex` for fast position lookups
 - **Dependency Graph**: ✅ Global to Workbook (cross-sheet tracking can be removed when R-tree is workbook-aware)
 - **Shared Formulas**: ✅ Global to Workbook
 - **Spill Regions**: ✅ Global to Workbook (master cell links back to sheet via its column/row refs)
 - **Ranges**: ✅ Global to Workbook; `_rangeIds` also global (link back to sheet via axis's sheetId)
 - **Range Index**: Remains per-sheet (R-tree for fast viewport queries by position)
-- **Position Indices**: Remain per-sheet (column/row position → ID lookups)
+- **Position Indices**: ✅ Per-sheet (`_columnIndex`, `_rowIndex` for position → ID lookups)
 
 ## Benefits
 
@@ -320,16 +332,16 @@ Move columns and rows (Axis objects) from Sheet to Workbook level. Each Axis alr
 - `_columnIndex` (position → ID) for fast position-based lookups
 - `_rowIndex` (position → ID) for fast position-based lookups
 
-- [ ] 10a: Add `Workbook::_columns` map (ID → unique_ptr<Axis>) as primary column storage
-- [ ] 10b: Add `Workbook::_rows` map (ID → unique_ptr<Axis>) as primary row storage
-- [ ] 10c: Add `Workbook::getColumn(colId)`, `addColumn()`, `removeColumn()` methods
-- [ ] 10d: Add `Workbook::getRow(rowId)`, `addRow()`, `removeRow()` methods
-- [ ] 10e: Change `Sheet::columns` to `_columnIds` set (just IDs, not ownership)
-- [ ] 10f: Change `Sheet::rows` to `_rowIds` set (just IDs, not ownership)
-- [ ] 10g: Update `Sheet::getColumn()`, `getRow()` to delegate to Workbook
-- [ ] 10h: Update all CRDT axis operations for Workbook-level storage
-- [ ] 10i: Update serializer/parser for new storage pattern
-- [ ] 10j: Run tests to verify axis operations work correctly
+- [x] 10a: Add `Workbook::_columns` map (ID → unique_ptr<Axis>) as primary column storage
+- [x] 10b: Add `Workbook::_rows` map (ID → unique_ptr<Axis>) as primary row storage
+- [x] 10c: Add `Workbook::getColumn(colId)`, `addColumn()`, `removeColumn()` methods
+- [x] 10d: Add `Workbook::getRow(rowId)`, `addRow()`, `removeRow()` methods
+- [x] 10e: Change `Sheet::columns` to `_columnIds` set (just IDs, not ownership) - also added `_columnIndex` position map
+- [x] 10f: Change `Sheet::rows` to `_rowIds` set (just IDs, not ownership) - also added `_rowIndex` position map
+- [x] 10g: Update `Sheet::getColumn()`, `getRow()` to delegate to Workbook
+- [x] 10h: Update all CRDT axis operations for Workbook-level storage
+- [x] 10i: Update serializer/parser for new storage pattern - updated serializer.cc to use getColumnIds()/getRowIds()
+- [ ] 10j: Run tests to verify axis operations work correctly - **TODO: run bazel run :check and :e2e**
 
 ## Phase 11: Global Range ID Tracking
 
