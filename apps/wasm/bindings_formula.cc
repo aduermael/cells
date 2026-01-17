@@ -239,7 +239,7 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
     std::set<ID> existingCells;
     for (const auto& [id, _] : sheet->columns) existingColumns.insert(id);
     for (const auto& [id, _] : sheet->rows) existingRows.insert(id);
-    for (const auto& [id, _] : sheet->cells) existingCells.insert(id);
+    for (const auto& cellId : sheet->getCellIds()) existingCells.insert(cellId);
 
     FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
     ResolveResult result = resolver.resolve(ast.get());
@@ -264,12 +264,14 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
             }
         }
 
-        for (const auto& [id, cell] : sheet->cells) {
-            if (existingCells.find(id) == existingCells.end()) {
+        for (const auto& cellId : sheet->getCellIds()) {
+            if (existingCells.find(cellId) == existingCells.end()) {
+                Cell* cell = _workbook->getCell(cellId);
+                if (!cell) continue;
                 std::string payload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
                                       cell->colId.toString() + "\",\"row_id\":\"" +
                                       cell->rowId.toString() + "\"}";
-                Operation op = makeCellSetValueOp(*_workbook, id, payload);
+                Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
                 _workbook->getOpLog()->addOperation(op);
             }
         }
@@ -640,7 +642,9 @@ std::string CellsEngine::markCellDirty(const std::string& cellIdStr) {
     markDirty(sheet, cellId);
 
     int dirtyCount = 0;
-    for (const auto& [id, cell] : sheet->cells) {
+    for (const auto& cellId : sheet->getCellIds()) {
+        Cell* cell = _workbook->getCell(cellId);
+        if (!cell) continue;
         const Formula* formula = cell->getFormula();
         if (formula && formula->dirty) {
             ++dirtyCount;

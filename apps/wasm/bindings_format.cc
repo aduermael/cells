@@ -147,11 +147,9 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
     // Find or create cell at this position
     ID cellId;
     bool cellCreated = false;
-    for (const auto& [id, c] : sheet->cells) {
-        if (c->colId == colId && c->rowId == rowId) {
-            cellId = id;
-            break;
-        }
+    Cell* existingCell = sheet->getCellAt(colId, rowId);
+    if (existingCell) {
+        cellId = existingCell->id;
     }
     if (cellId.isNull()) {
         cellId = generate_id();
@@ -1219,12 +1217,7 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
 
     // If both column and row exist, try to find the cell
     if (!existingColId.isNull() && !existingRowId.isNull()) {
-        for (const auto& [id, c] : sheet->cells) {
-            if (c->colId == existingColId && c->rowId == existingRowId) {
-                existingCell = c.get();
-                break;
-            }
-        }
+        existingCell = sheet->getCellAt(existingColId, existingRowId);
     }
 
     // Get existing style if cell has one (from workbook map)
@@ -1283,13 +1276,7 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
     ID cellId;
     bool cellCreated = false;
     if (existingCell) {
-        // Find the cell ID from the existing cell
-        for (const auto& [id, c] : sheet->cells) {
-            if (c.get() == existingCell) {
-                cellId = id;
-                break;
-            }
-        }
+        cellId = existingCell->id;
     }
     if (cellId.isNull()) {
         cellId = generate_id();
@@ -1398,13 +1385,7 @@ std::string CellsEngine::getCellStyleAt(uint32_t col, uint32_t row) {
     }
 
     // Find cell at this position
-    Cell* cell = nullptr;
-    for (const auto& [id, c] : sheet->cells) {
-        if (c->colId == colId && c->rowId == rowId) {
-            cell = c.get();
-            break;
-        }
-    }
+    Cell* cell = sheet->getCellAt(colId, rowId);
 
     // Read style from workbook map
     const ID styleId = cell ? _workbook->getCellStyleId(cell->id) : ID();
@@ -1954,12 +1935,15 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
 
     // Clear redundant cell-level styles within the range (I2: Range style clears cell styles)
     // When applying a range style, remove matching properties from individual cells to avoid redundancy
-    for (const auto& [cellId, cell] : sheet->cells) {
+    for (const auto& cellId : sheet->getCellIds()) {
         // Read style from workbook map
-        const ID cellStyleId = _workbook->getCellStyleId(cell->id);
+        const ID cellStyleId = _workbook->getCellStyleId(cellId);
         if (cellStyleId.isNull()) {
             continue;  // Cell has no style, skip
         }
+
+        Cell* cell = _workbook->getCell(cellId);
+        if (!cell) continue;
 
         // Check if cell is within the range bounds
         const Axis* cellCol = sheet->getColumn(cell->colId);

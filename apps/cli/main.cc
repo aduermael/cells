@@ -382,8 +382,9 @@ int show_file_info(const Options& opts) {
         bool is_last = (i == sheet_count - 1);
 
         size_t formula_count = 0;
-        for (const auto& [id, cell] : sheet->cells) {
-            if (cell->isFormula()) {
+        for (const auto& cellId : sheet->getCellIds()) {
+            Cell* cell = workbook->getCell(cellId);
+            if (cell && cell->isFormula()) {
                 formula_count++;
             }
         }

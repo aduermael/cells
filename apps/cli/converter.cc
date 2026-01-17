@@ -80,8 +80,9 @@ ConversionResult Converter::convertAllSheets() {
     // Check for formula warnings
     bool has_formulas = false;
     for (const auto& sheet : workbook->sheets) {
-        for (const auto& [id, cell] : sheet->cells) {
-            if (cell->isFormula()) {
+        for (const auto& cellId : sheet->getCellIds()) {
+            Cell* cell = workbook->getCell(cellId);
+            if (cell && cell->isFormula()) {
                 has_formulas = true;
                 break;
             }
@@ -154,7 +155,9 @@ ConversionResult Converter::convertAllSheets() {
         }
 
         // Copy cells (shallow copy of value is fine)
-        for (const auto& [cell_id, cell] : sheet->cells) {
+        for (const auto& cellId : sheet->getCellIds()) {
+            Cell* cell = workbook->getCell(cellId);
+            if (!cell) continue;
             auto new_cell = std::make_unique<Cell>(cell->id, cell->colId, cell->rowId);
             new_cell->value = cell->value;
             // Don't copy formula (CSV exports computed values only)
@@ -380,8 +383,9 @@ void Converter::checkFeatureLoss(const Workbook& workbook) {
         // Formula warning - check if any cells have formulas
         bool has_formulas = false;
         for (const auto& sheet : workbook.sheets) {
-            for (const auto& [id, cell] : sheet->cells) {
-                if (cell->isFormula()) {
+            for (const auto& cellId : sheet->getCellIds()) {
+                Cell* cell = workbook.getCell(cellId);
+                if (cell && cell->isFormula()) {
                     has_formulas = true;
                     break;
                 }
@@ -421,7 +425,9 @@ void Converter::convertFormulasToUuid(Workbook& workbook) {
         converter.setContext(*sheet);
 
         // Convert formulas in each cell
-        for (auto& [id, cell] : sheet->cells) {
+        for (const auto& cellId : sheet->getCellIds()) {
+            Cell* cell = workbook.getCell(cellId);
+            if (!cell) continue;
             if (cell->formula != nullptr && cell->formula->ast != nullptr) {
                 // Generate current formula text from AST
                 std::string formula_text = FormulaSerializer::serialize(cell->formula->ast);

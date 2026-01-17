@@ -66,7 +66,9 @@ std::string CellsEngine::loadFromCells(const std::string& content) {
                 return {static_cast<int32_t>(col->position), static_cast<int32_t>(row->position)};
             };
 
-            for (const auto& [cellId, cell] : sheet->cells) {
+            for (const auto& cellId : sheet->getCellIds()) {
+                Cell* cell = _workbook->getCell(cellId);
+                if (!cell) continue;
                 if (cell->isFormula() && cell->formula != nullptr) {
                     if (depGraph != nullptr && cell->formula->ast != nullptr) {
                         depGraph->addFormula(cell->id, cell->formula->ast, positionResolver,
@@ -148,7 +150,9 @@ std::string CellsEngine::loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
                 return {static_cast<int32_t>(col->position), static_cast<int32_t>(row->position)};
             };
 
-            for (const auto& [cellId, cell] : sheet->cells) {
+            for (const auto& cellId : sheet->getCellIds()) {
+                Cell* cell = _workbook->getCell(cellId);
+                if (!cell) continue;
                 if (cell->isFormula() && cell->formula != nullptr &&
                     cell->formula->ast != nullptr) {
                     // Resolve formula references from A1 notation to UUIDs
@@ -282,8 +286,9 @@ bool CellsEngine::hasFormulas() {
     for (size_t i = 0; i < _workbook->sheetCount(); ++i) {
         auto* sheet = _workbook->getSheetByIndex(i);
         if (sheet) {
-            for (const auto& [cellId, cell] : sheet->cells) {
-                if (cell->isFormula()) {
+            for (const auto& cellId : sheet->getCellIds()) {
+                Cell* cell = _workbook->getCell(cellId);
+                if (cell && cell->isFormula()) {
                     return true;
                 }
             }

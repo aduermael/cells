@@ -10,7 +10,18 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 1 in progress - updating test files to use new cell storage pattern.
+**Current status:** Phase 1 in progress - most files updated, fixing remaining test failures.
+
+**Progress Jan 17 (session 2):**
+- Updated all `sheet->cells` iterations in test and app files
+- Fixed FormulaDisplayConverter usage in fill_range_test.cc (needs workbook param)
+- fill_range_test.cc now passes
+- xlsx_reader_test.cc and xlsx_writer_test.cc still failing - need to ensure XLSX reader sets sheet's workbook pointer before adding cells
+- Identified issue: XLSX reader adds cells before sheet is added to workbook, so sheet's `_workbook` is null
+
+**Next steps:**
+1. Fix XLSX reader to set sheet's workbook pointer before adding cells
+2. Run all tests to verify Phase 1 complete
 
 ## Current Architecture
 
@@ -73,17 +84,24 @@ Add primary cell storage at Workbook level. Sheets keep a lightweight secondary 
 - [x] core/cells/ref_converter_test.cc - Refactored to use createTestWorkbook()
 - [x] core/cells/large_file_test.cc - 1 occurrence fixed
 
-**Test files remaining (need to update `sheet->cells` iterations):**
-- [ ] core/cells/xlsx_reader_test.cc - 14 occurrences
-- [ ] core/cells/xlsx_writer_test.cc - check count
-- [ ] core/cells/fill_range_test.cc - check count
+**Test files updated (session 2):**
+- [x] core/cells/xlsx_reader_test.cc - 14 occurrences updated
+- [x] core/cells/xlsx_writer_test.cc - 10 occurrences updated
+- [x] core/cells/fill_range_test.cc - fixed FormulaDisplayConverter to use workbook param
+- [x] core/cells/xlsx_writer.cc - 5 occurrences updated (plus function signature change)
 
-**App files remaining:**
-- [ ] apps/wasm/bindings_*.cc - multiple files
-- [ ] apps/cli/converter.cc
-- [ ] apps/cli/main.cc
-- [ ] apps/cli/converter_test.cc
-- [ ] core/cells/luau_api.cc
+**App files updated (session 2):**
+- [x] apps/wasm/bindings_format.cc - 5 occurrences
+- [x] apps/wasm/bindings_viewport.cc - 1 occurrence
+- [x] apps/wasm/bindings_formula.cc - 3 occurrences
+- [x] apps/wasm/bindings_file.cc - 3 occurrences
+- [x] apps/wasm/bindings_core.cc - 6 occurrences
+- [x] apps/cli/converter.cc - 4 occurrences
+- [x] apps/cli/main.cc - 1 occurrence
+
+**Remaining issues:**
+- [ ] Fix XLSX reader: sheet's `_workbook` is null when addCell is called (cells added before sheet added to workbook)
+- [ ] Fix lint errors introduced by clang-format (braces around single statements)
 
 - [ ] 1i: Run all tests to verify cell operations work correctly
 

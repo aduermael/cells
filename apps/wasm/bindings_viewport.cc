@@ -521,7 +521,10 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
     }
 
     // Iterate through all spill masters and check if any spilled positions are in viewport
-    for (const auto& [cellId, cell] : sheet->cells) {
+    for (const auto& cellId : sheet->getCellIds()) {
+        Cell* cell = _workbook->getCell(cellId);
+        if (!cell) continue;
+
         const SpillInfo* spillInfo = sheet->getSpillInfo(cell->id);
         if (spillInfo == nullptr || spillInfo->spilledPositions.empty()) {
             continue;

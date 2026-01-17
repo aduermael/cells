@@ -66,7 +66,8 @@ void RefConverter::setContext(const Sheet& sheet) {
     locationToCellId_.reserve(cellIds.size());
     for (const ID& cellId : cellIds) {
         const Cell* cell = wb ? wb->getCell(cellId) : nullptr;
-        if (!cell) continue;
+        if (!cell)
+            continue;
         const std::string cellIdStr = cell->id.toString();
         const std::string colIdStr = cell->colId.toString();
         const std::string rowIdStr = cell->rowId.toString();

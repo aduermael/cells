@@ -864,7 +864,8 @@ static size_t iterateColumnRange(const RangeBounds& bounds, Sheet* sheet,
     std::vector<std::tuple<uint32_t, uint32_t, ID>> cellsInRange;
     for (const ID& cellId : sheet->getCellIds()) {
         const Cell* cell = sheet->getCell(cellId);
-        if (!cell) continue;
+        if (!cell)
+            continue;
         const Axis* col = sheet->getColumn(cell->colId);
         if (col && col->position >= startCol->position && col->position <= endCol->position) {
             const Axis* row = sheet->getRow(cell->rowId);
@@ -902,7 +903,8 @@ static size_t iterateRowRange(const RangeBounds& bounds, Sheet* sheet,
     std::vector<std::tuple<uint32_t, uint32_t, ID>> cellsInRange;
     for (const ID& cellId : sheet->getCellIds()) {
         const Cell* cell = sheet->getCell(cellId);
-        if (!cell) continue;
+        if (!cell)
+            continue;
         const Axis* row = sheet->getRow(cell->rowId);
         if (row && row->position >= startRow->position && row->position <= endRow->position) {
             const Axis* col = sheet->getColumn(cell->colId);

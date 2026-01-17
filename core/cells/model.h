@@ -355,7 +355,6 @@ struct Sheet {
     std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> columns;
     std::unordered_map<ID, std::unique_ptr<Axis>, IDHash> rows;
 
-
     Sheet();
     explicit Sheet(const ID& id, std::string name = "Sheet1");
     ~Sheet();
@@ -365,7 +364,7 @@ struct Sheet {
     Cell* getCellAt(const ID& colId, const ID& rowId);
     Cell* getOrCreateCellAt(const ID& colId, const ID& rowId);  // Auto-creates if needed
     void addCell(std::unique_ptr<Cell> cell);
-    void reserveCells(size_t count);  // Pre-allocate capacity for bulk imports
+    void reserveCells(size_t count);             // Pre-allocate capacity for bulk imports
     void removeCellFromIndex(const ID& cellId);  // Remove cell from position index (for CRDT ops)
 
     // Axis operations

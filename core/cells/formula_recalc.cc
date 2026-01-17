@@ -430,7 +430,8 @@ bool hasDirtyCells(Sheet* sheet) {
 
     for (const ID& cellId : sheet->getCellIds()) {
         const Cell* cell = sheet->getCell(cellId);
-        if (!cell) continue;
+        if (!cell)
+            continue;
         const Formula* formula = cell->getFormula();
         if (formula && formula->dirty) {
             return true;
@@ -453,7 +454,8 @@ std::vector<ID> getDirtyCells(Sheet* sheet) {
     // Collect all dirty cells
     for (const ID& cellId : sheet->getCellIds()) {
         const Cell* cell = sheet->getCell(cellId);
-        if (!cell) continue;
+        if (!cell)
+            continue;
         const Formula* formula = cell->getFormula();
         if (formula && formula->dirty) {
             dirtyCells.push_back(cellId);

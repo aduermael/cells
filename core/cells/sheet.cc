@@ -82,11 +82,14 @@ Sheet::~Sheet() = default;
 Cell* Sheet::getCell(const ID& cellId) {
     // Delegate to workbook for actual cell storage
     // The cell belongs to this sheet if it exists and its column is in this sheet
-    if (!_workbook) return nullptr;
+    if (!_workbook)
+        return nullptr;
     Cell* cell = _workbook->getCell(cellId);
-    if (!cell) return nullptr;
+    if (!cell)
+        return nullptr;
     // Verify the cell belongs to this sheet by checking its column
-    if (columns.find(cell->colId) == columns.end()) return nullptr;
+    if (columns.find(cell->colId) == columns.end())
+        return nullptr;
     return cell;
 }
 
@@ -131,9 +134,11 @@ void Sheet::reserveCells(size_t count) {
 
 void Sheet::removeCellFromIndex(const ID& cellId) {
     // Get the cell to find its position key
-    if (!_workbook) return;
+    if (!_workbook)
+        return;
     const Cell* cell = _workbook->getCell(cellId);
-    if (!cell) return;
+    if (!cell)
+        return;
 
     auto key = makeCellKey(cell->colId, cell->rowId);
     _cellIndex.erase(key);

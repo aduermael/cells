@@ -93,7 +93,7 @@ protected:
         if (!cell || !cell->isFormula()) {
             return "";
         }
-        FormulaDisplayConverter converter(*sheet);
+        FormulaDisplayConverter converter(*sheet, workbook.get());
         return converter.toDisplayString(cell->getFormula()->ast);
     }
 

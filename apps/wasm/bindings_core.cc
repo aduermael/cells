@@ -592,11 +592,12 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
 
     // Also recalculate all cells with #SPILL! error - the value change might
     // have removed a blocking condition, allowing spills to be restored
-    for (const auto& [id, cellPtr] : sheet->cells) {
-        if (cellPtr->value.type == CellValueType::FORMULA_ERROR &&
+    for (const auto& cellId : sheet->getCellIds()) {
+        Cell* cellPtr = _workbook->getCell(cellId);
+        if (cellPtr && cellPtr->value.type == CellValueType::FORMULA_ERROR &&
             cellPtr->value.error == CellError::SPILL) {
-            markDirty(sheet, id);
-            changed.push_back(id);
+            markDirty(sheet, cellId);
+            changed.push_back(cellId);
         }
     }
 
@@ -791,46 +792,46 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
         applyOperation(*_workbook, rowOp);
     }
 
-    for (const auto& [id, cell] : sheet->cells) {
-        if (cell->colId == colId && cell->rowId == rowId) {
-            if (_syncManager) {
-                _syncManager->pruneOpLog();
-            }
-
-            if (colCreated) {
-                _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
-            }
-            if (rowCreated) {
-                _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
-            }
-
-            std::ostringstream json;
-            json << "{\"success\":true,\"id\":\"" << id.toString() << "\",\"existed\":true,";
-
-            // Compute editValue for formatted numbers (dates, percentages, etc.)
-            std::string editValue = cell->value.raw;
-            const ID cellFormatId = _workbook->getCellFormatId(cell->id);
-            if (cell->value.type == CellValueType::NUMBER && !cellFormatId.isNull()) {
-                double numValue = cell->value.asNumber();
-                editValue = formatEditValue(_formatRegistry, numValue, cellFormatId);
-            }
-
-            if (cell->isFormula()) {
-                Formula* formula = cell->getFormula();
-                if (formula != nullptr && formula->ast != nullptr) {
-                    const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
-                    std::string a1Formula = _refConverter.formulaToA1(uuidFormula);
-                    json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
-                }
-                json << "\"value\":\"" << jsonEscape(cell->value.raw) << "\",";
-                json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
-            } else {
-                json << "\"value\":\"" << jsonEscape(cell->value.raw) << "\",";
-                json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
-            }
-            json << "}";
-            return json.str();
+    Cell* existingCell = sheet->getCellAt(colId, rowId);
+    if (existingCell) {
+        if (_syncManager) {
+            _syncManager->pruneOpLog();
         }
+
+        if (colCreated) {
+            _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
+        }
+        if (rowCreated) {
+            _viewportIndex.onAxisInserted(rowId, false, row, DEFAULT_ROW_HEIGHT);
+        }
+
+        std::ostringstream json;
+        json << "{\"success\":true,\"id\":\"" << existingCell->id.toString()
+             << "\",\"existed\":true,";
+
+        // Compute editValue for formatted numbers (dates, percentages, etc.)
+        std::string editValue = existingCell->value.raw;
+        const ID cellFormatId = _workbook->getCellFormatId(existingCell->id);
+        if (existingCell->value.type == CellValueType::NUMBER && !cellFormatId.isNull()) {
+            double numValue = existingCell->value.asNumber();
+            editValue = formatEditValue(_formatRegistry, numValue, cellFormatId);
+        }
+
+        if (existingCell->isFormula()) {
+            Formula* formula = existingCell->getFormula();
+            if (formula != nullptr && formula->ast != nullptr) {
+                const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
+                std::string a1Formula = _refConverter.formulaToA1(uuidFormula);
+                json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
+            }
+            json << "\"value\":\"" << jsonEscape(existingCell->value.raw) << "\",";
+            json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
+        } else {
+            json << "\"value\":\"" << jsonEscape(existingCell->value.raw) << "\",";
+            json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
+        }
+        json << "}";
+        return json.str();
     }
 
     ID cellId = generate_id();
@@ -877,13 +878,13 @@ std::string CellsEngine::deleteCell(const std::string& cellIdStr) {
     }
     ID cellId(cellIdStr);
 
-    auto it = sheet->cells.find(cellId);
-    if (it == sheet->cells.end()) {
+    Cell* cellToDelete = _workbook->getCell(cellId);
+    if (!cellToDelete) {
         return "{\"error\":\"Cell not found\"}";
     }
 
-    const ID colId = it->second->colId;
-    const ID rowId = it->second->rowId;
+    const ID colId = cellToDelete->colId;
+    const ID rowId = cellToDelete->rowId;
 
     Operation op = makeCellClearOp(*_workbook, cellId);
     applyOperation(*_workbook, op);
@@ -898,11 +899,12 @@ std::string CellsEngine::deleteCell(const std::string& cellIdStr) {
     // After deleting a cell, recalculate all cells with #SPILL! error
     // This allows blocked spills to be restored when the blocking cell is removed
     std::vector<ID> spillErrorCells;
-    for (const auto& [id, cellPtr] : sheet->cells) {
-        if (cellPtr->value.type == CellValueType::FORMULA_ERROR &&
+    for (const auto& cId : sheet->getCellIds()) {
+        Cell* cellPtr = _workbook->getCell(cId);
+        if (cellPtr && cellPtr->value.type == CellValueType::FORMULA_ERROR &&
             cellPtr->value.error == CellError::SPILL) {
-            spillErrorCells.push_back(id);
-            markDirty(sheet, id);
+            spillErrorCells.push_back(cId);
+            markDirty(sheet, cId);
         }
     }
     if (!spillErrorCells.empty()) {
@@ -947,36 +949,36 @@ std::string CellsEngine::deleteCellAt(uint32_t col, uint32_t row) {
         return "{\"success\":true,\"deleted\":false}";
     }
 
-    for (const auto& [id, cell] : sheet->cells) {
-        if (cell->colId == colId && cell->rowId == rowId) {
-            Operation op = makeCellClearOp(*_workbook, id);
-            applyOperation(*_workbook, op);
+    Cell* cellToDelete = sheet->getCellAt(colId, rowId);
+    if (cellToDelete) {
+        Operation op = makeCellClearOp(*_workbook, cellToDelete->id);
+        applyOperation(*_workbook, op);
 
-            if (_syncManager) {
-                _syncManager->queueOperationsBroadcast();
-                _syncManager->pruneOpLog();
-            }
-
-            _viewportIndex.onCellRemoved(colId, rowId);
-
-            // After deleting a cell, recalculate all cells with #SPILL! error
-            // This allows blocked spills to be restored when the blocking cell is removed
-            std::vector<ID> spillErrorCells;
-            for (const auto& [cellId, cellPtr] : sheet->cells) {
-                if (cellPtr->value.type == CellValueType::FORMULA_ERROR &&
-                    cellPtr->value.error == CellError::SPILL) {
-                    spillErrorCells.push_back(cellId);
-                    markDirty(sheet, cellId);
-                }
-            }
-            if (!spillErrorCells.empty()) {
-                cells::recalculate(sheet, spillErrorCells);
-                cells::recalculateCrossSheet(_workbook.get(), sheet, spillErrorCells);
-            }
-
-            notifyListeners(ChangeType::CELL_CHANGED);
-            return "{\"success\":true,\"deleted\":true}";
+        if (_syncManager) {
+            _syncManager->queueOperationsBroadcast();
+            _syncManager->pruneOpLog();
         }
+
+        _viewportIndex.onCellRemoved(colId, rowId);
+
+        // After deleting a cell, recalculate all cells with #SPILL! error
+        // This allows blocked spills to be restored when the blocking cell is removed
+        std::vector<ID> spillErrorCells;
+        for (const auto& cId : sheet->getCellIds()) {
+            Cell* cellPtr = _workbook->getCell(cId);
+            if (cellPtr && cellPtr->value.type == CellValueType::FORMULA_ERROR &&
+                cellPtr->value.error == CellError::SPILL) {
+                spillErrorCells.push_back(cId);
+                markDirty(sheet, cId);
+            }
+        }
+        if (!spillErrorCells.empty()) {
+            cells::recalculate(sheet, spillErrorCells);
+            cells::recalculateCrossSheet(_workbook.get(), sheet, spillErrorCells);
+        }
+
+        notifyListeners(ChangeType::CELL_CHANGED);
+        return "{\"success\":true,\"deleted\":true}";
     }
 
     return "{\"success\":true,\"deleted\":false}";

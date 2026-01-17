@@ -69,8 +69,9 @@ TEST(XLSXReaderTest, ReadNumbers) {
 
     // Check that we have numeric cells
     bool foundNumber = false;
-    for (const auto& [id, cell] : sheet->cells) {
-        if (cell->value.type == CellValueType::NUMBER) {
+    for (const auto& cellId : sheet->getCellIds()) {
+        Cell* cell = result.workbook->getCell(cellId);
+        if (cell && cell->value.type == CellValueType::NUMBER) {
             foundNumber = true;
             break;
         }
@@ -88,8 +89,9 @@ TEST(XLSXReaderTest, ReadStrings) {
 
     // Check that we have string cells
     bool foundString = false;
-    for (const auto& [id, cell] : sheet->cells) {
-        if (cell->value.type == CellValueType::STRING) {
+    for (const auto& cellId : sheet->getCellIds()) {
+        Cell* cell = result.workbook->getCell(cellId);
+        if (cell && cell->value.type == CellValueType::STRING) {
             foundString = true;
             break;
         }
@@ -107,8 +109,9 @@ TEST(XLSXReaderTest, ReadBooleans) {
 
     // Check that we have boolean cells
     bool foundBoolean = false;
-    for (const auto& [id, cell] : sheet->cells) {
-        if (cell->value.type == CellValueType::BOOLEAN) {
+    for (const auto& cellId : sheet->getCellIds()) {
+        Cell* cell = result.workbook->getCell(cellId);
+        if (cell && cell->value.type == CellValueType::BOOLEAN) {
             foundBoolean = true;
             break;
         }
@@ -130,8 +133,9 @@ TEST(XLSXReaderTest, ReadFormulas) {
 
     // Check that we have formula cells
     int formulaCount = 0;
-    for (const auto& [id, cell] : sheet->cells) {
-        if (cell->isFormula()) {
+    for (const auto& cellId : sheet->getCellIds()) {
+        Cell* cell = result.workbook->getCell(cellId);
+        if (cell && cell->isFormula()) {
             formulaCount++;
             // Formula should have AST
             EXPECT_NE(cell->formula->ast, nullptr);
@@ -153,8 +157,9 @@ TEST(XLSXReaderTest, FormulaContainsExcelNotation) {
 
     // Look for formulas with A1 notation (e.g., "A1+B1", "SUM(A1:A3)")
     bool foundA1Reference = false;
-    for (const auto& [id, cell] : sheet->cells) {
-        if (cell->isFormula() && cell->formula->ast != nullptr) {
+    for (const auto& cellId : sheet->getCellIds()) {
+        Cell* cell = result.workbook->getCell(cellId);
+        if (cell && cell->isFormula() && cell->formula->ast != nullptr) {
             std::string formula = FormulaSerializer::serialize(cell->formula->ast);
             // Check for cell reference patterns
             if (formula.find("A1") != std::string::npos ||
@@ -181,7 +186,9 @@ TEST(XLSXReaderTest, SkipFormulasWhenDisabled) {
     ASSERT_NE(sheet, nullptr);
 
     // Should have no formula cells
-    for (const auto& [id, cell] : sheet->cells) {
+    for (const auto& cellId : sheet->getCellIds()) {
+        Cell* cell = result.workbook->getCell(cellId);
+        ASSERT_NE(cell, nullptr);
         EXPECT_FALSE(cell->isFormula()) << "Expected no formula cells when readFormulas=false";
     }
 }
@@ -254,8 +261,9 @@ TEST(XLSXReaderTest, ReadUnicodeText) {
 
     // Check that we can read cells with unicode content
     bool foundUnicode = false;
-    for (const auto& [id, cell] : sheet->cells) {
-        if (cell->value.type == CellValueType::STRING) {
+    for (const auto& cellId : sheet->getCellIds()) {
+        Cell* cell = result.workbook->getCell(cellId);
+        if (cell && cell->value.type == CellValueType::STRING) {
             const std::string& str = cell->value.asString();
             // Check for non-ASCII characters (UTF-8 multi-byte sequences)
             for (char c : str) {
@@ -629,8 +637,8 @@ TEST(XLSXReaderTest, ReadNumberFormatsFromLBOModel) {
     bool foundPercentageFormat = false;
     bool foundNumberFormat = false;
 
-    for (const auto& [cellId, cell] : sheet->cells) {
-        const ID formatId = result.workbook->getCellFormatId(cell->id);
+    for (const auto& cellId : sheet->getCellIds()) {
+        const ID formatId = result.workbook->getCellFormatId(cellId);
         if (formatId.isNull()) {
             continue;
         }
@@ -674,9 +682,9 @@ TEST(XLSXReaderTest, ReadNumberFormatsWithStyles) {
     size_t cellsWithFormatOnly = 0;
     size_t cellsWithStyleOnly = 0;
 
-    for (const auto& [cellId, cell] : sheet->cells) {
-        const bool hasStyle = !result.workbook->getCellStyleId(cell->id).isNull();
-        const bool hasFormat = !result.workbook->getCellFormatId(cell->id).isNull();
+    for (const auto& cellId : sheet->getCellIds()) {
+        const bool hasStyle = !result.workbook->getCellStyleId(cellId).isNull();
+        const bool hasFormat = !result.workbook->getCellFormatId(cellId).isNull();
 
         if (hasStyle && hasFormat) {
             cellsWithStyleAndFormat++;
@@ -706,8 +714,8 @@ TEST(XLSXReaderTest, NumberFormatsNotImportedWhenStylesDisabled) {
     ASSERT_NE(sheet, nullptr);
 
     // All cells should have null formatId when styles are disabled (read from workbook map)
-    for (const auto& [cellId, cell] : sheet->cells) {
-        EXPECT_TRUE(result.workbook->getCellFormatId(cell->id).isNull())
+    for (const auto& cellId : sheet->getCellIds()) {
+        EXPECT_TRUE(result.workbook->getCellFormatId(cellId).isNull())
             << "formatId should be null when readStyles=false";
     }
 }
@@ -831,8 +839,8 @@ TEST(XLSXReaderTest, CellBordersImportedFromLBOModel) {
     size_t cellsWithStyles = 0;
 
     // Iterate through all cells and check for borders (read from workbook map)
-    for (const auto& [id, cell] : sheet->cells) {
-        const ID cellStyleId = result.workbook->getCellStyleId(cell->id);
+    for (const auto& cellId : sheet->getCellIds()) {
+        const ID cellStyleId = result.workbook->getCellStyleId(cellId);
         if (!cellStyleId.isNull()) {
             cellsWithStyles++;
             auto* stylePtr = result.workbook->getStyle(cellStyleId);
@@ -870,8 +878,8 @@ TEST(XLSXReaderTest, ReadThemeColorsFromLBOModel) {
     size_t cellsWithBgColor = 0;
     size_t cellsWithDarkBgColor = 0;
 
-    for (const auto& [id, cell] : sheet->cells) {
-        const ID cellStyleId = result.workbook->getCellStyleId(cell->id);
+    for (const auto& cellId : sheet->getCellIds()) {
+        const ID cellStyleId = result.workbook->getCellStyleId(cellId);
         if (!cellStyleId.isNull()) {
             auto* stylePtr = result.workbook->getStyle(cellStyleId);
             if (stylePtr && !stylePtr->bgColor.empty()) {
@@ -917,8 +925,8 @@ TEST(XLSXReaderTest, ReadLightGrayBackgroundFromTheme) {
     // Light gray is approximately #D9D9D9 to #E6E6E6
     size_t cellsWithLightGray = 0;
 
-    for (const auto& [id, cell] : sheet->cells) {
-        const ID cellStyleId = result.workbook->getCellStyleId(cell->id);
+    for (const auto& cellId : sheet->getCellIds()) {
+        const ID cellStyleId = result.workbook->getCellStyleId(cellId);
         if (!cellStyleId.isNull()) {
             auto* stylePtr = result.workbook->getStyle(cellStyleId);
             if (stylePtr && !stylePtr->bgColor.empty() && stylePtr->bgColor.length() == 7) {
@@ -957,8 +965,12 @@ TEST(XLSXReaderTest, ReadGeneralAlignmentFromLBOModel) {
     size_t cellsWithExplicitAlign = 0;
     size_t numericCellsWithGeneralAlign = 0;
 
-    for (const auto& [id, cell] : sheet->cells) {
-        const ID cellStyleId = result.workbook->getCellStyleId(cell->id);
+    for (const auto& cellId : sheet->getCellIds()) {
+        Cell* cell = result.workbook->getCell(cellId);
+        if (!cell)
+            continue;
+
+        const ID cellStyleId = result.workbook->getCellStyleId(cellId);
         if (!cellStyleId.isNull()) {
             auto* stylePtr = result.workbook->getStyle(cellStyleId);
             if (stylePtr) {

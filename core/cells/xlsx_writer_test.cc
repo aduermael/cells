@@ -198,7 +198,9 @@ TEST(XLSXWriterTest, WriteNumbers) {
     EXPECT_EQ(readSheet->cellCount(), 1u);
 
     // Find the cell and check value
-    for (const auto& [id, c] : readSheet->cells) {
+    for (const auto& cellId : readSheet->getCellIds()) {
+        Cell* c = readResult.workbook->getCell(cellId);
+        ASSERT_NE(c, nullptr);
         EXPECT_EQ(c->value.type, CellValueType::NUMBER);
         EXPECT_DOUBLE_EQ(c->value.asNumber(), 42.5);
     }
@@ -241,7 +243,10 @@ TEST(XLSXWriterTest, WriteStrings) {
 
     // Check that we have a string cell
     bool foundString = false;
-    for (const auto& [id, c] : readSheet->cells) {
+    for (const auto& cellId : readSheet->getCellIds()) {
+        Cell* c = readResult.workbook->getCell(cellId);
+        if (!c)
+            continue;
         if (c->value.type == CellValueType::STRING) {
             foundString = true;
             EXPECT_EQ(c->value.asString(), "Hello World");
@@ -295,7 +300,10 @@ TEST(XLSXWriterTest, WriteBooleans) {
 
     bool foundTrue = false;
     bool foundFalse = false;
-    for (const auto& [id, c] : readSheet->cells) {
+    for (const auto& cellId : readSheet->getCellIds()) {
+        Cell* c = readResult.workbook->getCell(cellId);
+        if (!c)
+            continue;
         EXPECT_EQ(c->value.type, CellValueType::BOOLEAN);
         if (c->value.asBoolean()) {
             foundTrue = true;
@@ -553,7 +561,10 @@ TEST(XLSXWriterTest, RoundtripPreservesNumberValues) {
     EXPECT_EQ(readSheet->cellCount(), values.size());
 
     // Verify all values are numbers
-    for (const auto& [id, c] : readSheet->cells) {
+    for (const auto& cellId : readSheet->getCellIds()) {
+        Cell* c = readResult.workbook->getCell(cellId);
+        if (!c)
+            continue;
         EXPECT_EQ(c->value.type, CellValueType::NUMBER);
     }
 }
@@ -699,7 +710,10 @@ TEST(XLSXWriterTest, WriteFormulas) {
 
     // Find the formula cell
     bool foundFormula = false;
-    for (const auto& [id, c] : readSheet->cells) {
+    for (const auto& cellId : readSheet->getCellIds()) {
+        Cell* c = readResult.workbook->getCell(cellId);
+        if (!c)
+            continue;
         if (c->isFormula()) {
             foundFormula = true;
             const Formula* f = c->getFormula();
@@ -791,7 +805,10 @@ TEST(XLSXWriterTest, WriteSharedFormulas) {
     // Count formula cells - should have 3 (1 master + 2 subscribers)
     int formulaCount = 0;
     int sharedFormulaCount = 0;
-    for (const auto& [id, c] : readSheet->cells) {
+    for (const auto& cellId : readSheet->getCellIds()) {
+        Cell* c = readResult.workbook->getCell(cellId);
+        if (!c)
+            continue;
         if (c->isFormula()) {
             formulaCount++;
         }
@@ -933,7 +950,10 @@ TEST(XLSXWriterTest, WriteFormulasWithEvaluatedTypes) {
 
     // Count formula cells - should have 4 formula cells
     int formulaCount = 0;
-    for (const auto& [id, c] : readSheet->cells) {
+    for (const auto& cellId : readSheet->getCellIds()) {
+        Cell* c = readResult.workbook->getCell(cellId);
+        if (!c)
+            continue;
         if (c->isFormula()) {
             formulaCount++;
         }
@@ -989,7 +1009,10 @@ TEST(XLSXWriterTest, WriteFormulasDisabledWithDifferentTypes) {
     ASSERT_NE(readSheet, nullptr);
 
     // Verify no formulas but values are present
-    for (const auto& [id, c] : readSheet->cells) {
+    for (const auto& cellId : readSheet->getCellIds()) {
+        Cell* c = readResult.workbook->getCell(cellId);
+        if (!c)
+            continue;
         EXPECT_FALSE(c->isFormula()) << "Cell should not have formula when writeFormulas=false";
         EXPECT_EQ(c->value.type, CellValueType::NUMBER);
         EXPECT_DOUBLE_EQ(c->value.asNumber(), 42.0);
@@ -1038,7 +1061,10 @@ TEST(XLSXWriterTest, SkipFormulasWhenDisabled) {
     ASSERT_NE(readSheet, nullptr);
 
     // Check that no cell has a formula
-    for (const auto& [id, c] : readSheet->cells) {
+    for (const auto& cellId : readSheet->getCellIds()) {
+        Cell* c = readResult.workbook->getCell(cellId);
+        if (!c)
+            continue;
         EXPECT_FALSE(c->isFormula()) << "Cell should not have formula when writeFormulas=false";
         EXPECT_EQ(c->value.type, CellValueType::NUMBER);
         EXPECT_DOUBLE_EQ(c->value.asNumber(), 42.0);
@@ -1090,7 +1116,10 @@ TEST(XLSXWriterTest, WriteStringWithXmlSpecialChars) {
 
     // Count matching strings
     int matchCount = 0;
-    for (const auto& [id, c] : readSheet->cells) {
+    for (const auto& cellId : readSheet->getCellIds()) {
+        Cell* c = readResult.workbook->getCell(cellId);
+        if (!c)
+            continue;
         if (c->value.type == CellValueType::STRING) {
             const std::string& val = c->value.asString();
             for (const auto& expected : values) {

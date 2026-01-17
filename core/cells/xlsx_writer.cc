@@ -334,19 +334,13 @@ std::string generateWorkbook(const cells::Workbook& workbook) {
 
                 switch (target.type) {
                     case cells::NamedRangeTarget::Type::CELL: {
-                        const cells::Cell* cell = targetSheet->cells.count(target.id1) != 0
-                                                      ? targetSheet->cells.at(target.id1).get()
-                                                      : nullptr;
+                        const cells::Cell* cell = workbook.getCell(target.id1);
                         xlsxRef = cellIdToXlsxRef(cell, targetSheet);
                         break;
                     }
                     case cells::NamedRangeTarget::Type::RANGE: {
-                        const cells::Cell* startCell = targetSheet->cells.count(target.id1) != 0
-                                                           ? targetSheet->cells.at(target.id1).get()
-                                                           : nullptr;
-                        const cells::Cell* endCell = targetSheet->cells.count(target.id2) != 0
-                                                         ? targetSheet->cells.at(target.id2).get()
-                                                         : nullptr;
+                        const cells::Cell* startCell = workbook.getCell(target.id1);
+                        const cells::Cell* endCell = workbook.getCell(target.id2);
                         xlsxRef = rangeToXlsxRef(startCell, endCell, targetSheet);
                         break;
                     }
@@ -862,8 +856,9 @@ struct CellPosition {
 // cellStyleIndices maps cell pointer to XLSX style index (s attribute)
 // axisStyleIndices maps axis pointer to XLSX style index (style attribute for cols, s for rows)
 std::string generateWorksheet(
-    const cells::Sheet& sheet, SharedStringTable& sst, const cells::RefConverter& refConverter,
-    bool writeFormulas, const std::unordered_map<const cells::Cell*, size_t>& cellStyleIndices,
+    const cells::Sheet& sheet, const cells::Workbook& workbook, SharedStringTable& sst,
+    const cells::RefConverter& refConverter, bool writeFormulas,
+    const std::unordered_map<const cells::Cell*, size_t>& cellStyleIndices,
     const std::unordered_map<const cells::Axis*, size_t>& axisStyleIndices) {
     std::ostringstream xml;
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
@@ -900,8 +895,10 @@ std::string generateWorksheet(
     std::unordered_map<uint64_t, const cells::Cell*> cellGrid;
     // Also track cell positions
     std::unordered_map<const cells::Cell*, CellPosition> cellPositions;
-    for (const auto& pair : sheet.cells) {
-        const cells::Cell* cell = pair.second.get();
+    for (const auto& cellId : sheet.getCellIds()) {
+        const cells::Cell* cell = workbook.getCell(cellId);
+        if (!cell)
+            continue;
         auto colIt = colIdToIndex.find(cell->colId.toString());
         auto rowIt = rowIdToIndex.find(cell->rowId.toString());
         if (colIt != colIdToIndex.end() && rowIt != rowIdToIndex.end()) {
@@ -918,8 +915,10 @@ std::string generateWorksheet(
     int nextSi = 0;
 
     if (writeFormulas) {
-        for (const auto& pair : sheet.cells) {
-            const cells::Cell* cell = pair.second.get();
+        for (const auto& cellId : sheet.getCellIds()) {
+            const cells::Cell* cell = workbook.getCell(cellId);
+            if (!cell)
+                continue;
             // Check if this cell is a shared formula master
             if (cell->isSharedFormulaMaster()) {
                 masterToSi[cell] = nextSi++;
@@ -927,14 +926,18 @@ std::string generateWorksheet(
         }
         // Build master cell ID -> cell pointer map for reverse lookup
         std::unordered_map<std::string, const cells::Cell*> cellIdToCell;
-        for (const auto& pair : sheet.cells) {
-            const cells::Cell* cell = pair.second.get();
+        for (const auto& cellId : sheet.getCellIds()) {
+            const cells::Cell* cell = workbook.getCell(cellId);
+            if (!cell)
+                continue;
             cellIdToCell[cell->id.toString()] = cell;
         }
 
         // Map subscribers to their master's si using Sheet-level tracking
-        for (const auto& pair : sheet.cells) {
-            const cells::Cell* cell = pair.second.get();
+        for (const auto& cellId : sheet.getCellIds()) {
+            const cells::Cell* cell = workbook.getCell(cellId);
+            if (!cell)
+                continue;
             if (cell->isSharedFormula()) {
                 const cells::ID masterId = sheet.getSharedFormulaMaster(cell->id);
                 if (!masterId.isNull()) {
@@ -1610,14 +1613,17 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
 
     for (const auto& sheet : workbook.sheets) {
         // Collect cell styles (read from workbook map)
-        for (const auto& [id, cell] : sheet->cells) {
-            const ID cellStyleId = workbook.getCellStyleId(cell->id);
+        for (const auto& cellId : sheet->getCellIds()) {
+            const Cell* cell = workbook.getCell(cellId);
+            if (!cell)
+                continue;
+            const ID cellStyleId = workbook.getCellStyleId(cellId);
             if (!cellStyleId.isNull()) {
                 // Look up the CellStyle in the workbook
                 const CellStyle* style = workbook.getStyle(cellStyleId);
                 if (style != nullptr) {
                     const size_t styleIdx = styleTable.getOrAddFormat(*style);
-                    cellStyleIndices[cell.get()] = styleIdx;
+                    cellStyleIndices[cell] = styleIdx;
                 }
             }
         }
@@ -1662,8 +1668,9 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         refConverter.setContext(sheet);
 
         // Generate worksheet XML
-        const std::string sheetXml = generateWorksheet(
-            sheet, sst, refConverter, options_.writeFormulas, cellStyleIndices, axisStyleIndices);
+        const std::string sheetXml =
+            generateWorksheet(sheet, workbook, sst, refConverter, options_.writeFormulas,
+                              cellStyleIndices, axisStyleIndices);
 
         const std::string sheetPath = "xl/worksheets/sheet" + std::to_string(i + 1) + ".xml";
         if (!zip.addFile(sheetPath, sheetXml)) {
@@ -1671,7 +1678,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
             return result;
         }
 
-        totalCells += sheet.cells.size();
+        totalCells += sheet.cellCount();
     }
 
     // Write shared strings (after all worksheets so all strings are collected)
