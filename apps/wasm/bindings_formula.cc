@@ -137,7 +137,7 @@ std::string CellsEngine::getFormulaDisplay(const std::string& cellIdStr) {
     // - For refs on the current sheet: shows "B2"
     // - For refs on other sheets: shows "Sheet2!B2"
     FormulaDisplayConverter converter(*sheet, _workbook.get());
-    return converter.toDisplayString(formula->ast.get());
+    return converter.toDisplayString(formula->ast);
 }
 
 std::string CellsEngine::getCellDependencies(const std::string& cellIdStr) {
@@ -249,8 +249,8 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
     std::set<ID> existingColumns;
     std::set<ID> existingRows;
     std::set<ID> existingCells;
-    for (const auto& [id, _] : sheet->columns) existingColumns.insert(id);
-    for (const auto& [id, _] : sheet->rows) existingRows.insert(id);
+    for (const ID& id : sheet->getColumnIds()) { existingColumns.insert(id); }
+    for (const ID& id : sheet->getRowIds()) { existingRows.insert(id); }
     for (const auto& cellId : sheet->getCellIds()) existingCells.insert(cellId);
 
     FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
@@ -258,8 +258,10 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
 
     // Generate operations for newly created entities when collaborating
     if (_workbook->isCollaborating()) {
-        for (const auto& [id, col] : sheet->columns) {
+        for (const ID& id : sheet->getColumnIds()) {
             if (existingColumns.find(id) == existingColumns.end()) {
+                Axis* col = sheet->getColumn(id);
+                if (col == nullptr) { continue; }
                 std::string payload = "{\"pos\":" + std::to_string(col->position) +
                                       ",\"size\":" + std::to_string(col->size) + "}";
                 Operation op = makeColInsertOp(*_workbook, id, payload);
@@ -267,8 +269,10 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
             }
         }
 
-        for (const auto& [id, row] : sheet->rows) {
+        for (const ID& id : sheet->getRowIds()) {
             if (existingRows.find(id) == existingRows.end()) {
+                Axis* row = sheet->getRow(id);
+                if (row == nullptr) { continue; }
                 std::string payload = "{\"pos\":" + std::to_string(row->position) +
                                       ",\"size\":" + std::to_string(row->size) + "}";
                 Operation op = makeRowInsertOp(*_workbook, id, payload);

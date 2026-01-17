@@ -623,11 +623,9 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
 
     ID colId;
     bool colCreated = false;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == col) {
-            colId = id;
-            break;
-        }
+    Axis* colAxis = sheet->getColumnByPosition(col);
+    if (colAxis != nullptr) {
+        colId = colAxis->id;
     }
     if (colId.isNull()) {
         colId = generate_id();
@@ -640,11 +638,9 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
 
     ID rowId;
     bool rowCreated = false;
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == row) {
-            rowId = id;
-            break;
-        }
+    Axis* rowAxis = sheet->getRowByPosition(row);
+    if (rowAxis != nullptr) {
+        rowId = rowAxis->id;
     }
     if (rowId.isNull()) {
         rowId = generate_id();
@@ -760,11 +756,9 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
 
     ID colId;
     bool colCreated = false;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == col) {
-            colId = id;
-            break;
-        }
+    Axis* colAxis = sheet->getColumnByPosition(col);
+    if (colAxis != nullptr) {
+        colId = colAxis->id;
     }
     if (colId.isNull()) {
         colId = generate_id();
@@ -777,11 +771,9 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
 
     ID rowId;
     bool rowCreated = false;
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == row) {
-            rowId = id;
-            break;
-        }
+    Axis* rowAxis = sheet->getRowByPosition(row);
+    if (rowAxis != nullptr) {
+        rowId = rowAxis->id;
     }
     if (rowId.isNull()) {
         rowId = generate_id();
@@ -928,22 +920,18 @@ std::string CellsEngine::deleteCellAt(uint32_t col, uint32_t row) {
     }
 
     ID colId;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == col) {
-            colId = id;
-            break;
-        }
+    Axis* colAxis = sheet->getColumnByPosition(col);
+    if (colAxis != nullptr) {
+        colId = colAxis->id;
     }
     if (colId.isNull()) {
         return "{\"success\":true,\"deleted\":false}";
     }
 
     ID rowId;
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == row) {
-            rowId = id;
-            break;
-        }
+    Axis* rowAxis = sheet->getRowByPosition(row);
+    if (rowAxis != nullptr) {
+        rowId = rowAxis->id;
     }
     if (rowId.isNull()) {
         return "{\"success\":true,\"deleted\":false}";
@@ -1003,8 +991,8 @@ std::string CellsEngine::resizeColumn(const std::string& colIdStr, uint32_t widt
     }
     ID colId(colIdStr);
 
-    auto it = sheet->columns.find(colId);
-    if (it == sheet->columns.end()) {
+    Axis* colAxis = sheet->getColumn(colId);
+    if (colAxis == nullptr) {
         return "{\"error\":\"Column not found\"}";
     }
 
@@ -1037,14 +1025,10 @@ std::string CellsEngine::resizeColumnByPos(uint32_t pos, uint32_t width) {
     if (width < 20) width = 20;
     if (width > 1000) width = 1000;
 
-    Axis* column = nullptr;
+    Axis* column = sheet->getColumnByPosition(pos);
     ID colId;
-    for (auto& [id, col] : sheet->columns) {
-        if (col->position == pos) {
-            column = col.get();
-            colId = id;
-            break;
-        }
+    if (column != nullptr) {
+        colId = column->id;
     }
 
     bool colCreated = false;
@@ -1093,8 +1077,8 @@ std::string CellsEngine::resizeRow(const std::string& rowIdStr, uint32_t height)
     }
     ID rowId(rowIdStr);
 
-    auto it = sheet->rows.find(rowId);
-    if (it == sheet->rows.end()) {
+    Axis* rowAxis = sheet->getRow(rowId);
+    if (rowAxis == nullptr) {
         return "{\"error\":\"Row not found\"}";
     }
 
@@ -1127,14 +1111,10 @@ std::string CellsEngine::resizeRowByPos(uint32_t pos, uint32_t height) {
     if (height < 10) height = 10;
     if (height > 500) height = 500;
 
-    Axis* row = nullptr;
+    Axis* row = sheet->getRowByPosition(pos);
     ID rowId;
-    for (auto& [id, r] : sheet->rows) {
-        if (r->position == pos) {
-            row = r.get();
-            rowId = id;
-            break;
-        }
+    if (row != nullptr) {
+        rowId = row->id;
     }
 
     bool rowCreated = false;
@@ -1187,8 +1167,8 @@ std::string CellsEngine::renameColumn(const std::string& colIdStr, const std::st
     }
     ID colId(colIdStr);
 
-    auto it = sheet->columns.find(colId);
-    if (it == sheet->columns.end()) {
+    Axis* colAxis = sheet->getColumn(colId);
+    if (colAxis == nullptr) {
         return "{\"error\":\"Column not found\"}";
     }
 
@@ -1214,14 +1194,10 @@ std::string CellsEngine::renameColumnByPos(uint32_t pos, const std::string& name
         return "{\"error\":\"Sheet not found\"}";
     }
 
-    Axis* column = nullptr;
+    Axis* column = sheet->getColumnByPosition(pos);
     ID colId;
-    for (auto& [id, col] : sheet->columns) {
-        if (col->position == pos) {
-            column = col.get();
-            colId = id;
-            break;
-        }
+    if (column != nullptr) {
+        colId = column->id;
     }
 
     if (!column) {
@@ -1273,14 +1249,16 @@ std::string CellsEngine::shiftColumnsForEmptyMove(uint32_t sourcePos, uint32_t t
     }
 
     if (sourcePos > targetPos) {
-        for (auto& [id, col] : sheet->columns) {
-            if (col->position >= targetPos && col->position < sourcePos) {
+        for (const ID& id : sheet->getColumnIds()) {
+            Axis* col = sheet->getColumn(id);
+            if (col != nullptr && col->position >= targetPos && col->position < sourcePos) {
                 col->position++;
             }
         }
     } else {
-        for (auto& [id, col] : sheet->columns) {
-            if (col->position > sourcePos && col->position < targetPos) {
+        for (const ID& id : sheet->getColumnIds()) {
+            Axis* col = sheet->getColumn(id);
+            if (col != nullptr && col->position > sourcePos && col->position < targetPos) {
                 col->position--;
             }
         }
@@ -1306,14 +1284,16 @@ std::string CellsEngine::shiftRowsForEmptyMove(uint32_t sourcePos, uint32_t targ
     }
 
     if (sourcePos > targetPos) {
-        for (auto& [id, row] : sheet->rows) {
-            if (row->position >= targetPos && row->position < sourcePos) {
+        for (const ID& id : sheet->getRowIds()) {
+            Axis* row = sheet->getRow(id);
+            if (row != nullptr && row->position >= targetPos && row->position < sourcePos) {
                 row->position++;
             }
         }
     } else {
-        for (auto& [id, row] : sheet->rows) {
-            if (row->position > sourcePos && row->position < targetPos) {
+        for (const ID& id : sheet->getRowIds()) {
+            Axis* row = sheet->getRow(id);
+            if (row != nullptr && row->position > sourcePos && row->position < targetPos) {
                 row->position--;
             }
         }
@@ -1339,12 +1319,12 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
     }
     ID colId(colIdStr);
 
-    auto it = sheet->columns.find(colId);
-    if (it == sheet->columns.end()) {
+    Axis* colAxis = sheet->getColumn(colId);
+    if (colAxis == nullptr) {
         return "{\"error\":\"Column not found\"}";
     }
 
-    uint32_t currentPos = it->second->position;
+    uint32_t currentPos = colAxis->position;
 
     if (targetPos == currentPos || targetPos == currentPos + 1) {
         return "{\"success\":true}";
@@ -1379,12 +1359,12 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
     }
     ID rowId(rowIdStr);
 
-    auto it = sheet->rows.find(rowId);
-    if (it == sheet->rows.end()) {
+    Axis* rowAxis = sheet->getRow(rowId);
+    if (rowAxis == nullptr) {
         return "{\"error\":\"Row not found\"}";
     }
 
-    uint32_t currentPos = it->second->position;
+    uint32_t currentPos = rowAxis->position;
 
     if (targetPos == currentPos || targetPos == currentPos + 1) {
         return "{\"success\":true}";
@@ -1586,11 +1566,9 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
 
     // Get or create the start column (anchor)
     ID startColId;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == minCol) {
-            startColId = id;
-            break;
-        }
+    Axis* startColAxis = sheet->getColumnByPosition(minCol);
+    if (startColAxis != nullptr) {
+        startColId = startColAxis->id;
     }
     if (startColId.isNull()) {
         startColId = generate_id();
@@ -1602,11 +1580,9 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
 
     // Get or create the start row (anchor)
     ID startRowId;
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == minRow) {
-            startRowId = id;
-            break;
-        }
+    Axis* startRowAxis = sheet->getRowByPosition(minRow);
+    if (startRowAxis != nullptr) {
+        startRowId = startRowAxis->id;
     }
     if (startRowId.isNull()) {
         startRowId = generate_id();
@@ -1618,11 +1594,9 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
 
     // Get or create the end column
     ID endColId;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == maxCol) {
-            endColId = id;
-            break;
-        }
+    Axis* endColAxis = sheet->getColumnByPosition(maxCol);
+    if (endColAxis != nullptr) {
+        endColId = endColAxis->id;
     }
     if (endColId.isNull()) {
         endColId = generate_id();
@@ -1634,11 +1608,9 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
 
     // Get or create the end row
     ID endRowId;
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == maxRow) {
-            endRowId = id;
-            break;
-        }
+    Axis* endRowAxis = sheet->getRowByPosition(maxRow);
+    if (endRowAxis != nullptr) {
+        endRowId = endRowAxis->id;
     }
     if (endRowId.isNull()) {
         endRowId = generate_id();
@@ -1650,14 +1622,8 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
 
     // Ensure all intermediate columns exist (for proper range expansion on insert)
     for (uint32_t c = minCol + 1; c < maxCol; c++) {
-        bool found = false;
-        for (const auto& [id, axis] : sheet->columns) {
-            if (axis->position == c) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
+        Axis* colAxis = sheet->getColumnByPosition(c);
+        if (colAxis == nullptr) {
             ID newColId = generate_id();
             std::string colPayload = "{\"pos\":" + std::to_string(c) +
                                      ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
@@ -1668,14 +1634,8 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
 
     // Ensure all intermediate rows exist
     for (uint32_t r = minRow + 1; r < maxRow; r++) {
-        bool found = false;
-        for (const auto& [id, axis] : sheet->rows) {
-            if (axis->position == r) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
+        Axis* rowAxis = sheet->getRowByPosition(r);
+        if (rowAxis == nullptr) {
             ID newRowId = generate_id();
             std::string rowPayload = "{\"pos\":" + std::to_string(r) +
                                      ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
@@ -1717,11 +1677,9 @@ std::string CellsEngine::removeMergeRange(uint32_t col, uint32_t row) {
 
     // Find the column ID at this position
     ID colId;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == col) {
-            colId = id;
-            break;
-        }
+    Axis* colAxis = sheet->getColumnByPosition(col);
+    if (colAxis != nullptr) {
+        colId = colAxis->id;
     }
     if (colId.isNull()) {
         return "{\"error\":\"Column not found\"}";
@@ -1729,11 +1687,9 @@ std::string CellsEngine::removeMergeRange(uint32_t col, uint32_t row) {
 
     // Find the row ID at this position
     ID rowId;
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == row) {
-            rowId = id;
-            break;
-        }
+    Axis* rowAxis = sheet->getRowByPosition(row);
+    if (rowAxis != nullptr) {
+        rowId = rowAxis->id;
     }
     if (rowId.isNull()) {
         return "{\"error\":\"Row not found\"}";

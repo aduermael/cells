@@ -10,13 +10,18 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 10 IN PROGRESS - WASM bindings need updating for workbook-level axis storage.
+**Current status:** Phase 10 COMPLETE - All WASM bindings updated for workbook-level axis storage.
+
+**Progress Jan 17 (session 15):**
+- Fixed all remaining `sheet->columns` and `sheet->rows` usages in WASM bindings
+- Updated bindings_viewport.cc (2 locations), bindings_format.cc (20 locations), bindings_formula.cc (4 locations), bindings_core.cc (28 locations)
+- Fixed formula->ast.get() typo in bindings_formula.cc (should be formula->ast)
+- All 54 unit tests pass
+- All 184 E2E tests pass
 
 **Progress Jan 17 (session 14):**
 - Discovered bindings_viewport.cc still uses old `sheet->columns`/`sheet->rows` patterns
 - Partially fixed bindings_viewport.cc (lines 129, 145, 272-279, 547-554, 623-669, 698-710)
-- **TODO:** Fix remaining usages at lines 863-881 in bindings_viewport.cc
-- **TODO:** Run `bazel run :wasm-dist` then `bazel run :e2e` to verify
 
 **Progress Jan 17 (session 13):**
 - Phase 10: Completed test verification

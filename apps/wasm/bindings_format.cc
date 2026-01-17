@@ -111,11 +111,9 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
     // Find or create column at position
     ID colId;
     bool colCreated = false;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == col) {
-            colId = id;
-            break;
-        }
+    Axis* colAxis = sheet->getColumnByPosition(col);
+    if (colAxis != nullptr) {
+        colId = colAxis->id;
     }
     if (colId.isNull()) {
         colId = generate_id();
@@ -129,11 +127,9 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
     // Find or create row at position
     ID rowId;
     bool rowCreated = false;
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == row) {
-            rowId = id;
-            break;
-        }
+    Axis* rowAxis = sheet->getRowByPosition(row);
+    if (rowAxis != nullptr) {
+        rowId = rowAxis->id;
     }
     if (rowId.isNull()) {
         rowId = generate_id();
@@ -1200,19 +1196,15 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
     Cell* existingCell = nullptr;
 
     // Find existing column at position
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == col) {
-            existingColId = id;
-            break;
-        }
+    Axis* existingColAxis = sheet->getColumnByPosition(col);
+    if (existingColAxis != nullptr) {
+        existingColId = existingColAxis->id;
     }
 
     // Find existing row at position
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == row) {
-            existingRowId = id;
-            break;
-        }
+    Axis* existingRowAxis = sheet->getRowByPosition(row);
+    if (existingRowAxis != nullptr) {
+        existingRowId = existingRowAxis->id;
     }
 
     // If both column and row exist, try to find the cell
@@ -1365,17 +1357,13 @@ std::string CellsEngine::getCellStyleAt(uint32_t col, uint32_t row) {
 
     // Find column and row at positions
     ID colId, rowId;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == col) {
-            colId = id;
-            break;
-        }
+    Axis* colAxis = sheet->getColumnByPosition(col);
+    Axis* rowAxis = sheet->getRowByPosition(row);
+    if (colAxis != nullptr) {
+        colId = colAxis->id;
     }
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == row) {
-            rowId = id;
-            break;
-        }
+    if (rowAxis != nullptr) {
+        rowId = rowAxis->id;
     }
 
     if (colId.isNull() || rowId.isNull()) {
@@ -1481,11 +1469,9 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
     ID startColId, endColId, startRowId, endRowId;
 
     // Find start column
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == minCol) {
-            startColId = id;
-            break;
-        }
+    Axis* startColAxis = sheet->getColumnByPosition(minCol);
+    if (startColAxis != nullptr) {
+        startColId = startColAxis->id;
     }
     if (startColId.isNull()) {
         startColId = generate_id();
@@ -1496,11 +1482,9 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
     }
 
     // Find end column
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == maxCol) {
-            endColId = id;
-            break;
-        }
+    Axis* endColAxis = sheet->getColumnByPosition(maxCol);
+    if (endColAxis != nullptr) {
+        endColId = endColAxis->id;
     }
     if (endColId.isNull()) {
         endColId = generate_id();
@@ -1511,11 +1495,9 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
     }
 
     // Find start row
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == minRow) {
-            startRowId = id;
-            break;
-        }
+    Axis* startRowAxis = sheet->getRowByPosition(minRow);
+    if (startRowAxis != nullptr) {
+        startRowId = startRowAxis->id;
     }
     if (startRowId.isNull()) {
         startRowId = generate_id();
@@ -1526,11 +1508,9 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
     }
 
     // Find end row
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == maxRow) {
-            endRowId = id;
-            break;
-        }
+    Axis* endRowAxis = sheet->getRowByPosition(maxRow);
+    if (endRowAxis != nullptr) {
+        endRowId = endRowAxis->id;
     }
     if (endRowId.isNull()) {
         endRowId = generate_id();
@@ -1823,11 +1803,9 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
             ID rectStartColId, rectEndColId, rectStartRowId, rectEndRowId;
 
             // Find start column
-            for (const auto& [id, axis] : sheet->columns) {
-                if (axis->position == rect.minCol) {
-                    rectStartColId = id;
-                    break;
-                }
+            Axis* rectStartColAxis = sheet->getColumnByPosition(rect.minCol);
+            if (rectStartColAxis != nullptr) {
+                rectStartColId = rectStartColAxis->id;
             }
             if (rectStartColId.isNull()) {
                 rectStartColId = generate_id();
@@ -1838,11 +1816,9 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
             }
 
             // Find end column
-            for (const auto& [id, axis] : sheet->columns) {
-                if (axis->position == rect.maxCol) {
-                    rectEndColId = id;
-                    break;
-                }
+            Axis* rectEndColAxis = sheet->getColumnByPosition(rect.maxCol);
+            if (rectEndColAxis != nullptr) {
+                rectEndColId = rectEndColAxis->id;
             }
             if (rectEndColId.isNull()) {
                 rectEndColId = generate_id();
@@ -1853,11 +1829,9 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
             }
 
             // Find start row
-            for (const auto& [id, axis] : sheet->rows) {
-                if (axis->position == rect.minRow) {
-                    rectStartRowId = id;
-                    break;
-                }
+            Axis* rectStartRowAxis = sheet->getRowByPosition(rect.minRow);
+            if (rectStartRowAxis != nullptr) {
+                rectStartRowId = rectStartRowAxis->id;
             }
             if (rectStartRowId.isNull()) {
                 rectStartRowId = generate_id();
@@ -1868,11 +1842,9 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
             }
 
             // Find end row
-            for (const auto& [id, axis] : sheet->rows) {
-                if (axis->position == rect.maxRow) {
-                    rectEndRowId = id;
-                    break;
-                }
+            Axis* rectEndRowAxis = sheet->getRowByPosition(rect.maxRow);
+            if (rectEndRowAxis != nullptr) {
+                rectEndRowId = rectEndRowAxis->id;
             }
             if (rectEndRowId.isNull()) {
                 rectEndRowId = generate_id();
@@ -2116,9 +2088,9 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
 
     // Priority 3: Column's default style
     if (!colId.isNull()) {
-        auto colIt = sheet.columns.find(colId);
-        if (colIt != sheet.columns.end() && !colIt->second->defaultStyleId.isNull()) {
-            const CellStyle* colStyle = workbook.getStyle(colIt->second->defaultStyleId);
+        const Axis* colAxis = sheet.getColumn(colId);
+        if (colAxis != nullptr && !colAxis->defaultStyleId.isNull()) {
+            const CellStyle* colStyle = workbook.getStyle(colAxis->defaultStyleId);
             if (colStyle) {
                 result = mergeEffectiveStyles(result, *colStyle);
             }
@@ -2127,9 +2099,9 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
 
     // Priority 4: Row's default style
     if (!rowId.isNull()) {
-        auto rowIt = sheet.rows.find(rowId);
-        if (rowIt != sheet.rows.end() && !rowIt->second->defaultStyleId.isNull()) {
-            const CellStyle* rowStyle = workbook.getStyle(rowIt->second->defaultStyleId);
+        const Axis* rowAxis = sheet.getRow(rowId);
+        if (rowAxis != nullptr && !rowAxis->defaultStyleId.isNull()) {
+            const CellStyle* rowStyle = workbook.getStyle(rowAxis->defaultStyleId);
             if (rowStyle) {
                 result = mergeEffectiveStyles(result, *rowStyle);
             }
@@ -2153,17 +2125,13 @@ std::string CellsEngine::getEffectiveCellStyle(uint32_t col, uint32_t row) {
 
     // Find column and row IDs at positions
     ID colId, rowId;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position == col) {
-            colId = id;
-            break;
-        }
+    Axis* colAxis = sheet->getColumnByPosition(col);
+    Axis* rowAxis = sheet->getRowByPosition(row);
+    if (colAxis != nullptr) {
+        colId = colAxis->id;
     }
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position == row) {
-            rowId = id;
-            break;
-        }
+    if (rowAxis != nullptr) {
+        rowId = rowAxis->id;
     }
 
     CellStyle effectiveStyle = computeEffectiveStyleAt(*sheet, *_workbook, col, row, colId, rowId);
@@ -2188,13 +2156,15 @@ std::string CellsEngine::getEffectiveStyleForRange(uint32_t col1, uint32_t row1,
     // Build lookup tables for column/row IDs by position
     std::unordered_map<uint32_t, ID> colIdByPos;
     std::unordered_map<uint32_t, ID> rowIdByPos;
-    for (const auto& [id, axis] : sheet->columns) {
-        if (axis->position >= minCol && axis->position <= maxCol) {
+    for (const ID& id : sheet->getColumnIds()) {
+        Axis* axis = sheet->getColumn(id);
+        if (axis != nullptr && axis->position >= minCol && axis->position <= maxCol) {
             colIdByPos[axis->position] = id;
         }
     }
-    for (const auto& [id, axis] : sheet->rows) {
-        if (axis->position >= minRow && axis->position <= maxRow) {
+    for (const ID& id : sheet->getRowIds()) {
+        Axis* axis = sheet->getRow(id);
+        if (axis != nullptr && axis->position >= minRow && axis->position <= maxRow) {
             rowIdByPos[axis->position] = id;
         }
     }

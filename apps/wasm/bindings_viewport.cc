@@ -860,13 +860,13 @@ std::string CellsEngine::getSpillRangeAt(uint32_t col, uint32_t row) {
 
     uint32_t masterCol = 0;
     uint32_t masterRow = 0;
-    auto masterColIt = sheet->columns.find(masterCell->colId);
-    auto masterRowIt = sheet->rows.find(masterCell->rowId);
-    if (masterColIt != sheet->columns.end()) {
-        masterCol = masterColIt->second->position;
+    Axis* masterColAxis = sheet->getColumn(masterCell->colId);
+    Axis* masterRowAxis = sheet->getRow(masterCell->rowId);
+    if (masterColAxis != nullptr) {
+        masterCol = masterColAxis->position;
     }
-    if (masterRowIt != sheet->rows.end()) {
-        masterRow = masterRowIt->second->position;
+    if (masterRowAxis != nullptr) {
+        masterRow = masterRowAxis->position;
     }
 
     // Calculate the bounding box of the spill range
@@ -876,11 +876,11 @@ std::string CellsEngine::getSpillRangeAt(uint32_t col, uint32_t row) {
     uint32_t maxRow = masterRow;
 
     for (const auto& [spillColId, spillRowId] : spillInfo->spilledPositions) {
-        auto spillColIt = sheet->columns.find(spillColId);
-        auto spillRowIt = sheet->rows.find(spillRowId);
-        if (spillColIt != sheet->columns.end() && spillRowIt != sheet->rows.end()) {
-            uint32_t spillCol = spillColIt->second->position;
-            uint32_t spillRow = spillRowIt->second->position;
+        Axis* spillColAxis = sheet->getColumn(spillColId);
+        Axis* spillRowAxis = sheet->getRow(spillRowId);
+        if (spillColAxis != nullptr && spillRowAxis != nullptr) {
+            uint32_t spillCol = spillColAxis->position;
+            uint32_t spillRow = spillRowAxis->position;
             minCol = std::min(minCol, spillCol);
             maxCol = std::max(maxCol, spillCol);
             minRow = std::min(minRow, spillRow);
