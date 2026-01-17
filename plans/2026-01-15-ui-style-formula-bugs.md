@@ -143,23 +143,19 @@ The parser architecture supports cross-sheet references (verified in formula_par
 
 ## Known Bugs (discovered during testing, to be addressed)
 
-### Bug A: Cross-sheet formula becomes #VALUE! on re-edit ✅ FIXED
+### Bug A: Cross-sheet formula becomes #VALUE! on re-edit (PARTIALLY FIXED)
 
 **Repro**:
 1. Enter `=Sheet2!A1` in cell A1 (Sheet1)
 2. Observe: correct value from Sheet2!A1 is displayed ✓
-3. Click on A1 to edit, don't change anything, press Enter
-4. Observe: cell now shows `#VALUE!` instead of the original value
+3. Click on **formula bar** to edit (not F2 or double-click), don't change anything, press Enter
+4. Observe: formula becomes `=#ERROR!` and cell shows `#VALUE!`
 
-**Root Cause**: The current architecture stores formulas with `!sheetId + cellRef` format. When re-editing:
-1. Formula is converted to A1 notation for display (`=Sheet2!A1`)
-2. On commit, `updateCell()` calls `formulaToUuid()` which tries to convert back
-3. The conversion requires looking up Sheet2's columns/rows to find the cell
-4. Context is lost or lookup fails, resulting in invalid formula
+**Note**: F2 key and double-click editing work correctly. Only formula bar click editing fails.
 
-**Fix**: **Phase 5** - Architectural change where Axis knows its Sheet. Formulas only store Cell UUIDs, and cross-sheet prefixes are added dynamically during display. This eliminates the complex A1↔UUID round-trip that loses context.
+**Root Cause**: When editing via formula bar, the A1→UUID conversion in `formulaToUuid()` fails to resolve the cross-sheet reference. The formula bar editing path differs from F2/double-click paths.
 
-**Status**: FIXED as of Phase 5b. E2E tests added in `tests/cross-sheet-reedit.test.mjs` verify that cross-sheet formulas survive re-editing without changes.
+**Status**: Partially fixed - F2 and double-click work. Formula bar editing still broken. See **Phase 7** for complete fix.
 
 ### Bug B: Error formulas display #ERROR! suffix incorrectly
 
@@ -313,7 +309,8 @@ Formula evaluation was updated to work without explicit sheetId:
 - [x] 5e3: Full E2E test suite passes (184/184 tests)
 - [x] 5e4: Testing cross-sheet formula scenarios:
   - Enter cross-sheet formula ✅ (covered by existing E2E tests)
-  - Re-edit without changes → works ✅ (new E2E tests in `cross-sheet-reedit.test.mjs`)
+  - Re-edit via F2/double-click → works ✅
+  - Re-edit via formula bar click → BROKEN (Bug A, see Phase 7)
   - Rename sheet → deferred (sheet renaming UI not yet implemented)
   - Delete referenced sheet → deferred (sheet deletion not yet implemented)
 
@@ -348,6 +345,93 @@ The backend already supports column/row default styles via `Axis.defaultStyleId`
 - [ ] 6h: Update effective style display to show column/row default styles correctly
 - [ ] 6i: Add E2E test: set column style, then override single cell, verify cell shows override while others show column style
 - [ ] 6j: Visual feedback: highlight entire column/row when selected (not just visible cells)
+
+## Phase 7: Cross-Sheet Formula UX Fixes
+
+This phase addresses remaining cross-sheet formula issues to verify the architecture is correct. The fix should be simple if the architecture is sound.
+
+### Issues to Fix
+
+1. **Bug A (formula bar)**: Cross-sheet formula becomes `#VALUE!` when re-editing via formula bar click
+   - F2 and double-click work correctly
+   - Formula bar editing path has different A1→UUID conversion that fails
+
+2. **Foreign cell highlighting**: Cells from other sheets are not highlighted during formula editing
+   - When editing `=Sheet2!A1`, Sheet2's A1 should be highlighted
+   - Currently no visual feedback for cross-sheet references
+
+3. **Grid highlight persistence**: When switching sheets during formula editing, grid highlights from previous sheet persist
+   - Should clear highlights when leaving a sheet
+   - Should show relevant highlights when entering a sheet (cells referenced from that sheet)
+
+### Implementation
+
+- [ ] 7a: Create E2E test for Bug A (formula bar re-edit) - `tests/bug-a-repro.test.mjs` already exists
+- [ ] 7b: Debug formula bar editing path vs F2/double-click path
+  - Trace the code flow for both paths
+  - Identify where cross-sheet context is lost in formula bar path
+- [ ] 7c: Fix formula bar A1→UUID conversion for cross-sheet references
+- [ ] 7d: Add visual highlighting for foreign cells during formula editing
+  - Track which sheets have referenced cells
+  - When switching to a sheet, highlight any cells referenced by the current formula
+- [ ] 7e: Clear grid highlights when switching sheets
+  - Before switching: clear current sheet's formula highlights
+  - After switching: render new sheet's highlights based on formula references
+- [ ] 7f: Add E2E tests for cross-sheet highlighting behavior
+
+---
+
+## Phase 8: Cell Struct Optimization (formatId/styleId removal)
+
+Currently, `Cell` stores `formatId` and `styleId` directly. This increases memory usage since most cells don't have custom styles/formats.
+
+### Current State
+
+```cpp
+struct Cell {
+    ID id;
+    ID colId;
+    ID rowId;
+    CellValue value;
+    std::unique_ptr<Formula> formula;
+    ID formatId;   // ← Remove
+    ID styleId;    // ← Remove
+    // ...
+};
+```
+
+### Proposed Change
+
+Use a hash map at the Sheet level to store cell→format and cell→style mappings. This provides:
+- **Smaller Cell struct**: Most cells won't need format/style storage
+- **Fast value access**: Cell display only needs `value` field (format/style looked up on demand)
+- **Memory efficiency**: Only cells with custom formats/styles consume extra memory
+
+### Implementation
+
+```cpp
+// Sheet level
+std::unordered_map<ID, ID> _cellFormatMap;  // cellId → formatId
+std::unordered_map<ID, ID> _cellStyleMap;   // cellId → styleId
+
+// API
+ID getCellFormat(const ID& cellId) const;
+ID getCellStyle(const ID& cellId) const;
+void setCellFormat(const ID& cellId, const ID& formatId);
+void setCellStyle(const ID& cellId, const ID& styleId);
+```
+
+### Steps
+
+- [ ] 8a: Add `_cellFormatMap` and `_cellStyleMap` to Sheet
+- [ ] 8b: Add getter/setter methods for cell format and style
+- [ ] 8c: Migrate existing code that accesses `cell->formatId` and `cell->styleId`
+- [ ] 8d: Update CRDT operations to use new map-based storage
+- [ ] 8e: Remove `formatId` and `styleId` from Cell struct
+- [ ] 8f: Update serialization/deserialization
+- [ ] 8g: Run all tests to verify no regressions
+
+---
 
 ## Architecture Notes
 
