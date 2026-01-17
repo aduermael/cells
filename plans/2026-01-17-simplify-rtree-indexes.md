@@ -30,4 +30,4 @@ The rationale was to optimize queries like `queryAt(col, row, RangeFlags::MERGE)
 
 - [x] 2a: Update header comment in `range_index.h` to remove mention of flag-specific indices
 - [x] 2b: Run existing tests to verify no regressions (`range_index_test.cc`) - All 54 unit tests pass
-- [ ] 2c: Run E2E tests to verify viewport/rendering still works correctly
+- [x] 2c: Run E2E tests to verify viewport/rendering still works correctly - All 184 E2E tests pass
