@@ -286,23 +286,29 @@ void Cell::clearFlag(CellFlags flag) {
 // Axis
 // ============================================================================
 
-Axis::Axis() : name(), id(), sheetId(), position(0), size(DEFAULT_COLUMN_WIDTH), isColumn(true) {}
+Axis::Axis()
+    : name(),
+      id(),
+      sheetId(),
+      position(0),
+      size(DEFAULT_COLUMN_WIDTH),
+      _flags(AxisFlags::IS_COLUMN) {}
 
-Axis::Axis(const ID& id, bool isColumn)
+Axis::Axis(const ID& id, bool isCol)
     : name(),
       id(id),
       sheetId(),
       position(0),
-      size(isColumn ? DEFAULT_COLUMN_WIDTH : DEFAULT_ROW_HEIGHT),
-      isColumn(isColumn) {}
+      size(isCol ? DEFAULT_COLUMN_WIDTH : DEFAULT_ROW_HEIGHT),
+      _flags(isCol ? AxisFlags::IS_COLUMN : AxisFlags::NONE) {}
 
-Axis::Axis(const ID& id, const ID& sheetId, bool isColumn)
+Axis::Axis(const ID& id, const ID& sheetId, bool isCol)
     : name(),
       id(id),
       sheetId(sheetId),
       position(0),
-      size(isColumn ? DEFAULT_COLUMN_WIDTH : DEFAULT_ROW_HEIGHT),
-      isColumn(isColumn) {}
+      size(isCol ? DEFAULT_COLUMN_WIDTH : DEFAULT_ROW_HEIGHT),
+      _flags(isCol ? AxisFlags::IS_COLUMN : AxisFlags::NONE) {}
 
 // ============================================================================
 // Workbook

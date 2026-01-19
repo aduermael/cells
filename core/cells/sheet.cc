@@ -222,7 +222,7 @@ void Sheet::addColumn(std::unique_ptr<Axis> col) {
         return;
     }
 
-    col->isColumn = true;
+    col->setIsColumn(true);
     col->sheetId = id;  // Set the sheet ID for reverse lookup
 
     const ID colId = col->id;
@@ -245,7 +245,7 @@ void Sheet::addRow(std::unique_ptr<Axis> row) {
         return;
     }
 
-    row->isColumn = false;
+    row->setIsColumn(false);
     row->sheetId = id;  // Set the sheet ID for reverse lookup
 
     const ID rowId = row->id;

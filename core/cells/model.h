@@ -319,16 +319,43 @@ struct SharedFormulaInfo {
     [[nodiscard]] size_t size() const { return 1 + subscribers.size(); }
 };
 
+// Axis flags - combines type, visibility, and style presence in a single byte
+enum class AxisFlags : uint8_t {
+    NONE = 0,
+    IS_COLUMN = 1 << 0,  // bit 0: true = column (x), false = row (y)
+    HIDDEN = 1 << 1,     // bit 1: Whether axis is hidden
+    HAS_STYLE = 1 << 2,  // bit 2: This axis has a style in workbook._styles map
+    // bits 3-7: reserved for future use
+};
+
+// Bitwise operators for AxisFlags
+inline AxisFlags operator|(AxisFlags a, AxisFlags b) {
+    return static_cast<AxisFlags>(static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
+}
+inline AxisFlags operator&(AxisFlags a, AxisFlags b) {
+    return static_cast<AxisFlags>(static_cast<uint8_t>(a) & static_cast<uint8_t>(b));
+}
+inline AxisFlags operator~(AxisFlags a) {
+    return static_cast<AxisFlags>(~static_cast<uint8_t>(a));
+}
+inline AxisFlags& operator|=(AxisFlags& a, AxisFlags b) {
+    a = a | b;
+    return a;
+}
+inline AxisFlags& operator&=(AxisFlags& a, AxisFlags b) {
+    a = a & b;
+    return a;
+}
+
 // Axis - represents a column or row
 struct Axis {
-    std::string name;    // Custom name (empty = compute from position)
-    ID id;               // Unique identifier (8-char base62)
-    ID sheetId;          // ID of the sheet this axis belongs to
-    uint32_t position;   // Visual position (0-indexed)
-    uint32_t size;       // Width (column) or height (row) in pixels
-    bool isColumn;       // true = column (x), false = row (y)
-    bool hidden{false};  // Whether axis is hidden (default: false)
-    ID defaultStyleId;   // Default style for cells in this axis (null = no default)
+    std::string name;   // Custom name (empty = compute from position)
+    ID id;              // Unique identifier (8-char base62)
+    ID sheetId;         // ID of the sheet this axis belongs to
+    uint32_t position;  // Visual position (0-indexed)
+    uint32_t size;      // Width (column) or height (row) in pixels
+    AxisFlags _flags;   // Combined flags: IS_COLUMN, HIDDEN, HAS_STYLE
+    ID defaultStyleId;  // Default style for cells in this axis (null = no default)
 
     Axis();
     explicit Axis(const ID& id, bool isColumn = true);
@@ -336,6 +363,40 @@ struct Axis {
 
     // Get the sheet ID this axis belongs to
     [[nodiscard]] const ID& getSheetId() const { return sheetId; }
+
+    // Flag accessors
+    [[nodiscard]] bool isColumn() const {
+        return (static_cast<uint8_t>(_flags) & static_cast<uint8_t>(AxisFlags::IS_COLUMN)) != 0;
+    }
+    [[nodiscard]] bool hidden() const {
+        return (static_cast<uint8_t>(_flags) & static_cast<uint8_t>(AxisFlags::HIDDEN)) != 0;
+    }
+    void setHidden(bool hide) {
+        if (hide) {
+            _flags = _flags | AxisFlags::HIDDEN;
+        } else {
+            _flags = _flags & ~AxisFlags::HIDDEN;
+        }
+    }
+    [[nodiscard]] bool hasStyle() const {
+        return (static_cast<uint8_t>(_flags) & static_cast<uint8_t>(AxisFlags::HAS_STYLE)) != 0;
+    }
+    void setHasStyle(bool has) {
+        if (has) {
+            _flags = _flags | AxisFlags::HAS_STYLE;
+        } else {
+            _flags = _flags & ~AxisFlags::HAS_STYLE;
+        }
+    }
+
+    // Internal: set axis type (used by Sheet::addColumn/addRow for safety)
+    void setIsColumn(bool isCol) {
+        if (isCol) {
+            _flags = _flags | AxisFlags::IS_COLUMN;
+        } else {
+            _flags = _flags & ~AxisFlags::IS_COLUMN;
+        }
+    }
 };
 
 // Forward declarations for formula management

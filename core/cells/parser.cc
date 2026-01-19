@@ -771,7 +771,7 @@ bool Parser::parseAxisProps(std::string_view props, Axis& axis) {
             const std::string_view valueStr =
                 (endPos == std::string_view::npos) ? props : props.substr(0, endPos);
 
-            axis.hidden = (valueStr == "1");
+            axis.setHidden(valueStr == "1");
 
             if (endPos == std::string_view::npos) {
                 props = "";

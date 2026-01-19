@@ -2105,7 +2105,7 @@ TEST(SerializerTest, SerializeHiddenColumn) {
     sheet->setWorkbook(&wb);
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
-    col->hidden = true;
+    col->setHidden(true);
     sheet->addColumn(std::move(col));
 
     wb.addSheet(std::move(sheet));
@@ -2123,7 +2123,7 @@ TEST(SerializerTest, SerializeHiddenRow) {
     sheet->setWorkbook(&wb);
 
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
-    row->hidden = true;
+    row->setHidden(true);
     sheet->addRow(std::move(row));
 
     wb.addSheet(std::move(sheet));
@@ -2141,7 +2141,7 @@ TEST(SerializerTest, VisibleColumnNoHiddenProperty) {
     sheet->setWorkbook(&wb);
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
-    col->hidden = false;  // Not hidden (default)
+    col->setHidden(false);  // Not hidden (default)
     sheet->addColumn(std::move(col));
 
     wb.addSheet(std::move(sheet));
@@ -2167,7 +2167,7 @@ C cA1bC2dE 0 hidden:1
 
     Axis* col = sheet->getColumn(ID("cA1bC2dE"));
     ASSERT_NE(col, nullptr);
-    EXPECT_TRUE(col->hidden);
+    EXPECT_TRUE(col->hidden());
 }
 
 TEST(ParserTest, ParseHiddenRow) {
@@ -2184,7 +2184,7 @@ R rA1bC2dE 0 hidden:1
 
     Axis* row = sheet->getRow(ID("rA1bC2dE"));
     ASSERT_NE(row, nullptr);
-    EXPECT_TRUE(row->hidden);
+    EXPECT_TRUE(row->hidden());
 }
 
 TEST(ParserTest, ParseVisibleColumnNoHiddenProperty) {
@@ -2201,7 +2201,7 @@ C cA1bC2dE 0
 
     Axis* col = sheet->getColumn(ID("cA1bC2dE"));
     ASSERT_NE(col, nullptr);
-    EXPECT_FALSE(col->hidden);  // Default is visible
+    EXPECT_FALSE(col->hidden());  // Default is visible
 }
 
 TEST(SerializerTest, HiddenAxisRoundTrip) {
@@ -2211,11 +2211,11 @@ TEST(SerializerTest, HiddenAxisRoundTrip) {
     sheet->setWorkbook(&wb);
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
-    col->hidden = true;
+    col->setHidden(true);
     sheet->addColumn(std::move(col));
 
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
-    row->hidden = true;
+    row->setHidden(true);
     sheet->addRow(std::move(row));
 
     wb.addSheet(std::move(sheet));
@@ -2233,11 +2233,11 @@ TEST(SerializerTest, HiddenAxisRoundTrip) {
 
     Axis* parsedCol = parsedSheet->getColumn(ID("cA1bC2dE"));
     ASSERT_NE(parsedCol, nullptr);
-    EXPECT_TRUE(parsedCol->hidden);
+    EXPECT_TRUE(parsedCol->hidden());
 
     Axis* parsedRow = parsedSheet->getRow(ID("rA1bC2dE"));
     ASSERT_NE(parsedRow, nullptr);
-    EXPECT_TRUE(parsedRow->hidden);
+    EXPECT_TRUE(parsedRow->hidden());
 }
 
 TEST(SerializerTest, AxisDefaultStyleRoundTrip) {

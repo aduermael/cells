@@ -1000,7 +1000,7 @@ std::string generateWorksheet(
     for (const auto& colPair : columns) {
         const cells::Axis* col = sheet.getColumn(colPair.second);
         if (col != nullptr) {
-            if (col->hidden || axisStyleIndices.count(col) > 0) {
+            if (col->hidden() || axisStyleIndices.count(col) > 0) {
                 needColsElement = true;
                 break;
             }
@@ -1011,7 +1011,7 @@ std::string generateWorksheet(
         for (size_t i = 0; i < columns.size(); ++i) {
             const cells::Axis* col = sheet.getColumn(columns[i].second);
             if (col != nullptr) {
-                const bool hidden = col->hidden;
+                const bool hidden = col->hidden();
                 auto styleIt = axisStyleIndices.find(col);
                 const bool hasStyle = styleIt != axisStyleIndices.end() && styleIt->second > 0;
 
@@ -1051,7 +1051,7 @@ std::string generateWorksheet(
         size_t rowStyleIdx = 0;
         const cells::Axis* row = sheet.getRow(rows[rowIdx].second);
         if (row != nullptr) {
-            if (row->hidden) {
+            if (row->hidden()) {
                 rowHidden = true;
             }
             auto styleIt = axisStyleIndices.find(row);

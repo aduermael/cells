@@ -46,12 +46,12 @@ std::string CellsEngine::setRangeStyle(...) {
 
 Create `AxisFlags` enum combining `isColumn`, `hidden`, and reserving bits for `hasStyle` and future use.
 
-- [ ] 1a: Add `AxisFlags` enum in model.h with bits: `IS_COLUMN`, `HIDDEN`, `HAS_STYLE`, and operators
-- [ ] 1b: Replace `bool isColumn` and `bool hidden` in Axis struct with `AxisFlags _flags`
-- [ ] 1c: Add inline accessors: `isColumn()`, `hidden()`, `setHidden()`, `hasStyle()`, `setHasStyle()`
-- [ ] 1d: Update all call sites reading/writing `isColumn` and `hidden` to use new accessors
-- [ ] 1e: Update serializer (parser.cc, serializer.cc) to serialize flags byte
-- [ ] 1f: Run tests to verify no regressions
+- [x] 1a: Add `AxisFlags` enum in model.h with bits: `IS_COLUMN`, `HIDDEN`, `HAS_STYLE`, and operators
+- [x] 1b: Replace `bool isColumn` and `bool hidden` in Axis struct with `AxisFlags _flags`
+- [x] 1c: Add inline accessors: `isColumn()`, `hidden()`, `setHidden()`, `hasStyle()`, `setHasStyle()`, `setIsColumn()`
+- [x] 1d: Update all call sites reading/writing `isColumn` and `hidden` to use new accessors
+- [x] 1e: Update serializer (parser.cc, serializer.cc) to use accessor methods
+- [x] 1f: Run tests to verify no regressions
 
 ## Phase 2: Unify style index and move axis styles
 

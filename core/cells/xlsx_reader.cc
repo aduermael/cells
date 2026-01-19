@@ -1762,7 +1762,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             // Apply column width from XLSX if available, otherwise use default
             auto widthIt = columnWidths.find(c);
             col->size = (widthIt != columnWidths.end()) ? widthIt->second : DEFAULT_COLUMN_WIDTH;
-            col->hidden = columnHidden.count(c) > 0;
+            col->setHidden(columnHidden.count(c) > 0);
             // Apply column default style if present
             auto styleIt = columnStyleIndex.find(c);
             if (styleIt != columnStyleIndex.end()) {
@@ -1778,7 +1778,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             // Apply row height from XLSX if available, otherwise use default
             auto heightIt = rowHeights.find(r);
             rowAxis->size = (heightIt != rowHeights.end()) ? heightIt->second : DEFAULT_ROW_HEIGHT;
-            rowAxis->hidden = rowHidden.count(r) > 0;
+            rowAxis->setHidden(rowHidden.count(r) > 0);
             // Apply row default style if present
             auto styleIt = rowStyleIndex.find(r);
             if (styleIt != rowStyleIndex.end()) {

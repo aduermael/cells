@@ -411,7 +411,7 @@ ApplyResult applyAxisSetHidden(Workbook& workbook, const Operation& op) {
     }
 
     // Payload is just "1" (hidden) or "0" (visible)
-    axis->hidden = (op.payload == "1");
+    axis->setHidden(op.payload == "1");
 
     return ApplyResult::SUCCESS;
 }

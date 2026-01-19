@@ -2678,17 +2678,17 @@ TEST(XLSXWriterTest, HiddenColumnRoundTrip) {
     // Create 3 columns, hide the middle one
     auto col1 = std::make_unique<Axis>(generate_id(), true);
     col1->position = 0;
-    col1->hidden = false;
+    col1->setHidden(false);
     sheet->addColumn(std::move(col1));
 
     auto col2 = std::make_unique<Axis>(generate_id(), true);
     col2->position = 1;
-    col2->hidden = true;  // Hidden column
+    col2->setHidden(true);  // Hidden column
     sheet->addColumn(std::move(col2));
 
     auto col3 = std::make_unique<Axis>(generate_id(), true);
     col3->position = 2;
-    col3->hidden = false;
+    col3->setHidden(false);
     sheet->addColumn(std::move(col3));
 
     // Add a row
@@ -2738,9 +2738,9 @@ TEST(XLSXWriterTest, HiddenColumnRoundTrip) {
     ASSERT_NE(readCol2, nullptr);
     ASSERT_NE(readCol3, nullptr);
 
-    EXPECT_FALSE(readCol1->hidden) << "Column 0 should not be hidden";
-    EXPECT_TRUE(readCol2->hidden) << "Column 1 should be hidden";
-    EXPECT_FALSE(readCol3->hidden) << "Column 2 should not be hidden";
+    EXPECT_FALSE(readCol1->hidden()) << "Column 0 should not be hidden";
+    EXPECT_TRUE(readCol2->hidden()) << "Column 1 should be hidden";
+    EXPECT_FALSE(readCol3->hidden()) << "Column 2 should not be hidden";
 }
 
 TEST(XLSXWriterTest, HiddenRowRoundTrip) {
@@ -2756,17 +2756,17 @@ TEST(XLSXWriterTest, HiddenRowRoundTrip) {
     // Create 3 rows, hide the middle one
     auto row1 = std::make_unique<Axis>(generate_id(), false);
     row1->position = 0;
-    row1->hidden = false;
+    row1->setHidden(false);
     sheet->addRow(std::move(row1));
 
     auto row2 = std::make_unique<Axis>(generate_id(), false);
     row2->position = 1;
-    row2->hidden = true;  // Hidden row
+    row2->setHidden(true);  // Hidden row
     sheet->addRow(std::move(row2));
 
     auto row3 = std::make_unique<Axis>(generate_id(), false);
     row3->position = 2;
-    row3->hidden = false;
+    row3->setHidden(false);
     sheet->addRow(std::move(row3));
 
     // Add a cell to each row so they get exported
@@ -2811,9 +2811,9 @@ TEST(XLSXWriterTest, HiddenRowRoundTrip) {
     ASSERT_NE(readRow2, nullptr);
     ASSERT_NE(readRow3, nullptr);
 
-    EXPECT_FALSE(readRow1->hidden) << "Row 0 should not be hidden";
-    EXPECT_TRUE(readRow2->hidden) << "Row 1 should be hidden";
-    EXPECT_FALSE(readRow3->hidden) << "Row 2 should not be hidden";
+    EXPECT_FALSE(readRow1->hidden()) << "Row 0 should not be hidden";
+    EXPECT_TRUE(readRow2->hidden()) << "Row 1 should be hidden";
+    EXPECT_FALSE(readRow3->hidden()) << "Row 2 should not be hidden";
 }
 
 TEST(XLSXWriterTest, ColumnDefaultStyleRoundTrip) {

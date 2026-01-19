@@ -392,9 +392,9 @@ void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out)
     out << prefix << " " << axis.id.toString() << " " << axis.position;
 
     // Optional properties (only if non-default)
-    if (axis.isColumn && axis.size != DEFAULT_COLUMN_WIDTH) {
+    if (axis.isColumn() && axis.size != DEFAULT_COLUMN_WIDTH) {
         out << " w:" << axis.size;
-    } else if (!axis.isColumn && axis.size != DEFAULT_ROW_HEIGHT) {
+    } else if (!axis.isColumn() && axis.size != DEFAULT_ROW_HEIGHT) {
         out << " h:" << axis.size;
     }
 
@@ -402,7 +402,7 @@ void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out)
         out << " name:\"" << escapeString(axis.name) << "\"";
     }
 
-    if (axis.hidden) {
+    if (axis.hidden()) {
         out << " hidden:1";
     }
 
