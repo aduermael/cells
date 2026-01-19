@@ -101,7 +101,7 @@ std::unordered_map<ID, std::string, IDHash> _customFormats;  // Format ID → Fo
 - [x] 4d: Add `HAS_FORMAT` flag to AxisFlags enum (bit 3) and hasFormat()/setHasFormat() accessors
 - [x] 4e: Add AXIS_SET_FORMAT CRDT operation (OpType 53) with applyAxisSetFormat() and makeAxisSetFormatOp()
 - [x] 4f: Update serializer/parser for axis formats - added fmt: property support for columns and rows
-- [ ] 4g: Run tests to verify no regressions
+- [x] 4g: Run tests to verify no regressions (all 55 unit tests, 188 E2E tests pass)
 
 ## Phase 5: Add FormatRegistry with reference counting
 

@@ -95,13 +95,14 @@ export function drawRangeSelection(
     );
 
     // Draw range border (thinner than anchor cell)
+    // Border should align with cell borders, which are drawn centered at cell edges
     ctx.strokeStyle = colors.selectionBorder;
     ctx.lineWidth = 1;
     ctx.strokeRect(
       Math.max(zoomedHeaderWidth, rangeX) + 0.5,
       Math.max(zoomedHeaderHeight, rangeY) + 0.5,
-      Math.min(rangeW, rangeX + rangeW - Math.max(zoomedHeaderWidth, rangeX)) - 1,
-      Math.min(rangeH, rangeY + rangeH - Math.max(zoomedHeaderHeight, rangeY)) - 1
+      Math.min(rangeW, rangeX + rangeW - Math.max(zoomedHeaderWidth, rangeX)),
+      Math.min(rangeH, rangeY + rangeH - Math.max(zoomedHeaderHeight, rangeY))
     );
   }
 
@@ -135,12 +136,12 @@ export function drawRangeSelection(
       // Draw glow effect (subtle shadow)
       ctx.strokeStyle = "rgba(5, 134, 1, 0.15)";
       ctx.lineWidth = 3;
-      ctx.strokeRect(clipX - 0.5, clipY - 0.5, clipW + 1, clipH + 1);
+      ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW, clipH);
 
       // Main border for anchor cell (1px to match range border)
       ctx.strokeStyle = colors.selectionBorder;
       ctx.lineWidth = 1;
-      ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW - 1, clipH - 1);
+      ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW, clipH);
     }
   }
 }
@@ -177,19 +178,19 @@ export function drawSingleCellSelection(
   ) {
     const colors = getGridColors();
 
-    // Draw glow effect (2px spread shadow like formula bar)
+    // Draw glow effect (spread shadow around cell edges)
     ctx.strokeStyle = "rgba(5, 134, 1, 0.15)";
     ctx.lineWidth = 4;
-    ctx.strokeRect(selX - 1, selY - 1, selW + 2, selH + 2);
+    ctx.strokeRect(selX + 0.5, selY + 0.5, selW, selH);
 
     // Draw selection fill
     ctx.fillStyle = colors.selectionBg;
     ctx.fillRect(selX, selY, selW, selH);
 
-    // Draw main border
+    // Draw main border (aligned with cell borders)
     ctx.strokeStyle = colors.selectionBorder;
     ctx.lineWidth = 2;
-    ctx.strokeRect(selX + 1, selY + 1, selW - 2, selH - 2);
+    ctx.strokeRect(selX + 0.5, selY + 0.5, selW, selH);
   }
 }
 
@@ -422,12 +423,12 @@ export function drawFillPreview(
 
   const colors = getGridColors();
 
-  // Draw dashed border
+  // Draw dashed border (aligned with cell borders)
   ctx.save();
   ctx.strokeStyle = colors.selectionBorder;
   ctx.lineWidth = 2;
   ctx.setLineDash([4, 4]); // 4px dash, 4px gap
-  ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW - 1, clipH - 1);
+  ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW, clipH);
   ctx.restore();
 }
 
@@ -481,10 +482,10 @@ export function drawSpillRangeHighlight(
   ctx.fillStyle = SPILL_RANGE_COLOR.bg;
   ctx.fillRect(clipX, clipY, clipW, clipH);
 
-  // Draw blue border (like Excel's spill range indicator)
+  // Draw blue border (like Excel's spill range indicator, aligned with cell borders)
   ctx.strokeStyle = SPILL_RANGE_COLOR.border;
   ctx.lineWidth = 2;
-  ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW - 1, clipH - 1);
+  ctx.strokeRect(clipX + 0.5, clipY + 0.5, clipW, clipH);
 
   ctx.restore();
 }
