@@ -319,13 +319,14 @@ struct SharedFormulaInfo {
     [[nodiscard]] size_t size() const { return 1 + subscribers.size(); }
 };
 
-// Axis flags - combines type, visibility, and style presence in a single byte
+// Axis flags - combines type, visibility, style, and format presence in a single byte
 enum class AxisFlags : uint8_t {
     NONE = 0,
-    IS_COLUMN = 1 << 0,  // bit 0: true = column (x), false = row (y)
-    HIDDEN = 1 << 1,     // bit 1: Whether axis is hidden
-    HAS_STYLE = 1 << 2,  // bit 2: This axis has a style in workbook._styles map
-    // bits 3-7: reserved for future use
+    IS_COLUMN = 1 << 0,   // bit 0: true = column (x), false = row (y)
+    HIDDEN = 1 << 1,      // bit 1: Whether axis is hidden
+    HAS_STYLE = 1 << 2,   // bit 2: This axis has a style in workbook._styles map
+    HAS_FORMAT = 1 << 3,  // bit 3: This axis has a format in workbook._formats map
+    // bits 4-7: reserved for future use
 };
 
 // Bitwise operators for AxisFlags
@@ -354,8 +355,8 @@ struct Axis {
     ID sheetId;         // ID of the sheet this axis belongs to
     uint32_t position;  // Visual position (0-indexed)
     uint32_t size;      // Width (column) or height (row) in pixels
-    AxisFlags _flags;   // Combined flags: IS_COLUMN, HIDDEN, HAS_STYLE
-    // NOTE: Axis styles are stored in Workbook::_styles map via axis ID (see hasStyle() flag)
+    AxisFlags _flags;   // Combined flags: IS_COLUMN, HIDDEN, HAS_STYLE, HAS_FORMAT
+    // NOTE: Axis styles/formats stored in Workbook::_styles/_formats maps via axis ID
 
     Axis();
     explicit Axis(const ID& id, bool isColumn = true);
@@ -386,6 +387,16 @@ struct Axis {
             _flags = _flags | AxisFlags::HAS_STYLE;
         } else {
             _flags = _flags & ~AxisFlags::HAS_STYLE;
+        }
+    }
+    [[nodiscard]] bool hasFormat() const {
+        return (static_cast<uint8_t>(_flags) & static_cast<uint8_t>(AxisFlags::HAS_FORMAT)) != 0;
+    }
+    void setHasFormat(bool has) {
+        if (has) {
+            _flags = _flags | AxisFlags::HAS_FORMAT;
+        } else {
+            _flags = _flags & ~AxisFlags::HAS_FORMAT;
         }
     }
 
