@@ -490,10 +490,14 @@ tests pass. Note: Some E2E tests for formula display show #REF! - this is a sepa
 issue with FormulaDisplayConverter, not recalculation.
 
 **Step 2: Update callers to use workbook-level recalculate**
-- [ ] 14f: Update bindings_core.cc - replace `recalculate(sheet, ...)` + `recalculateCrossSheet(...)` with `recalculate(workbook, ...)`
-- [ ] 14g: Update bindings_file.cc similarly
-- [ ] 14h: Update luau_api.cc and luau_types.cc similarly
-- [ ] 14i: Keep old `recalculate(Sheet*, ...)` as a thin wrapper that delegates to workbook version
+- [x] 14f: Update bindings_core.cc - replace `recalculate(sheet, ...)` + `recalculateCrossSheet(...)` with `recalculate(workbook, ...)`
+- [x] 14g: Update bindings_file.cc similarly
+- [x] 14h: Update luau_api.cc and luau_types.cc similarly
+- [x] 14i: Keep old `recalculate(Sheet*, ...)` as a thin wrapper that delegates to workbook version (already exists)
+
+**Step 2 completed.** All callers now use `recalculate(workbook, ...)` directly instead of
+calling both `recalculate(sheet, ...)` and `recalculateCrossSheet(...)`. All 54 unit tests
+pass. 182/184 E2E tests pass - the 2 failures are cross-sheet formula display issues (Step 5).
 
 **Step 3: Remove cross-sheet dependency tracking**
 - [ ] 14j: Remove calls to `addCrossSheetDep()`, `removeCrossSheetDeps()` from crdt_cell.cc

@@ -460,7 +460,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
             // Trigger recalculation for dependents
             markDirty(sheet, cell->id);
             const std::vector<ID> changed = {cell->id};
-            cells::recalculate(sheet, changed);
+            cells::recalculate(workbook, changed);
             cells::recalculateVolatile(sheet);
             return 0;
         } else {
@@ -474,7 +474,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
         // Trigger recalculation: mark dependents dirty and recalculate
         markDirty(sheet, cell->id);
         const std::vector<ID> changed = {cell->id};
-        cells::recalculate(sheet, changed);
+        cells::recalculate(workbook, changed);
         cells::recalculateVolatile(sheet);
         return 0;
     }

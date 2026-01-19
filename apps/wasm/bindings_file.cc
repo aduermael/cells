@@ -81,7 +81,7 @@ std::string CellsEngine::loadFromCells(const std::string& content) {
                 }
             }
             if (!formulaCells.empty()) {
-                cells::recalculate(sheet, formulaCells);
+                cells::recalculate(_workbook.get(), formulaCells);
             }
         }
     }
@@ -170,7 +170,7 @@ std::string CellsEngine::loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
                 }
             }
             if (!formulaCells.empty()) {
-                cells::recalculate(sheet, formulaCells);
+                cells::recalculate(_workbook.get(), formulaCells);
             }
         }
     }

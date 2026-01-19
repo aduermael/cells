@@ -382,7 +382,7 @@ int LuauSandbox::luaCellSet(lua_State* L) {
         // Trigger recalculation for dependents
         markDirty(sheet, cell->id);
         const std::vector<ID> changed = {cell->id};
-        cells::recalculate(sheet, changed);
+        cells::recalculate(workbook, changed);
         cells::recalculateVolatile(sheet);
         return 0;
     } else {
@@ -397,7 +397,7 @@ int LuauSandbox::luaCellSet(lua_State* L) {
     // This ensures formulas that depend on this cell get updated
     markDirty(sheet, cell->id);
     const std::vector<ID> changed = {cell->id};
-    cells::recalculate(sheet, changed);
+    cells::recalculate(workbook, changed);
     cells::recalculateVolatile(sheet);
 
     return 0;
