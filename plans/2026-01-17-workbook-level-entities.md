@@ -407,7 +407,13 @@ Verify performance is maintained or improved with new architecture.
 Since cells are now globally unique by UUID at the workbook level, internal formula storage should NOT include sheet prefixes. The sheet context is only needed for display (derived dynamically from cell's column's sheetId).
 
 **Current (incorrect):** `=!bQYHziAr~~6RVulooT` (sheet prefix in internal storage)
-**Target:** `=6RVulooT` (just the cell UUID - globally unique)
+**Target:** `=~~6RVulooT` (lock flags + cell UUID, no sheet prefix)
+
+**Lock flag encoding (2-char prefix):**
+- `~~cellId` = relative reference (like `B1`)
+- `$~cellId` = column locked (like `$B1`)
+- `~$cellId` = row locked (like `B$1`)
+- `$$cellId` = absolute reference (like `$B$1`)
 
 **Display behavior (unchanged):**
 - Formula in Sheet1 referencing B1 on Sheet2 displays as `=Sheet2!B1`
