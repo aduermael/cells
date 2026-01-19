@@ -149,13 +149,13 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - **Shared Formulas**: ✅ Workbook level (`Workbook::_sharedFormulaMasters`, `_sharedFormulaFrom`)
 - **Spill Regions**: ✅ Workbook level (`Workbook::_spillMasters`, `_spilledFrom`)
 - **Ranges**: ✅ Workbook level (`Workbook::_ranges`, `_rangeIds`), Sheet has `_rangeIndex` R-tree only
-- **Cross-sheet Dependencies**: Workbook level (`Workbook::_crossSheetDeps`, `_crossSheetRangeDeps`) - to be removed when R-tree is workbook-aware
+- **Cross-sheet Dependencies**: ⚠️ TO BE REMOVED in Phase 14 - single global `_depGraph` handles all dependencies
 
 ## Target Architecture
 
 - **Cells**: ✅ Indexed by UUID at Workbook level; Sheets maintain `_cellIndex` for fast 2D access
 - **Columns/Rows**: ✅ Indexed by UUID at Workbook level; Sheets maintain `_columnIndex`/`_rowIndex` for fast position lookups
-- **Dependency Graph**: ✅ Global to Workbook (cross-sheet tracking can be removed when R-tree is workbook-aware)
+- **Dependency Graph**: ✅ Single global graph in Workbook - NO separate cross-sheet tracking needed
 - **Shared Formulas**: ✅ Global to Workbook
 - **Spill Regions**: ✅ Global to Workbook (master cell links back to sheet via its column/row refs)
 - **Ranges**: ✅ Global to Workbook; `_rangeIds` ✅ global (link back to sheet via axis's sheetId)
@@ -242,14 +242,11 @@ Move dependency graph from Sheet to Workbook level.
 - [x] 2h: All usages of _depGraph in sheet.cc now use getDependencyGraph()
 - [x] 2i: Run tests to verify formula dependencies work correctly - ALL PASS
 
-**Deferred to later phase:**
-- [ ] 2e: Remove `Workbook::_crossSheetDeps`, `_crossSheetDepReverse`, `_crossSheetRangeDeps`
-- [ ] 2f: Remove `Workbook::addCrossSheetDep()`, `removeCrossSheetDeps()`, `getCrossSheetDependents()`, etc.
+**Deferred to Phase 14:**
+- [ ] 2e: Remove `Workbook::_crossSheetDeps`, `_crossSheetDepReverse`, `_crossSheetRangeDeps` → Phase 14
+- [ ] 2f: Remove `Workbook::addCrossSheetDep()`, `removeCrossSheetDeps()`, `getCrossSheetDependents()`, etc. → Phase 14
 
-Note: Cross-sheet dependency tracking is kept for now because:
-1. The R-tree uses sheet-local positions for range queries
-2. Cross-sheet range references need separate tracking until R-tree is made workbook-aware
-3. Direct cell refs work via the global graph's reverseDeps_ map
+Note: Cross-sheet dependency tracking will be removed in Phase 14. With globally unique cell UUIDs and formula storage without sheet prefixes (Phase 13), ALL dependencies go through the single global `_depGraph`.
 
 ## Phase 3: Workbook-Level Shared Formulas
 
@@ -431,15 +428,23 @@ Since cells are now globally unique by UUID at the workbook level, internal form
 **Note on range references:**
 Range references (`A1:B5`) still need column/row IDs which belong to a specific sheet. However, since axes now have a `sheetId` field, the range's sheet can be derived from its corner axis IDs. Consider whether range refs also need simplification.
 
-## Phase 14: Clean Up Cross-Sheet Dependency Tracking
+## Phase 14: Remove Cross-Sheet Dependency Tracking
 
-Once sheet prefixes are removed from formula storage (Phase 13), the cross-sheet dependency tracking in Workbook may become redundant.
+**Confirmed:** `_crossSheetDeps` and `_crossSheetRangeDeps` are NOT necessary. With cells globally unique by UUID, ALL dependencies go through the single global `_depGraph`. This dramatically simplifies the architecture.
 
-- [ ] 14a: Analyze if `_crossSheetDeps`, `_crossSheetRangeDeps` are still needed
-- [ ] 14b: If cell refs no longer have sheet context, direct cell deps go through global `_depGraph`
-- [ ] 14c: Range deps may still need special handling (R-tree is sheet-local)
-- [ ] 14d: Remove redundant cross-sheet tracking if no longer needed
-- [ ] 14e: Run tests to verify dependency tracking still works
+**Benefits of single global dependency graph:**
+- No special-case handling for "cross-sheet" vs "same-sheet" references
+- Simpler recalculation logic - just walk the global graph
+- Cleaner code - remove redundant tracking structures and methods
+- Consistent behavior regardless of which sheet a formula references
+
+- [ ] 14a: Remove `Workbook::_crossSheetDeps` map
+- [ ] 14b: Remove `Workbook::_crossSheetDepReverse` map
+- [ ] 14c: Remove `Workbook::_crossSheetRangeDeps` vector
+- [ ] 14d: Remove `Workbook::addCrossSheetDep()`, `removeCrossSheetDeps()`, `getCrossSheetDependents()`
+- [ ] 14e: Remove `Workbook::addCrossSheetRangeDep()`, `getCrossSheetRangeDependents()`
+- [ ] 14f: Update any code that calls these methods to use `_depGraph` instead
+- [ ] 14g: Run tests to verify dependency tracking still works
 
 ## Design Notes
 
