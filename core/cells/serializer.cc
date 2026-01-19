@@ -429,7 +429,7 @@ void Serializer::serializeCell(const Workbook& workbook, const Cell& cell, const
     serializeCellValue(cell.value, cell, sheet, out);
 
     // Optional format property (only if not null/default) - read from workbook map
-    const ID formatId = workbook.getCellFormatId(cell.id);
+    const ID formatId = workbook.getFormatId(cell.id);
     if (!formatId.isNull()) {
         out << " fmt:" << formatId.toString();
     }

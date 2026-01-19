@@ -171,7 +171,7 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
     if (strcmp(key, "format") == 0) {
         const Workbook* workbook = getWorkbook(L);
         if (workbook != nullptr) {
-            const ID formatId = workbook->getCellFormatId(cell->id);
+            const ID formatId = workbook->getFormatId(cell->id);
             if (!formatId.isNull()) {
                 lua_pushstring(L, formatId.toString().c_str());
                 return 1;

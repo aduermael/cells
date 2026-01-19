@@ -640,7 +640,7 @@ TEST(XLSXReaderTest, ReadNumberFormatsFromLBOModel) {
     bool foundNumberFormat = false;
 
     for (const auto& cellId : sheet->getCellIds()) {
-        const ID formatId = result.workbook->getCellFormatId(cellId);
+        const ID formatId = result.workbook->getFormatId(cellId);
         if (formatId.isNull()) {
             continue;
         }
@@ -686,7 +686,7 @@ TEST(XLSXReaderTest, ReadNumberFormatsWithStyles) {
 
     for (const auto& cellId : sheet->getCellIds()) {
         const bool hasStyle = !result.workbook->getStyleId(cellId).isNull();
-        const bool hasFormat = !result.workbook->getCellFormatId(cellId).isNull();
+        const bool hasFormat = !result.workbook->getFormatId(cellId).isNull();
 
         if (hasStyle && hasFormat) {
             cellsWithStyleAndFormat++;
@@ -717,7 +717,7 @@ TEST(XLSXReaderTest, NumberFormatsNotImportedWhenStylesDisabled) {
 
     // All cells should have null formatId when styles are disabled (read from workbook map)
     for (const auto& cellId : sheet->getCellIds()) {
-        EXPECT_TRUE(result.workbook->getCellFormatId(cellId).isNull())
+        EXPECT_TRUE(result.workbook->getFormatId(cellId).isNull())
             << "formatId should be null when readStyles=false";
     }
 }

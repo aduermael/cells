@@ -318,7 +318,7 @@ std::string CellsEngine::getCellFormatId(const std::string& cellIdStr) {
         return "{\"error\":\"Cell not found\"}";
     }
 
-    const ID formatId = _workbook->getCellFormatId(cell->id);
+    const ID formatId = _workbook->getFormatId(cell->id);
     std::string formatIdStr = formatId.isNull() ? "~" : formatId.toString();
     return "{\"formatId\":\"" + formatIdStr + "\"}";
 }
@@ -432,7 +432,7 @@ std::string CellsEngine::formatCellById(const std::string& cellIdStr) {
         return "{\"text\":\"" + jsonEscape(text) + "\"}";
     }
 
-    const ID cellFormatId = _workbook->getCellFormatId(cell->id);
+    const ID cellFormatId = _workbook->getFormatId(cell->id);
     FormattedValue result =
         formatNumber(_formatRegistry, _workbook->getCustomFormats(), numericValue, cellFormatId);
 

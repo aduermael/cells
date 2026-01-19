@@ -568,7 +568,7 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
     Operation op = makeCellSetValueOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
 
-    if (!detectedFormatId.isNull() && detectedFormatId != _workbook->getCellFormatId(cell->id)) {
+    if (!detectedFormatId.isNull() && detectedFormatId != _workbook->getFormatId(cell->id)) {
         std::string formatPayload = "{\"format_id\":\"" + detectedFormatId.toString() + "\"}";
         Operation formatOp = makeCellSetFormatOp(*_workbook, cellId, formatPayload);
         applyOperation(*_workbook, formatOp);
@@ -800,7 +800,7 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
 
         // Compute editValue for formatted numbers (dates, percentages, etc.)
         std::string editValue = existingCell->value.raw;
-        const ID cellFormatId = _workbook->getCellFormatId(existingCell->id);
+        const ID cellFormatId = _workbook->getFormatId(existingCell->id);
         if (existingCell->value.type == CellValueType::NUMBER && !cellFormatId.isNull()) {
             double numValue = existingCell->value.asNumber();
             editValue = formatEditValue(_formatRegistry, numValue, cellFormatId);

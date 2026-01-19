@@ -1071,7 +1071,7 @@ bool Parser::parseCellProps(std::string_view props, Cell& cell) {
             }
             const ID formatId(std::string(props.substr(0, end)));
             if (workbook_ != nullptr && !formatId.isNull()) {
-                workbook_->setCellFormatId(cell.id, formatId);
+                workbook_->setFormatId(cell.id, formatId);
                 cell.markHasFormat();
             }
             props = (end < props.size()) ? props.substr(end) : "";

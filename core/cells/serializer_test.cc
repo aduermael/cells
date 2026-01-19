@@ -902,7 +902,7 @@ TEST(CellFormatTest, SerializeCellWithFormat) {
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cell->value = CellValue(1234.56);
     // Store format in workbook map
-    wb->setCellFormatId(cell->id, ID("FMT_C002"));
+    wb->setFormatId(cell->id, ID("FMT_C002"));
     cell->markHasFormat();
 
     sheet->addColumn(std::move(col));
@@ -948,7 +948,7 @@ TEST(CellFormatTest, RoundtripCellWithFormat) {
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cell->value = CellValue(0.15);
     // Store format in workbook map
-    wb->setCellFormatId(cell->id, ID("FMT_P002"));
+    wb->setFormatId(cell->id, ID("FMT_P002"));
     cell->markHasFormat();
 
     sheet->addColumn(std::move(col));
@@ -968,7 +968,7 @@ TEST(CellFormatTest, RoundtripCellWithFormat) {
     Sheet* parsedSheet = result.workbook->getSheetByIndex(0);
     Cell* parsedCell = parsedSheet->getCell(ID("xA1bC2dE"));
     ASSERT_NE(parsedCell, nullptr);
-    EXPECT_EQ(result.workbook->getCellFormatId(parsedCell->id), ID("FMT_P002"));
+    EXPECT_EQ(result.workbook->getFormatId(parsedCell->id), ID("FMT_P002"));
 }
 
 TEST(CellFormatTest, ParseCellWithFormat) {
@@ -989,7 +989,7 @@ X xA1bC2dE cA1bC2dE rA1bC2dE n 1234.56 fmt:FMT_C002
 
     EXPECT_DOUBLE_EQ(cell->value.asNumber(), 1234.56);
     // Format is now read from workbook map
-    EXPECT_EQ(result.workbook->getCellFormatId(cell->id), ID("FMT_C002"));
+    EXPECT_EQ(result.workbook->getFormatId(cell->id), ID("FMT_C002"));
 }
 
 TEST(CellFormatTest, ParseCellWithStringValueAndFormat) {
@@ -1010,7 +1010,7 @@ X xA1bC2dE cA1bC2dE rA1bC2dE s "Hello" fmt:FMT_TEXT
 
     EXPECT_EQ(cell->value.asString(), "Hello");
     // Format is now read from workbook map
-    EXPECT_EQ(result.workbook->getCellFormatId(cell->id), ID("FMT_TEXT"));
+    EXPECT_EQ(result.workbook->getFormatId(cell->id), ID("FMT_TEXT"));
 }
 
 TEST(CellFormatTest, ParseCellWithFormulaAndFormat) {
@@ -1031,7 +1031,7 @@ X xA1bC2dE cA1bC2dE rA1bC2dE f "=A1+A2" fmt:FMT_C002
 
     EXPECT_TRUE(cell->isFormula());
     // Format is now read from workbook map
-    EXPECT_EQ(result.workbook->getCellFormatId(cell->id), ID("FMT_C002"));
+    EXPECT_EQ(result.workbook->getFormatId(cell->id), ID("FMT_C002"));
 }
 
 // --- Custom Format Tests ---
@@ -1281,7 +1281,7 @@ X xA1bC2dE cA1bC2dE rA1bC2dE n 42 fmt:FMT_C002 sty:STYbold1
     Cell* cell = sheet->getCell(ID("xA1bC2dE"));
     ASSERT_NE(cell, nullptr);
     // Format and style are now read from workbook map
-    EXPECT_EQ(result.workbook->getCellFormatId(cell->id).toString(), "FMT_C002");
+    EXPECT_EQ(result.workbook->getFormatId(cell->id).toString(), "FMT_C002");
     EXPECT_EQ(result.workbook->getStyleId(cell->id).toString(), "STYbold1");
 }
 
@@ -1763,7 +1763,7 @@ X xF1mN2pQ cB3dE4fG rC5fG6hJ n -500 fmt:FMT_C002 sty:STYwarn0
 
     // Verify cell with both format and style (read from workbook map)
     Cell* amountCell = sheet->getCell(ID("xD7hJ8kL"));
-    EXPECT_EQ(result.workbook->getCellFormatId(amountCell->id).toString(), "FMT_C002");
+    EXPECT_EQ(result.workbook->getFormatId(amountCell->id).toString(), "FMT_C002");
     EXPECT_EQ(result.workbook->getStyleId(amountCell->id).toString(), "STYmoney");
 
     // Serialize and verify round-trip

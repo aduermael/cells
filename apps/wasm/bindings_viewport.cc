@@ -291,7 +291,7 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         json << "\"row\":" << rowPos << ",";
 
         // Include formatId if cell has a format (read from workbook map)
-        const ID cellFormatId = _workbook->getCellFormatId(entry.cell->id);
+        const ID cellFormatId = _workbook->getFormatId(entry.cell->id);
         if (!cellFormatId.isNull()) {
             json << "\"formatId\":\"" << cellFormatId.toString() << "\",";
         }

@@ -172,7 +172,7 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
 
         // Phase 7: Format inheritance
         // If cell has GENERAL format, inherit format from referenced cells
-        const ID currentFormatId = workbook.getCellFormatId(cell->id);
+        const ID currentFormatId = workbook.getFormatId(cell->id);
         const std::string currentFormat = currentFormatId.toString();
         const bool isGeneralFormat =
             currentFormat.empty() || currentFormat == "~" || currentFormat == "FMT_GEN0";
@@ -186,13 +186,13 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
                 if (refCell == nullptr) {
                     return "";
                 }
-                return workbook.getCellFormatId(refCell->id).toString();
+                return workbook.getFormatId(refCell->id).toString();
             };
 
             const std::string inheritedFormat = inferFormatFromFormula(formula->ast, formatLookup);
             if (!inheritedFormat.empty()) {
                 const ID inheritedFormatId(inheritedFormat);
-                workbook.setCellFormatId(cell->id, inheritedFormatId);
+                workbook.setFormatId(cell->id, inheritedFormatId);
                 cell->markHasFormat();
             }
         }
@@ -240,11 +240,11 @@ ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op) {
     // Store format in workbook-level map and update cell flag
     if (formatId.isNull()) {
         // Clear format - remove from map and clear flag
-        workbook.setCellFormatId(cell->id, formatId);
+        workbook.setFormatId(cell->id, formatId);
         cell->clearHasFormat();
     } else {
         // Set format - store in map and set flag
-        workbook.setCellFormatId(cell->id, formatId);
+        workbook.setFormatId(cell->id, formatId);
         cell->markHasFormat();
     }
 

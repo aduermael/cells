@@ -177,8 +177,8 @@ inline CellFlags& operator&=(CellFlags& a, CellFlags b) {
 
 // Cell - fundamental unit of data
 // Either a direct value OR a formula with cached result
-// Note: formatId and styleId are stored at the Workbook level (see Workbook::_cellFormats,
-// _cellStyles) to save memory - most cells don't have custom formats/styles.
+// Note: formatId and styleId are stored at the Workbook level (see Workbook::_formats,
+// _styles) to save memory - most cells don't have custom formats/styles.
 struct Cell {
     ID id;             // Unique identifier (8-char base62)
     ID colId;          // Column axis ID
@@ -890,18 +890,18 @@ struct Workbook {
     [[nodiscard]] const StyleRegistry* getStyleRegistry() const;
 
     // ========================================================================
-    // Cell format storage (moved from Cell struct for memory efficiency)
+    // Entity format storage (unified: cells, axes, etc.)
     // ========================================================================
 
-    // Get the format ID for a cell (returns null ID if no custom format)
-    [[nodiscard]] ID getCellFormatId(const ID& cellId) const;
+    // Get the format ID for an entity (cell, axis, etc.) - returns null ID if no format
+    [[nodiscard]] ID getFormatId(const ID& entityId) const;
 
-    // Set the format ID for a cell. Returns the old format ID (null if none).
-    // Pass null ID to clear the format (same as clearCellFormat).
-    ID setCellFormatId(const ID& cellId, const ID& formatId);
+    // Set the format ID for an entity. Returns the old format ID (null if none).
+    // Pass null ID to clear the format (same as clearFormat).
+    ID setFormatId(const ID& entityId, const ID& formatId);
 
-    // Clear the format for a cell. Returns true if the cell had a format.
-    bool clearCellFormat(const ID& cellId);
+    // Clear the format for an entity. Returns true if the entity had a format.
+    bool clearFormat(const ID& entityId);
 
     // ========================================================================
     // Entity style storage (unified: cells, axes, etc.)
@@ -1054,8 +1054,9 @@ private:
     // Cell format/style storage (moved from Cell struct for memory efficiency)
     // ========================================================================
 
-    // Cell ID -> format ID mapping (only cells with custom formats are stored)
-    std::unordered_map<ID, ID, IDHash> _cellFormats;
+    // Entity ID -> format ID mapping (cells, axes, or other entities with formats)
+    // Unified format map: since UUIDs are unique across resource types, one map suffices
+    std::unordered_map<ID, ID, IDHash> _formats;
 
     // Entity ID -> style ID mapping (cells, axes, or other entities with styles)
     // Unified style map: since UUIDs are unique across resource types, one map suffices

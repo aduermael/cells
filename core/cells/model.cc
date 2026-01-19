@@ -729,42 +729,42 @@ const DependencyGraph* Workbook::getDependencyGraph() const {
 }
 
 // =============================================================================
-// Cell format storage
+// Entity format storage (unified: cells, axes, etc.)
 // =============================================================================
 
-ID Workbook::getCellFormatId(const ID& cellId) const {
-    auto it = _cellFormats.find(cellId);
-    if (it != _cellFormats.end()) {
+ID Workbook::getFormatId(const ID& entityId) const {
+    auto it = _formats.find(entityId);
+    if (it != _formats.end()) {
         return it->second;
     }
     return {};  // null ID
 }
 
-ID Workbook::setCellFormatId(const ID& cellId, const ID& formatId) {
+ID Workbook::setFormatId(const ID& entityId, const ID& formatId) {
     // If clearing the format (null ID), remove from map
     if (formatId.isNull()) {
-        auto it = _cellFormats.find(cellId);
-        if (it != _cellFormats.end()) {
+        auto it = _formats.find(entityId);
+        if (it != _formats.end()) {
             ID oldId = it->second;
-            _cellFormats.erase(it);
+            _formats.erase(it);
             return oldId;
         }
         return {};  // No previous format
     }
 
     // Check if exists first, get old value before overwriting
-    auto existing = _cellFormats.find(cellId);
-    if (existing != _cellFormats.end()) {
+    auto existing = _formats.find(entityId);
+    if (existing != _formats.end()) {
         ID oldId = existing->second;
         existing->second = formatId;
         return oldId;
     }
-    _cellFormats[cellId] = formatId;
+    _formats[entityId] = formatId;
     return {};  // No previous format
 }
 
-bool Workbook::clearCellFormat(const ID& cellId) {
-    return _cellFormats.erase(cellId) > 0;
+bool Workbook::clearFormat(const ID& entityId) {
+    return _formats.erase(entityId) > 0;
 }
 
 // =============================================================================

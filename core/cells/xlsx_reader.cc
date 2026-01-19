@@ -1891,7 +1891,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 // Apply number format if present - store in workbook map
                 const ID formatId = getFormatId(styleIndex);
                 if (!formatId.isNull()) {
-                    workbook->setCellFormatId(cell->id, formatId);
+                    workbook->setFormatId(cell->id, formatId);
                     cell->markHasFormat();
                 }
 

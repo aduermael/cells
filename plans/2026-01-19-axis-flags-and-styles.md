@@ -95,9 +95,9 @@ std::unordered_map<ID, ID, IDHash> _cellFormats;    // Cell ID → Format ID (ce
 std::unordered_map<ID, std::string, IDHash> _customFormats;  // Format ID → Format code
 ```
 
-- [ ] 4a: Rename `_cellFormats` to `_formats` in Workbook (unified entity-to-format map)
-- [ ] 4b: Rename accessor methods: `getCellFormatId()` → `getFormatId()`, `setCellFormatId()` → `setFormatId()`, `clearCellFormat()` → `clearFormat()`
-- [ ] 4c: Update all call sites to use the new method names
+- [x] 4a: Rename `_cellFormats` to `_formats` in Workbook (unified entity-to-format map)
+- [x] 4b: Rename accessor methods: `getCellFormatId()` → `getFormatId()`, `setCellFormatId()` → `setFormatId()`, `clearCellFormat()` → `clearFormat()`
+- [x] 4c: Update all call sites to use the new method names. TypeScript API keeps `getCellFormatId` for backward compatibility.
 - [ ] 4d: Add `HAS_FORMAT` flag to AxisFlags enum (like `HAS_STYLE`)
 - [ ] 4e: Update CRDT operations to support axis formats (new `AXIS_SET_FORMAT` op or extend existing)
 - [ ] 4f: Update serializer/parser for axis formats
