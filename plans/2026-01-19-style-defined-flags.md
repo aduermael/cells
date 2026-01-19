@@ -1,4 +1,4 @@
-# Style Defined Flags and Border Enhancements
+# Style Defined Flags and Border UI
 
 Status: READY
 Created At: 2026-01-19
@@ -7,11 +7,11 @@ Created At: 2026-01-19
 
 The current style merge system treats default values (e.g., `bold=false`) as "unset", which makes it impossible for a cell to explicitly override a parent range's property back to the default value. For example, if a range sets `bold=true`, a cell inside that range cannot set `bold=false` to override it.
 
-**Solution**: Add a `defined` bitfield (2 bytes) to `CellStyle` to track which properties have been explicitly set. Only defined properties participate in merges.
+**Solution**: Add a `defined` bitfield (2 bytes) to `CellStyle` to track which properties have been explicitly set. The `defined` flag is the source of truth - not whether a value equals its default. Only defined properties participate in merges.
 
 Additionally:
 1. Reorder CellStyle struct fields for better memory alignment
-2. Add border width and style properties to BorderEdge
+2. Expose existing border styles (thin/medium/thick/dashed/etc.) in the UI
 
 ## Current Property Count
 
@@ -75,26 +75,15 @@ struct CellStyle {
 };
 ```
 
-## BorderEdge Enhancement
+## Existing Border Styles (already implemented in C++)
 
-Current:
-```cpp
-struct BorderEdge {
-    BorderStyle style{NONE};     // 1 byte
-    std::string color;           // 24-32 bytes
-};
-```
+The `BorderStyle` enum already supports all Excel border styles:
+- NONE, THIN, MEDIUM, THICK
+- DASHED, DOTTED, DOUBLE, HAIR
+- MEDIUM_DASHED, DASH_DOT, MEDIUM_DASH_DOT
+- DASH_DOT_DOT, MEDIUM_DASH_DOT_DOT, SLANT_DASH_DOT
 
-Proposed (add width):
-```cpp
-struct BorderEdge {
-    BorderStyle style{NONE};     // 1 byte (style: none, thin, medium, thick, dashed, etc.)
-    uint8_t width{1};            // 1 byte (width in pixels, 1-10 range typical)
-    std::string color;           // 24-32 bytes
-};
-```
-
-Note: `BorderStyle` already includes styles like THIN, MEDIUM, THICK, DASHED, DOTTED, etc. The `width` field provides finer control for custom widths beyond the predefined styles.
+These just need to be exposed in the UI - no C++ changes needed for border styles.
 
 ---
 
@@ -110,7 +99,7 @@ Note: `BorderStyle` already includes styles like THIN, MEDIUM, THICK, DASHED, DO
   - Keep strings and border at end
 
 - [ ] 1c: Update `isEmpty()` to check `defined == 0`
-  - An empty style has no defined properties
+  - An empty style has no defined properties (flag is source of truth)
 
 - [ ] 1d: Update `hash()` to include `defined` field
   - Hash should differentiate between defined vs undefined properties
@@ -130,20 +119,19 @@ Note: `BorderStyle` already includes styles like THIN, MEDIUM, THICK, DASHED, DO
   - When parsing JSON style updates, mark properties as defined
 
 - [ ] 2c: Add unit tests for override behavior
-  - Test: range has `bold=true`, cell sets `bold=false`, effective style should be `bold=false`
-  - Test: range has `bgColor="#FF0000"`, cell sets `bgColor=""` (explicit clear), effective should be no background
+  - Test: range has `bold=true`, cell sets `bold=false` (defined), effective style should be `bold=false`
+  - Test: range has `bgColor="#FF0000"`, cell sets `bgColor=""` with DEFINED_BGCOLOR, effective should be no background
 
 ---
 
 ## Phase 3: Update Serialization
 
-- [ ] 3a: Update `styleToJson()` to include defined flags
-  - Option 1: Serialize as `"defined": ["bold", "italic", ...]`
-  - Option 2: Always serialize defined properties even if default value
-  - Prefer Option 2 for simpler logic
+- [ ] 3a: Update `styleToJson()` to serialize defined properties
+  - Serialize all properties that have their defined flag set, even if value equals default
+  - Example: `bold=false` with `DEFINED_BOLD` set should serialize as `"bold": false`
 
 - [ ] 3b: Update `jsonToStyle()` to set defined flags
-  - When parsing JSON, any property present in JSON is defined
+  - When parsing JSON, any property present in JSON sets its defined flag
 
 - [ ] 3c: Update ZCD serialization to preserve defined flags
   - Ensure round-trip preserves which properties are defined
@@ -151,24 +139,23 @@ Note: `BorderStyle` already includes styles like THIN, MEDIUM, THICK, DASHED, DO
 - [ ] 3d: Update XLSX import to set appropriate defined flags
   - Properties explicitly set in XLSX should be marked defined
 
+- [ ] 3e: Backward compatibility for old files
+  - When loading files without defined flags, compute `defined` from which values differ from defaults
+
 ---
 
-## Phase 4: Add Border Width
+## Phase 4: Expose Border Styles in UI
 
-- [ ] 4a: Add `width` field to `BorderEdge` struct
-  - `uint8_t width{1}` - default 1 pixel
-  - Update `hasValue()`, `operator==`, etc.
+- [ ] 4a: Add border style selector to border dropdown
+  - Show style options: Thin, Medium, Thick, Dashed, Dotted, Double
+  - Group less common styles (Hair, Medium Dashed, etc.) in submenu or advanced section
 
-- [ ] 4b: Update border serialization (JSON, ZCD, XLSX)
-  - Include width in JSON: `"top": {"style": "thin", "width": 2, "color": "#000"}`
-  - Map to XLSX border attributes
+- [ ] 4b: Update border button to show current style
+  - Display style name or icon indicating current border style
 
-- [ ] 4c: Update grid renderer to use border width
-  - Draw borders with specified width
-  - Handle width in canvas strokeWidth
-
-- [ ] 4d: Update border UI controls to set width
-  - Add width selector to border dropdown (1, 2, 3 px options)
+- [ ] 4c: Update grid renderer border drawing for different styles
+  - Implement dashed/dotted line patterns in canvas
+  - Map style to appropriate line width (thin=1px, medium=2px, thick=3px)
 
 ---
 
@@ -177,6 +164,7 @@ Note: `BorderStyle` already includes styles like THIN, MEDIUM, THICK, DASHED, DO
 - [ ] 5a: Add unit tests for defined flags
   - Test merge with defined vs undefined properties
   - Test serialization round-trip of defined flags
+  - Test backward compatibility with old files
 
 - [ ] 5b: Add E2E tests for style override behavior
   - Create range style, create cell inside with override, verify effective style
@@ -216,6 +204,7 @@ CellStyle mergeEffectiveStyles(const CellStyle& base, const CellStyle& overlay) 
     CellStyle result = base;
 
     // Only apply overlay properties that are defined and not already defined in result
+    // The defined flag is the source of truth, not the value
     if ((overlay.defined & DEFINED_BOLD) && !(result.defined & DEFINED_BOLD)) {
         result.bold = overlay.bold;
         result.defined |= DEFINED_BOLD;
@@ -226,10 +215,17 @@ CellStyle mergeEffectiveStyles(const CellStyle& base, const CellStyle& overlay) 
 }
 ```
 
+### Key Principle: Defined Flag is Source of Truth
+
+- `bold=false` with `DEFINED_BOLD=0`: property not set, inherit from parent
+- `bold=false` with `DEFINED_BOLD=1`: explicitly set to false, overrides parent
+- `bgColor=""` with `DEFINED_BGCOLOR=0`: no background set, inherit from parent
+- `bgColor=""` with `DEFINED_BGCOLOR=1`: explicitly cleared background, overrides parent
+
 ### Backward Compatibility
 
-- Old files without `defined` field: treat all non-default values as defined
-- Migration: when loading old format, compute `defined` from which values differ from defaults
+- Old files without `defined` field: compute defined from non-default values
+- This means old files can't express "explicitly set to default", but that's acceptable for migration
 
 ---
 
