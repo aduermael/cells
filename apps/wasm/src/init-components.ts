@@ -827,6 +827,7 @@ export function createComponents(config: ComponentsConfig): Components {
     {
       borderDropdown: elements.borderDropdown,
       borderBtn: elements.borderBtn,
+      borderStyleIndicator: elements.borderStyleIndicator,
       borderAllBtn: elements.borderAllBtn,
       borderOuterBtn: elements.borderOuterBtn,
       borderTopBtn: elements.borderTopBtn,

@@ -166,8 +166,10 @@ These just need to be exposed in the UI - no C++ changes needed for border style
   - Added CSS styling for the border style selector buttons
   - Updated BorderControls to track selected style and use it when creating borders
 
-- [ ] 4b: Update border button to show current style
-  - Display style name or icon indicating current border style
+- [x] 4b: Update border button to show current style
+  - Added border style indicator SVG below the border icon
+  - Indicator shows thin/medium/thick line widths, dashed/dotted patterns, or double lines
+  - Updates dynamically when user selects a new style from the dropdown
 
 - [x] 4c: Update grid renderer border drawing for different styles
   - Dashed/dotted line patterns were already implemented in `_setBorderDash`

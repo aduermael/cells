@@ -3266,6 +3266,18 @@ canvas {
     color: var(--color-primary);
 }
 
+/* Border button style indicator */
+.border-btn-icon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+}
+
+.border-style-indicator {
+    margin-top: -2px;
+}
+
 /* Alignment button groups */
 .align-btn-group {
     display: flex;

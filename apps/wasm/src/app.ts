@@ -190,6 +190,7 @@ export interface DOMElements {
   // Border controls
   borderDropdown: HTMLElement;
   borderBtn: HTMLButtonElement;
+  borderStyleIndicator: SVGElement;
   borderAllBtn: HTMLButtonElement;
   borderOuterBtn: HTMLButtonElement;
   borderTopBtn: HTMLButtonElement;
@@ -558,6 +559,14 @@ export function createApp(): App {
     return el as T;
   };
 
+  const getSvgElement = (id: string): SVGElement => {
+    const el = document.getElementById(id);
+    if (!el) {
+      throw new Error(`Required DOM element not found: #${id}`);
+    }
+    return el as unknown as SVGElement;
+  };
+
   const elements: DOMElements = {
     canvas: getElement<HTMLCanvasElement>("grid"),
     loading: getElement("loading"),
@@ -673,6 +682,7 @@ export function createApp(): App {
     // Border controls
     borderDropdown: getElement("border-dropdown"),
     borderBtn: getElement<HTMLButtonElement>("border-btn"),
+    borderStyleIndicator: getSvgElement("border-style-indicator"),
     borderAllBtn: getElement<HTMLButtonElement>("border-all-btn"),
     borderOuterBtn: getElement<HTMLButtonElement>("border-outer-btn"),
     borderTopBtn: getElement<HTMLButtonElement>("border-top-btn"),

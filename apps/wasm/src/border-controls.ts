@@ -21,6 +21,7 @@ import type { Position, BorderStyle, CellBorder } from "./types";
 export interface BorderControlsConfig {
   borderDropdown: HTMLElement;
   borderBtn: HTMLButtonElement;
+  borderStyleIndicator: SVGElement;
   borderAllBtn: HTMLButtonElement;
   borderOuterBtn: HTMLButtonElement;
   borderTopBtn: HTMLButtonElement;
@@ -54,6 +55,7 @@ export type BorderType = "all" | "outer" | "top" | "bottom" | "left" | "right" |
 export class BorderControls {
   private borderDropdown: HTMLElement;
   private borderBtn: HTMLButtonElement;
+  private borderStyleIndicator: SVGElement;
   private borderAllBtn: HTMLButtonElement;
   private borderOuterBtn: HTMLButtonElement;
   private borderTopBtn: HTMLButtonElement;
@@ -73,6 +75,7 @@ export class BorderControls {
   constructor(config: BorderControlsConfig, callbacks: BorderControlsCallbacks) {
     this.borderDropdown = config.borderDropdown;
     this.borderBtn = config.borderBtn;
+    this.borderStyleIndicator = config.borderStyleIndicator;
     this.borderAllBtn = config.borderAllBtn;
     this.borderOuterBtn = config.borderOuterBtn;
     this.borderTopBtn = config.borderTopBtn;
@@ -164,12 +167,59 @@ export class BorderControls {
   private selectBorderStyle(style: BorderStyle): void {
     this.selectedBorderStyle = style;
 
-    // Update selected state in UI
+    // Update selected state in dropdown grid
     const buttons = this.borderStyleGrid.querySelectorAll(".border-style-btn");
     buttons.forEach((btn) => {
       const btnStyle = (btn as HTMLElement).dataset.style;
       btn.classList.toggle("selected", btnStyle === style);
     });
+
+    // Update the style indicator on the main button
+    this.updateStyleIndicator(style);
+  }
+
+  /**
+   * Update the style indicator SVG to show the selected border style.
+   */
+  private updateStyleIndicator(style: BorderStyle): void {
+    // For double style, show two lines
+    if (style === "double") {
+      this.borderStyleIndicator.innerHTML =
+        '<line x1="0" y1="1" x2="14" y2="1" stroke="currentColor" stroke-width="1"/>' +
+        '<line x1="0" y1="3" x2="14" y2="3" stroke="currentColor" stroke-width="1"/>';
+      return;
+    }
+
+    // For single-line styles, ensure we have one line element
+    let line = this.borderStyleIndicator.querySelector("line");
+    if (!line || this.borderStyleIndicator.querySelectorAll("line").length !== 1) {
+      this.borderStyleIndicator.innerHTML =
+        '<line x1="0" y1="2" x2="14" y2="2" stroke="currentColor" stroke-width="1"/>';
+      line = this.borderStyleIndicator.querySelector("line")!;
+    }
+
+    // Reset attributes
+    line.removeAttribute("stroke-dasharray");
+    line.setAttribute("stroke-width", "1");
+
+    // Apply style-specific attributes
+    switch (style) {
+      case "thin":
+        // Default stroke-width is already 1
+        break;
+      case "medium":
+        line.setAttribute("stroke-width", "2");
+        break;
+      case "thick":
+        line.setAttribute("stroke-width", "3");
+        break;
+      case "dashed":
+        line.setAttribute("stroke-dasharray", "4 2");
+        break;
+      case "dotted":
+        line.setAttribute("stroke-dasharray", "1 2");
+        break;
+    }
   }
 
   private toggleDropdown(): void {
