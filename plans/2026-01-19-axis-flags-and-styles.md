@@ -1,9 +1,12 @@
-# Plan: Axis Flags Refactoring & Unified Style Index
+# Plan: Axis Flags Refactoring & Unified Style/Format Index
 
-This plan addresses two related issues:
+This plan addresses several related issues:
 1. **Axis struct optimization**: Move `defaultStyleId` out of the Axis struct, introduce an `AxisFlags` byte combining `isColumn`, `hidden`, `hasStyle` and future flags.
 2. **Unified style indexing**: Rename `_cellStyles` to `_styles` as a single entity-to-style map for cells, ranges, and axes. UUIDs are unique across resource types, so one map suffices.
 3. **Cross-sheet style bug**: Fix the bug where applying background colors to ranges only works on the first sheet.
+4. **Unified format indexing**: Similar to styles, rename `_cellFormats` to `_formats` as a unified entity-to-format map for cells, ranges, and axes.
+5. **Format reference counting**: Add `FormatRegistry` with reference counting and automatic garbage collection (like `StyleRegistry` for styles).
+6. **Style reference counting consistency**: Ensure style refcounting is consistently applied across all code paths.
 
 ## Current State
 
@@ -81,26 +84,96 @@ The current `setRangeStyle()` takes position coordinates and always operates on 
 
 ---
 
+## Phase 4: Unify format indexing (like styles)
+
+Currently `_cellFormats` only maps cells to format IDs. Ranges and axes can also have formats, so we need a unified `_formats` map like we did for `_styles`.
+
+**Current State**:
+```cpp
+// Workbook
+std::unordered_map<ID, ID, IDHash> _cellFormats;    // Cell ID → Format ID (cells only)
+std::unordered_map<ID, std::string, IDHash> _customFormats;  // Format ID → Format code
+```
+
+- [ ] 4a: Rename `_cellFormats` to `_formats` in Workbook (unified entity-to-format map)
+- [ ] 4b: Rename accessor methods: `getCellFormatId()` → `getFormatId()`, `setCellFormatId()` → `setFormatId()`, `clearCellFormat()` → `clearFormat()`
+- [ ] 4c: Update all call sites to use the new method names
+- [ ] 4d: Add `HAS_FORMAT` flag to AxisFlags enum (like `HAS_STYLE`)
+- [ ] 4e: Update CRDT operations to support axis formats (new `AXIS_SET_FORMAT` op or extend existing)
+- [ ] 4f: Update serializer/parser for axis formats
+- [ ] 4g: Run tests to verify no regressions
+
+## Phase 5: Add FormatRegistry with reference counting
+
+Formats currently have no garbage collection - `_customFormats` stores format definitions indefinitely. Add a `FormatRegistry` class similar to `StyleRegistry` with reference counting.
+
+**Current Problem**: Custom formats accumulate without cleanup. When a format is no longer used by any entity, it should be garbage collected.
+
+**Approach**: Create `FormatRegistry` class with:
+- Content deduplication (same format code → same ID)
+- Reference counting (addRef/release)
+- Automatic garbage collection when refcount hits 0
+
+- [ ] 5a: Create `FormatRegistry` class in `format_registry.h/.cc` with:
+  - `_formats: map<formatId, formatCode>` - Format definitions
+  - `_codeToId: map<formatCode, formatId>` - Deduplication by code string
+  - `_refCount: map<formatId, count>` - Reference counting
+  - Methods: `registerFormat()`, `findOrRegisterFormat()`, `addRef()`, `release()`, `getFormatCode()`
+- [ ] 5b: Replace `_customFormats` in Workbook with `_formatRegistry` (unique_ptr<FormatRegistry>)
+- [ ] 5c: Update `setFormatId()` to call `addRef`/`release` on the registry (like `setRangeStyleId` does for styles)
+- [ ] 5d: Update CRDT operations (`CELL_SET_FORMAT`, `AXIS_SET_FORMAT`) to use registry reference counting
+- [ ] 5e: Update serializer/parser to work with FormatRegistry
+- [ ] 5f: Add unit tests for FormatRegistry (reference counting, deduplication, GC)
+- [ ] 5g: Run full test suite
+
+## Phase 6: Ensure style reference counting is consistent
+
+Currently style reference counting is handled differently in different places:
+- `setRangeStyleId()` includes addRef/release calls internally
+- `setStyleId()` does NOT include addRef/release (relies on CRDT ops)
+- CRDT operations (crdt_cell.cc, crdt_axis.cc) call addRef/release
+
+This inconsistency could lead to bugs. Consider unifying the approach.
+
+- [ ] 6a: Audit all places where styles are set/cleared and verify refcounting is correct
+- [ ] 6b: Option A: Move addRef/release into `setStyleId()` (like `setRangeStyleId()`)
+- [ ] 6c: Option B: Keep addRef/release in CRDT ops but document clearly
+- [ ] 6d: Add assertions or debug logging to detect refcount mismatches
+- [ ] 6e: Run full test suite with refcount validation
+
+---
+
 ## Architecture After This Plan
 
 ```
-StyleRegistry (unchanged):
+StyleRegistry (already exists):
   - _styles: map<styleId, CellStyle>     // Style objects
   - _hashToId: map<hash, styleId>        // Props → ID deduplication
   - _refCount: map<styleId, count>       // Reference counting
 
+FormatRegistry (NEW - Phase 5):
+  - _formats: map<formatId, formatCode>  // Format code strings
+  - _codeToId: map<code, formatId>       // Code → ID deduplication
+  - _refCount: map<formatId, count>      // Reference counting
+
 Workbook:
-  - _styles: map<entityId, styleId>      // Unified: cell/range/axis → style references
+  - _styles: map<entityId, styleId>      // Unified: cell/range/axis → style
+  - _formats: map<entityId, formatId>    // Unified: cell/range/axis → format
+  - _styleRegistry: StyleRegistry*       // Style definitions with refcount
+  - _formatRegistry: FormatRegistry*     // Format definitions with refcount
 
 Axis:
-  - _flags: AxisFlags                    // IS_COLUMN | HIDDEN | HAS_STYLE
+  - _flags: AxisFlags                    // IS_COLUMN | HIDDEN | HAS_STYLE | HAS_FORMAT
   - (no defaultStyleId field)            // Style looked up via _styles[axisId]
+  - (no defaultFormatId field)           // Format looked up via _formats[axisId]
 ```
 
 ## Notes
 
-- Phase 1 and 2 can be done independently of Phase 3 but all three contribute to cleaner style handling
-- The `AxisFlags` pattern mirrors `CellFlags` for consistency
-- Serialization format will change: need to handle backward compatibility (empty flags = defaults)
-- The cross-sheet bug fix requires both C++ and TypeScript changes
-- The same style ID can be referenced by multiple entities (cell, axis, range) - that's intentional and enables style sharing
+- Phase 1-3 are complete
+- Phase 4 mirrors Phase 2 but for formats instead of styles
+- Phase 5 mirrors StyleRegistry but for formats
+- Phase 6 addresses potential refcount inconsistencies discovered during analysis
+- Reference counting enables automatic garbage collection of unused styles/formats
+- Deduplication reduces memory when multiple entities share the same style/format
+- The same style/format ID can be referenced by multiple entities - that's intentional
