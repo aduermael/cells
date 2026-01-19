@@ -10,7 +10,7 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 14 COMPLETE - All phases complete! Workbook-level entities architecture fully implemented.
+**Current status:** Phase 14 COMPLETE - Ready for Phase 15 (Cross-Sheet Formula Round-Trip Integrity).
 
 **Progress Jan 19 (session 17):**
 - Phase 14 Step 6: Final cleanup
@@ -548,6 +548,90 @@ references with sheet names (when cell's column's sheetId differs from active sh
 - `recalculate(Workbook*, changedCells)` recalculates all dependents regardless of sheet
 - FormulaDisplayConverter handles context-aware sheet prefix display
 - All dead code removed (CrossSheetRef, extractCrossSheetRefs, etc.)
+
+## Phase 15: Cross-Sheet Formula Round-Trip Integrity
+
+**Problem:** Cross-sheet formulas break when re-submitted without changes.
+
+**Reproduction steps:**
+1. Create "Sheet2" sheet
+2. Put `42` in Sheet2!B1 (manually)
+3. Put `=Sheet2!B1` in Sheet1!A1
+4. It works! Modify Sheet2!B1 → Sheet1!A1 updates correctly
+5. Select Sheet1!A1, focus formula bar, press Enter (without changing the formula)
+6. **BUG:** Sheet1!A1 now shows `#REF!`
+
+**Root cause hypothesis:**
+The formula display → parse → resolve cycle has a bug. When the formula is displayed as `=Sheet2!B1` and then re-parsed:
+- Parser converts `Sheet2!B1` back to an AST with sheet name "Sheet2"
+- Resolver must look up "Sheet2" to find the sheet, then find cell B1 on that sheet
+- Something in this resolution is failing, causing #REF!
+
+**The round-trip that must be solid:**
+```
+Internal storage (UUID-based)     Display (A1 notation)
+        ↓                               ↑
+   FormulaSerializer    →    "=~~cellUUID"
+        ↓                               ↑
+   FormulaDisplayConverter  →  "=Sheet2!B1" (context-aware)
+        ↓                               ↑
+   User sees/edits          ←    Formula bar
+        ↓                               ↑
+   FormulaParser           →    AST with sheetName="Sheet2", ref="B1"
+        ↓                               ↑
+   FormulaResolver         →    AST with cellId=UUID (sheetId cleared per Phase 13)
+        ↓                               ↑
+   FormulaSerializer       →    "=~~cellUUID" (back to internal storage)
+```
+
+### Implementation Steps
+
+**Step 1: Create E2E test to reproduce the bug**
+- [ ] 15a: Add E2E test in `apps/wasm/tests/formula.test.mjs` that:
+  1. Creates Sheet2
+  2. Enters `42` in Sheet2!B1
+  3. Switches to Sheet1, enters `=Sheet2!B1` in A1
+  4. Verifies A1 shows `42`
+  5. Selects A1, focuses formula bar, presses Enter (re-submit same formula)
+  6. Verifies A1 still shows `42` (not #REF!)
+  7. Changes Sheet2!B1 to `99`, verifies Sheet1!A1 updates to `99`
+- [ ] 15b: Verify test fails (reproduces the bug)
+
+**Step 2: Add unit tests for round-trip integrity**
+- [ ] 15c: Add unit test in `formula_integration_test.cc`:
+  - Create workbook with Sheet1, Sheet2
+  - Set Sheet2!B1 = 42
+  - Set Sheet1!A1 = `=Sheet2!B1` via CRDT operation
+  - Get formula display for A1 (should be `=Sheet2!B1`)
+  - Re-parse that display string
+  - Re-resolve on Sheet1
+  - Re-serialize to internal format
+  - Verify the internal format is identical to original
+  - Re-evaluate and verify result is still 42
+
+**Step 3: Debug and identify the exact failure point**
+- [ ] 15d: Trace the formula submission path in `bindings_formula.cc`:
+  - `setFormula()` receives the display string from UI
+  - Parser converts to AST
+  - Resolver converts sheet names to cell UUIDs
+  - Check: Is the resolver finding the correct sheet?
+  - Check: Is the resolver finding the correct cell on that sheet?
+  - Check: Is the resolved cellId correct?
+
+**Step 4: Fix the bug**
+- [ ] 15e: Fix the identified issue (TBD based on debugging)
+- [ ] 15f: Ensure the fix handles edge cases:
+  - Re-submitting unchanged formula (the reported bug)
+  - Editing and re-submitting a cross-sheet formula
+  - Cross-sheet formulas with ranges (`=Sheet2!A1:B5`)
+  - Cross-sheet formulas with mixed refs (`=Sheet2!$A$1`)
+  - Formulas referencing multiple sheets (`=Sheet2!A1+Sheet3!B1`)
+
+**Step 5: Verify comprehensive formula round-trip**
+- [ ] 15g: Verify E2E test passes
+- [ ] 15h: Run all formula E2E tests (19 tests)
+- [ ] 15i: Run all unit tests (54 tests)
+- [ ] 15j: Manual testing of the exact reproduction steps
 
 ## Design Notes
 
