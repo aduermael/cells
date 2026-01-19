@@ -834,6 +834,7 @@ export function createComponents(config: ComponentsConfig): Components {
       borderLeftBtn: elements.borderLeftBtn,
       borderRightBtn: elements.borderRightBtn,
       borderNoneBtn: elements.borderNoneBtn,
+      borderStyleGrid: elements.borderStyleGrid,
     },
     {
       getSelectedCell: () => app.selectedCell,

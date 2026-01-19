@@ -160,16 +160,19 @@ These just need to be exposed in the UI - no C++ changes needed for border style
 
 ## Phase 4: Expose Border Styles in UI
 
-- [ ] 4a: Add border style selector to border dropdown
-  - Show style options: Thin, Medium, Thick, Dashed, Dotted, Double
-  - Group less common styles (Hair, Medium Dashed, etc.) in submenu or advanced section
+- [x] 4a: Add border style selector to border dropdown
+  - Added 6 common style options: Thin, Medium, Thick, Dashed, Dotted, Double
+  - Added border style grid UI with visual line previews in HTML
+  - Added CSS styling for the border style selector buttons
+  - Updated BorderControls to track selected style and use it when creating borders
 
 - [ ] 4b: Update border button to show current style
   - Display style name or icon indicating current border style
 
-- [ ] 4c: Update grid renderer border drawing for different styles
-  - Implement dashed/dotted line patterns in canvas
-  - Map style to appropriate line width (thin=1px, medium=2px, thick=3px)
+- [x] 4c: Update grid renderer border drawing for different styles
+  - Dashed/dotted line patterns were already implemented in `_setBorderDash`
+  - Line widths were already mapped in `_getBorderWidth` (thin=1px, medium=2px, thick=3px)
+  - Added special handling for "double" border style to draw two parallel lines
 
 ---
 

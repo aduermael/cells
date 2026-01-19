@@ -28,6 +28,7 @@ export interface BorderControlsConfig {
   borderLeftBtn: HTMLButtonElement;
   borderRightBtn: HTMLButtonElement;
   borderNoneBtn: HTMLButtonElement;
+  borderStyleGrid: HTMLElement;
 }
 
 /** Callback signatures */
@@ -60,8 +61,10 @@ export class BorderControls {
   private borderLeftBtn: HTMLButtonElement;
   private borderRightBtn: HTMLButtonElement;
   private borderNoneBtn: HTMLButtonElement;
+  private borderStyleGrid: HTMLElement;
 
   private dataSource: WasmDataSource | null = null;
+  private selectedBorderStyle: BorderStyle = "thin";
 
   private getSelectedCell: () => Position | null;
   private getSelectionRange: () => { start: Position | null; end: Position | null };
@@ -77,6 +80,7 @@ export class BorderControls {
     this.borderLeftBtn = config.borderLeftBtn;
     this.borderRightBtn = config.borderRightBtn;
     this.borderNoneBtn = config.borderNoneBtn;
+    this.borderStyleGrid = config.borderStyleGrid;
 
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectionRange = callbacks.getSelectionRange;
@@ -133,12 +137,38 @@ export class BorderControls {
       this.closeDropdown();
     });
 
+    // Border style selection
+    this.borderStyleGrid.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const styleBtn = target.closest(".border-style-btn") as HTMLElement | null;
+      if (styleBtn) {
+        const style = styleBtn.dataset.style as BorderStyle;
+        if (style) {
+          this.selectBorderStyle(style);
+        }
+      }
+    });
+
     // Close dropdown on outside click
     document.addEventListener("click", (e) => {
       const target = e.target as Node;
       if (!this.borderDropdown.contains(target)) {
         this.closeDropdown();
       }
+    });
+  }
+
+  /**
+   * Select a border style and update the UI.
+   */
+  private selectBorderStyle(style: BorderStyle): void {
+    this.selectedBorderStyle = style;
+
+    // Update selected state in UI
+    const buttons = this.borderStyleGrid.querySelectorAll(".border-style-btn");
+    buttons.forEach((btn) => {
+      const btnStyle = (btn as HTMLElement).dataset.style;
+      btn.classList.toggle("selected", btnStyle === style);
     });
   }
 
@@ -156,10 +186,10 @@ export class BorderControls {
   }
 
   /**
-   * Create a border edge object with thin style and black color.
+   * Create a border edge object with the selected style and black color.
    */
   private createBorderEdge(): { style: BorderStyle; color: string } {
-    return { style: "thin" as BorderStyle, color: "#000000" };
+    return { style: this.selectedBorderStyle, color: "#000000" };
   }
 
   /**

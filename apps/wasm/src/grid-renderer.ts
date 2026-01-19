@@ -979,12 +979,28 @@ export class GridRenderer {
 
         if (startX >= endX) continue;
 
-        ctx.beginPath();
-        // Center the line on the edge (add 0.5 for crisp 1px lines)
-        const lineY = Math.round(y) + 0.5;
-        ctx.moveTo(startX, lineY);
-        ctx.lineTo(endX, lineY);
-        ctx.stroke();
+        if (edge.style === "double") {
+          // Draw two parallel lines for double border
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          const lineY1 = Math.round(y) - 1 + 0.5;
+          ctx.moveTo(startX, lineY1);
+          ctx.lineTo(endX, lineY1);
+          ctx.stroke();
+
+          ctx.beginPath();
+          const lineY2 = Math.round(y) + 1 + 0.5;
+          ctx.moveTo(startX, lineY2);
+          ctx.lineTo(endX, lineY2);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          // Center the line on the edge (add 0.5 for crisp 1px lines)
+          const lineY = Math.round(y) + 0.5;
+          ctx.moveTo(startX, lineY);
+          ctx.lineTo(endX, lineY);
+          ctx.stroke();
+        }
       } else {
         // Vertical edge: draw at the boundary between col-1 and col
         // Edge position is at the left of 'col' (or right of 'col-1')
@@ -1022,12 +1038,28 @@ export class GridRenderer {
 
         if (startY >= endY) continue;
 
-        ctx.beginPath();
-        // Center the line on the edge (add 0.5 for crisp 1px lines)
-        const lineX = Math.round(x) + 0.5;
-        ctx.moveTo(lineX, startY);
-        ctx.lineTo(lineX, endY);
-        ctx.stroke();
+        if (edge.style === "double") {
+          // Draw two parallel lines for double border
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          const lineX1 = Math.round(x) - 1 + 0.5;
+          ctx.moveTo(lineX1, startY);
+          ctx.lineTo(lineX1, endY);
+          ctx.stroke();
+
+          ctx.beginPath();
+          const lineX2 = Math.round(x) + 1 + 0.5;
+          ctx.moveTo(lineX2, startY);
+          ctx.lineTo(lineX2, endY);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          // Center the line on the edge (add 0.5 for crisp 1px lines)
+          const lineX = Math.round(x) + 0.5;
+          ctx.moveTo(lineX, startY);
+          ctx.lineTo(lineX, endY);
+          ctx.stroke();
+        }
       }
     }
 

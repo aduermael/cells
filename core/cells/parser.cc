@@ -302,32 +302,45 @@ static bool hasJSONKey(std::string_view json, const std::string& key) {
 
 // Helper to convert string to BorderStyle enum
 static BorderStyle stringToBorderStyle(const std::string& str) {
-    if (str == "thin")
+    if (str == "thin") {
         return BorderStyle::THIN;
-    if (str == "medium")
+    }
+    if (str == "medium") {
         return BorderStyle::MEDIUM;
-    if (str == "thick")
+    }
+    if (str == "thick") {
         return BorderStyle::THICK;
-    if (str == "dashed")
+    }
+    if (str == "dashed") {
         return BorderStyle::DASHED;
-    if (str == "dotted")
+    }
+    if (str == "dotted") {
         return BorderStyle::DOTTED;
-    if (str == "double")
+    }
+    if (str == "double") {
         return BorderStyle::DOUBLE;
-    if (str == "hair")
+    }
+    if (str == "hair") {
         return BorderStyle::HAIR;
-    if (str == "mediumDashed")
+    }
+    if (str == "mediumDashed") {
         return BorderStyle::MEDIUM_DASHED;
-    if (str == "dashDot")
+    }
+    if (str == "dashDot") {
         return BorderStyle::DASH_DOT;
-    if (str == "mediumDashDot")
+    }
+    if (str == "mediumDashDot") {
         return BorderStyle::MEDIUM_DASH_DOT;
-    if (str == "dashDotDot")
+    }
+    if (str == "dashDotDot") {
         return BorderStyle::DASH_DOT_DOT;
-    if (str == "mediumDashDotDot")
+    }
+    if (str == "mediumDashDotDot") {
         return BorderStyle::MEDIUM_DASH_DOT_DOT;
-    if (str == "slantDashDot")
+    }
+    if (str == "slantDashDot") {
         return BorderStyle::SLANT_DASH_DOT;
+    }
     return BorderStyle::NONE;
 }
 
