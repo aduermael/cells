@@ -10,7 +10,7 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 12 COMPLETE - Ready for Phase 13 (Remove sheet prefixes from internal formula storage).
+**Current status:** Phase 13 COMPLETE - Ready for Phase 14 (Remove cross-sheet dependency tracking).
 
 **Progress Jan 17 (session 16):**
 - Phase 11: Global Range ID Tracking
@@ -420,19 +420,19 @@ Since cells are now globally unique by UUID at the workbook level, internal form
 - Same formula viewed on Sheet2 displays as `=B1`
 - This is handled by `FormulaDisplayConverter` using context sheet comparison
 
-**What needs to change:**
+**What was changed:**
 
-- [ ] 13a: Audit FormulaResolver to understand how sheet prefixes are added to cell references
-- [ ] 13b: Update FormulaResolver to NOT add sheet prefixes for cell references (cell UUID is sufficient)
-- [ ] 13c: Update FormulaParser to handle cell references without sheet prefixes
-- [ ] 13d: Update FormulaSerializer to output cell references without sheet prefixes
-- [ ] 13e: Update FormulaEvaluator if needed (may already work via `workbook.findCell()`)
-- [ ] 13f: Update dependency graph registration (remove sheet-specific tracking for cell refs)
-- [ ] 13g: Handle backward compatibility for existing files with sheet-prefixed formulas
-- [ ] 13h: Run tests to verify formulas work correctly with new storage format
+- [x] 13a: Audit FormulaResolver - sheet prefixes were added in `resolveCellRef()` when `targetSheet != &_sheet`
+- [x] 13b: Updated FormulaResolver to NOT set `node->sheetId` for cell references (cell UUID is sufficient)
+- [x] 13c: FormulaParser already handles cell references without sheet prefixes via `parseUuidCellRef()`
+- [x] 13d: Updated FormulaSerializer to NOT output sheet prefixes for cell/range references
+- [x] 13e: FormulaEvaluator already works via `workbook.findCell()` for cells without sheetId
+- [x] 13f: DependencyGraph extracts cell deps by cellId only (sheetId not used). `extractCrossSheetRefs()` now returns empty for cell refs.
+- [x] 13g: Backward compatibility removed (app not public). Old format support removed from tests.
+- [x] 13h: All 54 unit tests + 184 E2E tests pass
 
 **Note on range references:**
-Range references (`A1:B5`) still need column/row IDs which belong to a specific sheet. However, since axes now have a `sheetId` field, the range's sheet can be derived from its corner axis IDs. Consider whether range refs also need simplification.
+Range references (`A1:B5`) also no longer have sheet prefixes. The range's sheet can be derived from its corner cells' columns' `sheetId` fields.
 
 ## Phase 14: Remove Cross-Sheet Dependency Tracking
 

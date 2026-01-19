@@ -1587,16 +1587,17 @@ TEST_F(FormulaEvalTest, CrossSheetCellRef_Evaluates) {
     ASSERT_NE(ast, nullptr);
     ASSERT_FALSE(parser.hasErrors());
 
-    // Resolve - this should find Sheet2 and set sheetId
+    // Resolve - this should find Sheet2 and set cellId (but NOT sheetId)
     FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
     auto result = resolver.resolve(ast.get());
     ASSERT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
 
-    // The AST should be a CellRefNode with sheetId set
+    // The AST should be a CellRefNode - sheetId should NOT be set (cells are globally unique)
     ASSERT_EQ(ast->type, ASTNodeType::CELL_REF);
     auto* cellRef = static_cast<CellRefNode*>(ast.get());
-    EXPECT_FALSE(cellRef->sheetId.empty()) << "sheetId should be set for cross-sheet ref";
-    EXPECT_EQ(cellRef->sheetId, sheet2->id.toString()) << "sheetId should match Sheet2";
+    EXPECT_TRUE(cellRef->sheetId.empty())
+        << "sheetId should NOT be set (cells are globally unique)";
+    EXPECT_EQ(cellRef->cellId, cellB27->id.toString()) << "cellId should be set";
 
     // Evaluate
     std::unordered_set<ID> evaluating;

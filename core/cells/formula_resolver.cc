@@ -141,10 +141,10 @@ ResolveResult FormulaResolver::resolveCellRef(CellRefNode* node) {
     // Store the cell ID
     node->cellId = cell->id.toString();
 
-    // Store the sheet ID for cross-sheet references (when targeting a different sheet)
-    if (!node->sheetName.empty() && targetSheet != &_sheet) {
-        node->sheetId = targetSheet->id.toString();
-    }
+    // NOTE: We do NOT store sheetId for cell references anymore.
+    // Cell UUIDs are globally unique, so the cell can be looked up directly
+    // via workbook.findCell(). The sheet context is only needed for display
+    // (derived dynamically from cell's column's sheetId).
 
     return ResolveResult::ok();
 }

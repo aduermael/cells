@@ -296,21 +296,21 @@ TEST_F(FormulaSerializerTest, SerializeCrossSheetCellRef) {
     auto ast = parser.parse();
     ASSERT_NE(ast, nullptr);
 
-    // Resolve (should set sheetId and cellId)
+    // Resolve (should set cellId but NOT sheetId - cells are globally unique)
     FormulaResolver resolver(*workbook, *sheet);
     auto result = resolver.resolve(ast.get());
     ASSERT_TRUE(result.success) << result.errorMessage;
 
-    // Check the AST has sheetId set
+    // Check the AST - sheetId should NOT be set (cell UUIDs are globally unique)
     auto* cellRef = static_cast<CellRefNode*>(ast.get());
-    EXPECT_EQ(cellRef->sheetId, sheet2->id.toString()) << "sheetId should be Sheet2's ID";
+    EXPECT_TRUE(cellRef->sheetId.empty()) << "sheetId should NOT be set for cell refs";
     EXPECT_EQ(cellRef->cellId, cellB27->id.toString()) << "cellId should be B27's ID";
 
-    // Serialize and verify format
+    // Serialize and verify format - should NOT contain sheet prefix
     std::string serialized = FormulaSerializer::serialize(ast.get());
-    // Should be: =!<8-char-sheet-id>~~<8-char-cell-id>
-    EXPECT_TRUE(serialized.find("=!" + sheet2->id.toString()) != std::string::npos)
-        << "Should contain sheet ID prefix: " << serialized;
+    // Should be: =~~<8-char-cell-id> (no sheet prefix)
+    EXPECT_EQ(serialized.find("!"), std::string::npos)
+        << "Should NOT contain sheet prefix: " << serialized;
     EXPECT_TRUE(serialized.find(cellB27->id.toString()) != std::string::npos)
         << "Should contain cell ID: " << serialized;
 
@@ -320,10 +320,10 @@ TEST_F(FormulaSerializerTest, SerializeCrossSheetCellRef) {
     ASSERT_NE(ast2, nullptr) << "Failed to parse serialized formula: " << serialized;
     ASSERT_FALSE(parser2.hasErrors());
 
-    // The parsed AST should have sheetId set correctly
+    // The parsed AST should have no sheetId (cell UUIDs are globally unique)
     auto* cellRef2 = dynamic_cast<CellRefNode*>(ast2.get());
     ASSERT_NE(cellRef2, nullptr);
-    EXPECT_EQ(cellRef2->sheetId, sheet2->id.toString()) << "Round-trip should preserve sheetId";
+    EXPECT_TRUE(cellRef2->sheetId.empty()) << "Round-trip should not have sheetId";
     EXPECT_EQ(cellRef2->cellId, cellB27->id.toString()) << "Round-trip should preserve cellId";
 }
 
@@ -351,13 +351,16 @@ TEST_F(FormulaSerializerTest, SerializeCrossSheetRange) {
     auto result = resolver.resolve(ast.get());
     ASSERT_TRUE(result.success) << result.errorMessage;
 
-    // Serialize
+    // Serialize - should NOT contain sheet prefix (cells are globally unique)
     std::string serialized = FormulaSerializer::serialize(ast.get());
+    EXPECT_EQ(serialized.find("!"), std::string::npos)
+        << "Should NOT contain sheet prefix: " << serialized;
 
-    // Should contain sheet ID prefix only ONCE for the range (not twice)
-    size_t firstSheetPrefix = serialized.find("!" + sheet2->id.toString());
-    EXPECT_NE(firstSheetPrefix, std::string::npos)
-        << "Should contain sheet ID prefix: " << serialized;
+    // Should contain both cell IDs
+    EXPECT_TRUE(serialized.find(cellA1->id.toString()) != std::string::npos)
+        << "Should contain A1's cell ID: " << serialized;
+    EXPECT_TRUE(serialized.find(cellA3->id.toString()) != std::string::npos)
+        << "Should contain A3's cell ID: " << serialized;
 
     // Parse the serialized formula back
     FormulaParser parser2(serialized);
@@ -373,11 +376,11 @@ TEST_F(FormulaSerializerTest, SerializeCrossSheetRange) {
     auto* rangeRef = dynamic_cast<RangeRefNode*>(func->args[0].get());
     ASSERT_NE(rangeRef, nullptr);
 
-    // Both cells should have sheetId set
-    EXPECT_EQ(rangeRef->topLeft->sheetId, sheet2->id.toString())
-        << "topLeft should have sheetId after round-trip";
-    EXPECT_EQ(rangeRef->bottomRight->sheetId, sheet2->id.toString())
-        << "bottomRight should have sheetId after round-trip";
+    // Cell refs should NOT have sheetId (cells are globally unique)
+    EXPECT_TRUE(rangeRef->topLeft->sheetId.empty())
+        << "topLeft should NOT have sheetId after round-trip";
+    EXPECT_TRUE(rangeRef->bottomRight->sheetId.empty())
+        << "bottomRight should NOT have sheetId after round-trip";
 }
 
 }  // namespace

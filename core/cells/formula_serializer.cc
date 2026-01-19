@@ -83,12 +83,13 @@ std::string FormulaSerializer::nodeToUuidString(const ASTNode* node) {
 std::string FormulaSerializer::cellRefToUuidString(const CellRefNode* node) {
     std::string result;
 
-    // Add sheet prefix if present (prefer sheetId for storage, fall back to sheetName)
-    if (!node->sheetId.empty()) {
-        result += "!" + node->sheetId;
-    } else if (!node->sheetName.empty()) {
-        result += node->sheetName + "!";
-    }
+    // NOTE: We do NOT output sheet prefix for cell references anymore.
+    // Cell UUIDs are globally unique, so no sheet context is needed for storage.
+    // The sheet context is only needed for display (derived dynamically from
+    // cell's column's sheetId by FormulaDisplayConverter).
+    //
+    // For backward compatibility when parsing old formulas, we still accept
+    // sheet prefixes in the parser, but we never write them out.
 
     // If we have a resolved cellId, use UUID format
     if (!node->cellId.empty()) {
@@ -111,18 +112,11 @@ std::string FormulaSerializer::cellRefToUuidString(const CellRefNode* node) {
 }
 
 std::string FormulaSerializer::rangeRefToUuidString(const RangeRefNode* node) {
-    std::string result;
+    // NOTE: We do NOT output sheet prefix for range references anymore.
+    // Cell UUIDs are globally unique, so the range's sheet can be derived from
+    // its corner cells' columns' sheetId fields.
 
-    // Add sheet prefix once at the beginning (ranges belong to a single sheet)
-    // Check topLeft for sheet reference since both cells should be on the same sheet
-    if (!node->topLeft->sheetId.empty()) {
-        result += "!" + node->topLeft->sheetId;
-    } else if (!node->topLeft->sheetName.empty()) {
-        result += node->topLeft->sheetName + "!";
-    }
-
-    // For the cell refs, we need to skip the sheet prefix since we already added it
-    // Use a helper that outputs just the cell reference part
+    // Helper that outputs just the cell reference part (no sheet prefix)
     auto cellRefWithoutSheet = [](const CellRefNode* cell) {
         std::string cellResult;
         if (!cell->cellId.empty()) {
@@ -142,6 +136,7 @@ std::string FormulaSerializer::rangeRefToUuidString(const RangeRefNode* node) {
         return cellResult;
     };
 
+    std::string result;
     result += cellRefWithoutSheet(node->topLeft.get());
     result += ":";
     result += cellRefWithoutSheet(node->bottomRight.get());
