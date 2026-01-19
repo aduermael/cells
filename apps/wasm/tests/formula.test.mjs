@@ -595,9 +595,10 @@ const tests = {
     const formulaBeforeResubmit = await getFormulaBarContent(ctx.page);
     assertEqual(formulaBeforeResubmit, '=Sheet2!B1', 'Formula bar should show =Sheet2!B1');
 
-    // Now re-submit the formula by clicking the formula bar and pressing Enter
-    // This simulates the user editing/viewing the formula and confirming it unchanged
-    await ctx.page.click('#formula-bar');
+    // Now re-submit the formula by clicking the formula display and pressing Enter
+    // This simulates the user focusing the formula bar and confirming it unchanged
+    // NOTE: Must click #formula-display (the contenteditable) not #formula-bar (the container)
+    await ctx.page.click('#formula-display');
     await sleep(200);
     await ctx.page.keyboard.press('Enter');
     await sleep(300);
@@ -672,10 +673,10 @@ const tests = {
     const initialValue = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(initialValue, '60', 'A1 should initially show 60 (sum of 10+20+30)');
 
-    // Re-submit the formula
+    // Re-submit the formula by clicking formula display and pressing Enter
     await clickCell(ctx.page, 'A1');
     await sleep(200);
-    await ctx.page.click('#formula-bar');
+    await ctx.page.click('#formula-display');
     await sleep(200);
     await ctx.page.keyboard.press('Enter');
     await sleep(300);

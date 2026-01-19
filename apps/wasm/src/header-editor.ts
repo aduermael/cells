@@ -680,7 +680,9 @@ export class FormulaBarEditor {
         // Create cell if it doesn't exist and value is non-empty
         await this.dataSource.createCell(editCell.col, editCell.row, newValue);
       } else {
-        await this.dataSource.updateCell(cell.id, newValue);
+        // Use updateCellWithFormatDetection which uses the proper AST-based
+        // FormulaResolver for cross-sheet references (not the string-based converter)
+        await this.dataSource.updateCellWithFormatDetection(cell.id, newValue);
       }
       // Listener handles refresh automatically
     } catch (e) {

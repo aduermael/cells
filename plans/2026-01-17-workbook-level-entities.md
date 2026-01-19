@@ -607,12 +607,19 @@ Internal storage (UUID-based)     Display (A1 notation)
 - [x] 15d: Unit tests revealed a BUG in FormulaDisplayConverter:
   - Context-aware display was NOT working: `=Sheet2!B1` showed the same from both Sheet1 and Sheet2
   - Root cause: When cellId is resolved but sheetId is empty (Phase 13+), the code still used sheetName to set the prefix before checking if the cell's sheet matches the context sheet
+- [x] 15d-2: Manual testing revealed the REAL BUG in formula bar (header-editor.ts):
+  - Formula bar used `updateCell()` which uses string-based `_refConverter.formulaToUuid()`
+  - Cell editor used `updateCellWithFormatDetection()` which uses proper AST-based `FormulaResolver`
+  - The string-based converter doesn't properly handle cross-sheet references!
 
 **Step 4: Fix the bug**
 - [x] 15e: Fixed `FormulaDisplayConverter::cellRefToStringInternal()` in formula_display.cc:
   - Restructured logic to prioritize cellId lookup (Phase 13+ simplified storage)
   - When cellId is resolved, only add sheet prefix if cell's column's sheetId differs from context sheet
   - Legacy sheetId/sheetName paths only used when cellId is not resolved
+- [x] 15e-2: Fixed formula bar in header-editor.ts line 685:
+  - Changed from `updateCell()` to `updateCellWithFormatDetection()`
+  - Now uses proper AST-based FormulaResolver for cross-sheet references
 - [x] 15f: All edge cases handled:
   - Re-submitting unchanged formula (E2E test passes)
   - Cross-sheet formulas with ranges (RangeRef unit test passes)
@@ -620,10 +627,10 @@ Internal storage (UUID-based)     Display (A1 notation)
   - Formulas referencing multiple sheets (MultipleSheetRefs unit test passes)
 
 **Step 5: Verify comprehensive formula round-trip**
-- [x] 15g: E2E test passes
+- [x] 15g: E2E tests updated to click `#formula-display` (contenteditable) not `#formula-bar` (container)
 - [x] 15h: All 21 formula E2E tests pass (including 2 new round-trip tests)
 - [x] 15i: All 55 unit tests pass (including 5 new CrossSheetRoundTripTest tests)
-- [x] 15j: Manual verification not needed - comprehensive automated tests cover all scenarios
+- [x] 15j: Manual testing verified - cross-sheet formula re-submission now works correctly
 
 ## Design Notes
 
