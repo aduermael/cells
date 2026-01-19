@@ -438,6 +438,24 @@ Range references (`A1:B5`) still need column/row IDs which belong to a specific 
 
 **Confirmed:** `_crossSheetDeps` and `_crossSheetRangeDeps` are NOT necessary. With cells globally unique by UUID, ALL dependencies go through the single global `_depGraph`. This dramatically simplifies the architecture.
 
+**Single `_depGraph` with two internal indexes (this is correct):**
+```cpp
+// Forward: cellId -> what this formula references (for display, cleanup)
+std::unordered_map<ID, std::vector<DependencyRef>> dependencies_;
+
+// Reverse: cellId -> formulas that depend on this cell (for recalculation)
+std::unordered_map<ID, std::vector<ID>> reverseDeps_;
+
+// R-tree for range queries (spatial index)
+RTree<ID> rtree_;
+```
+
+Both indexes are needed:
+- **Forward (`dependencies_`)**: When removing a formula, need to clean up `reverseDeps_`. Also for UI display.
+- **Reverse (`reverseDeps_`)**: When cell X changes, find formulas to recalculate. O(1) vs scanning all formulas.
+
+This is ONE graph with TWO indexes - not two separate graphs. The redundant part is `_crossSheetDeps`/`_crossSheetRangeDeps` in Workbook.
+
 **Benefits of single global dependency graph:**
 - No special-case handling for "cross-sheet" vs "same-sheet" references
 - Simpler recalculation logic - just walk the global graph
