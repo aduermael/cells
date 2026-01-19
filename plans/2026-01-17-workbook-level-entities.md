@@ -10,7 +10,7 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 12 COMPLETE - Performance validation completed with benchmark tests.
+**Current status:** Phase 12 COMPLETE - Ready for Phase 13 (Remove sheet prefixes from internal formula storage).
 
 **Progress Jan 17 (session 16):**
 - Phase 11: Global Range ID Tracking
@@ -404,6 +404,42 @@ Verify performance is maintained or improved with new architecture.
 - Dependency queries: sub-100ns
 - CRDT operations: 22-67µs (includes HLC generation and model updates)
 - Memory efficiency verified: All entities accessible through workbook-level storage
+
+## Phase 13: Remove Sheet Prefixes from Internal Formula Storage
+
+Since cells are now globally unique by UUID at the workbook level, internal formula storage should NOT include sheet prefixes. The sheet context is only needed for display (derived dynamically from cell's column's sheetId).
+
+**Current (incorrect):** `=!bQYHziAr~~6RVulooT` (sheet prefix in internal storage)
+**Target:** `=6RVulooT` (just the cell UUID - globally unique)
+
+**Display behavior (unchanged):**
+- Formula in Sheet1 referencing B1 on Sheet2 displays as `=Sheet2!B1`
+- Same formula viewed on Sheet2 displays as `=B1`
+- This is handled by `FormulaDisplayConverter` using context sheet comparison
+
+**What needs to change:**
+
+- [ ] 13a: Audit FormulaResolver to understand how sheet prefixes are added to cell references
+- [ ] 13b: Update FormulaResolver to NOT add sheet prefixes for cell references (cell UUID is sufficient)
+- [ ] 13c: Update FormulaParser to handle cell references without sheet prefixes
+- [ ] 13d: Update FormulaSerializer to output cell references without sheet prefixes
+- [ ] 13e: Update FormulaEvaluator if needed (may already work via `workbook.findCell()`)
+- [ ] 13f: Update dependency graph registration (remove sheet-specific tracking for cell refs)
+- [ ] 13g: Handle backward compatibility for existing files with sheet-prefixed formulas
+- [ ] 13h: Run tests to verify formulas work correctly with new storage format
+
+**Note on range references:**
+Range references (`A1:B5`) still need column/row IDs which belong to a specific sheet. However, since axes now have a `sheetId` field, the range's sheet can be derived from its corner axis IDs. Consider whether range refs also need simplification.
+
+## Phase 14: Clean Up Cross-Sheet Dependency Tracking
+
+Once sheet prefixes are removed from formula storage (Phase 13), the cross-sheet dependency tracking in Workbook may become redundant.
+
+- [ ] 14a: Analyze if `_crossSheetDeps`, `_crossSheetRangeDeps` are still needed
+- [ ] 14b: If cell refs no longer have sheet context, direct cell deps go through global `_depGraph`
+- [ ] 14c: Range deps may still need special handling (R-tree is sheet-local)
+- [ ] 14d: Remove redundant cross-sheet tracking if no longer needed
+- [ ] 14e: Run tests to verify dependency tracking still works
 
 ## Design Notes
 
