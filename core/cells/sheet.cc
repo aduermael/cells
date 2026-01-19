@@ -65,6 +65,40 @@ PositionResolver makePositionResolver(Sheet* sheet) {
         return {static_cast<int32_t>(col->position), static_cast<int32_t>(row->position)};
     };
 }
+
+// Create a workbook-level position resolver for cross-sheet formula dependencies
+// Returns (col, row) position for a cell ID from ANY sheet in the workbook
+PositionResolver makeWorkbookPositionResolver(Workbook* workbook) {
+    return [workbook](const ID& cellId) -> std::pair<int32_t, int32_t> {
+        if (!workbook) {
+            return {-1, -1};
+        }
+
+        // Look up cell from workbook-level storage
+        const Cell* cell = workbook->getCell(cellId);
+        if (!cell) {
+            // Maybe it's a column or row ID, not a cell ID
+            const Axis* col = workbook->getColumn(cellId);
+            if (col) {
+                return {static_cast<int32_t>(col->position), -1};
+            }
+            const Axis* row = workbook->getRow(cellId);
+            if (row) {
+                return {-1, static_cast<int32_t>(row->position)};
+            }
+            return {-1, -1};
+        }
+
+        // Get column and row from workbook-level storage
+        const Axis* col = workbook->getColumn(cell->colId);
+        const Axis* row = workbook->getRow(cell->rowId);
+        if (!col || !row) {
+            return {-1, -1};
+        }
+
+        return {static_cast<int32_t>(col->position), static_cast<int32_t>(row->position)};
+    };
+}
 }  // namespace
 
 // ============================================================================
@@ -695,10 +729,11 @@ FormulaResult Sheet::setCellFormula(const ID& cellId, const std::string& /* form
     cell->setFormula(formula);
 
     // Add to dependency graph (AST should already be resolved)
-    // Use position resolver to populate R-tree for range queries
+    // Use workbook-level position resolver to handle cross-sheet range deps
     DependencyGraph* depGraph = getDependencyGraph();
-    if (ast != nullptr && depGraph != nullptr) {
-        depGraph->addFormula(cellId, ast, makePositionResolver(this));
+    Workbook* workbook = getWorkbook();
+    if (ast != nullptr && depGraph != nullptr && workbook != nullptr) {
+        depGraph->addFormula(cellId, ast, makeWorkbookPositionResolver(workbook));
 
         // Track volatile functions
         if (formula->hasVolatile()) {

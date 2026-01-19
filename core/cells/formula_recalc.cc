@@ -45,6 +45,47 @@ static std::vector<ID> getDependentsWithRanges(Sheet* sheet, const ID& cellId) {
                                           static_cast<int32_t>(row->position));
 }
 
+// Workbook-level version: Get all formula cells that depend on a given cell
+// Works across sheets by looking up the cell's position via workbook-level axis storage
+static std::vector<ID> getDependentsWithRanges(Workbook* workbook, const ID& cellId) {
+    const DependencyGraph* depGraph = workbook->getDependencyGraph();
+    if (!depGraph) {
+        return {};
+    }
+
+    // Get the cell and its position for R-tree query
+    const Cell* cell = workbook->getCell(cellId);
+    if (!cell) {
+        // Cell doesn't exist - just use direct deps lookup
+        return depGraph->getDependents(cellId);
+    }
+
+    const Axis* col = workbook->getColumn(cell->colId);
+    const Axis* row = workbook->getRow(cell->rowId);
+    if (!col || !row) {
+        // Can't determine position - fall back to direct deps only
+        return depGraph->getDependents(cellId);
+    }
+
+    // Use optimized combined lookup:
+    // - O(1) reverse index for direct cell references
+    // - O(log n) R-tree query for range references
+    return depGraph->getDependentsForCell(cellId, static_cast<int32_t>(col->position),
+                                          static_cast<int32_t>(row->position));
+}
+
+// Helper to get the sheet containing a cell (via its column's sheetId)
+static Sheet* getSheetForCell(Workbook* workbook, const Cell* cell) {
+    if (!workbook || !cell) {
+        return nullptr;
+    }
+    const Axis* col = workbook->getColumn(cell->colId);
+    if (!col) {
+        return nullptr;
+    }
+    return workbook->getSheetById(col->sheetId);
+}
+
 // =============================================================================
 // Single-Cell Evaluation
 // =============================================================================
@@ -187,15 +228,19 @@ EvalResult evaluateCell(Sheet* sheet, const ID& cellId) {
 }
 
 // =============================================================================
-// Batch Recalculation
+// Batch Recalculation (Workbook-Level)
+// =============================================================================
+// The recalculation engine is sheet-agnostic - it follows the global dependency
+// graph to recalculate ALL dependents regardless of which sheet they're on.
+// Sheets are a UI concept; calculation works at the workbook level.
 // =============================================================================
 
-void recalculate(Sheet* sheet, const std::vector<ID>& changedCells) {
-    if (!sheet || changedCells.empty()) {
+void recalculate(Workbook* workbook, const std::vector<ID>& changedCells) {
+    if (!workbook || changedCells.empty()) {
         return;
     }
 
-    const DependencyGraph* depGraph = sheet->getDependencyGraph();
+    const DependencyGraph* depGraph = workbook->getDependencyGraph();
     if (!depGraph) {
         return;
     }
@@ -209,7 +254,7 @@ void recalculate(Sheet* sheet, const std::vector<ID>& changedCells) {
         const ID cellId = queue.back();
         queue.pop_back();
 
-        auto dependents = getDependentsWithRanges(sheet, cellId);
+        auto dependents = getDependentsWithRanges(workbook, cellId);
         for (const ID& dep : dependents) {
             if (toRecalc.insert(dep).second) {
                 queue.push_back(dep);
@@ -240,7 +285,7 @@ void recalculate(Sheet* sheet, const std::vector<ID>& changedCells) {
 
         // Mark cells in cycles with error
         for (const ID& cellId : cellsInCycle) {
-            Cell* cell = sheet->getCell(cellId);
+            Cell* cell = workbook->getCell(cellId);
             if (cell) {
                 cell->value = CellValue(CellError::CIRCULAR);
                 Formula* formula = cell->getFormula();
@@ -255,7 +300,7 @@ void recalculate(Sheet* sheet, const std::vector<ID>& changedCells) {
     // Mark all cells in the recalculation set as dirty
     // This ensures they will be re-evaluated even if they were previously clean
     for (const ID& cellId : recalcOrder) {
-        const Cell* cell = sheet->getCell(cellId);
+        const Cell* cell = workbook->getCell(cellId);
         if (cell) {
             Formula* formula = cell->getFormula();
             if (formula) {
@@ -265,12 +310,28 @@ void recalculate(Sheet* sheet, const std::vector<ID>& changedCells) {
     }
 
     // Evaluate each cell in dependency order
+    // Note: evaluateCell needs a sheet for EvalContext, so we look it up per-cell
     for (const ID& cellId : recalcOrder) {
-        Cell* cell = sheet->getCell(cellId);
+        Cell* cell = workbook->getCell(cellId);
         if (cell && cell->isFormula()) {
-            evaluateCell(sheet, cell);
+            Sheet* sheet = getSheetForCell(workbook, cell);
+            if (sheet) {
+                evaluateCell(sheet, cell);
+            }
         }
     }
+}
+
+// Legacy sheet-based recalculate - delegates to workbook-level version
+void recalculate(Sheet* sheet, const std::vector<ID>& changedCells) {
+    if (!sheet) {
+        return;
+    }
+    Workbook* workbook = sheet->getWorkbook();
+    if (!workbook) {
+        return;
+    }
+    recalculate(workbook, changedCells);
 }
 
 // =============================================================================

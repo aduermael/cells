@@ -624,8 +624,8 @@ TEST_F(FormulaRecalcTest, NullSheet) {
     EvalResult result = evaluateCell(nullptr, ID("test"));
     EXPECT_TRUE(result.isError());
 
-    recalculate(nullptr, {ID("test")});  // Should not crash
-    recalculateVolatile(nullptr);        // Should not crash
+    recalculate(static_cast<Sheet*>(nullptr), {ID("test")});  // Should not crash
+    recalculateVolatile(nullptr);                             // Should not crash
 }
 
 TEST_F(FormulaRecalcTest, FormulaWithMultipleDependencies) {
@@ -1079,6 +1079,140 @@ TEST_F(FormulaRecalcTest, SpillSizeJustUnderLimit) {
     // Should succeed - no #SPILL! error
     EXPECT_NE(a1->value.error, CellError::SPILL);
     EXPECT_TRUE(a1->hasFlag(CellFlags::SPILL_MASTER));
+}
+
+// =============================================================================
+// Cross-Sheet Dependency Tests
+// =============================================================================
+
+// Test that workbook-level recalculate handles cross-sheet dependencies
+TEST_F(FormulaRecalcTest, CrossSheetDependency) {
+    // Create a second sheet
+    workbook->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet2"));
+    Sheet* sheet2 = workbook->getSheetByIndex(1);
+
+    // Create columns/rows on Sheet2
+    ID sheet2ColIds[3];
+    ID sheet2RowIds[3];
+    for (uint32_t i = 0; i < 3; i++) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        col->name = Sheet::positionToColumnName(i);
+        sheet2ColIds[i] = col->id;
+        sheet2->addColumn(std::move(col));
+
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        sheet2RowIds[i] = row->id;
+        sheet2->addRow(std::move(row));
+    }
+
+    // Set Sheet2!A1 = 10
+    Cell* sheet2A1 = sheet2->getOrCreateCellAt(sheet2ColIds[0], sheet2RowIds[0]);
+    sheet2A1->value = CellValue(10.0);
+
+    // Create a formula on Sheet1 that references Sheet2!A1
+    // The formula is stored with just the cell ID (no sheet prefix) per Phase 13
+    Cell* sheet1B1 = sheet->getOrCreateCellAt(colIds[1], rowIds[0]);
+
+    // Parse and resolve the formula
+    FormulaParser parser("=Sheet2!A1");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    ASSERT_FALSE(parser.hasErrors());
+
+    FormulaResolver resolver(*workbook, *sheet);
+    ResolveResult resolveResult = resolver.resolve(ast.get());
+    ASSERT_TRUE(resolveResult.success);
+
+    // Set the formula on sheet1B1
+    auto result = sheet->setCellFormula(sheet1B1->id, "=Sheet2!A1", ast.release());
+    ASSERT_TRUE(result.success);
+
+    // Initial evaluation - sheet1B1 should show 10
+    EvalResult evalResult = evaluateCell(sheet, sheet1B1);
+    EXPECT_TRUE(evalResult.isNumber());
+    EXPECT_DOUBLE_EQ(evalResult.getNumber(), 10.0);
+
+    // Verify the dependency is registered in the global dep graph
+    const DependencyGraph* depGraph = workbook->getDependencyGraph();
+    ASSERT_NE(depGraph, nullptr);
+
+    // Sheet2!A1's cellId should have sheet1B1 as a dependent
+    auto dependents = depGraph->getDependents(sheet2A1->id);
+    EXPECT_EQ(dependents.size(), 1u);
+    if (!dependents.empty()) {
+        EXPECT_EQ(dependents[0], sheet1B1->id);
+    }
+
+    // Now change Sheet2!A1 to 20 and recalculate at workbook level
+    sheet2A1->value = CellValue(20.0);
+
+    // Workbook-level recalculate should find and update sheet1B1
+    recalculate(workbook.get(), {sheet2A1->id});
+
+    // sheet1B1 should now show 20
+    EXPECT_DOUBLE_EQ(sheet1B1->value.asNumber(), 20.0);
+}
+
+// Test cross-sheet range dependency
+TEST_F(FormulaRecalcTest, CrossSheetRangeDependency) {
+    // Create a second sheet
+    workbook->addSheet(std::make_unique<Sheet>(generate_id(), "Sheet2"));
+    Sheet* sheet2 = workbook->getSheetByIndex(1);
+
+    // Create columns/rows on Sheet2
+    ID sheet2ColIds[3];
+    ID sheet2RowIds[3];
+    for (uint32_t i = 0; i < 3; i++) {
+        auto col = std::make_unique<Axis>(generate_id(), true);
+        col->position = i;
+        col->name = Sheet::positionToColumnName(i);
+        sheet2ColIds[i] = col->id;
+        sheet2->addColumn(std::move(col));
+
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = i;
+        sheet2RowIds[i] = row->id;
+        sheet2->addRow(std::move(row));
+    }
+
+    // Set Sheet2!A1:A3 = [1, 2, 3]
+    Cell* sheet2A1 = sheet2->getOrCreateCellAt(sheet2ColIds[0], sheet2RowIds[0]);
+    Cell* sheet2A2 = sheet2->getOrCreateCellAt(sheet2ColIds[0], sheet2RowIds[1]);
+    Cell* sheet2A3 = sheet2->getOrCreateCellAt(sheet2ColIds[0], sheet2RowIds[2]);
+    sheet2A1->value = CellValue(1.0);
+    sheet2A2->value = CellValue(2.0);
+    sheet2A3->value = CellValue(3.0);
+
+    // Create a SUM formula on Sheet1 that references Sheet2!A1:A3
+    Cell* sheet1B1 = sheet->getOrCreateCellAt(colIds[1], rowIds[0]);
+
+    FormulaParser parser("=SUM(Sheet2!A1:A3)");
+    auto ast = parser.parse();
+    ASSERT_NE(ast, nullptr);
+    ASSERT_FALSE(parser.hasErrors());
+
+    FormulaResolver resolver(*workbook, *sheet);
+    ResolveResult resolveResult = resolver.resolve(ast.get());
+    ASSERT_TRUE(resolveResult.success);
+
+    auto result = sheet->setCellFormula(sheet1B1->id, "=SUM(Sheet2!A1:A3)", ast.release());
+    ASSERT_TRUE(result.success);
+
+    // Initial evaluation - sheet1B1 should show 6 (1+2+3)
+    EvalResult evalResult = evaluateCell(sheet, sheet1B1);
+    EXPECT_TRUE(evalResult.isNumber());
+    EXPECT_DOUBLE_EQ(evalResult.getNumber(), 6.0);
+
+    // Change Sheet2!A2 to 10 and recalculate at workbook level
+    sheet2A2->value = CellValue(10.0);
+
+    // Workbook-level recalculate should find and update sheet1B1
+    recalculate(workbook.get(), {sheet2A2->id});
+
+    // sheet1B1 should now show 14 (1+10+3)
+    EXPECT_DOUBLE_EQ(sheet1B1->value.asNumber(), 14.0);
 }
 
 }  // namespace

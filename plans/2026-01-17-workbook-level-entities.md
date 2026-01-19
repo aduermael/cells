@@ -476,11 +476,18 @@ This means `getDependentsForCell(cellId, col, row)` still needs position info, b
 ### Implementation Steps
 
 **Step 1: Create workbook-level recalculate function**
-- [ ] 14a: Add `recalculate(Workbook*, const std::vector<ID>& changedCells)` in formula_recalc.h/cc
-- [ ] 14b: Use `workbook->getCell()` instead of `sheet->getCell()` for cell lookups
-- [ ] 14c: Use `workbook->getDependencyGraph()` for dep graph access
-- [ ] 14d: For R-tree queries, look up cell position via `workbook->getColumn(cell->colId)->position`
-- [ ] 14e: `evaluateCell()` already works at workbook level (uses `workbook->findCell()`)
+- [x] 14a: Add `recalculate(Workbook*, const std::vector<ID>& changedCells)` in formula_recalc.h/cc
+- [x] 14b: Use `workbook->getCell()` instead of `sheet->getCell()` for cell lookups
+- [x] 14c: Use `workbook->getDependencyGraph()` for dep graph access
+- [x] 14d: For R-tree queries, look up cell position via `workbook->getColumn(cell->colId)->position`
+- [x] 14e: `evaluateCell()` already works at workbook level (uses `workbook->findCell()`)
+
+**Step 1 completed.** Created workbook-level `recalculate()` that uses global dep graph.
+Added workbook-level position resolver for cross-sheet range deps. Updated `addFormula()`
+calls to use workbook-level resolver. Sheet-level `recalculate()` now delegates to workbook
+version. Added cross-sheet dependency unit tests - both pass. Cross-sheet dependency E2E
+tests pass. Note: Some E2E tests for formula display show #REF! - this is a separate
+issue with FormulaDisplayConverter, not recalculation.
 
 **Step 2: Update callers to use workbook-level recalculate**
 - [ ] 14f: Update bindings_core.cc - replace `recalculate(sheet, ...)` + `recalculateCrossSheet(...)` with `recalculate(workbook, ...)`

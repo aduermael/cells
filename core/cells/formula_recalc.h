@@ -59,18 +59,21 @@ EvalResult evaluateCell(Sheet* sheet, Cell* cell);
 // Convenience overload that looks up the cell first
 EvalResult evaluateCell(Sheet* sheet, const ID& cellId);
 
-// Recalculate cells in response to changes (same-sheet only)
+// Recalculate cells in response to changes (workbook-level, sheet-agnostic)
 // changedCells: cells whose values have changed (triggers dependent recalc)
-// Uses the dependency graph to determine recalculation order
+// Uses the global dependency graph to determine recalculation order
 // Handles circular references by marking cells with #CIRCULAR! error
-// NOTE: This only recalculates formulas on the same sheet. For cross-sheet
-// dependencies, use recalculateCrossSheet() as well.
+// This recalculates ALL dependents regardless of which sheet they're on.
+void recalculate(Workbook* workbook, const std::vector<ID>& changedCells);
+
+// Legacy sheet-based recalculate (delegates to workbook-level version)
+// Kept for backward compatibility with existing callers
 void recalculate(Sheet* sheet, const std::vector<ID>& changedCells);
 
 // Recalculate cross-sheet dependents for changed cells
-// Looks up the workbook's cross-sheet dependency index and triggers
-// recalculation on other sheets that have formulas depending on changedCells.
-// This handles cases like Sheet1!A1 containing =Sheet2!B1.
+// DEPRECATED: With workbook-level recalculate(), this is no longer needed.
+// The global dependency graph handles all dependencies regardless of sheet.
+// Kept temporarily for backward compatibility - will be removed.
 void recalculateCrossSheet(Workbook* workbook, Sheet* changedSheet,
                            const std::vector<ID>& changedCells);
 

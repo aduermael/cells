@@ -58,6 +58,40 @@ static PositionResolver makePositionResolver(Sheet* sheet) {
     };
 }
 
+// Create a workbook-level position resolver for cross-sheet formula dependencies
+// Returns (col, row) position for a cell ID from ANY sheet in the workbook
+static PositionResolver makeWorkbookPositionResolver(Workbook* workbook) {
+    return [workbook](const ID& cellId) -> std::pair<int32_t, int32_t> {
+        if (workbook == nullptr) {
+            return {-1, -1};
+        }
+
+        // Look up cell from workbook-level storage
+        const Cell* cell = workbook->getCell(cellId);
+        if (cell == nullptr) {
+            // Maybe it's a column or row ID, not a cell ID
+            const Axis* col = workbook->getColumn(cellId);
+            if (col != nullptr) {
+                return {static_cast<int32_t>(col->position), -1};
+            }
+            const Axis* row = workbook->getRow(cellId);
+            if (row != nullptr) {
+                return {-1, static_cast<int32_t>(row->position)};
+            }
+            return {-1, -1};
+        }
+
+        // Get column and row from workbook-level storage
+        const Axis* col = workbook->getColumn(cell->colId);
+        const Axis* row = workbook->getRow(cell->rowId);
+        if (col == nullptr || row == nullptr) {
+            return {-1, -1};
+        }
+
+        return {static_cast<int32_t>(col->position), static_cast<int32_t>(row->position)};
+    };
+}
+
 ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
     // Find the target cell from workbook-level storage
     auto result = workbook.findCell(op.target_id);
@@ -146,7 +180,10 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         if (formula->ast != nullptr && targetSheet != nullptr) {
             DependencyGraph* depGraph = workbook.getDependencyGraph();
             if (depGraph != nullptr) {
-                depGraph->addFormula(cell->id, formula->ast, makePositionResolver(targetSheet));
+                // Use workbook-level position resolver to handle cross-sheet range deps
+                // This allows the R-tree to be populated with positions from ANY sheet
+                depGraph->addFormula(cell->id, formula->ast,
+                                     makeWorkbookPositionResolver(&workbook));
 
                 // Track volatile functions
                 if (formula->hasVolatile()) {
@@ -154,26 +191,12 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
                 }
             }
 
-            // Register cross-sheet dependencies at workbook level
-            const std::vector<CrossSheetRef> crossRefs = extractCrossSheetRefs(formula->ast);
-            for (const auto& ref : crossRefs) {
-                if (ref.type == CrossSheetRef::Type::CELL) {
-                    workbook.addCrossSheetDep(ref.cellId, targetSheet->id, cell->id);
-                } else if (ref.type == CrossSheetRef::Type::RANGE) {
-                    // For ranges, register as a range dependency
-                    // We need to look up the cell positions from their IDs
-                    const Sheet* sourceSheet = workbook.getSheetById(ref.sheetId);
-                    if (sourceSheet != nullptr) {
-                        const Cell* startCell = workbook.getCell(ref.startCellId);
-                        const Cell* endCell = workbook.getCell(ref.endCellId);
-                        if (startCell != nullptr && endCell != nullptr) {
-                            workbook.addCrossSheetRangeDep(
-                                ref.sheetId, startCell->colId, startCell->rowId, endCell->colId,
-                                endCell->rowId, targetSheet->id, cell->id);
-                        }
-                    }
-                }
-            }
+            // NOTE: Cross-sheet dependency tracking via extractCrossSheetRefs() is no longer
+            // needed. With Phase 13 changes, formula storage no longer includes sheet prefixes,
+            // so extractCrossSheetRefs() returns empty. All dependencies (including cross-sheet)
+            // are now tracked through the global dep graph:
+            // - Direct cell refs: via reverseDeps_ (cell ID -> dependent formulas)
+            // - Range refs: via R-tree (positions come from workbook-level axis storage)
         }
 
         cell->setFormula(formula);

@@ -526,11 +526,12 @@ Workbook::CellLookupResult Workbook::findCell(const ID& cellId) {
         return {nullptr, nullptr};
     }
 
-    // Find the sheet by looking up the column's sheetId
-    for (auto& sheet : sheets) {
-        const Axis* col = sheet->getColumn(cell->colId);
-        if (col) {
-            return {cell, sheet.get()};
+    // Find the sheet via the column's sheetId (more reliable than checking _columnIds)
+    const Axis* col = getColumn(cell->colId);
+    if (col) {
+        Sheet* sheet = getSheetById(col->sheetId);
+        if (sheet) {
+            return {cell, sheet};
         }
     }
     return {cell, nullptr};  // Cell exists but sheet not found (shouldn't happen)
@@ -543,11 +544,12 @@ std::pair<const Cell*, const Sheet*> Workbook::findCell(const ID& cellId) const 
         return {nullptr, nullptr};
     }
 
-    // Find the sheet by looking up the column's sheetId
-    for (const auto& sheet : sheets) {
-        const Axis* col = sheet->getColumn(cell->colId);
-        if (col) {
-            return {cell, sheet.get()};
+    // Find the sheet via the column's sheetId (more reliable than checking _columnIds)
+    const Axis* col = getColumn(cell->colId);
+    if (col) {
+        const Sheet* sheet = getSheetById(col->sheetId);
+        if (sheet) {
+            return {cell, sheet};
         }
     }
     return {cell, nullptr};  // Cell exists but sheet not found (shouldn't happen)
