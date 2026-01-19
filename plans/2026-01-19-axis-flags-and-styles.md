@@ -70,12 +70,14 @@ Rename `_cellStyles` to `_styles` as a unified entity-to-style map. Since UUIDs 
 
 ## Phase 3: Fix cross-sheet style application
 
-Add sheet ID parameter to style functions so styles can be applied to non-active sheets.
+The current `setRangeStyle()` takes position coordinates and always operates on the active sheet. This breaks when styling ranges on non-active sheets. Since axes have a `sheetId` field, we can derive the correct sheet from axis UUIDs.
 
-- [ ] 3a: Add `sheetId` parameter to `setRangeStyle()` in CellsEngine (optional, defaults to active sheet)
-- [ ] 3b: Update TypeScript client/worker to pass sheet ID from selection state
-- [ ] 3c: Add `sheetId` parameter to related functions: `removeRangeStyle()`, `setCellStyleAt()`, `getCellStyleAt()`
-- [ ] 3d: Add `sheetId` parameter to effective style functions: `getEffectiveCellStyle()`, `getEffectiveStyleForRange()`
+**Approach**: Add UUID-based overloads that derive sheet from `axis.sheetId` instead of using active sheet.
+
+- [ ] 3a: Add UUID-based `setRangeStyleById(startColId, startRowId, endColId, endRowId, styleJson)` that derives sheet from axis.sheetId
+- [ ] 3b: Update TypeScript client/worker to use UUID-based API when selection has explicit axis IDs
+- [ ] 3c: Add UUID-based versions for related functions: `removeRangeStyleById()`, `setCellStyleById()`, `getCellStyleById()`
+- [ ] 3d: Keep position-based functions for backward compatibility (they continue to use active sheet)
 - [ ] 3e: Add E2E test for applying background color to range on non-active sheet
 - [ ] 3f: Run full test suite
 
