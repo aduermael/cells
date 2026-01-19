@@ -505,10 +505,26 @@ issue with FormulaDisplayConverter, not recalculation.
 **Step 4: Remove recalculateCrossSheet**
 - [ ] 14o: Remove `recalculateCrossSheet()` from formula_recalc.h/cc (no longer needed)
 
-**Step 5: Cleanup and testing**
-- [ ] 14p: Remove `extractCrossSheetRefs()` from dependency_graph.h/cc if no longer used
-- [ ] 14q: Run all tests to verify recalculation still works correctly
-- [ ] 14r: Verify cross-sheet formula scenarios work (Sheet1!A1 = Sheet2!B1)
+**Step 5: Fix cross-sheet formula display**
+Formula display is built from AST. It needs the active sheet to determine when to prefix
+references with sheet names (when cell's column's sheetId differs from active sheet).
+
+- [ ] 14p: Ensure FormulaResolver correctly resolves cross-sheet refs to cell UUIDs
+  - When entering `=Sheet2!B5` on Sheet1, resolver should find Sheet2, lookup/create cell at B5
+  - The cellId should be stored in the AST; sheetId is NOT stored (cell UUID is globally unique)
+- [ ] 14q: FormulaDisplayConverter determines sheet prefix from cell's column's sheetId vs active sheet
+  - If cell's column's sheetId != active sheet's id, prepend sheet name
+  - It's OK to always prepend sheet name (even for same-sheet refs)
+- [ ] 14r: Debug why resolution is failing for cross-sheet refs in E2E tests
+  - The `#REF!` output suggests resolution is falling back to RefConverter
+  - Check that Sheet2 exists when formula resolution happens
+- [ ] 14s: Ensure formula parser correctly handles `Sheet!Ref` syntax and maps to UUIDs
+
+**Step 6: Cleanup and testing**
+- [ ] 14t: Remove `extractCrossSheetRefs()` from dependency_graph.h/cc if no longer used
+- [ ] 14u: Run all tests to verify recalculation still works correctly
+- [ ] 14v: Verify cross-sheet formula scenarios work (Sheet1!A1 = Sheet2!B1)
+- [ ] 14w: Verify formula bar displays cross-sheet refs correctly (=Sheet2!B5)
 
 ## Design Notes
 
