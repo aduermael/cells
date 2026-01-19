@@ -710,9 +710,9 @@ bool Parser::parseQuotedString(std::string_view input, std::string& out, size_t&
     return false;
 }
 
-bool Parser::parseAxisProps(std::string_view props, Axis& axis, ID* outStyleId) {
+bool Parser::parseAxisProps(std::string_view props, Axis& axis, ID* outStyleId, ID* outFormatId) {
     // Format: key:value pairs separated by space
-    // Examples: w:100 name:"Total" h:30
+    // Examples: w:100 name:"Total" h:30 sty:STYL1234 fmt:FMT_C002
 
     while (!props.empty()) {
         // Skip leading whitespace
@@ -794,6 +794,22 @@ bool Parser::parseAxisProps(std::string_view props, Axis& axis, ID* outStyleId) 
             } else {
                 props = props.substr(endPos);
             }
+        } else if (key == "fmt") {
+            // Format ID value - output via optional parameter (stored in workbook map by caller)
+            const size_t endPos = props.find_first_of(" \t");
+            const std::string_view valueStr =
+                (endPos == std::string_view::npos) ? props : props.substr(0, endPos);
+
+            if (outFormatId != nullptr) {
+                *outFormatId = ID(std::string(valueStr));
+            }
+            axis.setHasFormat(true);  // Set flag for hasFormat() accessor
+
+            if (endPos == std::string_view::npos) {
+                props = "";
+            } else {
+                props = props.substr(endPos);
+            }
         } else {
             // Unknown property - skip to next space
             const size_t endPos = props.find_first_of(" \t");
@@ -859,19 +875,23 @@ bool Parser::parseColumn(std::string_view line) {
     }
     col->position = static_cast<uint32_t>(position);
 
-    // Parse optional properties (style ID stored in workbook map, not Axis struct)
+    // Parse optional properties (style/format IDs stored in workbook map, not Axis struct)
     ID styleId;
+    ID formatId;
     if (propsStart < line.size()) {
-        if (!parseAxisProps(line.substr(propsStart), *col, &styleId)) {
+        if (!parseAxisProps(line.substr(propsStart), *col, &styleId, &formatId)) {
             return setError("Invalid column properties");
         }
     }
 
-    // Store style ID in workbook map (before moving col)
+    // Store style/format IDs in workbook map (before moving col)
     const ID colId = col->id;
     currentSheet_->addColumn(std::move(col));
     if (workbook_ != nullptr && !styleId.isNull()) {
         workbook_->setStyleId(colId, styleId);
+    }
+    if (workbook_ != nullptr && !formatId.isNull()) {
+        workbook_->setFormatId(colId, formatId);
     }
     return true;
 }
@@ -925,19 +945,23 @@ bool Parser::parseRow(std::string_view line) {
     }
     row->position = static_cast<uint32_t>(position);
 
-    // Parse optional properties (style ID stored in workbook map, not Axis struct)
+    // Parse optional properties (style/format IDs stored in workbook map, not Axis struct)
     ID styleId;
+    ID formatId;
     if (propsStart < line.size()) {
-        if (!parseAxisProps(line.substr(propsStart), *row, &styleId)) {
+        if (!parseAxisProps(line.substr(propsStart), *row, &styleId, &formatId)) {
             return setError("Invalid row properties");
         }
     }
 
-    // Store style ID in workbook map (before moving row)
+    // Store style/format IDs in workbook map (before moving row)
     const ID rowId = row->id;
     currentSheet_->addRow(std::move(row));
     if (workbook_ != nullptr && !styleId.isNull()) {
         workbook_->setStyleId(rowId, styleId);
+    }
+    if (workbook_ != nullptr && !formatId.isNull()) {
+        workbook_->setFormatId(rowId, formatId);
     }
     return true;
 }

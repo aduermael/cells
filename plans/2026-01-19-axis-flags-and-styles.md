@@ -100,7 +100,7 @@ std::unordered_map<ID, std::string, IDHash> _customFormats;  // Format ID → Fo
 - [x] 4c: Update all call sites to use the new method names. TypeScript API keeps `getCellFormatId` for backward compatibility.
 - [x] 4d: Add `HAS_FORMAT` flag to AxisFlags enum (bit 3) and hasFormat()/setHasFormat() accessors
 - [x] 4e: Add AXIS_SET_FORMAT CRDT operation (OpType 53) with applyAxisSetFormat() and makeAxisSetFormatOp()
-- [ ] 4f: Update serializer/parser for axis formats
+- [x] 4f: Update serializer/parser for axis formats - added fmt: property support for columns and rows
 - [ ] 4g: Run tests to verify no regressions
 
 ## Phase 5: Add FormatRegistry with reference counting

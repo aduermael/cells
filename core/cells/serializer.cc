@@ -417,6 +417,14 @@ void Serializer::serializeAxis(const Workbook& workbook, const Axis& axis, char 
         }
     }
 
+    // Axis format is stored in workbook._formats map (not in Axis struct)
+    if (axis.hasFormat()) {
+        const ID formatId = workbook.getFormatId(axis.id);
+        if (!formatId.isNull()) {
+            out << " fmt:" << formatId.toString();
+        }
+    }
+
     out << "\n";
 }
 
