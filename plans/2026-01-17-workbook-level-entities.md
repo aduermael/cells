@@ -10,7 +10,7 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 13 COMPLETE - Ready for Phase 14 (Remove cross-sheet dependency tracking).
+**Current status:** Phase 13 COMPLETE - Ready for Phase 14 (Sheet-Agnostic Recalculation Engine).
 
 **Progress Jan 17 (session 16):**
 - Phase 11: Global Range ID Tracking
@@ -434,11 +434,21 @@ Since cells are now globally unique by UUID at the workbook level, internal form
 **Note on range references:**
 Range references (`A1:B5`) also no longer have sheet prefixes. The range's sheet can be derived from its corner cells' columns' `sheetId` fields.
 
-## Phase 14: Remove Cross-Sheet Dependency Tracking
+## Phase 14: Sheet-Agnostic Recalculation Engine
 
-**Confirmed:** `_crossSheetDeps` and `_crossSheetRangeDeps` are NOT necessary. With cells globally unique by UUID, ALL dependencies go through the single global `_depGraph`. This dramatically simplifies the architecture.
+**Key insight:** Sheets are a UI concept. The calculation engine should be completely sheet-agnostic - it just follows the global dependency graph. The UI layer refreshes the displayed viewport after calculation.
 
-**Single `_depGraph` with two internal indexes (this is correct):**
+**Current (flawed) design:**
+- `recalculate(sheet, changedCells)` - only recalculates cells on one sheet
+- `recalculateCrossSheet(workbook, sheet, changedCells)` - special handling for "other" sheets
+- Uses redundant `_crossSheetDeps`/`_crossSheetRangeDeps` tracking structures
+
+**Target design:**
+- `recalculate(workbook, changedCells)` - recalculates ALL dependents regardless of sheet
+- Uses only the global `_depGraph` for dependency lookups
+- UI layer refreshes the visible viewport (cheap/fast - just re-renders computed values)
+
+**Single `_depGraph` with two internal indexes:**
 ```cpp
 // Forward: cellId -> what this formula references (for display, cleanup)
 std::unordered_map<ID, std::vector<DependencyRef>> dependencies_;
@@ -446,29 +456,52 @@ std::unordered_map<ID, std::vector<DependencyRef>> dependencies_;
 // Reverse: cellId -> formulas that depend on this cell (for recalculation)
 std::unordered_map<ID, std::vector<ID>> reverseDeps_;
 
-// R-tree for range queries (spatial index)
+// R-tree for range queries (spatial index) - NOTE: positions are sheet-local
 RTree<ID> rtree_;
 ```
 
-Both indexes are needed:
-- **Forward (`dependencies_`)**: When removing a formula, need to clean up `reverseDeps_`. Also for UI display.
-- **Reverse (`reverseDeps_`)**: When cell X changes, find formulas to recalculate. O(1) vs scanning all formulas.
-
-This is ONE graph with TWO indexes - not two separate graphs. The redundant part is `_crossSheetDeps`/`_crossSheetRangeDeps` in Workbook.
-
-**Benefits of single global dependency graph:**
-- No special-case handling for "cross-sheet" vs "same-sheet" references
+**Benefits:**
+- No "cross-sheet" vs "same-sheet" distinction in calculation engine
 - Simpler recalculation logic - just walk the global graph
 - Cleaner code - remove redundant tracking structures and methods
-- Consistent behavior regardless of which sheet a formula references
+- Sheet concept only matters for display and position lookups
 
-- [ ] 14a: Remove `Workbook::_crossSheetDeps` map
-- [ ] 14b: Remove `Workbook::_crossSheetDepReverse` map
-- [ ] 14c: Remove `Workbook::_crossSheetRangeDeps` vector
-- [ ] 14d: Remove `Workbook::addCrossSheetDep()`, `removeCrossSheetDeps()`, `getCrossSheetDependents()`
-- [ ] 14e: Remove `Workbook::addCrossSheetRangeDep()`, `getCrossSheetRangeDependents()`
-- [ ] 14f: Update any code that calls these methods to use `_depGraph` instead
-- [ ] 14g: Run tests to verify dependency tracking still works
+**R-tree consideration:**
+The R-tree uses sheet-local positions for range queries. When getting dependents for a cell, we need to:
+1. Look up direct cell deps via `reverseDeps_` (O(1), sheet-agnostic)
+2. Look up range deps via R-tree query using the cell's position on its sheet
+
+This means `getDependentsForCell(cellId, col, row)` still needs position info, but the caller can get that from the cell's column/row axes.
+
+### Implementation Steps
+
+**Step 1: Create workbook-level recalculate function**
+- [ ] 14a: Add `recalculate(Workbook*, const std::vector<ID>& changedCells)` in formula_recalc.h/cc
+- [ ] 14b: Use `workbook->getCell()` instead of `sheet->getCell()` for cell lookups
+- [ ] 14c: Use `workbook->getDependencyGraph()` for dep graph access
+- [ ] 14d: For R-tree queries, look up cell position via `workbook->getColumn(cell->colId)->position`
+- [ ] 14e: `evaluateCell()` already works at workbook level (uses `workbook->findCell()`)
+
+**Step 2: Update callers to use workbook-level recalculate**
+- [ ] 14f: Update bindings_core.cc - replace `recalculate(sheet, ...)` + `recalculateCrossSheet(...)` with `recalculate(workbook, ...)`
+- [ ] 14g: Update bindings_file.cc similarly
+- [ ] 14h: Update luau_api.cc and luau_types.cc similarly
+- [ ] 14i: Keep old `recalculate(Sheet*, ...)` as a thin wrapper that delegates to workbook version
+
+**Step 3: Remove cross-sheet dependency tracking**
+- [ ] 14j: Remove calls to `addCrossSheetDep()`, `removeCrossSheetDeps()` from crdt_cell.cc
+- [ ] 14k: Remove `Workbook::_crossSheetDeps`, `_crossSheetDepReverse`, `_crossSheetRangeDeps` from model.h
+- [ ] 14l: Remove `Workbook::addCrossSheetDep()`, `removeCrossSheetDeps()`, `getCrossSheetDependents()` from model.h/cc
+- [ ] 14m: Remove `Workbook::addCrossSheetRangeDep()`, `getCrossSheetRangeDependents()` from model.h/cc
+- [ ] 14n: Remove `CrossSheetDep` and `CrossSheetRangeDep` structs from model.h
+
+**Step 4: Remove recalculateCrossSheet**
+- [ ] 14o: Remove `recalculateCrossSheet()` from formula_recalc.h/cc (no longer needed)
+
+**Step 5: Cleanup and testing**
+- [ ] 14p: Remove `extractCrossSheetRefs()` from dependency_graph.h/cc if no longer used
+- [ ] 14q: Run all tests to verify recalculation still works correctly
+- [ ] 14r: Verify cross-sheet formula scenarios work (Sheet1!A1 = Sheet2!B1)
 
 ## Design Notes
 
@@ -485,11 +518,31 @@ This is ONE graph with TWO indexes - not two separate graphs. The redundant part
 - `_sharedFormulaMasters`, `_sharedFormulaFrom` - shared formula tracking ✅
 - `_spillMasters`, `_spilledFrom` - spill range tracking ✅
 
-**Sheet-level storage (position-based indices):**
+**Sheet-level storage (position-based indices for UI):**
 - `_cellIndex` - (colId:rowId → cellId) for fast position lookups ✅
 - `_columnIndex` - (position → colId) for fast column position lookups ✅
 - `_rowIndex` - (position → rowId) for fast row position lookups ✅
 - `_rangeIndex` - R-tree for fast spatial queries (positions are sheet-local) ✅
+
+### Sheets as a UI Concept
+
+**Key architectural insight:** Sheets are primarily a UI/display concept, not a calculation concept.
+
+**What sheets are for:**
+- **Display**: Organizing cells into separate viewable areas
+- **Position mapping**: Converting (col, row) positions to cell IDs for rendering
+- **Viewport queries**: Finding what to display in a visible area (R-tree)
+
+**What sheets are NOT for:**
+- **Calculation**: The formula engine follows the global dependency graph regardless of sheets
+- **Dependencies**: All dependencies go through the single global `_depGraph`
+- **Cell identity**: Cells are globally unique by UUID, not by (sheet, col, row)
+
+**Recalculation flow:**
+1. Cell X changes → get all dependents from global `_depGraph`
+2. Topologically sort dependents
+3. Evaluate each dependent (using workbook-level cell lookup)
+4. UI layer refreshes displayed viewport (cheap - just re-renders computed values)
 
 ### Cell Ownership
 - Workbook owns all Cell objects via `_cells` map
