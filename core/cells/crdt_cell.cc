@@ -274,28 +274,15 @@ ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op) {
     }
 
     const ID newStyleId(styleIdStr);
-    StyleRegistry* registry = workbook.getStyleRegistry();
-
-    // Release old style reference (if any) - read from workbook map
-    const ID oldStyleId = workbook.getStyleId(cell->id);
-    if (!oldStyleId.isNull() && registry != nullptr) {
-        registry->release(oldStyleId);
-    }
 
     // Store style in workbook-level map and update cell flag
+    // Note: setStyleId() handles reference counting internally
+    workbook.setStyleId(cell->id, newStyleId);
+
     if (newStyleId.isNull()) {
-        // Clear style - remove from map and clear flag
-        workbook.setStyleId(cell->id, newStyleId);
         cell->clearHasStyle();
     } else {
-        // Set style - store in map and set flag
-        workbook.setStyleId(cell->id, newStyleId);
         cell->markHasStyle();
-
-        // Add reference to new style
-        if (registry != nullptr) {
-            registry->addRef(newStyleId);
-        }
     }
 
     return ApplyResult::SUCCESS;

@@ -811,30 +811,55 @@ ID Workbook::getStyleId(const ID& entityId) const {
 }
 
 ID Workbook::setStyleId(const ID& entityId, const ID& styleId) {
-    // If clearing the style (null ID), remove from map
-    if (styleId.isNull()) {
-        auto it = _styles.find(entityId);
-        if (it != _styles.end()) {
-            ID oldId = it->second;
-            _styles.erase(it);
-            return oldId;
-        }
-        return {};  // No previous style
-    }
-
-    // Check if exists first, get old value before overwriting
+    // Get old style ID for reference counting
+    ID oldStyleId;
     auto existing = _styles.find(entityId);
     if (existing != _styles.end()) {
-        ID oldId = existing->second;
-        existing->second = styleId;
-        return oldId;
+        oldStyleId = existing->second;
     }
-    _styles[entityId] = styleId;
-    return {};  // No previous style
+
+    // If clearing the style (null ID), remove from map
+    if (styleId.isNull()) {
+        if (existing != _styles.end()) {
+            _styles.erase(existing);
+        }
+    } else {
+        // Set style association
+        _styles[entityId] = styleId;
+    }
+
+    // Update reference counts
+    StyleRegistry* registry = getStyleRegistry();
+    if (registry != nullptr) {
+        // Release old style reference (if any)
+        if (!oldStyleId.isNull()) {
+            registry->release(oldStyleId);
+        }
+        // Add reference to new style (if not null)
+        if (!styleId.isNull()) {
+            registry->addRef(styleId);
+        }
+    }
+
+    return oldStyleId;
 }
 
 bool Workbook::clearStyle(const ID& entityId) {
-    return _styles.erase(entityId) > 0;
+    auto it = _styles.find(entityId);
+    if (it == _styles.end()) {
+        return false;
+    }
+
+    // Release reference before erasing
+    const ID styleId = it->second;
+    _styles.erase(it);
+
+    StyleRegistry* registry = getStyleRegistry();
+    if (registry != nullptr && !styleId.isNull()) {
+        registry->release(styleId);
+    }
+
+    return true;
 }
 
 // =============================================================================
