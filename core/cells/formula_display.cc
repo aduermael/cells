@@ -116,6 +116,11 @@ std::string FormulaDisplayConverter::nodeToString(const ASTNode* node) const {
 }
 
 std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) const {
+    return cellRefToStringInternal(node, false);
+}
+
+std::string FormulaDisplayConverter::cellRefToStringInternal(const CellRefNode* node,
+                                                             bool suppressSheetPrefix) const {
     std::string result;
     std::string sheetPrefix;
 
@@ -128,10 +133,12 @@ std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) co
         const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
         if (crossSheet != nullptr) {
             lookupSheet = crossSheet;
-            // Add sheet prefix since it's explicitly a cross-sheet ref
-            sheetPrefix = getSheetPrefix(node->sheetId, node->sheetName);
+            // Add sheet prefix since it's explicitly a cross-sheet ref (unless suppressed)
+            if (!suppressSheetPrefix) {
+                sheetPrefix = getSheetPrefix(node->sheetId, node->sheetName);
+            }
         }
-    } else if (!node->sheetName.empty()) {
+    } else if (!node->sheetName.empty() && !suppressSheetPrefix) {
         // Legacy sheetName reference
         sheetPrefix = getSheetPrefix("", node->sheetName);
     }
@@ -150,7 +157,7 @@ std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) co
                 // Check if this is a cross-sheet reference by comparing the cell's column sheetId
                 // with the formula's sheet. Use workbook-level lookup for reliability.
                 const Axis* col = _workbook->getColumn(foundCell->colId);
-                if (col != nullptr && col->sheetId != _sheet.id) {
+                if (col != nullptr && col->sheetId != _sheet.id && !suppressSheetPrefix) {
                     // Cross-sheet reference - add sheet prefix
                     sheetPrefix = formatSheetName(lookupSheet->name);
                 }
@@ -198,7 +205,38 @@ std::string FormulaDisplayConverter::cellRefToString(const CellRefNode* node) co
 }
 
 std::string FormulaDisplayConverter::rangeRefToString(const RangeRefNode* node) const {
-    return cellRefToString(node->topLeft.get()) + ":" + cellRefToString(node->bottomRight.get());
+    // Get the first cell reference with full sheet prefix handling
+    std::string firstRef = cellRefToString(node->topLeft.get());
+
+    // For the second cell, check if it's on the same sheet as the first
+    // If so, omit the sheet prefix (Excel-like behavior: Sheet2!A1:A3, not Sheet2!A1:Sheet2!A3)
+    const CellRefNode* topLeft = node->topLeft.get();
+    const CellRefNode* bottomRight = node->bottomRight.get();
+
+    // Helper to get sheet ID for a cell reference
+    auto getSheetIdForRef = [this](const CellRefNode* ref) -> std::string {
+        if (!ref->sheetId.empty()) {
+            return ref->sheetId;
+        }
+        if (!ref->cellId.empty() && _workbook != nullptr) {
+            const ID cellIdObj(ref->cellId);
+            auto [cell, sheet] = _workbook->findCell(cellIdObj);
+            if (sheet != nullptr) {
+                return sheet->id.toString();
+            }
+        }
+        // If no sheet can be determined, return the current sheet ID
+        return _sheet.id.toString();
+    };
+
+    const std::string firstSheetId = getSheetIdForRef(topLeft);
+    const std::string secondSheetId = getSheetIdForRef(bottomRight);
+
+    // If both cells are on the same sheet, suppress the sheet prefix for the second cell
+    const bool sameSheet = (firstSheetId == secondSheetId);
+    std::string secondRef = cellRefToStringInternal(bottomRight, sameSheet);
+
+    return firstRef + ":" + secondRef;
 }
 
 std::string FormulaDisplayConverter::columnRefToString(const ColumnRefNode* node) const {

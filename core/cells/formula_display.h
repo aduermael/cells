@@ -49,6 +49,9 @@ private:
     // Convert individual nodes
     [[nodiscard]] std::string nodeToString(const ASTNode* node) const;
     [[nodiscard]] std::string cellRefToString(const CellRefNode* node) const;
+    // Internal helper with option to suppress cross-sheet prefix (for range second cell)
+    [[nodiscard]] std::string cellRefToStringInternal(const CellRefNode* node,
+                                                      bool suppressSheetPrefix) const;
     [[nodiscard]] std::string rangeRefToString(const RangeRefNode* node) const;
     [[nodiscard]] std::string columnRefToString(const ColumnRefNode* node) const;
     [[nodiscard]] std::string rowRefToString(const RowRefNode* node) const;

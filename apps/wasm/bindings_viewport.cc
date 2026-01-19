@@ -19,6 +19,7 @@
 #include <set>
 #include <sstream>
 
+#include "core/cells/formula_display.h"
 #include "core/cells/formula_eval.h"
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_serializer.h"
@@ -364,9 +365,9 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             if (masterCell != nullptr) {
                 Formula* masterFormula = masterCell->getFormula();
                 if (masterFormula != nullptr && masterFormula->ast != nullptr) {
-                    const std::string uuidFormula =
-                        FormulaSerializer::serialize(masterFormula->ast);
-                    const std::string a1Formula = _refConverter.formulaToA1(uuidFormula);
+                    // Use FormulaDisplayConverter for context-aware display
+                    FormulaDisplayConverter displayConverter(*sheet, _workbook.get());
+                    const std::string a1Formula = displayConverter.toDisplayString(masterFormula->ast);
                     json << "\"masterFormula\":\"" << jsonEscape(a1Formula) << "\",";
                 }
             }
@@ -418,8 +419,10 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             Formula* formula = entry.cell->getFormula();
             std::string a1Formula;
             if (formula != nullptr && formula->ast != nullptr) {
-                const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
-                a1Formula = _refConverter.formulaToA1(uuidFormula);
+                // Use FormulaDisplayConverter for context-aware display
+                // This handles cross-sheet references correctly
+                FormulaDisplayConverter displayConverter(*sheet, _workbook.get());
+                a1Formula = displayConverter.toDisplayString(formula->ast);
                 json << "\"formula\":\"" << jsonEscape(a1Formula) << "\",";
             }
 
@@ -530,8 +533,9 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         std::string masterFormula;
         Formula* formula = cell->getFormula();
         if (formula != nullptr && formula->ast != nullptr) {
-            const std::string uuidFormula = FormulaSerializer::serialize(formula->ast);
-            masterFormula = _refConverter.formulaToA1(uuidFormula);
+            // Use FormulaDisplayConverter for context-aware display
+            FormulaDisplayConverter displayConverter(*sheet, _workbook.get());
+            masterFormula = displayConverter.toDisplayString(formula->ast);
         }
 
         // Check each spilled position
