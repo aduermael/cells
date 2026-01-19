@@ -3070,20 +3070,12 @@ canvas {
 }
 
 /* Mixed state indicator (when selection has different values) */
+/* Note: Buttons should look normal (not disabled) when mixed - they're still clickable */
+/* The non-highlighted state already indicates the property is not uniformly applied */
 .style-btn.mixed,
 .color-btn.mixed {
-    opacity: 0.6;
-}
-
-.style-btn.mixed::after {
-    content: "";
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: var(--color-warning);
+    /* No special styling - button looks like default state */
+    /* User can click to apply the property to the entire selection */
 }
 
 /* Font dropdowns */
