@@ -1183,7 +1183,7 @@ TEST(XLSXWriterTest, WriteStylesBold) {
     boldStyle.bold = true;
     ID styleId = generate_id();
     workbook->registerStyle(styleId, boldStyle);
-    workbook->setCellStyleId(cell->id, styleId);
+    workbook->setStyleId(cell->id, styleId);
     cell->markHasStyle();
 
     sheet->addCell(std::move(cell));
@@ -1213,7 +1213,7 @@ TEST(XLSXWriterTest, WriteStylesBold) {
     Cell* readCell = readSheet->getCellAt(readCol->id, readRow->id);
     ASSERT_NE(readCell, nullptr) << "Cell should exist";
     // Read style from workbook map
-    const ID readCellStyleId = readResult.workbook->getCellStyleId(readCell->id);
+    const ID readCellStyleId = readResult.workbook->getStyleId(readCell->id);
     EXPECT_FALSE(readCellStyleId.isNull()) << "Cell should have style";
 
     const CellStyle* readStyle = readResult.workbook->getStyle(readCellStyleId);
@@ -1250,7 +1250,7 @@ TEST(XLSXWriterTest, WriteStylesBackgroundColor) {
     workbook->addSheet(std::move(sheet));
 
     // Set style via workbook map (after cell is added)
-    workbook->setCellStyleId(cellId, styleId);
+    workbook->setStyleId(cellId, styleId);
 
     std::string path = tempFilePath("style_bgcolor.xlsx");
     TempFileGuard guard(path);
@@ -1275,7 +1275,7 @@ TEST(XLSXWriterTest, WriteStylesBackgroundColor) {
 
     Cell* readCell = readSheet->getCellAt(readCol->id, readRow->id);
     ASSERT_NE(readCell, nullptr) << "Cell should exist";
-    ID readCellStyleId = readResult.workbook->getCellStyleId(readCell->id);
+    ID readCellStyleId = readResult.workbook->getStyleId(readCell->id);
     EXPECT_FALSE(readCellStyleId.isNull()) << "Cell should have style";
 
     const CellStyle* readStyle = readResult.workbook->getStyle(readCellStyleId);
@@ -1313,7 +1313,7 @@ TEST(XLSXWriterTest, WriteStylesAlignment) {
     workbook->addSheet(std::move(sheet));
 
     // Set style via workbook map (after cell is added)
-    workbook->setCellStyleId(cellId, styleId);
+    workbook->setStyleId(cellId, styleId);
 
     std::string path = tempFilePath("style_align.xlsx");
     TempFileGuard guard(path);
@@ -1338,7 +1338,7 @@ TEST(XLSXWriterTest, WriteStylesAlignment) {
 
     Cell* readCell = readSheet->getCellAt(readCol->id, readRow->id);
     ASSERT_NE(readCell, nullptr) << "Cell should exist";
-    ID readCellStyleId = readResult.workbook->getCellStyleId(readCell->id);
+    ID readCellStyleId = readResult.workbook->getStyleId(readCell->id);
     EXPECT_FALSE(readCellStyleId.isNull()) << "Cell should have style";
 
     const CellStyle* readStyle = readResult.workbook->getStyle(readCellStyleId);
@@ -1382,7 +1382,7 @@ TEST(XLSXWriterTest, RoundtripStyles) {
     Axis* row0_2 = sheet2->getRowByPosition(0);
     if (col0_2 && row0_2) {
         Cell* cell = sheet2->getCellAt(col0_2->id, row0_2->id);
-        ID cellStyleId = readResult2.workbook->getCellStyleId(cell->id);
+        ID cellStyleId = readResult2.workbook->getStyleId(cell->id);
         if (cell && !cellStyleId.isNull()) {
             const CellStyle* style = readResult2.workbook->getStyle(cellStyleId);
             EXPECT_NE(style, nullptr);
@@ -1418,8 +1418,8 @@ void compareStyleAtPosition(const Workbook& wb1, const Workbook& wb2, Sheet* s1,
     ASSERT_NE(cell2, nullptr) << context << ": roundtrip cell not found";
 
     // Get style IDs from workbook map
-    ID cell1StyleId = wb1.getCellStyleId(cell1->id);
-    ID cell2StyleId = wb2.getCellStyleId(cell2->id);
+    ID cell1StyleId = wb1.getStyleId(cell1->id);
+    ID cell2StyleId = wb2.getStyleId(cell2->id);
 
     // If original has no style, roundtrip should have no style
     if (cell1StyleId.isNull()) {
@@ -1591,11 +1591,11 @@ TEST(XLSXStyleRoundtripTest, RoundtripAllStyleProperties) {
     workbook->addSheet(std::move(sheet));
 
     // Set styles via workbook map (after cells are added)
-    workbook->setCellStyleId(cellId1, styleId1);
-    workbook->setCellStyleId(cellId2, styleId2);
-    workbook->setCellStyleId(cellId3, styleId3);
-    workbook->setCellStyleId(cellId4, styleId4);
-    workbook->setCellStyleId(cellId6, styleId6);
+    workbook->setStyleId(cellId1, styleId1);
+    workbook->setStyleId(cellId2, styleId2);
+    workbook->setStyleId(cellId3, styleId3);
+    workbook->setStyleId(cellId4, styleId4);
+    workbook->setStyleId(cellId6, styleId6);
 
     // Write to XLSX
     std::string path = tempFilePath("all_styles.xlsx");
@@ -1620,7 +1620,7 @@ TEST(XLSXStyleRoundtripTest, RoundtripAllStyleProperties) {
     if (rc0 && rr0) {
         Cell* c = readSheet->getCellAt(rc0->id, rr0->id);
         ASSERT_NE(c, nullptr);
-        ID cStyleId = readResult.workbook->getCellStyleId(c->id);
+        ID cStyleId = readResult.workbook->getStyleId(c->id);
         EXPECT_FALSE(cStyleId.isNull());
         const CellStyle* s = readResult.workbook->getStyle(cStyleId);
         if (s) {
@@ -1635,7 +1635,7 @@ TEST(XLSXStyleRoundtripTest, RoundtripAllStyleProperties) {
     if (rc1 && rr0) {
         Cell* c = readSheet->getCellAt(rc1->id, rr0->id);
         ASSERT_NE(c, nullptr);
-        ID cStyleId = readResult.workbook->getCellStyleId(c->id);
+        ID cStyleId = readResult.workbook->getStyleId(c->id);
         EXPECT_FALSE(cStyleId.isNull());
         const CellStyle* s = readResult.workbook->getStyle(cStyleId);
         if (s) {
@@ -1649,7 +1649,7 @@ TEST(XLSXStyleRoundtripTest, RoundtripAllStyleProperties) {
     if (rc2 && rr0) {
         Cell* c = readSheet->getCellAt(rc2->id, rr0->id);
         ASSERT_NE(c, nullptr);
-        ID cStyleId = readResult.workbook->getCellStyleId(c->id);
+        ID cStyleId = readResult.workbook->getStyleId(c->id);
         EXPECT_FALSE(cStyleId.isNull());
         const CellStyle* s = readResult.workbook->getStyle(cStyleId);
         if (s) {
@@ -1717,7 +1717,7 @@ TEST(XLSXStyleRoundtripTest, RoundtripMultipleSheetsWithStyles) {
 
     // Set styles via workbook map (after cells are added)
     for (const auto& [cellId, styleId] : cellStylePairs) {
-        workbook->setCellStyleId(cellId, styleId);
+        workbook->setStyleId(cellId, styleId);
     }
 
     // Write to XLSX
@@ -1746,7 +1746,7 @@ TEST(XLSXStyleRoundtripTest, RoundtripMultipleSheetsWithStyles) {
         if (col && row) {
             Cell* cell = sheet->getCellAt(col->id, row->id);
             ASSERT_NE(cell, nullptr) << "Cell in sheet " << i << " should exist";
-            ID cellStyleId = readResult.workbook->getCellStyleId(cell->id);
+            ID cellStyleId = readResult.workbook->getStyleId(cell->id);
             EXPECT_FALSE(cellStyleId.isNull()) << "Cell in sheet " << i << " should have style";
 
             const CellStyle* readStyle = readResult.workbook->getStyle(cellStyleId);
@@ -1805,7 +1805,7 @@ TEST(XLSXStyleRoundtripTest, StyleDeduplication) {
 
     // Set styles via workbook map (after cells are added)
     for (const auto& [cellId, styleId] : cellStylePairs) {
-        workbook->setCellStyleId(cellId, styleId);
+        workbook->setStyleId(cellId, styleId);
     }
 
     // Write to XLSX
@@ -1835,7 +1835,7 @@ TEST(XLSXStyleRoundtripTest, StyleDeduplication) {
 
         Cell* cell = readSheet->getCellAt(readCol->id, readRow->id);
         ASSERT_NE(cell, nullptr) << "Cell at row " << i << " should exist";
-        ID cellStyleId = readResult.workbook->getCellStyleId(cell->id);
+        ID cellStyleId = readResult.workbook->getStyleId(cell->id);
         EXPECT_FALSE(cellStyleId.isNull()) << "Cell at row " << i << " should have style";
 
         const CellStyle* style = readResult.workbook->getStyle(cellStyleId);
@@ -1879,7 +1879,7 @@ TEST(XLSXStyleRoundtripTest, EmptyStyleNotWritten) {
     workbook->addSheet(std::move(sheet));
 
     // Set style via workbook map (after cell is added)
-    workbook->setCellStyleId(cellId, styleId);
+    workbook->setStyleId(cellId, styleId);
 
     // Write to XLSX
     std::string path = tempFilePath("empty_style.xlsx");
@@ -1910,7 +1910,7 @@ TEST(XLSXStyleRoundtripTest, EmptyStyleNotWritten) {
 
     // Cell may or may not have a style after roundtrip (depends on Excel's handling)
     // If it has a style, it should be empty/default
-    ID readCellStyleId = readResult.workbook->getCellStyleId(readCell->id);
+    ID readCellStyleId = readResult.workbook->getStyleId(readCell->id);
     if (!readCellStyleId.isNull()) {
         const CellStyle* style = readResult.workbook->getStyle(readCellStyleId);
         if (style) {
@@ -3188,7 +3188,7 @@ TEST(XLSXWriterTest, MergedCellsWithStyles) {
     workbook->addSheet(std::move(sheet));
 
     // Set style via workbook map (after cell is added)
-    workbook->setCellStyleId(cellId, styleId);
+    workbook->setStyleId(cellId, styleId);
 
     // Write and read back
     std::string path = tempFilePath("styled_merge.xlsx");
@@ -3238,7 +3238,7 @@ TEST(XLSXWriterTest, MergedCellsWithStyles) {
 
     Cell* anchorCell = readSheet->getCellAt(readCol0->id, readRow0->id);
     ASSERT_NE(anchorCell, nullptr);
-    ID anchorStyleId = readResult.workbook->getCellStyleId(anchorCell->id);
+    ID anchorStyleId = readResult.workbook->getStyleId(anchorCell->id);
     EXPECT_FALSE(anchorStyleId.isNull()) << "Anchor cell should have style";
 
     if (!anchorStyleId.isNull()) {

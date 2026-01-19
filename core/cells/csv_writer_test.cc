@@ -549,7 +549,7 @@ TEST(CSVWriterTest, StyleWarningForStyledSheet) {
     boldStyle.bold = true;
     ID styleId = generate_id();
     workbook->registerStyle(styleId, boldStyle);
-    workbook->setCellStyleId(cell->id, styleId);
+    workbook->setStyleId(cell->id, styleId);
     cell->markHasStyle();
 
     sheet->addCell(std::move(cell));
@@ -598,7 +598,7 @@ TEST(CSVWriterTest, StyleWarningOnlyOnce) {
         auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
         cell->value = CellValue("Row " + std::to_string(i));
         // Store style in workbook map
-        workbook->setCellStyleId(cell->id, styleId);
+        workbook->setStyleId(cell->id, styleId);
         cell->markHasStyle();
         sheet->addCell(std::move(cell));
     }

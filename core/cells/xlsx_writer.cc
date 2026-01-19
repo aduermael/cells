@@ -1622,7 +1622,7 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
             if (!cell) {
                 continue;
             }
-            const ID cellStyleId = workbook.getCellStyleId(cellId);
+            const ID cellStyleId = workbook.getStyleId(cellId);
             if (!cellStyleId.isNull()) {
                 // Look up the CellStyle in the workbook
                 const CellStyle* style = workbook.getStyle(cellStyleId);

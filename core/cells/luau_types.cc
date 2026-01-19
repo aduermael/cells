@@ -189,7 +189,7 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
             lua_pushnil(L);
             return 1;
         }
-        const ID styleId = workbook->getCellStyleId(cell->id);
+        const ID styleId = workbook->getStyleId(cell->id);
         if (styleId.isNull()) {
             lua_pushnil(L);
             return 1;
@@ -566,7 +566,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
         CellStyle style;
 
         // Get existing style to merge with (if any) - read from workbook map
-        const ID existingStyleId = workbook->getCellStyleId(cell->id);
+        const ID existingStyleId = workbook->getStyleId(cell->id);
         if (!existingStyleId.isNull()) {
             const CellStyle* existing = workbook->getStyle(existingStyleId);
             if (existing != nullptr) {

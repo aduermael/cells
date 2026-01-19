@@ -57,9 +57,9 @@ Create `AxisFlags` enum combining `isColumn`, `hidden`, and reserving bits for `
 
 Rename `_cellStyles` to `_styles` as a unified entity-to-style map. Since UUIDs are unique across resource types (cells, ranges, axes), one map can serve all.
 
-- [ ] 2a: Rename `_cellStyles` to `_styles` in Workbook
-- [ ] 2b: Rename accessor methods: `getCellStyleId()` → `getStyleId()`, `setCellStyleId()` → `setStyleId()`, `clearCellStyle()` → `clearStyle()`
-- [ ] 2c: Update all call sites to use the new method names
+- [x] 2a: Rename `_cellStyles` to `_styles` in Workbook
+- [x] 2b: Rename accessor methods: `getCellStyleId()` → `getStyleId()`, `setCellStyleId()` → `setStyleId()`, `clearCellStyle()` → `clearStyle()`
+- [x] 2c: Update all call sites to use the new method names
 - [ ] 2d: Remove `defaultStyleId` field from Axis struct
 - [ ] 2e: Update `HAS_STYLE` flag in AxisFlags to be set/cleared when axis style is added/removed via `_styles`
 - [ ] 2f: Update CRDT operations (crdt_axis.cc - AXIS_SET_STYLE) to use `_styles` map + flag

@@ -342,7 +342,7 @@ TEST(XLSXReaderTest, ReadStylesBold) {
     ASSERT_NE(boldCell, nullptr) << "Bold cell A1 should exist";
 
     // Should have a style ID (read from workbook map)
-    const ID boldStyleId = result.workbook->getCellStyleId(boldCell->id);
+    const ID boldStyleId = result.workbook->getStyleId(boldCell->id);
     EXPECT_FALSE(boldStyleId.isNull()) << "Bold cell should have a style";
 
     // Get the style and verify it's bold
@@ -372,7 +372,7 @@ TEST(XLSXReaderTest, ReadStylesItalic) {
     ASSERT_NE(italicCell, nullptr) << "Italic cell A2 should exist";
 
     // Should have a style ID (read from workbook map)
-    const ID italicStyleId = result.workbook->getCellStyleId(italicCell->id);
+    const ID italicStyleId = result.workbook->getStyleId(italicCell->id);
     EXPECT_FALSE(italicStyleId.isNull()) << "Italic cell should have a style";
 
     // Get the style and verify it's italic
@@ -402,7 +402,7 @@ TEST(XLSXReaderTest, ReadStylesBackgroundColor) {
     ASSERT_NE(redBgCell, nullptr) << "Red background cell B1 should exist";
 
     // Should have a style ID (read from workbook map)
-    const ID redBgStyleId = result.workbook->getCellStyleId(redBgCell->id);
+    const ID redBgStyleId = result.workbook->getStyleId(redBgCell->id);
     EXPECT_FALSE(redBgStyleId.isNull()) << "Red BG cell should have a style";
 
     // Get the style and verify it has red background
@@ -432,7 +432,7 @@ TEST(XLSXReaderTest, ReadStylesTextColor) {
     ASSERT_NE(blueTextCell, nullptr) << "Blue text cell B2 should exist";
 
     // Should have a style ID (read from workbook map)
-    const ID blueStyleId = result.workbook->getCellStyleId(blueTextCell->id);
+    const ID blueStyleId = result.workbook->getStyleId(blueTextCell->id);
     EXPECT_FALSE(blueStyleId.isNull()) << "Blue text cell should have a style";
 
     // Get the style and verify it has blue text
@@ -462,7 +462,7 @@ TEST(XLSXReaderTest, ReadStylesAlignment) {
     ASSERT_NE(centerCell, nullptr) << "Center aligned cell C1 should exist";
 
     // Should have a style ID (read from workbook map)
-    const ID centerStyleId = result.workbook->getCellStyleId(centerCell->id);
+    const ID centerStyleId = result.workbook->getStyleId(centerCell->id);
     EXPECT_FALSE(centerStyleId.isNull()) << "Center cell should have a style";
 
     // Get the style and verify it's center aligned
@@ -488,7 +488,7 @@ TEST(XLSXReaderTest, ReadStylesSkipWhenDisabled) {
     if (col0 && row0) {
         Cell* cell = sheet->getCellAt(col0->id, row0->id);
         if (cell) {
-            EXPECT_TRUE(result.workbook->getCellStyleId(cell->id).isNull())
+            EXPECT_TRUE(result.workbook->getStyleId(cell->id).isNull())
                 << "Style should be null when readStyles=false";
         }
     }
@@ -685,7 +685,7 @@ TEST(XLSXReaderTest, ReadNumberFormatsWithStyles) {
     size_t cellsWithStyleOnly = 0;
 
     for (const auto& cellId : sheet->getCellIds()) {
-        const bool hasStyle = !result.workbook->getCellStyleId(cellId).isNull();
+        const bool hasStyle = !result.workbook->getStyleId(cellId).isNull();
         const bool hasFormat = !result.workbook->getCellFormatId(cellId).isNull();
 
         if (hasStyle && hasFormat) {
@@ -852,7 +852,7 @@ TEST(XLSXReaderTest, CellBordersImportedFromLBOModel) {
 
     // Iterate through all cells and check for borders (read from workbook map)
     for (const auto& cellId : sheet->getCellIds()) {
-        const ID cellStyleId = result.workbook->getCellStyleId(cellId);
+        const ID cellStyleId = result.workbook->getStyleId(cellId);
         if (!cellStyleId.isNull()) {
             cellsWithStyles++;
             auto* stylePtr = result.workbook->getStyle(cellStyleId);
@@ -891,7 +891,7 @@ TEST(XLSXReaderTest, ReadThemeColorsFromLBOModel) {
     size_t cellsWithDarkBgColor = 0;
 
     for (const auto& cellId : sheet->getCellIds()) {
-        const ID cellStyleId = result.workbook->getCellStyleId(cellId);
+        const ID cellStyleId = result.workbook->getStyleId(cellId);
         if (!cellStyleId.isNull()) {
             auto* stylePtr = result.workbook->getStyle(cellStyleId);
             if (stylePtr && !stylePtr->bgColor.empty()) {
@@ -938,7 +938,7 @@ TEST(XLSXReaderTest, ReadLightGrayBackgroundFromTheme) {
     size_t cellsWithLightGray = 0;
 
     for (const auto& cellId : sheet->getCellIds()) {
-        const ID cellStyleId = result.workbook->getCellStyleId(cellId);
+        const ID cellStyleId = result.workbook->getStyleId(cellId);
         if (!cellStyleId.isNull()) {
             auto* stylePtr = result.workbook->getStyle(cellStyleId);
             if (stylePtr && !stylePtr->bgColor.empty() && stylePtr->bgColor.length() == 7) {
@@ -982,7 +982,7 @@ TEST(XLSXReaderTest, ReadGeneralAlignmentFromLBOModel) {
         if (!cell)
             continue;
 
-        const ID cellStyleId = result.workbook->getCellStyleId(cellId);
+        const ID cellStyleId = result.workbook->getStyleId(cellId);
         if (!cellStyleId.isNull()) {
             auto* stylePtr = result.workbook->getStyle(cellStyleId);
             if (stylePtr) {

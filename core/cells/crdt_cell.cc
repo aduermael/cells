@@ -277,7 +277,7 @@ ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op) {
     StyleRegistry* registry = workbook.getStyleRegistry();
 
     // Release old style reference (if any) - read from workbook map
-    const ID oldStyleId = workbook.getCellStyleId(cell->id);
+    const ID oldStyleId = workbook.getStyleId(cell->id);
     if (!oldStyleId.isNull() && registry != nullptr) {
         registry->release(oldStyleId);
     }
@@ -285,11 +285,11 @@ ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op) {
     // Store style in workbook-level map and update cell flag
     if (newStyleId.isNull()) {
         // Clear style - remove from map and clear flag
-        workbook.setCellStyleId(cell->id, newStyleId);
+        workbook.setStyleId(cell->id, newStyleId);
         cell->clearHasStyle();
     } else {
         // Set style - store in map and set flag
-        workbook.setCellStyleId(cell->id, newStyleId);
+        workbook.setStyleId(cell->id, newStyleId);
         cell->markHasStyle();
 
         // Add reference to new style

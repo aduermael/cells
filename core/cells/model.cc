@@ -768,42 +768,42 @@ bool Workbook::clearCellFormat(const ID& cellId) {
 }
 
 // =============================================================================
-// Cell style storage
+// Entity style storage (unified: cells, axes, etc.)
 // =============================================================================
 
-ID Workbook::getCellStyleId(const ID& cellId) const {
-    auto it = _cellStyles.find(cellId);
-    if (it != _cellStyles.end()) {
+ID Workbook::getStyleId(const ID& entityId) const {
+    auto it = _styles.find(entityId);
+    if (it != _styles.end()) {
         return it->second;
     }
     return {};  // null ID
 }
 
-ID Workbook::setCellStyleId(const ID& cellId, const ID& styleId) {
+ID Workbook::setStyleId(const ID& entityId, const ID& styleId) {
     // If clearing the style (null ID), remove from map
     if (styleId.isNull()) {
-        auto it = _cellStyles.find(cellId);
-        if (it != _cellStyles.end()) {
+        auto it = _styles.find(entityId);
+        if (it != _styles.end()) {
             ID oldId = it->second;
-            _cellStyles.erase(it);
+            _styles.erase(it);
             return oldId;
         }
         return {};  // No previous style
     }
 
     // Check if exists first, get old value before overwriting
-    auto existing = _cellStyles.find(cellId);
-    if (existing != _cellStyles.end()) {
+    auto existing = _styles.find(entityId);
+    if (existing != _styles.end()) {
         ID oldId = existing->second;
         existing->second = styleId;
         return oldId;
     }
-    _cellStyles[cellId] = styleId;
+    _styles[entityId] = styleId;
     return {};  // No previous style
 }
 
-bool Workbook::clearCellStyle(const ID& cellId) {
-    return _cellStyles.erase(cellId) > 0;
+bool Workbook::clearStyle(const ID& entityId) {
+    return _styles.erase(entityId) > 0;
 }
 
 // =============================================================================

@@ -904,18 +904,18 @@ struct Workbook {
     bool clearCellFormat(const ID& cellId);
 
     // ========================================================================
-    // Cell style storage (moved from Cell struct for memory efficiency)
+    // Entity style storage (unified: cells, axes, etc.)
     // ========================================================================
 
-    // Get the style ID for a cell (returns null ID if no custom style)
-    [[nodiscard]] ID getCellStyleId(const ID& cellId) const;
+    // Get the style ID for an entity (cell, axis, etc.) - returns null ID if no style
+    [[nodiscard]] ID getStyleId(const ID& entityId) const;
 
-    // Set the style ID for a cell. Returns the old style ID (null if none).
-    // Pass null ID to clear the style (same as clearCellStyle).
-    ID setCellStyleId(const ID& cellId, const ID& styleId);
+    // Set the style ID for an entity. Returns the old style ID (null if none).
+    // Pass null ID to clear the style (same as clearStyle).
+    ID setStyleId(const ID& entityId, const ID& styleId);
 
-    // Clear the style for a cell. Returns true if the cell had a style.
-    bool clearCellStyle(const ID& cellId);
+    // Clear the style for an entity. Returns true if the entity had a style.
+    bool clearStyle(const ID& entityId);
 
     // ========================================================================
     // Workbook-level shared formula tracking (runtime-only)
@@ -1057,8 +1057,9 @@ private:
     // Cell ID -> format ID mapping (only cells with custom formats are stored)
     std::unordered_map<ID, ID, IDHash> _cellFormats;
 
-    // Cell ID -> style ID mapping (only cells with custom styles are stored)
-    std::unordered_map<ID, ID, IDHash> _cellStyles;
+    // Entity ID -> style ID mapping (cells, axes, or other entities with styles)
+    // Unified style map: since UUIDs are unique across resource types, one map suffices
+    std::unordered_map<ID, ID, IDHash> _styles;
 
     // ========================================================================
     // Workbook-level dependency graph (global, shared by all sheets)

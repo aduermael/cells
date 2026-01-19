@@ -1876,7 +1876,7 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 const int styleIndex = cellNode.attribute("s").as_int(0);
                 const ID styleId = getOrCreateStyleId(styleIndex);
                 if (!styleId.isNull()) {
-                    workbook->setCellStyleId(cell->id, styleId);
+                    workbook->setStyleId(cell->id, styleId);
                     cell->markHasStyle();
                 }
 

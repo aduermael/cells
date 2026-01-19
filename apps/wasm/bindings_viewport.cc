@@ -92,7 +92,7 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
     // Note: We don't return early - we continue to merge lower-priority styles
     // to fill in any properties not explicitly set at the cell level.
     // Read style from workbook map (not from cell field)
-    const ID cellStyleId = workbook.getCellStyleId(cell.id);
+    const ID cellStyleId = workbook.getStyleId(cell.id);
     if (!cellStyleId.isNull()) {
         const CellStyle* cellStyle = workbook.getStyle(cellStyleId);
         if (cellStyle != nullptr) {

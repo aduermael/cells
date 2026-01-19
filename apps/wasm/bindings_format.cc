@@ -1142,7 +1142,7 @@ std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::s
 
     // Get existing style (if any) and merge with incoming JSON (read from workbook map)
     CellStyle style;
-    const ID existingStyleId = _workbook->getCellStyleId(cell->id);
+    const ID existingStyleId = _workbook->getStyleId(cell->id);
     if (!existingStyleId.isNull()) {
         const CellStyle* existingStyle = _workbook->getStyle(existingStyleId);
         if (existingStyle) {
@@ -1214,7 +1214,7 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
 
     // Get existing style if cell has one (from workbook map)
     if (existingCell && existingCell->hasStyle()) {
-        const ID existingStyleId = _workbook->getCellStyleId(existingCell->id);
+        const ID existingStyleId = _workbook->getStyleId(existingCell->id);
         if (!existingStyleId.isNull()) {
             const CellStyle* existingStyle = _workbook->getStyle(existingStyleId);
             if (existingStyle) {
@@ -1328,7 +1328,7 @@ std::string CellsEngine::getCellStyle(const std::string& cellIdStr) {
     }
 
     // Read style from workbook map
-    const ID styleId = _workbook->getCellStyleId(cell->id);
+    const ID styleId = _workbook->getStyleId(cell->id);
     if (styleId.isNull()) {
         // Return empty/default style
         CellStyle defaultStyle;
@@ -1376,7 +1376,7 @@ std::string CellsEngine::getCellStyleAt(uint32_t col, uint32_t row) {
     Cell* cell = sheet->getCellAt(colId, rowId);
 
     // Read style from workbook map
-    const ID styleId = cell ? _workbook->getCellStyleId(cell->id) : ID();
+    const ID styleId = cell ? _workbook->getStyleId(cell->id) : ID();
     if (!cell || styleId.isNull()) {
         // No cell or no style - return default
         CellStyle defaultStyle;
@@ -1909,7 +1909,7 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
     // When applying a range style, remove matching properties from individual cells to avoid redundancy
     for (const auto& cellId : sheet->getCellIds()) {
         // Read style from workbook map
-        const ID cellStyleId = _workbook->getCellStyleId(cellId);
+        const ID cellStyleId = _workbook->getStyleId(cellId);
         if (cellStyleId.isNull()) {
             continue;  // Cell has no style, skip
         }
@@ -2064,7 +2064,7 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
     // Note: We start with cell style but continue to merge lower-priority styles
     // to fill in any properties not explicitly set at the cell level.
     // Read style from workbook map
-    const ID cellStyleId = cell ? workbook.getCellStyleId(cell->id) : ID();
+    const ID cellStyleId = cell ? workbook.getStyleId(cell->id) : ID();
     if (cell && !cellStyleId.isNull()) {
         const CellStyle* cellStyle = workbook.getStyle(cellStyleId);
         if (cellStyle) {

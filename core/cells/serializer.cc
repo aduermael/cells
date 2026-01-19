@@ -428,7 +428,7 @@ void Serializer::serializeCell(const Workbook& workbook, const Cell& cell, const
     }
 
     // Optional style property (only if not null/default) - read from workbook map
-    const ID styleId = workbook.getCellStyleId(cell.id);
+    const ID styleId = workbook.getStyleId(cell.id);
     if (!styleId.isNull()) {
         out << " sty:" << styleId.toString();
     }

@@ -1068,7 +1068,7 @@ bool Parser::parseCellProps(std::string_view props, Cell& cell) {
             }
             const ID styleId(std::string(props.substr(0, end)));
             if (workbook_ != nullptr && !styleId.isNull()) {
-                workbook_->setCellStyleId(cell.id, styleId);
+                workbook_->setStyleId(cell.id, styleId);
                 cell.markHasStyle();
             }
             props = (end < props.size()) ? props.substr(end) : "";

@@ -1148,7 +1148,7 @@ TEST(StyleSerializationTest, SerializeCellWithStyle) {
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cell->value = CellValue(42.0);
     // Store style in workbook map
-    wb->setCellStyleId(cell->id, ID("STYbold1"));
+    wb->setStyleId(cell->id, ID("STYbold1"));
     cell->markHasStyle();
 
     sheet->addColumn(std::move(col));
@@ -1199,7 +1199,7 @@ X xA1bC2dE cA1bC2dE rA1bC2dE n 42 sty:STYbold1
     Cell* cell = sheet->getCell(ID("xA1bC2dE"));
     ASSERT_NE(cell, nullptr);
     // Style is now read from workbook map
-    EXPECT_EQ(result.workbook->getCellStyleId(cell->id).toString(), "STYbold1");
+    EXPECT_EQ(result.workbook->getStyleId(cell->id).toString(), "STYbold1");
 }
 
 TEST(StyleSerializationTest, RoundtripStyles) {
@@ -1212,7 +1212,7 @@ TEST(StyleSerializationTest, RoundtripStyles) {
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cell->value = CellValue(42.0);
     // Store style in workbook map
-    wb->setCellStyleId(cell->id, ID("STYbold1"));
+    wb->setStyleId(cell->id, ID("STYbold1"));
     cell->markHasStyle();
 
     sheet->addColumn(std::move(col));
@@ -1260,7 +1260,7 @@ TEST(StyleSerializationTest, RoundtripStyles) {
     Sheet* parsedSheet = result.workbook->getSheetByIndex(0);
     Cell* parsedCell = parsedSheet->getCell(ID("xA1bC2dE"));
     ASSERT_NE(parsedCell, nullptr);
-    EXPECT_EQ(result.workbook->getCellStyleId(parsedCell->id).toString(), "STYbold1");
+    EXPECT_EQ(result.workbook->getStyleId(parsedCell->id).toString(), "STYbold1");
 }
 
 TEST(StyleSerializationTest, ParseCellWithBothFormatAndStyle) {
@@ -1282,7 +1282,7 @@ X xA1bC2dE cA1bC2dE rA1bC2dE n 42 fmt:FMT_C002 sty:STYbold1
     ASSERT_NE(cell, nullptr);
     // Format and style are now read from workbook map
     EXPECT_EQ(result.workbook->getCellFormatId(cell->id).toString(), "FMT_C002");
-    EXPECT_EQ(result.workbook->getCellStyleId(cell->id).toString(), "STYbold1");
+    EXPECT_EQ(result.workbook->getStyleId(cell->id).toString(), "STYbold1");
 }
 
 // =============================================================================
@@ -1300,7 +1300,7 @@ TEST(StyleZCDRoundtripTest, EmptyStyleRoundtrip) {
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cell->value = CellValue(42.0);
     // Store style in workbook map
-    wb->setCellStyleId(cell->id, ID("STYempty"));
+    wb->setStyleId(cell->id, ID("STYempty"));
     cell->markHasStyle();
 
     sheet->addColumn(std::move(col));
@@ -1349,7 +1349,7 @@ TEST(StyleZCDRoundtripTest, PartialStyleBoldOnly) {
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cell->value = CellValue("Header");
     // Store style in workbook map
-    wb->setCellStyleId(cell->id, ID("STYbold0"));
+    wb->setStyleId(cell->id, ID("STYbold0"));
     cell->markHasStyle();
 
     sheet->addColumn(std::move(col));
@@ -1384,7 +1384,7 @@ TEST(StyleZCDRoundtripTest, PartialStyleColorOnly) {
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cell->value = CellValue("Highlighted");
     // Store style in workbook map
-    wb->setCellStyleId(cell->id, ID("STYcolor"));
+    wb->setStyleId(cell->id, ID("STYcolor"));
     cell->markHasStyle();
 
     sheet->addColumn(std::move(col));
@@ -1420,7 +1420,7 @@ TEST(StyleZCDRoundtripTest, PartialStyleAlignmentOnly) {
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cell->value = CellValue("Centered");
     // Store style in workbook map
-    wb->setCellStyleId(cell->id, ID("STYalign"));
+    wb->setStyleId(cell->id, ID("STYalign"));
     cell->markHasStyle();
 
     sheet->addColumn(std::move(col));
@@ -1455,7 +1455,7 @@ TEST(StyleZCDRoundtripTest, PartialStyleFontOnly) {
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cell->value = CellValue("Large Text");
     // Store style in workbook map
-    wb->setCellStyleId(cell->id, ID("STYfont0"));
+    wb->setStyleId(cell->id, ID("STYfont0"));
     cell->markHasStyle();
 
     sheet->addColumn(std::move(col));
@@ -1499,14 +1499,14 @@ TEST(StyleZCDRoundtripTest, MultipleCellsDifferentStyles) {
     auto cellA1 = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cellA1->value = CellValue("Name");
     // Store style in workbook map
-    wb->setCellStyleId(cellA1->id, ID("STYhead0"));
+    wb->setStyleId(cellA1->id, ID("STYhead0"));
     cellA1->markHasStyle();
 
     // Cell B1: Bold header
     auto cellB1 = std::make_unique<Cell>(ID("xB3dE4fG"), ID("cB3dE4fG"), ID("rA1bC2dE"));
     cellB1->value = CellValue("Value");
     // Store style in workbook map
-    wb->setCellStyleId(cellB1->id, ID("STYhead0"));
+    wb->setStyleId(cellB1->id, ID("STYhead0"));
     cellB1->markHasStyle();
 
     // Cell A2: Normal text
@@ -1518,7 +1518,7 @@ TEST(StyleZCDRoundtripTest, MultipleCellsDifferentStyles) {
     auto cellB2 = std::make_unique<Cell>(ID("xD7hJ8kL"), ID("cB3dE4fG"), ID("rB3dE4fG"));
     cellB2->value = CellValue(1234.56);
     // Store style in workbook map
-    wb->setCellStyleId(cellB2->id, ID("STYmoney"));
+    wb->setStyleId(cellB2->id, ID("STYmoney"));
     cellB2->markHasStyle();
 
     sheet->addColumn(std::move(col1));
@@ -1569,12 +1569,12 @@ TEST(StyleZCDRoundtripTest, MultipleCellsDifferentStyles) {
 
     // Verify cells (read style from workbook map)
     Sheet* parsedSheet = result.workbook->getSheetByIndex(0);
-    EXPECT_EQ(result.workbook->getCellStyleId(parsedSheet->getCell(ID("xA1bC2dE"))->id).toString(),
+    EXPECT_EQ(result.workbook->getStyleId(parsedSheet->getCell(ID("xA1bC2dE"))->id).toString(),
               "STYhead0");
-    EXPECT_EQ(result.workbook->getCellStyleId(parsedSheet->getCell(ID("xB3dE4fG"))->id).toString(),
+    EXPECT_EQ(result.workbook->getStyleId(parsedSheet->getCell(ID("xB3dE4fG"))->id).toString(),
               "STYhead0");
-    EXPECT_TRUE(result.workbook->getCellStyleId(parsedSheet->getCell(ID("xC5fG6hJ"))->id).isNull());
-    EXPECT_EQ(result.workbook->getCellStyleId(parsedSheet->getCell(ID("xD7hJ8kL"))->id).toString(),
+    EXPECT_TRUE(result.workbook->getStyleId(parsedSheet->getCell(ID("xC5fG6hJ"))->id).isNull());
+    EXPECT_EQ(result.workbook->getStyleId(parsedSheet->getCell(ID("xD7hJ8kL"))->id).toString(),
               "STYmoney");
 }
 
@@ -1754,17 +1754,17 @@ X xF1mN2pQ cB3dE4fG rC5fG6hJ n -500 fmt:FMT_C002 sty:STYwarn0
 
     // Verify cells have correct styles (read from workbook map)
     Sheet* sheet = result.workbook->getSheetByIndex(0);
-    EXPECT_EQ(result.workbook->getCellStyleId(sheet->getCell(ID("xA1bC2dE"))->id).toString(),
+    EXPECT_EQ(result.workbook->getStyleId(sheet->getCell(ID("xA1bC2dE"))->id).toString(),
               "STYhead0");
-    EXPECT_EQ(result.workbook->getCellStyleId(sheet->getCell(ID("xD7hJ8kL"))->id).toString(),
+    EXPECT_EQ(result.workbook->getStyleId(sheet->getCell(ID("xD7hJ8kL"))->id).toString(),
               "STYmoney");
-    EXPECT_EQ(result.workbook->getCellStyleId(sheet->getCell(ID("xE9kL0mN"))->id).toString(),
+    EXPECT_EQ(result.workbook->getStyleId(sheet->getCell(ID("xE9kL0mN"))->id).toString(),
               "STYwarn0");
 
     // Verify cell with both format and style (read from workbook map)
     Cell* amountCell = sheet->getCell(ID("xD7hJ8kL"));
     EXPECT_EQ(result.workbook->getCellFormatId(amountCell->id).toString(), "FMT_C002");
-    EXPECT_EQ(result.workbook->getCellStyleId(amountCell->id).toString(), "STYmoney");
+    EXPECT_EQ(result.workbook->getStyleId(amountCell->id).toString(), "STYmoney");
 
     // Serialize and verify round-trip
     const std::string serialized = serialize(*result.workbook);
