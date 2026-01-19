@@ -139,8 +139,8 @@ These just need to be exposed in the UI - no C++ changes needed for border style
 - [ ] 3d: Update XLSX import to set appropriate defined flags
   - Properties explicitly set in XLSX should be marked defined
 
-- [ ] 3e: Backward compatibility for old files
-  - When loading files without defined flags, compute `defined` from which values differ from defaults
+- [ ] 3e: Update testdata files if needed
+  - Fix any test files that break due to serialization changes
 
 ---
 
@@ -164,7 +164,6 @@ These just need to be exposed in the UI - no C++ changes needed for border style
 - [ ] 5a: Add unit tests for defined flags
   - Test merge with defined vs undefined properties
   - Test serialization round-trip of defined flags
-  - Test backward compatibility with old files
 
 - [ ] 5b: Add E2E tests for style override behavior
   - Create range style, create cell inside with override, verify effective style
@@ -221,11 +220,6 @@ CellStyle mergeEffectiveStyles(const CellStyle& base, const CellStyle& overlay) 
 - `bold=false` with `DEFINED_BOLD=1`: explicitly set to false, overrides parent
 - `bgColor=""` with `DEFINED_BGCOLOR=0`: no background set, inherit from parent
 - `bgColor=""` with `DEFINED_BGCOLOR=1`: explicitly cleared background, overrides parent
-
-### Backward Compatibility
-
-- Old files without `defined` field: compute defined from non-default values
-- This means old files can't express "explicitly set to default", but that's acceptable for migration
 
 ---
 
