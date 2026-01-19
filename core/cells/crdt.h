@@ -124,6 +124,8 @@ Operation makeRowMoveOp(Workbook& workbook, const ID& axisId, const std::string&
 Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden);
 // payload: style ID string, or empty string to clear style
 Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const ID& styleId);
+// payload: format ID string, or empty string to clear format
+Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const ID& formatId);
 
 // Generate a SHEET_CREATE operation.
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload);

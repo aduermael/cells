@@ -299,6 +299,10 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             result = internal::applyAxisSetStyle(workbook, op);
             break;
 
+        case OpType::AXIS_SET_FORMAT:
+            result = internal::applyAxisSetFormat(workbook, op);
+            break;
+
         // Legacy DIM_* operations (backwards compatibility)
         case OpType::DIM_INSERT_AXIS:
             result = internal::applyDimInsertAxis(workbook, op);
@@ -526,6 +530,11 @@ Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden)
 Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const ID& styleId) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::AXIS_SET_STYLE, axisId, styleId.isNull() ? "" : styleId.toString()};
+}
+
+Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const ID& formatId) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::AXIS_SET_FORMAT, axisId, formatId.isNull() ? "" : formatId.toString()};
 }
 
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {
