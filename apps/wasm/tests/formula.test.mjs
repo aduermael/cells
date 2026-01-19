@@ -547,6 +547,150 @@ const tests = {
     assertEqual(updatedValue, '14', 'B1 should update to 14 when Sheet2!A2 changes (1+10+3)');
   },
 
+  // ============================================================================
+  // Cross-Sheet Formula Round-Trip Tests (Phase 15)
+  // These tests verify that cross-sheet formulas survive re-submission without
+  // changes (e.g., focusing formula bar and pressing Enter).
+  // ============================================================================
+
+  'Cross-sheet formula survives re-submission': async (ctx) => {
+    // BUG: Re-submitting a cross-sheet formula without changes causes #REF!
+    // Reproduction:
+    // 1. Create Sheet2, put 42 in Sheet2!B1
+    // 2. In Sheet1!A1, enter =Sheet2!B1
+    // 3. Select A1, focus formula bar, press Enter (re-submit)
+    // 4. A1 should still show 42, not #REF!
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Add a second sheet
+    await ctx.page.click('#add-sheet-btn');
+    await sleep(300);
+
+    // Now on Sheet2, enter 42 in B1
+    await setCellValue(ctx.page, 'B1', '42');
+    await sleep(200);
+
+    // Switch back to Sheet1
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+    });
+    await sleep(300);
+
+    // In Sheet1!A1, enter =Sheet2!B1
+    await setCellValue(ctx.page, 'A1', '=Sheet2!B1');
+    await sleep(300);
+
+    // Verify A1 shows 42 initially
+    const initialValue = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(initialValue, '42', 'A1 should initially show 42 from Sheet2!B1');
+
+    // Select A1 and verify formula bar
+    await clickCell(ctx.page, 'A1');
+    await sleep(200);
+
+    const formulaBeforeResubmit = await getFormulaBarContent(ctx.page);
+    assertEqual(formulaBeforeResubmit, '=Sheet2!B1', 'Formula bar should show =Sheet2!B1');
+
+    // Now re-submit the formula by clicking the formula bar and pressing Enter
+    // This simulates the user editing/viewing the formula and confirming it unchanged
+    await ctx.page.click('#formula-bar');
+    await sleep(200);
+    await ctx.page.keyboard.press('Enter');
+    await sleep(300);
+
+    // Verify A1 still shows 42 (not #REF!)
+    const valueAfterResubmit = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(valueAfterResubmit, '42', 'A1 should still show 42 after re-submitting the formula (not #REF!)');
+
+    // Verify formula bar still shows the correct formula
+    await clickCell(ctx.page, 'A1');
+    await sleep(200);
+    const formulaAfterResubmit = await getFormulaBarContent(ctx.page);
+    assertEqual(formulaAfterResubmit, '=Sheet2!B1', 'Formula bar should still show =Sheet2!B1 after re-submit');
+
+    // Verify the formula still updates when the source cell changes
+    // Switch to Sheet2
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 1) {
+        tabs[1].click();
+      }
+    });
+    await sleep(300);
+
+    // Change B1 to 99
+    await setCellValue(ctx.page, 'B1', '99');
+    await sleep(200);
+
+    // Switch back to Sheet1
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+    });
+    await sleep(300);
+
+    // Verify A1 updates to 99
+    const valueAfterSourceChange = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(valueAfterSourceChange, '99', 'A1 should update to 99 when Sheet2!B1 changes');
+  },
+
+  'Cross-sheet range formula survives re-submission': async (ctx) => {
+    // Similar test but for range references: =SUM(Sheet2!A1:A3)
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Add a second sheet
+    await ctx.page.click('#add-sheet-btn');
+    await sleep(300);
+
+    // Enter values in Sheet2!A1:A3
+    await setCellValue(ctx.page, 'A1', '10');
+    await setCellValue(ctx.page, 'A2', '20');
+    await setCellValue(ctx.page, 'A3', '30');
+    await sleep(200);
+
+    // Switch back to Sheet1
+    await ctx.page.evaluate(() => {
+      const tabs = document.querySelectorAll('.sheet-tab');
+      if (tabs.length > 0) {
+        tabs[0].click();
+      }
+    });
+    await sleep(300);
+
+    // Enter =SUM(Sheet2!A1:A3)
+    await setCellValue(ctx.page, 'A1', '=SUM(Sheet2!A1:A3)');
+    await sleep(300);
+
+    // Verify A1 shows 60 initially
+    const initialValue = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(initialValue, '60', 'A1 should initially show 60 (sum of 10+20+30)');
+
+    // Re-submit the formula
+    await clickCell(ctx.page, 'A1');
+    await sleep(200);
+    await ctx.page.click('#formula-bar');
+    await sleep(200);
+    await ctx.page.keyboard.press('Enter');
+    await sleep(300);
+
+    // Verify A1 still shows 60
+    const valueAfterResubmit = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(valueAfterResubmit, '60', 'A1 should still show 60 after re-submitting the range formula');
+
+    // Verify formula bar still shows the correct formula
+    await clickCell(ctx.page, 'A1');
+    await sleep(200);
+    const formulaAfterResubmit = await getFormulaBarContent(ctx.page);
+    assertEqual(formulaAfterResubmit, '=SUM(Sheet2!A1:A3)', 'Formula bar should still show =SUM(Sheet2!A1:A3)');
+  },
+
   'Multi-hop cross-sheet dependencies update correctly': async (ctx) => {
     // Test chain: Sheet3!A1 -> Sheet2!A1 -> Sheet1!A1
     await ctx.page.goto(ctx.baseUrl);

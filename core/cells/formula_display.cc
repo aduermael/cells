@@ -127,43 +127,39 @@ std::string FormulaDisplayConverter::cellRefToStringInternal(const CellRefNode* 
     // Determine which sheet to look up the cell on
     const Sheet* lookupSheet = &_sheet;
 
-    // If sheetId is explicitly set, use it (existing storage format)
-    if (!node->sheetId.empty() && _workbook != nullptr) {
-        const ID sheetIdObj(node->sheetId);
-        const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
-        if (crossSheet != nullptr) {
-            lookupSheet = crossSheet;
-            // Add sheet prefix since it's explicitly a cross-sheet ref (unless suppressed)
-            if (!suppressSheetPrefix) {
-                sheetPrefix = getSheetPrefix(node->sheetId, node->sheetName);
-            }
-        }
-    } else if (!node->sheetName.empty() && !suppressSheetPrefix) {
-        // Legacy sheetName reference
-        sheetPrefix = getSheetPrefix("", node->sheetName);
-    }
-
     // If we have a resolved cellId, look up the current position
+    // This takes precedence over sheetId/sheetName since cell UUIDs are globally unique
     if (!node->cellId.empty() && _workbook != nullptr) {
         const ID cellIdObj(node->cellId);
         const Cell* foundCell = nullptr;
 
-        // For simplified storage: search all sheets if sheetId is empty
+        // For simplified storage (Phase 13+): search all sheets via workbook
+        // sheetId may be empty since cell UUID is sufficient for lookup
         if (node->sheetId.empty()) {
             auto [cell, sheet] = _workbook->findCell(cellIdObj);
             if (cell && sheet) {
                 foundCell = cell;
                 lookupSheet = sheet;
                 // Check if this is a cross-sheet reference by comparing the cell's column sheetId
-                // with the formula's sheet. Use workbook-level lookup for reliability.
+                // with the context sheet. Add prefix only if they differ.
                 const Axis* col = _workbook->getColumn(foundCell->colId);
                 if (col != nullptr && col->sheetId != _sheet.id && !suppressSheetPrefix) {
                     // Cross-sheet reference - add sheet prefix
                     sheetPrefix = formatSheetName(lookupSheet->name);
                 }
+                // Otherwise: same-sheet reference, no prefix needed (even if sheetName is set)
             }
         } else {
-            // Explicit sheet - look up directly
+            // Explicit sheetId set - use it for the prefix
+            const ID sheetIdObj(node->sheetId);
+            const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
+            if (crossSheet != nullptr) {
+                lookupSheet = crossSheet;
+                // Add sheet prefix since it's explicitly a cross-sheet ref (unless suppressed)
+                if (!suppressSheetPrefix) {
+                    sheetPrefix = getSheetPrefix(node->sheetId, node->sheetName);
+                }
+            }
             foundCell = _workbook->getCell(cellIdObj);
         }
 
@@ -185,6 +181,21 @@ std::string FormulaDisplayConverter::cellRefToStringInternal(const CellRefNode* 
                 return result;
             }
         }
+    }
+
+    // Legacy: no cellId resolved, use sheetId/sheetName for prefix
+    if (!node->sheetId.empty() && _workbook != nullptr) {
+        const ID sheetIdObj(node->sheetId);
+        const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
+        if (crossSheet != nullptr) {
+            lookupSheet = crossSheet;
+            if (!suppressSheetPrefix) {
+                sheetPrefix = getSheetPrefix(node->sheetId, node->sheetName);
+            }
+        }
+    } else if (!node->sheetName.empty() && !suppressSheetPrefix) {
+        // Legacy sheetName reference (unresolved formula)
+        sheetPrefix = getSheetPrefix("", node->sheetName);
     }
 
     // Fall back to original column/row (uppercase column for normalization)

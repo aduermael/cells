@@ -1367,5 +1367,319 @@ TEST(FormulaIntegrationTest, QuotedSheetNameWithQuoteDisplay) {
     EXPECT_EQ(display, "='It''s here'!A1") << "Sheet name with quote should be escaped in display";
 }
 
+// ============================================================================
+// Cross-Sheet Formula Round-Trip Tests (Phase 15)
+// Verify that cross-sheet formulas survive the full round-trip:
+//   display → parse → resolve → serialize → display (identical)
+// ============================================================================
+
+// Helper to create a two-sheet workbook for cross-sheet tests
+std::unique_ptr<Workbook> createTwoSheetWorkbook() {
+    auto wb = std::make_unique<Workbook>(ID("wbXSheet1"), "TestWorkbook");
+
+    // Sheet1
+    auto sheet1 = std::make_unique<Sheet>(ID("sheet1Id"), "Sheet1");
+    sheet1->setWorkbook(wb.get());
+    auto s1ColA = std::make_unique<Axis>(ID("s1ColA01"), true);
+    s1ColA->position = 0;
+    auto s1ColB = std::make_unique<Axis>(ID("s1ColB01"), true);
+    s1ColB->position = 1;
+    auto s1Row1 = std::make_unique<Axis>(ID("s1Row101"), false);
+    s1Row1->position = 0;
+    auto s1Row2 = std::make_unique<Axis>(ID("s1Row201"), false);
+    s1Row2->position = 1;
+    auto s1CellA1 = std::make_unique<Cell>(ID("s1CelA11"), s1ColA->id, s1Row1->id);  // Formula cell
+    auto s1CellB1 = std::make_unique<Cell>(ID("s1CelB11"), s1ColB->id, s1Row1->id);
+    s1CellB1->value = CellValue(100.0);
+    sheet1->addColumn(std::move(s1ColA));
+    sheet1->addColumn(std::move(s1ColB));
+    sheet1->addRow(std::move(s1Row1));
+    sheet1->addRow(std::move(s1Row2));
+    sheet1->addCell(std::move(s1CellA1));
+    sheet1->addCell(std::move(s1CellB1));
+
+    // Sheet2
+    auto sheet2 = std::make_unique<Sheet>(ID("sheet2Id"), "Sheet2");
+    sheet2->setWorkbook(wb.get());
+    auto s2ColA = std::make_unique<Axis>(ID("s2ColA01"), true);
+    s2ColA->position = 0;
+    auto s2ColB = std::make_unique<Axis>(ID("s2ColB01"), true);
+    s2ColB->position = 1;
+    auto s2Row1 = std::make_unique<Axis>(ID("s2Row101"), false);
+    s2Row1->position = 0;
+    auto s2Row2 = std::make_unique<Axis>(ID("s2Row201"), false);
+    s2Row2->position = 1;
+    auto s2Row3 = std::make_unique<Axis>(ID("s2Row301"), false);
+    s2Row3->position = 2;
+    auto s2CellB1 = std::make_unique<Cell>(ID("s2CelB11"), s2ColB->id, s2Row1->id);
+    s2CellB1->value = CellValue(42.0);
+    auto s2CellA1 = std::make_unique<Cell>(ID("s2CelA11"), s2ColA->id, s2Row1->id);
+    s2CellA1->value = CellValue(10.0);
+    auto s2CellA2 = std::make_unique<Cell>(ID("s2CelA21"), s2ColA->id, s2Row2->id);
+    s2CellA2->value = CellValue(20.0);
+    auto s2CellA3 = std::make_unique<Cell>(ID("s2CelA31"), s2ColA->id, s2Row3->id);
+    s2CellA3->value = CellValue(30.0);
+    sheet2->addColumn(std::move(s2ColA));
+    sheet2->addColumn(std::move(s2ColB));
+    sheet2->addRow(std::move(s2Row1));
+    sheet2->addRow(std::move(s2Row2));
+    sheet2->addRow(std::move(s2Row3));
+    sheet2->addCell(std::move(s2CellB1));
+    sheet2->addCell(std::move(s2CellA1));
+    sheet2->addCell(std::move(s2CellA2));
+    sheet2->addCell(std::move(s2CellA3));
+
+    wb->addSheet(std::move(sheet1));
+    wb->addSheet(std::move(sheet2));
+    return wb;
+}
+
+TEST(CrossSheetRoundTripTest, SimpleCellRef) {
+    // Test: =Sheet2!B1 entered on Sheet1!A1
+    // Round-trip: display → parse → resolve → serialize → display (should be identical)
+    auto wb = createTwoSheetWorkbook();
+    Sheet* sheet1 = wb->getSheetByIndex(0);
+    Sheet* sheet2 = wb->getSheetByIndex(1);
+    ASSERT_NE(sheet1, nullptr);
+    ASSERT_NE(sheet2, nullptr);
+
+    // Step 1: Parse the formula
+    FormulaParser parser1("=Sheet2!B1");
+    auto ast1 = parser1.parse();
+    ASSERT_NE(ast1, nullptr);
+    ASSERT_FALSE(parser1.hasErrors());
+
+    // Step 2: Resolve references to UUIDs (like bindings_core.cc does)
+    FormulaResolver resolver1(*wb, *sheet1, wb->getNamedRanges());
+    ResolveResult resolveResult1 = resolver1.resolve(ast1.get());
+    EXPECT_TRUE(resolveResult1.success)
+        << "Initial resolve failed: " << resolveResult1.errorMessage;
+
+    // Step 3: Set the resolved formula on the cell
+    auto result = sheet1->setCellFormula(ID("s1CelA11"), "=Sheet2!B1", ast1.release());
+    EXPECT_TRUE(result.success) << "setCellFormula failed: " << result.errorMessage;
+
+    Cell* cellA1 = sheet1->getCell(ID("s1CelA11"));
+    ASSERT_NE(cellA1, nullptr);
+    Formula* formula = cellA1->getFormula();
+    ASSERT_NE(formula, nullptr);
+    ASSERT_NE(formula->ast, nullptr);
+
+    // Step 4: Serialize to internal format (UUID-based)
+    std::string internalFormat = FormulaSerializer::serialize(formula->ast);
+    EXPECT_FALSE(internalFormat.empty()) << "Serialization produced empty string";
+    // Should contain UUID-based cell reference
+    EXPECT_TRUE(internalFormat.find("s2CelB11") != std::string::npos)
+        << "Internal format should contain Sheet2!B1's UUID: " << internalFormat;
+
+    // Step 5: Get display format (should be "=Sheet2!B1" when viewed from Sheet1)
+    FormulaDisplayConverter converter(*sheet1, wb.get());
+    std::string display1 = converter.toDisplayString(formula->ast);
+    EXPECT_EQ(display1, "=Sheet2!B1") << "First display should be =Sheet2!B1";
+
+    // Step 6: Re-parse the display string (simulating user re-submitting)
+    FormulaParser parser2(display1);
+    auto ast2 = parser2.parse();
+    ASSERT_NE(ast2, nullptr) << "Re-parse returned null";
+    ASSERT_FALSE(parser2.hasErrors()) << "Re-parse had errors";
+
+    // Step 7: Re-resolve on Sheet1 (the sheet where the formula is entered)
+    FormulaResolver resolver2(*wb, *sheet1, wb->getNamedRanges());
+    ResolveResult resolveResult2 = resolver2.resolve(ast2.get());
+    EXPECT_TRUE(resolveResult2.success) << "Re-resolve failed: " << resolveResult2.errorMessage;
+
+    // Step 8: Re-serialize to internal format
+    std::string internalFormat2 = FormulaSerializer::serialize(ast2.get());
+    EXPECT_EQ(internalFormat, internalFormat2) << "Internal format changed after round-trip!\n"
+                                               << "  Original: " << internalFormat << "\n"
+                                               << "  After round-trip: " << internalFormat2;
+
+    // Step 9: Get display format again (should still be "=Sheet2!B1")
+    std::string display2 = converter.toDisplayString(ast2.get());
+    EXPECT_EQ(display2, "=Sheet2!B1") << "Display after round-trip should still be =Sheet2!B1";
+}
+
+TEST(CrossSheetRoundTripTest, RangeRef) {
+    // Test: =SUM(Sheet2!A1:A3) entered on Sheet1!A1
+    auto wb = createTwoSheetWorkbook();
+    Sheet* sheet1 = wb->getSheetByIndex(0);
+    ASSERT_NE(sheet1, nullptr);
+
+    // Step 1: Parse the formula
+    FormulaParser parser1("=SUM(Sheet2!A1:A3)");
+    auto ast1 = parser1.parse();
+    ASSERT_NE(ast1, nullptr);
+    ASSERT_FALSE(parser1.hasErrors());
+
+    // Step 2: Resolve references to UUIDs
+    FormulaResolver resolver1(*wb, *sheet1, wb->getNamedRanges());
+    ResolveResult resolveResult1 = resolver1.resolve(ast1.get());
+    EXPECT_TRUE(resolveResult1.success);
+
+    // Step 3: Set formula on cell
+    auto result = sheet1->setCellFormula(ID("s1CelA11"), "=SUM(Sheet2!A1:A3)", ast1.release());
+    EXPECT_TRUE(result.success);
+
+    Cell* cellA1 = sheet1->getCell(ID("s1CelA11"));
+    ASSERT_NE(cellA1, nullptr);
+    Formula* formula = cellA1->getFormula();
+    ASSERT_NE(formula, nullptr);
+    ASSERT_NE(formula->ast, nullptr);
+
+    // Step 4: Serialize to internal format
+    std::string internalFormat = FormulaSerializer::serialize(formula->ast);
+
+    // Step 5: Get display format
+    FormulaDisplayConverter converter(*sheet1, wb.get());
+    std::string display1 = converter.toDisplayString(formula->ast);
+    EXPECT_EQ(display1, "=SUM(Sheet2!A1:A3)") << "First display should be =SUM(Sheet2!A1:A3)";
+
+    // Step 6: Re-parse
+    FormulaParser parser2(display1);
+    auto ast2 = parser2.parse();
+    ASSERT_NE(ast2, nullptr);
+
+    // Step 7: Re-resolve
+    FormulaResolver resolver2(*wb, *sheet1, wb->getNamedRanges());
+    ResolveResult resolveResult2 = resolver2.resolve(ast2.get());
+    EXPECT_TRUE(resolveResult2.success) << "Re-resolve failed";
+
+    // Step 8: Re-serialize (should be identical)
+    std::string internalFormat2 = FormulaSerializer::serialize(ast2.get());
+    EXPECT_EQ(internalFormat, internalFormat2) << "Internal format changed after round-trip";
+
+    // Step 9: Display should be unchanged
+    std::string display2 = converter.toDisplayString(ast2.get());
+    EXPECT_EQ(display2, "=SUM(Sheet2!A1:A3)") << "Display after round-trip should be unchanged";
+}
+
+TEST(CrossSheetRoundTripTest, AbsoluteRef) {
+    // Test: =Sheet2!$B$1 with absolute references
+    auto wb = createTwoSheetWorkbook();
+    Sheet* sheet1 = wb->getSheetByIndex(0);
+    ASSERT_NE(sheet1, nullptr);
+
+    // Step 1: Parse the formula
+    FormulaParser parser1("=Sheet2!$B$1");
+    auto ast1 = parser1.parse();
+    ASSERT_NE(ast1, nullptr);
+
+    // Step 2: Resolve references
+    FormulaResolver resolver1(*wb, *sheet1, wb->getNamedRanges());
+    EXPECT_TRUE(resolver1.resolve(ast1.get()).success);
+
+    // Step 3: Set formula
+    auto result = sheet1->setCellFormula(ID("s1CelA11"), "=Sheet2!$B$1", ast1.release());
+    EXPECT_TRUE(result.success);
+
+    Cell* cellA1 = sheet1->getCell(ID("s1CelA11"));
+    ASSERT_NE(cellA1, nullptr);
+    Formula* formula = cellA1->getFormula();
+    ASSERT_NE(formula, nullptr);
+
+    // Step 4-5: Serialize and get display
+    std::string internalFormat = FormulaSerializer::serialize(formula->ast);
+    FormulaDisplayConverter converter(*sheet1, wb.get());
+    std::string display1 = converter.toDisplayString(formula->ast);
+    EXPECT_EQ(display1, "=Sheet2!$B$1");
+
+    // Step 6-7: Re-parse and re-resolve
+    FormulaParser parser2(display1);
+    auto ast2 = parser2.parse();
+    ASSERT_NE(ast2, nullptr);
+    FormulaResolver resolver2(*wb, *sheet1, wb->getNamedRanges());
+    ResolveResult resolveResult2 = resolver2.resolve(ast2.get());
+    EXPECT_TRUE(resolveResult2.success);
+
+    // Step 8-9: Verify round-trip integrity
+    std::string internalFormat2 = FormulaSerializer::serialize(ast2.get());
+    EXPECT_EQ(internalFormat, internalFormat2) << "Absolute ref internal format changed";
+    std::string display2 = converter.toDisplayString(ast2.get());
+    EXPECT_EQ(display2, "=Sheet2!$B$1");
+}
+
+TEST(CrossSheetRoundTripTest, MultipleSheetRefs) {
+    // Test: =Sheet2!A1+B1 (cross-sheet + same-sheet refs)
+    auto wb = createTwoSheetWorkbook();
+    Sheet* sheet1 = wb->getSheetByIndex(0);
+    ASSERT_NE(sheet1, nullptr);
+
+    // Step 1: Parse the formula
+    FormulaParser parser1("=Sheet2!A1+B1");
+    auto ast1 = parser1.parse();
+    ASSERT_NE(ast1, nullptr);
+
+    // Step 2: Resolve references
+    FormulaResolver resolver1(*wb, *sheet1, wb->getNamedRanges());
+    EXPECT_TRUE(resolver1.resolve(ast1.get()).success);
+
+    // Step 3: Set formula
+    auto result = sheet1->setCellFormula(ID("s1CelA11"), "=Sheet2!A1+B1", ast1.release());
+    EXPECT_TRUE(result.success);
+
+    Cell* cellA1 = sheet1->getCell(ID("s1CelA11"));
+    ASSERT_NE(cellA1, nullptr);
+    Formula* formula = cellA1->getFormula();
+    ASSERT_NE(formula, nullptr);
+
+    std::string internalFormat = FormulaSerializer::serialize(formula->ast);
+    FormulaDisplayConverter converter(*sheet1, wb.get());
+    std::string display1 = converter.toDisplayString(formula->ast);
+    EXPECT_EQ(display1, "=Sheet2!A1+B1")
+        << "Formula should show Sheet2!A1 (cross-sheet) and B1 (same sheet)";
+
+    // Round-trip
+    FormulaParser parser2(display1);
+    auto ast2 = parser2.parse();
+    ASSERT_NE(ast2, nullptr);
+    FormulaResolver resolver2(*wb, *sheet1, wb->getNamedRanges());
+    EXPECT_TRUE(resolver2.resolve(ast2.get()).success);
+
+    std::string internalFormat2 = FormulaSerializer::serialize(ast2.get());
+    EXPECT_EQ(internalFormat, internalFormat2);
+    std::string display2 = converter.toDisplayString(ast2.get());
+    EXPECT_EQ(display2, "=Sheet2!A1+B1");
+}
+
+TEST(CrossSheetRoundTripTest, ContextAwareDisplay) {
+    // Test: Formula referencing Sheet2!B1 shows differently on different sheets
+    // - On Sheet1: "=Sheet2!B1"
+    // - On Sheet2: "=B1" (same sheet, no prefix needed)
+    auto wb = createTwoSheetWorkbook();
+    Sheet* sheet1 = wb->getSheetByIndex(0);
+    Sheet* sheet2 = wb->getSheetByIndex(1);
+    ASSERT_NE(sheet1, nullptr);
+    ASSERT_NE(sheet2, nullptr);
+
+    // Step 1: Parse the formula
+    FormulaParser parser1("=Sheet2!B1");
+    auto ast1 = parser1.parse();
+    ASSERT_NE(ast1, nullptr);
+
+    // Step 2: Resolve references
+    FormulaResolver resolver1(*wb, *sheet1, wb->getNamedRanges());
+    EXPECT_TRUE(resolver1.resolve(ast1.get()).success);
+
+    // Step 3: Set formula on Sheet1!A1
+    auto result = sheet1->setCellFormula(ID("s1CelA11"), "=Sheet2!B1", ast1.release());
+    EXPECT_TRUE(result.success);
+
+    Cell* cellA1 = sheet1->getCell(ID("s1CelA11"));
+    ASSERT_NE(cellA1, nullptr);
+    Formula* formula = cellA1->getFormula();
+    ASSERT_NE(formula, nullptr);
+
+    // Display from Sheet1 context: should show "=Sheet2!B1"
+    FormulaDisplayConverter converter1(*sheet1, wb.get());
+    std::string displayFromSheet1 = converter1.toDisplayString(formula->ast);
+    EXPECT_EQ(displayFromSheet1, "=Sheet2!B1");
+
+    // Display from Sheet2 context: should show "=B1" (same sheet)
+    FormulaDisplayConverter converter2(*sheet2, wb.get());
+    std::string displayFromSheet2 = converter2.toDisplayString(formula->ast);
+    EXPECT_EQ(displayFromSheet2, "=B1")
+        << "When viewed from Sheet2, cross-sheet ref to Sheet2 should show as local ref";
+}
+
 }  // namespace
 }  // namespace cells
