@@ -70,13 +70,6 @@ void recalculate(Workbook* workbook, const std::vector<ID>& changedCells);
 // Kept for backward compatibility with existing callers
 void recalculate(Sheet* sheet, const std::vector<ID>& changedCells);
 
-// Recalculate cross-sheet dependents for changed cells
-// DEPRECATED: With workbook-level recalculate(), this is no longer needed.
-// The global dependency graph handles all dependencies regardless of sheet.
-// Kept temporarily for backward compatibility - will be removed.
-void recalculateCrossSheet(Workbook* workbook, Sheet* changedSheet,
-                           const std::vector<ID>& changedCells);
-
 // Recalculate all volatile cells and their dependents
 // Call this when any edit occurs to ensure NOW(), TODAY(), etc. are updated
 void recalculateVolatile(Sheet* sheet);

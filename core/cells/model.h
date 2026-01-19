@@ -857,52 +857,6 @@ struct Workbook {
     bool clearCellStyle(const ID& cellId);
 
     // ========================================================================
-    // Cross-sheet dependency tracking
-    // ========================================================================
-
-    // A cross-sheet dependency record: a formula on one sheet references a cell on another
-    struct CrossSheetDep {
-        ID formulaSheetId;  // Sheet containing the formula
-        ID formulaCellId;   // Cell containing the formula
-    };
-
-    // A cross-sheet range dependency: a formula references a range on another sheet
-    struct CrossSheetRangeDep {
-        ID sourceSheetId;   // Sheet containing the referenced range
-        ID startColId;      // Range start column ID
-        ID startRowId;      // Range start row ID
-        ID endColId;        // Range end column ID
-        ID endRowId;        // Range end row ID
-        ID formulaSheetId;  // Sheet containing the formula
-        ID formulaCellId;   // Cell containing the formula
-    };
-
-    // Register a cross-sheet dependency (source cell -> formula cell on different sheet)
-    // Called when a formula references a cell on a different sheet
-    void addCrossSheetDep(const ID& sourceCellId, const ID& formulaSheetId,
-                          const ID& formulaCellId);
-
-    // Register a cross-sheet range dependency
-    // Called when a formula references a range on a different sheet
-    void addCrossSheetRangeDep(const ID& sourceSheetId, const ID& startColId, const ID& startRowId,
-                               const ID& endColId, const ID& endRowId, const ID& formulaSheetId,
-                               const ID& formulaCellId);
-
-    // Remove all cross-sheet dependencies for a formula cell
-    // Called when a formula is cleared or updated
-    void removeCrossSheetDeps(const ID& formulaCellId);
-
-    // Get all formula cells on OTHER sheets that depend on this cell
-    // Returns vector of (sheetId, cellId) pairs for formulas that reference sourceCellId
-    [[nodiscard]] std::vector<CrossSheetDep> getCrossSheetDependents(const ID& sourceCellId) const;
-
-    // Get all formula cells on OTHER sheets that depend on a range containing this cell position
-    // changedSheetId: the sheet where the cell changed
-    // changedColId, changedRowId: the position of the changed cell
-    [[nodiscard]] std::vector<CrossSheetDep> getCrossSheetRangeDependents(
-        const ID& changedSheetId, const ID& changedColId, const ID& changedRowId) const;
-
-    // ========================================================================
     // Workbook-level shared formula tracking (runtime-only)
     // ========================================================================
 
@@ -1096,22 +1050,6 @@ private:
 
     // Helper for building composite position keys
     static std::string makePositionKey(const ID& colId, const ID& rowId);
-
-    // ========================================================================
-    // Cross-sheet dependency tracking (runtime-only)
-    // ========================================================================
-
-    // Forward index: source cell ID -> formula cells on OTHER sheets that depend on it
-    // Used for cross-sheet dirty propagation when a cell changes
-    std::unordered_map<ID, std::vector<CrossSheetDep>, IDHash> _crossSheetDeps;
-
-    // Reverse index: formula cell ID -> source cell IDs it depends on from OTHER sheets
-    // Used to clean up _crossSheetDeps when a formula is removed/updated
-    std::unordered_map<ID, std::vector<ID>, IDHash> _crossSheetDepReverse;
-
-    // Range dependencies: formula cell ID -> ranges it depends on from OTHER sheets
-    // Used for checking if a changed cell position falls within a tracked range
-    std::unordered_map<ID, std::vector<CrossSheetRangeDep>, IDHash> _crossSheetRangeDeps;
 
     // ========================================================================
     // Workbook-level range storage (primary storage)

@@ -164,8 +164,6 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
         if (depGraph != nullptr) {
             depGraph->removeFormula(cell->id);
         }
-        // Also clear cross-sheet dependencies at workbook level
-        workbook.removeCrossSheetDeps(cell->id);
 
         // Parse the UUID formula text to create the AST
         FormulaParser parser(value_str);
@@ -239,8 +237,6 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
                 depGraph->removeFormula(cell->id);
                 depGraph->unmarkVolatile(cell->id);
             }
-            // Also clear cross-sheet dependencies at workbook level
-            workbook.removeCrossSheetDeps(cell->id);
             cell->clearFormula();
         }
         cell->value.raw = value_str;

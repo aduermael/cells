@@ -242,11 +242,11 @@ Move dependency graph from Sheet to Workbook level.
 - [x] 2h: All usages of _depGraph in sheet.cc now use getDependencyGraph()
 - [x] 2i: Run tests to verify formula dependencies work correctly - ALL PASS
 
-**Deferred to Phase 14:**
-- [ ] 2e: Remove `Workbook::_crossSheetDeps`, `_crossSheetDepReverse`, `_crossSheetRangeDeps` → Phase 14
-- [ ] 2f: Remove `Workbook::addCrossSheetDep()`, `removeCrossSheetDeps()`, `getCrossSheetDependents()`, etc. → Phase 14
+**Completed in Phase 14:**
+- [x] 2e: Remove `Workbook::_crossSheetDeps`, `_crossSheetDepReverse`, `_crossSheetRangeDeps` → Done in Phase 14 Step 3
+- [x] 2f: Remove `Workbook::addCrossSheetDep()`, `removeCrossSheetDeps()`, `getCrossSheetDependents()`, etc. → Done in Phase 14 Step 3
 
-Note: Cross-sheet dependency tracking will be removed in Phase 14. With globally unique cell UUIDs and formula storage without sheet prefixes (Phase 13), ALL dependencies go through the single global `_depGraph`.
+Note: Cross-sheet dependency tracking has been removed. With globally unique cell UUIDs and formula storage without sheet prefixes (Phase 13), ALL dependencies go through the single global `_depGraph`.
 
 ## Phase 3: Workbook-Level Shared Formulas
 
@@ -500,14 +500,17 @@ calling both `recalculate(sheet, ...)` and `recalculateCrossSheet(...)`. All 54 
 pass. 182/184 E2E tests pass - the 2 failures are cross-sheet formula display issues (Step 5).
 
 **Step 3: Remove cross-sheet dependency tracking**
-- [ ] 14j: Remove calls to `addCrossSheetDep()`, `removeCrossSheetDeps()` from crdt_cell.cc
-- [ ] 14k: Remove `Workbook::_crossSheetDeps`, `_crossSheetDepReverse`, `_crossSheetRangeDeps` from model.h
-- [ ] 14l: Remove `Workbook::addCrossSheetDep()`, `removeCrossSheetDeps()`, `getCrossSheetDependents()` from model.h/cc
-- [ ] 14m: Remove `Workbook::addCrossSheetRangeDep()`, `getCrossSheetRangeDependents()` from model.h/cc
-- [ ] 14n: Remove `CrossSheetDep` and `CrossSheetRangeDep` structs from model.h
+- [x] 14j: Remove calls to `addCrossSheetDep()`, `removeCrossSheetDeps()` from crdt_cell.cc
+- [x] 14k: Remove `Workbook::_crossSheetDeps`, `_crossSheetDepReverse`, `_crossSheetRangeDeps` from model.h
+- [x] 14l: Remove `Workbook::addCrossSheetDep()`, `removeCrossSheetDeps()`, `getCrossSheetDependents()` from model.h/cc
+- [x] 14m: Remove `Workbook::addCrossSheetRangeDep()`, `getCrossSheetRangeDependents()` from model.h/cc
+- [x] 14n: Remove `CrossSheetDep` and `CrossSheetRangeDep` structs from model.h
+
+**Step 3-4 completed.** Removed all cross-sheet dependency tracking code and `recalculateCrossSheet()`.
+The global dependency graph now handles ALL dependencies. 54 unit tests pass, 182/184 E2E pass.
 
 **Step 4: Remove recalculateCrossSheet**
-- [ ] 14o: Remove `recalculateCrossSheet()` from formula_recalc.h/cc (no longer needed)
+- [x] 14o: Remove `recalculateCrossSheet()` from formula_recalc.h/cc (no longer needed)
 
 **Step 5: Fix cross-sheet formula display**
 Formula display is built from AST. It needs the active sheet to determine when to prefix
