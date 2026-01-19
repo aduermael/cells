@@ -603,31 +603,37 @@ struct XLSXStyles {
         const XLSXCellFormat& xf = cellFormats[styleIndex];
         bool hasStyle = false;
 
-        // Apply font properties
+        // Apply font properties and set defined flags
         if (xf.applyFont && xf.fontId >= 0 && xf.fontId < static_cast<int>(fonts.size())) {
             const XLSXFont& font = fonts[xf.fontId];
             if (font.bold) {
                 outStyle.bold = true;
+                outStyle.setDefined(cells::DEFINED_BOLD);
                 hasStyle = true;
             }
             if (font.italic) {
                 outStyle.italic = true;
+                outStyle.setDefined(cells::DEFINED_ITALIC);
                 hasStyle = true;
             }
             if (font.underline) {
                 outStyle.underline = true;
+                outStyle.setDefined(cells::DEFINED_UNDERLINE);
                 hasStyle = true;
             }
             if (!font.name.empty()) {
                 outStyle.fontFamily = font.name;
+                outStyle.setDefined(cells::DEFINED_FONTFAMILY);
                 hasStyle = true;
             }
             if (font.size > 0) {
                 outStyle.fontSize = static_cast<uint8_t>(font.size);
+                outStyle.setDefined(cells::DEFINED_FONTSIZE);
                 hasStyle = true;
             }
             if (!font.color.empty()) {
                 outStyle.textColor = font.color;
+                outStyle.setDefined(cells::DEFINED_TEXTCOLOR);
                 hasStyle = true;
             }
         }
@@ -637,6 +643,7 @@ struct XLSXStyles {
             const XLSXFill& fill = fills[xf.fillId];
             if (!fill.fgColor.empty()) {
                 outStyle.bgColor = fill.fgColor;
+                outStyle.setDefined(cells::DEFINED_BGCOLOR);
                 hasStyle = true;
             }
         }
@@ -649,21 +656,25 @@ struct XLSXStyles {
                 if (border.top.style != cells::BorderStyle::NONE) {
                     outStyle.border.top.style = border.top.style;
                     outStyle.border.top.color = border.top.color;
+                    outStyle.setDefined(cells::DEFINED_BORDER_TOP);
                 }
                 // Copy right border
                 if (border.right.style != cells::BorderStyle::NONE) {
                     outStyle.border.right.style = border.right.style;
                     outStyle.border.right.color = border.right.color;
+                    outStyle.setDefined(cells::DEFINED_BORDER_RIGHT);
                 }
                 // Copy bottom border
                 if (border.bottom.style != cells::BorderStyle::NONE) {
                     outStyle.border.bottom.style = border.bottom.style;
                     outStyle.border.bottom.color = border.bottom.color;
+                    outStyle.setDefined(cells::DEFINED_BORDER_BOTTOM);
                 }
                 // Copy left border
                 if (border.left.style != cells::BorderStyle::NONE) {
                     outStyle.border.left.style = border.left.style;
                     outStyle.border.left.color = border.left.color;
+                    outStyle.setDefined(cells::DEFINED_BORDER_LEFT);
                 }
                 hasStyle = true;
             }
@@ -673,14 +684,17 @@ struct XLSXStyles {
         if (xf.applyAlignment) {
             if (xf.alignment.horizontal != cells::TextAlign::GENERAL) {
                 outStyle.hAlign = xf.alignment.horizontal;
+                outStyle.setDefined(cells::DEFINED_HALIGN);
                 hasStyle = true;
             }
             if (xf.alignment.vertical != cells::VerticalAlign::BOTTOM) {
                 outStyle.vAlign = xf.alignment.vertical;
+                outStyle.setDefined(cells::DEFINED_VALIGN);
                 hasStyle = true;
             }
             if (xf.alignment.wrapText) {
                 outStyle.wrapText = true;
+                outStyle.setDefined(cells::DEFINED_WRAPTEXT);
                 hasStyle = true;
             }
         }

@@ -1122,11 +1122,14 @@ TEST(StyleSerializationTest, SerializeStyleDefinition) {
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
     wb->addSheet(std::move(sheet));
 
-    // Register a style
+    // Register a style with defined flags set
     CellStyle style;
     style.bold = true;
+    style.setDefined(DEFINED_BOLD);
     style.italic = true;
+    style.setDefined(DEFINED_ITALIC);
     style.bgColor = "#FF0000";
+    style.setDefined(DEFINED_BGCOLOR);
     wb->registerStyle(ID("STYbold1"), style);
 
     const std::string output = serialize(*wb);
@@ -1220,18 +1223,28 @@ TEST(StyleSerializationTest, RoundtripStyles) {
     sheet->addCell(std::move(cell));
     wb->addSheet(std::move(sheet));
 
-    // Register style
+    // Register style with defined flags set
     CellStyle style;
     style.bold = true;
+    style.setDefined(DEFINED_BOLD);
     style.italic = true;
+    style.setDefined(DEFINED_ITALIC);
     style.underline = true;
+    style.setDefined(DEFINED_UNDERLINE);
     style.wrapText = true;
+    style.setDefined(DEFINED_WRAPTEXT);
     style.bgColor = "#FFFF00";
+    style.setDefined(DEFINED_BGCOLOR);
     style.textColor = "#000000";
+    style.setDefined(DEFINED_TEXTCOLOR);
     style.fontFamily = "Arial";
+    style.setDefined(DEFINED_FONTFAMILY);
     style.fontSize = 14;
+    style.setDefined(DEFINED_FONTSIZE);
     style.hAlign = TextAlign::CENTER;
+    style.setDefined(DEFINED_HALIGN);
     style.vAlign = VerticalAlign::MIDDLE;
+    style.setDefined(DEFINED_VALIGN);
     wb->registerStyle(ID("STYbold1"), style);
 
     // Serialize
@@ -1359,6 +1372,7 @@ TEST(StyleZCDRoundtripTest, PartialStyleBoldOnly) {
 
     CellStyle style;
     style.bold = true;
+    style.setDefined(DEFINED_BOLD);
     wb->registerStyle(ID("STYbold0"), style);
 
     const std::string serialized = serialize(*wb);
@@ -1393,8 +1407,10 @@ TEST(StyleZCDRoundtripTest, PartialStyleColorOnly) {
     wb->addSheet(std::move(sheet));
 
     CellStyle style;
-    style.bgColor = "#FFFF00";    // Yellow background
+    style.bgColor = "#FFFF00";  // Yellow background
+    style.setDefined(DEFINED_BGCOLOR);
     style.textColor = "#0000FF";  // Blue text
+    style.setDefined(DEFINED_TEXTCOLOR);
     wb->registerStyle(ID("STYcolor"), style);
 
     const std::string serialized = serialize(*wb);
@@ -1430,7 +1446,9 @@ TEST(StyleZCDRoundtripTest, PartialStyleAlignmentOnly) {
 
     CellStyle style;
     style.hAlign = TextAlign::CENTER;
+    style.setDefined(DEFINED_HALIGN);
     style.vAlign = VerticalAlign::MIDDLE;
+    style.setDefined(DEFINED_VALIGN);
     wb->registerStyle(ID("STYalign"), style);
 
     const std::string serialized = serialize(*wb);
@@ -1465,7 +1483,9 @@ TEST(StyleZCDRoundtripTest, PartialStyleFontOnly) {
 
     CellStyle style;
     style.fontFamily = "Times New Roman";
+    style.setDefined(DEFINED_FONTFAMILY);
     style.fontSize = 18;
+    style.setDefined(DEFINED_FONTSIZE);
     wb->registerStyle(ID("STYfont0"), style);
 
     const std::string serialized = serialize(*wb);
@@ -1531,17 +1551,23 @@ TEST(StyleZCDRoundtripTest, MultipleCellsDifferentStyles) {
     sheet->addCell(std::move(cellB2));
     wb->addSheet(std::move(sheet));
 
-    // Register styles
+    // Register styles with defined flags
     CellStyle headerStyle;
     headerStyle.bold = true;
+    headerStyle.setDefined(DEFINED_BOLD);
     headerStyle.bgColor = "#4472C4";
+    headerStyle.setDefined(DEFINED_BGCOLOR);
     headerStyle.textColor = "#FFFFFF";
+    headerStyle.setDefined(DEFINED_TEXTCOLOR);
     headerStyle.hAlign = TextAlign::CENTER;
+    headerStyle.setDefined(DEFINED_HALIGN);
     wb->registerStyle(ID("STYhead0"), headerStyle);
 
     CellStyle moneyStyle;
     moneyStyle.textColor = "#008000";  // Green for positive values
+    moneyStyle.setDefined(DEFINED_TEXTCOLOR);
     moneyStyle.hAlign = TextAlign::RIGHT;
+    moneyStyle.setDefined(DEFINED_HALIGN);
     wb->registerStyle(ID("STYmoney"), moneyStyle);
 
     // Serialize
@@ -1584,34 +1610,41 @@ TEST(StyleZCDRoundtripTest, AllAlignmentValues) {
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
     wb->addSheet(std::move(sheet));
 
-    // Test all horizontal alignment values
+    // Test all horizontal alignment values (with defined flags)
     CellStyle leftStyle;
     leftStyle.hAlign = TextAlign::LEFT;
+    leftStyle.setDefined(DEFINED_HALIGN);
     wb->registerStyle(ID("STYleft0"), leftStyle);
 
     CellStyle centerStyle;
     centerStyle.hAlign = TextAlign::CENTER;
+    centerStyle.setDefined(DEFINED_HALIGN);
     wb->registerStyle(ID("STYcentr"), centerStyle);
 
     CellStyle rightStyle;
     rightStyle.hAlign = TextAlign::RIGHT;
+    rightStyle.setDefined(DEFINED_HALIGN);
     wb->registerStyle(ID("STYright"), rightStyle);
 
     CellStyle justifyStyle;
     justifyStyle.hAlign = TextAlign::JUSTIFY;
+    justifyStyle.setDefined(DEFINED_HALIGN);
     wb->registerStyle(ID("STYjstfy"), justifyStyle);
 
-    // Test all vertical alignment values
+    // Test all vertical alignment values (with defined flags)
     CellStyle topStyle;
     topStyle.vAlign = VerticalAlign::TOP;
+    topStyle.setDefined(DEFINED_VALIGN);
     wb->registerStyle(ID("STYtop00"), topStyle);
 
     CellStyle middleStyle;
     middleStyle.vAlign = VerticalAlign::MIDDLE;
+    middleStyle.setDefined(DEFINED_VALIGN);
     wb->registerStyle(ID("STYmidl0"), middleStyle);
 
     CellStyle bottomStyle;
     bottomStyle.vAlign = VerticalAlign::BOTTOM;
+    bottomStyle.setDefined(DEFINED_VALIGN);
     wb->registerStyle(ID("STYbotm0"), bottomStyle);
 
     // Serialize and parse
@@ -1639,7 +1672,9 @@ TEST(StyleZCDRoundtripTest, StyleWithSpecialCharactersInFont) {
 
     CellStyle style;
     style.fontFamily = "Courier New";  // Space in name
+    style.setDefined(DEFINED_FONTFAMILY);
     style.fontSize = 12;
+    style.setDefined(DEFINED_FONTSIZE);
     wb->registerStyle(ID("STYcourn"), style);
 
     const std::string serialized = serialize(*wb);

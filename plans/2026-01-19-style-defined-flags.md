@@ -134,21 +134,27 @@ These just need to be exposed in the UI - no C++ changes needed for border style
 
 ## Phase 3: Update Serialization
 
-- [ ] 3a: Update `styleToJson()` to serialize defined properties
+- [x] 3a: Update `styleToJson()` to serialize defined properties
   - Serialize all properties that have their defined flag set, even if value equals default
   - Example: `bold=false` with `DEFINED_BOLD` set should serialize as `"bold": false`
+  - Updated `bindings_format.cc` to use `isDefined()` checks instead of value checks
 
-- [ ] 3b: Update `jsonToStyle()` to set defined flags
+- [x] 3b: Update `jsonToStyle()` to set defined flags
   - When parsing JSON, any property present in JSON sets its defined flag
+  - Updated `parseStyleJson()` in `bindings_format.cc` to set defined flags for each property found
 
-- [ ] 3c: Update ZCD serialization to preserve defined flags
-  - Ensure round-trip preserves which properties are defined
+- [x] 3c: Update ZCD serialization to preserve defined flags
+  - Updated `serializeStyles()` in `serializer.cc` to use defined flags
+  - Updated `parseStyle()` in `parser.cc` to set defined flags when parsing
+  - Added `borderStyleToString()` and `stringToBorderStyle()` helpers
+  - Round-trip now preserves which properties are defined
 
-- [ ] 3d: Update XLSX import to set appropriate defined flags
-  - Properties explicitly set in XLSX should be marked defined
+- [x] 3d: Update XLSX import to set appropriate defined flags
+  - Updated `getCellStyle()` in `xlsx_reader.cc` to set defined flags for each property imported
 
-- [ ] 3e: Update testdata files if needed
-  - Fix any test files that break due to serialization changes
+- [x] 3e: Update testdata files if needed
+  - Updated `serializer_test.cc` to set defined flags in all style creation tests
+  - Tests now properly use `setDefined()` for each property being tested
 
 ---
 

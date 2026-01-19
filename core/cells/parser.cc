@@ -294,6 +294,82 @@ static int extractJSONIntValue(std::string_view json, const std::string& key, in
     return result;
 }
 
+// Helper to check if a JSON key exists
+static bool hasJSONKey(std::string_view json, const std::string& key) {
+    const std::string keyPattern = "\"" + key + "\":";
+    return json.find(keyPattern) != std::string_view::npos;
+}
+
+// Helper to convert string to BorderStyle enum
+static BorderStyle stringToBorderStyle(const std::string& str) {
+    if (str == "thin")
+        return BorderStyle::THIN;
+    if (str == "medium")
+        return BorderStyle::MEDIUM;
+    if (str == "thick")
+        return BorderStyle::THICK;
+    if (str == "dashed")
+        return BorderStyle::DASHED;
+    if (str == "dotted")
+        return BorderStyle::DOTTED;
+    if (str == "double")
+        return BorderStyle::DOUBLE;
+    if (str == "hair")
+        return BorderStyle::HAIR;
+    if (str == "mediumDashed")
+        return BorderStyle::MEDIUM_DASHED;
+    if (str == "dashDot")
+        return BorderStyle::DASH_DOT;
+    if (str == "mediumDashDot")
+        return BorderStyle::MEDIUM_DASH_DOT;
+    if (str == "dashDotDot")
+        return BorderStyle::DASH_DOT_DOT;
+    if (str == "mediumDashDotDot")
+        return BorderStyle::MEDIUM_DASH_DOT_DOT;
+    if (str == "slantDashDot")
+        return BorderStyle::SLANT_DASH_DOT;
+    return BorderStyle::NONE;
+}
+
+// Helper to extract a border edge object from JSON within a border object
+// Looking for pattern like: "top":{"style":"thin","color":"#000000"}
+static BorderEdge extractBorderEdge(std::string_view borderJson, const std::string& edgeName) {
+    BorderEdge edge;
+
+    // Look for the edge within the border object
+    const std::string edgeKey = "\"" + edgeName + "\":";
+    auto edgePos = borderJson.find(edgeKey);
+    if (edgePos == std::string_view::npos) {
+        return edge;
+    }
+
+    // Find the edge object
+    auto braceStart = borderJson.find('{', edgePos + edgeKey.size());
+    if (braceStart == std::string_view::npos) {
+        return edge;
+    }
+
+    int braceCount = 1;
+    size_t braceEnd = braceStart + 1;
+    while (braceEnd < borderJson.size() && braceCount > 0) {
+        if (borderJson[braceEnd] == '{') {
+            braceCount++;
+        } else if (borderJson[braceEnd] == '}') {
+            braceCount--;
+        }
+        braceEnd++;
+    }
+
+    auto edgeJson = borderJson.substr(braceStart, braceEnd - braceStart);
+
+    // Extract style and color from edge JSON
+    const std::string styleStr = extractJSONStringValue(edgeJson, "style");
+    edge.style = stringToBorderStyle(styleStr);
+    edge.color = extractJSONStringValue(edgeJson, "color");
+
+    return edge;
+}
+
 bool Parser::parseStyle(std::string_view line) {
     // Format: Y <id> <json-props>
     if (line.size() < 2 || line[0] != 'Y' || line[1] != ' ') {
@@ -317,38 +393,109 @@ bool Parser::parseStyle(std::string_view line) {
         return setError("Missing style JSON payload");
     }
 
-    // Parse style properties from JSON
+    // Parse style properties from JSON and set defined flags
     CellStyle style;
-    style.bold = extractJSONBoolValue(json, "bold", false);
-    style.italic = extractJSONBoolValue(json, "italic", false);
-    style.underline = extractJSONBoolValue(json, "underline", false);
-    style.wrapText = extractJSONBoolValue(json, "wrapText", false);
-    style.bgColor = extractJSONStringValue(json, "bgColor");
-    style.textColor = extractJSONStringValue(json, "textColor");
-    style.fontFamily = extractJSONStringValue(json, "fontFamily");
-    style.fontSize = static_cast<uint8_t>(extractJSONIntValue(json, "fontSize", 0));
 
-    // Parse alignment enums (default to GENERAL for content-type-based alignment)
-    const std::string hAlignStr = extractJSONStringValue(json, "hAlign");
-    if (hAlignStr == "left") {
-        style.hAlign = TextAlign::LEFT;
-    } else if (hAlignStr == "center") {
-        style.hAlign = TextAlign::CENTER;
-    } else if (hAlignStr == "right") {
-        style.hAlign = TextAlign::RIGHT;
-    } else if (hAlignStr == "justify") {
-        style.hAlign = TextAlign::JUSTIFY;
-    } else {
-        style.hAlign = TextAlign::GENERAL;
+    if (hasJSONKey(json, "bold")) {
+        style.bold = extractJSONBoolValue(json, "bold", false);
+        style.setDefined(DEFINED_BOLD);
+    }
+    if (hasJSONKey(json, "italic")) {
+        style.italic = extractJSONBoolValue(json, "italic", false);
+        style.setDefined(DEFINED_ITALIC);
+    }
+    if (hasJSONKey(json, "underline")) {
+        style.underline = extractJSONBoolValue(json, "underline", false);
+        style.setDefined(DEFINED_UNDERLINE);
+    }
+    if (hasJSONKey(json, "wrapText")) {
+        style.wrapText = extractJSONBoolValue(json, "wrapText", false);
+        style.setDefined(DEFINED_WRAPTEXT);
+    }
+    if (hasJSONKey(json, "bgColor")) {
+        style.bgColor = extractJSONStringValue(json, "bgColor");
+        style.setDefined(DEFINED_BGCOLOR);
+    }
+    if (hasJSONKey(json, "textColor")) {
+        style.textColor = extractJSONStringValue(json, "textColor");
+        style.setDefined(DEFINED_TEXTCOLOR);
+    }
+    if (hasJSONKey(json, "fontFamily")) {
+        style.fontFamily = extractJSONStringValue(json, "fontFamily");
+        style.setDefined(DEFINED_FONTFAMILY);
+    }
+    if (hasJSONKey(json, "fontSize")) {
+        style.fontSize = static_cast<uint8_t>(extractJSONIntValue(json, "fontSize", 0));
+        style.setDefined(DEFINED_FONTSIZE);
     }
 
-    const std::string vAlignStr = extractJSONStringValue(json, "vAlign");
-    if (vAlignStr == "top") {
-        style.vAlign = VerticalAlign::TOP;
-    } else if (vAlignStr == "middle") {
-        style.vAlign = VerticalAlign::MIDDLE;
-    } else {
-        style.vAlign = VerticalAlign::BOTTOM;
+    // Parse alignment enums
+    if (hasJSONKey(json, "hAlign")) {
+        const std::string hAlignStr = extractJSONStringValue(json, "hAlign");
+        if (hAlignStr == "left") {
+            style.hAlign = TextAlign::LEFT;
+        } else if (hAlignStr == "center") {
+            style.hAlign = TextAlign::CENTER;
+        } else if (hAlignStr == "right") {
+            style.hAlign = TextAlign::RIGHT;
+        } else if (hAlignStr == "justify") {
+            style.hAlign = TextAlign::JUSTIFY;
+        } else {
+            style.hAlign = TextAlign::GENERAL;
+        }
+        style.setDefined(DEFINED_HALIGN);
+    }
+
+    if (hasJSONKey(json, "vAlign")) {
+        const std::string vAlignStr = extractJSONStringValue(json, "vAlign");
+        if (vAlignStr == "top") {
+            style.vAlign = VerticalAlign::TOP;
+        } else if (vAlignStr == "middle") {
+            style.vAlign = VerticalAlign::MIDDLE;
+        } else {
+            style.vAlign = VerticalAlign::BOTTOM;
+        }
+        style.setDefined(DEFINED_VALIGN);
+    }
+
+    // Parse border if present
+    if (hasJSONKey(json, "border")) {
+        // Find the border object
+        const std::string borderKey = "\"border\":";
+        auto borderPos = json.find(borderKey);
+        if (borderPos != std::string_view::npos) {
+            auto braceStart = json.find('{', borderPos + borderKey.size());
+            if (braceStart != std::string_view::npos) {
+                int braceCount = 1;
+                size_t braceEnd = braceStart + 1;
+                while (braceEnd < json.size() && braceCount > 0) {
+                    if (json[braceEnd] == '{') {
+                        braceCount++;
+                    } else if (json[braceEnd] == '}') {
+                        braceCount--;
+                    }
+                    braceEnd++;
+                }
+                auto borderJson = json.substr(braceStart, braceEnd - braceStart);
+
+                if (hasJSONKey(borderJson, "top")) {
+                    style.border.top = extractBorderEdge(borderJson, "top");
+                    style.setDefined(DEFINED_BORDER_TOP);
+                }
+                if (hasJSONKey(borderJson, "right")) {
+                    style.border.right = extractBorderEdge(borderJson, "right");
+                    style.setDefined(DEFINED_BORDER_RIGHT);
+                }
+                if (hasJSONKey(borderJson, "bottom")) {
+                    style.border.bottom = extractBorderEdge(borderJson, "bottom");
+                    style.setDefined(DEFINED_BORDER_BOTTOM);
+                }
+                if (hasJSONKey(borderJson, "left")) {
+                    style.border.left = extractBorderEdge(borderJson, "left");
+                    style.setDefined(DEFINED_BORDER_LEFT);
+                }
+            }
+        }
     }
 
     // Register the style in the workbook

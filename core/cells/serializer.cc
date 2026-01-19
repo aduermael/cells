@@ -43,6 +43,72 @@ std::string escapeString(const std::string& str) {
     return result;
 }
 
+// Helper to convert BorderStyle enum to string
+std::string borderStyleToString(BorderStyle style) {
+    switch (style) {
+        case BorderStyle::THIN:
+            return "thin";
+        case BorderStyle::MEDIUM:
+            return "medium";
+        case BorderStyle::THICK:
+            return "thick";
+        case BorderStyle::DASHED:
+            return "dashed";
+        case BorderStyle::DOTTED:
+            return "dotted";
+        case BorderStyle::DOUBLE:
+            return "double";
+        case BorderStyle::HAIR:
+            return "hair";
+        case BorderStyle::MEDIUM_DASHED:
+            return "mediumDashed";
+        case BorderStyle::DASH_DOT:
+            return "dashDot";
+        case BorderStyle::MEDIUM_DASH_DOT:
+            return "mediumDashDot";
+        case BorderStyle::DASH_DOT_DOT:
+            return "dashDotDot";
+        case BorderStyle::MEDIUM_DASH_DOT_DOT:
+            return "mediumDashDotDot";
+        case BorderStyle::SLANT_DASH_DOT:
+            return "slantDashDot";
+        case BorderStyle::NONE:
+        default:
+            return "none";
+    }
+}
+
+// Helper to convert string to BorderStyle enum
+BorderStyle stringToBorderStyle(const std::string& str) {
+    if (str == "thin")
+        return BorderStyle::THIN;
+    if (str == "medium")
+        return BorderStyle::MEDIUM;
+    if (str == "thick")
+        return BorderStyle::THICK;
+    if (str == "dashed")
+        return BorderStyle::DASHED;
+    if (str == "dotted")
+        return BorderStyle::DOTTED;
+    if (str == "double")
+        return BorderStyle::DOUBLE;
+    if (str == "hair")
+        return BorderStyle::HAIR;
+    if (str == "mediumDashed")
+        return BorderStyle::MEDIUM_DASHED;
+    if (str == "dashDot")
+        return BorderStyle::DASH_DOT;
+    if (str == "mediumDashDot")
+        return BorderStyle::MEDIUM_DASH_DOT;
+    if (str == "dashDotDot")
+        return BorderStyle::DASH_DOT_DOT;
+    if (str == "mediumDashDotDot")
+        return BorderStyle::MEDIUM_DASH_DOT_DOT;
+    if (str == "slantDashDot")
+        return BorderStyle::SLANT_DASH_DOT;
+    return BorderStyle::NONE;
+}
+
 // --- Serializer ---
 
 Serializer::Serializer() = default;
@@ -125,51 +191,139 @@ void Serializer::serializeStyles(const Workbook& workbook, std::ostream& out) co
 
     // Output style definitions
     // Format: Y <style-id> <json-props>
+    // Properties are serialized based on defined flags (source of truth)
     for (const auto& [idStr, style] : ordered) {
         out << "Y " << idStr << " {";
-        out << "\"bold\":" << (style->bold ? "true" : "false");
-        out << ",\"italic\":" << (style->italic ? "true" : "false");
-        out << ",\"underline\":" << (style->underline ? "true" : "false");
-        out << ",\"wrapText\":" << (style->wrapText ? "true" : "false");
-        if (!style->bgColor.empty()) {
-            out << ",\"bgColor\":\"" << escapeString(style->bgColor) << "\"";
+        bool first = true;
+
+        // Helper lambda to add comma separator
+        auto addComma = [&first, &out]() {
+            if (!first) {
+                out << ",";
+            }
+            first = false;
+        };
+
+        // Serialize properties based on defined flags
+        if (style->isDefined(DEFINED_BOLD)) {
+            addComma();
+            out << "\"bold\":" << (style->bold ? "true" : "false");
         }
-        if (!style->textColor.empty()) {
-            out << ",\"textColor\":\"" << escapeString(style->textColor) << "\"";
+        if (style->isDefined(DEFINED_ITALIC)) {
+            addComma();
+            out << "\"italic\":" << (style->italic ? "true" : "false");
         }
-        if (!style->fontFamily.empty()) {
-            out << ",\"fontFamily\":\"" << escapeString(style->fontFamily) << "\"";
+        if (style->isDefined(DEFINED_UNDERLINE)) {
+            addComma();
+            out << "\"underline\":" << (style->underline ? "true" : "false");
         }
-        if (style->fontSize > 0) {
-            out << ",\"fontSize\":" << static_cast<int>(style->fontSize);
+        if (style->isDefined(DEFINED_WRAPTEXT)) {
+            addComma();
+            out << "\"wrapText\":" << (style->wrapText ? "true" : "false");
         }
-        // Horizontal alignment (GENERAL is default, omit)
-        switch (style->hAlign) {
-            case TextAlign::LEFT:
-                out << ",\"hAlign\":\"left\"";
-                break;
-            case TextAlign::CENTER:
-                out << ",\"hAlign\":\"center\"";
-                break;
-            case TextAlign::RIGHT:
-                out << ",\"hAlign\":\"right\"";
-                break;
-            case TextAlign::JUSTIFY:
-                out << ",\"hAlign\":\"justify\"";
-                break;
-            default:
-                break;  // GENERAL is default, omit
+        if (style->isDefined(DEFINED_BGCOLOR)) {
+            addComma();
+            out << "\"bgColor\":\"" << escapeString(style->bgColor) << "\"";
         }
-        // Vertical alignment
-        switch (style->vAlign) {
-            case VerticalAlign::TOP:
-                out << ",\"vAlign\":\"top\"";
-                break;
-            case VerticalAlign::MIDDLE:
-                out << ",\"vAlign\":\"middle\"";
-                break;
-            default:
-                break;  // BOTTOM is default, omit
+        if (style->isDefined(DEFINED_TEXTCOLOR)) {
+            addComma();
+            out << "\"textColor\":\"" << escapeString(style->textColor) << "\"";
+        }
+        if (style->isDefined(DEFINED_FONTFAMILY)) {
+            addComma();
+            out << "\"fontFamily\":\"" << escapeString(style->fontFamily) << "\"";
+        }
+        if (style->isDefined(DEFINED_FONTSIZE)) {
+            addComma();
+            out << "\"fontSize\":" << static_cast<int>(style->fontSize);
+        }
+        if (style->isDefined(DEFINED_HALIGN)) {
+            addComma();
+            out << "\"hAlign\":\"";
+            switch (style->hAlign) {
+                case TextAlign::LEFT:
+                    out << "left";
+                    break;
+                case TextAlign::CENTER:
+                    out << "center";
+                    break;
+                case TextAlign::RIGHT:
+                    out << "right";
+                    break;
+                case TextAlign::JUSTIFY:
+                    out << "justify";
+                    break;
+                case TextAlign::GENERAL:
+                    out << "general";
+                    break;
+            }
+            out << "\"";
+        }
+        if (style->isDefined(DEFINED_VALIGN)) {
+            addComma();
+            out << "\"vAlign\":\"";
+            switch (style->vAlign) {
+                case VerticalAlign::TOP:
+                    out << "top";
+                    break;
+                case VerticalAlign::MIDDLE:
+                    out << "middle";
+                    break;
+                case VerticalAlign::BOTTOM:
+                    out << "bottom";
+                    break;
+            }
+            out << "\"";
+        }
+        // Border edges - serialize individually if defined
+        if (style->isDefined(DEFINED_BORDER_TOP) || style->isDefined(DEFINED_BORDER_RIGHT) ||
+            style->isDefined(DEFINED_BORDER_BOTTOM) || style->isDefined(DEFINED_BORDER_LEFT)) {
+            addComma();
+            out << "\"border\":{";
+            bool borderFirst = true;
+            auto addBorderComma = [&borderFirst, &out]() {
+                if (!borderFirst) {
+                    out << ",";
+                }
+                borderFirst = false;
+            };
+            if (style->isDefined(DEFINED_BORDER_TOP)) {
+                addBorderComma();
+                out << "\"top\":{\"style\":\"" << borderStyleToString(style->border.top.style)
+                    << "\"";
+                if (!style->border.top.color.empty()) {
+                    out << ",\"color\":\"" << escapeString(style->border.top.color) << "\"";
+                }
+                out << "}";
+            }
+            if (style->isDefined(DEFINED_BORDER_RIGHT)) {
+                addBorderComma();
+                out << "\"right\":{\"style\":\"" << borderStyleToString(style->border.right.style)
+                    << "\"";
+                if (!style->border.right.color.empty()) {
+                    out << ",\"color\":\"" << escapeString(style->border.right.color) << "\"";
+                }
+                out << "}";
+            }
+            if (style->isDefined(DEFINED_BORDER_BOTTOM)) {
+                addBorderComma();
+                out << "\"bottom\":{\"style\":\"" << borderStyleToString(style->border.bottom.style)
+                    << "\"";
+                if (!style->border.bottom.color.empty()) {
+                    out << ",\"color\":\"" << escapeString(style->border.bottom.color) << "\"";
+                }
+                out << "}";
+            }
+            if (style->isDefined(DEFINED_BORDER_LEFT)) {
+                addBorderComma();
+                out << "\"left\":{\"style\":\"" << borderStyleToString(style->border.left.style)
+                    << "\"";
+                if (!style->border.left.color.empty()) {
+                    out << ",\"color\":\"" << escapeString(style->border.left.color) << "\"";
+                }
+                out << "}";
+            }
+            out << "}";
         }
         out << "}\n";
     }

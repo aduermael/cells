@@ -522,49 +522,49 @@ std::string styleToJson(const CellStyle& style) {
     ss << "{";
     bool first = true;
 
-    // Only include non-default values (sparse representation)
-    if (style.bold) {
+    // Serialize properties based on defined flags (source of truth)
+    // This allows explicitly set default values (e.g., bold=false) to be preserved
+    if (style.isDefined(DEFINED_BOLD)) {
         if (!first) ss << ",";
-        ss << "\"bold\":true";
+        ss << "\"bold\":" << (style.bold ? "true" : "false");
         first = false;
     }
-    if (style.italic) {
+    if (style.isDefined(DEFINED_ITALIC)) {
         if (!first) ss << ",";
-        ss << "\"italic\":true";
+        ss << "\"italic\":" << (style.italic ? "true" : "false");
         first = false;
     }
-    if (style.underline) {
+    if (style.isDefined(DEFINED_UNDERLINE)) {
         if (!first) ss << ",";
-        ss << "\"underline\":true";
+        ss << "\"underline\":" << (style.underline ? "true" : "false");
         first = false;
     }
-    if (style.wrapText) {
+    if (style.isDefined(DEFINED_WRAPTEXT)) {
         if (!first) ss << ",";
-        ss << "\"wrapText\":true";
+        ss << "\"wrapText\":" << (style.wrapText ? "true" : "false");
         first = false;
     }
-    if (!style.bgColor.empty()) {
+    if (style.isDefined(DEFINED_BGCOLOR)) {
         if (!first) ss << ",";
         ss << "\"bgColor\":\"" << jsonEscape(style.bgColor) << "\"";
         first = false;
     }
-    if (!style.textColor.empty()) {
+    if (style.isDefined(DEFINED_TEXTCOLOR)) {
         if (!first) ss << ",";
         ss << "\"textColor\":\"" << jsonEscape(style.textColor) << "\"";
         first = false;
     }
-    if (!style.fontFamily.empty()) {
+    if (style.isDefined(DEFINED_FONTFAMILY)) {
         if (!first) ss << ",";
         ss << "\"fontFamily\":\"" << jsonEscape(style.fontFamily) << "\"";
         first = false;
     }
-    if (style.fontSize != 0) {
+    if (style.isDefined(DEFINED_FONTSIZE)) {
         if (!first) ss << ",";
         ss << "\"fontSize\":" << static_cast<int>(style.fontSize);
         first = false;
     }
-    // Only include hAlign if not GENERAL (the default)
-    if (style.hAlign != TextAlign::GENERAL) {
+    if (style.isDefined(DEFINED_HALIGN)) {
         if (!first) ss << ",";
         ss << "\"hAlign\":\"";
         switch (style.hAlign) {
@@ -580,14 +580,14 @@ std::string styleToJson(const CellStyle& style) {
             case TextAlign::JUSTIFY:
                 ss << "justify";
                 break;
-            default:
+            case TextAlign::GENERAL:
+                ss << "general";
                 break;
         }
         ss << "\"";
         first = false;
     }
-    // Only include vAlign if not BOTTOM (the default)
-    if (style.vAlign != VerticalAlign::BOTTOM) {
+    if (style.isDefined(DEFINED_VALIGN)) {
         if (!first) ss << ",";
         ss << "\"vAlign\":\"";
         switch (style.vAlign) {
@@ -597,21 +597,32 @@ std::string styleToJson(const CellStyle& style) {
             case VerticalAlign::MIDDLE:
                 ss << "middle";
                 break;
-            default:
+            case VerticalAlign::BOTTOM:
+                ss << "bottom";
                 break;
         }
         ss << "\"";
         first = false;
     }
-    // Include border if any edge has a value
-    if (style.border.hasValue()) {
+    // Include border edges that are defined
+    bool hasBorder = style.isDefined(DEFINED_BORDER_TOP) || style.isDefined(DEFINED_BORDER_RIGHT) ||
+                     style.isDefined(DEFINED_BORDER_BOTTOM) || style.isDefined(DEFINED_BORDER_LEFT);
+    if (hasBorder) {
         if (!first) ss << ",";
         ss << "\"border\":{";
         bool borderFirst = true;
-        serializeBorderEdge(ss, "top", style.border.top, borderFirst);
-        serializeBorderEdge(ss, "right", style.border.right, borderFirst);
-        serializeBorderEdge(ss, "bottom", style.border.bottom, borderFirst);
-        serializeBorderEdge(ss, "left", style.border.left, borderFirst);
+        if (style.isDefined(DEFINED_BORDER_TOP)) {
+            serializeBorderEdge(ss, "top", style.border.top, borderFirst);
+        }
+        if (style.isDefined(DEFINED_BORDER_RIGHT)) {
+            serializeBorderEdge(ss, "right", style.border.right, borderFirst);
+        }
+        if (style.isDefined(DEFINED_BORDER_BOTTOM)) {
+            serializeBorderEdge(ss, "bottom", style.border.bottom, borderFirst);
+        }
+        if (style.isDefined(DEFINED_BORDER_LEFT)) {
+            serializeBorderEdge(ss, "left", style.border.left, borderFirst);
+        }
         ss << "}";
         first = false;
     }
@@ -733,43 +744,107 @@ BorderEdge extractBorderEdge(const std::string& json, const std::string& edgeNam
 }
 
 // Helper to parse CellStyle from JSON
+// Sets defined flags for each property present in the JSON
 CellStyle parseStyleJson(const std::string& json) {
     CellStyle style;
-    style.bold = extractBoolField(json, "bold", false);
-    style.italic = extractBoolField(json, "italic", false);
-    style.underline = extractBoolField(json, "underline", false);
-    style.wrapText = extractBoolField(json, "wrapText", false);
-    style.bgColor = extractPayloadField(json, "bgColor");
-    style.textColor = extractPayloadField(json, "textColor");
-    style.fontFamily = extractPayloadField(json, "fontFamily");
-    style.fontSize = static_cast<uint8_t>(extractIntField(json, "fontSize", 0));
 
-    std::string hAlignStr = extractPayloadField(json, "hAlign");
-    if (hAlignStr == "center") {
-        style.hAlign = TextAlign::CENTER;
-    } else if (hAlignStr == "right") {
-        style.hAlign = TextAlign::RIGHT;
-    } else if (hAlignStr == "justify") {
-        style.hAlign = TextAlign::JUSTIFY;
-    } else {
-        style.hAlign = TextAlign::LEFT;
+    // Parse each field and set its defined flag if present in JSON
+    if (hasJsonField(json, "bold")) {
+        style.bold = extractBoolField(json, "bold", false);
+        style.setDefined(DEFINED_BOLD);
+    }
+    if (hasJsonField(json, "italic")) {
+        style.italic = extractBoolField(json, "italic", false);
+        style.setDefined(DEFINED_ITALIC);
+    }
+    if (hasJsonField(json, "underline")) {
+        style.underline = extractBoolField(json, "underline", false);
+        style.setDefined(DEFINED_UNDERLINE);
+    }
+    if (hasJsonField(json, "wrapText")) {
+        style.wrapText = extractBoolField(json, "wrapText", false);
+        style.setDefined(DEFINED_WRAPTEXT);
+    }
+    if (hasJsonField(json, "bgColor")) {
+        style.bgColor = extractPayloadField(json, "bgColor");
+        style.setDefined(DEFINED_BGCOLOR);
+    }
+    if (hasJsonField(json, "textColor")) {
+        style.textColor = extractPayloadField(json, "textColor");
+        style.setDefined(DEFINED_TEXTCOLOR);
+    }
+    if (hasJsonField(json, "fontFamily")) {
+        style.fontFamily = extractPayloadField(json, "fontFamily");
+        style.setDefined(DEFINED_FONTFAMILY);
+    }
+    if (hasJsonField(json, "fontSize")) {
+        style.fontSize = static_cast<uint8_t>(extractIntField(json, "fontSize", 0));
+        style.setDefined(DEFINED_FONTSIZE);
     }
 
-    std::string vAlignStr = extractPayloadField(json, "vAlign");
-    if (vAlignStr == "top") {
-        style.vAlign = VerticalAlign::TOP;
-    } else if (vAlignStr == "middle") {
-        style.vAlign = VerticalAlign::MIDDLE;
-    } else {
-        style.vAlign = VerticalAlign::BOTTOM;
+    if (hasJsonField(json, "hAlign")) {
+        std::string hAlignStr = extractPayloadField(json, "hAlign");
+        if (hAlignStr == "center") {
+            style.hAlign = TextAlign::CENTER;
+        } else if (hAlignStr == "right") {
+            style.hAlign = TextAlign::RIGHT;
+        } else if (hAlignStr == "justify") {
+            style.hAlign = TextAlign::JUSTIFY;
+        } else if (hAlignStr == "general") {
+            style.hAlign = TextAlign::GENERAL;
+        } else {
+            style.hAlign = TextAlign::LEFT;
+        }
+        style.setDefined(DEFINED_HALIGN);
     }
 
-    // Parse border if present
+    if (hasJsonField(json, "vAlign")) {
+        std::string vAlignStr = extractPayloadField(json, "vAlign");
+        if (vAlignStr == "top") {
+            style.vAlign = VerticalAlign::TOP;
+        } else if (vAlignStr == "middle") {
+            style.vAlign = VerticalAlign::MIDDLE;
+        } else {
+            style.vAlign = VerticalAlign::BOTTOM;
+        }
+        style.setDefined(DEFINED_VALIGN);
+    }
+
+    // Parse border if present - check each edge individually
     if (hasJsonField(json, "border")) {
-        style.border.top = extractBorderEdge(json, "top");
-        style.border.right = extractBorderEdge(json, "right");
-        style.border.bottom = extractBorderEdge(json, "bottom");
-        style.border.left = extractBorderEdge(json, "left");
+        // Look for "border":{...} section to check individual edges
+        std::string borderKey = "\"border\":";
+        size_t borderPos = json.find(borderKey);
+        if (borderPos != std::string::npos) {
+            size_t braceStart = json.find('{', borderPos + borderKey.length());
+            if (braceStart != std::string::npos) {
+                int braceCount = 1;
+                size_t braceEnd = braceStart + 1;
+                while (braceEnd < json.size() && braceCount > 0) {
+                    if (json[braceEnd] == '{') braceCount++;
+                    else if (json[braceEnd] == '}') braceCount--;
+                    braceEnd++;
+                }
+                std::string borderJson = json.substr(braceStart, braceEnd - braceStart);
+
+                if (hasJsonField(borderJson, "top")) {
+                    style.border.top = extractBorderEdge(json, "top");
+                    style.setDefined(DEFINED_BORDER_TOP);
+                }
+                if (hasJsonField(borderJson, "right")) {
+                    style.border.right = extractBorderEdge(json, "right");
+                    style.setDefined(DEFINED_BORDER_RIGHT);
+                }
+                if (hasJsonField(borderJson, "bottom")) {
+                    style.border.bottom = extractBorderEdge(json, "bottom");
+                    style.setDefined(DEFINED_BORDER_BOTTOM);
+                }
+                if (hasJsonField(borderJson, "left")) {
+                    style.border.left = extractBorderEdge(json, "left");
+                    style.setDefined(DEFINED_BORDER_LEFT);
+                }
+            }
+        }
     }
 
     return style;
