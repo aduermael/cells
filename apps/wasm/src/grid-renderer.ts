@@ -369,9 +369,9 @@ export class GridRenderer {
     ctx.rect(freezeX, freezeY, viewWidth - freezeX, viewHeight - freezeY);
     ctx.clip();
 
+    this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
     this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
     this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-    this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
     this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
     this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
     ctx.restore();
@@ -386,9 +386,9 @@ export class GridRenderer {
       ctx.fillStyle = this.colors.cellBg;
       ctx.fillRect(freezeX, zoomedHeaderHeight, viewWidth - freezeX, frozenRowHeight);
 
+      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
       this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       ctx.restore();
@@ -404,9 +404,9 @@ export class GridRenderer {
       ctx.fillStyle = this.colors.cellBg;
       ctx.fillRect(zoomedHeaderWidth, freezeY, frozenColWidth, viewHeight - freezeY);
 
+      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
       this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       ctx.restore();
@@ -422,9 +422,9 @@ export class GridRenderer {
       ctx.fillStyle = this.colors.cellBg;
       ctx.fillRect(zoomedHeaderWidth, zoomedHeaderHeight, frozenColWidth, frozenRowHeight);
 
+      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
       this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
       ctx.restore();
@@ -637,7 +637,7 @@ export class GridRenderer {
       if (cellY + totalHeight < zoomedHeaderHeight || cellY > viewHeight) continue;
 
       ctx.fillStyle = bgColor;
-      // Draw backgrounds edge-to-edge (no inset) - grid lines will be drawn on top
+      // Draw backgrounds edge-to-edge to cover grid lines (like Excel)
       ctx.fillRect(cellX, cellY, totalWidth, totalHeight);
     }
   }
