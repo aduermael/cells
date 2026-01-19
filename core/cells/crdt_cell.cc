@@ -26,38 +26,6 @@
 namespace cells {
 namespace internal {
 
-// Create a position resolver for a Sheet
-// Returns (col, row) position for a cell ID, or (-1, -1) if not found
-static PositionResolver makePositionResolver(Sheet* sheet) {
-    return [sheet](const ID& cellId) -> std::pair<int32_t, int32_t> {
-        if (sheet == nullptr) {
-            return {-1, -1};
-        }
-
-        const Cell* cell = sheet->getCell(cellId);
-        if (cell == nullptr) {
-            // Maybe it's a column or row ID, not a cell ID
-            const Axis* col = sheet->getColumn(cellId);
-            if (col != nullptr) {
-                return {static_cast<int32_t>(col->position), -1};
-            }
-            const Axis* row = sheet->getRow(cellId);
-            if (row != nullptr) {
-                return {-1, static_cast<int32_t>(row->position)};
-            }
-            return {-1, -1};
-        }
-
-        const Axis* col = sheet->getColumn(cell->colId);
-        const Axis* row = sheet->getRow(cell->rowId);
-        if (col == nullptr || row == nullptr) {
-            return {-1, -1};
-        }
-
-        return {static_cast<int32_t>(col->position), static_cast<int32_t>(row->position)};
-    };
-}
-
 // Create a workbook-level position resolver for cross-sheet formula dependencies
 // Returns (col, row) position for a cell ID from ANY sheet in the workbook
 static PositionResolver makeWorkbookPositionResolver(Workbook* workbook) {

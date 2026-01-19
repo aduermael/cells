@@ -10,7 +10,15 @@ Move cells, ranges, dependency graph, shared formulas, and spill tracking from S
 - Update this plan after each commit to track exactly where we left off
 - Run `bazel build //core/cells/...` after each batch to check progress
 
-**Current status:** Phase 13 COMPLETE - Ready for Phase 14 (Sheet-Agnostic Recalculation Engine).
+**Current status:** Phase 14 COMPLETE - All phases complete! Workbook-level entities architecture fully implemented.
+
+**Progress Jan 19 (session 17):**
+- Phase 14 Step 6: Final cleanup
+- Removed dead `extractCrossSheetRefs()` function and `extractCrossSheetRefsHelper()` from dependency_graph.cc
+- Removed unused `makePositionResolver(Sheet*)` from crdt_cell.cc (replaced by workbook-level resolver)
+- Fixed lint errors in formula_display.cc (const correctness)
+- All 54 unit tests pass
+- All 184 E2E tests pass
 
 **Progress Jan 17 (session 16):**
 - Phase 11: Global Range ID Tracking
@@ -530,12 +538,16 @@ references with sheet names (when cell's column's sheetId differs from active sh
 **Step 5 completed.** All 19 formula E2E tests now pass, including cross-sheet reference tests.
 
 **Step 6: Cleanup and testing**
-- [x] 14t: Remove `extractCrossSheetRefs()` from dependency_graph.h/cc - removed CrossSheetRef struct and function (in progress)
-- [x] 14u: Run all tests to verify recalculation still works correctly (54 unit, 183/184 E2E pass)
+- [x] 14t: Remove `extractCrossSheetRefs()` from dependency_graph.h/cc - removed CrossSheetRef struct and function from header; removed extractCrossSheetRefs() and extractCrossSheetRefsHelper() from .cc; removed unused makePositionResolver(Sheet*) from crdt_cell.cc
+- [x] 14u: Run all tests to verify recalculation still works correctly (54 unit, 184/184 E2E pass)
 - [x] 14v: Verify cross-sheet formula scenarios work (Sheet1!A1 = Sheet2!B1)
 - [x] 14w: Verify formula bar displays cross-sheet refs correctly (=Sheet2!B5)
 
-**Phase 14 in progress.** Steps 3-5 complete. Step 6 cleanup started (removing extractCrossSheetRefs from .cc still needed).
+**Phase 14 COMPLETE.** All steps done. Sheet-agnostic recalculation engine is fully implemented.
+- Single global `_depGraph` handles ALL dependencies (no cross-sheet tracking)
+- `recalculate(Workbook*, changedCells)` recalculates all dependents regardless of sheet
+- FormulaDisplayConverter handles context-aware sheet prefix display
+- All dead code removed (CrossSheetRef, extractCrossSheetRefs, etc.)
 
 ## Design Notes
 

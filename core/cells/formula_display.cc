@@ -206,7 +206,7 @@ std::string FormulaDisplayConverter::cellRefToStringInternal(const CellRefNode* 
 
 std::string FormulaDisplayConverter::rangeRefToString(const RangeRefNode* node) const {
     // Get the first cell reference with full sheet prefix handling
-    std::string firstRef = cellRefToString(node->topLeft.get());
+    const std::string firstRef = cellRefToString(node->topLeft.get());
 
     // For the second cell, check if it's on the same sheet as the first
     // If so, omit the sheet prefix (Excel-like behavior: Sheet2!A1:A3, not Sheet2!A1:Sheet2!A3)
@@ -234,7 +234,7 @@ std::string FormulaDisplayConverter::rangeRefToString(const RangeRefNode* node) 
 
     // If both cells are on the same sheet, suppress the sheet prefix for the second cell
     const bool sameSheet = (firstSheetId == secondSheetId);
-    std::string secondRef = cellRefToStringInternal(bottomRight, sameSheet);
+    const std::string secondRef = cellRefToStringInternal(bottomRight, sameSheet);
 
     return firstRef + ":" + secondRef;
 }
