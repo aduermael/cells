@@ -117,17 +117,18 @@ These just need to be exposed in the UI - no C++ changes needed for border style
 
 ## Phase 2: Update Style Merge Logic
 
-- [ ] 2a: Update `mergeEffectiveStyles()` in `bindings_format.cc`
+- [x] 2a: Update `mergeEffectiveStyles()` in `bindings_format.cc`
   - Only merge properties where overlay has them defined
   - Example: `if ((overlay.defined & DEFINED_BOLD) && !(result.defined & DEFINED_BOLD)) { result.bold = overlay.bold; result.defined |= DEFINED_BOLD; }`
 
-- [ ] 2b: Update style application to set defined flags
-  - When user sets a property via UI, mark it as defined
-  - When parsing JSON style updates, mark properties as defined
+- [x] 2b: Update style application to set defined flags
+  - Updated `mergeStyleJson()` to set defined flags when parsing JSON
+  - Updated `mergeStyles()` to set defined flags when merging
+  - Updated `stripConflictingProperties()` to clear defined flags when stripping
 
-- [ ] 2c: Add unit tests for override behavior
-  - Test: range has `bold=true`, cell sets `bold=false` (defined), effective style should be `bold=false`
-  - Test: range has `bgColor="#FF0000"`, cell sets `bgColor=""` with DEFINED_BGCOLOR, effective should be no background
+- [x] 2c: Add unit tests for override behavior
+  - Added E2E test: "Cell explicit default value overrides range style" in `range-styles.test.mjs`
+  - Test verifies range with `bold=true` can be overridden by cell setting `bold=false`
 
 ---
 

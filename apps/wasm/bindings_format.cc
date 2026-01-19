@@ -776,31 +776,41 @@ CellStyle parseStyleJson(const std::string& json) {
 }
 
 // Merges style JSON into an existing style in-place (only updates fields present in JSON)
+// Sets the defined flag for each property that is present in the JSON
 void mergeStyleJson(CellStyle& style, const std::string& json) {
     // Only update fields that are actually present in the JSON
+    // Set the defined flag for each property present in the JSON
     if (hasJsonField(json, "bold")) {
         style.bold = extractBoolField(json, "bold", style.bold);
+        style.setDefined(DEFINED_BOLD);
     }
     if (hasJsonField(json, "italic")) {
         style.italic = extractBoolField(json, "italic", style.italic);
+        style.setDefined(DEFINED_ITALIC);
     }
     if (hasJsonField(json, "underline")) {
         style.underline = extractBoolField(json, "underline", style.underline);
+        style.setDefined(DEFINED_UNDERLINE);
     }
     if (hasJsonField(json, "wrapText")) {
         style.wrapText = extractBoolField(json, "wrapText", style.wrapText);
+        style.setDefined(DEFINED_WRAPTEXT);
     }
     if (hasJsonField(json, "bgColor")) {
         style.bgColor = extractPayloadField(json, "bgColor");
+        style.setDefined(DEFINED_BGCOLOR);
     }
     if (hasJsonField(json, "textColor")) {
         style.textColor = extractPayloadField(json, "textColor");
+        style.setDefined(DEFINED_TEXTCOLOR);
     }
     if (hasJsonField(json, "fontFamily")) {
         style.fontFamily = extractPayloadField(json, "fontFamily");
+        style.setDefined(DEFINED_FONTFAMILY);
     }
     if (hasJsonField(json, "fontSize")) {
         style.fontSize = static_cast<uint8_t>(extractIntField(json, "fontSize", style.fontSize));
+        style.setDefined(DEFINED_FONTSIZE);
     }
     if (hasJsonField(json, "hAlign")) {
         std::string hAlignStr = extractPayloadField(json, "hAlign");
@@ -813,6 +823,7 @@ void mergeStyleJson(CellStyle& style, const std::string& json) {
         } else {
             style.hAlign = TextAlign::LEFT;
         }
+        style.setDefined(DEFINED_HALIGN);
     }
     if (hasJsonField(json, "vAlign")) {
         std::string vAlignStr = extractPayloadField(json, "vAlign");
@@ -823,6 +834,7 @@ void mergeStyleJson(CellStyle& style, const std::string& json) {
         } else {
             style.vAlign = VerticalAlign::BOTTOM;
         }
+        style.setDefined(DEFINED_VALIGN);
     }
     // Merge border properties if present
     if (hasJsonField(json, "border")) {
@@ -831,60 +843,82 @@ void mergeStyleJson(CellStyle& style, const std::string& json) {
         BorderEdge bottomEdge = extractBorderEdge(json, "bottom");
         BorderEdge leftEdge = extractBorderEdge(json, "left");
         // Only update edges that are specified in the JSON
+        // Set defined flag for each border edge present
         if (topEdge.hasValue() || topEdge.style != BorderStyle::NONE) {
             style.border.top = topEdge;
+            style.setDefined(DEFINED_BORDER_TOP);
         }
         if (rightEdge.hasValue() || rightEdge.style != BorderStyle::NONE) {
             style.border.right = rightEdge;
+            style.setDefined(DEFINED_BORDER_RIGHT);
         }
         if (bottomEdge.hasValue() || bottomEdge.style != BorderStyle::NONE) {
             style.border.bottom = bottomEdge;
+            style.setDefined(DEFINED_BORDER_BOTTOM);
         }
         if (leftEdge.hasValue() || leftEdge.style != BorderStyle::NONE) {
             style.border.left = leftEdge;
+            style.setDefined(DEFINED_BORDER_LEFT);
         }
     }
 }
 
 // Helper to merge two CellStyles - newStyle properties override baseStyle properties.
 // Used for exact match case: when new range matches existing range, merge their styles.
+// Sets defined flags for properties being merged from newStyle.
 CellStyle mergeStyles(const CellStyle& baseStyle, const CellStyle& newStyle,
                       const std::string& newStyleJson) {
     CellStyle result = baseStyle;
 
     // Only merge properties that are actually set in the new style (present in JSON)
+    // Set defined flag for each property being merged
     if (hasJsonField(newStyleJson, "bold")) {
         result.bold = newStyle.bold;
+        result.setDefined(DEFINED_BOLD);
     }
     if (hasJsonField(newStyleJson, "italic")) {
         result.italic = newStyle.italic;
+        result.setDefined(DEFINED_ITALIC);
     }
     if (hasJsonField(newStyleJson, "underline")) {
         result.underline = newStyle.underline;
+        result.setDefined(DEFINED_UNDERLINE);
     }
     if (hasJsonField(newStyleJson, "wrapText")) {
         result.wrapText = newStyle.wrapText;
+        result.setDefined(DEFINED_WRAPTEXT);
     }
     if (hasJsonField(newStyleJson, "bgColor")) {
         result.bgColor = newStyle.bgColor;
+        result.setDefined(DEFINED_BGCOLOR);
     }
     if (hasJsonField(newStyleJson, "textColor")) {
         result.textColor = newStyle.textColor;
+        result.setDefined(DEFINED_TEXTCOLOR);
     }
     if (hasJsonField(newStyleJson, "fontFamily")) {
         result.fontFamily = newStyle.fontFamily;
+        result.setDefined(DEFINED_FONTFAMILY);
     }
     if (hasJsonField(newStyleJson, "fontSize")) {
         result.fontSize = newStyle.fontSize;
+        result.setDefined(DEFINED_FONTSIZE);
     }
     if (hasJsonField(newStyleJson, "hAlign")) {
         result.hAlign = newStyle.hAlign;
+        result.setDefined(DEFINED_HALIGN);
     }
     if (hasJsonField(newStyleJson, "vAlign")) {
         result.vAlign = newStyle.vAlign;
+        result.setDefined(DEFINED_VALIGN);
     }
     if (hasJsonField(newStyleJson, "border")) {
         result.border = newStyle.border;
+        // Copy border defined flags from newStyle
+        if (newStyle.isDefined(DEFINED_BORDER_TOP)) result.setDefined(DEFINED_BORDER_TOP);
+        if (newStyle.isDefined(DEFINED_BORDER_RIGHT)) result.setDefined(DEFINED_BORDER_RIGHT);
+        if (newStyle.isDefined(DEFINED_BORDER_BOTTOM)) result.setDefined(DEFINED_BORDER_BOTTOM);
+        if (newStyle.isDefined(DEFINED_BORDER_LEFT)) result.setDefined(DEFINED_BORDER_LEFT);
     }
 
     return result;
@@ -893,43 +927,59 @@ CellStyle mergeStyles(const CellStyle& baseStyle, const CellStyle& newStyle,
 // Helper to strip conflicting properties from a style based on what's set in another style's JSON.
 // Used for contained case: when existing range is fully inside new range, strip conflicting props.
 // Returns the stripped style and a bool indicating if the style is now empty.
+// Clears the defined flag for each stripped property.
 std::pair<CellStyle, bool> stripConflictingProperties(const CellStyle& existingStyle,
                                                        const std::string& newStyleJson) {
     CellStyle result = existingStyle;
 
     // Strip properties that are set in the new style JSON
+    // Clear the defined flag for each stripped property
     if (hasJsonField(newStyleJson, "bold")) {
         result.bold = false;  // Reset to default
+        result.clearDefined(DEFINED_BOLD);
     }
     if (hasJsonField(newStyleJson, "italic")) {
         result.italic = false;
+        result.clearDefined(DEFINED_ITALIC);
     }
     if (hasJsonField(newStyleJson, "underline")) {
         result.underline = false;
+        result.clearDefined(DEFINED_UNDERLINE);
     }
     if (hasJsonField(newStyleJson, "wrapText")) {
         result.wrapText = false;
+        result.clearDefined(DEFINED_WRAPTEXT);
     }
     if (hasJsonField(newStyleJson, "bgColor")) {
         result.bgColor = "";  // Reset to default
+        result.clearDefined(DEFINED_BGCOLOR);
     }
     if (hasJsonField(newStyleJson, "textColor")) {
         result.textColor = "";
+        result.clearDefined(DEFINED_TEXTCOLOR);
     }
     if (hasJsonField(newStyleJson, "fontFamily")) {
         result.fontFamily = "";
+        result.clearDefined(DEFINED_FONTFAMILY);
     }
     if (hasJsonField(newStyleJson, "fontSize")) {
         result.fontSize = 0;
+        result.clearDefined(DEFINED_FONTSIZE);
     }
     if (hasJsonField(newStyleJson, "hAlign")) {
         result.hAlign = TextAlign::GENERAL;
+        result.clearDefined(DEFINED_HALIGN);
     }
     if (hasJsonField(newStyleJson, "vAlign")) {
         result.vAlign = VerticalAlign::BOTTOM;
+        result.clearDefined(DEFINED_VALIGN);
     }
     if (hasJsonField(newStyleJson, "border")) {
         result.border = CellBorder();  // Reset to default (no borders)
+        result.clearDefined(DEFINED_BORDER_TOP);
+        result.clearDefined(DEFINED_BORDER_RIGHT);
+        result.clearDefined(DEFINED_BORDER_BOTTOM);
+        result.clearDefined(DEFINED_BORDER_LEFT);
     }
 
     return {result, result.isEmpty()};
@@ -2027,32 +2077,75 @@ namespace {
 
 // Helper to merge two CellStyles - overlay properties fill in properties not set in base.
 // Used for CSS-like cascading where multiple sources contribute different properties.
+// The defined flag is the source of truth - only defined properties participate in merges.
 CellStyle mergeEffectiveStyles(const CellStyle& base, const CellStyle& overlay) {
     CellStyle result = base;
 
-    // Merge boolean properties (overlay wins if base is false/default)
-    if (!result.bold && overlay.bold) result.bold = true;
-    if (!result.italic && overlay.italic) result.italic = true;
-    if (!result.underline && overlay.underline) result.underline = true;
-    if (!result.wrapText && overlay.wrapText) result.wrapText = true;
+    // Merge boolean properties (overlay wins if overlay is defined and base is not)
+    if (overlay.isDefined(DEFINED_BOLD) && !result.isDefined(DEFINED_BOLD)) {
+        result.bold = overlay.bold;
+        result.setDefined(DEFINED_BOLD);
+    }
+    if (overlay.isDefined(DEFINED_ITALIC) && !result.isDefined(DEFINED_ITALIC)) {
+        result.italic = overlay.italic;
+        result.setDefined(DEFINED_ITALIC);
+    }
+    if (overlay.isDefined(DEFINED_UNDERLINE) && !result.isDefined(DEFINED_UNDERLINE)) {
+        result.underline = overlay.underline;
+        result.setDefined(DEFINED_UNDERLINE);
+    }
+    if (overlay.isDefined(DEFINED_WRAPTEXT) && !result.isDefined(DEFINED_WRAPTEXT)) {
+        result.wrapText = overlay.wrapText;
+        result.setDefined(DEFINED_WRAPTEXT);
+    }
 
-    // Merge string properties (overlay wins if base is empty)
-    if (result.bgColor.empty() && !overlay.bgColor.empty()) result.bgColor = overlay.bgColor;
-    if (result.textColor.empty() && !overlay.textColor.empty()) result.textColor = overlay.textColor;
-    if (result.fontFamily.empty() && !overlay.fontFamily.empty()) result.fontFamily = overlay.fontFamily;
+    // Merge string properties (overlay wins if overlay is defined and base is not)
+    if (overlay.isDefined(DEFINED_BGCOLOR) && !result.isDefined(DEFINED_BGCOLOR)) {
+        result.bgColor = overlay.bgColor;
+        result.setDefined(DEFINED_BGCOLOR);
+    }
+    if (overlay.isDefined(DEFINED_TEXTCOLOR) && !result.isDefined(DEFINED_TEXTCOLOR)) {
+        result.textColor = overlay.textColor;
+        result.setDefined(DEFINED_TEXTCOLOR);
+    }
+    if (overlay.isDefined(DEFINED_FONTFAMILY) && !result.isDefined(DEFINED_FONTFAMILY)) {
+        result.fontFamily = overlay.fontFamily;
+        result.setDefined(DEFINED_FONTFAMILY);
+    }
 
-    // Merge numeric properties (overlay wins if base is 0/default)
-    if (result.fontSize == 0 && overlay.fontSize != 0) result.fontSize = overlay.fontSize;
+    // Merge numeric properties (overlay wins if overlay is defined and base is not)
+    if (overlay.isDefined(DEFINED_FONTSIZE) && !result.isDefined(DEFINED_FONTSIZE)) {
+        result.fontSize = overlay.fontSize;
+        result.setDefined(DEFINED_FONTSIZE);
+    }
 
-    // Merge alignment (overlay wins if base is default)
-    if (result.hAlign == TextAlign::GENERAL && overlay.hAlign != TextAlign::GENERAL) result.hAlign = overlay.hAlign;
-    if (result.vAlign == VerticalAlign::BOTTOM && overlay.vAlign != VerticalAlign::BOTTOM) result.vAlign = overlay.vAlign;
+    // Merge alignment (overlay wins if overlay is defined and base is not)
+    if (overlay.isDefined(DEFINED_HALIGN) && !result.isDefined(DEFINED_HALIGN)) {
+        result.hAlign = overlay.hAlign;
+        result.setDefined(DEFINED_HALIGN);
+    }
+    if (overlay.isDefined(DEFINED_VALIGN) && !result.isDefined(DEFINED_VALIGN)) {
+        result.vAlign = overlay.vAlign;
+        result.setDefined(DEFINED_VALIGN);
+    }
 
-    // Merge borders (each edge individually)
-    if (!result.border.top.hasValue() && overlay.border.top.hasValue()) result.border.top = overlay.border.top;
-    if (!result.border.right.hasValue() && overlay.border.right.hasValue()) result.border.right = overlay.border.right;
-    if (!result.border.bottom.hasValue() && overlay.border.bottom.hasValue()) result.border.bottom = overlay.border.bottom;
-    if (!result.border.left.hasValue() && overlay.border.left.hasValue()) result.border.left = overlay.border.left;
+    // Merge borders (each edge individually, overlay wins if defined and base is not)
+    if (overlay.isDefined(DEFINED_BORDER_TOP) && !result.isDefined(DEFINED_BORDER_TOP)) {
+        result.border.top = overlay.border.top;
+        result.setDefined(DEFINED_BORDER_TOP);
+    }
+    if (overlay.isDefined(DEFINED_BORDER_RIGHT) && !result.isDefined(DEFINED_BORDER_RIGHT)) {
+        result.border.right = overlay.border.right;
+        result.setDefined(DEFINED_BORDER_RIGHT);
+    }
+    if (overlay.isDefined(DEFINED_BORDER_BOTTOM) && !result.isDefined(DEFINED_BORDER_BOTTOM)) {
+        result.border.bottom = overlay.border.bottom;
+        result.setDefined(DEFINED_BORDER_BOTTOM);
+    }
+    if (overlay.isDefined(DEFINED_BORDER_LEFT) && !result.isDefined(DEFINED_BORDER_LEFT)) {
+        result.border.left = overlay.border.left;
+        result.setDefined(DEFINED_BORDER_LEFT);
+    }
 
     return result;
 }

@@ -1002,6 +1002,69 @@ const tests = {
     }
   },
 
+  // Test: Cell can explicitly override range style to default value
+  // When a range has bold=true, a cell inside can set bold=false (with defined flag)
+  // and the effective style should be bold=false (cell's explicit value wins)
+  'Cell explicit default value overrides range style': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Apply bold to B2:D4 (range style)
+    await selectRange(ctx.page, 'B2', 'D4');
+    await sleep(100);
+    await ctx.page.click('#style-bold-btn');
+    await sleep(300);
+
+    // Verify B2 is bold (from range)
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    const b2BoldBefore = await ctx.page.evaluate(() => {
+      const btn = document.querySelector('#style-bold-btn');
+      return btn?.classList.contains('active');
+    });
+    assertTrue(b2BoldBefore, 'B2 should be bold from range style');
+
+    // Now select C3 (inside the range) and toggle bold OFF
+    await clickCell(ctx.page, 'C3');
+    await sleep(100);
+
+    // Verify C3 is currently bold (from range)
+    const c3BoldBefore = await ctx.page.evaluate(() => {
+      const btn = document.querySelector('#style-bold-btn');
+      return btn?.classList.contains('active');
+    });
+    assertTrue(c3BoldBefore, 'C3 should be bold from range style before override');
+
+    // Click bold button to turn OFF bold for C3
+    await ctx.page.click('#style-bold-btn');
+    await sleep(300);
+
+    // Verify C3 is now NOT bold (cell override wins)
+    const c3BoldAfter = await ctx.page.evaluate(() => {
+      const btn = document.querySelector('#style-bold-btn');
+      return btn?.classList.contains('active');
+    });
+    assertTrue(!c3BoldAfter, 'C3 should NOT be bold after explicit override to default value');
+
+    // Verify B2 is still bold (still from range)
+    await clickCell(ctx.page, 'B2');
+    await sleep(100);
+    const b2BoldAfter = await ctx.page.evaluate(() => {
+      const btn = document.querySelector('#style-bold-btn');
+      return btn?.classList.contains('active');
+    });
+    assertTrue(b2BoldAfter, 'B2 should still be bold from range style');
+
+    // Go back to C3 and verify it's still not bold
+    await clickCell(ctx.page, 'C3');
+    await sleep(100);
+    const c3BoldFinal = await ctx.page.evaluate(() => {
+      const btn = document.querySelector('#style-bold-btn');
+      return btn?.classList.contains('active');
+    });
+    assertTrue(!c3BoldFinal, 'C3 should persist its bold=false override');
+  },
+
   // L8: Mixed styles show correctly in multi-cell selection
   'Toolbar shows mixed indicator for multi-cell selection with different styles': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
