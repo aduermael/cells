@@ -120,7 +120,7 @@ Formats currently have no garbage collection - `_customFormats` stores format de
   - `_refCount: map<formatId, count>` - Reference counting
   - Methods: `registerFormat()`, `findOrRegisterFormat()`, `addRef()`, `release()`, `getFormatCode()`
 - [x] 5b: Replace `_customFormats` in Workbook with `_formatRegistry` (unique_ptr<FormatRegistry>)
-- [ ] 5c: Update `setFormatId()` to call `addRef`/`release` on the registry (like `setRangeStyleId` does for styles)
+- [x] 5c: Update `setFormatId()` to call `addRef`/`release` on the registry (like `setRangeStyleId` does for styles). Also updated `clearFormat()` to release references.
 - [ ] 5d: Update CRDT operations (`CELL_SET_FORMAT`, `AXIS_SET_FORMAT`) to use registry reference counting
 - [ ] 5e: Update serializer/parser to work with FormatRegistry
 - [ ] 5f: Add unit tests for FormatRegistry (reference counting, deduplication, GC)

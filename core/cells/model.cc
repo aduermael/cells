@@ -747,30 +747,55 @@ ID Workbook::getFormatId(const ID& entityId) const {
 }
 
 ID Workbook::setFormatId(const ID& entityId, const ID& formatId) {
-    // If clearing the format (null ID), remove from map
-    if (formatId.isNull()) {
-        auto it = _formats.find(entityId);
-        if (it != _formats.end()) {
-            ID oldId = it->second;
-            _formats.erase(it);
-            return oldId;
-        }
-        return {};  // No previous format
-    }
-
-    // Check if exists first, get old value before overwriting
+    // Get old format ID for reference counting
+    ID oldFormatId;
     auto existing = _formats.find(entityId);
     if (existing != _formats.end()) {
-        ID oldId = existing->second;
-        existing->second = formatId;
-        return oldId;
+        oldFormatId = existing->second;
     }
-    _formats[entityId] = formatId;
-    return {};  // No previous format
+
+    // If clearing the format (null ID), remove from map
+    if (formatId.isNull()) {
+        if (existing != _formats.end()) {
+            _formats.erase(existing);
+        }
+    } else {
+        // Set format association
+        _formats[entityId] = formatId;
+    }
+
+    // Update reference counts
+    FormatRegistry* registry = getFormatRegistry();
+    if (registry != nullptr) {
+        // Release old format reference (if any)
+        if (!oldFormatId.isNull()) {
+            registry->release(oldFormatId);
+        }
+        // Add reference to new format (if not null)
+        if (!formatId.isNull()) {
+            registry->addRef(formatId);
+        }
+    }
+
+    return oldFormatId;
 }
 
 bool Workbook::clearFormat(const ID& entityId) {
-    return _formats.erase(entityId) > 0;
+    auto it = _formats.find(entityId);
+    if (it == _formats.end()) {
+        return false;
+    }
+
+    // Release reference before erasing
+    const ID formatId = it->second;
+    _formats.erase(it);
+
+    FormatRegistry* registry = getFormatRegistry();
+    if (registry != nullptr && !formatId.isNull()) {
+        registry->release(formatId);
+    }
+
+    return true;
 }
 
 // =============================================================================
