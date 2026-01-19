@@ -706,6 +706,29 @@ export function handleRemoveRangeStyle(
     }
 }
 
+export function handleSetRangeStyleOnSheet(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { sheetIndex, startCol, startRow, endCol, endRow, styleJson } = params as {
+        sheetIndex: number;
+        startCol: number;
+        startRow: number;
+        endCol: number;
+        endRow: number;
+        styleJson: string;
+    };
+    const result = JSON.parse(
+        engine.setRangeStyleOnSheet(sheetIndex, startCol, startRow, endCol, endRow, styleJson),
+    ) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "rangeStyleSet", success: true, rangeId: result.rangeId, styleId: result.styleId });
+    }
+}
+
 // ============================================================================
 // Effective Style Operations
 // ============================================================================

@@ -530,6 +530,18 @@ declare module 'cells-wasm' {
      */
     removeRangeStyle(col: number, row: number): string;
 
+    /**
+     * Apply a style to a range on a specific sheet (for cross-sheet operations)
+     * @param sheetIndex - Sheet index (0-based)
+     * @param startCol - Start column position (0-based)
+     * @param startRow - Start row position (0-based)
+     * @param endCol - End column position (0-based)
+     * @param endRow - End row position (0-based)
+     * @param styleJson - JSON string with style properties
+     * @returns JSON string with {success, rangeId, styleId}
+     */
+    setRangeStyleOnSheet(sheetIndex: number, startCol: number, startRow: number, endCol: number, endRow: number, styleJson: string): string;
+
     // ========================================================================
     // Effective style (UI display)
     // ========================================================================

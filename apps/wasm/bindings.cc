@@ -145,6 +145,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("getAvailableStyles", &cells::wasm::CellsEngine::getAvailableStyles)
         // Range styles
         .function("setRangeStyle", &cells::wasm::CellsEngine::setRangeStyle)
+        .function("setRangeStyleOnSheet", &cells::wasm::CellsEngine::setRangeStyleOnSheet)
         .function("removeRangeStyle", &cells::wasm::CellsEngine::removeRangeStyle)
         // Effective style (resolves cell > range > column > row hierarchy)
         .function("getEffectiveCellStyle", &cells::wasm::CellsEngine::getEffectiveCellStyle)

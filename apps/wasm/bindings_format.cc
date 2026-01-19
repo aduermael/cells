@@ -1450,11 +1450,47 @@ std::string CellsEngine::getAvailableStyles() {
 
 std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uint32_t endCol,
                                        uint32_t endRow, const std::string& styleJson) {
+    // Delegate to setRangeStyleOnSheet with active sheet
+    return setRangeStyleOnSheet(_activeSheetIndex, startCol, startRow, endCol, endRow, styleJson);
+}
+
+std::string CellsEngine::removeRangeStyle(uint32_t col, uint32_t row) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"No sheet available\"}";
     }
 
     auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Find style ranges at this position
+    std::vector<Range*> styleRanges = sheet->getRangesAt(col, row, RangeFlags::STYLE);
+    if (styleRanges.empty()) {
+        return "{\"error\":\"No style range found at this position\"}";
+    }
+
+    // Remove the first style range found
+    Range* range = styleRanges[0];
+    std::ostringstream payload;
+    payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
+
+    Operation removeOp = makeRangeRemoveOp(*_workbook, range->id, payload.str());
+    applyOperation(*_workbook, removeOp);
+
+    rebuildViewportIndex();
+    notifyListeners(ChangeType::CELL_CHANGED);
+
+    return "{\"success\":true}";
+}
+
+std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t startCol, uint32_t startRow,
+                                               uint32_t endCol, uint32_t endRow, const std::string& styleJson) {
+    if (!_workbook || sheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"Invalid sheet index\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(sheetIndex);
     if (!sheet) {
         return "{\"error\":\"Sheet not found\"}";
     }
@@ -1966,40 +2002,15 @@ std::string CellsEngine::setRangeStyle(uint32_t startCol, uint32_t startRow, uin
         }
     }
 
+    if (_syncManager) {
+        _syncManager->queueOperationsBroadcast();
+        _syncManager->pruneOpLog();
+    }
+
     rebuildViewportIndex();
     notifyListeners(ChangeType::CELL_CHANGED);
 
     return "{\"success\":true,\"rangeId\":\"" + rangeId.toString() + "\",\"styleId\":\"" + styleId.toString() + "\"}";
-}
-
-std::string CellsEngine::removeRangeStyle(uint32_t col, uint32_t row) {
-    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
-        return "{\"error\":\"No sheet available\"}";
-    }
-
-    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
-    if (!sheet) {
-        return "{\"error\":\"Sheet not found\"}";
-    }
-
-    // Find style ranges at this position
-    std::vector<Range*> styleRanges = sheet->getRangesAt(col, row, RangeFlags::STYLE);
-    if (styleRanges.empty()) {
-        return "{\"error\":\"No style range found at this position\"}";
-    }
-
-    // Remove the first style range found
-    Range* range = styleRanges[0];
-    std::ostringstream payload;
-    payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
-
-    Operation removeOp = makeRangeRemoveOp(*_workbook, range->id, payload.str());
-    applyOperation(*_workbook, removeOp);
-
-    rebuildViewportIndex();
-    notifyListeners(ChangeType::CELL_CHANGED);
-
-    return "{\"success\":true}";
 }
 
 // =============================================================================

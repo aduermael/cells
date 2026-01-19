@@ -73,6 +73,7 @@ import {
     handleCreateStyle,
     handleGetAvailableStyles,
     handleSetRangeStyle,
+    handleSetRangeStyleOnSheet,
     handleRemoveRangeStyle,
     handleGetEffectiveCellStyle,
     handleGetEffectiveStyleForRange,
@@ -498,6 +499,9 @@ function handleMessage(msg: WorkerRequest): void {
             // ================================================================
             case "setRangeStyle":
                 handleSetRangeStyle(engine, params, respond);
+                break;
+            case "setRangeStyleOnSheet":
+                handleSetRangeStyleOnSheet(engine, params, respond);
                 break;
             case "removeRangeStyle":
                 handleRemoveRangeStyle(engine, params, respond);

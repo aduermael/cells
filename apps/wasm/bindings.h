@@ -166,6 +166,8 @@ public:
     // Range style operations (creates a Range with RANGE_STYLE flag)
     std::string setRangeStyle(uint32_t startCol, uint32_t startRow, uint32_t endCol, uint32_t endRow,
                               const std::string& styleJson);
+    std::string setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t startCol, uint32_t startRow,
+                                     uint32_t endCol, uint32_t endRow, const std::string& styleJson);
     std::string removeRangeStyle(uint32_t col, uint32_t row);
 
     // Effective style operations (resolves cell > range > column > row hierarchy)

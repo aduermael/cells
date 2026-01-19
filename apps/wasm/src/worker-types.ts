@@ -90,6 +90,14 @@ export interface CellsEngine {
         endRow: number,
         styleJson: string
     ): string;
+    setRangeStyleOnSheet(
+        sheetIndex: number,
+        startCol: number,
+        startRow: number,
+        endCol: number,
+        endRow: number,
+        styleJson: string
+    ): string;
     removeRangeStyle(col: number, row: number): string;
 
     // Effective style operations (resolves style hierarchy)
