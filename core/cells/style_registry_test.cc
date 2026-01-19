@@ -374,5 +374,149 @@ TEST(CellStyleHashTest, AllPropertiesAffectHash) {
     EXPECT_NE(base.hash(), withVAlign.hash());
 }
 
+// =============================================================================
+// Defined Flags Tests
+// =============================================================================
+
+// Test that styles with same values but different defined flags are different
+TEST(CellStyleDefinedTest, SameValuesDifferentDefinedFlagsAreDifferent) {
+    CellStyle style1;
+    style1.bold = false;  // Default value, but with defined flag
+    style1.setDefined(DEFINED_BOLD);
+
+    CellStyle style2;
+    style2.bold = false;  // Default value, no defined flag
+
+    // These should be different because one has the defined flag set
+    EXPECT_NE(style1, style2);
+    EXPECT_NE(style1.hash(), style2.hash());
+}
+
+// Test that isEmpty() returns false when any defined flag is set
+TEST(CellStyleDefinedTest, IsEmptyFalseWhenDefinedFlagSet) {
+    CellStyle style;
+    EXPECT_TRUE(style.isEmpty());
+
+    // Set bold=false with defined flag - should no longer be empty
+    style.bold = false;
+    style.setDefined(DEFINED_BOLD);
+    EXPECT_FALSE(style.isEmpty());
+}
+
+// Test that isEmpty() only checks defined flags, not actual values
+TEST(CellStyleDefinedTest, IsEmptyOnlyChecksDefinedFlags) {
+    CellStyle style1;
+    style1.bold = true;  // Non-default value, but no defined flag
+    // This is technically invalid state, but isEmpty should check defined, not values
+    EXPECT_TRUE(style1.isEmpty());  // No defined flags set
+
+    CellStyle style2;
+    style2.setDefined(DEFINED_BGCOLOR);  // Empty string bgColor but with defined flag
+    EXPECT_FALSE(style2.isEmpty());
+}
+
+// Test isDefined helper method
+TEST(CellStyleDefinedTest, IsDefinedMethod) {
+    CellStyle style;
+    EXPECT_FALSE(style.isDefined(DEFINED_BOLD));
+    EXPECT_FALSE(style.isDefined(DEFINED_ITALIC));
+
+    style.setDefined(DEFINED_BOLD);
+    EXPECT_TRUE(style.isDefined(DEFINED_BOLD));
+    EXPECT_FALSE(style.isDefined(DEFINED_ITALIC));
+
+    style.setDefined(DEFINED_ITALIC);
+    EXPECT_TRUE(style.isDefined(DEFINED_BOLD));
+    EXPECT_TRUE(style.isDefined(DEFINED_ITALIC));
+}
+
+// Test clearDefined helper method
+TEST(CellStyleDefinedTest, ClearDefinedMethod) {
+    CellStyle style;
+    style.setDefined(DEFINED_BOLD);
+    style.setDefined(DEFINED_ITALIC);
+    EXPECT_TRUE(style.isDefined(DEFINED_BOLD));
+    EXPECT_TRUE(style.isDefined(DEFINED_ITALIC));
+
+    style.clearDefined(DEFINED_BOLD);
+    EXPECT_FALSE(style.isDefined(DEFINED_BOLD));
+    EXPECT_TRUE(style.isDefined(DEFINED_ITALIC));
+}
+
+// Test that defined flags work for all border properties
+TEST(CellStyleDefinedTest, BorderDefinedFlags) {
+    CellStyle style;
+    EXPECT_FALSE(style.isDefined(DEFINED_BORDER_TOP));
+    EXPECT_FALSE(style.isDefined(DEFINED_BORDER_RIGHT));
+    EXPECT_FALSE(style.isDefined(DEFINED_BORDER_BOTTOM));
+    EXPECT_FALSE(style.isDefined(DEFINED_BORDER_LEFT));
+
+    style.border.top.style = BorderStyle::THIN;
+    style.setDefined(DEFINED_BORDER_TOP);
+
+    style.border.right.style = BorderStyle::MEDIUM;
+    style.setDefined(DEFINED_BORDER_RIGHT);
+
+    EXPECT_TRUE(style.isDefined(DEFINED_BORDER_TOP));
+    EXPECT_TRUE(style.isDefined(DEFINED_BORDER_RIGHT));
+    EXPECT_FALSE(style.isDefined(DEFINED_BORDER_BOTTOM));
+    EXPECT_FALSE(style.isDefined(DEFINED_BORDER_LEFT));
+    EXPECT_FALSE(style.isEmpty());
+}
+
+// Test that two styles with explicitly set default values are equal
+TEST(CellStyleDefinedTest, ExplicitDefaultValuesAreEqual) {
+    CellStyle style1;
+    style1.bold = false;
+    style1.setDefined(DEFINED_BOLD);
+
+    CellStyle style2;
+    style2.bold = false;
+    style2.setDefined(DEFINED_BOLD);
+
+    EXPECT_EQ(style1, style2);
+    EXPECT_EQ(style1.hash(), style2.hash());
+}
+
+// Test defined flags with all properties
+TEST(CellStyleDefinedTest, AllDefinedFlagsWork) {
+    CellStyle style;
+
+    // Set all defined flags
+    style.setDefined(DEFINED_BOLD);
+    style.setDefined(DEFINED_ITALIC);
+    style.setDefined(DEFINED_UNDERLINE);
+    style.setDefined(DEFINED_WRAPTEXT);
+    style.setDefined(DEFINED_BGCOLOR);
+    style.setDefined(DEFINED_TEXTCOLOR);
+    style.setDefined(DEFINED_FONTFAMILY);
+    style.setDefined(DEFINED_FONTSIZE);
+    style.setDefined(DEFINED_HALIGN);
+    style.setDefined(DEFINED_VALIGN);
+    style.setDefined(DEFINED_BORDER_TOP);
+    style.setDefined(DEFINED_BORDER_RIGHT);
+    style.setDefined(DEFINED_BORDER_BOTTOM);
+    style.setDefined(DEFINED_BORDER_LEFT);
+
+    // Verify all flags are set
+    EXPECT_TRUE(style.isDefined(DEFINED_BOLD));
+    EXPECT_TRUE(style.isDefined(DEFINED_ITALIC));
+    EXPECT_TRUE(style.isDefined(DEFINED_UNDERLINE));
+    EXPECT_TRUE(style.isDefined(DEFINED_WRAPTEXT));
+    EXPECT_TRUE(style.isDefined(DEFINED_BGCOLOR));
+    EXPECT_TRUE(style.isDefined(DEFINED_TEXTCOLOR));
+    EXPECT_TRUE(style.isDefined(DEFINED_FONTFAMILY));
+    EXPECT_TRUE(style.isDefined(DEFINED_FONTSIZE));
+    EXPECT_TRUE(style.isDefined(DEFINED_HALIGN));
+    EXPECT_TRUE(style.isDefined(DEFINED_VALIGN));
+    EXPECT_TRUE(style.isDefined(DEFINED_BORDER_TOP));
+    EXPECT_TRUE(style.isDefined(DEFINED_BORDER_RIGHT));
+    EXPECT_TRUE(style.isDefined(DEFINED_BORDER_BOTTOM));
+    EXPECT_TRUE(style.isDefined(DEFINED_BORDER_LEFT));
+
+    // Verify all bits are set (14 properties = bits 0-13)
+    EXPECT_EQ(style.defined, 0x3FFF);  // 0011 1111 1111 1111
+}
+
 }  // namespace
 }  // namespace cells

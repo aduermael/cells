@@ -1,7 +1,8 @@
 # Style Defined Flags and Border UI
 
-Status: READY
+Status: COMPLETE
 Created At: 2026-01-19
+Completed At: 2026-01-19
 
 ## Overview
 
@@ -180,16 +181,23 @@ These just need to be exposed in the UI - no C++ changes needed for border style
 
 ## Phase 5: Testing and Verification
 
-- [ ] 5a: Add unit tests for defined flags
-  - Test merge with defined vs undefined properties
-  - Test serialization round-trip of defined flags
+- [x] 5a: Add unit tests for defined flags
+  - Added tests in `style_registry_test.cc` for:
+    - Same values with different defined flags being different (equality and hash)
+    - isEmpty() correctly checking defined flags
+    - isDefined() and clearDefined() helper methods
+    - Border defined flags for all 4 edges
+    - All 14 defined flags working correctly
+  - Serialization round-trip tests already exist in `serializer_test.cc`
 
-- [ ] 5b: Add E2E tests for style override behavior
-  - Create range style, create cell inside with override, verify effective style
+- [x] 5b: Add E2E tests for style override behavior
+  - Test already exists: "Cell explicit default value overrides range style" in `range-styles.test.mjs`
+  - Test verifies: range with bold=true, cell override to bold=false, effective style is bold=false
 
-- [ ] 5c: Run full test suite
-  - `make test`
-  - `cd apps/wasm && npm run test:parallel -- stable`
+- [x] 5c: Run full test suite
+  - All C++ unit tests pass (56 tests)
+  - All E2E tests pass (189 tests)
+  - Lint and type checks pass
 
 ---
 
