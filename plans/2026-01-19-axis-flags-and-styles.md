@@ -124,7 +124,7 @@ Formats currently have no garbage collection - `_customFormats` stores format de
 - [x] 5d: Update CRDT operations (`CELL_SET_FORMAT`, `AXIS_SET_FORMAT`) to use registry reference counting. Both operations already call `workbook.setFormatId()` which now includes addRef/release logic.
 - [x] 5e: Update serializer/parser to work with FormatRegistry. Already compatible - serializer uses getCustomFormats() which delegates to registry, parser uses registerCustomFormat() which delegates to registry.
 - [x] 5f: Add unit tests for FormatRegistry (reference counting, deduplication, GC). Created format_registry_test.cc with 17 tests covering all functionality.
-- [ ] 5g: Run full test suite
+- [x] 5g: Run full test suite (56 unit tests pass, 188 E2E tests pass)
 
 ## Phase 6: Ensure style reference counting is consistent
 
