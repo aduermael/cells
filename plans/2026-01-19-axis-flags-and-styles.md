@@ -60,13 +60,13 @@ Rename `_cellStyles` to `_styles` as a unified entity-to-style map. Since UUIDs 
 - [x] 2a: Rename `_cellStyles` to `_styles` in Workbook
 - [x] 2b: Rename accessor methods: `getCellStyleId()` → `getStyleId()`, `setCellStyleId()` → `setStyleId()`, `clearCellStyle()` → `clearStyle()`
 - [x] 2c: Update all call sites to use the new method names
-- [ ] 2d: Remove `defaultStyleId` field from Axis struct
-- [ ] 2e: Update `HAS_STYLE` flag in AxisFlags to be set/cleared when axis style is added/removed via `_styles`
-- [ ] 2f: Update CRDT operations (crdt_axis.cc - AXIS_SET_STYLE) to use `_styles` map + flag
-- [ ] 2g: Update XLSX reader/writer (xlsx_reader.cc, xlsx_writer.cc) to use new pattern
-- [ ] 2h: Update bindings_viewport.cc style resolution to use `getStyleId(axisId)`
-- [ ] 2i: Update parser/serializer to handle axis styles via unified `_styles` map
-- [ ] 2j: Run tests to verify no regressions
+- [x] 2d: Remove `defaultStyleId` field from Axis struct - axis styles now stored in workbook._styles via axis ID
+- [x] 2e: Update `HAS_STYLE` flag in AxisFlags to be set/cleared when axis style is added/removed via `_styles`
+- [x] 2f: Update CRDT operations (crdt_axis.cc - AXIS_SET_STYLE) to use `_styles` map + flag
+- [x] 2g: Update XLSX reader/writer (xlsx_reader.cc, xlsx_writer.cc) to use new pattern
+- [x] 2h: Update bindings_viewport.cc style resolution to use `getStyleId(axisId)` and fixed hidden() accessor calls
+- [x] 2i: Update parser/serializer to handle axis styles via unified `_styles` map with optional style ID output
+- [x] 2j: Run tests to verify no regressions (all 55 core tests pass)
 
 ## Phase 3: Fix cross-sheet style application
 

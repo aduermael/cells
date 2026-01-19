@@ -2089,10 +2089,13 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
     // Priority 3: Column's default style
     if (!colId.isNull()) {
         const Axis* colAxis = sheet.getColumn(colId);
-        if (colAxis != nullptr && !colAxis->defaultStyleId.isNull()) {
-            const CellStyle* colStyle = workbook.getStyle(colAxis->defaultStyleId);
-            if (colStyle) {
-                result = mergeEffectiveStyles(result, *colStyle);
+        if (colAxis != nullptr && colAxis->hasStyle()) {
+            const ID colStyleId = workbook.getStyleId(colAxis->id);
+            if (!colStyleId.isNull()) {
+                const CellStyle* colStyle = workbook.getStyle(colStyleId);
+                if (colStyle) {
+                    result = mergeEffectiveStyles(result, *colStyle);
+                }
             }
         }
     }
@@ -2100,10 +2103,13 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
     // Priority 4: Row's default style
     if (!rowId.isNull()) {
         const Axis* rowAxis = sheet.getRow(rowId);
-        if (rowAxis != nullptr && !rowAxis->defaultStyleId.isNull()) {
-            const CellStyle* rowStyle = workbook.getStyle(rowAxis->defaultStyleId);
-            if (rowStyle) {
-                result = mergeEffectiveStyles(result, *rowStyle);
+        if (rowAxis != nullptr && rowAxis->hasStyle()) {
+            const ID rowStyleId = workbook.getStyleId(rowAxis->id);
+            if (!rowStyleId.isNull()) {
+                const CellStyle* rowStyle = workbook.getStyle(rowStyleId);
+                if (rowStyle) {
+                    result = mergeEffectiveStyles(result, *rowStyle);
+                }
             }
         }
     }

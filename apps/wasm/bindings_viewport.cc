@@ -128,33 +128,39 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
 
     // Priority 3: Column's default style (fills remaining gaps)
     const Axis* col = sheet.getColumn(cell.colId);
-    if (col && !col->defaultStyleId.isNull()) {
-        const CellStyle* colStyle = workbook.getStyle(col->defaultStyleId);
-        if (colStyle != nullptr) {
-            if (!hasAnyStyle) {
-                combinedStyle = *colStyle;
-                result.styleId = col->defaultStyleId;
-                hasAnyStyle = true;
-            } else {
-                combinedStyle = mergeStyles(combinedStyle, *colStyle);
+    if (col != nullptr && col->hasStyle()) {
+        const ID colStyleId = workbook.getStyleId(col->id);
+        if (!colStyleId.isNull()) {
+            const CellStyle* colStyle = workbook.getStyle(colStyleId);
+            if (colStyle != nullptr) {
+                if (!hasAnyStyle) {
+                    combinedStyle = *colStyle;
+                    result.styleId = colStyleId;
+                    hasAnyStyle = true;
+                } else {
+                    combinedStyle = mergeStyles(combinedStyle, *colStyle);
+                }
+                result.fromColumn = true;
             }
-            result.fromColumn = true;
         }
     }
 
     // Priority 4: Row's default style (fills remaining gaps)
     const Axis* row = sheet.getRow(cell.rowId);
-    if (row && !row->defaultStyleId.isNull()) {
-        const CellStyle* rowStyle = workbook.getStyle(row->defaultStyleId);
-        if (rowStyle != nullptr) {
-            if (!hasAnyStyle) {
-                combinedStyle = *rowStyle;
-                result.styleId = row->defaultStyleId;
-                hasAnyStyle = true;
-            } else {
-                combinedStyle = mergeStyles(combinedStyle, *rowStyle);
+    if (row != nullptr && row->hasStyle()) {
+        const ID rowStyleId = workbook.getStyleId(row->id);
+        if (!rowStyleId.isNull()) {
+            const CellStyle* rowStyle = workbook.getStyle(rowStyleId);
+            if (rowStyle != nullptr) {
+                if (!hasAnyStyle) {
+                    combinedStyle = *rowStyle;
+                    result.styleId = rowStyleId;
+                    hasAnyStyle = true;
+                } else {
+                    combinedStyle = mergeStyles(combinedStyle, *rowStyle);
+                }
+                result.fromRow = true;
             }
-            result.fromRow = true;
         }
     }
 
@@ -641,7 +647,7 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             auto pixelOffset = _viewportIndex.columnToPixel(id);
             json << "\"pixelOffset\":" << (pixelOffset ? *pixelOffset : 0) << ",";
             json << "\"name\":\"" << jsonEscape(col->name) << "\",";
-            json << "\"hidden\":" << (col->hidden ? "true" : "false");
+            json << "\"hidden\":" << (col->hidden() ? "true" : "false");
             json << "}";
         }
     }
@@ -667,7 +673,7 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             auto pixelOffset = _viewportIndex.rowToPixel(id);
             json << "\"pixelOffset\":" << (pixelOffset ? *pixelOffset : 0) << ",";
             json << "\"name\":\"" << jsonEscape(row->name) << "\",";
-            json << "\"hidden\":" << (row->hidden ? "true" : "false");
+            json << "\"hidden\":" << (row->hidden() ? "true" : "false");
             json << "}";
         }
     }

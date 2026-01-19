@@ -710,7 +710,7 @@ bool Parser::parseQuotedString(std::string_view input, std::string& out, size_t&
     return false;
 }
 
-bool Parser::parseAxisProps(std::string_view props, Axis& axis) {
+bool Parser::parseAxisProps(std::string_view props, Axis& axis, ID* outStyleId) {
     // Format: key:value pairs separated by space
     // Examples: w:100 name:"Total" h:30
 
@@ -779,12 +779,15 @@ bool Parser::parseAxisProps(std::string_view props, Axis& axis) {
                 props = props.substr(endPos);
             }
         } else if (key == "sty") {
-            // Style ID value
+            // Style ID value - output via optional parameter (stored in workbook map by caller)
             const size_t endPos = props.find_first_of(" \t");
             const std::string_view valueStr =
                 (endPos == std::string_view::npos) ? props : props.substr(0, endPos);
 
-            axis.defaultStyleId = ID(std::string(valueStr));
+            if (outStyleId != nullptr) {
+                *outStyleId = ID(std::string(valueStr));
+            }
+            axis.setHasStyle(true);  // Set flag for hasStyle() accessor
 
             if (endPos == std::string_view::npos) {
                 props = "";
@@ -856,14 +859,20 @@ bool Parser::parseColumn(std::string_view line) {
     }
     col->position = static_cast<uint32_t>(position);
 
-    // Parse optional properties
+    // Parse optional properties (style ID stored in workbook map, not Axis struct)
+    ID styleId;
     if (propsStart < line.size()) {
-        if (!parseAxisProps(line.substr(propsStart), *col)) {
+        if (!parseAxisProps(line.substr(propsStart), *col, &styleId)) {
             return setError("Invalid column properties");
         }
     }
 
+    // Store style ID in workbook map (before moving col)
+    const ID colId = col->id;
     currentSheet_->addColumn(std::move(col));
+    if (workbook_ != nullptr && !styleId.isNull()) {
+        workbook_->setStyleId(colId, styleId);
+    }
     return true;
 }
 
@@ -916,14 +925,20 @@ bool Parser::parseRow(std::string_view line) {
     }
     row->position = static_cast<uint32_t>(position);
 
-    // Parse optional properties
+    // Parse optional properties (style ID stored in workbook map, not Axis struct)
+    ID styleId;
     if (propsStart < line.size()) {
-        if (!parseAxisProps(line.substr(propsStart), *row)) {
+        if (!parseAxisProps(line.substr(propsStart), *row, &styleId)) {
             return setError("Invalid row properties");
         }
     }
 
+    // Store style ID in workbook map (before moving row)
+    const ID rowId = row->id;
     currentSheet_->addRow(std::move(row));
+    if (workbook_ != nullptr && !styleId.isNull()) {
+        workbook_->setStyleId(rowId, styleId);
+    }
     return true;
 }
 

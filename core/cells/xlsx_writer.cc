@@ -1635,22 +1635,28 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         // Collect column default styles
         for (const ID& colId : sheet->getColumnIds()) {
             const Axis* col = sheet->getColumn(colId);
-            if (col && !col->defaultStyleId.isNull()) {
-                const CellStyle* style = workbook.getStyle(col->defaultStyleId);
-                if (style != nullptr) {
-                    const size_t styleIdx = styleTable.getOrAddFormat(*style);
-                    axisStyleIndices[col] = styleIdx;
+            if (col != nullptr && col->hasStyle()) {
+                const ID styleId = workbook.getStyleId(col->id);
+                if (!styleId.isNull()) {
+                    const CellStyle* style = workbook.getStyle(styleId);
+                    if (style != nullptr) {
+                        const size_t styleIdx = styleTable.getOrAddFormat(*style);
+                        axisStyleIndices[col] = styleIdx;
+                    }
                 }
             }
         }
         // Collect row default styles
         for (const ID& rowId : sheet->getRowIds()) {
             const Axis* row = sheet->getRow(rowId);
-            if (row && !row->defaultStyleId.isNull()) {
-                const CellStyle* style = workbook.getStyle(row->defaultStyleId);
-                if (style != nullptr) {
-                    const size_t styleIdx = styleTable.getOrAddFormat(*style);
-                    axisStyleIndices[row] = styleIdx;
+            if (row != nullptr && row->hasStyle()) {
+                const ID styleId = workbook.getStyleId(row->id);
+                if (!styleId.isNull()) {
+                    const CellStyle* style = workbook.getStyle(styleId);
+                    if (style != nullptr) {
+                        const size_t styleIdx = styleTable.getOrAddFormat(*style);
+                        axisStyleIndices[row] = styleIdx;
+                    }
                 }
             }
         }

@@ -277,13 +277,14 @@ void Serializer::serializeSheet(const Workbook& workbook, const Sheet& sheet,
     }
 
     // Columns, rows, cells, ranges
-    serializeColumns(sheet, out);
-    serializeRows(sheet, out);
+    serializeColumns(workbook, sheet, out);
+    serializeRows(workbook, sheet, out);
     serializeCells(workbook, sheet, out);
     serializeRanges(sheet, out);
 }
 
-void Serializer::serializeColumns(const Sheet& sheet, std::ostream& out) const {
+void Serializer::serializeColumns(const Workbook& workbook, const Sheet& sheet,
+                                  std::ostream& out) const {
     // Collect columns for alphabetical ordering by UUID
     std::vector<std::pair<std::string, const Axis*>> ordered;
     ordered.reserve(sheet.columnCount());
@@ -301,11 +302,12 @@ void Serializer::serializeColumns(const Sheet& sheet, std::ostream& out) const {
 
     // Serialize in order
     for (const auto& item : ordered) {
-        serializeAxis(*item.second, 'C', out);
+        serializeAxis(workbook, *item.second, 'C', out);
     }
 }
 
-void Serializer::serializeRows(const Sheet& sheet, std::ostream& out) const {
+void Serializer::serializeRows(const Workbook& workbook, const Sheet& sheet,
+                               std::ostream& out) const {
     // Collect rows for alphabetical ordering by UUID
     std::vector<std::pair<std::string, const Axis*>> ordered;
     ordered.reserve(sheet.rowCount());
@@ -323,7 +325,7 @@ void Serializer::serializeRows(const Sheet& sheet, std::ostream& out) const {
 
     // Serialize in order
     for (const auto& item : ordered) {
-        serializeAxis(*item.second, 'R', out);
+        serializeAxis(workbook, *item.second, 'R', out);
     }
 }
 
@@ -387,7 +389,8 @@ void Serializer::serializeRanges(const Sheet& sheet, std::ostream& out) const {
     }
 }
 
-void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out) const {
+void Serializer::serializeAxis(const Workbook& workbook, const Axis& axis, char prefix,
+                               std::ostream& out) const {
     // Format: C/R <id> <position> [props...]
     out << prefix << " " << axis.id.toString() << " " << axis.position;
 
@@ -406,8 +409,12 @@ void Serializer::serializeAxis(const Axis& axis, char prefix, std::ostream& out)
         out << " hidden:1";
     }
 
-    if (!axis.defaultStyleId.isNull()) {
-        out << " sty:" << axis.defaultStyleId.toString();
+    // Axis style is stored in workbook._styles map (not in Axis struct)
+    if (axis.hasStyle()) {
+        const ID styleId = workbook.getStyleId(axis.id);
+        if (!styleId.isNull()) {
+            out << " sty:" << styleId.toString();
+        }
     }
 
     out << "\n";

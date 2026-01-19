@@ -2834,8 +2834,10 @@ TEST(XLSXWriterTest, ColumnDefaultStyleRoundTrip) {
 
     auto col2 = std::make_unique<Axis>(generate_id(), true);
     col2->position = 1;
-    col2->defaultStyleId = styleId;  // Styled column
+    const ID col2Id = col2->id;
+    col2->setHasStyle(true);  // Mark that this column has a style
     sheet->addColumn(std::move(col2));
+    workbook->setStyleId(col2Id, styleId);  // Store style in workbook map
 
     auto col3 = std::make_unique<Axis>(generate_id(), true);
     col3->position = 2;
@@ -2885,13 +2887,15 @@ TEST(XLSXWriterTest, ColumnDefaultStyleRoundTrip) {
     ASSERT_NE(readCol3, nullptr);
 
     // Column 1 should have default style, others should not
-    EXPECT_TRUE(readCol1->defaultStyleId.isNull()) << "Column 0 should not have default style";
-    EXPECT_FALSE(readCol2->defaultStyleId.isNull()) << "Column 1 should have default style";
-    EXPECT_TRUE(readCol3->defaultStyleId.isNull()) << "Column 2 should not have default style";
+    EXPECT_FALSE(readCol1->hasStyle()) << "Column 0 should not have default style";
+    EXPECT_TRUE(readCol2->hasStyle()) << "Column 1 should have default style";
+    EXPECT_FALSE(readCol3->hasStyle()) << "Column 2 should not have default style";
 
     // Verify the style content
-    if (!readCol2->defaultStyleId.isNull()) {
-        const CellStyle* readStyle = readResult.workbook->getStyle(readCol2->defaultStyleId);
+    if (readCol2->hasStyle()) {
+        const ID readStyleId = readResult.workbook->getStyleId(readCol2->id);
+        ASSERT_FALSE(readStyleId.isNull());
+        const CellStyle* readStyle = readResult.workbook->getStyle(readStyleId);
         ASSERT_NE(readStyle, nullptr);
         EXPECT_TRUE(readStyle->bold) << "Column 1 style should be bold";
     }
@@ -2922,8 +2926,10 @@ TEST(XLSXWriterTest, RowDefaultStyleRoundTrip) {
 
     auto row2 = std::make_unique<Axis>(generate_id(), false);
     row2->position = 1;
-    row2->defaultStyleId = styleId;  // Styled row
+    const ID row2Id = row2->id;
+    row2->setHasStyle(true);  // Mark that this row has a style
     sheet->addRow(std::move(row2));
+    workbook->setStyleId(row2Id, styleId);  // Store style in workbook map
 
     auto row3 = std::make_unique<Axis>(generate_id(), false);
     row3->position = 2;
@@ -2965,13 +2971,15 @@ TEST(XLSXWriterTest, RowDefaultStyleRoundTrip) {
     ASSERT_NE(readRow3, nullptr);
 
     // Row 1 should have default style, others should not
-    EXPECT_TRUE(readRow1->defaultStyleId.isNull()) << "Row 0 should not have default style";
-    EXPECT_FALSE(readRow2->defaultStyleId.isNull()) << "Row 1 should have default style";
-    EXPECT_TRUE(readRow3->defaultStyleId.isNull()) << "Row 2 should not have default style";
+    EXPECT_FALSE(readRow1->hasStyle()) << "Row 0 should not have default style";
+    EXPECT_TRUE(readRow2->hasStyle()) << "Row 1 should have default style";
+    EXPECT_FALSE(readRow3->hasStyle()) << "Row 2 should not have default style";
 
     // Verify the style content
-    if (!readRow2->defaultStyleId.isNull()) {
-        const CellStyle* readStyle = readResult.workbook->getStyle(readRow2->defaultStyleId);
+    if (readRow2->hasStyle()) {
+        const ID readStyleId = readResult.workbook->getStyleId(readRow2->id);
+        ASSERT_FALSE(readStyleId.isNull());
+        const CellStyle* readStyle = readResult.workbook->getStyle(readStyleId);
         ASSERT_NE(readStyle, nullptr);
         EXPECT_TRUE(readStyle->italic) << "Row 1 style should be italic";
     }

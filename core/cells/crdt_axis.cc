@@ -445,10 +445,13 @@ ApplyResult applyAxisSetStyle(Workbook& workbook, const Operation& op) {
     }
 
     // Payload is the style ID (or empty string to clear)
+    // Axis styles are stored in workbook._styles map (not in Axis struct)
     if (op.payload.empty()) {
-        axis->defaultStyleId = ID{};  // Clear style
+        workbook.setStyleId(axis->id, ID{});  // Clear style
+        axis->setHasStyle(false);
     } else {
-        axis->defaultStyleId = ID(op.payload);
+        workbook.setStyleId(axis->id, ID(op.payload));
+        axis->setHasStyle(true);
     }
 
     return ApplyResult::SUCCESS;

@@ -2256,12 +2256,14 @@ TEST(SerializerTest, AxisDefaultStyleRoundTrip) {
     wb.registerStyle(ID("sT1yL2eB"), italicStyle);
 
     auto col = std::make_unique<Axis>(ID("cA1bC2dE"), true);
-    col->defaultStyleId = ID("sT1yL2eA");
+    col->setHasStyle(true);
     sheet->addColumn(std::move(col));
+    wb.setStyleId(ID("cA1bC2dE"), ID("sT1yL2eA"));
 
     auto row = std::make_unique<Axis>(ID("rA1bC2dE"), false);
-    row->defaultStyleId = ID("sT1yL2eB");
+    row->setHasStyle(true);
     sheet->addRow(std::move(row));
+    wb.setStyleId(ID("rA1bC2dE"), ID("sT1yL2eB"));
 
     wb.addSheet(std::move(sheet));
 
@@ -2282,11 +2284,13 @@ TEST(SerializerTest, AxisDefaultStyleRoundTrip) {
 
     Axis* parsedCol = parsedSheet->getColumn(ID("cA1bC2dE"));
     ASSERT_NE(parsedCol, nullptr);
-    EXPECT_EQ(parsedCol->defaultStyleId.toString(), "sT1yL2eA");
+    EXPECT_TRUE(parsedCol->hasStyle());
+    EXPECT_EQ(result.workbook->getStyleId(parsedCol->id).toString(), "sT1yL2eA");
 
     Axis* parsedRow = parsedSheet->getRow(ID("rA1bC2dE"));
     ASSERT_NE(parsedRow, nullptr);
-    EXPECT_EQ(parsedRow->defaultStyleId.toString(), "sT1yL2eB");
+    EXPECT_TRUE(parsedRow->hasStyle());
+    EXPECT_EQ(result.workbook->getStyleId(parsedRow->id).toString(), "sT1yL2eB");
 }
 
 }  // namespace

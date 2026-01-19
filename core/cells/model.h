@@ -355,7 +355,7 @@ struct Axis {
     uint32_t position;  // Visual position (0-indexed)
     uint32_t size;      // Width (column) or height (row) in pixels
     AxisFlags _flags;   // Combined flags: IS_COLUMN, HIDDEN, HAS_STYLE
-    ID defaultStyleId;  // Default style for cells in this axis (null = no default)
+    // NOTE: Axis styles are stored in Workbook::_styles map via axis ID (see hasStyle() flag)
 
     Axis();
     explicit Axis(const ID& id, bool isColumn = true);

@@ -1763,10 +1763,14 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             auto widthIt = columnWidths.find(c);
             col->size = (widthIt != columnWidths.end()) ? widthIt->second : DEFAULT_COLUMN_WIDTH;
             col->setHidden(columnHidden.count(c) > 0);
-            // Apply column default style if present
+            // Apply column default style if present (store in workbook map)
             auto styleIt = columnStyleIndex.find(c);
             if (styleIt != columnStyleIndex.end()) {
-                col->defaultStyleId = getOrCreateStyleId(styleIt->second);
+                const ID styleId = getOrCreateStyleId(styleIt->second);
+                if (!styleId.isNull()) {
+                    workbook->setStyleId(col->id, styleId);
+                    col->setHasStyle(true);
+                }
             }
             columnIds.push_back(col->id);
             sheet->addColumn(std::move(col));
@@ -1779,10 +1783,14 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             auto heightIt = rowHeights.find(r);
             rowAxis->size = (heightIt != rowHeights.end()) ? heightIt->second : DEFAULT_ROW_HEIGHT;
             rowAxis->setHidden(rowHidden.count(r) > 0);
-            // Apply row default style if present
+            // Apply row default style if present (store in workbook map)
             auto styleIt = rowStyleIndex.find(r);
             if (styleIt != rowStyleIndex.end()) {
-                rowAxis->defaultStyleId = getOrCreateStyleId(styleIt->second);
+                const ID styleId = getOrCreateStyleId(styleIt->second);
+                if (!styleId.isNull()) {
+                    workbook->setStyleId(rowAxis->id, styleId);
+                    rowAxis->setHasStyle(true);
+                }
             }
             rowIds.push_back(rowAxis->id);
             sheet->addRow(std::move(rowAxis));
