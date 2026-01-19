@@ -527,6 +527,115 @@ const tests = {
     );
   },
 
+  // Additional test: Larger range overlaps with partial coverage
+  // Specifically tests green B1:E5 then red D3:F8 (matching user-reported scenario)
+  'Overlapping ranges: large first range, partial overlap second': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const greenColor = '#10B981';  // Emerald 500
+    const redColor = '#EF4444';    // Red 500
+
+    // Apply green background to B1:E5 (larger range)
+    await selectRange(ctx.page, 'B1', 'E5');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, greenColor);
+    await sleep(300);
+
+    // Apply red background to D3:F8 (overlaps with D3:E5)
+    await selectRange(ctx.page, 'D3', 'F8');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, redColor);
+    await sleep(300);
+
+    // Click elsewhere to deselect
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // The green range should have been split - the overlap area D3:E5 should be RED
+    // Original green B1:E5 minus D3:F8 intersection produces:
+    // - Left strip: B1:C5 (cols 1-2, rows 0-4)
+    // - Top strip: D1:E2 (cols 3-4, rows 0-1)
+
+    // Check D3 (overlap area) - should be RED
+    const posD3 = await getCellPosition(ctx.page, 3, 2);
+    const pixelD3 = await getPixelColor(
+      ctx.page,
+      posD3.x + posD3.width / 2,
+      posD3.y + posD3.height / 2
+    );
+    console.log(`D3 pixel color: r=${pixelD3?.r}, g=${pixelD3?.g}, b=${pixelD3?.b}`);
+    assertTrue(
+      isColorApproximately(pixelD3, redColor, 30),
+      `D3 (overlap area) should have RED background after new range applied (got r=${pixelD3?.r}, g=${pixelD3?.g}, b=${pixelD3?.b})`
+    );
+
+    // Check E5 (overlap area) - should be RED
+    const posE5 = await getCellPosition(ctx.page, 4, 4);
+    const pixelE5 = await getPixelColor(
+      ctx.page,
+      posE5.x + posE5.width / 2,
+      posE5.y + posE5.height / 2
+    );
+    console.log(`E5 pixel color: r=${pixelE5?.r}, g=${pixelE5?.g}, b=${pixelE5?.b}`);
+    assertTrue(
+      isColorApproximately(pixelE5, redColor, 30),
+      `E5 (overlap area) should have RED background`
+    );
+
+    // Check F6 (red only, outside green) - should be RED
+    const posF6 = await getCellPosition(ctx.page, 5, 5);
+    const pixelF6 = await getPixelColor(
+      ctx.page,
+      posF6.x + posF6.width / 2,
+      posF6.y + posF6.height / 2
+    );
+    console.log(`F6 pixel color: r=${pixelF6?.r}, g=${pixelF6?.g}, b=${pixelF6?.b}`);
+    assertTrue(
+      isColorApproximately(pixelF6, redColor, 30),
+      `F6 (red range only) should have RED background`
+    );
+
+    // Check B1 (green only, not in overlap) - should be GREEN
+    const posB1 = await getCellPosition(ctx.page, 1, 0);
+    const pixelB1 = await getPixelColor(
+      ctx.page,
+      posB1.x + posB1.width / 2,
+      posB1.y + posB1.height / 2
+    );
+    console.log(`B1 pixel color: r=${pixelB1?.r}, g=${pixelB1?.g}, b=${pixelB1?.b}`);
+    assertTrue(
+      isColorApproximately(pixelB1, greenColor, 30),
+      `B1 (split green range - left) should have GREEN background`
+    );
+
+    // Check C5 (green only - in left split strip) - should be GREEN
+    const posC5 = await getCellPosition(ctx.page, 2, 4);
+    const pixelC5 = await getPixelColor(
+      ctx.page,
+      posC5.x + posC5.width / 2,
+      posC5.y + posC5.height / 2
+    );
+    console.log(`C5 pixel color: r=${pixelC5?.r}, g=${pixelC5?.g}, b=${pixelC5?.b}`);
+    assertTrue(
+      isColorApproximately(pixelC5, greenColor, 30),
+      `C5 (split green range - left) should have GREEN background`
+    );
+
+    // Check D2 (green only - in top split strip) - should be GREEN
+    const posD2 = await getCellPosition(ctx.page, 3, 1);
+    const pixelD2 = await getPixelColor(
+      ctx.page,
+      posD2.x + posD2.width / 2,
+      posD2.y + posD2.height / 2
+    );
+    console.log(`D2 pixel color: r=${pixelD2?.r}, g=${pixelD2?.g}, b=${pixelD2?.b}`);
+    assertTrue(
+      isColorApproximately(pixelD2, greenColor, 30),
+      `D2 (split green range - top) should have GREEN background`
+    );
+  },
+
   // J5: Overlapping ranges with DIFFERENT properties can layer (no splitting)
   // When applying textColor to an overlapping range, bgColor range should NOT be split
   'Overlapping ranges with different properties can layer': async (ctx) => {
