@@ -70,22 +70,6 @@ struct DependencyRef {
     DependencyRef() = default;
 };
 
-// Cross-sheet reference info for workbook-level dependency tracking
-// Stores the referenced cell/range and the sheet it belongs to
-struct CrossSheetRef {
-    ID sheetId;      // Sheet containing the referenced cell
-    ID cellId;       // For cell refs: the cell ID
-    ID startCellId;  // For range refs: top-left cell ID
-    ID endCellId;    // For range refs: bottom-right cell ID
-
-    enum class Type : uint8_t { CELL, RANGE };
-    Type type{Type::CELL};
-};
-
-// Extract cross-sheet references from an AST
-// Returns references that have a sheetId set (pointing to a different sheet)
-std::vector<CrossSheetRef> extractCrossSheetRefs(const ASTNode* ast);
-
 // Dependency graph for tracking which cells depend on which
 // Uses R-tree for efficient "what depends on this cell/range" queries
 class DependencyGraph {

@@ -530,10 +530,12 @@ references with sheet names (when cell's column's sheetId differs from active sh
 **Step 5 completed.** All 19 formula E2E tests now pass, including cross-sheet reference tests.
 
 **Step 6: Cleanup and testing**
-- [ ] 14t: Remove `extractCrossSheetRefs()` from dependency_graph.h/cc if no longer used
+- [x] 14t: Remove `extractCrossSheetRefs()` from dependency_graph.h/cc - removed CrossSheetRef struct and function (in progress)
 - [x] 14u: Run all tests to verify recalculation still works correctly (54 unit, 183/184 E2E pass)
 - [x] 14v: Verify cross-sheet formula scenarios work (Sheet1!A1 = Sheet2!B1)
 - [x] 14w: Verify formula bar displays cross-sheet refs correctly (=Sheet2!B5)
+
+**Phase 14 in progress.** Steps 3-5 complete. Step 6 cleanup started (removing extractCrossSheetRefs from .cc still needed).
 
 ## Design Notes
 
