@@ -276,6 +276,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":dependency_graph",
+        ":format_registry",
         ":formula_ast",
         ":formula_parser",
         ":formula_serializer",

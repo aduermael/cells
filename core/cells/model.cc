@@ -30,6 +30,7 @@
 #include <utility>
 
 #include "core/cells/dependency_graph.h"
+#include "core/cells/format_registry.h"
 #include "core/cells/formula_ast.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
@@ -320,6 +321,7 @@ Workbook::Workbook()
       _oplog(std::make_unique<OpLog>()),
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
+      _formatRegistry(std::make_unique<FormatRegistry>()),
       _styleRegistry(std::make_unique<StyleRegistry>()),
       _depGraph(std::make_unique<DependencyGraph>()) {}
 
@@ -329,6 +331,7 @@ Workbook::Workbook(const ID& id, std::string name)
       _oplog(std::make_unique<OpLog>()),
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
+      _formatRegistry(std::make_unique<FormatRegistry>()),
       _styleRegistry(std::make_unique<StyleRegistry>()),
       _depGraph(std::make_unique<DependencyGraph>()) {}
 
@@ -666,24 +669,27 @@ std::unique_ptr<Axis> Workbook::removeRow(const ID& rowId) {
 }
 
 bool Workbook::registerCustomFormat(const ID& formatId, const std::string& formatCode) {
-    auto [it, inserted] = _customFormats.try_emplace(formatId, formatCode);
-    return inserted;
+    return _formatRegistry->registerFormat(formatId, formatCode);
 }
 
 bool Workbook::hasCustomFormat(const ID& formatId) const {
-    return _customFormats.find(formatId) != _customFormats.end();
+    return _formatRegistry->hasFormat(formatId);
 }
 
 std::string Workbook::getCustomFormatCode(const ID& formatId) const {
-    auto it = _customFormats.find(formatId);
-    if (it != _customFormats.end()) {
-        return it->second;
-    }
-    return "";
+    return _formatRegistry->getFormatCode(formatId);
 }
 
 const std::unordered_map<ID, std::string, IDHash>& Workbook::getCustomFormats() const {
-    return _customFormats;
+    return _formatRegistry->getFormats();
+}
+
+FormatRegistry* Workbook::getFormatRegistry() {
+    return _formatRegistry.get();
+}
+
+const FormatRegistry* Workbook::getFormatRegistry() const {
+    return _formatRegistry.get();
 }
 
 bool Workbook::registerStyle(const ID& styleId, const CellStyle& style) {

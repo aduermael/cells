@@ -59,6 +59,7 @@ struct SpillInfo;
 struct Range;
 class RangeIndex;
 class StyleRegistry;
+class FormatRegistry;
 enum class RangeFlags : uint8_t;
 
 // Collaboration mode for the workbook
@@ -855,7 +856,7 @@ struct Workbook {
     std::unique_ptr<Axis> removeRow(const ID& rowId);
 
     // ========================================================================
-    // Custom formats (CRDT-synced)
+    // Custom formats (CRDT-synced via FormatRegistry)
     // ========================================================================
 
     // Register a custom format definition (called by CRDT when applying FORMAT_DEFINE)
@@ -870,6 +871,10 @@ struct Workbook {
 
     // Get all custom formats (for bootstrapOpLog and sync)
     [[nodiscard]] const std::unordered_map<ID, std::string, IDHash>& getCustomFormats() const;
+
+    // Get the format registry for advanced operations (ref counting, etc.)
+    [[nodiscard]] FormatRegistry* getFormatRegistry();
+    [[nodiscard]] const FormatRegistry* getFormatRegistry() const;
 
     // ========================================================================
     // Cell styles (CRDT-synced)
@@ -1053,9 +1058,9 @@ private:
     // Collaboration mode (default: OFFLINE)
     CollabMode _collabMode{CollabMode::OFFLINE};
 
-    // Custom format definitions (format ID -> format code)
+    // Format registry with deduplication and reference counting
     // Synced via FORMAT_DEFINE operations
-    std::unordered_map<ID, std::string, IDHash> _customFormats;
+    std::unique_ptr<FormatRegistry> _formatRegistry;
 
     // Cell style registry with deduplication and reference counting
     // Synced via STYLE_DEFINE operations
