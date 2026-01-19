@@ -645,6 +645,41 @@ export class CellsClient {
   }
 
   /**
+   * Apply a style to a range on a specific sheet.
+   * Unlike setRangeStyle(), this targets a specific sheet by index instead of
+   * always using the active sheet. This is needed for cross-sheet operations.
+   * @param sheetIndex Sheet index (0-indexed)
+   * @param startCol Start column position (0-indexed)
+   * @param startRow Start row position (0-indexed)
+   * @param endCol End column position (0-indexed)
+   * @param endRow End row position (0-indexed)
+   * @param style Style properties to apply
+   * @returns Result with rangeId and styleId on success
+   */
+  async setRangeStyleOnSheet(
+    sheetIndex: number,
+    startCol: number,
+    startRow: number,
+    endCol: number,
+    endRow: number,
+    style: Partial<CellStyle>,
+  ): Promise<{ success: boolean; rangeId?: string; styleId?: string }> {
+    const response = await this._send("setRangeStyleOnSheet", {
+      sheetIndex,
+      startCol,
+      startRow,
+      endCol,
+      endRow,
+      styleJson: JSON.stringify(style),
+    });
+    return {
+      success: true,
+      rangeId: String(response.rangeId),
+      styleId: String(response.styleId),
+    };
+  }
+
+  /**
    * Remove a style range at the given position.
    * @param col Column position (0-indexed)
    * @param row Row position (0-indexed)

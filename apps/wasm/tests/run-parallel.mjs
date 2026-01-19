@@ -34,6 +34,7 @@ const COLLECTIONS = {
     'cell-background.test.mjs',
     'font-loading.test.mjs',
     'range-styles.test.mjs',
+    'cross-sheet-style.test.mjs',
     'text-wrapping.test.mjs',
     'auto-fit.test.mjs',
   ],

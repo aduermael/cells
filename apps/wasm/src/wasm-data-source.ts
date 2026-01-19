@@ -292,6 +292,28 @@ export class WasmDataSource {
   }
 
   /**
+   * Apply a style to a range on a specific sheet.
+   * Unlike setRangeStyle(), this targets a specific sheet by index.
+   */
+  async setRangeStyleOnSheet(
+    sheetIndex: number,
+    startCol: number,
+    startRow: number,
+    endCol: number,
+    endRow: number,
+    style: Partial<CellStyle>,
+  ): Promise<{ success: boolean; rangeId?: string; styleId?: string }> {
+    return this._client.setRangeStyleOnSheet(
+      sheetIndex,
+      startCol,
+      startRow,
+      endCol,
+      endRow,
+      style,
+    );
+  }
+
+  /**
    * Remove a style range at the given position.
    */
   async removeRangeStyle(col: number, row: number): Promise<{ success: boolean }> {

@@ -1513,7 +1513,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         startColId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(minCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation op = makeColInsertOp(*_workbook, startColId, payload);
+        Operation op = makeColInsertOp(*_workbook, startColId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -1526,7 +1526,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         endColId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(maxCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-        Operation op = makeColInsertOp(*_workbook, endColId, payload);
+        Operation op = makeColInsertOp(*_workbook, endColId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -1539,7 +1539,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         startRowId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(minRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation op = makeRowInsertOp(*_workbook, startRowId, payload);
+        Operation op = makeRowInsertOp(*_workbook, startRowId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -1552,7 +1552,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         endRowId = generate_id();
         std::string payload =
             "{\"pos\":" + std::to_string(maxRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-        Operation op = makeRowInsertOp(*_workbook, endRowId, payload);
+        Operation op = makeRowInsertOp(*_workbook, endRowId, sheet->id, payload);
         applyOperation(*_workbook, op);
     }
 
@@ -1847,7 +1847,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 rectStartColId = generate_id();
                 std::string payload = "{\"pos\":" + std::to_string(rect.minCol) +
                                       ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-                Operation op = makeColInsertOp(*_workbook, rectStartColId, payload);
+                Operation op = makeColInsertOp(*_workbook, rectStartColId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
 
@@ -1860,7 +1860,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 rectEndColId = generate_id();
                 std::string payload = "{\"pos\":" + std::to_string(rect.maxCol) +
                                       ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
-                Operation op = makeColInsertOp(*_workbook, rectEndColId, payload);
+                Operation op = makeColInsertOp(*_workbook, rectEndColId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
 
@@ -1873,7 +1873,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 rectStartRowId = generate_id();
                 std::string payload = "{\"pos\":" + std::to_string(rect.minRow) +
                                       ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-                Operation op = makeRowInsertOp(*_workbook, rectStartRowId, payload);
+                Operation op = makeRowInsertOp(*_workbook, rectStartRowId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
 
@@ -1886,7 +1886,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 rectEndRowId = generate_id();
                 std::string payload = "{\"pos\":" + std::to_string(rect.maxRow) +
                                       ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
-                Operation op = makeRowInsertOp(*_workbook, rectEndRowId, payload);
+                Operation op = makeRowInsertOp(*_workbook, rectEndRowId, sheet->id, payload);
                 applyOperation(*_workbook, op);
             }
 
