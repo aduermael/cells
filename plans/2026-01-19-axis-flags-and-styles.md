@@ -114,7 +114,7 @@ Formats currently have no garbage collection - `_customFormats` stores format de
 - Reference counting (addRef/release)
 - Automatic garbage collection when refcount hits 0
 
-- [ ] 5a: Create `FormatRegistry` class in `format_registry.h/.cc` with:
+- [x] 5a: Create `FormatRegistry` class in `format_registry.h/.cc` with:
   - `_formats: map<formatId, formatCode>` - Format definitions
   - `_codeToId: map<formatCode, formatId>` - Deduplication by code string
   - `_refCount: map<formatId, count>` - Reference counting
