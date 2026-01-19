@@ -282,9 +282,11 @@ TEST(CellStyleHashTest, EmptyStyleHashIsZero) {
 TEST(CellStyleHashTest, DifferentStylesHaveDifferentHashes) {
     CellStyle style1;
     style1.bold = true;
+    style1.setDefined(DEFINED_BOLD);
 
     CellStyle style2;
     style2.italic = true;
+    style2.setDefined(DEFINED_ITALIC);
 
     // Different styles should (usually) have different hashes
     EXPECT_NE(style1.hash(), style2.hash());
@@ -293,13 +295,19 @@ TEST(CellStyleHashTest, DifferentStylesHaveDifferentHashes) {
 TEST(CellStyleHashTest, IdenticalStylesHaveSameHash) {
     CellStyle style1;
     style1.bold = true;
+    style1.setDefined(DEFINED_BOLD);
     style1.bgColor = "#FF0000";
+    style1.setDefined(DEFINED_BGCOLOR);
     style1.fontSize = 12;
+    style1.setDefined(DEFINED_FONTSIZE);
 
     CellStyle style2;
     style2.bold = true;
+    style2.setDefined(DEFINED_BOLD);
     style2.bgColor = "#FF0000";
+    style2.setDefined(DEFINED_BGCOLOR);
     style2.fontSize = 12;
+    style2.setDefined(DEFINED_FONTSIZE);
 
     EXPECT_EQ(style1.hash(), style2.hash());
 }
@@ -307,9 +315,11 @@ TEST(CellStyleHashTest, IdenticalStylesHaveSameHash) {
 TEST(CellStyleHashTest, BorderStylesAffectHash) {
     CellStyle style1;
     style1.border.top.style = BorderStyle::THIN;
+    style1.setDefined(DEFINED_BORDER_TOP);
 
     CellStyle style2;
     style2.border.top.style = BorderStyle::THICK;
+    style2.setDefined(DEFINED_BORDER_TOP);
 
     EXPECT_NE(style1.hash(), style2.hash());
 }
@@ -320,38 +330,47 @@ TEST(CellStyleHashTest, AllPropertiesAffectHash) {
     // Test each property changes the hash
     CellStyle withBold = base;
     withBold.bold = true;
+    withBold.setDefined(DEFINED_BOLD);
     EXPECT_NE(base.hash(), withBold.hash());
 
     CellStyle withItalic = base;
     withItalic.italic = true;
+    withItalic.setDefined(DEFINED_ITALIC);
     EXPECT_NE(base.hash(), withItalic.hash());
 
     CellStyle withUnderline = base;
     withUnderline.underline = true;
+    withUnderline.setDefined(DEFINED_UNDERLINE);
     EXPECT_NE(base.hash(), withUnderline.hash());
 
     CellStyle withBgColor = base;
     withBgColor.bgColor = "#000000";
+    withBgColor.setDefined(DEFINED_BGCOLOR);
     EXPECT_NE(base.hash(), withBgColor.hash());
 
     CellStyle withTextColor = base;
     withTextColor.textColor = "#FFFFFF";
+    withTextColor.setDefined(DEFINED_TEXTCOLOR);
     EXPECT_NE(base.hash(), withTextColor.hash());
 
     CellStyle withFontFamily = base;
     withFontFamily.fontFamily = "Arial";
+    withFontFamily.setDefined(DEFINED_FONTFAMILY);
     EXPECT_NE(base.hash(), withFontFamily.hash());
 
     CellStyle withFontSize = base;
     withFontSize.fontSize = 14;
+    withFontSize.setDefined(DEFINED_FONTSIZE);
     EXPECT_NE(base.hash(), withFontSize.hash());
 
     CellStyle withHAlign = base;
     withHAlign.hAlign = TextAlign::CENTER;
+    withHAlign.setDefined(DEFINED_HALIGN);
     EXPECT_NE(base.hash(), withHAlign.hash());
 
     CellStyle withVAlign = base;
     withVAlign.vAlign = VerticalAlign::TOP;
+    withVAlign.setDefined(DEFINED_VALIGN);
     EXPECT_NE(base.hash(), withVAlign.hash());
 }
 

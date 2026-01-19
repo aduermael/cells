@@ -89,22 +89,29 @@ These just need to be exposed in the UI - no C++ changes needed for border style
 
 ## Phase 1: Add Defined Flags to CellStyle
 
-- [ ] 1a: Add `defined` bitfield and constants to `style_types.h`
+- [x] 1a: Add `defined` bitfield and constants to `style_types.h`
   - Add `uint16_t defined{0}` field to CellStyle
   - Define bit constants: `DEFINED_BOLD = 1 << 0`, `DEFINED_ITALIC = 1 << 1`, etc.
   - Add helper methods: `bool isDefined(uint16_t prop) const`, `void setDefined(uint16_t prop)`, `void clearDefined(uint16_t prop)`
 
-- [ ] 1b: Reorder CellStyle fields for better alignment
+- [x] 1b: Reorder CellStyle fields for better alignment
   - Move `defined`, `fontSize`, `hAlign`, `vAlign`, booleans together
   - Keep strings and border at end
 
-- [ ] 1c: Update `isEmpty()` to check `defined == 0`
+- [x] 1c: Update `isEmpty()` to check `defined == 0`
   - An empty style has no defined properties (flag is source of truth)
 
-- [ ] 1d: Update `hash()` to include `defined` field
+- [x] 1d: Update `hash()` to include `defined` field
   - Hash should differentiate between defined vs undefined properties
+  - Returns 0 for empty styles (defined == 0)
 
-- [ ] 1e: Update `operator==` to compare `defined` field
+- [x] 1e: Update `operator==` to compare `defined` field
+
+**Additional work done in Phase 1** (required for tests to pass):
+- Updated `applyStyleDefine()` in `crdt_axis.cc` to set defined flags when parsing JSON
+- Updated `luaSetStyle()` in `luau_api.cc` to set defined flags when building styles from Lua tables
+- Updated `luaCellSet()` style handler in `luau_types.cc` to set defined flags
+- Updated unit tests in `style_registry_test.cc` and `crdt_test.cc` to use defined flags
 
 ---
 

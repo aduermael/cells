@@ -943,42 +943,82 @@ static bool extractJSONBool(const std::string& json, const std::string& key,
     return defaultValue;
 }
 
+// Helper to check if a JSON key exists (not just if its value is non-empty)
+static bool jsonKeyExists(const std::string& json, const std::string& key) {
+    const std::string keyPattern = "\"" + key + "\":";
+    return json.find(keyPattern) != std::string::npos;
+}
+
 ApplyResult applyStyleDefine(Workbook& workbook, const Operation& op) {
     // Check if this style is already defined
     if (workbook.hasStyle(op.target_id)) {
         return ApplyResult::ALREADY_APPLIED;
     }
 
-    // Parse style properties from JSON payload
+    // Parse style properties from JSON payload, setting defined flags for present keys
     CellStyle style;
-    style.bold = extractJSONBool(op.payload, "bold", false);
-    style.italic = extractJSONBool(op.payload, "italic", false);
-    style.underline = extractJSONBool(op.payload, "underline", false);
-    style.wrapText = extractJSONBool(op.payload, "wrapText", false);
-    style.bgColor = extractJSONString(op.payload, "bgColor");
-    style.textColor = extractJSONString(op.payload, "textColor");
-    style.fontFamily = extractJSONString(op.payload, "fontFamily");
-    style.fontSize = static_cast<uint8_t>(extractJSONInt(op.payload, "fontSize", 0));
+
+    // Boolean properties - check if key exists to set defined flag
+    if (jsonKeyExists(op.payload, "bold")) {
+        style.bold = extractJSONBool(op.payload, "bold", false);
+        style.setDefined(DEFINED_BOLD);
+    }
+    if (jsonKeyExists(op.payload, "italic")) {
+        style.italic = extractJSONBool(op.payload, "italic", false);
+        style.setDefined(DEFINED_ITALIC);
+    }
+    if (jsonKeyExists(op.payload, "underline")) {
+        style.underline = extractJSONBool(op.payload, "underline", false);
+        style.setDefined(DEFINED_UNDERLINE);
+    }
+    if (jsonKeyExists(op.payload, "wrapText")) {
+        style.wrapText = extractJSONBool(op.payload, "wrapText", false);
+        style.setDefined(DEFINED_WRAPTEXT);
+    }
+
+    // String properties - non-empty extraction means key was present
+    if (jsonKeyExists(op.payload, "bgColor")) {
+        style.bgColor = extractJSONString(op.payload, "bgColor");
+        style.setDefined(DEFINED_BGCOLOR);
+    }
+    if (jsonKeyExists(op.payload, "textColor")) {
+        style.textColor = extractJSONString(op.payload, "textColor");
+        style.setDefined(DEFINED_TEXTCOLOR);
+    }
+    if (jsonKeyExists(op.payload, "fontFamily")) {
+        style.fontFamily = extractJSONString(op.payload, "fontFamily");
+        style.setDefined(DEFINED_FONTFAMILY);
+    }
+    if (jsonKeyExists(op.payload, "fontSize")) {
+        style.fontSize = static_cast<uint8_t>(extractJSONInt(op.payload, "fontSize", 0));
+        style.setDefined(DEFINED_FONTSIZE);
+    }
 
     // Parse alignment enums
     const std::string hAlignStr = extractJSONString(op.payload, "hAlign");
-    if (hAlignStr == "center") {
-        style.hAlign = TextAlign::CENTER;
-    } else if (hAlignStr == "right") {
-        style.hAlign = TextAlign::RIGHT;
-    } else if (hAlignStr == "justify") {
-        style.hAlign = TextAlign::JUSTIFY;
-    } else {
-        style.hAlign = TextAlign::LEFT;
+    if (!hAlignStr.empty() || jsonKeyExists(op.payload, "hAlign")) {
+        if (hAlignStr == "center") {
+            style.hAlign = TextAlign::CENTER;
+        } else if (hAlignStr == "right") {
+            style.hAlign = TextAlign::RIGHT;
+        } else if (hAlignStr == "justify") {
+            style.hAlign = TextAlign::JUSTIFY;
+        } else {
+            style.hAlign = TextAlign::LEFT;
+        }
+        style.setDefined(DEFINED_HALIGN);
     }
 
     const std::string vAlignStr = extractJSONString(op.payload, "vAlign");
-    if (vAlignStr == "top") {
-        style.vAlign = VerticalAlign::TOP;
-    } else if (vAlignStr == "middle") {
-        style.vAlign = VerticalAlign::MIDDLE;
-    } else {
-        style.vAlign = VerticalAlign::BOTTOM;
+    if (!vAlignStr.empty() || jsonKeyExists(op.payload, "vAlign")) {
+        if (vAlignStr == "top") {
+            style.vAlign = VerticalAlign::TOP;
+        } else if (vAlignStr == "middle") {
+            style.vAlign = VerticalAlign::MIDDLE;
+        } else {
+            style.vAlign = VerticalAlign::BOTTOM;
+        }
+        style.setDefined(DEFINED_VALIGN);
     }
 
     workbook.registerStyle(op.target_id, style);

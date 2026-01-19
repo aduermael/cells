@@ -1377,54 +1377,62 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
         luaL_error(L, "setStyle: second argument must be style table or nil");
     }
 
-    // Build style from table
+    // Build style from table, setting defined flags for provided properties
     CellStyle style;
 
     lua_getfield(L, 2, "bold");
     if (lua_isboolean(L, -1) != 0) {
         style.bold = lua_toboolean(L, -1) != 0;
+        style.setDefined(DEFINED_BOLD);
     }
     lua_pop(L, 1);
 
     lua_getfield(L, 2, "italic");
     if (lua_isboolean(L, -1) != 0) {
         style.italic = lua_toboolean(L, -1) != 0;
+        style.setDefined(DEFINED_ITALIC);
     }
     lua_pop(L, 1);
 
     lua_getfield(L, 2, "underline");
     if (lua_isboolean(L, -1) != 0) {
         style.underline = lua_toboolean(L, -1) != 0;
+        style.setDefined(DEFINED_UNDERLINE);
     }
     lua_pop(L, 1);
 
     lua_getfield(L, 2, "wrapText");
     if (lua_isboolean(L, -1) != 0) {
         style.wrapText = lua_toboolean(L, -1) != 0;
+        style.setDefined(DEFINED_WRAPTEXT);
     }
     lua_pop(L, 1);
 
     lua_getfield(L, 2, "bgColor");
     if (lua_isstring(L, -1) != 0) {
         style.bgColor = lua_tostring(L, -1);
+        style.setDefined(DEFINED_BGCOLOR);
     }
     lua_pop(L, 1);
 
     lua_getfield(L, 2, "textColor");
     if (lua_isstring(L, -1) != 0) {
         style.textColor = lua_tostring(L, -1);
+        style.setDefined(DEFINED_TEXTCOLOR);
     }
     lua_pop(L, 1);
 
     lua_getfield(L, 2, "fontFamily");
     if (lua_isstring(L, -1) != 0) {
         style.fontFamily = lua_tostring(L, -1);
+        style.setDefined(DEFINED_FONTFAMILY);
     }
     lua_pop(L, 1);
 
     lua_getfield(L, 2, "fontSize");
     if (lua_isnumber(L, -1) != 0) {
         style.fontSize = static_cast<uint8_t>(lua_tonumber(L, -1));
+        style.setDefined(DEFINED_FONTSIZE);
     }
     lua_pop(L, 1);
 
@@ -1440,6 +1448,7 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
         } else {
             style.hAlign = TextAlign::LEFT;
         }
+        style.setDefined(DEFINED_HALIGN);
     }
     lua_pop(L, 1);
 
@@ -1453,6 +1462,7 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
         } else {
             style.vAlign = VerticalAlign::BOTTOM;
         }
+        style.setDefined(DEFINED_VALIGN);
     }
     lua_pop(L, 1);
 

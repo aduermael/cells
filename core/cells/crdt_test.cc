@@ -549,10 +549,12 @@ TEST_F(CRDTTest, CellStyleDefaults) {
 TEST_F(CRDTTest, CellStyleNonEmpty) {
     CellStyle style;
     style.bold = true;
+    style.setDefined(DEFINED_BOLD);
     EXPECT_FALSE(style.isEmpty());
 
     CellStyle style2;
     style2.bgColor = "#FF0000";
+    style2.setDefined(DEFINED_BGCOLOR);
     EXPECT_FALSE(style2.isEmpty());
 }
 
@@ -561,12 +563,15 @@ TEST_F(CRDTTest, CellStyleEquality) {
     EXPECT_EQ(a, b);
 
     a.bold = true;
+    a.setDefined(DEFINED_BOLD);
     EXPECT_NE(a, b);
 
     b.bold = true;
+    b.setDefined(DEFINED_BOLD);
     EXPECT_EQ(a, b);
 
     a.bgColor = "#FF0000";
+    a.setDefined(DEFINED_BGCOLOR);
     EXPECT_NE(a, b);
 }
 

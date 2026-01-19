@@ -574,58 +574,69 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
             }
         }
 
-        // Merge provided properties
+        // Merge provided properties, setting defined flags for provided properties
         lua_getfield(L, 3, "bold");
         if (lua_isboolean(L, -1) != 0) {
             style.bold = lua_toboolean(L, -1) != 0;
+            style.setDefined(DEFINED_BOLD);
         }
         lua_pop(L, 1);
 
         lua_getfield(L, 3, "italic");
         if (lua_isboolean(L, -1) != 0) {
             style.italic = lua_toboolean(L, -1) != 0;
+            style.setDefined(DEFINED_ITALIC);
         }
         lua_pop(L, 1);
 
         lua_getfield(L, 3, "underline");
         if (lua_isboolean(L, -1) != 0) {
             style.underline = lua_toboolean(L, -1) != 0;
+            style.setDefined(DEFINED_UNDERLINE);
         }
         lua_pop(L, 1);
 
         lua_getfield(L, 3, "wrapText");
         if (lua_isboolean(L, -1) != 0) {
             style.wrapText = lua_toboolean(L, -1) != 0;
+            style.setDefined(DEFINED_WRAPTEXT);
         }
         lua_pop(L, 1);
 
         lua_getfield(L, 3, "bgColor");
         if (lua_isstring(L, -1) != 0) {
             style.bgColor = lua_tostring(L, -1);
+            style.setDefined(DEFINED_BGCOLOR);
         } else if (lua_isnil(L, -1) != 0) {
             style.bgColor.clear();
+            style.setDefined(DEFINED_BGCOLOR);  // Explicitly cleared
         }
         lua_pop(L, 1);
 
         lua_getfield(L, 3, "textColor");
         if (lua_isstring(L, -1) != 0) {
             style.textColor = lua_tostring(L, -1);
+            style.setDefined(DEFINED_TEXTCOLOR);
         } else if (lua_isnil(L, -1) != 0) {
             style.textColor.clear();
+            style.setDefined(DEFINED_TEXTCOLOR);  // Explicitly cleared
         }
         lua_pop(L, 1);
 
         lua_getfield(L, 3, "fontFamily");
         if (lua_isstring(L, -1) != 0) {
             style.fontFamily = lua_tostring(L, -1);
+            style.setDefined(DEFINED_FONTFAMILY);
         } else if (lua_isnil(L, -1) != 0) {
             style.fontFamily.clear();
+            style.setDefined(DEFINED_FONTFAMILY);  // Explicitly cleared
         }
         lua_pop(L, 1);
 
         lua_getfield(L, 3, "fontSize");
         if (lua_isnumber(L, -1) != 0) {
             style.fontSize = static_cast<uint8_t>(lua_tonumber(L, -1));
+            style.setDefined(DEFINED_FONTSIZE);
         }
         lua_pop(L, 1);
 
@@ -641,6 +652,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
             } else {
                 style.hAlign = TextAlign::LEFT;
             }
+            style.setDefined(DEFINED_HALIGN);
         }
         lua_pop(L, 1);
 
@@ -654,6 +666,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
             } else {
                 style.vAlign = VerticalAlign::BOTTOM;
             }
+            style.setDefined(DEFINED_VALIGN);
         }
         lua_pop(L, 1);
 
