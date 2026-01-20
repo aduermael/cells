@@ -305,10 +305,8 @@ export class StyleControls {
     this.bgColorPopup.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
       const colorOption = target.closest(".color-option") as HTMLElement;
-      console.log("[StyleControls] bgColorPopup click, colorOption:", colorOption?.dataset.color);
       if (colorOption) {
         const color = colorOption.dataset.color || "";
-        console.log("[StyleControls] applying bgColor:", color);
         this.applyBgColor(color);
         this.closeColorPopups();
       }
@@ -356,13 +354,10 @@ export class StyleControls {
     // Close popups on outside click
     document.addEventListener("click", (e) => {
       const target = e.target as Node;
-      const targetEl = target as HTMLElement;
-      console.log("[StyleControls] document click, target:", targetEl.tagName, targetEl.className, "inBgWrapper:", this.bgColorWrapper.contains(target), "inBgPopup:", this.bgColorPopup?.contains(target));
       if (
         !this.bgColorWrapper.contains(target) &&
         !this.textColorWrapper.contains(target)
       ) {
-        console.log("[StyleControls] closing color popups due to outside click");
         this.closeColorPopups();
       }
       if (
@@ -495,18 +490,12 @@ export class StyleControls {
 
   private async applyBgColor(color: string): Promise<void> {
     const position = this.getSelectedCell();
-    console.log("[StyleControls] applyBgColor called, color:", color, "position:", position, "hasDataSource:", !!this.dataSource);
-    if (!position || !this.dataSource) {
-      console.log("[StyleControls] applyBgColor early return: no position or dataSource");
-      return;
-    }
+    if (!position || !this.dataSource) return;
 
     const styleUpdate: Partial<CellStyle> = { bgColor: color };
 
     try {
-      console.log("[StyleControls] calling applyStyleToSelection with:", styleUpdate);
       await this.applyStyleToSelection(styleUpdate);
-      console.log("[StyleControls] applyStyleToSelection completed");
 
       this.currentStyle.bgColor = color;
       this.updateBgColorSwatch(color);
