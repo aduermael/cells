@@ -61,6 +61,22 @@ async function setDisplayName(page, name) {
 }
 
 /**
+ * Set the theme (light or dark) for a participant
+ * @param {Page} page - Puppeteer page
+ * @param {'light' | 'dark'} theme - Theme to set
+ */
+async function setTheme(page, theme) {
+  await page.evaluate((themeName) => {
+    // Store in localStorage so it persists
+    localStorage.setItem('cells.theme', themeName);
+    // Apply immediately
+    document.documentElement.setAttribute('data-theme', themeName);
+    // Trigger theme change event so grid re-renders
+    window.dispatchEvent(new CustomEvent('themechange', { detail: { theme: themeName } }));
+  }, theme);
+}
+
+/**
  * Navigate to a specific collaboration room
  */
 async function joinRoom(page, baseUrl, roomId, participantName) {
@@ -268,8 +284,12 @@ async function runCollabDemo() {
       await joinRoom(robertPage, ctx.baseUrl, ROOM_ID, 'Robert');
       await joinRoom(shuyingPage, ctx.baseUrl, ROOM_ID, 'Shuying');
 
+      // Robert prefers light mode (for visual diversity in demo)
+      await setTheme(robertPage, 'light');
+      console.log('  [Robert] Switched to light mode\n');
+
       // Wait for everyone to see each other
-      console.log('\n  Waiting for peer connections...');
+      console.log('  Waiting for peer connections...');
       await waitForAllPeers([nicoPage, robertPage, shuyingPage], 2, 25000);
 
       // Verify all canvases are loaded

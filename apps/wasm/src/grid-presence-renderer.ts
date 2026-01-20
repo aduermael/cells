@@ -8,6 +8,7 @@ import {
   PRESENCE_LABEL_HEIGHT,
   getZoomedHeaderWidth,
   getZoomedHeaderHeight,
+  getGridColors,
   type RemotePresenceRender,
 } from "./grid-constants.js";
 import { getCellBounds, getRangeBounds } from "./grid-utils.js";
@@ -386,7 +387,7 @@ function drawRemoteEditing(
 
   // Draw the editing text (no background, name shown on cursor already)
   ctx.globalAlpha = 0.7;
-  ctx.fillStyle = "#000000";
+  ctx.fillStyle = getGridColors().cellText;
   ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
   ctx.textAlign = "left";
   ctx.textBaseline = "middle";
