@@ -33,6 +33,7 @@ The project has multiple test layers:
 - [x] 3c: For each failing test, either fix it or remove it (no flaky/broken tests allowed)
   - Fixed `multi-cell-format.test.mjs`: changed `getCellStyleAt` to `getEffectiveCellStyle` to get resolved styles
   - Fixed `bug-a-repro.test.mjs`: removed F2 and double-click tests (document unfixed Bug A), kept working formula bar test
+  - Fixed `custom-format.test.mjs`: removed collaboration tests (custom format sync not implemented), rewrote to use standard `runTests` harness
 
 ### Missing Test Files (not currently run by `bazel run :e2e`)
 1. `borders.test.mjs`
