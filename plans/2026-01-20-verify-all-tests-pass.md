@@ -51,7 +51,7 @@ The project has multiple test layers:
 12. `xlsx-export.test.mjs`
 
 ## Phase 4: Final Verification
-- [ ] 4a: Run `bazel run :check` to verify all checks pass
-- [ ] 4b: Confirm all 36 E2E test files are included and passing
+- [x] 4a: Run `bazel run :check` to verify all checks pass - **All checks passed!**
+- [x] 4b: Confirm all 36 E2E test files are included and passing - **302/302 tests passing**
 
 **Note:** The test suite explicitly states "All tests must pass. There is no 'stable' subset - if a test is flaky or broken, fix it or remove it." (from `scripts/test-parallel.mjs`)
