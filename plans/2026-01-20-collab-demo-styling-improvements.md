@@ -58,9 +58,17 @@ This will be a separate file that runs with all E2E tests but can also be run st
 - Bold/italic/underline DO get stored in `cell.style` and sync correctly
 - Background colors fail to sync because the style data isn't in the viewport response
 
-**Root Cause Hypothesis:** Background colors may be using a different style storage path that doesn't get included in viewport queries. The renderer might access styles directly from WASM/CRDT oplog rather than from the viewport cell data.
+**Style Resolution Architecture:**
+Cell styles are inferred from multiple sources, applied in this priority order (higher overrides lower):
+1. **Column/Row style/format** (lowest priority) - not sure if implemented yet
+2. **Range style/format** - styles applied to cell ranges
+3. **Cell style/format** (highest priority) - styles applied directly to individual cells
 
-**Next Steps:** Before continuing to Phase 2-5, the viewport data must be fixed to include all style properties (bgColor, textColor, fontFamily, fontSize) in the cell style object. This is a core engine bug, not a test issue.
+Bold, italic, underline, background colors, text colors, fonts, etc. should ALL follow this resolution logic.
+
+**Root Cause Hypothesis:** Background colors may be stored at the range level but not properly resolved/included in the viewport cell data. The renderer might access styles directly from WASM/CRDT oplog rather than from the merged viewport cell data. Bold/italic may be working because they're stored at the cell level.
+
+**Next Steps:** Before continuing to Phase 2-5, the viewport data must be fixed to include all resolved style properties (bgColor, textColor, fontFamily, fontSize, bold, italic, etc.) in the cell style object, properly merged from column/row → range → cell sources. This is a core engine bug, not a test issue.
 
 ## Phase 2: Add Font Family Helper Function
 
