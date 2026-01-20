@@ -18,6 +18,7 @@ The collab demo (`bazel run :e2e-headed -- collab-demo`) has several issues:
 ## Phase 1: Add Dedicated Style Sync Test
 
 Create a focused collaboration test that verifies all style properties sync correctly.
+This will be a separate file that runs with all E2E tests but can also be run standalone.
 
 - [ ] 1a: Create `collab-style-sync.test.mjs` with tests for:
   - Background color sync between 2 peers
@@ -28,7 +29,10 @@ Create a focused collaboration test that verifies all style properties sync corr
   - Border sync between 2 peers
   - Number format sync between 2 peers (currency, percentage)
 
-- [ ] 1b: Add the new test to the `collab` collection in `test-parallel.mjs`
+- [ ] 1b: Add the new test to:
+  - The `all` collection in `test-parallel.mjs` (runs with all E2E tests)
+  - The `collab` collection in `test-parallel.mjs` (runs with collab tests)
+  - Can be run standalone via `bazel run :e2e-headed -- collab-style-sync`
 
 ## Phase 2: Add Font Family Helper Function
 
@@ -39,12 +43,18 @@ Create a focused collaboration test that verifies all style properties sync corr
 
 ## Phase 3: Restructure Demo - Robert as Styling Lead
 
-Reorganize the demo so Robert focuses on styling existing content while others add data:
+Reorganize the demo so Robert focuses on styling existing content while others add data.
 
-- [ ] 3a: Modify Act 2 - After Nico creates title, Robert immediately styles it (blue background, white text, bold) before Nico continues with headers
-- [ ] 3b: Modify Act 2 - After Nico adds headers, Robert styles them (gray background, bold, borders) before Nico adds features
-- [ ] 3c: Modify Act 2 - Robert adds different fonts: title in Georgia, headers in Helvetica, data in Arial
-- [ ] 3d: Modify Act 4 - While Shuying adds estimates, Robert styles feature list with alternating row colors
+**Font choices (visually distinct):**
+- Title: **Georgia** (serif, elegant)
+- Headers: **Helvetica** (sans-serif, clean)
+- Data cells: **Arial** (default, readable)
+- Credits/Motto: **Courier New** (monospace, distinctive)
+
+- [ ] 3a: Modify Act 2 - After Nico creates title, Robert immediately styles it (blue background, white text, bold, Georgia font) before Nico continues with headers
+- [ ] 3b: Modify Act 2 - After Nico adds headers, Robert styles them (gray background, bold, borders, Helvetica font) before Nico adds features
+- [ ] 3c: Modify Act 4 - While Shuying adds estimates, Robert styles feature list with alternating row colors
+- [ ] 3d: Modify Finale - Apply Courier New font to the motto/credits section
 - [ ] 3e: Ensure all styling happens with clear sync verification to other peers
 
 ## Phase 4: Debug and Fix Style Visibility Issues
