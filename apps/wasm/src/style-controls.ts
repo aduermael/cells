@@ -198,11 +198,12 @@ export class StyleControls {
     this.setupEventListeners();
 
     // Register menus with MenuStateManager for mutual exclusivity
+    // Each menu must have its own close callback to avoid reentrancy bugs
     const menuState = getMenuStateManager();
-    menuState.registerMenu("bgColor", () => this.closeColorPopups());
-    menuState.registerMenu("textColor", () => this.closeColorPopups());
-    menuState.registerMenu("fontFamily", () => this.closeFontDropdowns());
-    menuState.registerMenu("fontSize", () => this.closeFontDropdowns());
+    menuState.registerMenu("bgColor", () => this.closeBgColorPopup());
+    menuState.registerMenu("textColor", () => this.closeTextColorPopup());
+    menuState.registerMenu("fontFamily", () => this.closeFontFamilyDropdown());
+    menuState.registerMenu("fontSize", () => this.closeFontSizeDropdown());
   }
 
   // =========================================================================
@@ -304,8 +305,10 @@ export class StyleControls {
     this.bgColorPopup.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
       const colorOption = target.closest(".color-option") as HTMLElement;
+      console.log("[StyleControls] bgColorPopup click, colorOption:", colorOption?.dataset.color);
       if (colorOption) {
         const color = colorOption.dataset.color || "";
+        console.log("[StyleControls] applying bgColor:", color);
         this.applyBgColor(color);
         this.closeColorPopups();
       }
@@ -353,10 +356,13 @@ export class StyleControls {
     // Close popups on outside click
     document.addEventListener("click", (e) => {
       const target = e.target as Node;
+      const targetEl = target as HTMLElement;
+      console.log("[StyleControls] document click, target:", targetEl.tagName, targetEl.className, "inBgWrapper:", this.bgColorWrapper.contains(target), "inBgPopup:", this.bgColorPopup?.contains(target));
       if (
         !this.bgColorWrapper.contains(target) &&
         !this.textColorWrapper.contains(target)
       ) {
+        console.log("[StyleControls] closing color popups due to outside click");
         this.closeColorPopups();
       }
       if (
@@ -489,12 +495,18 @@ export class StyleControls {
 
   private async applyBgColor(color: string): Promise<void> {
     const position = this.getSelectedCell();
-    if (!position || !this.dataSource) return;
+    console.log("[StyleControls] applyBgColor called, color:", color, "position:", position, "hasDataSource:", !!this.dataSource);
+    if (!position || !this.dataSource) {
+      console.log("[StyleControls] applyBgColor early return: no position or dataSource");
+      return;
+    }
 
     const styleUpdate: Partial<CellStyle> = { bgColor: color };
 
     try {
+      console.log("[StyleControls] calling applyStyleToSelection with:", styleUpdate);
       await this.applyStyleToSelection(styleUpdate);
+      console.log("[StyleControls] applyStyleToSelection completed");
 
       this.currentStyle.bgColor = color;
       this.updateBgColorSwatch(color);
@@ -715,25 +727,36 @@ export class StyleControls {
     const menuState = getMenuStateManager();
     const isOpen = wrapper.classList.contains("open");
 
-    // Close all popups first (MenuStateManager will handle closing other menus)
+    // Close all color popups first
     this.closeColorPopups();
 
     // Toggle the clicked one
     if (!isOpen) {
       wrapper.classList.add("open");
+      // Notify MenuStateManager - this will close other menus via their callbacks
       menuState.openMenu(menuId);
+    } else {
+      // Notify MenuStateManager that this menu is now closed
+      menuState.closeMenu(menuId);
     }
   }
 
   private closeColorPopups(): void {
-    const menuState = getMenuStateManager();
+    this.closeBgColorPopup();
+    this.closeTextColorPopup();
+  }
+
+  /** Close only the background color popup (for MenuStateManager callback) */
+  private closeBgColorPopup(): void {
     if (this.bgColorWrapper.classList.contains("open")) {
       this.bgColorWrapper.classList.remove("open");
-      menuState.closeMenu("bgColor");
     }
+  }
+
+  /** Close only the text color popup (for MenuStateManager callback) */
+  private closeTextColorPopup(): void {
     if (this.textColorWrapper.classList.contains("open")) {
       this.textColorWrapper.classList.remove("open");
-      menuState.closeMenu("textColor");
     }
   }
 
@@ -751,25 +774,36 @@ export class StyleControls {
     const menuState = getMenuStateManager();
     const isOpen = dropdown.classList.contains("open");
 
-    // Close all font dropdowns first (MenuStateManager will handle closing other menus)
+    // Close all font dropdowns first
     this.closeFontDropdowns();
 
     // Toggle the clicked one
     if (!isOpen) {
       dropdown.classList.add("open");
+      // Notify MenuStateManager - this will close other menus via their callbacks
       menuState.openMenu(menuId);
+    } else {
+      // Notify MenuStateManager that this menu is now closed
+      menuState.closeMenu(menuId);
     }
   }
 
   private closeFontDropdowns(): void {
-    const menuState = getMenuStateManager();
+    this.closeFontFamilyDropdown();
+    this.closeFontSizeDropdown();
+  }
+
+  /** Close only the font family dropdown (for MenuStateManager callback) */
+  private closeFontFamilyDropdown(): void {
     if (this.fontFamilyDropdown.classList.contains("open")) {
       this.fontFamilyDropdown.classList.remove("open");
-      menuState.closeMenu("fontFamily");
     }
+  }
+
+  /** Close only the font size dropdown (for MenuStateManager callback) */
+  private closeFontSizeDropdown(): void {
     if (this.fontSizeDropdown.classList.contains("open")) {
       this.fontSizeDropdown.classList.remove("open");
-      menuState.closeMenu("fontSize");
     }
   }
 

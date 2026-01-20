@@ -52,23 +52,48 @@ This will be a separate file that runs with all E2E tests but can also be run st
 
 **Run the test:** `bazel run :e2e -- collab-style-sync` (or `bazel run :e2e-headed -- collab-style-sync` for visible browser)
 
-**Bug Discovered:** Background color styles are NOT being included in viewport data.
-- Debug shows that even on local peer, after applying background color, the cell has NO `styleId` or `style` property
-- Yet the cell renders with the color visually - the renderer must be getting style info from somewhere else
-- Bold/italic/underline DO get stored in `cell.style` and sync correctly
-- Background colors fail to sync because the style data isn't in the viewport response
+### Bug #1: MenuStateManager Reentrancy Bug (FIXED)
 
-**Style Resolution Architecture:**
-Cell styles are inferred from multiple sources, applied in this priority order (higher overrides lower):
-1. **Column/Row style/format** (lowest priority) - not sure if implemented yet
-2. **Range style/format** - styles applied to cell ranges
-3. **Cell style/format** (highest priority) - styles applied directly to individual cells
+**Commit that introduced the bug:** d84cdb9 "2: integrate StyleControls with MenuStateManager"
 
-Bold, italic, underline, background colors, text colors, fonts, etc. should ALL follow this resolution logic.
+**Root cause:** When registering menus with MenuStateManager, both `bgColor` and `textColor` menus shared the same close callback (`closeColorPopups()`). When `openMenu("bgColor")` was called:
+1. It iterates over all menus and calls their close callbacks
+2. For `textColor`, it called `closeColorPopups()`
+3. `closeColorPopups()` closed BOTH color popups, including the one we just opened!
 
-**Root Cause Hypothesis:** Background colors may be stored at the range level but not properly resolved/included in the viewport cell data. The renderer might access styles directly from WASM/CRDT oplog rather than from the merged viewport cell data. Bold/italic may be working because they're stored at the cell level.
+**Fix applied:** Each menu now has its own individual close callback:
+- `closeBgColorPopup()` - only closes the bg color popup
+- `closeTextColorPopup()` - only closes the text color popup
+- `closeFontFamilyDropdown()` - only closes the font family dropdown
+- `closeFontSizeDropdown()` - only closes the font size dropdown
 
-**Next Steps:** Before continuing to Phase 2-5, the viewport data must be fixed to include all resolved style properties (bgColor, textColor, fontFamily, fontSize, bold, italic, etc.) in the cell style object, properly merged from column/row → range → cell sources. This is a core engine bug, not a test issue.
+The shared `closeColorPopups()` and `closeFontDropdowns()` methods now call the individual methods.
+
+### Bug #2: Click Event Handlers Not Firing (IN PROGRESS)
+
+**Status:** Investigating
+
+**Symptom:** After fixing Bug #1, the color picker popup now opens correctly (verified: `popup visible? true`). However, clicking on a color option does NOT trigger the JavaScript click event handler on `bgColorPopup`.
+
+**Debug evidence:**
+- Puppeteer finds the color option element: `color option found? true`
+- Puppeteer clicks the element
+- NO console messages from the `bgColorPopup.addEventListener("click", ...)` handler
+- The style is NOT applied
+
+**Hypothesis:** Either:
+1. The click event is not bubbling correctly
+2. Some other event handler is intercepting/stopping the event
+3. Puppeteer's click isn't triggering a real DOM event
+
+**Debug code added to style-controls.ts:**
+- `applyBgColor()` logs when called
+- `bgColorPopup` click handler logs when triggered
+- Document click handler logs target info
+
+**Test debug code:** Modified `applyBackgroundColor()` helper to try `el.click()` via JavaScript instead of puppeteer click.
+
+**Next step:** Continue debugging why click handlers aren't firing. May need to check event propagation or try different click approaches.
 
 ## Phase 2: Add Font Family Helper Function
 
@@ -104,3 +129,8 @@ Reorganize the demo so Robert focuses on styling existing content while others a
 - [ ] 5a: Update console log messages to clearly narrate the styling as it happens ("Robert applies blue background to title...")
 - [ ] 5b: Add font changes to the final summary output
 - [ ] 5c: Ensure SLOWMO mode allows watching all style changes visually
+
+## Files Modified
+
+- `apps/wasm/src/style-controls.ts` - Fixed MenuStateManager reentrancy bug, added individual close methods, added debug logging (to be removed)
+- `apps/wasm/tests/collab-style-sync.test.mjs` - Added debug logging for investigation (to be removed)

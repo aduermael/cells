@@ -34,16 +34,33 @@ import {
 async function applyBackgroundColor(page, color) {
   await page.click('#style-bg-color-btn');
   await sleep(100);
+
+  // Debug: check if popup is visible
+  const popupVisible = await page.$eval('#bg-color-popup', el => window.getComputedStyle(el).display !== 'none').catch(() => false);
+  console.log('DEBUG applyBackgroundColor: popup visible?', popupVisible);
+
   const colorSelector = `#bg-color-popup .color-option[data-color="${color.toUpperCase()}"]`;
   const hasColor = await page.$(colorSelector);
+  console.log('DEBUG applyBackgroundColor: color option found?', !!hasColor, 'selector:', colorSelector);
+
   if (hasColor) {
-    await page.click(colorSelector);
+    // Check what color attribute the element has
+    const colorAttr = await page.$eval(colorSelector, el => el.dataset.color);
+    console.log('DEBUG applyBackgroundColor: color attribute value:', colorAttr);
+    // Try clicking via JavaScript instead of puppeteer click
+    await page.$eval(colorSelector, el => {
+      console.log('[TEST] Dispatching click on color option');
+      el.click();
+    });
+    console.log('DEBUG applyBackgroundColor: clicked color option via JS');
   } else {
     const hexInput = await page.$('#bg-color-popup .color-hex-input');
+    console.log('DEBUG applyBackgroundColor: hex input found?', !!hexInput);
     if (hexInput) {
       await hexInput.click({ clickCount: 3 });
       await page.keyboard.type(color);
       await page.keyboard.press('Enter');
+      console.log('DEBUG applyBackgroundColor: entered hex color');
     }
   }
   await sleep(200);
@@ -397,7 +414,55 @@ async function runCollabStyleSyncTests() {
       await setCellValue(ctx.page, 'A1', 'Blue');
       await sleep(200);
       await clickCell(ctx.page, 'A1');
+
+      // DEBUG: Check style BEFORE applying background via UI
+      const styleBefore = await ctx.page.evaluate(async () => {
+        const ctx = window._appContext;
+        if (!ctx || !ctx.app?.dataSource) return { error: 'no app context' };
+        return ctx.app.dataSource.getCellStyleAt(0, 0);
+      });
+      console.log('DEBUG Style BEFORE UI apply:', JSON.stringify(styleBefore, null, 2));
+
+      // Listen for all console messages from StyleControls or TEST
+      const consoleMessages = [];
+      const consoleHandler = msg => {
+        const text = msg.text();
+        if (text.includes('[StyleControls]') || text.includes('[TEST]') || msg.type() === 'error') {
+          consoleMessages.push(text);
+        }
+      };
+      ctx.page.on('console', consoleHandler);
+
+      // DEBUG: Check current selection before applying style
+      const selection = await ctx.page.evaluate(() => {
+        const ctx = window._appContext;
+        if (!ctx || !ctx.app) return { error: 'no app context' };
+        return {
+          selectedCell: ctx.app.selectedCell,
+          selectionStart: ctx.app.selectionStart,
+          selectionEnd: ctx.app.selectionEnd,
+        };
+      });
+      console.log('DEBUG Selection state:', JSON.stringify(selection, null, 2));
+
       await applyBackgroundColor(ctx.page, COLORS.BLUE_500);
+
+      // Print captured console messages
+      ctx.page.off('console', consoleHandler);
+      if (consoleMessages.length > 0) {
+        console.log('DEBUG Console messages during apply:', consoleMessages);
+      } else {
+        console.log('DEBUG No StyleControls console messages captured');
+      }
+
+      // Check style immediately after UI apply
+      const styleAfterUI = await ctx.page.evaluate(async () => {
+        const ctx = window._appContext;
+        if (!ctx || !ctx.app?.dataSource) return { error: 'no app context' };
+        return ctx.app.dataSource.getCellStyleAt(0, 0);
+      });
+      console.log('DEBUG Style AFTER UI apply:', JSON.stringify(styleAfterUI, null, 2));
+
       await sleep(500);
 
       // Verify value synced first
@@ -407,6 +472,25 @@ async function runCollabStyleSyncTests() {
         const content = await getFormulaBarContent(page2);
         assertEqual(content, 'Blue', 'Value should sync to peer 2');
       }, { retries: 8, initialDelay: 300 });
+
+      // DEBUG: Query cell style directly from WASM engine on peer 1
+      const peer1StyleDirect = await ctx.page.evaluate(async () => {
+        const ctx = window._appContext;
+        if (!ctx || !ctx.app?.dataSource) return { error: 'no app context' };
+        // Call getCellStyleAt directly through the dataSource
+        const style = await ctx.app.dataSource.getCellStyleAt(0, 0);
+        return style;
+      });
+      console.log('DEBUG Peer 1 cell style (direct WASM query):', JSON.stringify(peer1StyleDirect, null, 2));
+
+      // Also get raw viewport to see what it returns
+      const peer1ViewportRaw = await ctx.page.evaluate(async () => {
+        const ctx = window._appContext;
+        if (!ctx || !ctx.app?.dataSource) return { error: 'no app context' };
+        const viewport = await ctx.app.dataSource.getViewport(0, 0, 5, 5);
+        return viewport;
+      });
+      console.log('DEBUG Peer 1 raw viewport:', JSON.stringify(peer1ViewportRaw, null, 2));
 
       // Verify background color is visible on peer 2 (pixel check)
       await verifyStyleSyncedVisually(page2, 'A1', COLORS.BLUE_500, 'Peer 2');
