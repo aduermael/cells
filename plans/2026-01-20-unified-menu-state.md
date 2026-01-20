@@ -17,12 +17,12 @@ Extend the existing `MenuStateManager` to handle all toolbar menus, ensuring onl
 - [x] 1a: Add new menu IDs to the `MenuId` type for all toolbar menus: `bgColor`, `textColor`, `fontFamily`, `fontSize`, `format`, `currency`, `customFormat`, `merge`, `border`
 
 ## Phase 2: Integrate StyleControls with MenuStateManager
-- [ ] 2a: Register `bgColor` and `textColor` menus in StyleControls constructor
-- [ ] 2b: Update `toggleColorPopup()` to call `menuState.openMenu()` instead of just toggling CSS class
-- [ ] 2c: Update `closeColorPopups()` to call `menuState.closeMenu()`
-- [ ] 2d: Register `fontFamily` and `fontSize` menus
-- [ ] 2e: Update `toggleFontDropdown()` to use MenuStateManager
-- [ ] 2f: Update `closeFontDropdowns()` to use MenuStateManager
+- [x] 2a: Register `bgColor` and `textColor` menus in StyleControls constructor
+- [x] 2b: Update `toggleColorPopup()` to call `menuState.openMenu()` instead of just toggling CSS class
+- [x] 2c: Update `closeColorPopups()` to call `menuState.closeMenu()`
+- [x] 2d: Register `fontFamily` and `fontSize` menus
+- [x] 2e: Update `toggleFontDropdown()` to use MenuStateManager
+- [x] 2f: Update `closeFontDropdowns()` to use MenuStateManager
 
 ## Phase 3: Integrate FormatControls with MenuStateManager
 - [ ] 3a: Register `format`, `currency`, and `customFormat` menus in FormatControls constructor

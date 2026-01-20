@@ -23,6 +23,7 @@
 
 import type { WasmDataSource } from "./wasm-data-source";
 import type { CellStyle, Position, CellData } from "./types";
+import { getMenuStateManager } from "./menu-state";
 
 // =============================================================================
 // Types
@@ -195,6 +196,13 @@ export class StyleControls {
     this.updateFormulaBar = callbacks.updateFormulaBar;
 
     this.setupEventListeners();
+
+    // Register menus with MenuStateManager for mutual exclusivity
+    const menuState = getMenuStateManager();
+    menuState.registerMenu("bgColor", () => this.closeColorPopups());
+    menuState.registerMenu("textColor", () => this.closeColorPopups());
+    menuState.registerMenu("fontFamily", () => this.closeFontDropdowns());
+    menuState.registerMenu("fontSize", () => this.closeFontDropdowns());
   }
 
   // =========================================================================
@@ -703,20 +711,30 @@ export class StyleControls {
 
   private toggleColorPopup(type: "bg" | "text"): void {
     const wrapper = type === "bg" ? this.bgColorWrapper : this.textColorWrapper;
+    const menuId = type === "bg" ? "bgColor" : "textColor";
+    const menuState = getMenuStateManager();
     const isOpen = wrapper.classList.contains("open");
 
-    // Close all popups first
+    // Close all popups first (MenuStateManager will handle closing other menus)
     this.closeColorPopups();
 
     // Toggle the clicked one
     if (!isOpen) {
       wrapper.classList.add("open");
+      menuState.openMenu(menuId);
     }
   }
 
   private closeColorPopups(): void {
-    this.bgColorWrapper.classList.remove("open");
-    this.textColorWrapper.classList.remove("open");
+    const menuState = getMenuStateManager();
+    if (this.bgColorWrapper.classList.contains("open")) {
+      this.bgColorWrapper.classList.remove("open");
+      menuState.closeMenu("bgColor");
+    }
+    if (this.textColorWrapper.classList.contains("open")) {
+      this.textColorWrapper.classList.remove("open");
+      menuState.closeMenu("textColor");
+    }
   }
 
   private isValidHexColor(color: string): boolean {
@@ -729,20 +747,30 @@ export class StyleControls {
 
   private toggleFontDropdown(type: "family" | "size"): void {
     const dropdown = type === "family" ? this.fontFamilyDropdown : this.fontSizeDropdown;
+    const menuId = type === "family" ? "fontFamily" : "fontSize";
+    const menuState = getMenuStateManager();
     const isOpen = dropdown.classList.contains("open");
 
-    // Close all font dropdowns first
+    // Close all font dropdowns first (MenuStateManager will handle closing other menus)
     this.closeFontDropdowns();
 
     // Toggle the clicked one
     if (!isOpen) {
       dropdown.classList.add("open");
+      menuState.openMenu(menuId);
     }
   }
 
   private closeFontDropdowns(): void {
-    this.fontFamilyDropdown.classList.remove("open");
-    this.fontSizeDropdown.classList.remove("open");
+    const menuState = getMenuStateManager();
+    if (this.fontFamilyDropdown.classList.contains("open")) {
+      this.fontFamilyDropdown.classList.remove("open");
+      menuState.closeMenu("fontFamily");
+    }
+    if (this.fontSizeDropdown.classList.contains("open")) {
+      this.fontSizeDropdown.classList.remove("open");
+      menuState.closeMenu("fontSize");
+    }
   }
 
   private async applyFontFamily(fontFamily: string): Promise<void> {
