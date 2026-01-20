@@ -128,6 +128,28 @@ async function applyNumberFormat(page, formatCategory) {
   await sleep(200);
 }
 
+/**
+ * Apply a font family to the currently selected cell(s) using the toolbar dropdown
+ * @param {Page} page - Puppeteer page
+ * @param {string} fontName - Font family name (e.g., 'Arial', 'Georgia', 'Courier New')
+ */
+async function applyFontFamily(page, fontName) {
+  // Click the font family dropdown button to open the menu
+  await page.click('#font-family-btn');
+  await sleep(100);
+  // Select the font from the dropdown menu
+  const fontSelector = `#font-family-menu [data-font="${fontName}"]`;
+  const hasFontOption = await page.$(fontSelector);
+  if (hasFontOption) {
+    await page.click(fontSelector);
+  } else {
+    console.warn(`Font "${fontName}" not found in font dropdown, using default`);
+    // Close the dropdown without selection
+    await page.click('#font-family-btn');
+  }
+  await sleep(200);
+}
+
 // Color palette constants
 const COLORS = {
   BLUE_500: '#3B82F6',

@@ -82,7 +82,7 @@ Also fixed the test click handler by using JavaScript's `el.click()` instead of 
 
 ## Phase 2: Add Font Family Helper Function
 
-- [ ] 2a: Add `applyFontFamily(page, fontName)` helper to collab-demo.test.mjs that:
+- [x] 2a: Add `applyFontFamily(page, fontName)` helper to collab-demo.test.mjs that:
   - Clicks the font-family-btn dropdown
   - Selects the font from the dropdown menu
   - Handles the dropdown toggle correctly
