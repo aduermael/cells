@@ -1,13 +1,19 @@
 #!/usr/bin/env node
-// Parallel E2E test runner for Cells
-// Runs multiple test files concurrently with unique ports
+/**
+ * Parallel E2E test runner for Cells.
+ * Must be run via: bazel run :e2e or bazel run :check
+ *
+ * Runs multiple test files concurrently with unique ports.
+ */
 
+import './guard.mjs';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname, join, basename } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const testsDir = join(__dirname, '..', 'tests');
 
 // Test collection definitions
 // Note: All tests must pass. There is no "stable" subset - if a test is flaky or broken, fix it or remove it.
@@ -79,7 +85,7 @@ function parseArgs() {
 
 function printUsage() {
   console.log(`
-Usage: node run-parallel.mjs [options] [collection]
+Usage: bazel run :e2e [-- options] [collection]
 
 Collections:
   all      All test files (default)
@@ -90,8 +96,8 @@ Options:
   -h, --help            Show this help message
 
 Examples:
-  node run-parallel.mjs                  # Run all tests
-  node run-parallel.mjs -c 5 collab      # Run collab tests with max 5 concurrent
+  bazel run :e2e                       # Run all tests
+  bazel run :e2e -- -c 5 collab        # Run collab tests with max 5 concurrent
 `);
 }
 
@@ -100,7 +106,7 @@ Examples:
  */
 function runTestFile(testFile, port) {
   return new Promise((resolve) => {
-    const testPath = join(__dirname, testFile);
+    const testPath = join(testsDir, testFile);
     const testName = basename(testFile, '.test.mjs');
     const startTime = Date.now();
     let stdout = '';

@@ -12,6 +12,7 @@ else
 fi
 cd "$REPO_ROOT/apps/wasm"
 
+export BAZEL_RUN=1
 export HEADED=1
 TARGET="${1:-}"
 
@@ -19,5 +20,5 @@ if [ -n "$TARGET" ]; then
     node "tests/${TARGET}.test.mjs"
 else
     # Run all tests with browser visible (sequentially is better for headed mode)
-    npm run test:parallel -- all
+    node scripts/test-parallel.mjs all
 fi

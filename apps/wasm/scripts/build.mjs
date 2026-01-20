@@ -1,18 +1,14 @@
 #!/usr/bin/env node
 /**
- * esbuild script for bundling TypeScript sources
+ * Build script for bundling TypeScript sources with esbuild.
+ * Must be run via: bazel run :wasm-dist
  *
  * Entry points:
  * - src/main.ts -> ../../dist/wasm/main.js (browser application entry point)
  * - src/worker.ts -> ../../dist/wasm/worker.js (web worker)
- *
- * Note: client.ts is bundled into main.js as a dependency, not as a separate
- * entry point. It contains the CellsClient class for worker communication.
- *
- * Usage:
- *   node build.mjs  # Production build
  */
 
+import './guard.mjs';
 import * as esbuild from 'esbuild';
 
 /** @type {esbuild.BuildOptions} */

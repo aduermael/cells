@@ -11,4 +11,5 @@ else
 fi
 cd "$REPO_ROOT/apps/wasm"
 
-npm run check-types
+export BAZEL_RUN=1
+node scripts/check-types.mjs

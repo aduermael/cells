@@ -26,8 +26,8 @@ cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.js dist/wasm/
 cp bazel-bin/apps/wasm/cells_wasm/cells_wasm_bin.wasm dist/wasm/
 
 echo "Building TypeScript..."
-cd apps/wasm && npm run build
-cd "$REPO_ROOT"
+export BAZEL_RUN=1
+(cd apps/wasm && node scripts/build.mjs)
 
 echo "Copying HTML, CSS, and TypeScript definitions..."
 cp apps/wasm/static/index.html dist/wasm/

@@ -102,8 +102,9 @@ echo ""
 # 3. Type checks (TypeScript)
 echo -e "${BOLD}=== Type Check (TypeScript) ===${NC}"
 typecheck_cmd() {
-    if [ -f "$REPO_ROOT/apps/wasm/package.json" ]; then
-        (cd "$REPO_ROOT/apps/wasm" && npm run check-types)
+    if [ -f "$REPO_ROOT/apps/wasm/scripts/check-types.mjs" ]; then
+        export BAZEL_RUN=1
+        (cd "$REPO_ROOT/apps/wasm" && node scripts/check-types.mjs)
     else
         echo -e "${YELLOW}apps/wasm not found, skipping type checks${NC}"
         return 0
@@ -118,8 +119,9 @@ echo ""
 # 4. Integration tests (E2E)
 echo -e "${BOLD}=== Integration Tests (E2E, $JOBS parallel) ===${NC}"
 e2e_cmd() {
-    if [ -f "$REPO_ROOT/apps/wasm/tests/run-parallel.mjs" ]; then
-        (cd "$REPO_ROOT/apps/wasm" && npm run test:parallel -- --concurrency "$JOBS" all)
+    if [ -f "$REPO_ROOT/apps/wasm/scripts/test-parallel.mjs" ]; then
+        export BAZEL_RUN=1
+        (cd "$REPO_ROOT/apps/wasm" && node scripts/test-parallel.mjs --concurrency "$JOBS" all)
     else
         echo -e "${YELLOW}E2E test runner not found, skipping integration tests${NC}"
         return 0

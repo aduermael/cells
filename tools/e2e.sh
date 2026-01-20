@@ -29,6 +29,7 @@ get_num_cores() {
 JOBS=$(get_num_cores)
 TARGET="${1:-}"
 
+export BAZEL_RUN=1
 cd apps/wasm
 
 if [ -n "$TARGET" ]; then
@@ -38,5 +39,5 @@ if [ -n "$TARGET" ]; then
 else
     # Run all tests
     echo "Running all E2E tests with $JOBS parallel workers..."
-    npm run test:parallel -- --concurrency "$JOBS" all
+    node scripts/test-parallel.mjs --concurrency "$JOBS" all
 fi
