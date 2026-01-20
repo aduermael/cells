@@ -6,14 +6,20 @@
 // This demo showcases real-time collaboration with three participants
 // simultaneously editing a spreadsheet - ALL IN ONE SESSION.
 //
-// Run with HEADED=1 to watch the demo:
-//   HEADED=1 npm run test:collab-demo
+// Features demonstrated:
+// - Real-time collaborative editing
+// - Background colors and text colors
+// - Bold and italic formatting
+// - Cell borders (outline and all borders)
+// - Number formatting (currency)
+// - Alternating row colors
+// - Color-coded status badges
 //
-// Run with DEBUG=1 for verbose logging:
-//   DEBUG=1 HEADED=1 npm run test:collab-demo
+// Run in headed mode to watch the demo:
+//   bazel run :e2e-headed -- collab
 //
 // Run with SLOWMO for slower animations:
-//   HEADED=1 SLOWMO=100 npm run test:collab-demo
+//   SLOWMO=100 bazel run :e2e-headed -- collab
 
 import { setup, runTest, CONFIG } from './harness.mjs';
 import {
@@ -27,7 +33,116 @@ import {
   waitForCollabReady,
   waitForPeerConnection,
   assertWithRetry,
+  selectRange,
 } from './helpers.mjs';
+
+// =============================================================================
+// Styling Helper Functions
+// =============================================================================
+
+/**
+ * Apply a background color to the currently selected cell(s) using the toolbar
+ * @param {Page} page - Puppeteer page
+ * @param {string} color - Hex color (e.g., '#3B82F6')
+ */
+async function applyBackgroundColor(page, color) {
+  await page.click('#style-bg-color-btn');
+  await sleep(100);
+  const colorSelector = `#bg-color-popup .color-option[data-color="${color.toUpperCase()}"]`;
+  const hasColor = await page.$(colorSelector);
+  if (hasColor) {
+    await page.click(colorSelector);
+  } else {
+    const hexInput = await page.$('#bg-color-popup .color-hex-input');
+    if (hexInput) {
+      await hexInput.click({ clickCount: 3 });
+      await page.keyboard.type(color);
+      await page.keyboard.press('Enter');
+    }
+  }
+  await sleep(200);
+}
+
+/**
+ * Apply a text color to the currently selected cell(s) using the toolbar
+ * @param {Page} page - Puppeteer page
+ * @param {string} color - Hex color (e.g., '#EF4444')
+ */
+async function applyTextColor(page, color) {
+  await page.click('#style-text-color-btn');
+  await sleep(100);
+  const colorSelector = `#text-color-popup .color-option[data-color="${color.toUpperCase()}"]`;
+  const hasColor = await page.$(colorSelector);
+  if (hasColor) {
+    await page.click(colorSelector);
+  } else {
+    const hexInput = await page.$('#text-color-popup .color-hex-input');
+    if (hexInput) {
+      await hexInput.click({ clickCount: 3 });
+      await page.keyboard.type(color);
+      await page.keyboard.press('Enter');
+    }
+  }
+  await sleep(200);
+}
+
+/**
+ * Toggle bold on the currently selected cell(s)
+ * @param {Page} page - Puppeteer page
+ */
+async function applyBold(page) {
+  await page.click('#style-bold-btn');
+  await sleep(200);
+}
+
+/**
+ * Toggle italic on the currently selected cell(s)
+ * @param {Page} page - Puppeteer page
+ */
+async function applyItalic(page) {
+  await page.click('#style-italic-btn');
+  await sleep(200);
+}
+
+/**
+ * Apply a border to the current selection using the toolbar dropdown
+ * @param {Page} page - Puppeteer page
+ * @param {'all' | 'outer' | 'top' | 'bottom' | 'left' | 'right' | 'none'} borderType
+ */
+async function applyBorder(page, borderType) {
+  await page.click('#border-btn');
+  await sleep(100);
+  await page.click(`#border-${borderType}-btn`);
+  await sleep(200);
+}
+
+/**
+ * Apply a number format category to the current selection
+ * @param {Page} page - Puppeteer page
+ * @param {'NUMBER' | 'CURRENCY' | 'PERCENTAGE' | 'ACCOUNTING'} formatCategory
+ */
+async function applyNumberFormat(page, formatCategory) {
+  await page.click('#format-dropdown-btn');
+  await sleep(100);
+  await page.click(`[data-format-category="${formatCategory}"]`);
+  await sleep(200);
+}
+
+// Color palette constants
+const COLORS = {
+  BLUE_500: '#3B82F6',
+  BLUE_600: '#2563EB',
+  GREEN_500: '#10B981',
+  GREEN_600: '#059669',
+  RED_500: '#EF4444',
+  AMBER_400: '#FBBF24',
+  AMBER_500: '#F59E0B',
+  PURPLE_500: '#8B5CF6',
+  GRAY_100: '#F3F4F6',
+  GRAY_200: '#E5E7EB',
+  GRAY_700: '#374151',
+  WHITE: '#FFFFFF',
+};
 
 /**
  * Generate a random room ID for testing
@@ -312,12 +427,30 @@ async function runCollabDemo() {
       await setCellValue(nicoPage, 'A1', 'CELLS - Master Plan 2025');
       await sleep(300);
 
+      // Style the title: blue background, white text, bold
+      console.log('  [Nico] Styling the title...\n');
+      await selectRange(nicoPage, 'A1', 'E1');
+      await sleep(100);
+      await applyBackgroundColor(nicoPage, COLORS.BLUE_600);
+      await applyTextColor(nicoPage, COLORS.WHITE);
+      await applyBold(nicoPage);
+      await sleep(300);
+
       // Nico creates the header row
       await setCellValue(nicoPage, 'A3', 'Feature');
       await setCellValue(nicoPage, 'B3', 'Owner');
       await setCellValue(nicoPage, 'C3', 'Days');
       await setCellValue(nicoPage, 'D3', 'Cost');
       await setCellValue(nicoPage, 'E3', 'Status');
+      await sleep(300);
+
+      // Style the header row: gray background, bold text, borders
+      console.log('  [Nico] Styling the header row...\n');
+      await selectRange(nicoPage, 'A3', 'E3');
+      await sleep(100);
+      await applyBackgroundColor(nicoPage, COLORS.GRAY_200);
+      await applyBold(nicoPage);
+      await applyBorder(nicoPage, 'all');
       await sleep(300);
 
       // Nico adds the feature list
@@ -333,8 +466,8 @@ async function runCollabDemo() {
       await verifyCellSynced(robertPage, 'A1', 'CELLS - Master Plan 2025', 'Robert');
       await verifyCellSynced(shuyingPage, 'A1', 'CELLS - Master Plan 2025', 'Shuying');
 
-      console.log('  [Robert] I can see the structure! Great start Nico.');
-      console.log('  [Shuying] Looking good! Let me see the features...\n');
+      console.log('  [Robert] I can see the structure! The styling looks great!');
+      console.log('  [Shuying] Love the blue header! Let me see the features...\n');
     }));
 
     // === ACT 3: ROBERT ASSIGNS OWNERS ===
@@ -365,7 +498,21 @@ async function runCollabDemo() {
       await setCellValue(shuyingPage, 'C6', '20');
       await setCellValue(shuyingPage, 'C7', '60');
       await setCellValue(shuyingPage, 'C8', '90');
-      await sleep(500);
+      await sleep(300);
+
+      // Style data rows with alternating backgrounds for better readability
+      console.log('  [Shuying] Adding alternating row colors...\n');
+      await selectRange(shuyingPage, 'A4', 'E4');
+      await applyBackgroundColor(shuyingPage, COLORS.GRAY_100);
+      await sleep(100);
+      // Row 5 stays white
+      await selectRange(shuyingPage, 'A6', 'E6');
+      await applyBackgroundColor(shuyingPage, COLORS.GRAY_100);
+      await sleep(100);
+      // Row 7 stays white
+      await selectRange(shuyingPage, 'A8', 'E8');
+      await applyBackgroundColor(shuyingPage, COLORS.GRAY_100);
+      await sleep(300);
 
       // Verify synced
       await verifyCellSynced(nicoPage, 'C4', '30', 'Nico');
@@ -379,9 +526,16 @@ async function runCollabDemo() {
     results.push(await runTest('Act 5: The Formulas Come Alive', async () => {
       console.log('\n  [Shuying] Adding cost calculations...\n');
 
-      // Shuying adds cost rate in F1
+      // Shuying adds cost rate in F1 with styling
       await setCellValue(shuyingPage, 'F1', 'Rate/day:');
-      await setCellValue(shuyingPage, 'G1', '500');
+      await clickCell(shuyingPage, 'F1');
+      await applyItalic(shuyingPage);
+      await sleep(100);
+
+      await setCellValue(shuyingPage, 'G1', '$500');
+      await clickCell(shuyingPage, 'G1');
+      await applyBold(shuyingPage);
+      await applyTextColor(shuyingPage, COLORS.GREEN_600);
       await sleep(300);
 
       // Shuying adds cost formulas
@@ -394,37 +548,96 @@ async function runCollabDemo() {
       await setCellValue(shuyingPage, 'D7', '=C7*$G$1');
       await sleep(200);
       await setCellValue(shuyingPage, 'D8', '=C8*$G$1');
-      await sleep(500);
+      await sleep(300);
+
+      // Apply currency format to cost column
+      console.log('  [Shuying] Formatting costs as currency...\n');
+      await selectRange(shuyingPage, 'D4', 'D8');
+      await applyNumberFormat(shuyingPage, 'CURRENCY');
+      await sleep(300);
 
       console.log('  [Nico] Adding totals row...\n');
 
       // Nico adds totals
       await setCellValue(nicoPage, 'A10', 'TOTAL');
+      await clickCell(nicoPage, 'A10');
+      await applyBold(nicoPage);
+      await sleep(100);
+
       await setCellValue(nicoPage, 'C10', '=SUM(C4:C8)');
       await setCellValue(nicoPage, 'D10', '=SUM(D4:D8)');
+      await sleep(300);
+
+      // Style the totals row
+      console.log('  [Nico] Styling the totals row...\n');
+      await selectRange(nicoPage, 'A10', 'E10');
+      await applyBackgroundColor(nicoPage, COLORS.BLUE_500);
+      await applyTextColor(nicoPage, COLORS.WHITE);
+      await applyBold(nicoPage);
+      await applyBorder(nicoPage, 'all');
+      await sleep(300);
+
+      // Apply currency format to total cost
+      await clickCell(nicoPage, 'D10');
+      await applyNumberFormat(nicoPage, 'CURRENCY');
+      await sleep(300);
+
+      // Add outer border to the entire data table
+      console.log('  [Robert] Adding borders to the table...\n');
+      await selectRange(robertPage, 'A3', 'E10');
+      await applyBorder(robertPage, 'outer');
       await sleep(500);
 
       // Verify formulas synced
       await verifyCellSynced(robertPage, 'D10', '=SUM(D4:D8)', 'Robert');
 
       console.log('  [Robert] The formulas are calculating automatically!');
-      console.log('  [Shuying] Total cost is showing - this is powerful!\n');
+      console.log('  [Shuying] The currency formatting looks professional!\n');
     }));
 
     // === ACT 6: STATUS UPDATES ===
     results.push(await runTest('Act 6: Status Updates', async () => {
-      console.log('\n  [Everyone] Updating project status...\n');
+      console.log('\n  [Everyone] Updating project status with colors...\n');
 
-      // Everyone adds status (different cells to avoid conflicts)
+      // Everyone adds status with color-coded backgrounds
+
+      // Nico: E4 = Done (green)
       await setCellValue(nicoPage, 'E4', 'Done');
-      await sleep(100);
+      await clickCell(nicoPage, 'E4');
+      await applyBackgroundColor(nicoPage, COLORS.GREEN_500);
+      await applyTextColor(nicoPage, COLORS.WHITE);
+      await applyBold(nicoPage);
+      await sleep(200);
+
+      // Robert: E5 = In Progress (amber)
       await setCellValue(robertPage, 'E5', 'In Progress');
-      await sleep(100);
+      await clickCell(robertPage, 'E5');
+      await applyBackgroundColor(robertPage, COLORS.AMBER_400);
+      await applyBold(robertPage);
+      await sleep(200);
+
+      // Shuying: E6 = Done (green)
       await setCellValue(shuyingPage, 'E6', 'Done');
-      await sleep(100);
+      await clickCell(shuyingPage, 'E6');
+      await applyBackgroundColor(shuyingPage, COLORS.GREEN_500);
+      await applyTextColor(shuyingPage, COLORS.WHITE);
+      await applyBold(shuyingPage);
+      await sleep(200);
+
+      // Nico: E7 = Planning (purple)
       await setCellValue(nicoPage, 'E7', 'Planning');
-      await sleep(100);
+      await clickCell(nicoPage, 'E7');
+      await applyBackgroundColor(nicoPage, COLORS.PURPLE_500);
+      await applyTextColor(nicoPage, COLORS.WHITE);
+      await applyBold(nicoPage);
+      await sleep(200);
+
+      // Robert: E8 = Todo (red)
       await setCellValue(robertPage, 'E8', 'Todo');
+      await clickCell(robertPage, 'E8');
+      await applyBackgroundColor(robertPage, COLORS.RED_500);
+      await applyTextColor(robertPage, COLORS.WHITE);
+      await applyBold(robertPage);
       await sleep(500);
 
       // Verify all statuses synced
@@ -432,16 +645,16 @@ async function runCollabDemo() {
       await verifyCellSynced(nicoPage, 'E5', 'In Progress', 'Nico');
       await verifyCellSynced(robertPage, 'E6', 'Done', 'Robert');
 
-      console.log('  [Nico] Collaboration is DONE!');
-      console.log('  [Robert] Formula Engine is in progress.');
-      console.log('  [Shuying] XLSX is done too!\n');
+      console.log('  [Nico] Collaboration is DONE - green means go!');
+      console.log('  [Robert] Formula Engine is in progress - amber for attention.');
+      console.log('  [Shuying] XLSX is green too! Love the status colors!\n');
     }));
 
     // === FINALE: THE MASTER PLAN IS COMPLETE ===
     results.push(await runTest('Finale: All Together Now', async () => {
       console.log('\n  The team makes final touches simultaneously...\n');
 
-      // Simultaneous edits
+      // Simultaneous edits - team credits
       const edits = [
         setCellValue(nicoPage, 'A12', 'Project Lead: Nico'),
         setCellValue(robertPage, 'A13', 'Tech Lead: Robert'),
@@ -450,8 +663,39 @@ async function runCollabDemo() {
       await Promise.all(edits);
       await sleep(500);
 
-      // Add the company motto
+      // Style the credits section - each person styles their own credit
+      console.log('  [Team] Styling the credits...\n');
+
+      // Nico styles A12
+      await clickCell(nicoPage, 'A12');
+      await applyItalic(nicoPage);
+      await applyTextColor(nicoPage, COLORS.BLUE_600);
+      await sleep(100);
+
+      // Robert styles A13
+      await clickCell(robertPage, 'A13');
+      await applyItalic(robertPage);
+      await applyTextColor(robertPage, COLORS.GREEN_600);
+      await sleep(100);
+
+      // Shuying styles A14
+      await clickCell(shuyingPage, 'A14');
+      await applyItalic(shuyingPage);
+      await applyTextColor(shuyingPage, COLORS.PURPLE_500);
+      await sleep(300);
+
+      // Add the company motto with special styling
       await setCellValue(nicoPage, 'A16', 'Cells: The Future of Spreadsheets');
+      await sleep(300);
+
+      // Style the motto as a signature banner
+      console.log('  [Nico] Adding the finishing touch...\n');
+      await selectRange(nicoPage, 'A16', 'E16');
+      await applyBackgroundColor(nicoPage, COLORS.GRAY_700);
+      await applyTextColor(nicoPage, COLORS.WHITE);
+      await applyBold(nicoPage);
+      await applyItalic(nicoPage);
+      await applyBorder(nicoPage, 'all');
       await sleep(500);
 
       // Final verification - everyone can see the complete plan
@@ -468,12 +712,14 @@ async function runCollabDemo() {
       console.log('  ==========================================');
       console.log('');
       console.log('  The spreadsheet now contains:');
-      console.log('  - Title: CELLS - Master Plan 2025');
-      console.log('  - 5 Features with owners and estimates');
-      console.log('  - Cost formulas calculating from a rate');
-      console.log('  - SUM totals for days and cost');
-      console.log('  - Status for each feature');
-      console.log('  - Team credits');
+      console.log('  - Styled title with blue background');
+      console.log('  - Professional header row with borders');
+      console.log('  - 5 Features with alternating row colors');
+      console.log('  - Cost formulas with currency formatting');
+      console.log('  - Blue totals row with SUM formulas');
+      console.log('  - Color-coded status badges');
+      console.log('  - Styled team credits');
+      console.log('  - Signature banner motto');
       console.log('');
       console.log('  All built collaboratively in real-time!');
       console.log('  ==========================================\n');
@@ -505,6 +751,16 @@ async function runCollabDemo() {
 
   console.log('\n====================================================');
   console.log('         Cells: The Future of Spreadsheets');
+  console.log('====================================================');
+  console.log('');
+  console.log('  This demo showcased:');
+  console.log('  - Background & text colors');
+  console.log('  - Bold & italic formatting');
+  console.log('  - Cell borders');
+  console.log('  - Currency formatting');
+  console.log('  - Alternating row colors');
+  console.log('  - Color-coded status badges');
+  console.log('');
   console.log('====================================================\n');
 
   process.exit(0);

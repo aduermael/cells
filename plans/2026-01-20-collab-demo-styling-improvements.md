@@ -20,7 +20,7 @@ The collab demo (`bazel run :e2e-headed -- collab-demo`) has several issues:
 Create a focused collaboration test that verifies all style properties sync correctly.
 This will be a separate file that runs with all E2E tests but can also be run standalone.
 
-- [ ] 1a: Create `collab-style-sync.test.mjs` with tests for:
+- [x] 1a: Create `collab-style-sync.test.mjs` with tests for:
   - Background color sync between 2 peers
   - Text color sync between 2 peers
   - Bold/italic/underline sync between 2 peers
@@ -28,11 +28,26 @@ This will be a separate file that runs with all E2E tests but can also be run st
   - Font size sync between 2 peers
   - Border sync between 2 peers
   - Number format sync between 2 peers (currency, percentage)
+  - Bidirectional style sync test
 
-- [ ] 1b: Add the new test to:
+- [x] 1b: Add the new test to:
   - The `all` collection in `test-parallel.mjs` (runs with all E2E tests)
   - The `collab` collection in `test-parallel.mjs` (runs with collab tests)
   - Can be run standalone via `bazel run :e2e-headed -- collab-style-sync`
+
+### Phase 1 Test Results (Bug Found)
+
+**Test Status:** 3/8 tests pass (Bold, Border, Number format)
+
+**Bug Discovered:** Background color styles are NOT being included in viewport data.
+- Debug shows that even on local peer, after applying background color, the cell has NO `styleId` or `style` property
+- Yet the cell renders with the color visually - the renderer must be getting style info from somewhere else
+- Bold/italic/underline DO get stored in `cell.style` and sync correctly
+- Background colors fail to sync because the style data isn't in the viewport response
+
+**Root Cause Hypothesis:** Background colors may be using a different style storage path that doesn't get included in viewport queries. The renderer might access styles directly from WASM/CRDT oplog rather than from the viewport cell data.
+
+**Next Steps:** Before continuing to Phase 2-5, the viewport data must be fixed to include all style properties (bgColor, textColor, fontFamily, fontSize) in the cell style object. This is a core engine bug, not a test issue.
 
 ## Phase 2: Add Font Family Helper Function
 

@@ -30,6 +30,7 @@ const COLLECTIONS = {
     'collab.test.mjs',
     'initial-sync.test.mjs',
     'collab-demo.test.mjs',
+    'collab-style-sync.test.mjs',
     'lbo-integration.test.mjs',
     'zoom-selection.test.mjs',
     'zoom-headers.test.mjs',
@@ -61,6 +62,7 @@ const COLLECTIONS = {
     'collab.test.mjs',
     'initial-sync.test.mjs',
     'collab-demo.test.mjs',
+    'collab-style-sync.test.mjs',
   ],
 };
 

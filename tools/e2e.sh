@@ -2,7 +2,7 @@
 # Run E2E tests (headless)
 # Usage: bazel run :e2e [-- <test>]
 #   <test> can be a single test: smoke, formula, editing, column-move, clipboard,
-#          selection, script, collab, initial-sync, collab-demo
+#          selection, script, collab, initial-sync, collab-demo, collab-style-sync
 #          or omit to run all tests (default)
 set -euo pipefail
 
