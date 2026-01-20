@@ -67,15 +67,15 @@ async function isStyleButtonMixed(page, style) {
 }
 
 /**
- * Get cell style from data source
+ * Get effective cell style from data source (resolves cell > range > column > row hierarchy)
  */
 async function getCellStyle(page, cellRef) {
   return page.evaluate(async (ref) => {
     const col = ref.charCodeAt(0) - 'A'.charCodeAt(0);
     const row = parseInt(ref.slice(1)) - 1;
     const ctx = window._appContext;
-    if (!ctx?.app?.dataSource) return null;
-    return ctx.app.dataSource.getCellStyleAt(col, row);
+    if (!ctx?.app?.dataSource?.client) return null;
+    return ctx.app.dataSource.client.getEffectiveCellStyle(col, row);
   }, cellRef);
 }
 
