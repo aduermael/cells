@@ -14,7 +14,7 @@ Extend the existing `MenuStateManager` to handle all toolbar menus, ensuring onl
 ---
 
 ## Phase 1: Extend MenuStateManager with toolbar menu IDs
-- [ ] 1a: Add new menu IDs to the `MenuId` type for all toolbar menus: `bgColor`, `textColor`, `fontFamily`, `fontSize`, `format`, `currency`, `customFormat`, `merge`, `border`
+- [x] 1a: Add new menu IDs to the `MenuId` type for all toolbar menus: `bgColor`, `textColor`, `fontFamily`, `fontSize`, `format`, `currency`, `customFormat`, `merge`, `border`
 
 ## Phase 2: Integrate StyleControls with MenuStateManager
 - [ ] 2a: Register `bgColor` and `textColor` menus in StyleControls constructor

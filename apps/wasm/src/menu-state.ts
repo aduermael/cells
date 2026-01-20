@@ -1,12 +1,25 @@
 // Menu State Manager - Ensures only one menu can be open at a time
-// Manages mutual exclusivity between Export dropdown, Collaborate panel, and Context menu
+// Manages mutual exclusivity between all menus: Export dropdown, Collaborate panel,
+// Context menu, and all toolbar menus (colors, fonts, format, merge, border)
 
 // ============================================================================
 // Types
 // ============================================================================
 
 /** Menu identifier type */
-export type MenuId = "export" | "collaborate" | "context" | string;
+export type MenuId =
+  | "export"
+  | "collaborate"
+  | "context"
+  | "bgColor"
+  | "textColor"
+  | "fontFamily"
+  | "fontSize"
+  | "format"
+  | "currency"
+  | "customFormat"
+  | "merge"
+  | "border";
 
 /** Callback for when a menu is closed externally */
 export type MenuCloseCallback = () => void;
