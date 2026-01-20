@@ -27,7 +27,7 @@ The project has multiple test layers:
   - **Critical finding:** 12 E2E test files are NOT included in `COLLECTIONS.all` in `scripts/test-parallel.mjs`
 
 ## Phase 3: Add Missing Tests to Test Runner
-- [ ] 3a: Add all 12 missing test files to `COLLECTIONS.all` in `apps/wasm/scripts/test-parallel.mjs`
+- [x] 3a: Add all 12 missing test files to `COLLECTIONS.all` in `apps/wasm/scripts/test-parallel.mjs`
 - [ ] 3b: Run the full test suite and identify which tests fail
 - [ ] 3c: For each failing test, either fix it or remove it (no flaky/broken tests allowed)
 
