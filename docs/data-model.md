@@ -206,6 +206,58 @@ Sharded hashmap for O(1) access with parallelization:
 3. **CRDT-compatible**: Position conflicts resolved via LWW
 4. **Easy sorting**: Just sort by position field
 
+## Range Formatting
+
+Formatting (background colors, borders, etc.) is stored as ranges, not per-cell. When ranges with colliding properties overlap, we split them to maintain consistency.
+
+### Range Storage
+
+When a user applies a background color to range A1:C3, we store a single range object with that property. This is more compact than per-cell storage and preserves the user's intent.
+
+**Note:** Excel internally stores styles per-cell (each `<c>` element references a style). When importing XLSX files, we observe the per-cell styles and could reconstruct ranges, but the canonical representation in XLSX is per-cell.
+
+### Overlapping Ranges and Property Collision
+
+When two ranges overlap, the behavior depends on whether their properties **collide**:
+
+**Colliding properties** (same attribute): The earlier range gets split to avoid overlap.
+
+Example: Blue background on C4:F13, then green background on E7:H18:
+```
+     C   D   E   F   G   H
+4   [  BLUE   ]
+5   [  BLUE   ]
+6   [  BLUE   ]
+7   [BLU][ GREEN        ]
+... [BLU][ GREEN        ]
+13  [BLU][ GREEN        ]
+14       [ GREEN        ]
+...
+18       [ GREEN        ]
+```
+
+The original blue range (C4:F13) is split into non-overlapping parts (C4:F6 and C7:D13) so that the green range can occupy E7:H18 without conflict.
+
+**Non-colliding properties** (different attributes): Ranges can overlap freely.
+
+Example: Blue background on A1:C3, then thick border on B2:D4:
+```
+     A   B   C   D
+1   [BLUE      ]
+2   [BLUE┏━━━━━━━━━┓
+3   [BLUE┃   ]    ┃
+4        ┗━━━━━━━━━┛
+```
+
+Cells B2:C3 are covered by both ranges - the background range and the border range coexist without splitting.
+
+### Design Rationale
+
+1. **Compact storage**: One range object vs. many per-cell entries
+2. **No z-order complexity**: Splitting eliminates the need to track layering
+3. **Predictable rendering**: No runtime overlap resolution needed
+4. **CRDT-friendly**: Range operations have clear conflict resolution semantics
+
 ## Implementation
 
 - Types: `core/cells/types.h`
