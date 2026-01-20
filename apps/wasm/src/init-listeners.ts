@@ -94,9 +94,9 @@ export function setupDataListeners(config: DataListenersConfig): {
     const OVERSCAN_COLS = 8;  // Columns to fetch beyond visible area on each side
     const OVERSCAN_ROWS = 15; // Rows to fetch beyond visible area on each side
 
-    // Calculate scrollable viewport range
-    let startCol = Math.max(0, Math.floor(app.scrollX / DEFAULT_COL_WIDTH) - OVERSCAN_COLS);
-    let startRow = Math.max(0, Math.floor(app.scrollY / DEFAULT_ROW_HEIGHT) - OVERSCAN_ROWS);
+    // Calculate viewport range
+    const startCol = Math.max(0, Math.floor(app.scrollX / DEFAULT_COL_WIDTH) - OVERSCAN_COLS);
+    const startRow = Math.max(0, Math.floor(app.scrollY / DEFAULT_ROW_HEIGHT) - OVERSCAN_ROWS);
     const endCol = Math.min(
       app.sheetInfo.colCount,
       startCol + Math.ceil(viewWidth / DEFAULT_COL_WIDTH) + OVERSCAN_COLS * 2
@@ -105,13 +105,6 @@ export function setupDataListeners(config: DataListenersConfig): {
       app.sheetInfo.rowCount,
       startRow + Math.ceil(viewHeight / DEFAULT_ROW_HEIGHT) + OVERSCAN_ROWS * 2
     );
-
-    // Always include frozen rows and columns in the viewport
-    // This ensures frozen cells are available even when scrolled far away
-    const freezeCol = app.sheetInfo.freezeCol || 0;
-    const freezeRow = app.sheetInfo.freezeRow || 0;
-    if (freezeCol > 0) startCol = 0;
-    if (freezeRow > 0) startRow = 0;
 
     try {
       const data = await app.dataSource.getViewport(
@@ -124,11 +117,6 @@ export function setupDataListeners(config: DataListenersConfig): {
       app.columns = data.columns || [];
       app.rows = data.rows || [];
       app.styleRanges = data.styleRanges || [];
-
-      // DEBUG: Log style ranges from viewport
-      if (app.styleRanges.length > 0) {
-        console.log("[DEBUG] Viewport returned styleRanges:", JSON.stringify(app.styleRanges, null, 2));
-      }
 
       // Clear caches for viewport range before repopulating
       for (let col = startCol; col < endCol; col++) {

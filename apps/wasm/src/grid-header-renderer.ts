@@ -108,10 +108,6 @@ export function getColumnHeaderText(
  * Get the visual X position for a column during drag operations.
  * Uses O(1) lookup via pre-computed pixel offsets when not dragging.
  * All positions are returned in zoomed pixels.
- *
- * For frozen panes:
- * - Frozen columns (col < freezeCol) are not affected by scrollX
- * - Non-frozen columns scroll normally, but start after the frozen area
  */
 export function getDragAdjustedColX(
   col: number,
@@ -122,31 +118,13 @@ export function getDragAdjustedColX(
     state.dragTargetIndex !== state.dragSourceIndex &&
     state.dragTargetIndex !== state.dragSourceIndex + 1;
 
-  const freezeCol = state.sheetInfo?.freezeCol || 0;
-  const isFrozen = col < freezeCol;
   const zoomFactor = getZoomFactor();
   const zoomedHeaderWidth = getZoomedHeaderWidth();
   // Convert scroll to zoomed pixels
   const zoomedScrollX = Math.round(state.scrollX * zoomFactor);
 
   if (!colHasMoved) {
-    // Fast path for frozen columns: no scroll offset
-    if (isFrozen) {
-      // Use cached offset or calculate (cached offsets are unzoomed)
-      const cachedOffset = state.colPixelOffsets.get(col);
-      if (cachedOffset !== undefined) {
-        return zoomedHeaderWidth + Math.round(cachedOffset * zoomFactor);
-      }
-      // Fallback: sum unzoomed widths first, then zoom the total
-      // This matches the cached calculation and avoids rounding accumulation errors
-      let offset = 0;
-      for (let i = 0; i < col; i++) {
-        offset += state.colWidths.get(i) || DEFAULT_COL_WIDTH;
-      }
-      return zoomedHeaderWidth + Math.round(offset * zoomFactor);
-    }
-
-    // Non-frozen columns: apply scroll but stay to the right of frozen area
+    // Use cached offset or calculate (cached offsets are unzoomed)
     const cachedOffset = state.colPixelOffsets.get(col);
     if (cachedOffset !== undefined) {
       return zoomedHeaderWidth + Math.round(cachedOffset * zoomFactor) - zoomedScrollX;
@@ -183,19 +161,13 @@ export function getDragAdjustedColX(
   }
 
   const zoomedOffset = Math.round(offset * zoomFactor);
-  return isFrozen
-    ? zoomedHeaderWidth + zoomedOffset
-    : zoomedHeaderWidth + zoomedOffset - zoomedScrollX;
+  return zoomedHeaderWidth + zoomedOffset - zoomedScrollX;
 }
 
 /**
  * Get the visual Y position for a row during drag operations.
  * Uses O(1) lookup via pre-computed pixel offsets when not dragging.
  * All positions are returned in zoomed pixels.
- *
- * For frozen panes:
- * - Frozen rows (row < freezeRow) are not affected by scrollY
- * - Non-frozen rows scroll normally, but start after the frozen area
  */
 export function getDragAdjustedRowY(
   row: number,
@@ -206,31 +178,13 @@ export function getDragAdjustedRowY(
     state.dragTargetIndex !== state.dragSourceIndex &&
     state.dragTargetIndex !== state.dragSourceIndex + 1;
 
-  const freezeRow = state.sheetInfo?.freezeRow || 0;
-  const isFrozen = row < freezeRow;
   const zoomFactor = getZoomFactor();
   const zoomedHeaderHeight = getZoomedHeaderHeight();
   // Convert scroll to zoomed pixels
   const zoomedScrollY = Math.round(state.scrollY * zoomFactor);
 
   if (!rowHasMoved) {
-    // Fast path for frozen rows: no scroll offset
-    if (isFrozen) {
-      // Use cached offset or calculate (cached offsets are unzoomed)
-      const cachedOffset = state.rowPixelOffsets.get(row);
-      if (cachedOffset !== undefined) {
-        return zoomedHeaderHeight + Math.round(cachedOffset * zoomFactor);
-      }
-      // Fallback: sum unzoomed heights first, then zoom the total
-      // This matches the cached calculation and avoids rounding accumulation errors
-      let offset = 0;
-      for (let i = 0; i < row; i++) {
-        offset += state.rowHeights.get(i) || DEFAULT_ROW_HEIGHT;
-      }
-      return zoomedHeaderHeight + Math.round(offset * zoomFactor);
-    }
-
-    // Non-frozen rows: apply scroll
+    // Use cached offset or calculate (cached offsets are unzoomed)
     const cachedOffset = state.rowPixelOffsets.get(row);
     if (cachedOffset !== undefined) {
       return zoomedHeaderHeight + Math.round(cachedOffset * zoomFactor) - zoomedScrollY;
@@ -267,9 +221,7 @@ export function getDragAdjustedRowY(
   }
 
   const zoomedOffset = Math.round(offset * zoomFactor);
-  return isFrozen
-    ? zoomedHeaderHeight + zoomedOffset
-    : zoomedHeaderHeight + zoomedOffset - zoomedScrollY;
+  return zoomedHeaderHeight + zoomedOffset - zoomedScrollY;
 }
 
 /**
@@ -296,13 +248,10 @@ export function drawColumnHeaders(
 
   // Calculate visible column range - only iterate through visible columns
   // Use unzoomed values for logical calculation
-  // Always start from 0 if there are frozen columns to ensure they're drawn
-  const freezeCol = state.sheetInfo.freezeCol || 0;
-  const scrollBasedStartCol = Math.max(0, Math.floor(state.scrollX / DEFAULT_COL_WIDTH) - 1);
-  const startCol = freezeCol > 0 ? 0 : scrollBasedStartCol;
+  const startCol = Math.max(0, Math.floor(state.scrollX / DEFAULT_COL_WIDTH) - 1);
   const endCol = Math.min(
     state.sheetInfo.colCount,
-    scrollBasedStartCol + Math.ceil(viewWidth / (DEFAULT_COL_WIDTH * zoomFactor)) + 2
+    startCol + Math.ceil(viewWidth / (DEFAULT_COL_WIDTH * zoomFactor)) + 2
   );
 
   ctx.font = `${zoomedFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
@@ -390,13 +339,10 @@ export function drawRowHeaders(
   // Calculate visible row range - only iterate through visible rows
   // Use unzoomed values for logical calculation
   // Use larger buffer (-5) to handle custom row heights and rounding at different zoom levels
-  // Always start from 0 if there are frozen rows to ensure they're drawn
-  const freezeRow = state.sheetInfo.freezeRow || 0;
-  const scrollBasedStartRow = Math.max(0, Math.floor(state.scrollY / DEFAULT_ROW_HEIGHT) - 5);
-  const startRow = freezeRow > 0 ? 0 : scrollBasedStartRow;
+  const startRow = Math.max(0, Math.floor(state.scrollY / DEFAULT_ROW_HEIGHT) - 5);
   const endRow = Math.min(
     rowCount,
-    scrollBasedStartRow + Math.ceil(viewHeight / (DEFAULT_ROW_HEIGHT * zoomFactor)) + 10
+    startRow + Math.ceil(viewHeight / (DEFAULT_ROW_HEIGHT * zoomFactor)) + 10
   );
 
   ctx.font = `${zoomedFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;

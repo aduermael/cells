@@ -409,9 +409,18 @@ export class MouseEventHandlers {
         const logicalViewportHeight = (canvas.clientHeight - getZoomedHeaderHeight()) / zoomFactor;
 
         // Max scroll in logical coordinates
+        const { getColWidths, getRowHeights } = this.config;
+        const colWidths = getColWidths();
+        let contentWidth = sheetInfo.colCount * DEFAULT_COL_WIDTH;
+        // Adjust for any custom column widths
+        for (const [col, customWidth] of colWidths) {
+            if (col < sheetInfo.colCount) {
+                contentWidth += customWidth - DEFAULT_COL_WIDTH;
+            }
+        }
         const maxScrollX = Math.max(
             0,
-            sheetInfo.colCount * DEFAULT_COL_WIDTH - logicalViewportWidth,
+            contentWidth - logicalViewportWidth,
         );
 
         // Convert wheel delta from screen pixels to logical pixels
@@ -437,9 +446,18 @@ export class MouseEventHandlers {
             setDiscoveredRows(newDiscovered);
         }
 
+        // Calculate actual content height
+        const rowHeights = getRowHeights();
+        let contentHeight = effectiveRowCount * DEFAULT_ROW_HEIGHT;
+        // Adjust for any custom row heights
+        for (const [row, customHeight] of rowHeights) {
+            if (row < effectiveRowCount) {
+                contentHeight += customHeight - DEFAULT_ROW_HEIGHT;
+            }
+        }
         const maxScrollY = Math.max(
             0,
-            effectiveRowCount * DEFAULT_ROW_HEIGHT - logicalViewportHeight,
+            contentHeight - logicalViewportHeight,
         );
 
         setScrollX(Math.max(0, Math.min(maxScrollX, getScrollX() + logicalDeltaX)));
@@ -1679,28 +1697,6 @@ export class MouseEventHandlers {
                     action: () => {
                         selectCell();
                         clipboardManager.paste();
-                    },
-                });
-                items.push({ type: "separator" });
-                items.push({
-                    label: "Freeze panes",
-                    action: async () => {
-                        const ds = getDataSource();
-                        if (!ds) return;
-                        // Freeze rows above and columns to the left of current cell
-                        await ds.setFreezePanes(context.col, context.row);
-                        fetchViewportNow();
-                        render();
-                    },
-                });
-                items.push({
-                    label: "Unfreeze panes",
-                    action: async () => {
-                        const ds = getDataSource();
-                        if (!ds) return;
-                        await ds.setFreezePanes(0, 0);
-                        fetchViewportNow();
-                        render();
                     },
                 });
                 break;

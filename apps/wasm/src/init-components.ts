@@ -48,10 +48,6 @@ import {
   HEADER_HEIGHT,
 } from "./grid-renderer";
 import {
-  getFrozenColWidth,
-  getFrozenRowHeight,
-} from "./grid-header-renderer";
-import {
   getZoomFactor,
   getZoomedHeaderWidth,
   getZoomedHeaderHeight,
@@ -255,36 +251,24 @@ export function createComponents(config: ComponentsConfig): Components {
       setScrollY: (y) => { app.scrollY = y; },
       // Viewport dimensions need to be in logical (unzoomed) coordinates to match
       // content dimensions. Screen pixels of scrollable area / zoom = logical viewport.
-      // For frozen panes: subtract frozen area from scrollable viewport so content
-      // scrolls within the reduced area (not under frozen cells).
       getViewportWidth: () => {
         const zoomFactor = getZoomFactor();
-        const freezeCol = app.sheetInfo?.freezeCol || 0;
-        const frozenColWidth = getFrozenColWidth(freezeCol, app.colWidths);
-        const scrollableScreenWidth = elements.canvas.clientWidth - getZoomedHeaderWidth() - frozenColWidth;
+        const scrollableScreenWidth = elements.canvas.clientWidth - getZoomedHeaderWidth();
         return scrollableScreenWidth / zoomFactor + HEADER_WIDTH;
       },
       getViewportHeight: () => {
         const zoomFactor = getZoomFactor();
-        const freezeRow = app.sheetInfo?.freezeRow || 0;
-        const frozenRowHeight = getFrozenRowHeight(freezeRow, app.rowHeights);
-        const scrollableScreenHeight = elements.canvas.clientHeight - getZoomedHeaderHeight() - frozenRowHeight;
+        const scrollableScreenHeight = elements.canvas.clientHeight - getZoomedHeaderHeight();
         return scrollableScreenHeight / zoomFactor + HEADER_HEIGHT;
       },
       getContentWidth: () => {
         const colCount = app.sheetInfo?.colCount ?? 22;
         const { width } = calculateContentDimensions(colCount, 0, app.colWidths, app.rowHeights);
-        // Subtract frozen column width since frozen columns don't scroll
-        const freezeCol = app.sheetInfo?.freezeCol || 0;
-        const frozenColWidth = getFrozenColWidth(freezeCol, app.colWidths) / getZoomFactor();
-        return width - frozenColWidth;
+        return width;
       },
       getContentHeight: () => {
         const { height } = calculateContentDimensions(0, app.discoveredRows, app.colWidths, app.rowHeights);
-        // Subtract frozen row height since frozen rows don't scroll
-        const freezeRow = app.sheetInfo?.freezeRow || 0;
-        const frozenRowHeight = getFrozenRowHeight(freezeRow, app.rowHeights) / getZoomFactor();
-        return height - frozenRowHeight;
+        return height;
       },
       onScroll: () => {
         // Convert screen viewport to logical coordinates for row discovery

@@ -328,26 +328,34 @@ export class GridEventHandler {
         if (!this.sheetInfo) return;
         e.preventDefault();
 
+        // Get zoom factor for coordinate conversion
+        const zoomFactor = getZoomFactor();
+
+        // Convert screen viewport dimensions to logical coordinates
+        const logicalViewportWidth = (this.canvas.clientWidth - getZoomedHeaderWidth()) / zoomFactor;
+        const logicalViewportHeight = (this.canvas.clientHeight - getZoomedHeaderHeight()) / zoomFactor;
+
+        // Max scroll in logical coordinates
         const maxScrollX = Math.max(
             0,
-            this.sheetInfo.colCount * DEFAULT_COL_WIDTH -
-                this.canvas.clientWidth +
-                HEADER_WIDTH,
+            this.sheetInfo.colCount * DEFAULT_COL_WIDTH - logicalViewportWidth,
         );
         const maxScrollY = Math.max(
             0,
-            this.sheetInfo.rowCount * DEFAULT_ROW_HEIGHT -
-                this.canvas.clientHeight +
-                HEADER_HEIGHT,
+            this.sheetInfo.rowCount * DEFAULT_ROW_HEIGHT - logicalViewportHeight,
         );
+
+        // Convert wheel delta from screen pixels to logical pixels
+        const logicalDeltaX = e.deltaX / zoomFactor;
+        const logicalDeltaY = e.deltaY / zoomFactor;
 
         this.scrollX = Math.max(
             0,
-            Math.min(maxScrollX, this.scrollX + e.deltaX),
+            Math.min(maxScrollX, this.scrollX + logicalDeltaX),
         );
         this.scrollY = Math.max(
             0,
-            Math.min(maxScrollY, this.scrollY + e.deltaY),
+            Math.min(maxScrollY, this.scrollY + logicalDeltaY),
         );
 
         this.onStateChange({ scrollX: this.scrollX, scrollY: this.scrollY });
