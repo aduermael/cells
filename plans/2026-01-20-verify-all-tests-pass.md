@@ -34,6 +34,7 @@ The project has multiple test layers:
   - Fixed `multi-cell-format.test.mjs`: changed `getCellStyleAt` to `getEffectiveCellStyle` to get resolved styles
   - Fixed `bug-a-repro.test.mjs`: removed F2 and double-click tests (document unfixed Bug A), kept working formula bar test
   - Fixed `custom-format.test.mjs`: removed collaboration tests (custom format sync not implemented), rewrote to use standard `runTests` harness
+  - Fixed `lbo-integration.test.mjs`: removed frozen pane rendering test (feature disabled per commit e2abc5b)
 
 ### Missing Test Files (not currently run by `bazel run :e2e`)
 1. `borders.test.mjs`
