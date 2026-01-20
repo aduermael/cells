@@ -199,6 +199,8 @@ export interface DOMElements {
   borderRightBtn: HTMLButtonElement;
   borderNoneBtn: HTMLButtonElement;
   borderStyleGrid: HTMLElement;
+  borderColorPalette: HTMLElement;
+  borderColorHexInput: HTMLInputElement;
 }
 
 // =============================================================================
@@ -691,6 +693,8 @@ export function createApp(): App {
     borderRightBtn: getElement<HTMLButtonElement>("border-right-btn"),
     borderNoneBtn: getElement<HTMLButtonElement>("border-none-btn"),
     borderStyleGrid: getElement("border-style-grid"),
+    borderColorPalette: getElement("border-color-palette"),
+    borderColorHexInput: getElement<HTMLInputElement>("border-color-hex"),
   };
 
   return new App(elements);

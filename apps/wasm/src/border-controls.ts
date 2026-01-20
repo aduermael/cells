@@ -30,6 +30,8 @@ export interface BorderControlsConfig {
   borderRightBtn: HTMLButtonElement;
   borderNoneBtn: HTMLButtonElement;
   borderStyleGrid: HTMLElement;
+  borderColorPalette: HTMLElement;
+  borderColorHexInput: HTMLInputElement;
 }
 
 /** Callback signatures */
@@ -64,9 +66,12 @@ export class BorderControls {
   private borderRightBtn: HTMLButtonElement;
   private borderNoneBtn: HTMLButtonElement;
   private borderStyleGrid: HTMLElement;
+  private borderColorPalette: HTMLElement;
+  private borderColorHexInput: HTMLInputElement;
 
   private dataSource: WasmDataSource | null = null;
   private selectedBorderStyle: BorderStyle = "thin";
+  private selectedBorderColor: string = "#000000";
 
   private getSelectedCell: () => Position | null;
   private getSelectionRange: () => { start: Position | null; end: Position | null };
@@ -84,6 +89,8 @@ export class BorderControls {
     this.borderRightBtn = config.borderRightBtn;
     this.borderNoneBtn = config.borderNoneBtn;
     this.borderStyleGrid = config.borderStyleGrid;
+    this.borderColorPalette = config.borderColorPalette;
+    this.borderColorHexInput = config.borderColorHexInput;
 
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectionRange = callbacks.getSelectionRange;
@@ -152,6 +159,28 @@ export class BorderControls {
       }
     });
 
+    // Border color palette clicks
+    this.borderColorPalette.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const colorOption = target.closest(".border-color-option") as HTMLElement | null;
+      if (colorOption) {
+        const color = colorOption.dataset.color || "#000000";
+        this.selectBorderColor(color);
+      }
+    });
+
+    // Border color hex input
+    this.borderColorHexInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const color = this.borderColorHexInput.value.trim();
+        if (this.isValidHexColor(color)) {
+          this.selectBorderColor(color);
+          this.borderColorHexInput.value = "";
+        }
+      }
+    });
+
     // Close dropdown on outside click
     document.addEventListener("click", (e) => {
       const target = e.target as Node;
@@ -159,6 +188,30 @@ export class BorderControls {
         this.closeDropdown();
       }
     });
+  }
+
+  /**
+   * Check if a string is a valid hex color.
+   */
+  private isValidHexColor(color: string): boolean {
+    return /^#[0-9A-Fa-f]{6}$/.test(color) || /^#[0-9A-Fa-f]{3}$/.test(color);
+  }
+
+  /**
+   * Select a border color and update the UI.
+   */
+  private selectBorderColor(color: string): void {
+    this.selectedBorderColor = color;
+
+    // Update selected state in color palette
+    const options = this.borderColorPalette.querySelectorAll(".border-color-option");
+    options.forEach((opt) => {
+      const optColor = (opt as HTMLElement).dataset.color || "";
+      opt.classList.toggle("selected", optColor.toUpperCase() === color.toUpperCase());
+    });
+
+    // Update the style indicator color
+    this.updateStyleIndicatorColor(color);
   }
 
   /**
@@ -182,11 +235,13 @@ export class BorderControls {
    * Update the style indicator SVG to show the selected border style.
    */
   private updateStyleIndicator(style: BorderStyle): void {
+    const color = this.selectedBorderColor;
+
     // For double style, show two lines
     if (style === "double") {
       this.borderStyleIndicator.innerHTML =
-        '<line x1="0" y1="1" x2="14" y2="1" stroke="currentColor" stroke-width="1"/>' +
-        '<line x1="0" y1="3" x2="14" y2="3" stroke="currentColor" stroke-width="1"/>';
+        `<line x1="0" y1="1" x2="14" y2="1" stroke="${color}" stroke-width="1"/>` +
+        `<line x1="0" y1="3" x2="14" y2="3" stroke="${color}" stroke-width="1"/>`;
       return;
     }
 
@@ -194,13 +249,14 @@ export class BorderControls {
     let line = this.borderStyleIndicator.querySelector("line");
     if (!line || this.borderStyleIndicator.querySelectorAll("line").length !== 1) {
       this.borderStyleIndicator.innerHTML =
-        '<line x1="0" y1="2" x2="14" y2="2" stroke="currentColor" stroke-width="1"/>';
+        `<line x1="0" y1="2" x2="14" y2="2" stroke="${color}" stroke-width="1"/>`;
       line = this.borderStyleIndicator.querySelector("line")!;
     }
 
     // Reset attributes
     line.removeAttribute("stroke-dasharray");
     line.setAttribute("stroke-width", "1");
+    line.setAttribute("stroke", color);
 
     // Apply style-specific attributes
     switch (style) {
@@ -222,6 +278,16 @@ export class BorderControls {
     }
   }
 
+  /**
+   * Update the style indicator color without changing the style.
+   */
+  private updateStyleIndicatorColor(color: string): void {
+    const lines = this.borderStyleIndicator.querySelectorAll("line");
+    lines.forEach((line) => {
+      line.setAttribute("stroke", color);
+    });
+  }
+
   private toggleDropdown(): void {
     const isOpen = this.borderDropdown.classList.contains("open");
     if (isOpen) {
@@ -236,10 +302,10 @@ export class BorderControls {
   }
 
   /**
-   * Create a border edge object with the selected style and black color.
+   * Create a border edge object with the selected style and color.
    */
   private createBorderEdge(): { style: BorderStyle; color: string } {
-    return { style: this.selectedBorderStyle, color: "#000000" };
+    return { style: this.selectedBorderStyle, color: this.selectedBorderColor };
   }
 
   /**

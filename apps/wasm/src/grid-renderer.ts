@@ -91,6 +91,28 @@ export {
 } from "./grid-constants.js";
 
 /**
+ * Filter to specify which cells should be drawn in a quadrant.
+ * Used to ensure only cells belonging to a quadrant are rendered there,
+ * preventing scroll-position-based overlap between frozen and non-frozen areas.
+ */
+interface QuadrantFilter {
+  minCol?: number;  // Only draw cells where col >= minCol
+  maxCol?: number;  // Only draw cells where col <= maxCol
+  minRow?: number;  // Only draw cells where row >= minRow
+  maxRow?: number;  // Only draw cells where row <= maxRow
+}
+
+/** Check if a cell passes the quadrant filter */
+function cellPassesFilter(col: number, row: number, filter?: QuadrantFilter): boolean {
+  if (!filter) return true;
+  if (filter.minCol !== undefined && col < filter.minCol) return false;
+  if (filter.maxCol !== undefined && col > filter.maxCol) return false;
+  if (filter.minRow !== undefined && row < filter.minRow) return false;
+  if (filter.maxRow !== undefined && row > filter.maxRow) return false;
+  return true;
+}
+
+/**
  * GridRenderer handles all canvas drawing operations for the spreadsheet
  */
 export class GridRenderer {
@@ -362,21 +384,27 @@ export class GridRenderer {
     // - Q4 (top-left): Fully frozen corner (no scrolling)
     //
     // We render in order Q1 -> Q2 -> Q3 -> Q4 so frozen content is drawn on top.
+    // IMPORTANT: Each quadrant only draws cells that BELONG to that quadrant
+    // (filtering by col/row vs freezeCol/freezeRow), not just relying on clipping.
+    // This prevents non-frozen cells from appearing in frozen areas when scrolled.
 
     // === Q1: Scrollable content (bottom-right) ===
+    // Only cells where col >= freezeCol AND row >= freezeRow
     ctx.save();
     ctx.beginPath();
     ctx.rect(freezeX, freezeY, viewWidth - freezeX, viewHeight - freezeY);
     ctx.clip();
 
-    this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-    this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
-    this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-    this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-    this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+    const q1Filter = { minCol: freezeCol, minRow: freezeRow };
+    this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q1Filter);
+    this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState, q1Filter);
+    this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q1Filter);
+    this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q1Filter);
+    this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q1Filter);
     ctx.restore();
 
     // === Q2: Frozen rows (top-right) ===
+    // Only cells where col >= freezeCol AND row < freezeRow
     if (freezeRow > 0) {
       ctx.save();
       ctx.beginPath();
@@ -386,15 +414,17 @@ export class GridRenderer {
       ctx.fillStyle = this.colors.cellBg;
       ctx.fillRect(freezeX, zoomedHeaderHeight, viewWidth - freezeX, frozenRowHeight);
 
-      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
-      this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      const q2Filter = { minCol: freezeCol, maxRow: freezeRow - 1 };
+      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q2Filter);
+      this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState, q2Filter);
+      this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q2Filter);
+      this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q2Filter);
+      this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q2Filter);
       ctx.restore();
     }
 
     // === Q3: Frozen columns (bottom-left) ===
+    // Only cells where col < freezeCol AND row >= freezeRow
     if (freezeCol > 0) {
       ctx.save();
       ctx.beginPath();
@@ -404,15 +434,17 @@ export class GridRenderer {
       ctx.fillStyle = this.colors.cellBg;
       ctx.fillRect(zoomedHeaderWidth, freezeY, frozenColWidth, viewHeight - freezeY);
 
-      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
-      this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      const q3Filter = { maxCol: freezeCol - 1, minRow: freezeRow };
+      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q3Filter);
+      this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState, q3Filter);
+      this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q3Filter);
+      this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q3Filter);
+      this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q3Filter);
       ctx.restore();
     }
 
     // === Q4: Frozen corner (top-left) ===
+    // Only cells where col < freezeCol AND row < freezeRow
     if (freezeCol > 0 && freezeRow > 0) {
       ctx.save();
       ctx.beginPath();
@@ -422,11 +454,12 @@ export class GridRenderer {
       ctx.fillStyle = this.colors.cellBg;
       ctx.fillRect(zoomedHeaderWidth, zoomedHeaderHeight, frozenColWidth, frozenRowHeight);
 
-      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
-      this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
-      this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+      const q4Filter = { maxCol: freezeCol - 1, maxRow: freezeRow - 1 };
+      this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q4Filter);
+      this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState, q4Filter);
+      this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q4Filter);
+      this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q4Filter);
+      this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState, q4Filter);
       ctx.restore();
     }
 
@@ -594,7 +627,8 @@ export class GridRenderer {
     viewHeight: number,
     colHasMoved: boolean,
     rowHasMoved: boolean,
-    headerState: HeaderRendererState
+    headerState: HeaderRendererState,
+    filter?: QuadrantFilter
   ): void {
     const zoomedHeaderWidth = getZoomedHeaderWidth();
     const zoomedHeaderHeight = getZoomedHeaderHeight();
@@ -605,6 +639,9 @@ export class GridRenderer {
 
       // Skip merged cells (not anchors) - their background is drawn by the anchor
       if (cell.isMergedCell) continue;
+
+      // Skip cells that don't belong to this quadrant
+      if (!cellPassesFilter(cell.col, cell.row, filter)) continue;
 
       const bgColor = cell.style?.bgColor;
       if (!bgColor) continue;
@@ -647,7 +684,8 @@ export class GridRenderer {
     ctx: CanvasRenderingContext2D,
     viewWidth: number,
     viewHeight: number,
-    headerState: HeaderRendererState
+    headerState: HeaderRendererState,
+    filter?: QuadrantFilter
   ): void {
     const zoomedHeaderWidth = getZoomedHeaderWidth();
     const zoomedHeaderHeight = getZoomedHeaderHeight();
@@ -661,6 +699,21 @@ export class GridRenderer {
       const bgColor = range.style?.bgColor;
       console.log("[DEBUG] Processing range:", range, "bgColor:", bgColor);
       if (!bgColor) continue;
+
+      // Skip ranges that don't overlap with this quadrant
+      // A range overlaps if any part of it is in the quadrant
+      if (filter) {
+        const rangeMinCol = range.startCol;
+        const rangeMaxCol = range.endCol;
+        const rangeMinRow = range.startRow;
+        const rangeMaxRow = range.endRow;
+
+        // Check if range is completely outside the filter bounds
+        if (filter.minCol !== undefined && rangeMaxCol < filter.minCol) continue;
+        if (filter.maxCol !== undefined && rangeMinCol > filter.maxCol) continue;
+        if (filter.minRow !== undefined && rangeMaxRow < filter.minRow) continue;
+        if (filter.maxRow !== undefined && rangeMinRow > filter.maxRow) continue;
+      }
 
       // Calculate pixel bounds for the range
       const startX = getColX(range.startCol, headerState);
@@ -696,7 +749,8 @@ export class GridRenderer {
     viewHeight: number,
     colHasMoved: boolean,
     rowHasMoved: boolean,
-    headerState: HeaderRendererState
+    headerState: HeaderRendererState,
+    filter?: QuadrantFilter
   ): void {
     if (!this.sheetInfo) return;
 
@@ -707,20 +761,29 @@ export class GridRenderer {
     const zoomedHeaderHeight = getZoomedHeaderHeight();
     const zoomedColWidth = getZoomedColWidth(DEFAULT_COL_WIDTH);
     const zoomedRowHeight = getZoomedRowHeight(DEFAULT_ROW_HEIGHT);
+    const freezeCol = this.sheetInfo.freezeCol || 0;
+    const freezeRow = this.sheetInfo.freezeRow || 0;
 
     ctx.strokeStyle = this.colors.gridLine;
     ctx.lineWidth = 1;
 
     // Calculate visible column range (approximate, then refine)
-    const startCol = Math.max(0, Math.floor(this.scrollX / DEFAULT_COL_WIDTH) - 1);
+    // Always start from 0 if there are frozen columns to ensure they're drawn
+    const scrollBasedStartCol = Math.max(0, Math.floor(this.scrollX / DEFAULT_COL_WIDTH) - 1);
+    const startCol = freezeCol > 0 ? 0 : scrollBasedStartCol;
     const endCol = Math.min(
       this.sheetInfo.colCount,
-      startCol + Math.ceil(viewWidth / zoomedColWidth) + 2
+      scrollBasedStartCol + Math.ceil(viewWidth / zoomedColWidth) + 2
     );
 
     // Vertical lines - only iterate through visible columns
     for (let col = startCol; col <= endCol; col++) {
       if (colHasMoved && col === this.dragSourceIndex) continue;
+      // Skip columns that don't belong to this quadrant
+      if (filter) {
+        if (filter.minCol !== undefined && col < filter.minCol) continue;
+        if (filter.maxCol !== undefined && col > filter.maxCol) continue;
+      }
       const lineX = getColX(col, headerState) + 0.5;
       if (lineX >= zoomedHeaderWidth && lineX < viewWidth) {
         ctx.beginPath();
@@ -733,15 +796,22 @@ export class GridRenderer {
     // Calculate visible row range
     const rowCount = Math.max(this.sheetInfo.rowCount, this.discoveredRows);
     // Use larger buffer (-5) to handle custom row heights and rounding at different zoom levels
-    const startRow = Math.max(0, Math.floor(this.scrollY / DEFAULT_ROW_HEIGHT) - 5);
+    // Always start from 0 if there are frozen rows to ensure they're drawn
+    const scrollBasedStartRow = Math.max(0, Math.floor(this.scrollY / DEFAULT_ROW_HEIGHT) - 5);
+    const startRow = freezeRow > 0 ? 0 : scrollBasedStartRow;
     const endRow = Math.min(
       rowCount,
-      startRow + Math.ceil(viewHeight / zoomedRowHeight) + 10
+      scrollBasedStartRow + Math.ceil(viewHeight / zoomedRowHeight) + 10
     );
 
     // Horizontal lines - only iterate through visible rows
     for (let row = startRow; row <= endRow; row++) {
       if (rowHasMoved && row === this.dragSourceIndex) continue;
+      // Skip rows that don't belong to this quadrant
+      if (filter) {
+        if (filter.minRow !== undefined && row < filter.minRow) continue;
+        if (filter.maxRow !== undefined && row > filter.maxRow) continue;
+      }
       const lineY = getRowY(row, headerState) + 0.5;
       if (lineY >= zoomedHeaderHeight && lineY < viewHeight) {
         ctx.beginPath();
@@ -789,13 +859,17 @@ export class GridRenderer {
   /** Build a map of border edges, keeping only the highest priority border for each edge */
   private _buildBorderEdgeMap(
     colHasMoved: boolean,
-    rowHasMoved: boolean
+    rowHasMoved: boolean,
+    filter?: QuadrantFilter
   ): Map<string, { style: BorderStyle; color: string }> {
     const edgeMap = new Map<string, { style: BorderStyle; color: string }>();
 
     for (const cell of this.cells) {
       if (colHasMoved && cell.col === this.dragSourceIndex) continue;
       if (rowHasMoved && cell.row === this.dragSourceIndex) continue;
+
+      // Skip cells that don't belong to this quadrant
+      if (!cellPassesFilter(cell.col, cell.row, filter)) continue;
 
       const border = cell.style?.border;
       if (!border) continue;
@@ -918,10 +992,11 @@ export class GridRenderer {
     viewHeight: number,
     colHasMoved: boolean,
     rowHasMoved: boolean,
-    headerState: HeaderRendererState
+    headerState: HeaderRendererState,
+    filter?: QuadrantFilter
   ): void {
     // Build deduplicated edge map
-    const edgeMap = this._buildBorderEdgeMap(colHasMoved, rowHasMoved);
+    const edgeMap = this._buildBorderEdgeMap(colHasMoved, rowHasMoved, filter);
 
     if (edgeMap.size === 0) return;
 
@@ -1139,7 +1214,8 @@ export class GridRenderer {
     viewHeight: number,
     colHasMoved: boolean,
     rowHasMoved: boolean,
-    headerState: HeaderRendererState
+    headerState: HeaderRendererState,
+    filter?: QuadrantFilter
   ): void {
     const zoomedHeaderWidth = getZoomedHeaderWidth();
     const zoomedHeaderHeight = getZoomedHeaderHeight();
@@ -1161,6 +1237,9 @@ export class GridRenderer {
 
       // Skip merged cells (not anchors) - their content is drawn by the anchor
       if (cell.isMergedCell) continue;
+
+      // Skip cells that don't belong to this quadrant
+      if (!cellPassesFilter(cell.col, cell.row, filter)) continue;
 
       const cellX = getColX(cell.col, headerState);
       const cellY = getRowY(cell.row, headerState);

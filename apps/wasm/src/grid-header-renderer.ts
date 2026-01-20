@@ -296,10 +296,13 @@ export function drawColumnHeaders(
 
   // Calculate visible column range - only iterate through visible columns
   // Use unzoomed values for logical calculation
-  const startCol = Math.max(0, Math.floor(state.scrollX / DEFAULT_COL_WIDTH) - 1);
+  // Always start from 0 if there are frozen columns to ensure they're drawn
+  const freezeCol = state.sheetInfo.freezeCol || 0;
+  const scrollBasedStartCol = Math.max(0, Math.floor(state.scrollX / DEFAULT_COL_WIDTH) - 1);
+  const startCol = freezeCol > 0 ? 0 : scrollBasedStartCol;
   const endCol = Math.min(
     state.sheetInfo.colCount,
-    startCol + Math.ceil(viewWidth / (DEFAULT_COL_WIDTH * zoomFactor)) + 2
+    scrollBasedStartCol + Math.ceil(viewWidth / (DEFAULT_COL_WIDTH * zoomFactor)) + 2
   );
 
   ctx.font = `${zoomedFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
@@ -387,10 +390,13 @@ export function drawRowHeaders(
   // Calculate visible row range - only iterate through visible rows
   // Use unzoomed values for logical calculation
   // Use larger buffer (-5) to handle custom row heights and rounding at different zoom levels
-  const startRow = Math.max(0, Math.floor(state.scrollY / DEFAULT_ROW_HEIGHT) - 5);
+  // Always start from 0 if there are frozen rows to ensure they're drawn
+  const freezeRow = state.sheetInfo.freezeRow || 0;
+  const scrollBasedStartRow = Math.max(0, Math.floor(state.scrollY / DEFAULT_ROW_HEIGHT) - 5);
+  const startRow = freezeRow > 0 ? 0 : scrollBasedStartRow;
   const endRow = Math.min(
     rowCount,
-    startRow + Math.ceil(viewHeight / (DEFAULT_ROW_HEIGHT * zoomFactor)) + 10
+    scrollBasedStartRow + Math.ceil(viewHeight / (DEFAULT_ROW_HEIGHT * zoomFactor)) + 10
   );
 
   ctx.font = `${zoomedFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
