@@ -25,6 +25,8 @@ const CONFIG = {
   headed: process.env.HEADED === '1',
   // Slow down actions for debugging (set SLOWMO=100 for 100ms delay)
   slowMo: parseInt(process.env.SLOWMO || '0', 10),
+  // Viewport size for headed mode (smaller window to match rendered area)
+  viewport: { width: 720, height: 540 },
 };
 
 /**
@@ -174,6 +176,8 @@ async function startBrowser() {
         '--use-fake-device-for-media-stream',
         '--disable-web-security',
         '--allow-running-insecure-content',
+        // Set window size for headed mode
+        `--window-size=${CONFIG.viewport.width},${CONFIG.viewport.height}`,
       ],
     });
     return { browser, proc: null };
@@ -244,6 +248,9 @@ export async function setup() {
       origin: `http://localhost:${CONFIG.serverPort}`,
       permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'],
     });
+
+    // Set viewport size (affects content area)
+    await page.setViewport(CONFIG.viewport);
   } else {
     const context = await browser.createBrowserContext();
     page = await context.newPage();
