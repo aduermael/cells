@@ -37,7 +37,20 @@ This will be a separate file that runs with all E2E tests but can also be run st
 
 ### Phase 1 Test Results (Bug Found)
 
-**Test Status:** 3/8 tests pass (Bold, Border, Number format)
+**Test Status:** 3/8 tests pass
+
+| Test | Status | Verification Method |
+|------|--------|---------------------|
+| Background color sync | ❌ FAIL | Visual pixel check |
+| Text color sync | ❌ FAIL | Visual pixel check |
+| Bold/italic/underline sync | ✅ PASS | `cell.style` object check |
+| Amber background sync | ❌ FAIL | Visual pixel check |
+| Purple background sync | ❌ FAIL | Visual pixel check |
+| Border sync | ✅ PASS | `cell.style` object check |
+| Number format sync | ✅ PASS | Value sync verification |
+| Bidirectional sync | ❌ FAIL | Visual pixel check |
+
+**Run the test:** `bazel run :e2e -- collab-style-sync` (or `bazel run :e2e-headed -- collab-style-sync` for visible browser)
 
 **Bug Discovered:** Background color styles are NOT being included in viewport data.
 - Debug shows that even on local peer, after applying background color, the cell has NO `styleId` or `style` property
