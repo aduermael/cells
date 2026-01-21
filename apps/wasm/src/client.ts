@@ -621,7 +621,7 @@ export class CellsClient {
    * @param endCol End column position (0-indexed)
    * @param endRow End row position (0-indexed)
    * @param style Style properties to apply
-   * @returns Result with rangeId and styleId on success
+   * @returns Result with rangeId on success
    */
   async setRangeStyle(
     startCol: number,
@@ -639,8 +639,9 @@ export class CellsClient {
     });
     return {
       success: true,
-      rangeId: String(response.rangeId),
-      styleId: String(response.styleId),
+      rangeId: response.rangeId ? String(response.rangeId) : undefined,
+      // styleId is deprecated with content-addressed styles
+      styleId: response.styleId ? String(response.styleId) : undefined,
     };
   }
 
@@ -654,7 +655,7 @@ export class CellsClient {
    * @param endCol End column position (0-indexed)
    * @param endRow End row position (0-indexed)
    * @param style Style properties to apply
-   * @returns Result with rangeId and styleId on success
+   * @returns Result with rangeId on success
    */
   async setRangeStyleOnSheet(
     sheetIndex: number,
@@ -674,8 +675,9 @@ export class CellsClient {
     });
     return {
       success: true,
-      rangeId: String(response.rangeId),
-      styleId: String(response.styleId),
+      rangeId: response.rangeId ? String(response.rangeId) : undefined,
+      // styleId is deprecated with content-addressed styles
+      styleId: response.styleId ? String(response.styleId) : undefined,
     };
   }
 

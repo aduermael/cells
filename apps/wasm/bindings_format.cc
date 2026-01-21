@@ -32,6 +32,7 @@
 #include "core/cells/input_parser.h"
 #include "core/cells/number_formatter.h"
 #include "core/cells/operation.h"
+#include "core/cells/style_buffer.h"
 #include "core/cells/style_registry.h"
 
 namespace cells::wasm {
@@ -1712,11 +1713,15 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
 
         // Case 1: EXACT MATCH - merge styles into existing range
         if (existingRect == newRect) {
-            ID existingStyleId = sheet->getRangeStyleId(existingRange->id);
-            const CellStyle* existingStyle = existingStyleId.isNull() ? nullptr : _workbook->getStyle(existingStyleId);
+            // Get existing style from range's StyleBuffer
+            const StyleBuffer* existingStyleBuf = existingRange->getStyle();
+            CellStyle existingStyleValue;
+            if (existingStyleBuf != nullptr) {
+                existingStyleValue = existingStyleBuf->toCellStyle();
+            }
 
-            // Merge new style properties into existing style
-            CellStyle mergedStyle = existingStyle ? mergeStyles(*existingStyle, style, styleJson) : style;
+            // Merge style properties into existing style
+            CellStyle mergedStyle = mergeStyles(existingStyleValue, style, styleJson);
 
             // If merged style is empty (all defaults), delete the range instead
             if (mergedStyle.isEmpty()) {
@@ -1734,23 +1739,9 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                        "\",\"deleted\":true}";
             }
 
-            // Find or create the merged style via CRDT operations
-            // Check if identical style already exists (lookup only, no registration)
-            ID mergedStyleId = _workbook->findStyleByContent(mergedStyle);
-            if (mergedStyleId.isNull()) {
-                // Style doesn't exist - create via STYLE_DEFINE operation
-                // This is the ONLY way styles should be created (CRDT-native)
-                mergedStyleId = generate_id();
-                std::string fullStyleJson = styleToJson(mergedStyle);
-                Operation styleOp = makeStyleDefineOp(*_workbook, mergedStyleId, fullStyleJson);
-                applyOperation(*_workbook, styleOp);
-            }
-
-            // Update the existing range's style
-            std::ostringstream updatePayload;
-            updatePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
-            updatePayload << "\"style_id\":\"" << mergedStyleId.toString() << "\"}";
-            Operation updateOp = makeRangeSetStyleOp(*_workbook, existingRange->id, updatePayload.str());
+            // Convert to content-addressed StyleBuffer and update the range
+            StyleBuffer mergedStyleBuf = StyleBuffer::fromCellStyle(mergedStyle);
+            Operation updateOp = makeRangeSetStyleOp(*_workbook, existingRange->id, mergedStyleBuf);
             applyOperation(*_workbook, updateOp);
 
             broadcastPendingOperations();
@@ -1760,7 +1751,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
 
             // Return early - no new range needed, we merged into existing
             return "{\"success\":true,\"rangeId\":\"" + existingRange->id.toString() +
-                   "\",\"styleId\":\"" + mergedStyleId.toString() + "\",\"merged\":true}";
+                   "\",\"merged\":true}";
         }
     }
 
@@ -1768,48 +1759,27 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     // If the style is empty (all defaults like bold:false), we can't create a new range.
     // The only way to "clear" a style is to have an exact-match range that gets merged
     // to empty (handled above with range deletion).
-    ID styleId;
-    if (!style.isEmpty()) {
-        // Check if identical style already exists (lookup only, no registration)
-        styleId = _workbook->findStyleByContent(style);
-        if (styleId.isNull()) {
-            // Style doesn't exist - create via STYLE_DEFINE operation
-            // This is the ONLY way styles should be created (CRDT-native)
-            styleId = generate_id();
-            std::string fullStyleJson = styleToJson(style);
-            LOG_DEBUG("[setRangeStyle] Creating new style %s with JSON: %s",
-                      styleId.toString().c_str(), fullStyleJson.c_str());
-            Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
-            applyOperation(*_workbook, styleOp);
-            // Verify style was registered
-            if (!_workbook->hasStyle(styleId)) {
-                LOG_DEBUG("[setRangeStyle] WARNING: style %s NOT in workbook after applyOperation!",
-                          styleId.toString().c_str());
-            }
-        } else {
-            LOG_DEBUG("[setRangeStyle] Reusing existing style %s", styleId.toString().c_str());
-        }
-    }
-
-    if (styleId.isNull()) {
+    if (style.isEmpty()) {
         // Style is empty (all defaults) and no exact-match range was found.
         // This can happen when trying to "clear" a style on a range that doesn't exist.
         return "{\"error\":\"Empty style\"}";
     }
 
+    // Convert to content-addressed StyleBuffer for the new range
+    StyleBuffer newStyleBuf = StyleBuffer::fromCellStyle(style);
+
     // Track operations to perform after iteration (can't modify while iterating)
     struct SplitOperation {
         ID oldRangeId;
-        ID oldStyleId;
+        StyleBuffer styleToPreserve;  // Style to apply to split ranges
         std::vector<PositionRect> newRects;
     };
     std::vector<SplitOperation> splitOps;
 
     struct ContainedOperation {
         ID rangeId;
-        ID existingStyleId;
-        CellStyle strippedStyle;  // Style with conflicting props removed
-        bool deleteRange;          // True if stripped style is empty
+        StyleBuffer strippedStyle;  // Style with conflicting props removed
+        bool deleteRange;           // True if stripped style is empty
     };
     std::vector<ContainedOperation> containedOps;
 
@@ -1819,18 +1789,14 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         }
 
         // Get the existing range's style
-        ID existingStyleId = sheet->getRangeStyleId(existingRange->id);
-        if (existingStyleId.isNull()) {
+        const StyleBuffer* existingStyleBuf = existingRange->getStyle();
+        if (existingStyleBuf == nullptr) {
             continue;
         }
+        CellStyle existingStyle = existingStyleBuf->toCellStyle();
 
-        const CellStyle* existingStyle = _workbook->getStyle(existingStyleId);
-        if (!existingStyle) {
-            continue;
-        }
-
-        // Check if the existing style has conflicting properties with the new style
-        std::string existingStyleJson = getStylePropertiesJson(*existingStyle);
+        // Check if the existing style has conflicting properties with the style being applied
+        std::string existingStyleJson = getStylePropertiesJson(existingStyle);
         if (!stylesHaveConflictingProperties(styleJson, existingStyleJson)) {
             // No conflict - different properties, can layer (skip)
             continue;
@@ -1860,11 +1826,10 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         // Case 2: CONTAINED - existing range is fully inside new range
         // Strip conflicting properties from the existing range's style
         if (newRect.contains(existingRect)) {
-            auto [strippedStyle, isEmpty] = stripConflictingProperties(*existingStyle, styleJson);
+            auto [strippedCellStyle, isEmpty] = stripConflictingProperties(existingStyle, styleJson);
             ContainedOperation op;
             op.rangeId = existingRange->id;
-            op.existingStyleId = existingStyleId;
-            op.strippedStyle = strippedStyle;
+            op.strippedStyle = StyleBuffer::fromCellStyle(strippedCellStyle);
             op.deleteRange = isEmpty;
             containedOps.push_back(std::move(op));
             continue;  // Don't also split
@@ -1875,7 +1840,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
 
         SplitOperation op;
         op.oldRangeId = existingRange->id;
-        op.oldStyleId = existingStyleId;
+        op.styleToPreserve = *existingStyleBuf;  // Copy the style to preserve it
         op.newRects = std::move(splitRects);
         splitOps.push_back(std::move(op));
     }
@@ -1889,40 +1854,15 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             Operation removeOp = makeRangeRemoveOp(*_workbook, containedOp.rangeId, removePayload.str());
             applyOperation(*_workbook, removeOp);
         } else {
-            // Update the range with stripped style via CRDT operations
-            // Check if identical style already exists (lookup only, no registration)
-            ID newStyleId = _workbook->findStyleByContent(containedOp.strippedStyle);
-            if (newStyleId.isNull()) {
-                // Style doesn't exist - create via STYLE_DEFINE operation
-                // This is the ONLY way styles should be created (CRDT-native)
-                newStyleId = generate_id();
-                std::string fullStyleJson = styleToJson(containedOp.strippedStyle);
-                Operation styleOp = makeStyleDefineOp(*_workbook, newStyleId, fullStyleJson);
-                applyOperation(*_workbook, styleOp);
-            }
-
-            std::ostringstream updatePayload;
-            updatePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
-            updatePayload << "\"style_id\":\"" << newStyleId.toString() << "\"}";
-            Operation updateOp = makeRangeSetStyleOp(*_workbook, containedOp.rangeId, updatePayload.str());
+            // Update the range with the stripped style
+            Operation updateOp = makeRangeSetStyleOp(*_workbook, containedOp.rangeId, containedOp.strippedStyle);
             applyOperation(*_workbook, updateOp);
         }
     }
 
     // Execute split operations: delete old ranges, create new split ranges
     for (const SplitOperation& splitOp : splitOps) {
-        // IMPORTANT: Add a temporary reference to the old style BEFORE deleting the old range.
-        // When removeRange() is called, it releases the style reference. If the style's
-        // refcount drops to 0, it gets garbage collected before we can use it for the
-        // new split ranges. By adding a temp ref first, we keep the style alive during the split.
-        StyleRegistry* registry = _workbook->getStyleRegistry();
-        const bool needsTempRef = (registry != nullptr && !splitOp.oldStyleId.isNull() &&
-                                   !splitOp.newRects.empty());
-        if (needsTempRef) {
-            registry->addRef(splitOp.oldStyleId);
-        }
-
-        // Delete the old range (this releases one ref to the style)
+        // Delete the old range
         std::ostringstream removePayload;
         removePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
         Operation removeOp = makeRangeRemoveOp(*_workbook, splitOp.oldRangeId, removePayload.str());
@@ -1997,19 +1937,9 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             Operation newRangeOp = makeRangeAddOp(*_workbook, newRangeId, newRangePayload.str());
             applyOperation(*_workbook, newRangeOp);
 
-            // Associate the OLD style with the new split range (preserving the style)
-            std::ostringstream newStylePayload;
-            newStylePayload << "{\"style_id\":\"" << splitOp.oldStyleId.toString() << "\"}";
-
-            Operation newSetStyleOp =
-                makeRangeSetStyleOp(*_workbook, newRangeId, newStylePayload.str());
+            // Apply the preserved style to the new split range
+            Operation newSetStyleOp = makeRangeSetStyleOp(*_workbook, newRangeId, splitOp.styleToPreserve);
             applyOperation(*_workbook, newSetStyleOp);
-        }
-
-        // Release the temporary reference now that all split ranges have been created
-        // (setRangeStyleId added permanent refs for each new range)
-        if (needsTempRef) {
-            registry->release(splitOp.oldStyleId);
         }
     }
 
@@ -2026,10 +1956,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     applyOperation(*_workbook, rangeOp);
 
     // Associate the style with the range
-    std::ostringstream stylePayload;
-    stylePayload << "{\"style_id\":\"" << styleId.toString() << "\"}";
-
-    Operation setStyleOp = makeRangeSetStyleOp(*_workbook, rangeId, stylePayload.str());
+    Operation setStyleOp = makeRangeSetStyleOp(*_workbook, rangeId, newStyleBuf);
     applyOperation(*_workbook, setStyleOp);
 
     // Clear redundant cell-level styles within the range (I2: Range style clears cell styles)
@@ -2098,7 +2025,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     rebuildViewportIndex();
     notifyListeners(ChangeType::CELL_CHANGED);
 
-    return "{\"success\":true,\"rangeId\":\"" + rangeId.toString() + "\",\"styleId\":\"" + styleId.toString() + "\"}";
+    return "{\"success\":true,\"rangeId\":\"" + rangeId.toString() + "\"}";
 }
 
 // =============================================================================
@@ -2219,12 +2146,10 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
     // These fill in any properties not set by the cell style
     std::vector<Range*> styleRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::STYLE);
     for (Range* range : styleRanges) {
-        ID rangeStyleId = sheet.getRangeStyleId(range->id);
-        if (!rangeStyleId.isNull()) {
-            const CellStyle* rangeStyle = workbook.getStyle(rangeStyleId);
-            if (rangeStyle) {
-                result = mergeEffectiveStyles(result, *rangeStyle);
-            }
+        const StyleBuffer* rangeStyleBuf = range->getStyle();
+        if (rangeStyleBuf != nullptr) {
+            CellStyle rangeStyle = rangeStyleBuf->toCellStyle();
+            result = mergeEffectiveStyles(result, rangeStyle);
         }
     }
 

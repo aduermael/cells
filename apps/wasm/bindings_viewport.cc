@@ -106,44 +106,26 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
     // Priority 2: Range styles (for ranges with RANGE_STYLE flag)
     // Merge styles from all overlapping ranges to fill gaps from cell style
     // e.g., if cell has border and Range has bold, the cell gets both properties
-    //
-    // Supports both:
-    // - Old system: style ID reference via getRangeStyleId()
-    // - New system: content-addressed StyleBuffer stored directly in Range
     std::vector<Range*> styleRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::STYLE);
     for (Range* range : styleRanges) {
-        const CellStyle* rangeStyle = nullptr;
-        CellStyle convertedStyle;  // For new system: converted from StyleBuffer
-        ID rangeStyleId;
-
-        // Check new system first: content-addressed StyleBuffer in Range
+        // Get content-addressed StyleBuffer from Range
         const StyleBuffer* styleBuffer = range->getStyle();
-        if (styleBuffer != nullptr) {
-            // Convert StyleBuffer to CellStyle for merging
-            convertedStyle = styleBuffer->toCellStyle();
-            rangeStyle = &convertedStyle;
-        } else {
-            // Fall back to old system: style ID reference
-            rangeStyleId = sheet.getRangeStyleId(range->id);
-            if (!rangeStyleId.isNull()) {
-                rangeStyle = workbook.getStyle(rangeStyleId);
-            }
+        if (styleBuffer == nullptr) {
+            continue;
         }
 
-        if (rangeStyle != nullptr) {
-            if (!hasAnyStyle) {
-                // First style found - use it as base
-                combinedStyle = *rangeStyle;
-                if (!rangeStyleId.isNull()) {
-                    result.styleId = rangeStyleId;
-                }
-                hasAnyStyle = true;
-            } else {
-                // Merge range's style into combined style (fills gaps)
-                combinedStyle = mergeStyles(combinedStyle, *rangeStyle);
-            }
-            result.fromRange = true;
+        // Convert StyleBuffer to CellStyle for merging
+        CellStyle rangeStyle = styleBuffer->toCellStyle();
+
+        if (!hasAnyStyle) {
+            // First style found - use it as base
+            combinedStyle = rangeStyle;
+            hasAnyStyle = true;
+        } else {
+            // Merge range's style into combined style (fills gaps)
+            combinedStyle = mergeStyles(combinedStyle, rangeStyle);
         }
+        result.fromRange = true;
     }
 
     // Priority 3: Column's default style (fills remaining gaps)
@@ -194,22 +176,22 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
 }
 
 // Helper: Convert BorderStyle enum to JSON string value
-const char* borderStyleToString(BorderStyle style) {
+const char* borderStyleToString(cells::BorderStyle style) {
     switch (style) {
-        case BorderStyle::NONE: return "none";
-        case BorderStyle::THIN: return "thin";
-        case BorderStyle::MEDIUM: return "medium";
-        case BorderStyle::THICK: return "thick";
-        case BorderStyle::DASHED: return "dashed";
-        case BorderStyle::DOTTED: return "dotted";
-        case BorderStyle::DOUBLE: return "double";
-        case BorderStyle::HAIR: return "hair";
-        case BorderStyle::MEDIUM_DASHED: return "mediumDashed";
-        case BorderStyle::DASH_DOT: return "dashDot";
-        case BorderStyle::MEDIUM_DASH_DOT: return "mediumDashDot";
-        case BorderStyle::DASH_DOT_DOT: return "dashDotDot";
-        case BorderStyle::MEDIUM_DASH_DOT_DOT: return "mediumDashDotDot";
-        case BorderStyle::SLANT_DASH_DOT: return "slantDashDot";
+        case cells::BorderStyle::NONE: return "none";
+        case cells::BorderStyle::THIN: return "thin";
+        case cells::BorderStyle::MEDIUM: return "medium";
+        case cells::BorderStyle::THICK: return "thick";
+        case cells::BorderStyle::DASHED: return "dashed";
+        case cells::BorderStyle::DOTTED: return "dotted";
+        case cells::BorderStyle::DOUBLE: return "double";
+        case cells::BorderStyle::HAIR: return "hair";
+        case cells::BorderStyle::MEDIUM_DASHED: return "mediumDashed";
+        case cells::BorderStyle::DASH_DOT: return "dashDot";
+        case cells::BorderStyle::MEDIUM_DASH_DOT: return "mediumDashDot";
+        case cells::BorderStyle::DASH_DOT_DOT: return "dashDotDot";
+        case cells::BorderStyle::MEDIUM_DASH_DOT_DOT: return "mediumDashDotDot";
+        case cells::BorderStyle::SLANT_DASH_DOT: return "slantDashDot";
         default: return "none";
     }
 }
@@ -714,15 +696,12 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             continue;
         }
 
-        // Get the style for this range
-        ID styleId = sheet->getRangeStyleId(rangeId);
-        if (styleId.isNull()) {
+        // Get the style from the range's StyleBuffer
+        const StyleBuffer* styleBuffer = range->getStyle();
+        if (styleBuffer == nullptr) {
             continue;
         }
-        const CellStyle* style = _workbook->getStyle(styleId);
-        if (style == nullptr) {
-            continue;
-        }
+        CellStyle style = styleBuffer->toCellStyle();
 
         // Get position bounds from corner IDs
         const Axis* startCol = sheet->getColumn(range->startColId);
@@ -754,47 +733,46 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         json << "\"startRow\":" << rangeRow1 << ",";
         json << "\"endCol\":" << rangeCol2 << ",";
         json << "\"endRow\":" << rangeRow2 << ",";
-        json << "\"styleId\":\"" << styleId.toString() << "\",";
         json << "\"style\":{";
         bool firstProp = true;
         // Add all non-default style properties
-        if (!style->bgColor.empty()) {
-            json << "\"bgColor\":\"" << style->bgColor << "\"";
+        if (!style.bgColor.empty()) {
+            json << "\"bgColor\":\"" << style.bgColor << "\"";
             firstProp = false;
         }
-        if (!style->textColor.empty()) {
+        if (!style.textColor.empty()) {
             if (!firstProp) json << ",";
-            json << "\"textColor\":\"" << style->textColor << "\"";
+            json << "\"textColor\":\"" << style.textColor << "\"";
             firstProp = false;
         }
-        if (style->bold) {
+        if (style.bold) {
             if (!firstProp) json << ",";
             json << "\"bold\":true";
             firstProp = false;
         }
-        if (style->italic) {
+        if (style.italic) {
             if (!firstProp) json << ",";
             json << "\"italic\":true";
             firstProp = false;
         }
-        if (style->underline) {
+        if (style.underline) {
             if (!firstProp) json << ",";
             json << "\"underline\":true";
             firstProp = false;
         }
-        if (style->wrapText) {
+        if (style.wrapText) {
             if (!firstProp) json << ",";
             json << "\"wrapText\":true";
             firstProp = false;
         }
-        if (!style->fontFamily.empty()) {
+        if (!style.fontFamily.empty()) {
             if (!firstProp) json << ",";
-            json << "\"fontFamily\":\"" << style->fontFamily << "\"";
+            json << "\"fontFamily\":\"" << style.fontFamily << "\"";
             firstProp = false;
         }
-        if (style->fontSize != 0) {
+        if (style.fontSize != 0) {
             if (!firstProp) json << ",";
-            json << "\"fontSize\":" << static_cast<int>(style->fontSize);
+            json << "\"fontSize\":" << static_cast<int>(style.fontSize);
             firstProp = false;
         }
         json << "}}";

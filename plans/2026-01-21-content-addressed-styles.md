@@ -492,10 +492,10 @@ Update ranges to use StyleBuffer instead of style_id reference.
 
 ### Phase 6: Update Bindings and TypeScript
 
-- [ ] 6a: Update `setRangeStyle()` binding to accept style properties directly
-- [ ] 6b: Remove `defineStyle()` binding (no longer needed)
-- [ ] 6c: Update TypeScript types for new style format
-- [ ] 6d: Update style toolbar to work with new system
+- [x] 6a: Update `setRangeStyle()` binding to accept style properties directly - bindings_format.cc and bindings_viewport.cc now use StyleBuffer directly instead of style ID references.
+- [x] 6b: Remove `defineStyle()` binding (no longer needed) - No defineStyle binding existed; only cell-level styling still uses STYLE_DEFINE (which will be migrated in Phase 7).
+- [x] 6c: Update TypeScript types for new style format - Made styleId optional in StyleRangeInfo and setRangeStyle responses since content-addressed styles no longer emit style IDs.
+- [x] 6d: Update style toolbar to work with new system - The toolbar already works with the new system since it uses setRangeStyle which internally uses StyleBuffer.
 
 ### Phase 7: Remove Old Style System
 

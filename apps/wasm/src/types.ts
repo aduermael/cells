@@ -281,7 +281,7 @@ export interface StyleRangeInfo {
   startRow: number;
   endCol: number;
   endRow: number;
-  styleId: string;
+  styleId?: string; // Deprecated: no longer emitted with content-addressed styles
   style: {
     bgColor?: string;
     textColor?: string;
