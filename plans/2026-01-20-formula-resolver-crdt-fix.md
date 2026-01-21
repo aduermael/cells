@@ -72,10 +72,11 @@ FormulaResolver itself should NOT create entities. Instead:
 
 ## Phase 3: Refactor callers to create entities via CRDT
 
-- [ ] 3a: Update `bindings_core.cc` cell editing path:
+- [x] 3a: Update `bindings_core.cc` cell editing path:
   - Call resolver to identify needed entities
   - Create column/row/cell ops via `applyOperation`
   - Then resolve AST with existing entities
+  - Also added sheetId to PendingCell struct to track target sheet for cell creation
 - [ ] 3b: Update `bindings_formula.cc` formula editing path (same pattern)
 - [ ] 3c: Update `bindings_file.cc` XLSX import path (same pattern)
 - [ ] 3d: Update `fill_range.cc` auto-fill path (same pattern)

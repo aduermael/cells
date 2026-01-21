@@ -518,9 +518,38 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
         auto ast = parser.parse();
 
         if (ast && ast->type != ASTNodeType::ERROR_NODE) {
-            // Resolve references to UUIDs (handles cross-sheet refs via getTargetSheet)
             FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
-            ResolveResult resolveResult = resolver.resolve(ast.get());
+
+            // CRDT-compliant resolution: discover and create entities first
+            RequiredEntities required = resolver.getRequiredEntities(ast.get());
+
+            // Create required columns via CRDT operations
+            for (const auto& pending : required.columns) {
+                std::string colPayload = "{\"pos\":" + std::to_string(pending.position) +
+                                         ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+                Operation colOp = makeColInsertOp(*_workbook, pending.id, pending.sheetId, colPayload);
+                applyOperation(*_workbook, colOp);
+            }
+
+            // Create required rows via CRDT operations
+            for (const auto& pending : required.rows) {
+                std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) +
+                                         ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+                Operation rowOp = makeRowInsertOp(*_workbook, pending.id, pending.sheetId, rowPayload);
+                applyOperation(*_workbook, rowOp);
+            }
+
+            // Create required cells via CRDT operations (empty cells for references)
+            for (const auto& pending : required.cells) {
+                std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
+                                          pending.colId.toString() + "\",\"row_id\":\"" +
+                                          pending.rowId.toString() + "\"}";
+                Operation cellOp = makeCellSetValueOp(*_workbook, pending.id, pending.sheetId, cellPayload);
+                applyOperation(*_workbook, cellOp);
+            }
+
+            // Now resolve with existingOnly=true (all entities should exist)
+            ResolveResult resolveResult = resolver.resolve(ast.get(), true);
 
             if (resolveResult.success) {
                 // Serialize AST to UUID format for storage

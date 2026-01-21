@@ -73,9 +73,10 @@ struct PendingAxis {
 
 // Pending cell to be created
 struct PendingCell {
-    ID id;     // Pre-generated ID for the cell
-    ID colId;  // Column axis ID (may be a pending axis ID)
-    ID rowId;  // Row axis ID (may be a pending axis ID)
+    ID id;       // Pre-generated ID for the cell
+    ID sheetId;  // Target sheet
+    ID colId;    // Column axis ID (may be a pending axis ID)
+    ID rowId;    // Row axis ID (may be a pending axis ID)
 };
 
 // Entities required by a formula that don't yet exist

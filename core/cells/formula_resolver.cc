@@ -730,6 +730,7 @@ void FormulaResolver::collectRequiredEntitiesFromCellRef(const CellRefNode* node
     // Queue cell for creation
     PendingCell pendingCell;
     pendingCell.id = generate_id();
+    pendingCell.sheetId = targetSheet->id;
     pendingCell.colId = colId;
     pendingCell.rowId = rowId;
     required.cells.push_back(pendingCell);
@@ -851,7 +852,7 @@ void FormulaResolver::collectRequiredEntitiesFromColumnRangeRef(const ColumnRang
     }
 
     // Check and queue both columns
-    for (int32_t colPos : {startColPos, endColPos}) {
+    for (const int32_t colPos : {startColPos, endColPos}) {
         const Axis* existingCol = targetSheet->getColumnByPosition(static_cast<uint32_t>(colPos));
         if (existingCol != nullptr) {
             continue;  // Already exists
@@ -902,7 +903,7 @@ void FormulaResolver::collectRequiredEntitiesFromRowRangeRef(const RowRangeRefNo
     const auto endRowPos = static_cast<uint32_t>(node->endRow - 1);
 
     // Check and queue both rows
-    for (uint32_t rowPos : {startRowPos, endRowPos}) {
+    for (const uint32_t rowPos : {startRowPos, endRowPos}) {
         const Axis* existingRow = targetSheet->getRowByPosition(rowPos);
         if (existingRow != nullptr) {
             continue;  // Already exists
