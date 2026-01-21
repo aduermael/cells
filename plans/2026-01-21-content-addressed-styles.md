@@ -147,10 +147,311 @@ bool hasPropertyCollision(const StyleBuffer& a, const StyleBuffer& b) {
 
 ### Phase 1: Design Binary Style Format
 
-- [ ] 1a: Document complete flag layout for all supported properties (current + Excel compatibility)
-- [ ] 1b: Define property encoding for each type (colors, fonts, alignments, borders)
-- [ ] 1c: Create test cases for encoding/decoding round-trips
-- [ ] 1d: Decide on base64 variant (standard vs URL-safe)
+- [x] 1a: Document complete flag layout for all supported properties (current + Excel compatibility)
+
+**Complete Flag Layout:**
+
+```
+Flag Byte 0 (bits 0-7):
+  Bits 0-1: Flag byte count indicator (0b00 = 2 bytes, 0b01 = 3, 0b10 = 4, 0b11 = reserved)
+  Bit 2: bold present
+  Bit 3: italic present
+  Bit 4: underline present
+  Bit 5: strikethrough present (new, for Excel compatibility)
+  Bit 6: bgColor present
+  Bit 7: textColor present
+
+Flag Byte 1 (bits 8-15):
+  Bit 0 (8): fontSize present
+  Bit 1 (9): fontFamily present
+  Bit 2 (10): horizontalAlign present
+  Bit 3 (11): verticalAlign present
+  Bit 4 (12): textWrap present
+  Bit 5 (13): numberFormat present (reference to format registry)
+  Bit 6 (14): border present
+  Bit 7 (15): reserved (for flag byte 3 indicator if needed)
+
+Future Flag Bytes 2-3 (if needed):
+  - indent level
+  - rotation angle
+  - shrink to fit
+  - locked/protected
+  - hidden
+  - etc.
+```
+
+**Current properties (14 total, plus borders which use 4 flags internally):**
+1. bold, italic, underline, strikethrough (4 booleans → packed into 1 byte)
+2. bgColor, textColor (2 colors → 6 bytes total)
+3. fontSize (1 byte)
+4. fontFamily (length-prefixed string)
+5. hAlign, vAlign (packed into 1 byte: 3+3 bits)
+6. textWrap (packed with other booleans)
+7. numberFormat (8 bytes format ID reference)
+8. border (variable: 1 sides-mask byte + 4 bytes per side present)
+
+- [x] 1b: Define property encoding for each type (colors, fonts, alignments, borders)
+
+**Property Encoding Specification:**
+
+```
+Property Data (in order of flag bits, only present if flag is set):
+
+1. BOOLEAN BYTE (if any of bold/italic/underline/strikethrough/textWrap flags set):
+   +--------+
+   | B I U S W _ _ _ |  (1 byte)
+   +--------+
+   Bit 0: bold value
+   Bit 1: italic value
+   Bit 2: underline value
+   Bit 3: strikethrough value
+   Bit 4: textWrap value
+   Bits 5-7: reserved
+
+2. BGCOLOR (if flag set): 3 bytes RGB
+   +--------+--------+--------+
+   |   R    |   G    |   B    |
+   +--------+--------+--------+
+
+3. TEXTCOLOR (if flag set): 3 bytes RGB (same as bgColor)
+
+4. FONTSIZE (if flag set): 1 byte
+   +--------+
+   | size-6 |  (supports 6-261pt, but practical range is 6-72pt)
+   +--------+
+   Encoding: stored as (size - 6), so 11pt → 5, 6pt → 0, 72pt → 66
+
+5. FONTFAMILY (if flag set): length-prefixed string
+   +--------+--------+--------+...
+   | length | UTF-8 bytes...   |
+   +--------+--------+--------+...
+   Length: 1 byte (max 255 chars, practical font names are <64)
+
+6. ALIGNMENT (if either hAlign or vAlign flag set): 1 byte
+   +--------+
+   | HHH VVV _ _ |  (1 byte)
+   +--------+
+   Bits 0-2: hAlign (0=LEFT, 1=CENTER, 2=RIGHT, 3=JUSTIFY, 4=GENERAL)
+   Bits 3-5: vAlign (0=TOP, 1=MIDDLE, 2=BOTTOM)
+   Bits 6-7: reserved
+
+7. NUMBERFORMAT (if flag set): 8 bytes format ID
+   +--------+--------+--------+--------+--------+--------+--------+--------+
+   |                    format_id (64-bit)                                  |
+   +--------+--------+--------+--------+--------+--------+--------+--------+
+   Note: Format IDs are from a separate registry (content-address formats later)
+
+8. BORDER (if flag set): variable length
+   +--------+--------+--------+--------+--------+...
+   | sides  | T_style| T_R    | T_G    | T_B    | R_style | R_R | ...
+   +--------+--------+--------+--------+--------+...
+
+   Sides mask (1 byte):
+     Bit 0: top present
+     Bit 1: right present
+     Bit 2: bottom present
+     Bit 3: left present
+     Bits 4-7: reserved
+
+   For each side present (4 bytes each):
+     Byte 0: BorderStyle enum (0-13)
+     Bytes 1-3: RGB color
+
+   Total border size: 1 + (4 × number_of_sides_present) bytes
+   Min: 1 byte (no sides), Max: 17 bytes (all 4 sides)
+```
+
+**Example Encodings:**
+
+```
+Style: { bold: true, bgColor: "#FBBF24" }
+Flags: 0b00_0100_0100 (bold=bit2, bgColor=bit6)
+Data:  [0x01] [0xFB, 0xBF, 0x24]
+       ^^^^   ^^^^^^^^^^^^^^^^
+       bools  RGB color
+Total: 2 flag bytes + 1 bool byte + 3 color bytes = 6 bytes
+Base64: ~8 characters
+
+Style: { fontSize: 14, hAlign: "center" }
+Flags: 0b00_0000_0101_0000_0000 (fontSize=bit8, hAlign=bit10)
+Data:  [0x08] [0x01]
+       ^^^^   ^^^^
+       14-6   CENTER|BOTTOM
+Total: 2 flag bytes + 1 size byte + 1 align byte = 4 bytes
+```
+
+- [x] 1c: Create test cases for encoding/decoding round-trips
+
+**Test Cases for StyleBuffer:**
+
+```cpp
+// 1. Empty style
+TEST(StyleBuffer, EmptyStyle) {
+  StyleBuffer s;
+  EXPECT_EQ(s.toBase64(), "AAA=");  // Just flag bytes, all zeros
+  auto decoded = StyleBuffer::fromBase64("AAA=");
+  EXPECT_TRUE(decoded.isEmpty());
+}
+
+// 2. Single boolean property
+TEST(StyleBuffer, BoldOnly) {
+  StyleBuffer s;
+  s.setBold(true);
+  auto b64 = s.toBase64();
+  auto decoded = StyleBuffer::fromBase64(b64);
+  EXPECT_TRUE(decoded.getBold());
+  EXPECT_FALSE(decoded.hasItalic());
+}
+
+// 3. Boolean with false value (presence matters, not value)
+TEST(StyleBuffer, BoldFalseExplicit) {
+  StyleBuffer s;
+  s.setBold(false);  // Explicitly set to false
+  EXPECT_TRUE(s.hasBold());  // Flag IS set
+  EXPECT_FALSE(s.getBold()); // But value is false
+}
+
+// 4. Single color
+TEST(StyleBuffer, BgColorOnly) {
+  StyleBuffer s;
+  s.setBgColor(0xFB, 0xBF, 0x24);  // #FBBF24
+  auto decoded = StyleBuffer::fromBase64(s.toBase64());
+  uint8_t r, g, b;
+  decoded.getBgColor(r, g, b);
+  EXPECT_EQ(r, 0xFB);
+  EXPECT_EQ(g, 0xBF);
+  EXPECT_EQ(b, 0x24);
+}
+
+// 5. Font size edge cases
+TEST(StyleBuffer, FontSizeRange) {
+  StyleBuffer s1, s2, s3;
+  s1.setFontSize(6);   // Minimum
+  s2.setFontSize(11);  // Default
+  s3.setFontSize(72);  // Max practical
+
+  EXPECT_EQ(StyleBuffer::fromBase64(s1.toBase64()).getFontSize(), 6);
+  EXPECT_EQ(StyleBuffer::fromBase64(s2.toBase64()).getFontSize(), 11);
+  EXPECT_EQ(StyleBuffer::fromBase64(s3.toBase64()).getFontSize(), 72);
+}
+
+// 6. Font family with special characters
+TEST(StyleBuffer, FontFamilyUnicode) {
+  StyleBuffer s;
+  s.setFontFamily("Arial Unicode™");
+  auto decoded = StyleBuffer::fromBase64(s.toBase64());
+  EXPECT_EQ(decoded.getFontFamily(), "Arial Unicode™");
+}
+
+// 7. All alignments
+TEST(StyleBuffer, AllAlignments) {
+  for (auto h : {TextAlign::LEFT, TextAlign::CENTER, TextAlign::RIGHT,
+                 TextAlign::JUSTIFY, TextAlign::GENERAL}) {
+    for (auto v : {VerticalAlign::TOP, VerticalAlign::MIDDLE, VerticalAlign::BOTTOM}) {
+      StyleBuffer s;
+      s.setHAlign(h);
+      s.setVAlign(v);
+      auto decoded = StyleBuffer::fromBase64(s.toBase64());
+      EXPECT_EQ(decoded.getHAlign(), h);
+      EXPECT_EQ(decoded.getVAlign(), v);
+    }
+  }
+}
+
+// 8. Border with single side
+TEST(StyleBuffer, BorderSingleSide) {
+  StyleBuffer s;
+  s.setBorderTop(BorderStyle::THIN, 0x00, 0x00, 0x00);
+  auto decoded = StyleBuffer::fromBase64(s.toBase64());
+  EXPECT_TRUE(decoded.hasBorderTop());
+  EXPECT_FALSE(decoded.hasBorderRight());
+  EXPECT_EQ(decoded.getBorderTopStyle(), BorderStyle::THIN);
+}
+
+// 9. Border with all sides
+TEST(StyleBuffer, BorderAllSides) {
+  StyleBuffer s;
+  s.setBorderTop(BorderStyle::THIN, 0xFF, 0x00, 0x00);
+  s.setBorderRight(BorderStyle::MEDIUM, 0x00, 0xFF, 0x00);
+  s.setBorderBottom(BorderStyle::THICK, 0x00, 0x00, 0xFF);
+  s.setBorderLeft(BorderStyle::DASHED, 0xFF, 0xFF, 0x00);
+
+  auto decoded = StyleBuffer::fromBase64(s.toBase64());
+  EXPECT_EQ(decoded.getBorderTopStyle(), BorderStyle::THIN);
+  EXPECT_EQ(decoded.getBorderRightStyle(), BorderStyle::MEDIUM);
+  EXPECT_EQ(decoded.getBorderBottomStyle(), BorderStyle::THICK);
+  EXPECT_EQ(decoded.getBorderLeftStyle(), BorderStyle::DASHED);
+}
+
+// 10. Complex style with multiple properties
+TEST(StyleBuffer, ComplexStyle) {
+  StyleBuffer s;
+  s.setBold(true);
+  s.setItalic(true);
+  s.setBgColor(0xFF, 0xFF, 0x00);
+  s.setTextColor(0x00, 0x00, 0x00);
+  s.setFontSize(14);
+  s.setFontFamily("Helvetica");
+  s.setHAlign(TextAlign::CENTER);
+  s.setVAlign(VerticalAlign::MIDDLE);
+  s.setBorderTop(BorderStyle::THIN, 0x00, 0x00, 0x00);
+
+  auto decoded = StyleBuffer::fromBase64(s.toBase64());
+  EXPECT_TRUE(decoded.getBold());
+  EXPECT_TRUE(decoded.getItalic());
+  EXPECT_FALSE(decoded.hasUnderline());
+  EXPECT_EQ(decoded.getFontSize(), 14);
+  EXPECT_EQ(decoded.getFontFamily(), "Helvetica");
+  EXPECT_EQ(decoded.getHAlign(), TextAlign::CENTER);
+  EXPECT_TRUE(decoded.hasBorderTop());
+  EXPECT_FALSE(decoded.hasBorderBottom());
+}
+
+// 11. Determinism: same input = same output
+TEST(StyleBuffer, Deterministic) {
+  StyleBuffer s1, s2;
+  s1.setBold(true);
+  s1.setBgColor(0xFB, 0xBF, 0x24);
+
+  s2.setBgColor(0xFB, 0xBF, 0x24);  // Different order
+  s2.setBold(true);
+
+  EXPECT_EQ(s1.toBase64(), s2.toBase64());  // Same result regardless of order
+}
+
+// 12. Identity: style content IS its identity
+TEST(StyleBuffer, ContentIdentity) {
+  StyleBuffer s1, s2;
+  s1.setBold(true);
+  s2.setBold(true);
+
+  // Same content = same base64 = same identity
+  EXPECT_EQ(s1.toBase64(), s2.toBase64());
+
+  StyleBuffer s3;
+  s3.setBold(false);  // Explicit false is different from no bold
+
+  StyleBuffer s4;  // No bold set at all
+
+  EXPECT_NE(s3.toBase64(), s4.toBase64());
+}
+```
+
+- [x] 1d: Decide on base64 variant (standard vs URL-safe)
+
+**Decision: Standard Base64 (RFC 4648)**
+
+Rationale:
+- Style data is never used in URLs directly (it's embedded in CRDT operations which are already JSON-encoded)
+- Standard base64 is more widely supported and recognized
+- No special URL encoding needed since styles are transported in JSON string fields
+- Padding (`=`) is fine since we're not concatenating or splitting
+
+Implementation: Use standard base64 alphabet `A-Za-z0-9+/` with `=` padding.
+
+Alternative considered: URL-safe base64 (`-_` instead of `+/`) was rejected because:
+- Adds complexity without benefit for our use case
+- Would require custom encoder since many libs default to standard
 
 ### Phase 2: Implement StyleBuffer Class
 
