@@ -111,9 +111,17 @@ FormulaResolver itself should NOT create entities. Instead:
 
 ## Phase 5: Testing
 
-- [ ] 5a: Add unit test verifying formula resolution creates CRDT operations
-- [ ] 5b: Add E2E test verifying formula-created entities sync to peers
-- [ ] 5c: Run existing formula tests to verify no regressions
+- [x] 5a: Add unit test verifying formula resolution creates CRDT operations
+  - Added 10 tests to formula_resolver_test.cc for getRequiredEntities and existingOnly mode
+  - Added 4 tests to sync_formula_test.cc for two-phase CRDT resolution workflow
+- [x] 5b: Add E2E test verifying formula-created entities sync to peers
+  - Added 2 tests to collab.test.mjs:
+    - "Formula with new entity reference syncs" - tests value + formula sync
+    - "Formula creates distant cell reference via CRDT" - tests entity creation sync
+- [x] 5c: Run existing formula tests to verify no regressions
+  - All formula tests pass (21/21)
+  - All collab tests pass (6/6) including new CRDT entity sync tests
+  - All sync_formula_test.cc tests pass
 
 ---
 

@@ -604,5 +604,167 @@ TEST_F(FormulaResolverTest, ResolveCrossSheetRange) {
     EXPECT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
 }
 
+// ===========================================================================
+// CRDT-compliant resolution tests (getRequiredEntities)
+// ===========================================================================
+
+TEST_F(FormulaResolverTest, GetRequiredEntities_ExistingCell_ReturnsEmpty) {
+    // A1 exists, so no entities should be required
+    auto ast = parseFormula("=A1");
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1);
+    RequiredEntities required = resolver.getRequiredEntities(ast.get());
+
+    EXPECT_TRUE(required.empty());
+    EXPECT_TRUE(required.columns.empty());
+    EXPECT_TRUE(required.rows.empty());
+    EXPECT_TRUE(required.cells.empty());
+}
+
+TEST_F(FormulaResolverTest, GetRequiredEntities_MissingColumn_ReturnsPendingColumn) {
+    // Column D (position 3) doesn't exist
+    auto ast = parseFormula("=D1");
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1);
+    RequiredEntities required = resolver.getRequiredEntities(ast.get());
+
+    EXPECT_FALSE(required.empty());
+    EXPECT_EQ(required.columns.size(), 1);
+    EXPECT_EQ(required.columns[0].position, 3);  // D = position 3
+    EXPECT_TRUE(required.columns[0].isColumn);
+}
+
+TEST_F(FormulaResolverTest, GetRequiredEntities_MissingRow_ReturnsPendingRow) {
+    // Row 10 (position 9) doesn't exist
+    auto ast = parseFormula("=A10");
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1);
+    RequiredEntities required = resolver.getRequiredEntities(ast.get());
+
+    EXPECT_FALSE(required.empty());
+    EXPECT_EQ(required.rows.size(), 1);
+    EXPECT_EQ(required.rows[0].position, 9);  // Row 10 = position 9
+    EXPECT_FALSE(required.rows[0].isColumn);
+}
+
+TEST_F(FormulaResolverTest, GetRequiredEntities_MissingCell_ReturnsPendingCell) {
+    // A2 doesn't exist (row 2 exists, col A exists, but cell doesn't)
+    EXPECT_EQ(sheet1->getCellAt(colAId, row2Id), nullptr);
+
+    auto ast = parseFormula("=A2");
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1);
+    RequiredEntities required = resolver.getRequiredEntities(ast.get());
+
+    EXPECT_FALSE(required.empty());
+    EXPECT_TRUE(required.columns.empty());  // Column A exists
+    EXPECT_TRUE(required.rows.empty());     // Row 2 exists
+    EXPECT_EQ(required.cells.size(), 1);
+    EXPECT_EQ(required.cells[0].colId, colAId);
+    EXPECT_EQ(required.cells[0].rowId, row2Id);
+}
+
+TEST_F(FormulaResolverTest, GetRequiredEntities_MissingAll_ReturnsAll) {
+    // D10 requires column D, row 10, and the cell
+    auto ast = parseFormula("=D10");
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1);
+    RequiredEntities required = resolver.getRequiredEntities(ast.get());
+
+    EXPECT_FALSE(required.empty());
+    EXPECT_EQ(required.columns.size(), 1);
+    EXPECT_EQ(required.columns[0].position, 3);  // D = position 3
+    EXPECT_EQ(required.rows.size(), 1);
+    EXPECT_EQ(required.rows[0].position, 9);  // Row 10 = position 9
+    EXPECT_EQ(required.cells.size(), 1);
+}
+
+TEST_F(FormulaResolverTest, GetRequiredEntities_Range_ReturnsCorners) {
+    // Range D10:E12 requires corners:
+    // - Columns D (pos 3), E (pos 4)
+    // - Rows 10 (pos 9), 12 (pos 11) - only corner rows for range bounds
+    // - Cells at the two corners (D10 and E12)
+    auto ast = parseFormula("=SUM(D10:E12)");
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1);
+    RequiredEntities required = resolver.getRequiredEntities(ast.get());
+
+    EXPECT_FALSE(required.empty());
+    // Columns D and E
+    EXPECT_EQ(required.columns.size(), 2);
+    // Rows for corners (10 and 12)
+    EXPECT_EQ(required.rows.size(), 2);
+    // Cells at corners (D10 and E12)
+    EXPECT_EQ(required.cells.size(), 2);
+}
+
+TEST_F(FormulaResolverTest, ExistingOnlyMode_FailsOnMissingCell) {
+    // A2 doesn't exist
+    EXPECT_EQ(sheet1->getCellAt(colAId, row2Id), nullptr);
+
+    auto ast = parseFormula("=A2");
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1);
+    // Use existingOnly=true (CRDT-compliant mode)
+    auto result = resolver.resolve(ast.get(), true);
+
+    // Should fail because cell doesn't exist
+    EXPECT_FALSE(result.success);
+}
+
+TEST_F(FormulaResolverTest, ExistingOnlyMode_SucceedsWithExistingCell) {
+    // A1 exists
+    auto ast = parseFormula("=A1");
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1);
+    // Use existingOnly=true (CRDT-compliant mode)
+    auto result = resolver.resolve(ast.get(), true);
+
+    // Should succeed because cell exists
+    EXPECT_TRUE(result.success);
+
+    auto* cellRef = static_cast<CellRefNode*>(ast.get());
+    EXPECT_EQ(cellRef->cellId, cellA1Id.toString());
+}
+
+TEST_F(FormulaResolverTest, TwoPhaseApproach_CreateThenResolve) {
+    // Verify the CRDT-compliant two-phase approach works:
+    // 1. Get required entities
+    // 2. Create entities manually
+    // 3. Resolve with existingOnly=true
+
+    // A2 doesn't exist
+    EXPECT_EQ(sheet1->getCellAt(colAId, row2Id), nullptr);
+
+    auto ast = parseFormula("=A2");
+    ASSERT_NE(ast, nullptr);
+
+    FormulaResolver resolver(*workbook, *sheet1);
+
+    // Phase 1: Get required entities
+    RequiredEntities required = resolver.getRequiredEntities(ast.get());
+    EXPECT_EQ(required.cells.size(), 1);
+
+    // Phase 2: Create the cell manually (simulating CRDT operation)
+    auto newCell = std::make_unique<Cell>(required.cells[0].id, colAId, row2Id);
+    sheet1->addCell(std::move(newCell));
+
+    // Phase 3: Resolve with existingOnly=true should now succeed
+    auto result = resolver.resolve(ast.get(), true);
+    EXPECT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
+
+    // Cell reference should point to the created cell
+    auto* cellRef = static_cast<CellRefNode*>(ast.get());
+    EXPECT_EQ(cellRef->cellId, required.cells[0].id.toString());
+}
+
 }  // namespace
 }  // namespace cells

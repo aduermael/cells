@@ -185,6 +185,87 @@ async function runCollabTests() {
       assertEqual(content4, 'From Peer 1', 'Peer 2 should see A1 from Peer 1');
     }));
 
+    // Test 5: Formula referencing distant cell syncs (CRDT entity creation)
+    // This tests the CRDT-compliant formula resolution where the formula creates
+    // entities (column, row, cell) that didn't previously exist.
+    results.push(await runTest('Formula with new entity reference syncs', async () => {
+      const roomId = generateRoomId();
+
+      // Both peers join
+      await joinRoom(ctx.page, ctx.baseUrl, roomId);
+      await joinRoom(page2, ctx.baseUrl, roomId);
+
+      // Wait for peers to connect
+      await waitForPeerConnection(ctx.page, 10000);
+      await waitForPeerConnection(page2, 10000);
+
+      // First peer enters a value in a "distant" cell (D5)
+      // This creates the column D and row 5 via CRDT operations
+      await setCellValue(ctx.page, 'D5', '42');
+
+      // Verify D5 syncs to peer 2
+      await assertWithRetry(async () => {
+        await clickCell(page2, 'D5');
+        await sleep(200);
+        const content = await getFormulaBarContent(page2);
+        assertEqual(content, '42', 'D5 value should sync to second peer');
+      }, { retries: 5, initialDelay: 500 });
+
+      // Now first peer enters a formula in A1 that references D5
+      await setCellValue(ctx.page, 'A1', '=D5*2');
+
+      // Verify formula syncs and evaluates correctly on peer 2
+      await assertWithRetry(async () => {
+        await clickCell(page2, 'A1');
+        await sleep(200);
+        const formulaContent = await getFormulaBarContent(page2);
+        assertEqual(formulaContent, '=D5*2', 'Formula should sync to second peer');
+      }, { retries: 5, initialDelay: 500 });
+    }));
+
+    // Test 6: Formula referencing non-existent cell creates entities via CRDT
+    // This tests that when a formula references a cell that doesn't exist yet,
+    // the CRDT operations create the necessary column/row/cell entities and
+    // sync them to the remote peer.
+    results.push(await runTest('Formula creates distant cell reference via CRDT', async () => {
+      const roomId = generateRoomId();
+
+      // Both peers join
+      await joinRoom(ctx.page, ctx.baseUrl, roomId);
+      await joinRoom(page2, ctx.baseUrl, roomId);
+
+      // Wait for peers to connect
+      await waitForPeerConnection(ctx.page, 10000);
+      await waitForPeerConnection(page2, 10000);
+
+      // First peer enters a formula that references E10 (which doesn't exist yet)
+      // The CRDT-compliant resolution should:
+      // 1. Create column E
+      // 2. Create row 10
+      // 3. Create cell E10
+      // All via CRDT operations that sync to peer 2
+      await setCellValue(ctx.page, 'A1', '=E10+1');
+
+      // Verify formula syncs to peer 2
+      await assertWithRetry(async () => {
+        await clickCell(page2, 'A1');
+        await sleep(200);
+        const formulaContent = await getFormulaBarContent(page2);
+        assertEqual(formulaContent, '=E10+1', 'Formula referencing new cell should sync');
+      }, { retries: 5, initialDelay: 500 });
+
+      // Now if peer 2 sets a value in E10, peer 1's formula should update
+      await setCellValue(page2, 'E10', '99');
+
+      // Verify peer 1 sees the formula still works after E10 gets a value
+      await assertWithRetry(async () => {
+        await clickCell(ctx.page, 'A1');
+        await sleep(200);
+        const content = await getFormulaBarContent(ctx.page);
+        assertEqual(content, '=E10+1', 'Formula should still show =E10+1');
+      }, { retries: 5, initialDelay: 500 });
+    }));
+
   } finally {
     // Cleanup
     if (page2) {

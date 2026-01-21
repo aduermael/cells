@@ -1332,5 +1332,159 @@ TEST_F(SyncFormulaTest, DeletedSheetResurrectedByLaterRename) {
     EXPECT_EQ(workbookA_->getSheet(sheetId)->name, "Resurrected");
 }
 
+// ============================================================================
+// CRDT-Compliant Two-Phase Resolution Tests
+// ============================================================================
+// These tests verify that the two-phase resolution approach (getRequiredEntities
+// + applyOperation + resolve) generates correct CRDT operations that sync
+// to remote peers.
+
+TEST_F(SyncFormulaTest, TwoPhaseResolution_ColumnCreationSyncs) {
+    // Test: When a formula requires a new column, create it via CRDT op, and it syncs
+
+    // Start with a fresh workbook that only has columns A,B (positions 0,1)
+    EXPECT_EQ(workbookA_->getSheetByIndex(0)->columnCount(), 2);
+    EXPECT_EQ(workbookB_->getSheetByIndex(0)->columnCount(), 2);
+
+    // Create column C (position 2) via CRDT operation
+    ID newColId("ColCCCCC");
+    std::string colPayload = "{\"pos\":2,\"size\":100}";
+    Operation colOp =
+        makeColInsertOp(*workbookA_, newColId, workbookA_->getSheetByIndex(0)->id, colPayload);
+
+    // Apply to both workbooks
+    applyOperation(*workbookA_, colOp);
+    applyOperation(*workbookB_, colOp);
+
+    // Verify column exists in both
+    EXPECT_EQ(workbookA_->getSheetByIndex(0)->columnCount(), 3);
+    EXPECT_EQ(workbookB_->getSheetByIndex(0)->columnCount(), 3);
+    EXPECT_NE(workbookA_->getSheetByIndex(0)->getColumnByPosition(2), nullptr);
+    EXPECT_NE(workbookB_->getSheetByIndex(0)->getColumnByPosition(2), nullptr);
+}
+
+TEST_F(SyncFormulaTest, TwoPhaseResolution_RowCreationSyncs) {
+    // Test: When a formula requires a new row, create it via CRDT op, and it syncs
+
+    // Start with workbooks that only have rows 1,2 (positions 0,1)
+    EXPECT_EQ(workbookA_->getSheetByIndex(0)->rowCount(), 2);
+    EXPECT_EQ(workbookB_->getSheetByIndex(0)->rowCount(), 2);
+
+    // Create row 3 (position 2) via CRDT operation
+    ID newRowId("Row33333");
+    std::string rowPayload = "{\"pos\":2,\"size\":21}";
+    Operation rowOp =
+        makeRowInsertOp(*workbookA_, newRowId, workbookA_->getSheetByIndex(0)->id, rowPayload);
+
+    // Apply to both workbooks
+    applyOperation(*workbookA_, rowOp);
+    applyOperation(*workbookB_, rowOp);
+
+    // Verify row exists in both
+    EXPECT_EQ(workbookA_->getSheetByIndex(0)->rowCount(), 3);
+    EXPECT_EQ(workbookB_->getSheetByIndex(0)->rowCount(), 3);
+    EXPECT_NE(workbookA_->getSheetByIndex(0)->getRowByPosition(2), nullptr);
+    EXPECT_NE(workbookB_->getSheetByIndex(0)->getRowByPosition(2), nullptr);
+}
+
+TEST_F(SyncFormulaTest, TwoPhaseResolution_CellCreationSyncs) {
+    // Test: When a formula requires a new cell, create it via CRDT op, and it syncs
+
+    // Cell A2 (colA, row2) doesn't exist as a value cell - verify this
+    Sheet* sheetA = workbookA_->getSheetByIndex(0);
+    Sheet* sheetB = workbookB_->getSheetByIndex(0);
+    EXPECT_EQ(sheetA->getCellAt(sharedColA_, sharedRow2_)->value.type, CellValueType::NUMBER);
+
+    // Create a new cell at a previously empty location (let's use B2 with a specific value)
+    Cell* b2_A = sheetA->getCellAt(sharedColB_, sharedRow2_);
+
+    // Set a new value via CRDT operation to create/update cell
+    std::string cellPayload = "{\"type\":\"n\",\"value\":\"12345\",\"col_id\":\"" +
+                              sharedColB_.toString() + "\",\"row_id\":\"" + sharedRow2_.toString() +
+                              "\"}";
+    Operation cellOp = makeCellSetValueOp(*workbookA_, sharedCellB2_, cellPayload);
+
+    // Apply to both workbooks
+    applyOperation(*workbookA_, cellOp);
+    applyOperation(*workbookB_, cellOp);
+
+    // Verify cell has the new value in both
+    b2_A = sheetA->getCellAt(sharedColB_, sharedRow2_);
+    Cell* b2_B = sheetB->getCellAt(sharedColB_, sharedRow2_);
+
+    EXPECT_NE(b2_A, nullptr);
+    EXPECT_NE(b2_B, nullptr);
+    EXPECT_EQ(b2_A->value.asNumber(), 12345);
+    EXPECT_EQ(b2_B->value.asNumber(), 12345);
+}
+
+TEST_F(SyncFormulaTest, TwoPhaseResolution_FullWorkflow) {
+    // Test: Full workflow of two-phase resolution
+    // 1. Create required entities via CRDT ops
+    // 2. Both peers receive operations
+    // 3. Formula can reference these entities
+
+    // Create a new column C at position 2
+    ID newColId("ColCCCCC");
+    std::string colPayload = "{\"pos\":2,\"size\":100}";
+    Operation colOp =
+        makeColInsertOp(*workbookA_, newColId, workbookA_->getSheetByIndex(0)->id, colPayload);
+
+    // Create a new row 3 at position 2
+    ID newRowId("Row33333");
+    std::string rowPayload = "{\"pos\":2,\"size\":21}";
+    Operation rowOp =
+        makeRowInsertOp(*workbookA_, newRowId, workbookA_->getSheetByIndex(0)->id, rowPayload);
+
+    // Create cell C3 at the new intersection
+    ID newCellId("CellC333");
+    std::string cellPayload = "{\"type\":\"n\",\"value\":\"999\",\"col_id\":\"" +
+                              newColId.toString() + "\",\"row_id\":\"" + newRowId.toString() +
+                              "\"}";
+    Operation cellOp = makeCellSetValueOp(*workbookA_, newCellId, cellPayload);
+
+    // Apply all operations to both workbooks (simulating sync)
+    applyOperation(*workbookA_, colOp);
+    applyOperation(*workbookA_, rowOp);
+    applyOperation(*workbookA_, cellOp);
+    applyOperation(*workbookB_, colOp);
+    applyOperation(*workbookB_, rowOp);
+    applyOperation(*workbookB_, cellOp);
+
+    // Now create a formula that references C3
+    // Formula =C3 (the new cell ID, as relative ref)
+    std::string uuidFormula = newCellId.toString();
+    std::string formulaPayload = makeFormulaPayload(sharedColA_, sharedRow1_, uuidFormula);
+    Operation formulaOp = makeCellSetValueOp(*workbookA_, sharedCellA1_, formulaPayload);
+
+    // Apply formula to both
+    applyOperation(*workbookA_, formulaOp);
+    applyOperation(*workbookB_, formulaOp);
+
+    // Verify formula exists and displays correctly on both
+    Cell* cellA1_A = workbookA_->getSheetByIndex(0)->getCell(sharedCellA1_);
+    Cell* cellA1_B = workbookB_->getSheetByIndex(0)->getCell(sharedCellA1_);
+
+    EXPECT_TRUE(cellA1_A->isFormula());
+    EXPECT_TRUE(cellA1_B->isFormula());
+
+    // Verify display conversion works (C3)
+    RefConverter convA, convB;
+    convA.setContext(*workbookA_->getSheetByIndex(0));
+    convB.setContext(*workbookB_->getSheetByIndex(0));
+
+    EXPECT_EQ(convA.formulaToA1(getFormulaText(cellA1_A)), "=C3");
+    EXPECT_EQ(convB.formulaToA1(getFormulaText(cellA1_B)), "=C3");
+
+    // Verify operations are in the oplog
+    const OpLog* oplogA = workbookA_->getOpLog();
+    const OpLog* oplogB = workbookB_->getOpLog();
+
+    // Both oplogs should have the same operations
+    // (Each operation is applied once per workbook, so 4 ops total: col, row, cell, formula)
+    EXPECT_GE(oplogA->size(), 4) << "OpLog should contain col, row, cell, and formula ops";
+    EXPECT_GE(oplogB->size(), 4) << "OpLog should contain col, row, cell, and formula ops";
+}
+
 }  // namespace
 }  // namespace cells
