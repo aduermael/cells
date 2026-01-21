@@ -262,9 +262,11 @@ void SyncManager::queueOperationsBroadcast() {
     const size_t totalOps = oplog->size();
     const std::vector<Operation> opsToSend = oplog->getOperationsSince(minHLC);
 
-    LOG_DEBUG(
-        "[Sync] queueOperationsBroadcast: peers=%zu oplog_size=%zu min_hlc=%s ops_to_send=%zu",
-        _peers.size(), totalOps, minHLC.toString().c_str(), opsToSend.size());
+    if (!opsToSend.empty()) {
+        LOG_DEBUG(
+            "[Sync] queueOperationsBroadcast: peers=%zu oplog_size=%zu min_hlc=%s ops_to_send=%zu",
+            _peers.size(), totalOps, minHLC.toString().c_str(), opsToSend.size());
+    }
 
     // Create and queue the operations message
     const std::string msg = makeOperationsMessage(minHLC);

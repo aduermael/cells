@@ -224,7 +224,7 @@ export function setupDataListeners(config: DataListenersConfig): {
   let changeHandlerScheduled = false;
 
   function handleDataChanged(changeType: DataChangeType): void {
-    console.debug("[DataChanged]", changeType);
+    // console.debug("[DataChanged]", changeType);
     pendingChangeTypes.add(changeType);
 
     if (!changeHandlerScheduled) {
@@ -238,7 +238,7 @@ export function setupDataListeners(config: DataListenersConfig): {
     const changeTypes = pendingChangeTypes;
     pendingChangeTypes = new Set();
 
-    console.debug("[processDataChanges] Processing:", Array.from(changeTypes));
+    // console.debug("[processDataChanges] Processing:", Array.from(changeTypes));
 
     if (
       changeTypes.has("structure") ||
