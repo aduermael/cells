@@ -239,10 +239,37 @@ FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, i
                 return info;
             }
 
-            // Resolve the adjusted AST to populate cellId fields
-            // This converts A1 references to UUID references
+            // CRDT-compliant resolution: discover and create entities first
             FormulaResolver resolver(*workbook, *sheet);
-            resolver.resolve(adjustedAST.get());
+            RequiredEntities required = resolver.getRequiredEntities(adjustedAST.get());
+
+            // Create required columns via CRDT operations
+            for (const auto& pending : required.columns) {
+                std::string colPayload = "{\"pos\":" + std::to_string(pending.position) +
+                                         ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+                Operation colOp = makeColInsertOp(*workbook, pending.id, pending.sheetId, colPayload);
+                applyOperation(*workbook, colOp);
+            }
+
+            // Create required rows via CRDT operations
+            for (const auto& pending : required.rows) {
+                std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) +
+                                         ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+                Operation rowOp = makeRowInsertOp(*workbook, pending.id, pending.sheetId, rowPayload);
+                applyOperation(*workbook, rowOp);
+            }
+
+            // Create required cells via CRDT operations (empty cells for references)
+            for (const auto& pending : required.cells) {
+                std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
+                                          pending.colId.toString() + "\",\"row_id\":\"" +
+                                          pending.rowId.toString() + "\"}";
+                Operation cellOp = makeCellSetValueOp(*workbook, pending.id, pending.sheetId, cellPayload);
+                applyOperation(*workbook, cellOp);
+            }
+
+            // Now resolve with existingOnly=true (all entities should exist)
+            resolver.resolve(adjustedAST.get(), true);
 
             // Serialize to UUID format for CRDT storage
             info.value = FormulaSerializer::serialize(adjustedAST.get());

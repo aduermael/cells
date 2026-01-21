@@ -79,8 +79,12 @@ FormulaResolver itself should NOT create entities. Instead:
   - Also added sheetId to PendingCell struct to track target sheet for cell creation
 - [x] 3b: Update `bindings_formula.cc` getFormulaReferences (same pattern)
   - Removed snapshot-based workaround, now uses proper two-phase approach
-- [ ] 3c: Update `bindings_file.cc` XLSX import path (same pattern)
-- [ ] 3d: Update `fill_range.cc` auto-fill path (same pattern)
+- [x] 3c: Skip `bindings_file.cc` XLSX import - legacy mode appropriate for file loading
+  - File import is not a collaborative operation; entities come from the file
+  - bootstrapOpLog() handles converting to CRDT ops when collaboration starts
+- [x] 3d: Update `fill_range.cc` getFillValueNonNumeric for formula resolution
+  - Formula references in auto-fill now use CRDT-compliant two-phase approach
+  - Note: axis/cell creation for target cells still uses direct methods (separate issue)
 - [ ] 3e: Update `luau_api.cc` Luau script path (same pattern)
 - [ ] 3f: Update `formula_recalc.cc` spill expansion path (same pattern)
 
