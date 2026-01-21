@@ -41,8 +41,8 @@ The `bootstrapOpLog()` function in `core/cells/crdt.cc:617-847` generates bootst
 
 ## Phase 3: Add Range Bootstrap for Collaboration Sync
 
-- [ ] 3a: Add RANGE_ADD operations to `bootstrapOpLog()` for all existing ranges
-- [ ] 3b: Add RANGE_SET_STYLE operations to `bootstrapOpLog()` for ranges that have styles
+- [x] 3a: Add RANGE_ADD operations to `bootstrapOpLog()` for all existing ranges. Iterates `sheet->getRangeIds()` and generates RANGE_ADD operations with the new payload format (no sheet_id).
+- [x] 3b: Add RANGE_SET_STYLE operations to `bootstrapOpLog()` for ranges that have styles. Checks `workbook.getRangeStyleId(range->id)` and emits RANGE_SET_STYLE if not null.
 
 ## Phase 4: Testing
 

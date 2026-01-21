@@ -28,6 +28,7 @@
 #include "core/cells/crdt_internal.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/range.h"
 
 namespace cells {
 
@@ -769,6 +770,40 @@ size_t bootstrapOpLog(Workbook& workbook) {
         const Operation op = makeStyleDefineOp(workbook, styleId, payload);
         oplog->addOperation(op);
         count++;
+    }
+
+    // Generate RANGE_ADD operations for all ranges (merge ranges, style ranges, etc.)
+    // This must come AFTER column/row INSERT operations so the axis IDs exist
+    for (const auto& sheet : workbook.sheets) {
+        for (const ID& rangeId : sheet->getRangeIds()) {
+            const Range* range = workbook.getRange(rangeId);
+            if (!range) {
+                continue;
+            }
+
+            // Build RANGE_ADD payload (no sheet_id needed - derived from startColId)
+            std::string payload = "{";
+            payload += "\"start_col_id\":\"" + range->startColId.toString() + "\"";
+            payload += ",\"start_row_id\":\"" + range->startRowId.toString() + "\"";
+            payload += ",\"end_col_id\":\"" + range->endColId.toString() + "\"";
+            payload += ",\"end_row_id\":\"" + range->endRowId.toString() + "\"";
+            payload += ",\"flags\":" + std::to_string(static_cast<int>(range->flags));
+            payload += "}";
+
+            const Operation rangeOp = makeRangeAddOp(workbook, range->id, payload);
+            oplog->addOperation(rangeOp);
+            count++;
+
+            // If this range has a style, generate RANGE_SET_STYLE operation
+            // This must come after STYLE_DEFINE (already added above) so the style exists
+            const ID styleId = workbook.getRangeStyleId(range->id);
+            if (!styleId.isNull()) {
+                const std::string stylePayload = "{\"style_id\":\"" + styleId.toString() + "\"}";
+                const Operation styleOp = makeRangeSetStyleOp(workbook, range->id, stylePayload);
+                oplog->addOperation(styleOp);
+                count++;
+            }
+        }
     }
 
     // Generate CELL_SET_STYLE operations for cells that have styles
