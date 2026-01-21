@@ -11,6 +11,24 @@ cc_library(
 )
 
 cc_library(
+    name = "style_buffer",
+    srcs = ["style_buffer.cc"],
+    hdrs = ["style_buffer.h"],
+    visibility = ["//visibility:public"],
+    deps = [":style_types"],
+)
+
+cc_test(
+    name = "style_buffer_test",
+    srcs = ["style_buffer_test.cc"],
+    deps = [
+        ":style_buffer",
+        ":style_types",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "range",
     hdrs = ["range.h"],
     visibility = ["//visibility:public"],
