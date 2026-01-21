@@ -70,7 +70,7 @@ ID StyleRegistry::findStyleByContent(const CellStyle& style) const {
     }
 
     // Not found
-    return ID();
+    return {};
 }
 
 bool StyleRegistry::hasStyle(const ID& styleId) const {

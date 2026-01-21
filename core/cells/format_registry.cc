@@ -79,7 +79,7 @@ ID FormatRegistry::findFormatByCode(const std::string& formatCode) const {
     if (it != _codeToId.end()) {
         return it->second;
     }
-    return ID();
+    return {};
 }
 
 bool FormatRegistry::hasFormat(const ID& formatId) const {
