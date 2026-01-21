@@ -77,7 +77,8 @@ FormulaResolver itself should NOT create entities. Instead:
   - Create column/row/cell ops via `applyOperation`
   - Then resolve AST with existing entities
   - Also added sheetId to PendingCell struct to track target sheet for cell creation
-- [ ] 3b: Update `bindings_formula.cc` formula editing path (same pattern)
+- [x] 3b: Update `bindings_formula.cc` getFormulaReferences (same pattern)
+  - Removed snapshot-based workaround, now uses proper two-phase approach
 - [ ] 3c: Update `bindings_file.cc` XLSX import path (same pattern)
 - [ ] 3d: Update `fill_range.cc` auto-fill path (same pattern)
 - [ ] 3e: Update `luau_api.cc` Luau script path (same pattern)

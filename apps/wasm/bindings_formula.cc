@@ -245,53 +245,38 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
         return "{\"error\":\"Parse failed\",\"references\":[]}";
     }
 
-    // Snapshot existing entities before resolution
-    std::set<ID> existingColumns;
-    std::set<ID> existingRows;
-    std::set<ID> existingCells;
-    for (const ID& id : sheet->getColumnIds()) { existingColumns.insert(id); }
-    for (const ID& id : sheet->getRowIds()) { existingRows.insert(id); }
-    for (const auto& cellId : sheet->getCellIds()) existingCells.insert(cellId);
-
     FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
-    ResolveResult result = resolver.resolve(ast.get());
 
-    // Generate operations for newly created entities (always, not just when collaborating)
-    // NOTE: FormulaResolver creates entities directly, so we record ops after the fact.
-    // TODO: Refactor FormulaResolver to create entities via CRDT operations.
-    for (const ID& id : sheet->getColumnIds()) {
-        if (existingColumns.find(id) == existingColumns.end()) {
-            Axis* col = sheet->getColumn(id);
-            if (col == nullptr) { continue; }
-            std::string payload = "{\"pos\":" + std::to_string(col->position) +
-                                  ",\"size\":" + std::to_string(col->size) + "}";
-            Operation op = makeColInsertOp(*_workbook, id, payload);
-            _workbook->getOpLog()->addOperation(op);
-        }
+    // CRDT-compliant resolution: discover and create entities first
+    RequiredEntities required = resolver.getRequiredEntities(ast.get());
+
+    // Create required columns via CRDT operations
+    for (const auto& pending : required.columns) {
+        std::string colPayload = "{\"pos\":" + std::to_string(pending.position) +
+                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        Operation colOp = makeColInsertOp(*_workbook, pending.id, pending.sheetId, colPayload);
+        applyOperation(*_workbook, colOp);
     }
 
-    for (const ID& id : sheet->getRowIds()) {
-        if (existingRows.find(id) == existingRows.end()) {
-            Axis* row = sheet->getRow(id);
-            if (row == nullptr) { continue; }
-            std::string payload = "{\"pos\":" + std::to_string(row->position) +
-                                  ",\"size\":" + std::to_string(row->size) + "}";
-            Operation op = makeRowInsertOp(*_workbook, id, payload);
-            _workbook->getOpLog()->addOperation(op);
-        }
+    // Create required rows via CRDT operations
+    for (const auto& pending : required.rows) {
+        std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) +
+                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        Operation rowOp = makeRowInsertOp(*_workbook, pending.id, pending.sheetId, rowPayload);
+        applyOperation(*_workbook, rowOp);
     }
 
-    for (const auto& cellId : sheet->getCellIds()) {
-        if (existingCells.find(cellId) == existingCells.end()) {
-            Cell* cell = _workbook->getCell(cellId);
-            if (!cell) continue;
-            std::string payload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
-                                  cell->colId.toString() + "\",\"row_id\":\"" +
-                                  cell->rowId.toString() + "\"}";
-            Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
-            _workbook->getOpLog()->addOperation(op);
-        }
+    // Create required cells via CRDT operations (empty cells for references)
+    for (const auto& pending : required.cells) {
+        std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
+                                  pending.colId.toString() + "\",\"row_id\":\"" +
+                                  pending.rowId.toString() + "\"}";
+        Operation cellOp = makeCellSetValueOp(*_workbook, pending.id, pending.sheetId, cellPayload);
+        applyOperation(*_workbook, cellOp);
     }
+
+    // Now resolve with existingOnly=true (all entities should exist)
+    ResolveResult result = resolver.resolve(ast.get(), true);
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
