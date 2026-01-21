@@ -247,20 +247,20 @@ export class PresenceBroadcaster {
     const now = Date.now();
 
     // Debug: log remote presence data occasionally
-    if (allPeers.size > 0 && Math.random() < 0.01) {
-      console.debug(
-        "[Presence Debug] currentSheet:",
-        currentSheetId,
-        "allPeers:",
-        Array.from(allPeers.entries()).map(([id, p]) => ({
-          id,
-          sheet: p.sheet_id,
-          cursor: p.cursor,
-        })),
-        "peersOnSheet:",
-        peers.length
-      );
-    }
+    // if (allPeers.size > 0 && Math.random() < 0.01) {
+    //   console.debug(
+    //     "[Presence Debug] currentSheet:",
+    //     currentSheetId,
+    //     "allPeers:",
+    //     Array.from(allPeers.entries()).map(([id, p]) => ({
+    //       id,
+    //       sheet: p.sheet_id,
+    //       cursor: p.cursor,
+    //     })),
+    //     "peersOnSheet:",
+    //     peers.length
+    //   );
+    // }
 
     const activePeerIds = new Set<string>();
 
