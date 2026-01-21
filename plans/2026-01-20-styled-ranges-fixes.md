@@ -134,8 +134,119 @@ Add a runtime flag to disable operation log pruning for debugging sync issues. W
 - [x] 6.6a: Trace code path in setRangeStyle (bindings_format.cc) - where is STYLE_DEFINE created?
 - [x] 6.6b: Check applyStyleDefine return values - what could cause it to not be added to oplog?
 - [x] 6.6c: Added LOG_DEBUG in: applyStyleDefine (both paths), applyOperation (STYLE_DEFINE), setRangeStyle
-- [ ] 6.6d: Fix the root cause (awaiting debug output from test)
-- [ ] 6.6e: Test and verify styled ranges appear on peer that created them
+- [x] 6.6d: ROOT CAUSE FOUND - see detailed analysis below
+
+**Root Cause Analysis (from debug logs):**
+```
+[setRangeStyle] Creating new style ccvdWDK2 with JSON: {"bgColor":"#FBBF24"}
+[CRDT] applyStyleDefine: style ccvdWDK2 SUCCESS - registered in workbook
+[CRDT] applyOperation: STYLE_DEFINE ccvdWDK2 added to oplog (result=0)
+[Sync] queueOperationsBroadcast: peers=1 oplog_size=6 ops_to_send=6
+[Sync] handleAck: peer 07xJvXDz ACKed HLC 1768974310035.0.e7iI3Zgx
+[Sync] pruneOpLog: pruned 6 ops (was 6, now 0)              ← Oplog emptied after ACK
+[CRDT] applyStyleDefine: style ccvdWDK2 ALREADY_APPLIED     ← Peer 2 sent ops BACK!
+[Sync] handleOperations: from=07xJvXDz received=6 new=6    ← Treated as "new" (not in oplog)
+```
+
+**The bug is an ECHO problem:**
+1. Peer 1 creates styled range → 6 ops added to oplog
+2. Peer 1 broadcasts to Peer 2
+3. Peer 2 receives, applies ops, sends ACK
+4. Peer 1 receives ACK → prunes ALL 6 ops (oplog now empty)
+5. **BUG**: Peer 2's data-change listener triggers `queueLocalOperationsBroadcast()`
+6. Peer 2 broadcasts those SAME 6 ops back to Peer 1
+7. Peer 1 receives them as "new=6" (not in oplog because pruned)
+8. STYLE_DEFINE returns ALREADY_APPLIED but wasn't added to oplog (Phase 4 change)
+9. Style ends up missing from oplog → not exported to file
+
+**Location of the bug:** `apps/wasm/src/init-listeners.ts:269-272`
+```typescript
+// Queue operations broadcast to peers
+if (app.collaborationInitialized && app.syncAdapter) {
+  await app.syncAdapter.queueLocalOperationsBroadcast();
+}
+```
+This is called after ANY data change, including when applying REMOTE operations from peers.
+
+## Phase 6.7: Fix Operation Echo Bug (Don't Broadcast Remote Ops)
+
+**Problem**: When Peer 2 receives and applies operations from Peer 1, the "data changed" listener triggers a broadcast, sending those same operations BACK to Peer 1. This causes:
+1. Unnecessary network traffic (ops echoed back to sender)
+2. After oplog pruning, sender receives its own ops as "new"
+3. ALREADY_APPLIED ops not added to oplog → sync state corruption
+
+**Solution**: Only broadcast after LOCAL operations, not after applying REMOTE operations.
+
+**Implementation options:**
+
+Option A: Pass "isRemote" flag through the listener system
+- Modify listener callback signature to include `isRemote: boolean`
+- C++ side: track whether current operation batch is from local or remote
+- TypeScript: check flag before calling broadcast
+
+Option B: Use a "suppress broadcast" flag during remote op application
+- Set flag before applying remote ops
+- Check flag in listener before broadcasting
+- Clear flag after remote ops applied
+
+Option C: Move broadcast responsibility to C++ SyncManager
+- Remove broadcast call from TypeScript listener
+- C++ SyncManager already calls `queueOperationsBroadcast()` after local ops
+- Just need to ensure it's NOT called when handling remote ops
+
+**Recommended: Option C** - cleanest separation of concerns
+
+**Steps:**
+- [ ] 6.7a: Verify C++ bindings already call `queueOperationsBroadcast()` after local operations
+- [ ] 6.7b: Remove the broadcast call from `init-listeners.ts` (line 269-272)
+- [ ] 6.7c: Ensure `handleOperations` and `handleSyncResponse` do NOT trigger broadcasts
+- [ ] 6.7d: Test: Peer 1 creates styled range, verify Peer 2 does NOT echo ops back
+- [ ] 6.7e: Test: Both peers see the styled range correctly
+
+## Phase 6.8: Add CRDT Sync Metadata to ZCD File Format
+
+**Problem**: The ZCD file format lacks fundamental CRDT metadata needed for proper sync:
+1. No vector clocks / peer operation counts
+2. No tracking of "last seen HLC" per peer
+3. When file is saved/loaded, all sync state is lost
+4. Causes issues like ops being re-sent, duplicates, sync conflicts
+
+**What proper CRDT systems track:**
+- For each known peer: last HLC seen from that peer
+- Local peer's operation count / HLC
+- Optionally: tombstone/deletion markers with timestamps
+
+**Proposed ZCD additions:**
+
+```
+# Sync metadata section (new)
+#sync
+P <local_peer_id> <local_hlc>           # Local peer info
+K <peer_id> <last_seen_hlc>             # Known peer, last seen HLC
+K <peer_id> <last_seen_hlc>             # ... for each known peer
+```
+
+Example:
+```
+#sync
+P e7iI3Zgx 1768974310035.0.e7iI3Zgx
+K 07xJvXDz 1768974310035.0.e7iI3Zgx
+K a3Bc9XyZ 1768974309000.0.a3Bc9XyZ
+```
+
+**Benefits:**
+1. Reconnecting peer knows what ops it has already seen
+2. Can resume sync from correct HLC instead of re-syncing everything
+3. Prevents duplicate op processing
+4. Enables proper "catch-up" sync after offline editing
+
+**Steps:**
+- [ ] 6.8a: Design sync metadata format for ZCD (finalize schema above)
+- [ ] 6.8b: Add `SyncMetadata` struct to model (peer_id, last_hlc, known_peers map)
+- [ ] 6.8c: Update ZCD writer to export sync metadata section
+- [ ] 6.8d: Update ZCD reader to parse sync metadata section
+- [ ] 6.8e: Update SyncManager to use persisted metadata on init
+- [ ] 6.8f: Test: save file with sync state, reload, verify sync resumes correctly
 
 ## Phase 7: Fix All Lint Warnings, Checks, and Tests
 
