@@ -36,8 +36,8 @@ The `bootstrapOpLog()` function in `core/cells/crdt.cc:617-847` generates bootst
 
 ## Phase 2: Remove sheet_id from RANGE_SET_STYLE Payload
 
-- [ ] 2a: Update `applyRangeSetStyle` in `crdt_range.cc` to get sheet from the existing range instead of extracting from payload
-- [ ] 2b: Update RANGE_SET_STYLE payload creation in `bindings_format.cc` to not include sheet_id
+- [x] 2a: Update `applyRangeSetStyle` in `crdt_range.cc` to get sheet from the existing range instead of extracting from payload. Now uses `workbook.getRange()` to find range, then derives sheet from `range->startColId`.
+- [x] 2b: Update RANGE_SET_STYLE payload creation in `bindings_format.cc` to not include sheet_id. Updated two locations (split range style and main range style).
 
 ## Phase 3: Add Range Bootstrap for Collaboration Sync
 

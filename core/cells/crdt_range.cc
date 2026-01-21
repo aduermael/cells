@@ -223,31 +223,29 @@ ApplyResult applyRangeUpdateFlags(Workbook& workbook, const Operation& op) {
 // RANGE_SET_STYLE Operation
 // =============================================================================
 //
-// Payload: {"sheet_id":"...","style_id":"..."}
+// Payload: {"style_id":"..."}
 //
 // Sets the style metadata for a range that has the RANGE_STYLE flag.
 // The style_id references a style defined via STYLE_DEFINE operation.
 // If style_id is "~" or empty, clears the style.
+//
+// The range is identified by op.target_id (the range's UUID).
+// The sheet is derived from the range's startColId (columns belong to exactly one sheet).
 //
 // Note: This operation stores the style association. The actual style
 // data is stored in the workbook's style registry (see STYLE_DEFINE).
 //
 
 ApplyResult applyRangeSetStyle(Workbook& workbook, const Operation& op) {
-    // Extract sheet ID from payload
-    const std::string sheetIdStr = extractJSONString(op.payload, "sheet_id");
-    if (sheetIdStr.empty()) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    const ID sheetId(sheetIdStr);
-    Sheet* sheet = workbook.getSheet(sheetId);
-    if (sheet == nullptr) {
+    // Get the range by ID from workbook-level storage
+    const Range* range = workbook.getRange(op.target_id);
+    if (range == nullptr) {
         return ApplyResult::INVALID_TARGET;
     }
 
-    const Range* range = sheet->getRange(op.target_id);
-    if (range == nullptr) {
+    // Derive sheet from range's startColId (columns belong to exactly one sheet)
+    Sheet* sheet = workbook.findAxisSheet(range->startColId);
+    if (sheet == nullptr) {
         return ApplyResult::INVALID_TARGET;
     }
 

@@ -2013,8 +2013,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
 
             // Associate the OLD style with the new split range (preserving the style)
             std::ostringstream newStylePayload;
-            newStylePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
-            newStylePayload << "\"style_id\":\"" << splitOp.oldStyleId.toString() << "\"}";
+            newStylePayload << "{\"style_id\":\"" << splitOp.oldStyleId.toString() << "\"}";
 
             Operation newSetStyleOp =
                 makeRangeSetStyleOp(*_workbook, newRangeId, newStylePayload.str());
@@ -2042,8 +2041,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
 
     // Associate the style with the range
     std::ostringstream stylePayload;
-    stylePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
-    stylePayload << "\"style_id\":\"" << styleId.toString() << "\"}";
+    stylePayload << "{\"style_id\":\"" << styleId.toString() << "\"}";
 
     Operation setStyleOp = makeRangeSetStyleOp(*_workbook, rangeId, stylePayload.str());
     applyOperation(*_workbook, setStyleOp);
