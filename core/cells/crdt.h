@@ -33,6 +33,7 @@
 
 #include "core/cells/model.h"
 #include "core/cells/operation.h"
+#include "core/cells/style_buffer.h"
 
 namespace cells {
 
@@ -187,7 +188,19 @@ Operation makeRangeUpdateFlagsOp(Workbook& workbook, const ID& rangeId, const st
 // Generate a RANGE_SET_STYLE operation for setting range style metadata.
 // Payload: {"sheet_id":"...","style_id":"..."}
 // target_id: the range's UUID
+// DEPRECATED: Use makeRangeSetStyleOp with StyleBuffer instead
 Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
+
+// Generate a RANGE_SET_STYLE operation using content-addressed StyleBuffer.
+// Payload format: {"style":"<base64-encoded-stylebuffer>"}
+// This is the new format for content-addressed styles.
+// target_id: the range's UUID
+Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const StyleBuffer& style);
+
+// Generate a RANGE_SET_STYLE operation to clear the style.
+// Payload format: {"style":""}
+// target_id: the range's UUID
+Operation makeRangeClearStyleOp(Workbook& workbook, const ID& rangeId);
 
 // Bootstrap the OpLog with the current workbook state.
 // Called when transitioning from OFFLINE to COLLABORATING mode.

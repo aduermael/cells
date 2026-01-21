@@ -223,22 +223,27 @@ ApplyResult applyRangeUpdateFlags(Workbook& workbook, const Operation& op) {
 // RANGE_SET_STYLE Operation
 // =============================================================================
 //
-// Payload: {"style_id":"..."}
+// Two payload formats supported:
 //
-// Sets the style metadata for a range that has the RANGE_STYLE flag.
-// The style_id references a style defined via STYLE_DEFINE operation.
-// If style_id is "~" or empty, clears the style.
+// Old format (DEPRECATED): {"style_id":"..."}
+//   The style_id references a style defined via STYLE_DEFINE operation.
+//   If style_id is "~" or empty, clears the style.
+//
+// New format (content-addressed): {"style":"<base64>"}
+//   The style field contains a base64-encoded StyleBuffer.
+//   If style is empty "", clears the style.
+//   The style data is stored directly in the Range struct.
 //
 // The range is identified by op.target_id (the range's UUID).
 // The sheet is derived from the range's startColId (columns belong to exactly one sheet).
 //
-// Note: This operation stores the style association. The actual style
-// data is stored in the workbook's style registry (see STYLE_DEFINE).
+// Note: During migration, both formats are supported. The apply function
+// checks for "style" field first (new format), then falls back to "style_id" (old).
 //
 
 ApplyResult applyRangeSetStyle(Workbook& workbook, const Operation& op) {
     // Get the range by ID from workbook-level storage
-    const Range* range = workbook.getRange(op.target_id);
+    Range* range = workbook.getRange(op.target_id);
     if (range == nullptr) {
         return ApplyResult::INVALID_TARGET;
     }
@@ -249,13 +254,31 @@ ApplyResult applyRangeSetStyle(Workbook& workbook, const Operation& op) {
         return ApplyResult::INVALID_TARGET;
     }
 
-    // Extract style ID
+    // Check for new format first: {"style":"<base64>"}
+    const std::string styleBase64 = extractJSONString(op.payload, "style");
+    if (op.payload.find("\"style\"") != std::string::npos) {
+        // New format - content-addressed style
+        if (styleBase64.empty()) {
+            // Clear style
+            sheet->clearRangeStyle(range->id);
+        } else {
+            // Decode base64 and set style
+            auto styleOpt = StyleBuffer::fromBase64(styleBase64);
+            if (!styleOpt.has_value()) {
+                return ApplyResult::INVALID_PAYLOAD;
+            }
+            sheet->setRangeStyle(range->id, std::move(styleOpt.value()));
+        }
+        return ApplyResult::SUCCESS;
+    }
+
+    // Fall back to old format: {"style_id":"..."}
     const std::string styleIdStr = extractJSONString(op.payload, "style_id");
 
     // Set the style association (or remove if styleId is empty/null)
     // setRangeStyleId handles both the mapping and the RANGE_STYLE flag
     if (styleIdStr.empty() || styleIdStr == "~") {
-        sheet->setRangeStyleId(range->id, {});  // Remove style
+        sheet->setRangeStyleId(range->id, {});  // Remove style (old system)
     } else {
         sheet->setRangeStyleId(range->id, ID(styleIdStr));
     }

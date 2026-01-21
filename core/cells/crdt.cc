@@ -630,6 +630,19 @@ Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const std::
     return {hlc, OpType::RANGE_SET_STYLE, rangeId, payload};
 }
 
+Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const StyleBuffer& style) {
+    const HLC hlc = workbook.getCurrentHLC();
+    // New format: {"style":"<base64>"}
+    std::string payload = "{\"style\":\"" + style.toBase64() + "\"}";
+    return {hlc, OpType::RANGE_SET_STYLE, rangeId, payload};
+}
+
+Operation makeRangeClearStyleOp(Workbook& workbook, const ID& rangeId) {
+    const HLC hlc = workbook.getCurrentHLC();
+    // Clear format: {"style":""}
+    return {hlc, OpType::RANGE_SET_STYLE, rangeId, "{\"style\":\"\"}"};
+}
+
 // =============================================================================
 // Bootstrap OpLog
 // =============================================================================

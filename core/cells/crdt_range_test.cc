@@ -430,5 +430,143 @@ TEST_F(CRDTRangeTest, MultipleOverlappingRangesAtSamePosition) {
     EXPECT_EQ(styleRangesAtB2[0]->id, range2Id);
 }
 
+// =============================================================================
+// Content-Addressed Style Tests (new format)
+// =============================================================================
+
+TEST_F(CRDTRangeTest, SetStyleWithStyleBuffer) {
+    const ID rangeId = generate_id();
+
+    // Add a range (no STYLE flag yet)
+    std::string addPayload = "{\"sheet_id\":\"" + sheetId.toString() + "\",";
+    addPayload += "\"start_col_id\":\"" + colIds[0].toString() + "\",";
+    addPayload += "\"start_row_id\":\"" + rowIds[0].toString() + "\",";
+    addPayload += "\"end_col_id\":\"" + colIds[1].toString() + "\",";
+    addPayload += "\"end_row_id\":\"" + rowIds[1].toString() + "\",";
+    addPayload += "\"flags\":0}";
+
+    Operation addOp = makeRangeAddOp(*workbook, rangeId, addPayload);
+    applyOperation(*workbook, addOp);
+
+    Sheet* sheet = workbook->getSheet(sheetId);
+    Range* range = sheet->getRange(rangeId);
+    ASSERT_FALSE(range->hasFlag(RangeFlags::STYLE));
+
+    // Set a style using StyleBuffer
+    StyleBuffer style;
+    style.setBold(true);
+    style.setBgColorHex("#FBBF24");
+
+    Operation styleOp = makeRangeSetStyleOp(*workbook, rangeId, style);
+    ApplyResult result = applyOperation(*workbook, styleOp);
+
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+    EXPECT_TRUE(range->hasFlag(RangeFlags::STYLE));
+    EXPECT_TRUE(range->hasStyle());
+
+    // Verify style content
+    const StyleBuffer* retrievedStyle = range->getStyle();
+    ASSERT_NE(retrievedStyle, nullptr);
+    EXPECT_TRUE(retrievedStyle->hasBold());
+    EXPECT_TRUE(retrievedStyle->getBold());
+    EXPECT_TRUE(retrievedStyle->hasBgColor());
+    EXPECT_EQ(retrievedStyle->getBgColorHex(), "#FBBF24");
+}
+
+TEST_F(CRDTRangeTest, SetStyleWithStyleBufferBase64Payload) {
+    const ID rangeId = generate_id();
+
+    // Add a range
+    std::string addPayload = "{\"sheet_id\":\"" + sheetId.toString() + "\",";
+    addPayload += "\"start_col_id\":\"" + colIds[0].toString() + "\",";
+    addPayload += "\"start_row_id\":\"" + rowIds[0].toString() + "\",";
+    addPayload += "\"end_col_id\":\"" + colIds[1].toString() + "\",";
+    addPayload += "\"end_row_id\":\"" + rowIds[1].toString() + "\",";
+    addPayload += "\"flags\":0}";
+
+    Operation addOp = makeRangeAddOp(*workbook, rangeId, addPayload);
+    applyOperation(*workbook, addOp);
+
+    // Create a style and encode manually
+    StyleBuffer style;
+    style.setItalic(true);
+    style.setFontSize(14);
+    std::string base64 = style.toBase64();
+
+    // Use the new payload format directly
+    std::string stylePayload = "{\"style\":\"" + base64 + "\"}";
+    Operation styleOp = makeRangeSetStyleOp(*workbook, rangeId, stylePayload);
+    ApplyResult result = applyOperation(*workbook, styleOp);
+
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    Sheet* sheet = workbook->getSheet(sheetId);
+    Range* range = sheet->getRange(rangeId);
+    EXPECT_TRUE(range->hasStyle());
+
+    const StyleBuffer* retrievedStyle = range->getStyle();
+    ASSERT_NE(retrievedStyle, nullptr);
+    EXPECT_TRUE(retrievedStyle->hasItalic());
+    EXPECT_TRUE(retrievedStyle->getItalic());
+    EXPECT_TRUE(retrievedStyle->hasFontSize());
+    EXPECT_EQ(retrievedStyle->getFontSize(), 14);
+}
+
+TEST_F(CRDTRangeTest, ClearStyleWithNewFormat) {
+    const ID rangeId = generate_id();
+
+    // Add a range with a style
+    std::string addPayload = "{\"sheet_id\":\"" + sheetId.toString() + "\",";
+    addPayload += "\"start_col_id\":\"" + colIds[0].toString() + "\",";
+    addPayload += "\"start_row_id\":\"" + rowIds[0].toString() + "\",";
+    addPayload += "\"end_col_id\":\"" + colIds[1].toString() + "\",";
+    addPayload += "\"end_row_id\":\"" + rowIds[1].toString() + "\",";
+    addPayload += "\"flags\":2}";  // STYLE flag
+
+    Operation addOp = makeRangeAddOp(*workbook, rangeId, addPayload);
+    applyOperation(*workbook, addOp);
+
+    // Set a style first
+    StyleBuffer style;
+    style.setBold(true);
+    Operation setOp = makeRangeSetStyleOp(*workbook, rangeId, style);
+    applyOperation(*workbook, setOp);
+
+    Sheet* sheet = workbook->getSheet(sheetId);
+    Range* range = sheet->getRange(rangeId);
+    ASSERT_TRUE(range->hasStyle());
+
+    // Clear the style using makeClearStyleOp
+    Operation clearOp = makeRangeClearStyleOp(*workbook, rangeId);
+    ApplyResult result = applyOperation(*workbook, clearOp);
+
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+    EXPECT_FALSE(range->hasFlag(RangeFlags::STYLE));
+    EXPECT_FALSE(range->hasStyle());
+    EXPECT_EQ(range->getStyle(), nullptr);
+}
+
+TEST_F(CRDTRangeTest, InvalidBase64ReturnsInvalidPayload) {
+    const ID rangeId = generate_id();
+
+    // Add a range
+    std::string addPayload = "{\"sheet_id\":\"" + sheetId.toString() + "\",";
+    addPayload += "\"start_col_id\":\"" + colIds[0].toString() + "\",";
+    addPayload += "\"start_row_id\":\"" + rowIds[0].toString() + "\",";
+    addPayload += "\"end_col_id\":\"" + colIds[1].toString() + "\",";
+    addPayload += "\"end_row_id\":\"" + rowIds[1].toString() + "\",";
+    addPayload += "\"flags\":0}";
+
+    Operation addOp = makeRangeAddOp(*workbook, rangeId, addPayload);
+    applyOperation(*workbook, addOp);
+
+    // Try to set with invalid base64
+    std::string invalidPayload = "{\"style\":\"not-valid-base64!!!\"}";
+    Operation styleOp = makeRangeSetStyleOp(*workbook, rangeId, invalidPayload);
+    ApplyResult result = applyOperation(*workbook, styleOp);
+
+    EXPECT_EQ(result, ApplyResult::INVALID_PAYLOAD);
+}
+
 }  // namespace
 }  // namespace cells
