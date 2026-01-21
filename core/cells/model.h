@@ -53,6 +53,7 @@ struct Axis;
 struct Cell;
 struct Sheet;
 struct Workbook;
+class StyleBuffer;
 struct SharedFormulaInfo;
 struct OpLog;
 struct SpillInfo;
@@ -670,10 +671,31 @@ struct Sheet {
     // ========================================================================
 
     // Get the style ID associated with a range (delegates to Workbook)
+    // DEPRECATED: Use getRangeStyle() instead for content-addressed styles
     [[nodiscard]] ID getRangeStyleId(const ID& rangeId) const;
 
     // Set the style ID for a range (delegates to Workbook)
+    // DEPRECATED: Use setRangeStyle() instead for content-addressed styles
     void setRangeStyleId(const ID& rangeId, const ID& styleId);
+
+    // ========================================================================
+    // Content-addressed range styles (new system, delegates to Workbook)
+    // ========================================================================
+
+    // Set the style directly on a range using content-addressed StyleBuffer
+    void setRangeStyle(const ID& rangeId, const StyleBuffer& style);
+
+    // Set the style directly on a range (move semantics)
+    void setRangeStyle(const ID& rangeId, StyleBuffer&& style);
+
+    // Clear the style from a range
+    void clearRangeStyle(const ID& rangeId);
+
+    // Get the style from a range (returns nullptr if no style)
+    [[nodiscard]] const StyleBuffer* getRangeStyle(const ID& rangeId) const;
+
+    // Get mutable style from a range (returns nullptr if no style)
+    [[nodiscard]] StyleBuffer* getRangeStyle(const ID& rangeId);
 
 private:
     // Parent workbook (set by Workbook::addSheet)
@@ -1041,16 +1063,39 @@ struct Workbook {
     // ========================================================================
 
     // Get the style ID associated with a range (returns null ID if no style)
+    // DEPRECATED: Use Range::getStyle() instead for content-addressed styles
     [[nodiscard]] ID getRangeStyleId(const ID& rangeId) const;
 
     // Set the style ID for a range (also sets RANGE_STYLE flag on the range)
     // Pass null ID to remove the style association
+    // DEPRECATED: Use setRangeStyle(rangeId, StyleBuffer) instead
     void setRangeStyleId(const ID& rangeId, const ID& styleId);
 
     // Get all range-style mappings (for serialization)
+    // DEPRECATED: Use Range::getStyle() instead for content-addressed styles
     [[nodiscard]] const std::unordered_map<ID, ID, IDHash>& getRangeStyles() const {
         return _rangeStyles;
     }
+
+    // ========================================================================
+    // Content-addressed range styles (new system)
+    // ========================================================================
+
+    // Set the style directly on a range using content-addressed StyleBuffer
+    // This stores the style in the Range itself (no separate style ID needed)
+    void setRangeStyle(const ID& rangeId, const StyleBuffer& style);
+
+    // Set the style directly on a range (move semantics)
+    void setRangeStyle(const ID& rangeId, StyleBuffer&& style);
+
+    // Clear the style from a range
+    void clearRangeStyle(const ID& rangeId);
+
+    // Get the style from a range (returns nullptr if no style)
+    [[nodiscard]] const StyleBuffer* getRangeStyle(const ID& rangeId) const;
+
+    // Get mutable style from a range (returns nullptr if no style)
+    [[nodiscard]] StyleBuffer* getRangeStyle(const ID& rangeId);
 
 private:
     // Sheet lookup by ID

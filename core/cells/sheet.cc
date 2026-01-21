@@ -1130,4 +1130,68 @@ void Sheet::setRangeStyleId(const ID& rangeId, const ID& styleId) {
     _workbook->setRangeStyleId(rangeId, styleId);
 }
 
+// =============================================================================
+// Content-addressed range styles (delegates to Workbook)
+// =============================================================================
+
+void Sheet::setRangeStyle(const ID& rangeId, const StyleBuffer& style) {
+    if (_workbook == nullptr) {
+        return;
+    }
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
+        return;
+    }
+    _workbook->setRangeStyle(rangeId, style);
+}
+
+void Sheet::setRangeStyle(const ID& rangeId, StyleBuffer&& style) {
+    if (_workbook == nullptr) {
+        return;
+    }
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
+        return;
+    }
+    _workbook->setRangeStyle(rangeId, std::move(style));
+}
+
+void Sheet::clearRangeStyle(const ID& rangeId) {
+    if (_workbook == nullptr) {
+        return;
+    }
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
+        return;
+    }
+    _workbook->clearRangeStyle(rangeId);
+}
+
+const StyleBuffer* Sheet::getRangeStyle(const ID& rangeId) const {
+    if (_workbook == nullptr) {
+        return nullptr;
+    }
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
+        return nullptr;
+    }
+    return _workbook->getRangeStyle(rangeId);
+}
+
+StyleBuffer* Sheet::getRangeStyle(const ID& rangeId) {
+    if (_workbook == nullptr) {
+        return nullptr;
+    }
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
+        return nullptr;
+    }
+    return _workbook->getRangeStyle(rangeId);
+}
+
 }  // namespace cells

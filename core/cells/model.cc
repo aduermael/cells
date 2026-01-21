@@ -35,6 +35,7 @@
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
+#include "core/cells/style_buffer.h"
 #include "core/cells/style_registry.h"
 
 namespace cells {
@@ -1316,6 +1317,50 @@ void Workbook::setRangeStyleId(const ID& rangeId, const ID& styleId) {
             registry->addRef(styleId);
         }
     }
+}
+
+// =============================================================================
+// Content-addressed range styles (new system)
+// =============================================================================
+
+void Workbook::setRangeStyle(const ID& rangeId, const StyleBuffer& style) {
+    Range* range = getRange(rangeId);
+    if (!range) {
+        return;  // Range doesn't exist
+    }
+    range->setStyle(style);
+}
+
+void Workbook::setRangeStyle(const ID& rangeId, StyleBuffer&& style) {
+    Range* range = getRange(rangeId);
+    if (!range) {
+        return;  // Range doesn't exist
+    }
+    range->setStyle(std::move(style));
+}
+
+void Workbook::clearRangeStyle(const ID& rangeId) {
+    Range* range = getRange(rangeId);
+    if (!range) {
+        return;  // Range doesn't exist
+    }
+    range->clearStyle();
+}
+
+const StyleBuffer* Workbook::getRangeStyle(const ID& rangeId) const {
+    const Range* range = getRange(rangeId);
+    if (!range) {
+        return nullptr;
+    }
+    return range->getStyle();
+}
+
+StyleBuffer* Workbook::getRangeStyle(const ID& rangeId) {
+    Range* range = getRange(rangeId);
+    if (!range) {
+        return nullptr;
+    }
+    return range->getStyle();
 }
 
 }  // namespace cells
