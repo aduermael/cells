@@ -254,14 +254,14 @@ export function setupDataListeners(config: DataListenersConfig): {
 
     await fetchViewport();
     // Debug: log cell styles after fetch
-    if (app.cells && app.cells.length > 0) {
-      const styledCells = app.cells.filter((c: { style?: unknown }) => c.style);
-      if (styledCells.length > 0) {
-        console.debug("[processDataChanges] Styled cells after fetch:",
-          styledCells.slice(0, 5).map((c: { col: number; row: number; style?: { bgColor?: string } }) =>
-            `(${c.col},${c.row}): ${c.style?.bgColor || 'no-bg'}`));
-      }
-    }
+    // if (app.cells && app.cells.length > 0) {
+    //   const styledCells = app.cells.filter((c: { style?: unknown }) => c.style);
+    //   if (styledCells.length > 0) {
+    //     console.debug("[processDataChanges] Styled cells after fetch:",
+    //       styledCells.slice(0, 5).map((c: { col: number; row: number; style?: { bgColor?: string } }) =>
+    //         `(${c.col},${c.row}): ${c.style?.bgColor || 'no-bg'}`));
+    //   }
+    // }
     render();
     updateFormulaBar();
     updateScrollbars();
