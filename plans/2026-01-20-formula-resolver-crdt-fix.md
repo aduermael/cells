@@ -67,7 +67,7 @@ FormulaResolver itself should NOT create entities. Instead:
   - `std::vector<PendingAxis>` columns to create (position, generated ID)
   - `std::vector<PendingAxis>` rows to create (position, generated ID)
   - `std::vector<PendingCell>` cells to create (colId, rowId, generated ID)
-- [ ] 2b: Add method `FormulaResolver::getRequiredEntities(ast)` that returns `ResolvedEntities`
+- [x] 2b: Add method `FormulaResolver::getRequiredEntities(ast)` that returns `RequiredEntities`
 - [ ] 2c: Modify `resolve()` to optionally skip entity creation (via flag or separate method)
 
 ## Phase 3: Refactor callers to create entities via CRDT

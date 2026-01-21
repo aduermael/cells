@@ -713,6 +713,7 @@ cc_library(
     deps = [
         ":formula_ast",
         ":formula_display",
+        ":id",
         ":model",
         ":named_ranges",
         ":types",

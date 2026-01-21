@@ -146,6 +146,23 @@ public:
     // Check if AST contains any volatile functions
     [[nodiscard]] static bool containsVolatileFunction(const ASTNode* ast);
 
+    // ==========================================================================
+    // CRDT-Compatible Resolution (Two-Phase Approach)
+    // ==========================================================================
+    //
+    // These methods support the CRDT architecture by separating entity discovery
+    // from entity creation. Instead of auto-creating entities during resolution,
+    // callers should:
+    // 1. Call getRequiredEntities() to discover what needs to be created
+    // 2. Create entities via CRDT operations (applyOperation)
+    // 3. Call resolve() to complete resolution with existing entities
+    //
+
+    // Analyze AST and identify entities that need to be created
+    // Returns RequiredEntities describing columns, rows, and cells that don't exist
+    // The caller should create these via CRDT operations before calling resolve()
+    [[nodiscard]] RequiredEntities getRequiredEntities(const ASTNode* ast) const;
+
 private:
     // Internal resolution methods for each node type
     ResolveResult resolveNode(ASTNode* node);
@@ -165,6 +182,17 @@ private:
 
     // Internal reference extraction
     void extractReferencesFromNode(const ASTNode* node, std::vector<ReferenceInfo>& refs) const;
+
+    // Internal helpers for getRequiredEntities()
+    void collectRequiredEntitiesFromNode(const ASTNode* node, RequiredEntities& required) const;
+    void collectRequiredEntitiesFromCellRef(const CellRefNode* node, RequiredEntities& required) const;
+    void collectRequiredEntitiesFromColumnRef(const ColumnRefNode* node,
+                                              RequiredEntities& required) const;
+    void collectRequiredEntitiesFromRowRef(const RowRefNode* node, RequiredEntities& required) const;
+    void collectRequiredEntitiesFromColumnRangeRef(const ColumnRangeRefNode* node,
+                                                   RequiredEntities& required) const;
+    void collectRequiredEntitiesFromRowRangeRef(const RowRangeRefNode* node,
+                                                RequiredEntities& required) const;
 
     Workbook& _workbook;
     Sheet& _sheet;

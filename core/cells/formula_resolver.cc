@@ -2,6 +2,10 @@
 
 #include <algorithm>
 #include <sstream>
+#include <unordered_map>
+#include <unordered_set>
+
+#include "core/cells/id.h"
 
 namespace cells {
 
@@ -441,5 +445,403 @@ void FormulaResolver::extractReferencesFromNode(const ASTNode* node,
 }
 
 // Note: FormulaDisplayConverter implementation is now in formula_display.cc
+
+// ===========================================================================
+// CRDT-Compatible Resolution: getRequiredEntities
+// ===========================================================================
+//
+// Walks the AST to identify entities that need to be created via CRDT operations.
+// This enables a two-phase approach:
+// 1. Discover what entities are needed (this method)
+// 2. Create entities via applyOperation (caller responsibility)
+// 3. Resolve AST with existing entities
+//
+
+RequiredEntities FormulaResolver::getRequiredEntities(const ASTNode* ast) const {
+    RequiredEntities required;
+    if (ast != nullptr) {
+        collectRequiredEntitiesFromNode(ast, required);
+    }
+    return required;
+}
+
+void FormulaResolver::collectRequiredEntitiesFromNode(const ASTNode* node,
+                                                      RequiredEntities& required) const {
+    if (node == nullptr) {
+        return;
+    }
+
+    switch (node->type) {
+        case ASTNodeType::CELL_REF:
+            collectRequiredEntitiesFromCellRef(static_cast<const CellRefNode*>(node), required);
+            break;
+
+        case ASTNodeType::RANGE_REF: {
+            auto* rangeRef = static_cast<const RangeRefNode*>(node);
+            collectRequiredEntitiesFromCellRef(rangeRef->topLeft.get(), required);
+            collectRequiredEntitiesFromCellRef(rangeRef->bottomRight.get(), required);
+            break;
+        }
+
+        case ASTNodeType::COLUMN_REF:
+            collectRequiredEntitiesFromColumnRef(static_cast<const ColumnRefNode*>(node), required);
+            break;
+
+        case ASTNodeType::ROW_REF:
+            collectRequiredEntitiesFromRowRef(static_cast<const RowRefNode*>(node), required);
+            break;
+
+        case ASTNodeType::COLUMN_RANGE_REF:
+            collectRequiredEntitiesFromColumnRangeRef(static_cast<const ColumnRangeRefNode*>(node),
+                                                      required);
+            break;
+
+        case ASTNodeType::ROW_RANGE_REF:
+            collectRequiredEntitiesFromRowRangeRef(static_cast<const RowRangeRefNode*>(node),
+                                                   required);
+            break;
+
+        case ASTNodeType::SPILL_RANGE_REF: {
+            auto* spillRef = static_cast<const SpillRangeRefNode*>(node);
+            collectRequiredEntitiesFromCellRef(spillRef->anchor.get(), required);
+            break;
+        }
+
+        case ASTNodeType::BINARY_OP: {
+            auto* binOp = static_cast<const BinaryOpNode*>(node);
+            collectRequiredEntitiesFromNode(binOp->left.get(), required);
+            collectRequiredEntitiesFromNode(binOp->right.get(), required);
+            break;
+        }
+
+        case ASTNodeType::UNARY_OP: {
+            auto* unaryOp = static_cast<const UnaryOpNode*>(node);
+            collectRequiredEntitiesFromNode(unaryOp->operand.get(), required);
+            break;
+        }
+
+        case ASTNodeType::FUNCTION_CALL: {
+            auto* funcCall = static_cast<const FunctionCallNode*>(node);
+            for (const auto& arg : funcCall->args) {
+                collectRequiredEntitiesFromNode(arg.get(), required);
+            }
+            break;
+        }
+
+        case ASTNodeType::ERROR_NODE: {
+            auto* errorNode = static_cast<const ErrorNode*>(node);
+            for (const auto& child : errorNode->partialChildren) {
+                collectRequiredEntitiesFromNode(child.get(), required);
+            }
+            break;
+        }
+
+        default:
+            // Literals, named refs, etc. don't require entity creation
+            break;
+    }
+}
+
+void FormulaResolver::collectRequiredEntitiesFromCellRef(const CellRefNode* node,
+                                                         RequiredEntities& required) const {
+    // Get target sheet (cross-sheet reference handling)
+    // Note: getTargetSheet is non-const, so we need to use a workaround
+    Sheet* targetSheet = nullptr;
+    if (node->sheetName.empty()) {
+        targetSheet = &_sheet;
+    } else {
+        for (const auto& sheet : _workbook.sheets) {
+            if (sheet->name == node->sheetName) {
+                targetSheet = sheet.get();
+                break;
+            }
+        }
+    }
+    if (targetSheet == nullptr) {
+        return;  // Sheet not found - resolve() will report the error
+    }
+
+    // Convert column name to position (0-indexed)
+    const int32_t colPos = Sheet::columnNameToPosition(node->column);
+    if (colPos < 0) {
+        return;  // Invalid column - resolve() will report the error
+    }
+
+    // Row is 1-indexed in the AST, convert to 0-indexed position
+    if (node->row < 1) {
+        return;  // Invalid row - resolve() will report the error
+    }
+    const auto rowPos = static_cast<uint32_t>(node->row - 1);
+
+    // Check if column exists, add to pending if not
+    ID colId;
+    const Axis* existingCol = targetSheet->getColumnByPosition(static_cast<uint32_t>(colPos));
+    if (existingCol != nullptr) {
+        colId = existingCol->id;
+    } else {
+        // Check if we've already queued this column for creation
+        bool found = false;
+        for (const auto& pending : required.columns) {
+            if (pending.sheetId == targetSheet->id &&
+                pending.position == static_cast<uint32_t>(colPos) && pending.isColumn) {
+                colId = pending.id;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            PendingAxis pendingCol;
+            pendingCol.id = generate_id();
+            pendingCol.sheetId = targetSheet->id;
+            pendingCol.position = static_cast<uint32_t>(colPos);
+            pendingCol.isColumn = true;
+            colId = pendingCol.id;
+            required.columns.push_back(pendingCol);
+        }
+    }
+
+    // Check if row exists, add to pending if not
+    ID rowId;
+    const Axis* existingRow = targetSheet->getRowByPosition(rowPos);
+    if (existingRow != nullptr) {
+        rowId = existingRow->id;
+    } else {
+        // Check if we've already queued this row for creation
+        bool found = false;
+        for (const auto& pending : required.rows) {
+            if (pending.sheetId == targetSheet->id && pending.position == rowPos &&
+                !pending.isColumn) {
+                rowId = pending.id;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            PendingAxis pendingRow;
+            pendingRow.id = generate_id();
+            pendingRow.sheetId = targetSheet->id;
+            pendingRow.position = rowPos;
+            pendingRow.isColumn = false;
+            rowId = pendingRow.id;
+            required.rows.push_back(pendingRow);
+        }
+    }
+
+    // Check if cell exists, add to pending if not
+    // Use lookup-only method if both axes exist
+    if (existingCol != nullptr && existingRow != nullptr) {
+        const Cell* existingCell = targetSheet->getCellAtPosition(static_cast<uint32_t>(colPos), rowPos);
+        if (existingCell != nullptr) {
+            return;  // Cell already exists
+        }
+    }
+
+    // Check if we've already queued this cell for creation
+    for (const auto& pending : required.cells) {
+        if (pending.colId == colId && pending.rowId == rowId) {
+            return;  // Already queued
+        }
+    }
+
+    // Queue cell for creation
+    PendingCell pendingCell;
+    pendingCell.id = generate_id();
+    pendingCell.colId = colId;
+    pendingCell.rowId = rowId;
+    required.cells.push_back(pendingCell);
+}
+
+void FormulaResolver::collectRequiredEntitiesFromColumnRef(const ColumnRefNode* node,
+                                                           RequiredEntities& required) const {
+    // Get target sheet
+    Sheet* targetSheet = nullptr;
+    if (node->sheetName.empty()) {
+        targetSheet = &_sheet;
+    } else {
+        for (const auto& sheet : _workbook.sheets) {
+            if (sheet->name == node->sheetName) {
+                targetSheet = sheet.get();
+                break;
+            }
+        }
+    }
+    if (targetSheet == nullptr) {
+        return;
+    }
+
+    const int32_t colPos = Sheet::columnNameToPosition(node->column);
+    if (colPos < 0) {
+        return;
+    }
+
+    // Check if column exists
+    const Axis* existingCol = targetSheet->getColumnByPosition(static_cast<uint32_t>(colPos));
+    if (existingCol != nullptr) {
+        return;  // Already exists
+    }
+
+    // Check if already queued
+    for (const auto& pending : required.columns) {
+        if (pending.sheetId == targetSheet->id &&
+            pending.position == static_cast<uint32_t>(colPos) && pending.isColumn) {
+            return;  // Already queued
+        }
+    }
+
+    // Queue for creation
+    PendingAxis pendingCol;
+    pendingCol.id = generate_id();
+    pendingCol.sheetId = targetSheet->id;
+    pendingCol.position = static_cast<uint32_t>(colPos);
+    pendingCol.isColumn = true;
+    required.columns.push_back(pendingCol);
+}
+
+void FormulaResolver::collectRequiredEntitiesFromRowRef(const RowRefNode* node,
+                                                        RequiredEntities& required) const {
+    // Get target sheet
+    Sheet* targetSheet = nullptr;
+    if (node->sheetName.empty()) {
+        targetSheet = &_sheet;
+    } else {
+        for (const auto& sheet : _workbook.sheets) {
+            if (sheet->name == node->sheetName) {
+                targetSheet = sheet.get();
+                break;
+            }
+        }
+    }
+    if (targetSheet == nullptr) {
+        return;
+    }
+
+    if (node->row < 1) {
+        return;
+    }
+    const auto rowPos = static_cast<uint32_t>(node->row - 1);
+
+    // Check if row exists
+    const Axis* existingRow = targetSheet->getRowByPosition(rowPos);
+    if (existingRow != nullptr) {
+        return;  // Already exists
+    }
+
+    // Check if already queued
+    for (const auto& pending : required.rows) {
+        if (pending.sheetId == targetSheet->id && pending.position == rowPos && !pending.isColumn) {
+            return;  // Already queued
+        }
+    }
+
+    // Queue for creation
+    PendingAxis pendingRow;
+    pendingRow.id = generate_id();
+    pendingRow.sheetId = targetSheet->id;
+    pendingRow.position = rowPos;
+    pendingRow.isColumn = false;
+    required.rows.push_back(pendingRow);
+}
+
+void FormulaResolver::collectRequiredEntitiesFromColumnRangeRef(const ColumnRangeRefNode* node,
+                                                                RequiredEntities& required) const {
+    // Get target sheet
+    Sheet* targetSheet = nullptr;
+    if (node->sheetName.empty()) {
+        targetSheet = &_sheet;
+    } else {
+        for (const auto& sheet : _workbook.sheets) {
+            if (sheet->name == node->sheetName) {
+                targetSheet = sheet.get();
+                break;
+            }
+        }
+    }
+    if (targetSheet == nullptr) {
+        return;
+    }
+
+    const int32_t startColPos = Sheet::columnNameToPosition(node->startColumn);
+    const int32_t endColPos = Sheet::columnNameToPosition(node->endColumn);
+    if (startColPos < 0 || endColPos < 0) {
+        return;
+    }
+
+    // Check and queue both columns
+    for (int32_t colPos : {startColPos, endColPos}) {
+        const Axis* existingCol = targetSheet->getColumnByPosition(static_cast<uint32_t>(colPos));
+        if (existingCol != nullptr) {
+            continue;  // Already exists
+        }
+
+        // Check if already queued
+        bool found = false;
+        for (const auto& pending : required.columns) {
+            if (pending.sheetId == targetSheet->id &&
+                pending.position == static_cast<uint32_t>(colPos) && pending.isColumn) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            PendingAxis pendingCol;
+            pendingCol.id = generate_id();
+            pendingCol.sheetId = targetSheet->id;
+            pendingCol.position = static_cast<uint32_t>(colPos);
+            pendingCol.isColumn = true;
+            required.columns.push_back(pendingCol);
+        }
+    }
+}
+
+void FormulaResolver::collectRequiredEntitiesFromRowRangeRef(const RowRangeRefNode* node,
+                                                             RequiredEntities& required) const {
+    // Get target sheet
+    Sheet* targetSheet = nullptr;
+    if (node->sheetName.empty()) {
+        targetSheet = &_sheet;
+    } else {
+        for (const auto& sheet : _workbook.sheets) {
+            if (sheet->name == node->sheetName) {
+                targetSheet = sheet.get();
+                break;
+            }
+        }
+    }
+    if (targetSheet == nullptr) {
+        return;
+    }
+
+    if (node->startRow < 1 || node->endRow < 1) {
+        return;
+    }
+    const auto startRowPos = static_cast<uint32_t>(node->startRow - 1);
+    const auto endRowPos = static_cast<uint32_t>(node->endRow - 1);
+
+    // Check and queue both rows
+    for (uint32_t rowPos : {startRowPos, endRowPos}) {
+        const Axis* existingRow = targetSheet->getRowByPosition(rowPos);
+        if (existingRow != nullptr) {
+            continue;  // Already exists
+        }
+
+        // Check if already queued
+        bool found = false;
+        for (const auto& pending : required.rows) {
+            if (pending.sheetId == targetSheet->id && pending.position == rowPos &&
+                !pending.isColumn) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            PendingAxis pendingRow;
+            pendingRow.id = generate_id();
+            pendingRow.sheetId = targetSheet->id;
+            pendingRow.position = rowPos;
+            pendingRow.isColumn = false;
+            required.rows.push_back(pendingRow);
+        }
+    }
+}
 
 }  // namespace cells
