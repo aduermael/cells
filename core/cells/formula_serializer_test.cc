@@ -61,7 +61,7 @@ TEST_F(FormulaSerializerTest, SerializeCellRefResolved) {
     auto ast = parser.parse();
 
     FormulaResolver resolver(*workbook, *sheet);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success);
 
     std::string serialized = FormulaSerializer::serialize(ast.get());
@@ -80,7 +80,7 @@ TEST_F(FormulaSerializerTest, SerializeAbsoluteCellRef) {
     auto ast = parser.parse();
 
     FormulaResolver resolver(*workbook, *sheet);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success);
 
     std::string serialized = FormulaSerializer::serialize(ast.get());
@@ -95,7 +95,7 @@ TEST_F(FormulaSerializerTest, SerializeMixedAbsoluteCellRef) {
     FormulaParser parser1("=$A1");
     auto ast1 = parser1.parse();
     FormulaResolver resolver1(*workbook, *sheet);
-    resolver1.resolve(ast1.get());
+    resolver1.resolve(ast1.get(), false);  // legacy mode for tests
     std::string serialized1 = FormulaSerializer::serialize(ast1.get());
     EXPECT_TRUE(serialized1.find("$~") != std::string::npos)
         << "Expected $~ prefix for col-absolute ref, got: " << serialized1;
@@ -104,7 +104,7 @@ TEST_F(FormulaSerializerTest, SerializeMixedAbsoluteCellRef) {
     FormulaParser parser2("=A$1");
     auto ast2 = parser2.parse();
     FormulaResolver resolver2(*workbook, *sheet);
-    resolver2.resolve(ast2.get());
+    resolver2.resolve(ast2.get(), false);  // legacy mode for tests
     std::string serialized2 = FormulaSerializer::serialize(ast2.get());
     EXPECT_TRUE(serialized2.find("~$") != std::string::npos)
         << "Expected ~$ prefix for row-absolute ref, got: " << serialized2;
@@ -115,7 +115,7 @@ TEST_F(FormulaSerializerTest, SerializeRangeRef) {
     auto ast = parser.parse();
 
     FormulaResolver resolver(*workbook, *sheet);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success);
 
     std::string serialized = FormulaSerializer::serialize(ast.get());
@@ -138,7 +138,7 @@ TEST_F(FormulaSerializerTest, SerializeBinaryOp) {
     auto ast = parser.parse();
 
     FormulaResolver resolver(*workbook, *sheet);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success);
 
     std::string serialized = FormulaSerializer::serialize(ast.get());
@@ -160,7 +160,7 @@ TEST_F(FormulaSerializerTest, SerializeFunctionCall) {
     auto ast = parser.parse();
 
     FormulaResolver resolver(*workbook, *sheet);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success);
 
     std::string serialized = FormulaSerializer::serialize(ast.get());
@@ -176,7 +176,7 @@ TEST_F(FormulaSerializerTest, SerializeComplexFormula) {
     auto ast = parser.parse();
 
     FormulaResolver resolver(*workbook, *sheet);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success);
 
     std::string serialized = FormulaSerializer::serialize(ast.get());
@@ -193,7 +193,7 @@ TEST_F(FormulaSerializerTest, SerializeUnaryOp) {
     auto ast = parser.parse();
 
     FormulaResolver resolver(*workbook, *sheet);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success);
 
     std::string serialized = FormulaSerializer::serialize(ast.get());
@@ -214,7 +214,7 @@ TEST_F(FormulaSerializerTest, SerializeColumnRef) {
     auto ast = parser.parse();
 
     FormulaResolver resolver(*workbook, *sheet);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success);
 
     std::string serialized = FormulaSerializer::serialize(ast.get());
@@ -230,7 +230,7 @@ TEST_F(FormulaSerializerTest, SerializeRowRef) {
     auto ast = parser.parse();
 
     FormulaResolver resolver(*workbook, *sheet);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success);
 
     std::string serialized = FormulaSerializer::serialize(ast.get());
@@ -271,7 +271,7 @@ TEST_F(FormulaSerializerTest, SerializePrecedence) {
     auto ast = parser.parse();
 
     FormulaResolver resolver(*workbook, *sheet);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     std::string serialized = FormulaSerializer::serialize(ast.get());
 
@@ -298,7 +298,7 @@ TEST_F(FormulaSerializerTest, SerializeCrossSheetCellRef) {
 
     // Resolve (should set cellId but NOT sheetId - cells are globally unique)
     FormulaResolver resolver(*workbook, *sheet);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success) << result.errorMessage;
 
     // Check the AST - sheetId should NOT be set (cell UUIDs are globally unique)
@@ -348,7 +348,7 @@ TEST_F(FormulaSerializerTest, SerializeCrossSheetRange) {
 
     // Resolve
     FormulaResolver resolver(*workbook, *sheet);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success) << result.errorMessage;
 
     // Serialize - should NOT contain sheet prefix (cells are globally unique)

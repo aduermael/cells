@@ -187,7 +187,7 @@ TEST(FormulaIntegrationTest, DependencyGraphTracking) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    auto resolveResult = resolver.resolve(ast.get());
+    auto resolveResult = resolver.resolve(ast.get(), false);  // legacy mode for tests
     EXPECT_TRUE(resolveResult.success);
 
     // Set formula with resolved AST
@@ -216,7 +216,7 @@ TEST(FormulaIntegrationTest, SetCellFormulaStoresUuidFormat) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    auto resolveResult = resolver.resolve(ast.get());
+    auto resolveResult = resolver.resolve(ast.get(), false);  // legacy mode for tests
     EXPECT_TRUE(resolveResult.success);
 
     // Set formula with resolved AST - this should store UUID format
@@ -253,7 +253,7 @@ TEST(FormulaIntegrationTest, SetCellFormulaAbsoluteRefUuidFormat) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    auto resolveResult = resolver.resolve(ast.get());
+    auto resolveResult = resolver.resolve(ast.get(), false);  // legacy mode for tests
     EXPECT_TRUE(resolveResult.success);
 
     auto result = sheet->setCellFormula(ID("cellC101"), "=$A$1", ast.release());
@@ -278,7 +278,7 @@ TEST(FormulaIntegrationTest, SetCellFormulaMixedAbsoluteRefUuidFormat) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    auto resolveResult = resolver.resolve(ast.get());
+    auto resolveResult = resolver.resolve(ast.get(), false);  // legacy mode for tests
     EXPECT_TRUE(resolveResult.success);
 
     auto result = sheet->setCellFormula(ID("cellC101"), "=$A1", ast.release());
@@ -305,7 +305,7 @@ TEST(FormulaIntegrationTest, DisplayConversionSimple) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     // Use FormulaDisplayConverter to convert back to A1
     FormulaDisplayConverter converter(*sheet, wb.get());
@@ -324,7 +324,7 @@ TEST(FormulaIntegrationTest, DisplayConversionAbsolute) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(ast.get());
@@ -342,7 +342,7 @@ TEST(FormulaIntegrationTest, DisplayConversionRoundTrip) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     // Store the resolved AST (now in UUID format)
     auto result = sheet->setCellFormula(ID("cellC101"), "=A1+B1", ast.release());
@@ -371,7 +371,7 @@ TEST(FormulaIntegrationTest, DisplayConversionFunctionCall) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet, wb.get());
     std::string display = converter.toDisplayString(ast.get());
@@ -386,7 +386,7 @@ TEST(FormulaIntegrationTest, DependencyGraphRemoval) {
     FormulaParser parser("=A1+B1");
     auto ast = parser.parse();
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     sheet->setCellFormula(ID("cellC101"), "=A1+B1", ast.release());
 
@@ -406,7 +406,7 @@ TEST(FormulaIntegrationTest, VolatileFunctionTracking) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     sheet->setCellFormula(ID("cellC101"), "=NOW()", ast.release());
 
@@ -533,7 +533,7 @@ TEST(FormulaIntegrationTest, UuidFormatSerializationRoundTrip) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    auto resolveResult = resolver.resolve(ast.get());
+    auto resolveResult = resolver.resolve(ast.get(), false);  // legacy mode for tests
     EXPECT_TRUE(resolveResult.success);
 
     // Set formula with resolved AST - this stores UUID format
@@ -593,7 +593,7 @@ TEST(FormulaIntegrationTest, UuidFormatAbsoluteRefRoundTrip) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     sheet->setCellFormula(ID("cellC101"), "=$A$1+B$2", ast.release());
 
@@ -630,7 +630,7 @@ TEST(FormulaIntegrationTest, UuidFormatRangeRefRoundTrip) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     sheet->setCellFormula(ID("cellC101"), "=SUM(A1:B2)", ast.release());
 
@@ -662,7 +662,7 @@ TEST(FormulaIntegrationTest, UuidFormatFunctionCallRoundTrip) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     sheet->setCellFormula(ID("cellC101"), "=IF(A1>0,B1,0)", ast.release());
 
@@ -779,7 +779,7 @@ std::pair<bool, std::string> testFormulaRoundTrip(const std::string& formulaA1,
 
     // Step 2: Resolve references (A1 → UUID)
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    auto resolveResult = resolver.resolve(ast.get());
+    auto resolveResult = resolver.resolve(ast.get(), false);  // legacy mode for tests
     if (!resolveResult.success) {
         return {false, "Resolve failed: " + resolveResult.errorMessage};
     }
@@ -965,7 +965,7 @@ TEST(UuidRoundTripTest, PureLiteralFormula) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     sheet->setCellFormula(formulaCell->id, "=1+2+3", ast.release());
 
@@ -1002,7 +1002,7 @@ TEST(UuidRoundTripTest, ComplexCombined) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    auto resolveResult = resolver.resolve(ast.get());
+    auto resolveResult = resolver.resolve(ast.get(), false);  // legacy mode for tests
     EXPECT_TRUE(resolveResult.success);
 
     sheet->setCellFormula(formulaCell->id, formula, ast.release());
@@ -1039,7 +1039,7 @@ TEST(UuidRoundTripTest, AllAbsoluteMarkerCombinations) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     sheet->setCellFormula(formulaCell->id, formula, ast.release());
 
@@ -1082,7 +1082,7 @@ TEST(UuidRoundTripTest, RangeAbsoluteMarkerCombinations) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*wb, *sheet, wb->getNamedRanges());
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     sheet->setCellFormula(formulaCell->id, formula, ast.release());
 
@@ -1451,7 +1451,7 @@ TEST(CrossSheetRoundTripTest, SimpleCellRef) {
 
     // Step 2: Resolve references to UUIDs (like bindings_core.cc does)
     FormulaResolver resolver1(*wb, *sheet1, wb->getNamedRanges());
-    ResolveResult resolveResult1 = resolver1.resolve(ast1.get());
+    ResolveResult resolveResult1 = resolver1.resolve(ast1.get(), false);  // legacy mode for tests
     EXPECT_TRUE(resolveResult1.success)
         << "Initial resolve failed: " << resolveResult1.errorMessage;
 
@@ -1485,7 +1485,7 @@ TEST(CrossSheetRoundTripTest, SimpleCellRef) {
 
     // Step 7: Re-resolve on Sheet1 (the sheet where the formula is entered)
     FormulaResolver resolver2(*wb, *sheet1, wb->getNamedRanges());
-    ResolveResult resolveResult2 = resolver2.resolve(ast2.get());
+    ResolveResult resolveResult2 = resolver2.resolve(ast2.get(), false);  // legacy mode for tests
     EXPECT_TRUE(resolveResult2.success) << "Re-resolve failed: " << resolveResult2.errorMessage;
 
     // Step 8: Re-serialize to internal format
@@ -1513,7 +1513,7 @@ TEST(CrossSheetRoundTripTest, RangeRef) {
 
     // Step 2: Resolve references to UUIDs
     FormulaResolver resolver1(*wb, *sheet1, wb->getNamedRanges());
-    ResolveResult resolveResult1 = resolver1.resolve(ast1.get());
+    ResolveResult resolveResult1 = resolver1.resolve(ast1.get(), false);  // legacy mode for tests
     EXPECT_TRUE(resolveResult1.success);
 
     // Step 3: Set formula on cell
@@ -1541,7 +1541,7 @@ TEST(CrossSheetRoundTripTest, RangeRef) {
 
     // Step 7: Re-resolve
     FormulaResolver resolver2(*wb, *sheet1, wb->getNamedRanges());
-    ResolveResult resolveResult2 = resolver2.resolve(ast2.get());
+    ResolveResult resolveResult2 = resolver2.resolve(ast2.get(), false);  // legacy mode for tests
     EXPECT_TRUE(resolveResult2.success) << "Re-resolve failed";
 
     // Step 8: Re-serialize (should be identical)
@@ -1566,7 +1566,7 @@ TEST(CrossSheetRoundTripTest, AbsoluteRef) {
 
     // Step 2: Resolve references
     FormulaResolver resolver1(*wb, *sheet1, wb->getNamedRanges());
-    EXPECT_TRUE(resolver1.resolve(ast1.get()).success);
+    EXPECT_TRUE(resolver1.resolve(ast1.get(), false).success);  // legacy mode for tests
 
     // Step 3: Set formula
     auto result = sheet1->setCellFormula(ID("s1CelA11"), "=Sheet2!$B$1", ast1.release());
@@ -1588,7 +1588,7 @@ TEST(CrossSheetRoundTripTest, AbsoluteRef) {
     auto ast2 = parser2.parse();
     ASSERT_NE(ast2, nullptr);
     FormulaResolver resolver2(*wb, *sheet1, wb->getNamedRanges());
-    ResolveResult resolveResult2 = resolver2.resolve(ast2.get());
+    ResolveResult resolveResult2 = resolver2.resolve(ast2.get(), false);  // legacy mode for tests
     EXPECT_TRUE(resolveResult2.success);
 
     // Step 8-9: Verify round-trip integrity
@@ -1611,7 +1611,7 @@ TEST(CrossSheetRoundTripTest, MultipleSheetRefs) {
 
     // Step 2: Resolve references
     FormulaResolver resolver1(*wb, *sheet1, wb->getNamedRanges());
-    EXPECT_TRUE(resolver1.resolve(ast1.get()).success);
+    EXPECT_TRUE(resolver1.resolve(ast1.get(), false).success);  // legacy mode for tests
 
     // Step 3: Set formula
     auto result = sheet1->setCellFormula(ID("s1CelA11"), "=Sheet2!A1+B1", ast1.release());
@@ -1633,7 +1633,7 @@ TEST(CrossSheetRoundTripTest, MultipleSheetRefs) {
     auto ast2 = parser2.parse();
     ASSERT_NE(ast2, nullptr);
     FormulaResolver resolver2(*wb, *sheet1, wb->getNamedRanges());
-    EXPECT_TRUE(resolver2.resolve(ast2.get()).success);
+    EXPECT_TRUE(resolver2.resolve(ast2.get(), false).success);  // legacy mode for tests
 
     std::string internalFormat2 = FormulaSerializer::serialize(ast2.get());
     EXPECT_EQ(internalFormat, internalFormat2);
@@ -1658,7 +1658,7 @@ TEST(CrossSheetRoundTripTest, ContextAwareDisplay) {
 
     // Step 2: Resolve references
     FormulaResolver resolver1(*wb, *sheet1, wb->getNamedRanges());
-    EXPECT_TRUE(resolver1.resolve(ast1.get()).success);
+    EXPECT_TRUE(resolver1.resolve(ast1.get(), false).success);  // legacy mode for tests
 
     // Step 3: Set formula on Sheet1!A1
     auto result = sheet1->setCellFormula(ID("s1CelA11"), "=Sheet2!B1", ast1.release());

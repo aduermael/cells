@@ -54,7 +54,7 @@ protected:
 
         // Resolve references
         FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
-        resolver.resolve(ast.get());
+        resolver.resolve(ast.get(), false);  // legacy mode for tests
 
         // Evaluate
         std::unordered_set<ID> evaluating;
@@ -108,7 +108,7 @@ protected:
         auto ast = parser.parse();
         if (ast && !parser.hasErrors()) {
             FormulaResolver resolver(*workbook, *sheet);
-            resolver.resolve(ast.get());
+            resolver.resolve(ast.get(), false);  // legacy mode for tests
             sheet->setCellFormula(cell->id, formula, ast.release());
         }
 
@@ -1589,7 +1589,7 @@ TEST_F(FormulaEvalTest, CrossSheetCellRef_Evaluates) {
 
     // Resolve - this should find Sheet2 and set cellId (but NOT sheetId)
     FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
 
     // The AST should be a CellRefNode - sheetId should NOT be set (cells are globally unique)
@@ -1650,7 +1650,7 @@ TEST_F(FormulaEvalTest, CrossSheetRange_SUMEvaluates) {
     ASSERT_FALSE(parser.hasErrors());
 
     FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
 
     std::unordered_set<ID> evaluating;

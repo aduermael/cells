@@ -94,12 +94,20 @@ FormulaResolver itself should NOT create entities. Instead:
   - This is a separate architectural issue from formula resolution input path
   - Tracked as separate work item to avoid blocking Phase 3 completion
 
-## Phase 4: Remove direct entity creation from FormulaResolver
+## Phase 4: Make CRDT mode the default in FormulaResolver
 
-- [ ] 4a: Remove calls to `getOrCreateColumnByPosition` from FormulaResolver
-- [ ] 4b: Remove calls to `getOrCreateRowByPosition` from FormulaResolver
-- [ ] 4c: Remove calls to `getOrCreateCellAt` from FormulaResolver
-- [ ] 4d: Update tests to use new pattern
+- [x] 4a: Change resolve() default from existingOnly=false to existingOnly=true
+  - CRDT-compliant mode is now the default for all callers
+  - Legacy mode (existingOnly=false) only used for XLSX import (bindings_file.cc)
+- [x] 4b: Update bindings_file.cc to explicitly use legacy mode (false)
+  - Added comment explaining legacy mode is appropriate for file loading
+- [x] 4c: Update bindings_core.cc createCell() to use CRDT-compliant two-phase approach
+  - Same pattern as setCellValueAt: getRequiredEntities() -> applyOperation() -> resolve(true)
+- [x] 4d: Update luau_types.cc cell.value setter to use CRDT-compliant approach
+  - Formula setting via Luau scripts now creates entities via CRDT
+- [x] 4e: Update all unit tests to explicitly pass false for legacy mode
+  - Tests continue to use legacy mode for simplicity
+  - Production code uses CRDT mode by default
 
 ## Phase 5: Testing
 

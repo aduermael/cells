@@ -387,11 +387,46 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
                     payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) +
                               R"(","col_id":")" + colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
                 } else {
-                    // Resolve the AST - this creates cells/axes for referenced positions
+                    // CRDT-compliant resolution: discover and create entities first
                     FormulaResolver resolver(*workbook, *sheet);
-                    const ResolveResult resolveRes = resolver.resolve(ast.get());
+
+                    // Phase 1: Discover what entities need to be created
+                    const RequiredEntities required = resolver.getRequiredEntities(ast.get());
+
+                    // Create required columns via CRDT operations
+                    for (const auto& pending : required.columns) {
+                        const std::string colPayload = R"({"pos":)" +
+                                                       std::to_string(pending.position) +
+                                                       R"(,"size":100})";  // Default column width
+                        const Operation colOp =
+                            makeColInsertOp(*workbook, pending.id, pending.sheetId, colPayload);
+                        applyOperation(*workbook, colOp);
+                    }
+
+                    // Create required rows via CRDT operations
+                    for (const auto& pending : required.rows) {
+                        const std::string rowPayload = R"({"pos":)" +
+                                                       std::to_string(pending.position) +
+                                                       R"(,"size":21})";  // Default row height
+                        const Operation rowOp =
+                            makeRowInsertOp(*workbook, pending.id, pending.sheetId, rowPayload);
+                        applyOperation(*workbook, rowOp);
+                    }
+
+                    // Create required cells via CRDT operations (empty cells for references)
+                    for (const auto& pending : required.cells) {
+                        const std::string cellPayload =
+                            R"({"type":"s","value":"","col_id":")" + pending.colId.toString() +
+                            R"(","row_id":")" + pending.rowId.toString() + R"("})";
+                        const Operation cellOp =
+                            makeCellSetValueOp(*workbook, pending.id, pending.sheetId, cellPayload);
+                        applyOperation(*workbook, cellOp);
+                    }
+
+                    // Phase 2: Resolve with existing entities only
+                    const ResolveResult resolveRes = resolver.resolve(ast.get(), true);
                     if (!resolveRes.success) {
-                        // Resolution failed - use fallback
+                        // Resolution failed (e.g., sheet not found) - use fallback
                         RefConverter conv;
                         conv.setContext(*sheet);
                         const std::string uuidFormula = conv.formulaToUuid(str);

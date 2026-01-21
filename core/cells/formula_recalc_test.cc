@@ -76,7 +76,7 @@ protected:
         }
 
         FormulaResolver resolver(*workbook, *sheet);
-        resolver.resolve(ast.get());
+        resolver.resolve(ast.get(), false);  // legacy mode for tests
 
         auto result = sheet->setCellFormula(cell->id, formula, ast.release());
         if (!result.success) {
@@ -1122,7 +1122,7 @@ TEST_F(FormulaRecalcTest, CrossSheetDependency) {
     ASSERT_FALSE(parser.hasErrors());
 
     FormulaResolver resolver(*workbook, *sheet);
-    ResolveResult resolveResult = resolver.resolve(ast.get());
+    ResolveResult resolveResult = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(resolveResult.success);
 
     // Set the formula on sheet1B1
@@ -1194,7 +1194,7 @@ TEST_F(FormulaRecalcTest, CrossSheetRangeDependency) {
     ASSERT_FALSE(parser.hasErrors());
 
     FormulaResolver resolver(*workbook, *sheet);
-    ResolveResult resolveResult = resolver.resolve(ast.get());
+    ResolveResult resolveResult = resolver.resolve(ast.get(), false);  // legacy mode for tests
     ASSERT_TRUE(resolveResult.success);
 
     auto result = sheet->setCellFormula(sheet1B1->id, "=SUM(Sheet2!A1:A3)", ast.release());

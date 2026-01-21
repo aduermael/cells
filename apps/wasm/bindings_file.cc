@@ -157,7 +157,10 @@ std::string CellsEngine::loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
                     cell->formula->ast != nullptr) {
                     // Resolve formula references from A1 notation to UUIDs
                     // This converts CellRefNode column/row to resolved cellId
-                    resolver.resolve(cell->formula->ast);
+                    // NOTE: Using legacy mode (existingOnly=false) for file loading
+                    // because collaboration hasn't started yet, and formulas may
+                    // reference cells that don't exist in the import
+                    resolver.resolve(cell->formula->ast, false);
 
                     if (depGraph != nullptr) {
                         depGraph->addFormula(cell->id, cell->formula->ast, positionResolver,

@@ -3,7 +3,6 @@
 // =============================================================================
 //
 // Resolves A1-notation references in formula ASTs to UUID-based references.
-// Auto-creates cells and axes as needed for referenced locations.
 //
 // Key responsibilities:
 // - Walk AST and resolve A1 refs (B2, $A$1) to cell/axis UUIDs
@@ -11,14 +10,22 @@
 // - Resolve named ranges via NamedRangeRegistry
 // - Extract reference info for UI highlighting
 // - Detect volatile functions (NOW, RAND, etc.)
+// - Identify entities needed for formula resolution (getRequiredEntities)
 //
-// Resolution process:
+// CRDT-Compliant Resolution (recommended):
 // 1. Parse formula text -> AST (via FormulaParser)
-// 2. Resolve AST refs -> UUIDs (this module)
+// 2. Discover required entities (getRequiredEntities)
+// 3. Create missing entities via applyOperation()
+// 4. Resolve AST refs -> UUIDs (resolve with existingOnly=true)
+// 5. Serialize AST -> UUID formula text (via FormulaSerializer)
+//
+// Legacy Resolution (for file loading only):
+// 1. Parse formula text -> AST (via FormulaParser)
+// 2. Resolve AST refs -> UUIDs (resolve with existingOnly=false)
 // 3. Serialize AST -> UUID formula text (via FormulaSerializer)
 //
 // Dependencies: formula_ast.h, formula_display.h, model.h, named_ranges.h
-// Used by: bindings.cc (cell editing), crdt.cc (applying formula ops)
+// Used by: bindings.cc (cell editing), bindings_file.cc (XLSX import)
 //
 // =============================================================================
 
@@ -135,14 +142,15 @@ public:
 
     // Resolve all references in an AST
     // Modifies the AST in place, filling in UUID fields
-    // Auto-creates cells/axes as needed for non-existent references (when existingOnly=false)
     //
-    // When existingOnly=true:
+    // When existingOnly=true (default, CRDT-compliant):
     // - Returns error if any referenced entity doesn't exist
     // - Use with getRequiredEntities() for CRDT-compatible resolution
-    // When existingOnly=false (default, legacy behavior):
-    // - Auto-creates entities directly (bypasses CRDT - use only for file loading)
-    ResolveResult resolve(ASTNode* ast, bool existingOnly = false);
+    // - Caller should create entities via applyOperation() before calling resolve()
+    // When existingOnly=false (legacy mode for file loading only):
+    // - Auto-creates entities directly (bypasses CRDT)
+    // - Only use for XLSX import where collaboration hasn't started
+    ResolveResult resolve(ASTNode* ast, bool existingOnly = true);
 
     // Extract all references from a resolved AST
     // Used for UI highlighting and dependency tracking

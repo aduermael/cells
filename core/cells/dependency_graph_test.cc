@@ -51,7 +51,7 @@ protected:
         auto ast = parser.parse();
         if (ast) {
             FormulaResolver resolver(*workbook_, *sheet_, &registry_);
-            resolver.resolve(ast.get());
+            resolver.resolve(ast.get(), false);  // legacy mode for tests
         }
         return ast;
     }

@@ -84,7 +84,7 @@ TEST_F(FormulaResolverTest, ResolveCellRef_ExistingCell) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -101,7 +101,7 @@ TEST_F(FormulaResolverTest, ResolveCellRef_AutoCreateCell) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -124,7 +124,7 @@ TEST_F(FormulaResolverTest, ResolveCellRef_AutoCreateAxis) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -142,7 +142,7 @@ TEST_F(FormulaResolverTest, ResolveCellRef_AbsoluteReference) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -157,7 +157,7 @@ TEST_F(FormulaResolverTest, ResolveCellRef_MixedReference) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -175,7 +175,7 @@ TEST_F(FormulaResolverTest, ResolveRangeRef) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -193,7 +193,7 @@ TEST_F(FormulaResolverTest, ResolveColumnRef) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -206,7 +206,7 @@ TEST_F(FormulaResolverTest, ResolveRowRef) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -219,7 +219,7 @@ TEST_F(FormulaResolverTest, ResolveColumnRangeRef) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -233,7 +233,7 @@ TEST_F(FormulaResolverTest, ResolveRowRangeRef) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -252,7 +252,7 @@ TEST_F(FormulaResolverTest, ResolveNamedRef_NotFound) {
 
     // No named range registry
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_FALSE(result.success);
     EXPECT_TRUE(result.errorMessage.find("not found") != std::string::npos);
@@ -266,7 +266,7 @@ TEST_F(FormulaResolverTest, ResolveNamedRef_Found) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1, &registry);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 }
@@ -280,7 +280,7 @@ TEST_F(FormulaResolverTest, ResolveNamedRef_SheetScopeShadows) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1, &registry);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -298,7 +298,7 @@ TEST_F(FormulaResolverTest, ResolveBinaryOp) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -316,7 +316,7 @@ TEST_F(FormulaResolverTest, ResolveFunctionCall) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -329,7 +329,7 @@ TEST_F(FormulaResolverTest, ResolveVolatileFunction) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success);
 
@@ -355,7 +355,7 @@ TEST_F(FormulaResolverTest, ContainsVolatileFunction) {
 TEST_F(FormulaResolverTest, ExtractReferences_SingleCell) {
     auto ast = parseFormula("=A1");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     auto refs = resolver.extractReferences(ast.get());
     EXPECT_EQ(refs.size(), 1);
@@ -366,7 +366,7 @@ TEST_F(FormulaResolverTest, ExtractReferences_SingleCell) {
 TEST_F(FormulaResolverTest, ExtractReferences_Multiple) {
     auto ast = parseFormula("=A1+B1+C1");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     auto refs = resolver.extractReferences(ast.get());
     EXPECT_EQ(refs.size(), 3);
@@ -375,7 +375,7 @@ TEST_F(FormulaResolverTest, ExtractReferences_Multiple) {
 TEST_F(FormulaResolverTest, ExtractReferences_Range) {
     auto ast = parseFormula("=A1:C3");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     auto refs = resolver.extractReferences(ast.get());
     EXPECT_EQ(refs.size(), 1);
@@ -385,7 +385,7 @@ TEST_F(FormulaResolverTest, ExtractReferences_Range) {
 TEST_F(FormulaResolverTest, ExtractReferences_FunctionArgs) {
     auto ast = parseFormula("=SUM(A1,B1,C1)");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     auto refs = resolver.extractReferences(ast.get());
     EXPECT_EQ(refs.size(), 3);
@@ -398,7 +398,7 @@ TEST_F(FormulaResolverTest, ExtractReferences_FunctionArgs) {
 TEST_F(FormulaResolverTest, DisplayConversion_SimpleCellRef) {
     auto ast = parseFormula("=A1");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet1);
     std::string display = converter.toDisplayString(ast.get());
@@ -409,7 +409,7 @@ TEST_F(FormulaResolverTest, DisplayConversion_SimpleCellRef) {
 TEST_F(FormulaResolverTest, DisplayConversion_AbsoluteRef) {
     auto ast = parseFormula("=$A$1");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet1);
     std::string display = converter.toDisplayString(ast.get());
@@ -420,7 +420,7 @@ TEST_F(FormulaResolverTest, DisplayConversion_AbsoluteRef) {
 TEST_F(FormulaResolverTest, DisplayConversion_BinaryOp) {
     auto ast = parseFormula("=A1+B1*C1");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet1);
     std::string display = converter.toDisplayString(ast.get());
@@ -431,7 +431,7 @@ TEST_F(FormulaResolverTest, DisplayConversion_BinaryOp) {
 TEST_F(FormulaResolverTest, DisplayConversion_Function) {
     auto ast = parseFormula("=SUM(A1,B1)");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet1);
     std::string display = converter.toDisplayString(ast.get());
@@ -442,7 +442,7 @@ TEST_F(FormulaResolverTest, DisplayConversion_Function) {
 TEST_F(FormulaResolverTest, DisplayConversion_Literals) {
     auto ast = parseFormula("=1+2.5+TRUE+\"Hello\"");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet1);
     std::string display = converter.toDisplayString(ast.get());
@@ -456,7 +456,7 @@ TEST_F(FormulaResolverTest, DisplayConversion_Literals) {
 TEST_F(FormulaResolverTest, DisplayConversion_ColumnRef) {
     auto ast = parseFormula("=A:A");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet1);
     std::string display = converter.toDisplayString(ast.get());
@@ -467,7 +467,7 @@ TEST_F(FormulaResolverTest, DisplayConversion_ColumnRef) {
 TEST_F(FormulaResolverTest, DisplayConversion_RowRef) {
     auto ast = parseFormula("=1:1");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet1);
     std::string display = converter.toDisplayString(ast.get());
@@ -482,7 +482,7 @@ TEST_F(FormulaResolverTest, DisplayConversion_RowRef) {
 TEST_F(FormulaResolverTest, DisplayConversion_SpillRangeRef) {
     auto ast = parseFormula("=A1#");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet1);
     std::string display = converter.toDisplayString(ast.get());
@@ -493,7 +493,7 @@ TEST_F(FormulaResolverTest, DisplayConversion_SpillRangeRef) {
 TEST_F(FormulaResolverTest, DisplayConversion_SpillRangeRefAbsolute) {
     auto ast = parseFormula("=$B$2#");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet1);
     std::string display = converter.toDisplayString(ast.get());
@@ -504,7 +504,7 @@ TEST_F(FormulaResolverTest, DisplayConversion_SpillRangeRefAbsolute) {
 TEST_F(FormulaResolverTest, DisplayConversion_SpillRangeInFunction) {
     auto ast = parseFormula("=SUM(A1#)");
     FormulaResolver resolver(*workbook, *sheet1);
-    resolver.resolve(ast.get());
+    resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     FormulaDisplayConverter converter(*sheet1);
     std::string display = converter.toDisplayString(ast.get());
@@ -524,7 +524,7 @@ TEST_F(FormulaResolverTest, RoundTrip_ParseResolveDisplay) {
         ASSERT_NE(ast, nullptr) << "Failed to parse: " << formula;
 
         FormulaResolver resolver(*workbook, *sheet1);
-        auto result = resolver.resolve(ast.get());
+        auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
         EXPECT_TRUE(result.success) << "Failed to resolve: " << formula;
 
         FormulaDisplayConverter converter(*sheet1);
@@ -536,7 +536,7 @@ TEST_F(FormulaResolverTest, RoundTrip_ParseResolveDisplay) {
 
         // Verify it resolves successfully
         FormulaResolver resolver2(*workbook, *sheet1);
-        auto result2 = resolver2.resolve(ast2.get());
+        auto result2 = resolver2.resolve(ast2.get(), false);  // legacy mode for tests
         EXPECT_TRUE(result2.success) << "Failed to resolve re-parsed: " << display;
     }
 }
@@ -564,7 +564,7 @@ TEST_F(FormulaResolverTest, ResolveCrossSheetRef_SheetFound) {
 
     // Resolve the reference (from Sheet1's perspective)
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
 
@@ -583,7 +583,7 @@ TEST_F(FormulaResolverTest, ResolveCrossSheetRef_SheetNotFound) {
 
     // Resolve should fail
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_FALSE(result.success);
     EXPECT_TRUE(result.errorMessage.find("not found") != std::string::npos);
@@ -599,7 +599,7 @@ TEST_F(FormulaResolverTest, ResolveCrossSheetRange) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    auto result = resolver.resolve(ast.get());
+    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
 
     EXPECT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
 }

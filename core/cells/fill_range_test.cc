@@ -78,7 +78,7 @@ protected:
         FormulaParser parser(formulaText);
         auto ast = parser.parse();
         FormulaResolver resolver(*workbook, *sheet);
-        resolver.resolve(ast.get());
+        resolver.resolve(ast.get(), false);  // legacy mode for tests
 
         // Create and set the formula
         auto* formula = new Formula();

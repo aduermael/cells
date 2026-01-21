@@ -52,7 +52,7 @@ protected:
 
         // Resolve references
         FormulaResolver resolver(*workbook, *sheet);
-        resolver.resolve(ast.get());
+        resolver.resolve(ast.get(), false);  // legacy mode for tests
 
         // Evaluate
         std::unordered_set<ID> evaluating;
