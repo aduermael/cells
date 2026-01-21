@@ -1700,8 +1700,7 @@ std::string CellsEngine::addMergeRange(uint32_t startCol, uint32_t startRow,
     // Create the merge range using the unified Range system with CRDT operation
     ID rangeId = generate_id();
     std::ostringstream payload;
-    payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
-    payload << "\"start_col_id\":\"" << startColId.toString() << "\",";
+    payload << "{\"start_col_id\":\"" << startColId.toString() << "\",";
     payload << "\"start_row_id\":\"" << startRowId.toString() << "\",";
     payload << "\"end_col_id\":\"" << endColId.toString() << "\",";
     payload << "\"end_row_id\":\"" << endRowId.toString() << "\",";

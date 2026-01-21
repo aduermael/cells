@@ -45,32 +45,16 @@ namespace internal {
 // RANGE_ADD Operation
 // =============================================================================
 //
-// Payload: {"sheet_id":"...","start_col_id":"...","start_row_id":"...",
+// Payload: {"start_col_id":"...","start_row_id":"...",
 //           "end_col_id":"...","end_row_id":"...","flags":N}
 //
-// Creates a new range in the specified sheet. The range ID is the operation's
-// target_id. If a range with this ID already exists, the operation is ignored
-// (LWW handled by comparing HLCs in the main dispatcher).
+// Creates a new range in the sheet that contains the start column.
+// The sheet is derived from the start column ID (columns belong to exactly one sheet).
+// The range ID is the operation's target_id. If a range with this ID already exists,
+// the operation is ignored (LWW handled by comparing HLCs in the main dispatcher).
 //
 
 ApplyResult applyRangeAdd(Workbook& workbook, const Operation& op) {
-    // Extract sheet ID from payload
-    const std::string sheetIdStr = extractJSONString(op.payload, "sheet_id");
-    if (sheetIdStr.empty()) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    const ID sheetId(sheetIdStr);
-    Sheet* sheet = workbook.getSheet(sheetId);
-    if (sheet == nullptr) {
-        return ApplyResult::INVALID_TARGET;
-    }
-
-    // Check if range already exists
-    if (sheet->getRange(op.target_id) != nullptr) {
-        return ApplyResult::ALREADY_APPLIED;
-    }
-
     // Extract corner IDs
     const std::string startColIdStr = extractJSONString(op.payload, "start_col_id");
     const std::string startRowIdStr = extractJSONString(op.payload, "start_row_id");
@@ -82,12 +66,24 @@ ApplyResult applyRangeAdd(Workbook& workbook, const Operation& op) {
         return ApplyResult::INVALID_PAYLOAD;
     }
 
+    // Derive sheet from start column ID (columns belong to exactly one sheet)
+    const ID startColId(startColIdStr);
+    Sheet* sheet = workbook.findAxisSheet(startColId);
+    if (sheet == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check if range already exists
+    if (sheet->getRange(op.target_id) != nullptr) {
+        return ApplyResult::ALREADY_APPLIED;
+    }
+
     // Extract flags (default to NONE if not specified)
     const int flagsInt = extractJSONInt(op.payload, "flags", 0);
     const auto flags = static_cast<RangeFlags>(flagsInt);
 
     // Create the range
-    auto range = std::make_unique<Range>(op.target_id, ID(startColIdStr), ID(startRowIdStr),
+    auto range = std::make_unique<Range>(op.target_id, startColId, ID(startRowIdStr),
                                          ID(endColIdStr), ID(endRowIdStr), flags);
 
     // Add to sheet

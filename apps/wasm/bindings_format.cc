@@ -2002,8 +2002,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             // Create the new split range
             ID newRangeId = generate_id();
             std::ostringstream newRangePayload;
-            newRangePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
-            newRangePayload << "\"start_col_id\":\"" << rectStartColId.toString() << "\",";
+            newRangePayload << "{\"start_col_id\":\"" << rectStartColId.toString() << "\",";
             newRangePayload << "\"start_row_id\":\"" << rectStartRowId.toString() << "\",";
             newRangePayload << "\"end_col_id\":\"" << rectEndColId.toString() << "\",";
             newRangePayload << "\"end_row_id\":\"" << rectEndRowId.toString() << "\",";
@@ -2032,8 +2031,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     // Create a new Range with RANGE_STYLE flag
     ID rangeId = generate_id();
     std::ostringstream rangePayload;
-    rangePayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\",";
-    rangePayload << "\"start_col_id\":\"" << startColId.toString() << "\",";
+    rangePayload << "{\"start_col_id\":\"" << startColId.toString() << "\",";
     rangePayload << "\"start_row_id\":\"" << startRowId.toString() << "\",";
     rangePayload << "\"end_col_id\":\"" << endColId.toString() << "\",";
     rangePayload << "\"end_row_id\":\"" << endRowId.toString() << "\",";

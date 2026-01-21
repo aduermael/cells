@@ -30,9 +30,9 @@ The `bootstrapOpLog()` function in `core/cells/crdt.cc:617-847` generates bootst
 
 ## Phase 1: Remove sheet_id from RANGE_ADD Payload
 
-- [ ] 1a: Update `applyRangeAdd` in `crdt_range.cc` to derive sheet from column/row IDs instead of extracting from payload
-- [ ] 1b: Update RANGE_ADD payload creation in `bindings_format.cc` to not include sheet_id
-- [ ] 1c: Update RANGE_ADD payload creation in `bindings_core.cc` to not include sheet_id
+- [x] 1a: Update `applyRangeAdd` in `crdt_range.cc` to derive sheet from column/row IDs instead of extracting from payload. Used `workbook.findAxisSheet(startColId)` to derive sheet from start column ID.
+- [x] 1b: Update RANGE_ADD payload creation in `bindings_format.cc` to not include sheet_id. Updated two locations (split ranges and main range creation).
+- [x] 1c: Update RANGE_ADD payload creation in `bindings_core.cc` to not include sheet_id. Updated merge range creation.
 
 ## Phase 2: Remove sheet_id from RANGE_SET_STYLE Payload
 
