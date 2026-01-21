@@ -63,7 +63,7 @@ FormulaResolver itself should NOT create entities. Instead:
 
 ## Phase 2: Create FormulaResolver resolution result type
 
-- [ ] 2a: Define `ResolvedEntities` struct containing:
+- [x] 2a: Define `RequiredEntities` struct containing:
   - `std::vector<PendingAxis>` columns to create (position, generated ID)
   - `std::vector<PendingAxis>` rows to create (position, generated ID)
   - `std::vector<PendingCell>` cells to create (colId, rowId, generated ID)

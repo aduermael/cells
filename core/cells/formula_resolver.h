@@ -53,6 +53,51 @@ struct ResolveResult {
     }
 };
 
+// =============================================================================
+// Pending Entity Structs for CRDT-Compatible Resolution
+// =============================================================================
+//
+// These structs describe entities that need to be created via CRDT operations
+// before formula resolution can complete. The FormulaResolver identifies what
+// needs to be created, but the caller is responsible for creating them via
+// applyOperation() to maintain CRDT architecture.
+//
+
+// Pending axis (column or row) to be created
+struct PendingAxis {
+    ID id;             // Pre-generated ID for the axis
+    ID sheetId;        // Target sheet
+    uint32_t position; // Position (0-indexed)
+    bool isColumn;     // true = column, false = row
+};
+
+// Pending cell to be created
+struct PendingCell {
+    ID id;     // Pre-generated ID for the cell
+    ID colId;  // Column axis ID (may be a pending axis ID)
+    ID rowId;  // Row axis ID (may be a pending axis ID)
+};
+
+// Entities required by a formula that don't yet exist
+// Callers should create these via CRDT operations before resolving
+struct RequiredEntities {
+    std::vector<PendingAxis> columns;  // Columns to create
+    std::vector<PendingAxis> rows;     // Rows to create
+    std::vector<PendingCell> cells;    // Cells to create
+
+    // Check if any entities need to be created
+    [[nodiscard]] bool empty() const {
+        return columns.empty() && rows.empty() && cells.empty();
+    }
+
+    // Clear all pending entities
+    void clear() {
+        columns.clear();
+        rows.clear();
+        cells.clear();
+    }
+};
+
 // Reference information extracted from AST for UI highlighting
 struct ReferenceInfo {
     enum class Type : std::uint8_t { CELL, RANGE, COLUMN, ROW, COLUMN_RANGE, ROW_RANGE, NAMED };
