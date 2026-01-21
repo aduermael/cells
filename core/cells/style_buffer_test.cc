@@ -754,5 +754,157 @@ TEST(StyleBufferTest, UpdateBorderStyle) {
     EXPECT_EQ(s.getBorderTopColorHex(), "#00FF00");
 }
 
+// =============================================================================
+// getEffectiveStyle Tests
+// =============================================================================
+
+TEST(StyleBufferTest, EffectiveStyleEmptyList) {
+    std::vector<const StyleBuffer*> styles;
+    StyleBuffer result = StyleBuffer::getEffectiveStyle(styles);
+    EXPECT_TRUE(result.isEmpty());
+}
+
+TEST(StyleBufferTest, EffectiveStyleSingleStyle) {
+    StyleBuffer s;
+    s.setBold(true);
+    s.setBgColorHex("#FF0000");
+
+    std::vector<const StyleBuffer*> styles = {&s};
+    StyleBuffer result = StyleBuffer::getEffectiveStyle(styles);
+
+    EXPECT_TRUE(result.hasBold());
+    EXPECT_TRUE(result.getBold());
+    EXPECT_TRUE(result.hasBgColor());
+    EXPECT_EQ(result.getBgColorHex(), "#FF0000");
+}
+
+TEST(StyleBufferTest, EffectiveStyleMergeNonOverlapping) {
+    // Two styles with different properties - both should be present in result
+    StyleBuffer s1;
+    s1.setBold(true);
+    s1.setBgColorHex("#FF0000");
+
+    StyleBuffer s2;
+    s2.setItalic(true);
+    s2.setFontSize(14);
+
+    std::vector<const StyleBuffer*> styles = {&s1, &s2};
+    StyleBuffer result = StyleBuffer::getEffectiveStyle(styles);
+
+    // All properties from both styles
+    EXPECT_TRUE(result.getBold());
+    EXPECT_EQ(result.getBgColorHex(), "#FF0000");
+    EXPECT_TRUE(result.getItalic());
+    EXPECT_EQ(result.getFontSize(), 14);
+}
+
+TEST(StyleBufferTest, EffectiveStyleOverride) {
+    // Later styles override earlier ones for the same property
+    StyleBuffer s1;
+    s1.setBgColorHex("#FF0000");  // Red
+
+    StyleBuffer s2;
+    s2.setBgColorHex("#00FF00");  // Green
+
+    std::vector<const StyleBuffer*> styles = {&s1, &s2};
+    StyleBuffer result = StyleBuffer::getEffectiveStyle(styles);
+
+    // s2's green overrides s1's red
+    EXPECT_EQ(result.getBgColorHex(), "#00FF00");
+}
+
+TEST(StyleBufferTest, EffectiveStylePriorityChain) {
+    // Column < Row < Range < Cell priority
+    StyleBuffer colStyle;
+    colStyle.setBgColorHex("#FF0000");  // Column sets red bg
+    colStyle.setFontSize(10);
+
+    StyleBuffer rowStyle;
+    rowStyle.setBold(true);  // Row adds bold
+
+    StyleBuffer rangeStyle;
+    rangeStyle.setBgColorHex("#00FF00");  // Range overrides to green
+    rangeStyle.setItalic(true);
+
+    StyleBuffer cellStyle;
+    cellStyle.setBgColorHex("#0000FF");  // Cell overrides to blue
+    cellStyle.setUnderline(true);
+
+    std::vector<const StyleBuffer*> rangeStyles = {&rangeStyle};
+    StyleBuffer result =
+        StyleBuffer::getEffectiveStyle(&colStyle, &rowStyle, rangeStyles, &cellStyle);
+
+    // Cell's blue wins for bgColor (highest priority)
+    EXPECT_EQ(result.getBgColorHex(), "#0000FF");
+    // Column's fontSize is preserved (not overridden)
+    EXPECT_EQ(result.getFontSize(), 10);
+    // Row's bold is preserved
+    EXPECT_TRUE(result.getBold());
+    // Range's italic is preserved
+    EXPECT_TRUE(result.getItalic());
+    // Cell's underline is preserved
+    EXPECT_TRUE(result.getUnderline());
+}
+
+TEST(StyleBufferTest, EffectiveStyleNullPointers) {
+    // Should handle null pointers gracefully
+    StyleBuffer cellStyle;
+    cellStyle.setBold(true);
+
+    std::vector<const StyleBuffer*> rangeStyles;
+    StyleBuffer result = StyleBuffer::getEffectiveStyle(nullptr, nullptr, rangeStyles, &cellStyle);
+
+    EXPECT_TRUE(result.getBold());
+    EXPECT_FALSE(result.hasItalic());
+}
+
+TEST(StyleBufferTest, EffectiveStyleMultipleRanges) {
+    // Multiple overlapping ranges - later ranges have higher priority
+    StyleBuffer range1;
+    range1.setBgColorHex("#FF0000");
+    range1.setBold(true);
+
+    StyleBuffer range2;
+    range2.setBgColorHex("#00FF00");  // Overrides range1's bg
+    range2.setItalic(true);
+
+    StyleBuffer range3;
+    range3.setUnderline(true);  // Adds underline, doesn't touch bg
+
+    std::vector<const StyleBuffer*> rangeStyles = {&range1, &range2, &range3};
+    StyleBuffer result = StyleBuffer::getEffectiveStyle(nullptr, nullptr, rangeStyles, nullptr);
+
+    // range2's green wins (later in list)
+    EXPECT_EQ(result.getBgColorHex(), "#00FF00");
+    // range1's bold preserved
+    EXPECT_TRUE(result.getBold());
+    // range2's italic preserved
+    EXPECT_TRUE(result.getItalic());
+    // range3's underline preserved
+    EXPECT_TRUE(result.getUnderline());
+}
+
+TEST(StyleBufferTest, EffectiveStyleBorderMerge) {
+    // Different borders from different styles
+    StyleBuffer s1;
+    s1.setBorderTop(BorderStyle::THIN, 0xFF, 0x00, 0x00);
+
+    StyleBuffer s2;
+    s2.setBorderBottom(BorderStyle::MEDIUM, 0x00, 0xFF, 0x00);
+
+    StyleBuffer s3;
+    s3.setBorderTop(BorderStyle::THICK, 0x00, 0x00, 0xFF);  // Overrides s1's top
+
+    std::vector<const StyleBuffer*> styles = {&s1, &s2, &s3};
+    StyleBuffer result = StyleBuffer::getEffectiveStyle(styles);
+
+    // s3's thick blue top wins
+    EXPECT_EQ(result.getBorderTopStyle(), BorderStyle::THICK);
+    EXPECT_EQ(result.getBorderTopColorHex(), "#0000FF");
+    // s2's bottom preserved
+    EXPECT_EQ(result.getBorderBottomStyle(), BorderStyle::MEDIUM);
+    EXPECT_EQ(result.getBorderBottomColorHex(), "#00FF00");
+}
+
 }  // namespace
 }  // namespace cells

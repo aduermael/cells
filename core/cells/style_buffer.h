@@ -315,6 +315,19 @@ public:
     // Returns true if both styles define the same property.
     [[nodiscard]] bool hasCollision(const StyleBuffer& other) const;
 
+    // Compute effective style by merging multiple StyleBuffers.
+    // The order defines priority: later styles override earlier ones.
+    // Typical usage: getEffectiveStyle({columnStyle, rowStyle, rangeStyles..., cellStyle})
+    // Returns the merged result.
+    [[nodiscard]] static StyleBuffer getEffectiveStyle(
+        const std::vector<const StyleBuffer*>& styles);
+
+    // Convenience overload for common case: column, row, and cell styles.
+    // rangeStyles are merged in order (first range has lowest priority).
+    [[nodiscard]] static StyleBuffer getEffectiveStyle(
+        const StyleBuffer* columnStyle, const StyleBuffer* rowStyle,
+        const std::vector<const StyleBuffer*>& rangeStyles, const StyleBuffer* cellStyle);
+
     // =========================================================================
     // Equality and comparison
     // =========================================================================

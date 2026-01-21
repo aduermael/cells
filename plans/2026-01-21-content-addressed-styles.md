@@ -470,8 +470,8 @@ Note: Lint fixes for const-correctness and explicit bool conversions pending.
 
 - [x] 3a: Implement `merge(const StyleBuffer& other)` method - Implemented in style_buffer.cc.
 - [x] 3b: Implement `hasCollision(const StyleBuffer& other)` method - Implemented using flag AND operation.
-- [ ] 3c: Implement `getEffectiveStyle(col, row, ranges, cell)` helper
-- [x] 3d: Add unit tests for merging scenarios - Tests for simple merge, override merge, and collision detection.
+- [x] 3c: Implement `getEffectiveStyle(col, row, ranges, cell)` helper - Added two static methods: `getEffectiveStyle(vector<StyleBuffer*>)` for generic merging and `getEffectiveStyle(columnStyle, rowStyle, rangeStyles, cellStyle)` convenience overload. Later styles override earlier ones.
+- [x] 3d: Add unit tests for merging scenarios - Tests for simple merge, override merge, collision detection, and 8 new getEffectiveStyle tests covering empty list, single style, non-overlapping merge, override behavior, priority chain, null handling, multiple ranges, and border merging.
 
 ### Phase 4: Integrate with Range System
 

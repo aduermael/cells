@@ -960,7 +960,7 @@ void StyleBuffer::setBorderSide(uint8_t sideBit, BorderStyle style, uint8_t r, u
                 ++sideIndex;
             }
         }
-        size_t sideOffset = offset + 1 + (sideIndex * 4);
+        const size_t sideOffset = offset + 1 + static_cast<size_t>(sideIndex * 4);
         _data[sideOffset] = static_cast<uint8_t>(style);
         _data[sideOffset + 1] = r;
         _data[sideOffset + 2] = g;
@@ -979,7 +979,7 @@ void StyleBuffer::setBorderSide(uint8_t sideBit, BorderStyle style, uint8_t r, u
                 ++insertIndex;
             }
         }
-        size_t insertOffset = offset + 1 + (insertIndex * 4);
+        const size_t insertOffset = offset + 1 + static_cast<size_t>(insertIndex * 4);
         uint8_t sideData[4] = {static_cast<uint8_t>(style), r, g, b};
         insertDataAt(insertOffset, sideData, 4);
     }
@@ -990,8 +990,8 @@ void StyleBuffer::clearBorderSide(uint8_t sideBit) {
         return;
     }
 
-    size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
-    uint8_t mask = _data[offset];
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
+    const uint8_t mask = _data[offset];
 
     if (!(mask & sideBit)) {
         return;  // Side not set
@@ -1009,7 +1009,7 @@ void StyleBuffer::clearBorderSide(uint8_t sideBit) {
     }
 
     // Remove side data
-    size_t sideOffset = offset + 1 + (sideIndex * 4);
+    const size_t sideOffset = offset + 1 + static_cast<size_t>(sideIndex * 4);
     removeDataAt(sideOffset, 4);
 
     // Update mask
@@ -1027,8 +1027,8 @@ BorderStyle StyleBuffer::getBorderSideStyle(uint8_t sideBit) const {
         return BorderStyle::NONE;
     }
 
-    size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
-    uint8_t mask = _data[offset];
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
+    const uint8_t mask = _data[offset];
 
     if (!(mask & sideBit)) {
         return BorderStyle::NONE;
@@ -1045,7 +1045,7 @@ BorderStyle StyleBuffer::getBorderSideStyle(uint8_t sideBit) const {
         }
     }
 
-    size_t sideOffset = offset + 1 + (sideIndex * 4);
+    const size_t sideOffset = offset + 1 + static_cast<size_t>(sideIndex * 4);
     if (sideOffset >= _data.size()) {
         return BorderStyle::NONE;
     }
@@ -1059,8 +1059,8 @@ void StyleBuffer::getBorderSideColor(uint8_t sideBit, uint8_t& r, uint8_t& g, ui
         return;
     }
 
-    size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
-    uint8_t mask = _data[offset];
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
+    const uint8_t mask = _data[offset];
 
     if (!(mask & sideBit)) {
         return;
@@ -1077,7 +1077,7 @@ void StyleBuffer::getBorderSideColor(uint8_t sideBit, uint8_t& r, uint8_t& g, ui
         }
     }
 
-    size_t sideOffset = offset + 1 + (sideIndex * 4);
+    const size_t sideOffset = offset + 1 + static_cast<size_t>(sideIndex * 4);
     if (sideOffset + 3 >= _data.size()) {
         return;
     }
@@ -1152,8 +1152,8 @@ void StyleBuffer::clearBorderLeft() {
 
 void StyleBuffer::clearBorder() {
     if (hasFlag(STYLE_FLAG_BORDER)) {
-        size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
-        size_t size = getPropertySize(STYLE_FLAG_BORDER);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
+        const size_t size = getPropertySize(STYLE_FLAG_BORDER);
         removeDataAt(offset, size);
         clearFlag(STYLE_FLAG_BORDER);
     }
@@ -1584,6 +1584,46 @@ bool StyleBuffer::hasCollision(const StyleBuffer& other) const {
     // Fast check: AND the flags together
     // Any overlapping flags = collision
     return (getFlags() & other.getFlags()) != 0;
+}
+
+StyleBuffer StyleBuffer::getEffectiveStyle(const std::vector<const StyleBuffer*>& styles) {
+    StyleBuffer result;
+
+    // Merge styles in order: later styles override earlier ones
+    for (const StyleBuffer* style : styles) {
+        if (style != nullptr && !style->isEmpty()) {
+            result.merge(*style);
+        }
+    }
+
+    return result;
+}
+
+StyleBuffer StyleBuffer::getEffectiveStyle(const StyleBuffer* columnStyle,
+                                           const StyleBuffer* rowStyle,
+                                           const std::vector<const StyleBuffer*>& rangeStyles,
+                                           const StyleBuffer* cellStyle) {
+    // Build the priority list: column < row < ranges < cell
+    // Column has lowest priority, cell has highest
+    std::vector<const StyleBuffer*> styles;
+    styles.reserve(2 + rangeStyles.size() + 1);
+
+    if (columnStyle != nullptr) {
+        styles.push_back(columnStyle);
+    }
+    if (rowStyle != nullptr) {
+        styles.push_back(rowStyle);
+    }
+    for (const StyleBuffer* rangeStyle : rangeStyles) {
+        if (rangeStyle != nullptr) {
+            styles.push_back(rangeStyle);
+        }
+    }
+    if (cellStyle != nullptr) {
+        styles.push_back(cellStyle);
+    }
+
+    return getEffectiveStyle(styles);
 }
 
 }  // namespace cells
