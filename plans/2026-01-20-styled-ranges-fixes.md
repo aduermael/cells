@@ -44,15 +44,35 @@ The `bootstrapOpLog()` function in `core/cells/crdt.cc:617-847` generates bootst
 - [x] 3a: Add RANGE_ADD operations to `bootstrapOpLog()` for all existing ranges. Iterates `sheet->getRangeIds()` and generates RANGE_ADD operations with the new payload format (no sheet_id).
 - [x] 3b: Add RANGE_SET_STYLE operations to `bootstrapOpLog()` for ranges that have styles. Checks `workbook.getRangeStyleId(range->id)` and emits RANGE_SET_STYLE if not null.
 
-## Phase 4: Testing
+## Phase 4: Fix Local Style Application Bug
 
-- [ ] 4a: Build and verify no compilation errors
-- [ ] 4b: Manual test: create styled range, export file, verify no sheet_id in RANGE_ADD/RANGE_SET_STYLE payloads
-- [ ] 4c: Manual test: create styled range, share collaboration link, verify peer 2 sees the styled range
+**Problem**: After collaboration starts, new styled ranges don't show on the peer creating them. STYLE_DEFINE operations exist in the oplog but styles don't exist in the workbook.
 
-## Phase 5: Fix All Lint Warnings, Checks, and Tests
+**Analysis**: In `applyOperation()` (crdt.cc:383-384), operations are added to the oplog "regardless of result":
+```cpp
+// Add to OpLog regardless of result (for history/sync)
+oplog->addOperation(op);
+```
 
-- [ ] 5a: Run C++ linter and fix all warnings (including pre-existing)
-- [ ] 5b: Run TypeScript/JavaScript linter and fix all warnings (including pre-existing)
-- [ ] 5c: Run all unit tests and fix any failures
-- [ ] 5d: Run all e2e/collaboration tests and fix any failures
+This is wrong. The correct flow should be:
+- **Local ops**: Create → Apply → On SUCCESS, add to oplog → Broadcast
+- **Remote ops**: Receive (pending) → Apply → On SUCCESS, add to oplog
+
+**Fix**: Only add to oplog after successful application.
+
+- [ ] 4a: Modify `applyOperation()` to only add to oplog on successful apply (SUCCESS, SUPERSEDED, RESURRECTED)
+- [ ] 4b: Review all callers of `applyOperation()` to ensure they handle failure cases appropriately
+- [ ] 4c: Add tests for the scenario: bootstrap → create styled range → verify style exists in workbook
+
+## Phase 5: Testing
+
+- [ ] 5a: Build and verify no compilation errors
+- [ ] 5b: Manual test: create styled range, export file, verify no sheet_id in RANGE_ADD/RANGE_SET_STYLE payloads
+- [ ] 5c: Manual test: create styled range, share collaboration link, verify peer 2 sees the styled range
+
+## Phase 6: Fix All Lint Warnings, Checks, and Tests
+
+- [ ] 6a: Run C++ linter and fix all warnings (including pre-existing)
+- [ ] 6b: Run TypeScript/JavaScript linter and fix all warnings (including pre-existing)
+- [ ] 6c: Run all unit tests and fix any failures
+- [ ] 6d: Run all e2e/collaboration tests and fix any failures
