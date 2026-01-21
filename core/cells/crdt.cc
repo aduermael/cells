@@ -827,13 +827,24 @@ size_t bootstrapOpLog(Workbook& workbook) {
             count++;
 
             // If this range has a style, generate RANGE_SET_STYLE operation
-            // This must come after STYLE_DEFINE (already added above) so the style exists
-            const ID styleId = workbook.getRangeStyleId(range->id);
-            if (!styleId.isNull()) {
-                const std::string stylePayload = "{\"style_id\":\"" + styleId.toString() + "\"}";
-                const Operation styleOp = makeRangeSetStyleOp(workbook, range->id, stylePayload);
+            // Prefer content-addressed style (new system) over style_id reference (old system)
+            if (range->style.has_value()) {
+                // New format: emit base64-encoded StyleBuffer directly
+                const Operation styleOp =
+                    makeRangeSetStyleOp(workbook, range->id, range->style.value());
                 oplog->addOperation(styleOp);
                 count++;
+            } else {
+                // Fall back to old format for backward compatibility
+                const ID styleId = workbook.getRangeStyleId(range->id);
+                if (!styleId.isNull()) {
+                    const std::string stylePayload =
+                        "{\"style_id\":\"" + styleId.toString() + "\"}";
+                    const Operation styleOp =
+                        makeRangeSetStyleOp(workbook, range->id, stylePayload);
+                    oplog->addOperation(styleOp);
+                    count++;
+                }
             }
         }
     }

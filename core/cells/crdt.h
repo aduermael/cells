@@ -145,6 +145,10 @@ Operation makeWorkbookRenameOp(Workbook& workbook, const std::string& payload);
 Operation makeFormatDefineOp(Workbook& workbook, const ID& formatId, const std::string& payload);
 
 // Generate a STYLE_DEFINE operation for defining a cell style.
+// DEPRECATED: Use content-addressed styles via RANGE_SET_STYLE with StyleBuffer instead.
+// New code should use makeRangeSetStyleOp(workbook, rangeId, StyleBuffer) which embeds
+// the style data directly in the operation payload as base64-encoded StyleBuffer.
+// Kept for backward compatibility with cell styles (which still use the old system).
 // Payload: JSON with style properties (bold, italic, bgColor, etc.)
 Operation makeStyleDefineOp(Workbook& workbook, const ID& styleId, const std::string& payload);
 

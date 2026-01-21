@@ -484,11 +484,11 @@ Update ranges to use StyleBuffer instead of style_id reference.
 
 ### Phase 5: Update CRDT Operations
 
-- [ ] 5a: Modify `RANGE_SET_STYLE` payload to contain base64 style instead of style_id
-- [ ] 5b: Update `applyRangeSetStyle()` to parse base64 style
-- [ ] 5c: Remove `STYLE_DEFINE` operation type (or deprecate)
-- [ ] 5d: Update bootstrap to not emit STYLE_DEFINE operations
-- [ ] 5e: Add backward compatibility: parse old format during transition
+- [x] 5a: Modify `RANGE_SET_STYLE` payload to contain base64 style instead of style_id - Already done in Phase 4c (makeRangeSetStyleOp with StyleBuffer).
+- [x] 5b: Update `applyRangeSetStyle()` to parse base64 style - Already done in Phase 4c (supports both old {"style_id":"..."} and new {"style":"<base64>"} formats).
+- [x] 5c: Remove `STYLE_DEFINE` operation type (or deprecate) - Marked as deprecated with comments in operation.h and crdt.h. Cannot fully remove yet since cell styles still use the old system.
+- [x] 5d: Update bootstrap to not emit STYLE_DEFINE operations - Updated bootstrapOpLog to emit content-addressed styles for ranges using makeRangeSetStyleOp(StyleBuffer). Still emits STYLE_DEFINE for cell styles (old system).
+- [x] 5e: Add backward compatibility: parse old format during transition - Already in place from Phase 4c (applyRangeSetStyle checks for "style" field first, falls back to "style_id").
 
 ### Phase 6: Update Bindings and TypeScript
 
