@@ -440,7 +440,8 @@ struct Sheet {
     // Cell operations
     Cell* getCell(const ID& cellId);
     Cell* getCellAt(const ID& colId, const ID& rowId);
-    Cell* getCellAtPosition(uint32_t colPos, uint32_t rowPos);  // Lookup only, returns nullptr if not exists
+    Cell* getCellAtPosition(uint32_t colPos,
+                            uint32_t rowPos);  // Lookup only, returns nullptr if not exists
     Cell* getOrCreateCellAt(const ID& colId, const ID& rowId);  // Auto-creates if needed
     void addCell(std::unique_ptr<Cell> cell);
     void reserveCells(size_t count);             // Pre-allocate capacity for bulk imports

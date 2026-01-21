@@ -713,7 +713,8 @@ void FormulaResolver::collectRequiredEntitiesFromCellRef(const CellRefNode* node
     // Check if cell exists, add to pending if not
     // Use lookup-only method if both axes exist
     if (existingCol != nullptr && existingRow != nullptr) {
-        const Cell* existingCell = targetSheet->getCellAtPosition(static_cast<uint32_t>(colPos), rowPos);
+        const Cell* existingCell =
+            targetSheet->getCellAtPosition(static_cast<uint32_t>(colPos), rowPos);
         if (existingCell != nullptr) {
             return;  // Cell already exists
         }

@@ -65,10 +65,10 @@ struct ResolveResult {
 
 // Pending axis (column or row) to be created
 struct PendingAxis {
-    ID id;             // Pre-generated ID for the axis
-    ID sheetId;        // Target sheet
-    uint32_t position; // Position (0-indexed)
-    bool isColumn;     // true = column, false = row
+    ID id;                 // Pre-generated ID for the axis
+    ID sheetId;            // Target sheet
+    uint32_t position{0};  // Position (0-indexed)
+    bool isColumn{true};   // true = column, false = row
 };
 
 // Pending cell to be created
@@ -86,9 +86,7 @@ struct RequiredEntities {
     std::vector<PendingCell> cells;    // Cells to create
 
     // Check if any entities need to be created
-    [[nodiscard]] bool empty() const {
-        return columns.empty() && rows.empty() && cells.empty();
-    }
+    [[nodiscard]] bool empty() const { return columns.empty() && rows.empty() && cells.empty(); }
 
     // Clear all pending entities
     void clear() {
@@ -191,10 +189,12 @@ private:
 
     // Internal helpers for getRequiredEntities()
     void collectRequiredEntitiesFromNode(const ASTNode* node, RequiredEntities& required) const;
-    void collectRequiredEntitiesFromCellRef(const CellRefNode* node, RequiredEntities& required) const;
+    void collectRequiredEntitiesFromCellRef(const CellRefNode* node,
+                                            RequiredEntities& required) const;
     void collectRequiredEntitiesFromColumnRef(const ColumnRefNode* node,
                                               RequiredEntities& required) const;
-    void collectRequiredEntitiesFromRowRef(const RowRefNode* node, RequiredEntities& required) const;
+    void collectRequiredEntitiesFromRowRef(const RowRefNode* node,
+                                           RequiredEntities& required) const;
     void collectRequiredEntitiesFromColumnRangeRef(const ColumnRangeRefNode* node,
                                                    RequiredEntities& required) const;
     void collectRequiredEntitiesFromRowRangeRef(const RowRangeRefNode* node,
