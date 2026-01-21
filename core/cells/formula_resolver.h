@@ -136,8 +136,14 @@ public:
 
     // Resolve all references in an AST
     // Modifies the AST in place, filling in UUID fields
-    // Auto-creates cells/axes as needed for non-existent references
-    ResolveResult resolve(ASTNode* ast);
+    // Auto-creates cells/axes as needed for non-existent references (when existingOnly=false)
+    //
+    // When existingOnly=true:
+    // - Returns error if any referenced entity doesn't exist
+    // - Use with getRequiredEntities() for CRDT-compatible resolution
+    // When existingOnly=false (default, legacy behavior):
+    // - Auto-creates entities directly (bypasses CRDT - use only for file loading)
+    ResolveResult resolve(ASTNode* ast, bool existingOnly = false);
 
     // Extract all references from a resolved AST
     // Used for UI highlighting and dependency tracking
@@ -197,6 +203,7 @@ private:
     Workbook& _workbook;
     Sheet& _sheet;
     NamedRangeRegistry* _namedRanges;
+    bool _existingOnly{false};  // When true, don't create entities; return error instead
 };
 
 // Note: FormulaDisplayConverter is now in formula_display.h

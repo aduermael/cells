@@ -16,10 +16,11 @@ namespace cells {
 FormulaResolver::FormulaResolver(Workbook& workbook, Sheet& sheet, NamedRangeRegistry* namedRanges)
     : _workbook(workbook), _sheet(sheet), _namedRanges(namedRanges) {}
 
-ResolveResult FormulaResolver::resolve(ASTNode* ast) {
+ResolveResult FormulaResolver::resolve(ASTNode* ast, bool existingOnly) {
     if (ast == nullptr) {
         return ResolveResult::error("Null AST");
     }
+    _existingOnly = existingOnly;
     return resolveNode(ast);
 }
 
@@ -135,12 +136,39 @@ ResolveResult FormulaResolver::resolveCellRef(CellRefNode* node) {
     }
     const auto rowPos = static_cast<uint32_t>(node->row - 1);
 
-    // Get or create the column and row axes
-    const Axis* col = targetSheet->getOrCreateColumnByPosition(static_cast<uint32_t>(colPos));
-    const Axis* row = targetSheet->getOrCreateRowByPosition(rowPos);
+    const Axis* col = nullptr;
+    const Axis* row = nullptr;
+    const Cell* cell = nullptr;
 
-    // Get or create the cell at this position
-    const Cell* cell = targetSheet->getOrCreateCellAt(col->id, row->id);
+    if (_existingOnly) {
+        // CRDT mode: only use existing entities, return error if not found
+        col = targetSheet->getColumnByPosition(static_cast<uint32_t>(colPos));
+        if (col == nullptr) {
+            return ResolveResult::error(
+                "Column not found at position " + std::to_string(colPos) +
+                    ". Use getRequiredEntities() and create via CRDT first.",
+                node->position);
+        }
+        row = targetSheet->getRowByPosition(rowPos);
+        if (row == nullptr) {
+            return ResolveResult::error(
+                "Row not found at position " + std::to_string(rowPos) +
+                    ". Use getRequiredEntities() and create via CRDT first.",
+                node->position);
+        }
+        cell = targetSheet->getCellAtPosition(static_cast<uint32_t>(colPos), rowPos);
+        if (cell == nullptr) {
+            return ResolveResult::error(
+                "Cell not found at " + node->column + std::to_string(node->row) +
+                    ". Use getRequiredEntities() and create via CRDT first.",
+                node->position);
+        }
+    } else {
+        // Legacy mode: auto-create entities (bypasses CRDT - for file loading only)
+        col = targetSheet->getOrCreateColumnByPosition(static_cast<uint32_t>(colPos));
+        row = targetSheet->getOrCreateRowByPosition(rowPos);
+        cell = targetSheet->getOrCreateCellAt(col->id, row->id);
+    }
 
     // Store the cell ID
     node->cellId = cell->id.toString();
@@ -176,8 +204,18 @@ ResolveResult FormulaResolver::resolveColumnRef(ColumnRefNode* node) {
         return ResolveResult::error("Invalid column: " + node->column, node->position);
     }
 
-    // Get or create the column axis
-    const Axis* col = targetSheet->getOrCreateColumnByPosition(static_cast<uint32_t>(colPos));
+    const Axis* col = nullptr;
+    if (_existingOnly) {
+        col = targetSheet->getColumnByPosition(static_cast<uint32_t>(colPos));
+        if (col == nullptr) {
+            return ResolveResult::error(
+                "Column not found: " + node->column +
+                    ". Use getRequiredEntities() and create via CRDT first.",
+                node->position);
+        }
+    } else {
+        col = targetSheet->getOrCreateColumnByPosition(static_cast<uint32_t>(colPos));
+    }
 
     // Store the column ID
     node->columnId = col->id.toString();
@@ -203,8 +241,18 @@ ResolveResult FormulaResolver::resolveRowRef(RowRefNode* node) {
     }
     const auto rowPos = static_cast<uint32_t>(node->row - 1);
 
-    // Get or create the row axis
-    const Axis* row = targetSheet->getOrCreateRowByPosition(rowPos);
+    const Axis* row = nullptr;
+    if (_existingOnly) {
+        row = targetSheet->getRowByPosition(rowPos);
+        if (row == nullptr) {
+            return ResolveResult::error(
+                "Row not found: " + std::to_string(node->row) +
+                    ". Use getRequiredEntities() and create via CRDT first.",
+                node->position);
+        }
+    } else {
+        row = targetSheet->getOrCreateRowByPosition(rowPos);
+    }
 
     // Store the row ID
     node->rowId = row->id.toString();
@@ -235,10 +283,27 @@ ResolveResult FormulaResolver::resolveColumnRangeRef(ColumnRangeRefNode* node) {
         return ResolveResult::error("Invalid column: " + node->endColumn, node->position);
     }
 
-    // Get or create the column axes
-    const Axis* startCol =
-        targetSheet->getOrCreateColumnByPosition(static_cast<uint32_t>(startColPos));
-    const Axis* endCol = targetSheet->getOrCreateColumnByPosition(static_cast<uint32_t>(endColPos));
+    const Axis* startCol = nullptr;
+    const Axis* endCol = nullptr;
+    if (_existingOnly) {
+        startCol = targetSheet->getColumnByPosition(static_cast<uint32_t>(startColPos));
+        if (startCol == nullptr) {
+            return ResolveResult::error(
+                "Column not found: " + node->startColumn +
+                    ". Use getRequiredEntities() and create via CRDT first.",
+                node->position);
+        }
+        endCol = targetSheet->getColumnByPosition(static_cast<uint32_t>(endColPos));
+        if (endCol == nullptr) {
+            return ResolveResult::error(
+                "Column not found: " + node->endColumn +
+                    ". Use getRequiredEntities() and create via CRDT first.",
+                node->position);
+        }
+    } else {
+        startCol = targetSheet->getOrCreateColumnByPosition(static_cast<uint32_t>(startColPos));
+        endCol = targetSheet->getOrCreateColumnByPosition(static_cast<uint32_t>(endColPos));
+    }
 
     // Store the column IDs
     node->startColumnId = startCol->id.toString();
@@ -266,9 +331,27 @@ ResolveResult FormulaResolver::resolveRowRangeRef(RowRangeRefNode* node) {
     const auto startRowPos = static_cast<uint32_t>(node->startRow - 1);
     const auto endRowPos = static_cast<uint32_t>(node->endRow - 1);
 
-    // Get or create the row axes
-    const Axis* startRow = targetSheet->getOrCreateRowByPosition(startRowPos);
-    const Axis* endRow = targetSheet->getOrCreateRowByPosition(endRowPos);
+    const Axis* startRow = nullptr;
+    const Axis* endRow = nullptr;
+    if (_existingOnly) {
+        startRow = targetSheet->getRowByPosition(startRowPos);
+        if (startRow == nullptr) {
+            return ResolveResult::error(
+                "Row not found: " + std::to_string(node->startRow) +
+                    ". Use getRequiredEntities() and create via CRDT first.",
+                node->position);
+        }
+        endRow = targetSheet->getRowByPosition(endRowPos);
+        if (endRow == nullptr) {
+            return ResolveResult::error(
+                "Row not found: " + std::to_string(node->endRow) +
+                    ". Use getRequiredEntities() and create via CRDT first.",
+                node->position);
+        }
+    } else {
+        startRow = targetSheet->getOrCreateRowByPosition(startRowPos);
+        endRow = targetSheet->getOrCreateRowByPosition(endRowPos);
+    }
 
     // Store the row IDs
     node->startRowId = startRow->id.toString();
