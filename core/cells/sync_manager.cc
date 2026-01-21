@@ -441,9 +441,10 @@ HandleMessageResult SyncManager::handleSyncResponse(const ID& peerId, const std:
                   it->second.lastSyncedHLC.toString().c_str());
     }
 
-    // Prune oplog now that peer is synced - this helps keep oplog size manageable
-    // when multiple peers are syncing simultaneously
-    pruneOpLog();
+    // Note: Do NOT prune oplog here. When we receive a sync-response, we've just
+    // added operations to our oplog. Pruning immediately would remove them because
+    // lastSyncedHLC equals getCurrentHLC() (the max HLC of received ops).
+    // Pruning should only happen when all peers have confirmed receipt via ACK.
 
     // Return operations for delegate notification
     return {{}, std::move(ops), dataModified};
