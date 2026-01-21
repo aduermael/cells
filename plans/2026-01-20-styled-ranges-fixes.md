@@ -49,3 +49,10 @@ The `bootstrapOpLog()` function in `core/cells/crdt.cc:617-847` generates bootst
 - [ ] 4a: Build and verify no compilation errors
 - [ ] 4b: Manual test: create styled range, export file, verify no sheet_id in RANGE_ADD/RANGE_SET_STYLE payloads
 - [ ] 4c: Manual test: create styled range, share collaboration link, verify peer 2 sees the styled range
+
+## Phase 5: Fix All Lint Warnings, Checks, and Tests
+
+- [ ] 5a: Run C++ linter and fix all warnings (including pre-existing)
+- [ ] 5b: Run TypeScript/JavaScript linter and fix all warnings (including pre-existing)
+- [ ] 5c: Run all unit tests and fix any failures
+- [ ] 5d: Run all e2e/collaboration tests and fix any failures
