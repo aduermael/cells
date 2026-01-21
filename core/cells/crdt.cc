@@ -384,6 +384,14 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
     if (result == ApplyResult::SUCCESS || result == ApplyResult::SUPERSEDED ||
         result == ApplyResult::RESURRECTED) {
         oplog->addOperation(op);
+
+        // Periodic pruning for non-collaboration mode
+        // When not collaborating, oplog is only needed for undo/export, so prune periodically
+        constexpr size_t PRUNE_THRESHOLD = 100;
+        if (!workbook.isCollaborating() && oplog->size() >= PRUNE_THRESHOLD) {
+            // Prune all ops - no peers to sync with
+            oplog->clear();
+        }
     }
 
     return result;

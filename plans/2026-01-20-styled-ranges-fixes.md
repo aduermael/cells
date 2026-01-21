@@ -94,6 +94,22 @@ Add a runtime flag to disable operation log pruning for debugging sync issues. W
 - [x] 6d: Read `noPrune` URL parameter in `init.ts` and call `setDebugNoPrune(true)` if present
 - [x] 6e: Test: run with `?noPrune=true`, verify oplog grows without bounds during collaboration (build verified)
 
+## Phase 6.5: Move OpLog Pruning to Low-Level Layer
+
+**Problem**: `pruneOpLog()` is called from bindings after every local operation (27+ call sites). This is:
+1. Inefficient - pruning after every op
+2. Wrong - may prune before peers have ACKed
+
+**Solution**: Remove all bindings calls, prune only:
+1. In `handleAck()` - when peers confirm receipt (collaboration mode)
+2. Periodically when adding ops to oplog (e.g., every 100 ops) - for non-collaboration mode
+
+**Steps:**
+- [x] 6.5a: Remove all `pruneOpLog()` calls from `bindings_core.cc` - removed 18 call sites
+- [x] 6.5b: Remove all `pruneOpLog()` calls from `bindings_format.cc` - removed 9 call sites
+- [x] 6.5c: Add periodic pruning in `applyOperation()` (crdt.cc) - prune every 100 ops when not collaborating
+- [x] 6.5d: Build and test - all tests pass
+
 ## Phase 7: Fix All Lint Warnings, Checks, and Tests
 
 - [ ] 7a: Run C++ linter and fix all warnings (including pre-existing)

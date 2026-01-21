@@ -76,7 +76,6 @@ std::string CellsEngine::setCellFormat(const std::string& cellIdStr,
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     notifyListeners(ChangeType::CELL_CHANGED);
@@ -162,7 +161,6 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     if (colCreated) {
@@ -268,7 +266,6 @@ std::string CellsEngine::createCustomFormat(const std::string& formatCode) {
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     return "{\"success\":true,\"formatId\":\"" + formatId.toString() + "\"}";
@@ -1298,7 +1295,6 @@ std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::s
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     notifyListeners(ChangeType::CELL_CHANGED);
@@ -1412,7 +1408,6 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     if (colCreated) {
@@ -1538,7 +1533,6 @@ std::string CellsEngine::createStyle(const std::string& styleJson) {
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     return "{\"success\":true,\"styleId\":\"" + styleId.toString() + "\"}";
@@ -1744,7 +1738,6 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
 
                 if (_syncManager) {
                     _syncManager->queueOperationsBroadcast();
-                    _syncManager->pruneOpLog();
                 }
 
                 rebuildViewportIndex();
@@ -1775,7 +1768,6 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
 
             if (_syncManager) {
                 _syncManager->queueOperationsBroadcast();
-                _syncManager->pruneOpLog();
             }
 
             rebuildViewportIndex();
@@ -2109,7 +2101,6 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     rebuildViewportIndex();

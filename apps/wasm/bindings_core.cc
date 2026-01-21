@@ -275,7 +275,6 @@ std::string CellsEngine::addSheet(const std::string& name) {
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     notifyListeners(ChangeType::SHEET_CHANGED);
@@ -307,7 +306,6 @@ std::string CellsEngine::deleteSheet(int index) {
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     if (_activeSheetIndex >= _workbook->sheetCount()) {
@@ -356,7 +354,6 @@ std::string CellsEngine::renameSheet(int index, const std::string& name) {
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     notifyListeners(ChangeType::SHEET_CHANGED);
@@ -472,7 +469,6 @@ std::string CellsEngine::updateCell(const std::string& cellIdStr, const std::str
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     markDirty(sheet, cellId);
@@ -605,7 +601,6 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     markDirty(sheet, cellId);
@@ -764,9 +759,6 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
     Operation op = makeCellSetValueOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->pruneOpLog();
-    }
 
     if (colCreated) {
         _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
@@ -841,10 +833,6 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
 
     Cell* existingCell = sheet->getCellAt(colId, rowId);
     if (existingCell) {
-        if (_syncManager) {
-            _syncManager->pruneOpLog();
-        }
-
         if (colCreated) {
             _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
         }
@@ -888,9 +876,6 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
     Operation op = makeCellSetValueOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->pruneOpLog();
-    }
 
     if (colCreated) {
         _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
@@ -938,7 +923,6 @@ std::string CellsEngine::deleteCell(const std::string& cellIdStr) {
 
     if (_syncManager) {
         _syncManager->queueOperationsBroadcast();
-        _syncManager->pruneOpLog();
     }
 
     _viewportIndex.onCellRemoved(colId, rowId);
@@ -998,7 +982,6 @@ std::string CellsEngine::deleteCellAt(uint32_t col, uint32_t row) {
 
         if (_syncManager) {
             _syncManager->queueOperationsBroadcast();
-            _syncManager->pruneOpLog();
         }
 
         _viewportIndex.onCellRemoved(colId, rowId);
@@ -1056,9 +1039,6 @@ std::string CellsEngine::resizeColumn(const std::string& colIdStr, uint32_t widt
     Operation op = makeColResizeOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->pruneOpLog();
-    }
 
     _viewportIndex.onAxisResized(colId, true, width);
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
@@ -1099,9 +1079,6 @@ std::string CellsEngine::resizeColumnByPos(uint32_t pos, uint32_t width) {
         applyOperation(*_workbook, resizeOp);
     }
 
-    if (_syncManager) {
-        _syncManager->pruneOpLog();
-    }
 
     if (colCreated) {
         _viewportIndex.onAxisInserted(colId, true, pos, width);
@@ -1142,9 +1119,6 @@ std::string CellsEngine::resizeRow(const std::string& rowIdStr, uint32_t height)
     Operation op = makeRowResizeOp(*_workbook, rowId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->pruneOpLog();
-    }
 
     _viewportIndex.onAxisResized(rowId, false, height);
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
@@ -1185,9 +1159,6 @@ std::string CellsEngine::resizeRowByPos(uint32_t pos, uint32_t height) {
         applyOperation(*_workbook, resizeOp);
     }
 
-    if (_syncManager) {
-        _syncManager->pruneOpLog();
-    }
 
     if (rowCreated) {
         _viewportIndex.onAxisInserted(rowId, false, pos, height);
@@ -1229,9 +1200,6 @@ std::string CellsEngine::renameColumn(const std::string& colIdStr, const std::st
     Operation op = makeColRenameOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->pruneOpLog();
-    }
 
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
     return "{\"success\":true}";
@@ -1271,9 +1239,6 @@ std::string CellsEngine::renameColumnByPos(uint32_t pos, const std::string& name
         applyOperation(*_workbook, op);
     }
 
-    if (_syncManager) {
-        _syncManager->pruneOpLog();
-    }
 
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
 
@@ -1387,9 +1352,6 @@ std::string CellsEngine::moveColumn(const std::string& colIdStr, uint32_t target
     Operation op = makeColMoveOp(*_workbook, colId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->pruneOpLog();
-    }
 
     rebuildViewportIndex();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
@@ -1427,9 +1389,6 @@ std::string CellsEngine::moveRow(const std::string& rowIdStr, uint32_t targetPos
     Operation op = makeRowMoveOp(*_workbook, rowId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->pruneOpLog();
-    }
 
     rebuildViewportIndex();
     notifyListeners(ChangeType::STRUCTURE_CHANGED);
