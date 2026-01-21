@@ -672,6 +672,11 @@ bool Workbook::registerCustomFormat(const ID& formatId, const std::string& forma
     return _formatRegistry->registerFormat(formatId, formatCode);
 }
 
+ID Workbook::findFormatByCode(const std::string& formatCode) const {
+    // Lookup only, no registration - use for deduplication before FORMAT_DEFINE
+    return _formatRegistry->findFormatByCode(formatCode);
+}
+
 bool Workbook::hasCustomFormat(const ID& formatId) const {
     return _formatRegistry->hasFormat(formatId);
 }
@@ -699,7 +704,13 @@ bool Workbook::registerStyle(const ID& styleId, const CellStyle& style) {
 
 ID Workbook::findOrRegisterStyle(const CellStyle& style, bool* wasCreated) {
     // Content-addressed registration with deduplication
+    // DEPRECATED: Use findStyleByContent + STYLE_DEFINE operation instead
     return _styleRegistry->registerStyle(style, ID(), wasCreated);
+}
+
+ID Workbook::findStyleByContent(const CellStyle& style) const {
+    // Lookup only, no registration - use for deduplication before STYLE_DEFINE
+    return _styleRegistry->findStyleByContent(style);
 }
 
 bool Workbook::hasStyle(const ID& styleId) const {

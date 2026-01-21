@@ -253,22 +253,22 @@ std::string CellsEngine::createCustomFormat(const std::string& formatCode) {
         return "{\"error\":\"" + jsonEscape(*validationError) + "\"}";
     }
 
-    const ID formatId = generate_id();
-
-    const bool isNew = _workbook->registerCustomFormat(formatId, formatCode);
-    if (!isNew) {
-        return "{\"error\":\"Format ID collision\"}";
+    // Check if identical format already exists (lookup only, no registration)
+    ID formatId = _workbook->findFormatByCode(formatCode);
+    if (!formatId.isNull()) {
+        return "{\"success\":true,\"formatId\":\"" + formatId.toString() + "\",\"existing\":true}";
     }
 
-    if (_workbook->isCollaborating()) {
-        std::string payload = "{\"format_code\":\"" + jsonEscape(formatCode) + "\"}";
-        Operation op = makeFormatDefineOp(*_workbook, formatId, payload);
-        applyOperation(*_workbook, op);
+    // Format doesn't exist - create via FORMAT_DEFINE operation
+    // This is the ONLY way formats should be created (CRDT-native)
+    formatId = generate_id();
+    std::string payload = "{\"format_code\":\"" + jsonEscape(formatCode) + "\"}";
+    Operation op = makeFormatDefineOp(*_workbook, formatId, payload);
+    applyOperation(*_workbook, op);
 
-        if (_syncManager) {
-            _syncManager->queueOperationsBroadcast();
-            _syncManager->pruneOpLog();
-        }
+    if (_syncManager) {
+        _syncManager->queueOperationsBroadcast();
+        _syncManager->pruneOpLog();
     }
 
     return "{\"success\":true,\"formatId\":\"" + formatId.toString() + "\"}";
@@ -1278,12 +1278,12 @@ std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::s
 
     ID styleId;
     if (!style.isEmpty()) {
-        // Use hash-based O(1) lookup for deduplication
-        bool isNewStyle = false;
-        styleId = _workbook->findOrRegisterStyle(style, &isNewStyle);
-
-        // Create STYLE_DEFINE operation for sync if this is a new style
-        if (isNewStyle && _workbook->isCollaborating()) {
+        // Check if identical style already exists (lookup only, no registration)
+        styleId = _workbook->findStyleByContent(style);
+        if (styleId.isNull()) {
+            // Style doesn't exist - create via STYLE_DEFINE operation
+            // This is the ONLY way styles should be created (CRDT-native)
+            styleId = generate_id();
             std::string fullStyleJson = styleToJson(style);
             Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
             applyOperation(*_workbook, styleOp);
@@ -1353,12 +1353,12 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
 
     ID styleId;
     if (!style.isEmpty()) {
-        // Use hash-based O(1) lookup for deduplication
-        bool isNewStyle = false;
-        styleId = _workbook->findOrRegisterStyle(style, &isNewStyle);
-
-        // Create STYLE_DEFINE operation for sync if this is a new style
-        if (isNewStyle && _workbook->isCollaborating()) {
+        // Check if identical style already exists (lookup only, no registration)
+        styleId = _workbook->findStyleByContent(style);
+        if (styleId.isNull()) {
+            // Style doesn't exist - create via STYLE_DEFINE operation
+            // This is the ONLY way styles should be created (CRDT-native)
+            styleId = generate_id();
             std::string fullStyleJson = styleToJson(style);
             Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
             applyOperation(*_workbook, styleOp);
@@ -1524,23 +1524,21 @@ std::string CellsEngine::createStyle(const std::string& styleJson) {
 
     CellStyle style = parseStyleJson(styleJson);
 
-    // Use hash-based O(1) lookup for deduplication
-    bool isNewStyle = false;
-    ID styleId = _workbook->findOrRegisterStyle(style, &isNewStyle);
-
-    if (!isNewStyle) {
+    // Check if identical style already exists (lookup only, no registration)
+    ID styleId = _workbook->findStyleByContent(style);
+    if (!styleId.isNull()) {
         return "{\"success\":true,\"styleId\":\"" + styleId.toString() + "\",\"existing\":true}";
     }
 
-    // Create STYLE_DEFINE operation for sync (new style)
-    if (_workbook->isCollaborating()) {
-        Operation styleOp = makeStyleDefineOp(*_workbook, styleId, styleJson);
-        applyOperation(*_workbook, styleOp);
+    // Style doesn't exist - create via STYLE_DEFINE operation
+    // This is the ONLY way styles should be created (CRDT-native)
+    styleId = generate_id();
+    Operation styleOp = makeStyleDefineOp(*_workbook, styleId, styleJson);
+    applyOperation(*_workbook, styleOp);
 
-        if (_syncManager) {
-            _syncManager->queueOperationsBroadcast();
-            _syncManager->pruneOpLog();
-        }
+    if (_syncManager) {
+        _syncManager->queueOperationsBroadcast();
+        _syncManager->pruneOpLog();
     }
 
     return "{\"success\":true,\"styleId\":\"" + styleId.toString() + "\"}";
@@ -1756,23 +1754,16 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                        "\",\"deleted\":true}";
             }
 
-            // Find or create the merged style
-            ID mergedStyleId;
-            const auto& existingStyles = _workbook->getStyles();
-            for (const auto& [id, s] : existingStyles) {
-                if (s == mergedStyle) {
-                    mergedStyleId = id;
-                    break;
-                }
-            }
+            // Find or create the merged style via CRDT operations
+            // Check if identical style already exists (lookup only, no registration)
+            ID mergedStyleId = _workbook->findStyleByContent(mergedStyle);
             if (mergedStyleId.isNull()) {
+                // Style doesn't exist - create via STYLE_DEFINE operation
+                // This is the ONLY way styles should be created (CRDT-native)
                 mergedStyleId = generate_id();
-                _workbook->registerStyle(mergedStyleId, mergedStyle);
-                if (_workbook->isCollaborating()) {
-                    std::string fullStyleJson = styleToJson(mergedStyle);
-                    Operation styleOp = makeStyleDefineOp(*_workbook, mergedStyleId, fullStyleJson);
-                    applyOperation(*_workbook, styleOp);
-                }
+                std::string fullStyleJson = styleToJson(mergedStyle);
+                Operation styleOp = makeStyleDefineOp(*_workbook, mergedStyleId, fullStyleJson);
+                applyOperation(*_workbook, styleOp);
             }
 
             // Update the existing range's style
@@ -1802,12 +1793,12 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     // to empty (handled above with range deletion).
     ID styleId;
     if (!style.isEmpty()) {
-        // Use hash-based O(1) lookup for deduplication
-        bool isNewStyle = false;
-        styleId = _workbook->findOrRegisterStyle(style, &isNewStyle);
-
-        // Create STYLE_DEFINE operation for sync if this is a new style
-        if (isNewStyle && _workbook->isCollaborating()) {
+        // Check if identical style already exists (lookup only, no registration)
+        styleId = _workbook->findStyleByContent(style);
+        if (styleId.isNull()) {
+            // Style doesn't exist - create via STYLE_DEFINE operation
+            // This is the ONLY way styles should be created (CRDT-native)
+            styleId = generate_id();
             std::string fullStyleJson = styleToJson(style);
             Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
             applyOperation(*_workbook, styleOp);
@@ -1912,23 +1903,16 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             Operation removeOp = makeRangeRemoveOp(*_workbook, containedOp.rangeId, removePayload.str());
             applyOperation(*_workbook, removeOp);
         } else {
-            // Update the range with stripped style
-            ID newStyleId;
-            const auto& existingStyles = _workbook->getStyles();
-            for (const auto& [id, s] : existingStyles) {
-                if (s == containedOp.strippedStyle) {
-                    newStyleId = id;
-                    break;
-                }
-            }
+            // Update the range with stripped style via CRDT operations
+            // Check if identical style already exists (lookup only, no registration)
+            ID newStyleId = _workbook->findStyleByContent(containedOp.strippedStyle);
             if (newStyleId.isNull()) {
+                // Style doesn't exist - create via STYLE_DEFINE operation
+                // This is the ONLY way styles should be created (CRDT-native)
                 newStyleId = generate_id();
-                _workbook->registerStyle(newStyleId, containedOp.strippedStyle);
-                if (_workbook->isCollaborating()) {
-                    std::string fullStyleJson = styleToJson(containedOp.strippedStyle);
-                    Operation styleOp = makeStyleDefineOp(*_workbook, newStyleId, fullStyleJson);
-                    applyOperation(*_workbook, styleOp);
-                }
+                std::string fullStyleJson = styleToJson(containedOp.strippedStyle);
+                Operation styleOp = makeStyleDefineOp(*_workbook, newStyleId, fullStyleJson);
+                applyOperation(*_workbook, styleOp);
             }
 
             std::ostringstream updatePayload;
@@ -2109,12 +2093,12 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             applyOperation(*_workbook, clearOp);
         } else if (strippedStyle != *cellStylePtr) {
             // Style changed, need to update the cell
-            // Use hash-based O(1) lookup for deduplication
-            bool isNewStyle = false;
-            ID newStyleId = _workbook->findOrRegisterStyle(strippedStyle, &isNewStyle);
-
-            // Create STYLE_DEFINE operation for sync if this is a new style
-            if (isNewStyle && _workbook->isCollaborating()) {
+            // Check if identical style already exists (lookup only, no registration)
+            ID newStyleId = _workbook->findStyleByContent(strippedStyle);
+            if (newStyleId.isNull()) {
+                // Style doesn't exist - create via STYLE_DEFINE operation
+                // This is the ONLY way styles should be created (CRDT-native)
+                newStyleId = generate_id();
                 std::string fullStyleJson = styleToJson(strippedStyle);
                 Operation styleDefineOp = makeStyleDefineOp(*_workbook, newStyleId, fullStyleJson);
                 applyOperation(*_workbook, styleDefineOp);

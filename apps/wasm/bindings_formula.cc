@@ -256,45 +256,45 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
     FormulaResolver resolver(*_workbook, *sheet, _workbook->getNamedRanges());
     ResolveResult result = resolver.resolve(ast.get());
 
-    // Generate operations for newly created entities when collaborating
-    if (_workbook->isCollaborating()) {
-        for (const ID& id : sheet->getColumnIds()) {
-            if (existingColumns.find(id) == existingColumns.end()) {
-                Axis* col = sheet->getColumn(id);
-                if (col == nullptr) { continue; }
-                std::string payload = "{\"pos\":" + std::to_string(col->position) +
-                                      ",\"size\":" + std::to_string(col->size) + "}";
-                Operation op = makeColInsertOp(*_workbook, id, payload);
-                _workbook->getOpLog()->addOperation(op);
-            }
+    // Generate operations for newly created entities (always, not just when collaborating)
+    // NOTE: FormulaResolver creates entities directly, so we record ops after the fact.
+    // TODO: Refactor FormulaResolver to create entities via CRDT operations.
+    for (const ID& id : sheet->getColumnIds()) {
+        if (existingColumns.find(id) == existingColumns.end()) {
+            Axis* col = sheet->getColumn(id);
+            if (col == nullptr) { continue; }
+            std::string payload = "{\"pos\":" + std::to_string(col->position) +
+                                  ",\"size\":" + std::to_string(col->size) + "}";
+            Operation op = makeColInsertOp(*_workbook, id, payload);
+            _workbook->getOpLog()->addOperation(op);
         }
+    }
 
-        for (const ID& id : sheet->getRowIds()) {
-            if (existingRows.find(id) == existingRows.end()) {
-                Axis* row = sheet->getRow(id);
-                if (row == nullptr) { continue; }
-                std::string payload = "{\"pos\":" + std::to_string(row->position) +
-                                      ",\"size\":" + std::to_string(row->size) + "}";
-                Operation op = makeRowInsertOp(*_workbook, id, payload);
-                _workbook->getOpLog()->addOperation(op);
-            }
+    for (const ID& id : sheet->getRowIds()) {
+        if (existingRows.find(id) == existingRows.end()) {
+            Axis* row = sheet->getRow(id);
+            if (row == nullptr) { continue; }
+            std::string payload = "{\"pos\":" + std::to_string(row->position) +
+                                  ",\"size\":" + std::to_string(row->size) + "}";
+            Operation op = makeRowInsertOp(*_workbook, id, payload);
+            _workbook->getOpLog()->addOperation(op);
         }
+    }
 
-        for (const auto& cellId : sheet->getCellIds()) {
-            if (existingCells.find(cellId) == existingCells.end()) {
-                Cell* cell = _workbook->getCell(cellId);
-                if (!cell) continue;
-                std::string payload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
-                                      cell->colId.toString() + "\",\"row_id\":\"" +
-                                      cell->rowId.toString() + "\"}";
-                Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
-                _workbook->getOpLog()->addOperation(op);
-            }
+    for (const auto& cellId : sheet->getCellIds()) {
+        if (existingCells.find(cellId) == existingCells.end()) {
+            Cell* cell = _workbook->getCell(cellId);
+            if (!cell) continue;
+            std::string payload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
+                                  cell->colId.toString() + "\",\"row_id\":\"" +
+                                  cell->rowId.toString() + "\"}";
+            Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
+            _workbook->getOpLog()->addOperation(op);
         }
+    }
 
-        if (_syncManager) {
-            _syncManager->queueOperationsBroadcast();
-        }
+    if (_syncManager) {
+        _syncManager->queueOperationsBroadcast();
     }
 
     rebuildViewportIndex();

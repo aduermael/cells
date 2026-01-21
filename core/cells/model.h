@@ -863,6 +863,11 @@ struct Workbook {
     // Returns true if the format was newly added, false if it already existed
     bool registerCustomFormat(const ID& formatId, const std::string& formatCode);
 
+    // Find an existing format by code (lookup only, no registration)
+    // Returns the format ID if found, or null ID if not found.
+    // Use this before creating FORMAT_DEFINE operations for deduplication.
+    [[nodiscard]] ID findFormatByCode(const std::string& formatCode) const;
+
     // Check if a custom format is defined
     [[nodiscard]] bool hasCustomFormat(const ID& formatId) const;
 
@@ -890,7 +895,13 @@ struct Workbook {
     // Returns the ID of the matching/new style (may differ from any proposed ID)
     // This provides content-addressed deduplication - identical styles share one ID.
     // If wasCreated is provided, it will be set to true if a new style was created.
+    // DEPRECATED: Use findStyleByContent + STYLE_DEFINE operation instead.
     ID findOrRegisterStyle(const CellStyle& style, bool* wasCreated = nullptr);
+
+    // Find an existing style by content (lookup only, no registration)
+    // Returns the style ID if found, or null ID if not found.
+    // Use this before creating STYLE_DEFINE operations for deduplication.
+    [[nodiscard]] ID findStyleByContent(const CellStyle& style) const;
 
     // Check if a style is defined
     [[nodiscard]] bool hasStyle(const ID& styleId) const;

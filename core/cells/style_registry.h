@@ -52,6 +52,11 @@ public:
     ID registerStyle(const CellStyle& style, const ID& proposedId = ID(),
                      bool* wasCreated = nullptr);
 
+    // Find a style by content (lookup only, no registration)
+    // Returns the style ID if an identical style exists, or null ID if not found.
+    // Use this to check for duplicates before creating STYLE_DEFINE operations.
+    [[nodiscard]] ID findStyleByContent(const CellStyle& style) const;
+
     // Check if a style is registered
     [[nodiscard]] bool hasStyle(const ID& styleId) const;
 

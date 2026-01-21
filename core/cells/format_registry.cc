@@ -73,6 +73,15 @@ ID FormatRegistry::findOrRegisterFormat(const std::string& formatCode, const ID&
     return formatId;
 }
 
+ID FormatRegistry::findFormatByCode(const std::string& formatCode) const {
+    // Lookup only, no registration
+    auto it = _codeToId.find(formatCode);
+    if (it != _codeToId.end()) {
+        return it->second;
+    }
+    return ID();
+}
+
 bool FormatRegistry::hasFormat(const ID& formatId) const {
     return _formats.count(formatId) > 0;
 }

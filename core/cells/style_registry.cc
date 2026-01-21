@@ -55,6 +55,24 @@ ID StyleRegistry::registerStyle(const CellStyle& style, const ID& proposedId, bo
     return styleId;
 }
 
+ID StyleRegistry::findStyleByContent(const CellStyle& style) const {
+    // Lookup by content hash (no registration)
+    const size_t hash = style.hash();
+    auto it = _hashToId.find(hash);
+
+    if (it != _hashToId.end()) {
+        // Found by hash - verify it's actually equal (hash collisions are possible)
+        const ID& existingId = it->second;
+        auto styleIt = _styles.find(existingId);
+        if (styleIt != _styles.end() && styleIt->second == style) {
+            return existingId;
+        }
+    }
+
+    // Not found
+    return ID();
+}
+
 bool StyleRegistry::hasStyle(const ID& styleId) const {
     return _styles.count(styleId) > 0;
 }

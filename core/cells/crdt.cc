@@ -670,9 +670,10 @@ size_t bootstrapOpLog(Workbook& workbook) {
                 continue;
             }
 
-            // Skip empty cells
-            if (cell->value.type == CellValueType::STRING && cell->value.raw.empty() &&
-                cell->formula == nullptr) {
+            // Skip empty cells UNLESS they have a style (styled empty cells need to be synced)
+            const bool isEmpty = cell->value.type == CellValueType::STRING &&
+                                 cell->value.raw.empty() && cell->formula == nullptr;
+            if (isEmpty && !cell->hasStyle()) {
                 continue;
             }
 
@@ -768,6 +769,27 @@ size_t bootstrapOpLog(Workbook& workbook) {
         const Operation op = makeStyleDefineOp(workbook, styleId, payload);
         oplog->addOperation(op);
         count++;
+    }
+
+    // Generate CELL_SET_STYLE operations for cells that have styles
+    // This must come AFTER STYLE_DEFINE operations (higher HLC) so styles exist when applied
+    for (const auto& sheet : workbook.sheets) {
+        for (const ID& cellId : sheet->getCellIds()) {
+            const Cell* cell = workbook.getCell(cellId);
+            if (!cell || !cell->hasStyle()) {
+                continue;
+            }
+
+            const ID styleId = workbook.getStyleId(cellId);
+            if (styleId.isNull()) {
+                continue;
+            }
+
+            const std::string payload = "{\"style_id\":\"" + styleId.toString() + "\"}";
+            const Operation op = makeCellSetStyleOp(workbook, cellId, payload);
+            oplog->addOperation(op);
+            count++;
+        }
     }
 
     // Generate NAMED_RANGE_DEFINE operations for all named ranges
