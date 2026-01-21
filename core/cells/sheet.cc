@@ -146,6 +146,19 @@ Cell* Sheet::getCellAt(const ID& colId, const ID& rowId) {
     return getCell(it->second);
 }
 
+Cell* Sheet::getCellAtPosition(uint32_t colPos, uint32_t rowPos) {
+    // Lookup-only: returns nullptr if column, row, or cell doesn't exist
+    const Axis* col = getColumnByPosition(colPos);
+    if (col == nullptr) {
+        return nullptr;
+    }
+    const Axis* row = getRowByPosition(rowPos);
+    if (row == nullptr) {
+        return nullptr;
+    }
+    return getCellAt(col->id, row->id);
+}
+
 void Sheet::addCell(std::unique_ptr<Cell> cell) {
     if (!cell || !_workbook) {
         return;

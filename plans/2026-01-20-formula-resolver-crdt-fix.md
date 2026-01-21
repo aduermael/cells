@@ -56,10 +56,10 @@ FormulaResolver itself should NOT create entities. Instead:
 
 ## Phase 1: Add lookup-only methods to Sheet
 
-- [ ] 1a: Add `getColumnByPosition(pos)` - returns nullptr if not exists (already exists)
-- [ ] 1b: Add `getRowByPosition(pos)` - returns nullptr if not exists (already exists)
-- [ ] 1c: Add `getCellAtPosition(col_pos, row_pos)` - returns nullptr if not exists
-- [ ] 1d: Verify these methods exist and work correctly
+- [x] 1a: Add `getColumnByPosition(pos)` - returns nullptr if not exists (already exists in sheet.cc:302-308)
+- [x] 1b: Add `getRowByPosition(pos)` - returns nullptr if not exists (already exists in sheet.cc:311-317)
+- [x] 1c: Add `getCellAtPosition(col_pos, row_pos)` - returns nullptr if not exists (added to model.h:443 and sheet.cc:149-160)
+- [x] 1d: Verify these methods exist and work correctly - build passes
 
 ## Phase 2: Create FormulaResolver resolution result type
 
