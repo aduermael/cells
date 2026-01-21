@@ -72,10 +72,10 @@ Where `<BASE64_STYLE_HASH>` is a base64-encoded binary representation of the sty
 **Property data** follows flags in order of flag bits:
 - Colors: 3 bytes RGB (no alpha needed for cell styles)
 - fontSize: 1 byte (6-72pt range, encoded as value-6)
-- fontFamily: 1 byte index into predefined font list + custom fonts
+- fontFamily: length-prefixed string (1 byte length + UTF-8 bytes)
 - Alignment: 1 byte (3 bits h-align, 3 bits v-align, 2 bits reserved)
 - textWrap: 1 bit (packed with alignment)
-- numberFormat: variable length (format code or index)
+- numberFormat: 8 bytes format ID (keep separate registry for now)
 - Borders: variable length (see border encoding below)
 
 ### Border Encoding
@@ -250,8 +250,10 @@ Update ranges to use StyleBuffer instead of style_id reference.
 3. **Large styles (many properties)**: Still smaller than JSON; can compress if needed
 4. **Debugging difficulty**: Keep `toJSON()` for human-readable output
 
-## Open Questions
+## Design Decisions
 
-1. Should we support style inheritance (e.g., "inherit font from column")?
-2. How to handle custom fonts beyond predefined list?
-3. Should number formats be inline or use a separate registry (they can be long)?
+1. **Style inheritance**: Computed live at display time only. Cells don't store inherited properties - they inherit from col/row/range when rendering. Moving cells may absorb container styles as a future action-based feature.
+
+2. **Custom fonts**: Font family name stored directly in binary style (length-prefixed string). No predefined font index needed.
+
+3. **Number formats**: Keep separate for now. FORMAT_DEFINE operations have the same sync issue but format codes are variable-length strings. Store format_id reference in binary style for now; content-address formats in a future iteration.
