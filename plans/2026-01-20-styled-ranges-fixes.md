@@ -131,10 +131,10 @@ Add a runtime flag to disable operation log pruning for debugging sync issues. W
 3. Add debug logs to trace the exact flow if needed
 
 **Steps:**
-- [ ] 6.6a: Trace code path in setRangeStyle (bindings_format.cc) - where is STYLE_DEFINE created?
-- [ ] 6.6b: Check applyStyleDefine return values - what could cause it to not be added to oplog?
-- [ ] 6.6c: If needed, add LOG_DEBUG in: createStyle, applyStyleDefine, setRangeStyle to trace exact flow
-- [ ] 6.6d: Fix the root cause
+- [x] 6.6a: Trace code path in setRangeStyle (bindings_format.cc) - where is STYLE_DEFINE created?
+- [x] 6.6b: Check applyStyleDefine return values - what could cause it to not be added to oplog?
+- [x] 6.6c: Added LOG_DEBUG in: applyStyleDefine (both paths), applyOperation (STYLE_DEFINE), setRangeStyle
+- [ ] 6.6d: Fix the root cause (awaiting debug output from test)
 - [ ] 6.6e: Test and verify styled ranges appear on peer that created them
 
 ## Phase 7: Fix All Lint Warnings, Checks, and Tests

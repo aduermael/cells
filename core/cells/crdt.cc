@@ -29,6 +29,7 @@
 #include "core/cells/formula_serializer.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
+#include "core/log/include/Logger.h"
 
 namespace cells {
 
@@ -384,6 +385,10 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
     if (result == ApplyResult::SUCCESS || result == ApplyResult::SUPERSEDED ||
         result == ApplyResult::RESURRECTED) {
         oplog->addOperation(op);
+        if (op.type == OpType::STYLE_DEFINE) {
+            LOG_DEBUG("[CRDT] applyOperation: STYLE_DEFINE %s added to oplog (result=%d)",
+                      op.target_id.toString().c_str(), static_cast<int>(result));
+        }
 
         // Periodic pruning for non-collaboration mode
         // When not collaborating, oplog is only needed for undo/export, so prune periodically
@@ -392,6 +397,9 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             // Prune all ops - no peers to sync with
             oplog->clear();
         }
+    } else if (op.type == OpType::STYLE_DEFINE) {
+        LOG_DEBUG("[CRDT] applyOperation: STYLE_DEFINE %s NOT added to oplog (result=%d)",
+                  op.target_id.toString().c_str(), static_cast<int>(result));
     }
 
     return result;

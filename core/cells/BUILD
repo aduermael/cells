@@ -311,6 +311,7 @@ cc_library(
         ":operation",
         ":range",
         ":style_registry",
+        "//core/log",
     ],
 )
 

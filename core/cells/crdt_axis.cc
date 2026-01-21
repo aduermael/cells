@@ -23,6 +23,7 @@
 #include "core/cells/format_code_parser.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
+#include "core/log/include/Logger.h"
 
 namespace cells {
 namespace internal {
@@ -952,6 +953,8 @@ static bool jsonKeyExists(const std::string& json, const std::string& key) {
 ApplyResult applyStyleDefine(Workbook& workbook, const Operation& op) {
     // Check if this style is already defined
     if (workbook.hasStyle(op.target_id)) {
+        LOG_DEBUG("[CRDT] applyStyleDefine: style %s ALREADY_APPLIED (already in workbook)",
+                  op.target_id.toString().c_str());
         return ApplyResult::ALREADY_APPLIED;
     }
 
@@ -1022,6 +1025,8 @@ ApplyResult applyStyleDefine(Workbook& workbook, const Operation& op) {
     }
 
     workbook.registerStyle(op.target_id, style);
+    LOG_DEBUG("[CRDT] applyStyleDefine: style %s SUCCESS - registered in workbook",
+              op.target_id.toString().c_str());
 
     return ApplyResult::SUCCESS;
 }

@@ -23,6 +23,7 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/range.h"
+#include "core/log/include/Logger.h"
 #include "core/cells/range_index.h"
 #include "core/cells/format_code_formatter.h"
 #include "core/cells/format_code_parser.h"
@@ -1792,8 +1793,17 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             // This is the ONLY way styles should be created (CRDT-native)
             styleId = generate_id();
             std::string fullStyleJson = styleToJson(style);
+            LOG_DEBUG("[setRangeStyle] Creating new style %s with JSON: %s",
+                      styleId.toString().c_str(), fullStyleJson.c_str());
             Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
             applyOperation(*_workbook, styleOp);
+            // Verify style was registered
+            if (!_workbook->hasStyle(styleId)) {
+                LOG_DEBUG("[setRangeStyle] WARNING: style %s NOT in workbook after applyOperation!",
+                          styleId.toString().c_str());
+            }
+        } else {
+            LOG_DEBUG("[setRangeStyle] Reusing existing style %s", styleId.toString().c_str());
         }
     }
 
