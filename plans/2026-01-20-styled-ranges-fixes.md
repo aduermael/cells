@@ -66,13 +66,37 @@ This is wrong. The correct flow should be:
 
 ## Phase 5: Testing
 
-- [ ] 5a: Build and verify no compilation errors
-- [ ] 5b: Manual test: create styled range, export file, verify no sheet_id in RANGE_ADD/RANGE_SET_STYLE payloads
-- [ ] 5c: Manual test: create styled range, share collaboration link, verify peer 2 sees the styled range
+- [x] 5a: Build and verify no compilation errors
+- [x] 5b: Manual test: create styled range, export file, verify no sheet_id in RANGE_ADD/RANGE_SET_STYLE payloads
+- [x] 5c: Manual test: create styled range, share collaboration link, verify peer 2 sees the styled range
 
-## Phase 6: Fix All Lint Warnings, Checks, and Tests
+## Phase 6: Add Debug Mode to Disable OpLog Pruning
 
-- [ ] 6a: Run C++ linter and fix all warnings (including pre-existing)
-- [ ] 6b: Run TypeScript/JavaScript linter and fix all warnings (including pre-existing)
-- [ ] 6c: Run all unit tests and fix any failures
-- [ ] 6d: Run all e2e/collaboration tests and fix any failures
+Add a runtime flag to disable operation log pruning for debugging sync issues. When `?noPrune=true` is in the URL, the oplog will never be pruned, allowing full visibility into all operations.
+
+**Implementation approach:**
+- Add `_debugNoPrune` flag to `SyncManager` (core layer, not bindings)
+- Check flag inside `pruneOpLog()` itself - single check covers all call sites
+- Expose setter via CellsEngine for WASM binding
+- URL parameter `?noPrune=true` read by JavaScript and passed to C++
+
+**Files to modify:**
+- `core/cells/sync_manager.h` - Add `_debugNoPrune` flag and `setDebugNoPrune()` method
+- `core/cells/sync_manager.cc` - Implement setter, check flag at start of `pruneOpLog()`
+- `apps/wasm/bindings.h` - Add `setDebugNoPrune()` that forwards to SyncManager
+- `apps/wasm/bindings_crdt.cc` - Implement the forwarding method
+- `apps/wasm/src/init.ts` - Read URL param and call C++ method
+
+**Steps:**
+- [ ] 6a: Add `_debugNoPrune` flag and `setDebugNoPrune(bool)` to SyncManager in `sync_manager.h`
+- [ ] 6b: Implement `setDebugNoPrune()` and add early return in `pruneOpLog()` when flag is set (with LOG_DEBUG)
+- [ ] 6c: Add `setDebugNoPrune()` to CellsEngine that forwards to SyncManager
+- [ ] 6d: Read `noPrune` URL parameter in `init.ts` and call `setDebugNoPrune(true)` if present
+- [ ] 6e: Test: run with `?noPrune=true`, verify oplog grows without bounds during collaboration
+
+## Phase 7: Fix All Lint Warnings, Checks, and Tests
+
+- [ ] 7a: Run C++ linter and fix all warnings (including pre-existing)
+- [ ] 7b: Run TypeScript/JavaScript linter and fix all warnings (including pre-existing)
+- [ ] 7c: Run all unit tests and fix any failures
+- [ ] 7d: Run all e2e/collaboration tests and fix any failures
