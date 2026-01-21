@@ -234,7 +234,7 @@ ApplyResult applyRangeUpdateFlags(Workbook& workbook, const Operation& op) {
 
 ApplyResult applyRangeSetStyle(Workbook& workbook, const Operation& op) {
     // Get the range by ID from workbook-level storage
-    Range* range = workbook.getRange(op.target_id);
+    const Range* range = workbook.getRange(op.target_id);
     if (range == nullptr) {
         return ApplyResult::INVALID_TARGET;
     }

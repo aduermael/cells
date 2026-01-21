@@ -639,7 +639,7 @@ Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const std::
 Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const StyleBuffer& style) {
     const HLC hlc = workbook.getCurrentHLC();
     // New format: {"style":"<base64>"}
-    std::string payload = "{\"style\":\"" + style.toBase64() + "\"}";
+    const std::string payload = "{\"style\":\"" + style.toBase64() + "\"}";
     return {hlc, OpType::RANGE_SET_STYLE, rangeId, payload};
 }
 

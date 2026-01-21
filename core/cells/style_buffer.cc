@@ -555,12 +555,12 @@ bool StyleBuffer::parseHexColor(const std::string& hex, uint8_t& r, uint8_t& g, 
         return -1;
     };
 
-    int r1 = hexDigit(hex[1]);
-    int r2 = hexDigit(hex[2]);
-    int g1 = hexDigit(hex[3]);
-    int g2 = hexDigit(hex[4]);
-    int b1 = hexDigit(hex[5]);
-    int b2 = hexDigit(hex[6]);
+    const int r1 = hexDigit(hex[1]);
+    const int r2 = hexDigit(hex[2]);
+    const int g1 = hexDigit(hex[3]);
+    const int g2 = hexDigit(hex[4]);
+    const int b1 = hexDigit(hex[5]);
+    const int b2 = hexDigit(hex[6]);
 
     if (r1 < 0 || r2 < 0 || g1 < 0 || g2 < 0 || b1 < 0 || b2 < 0) {
         return false;
@@ -575,7 +575,7 @@ bool StyleBuffer::parseHexColor(const std::string& hex, uint8_t& r, uint8_t& g, 
 std::string StyleBuffer::formatHexColor(uint8_t r, uint8_t g, uint8_t b) {
     char buf[8];
     snprintf(buf, sizeof(buf), "#%02X%02X%02X", r, g, b);
-    return std::string(buf);
+    return {buf};
 }
 
 // =============================================================================
@@ -585,7 +585,7 @@ std::string StyleBuffer::formatHexColor(uint8_t r, uint8_t g, uint8_t b) {
 void StyleBuffer::setBgColor(uint8_t r, uint8_t g, uint8_t b) {
     if (hasFlag(STYLE_FLAG_BGCOLOR)) {
         // Update existing color
-        size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
         if (offset + 2 < _data.size()) {
             _data[offset] = r;
             _data[offset + 1] = g;
@@ -594,7 +594,7 @@ void StyleBuffer::setBgColor(uint8_t r, uint8_t g, uint8_t b) {
     } else {
         // Insert new color
         setFlag(STYLE_FLAG_BGCOLOR);
-        size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
         uint8_t color[3] = {r, g, b};
         insertDataAt(offset, color, 3);
     }
@@ -609,7 +609,7 @@ void StyleBuffer::setBgColorHex(const std::string& hex) {
 
 void StyleBuffer::clearBgColor() {
     if (hasFlag(STYLE_FLAG_BGCOLOR)) {
-        size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
         removeDataAt(offset, 3);
         clearFlag(STYLE_FLAG_BGCOLOR);
     }
@@ -618,7 +618,7 @@ void StyleBuffer::clearBgColor() {
 void StyleBuffer::setTextColor(uint8_t r, uint8_t g, uint8_t b) {
     if (hasFlag(STYLE_FLAG_TEXTCOLOR)) {
         // Update existing color
-        size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
         if (offset + 2 < _data.size()) {
             _data[offset] = r;
             _data[offset + 1] = g;
@@ -627,7 +627,7 @@ void StyleBuffer::setTextColor(uint8_t r, uint8_t g, uint8_t b) {
     } else {
         // Insert new color
         setFlag(STYLE_FLAG_TEXTCOLOR);
-        size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
         uint8_t color[3] = {r, g, b};
         insertDataAt(offset, color, 3);
     }
@@ -642,7 +642,7 @@ void StyleBuffer::setTextColorHex(const std::string& hex) {
 
 void StyleBuffer::clearTextColor() {
     if (hasFlag(STYLE_FLAG_TEXTCOLOR)) {
-        size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
         removeDataAt(offset, 3);
         clearFlag(STYLE_FLAG_TEXTCOLOR);
     }
@@ -657,7 +657,7 @@ void StyleBuffer::getBgColor(uint8_t& r, uint8_t& g, uint8_t& b) const {
         r = g = b = 0;
         return;
     }
-    size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BGCOLOR);
     if (offset + 2 < _data.size()) {
         r = _data[offset];
         g = _data[offset + 1];
@@ -672,7 +672,7 @@ void StyleBuffer::getTextColor(uint8_t& r, uint8_t& g, uint8_t& b) const {
         r = g = b = 0;
         return;
     }
-    size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
+    const size_t offset = findPropertyOffset(STYLE_FLAG_TEXTCOLOR);
     if (offset + 2 < _data.size()) {
         r = _data[offset];
         g = _data[offset + 1];
@@ -700,23 +700,23 @@ std::string StyleBuffer::getTextColorHex() const {
 
 void StyleBuffer::setFontSize(uint8_t size) {
     // Store as (size - 6) to support 6-261pt range
-    uint8_t encoded = (size >= 6) ? (size - 6) : 0;
+    const uint8_t encoded = (size >= 6) ? (size - 6) : 0;
 
     if (hasFlag(STYLE_FLAG_FONTSIZE)) {
-        size_t offset = findPropertyOffset(STYLE_FLAG_FONTSIZE);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_FONTSIZE);
         if (offset < _data.size()) {
             _data[offset] = encoded;
         }
     } else {
         setFlag(STYLE_FLAG_FONTSIZE);
-        size_t offset = findPropertyOffset(STYLE_FLAG_FONTSIZE);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_FONTSIZE);
         insertDataAt(offset, &encoded, 1);
     }
 }
 
 void StyleBuffer::clearFontSize() {
     if (hasFlag(STYLE_FLAG_FONTSIZE)) {
-        size_t offset = findPropertyOffset(STYLE_FLAG_FONTSIZE);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_FONTSIZE);
         removeDataAt(offset, 1);
         clearFlag(STYLE_FLAG_FONTSIZE);
     }
@@ -726,7 +726,7 @@ uint8_t StyleBuffer::getFontSize() const {
     if (!hasFlag(STYLE_FLAG_FONTSIZE)) {
         return 0;
     }
-    size_t offset = findPropertyOffset(STYLE_FLAG_FONTSIZE);
+    const size_t offset = findPropertyOffset(STYLE_FLAG_FONTSIZE);
     if (offset < _data.size()) {
         return _data[offset] + 6;
     }
@@ -739,12 +739,12 @@ uint8_t StyleBuffer::getFontSize() const {
 
 void StyleBuffer::setFontFamily(const std::string& family) {
     // Truncate to 255 chars max
-    size_t len = std::min(family.size(), static_cast<size_t>(255));
+    const size_t len = std::min(family.size(), static_cast<size_t>(255));
 
     if (hasFlag(STYLE_FLAG_FONTFAMILY)) {
         // Remove old, insert new
-        size_t offset = findPropertyOffset(STYLE_FLAG_FONTFAMILY);
-        size_t oldSize = getPropertySize(STYLE_FLAG_FONTFAMILY);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_FONTFAMILY);
+        const size_t oldSize = getPropertySize(STYLE_FLAG_FONTFAMILY);
         removeDataAt(offset, oldSize);
         // Now insert new
         std::vector<uint8_t> newData(1 + len);
@@ -753,7 +753,7 @@ void StyleBuffer::setFontFamily(const std::string& family) {
         insertDataAt(offset, newData.data(), newData.size());
     } else {
         setFlag(STYLE_FLAG_FONTFAMILY);
-        size_t offset = findPropertyOffset(STYLE_FLAG_FONTFAMILY);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_FONTFAMILY);
         std::vector<uint8_t> newData(1 + len);
         newData[0] = static_cast<uint8_t>(len);
         std::memcpy(newData.data() + 1, family.data(), len);
@@ -763,8 +763,8 @@ void StyleBuffer::setFontFamily(const std::string& family) {
 
 void StyleBuffer::clearFontFamily() {
     if (hasFlag(STYLE_FLAG_FONTFAMILY)) {
-        size_t offset = findPropertyOffset(STYLE_FLAG_FONTFAMILY);
-        size_t size = getPropertySize(STYLE_FLAG_FONTFAMILY);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_FONTFAMILY);
+        const size_t size = getPropertySize(STYLE_FLAG_FONTFAMILY);
         removeDataAt(offset, size);
         clearFlag(STYLE_FLAG_FONTFAMILY);
     }
@@ -774,15 +774,15 @@ std::string StyleBuffer::getFontFamily() const {
     if (!hasFlag(STYLE_FLAG_FONTFAMILY)) {
         return "";
     }
-    size_t offset = findPropertyOffset(STYLE_FLAG_FONTFAMILY);
+    const size_t offset = findPropertyOffset(STYLE_FLAG_FONTFAMILY);
     if (offset >= _data.size()) {
         return "";
     }
-    uint8_t len = _data[offset];
+    const uint8_t len = _data[offset];
     if (offset + 1 + len > _data.size()) {
         return "";
     }
-    return std::string(reinterpret_cast<const char*>(_data.data() + offset + 1), len);
+    return {reinterpret_cast<const char*>(_data.data() + offset + 1), len};
 }
 
 // =============================================================================
@@ -790,8 +790,8 @@ std::string StyleBuffer::getFontFamily() const {
 // =============================================================================
 
 void StyleBuffer::setHAlign(TextAlign align) {
-    bool hasAlign = hasFlag(STYLE_FLAG_HALIGN) || hasFlag(STYLE_FLAG_VALIGN);
-    size_t offset = findPropertyOffset(STYLE_FLAG_HALIGN);
+    const bool hasAlign = hasFlag(STYLE_FLAG_HALIGN) || hasFlag(STYLE_FLAG_VALIGN);
+    const size_t offset = findPropertyOffset(STYLE_FLAG_HALIGN);
 
     if (hasAlign) {
         // Update existing alignment byte
@@ -800,7 +800,7 @@ void StyleBuffer::setHAlign(TextAlign align) {
         _data[offset] = alignByte;
     } else {
         // Insert new alignment byte
-        uint8_t alignByte = static_cast<uint8_t>(align) & 0x07;
+        const uint8_t alignByte = static_cast<uint8_t>(align) & 0x07;
         insertDataAt(offset, &alignByte, 1);
     }
     setFlag(STYLE_FLAG_HALIGN);
@@ -811,19 +811,19 @@ void StyleBuffer::clearHAlign() {
         clearFlag(STYLE_FLAG_HALIGN);
         // If vAlign is still set, keep the byte but clear hAlign bits
         if (hasFlag(STYLE_FLAG_VALIGN)) {
-            size_t offset = findPropertyOffset(STYLE_FLAG_VALIGN);
+            const size_t offset = findPropertyOffset(STYLE_FLAG_VALIGN);
             _data[offset] &= 0xF8;  // Clear bottom 3 bits
         } else {
             // Remove the alignment byte entirely
-            size_t offset = findPropertyOffset(STYLE_FLAG_HALIGN);
+            const size_t offset = findPropertyOffset(STYLE_FLAG_HALIGN);
             removeDataAt(offset, 1);
         }
     }
 }
 
 void StyleBuffer::setVAlign(VerticalAlign align) {
-    bool hasAlign = hasFlag(STYLE_FLAG_HALIGN) || hasFlag(STYLE_FLAG_VALIGN);
-    size_t offset = findPropertyOffset(STYLE_FLAG_VALIGN);
+    const bool hasAlign = hasFlag(STYLE_FLAG_HALIGN) || hasFlag(STYLE_FLAG_VALIGN);
+    const size_t offset = findPropertyOffset(STYLE_FLAG_VALIGN);
 
     if (hasAlign) {
         // Update existing alignment byte
@@ -832,7 +832,7 @@ void StyleBuffer::setVAlign(VerticalAlign align) {
         _data[offset] = alignByte;
     } else {
         // Insert new alignment byte
-        uint8_t alignByte = (static_cast<uint8_t>(align) & 0x07) << 3;
+        const uint8_t alignByte = (static_cast<uint8_t>(align) & 0x07) << 3;
         insertDataAt(offset, &alignByte, 1);
     }
     setFlag(STYLE_FLAG_VALIGN);
@@ -843,11 +843,11 @@ void StyleBuffer::clearVAlign() {
         clearFlag(STYLE_FLAG_VALIGN);
         // If hAlign is still set, keep the byte but clear vAlign bits
         if (hasFlag(STYLE_FLAG_HALIGN)) {
-            size_t offset = findPropertyOffset(STYLE_FLAG_HALIGN);
+            const size_t offset = findPropertyOffset(STYLE_FLAG_HALIGN);
             _data[offset] &= 0xC7;  // Clear bits 3-5
         } else {
             // Remove the alignment byte entirely
-            size_t offset = findPropertyOffset(STYLE_FLAG_VALIGN);
+            const size_t offset = findPropertyOffset(STYLE_FLAG_VALIGN);
             removeDataAt(offset, 1);
         }
     }
@@ -857,7 +857,7 @@ TextAlign StyleBuffer::getHAlign() const {
     if (!hasFlag(STYLE_FLAG_HALIGN)) {
         return TextAlign::GENERAL;
     }
-    size_t offset = findPropertyOffset(STYLE_FLAG_HALIGN);
+    const size_t offset = findPropertyOffset(STYLE_FLAG_HALIGN);
     if (offset >= _data.size()) {
         return TextAlign::GENERAL;
     }
@@ -868,7 +868,7 @@ VerticalAlign StyleBuffer::getVAlign() const {
     if (!hasFlag(STYLE_FLAG_VALIGN)) {
         return VerticalAlign::BOTTOM;
     }
-    size_t offset = findPropertyOffset(STYLE_FLAG_VALIGN);
+    const size_t offset = findPropertyOffset(STYLE_FLAG_VALIGN);
     if (offset >= _data.size()) {
         return VerticalAlign::BOTTOM;
     }
@@ -886,18 +886,18 @@ void StyleBuffer::setNumberFormat(uint64_t formatId) {
     }
 
     if (hasFlag(STYLE_FLAG_NUMBERFORMAT)) {
-        size_t offset = findPropertyOffset(STYLE_FLAG_NUMBERFORMAT);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_NUMBERFORMAT);
         std::memcpy(_data.data() + offset, buf, 8);
     } else {
         setFlag(STYLE_FLAG_NUMBERFORMAT);
-        size_t offset = findPropertyOffset(STYLE_FLAG_NUMBERFORMAT);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_NUMBERFORMAT);
         insertDataAt(offset, buf, 8);
     }
 }
 
 void StyleBuffer::clearNumberFormat() {
     if (hasFlag(STYLE_FLAG_NUMBERFORMAT)) {
-        size_t offset = findPropertyOffset(STYLE_FLAG_NUMBERFORMAT);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_NUMBERFORMAT);
         removeDataAt(offset, 8);
         clearFlag(STYLE_FLAG_NUMBERFORMAT);
     }
@@ -907,7 +907,7 @@ uint64_t StyleBuffer::getNumberFormat() const {
     if (!hasFlag(STYLE_FLAG_NUMBERFORMAT)) {
         return 0;
     }
-    size_t offset = findPropertyOffset(STYLE_FLAG_NUMBERFORMAT);
+    const size_t offset = findPropertyOffset(STYLE_FLAG_NUMBERFORMAT);
     if (offset + 7 >= _data.size()) {
         return 0;
     }
@@ -926,7 +926,7 @@ uint8_t StyleBuffer::getBorderSideMask() const {
     if (!hasFlag(STYLE_FLAG_BORDER)) {
         return 0;
     }
-    size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
     if (offset >= _data.size()) {
         return 0;
     }
@@ -935,18 +935,18 @@ uint8_t StyleBuffer::getBorderSideMask() const {
 
 void StyleBuffer::setBorderSide(uint8_t sideBit, BorderStyle style, uint8_t r, uint8_t g,
                                 uint8_t b) {
-    size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
-
     if (!hasFlag(STYLE_FLAG_BORDER)) {
         // Create new border data
         setFlag(STYLE_FLAG_BORDER);
-        offset = findPropertyOffset(STYLE_FLAG_BORDER);
+        const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
         uint8_t newData[5] = {sideBit, static_cast<uint8_t>(style), r, g, b};
         insertDataAt(offset, newData, 5);
         return;
     }
 
-    uint8_t oldMask = _data[offset];
+    const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
+
+    const uint8_t oldMask = _data[offset];
 
     if ((oldMask & sideBit) != 0) {
         // Update existing side

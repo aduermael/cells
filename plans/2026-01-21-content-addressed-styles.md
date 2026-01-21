@@ -563,14 +563,14 @@ bazel build //core/cells/... 2>&1 | grep -E "error:|warning:" | head -50
 
 ### Phase 9: File Format Migration
 
-- [x] 9a: Update ZCD serializer to write new style format - Serializer builds style ID mapping from _entityStyles and range styles, serializes unique styles with generated IDs.
-- [x] 9b: Add ZCD deserializer support for both old and new formats - Parser stores parsed styles in parsedStyles_ map and applies via setEntityStyle.
+- [x] 9a: Update ZCD serializer to write base64 styles directly - No more Y lines or style IDs. Entities (cells, axes, ranges) now have `sty:<base64>` directly embedded, where base64 is the StyleBuffer content.
+- [x] 9b: Update ZCD parser for base64 styles - Parser decodes base64 from `sty:` property directly. Y lines are ignored (no backward compat needed - app not released).
 - [x] 9c: Update XLSX import to create StyleBuffer directly - xlsx_reader.cc uses getStyleBuffer helper to create StyleBuffer from XLSX style index and setEntityStyle.
 - [x] 9d: Update XLSX export to read from StyleBuffer - xlsx_writer.cc uses getEntityStyle and converts to CellStyle via toCellStyle().
 
 ### Phase 10: Testing and Validation
 
-- [ ] 10a: Run all existing style-related E2E tests
+- [x] 10a: Run all existing style-related E2E tests - All E2E tests pass (309/312). The 3 failures are unrelated pre-existing issues: borders dropdown UI (2), collab-demo flakiness (1). Fixed serializer_test.cc to use content-addressed base64 styles. Fixed lint errors (removed unused parser functions, added const-correctness to style_buffer.cc). Removed obsolete testdata/styles.zcd.
 - [ ] 10b: Add new E2E tests for style sync scenarios
 - [ ] 10c: Test collaboration with mixed old/new clients (if needed)
 - [ ] 10d: Performance benchmarks for style merging

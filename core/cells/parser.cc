@@ -35,7 +35,6 @@ void Parser::reset() {
     errorMsg_.clear();
     pendingSharedFormulas_.clear();
     cellsByIdForResolution_.clear();
-    parsedStyles_.clear();
 }
 
 bool Parser::setError(const std::string& message) {
@@ -219,302 +218,11 @@ bool Parser::parseFormat(std::string_view line) {
     return true;
 }
 
-// Helper to extract JSON string value for a key (simple parsing)
-static std::string extractJSONStringValue(std::string_view json, const std::string& key) {
-    const std::string keyPattern = "\"" + key + "\":\"";
-    auto pos = json.find(keyPattern);
-    if (pos == std::string_view::npos) {
-        return "";
-    }
-    pos += keyPattern.size();
-    // Find closing quote
-    std::string result;
-    while (pos < json.size() && json[pos] != '"') {
-        if (json[pos] == '\\' && pos + 1 < json.size()) {
-            pos++;  // Skip escape char
-            if (json[pos] == 'n') {
-                result += '\n';
-            } else if (json[pos] == 't') {
-                result += '\t';
-            } else if (json[pos] == 'r') {
-                result += '\r';
-            } else {
-                result += json[pos];
-            }
-        } else {
-            result += json[pos];
-        }
-        pos++;
-    }
-    return result;
-}
-
-// Helper to extract JSON bool value for a key
-static bool extractJSONBoolValue(std::string_view json, const std::string& key, bool defaultValue) {
-    const std::string keyPattern = "\"" + key + "\":";
-    auto pos = json.find(keyPattern);
-    if (pos == std::string_view::npos) {
-        return defaultValue;
-    }
-    pos += keyPattern.size();
-    // Skip whitespace
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
-        pos++;
-    }
-    if (pos >= json.size()) {
-        return defaultValue;
-    }
-    if (json.substr(pos, 4) == "true") {
-        return true;
-    }
-    if (json.substr(pos, 5) == "false") {
-        return false;
-    }
-    return defaultValue;
-}
-
-// Helper to extract JSON int value for a key
-static int extractJSONIntValue(std::string_view json, const std::string& key, int defaultValue) {
-    const std::string keyPattern = "\"" + key + "\":";
-    auto pos = json.find(keyPattern);
-    if (pos == std::string_view::npos) {
-        return defaultValue;
-    }
-    pos += keyPattern.size();
-    // Skip whitespace
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) {
-        pos++;
-    }
-    if (pos >= json.size() || std::isdigit(json[pos]) == 0) {
-        return defaultValue;
-    }
-    int result = 0;
-    while (pos < json.size() && std::isdigit(json[pos]) != 0) {
-        result = result * 10 + (json[pos] - '0');
-        pos++;
-    }
-    return result;
-}
-
-// Helper to check if a JSON key exists
-static bool hasJSONKey(std::string_view json, const std::string& key) {
-    const std::string keyPattern = "\"" + key + "\":";
-    return json.find(keyPattern) != std::string_view::npos;
-}
-
-// Helper to convert string to BorderStyle enum
-static BorderStyle stringToBorderStyle(const std::string& str) {
-    if (str == "thin") {
-        return BorderStyle::THIN;
-    }
-    if (str == "medium") {
-        return BorderStyle::MEDIUM;
-    }
-    if (str == "thick") {
-        return BorderStyle::THICK;
-    }
-    if (str == "dashed") {
-        return BorderStyle::DASHED;
-    }
-    if (str == "dotted") {
-        return BorderStyle::DOTTED;
-    }
-    if (str == "double") {
-        return BorderStyle::DOUBLE;
-    }
-    if (str == "hair") {
-        return BorderStyle::HAIR;
-    }
-    if (str == "mediumDashed") {
-        return BorderStyle::MEDIUM_DASHED;
-    }
-    if (str == "dashDot") {
-        return BorderStyle::DASH_DOT;
-    }
-    if (str == "mediumDashDot") {
-        return BorderStyle::MEDIUM_DASH_DOT;
-    }
-    if (str == "dashDotDot") {
-        return BorderStyle::DASH_DOT_DOT;
-    }
-    if (str == "mediumDashDotDot") {
-        return BorderStyle::MEDIUM_DASH_DOT_DOT;
-    }
-    if (str == "slantDashDot") {
-        return BorderStyle::SLANT_DASH_DOT;
-    }
-    return BorderStyle::NONE;
-}
-
-// Helper to extract a border edge object from JSON within a border object
-// Looking for pattern like: "top":{"style":"thin","color":"#000000"}
-static BorderEdge extractBorderEdge(std::string_view borderJson, const std::string& edgeName) {
-    BorderEdge edge;
-
-    // Look for the edge within the border object
-    const std::string edgeKey = "\"" + edgeName + "\":";
-    auto edgePos = borderJson.find(edgeKey);
-    if (edgePos == std::string_view::npos) {
-        return edge;
-    }
-
-    // Find the edge object
-    auto braceStart = borderJson.find('{', edgePos + edgeKey.size());
-    if (braceStart == std::string_view::npos) {
-        return edge;
-    }
-
-    int braceCount = 1;
-    size_t braceEnd = braceStart + 1;
-    while (braceEnd < borderJson.size() && braceCount > 0) {
-        if (borderJson[braceEnd] == '{') {
-            braceCount++;
-        } else if (borderJson[braceEnd] == '}') {
-            braceCount--;
-        }
-        braceEnd++;
-    }
-
-    auto edgeJson = borderJson.substr(braceStart, braceEnd - braceStart);
-
-    // Extract style and color from edge JSON
-    const std::string styleStr = extractJSONStringValue(edgeJson, "style");
-    edge.style = stringToBorderStyle(styleStr);
-    edge.color = extractJSONStringValue(edgeJson, "color");
-
-    return edge;
-}
-
 bool Parser::parseStyle(std::string_view line) {
-    // Format: Y <id> <json-props>
-    if (line.size() < 2 || line[0] != 'Y' || line[1] != ' ') {
-        return setError("Invalid style line");
-    }
-
-    line = line.substr(2);  // Skip "Y "
-
-    // Parse ID (until space)
-    const size_t spacePos = line.find(' ');
-    if (spacePos == std::string_view::npos || spacePos < 1) {
-        return setError("Missing style ID");
-    }
-
-    const std::string idStr(line.substr(0, spacePos));
-    const ID styleId(idStr);
-
-    // Parse JSON payload
-    const std::string_view json = line.substr(spacePos + 1);
-    if (json.empty() || json[0] != '{') {
-        return setError("Missing style JSON payload");
-    }
-
-    // Parse style properties from JSON and set defined flags
-    CellStyle style;
-
-    if (hasJSONKey(json, "bold")) {
-        style.bold = extractJSONBoolValue(json, "bold", false);
-        style.setDefined(DEFINED_BOLD);
-    }
-    if (hasJSONKey(json, "italic")) {
-        style.italic = extractJSONBoolValue(json, "italic", false);
-        style.setDefined(DEFINED_ITALIC);
-    }
-    if (hasJSONKey(json, "underline")) {
-        style.underline = extractJSONBoolValue(json, "underline", false);
-        style.setDefined(DEFINED_UNDERLINE);
-    }
-    if (hasJSONKey(json, "wrapText")) {
-        style.wrapText = extractJSONBoolValue(json, "wrapText", false);
-        style.setDefined(DEFINED_WRAPTEXT);
-    }
-    if (hasJSONKey(json, "bgColor")) {
-        style.bgColor = extractJSONStringValue(json, "bgColor");
-        style.setDefined(DEFINED_BGCOLOR);
-    }
-    if (hasJSONKey(json, "textColor")) {
-        style.textColor = extractJSONStringValue(json, "textColor");
-        style.setDefined(DEFINED_TEXTCOLOR);
-    }
-    if (hasJSONKey(json, "fontFamily")) {
-        style.fontFamily = extractJSONStringValue(json, "fontFamily");
-        style.setDefined(DEFINED_FONTFAMILY);
-    }
-    if (hasJSONKey(json, "fontSize")) {
-        style.fontSize = static_cast<uint8_t>(extractJSONIntValue(json, "fontSize", 0));
-        style.setDefined(DEFINED_FONTSIZE);
-    }
-
-    // Parse alignment enums
-    if (hasJSONKey(json, "hAlign")) {
-        const std::string hAlignStr = extractJSONStringValue(json, "hAlign");
-        if (hAlignStr == "left") {
-            style.hAlign = TextAlign::LEFT;
-        } else if (hAlignStr == "center") {
-            style.hAlign = TextAlign::CENTER;
-        } else if (hAlignStr == "right") {
-            style.hAlign = TextAlign::RIGHT;
-        } else if (hAlignStr == "justify") {
-            style.hAlign = TextAlign::JUSTIFY;
-        } else {
-            style.hAlign = TextAlign::GENERAL;
-        }
-        style.setDefined(DEFINED_HALIGN);
-    }
-
-    if (hasJSONKey(json, "vAlign")) {
-        const std::string vAlignStr = extractJSONStringValue(json, "vAlign");
-        if (vAlignStr == "top") {
-            style.vAlign = VerticalAlign::TOP;
-        } else if (vAlignStr == "middle") {
-            style.vAlign = VerticalAlign::MIDDLE;
-        } else {
-            style.vAlign = VerticalAlign::BOTTOM;
-        }
-        style.setDefined(DEFINED_VALIGN);
-    }
-
-    // Parse border if present
-    if (hasJSONKey(json, "border")) {
-        // Find the border object
-        const std::string borderKey = "\"border\":";
-        auto borderPos = json.find(borderKey);
-        if (borderPos != std::string_view::npos) {
-            auto braceStart = json.find('{', borderPos + borderKey.size());
-            if (braceStart != std::string_view::npos) {
-                int braceCount = 1;
-                size_t braceEnd = braceStart + 1;
-                while (braceEnd < json.size() && braceCount > 0) {
-                    if (json[braceEnd] == '{') {
-                        braceCount++;
-                    } else if (json[braceEnd] == '}') {
-                        braceCount--;
-                    }
-                    braceEnd++;
-                }
-                auto borderJson = json.substr(braceStart, braceEnd - braceStart);
-
-                if (hasJSONKey(borderJson, "top")) {
-                    style.border.top = extractBorderEdge(borderJson, "top");
-                    style.setDefined(DEFINED_BORDER_TOP);
-                }
-                if (hasJSONKey(borderJson, "right")) {
-                    style.border.right = extractBorderEdge(borderJson, "right");
-                    style.setDefined(DEFINED_BORDER_RIGHT);
-                }
-                if (hasJSONKey(borderJson, "bottom")) {
-                    style.border.bottom = extractBorderEdge(borderJson, "bottom");
-                    style.setDefined(DEFINED_BORDER_BOTTOM);
-                }
-                if (hasJSONKey(borderJson, "left")) {
-                    style.border.left = extractBorderEdge(borderJson, "left");
-                    style.setDefined(DEFINED_BORDER_LEFT);
-                }
-            }
-        }
-    }
-
-    // Store the style for later application (when cells/axes reference it)
-    parsedStyles_[styleId] = style;
+    // Y lines (legacy style definitions) are no longer used.
+    // Styles are now content-addressed and embedded directly in entities as base64.
+    // Just ignore Y lines for now (return true to not fail the parse).
+    (void)line;
     return true;
 }
 
@@ -872,9 +580,15 @@ bool Parser::parseQuotedString(std::string_view input, std::string& out, size_t&
     return false;
 }
 
-bool Parser::parseAxisProps(std::string_view props, Axis& axis, ID* outStyleId, ID* outFormatId) {
+std::optional<StyleBuffer> Parser::parseStyleValue(const std::string& value) const {
+    // Decode base64 StyleBuffer (content-addressed format)
+    return StyleBuffer::fromBase64(value);
+}
+
+bool Parser::parseAxisProps(std::string_view props, Axis& axis,
+                            std::optional<StyleBuffer>* outStyle, ID* outFormatId) {
     // Format: key:value pairs separated by space
-    // Examples: w:100 name:"Total" h:30 sty:STYL1234 fmt:FMT_C002
+    // Examples: w:100 name:"Total" h:30 sty:<base64> fmt:FMT_C002
 
     while (!props.empty()) {
         // Skip leading whitespace
@@ -941,13 +655,13 @@ bool Parser::parseAxisProps(std::string_view props, Axis& axis, ID* outStyleId, 
                 props = props.substr(endPos);
             }
         } else if (key == "sty") {
-            // Style ID value - output via optional parameter (stored in workbook map by caller)
+            // Style value - content-addressed base64 or legacy style ID
             const size_t endPos = props.find_first_of(" \t");
             const std::string_view valueStr =
                 (endPos == std::string_view::npos) ? props : props.substr(0, endPos);
 
-            if (outStyleId != nullptr) {
-                *outStyleId = ID(std::string(valueStr));
+            if (outStyle != nullptr) {
+                *outStyle = parseStyleValue(std::string(valueStr));
             }
             axis.setHasStyle(true);  // Set flag for hasStyle() accessor
 
@@ -1037,11 +751,11 @@ bool Parser::parseColumn(std::string_view line) {
     }
     col->position = static_cast<uint32_t>(position);
 
-    // Parse optional properties (style/format IDs stored in workbook map, not Axis struct)
-    ID styleId;
+    // Parse optional properties (style stored as StyleBuffer, format as ID)
+    std::optional<StyleBuffer> styleBuf;
     ID formatId;
     if (propsStart < line.size()) {
-        if (!parseAxisProps(line.substr(propsStart), *col, &styleId, &formatId)) {
+        if (!parseAxisProps(line.substr(propsStart), *col, &styleBuf, &formatId)) {
             return setError("Invalid column properties");
         }
     }
@@ -1049,11 +763,8 @@ bool Parser::parseColumn(std::string_view line) {
     // Store style/format in workbook (before moving col)
     const ID colId = col->id;
     currentSheet_->addColumn(std::move(col));
-    if (workbook_ != nullptr && !styleId.isNull()) {
-        auto it = parsedStyles_.find(styleId);
-        if (it != parsedStyles_.end()) {
-            workbook_->setEntityStyle(colId, StyleBuffer::fromCellStyle(it->second));
-        }
+    if (workbook_ != nullptr && styleBuf.has_value()) {
+        workbook_->setEntityStyle(colId, *styleBuf);
     }
     if (workbook_ != nullptr && !formatId.isNull()) {
         workbook_->setFormatId(colId, formatId);
@@ -1110,11 +821,11 @@ bool Parser::parseRow(std::string_view line) {
     }
     row->position = static_cast<uint32_t>(position);
 
-    // Parse optional properties (style/format IDs stored in workbook map, not Axis struct)
-    ID styleId;
+    // Parse optional properties (style stored as StyleBuffer, format as ID)
+    std::optional<StyleBuffer> styleBuf;
     ID formatId;
     if (propsStart < line.size()) {
-        if (!parseAxisProps(line.substr(propsStart), *row, &styleId, &formatId)) {
+        if (!parseAxisProps(line.substr(propsStart), *row, &styleBuf, &formatId)) {
             return setError("Invalid row properties");
         }
     }
@@ -1122,11 +833,8 @@ bool Parser::parseRow(std::string_view line) {
     // Store style/format in workbook (before moving row)
     const ID rowId = row->id;
     currentSheet_->addRow(std::move(row));
-    if (workbook_ != nullptr && !styleId.isNull()) {
-        auto it = parsedStyles_.find(styleId);
-        if (it != parsedStyles_.end()) {
-            workbook_->setEntityStyle(rowId, StyleBuffer::fromCellStyle(it->second));
-        }
+    if (workbook_ != nullptr && styleBuf.has_value()) {
+        workbook_->setEntityStyle(rowId, *styleBuf);
     }
     if (workbook_ != nullptr && !formatId.isNull()) {
         workbook_->setFormatId(rowId, formatId);
@@ -1268,16 +976,16 @@ bool Parser::parseCellProps(std::string_view props, Cell& cell) {
             }
             props = (end < props.size()) ? props.substr(end) : "";
         } else if (key == "sty") {
-            // Style ID: 8 characters - look up style and store in workbook
+            // Style value: content-addressed base64 or legacy style ID
             size_t end = props.find_first_of(" \t");
             if (end == std::string_view::npos) {
                 end = props.size();
             }
-            const ID styleId(std::string(props.substr(0, end)));
-            if (workbook_ != nullptr && !styleId.isNull()) {
-                auto it = parsedStyles_.find(styleId);
-                if (it != parsedStyles_.end()) {
-                    workbook_->setEntityStyle(cell.id, StyleBuffer::fromCellStyle(it->second));
+            const std::string styleValue(props.substr(0, end));
+            if (workbook_ != nullptr) {
+                auto styleBuf = parseStyleValue(styleValue);
+                if (styleBuf.has_value()) {
+                    workbook_->setEntityStyle(cell.id, *styleBuf);
                     cell.markHasStyle();
                 }
             }
@@ -1506,18 +1214,15 @@ bool Parser::parseRange(std::string_view line) {
     const Range* rangePtr = range.get();
     currentSheet_->addRange(std::move(range));
 
-    // Parse optional style reference
+    // Parse optional style reference (content-addressed base64 or legacy style ID)
     if (spacePos != std::string_view::npos) {
         line = line.substr(spacePos + 1);
         // Look for "sty:" property
         if (line.substr(0, 4) == "sty:") {
-            const ID styleId(std::string(line.substr(4)));
-            if (!styleId.isNull()) {
-                auto it = parsedStyles_.find(styleId);
-                if (it != parsedStyles_.end()) {
-                    currentSheet_->setRangeStyle(rangePtr->id,
-                                                 StyleBuffer::fromCellStyle(it->second));
-                }
+            const std::string styleValue(line.substr(4));
+            auto styleBuf = parseStyleValue(styleValue);
+            if (styleBuf.has_value()) {
+                currentSheet_->setRangeStyle(rangePtr->id, *styleBuf);
             }
         }
     }

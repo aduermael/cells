@@ -85,8 +85,6 @@ private:
     std::unordered_map<ID, std::string, IDHash> pendingSharedFormulas_;
     // Cell ID -> Cell* for resolving references after parsing
     std::unordered_map<ID, Cell*, IDHash> cellsByIdForResolution_;
-    // Parsed style definitions: style ID -> CellStyle (for applying to cells/axes)
-    std::unordered_map<ID, CellStyle, IDHash> parsedStyles_;
 
     // Reset parser state for new parse
     void reset();
@@ -116,10 +114,14 @@ private:
 
     // Helper parsers
     static bool parseQuotedString(std::string_view input, std::string& out, size_t& consumed);
-    static bool parseAxisProps(std::string_view props, Axis& axis, ID* outStyleId = nullptr,
-                               ID* outFormatId = nullptr);
+    bool parseAxisProps(std::string_view props, Axis& axis, std::optional<StyleBuffer>* outStyle,
+                        ID* outFormatId = nullptr);
     // Non-static because it needs access to workbook_ for format/style storage
     bool parseCellProps(std::string_view props, Cell& cell);
+
+    // Parse style value (content-addressed base64 or legacy style ID)
+    // Returns StyleBuffer if the value can be parsed, nullopt otherwise
+    [[nodiscard]] std::optional<StyleBuffer> parseStyleValue(const std::string& value) const;
     bool parseCellValue(std::string_view value, char type, CellValue& out, size_t& consumed);
 };
 

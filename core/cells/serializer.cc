@@ -128,63 +128,6 @@ BorderStyle stringToBorderStyle(const std::string& str) {
 
 Serializer::Serializer() = default;
 
-void Serializer::buildStyleIdMapping(const Workbook& workbook) const {
-    entityToStyleId_.clear();
-
-    // Collect unique styles and generate IDs for deduplication
-    // Use a string key derived from the CellStyle for deduplication
-    std::map<std::string, ID> styleKeyToId;  // styleKey -> generated style ID
-    int styleCounter = 0;
-
-    // Helper lambda to create a style key from CellStyle
-    auto makeStyleKey = [](const CellStyle& style) -> std::string {
-        std::ostringstream keyStream;
-        keyStream << style.bold << style.italic << style.underline << style.wrapText;
-        keyStream << style.bgColor << style.textColor << style.fontFamily;
-        keyStream << static_cast<int>(style.fontSize) << static_cast<int>(style.hAlign);
-        keyStream << static_cast<int>(style.vAlign) << style.defined;
-        // Add border info to key
-        keyStream << static_cast<int>(style.border.top.style) << style.border.top.color;
-        keyStream << static_cast<int>(style.border.right.style) << style.border.right.color;
-        keyStream << static_cast<int>(style.border.bottom.style) << style.border.bottom.color;
-        keyStream << static_cast<int>(style.border.left.style) << style.border.left.color;
-        return keyStream.str();
-    };
-
-    // Helper lambda to add a style to the mapping
-    auto addStyleMapping = [&](const ID& entityId, const StyleBuffer& styleBuf) {
-        const CellStyle style = styleBuf.toCellStyle();
-        const std::string key = makeStyleKey(style);
-
-        auto it = styleKeyToId.find(key);
-        if (it == styleKeyToId.end()) {
-            // Generate a unique style ID
-            std::ostringstream idStream;
-            idStream << "STY" << std::setfill('0') << std::setw(5) << styleCounter++;
-            const ID styleId(idStream.str());
-            styleKeyToId[key] = styleId;
-            entityToStyleId_[entityId] = styleId;
-        } else {
-            entityToStyleId_[entityId] = it->second;
-        }
-    };
-
-    // Add entity styles (cells, axes)
-    for (const auto& [entityId, styleBuf] : workbook.getEntityStyles()) {
-        addStyleMapping(entityId, styleBuf);
-    }
-
-    // Add range styles (stored in Range::style field)
-    for (const auto& sheet : workbook.sheets) {
-        for (const ID& rangeId : sheet->getRangeIds()) {
-            const Range* range = sheet->getRange(rangeId);
-            if (range != nullptr && range->style.has_value()) {
-                addStyleMapping(range->id, *range->style);
-            }
-        }
-    }
-}
-
 std::string Serializer::serialize(const Workbook& workbook) const {
     std::ostringstream ss;
     serialize(workbook, ss);
@@ -192,16 +135,13 @@ std::string Serializer::serialize(const Workbook& workbook) const {
 }
 
 void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
-    // Build the style ID mapping for deduplication during serialization
-    buildStyleIdMapping(workbook);
-
     serializeHeader(workbook, out);
 
     // Serialize custom formats (before sheets, as cells may reference them)
     serializeCustomFormats(workbook, out);
 
-    // Serialize styles (before sheets, as cells may reference them)
-    serializeStyles(workbook, out);
+    // NOTE: Styles are now content-addressed and serialized directly on entities
+    // (no separate Y lines needed - the base64 content IS the identity)
 
     // Serialize named ranges (before sheets, as formulas may reference them)
     serializeNamedRanges(workbook, out);
@@ -244,193 +184,6 @@ void Serializer::serializeCustomFormats(const Workbook& workbook, std::ostream& 
     // Format: F <format-id> "<format-code>"
     for (const auto& [idStr, formatCode] : ordered) {
         out << "F " << idStr << " \"" << escapeString(formatCode) << "\"\n";
-    }
-}
-
-void Serializer::serializeStyles(const Workbook& workbook, std::ostream& out) const {
-    const auto& entityStyles = workbook.getEntityStyles();
-    if (entityStyles.empty()) {
-        return;
-    }
-
-    // Collect unique styles by using the style IDs from entityToStyleId_
-    // Build a map from style ID -> CellStyle
-    std::map<ID, CellStyle> uniqueStyles;
-
-    for (const auto& [entityId, styleBuf] : entityStyles) {
-        auto it = entityToStyleId_.find(entityId);
-        if (it != entityToStyleId_.end()) {
-            const ID& styleId = it->second;
-            if (uniqueStyles.find(styleId) == uniqueStyles.end()) {
-                uniqueStyles[styleId] = styleBuf.toCellStyle();
-            }
-        }
-    }
-
-    // Add range styles (stored in Range::style field)
-    for (const auto& sheet : workbook.sheets) {
-        for (const ID& rangeId : sheet->getRangeIds()) {
-            const Range* range = sheet->getRange(rangeId);
-            if (range != nullptr && range->style.has_value()) {
-                auto it = entityToStyleId_.find(range->id);
-                if (it != entityToStyleId_.end()) {
-                    const ID& styleId = it->second;
-                    if (uniqueStyles.find(styleId) == uniqueStyles.end()) {
-                        uniqueStyles[styleId] = range->style->toCellStyle();
-                    }
-                }
-            }
-        }
-    }
-
-    // Sort styles by ID for deterministic output
-    std::vector<std::pair<std::string, const CellStyle*>> ordered;
-    ordered.reserve(uniqueStyles.size());
-
-    for (auto& [styleId, style] : uniqueStyles) {
-        ordered.emplace_back(styleId.toString(), &style);
-    }
-
-    std::sort(ordered.begin(), ordered.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
-
-    // Output style definitions
-    // Format: Y <style-id> <json-props>
-    // Properties are serialized based on defined flags (source of truth)
-    for (const auto& [idStr, style] : ordered) {
-        out << "Y " << idStr << " {";
-        bool first = true;
-
-        // Helper lambda to add comma separator
-        auto addComma = [&first, &out]() {
-            if (!first) {
-                out << ",";
-            }
-            first = false;
-        };
-
-        // Serialize properties based on defined flags
-        if (style->isDefined(DEFINED_BOLD)) {
-            addComma();
-            out << "\"bold\":" << (style->bold ? "true" : "false");
-        }
-        if (style->isDefined(DEFINED_ITALIC)) {
-            addComma();
-            out << "\"italic\":" << (style->italic ? "true" : "false");
-        }
-        if (style->isDefined(DEFINED_UNDERLINE)) {
-            addComma();
-            out << "\"underline\":" << (style->underline ? "true" : "false");
-        }
-        if (style->isDefined(DEFINED_WRAPTEXT)) {
-            addComma();
-            out << "\"wrapText\":" << (style->wrapText ? "true" : "false");
-        }
-        if (style->isDefined(DEFINED_BGCOLOR)) {
-            addComma();
-            out << "\"bgColor\":\"" << escapeString(style->bgColor) << "\"";
-        }
-        if (style->isDefined(DEFINED_TEXTCOLOR)) {
-            addComma();
-            out << "\"textColor\":\"" << escapeString(style->textColor) << "\"";
-        }
-        if (style->isDefined(DEFINED_FONTFAMILY)) {
-            addComma();
-            out << "\"fontFamily\":\"" << escapeString(style->fontFamily) << "\"";
-        }
-        if (style->isDefined(DEFINED_FONTSIZE)) {
-            addComma();
-            out << "\"fontSize\":" << static_cast<int>(style->fontSize);
-        }
-        if (style->isDefined(DEFINED_HALIGN)) {
-            addComma();
-            out << "\"hAlign\":\"";
-            switch (style->hAlign) {
-                case TextAlign::LEFT:
-                    out << "left";
-                    break;
-                case TextAlign::CENTER:
-                    out << "center";
-                    break;
-                case TextAlign::RIGHT:
-                    out << "right";
-                    break;
-                case TextAlign::JUSTIFY:
-                    out << "justify";
-                    break;
-                case TextAlign::GENERAL:
-                    out << "general";
-                    break;
-            }
-            out << "\"";
-        }
-        if (style->isDefined(DEFINED_VALIGN)) {
-            addComma();
-            out << "\"vAlign\":\"";
-            switch (style->vAlign) {
-                case VerticalAlign::TOP:
-                    out << "top";
-                    break;
-                case VerticalAlign::MIDDLE:
-                    out << "middle";
-                    break;
-                case VerticalAlign::BOTTOM:
-                    out << "bottom";
-                    break;
-            }
-            out << "\"";
-        }
-        // Border edges - serialize individually if defined
-        if (style->isDefined(DEFINED_BORDER_TOP) || style->isDefined(DEFINED_BORDER_RIGHT) ||
-            style->isDefined(DEFINED_BORDER_BOTTOM) || style->isDefined(DEFINED_BORDER_LEFT)) {
-            addComma();
-            out << "\"border\":{";
-            bool borderFirst = true;
-            auto addBorderComma = [&borderFirst, &out]() {
-                if (!borderFirst) {
-                    out << ",";
-                }
-                borderFirst = false;
-            };
-            if (style->isDefined(DEFINED_BORDER_TOP)) {
-                addBorderComma();
-                out << "\"top\":{\"style\":\"" << borderStyleToString(style->border.top.style)
-                    << "\"";
-                if (!style->border.top.color.empty()) {
-                    out << ",\"color\":\"" << escapeString(style->border.top.color) << "\"";
-                }
-                out << "}";
-            }
-            if (style->isDefined(DEFINED_BORDER_RIGHT)) {
-                addBorderComma();
-                out << "\"right\":{\"style\":\"" << borderStyleToString(style->border.right.style)
-                    << "\"";
-                if (!style->border.right.color.empty()) {
-                    out << ",\"color\":\"" << escapeString(style->border.right.color) << "\"";
-                }
-                out << "}";
-            }
-            if (style->isDefined(DEFINED_BORDER_BOTTOM)) {
-                addBorderComma();
-                out << "\"bottom\":{\"style\":\"" << borderStyleToString(style->border.bottom.style)
-                    << "\"";
-                if (!style->border.bottom.color.empty()) {
-                    out << ",\"color\":\"" << escapeString(style->border.bottom.color) << "\"";
-                }
-                out << "}";
-            }
-            if (style->isDefined(DEFINED_BORDER_LEFT)) {
-                addBorderComma();
-                out << "\"left\":{\"style\":\"" << borderStyleToString(style->border.left.style)
-                    << "\"";
-                if (!style->border.left.color.empty()) {
-                    out << ",\"color\":\"" << escapeString(style->border.left.color) << "\"";
-                }
-                out << "}";
-            }
-            out << "}";
-        }
-        out << "}\n";
     }
 }
 
@@ -629,19 +382,16 @@ void Serializer::serializeRanges(const Sheet& sheet, std::ostream& out) const {
               [](const auto& a, const auto& b) { return a.first < b.first; });
 
     // Serialize each range
-    // Format: RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<styleId>]
+    // Format: RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<base64>]
     for (const auto& item : ordered) {
         const Range* range = item.second;
         out << "RG " << range->id.toString() << " " << range->startColId.toString() << " "
             << range->startRowId.toString() << " " << range->endColId.toString() << " "
             << range->endRowId.toString() << " " << static_cast<int>(range->flags);
 
-        // Add style reference if RANGE_STYLE flag is set
-        if (range->hasFlag(RangeFlags::STYLE)) {
-            auto styleIt = entityToStyleId_.find(range->id);
-            if (styleIt != entityToStyleId_.end()) {
-                out << " sty:" << styleIt->second.toString();
-            }
+        // Add style content directly (content-addressed) if RANGE_STYLE flag is set
+        if (range->hasFlag(RangeFlags::STYLE) && range->style.has_value()) {
+            out << " sty:" << range->style->toBase64();
         }
 
         out << "\n";
@@ -668,11 +418,11 @@ void Serializer::serializeAxis(const Workbook& workbook, const Axis& axis, char 
         out << " hidden:1";
     }
 
-    // Axis style is stored in workbook._entityStyles map (not in Axis struct)
+    // Axis style is stored in workbook._entityStyles map (content-addressed)
     if (axis.hasStyle()) {
-        auto it = entityToStyleId_.find(axis.id);
-        if (it != entityToStyleId_.end()) {
-            out << " sty:" << it->second.toString();
+        const StyleBuffer* styleBuf = workbook.getEntityStyle(axis.id);
+        if (styleBuf != nullptr) {
+            out << " sty:" << styleBuf->toBase64();
         }
     }
 
@@ -701,10 +451,10 @@ void Serializer::serializeCell(const Workbook& workbook, const Cell& cell, const
         out << " fmt:" << formatId.toString();
     }
 
-    // Optional style property (only if not null/default) - read from entityToStyleId_
-    auto styleIt = entityToStyleId_.find(cell.id);
-    if (styleIt != entityToStyleId_.end()) {
-        out << " sty:" << styleIt->second.toString();
+    // Optional style property (content-addressed) - read from workbook
+    const StyleBuffer* styleBuf = workbook.getEntityStyle(cell.id);
+    if (styleBuf != nullptr) {
+        out << " sty:" << styleBuf->toBase64();
     }
 
     out << "\n";

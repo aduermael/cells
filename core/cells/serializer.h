@@ -59,21 +59,11 @@ public:
     void serialize(const Workbook& workbook, std::ostream& out) const;
 
 private:
-    // Style ID lookup for serialization (entity ID -> generated style ID)
-    // Mutable because it's built during const serialize() call
-    mutable std::unordered_map<ID, ID, IDHash> entityToStyleId_;
-
-    // Build the style ID mapping from entity styles
-    void buildStyleIdMapping(const Workbook& workbook) const;
-
     // Serialize document header
     void serializeHeader(const Workbook& workbook, std::ostream& out) const;
 
     // Serialize custom number formats
     void serializeCustomFormats(const Workbook& workbook, std::ostream& out) const;
-
-    // Serialize cell styles
-    void serializeStyles(const Workbook& workbook, std::ostream& out) const;
 
     // Serialize named ranges
     void serializeNamedRanges(const Workbook& workbook, std::ostream& out) const;
