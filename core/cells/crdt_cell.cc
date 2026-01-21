@@ -21,6 +21,7 @@
 #include "core/cells/dependency_graph.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/number_format.h"
+#include "core/cells/style_buffer.h"
 #include "core/cells/style_registry.h"
 
 namespace cells {
@@ -267,21 +268,20 @@ ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op) {
         }
     }
 
-    // Parse payload: {"style_id":"STY_abc123"}
-    const std::string styleIdStr = extractJSONString(op.payload, "style_id");
-    if (styleIdStr.empty()) {
-        return ApplyResult::INVALID_PAYLOAD;
-    }
-
-    const ID newStyleId(styleIdStr);
-
-    // Store style in workbook-level map and update cell flag
-    // Note: setStyleId() handles reference counting internally
-    workbook.setStyleId(cell->id, newStyleId);
-
-    if (newStyleId.isNull()) {
+    // Parse payload: {"style":"<base64>"} (content-addressed)
+    // Empty string clears the style
+    const std::string styleBase64 = extractJSONString(op.payload, "style");
+    if (styleBase64.empty()) {
+        // Clear style
+        workbook.clearEntityStyle(cell->id);
         cell->clearHasStyle();
     } else {
+        // Parse and store content-addressed style
+        auto maybeStyle = StyleBuffer::fromBase64(styleBase64);
+        if (!maybeStyle.has_value() || maybeStyle->isEmpty()) {
+            return ApplyResult::INVALID_PAYLOAD;
+        }
+        workbook.setEntityStyle(cell->id, *maybeStyle);
         cell->markHasStyle();
     }
 

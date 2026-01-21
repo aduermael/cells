@@ -82,7 +82,18 @@ Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const std::s
 
 // Generate a CELL_SET_STYLE operation to set a cell's style.
 // Payload: {"style_id":"..."} or {"style_id":"~"} for default/no style
+// DEPRECATED: Use makeCellSetStyleOp with StyleBuffer for content-addressed styles
 Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const std::string& payload);
+
+// Generate a CELL_SET_STYLE operation using content-addressed StyleBuffer.
+// Payload format: {"style":"<base64-encoded-stylebuffer>"}
+// This is the new format for content-addressed styles.
+// target_id: the cell's UUID
+Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const StyleBuffer& style);
+
+// Generate a CELL_SET_STYLE operation to clear the style.
+// Payload format: {"style":""}
+Operation makeCellClearStyleOp(Workbook& workbook, const ID& cellId);
 
 // Generate a DIM_INSERT_AXIS operation for inserting a column or row.
 Operation makeDimInsertAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
@@ -124,7 +135,12 @@ Operation makeRowMoveOp(Workbook& workbook, const ID& axisId, const std::string&
 // payload: "1" for hidden, "0" for visible
 Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden);
 // payload: style ID string, or empty string to clear style
+// DEPRECATED: Use makeAxisSetStyleOp with StyleBuffer for content-addressed styles
 Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const ID& styleId);
+// payload: {"style":"<base64-encoded-stylebuffer>"} for content-addressed styles
+Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const StyleBuffer& style);
+// Clear axis style - payload: {"style":""}
+Operation makeAxisClearStyleOp(Workbook& workbook, const ID& axisId);
 // payload: format ID string, or empty string to clear format
 Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const ID& formatId);
 

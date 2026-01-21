@@ -23,6 +23,7 @@
 #include "core/cells/format_code_parser.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
+#include "core/cells/style_buffer.h"
 #include "core/log/include/Logger.h"
 
 namespace cells {
@@ -445,13 +446,18 @@ ApplyResult applyAxisSetStyle(Workbook& workbook, const Operation& op) {
         }
     }
 
-    // Payload is the style ID (or empty string to clear)
-    // Axis styles are stored in workbook._styles map (not in Axis struct)
-    if (op.payload.empty()) {
-        workbook.setStyleId(axis->id, ID{});  // Clear style
+    // Parse payload: {"style":"<base64>"} (content-addressed)
+    // Empty string clears the style
+    const std::string styleBase64 = extractJSONString(op.payload, "style");
+    if (styleBase64.empty()) {
+        workbook.clearEntityStyle(axis->id);
         axis->setHasStyle(false);
     } else {
-        workbook.setStyleId(axis->id, ID(op.payload));
+        auto maybeStyle = StyleBuffer::fromBase64(styleBase64);
+        if (!maybeStyle.has_value() || maybeStyle->isEmpty()) {
+            return ApplyResult::INVALID_PAYLOAD;
+        }
+        workbook.setEntityStyle(axis->id, *maybeStyle);
         axis->setHasStyle(true);
     }
 

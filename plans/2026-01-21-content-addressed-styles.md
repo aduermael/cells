@@ -497,32 +497,46 @@ Update ranges to use StyleBuffer instead of style_id reference.
 - [x] 6c: Update TypeScript types for new style format - Made styleId optional in StyleRangeInfo and setRangeStyle responses since content-addressed styles no longer emit style IDs.
 - [x] 6d: Update style toolbar to work with new system - The toolbar already works with the new system since it uses setRangeStyle which internally uses StyleBuffer.
 
-### Phase 7: Remove Old Style System
+### Phase 7: Migrate Cell Styles to Content-Addressed System
 
-- [ ] 7a: Remove StyleRegistry class
-- [ ] 7b: Remove style_id from workbook model
-- [ ] 7c: Remove STYLE_DEFINE from operation types
-- [ ] 7d: Clean up any remaining style ID references
+Cells and axes (columns/rows) now use content-addressed StyleBuffer instead of the old style_id + StyleRegistry system.
 
-### Phase 8: File Format Migration
+- [x] 7a: Add `_entityStyles` map (ID → StyleBuffer) to Workbook for content-addressed entity styles
+- [x] 7b: Add `setEntityStyle(entityId, StyleBuffer)`, `getEntityStyle(entityId)`, `clearEntityStyle(entityId)`, `hasEntityStyle(entityId)` methods to Workbook
+- [x] 7c: Update `CELL_SET_STYLE` operation to use new `{"style":"<base64>"}` format only (removed old style_id format)
+- [x] 7d: Update `applyAxisSetStyle()` to use new format only
+- [x] 7e: Update bootstrap to emit content-addressed styles for cells/axes
+- [x] 7f: Update bindings (`setCellStyle`, `getCellStyle`, `setCellStyleAt`, `getCellStyleAt`, `getEffectiveCellStyle`, `computeEffectiveStyleAt`, viewport styles) to use new system exclusively
+- [ ] 7g: Add unit tests for new cell style operations (deferred - existing E2E tests cover most functionality)
 
-- [ ] 8a: Update ZCD serializer to write new style format
-- [ ] 8b: Add ZCD deserializer support for both old and new formats
-- [ ] 8c: Update XLSX import to create StyleBuffer directly
-- [ ] 8d: Update XLSX export to read from StyleBuffer
+### Phase 8: Remove Old Style System
 
-### Phase 9: Testing and Validation
+Now that both ranges AND cells use content-addressed styles, we can remove the old system.
 
-- [ ] 9a: Run all existing style-related E2E tests
-- [ ] 9b: Add new E2E tests for style sync scenarios
-- [ ] 9c: Test collaboration with mixed old/new clients (if needed)
-- [ ] 9d: Performance benchmarks for style merging
+- [ ] 8a: Remove StyleRegistry class
+- [ ] 8b: Remove style_id from workbook model (the `_styles` map of entity→styleId)
+- [ ] 8c: Remove STYLE_DEFINE from operation types
+- [ ] 8d: Clean up any remaining style ID references
 
-### Phase 10: Documentation and Cleanup
+### Phase 9: File Format Migration
 
-- [ ] 10a: Update architecture documentation
-- [ ] 10b: Remove debug logging added during development
-- [ ] 10c: Final code review and cleanup
+- [ ] 9a: Update ZCD serializer to write new style format
+- [ ] 9b: Add ZCD deserializer support for both old and new formats
+- [ ] 9c: Update XLSX import to create StyleBuffer directly
+- [ ] 9d: Update XLSX export to read from StyleBuffer
+
+### Phase 10: Testing and Validation
+
+- [ ] 10a: Run all existing style-related E2E tests
+- [ ] 10b: Add new E2E tests for style sync scenarios
+- [ ] 10c: Test collaboration with mixed old/new clients (if needed)
+- [ ] 10d: Performance benchmarks for style merging
+
+### Phase 11: Documentation and Cleanup
+
+- [ ] 11a: Update architecture documentation
+- [ ] 11b: Remove debug logging added during development
+- [ ] 11c: Final code review and cleanup
 
 ## File Changes Summary
 

@@ -91,16 +91,11 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
     // Priority 1: Cell's own style (highest priority - start with this as base)
     // Note: We don't return early - we continue to merge lower-priority styles
     // to fill in any properties not explicitly set at the cell level.
-    // Read style from workbook map (not from cell field)
-    const ID cellStyleId = workbook.getStyleId(cell.id);
-    if (!cellStyleId.isNull()) {
-        const CellStyle* cellStyle = workbook.getStyle(cellStyleId);
-        if (cellStyle != nullptr) {
-            combinedStyle = *cellStyle;
-            result.styleId = cellStyleId;
-            result.fromCell = true;
-            hasAnyStyle = true;
-        }
+    const StyleBuffer* cellStyle = workbook.getEntityStyle(cell.id);
+    if (cellStyle != nullptr) {
+        combinedStyle = cellStyle->toCellStyle();
+        result.fromCell = true;
+        hasAnyStyle = true;
     }
 
     // Priority 2: Range styles (for ranges with RANGE_STYLE flag)
@@ -131,38 +126,30 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
     // Priority 3: Column's default style (fills remaining gaps)
     const Axis* col = sheet.getColumn(cell.colId);
     if (col != nullptr && col->hasStyle()) {
-        const ID colStyleId = workbook.getStyleId(col->id);
-        if (!colStyleId.isNull()) {
-            const CellStyle* colStyle = workbook.getStyle(colStyleId);
-            if (colStyle != nullptr) {
-                if (!hasAnyStyle) {
-                    combinedStyle = *colStyle;
-                    result.styleId = colStyleId;
-                    hasAnyStyle = true;
-                } else {
-                    combinedStyle = mergeStyles(combinedStyle, *colStyle);
-                }
-                result.fromColumn = true;
+        const StyleBuffer* colStyle = workbook.getEntityStyle(col->id);
+        if (colStyle != nullptr) {
+            if (!hasAnyStyle) {
+                combinedStyle = colStyle->toCellStyle();
+                hasAnyStyle = true;
+            } else {
+                combinedStyle = mergeStyles(combinedStyle, colStyle->toCellStyle());
             }
+            result.fromColumn = true;
         }
     }
 
     // Priority 4: Row's default style (fills remaining gaps)
     const Axis* row = sheet.getRow(cell.rowId);
     if (row != nullptr && row->hasStyle()) {
-        const ID rowStyleId = workbook.getStyleId(row->id);
-        if (!rowStyleId.isNull()) {
-            const CellStyle* rowStyle = workbook.getStyle(rowStyleId);
-            if (rowStyle != nullptr) {
-                if (!hasAnyStyle) {
-                    combinedStyle = *rowStyle;
-                    result.styleId = rowStyleId;
-                    hasAnyStyle = true;
-                } else {
-                    combinedStyle = mergeStyles(combinedStyle, *rowStyle);
-                }
-                result.fromRow = true;
+        const StyleBuffer* rowStyle = workbook.getEntityStyle(row->id);
+        if (rowStyle != nullptr) {
+            if (!hasAnyStyle) {
+                combinedStyle = rowStyle->toCellStyle();
+                hasAnyStyle = true;
+            } else {
+                combinedStyle = mergeStyles(combinedStyle, rowStyle->toCellStyle());
             }
+            result.fromRow = true;
         }
     }
 
@@ -300,12 +287,11 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
 
         // Include effective style (resolves cell > range > column > row hierarchy)
         EffectiveStyleResult effectiveStyle = getEffectiveStyle(*entry.cell, *sheet, *_workbook, colPos, rowPos);
-        // Get style pointer: use merged style if available, otherwise use the single style pointer
+        // Get style pointer: use merged style if available
         const CellStyle* style = effectiveStyle.hasMergedStyle
             ? &effectiveStyle.mergedStyle
-            : effectiveStyle.style;
-        if (!effectiveStyle.styleId.isNull() && style != nullptr) {
-            json << "\"styleId\":\"" << effectiveStyle.styleId.toString() << "\",";
+            : nullptr;
+        if (effectiveStyle.hasMergedStyle && style != nullptr) {
             // Include inline style properties for efficient rendering
             json << "\"style\":{";
             json << "\"bold\":" << (style->bold ? "true" : "false");

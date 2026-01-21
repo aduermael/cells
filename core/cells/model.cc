@@ -875,6 +875,40 @@ bool Workbook::clearStyle(const ID& entityId) {
 }
 
 // =============================================================================
+// Content-addressed entity style storage (new system)
+// =============================================================================
+
+const StyleBuffer* Workbook::getEntityStyle(const ID& entityId) const {
+    auto it = _entityStyles.find(entityId);
+    if (it != _entityStyles.end()) {
+        return &it->second;
+    }
+    return nullptr;
+}
+
+void Workbook::setEntityStyle(const ID& entityId, const StyleBuffer& style) {
+    if (style.isEmpty()) {
+        // Empty style = clear
+        _entityStyles.erase(entityId);
+    } else {
+        _entityStyles[entityId] = style;
+    }
+}
+
+bool Workbook::clearEntityStyle(const ID& entityId) {
+    auto it = _entityStyles.find(entityId);
+    if (it == _entityStyles.end()) {
+        return false;
+    }
+    _entityStyles.erase(it);
+    return true;
+}
+
+bool Workbook::hasEntityStyle(const ID& entityId) const {
+    return _entityStyles.find(entityId) != _entityStyles.end();
+}
+
+// =============================================================================
 // Workbook-level shared formula tracking
 // =============================================================================
 

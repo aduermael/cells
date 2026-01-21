@@ -1258,36 +1258,23 @@ std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::s
         return "{\"error\":\"Cell not found\"}";
     }
 
-    // Get existing style (if any) and merge with incoming JSON (read from workbook map)
+    // Get existing style (if any) and merge with incoming JSON
     CellStyle style;
-    const ID existingStyleId = _workbook->getStyleId(cell->id);
-    if (!existingStyleId.isNull()) {
-        const CellStyle* existingStyle = _workbook->getStyle(existingStyleId);
-        if (existingStyle) {
-            style = *existingStyle;
-        }
+    const StyleBuffer* existingStyle = _workbook->getEntityStyle(cell->id);
+    if (existingStyle != nullptr) {
+        style = existingStyle->toCellStyle();
     }
     mergeStyleJson(style, styleJson);
 
-    ID styleId;
+    // Convert to content-addressed StyleBuffer and emit operation
     if (!style.isEmpty()) {
-        // Check if identical style already exists (lookup only, no registration)
-        styleId = _workbook->findStyleByContent(style);
-        if (styleId.isNull()) {
-            // Style doesn't exist - create via STYLE_DEFINE operation
-            // This is the ONLY way styles should be created (CRDT-native)
-            styleId = generate_id();
-            std::string fullStyleJson = styleToJson(style);
-            Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
-            applyOperation(*_workbook, styleOp);
-        }
+        StyleBuffer styleBuffer = StyleBuffer::fromCellStyle(style);
+        Operation op = makeCellSetStyleOp(*_workbook, cellId, styleBuffer);
+        applyOperation(*_workbook, op);
+    } else {
+        Operation op = makeCellClearStyleOp(*_workbook, cellId);
+        applyOperation(*_workbook, op);
     }
-
-    // Set the cell's styleId
-    std::string payload =
-        "{\"style_id\":\"" + (styleId.isNull() ? "~" : styleId.toString()) + "\"}";
-    Operation op = makeCellSetStyleOp(*_workbook, cellId, payload);
-    applyOperation(*_workbook, op);
 
     broadcastPendingOperations();
 
@@ -1327,33 +1314,16 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
         existingCell = sheet->getCellAt(existingColId, existingRowId);
     }
 
-    // Get existing style if cell has one (from workbook map)
+    // Get existing style if cell has one
     if (existingCell && existingCell->hasStyle()) {
-        const ID existingStyleId = _workbook->getStyleId(existingCell->id);
-        if (!existingStyleId.isNull()) {
-            const CellStyle* existingStyle = _workbook->getStyle(existingStyleId);
-            if (existingStyle) {
-                style = *existingStyle;
-            }
+        const StyleBuffer* existingStyle = _workbook->getEntityStyle(existingCell->id);
+        if (existingStyle != nullptr) {
+            style = existingStyle->toCellStyle();
         }
     }
 
     // Merge incoming JSON with existing style
     mergeStyleJson(style, styleJson);
-
-    ID styleId;
-    if (!style.isEmpty()) {
-        // Check if identical style already exists (lookup only, no registration)
-        styleId = _workbook->findStyleByContent(style);
-        if (styleId.isNull()) {
-            // Style doesn't exist - create via STYLE_DEFINE operation
-            // This is the ONLY way styles should be created (CRDT-native)
-            styleId = generate_id();
-            std::string fullStyleJson = styleToJson(style);
-            Operation styleOp = makeStyleDefineOp(*_workbook, styleId, fullStyleJson);
-            applyOperation(*_workbook, styleOp);
-        }
-    }
 
     // Find or create column at position
     ID colId = existingColId;
@@ -1394,11 +1364,15 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
         applyOperation(*_workbook, cellOp);
     }
 
-    // Set the cell's styleId
-    std::string payload =
-        "{\"style_id\":\"" + (styleId.isNull() ? "~" : styleId.toString()) + "\"}";
-    Operation op = makeCellSetStyleOp(*_workbook, cellId, payload);
-    applyOperation(*_workbook, op);
+    // Convert to content-addressed StyleBuffer and emit operation
+    if (!style.isEmpty()) {
+        StyleBuffer styleBuffer = StyleBuffer::fromCellStyle(style);
+        Operation op = makeCellSetStyleOp(*_workbook, cellId, styleBuffer);
+        applyOperation(*_workbook, op);
+    } else {
+        Operation op = makeCellClearStyleOp(*_workbook, cellId);
+        applyOperation(*_workbook, op);
+    }
 
     broadcastPendingOperations();
 
@@ -1439,22 +1413,13 @@ std::string CellsEngine::getCellStyle(const std::string& cellIdStr) {
         return "{\"error\":\"Cell not found\"}";
     }
 
-    // Read style from workbook map
-    const ID styleId = _workbook->getStyleId(cell->id);
-    if (styleId.isNull()) {
-        // Return empty/default style
-        CellStyle defaultStyle;
-        return styleToJson(defaultStyle);
+    const StyleBuffer* style = _workbook->getEntityStyle(cell->id);
+    if (style != nullptr) {
+        return styleToJson(style->toCellStyle());
     }
 
-    const CellStyle* style = _workbook->getStyle(styleId);
-    if (!style) {
-        // Style ID is set but not found in registry - return default
-        CellStyle defaultStyle;
-        return styleToJson(defaultStyle);
-    }
-
-    return styleToJson(*style);
+    CellStyle defaultStyle;
+    return styleToJson(defaultStyle);
 }
 
 std::string CellsEngine::getCellStyleAt(uint32_t col, uint32_t row) {
@@ -1468,40 +1433,27 @@ std::string CellsEngine::getCellStyleAt(uint32_t col, uint32_t row) {
     }
 
     // Find column and row at positions
-    ID colId, rowId;
     Axis* colAxis = sheet->getColumnByPosition(col);
     Axis* rowAxis = sheet->getRowByPosition(row);
-    if (colAxis != nullptr) {
-        colId = colAxis->id;
-    }
-    if (rowAxis != nullptr) {
-        rowId = rowAxis->id;
-    }
-
-    if (colId.isNull() || rowId.isNull()) {
-        // No axis at this position - return default style
+    if (colAxis == nullptr || rowAxis == nullptr) {
         CellStyle defaultStyle;
         return styleToJson(defaultStyle);
     }
 
     // Find cell at this position
-    Cell* cell = sheet->getCellAt(colId, rowId);
-
-    // Read style from workbook map
-    const ID styleId = cell ? _workbook->getStyleId(cell->id) : ID();
-    if (!cell || styleId.isNull()) {
-        // No cell or no style - return default
+    Cell* cell = sheet->getCellAt(colAxis->id, rowAxis->id);
+    if (cell == nullptr) {
         CellStyle defaultStyle;
         return styleToJson(defaultStyle);
     }
 
-    const CellStyle* style = _workbook->getStyle(styleId);
-    if (!style) {
-        CellStyle defaultStyle;
-        return styleToJson(defaultStyle);
+    const StyleBuffer* style = _workbook->getEntityStyle(cell->id);
+    if (style != nullptr) {
+        return styleToJson(style->toCellStyle());
     }
 
-    return styleToJson(*style);
+    CellStyle defaultStyle;
+    return styleToJson(defaultStyle);
 }
 
 std::string CellsEngine::createStyle(const std::string& styleJson) {
@@ -2130,20 +2082,14 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
     }
 
     // Priority 1: Cell's own style (highest priority - properties set here take precedence)
-    // Note: We start with cell style but continue to merge lower-priority styles
-    // to fill in any properties not explicitly set at the cell level.
-    // Read style from workbook map
-    const ID cellStyleId = cell ? workbook.getStyleId(cell->id) : ID();
-    if (cell && !cellStyleId.isNull()) {
-        const CellStyle* cellStyle = workbook.getStyle(cellStyleId);
-        if (cellStyle) {
-            result = *cellStyle;  // Start with cell style as base
-            // Don't return early - merge with range/column/row styles below
+    if (cell != nullptr) {
+        const StyleBuffer* cellStyle = workbook.getEntityStyle(cell->id);
+        if (cellStyle != nullptr) {
+            result = cellStyle->toCellStyle();
         }
     }
 
     // Priority 2: Range styles (merge all overlapping RANGE_STYLE ranges)
-    // These fill in any properties not set by the cell style
     std::vector<Range*> styleRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::STYLE);
     for (Range* range : styleRanges) {
         const StyleBuffer* rangeStyleBuf = range->getStyle();
@@ -2157,12 +2103,9 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
     if (!colId.isNull()) {
         const Axis* colAxis = sheet.getColumn(colId);
         if (colAxis != nullptr && colAxis->hasStyle()) {
-            const ID colStyleId = workbook.getStyleId(colAxis->id);
-            if (!colStyleId.isNull()) {
-                const CellStyle* colStyle = workbook.getStyle(colStyleId);
-                if (colStyle) {
-                    result = mergeEffectiveStyles(result, *colStyle);
-                }
+            const StyleBuffer* colStyle = workbook.getEntityStyle(colAxis->id);
+            if (colStyle != nullptr) {
+                result = mergeEffectiveStyles(result, colStyle->toCellStyle());
             }
         }
     }
@@ -2171,12 +2114,9 @@ CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
     if (!rowId.isNull()) {
         const Axis* rowAxis = sheet.getRow(rowId);
         if (rowAxis != nullptr && rowAxis->hasStyle()) {
-            const ID rowStyleId = workbook.getStyleId(rowAxis->id);
-            if (!rowStyleId.isNull()) {
-                const CellStyle* rowStyle = workbook.getStyle(rowStyleId);
-                if (rowStyle) {
-                    result = mergeEffectiveStyles(result, *rowStyle);
-                }
+            const StyleBuffer* rowStyle = workbook.getEntityStyle(rowAxis->id);
+            if (rowStyle != nullptr) {
+                result = mergeEffectiveStyles(result, rowStyle->toCellStyle());
             }
         }
     }

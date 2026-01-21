@@ -43,6 +43,7 @@
 
 #include "core/cells/operation.h"
 #include "core/cells/oplog.h"
+#include "core/cells/style_buffer.h"
 #include "core/cells/style_types.h"
 #include "core/cells/types.h"
 
@@ -53,7 +54,6 @@ struct Axis;
 struct Cell;
 struct Sheet;
 struct Workbook;
-class StyleBuffer;
 struct SharedFormulaInfo;
 struct OpLog;
 struct SpillInfo;
@@ -958,15 +958,41 @@ struct Workbook {
     // Entity style storage (unified: cells, axes, etc.)
     // ========================================================================
 
+    // ---- DEPRECATED: Old style_id-based system ----
+    // These methods use StyleRegistry and style IDs. Use the content-addressed
+    // methods below (setEntityStyle, getEntityStyle) for new code.
+
     // Get the style ID for an entity (cell, axis, etc.) - returns null ID if no style
+    // DEPRECATED: Use getEntityStyle() instead
     [[nodiscard]] ID getStyleId(const ID& entityId) const;
 
     // Set the style ID for an entity. Returns the old style ID (null if none).
     // Pass null ID to clear the style (same as clearStyle).
+    // DEPRECATED: Use setEntityStyle() instead
     ID setStyleId(const ID& entityId, const ID& styleId);
 
     // Clear the style for an entity. Returns true if the entity had a style.
+    // DEPRECATED: Use clearEntityStyle() instead
     bool clearStyle(const ID& entityId);
+
+    // ---- Content-addressed style system ----
+    // These methods use StyleBuffer directly without style IDs or StyleRegistry.
+    // The style data IS its identity (content-addressed).
+
+    // Get the content-addressed style for an entity (cell, axis, etc.)
+    // Returns nullptr if no style is set
+    [[nodiscard]] const StyleBuffer* getEntityStyle(const ID& entityId) const;
+
+    // Set a content-addressed style for an entity
+    // Pass empty StyleBuffer or use clearEntityStyle() to clear
+    void setEntityStyle(const ID& entityId, const StyleBuffer& style);
+
+    // Clear the content-addressed style for an entity
+    // Returns true if the entity had a style
+    bool clearEntityStyle(const ID& entityId);
+
+    // Check if entity has a content-addressed style
+    [[nodiscard]] bool hasEntityStyle(const ID& entityId) const;
 
     // ========================================================================
     // Workbook-level shared formula tracking (runtime-only)
@@ -1134,7 +1160,13 @@ private:
 
     // Entity ID -> style ID mapping (cells, axes, or other entities with styles)
     // Unified style map: since UUIDs are unique across resource types, one map suffices
+    // DEPRECATED: Use _entityStyles (content-addressed StyleBuffer) for new code
     std::unordered_map<ID, ID, IDHash> _styles;
+
+    // Entity ID -> content-addressed StyleBuffer mapping (cells, axes, etc.)
+    // This is the new style system that replaces _styles + StyleRegistry
+    // Content-addressed: the style data IS its identity, no separate style IDs needed
+    std::unordered_map<ID, StyleBuffer, IDHash> _entityStyles;
 
     // ========================================================================
     // Workbook-level dependency graph (global, shared by all sheets)

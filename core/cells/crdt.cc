@@ -459,6 +459,17 @@ Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const std::st
     return {hlc, OpType::CELL_SET_STYLE, cellId, payload};
 }
 
+Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const StyleBuffer& style) {
+    const HLC hlc = workbook.getCurrentHLC();
+    const std::string payload = "{\"style\":\"" + style.toBase64() + "\"}";
+    return {hlc, OpType::CELL_SET_STYLE, cellId, payload};
+}
+
+Operation makeCellClearStyleOp(Workbook& workbook, const ID& cellId) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::CELL_SET_STYLE, cellId, "{\"style\":\"\"}"};
+}
+
 Operation makeDimInsertAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::DIM_INSERT_AXIS, axisId, payload};
@@ -550,6 +561,17 @@ Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden)
 Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const ID& styleId) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::AXIS_SET_STYLE, axisId, styleId.isNull() ? "" : styleId.toString()};
+}
+
+Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const StyleBuffer& style) {
+    const HLC hlc = workbook.getCurrentHLC();
+    const std::string payload = "{\"style\":\"" + style.toBase64() + "\"}";
+    return {hlc, OpType::AXIS_SET_STYLE, axisId, payload};
+}
+
+Operation makeAxisClearStyleOp(Workbook& workbook, const ID& axisId) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::AXIS_SET_STYLE, axisId, "{\"style\":\"\"}"};
 }
 
 Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const ID& formatId) {
@@ -753,57 +775,6 @@ size_t bootstrapOpLog(Workbook& workbook) {
         count++;
     }
 
-    // Generate STYLE_DEFINE operations for all styles
-    for (const auto& [styleId, style] : workbook.getStyles()) {
-        std::string payload = "{";
-        payload += "\"bold\":" + std::string(style.bold ? "true" : "false");
-        payload += ",\"italic\":" + std::string(style.italic ? "true" : "false");
-        payload += ",\"underline\":" + std::string(style.underline ? "true" : "false");
-        payload += ",\"wrapText\":" + std::string(style.wrapText ? "true" : "false");
-        if (!style.bgColor.empty()) {
-            payload += ",\"bgColor\":\"" + internal::jsonEscape(style.bgColor) + "\"";
-        }
-        if (!style.textColor.empty()) {
-            payload += ",\"textColor\":\"" + internal::jsonEscape(style.textColor) + "\"";
-        }
-        if (!style.fontFamily.empty()) {
-            payload += ",\"fontFamily\":\"" + internal::jsonEscape(style.fontFamily) + "\"";
-        }
-        if (style.fontSize > 0) {
-            payload += ",\"fontSize\":" + std::to_string(style.fontSize);
-        }
-        // Horizontal alignment
-        switch (style.hAlign) {
-            case TextAlign::CENTER:
-                payload += ",\"hAlign\":\"center\"";
-                break;
-            case TextAlign::RIGHT:
-                payload += ",\"hAlign\":\"right\"";
-                break;
-            case TextAlign::JUSTIFY:
-                payload += ",\"hAlign\":\"justify\"";
-                break;
-            default:
-                break;  // LEFT is default, omit
-        }
-        // Vertical alignment
-        switch (style.vAlign) {
-            case VerticalAlign::TOP:
-                payload += ",\"vAlign\":\"top\"";
-                break;
-            case VerticalAlign::MIDDLE:
-                payload += ",\"vAlign\":\"middle\"";
-                break;
-            default:
-                break;  // BOTTOM is default, omit
-        }
-        payload += "}";
-
-        const Operation op = makeStyleDefineOp(workbook, styleId, payload);
-        oplog->addOperation(op);
-        count++;
-    }
-
     // Generate RANGE_ADD operations for all ranges (merge ranges, style ranges, etc.)
     // This must come AFTER column/row INSERT operations so the axis IDs exist
     for (const auto& sheet : workbook.sheets) {
@@ -827,30 +798,16 @@ size_t bootstrapOpLog(Workbook& workbook) {
             count++;
 
             // If this range has a style, generate RANGE_SET_STYLE operation
-            // Prefer content-addressed style (new system) over style_id reference (old system)
             if (range->style.has_value()) {
-                // New format: emit base64-encoded StyleBuffer directly
                 const Operation styleOp =
                     makeRangeSetStyleOp(workbook, range->id, range->style.value());
                 oplog->addOperation(styleOp);
                 count++;
-            } else {
-                // Fall back to old format for backward compatibility
-                const ID styleId = workbook.getRangeStyleId(range->id);
-                if (!styleId.isNull()) {
-                    const std::string stylePayload =
-                        "{\"style_id\":\"" + styleId.toString() + "\"}";
-                    const Operation styleOp =
-                        makeRangeSetStyleOp(workbook, range->id, stylePayload);
-                    oplog->addOperation(styleOp);
-                    count++;
-                }
             }
         }
     }
 
     // Generate CELL_SET_STYLE operations for cells that have styles
-    // This must come AFTER STYLE_DEFINE operations (higher HLC) so styles exist when applied
     for (const auto& sheet : workbook.sheets) {
         for (const ID& cellId : sheet->getCellIds()) {
             const Cell* cell = workbook.getCell(cellId);
@@ -858,15 +815,45 @@ size_t bootstrapOpLog(Workbook& workbook) {
                 continue;
             }
 
-            const ID styleId = workbook.getStyleId(cellId);
-            if (styleId.isNull()) {
+            const StyleBuffer* entityStyle = workbook.getEntityStyle(cellId);
+            if (entityStyle != nullptr) {
+                const Operation op = makeCellSetStyleOp(workbook, cellId, *entityStyle);
+                oplog->addOperation(op);
+                count++;
+            }
+        }
+    }
+
+    // Generate AXIS_SET_STYLE operations for columns and rows that have styles
+    for (const auto& sheet : workbook.sheets) {
+        // Column styles
+        for (const ID& colId : sheet->getColumnIds()) {
+            const Axis* axis = workbook.getColumn(colId);
+            if (!axis || !axis->hasStyle()) {
                 continue;
             }
 
-            const std::string payload = "{\"style_id\":\"" + styleId.toString() + "\"}";
-            const Operation op = makeCellSetStyleOp(workbook, cellId, payload);
-            oplog->addOperation(op);
-            count++;
+            const StyleBuffer* entityStyle = workbook.getEntityStyle(colId);
+            if (entityStyle != nullptr) {
+                const Operation op = makeAxisSetStyleOp(workbook, colId, *entityStyle);
+                oplog->addOperation(op);
+                count++;
+            }
+        }
+
+        // Row styles
+        for (const ID& rowId : sheet->getRowIds()) {
+            const Axis* axis = workbook.getRow(rowId);
+            if (!axis || !axis->hasStyle()) {
+                continue;
+            }
+
+            const StyleBuffer* entityStyle = workbook.getEntityStyle(rowId);
+            if (entityStyle != nullptr) {
+                const Operation op = makeAxisSetStyleOp(workbook, rowId, *entityStyle);
+                oplog->addOperation(op);
+                count++;
+            }
         }
     }
 
