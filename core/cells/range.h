@@ -22,8 +22,10 @@
 
 #include <cstdint>
 
+#include <optional>
 #include <vector>
 
+#include "core/cells/style_buffer.h"
 #include "core/cells/types.h"
 
 namespace cells {
@@ -101,6 +103,10 @@ struct Range {
     ID endRowId;                         // Row UUID for bottom edge
     RangeFlags flags{RangeFlags::NONE};  // Bitmask of purposes
 
+    // Content-addressed style stored directly in range (replaces style_id reference)
+    // When set, the STYLE flag should also be set
+    std::optional<StyleBuffer> style;
+
     Range() = default;
 
     // Create a range with all IDs
@@ -139,8 +145,38 @@ struct Range {
     // Check if this is a merge range
     [[nodiscard]] bool isMerge() const { return hasFlag(RangeFlags::MERGE); }
 
-    // Check if this has style metadata
-    [[nodiscard]] bool hasStyle() const { return hasFlag(RangeFlags::STYLE); }
+    // Check if this has style metadata (checks both flag and style presence)
+    [[nodiscard]] bool hasStyle() const { return hasFlag(RangeFlags::STYLE) || style.has_value(); }
+
+    // =========================================================================
+    // Style accessors (content-addressed style)
+    // =========================================================================
+
+    // Get the style buffer (returns nullptr if no style)
+    [[nodiscard]] const StyleBuffer* getStyle() const {
+        return style.has_value() ? &style.value() : nullptr;
+    }
+
+    // Get mutable style buffer (returns nullptr if no style)
+    [[nodiscard]] StyleBuffer* getStyle() { return style.has_value() ? &style.value() : nullptr; }
+
+    // Set the style (also sets the STYLE flag)
+    void setStyle(const StyleBuffer& s) {
+        style = s;
+        flags = flags | RangeFlags::STYLE;
+    }
+
+    // Set the style with move semantics (also sets the STYLE flag)
+    void setStyle(StyleBuffer&& s) {
+        style = std::move(s);
+        flags = flags | RangeFlags::STYLE;
+    }
+
+    // Clear the style (removes both the style data and the STYLE flag)
+    void clearStyle() {
+        style.reset();
+        flags = flags & ~RangeFlags::STYLE;
+    }
 
     // Equality comparison (by ID only - ranges with same ID are the same range)
     bool operator==(const Range& other) const { return id == other.id; }

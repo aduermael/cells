@@ -477,7 +477,7 @@ Note: Lint fixes for const-correctness and explicit bool conversions pending.
 
 Update ranges to use StyleBuffer instead of style_id reference.
 
-- [ ] 4a: Add `StyleBuffer` field to Range struct (replace style_id reference)
+- [x] 4a: Add `StyleBuffer` field to Range struct (replace style_id reference) - Added `std::optional<StyleBuffer> style` field and setStyle/getStyle/clearStyle helper methods. Added 7 unit tests for the new functionality.
 - [ ] 4b: Update `setRangeStyle()` to accept StyleBuffer
 - [ ] 4c: Update range serialization to use base64 style
 - [ ] 4d: Update `getViewportStyles()` to compute effective styles using merging

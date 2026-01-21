@@ -32,7 +32,10 @@ cc_library(
     name = "range",
     hdrs = ["range.h"],
     visibility = ["//visibility:public"],
-    deps = [":types"],
+    deps = [
+        ":style_buffer",
+        ":types",
+    ],
 )
 
 cc_test(

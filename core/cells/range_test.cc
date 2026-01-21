@@ -643,6 +643,115 @@ TEST(SubtractRectangleTest, SingleCellRanges) {
 }
 
 // =============================================================================
+// Range StyleBuffer Tests
+// =============================================================================
+
+TEST(RangeStyleTest, DefaultNoStyle) {
+    Range r;
+    EXPECT_FALSE(r.hasStyle());
+    EXPECT_EQ(r.getStyle(), nullptr);
+}
+
+TEST(RangeStyleTest, SetAndGetStyle) {
+    ID rangeId("range001");
+    ID col("colA0001");
+    ID row("row00001");
+    Range r(rangeId, col, row);
+
+    // Create a style with bold and background color
+    StyleBuffer style;
+    style.setBold(true);
+    style.setBgColorHex("#FBBF24");
+
+    // Set the style
+    r.setStyle(style);
+
+    // Verify flag and style are set
+    EXPECT_TRUE(r.hasStyle());
+    EXPECT_TRUE(r.hasFlag(RangeFlags::STYLE));
+
+    const StyleBuffer* retrieved = r.getStyle();
+    ASSERT_NE(retrieved, nullptr);
+    EXPECT_TRUE(retrieved->hasBold());
+    EXPECT_TRUE(retrieved->getBold());
+    EXPECT_TRUE(retrieved->hasBgColor());
+    EXPECT_EQ(retrieved->getBgColorHex(), "#FBBF24");
+}
+
+TEST(RangeStyleTest, SetStyleSetsFlag) {
+    Range r;
+    EXPECT_FALSE(r.hasFlag(RangeFlags::STYLE));
+
+    StyleBuffer style;
+    style.setItalic(true);
+    r.setStyle(style);
+
+    EXPECT_TRUE(r.hasFlag(RangeFlags::STYLE));
+}
+
+TEST(RangeStyleTest, ClearStyle) {
+    Range r;
+    StyleBuffer style;
+    style.setBold(true);
+    r.setStyle(style);
+
+    EXPECT_TRUE(r.hasStyle());
+    EXPECT_NE(r.getStyle(), nullptr);
+
+    r.clearStyle();
+
+    EXPECT_FALSE(r.hasStyle());
+    EXPECT_FALSE(r.hasFlag(RangeFlags::STYLE));
+    EXPECT_EQ(r.getStyle(), nullptr);
+}
+
+TEST(RangeStyleTest, MutableStyleAccess) {
+    Range r;
+    StyleBuffer style;
+    style.setBold(true);
+    r.setStyle(style);
+
+    // Get mutable style and modify it
+    StyleBuffer* mutableStyle = r.getStyle();
+    ASSERT_NE(mutableStyle, nullptr);
+    mutableStyle->setItalic(true);
+
+    // Verify modification persisted
+    const StyleBuffer* retrieved = r.getStyle();
+    ASSERT_NE(retrieved, nullptr);
+    EXPECT_TRUE(retrieved->hasBold());
+    EXPECT_TRUE(retrieved->hasItalic());
+}
+
+TEST(RangeStyleTest, MoveSemantics) {
+    Range r;
+
+    StyleBuffer style;
+    style.setBold(true);
+    style.setBgColorHex("#FF0000");
+
+    // Move-set the style
+    r.setStyle(std::move(style));
+
+    EXPECT_TRUE(r.hasStyle());
+    const StyleBuffer* retrieved = r.getStyle();
+    ASSERT_NE(retrieved, nullptr);
+    EXPECT_TRUE(retrieved->hasBold());
+    EXPECT_EQ(retrieved->getBgColorHex(), "#FF0000");
+}
+
+TEST(RangeStyleTest, HasStyleWithFlagOnly) {
+    // Test that hasStyle() returns true when only the flag is set (for backwards compatibility)
+    Range r;
+    r.flags = RangeFlags::STYLE;
+
+    // hasStyle() should return true due to flag, even without style data
+    EXPECT_TRUE(r.hasStyle());
+    // But getStyle() should return nullptr
+    EXPECT_EQ(r.getStyle(), nullptr);
+}
+
+// =============================================================================
 // PositionRect Contains and Equality Tests (Phase K)
 // =============================================================================
 
