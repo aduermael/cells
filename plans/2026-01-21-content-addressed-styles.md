@@ -49,13 +49,13 @@ Where `<BASE64_STYLE_HASH>` is a base64-encoded binary representation of the sty
 
 **Flag bytes** (2-4 bytes):
 - Bit 0-1 of byte 0: Number of flag bytes (0=2, 1=3, 2=4, 3=reserved)
-- Remaining bits: Property presence flags
+- Remaining bits: Property presence flags (presence only, NOT values)
 
-**Common properties in first flag byte** (bits 2-7):
-- Bit 2: bold
-- Bit 3: italic
-- Bit 4: underline
-- Bit 5: strikethrough
+**First flag byte** (bits 2-7):
+- Bit 2: bold present
+- Bit 3: italic present
+- Bit 4: underline present
+- Bit 5: strikethrough present
 - Bit 6: bgColor present
 - Bit 7: textColor present
 
@@ -70,13 +70,22 @@ Where `<BASE64_STYLE_HASH>` is a base64-encoded binary representation of the sty
 - Bit 7: (reserved for flag byte 3)
 
 **Property data** follows flags in order of flag bits:
-- Colors: 3 bytes RGB (no alpha needed for cell styles)
+- Boolean properties (bold, italic, underline, strikethrough, textWrap): 1 byte packed
+  - Bit 0: bold value (if bold present)
+  - Bit 1: italic value (if italic present)
+  - Bit 2: underline value (if underline present)
+  - Bit 3: strikethrough value (if strikethrough present)
+  - Bit 4: textWrap value (if textWrap present)
+  - Bits 5-7: reserved
+  - Note: This byte only present if ANY boolean flag is set
+- Colors: 3 bytes RGB each (no alpha needed for cell styles)
 - fontSize: 1 byte (6-72pt range, encoded as value-6)
 - fontFamily: length-prefixed string (1 byte length + UTF-8 bytes)
 - Alignment: 1 byte (3 bits h-align, 3 bits v-align, 2 bits reserved)
-- textWrap: 1 bit (packed with alignment)
 - numberFormat: 8 bytes format ID (keep separate registry for now)
 - Borders: variable length (see border encoding below)
+
+**Important**: Flags indicate PRESENCE, not value. A style with `bold: false` explicitly set is different from a style with no bold property. The former overrides inherited bold; the latter inherits.
 
 ### Border Encoding
 
