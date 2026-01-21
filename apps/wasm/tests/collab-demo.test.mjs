@@ -137,8 +137,8 @@ async function applyFontFamily(page, fontName) {
   // Click the font family dropdown button to open the menu
   await page.click('#font-family-btn');
   await sleep(100);
-  // Select the font from the dropdown menu
-  const fontSelector = `#font-family-menu [data-font="${fontName}"]`;
+  // Select the font from the dropdown menu (items are in #font-family-dropdown .font-dropdown-menu)
+  const fontSelector = `#font-family-dropdown [data-font="${fontName}"]`;
   const hasFontOption = await page.$(fontSelector);
   if (hasFontOption) {
     await page.click(fontSelector);
@@ -441,22 +441,28 @@ async function runCollabDemo() {
       console.log('  All team members connected!\n');
     }));
 
-    // === ACT 2: NICO CREATES THE STRUCTURE ===
-    results.push(await runTest('Act 2: Nico Creates the Structure', async () => {
+    // === ACT 2: NICO CREATES, ROBERT STYLES ===
+    results.push(await runTest('Act 2: Nico Creates, Robert Styles', async () => {
       console.log('\n  [Nico] Creating the spreadsheet structure...\n');
 
       // Nico creates the title
       await setCellValue(nicoPage, 'A1', 'CELLS - Master Plan 2025');
+      await sleep(500);
+
+      // Verify the title synced to Robert before he styles it
+      await verifyCellSynced(robertPage, 'A1', 'CELLS - Master Plan 2025', 'Robert');
+
+      // Robert immediately styles the title: blue background, white text, bold, Georgia font
+      console.log('  [Robert] I see the title! Let me make it look professional...\n');
+      await selectRange(robertPage, 'A1', 'E1');
+      await sleep(100);
+      await applyBackgroundColor(robertPage, COLORS.BLUE_600);
+      await applyTextColor(robertPage, COLORS.WHITE);
+      await applyBold(robertPage);
+      await applyFontFamily(robertPage, 'Georgia');
       await sleep(300);
 
-      // Style the title: blue background, white text, bold
-      console.log('  [Nico] Styling the title...\n');
-      await selectRange(nicoPage, 'A1', 'E1');
-      await sleep(100);
-      await applyBackgroundColor(nicoPage, COLORS.BLUE_600);
-      await applyTextColor(nicoPage, COLORS.WHITE);
-      await applyBold(nicoPage);
-      await sleep(300);
+      console.log('  [Robert] Added blue background, white text, bold, and Georgia font!\n');
 
       // Nico creates the header row
       await setCellValue(nicoPage, 'A3', 'Feature');
@@ -464,16 +470,22 @@ async function runCollabDemo() {
       await setCellValue(nicoPage, 'C3', 'Days');
       await setCellValue(nicoPage, 'D3', 'Cost');
       await setCellValue(nicoPage, 'E3', 'Status');
+      await sleep(500);
+
+      // Verify headers synced to Robert
+      await verifyCellSynced(robertPage, 'A3', 'Feature', 'Robert');
+
+      // Robert styles the header row: gray background, bold text, borders, Helvetica font
+      console.log('  [Robert] Headers are up! Adding my signature style...\n');
+      await selectRange(robertPage, 'A3', 'E3');
+      await sleep(100);
+      await applyBackgroundColor(robertPage, COLORS.GRAY_200);
+      await applyBold(robertPage);
+      await applyBorder(robertPage, 'all');
+      await applyFontFamily(robertPage, 'Helvetica');
       await sleep(300);
 
-      // Style the header row: gray background, bold text, borders
-      console.log('  [Nico] Styling the header row...\n');
-      await selectRange(nicoPage, 'A3', 'E3');
-      await sleep(100);
-      await applyBackgroundColor(nicoPage, COLORS.GRAY_200);
-      await applyBold(nicoPage);
-      await applyBorder(nicoPage, 'all');
-      await sleep(300);
+      console.log('  [Robert] Headers styled with gray background, bold, borders, and Helvetica!\n');
 
       // Nico adds the feature list
       console.log('  [Nico] Adding feature list...\n');
@@ -484,12 +496,11 @@ async function runCollabDemo() {
       await setCellValue(nicoPage, 'A8', 'Mobile Apps');
       await sleep(500);
 
-      // Verify the title synced to Robert and Shuying
-      await verifyCellSynced(robertPage, 'A1', 'CELLS - Master Plan 2025', 'Robert');
+      // Verify the styling synced to Shuying
       await verifyCellSynced(shuyingPage, 'A1', 'CELLS - Master Plan 2025', 'Shuying');
 
-      console.log('  [Robert] I can see the structure! The styling looks great!');
-      console.log('  [Shuying] Love the blue header! Let me see the features...\n');
+      console.log('  [Shuying] Wow! The styling synced to me perfectly!');
+      console.log('  [Shuying] Love the Georgia font on the title and Helvetica on headers!\n');
     }));
 
     // === ACT 3: ROBERT ASSIGNS OWNERS ===
@@ -511,8 +522,8 @@ async function runCollabDemo() {
       console.log('  [Shuying] Formula Engine is mine!\n');
     }));
 
-    // === ACT 4: SHUYING ADDS ESTIMATES ===
-    results.push(await runTest('Act 4: Shuying Adds Estimates', async () => {
+    // === ACT 4: SHUYING ADDS ESTIMATES, ROBERT STYLES ===
+    results.push(await runTest('Act 4: Shuying Adds Estimates, Robert Styles', async () => {
       console.log('\n  [Shuying] Adding effort estimates (in days)...\n');
 
       await setCellValue(shuyingPage, 'C4', '30');
@@ -520,28 +531,32 @@ async function runCollabDemo() {
       await setCellValue(shuyingPage, 'C6', '20');
       await setCellValue(shuyingPage, 'C7', '60');
       await setCellValue(shuyingPage, 'C8', '90');
-      await sleep(300);
+      await sleep(500);
 
-      // Style data rows with alternating backgrounds for better readability
-      console.log('  [Shuying] Adding alternating row colors...\n');
-      await selectRange(shuyingPage, 'A4', 'E4');
-      await applyBackgroundColor(shuyingPage, COLORS.GRAY_100);
+      // Verify estimates synced to Robert before he styles
+      await verifyCellSynced(robertPage, 'C4', '30', 'Robert');
+
+      // Robert styles the data rows with alternating backgrounds
+      console.log('  [Robert] Time to make this data easier to read...\n');
+      await selectRange(robertPage, 'A4', 'E4');
+      await applyBackgroundColor(robertPage, COLORS.GRAY_100);
       await sleep(100);
       // Row 5 stays white
-      await selectRange(shuyingPage, 'A6', 'E6');
-      await applyBackgroundColor(shuyingPage, COLORS.GRAY_100);
+      await selectRange(robertPage, 'A6', 'E6');
+      await applyBackgroundColor(robertPage, COLORS.GRAY_100);
       await sleep(100);
       // Row 7 stays white
-      await selectRange(shuyingPage, 'A8', 'E8');
-      await applyBackgroundColor(shuyingPage, COLORS.GRAY_100);
+      await selectRange(robertPage, 'A8', 'E8');
+      await applyBackgroundColor(robertPage, COLORS.GRAY_100);
       await sleep(300);
 
-      // Verify synced
+      console.log('  [Robert] Added alternating row colors for readability!\n');
+
+      // Verify styling synced to others
       await verifyCellSynced(nicoPage, 'C4', '30', 'Nico');
-      await verifyCellSynced(robertPage, 'C5', '45', 'Robert');
 
       console.log('  [Nico] 30 days for Collaboration - challenge accepted!');
-      console.log('  [Robert] 20 days for XLSX - I can do that.\n');
+      console.log('  [Shuying] The alternating colors look great, Robert!\n');
     }));
 
     // === ACT 5: EVERYONE ADDS FORMULAS ===
@@ -706,9 +721,15 @@ async function runCollabDemo() {
       await applyTextColor(shuyingPage, COLORS.PURPLE_500);
       await sleep(300);
 
+      // Robert applies Courier New font to all credits for a distinctive look
+      console.log('  [Robert] Adding Courier New font to credits for a distinctive look...\n');
+      await selectRange(robertPage, 'A12', 'A14');
+      await applyFontFamily(robertPage, 'Courier New');
+      await sleep(500);
+
       // Add the company motto with special styling
       await setCellValue(nicoPage, 'A16', 'Cells: The Future of Spreadsheets');
-      await sleep(300);
+      await sleep(500);
 
       // Style the motto as a signature banner
       console.log('  [Nico] Adding the finishing touch...\n');
@@ -718,7 +739,8 @@ async function runCollabDemo() {
       await applyBold(nicoPage);
       await applyItalic(nicoPage);
       await applyBorder(nicoPage, 'all');
-      await sleep(500);
+      await applyFontFamily(nicoPage, 'Courier New');
+      await sleep(800);
 
       // Final verification - everyone can see the complete plan
       await verifyCellSynced(robertPage, 'A16', 'Cells: The Future of Spreadsheets', 'Robert');
@@ -734,14 +756,14 @@ async function runCollabDemo() {
       console.log('  ==========================================');
       console.log('');
       console.log('  The spreadsheet now contains:');
-      console.log('  - Styled title with blue background');
-      console.log('  - Professional header row with borders');
+      console.log('  - Styled title with blue background + Georgia font');
+      console.log('  - Professional header row with borders + Helvetica font');
       console.log('  - 5 Features with alternating row colors');
       console.log('  - Cost formulas with currency formatting');
       console.log('  - Blue totals row with SUM formulas');
       console.log('  - Color-coded status badges');
-      console.log('  - Styled team credits');
-      console.log('  - Signature banner motto');
+      console.log('  - Styled team credits with Courier New font');
+      console.log('  - Signature banner motto with Courier New font');
       console.log('');
       console.log('  All built collaboratively in real-time!');
       console.log('  ==========================================\n');
@@ -778,6 +800,7 @@ async function runCollabDemo() {
   console.log('  This demo showcased:');
   console.log('  - Background & text colors');
   console.log('  - Bold & italic formatting');
+  console.log('  - Multiple font families (Georgia, Helvetica, Courier New)');
   console.log('  - Cell borders');
   console.log('  - Currency formatting');
   console.log('  - Alternating row colors');

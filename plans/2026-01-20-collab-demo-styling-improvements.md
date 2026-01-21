@@ -97,23 +97,57 @@ Reorganize the demo so Robert focuses on styling existing content while others a
 - Data cells: **Arial** (default, readable)
 - Credits/Motto: **Courier New** (monospace, distinctive)
 
-- [ ] 3a: Modify Act 2 - After Nico creates title, Robert immediately styles it (blue background, white text, bold, Georgia font) before Nico continues with headers
-- [ ] 3b: Modify Act 2 - After Nico adds headers, Robert styles them (gray background, bold, borders, Helvetica font) before Nico adds features
-- [ ] 3c: Modify Act 4 - While Shuying adds estimates, Robert styles feature list with alternating row colors
-- [ ] 3d: Modify Finale - Apply Courier New font to the motto/credits section
-- [ ] 3e: Ensure all styling happens with clear sync verification to other peers
+- [x] 3a: Modify Act 2 - After Nico creates title, Robert immediately styles it (blue background, white text, bold, Georgia font) before Nico continues with headers
+- [x] 3b: Modify Act 2 - After Nico adds headers, Robert styles them (gray background, bold, borders, Helvetica font) before Nico adds features
+- [x] 3c: Modify Act 4 - While Shuying adds estimates, Robert styles feature list with alternating row colors
+- [x] 3d: Modify Finale - Apply Courier New font to the motto/credits section (also added to credits A12-A14)
+- [x] 3e: Ensure all styling happens with clear sync verification to other peers
 
-## Phase 4: Debug and Fix Style Visibility Issues
+## Phase 4: Fix Fundamental Collaboration Bugs (BLOCKING)
 
-- [ ] 4a: Add explicit verification that styled cells render correctly on all peers (check computed background color via JavaScript evaluation)
-- [ ] 4b: Add sleep/sync waits after style operations to ensure sync completes before moving on
-- [ ] 4c: If colors don't appear, investigate the color popup selector matching (case sensitivity, color format)
+**These issues must be fixed before improving the collab-demo. They should be debugged with simple, focused tests.**
 
-## Phase 5: Polish Demo Output
+### Bug #3: Style changes don't appear on the originating peer
 
-- [ ] 5a: Update console log messages to clearly narrate the styling as it happens ("Robert applies blue background to title...")
-- [ ] 5b: Add font changes to the final summary output
-- [ ] 5c: Ensure SLOWMO mode allows watching all style changes visually
+**Symptom:** When peer 1 sets a background color on a cell, the color appears on peer 2 but NOT on peer 1 itself (and vice versa).
+
+**Hypothesis:** Style changes may be going through CRDT sync but not being applied locally. The local application of style might be bypassed when the operation is sent to sync.
+
+- [ ] 4a: Create simple test: single peer applies bg color, verify it appears locally (no collaboration)
+- [ ] 4b: Debug: Check if style operations go through CRDT even for local changes
+- [ ] 4c: Fix: Ensure style changes are applied locally through the same CRDT path as remote changes
+
+### Bug #4: Existing styles not loaded when joining a room
+
+**Symptom:** When a new peer joins a room, the cell values sync but the styles (background colors, etc.) do not appear.
+
+**Hypothesis:** Initial sync may only include cell values, not the style definitions and style assignments.
+
+- [ ] 4d: Create test: peer 1 styles cells, peer 2 joins later, verify peer 2 sees styles
+- [ ] 4e: Debug: Check what operations are sent during initial sync (STYLE_DEFINE, CELL_SET_STYLE, RANGE_SET_STYLE)
+- [ ] 4f: Fix: Ensure initial sync includes all style-related operations
+
+### Bug #5: Page refresh breaks collaboration
+
+**Symptom:** When refreshing the page with a room URL, the document doesn't load from the existing peer and the connection seems broken.
+
+**Hypothesis:** Reconnection logic may not properly handle rejoining an existing room, or the sync state is lost on page unload.
+
+- [ ] 4g: Create test: peer 1 adds data, peer 1 refreshes, verify data reloads from peer 2
+- [ ] 4h: Debug: Check WebSocket reconnection and sync state restoration
+- [ ] 4i: Fix: Ensure proper reconnection and full sync on rejoin
+
+## Phase 5: Debug and Fix Style Visibility Issues
+
+- [ ] 5a: Add explicit verification that styled cells render correctly on all peers (check computed background color via JavaScript evaluation)
+- [ ] 5b: Add sleep/sync waits after style operations to ensure sync completes before moving on
+- [ ] 5c: If colors don't appear, investigate the color popup selector matching (case sensitivity, color format)
+
+## Phase 6: Polish Demo Output
+
+- [ ] 6a: Update console log messages to clearly narrate the styling as it happens ("Robert applies blue background to title...")
+- [ ] 6b: Add font changes to the final summary output
+- [ ] 6c: Ensure SLOWMO mode allows watching all style changes visually
 
 ## Files Modified
 

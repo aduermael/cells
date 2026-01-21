@@ -100,7 +100,47 @@ export function parseCellRef(ref) {
 }
 
 /**
- * Calculate pixel position for a cell
+ * Calculate pixel position for a cell using the renderer's coordinate system.
+ * This properly accounts for scroll position, zoom, and custom column/row sizes.
+ */
+export async function cellToPixelFromRenderer(page, col, row) {
+  return await page.evaluate(({ col, row }) => {
+    const ctx = window._appContext;
+    if (!ctx || !ctx.app) {
+      // Fallback to basic calculation if context not available
+      const HEADER_WIDTH = 50;
+      const HEADER_HEIGHT = 24;
+      const DEFAULT_COL_WIDTH = 100;
+      const DEFAULT_ROW_HEIGHT = 24;
+      return {
+        x: HEADER_WIDTH + col * DEFAULT_COL_WIDTH + DEFAULT_COL_WIDTH / 2,
+        y: HEADER_HEIGHT + row * DEFAULT_ROW_HEIGHT + DEFAULT_ROW_HEIGHT / 2,
+      };
+    }
+
+    const renderer = ctx.app.renderer;
+    const zoomFactor = renderer.getZoomFactor();
+
+    // Use renderer's methods that properly account for scroll and zoom
+    const cellX = renderer.getDragAdjustedColX(col);
+    const cellY = renderer.getDragAdjustedRowY(row);
+
+    const colWidths = ctx.app.colWidths;
+    const rowHeights = ctx.app.rowHeights;
+
+    const DEFAULT_COL_WIDTH = 100;
+    const DEFAULT_ROW_HEIGHT = 24;
+
+    const width = Math.round((colWidths.get(col) ?? DEFAULT_COL_WIDTH) * zoomFactor);
+    const height = Math.round((rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT) * zoomFactor);
+
+    // Return center of cell
+    return { x: cellX + width / 2, y: cellY + height / 2 };
+  }, { col, row });
+}
+
+/**
+ * Calculate pixel position for a cell (legacy sync version for backward compat)
  * Uses approximate default dimensions from the app
  */
 export function cellToPixel(col, row, canvasInfo) {
@@ -125,7 +165,11 @@ export function cellToPixel(col, row, canvasInfo) {
 export async function clickCell(page, cellRef) {
   const { col, row } = parseCellRef(cellRef);
   const canvasInfo = await getCanvasInfo(page);
-  const { x, y } = cellToPixel(col, row, canvasInfo);
+
+  // Use renderer coordinates for proper scroll/zoom handling
+  const cellPos = await cellToPixelFromRenderer(page, col, row);
+  const x = canvasInfo.left + cellPos.x;
+  const y = canvasInfo.top + cellPos.y;
 
   await page.mouse.click(x, y);
   // Ensure canvas has focus for keyboard events
@@ -143,7 +187,11 @@ export async function clickCell(page, cellRef) {
 export async function doubleClickCell(page, cellRef) {
   const { col, row } = parseCellRef(cellRef);
   const canvasInfo = await getCanvasInfo(page);
-  const { x, y } = cellToPixel(col, row, canvasInfo);
+
+  // Use renderer coordinates for proper scroll/zoom handling
+  const cellPos = await cellToPixelFromRenderer(page, col, row);
+  const x = canvasInfo.left + cellPos.x;
+  const y = canvasInfo.top + cellPos.y;
 
   await page.mouse.click(x, y, { clickCount: 2 });
   // Wait for editor to appear
@@ -630,7 +678,11 @@ export async function selectRange(page, startRef, endRef) {
   // Shift-click end cell to create range
   const { col, row } = parseCellRef(endRef);
   const canvasInfo = await getCanvasInfo(page);
-  const { x, y } = cellToPixel(col, row, canvasInfo);
+
+  // Use renderer coordinates for proper scroll/zoom handling
+  const cellPos = await cellToPixelFromRenderer(page, col, row);
+  const x = canvasInfo.left + cellPos.x;
+  const y = canvasInfo.top + cellPos.y;
 
   await page.keyboard.down('Shift');
   await page.mouse.click(x, y);
