@@ -380,8 +380,11 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             break;
     }
 
-    // Add to OpLog regardless of result (for history/sync)
-    oplog->addOperation(op);
+    // Only add to OpLog on successful application
+    if (result == ApplyResult::SUCCESS || result == ApplyResult::SUPERSEDED ||
+        result == ApplyResult::RESURRECTED) {
+        oplog->addOperation(op);
+    }
 
     return result;
 }

@@ -107,12 +107,12 @@ TEST_F(CRDTRangeTest, AddRangeDuplicateIdReturnsAlreadyApplied) {
     EXPECT_EQ(result2, ApplyResult::ALREADY_APPLIED);
 }
 
-TEST_F(CRDTRangeTest, AddRangeInvalidSheetReturnsInvalidTarget) {
+TEST_F(CRDTRangeTest, AddRangeInvalidColumnReturnsInvalidTarget) {
     const ID rangeId = generate_id();
-    const ID fakeSheetId = generate_id();
+    const ID fakeColId = generate_id();  // Column doesn't exist
 
-    std::string payload = "{\"sheet_id\":\"" + fakeSheetId.toString() + "\",";
-    payload += "\"start_col_id\":\"" + colIds[0].toString() + "\",";
+    // Use fake column ID - sheet cannot be derived since column doesn't exist
+    std::string payload = "{\"start_col_id\":\"" + fakeColId.toString() + "\",";
     payload += "\"start_row_id\":\"" + rowIds[0].toString() + "\",";
     payload += "\"end_col_id\":\"" + colIds[1].toString() + "\",";
     payload += "\"end_row_id\":\"" + rowIds[1].toString() + "\",";

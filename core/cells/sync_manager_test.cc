@@ -12,9 +12,15 @@ namespace {
 class SyncManagerTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        // Create two workbooks simulating two peers
+        // Create two workbooks simulating two peers with shared entity IDs
         node_a = generate_id();
         node_b = generate_id();
+
+        // Generate shared IDs first so both workbooks have the same entities
+        sheet_id = generate_id();
+        col_id = generate_id();
+        row_id = generate_id();
+        cell_id = generate_id();
 
         workbook_a = createWorkbook(node_a);
         workbook_b = createWorkbook(node_b);
@@ -27,20 +33,16 @@ protected:
         auto wb = std::make_unique<Workbook>(generate_id(), "TestWorkbook");
         wb->setNodeId(node_id);
 
-        auto sheet = std::make_unique<Sheet>(generate_id(), "Sheet1");
-        sheet_id = sheet->id;
+        auto sheet = std::make_unique<Sheet>(sheet_id, "Sheet1");
         sheet->setWorkbook(wb.get());  // Set workbook early so cells get stored properly
 
-        // Create a column and row
-        col_id = generate_id();
-        row_id = generate_id();
+        // Create a column and row using shared IDs
         auto col = std::make_unique<Axis>(col_id, true);
         auto row = std::make_unique<Axis>(row_id, false);
         sheet->addColumn(std::move(col));
         sheet->addRow(std::move(row));
 
-        // Create a cell
-        cell_id = generate_id();
+        // Create a cell using shared ID
         auto cell = std::make_unique<Cell>(cell_id, col_id, row_id);
         cell->value = CellValue(0.0);
         sheet->addCell(std::move(cell));

@@ -304,18 +304,44 @@ protected:
 };
 
 TEST_F(CRDTConvergenceTest, TwoPeersConvergeOnConcurrentEdits) {
-    // Get cell IDs from both workbooks (they have different IDs since created separately)
+    // Create shared cell with shared column/row IDs that both workbooks know about
+    ID shared_col = generate_id();
+    ID shared_row = generate_id();
+    ID shared_cell1 = generate_id();
+    ID shared_cell2 = generate_id();
+
     auto* sheet_a = workbook_a->getSheetByIndex(0);
     auto* sheet_b = workbook_b->getSheetByIndex(0);
-    ID cell_a = sheet_a->getCellIds().front();
-    ID cell_b = sheet_b->getCellIds().front();
 
-    // Peer A makes an edit
-    Operation op_a = makeCellSetValueOp(*workbook_a, cell_a, R"({"type":"n","value":"100"})");
+    // Add shared column, row, and two cells to both workbooks
+    auto col_a = std::make_unique<Axis>(shared_col, true);
+    auto col_b = std::make_unique<Axis>(shared_col, true);
+    auto row_a = std::make_unique<Axis>(shared_row, false);
+    auto row_b = std::make_unique<Axis>(shared_row, false);
+    auto cell1_a = std::make_unique<Cell>(shared_cell1, shared_col, shared_row);
+    auto cell1_b = std::make_unique<Cell>(shared_cell1, shared_col, shared_row);
+    auto cell2_a = std::make_unique<Cell>(shared_cell2, shared_col, shared_row);
+    auto cell2_b = std::make_unique<Cell>(shared_cell2, shared_col, shared_row);
+    cell1_a->value = CellValue(0.0);
+    cell1_b->value = CellValue(0.0);
+    cell2_a->value = CellValue(0.0);
+    cell2_b->value = CellValue(0.0);
+
+    sheet_a->addColumn(std::move(col_a));
+    sheet_a->addRow(std::move(row_a));
+    sheet_a->addCell(std::move(cell1_a));
+    sheet_a->addCell(std::move(cell2_a));
+    sheet_b->addColumn(std::move(col_b));
+    sheet_b->addRow(std::move(row_b));
+    sheet_b->addCell(std::move(cell1_b));
+    sheet_b->addCell(std::move(cell2_b));
+
+    // Peer A makes an edit to cell1
+    Operation op_a = makeCellSetValueOp(*workbook_a, shared_cell1, R"({"type":"n","value":"100"})");
     applyOperation(*workbook_a, op_a);
 
-    // Peer B makes an edit (to its own cell, different ID)
-    Operation op_b = makeCellSetValueOp(*workbook_b, cell_b, R"({"type":"n","value":"200"})");
+    // Peer B makes an edit to cell2 (different cell, same workbook state)
+    Operation op_b = makeCellSetValueOp(*workbook_b, shared_cell2, R"({"type":"n","value":"200"})");
     applyOperation(*workbook_b, op_b);
 
     // Sync A -> B
@@ -324,9 +350,20 @@ TEST_F(CRDTConvergenceTest, TwoPeersConvergeOnConcurrentEdits) {
     // Sync B -> A
     applyOperation(*workbook_a, op_b);
 
-    // Both should have the operation in their OpLogs
+    // Both should have the operations in their OpLogs
     EXPECT_EQ(workbook_a->getOpLog()->size(), 2);
     EXPECT_EQ(workbook_b->getOpLog()->size(), 2);
+
+    // Verify convergence: both workbooks should have the same values
+    Cell* cell1_final_a = sheet_a->getCell(shared_cell1);
+    Cell* cell1_final_b = sheet_b->getCell(shared_cell1);
+    Cell* cell2_final_a = sheet_a->getCell(shared_cell2);
+    Cell* cell2_final_b = sheet_b->getCell(shared_cell2);
+
+    EXPECT_EQ(cell1_final_a->value.asNumber(), 100);
+    EXPECT_EQ(cell1_final_b->value.asNumber(), 100);
+    EXPECT_EQ(cell2_final_a->value.asNumber(), 200);
+    EXPECT_EQ(cell2_final_b->value.asNumber(), 200);
 }
 
 TEST_F(CRDTConvergenceTest, SameCellConcurrentEditsConverge) {
@@ -835,6 +872,87 @@ TEST_F(RangeAdjustmentTest, DeleteMiddleColumnKeepsRangeUnchanged) {
     ASSERT_NE(r, nullptr);
     EXPECT_EQ(r->startColId, originalStartCol);
     EXPECT_EQ(r->endColId, originalEndCol);
+}
+
+// =============================================================================
+// Style Operation Tests (Phase 4: verify styles exist after successful operations)
+// =============================================================================
+
+TEST_F(CRDTTest, StyleDefineCreatesStyleInWorkbook) {
+    // Test that a STYLE_DEFINE operation creates the style in the workbook
+    ID styleId = generate_id();
+    std::string payload = R"({"bold":true,"textColor":"#ff0000"})";
+
+    Operation op = makeStyleDefineOp(*workbook, styleId, payload);
+    ApplyResult result = applyOperation(*workbook, op);
+
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    // Verify style exists in workbook
+    EXPECT_TRUE(workbook->hasStyle(styleId));
+
+    const CellStyle* style = workbook->getStyle(styleId);
+    ASSERT_NE(style, nullptr);
+    EXPECT_TRUE(style->bold);
+    EXPECT_EQ(style->textColor, "#ff0000");
+}
+
+TEST_F(CRDTTest, StyleDefineAddedToOpLogOnSuccess) {
+    // Verify that successful STYLE_DEFINE operations are added to oplog
+    workbook->startCollaboration();  // Enable oplog
+
+    ID styleId = generate_id();
+    std::string payload = R"({"italic":true})";
+
+    size_t opCountBefore = workbook->getOpLog()->size();
+
+    Operation op = makeStyleDefineOp(*workbook, styleId, payload);
+    ApplyResult result = applyOperation(*workbook, op);
+
+    EXPECT_EQ(result, ApplyResult::SUCCESS);
+
+    // Oplog should have one more operation
+    EXPECT_EQ(workbook->getOpLog()->size(), opCountBefore + 1);
+}
+
+TEST_F(CRDTTest, DuplicateStyleDefineNotAddedToOpLog) {
+    // Test that ALREADY_APPLIED results don't add to oplog (critical for preventing duplicates)
+    workbook->startCollaboration();  // Enable oplog
+
+    ID styleId = generate_id();
+    std::string payload = R"({"bold":true})";
+
+    // First apply
+    Operation op1 = makeStyleDefineOp(*workbook, styleId, payload);
+    ApplyResult result1 = applyOperation(*workbook, op1);
+    EXPECT_EQ(result1, ApplyResult::SUCCESS);
+
+    size_t opCountAfterFirst = workbook->getOpLog()->size();
+
+    // Second apply with same style ID
+    Operation op2 = makeStyleDefineOp(*workbook, styleId, payload);
+    ApplyResult result2 = applyOperation(*workbook, op2);
+    EXPECT_EQ(result2, ApplyResult::ALREADY_APPLIED);
+
+    // Oplog should NOT have grown (duplicate not added)
+    EXPECT_EQ(workbook->getOpLog()->size(), opCountAfterFirst);
+}
+
+TEST_F(CRDTTest, FailedOperationNotAddedToOpLog) {
+    // Test that INVALID_TARGET operations don't add to oplog
+    workbook->startCollaboration();  // Enable oplog
+
+    size_t opCountBefore = workbook->getOpLog()->size();
+
+    // Create an operation targeting a non-existent cell
+    ID fakeCell = generate_id();
+    Operation op = makeCellSetValueOp(*workbook, fakeCell, R"({"type":"n","value":"42"})");
+    ApplyResult result = applyOperation(*workbook, op);
+
+    EXPECT_EQ(result, ApplyResult::INVALID_TARGET);
+
+    // Oplog should NOT have grown (failed operation not added)
+    EXPECT_EQ(workbook->getOpLog()->size(), opCountBefore);
 }
 
 }  // namespace

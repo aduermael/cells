@@ -60,9 +60,9 @@ This is wrong. The correct flow should be:
 
 **Fix**: Only add to oplog after successful application.
 
-- [ ] 4a: Modify `applyOperation()` to only add to oplog on successful apply (SUCCESS, SUPERSEDED, RESURRECTED)
-- [ ] 4b: Review all callers of `applyOperation()` to ensure they handle failure cases appropriately
-- [ ] 4c: Add tests for the scenario: bootstrap → create styled range → verify style exists in workbook
+- [x] 4a: Modify `applyOperation()` to only add to oplog on successful apply (SUCCESS, SUPERSEDED, RESURRECTED). Changed `crdt.cc` to check result before adding to oplog.
+- [x] 4b: Review all callers of `applyOperation()` to ensure they handle failure cases appropriately. Reviewed - existing callers either check result explicitly or are local ops that should succeed.
+- [x] 4c: Add tests for the scenario: bootstrap → create styled range → verify style exists in workbook. Added 4 tests to `crdt_test.cc`: StyleDefineCreatesStyleInWorkbook, StyleDefineAddedToOpLogOnSuccess, DuplicateStyleDefineNotAddedToOpLog, FailedOperationNotAddedToOpLog.
 
 ## Phase 5: Testing
 
