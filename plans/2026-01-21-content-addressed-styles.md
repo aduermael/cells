@@ -480,7 +480,7 @@ Update ranges to use StyleBuffer instead of style_id reference.
 - [x] 4a: Add `StyleBuffer` field to Range struct (replace style_id reference) - Added `std::optional<StyleBuffer> style` field and setStyle/getStyle/clearStyle helper methods. Added 7 unit tests for the new functionality.
 - [x] 4b: Update `setRangeStyle()` to accept StyleBuffer - Added setRangeStyle(rangeId, StyleBuffer), clearRangeStyle(), and getRangeStyle() methods to both Workbook and Sheet classes. Sheet methods delegate to Workbook.
 - [x] 4c: Update range serialization to use base64 style - Added makeRangeSetStyleOp(StyleBuffer) and makeRangeClearStyleOp(). Updated applyRangeSetStyle to support both old {"style_id":"..."} and new {"style":"<base64>"} formats. Added 4 unit tests for new format.
-- [ ] 4d: Update `getViewportStyles()` to compute effective styles using merging
+- [x] 4d: Update `getViewportStyles()` to compute effective styles using merging - Updated getEffectiveStyle() in bindings_viewport.cc to check range->getStyle() for content-addressed StyleBuffer first, then fall back to old style ID system. Converts StyleBuffer to CellStyle via toCellStyle() for merging.
 
 ### Phase 5: Update CRDT Operations
 

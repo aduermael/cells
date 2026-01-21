@@ -106,23 +106,43 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
     // Priority 2: Range styles (for ranges with RANGE_STYLE flag)
     // Merge styles from all overlapping ranges to fill gaps from cell style
     // e.g., if cell has border and Range has bold, the cell gets both properties
+    //
+    // Supports both:
+    // - Old system: style ID reference via getRangeStyleId()
+    // - New system: content-addressed StyleBuffer stored directly in Range
     std::vector<Range*> styleRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::STYLE);
     for (Range* range : styleRanges) {
-        ID rangeStyleId = sheet.getRangeStyleId(range->id);
-        if (!rangeStyleId.isNull()) {
-            const CellStyle* rangeStyle = workbook.getStyle(rangeStyleId);
-            if (rangeStyle != nullptr) {
-                if (!hasAnyStyle) {
-                    // First style found - use it as base
-                    combinedStyle = *rangeStyle;
-                    result.styleId = rangeStyleId;
-                    hasAnyStyle = true;
-                } else {
-                    // Merge range's style into combined style (fills gaps)
-                    combinedStyle = mergeStyles(combinedStyle, *rangeStyle);
-                }
-                result.fromRange = true;
+        const CellStyle* rangeStyle = nullptr;
+        CellStyle convertedStyle;  // For new system: converted from StyleBuffer
+        ID rangeStyleId;
+
+        // Check new system first: content-addressed StyleBuffer in Range
+        const StyleBuffer* styleBuffer = range->getStyle();
+        if (styleBuffer != nullptr) {
+            // Convert StyleBuffer to CellStyle for merging
+            convertedStyle = styleBuffer->toCellStyle();
+            rangeStyle = &convertedStyle;
+        } else {
+            // Fall back to old system: style ID reference
+            rangeStyleId = sheet.getRangeStyleId(range->id);
+            if (!rangeStyleId.isNull()) {
+                rangeStyle = workbook.getStyle(rangeStyleId);
             }
+        }
+
+        if (rangeStyle != nullptr) {
+            if (!hasAnyStyle) {
+                // First style found - use it as base
+                combinedStyle = *rangeStyle;
+                if (!rangeStyleId.isNull()) {
+                    result.styleId = rangeStyleId;
+                }
+                hasAnyStyle = true;
+            } else {
+                // Merge range's style into combined style (fills gaps)
+                combinedStyle = mergeStyles(combinedStyle, *rangeStyle);
+            }
+            result.fromRange = true;
         }
     }
 
