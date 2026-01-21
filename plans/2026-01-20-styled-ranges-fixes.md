@@ -235,3 +235,37 @@ The original sync issues were caused by the operation echo bug, not missing sync
 **Known test failures (pre-existing, not related to this plan):**
 - `borders` (7 failures) - Border feature tests, unrelated to styled ranges
 - `collab-demo` (1 failure) - "Finale: A16 should sync to Robert" - 3-peer sync issue in the finale act where rapid styling operations on A16 don't sync to the third peer. The core collab tests (collab.test.mjs, collab-style-sync.test.mjs) all pass. This appears to be a separate sync bug that needs further investigation
+
+## Phase 8: Debug Remaining Style Sync Issues
+
+**Goal**: Keep more operations in the oplog for debugging, then investigate remaining sync issues.
+
+**Oplog retention change:**
+- Always keep at least 500 operations in the oplog (only trim beyond this threshold)
+- When collaborating, keep more than 500 if needed until all peers have acknowledged
+- This provides better visibility into sync state for debugging
+
+**Steps:**
+- [ ] 8a: Modify `pruneOpLog()` to keep minimum 500 operations
+- [ ] 8b: Wait for user to provide more details about remaining style sync issue (using retained ops)
+- [ ] 8c: (Further steps TBD based on debugging findings)
+
+## Phase 9: Fix Border Issues
+
+**Problem**: Border outlines can no longer be set, causing 7 E2E test failures in `borders.test.mjs`.
+
+**Steps:**
+- [ ] 9a: Investigate why outline borders stopped working
+- [ ] 9b: Fix the border application issue
+- [ ] 9c: Verify all 10 border E2E tests pass
+
+## Phase 10: Fix Collab Demo Test
+
+**Problem**: The collab-demo "Finale" act fails - A16 doesn't sync to Robert (third peer) after rapid styling operations.
+
+**Note**: This will be easier to fix once Phase 8 and Phase 9 issues are resolved.
+
+**Steps:**
+- [ ] 10a: Debug the 3-peer sync scenario
+- [ ] 10b: Fix the sync issue
+- [ ] 10c: Verify collab-demo test passes (7/7 acts)
