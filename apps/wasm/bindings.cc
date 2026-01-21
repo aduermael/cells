@@ -203,6 +203,7 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("handlePeerMessage", &cells::wasm::CellsEngine::handlePeerMessage)
         .function("getOutgoingMessages", &cells::wasm::CellsEngine::getOutgoingMessages)
         .function("queueOperationsBroadcast", &cells::wasm::CellsEngine::queueOperationsBroadcast)
+        .function("setDebugNoPrune", &cells::wasm::CellsEngine::setDebugNoPrune)
         // Collaboration mode
         .function("getCollabMode", &cells::wasm::CellsEngine::getCollabMode)
         .function("isCollaborating", &cells::wasm::CellsEngine::isCollaborating)

@@ -387,6 +387,12 @@ std::string CellsEngine::queueOperationsBroadcast() {
     return "{\"success\":true}";
 }
 
+void CellsEngine::setDebugNoPrune(bool noPrune) {
+    if (_syncManager) {
+        _syncManager->setDebugNoPrune(noPrune);
+    }
+}
+
 // ============================================================================
 // Collaboration mode methods
 // ============================================================================

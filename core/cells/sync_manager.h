@@ -124,6 +124,9 @@ public:
     // Returns number of operations pruned.
     size_t pruneOpLog();
 
+    // Debug mode to disable oplog pruning (useful for debugging sync issues)
+    void setDebugNoPrune(bool noPrune);
+
 private:
     // Handle specific message types (return result with appropriate flags)
     HandleMessageResult handleHello(const ID& peerId, const std::string& json);
@@ -152,6 +155,9 @@ private:
 
     // Outgoing message queue
     std::vector<OutgoingMessage> _outgoing;
+
+    // Debug flag to disable oplog pruning
+    bool _debugNoPrune{false};
 };
 
 }  // namespace cells

@@ -281,6 +281,7 @@ public:
     std::string handlePeerMessage(const std::string& peerIdStr, const std::string& messageJson);
     std::string getOutgoingMessages();
     std::string queueOperationsBroadcast();
+    void setDebugNoPrune(bool noPrune);
 
     // ========================================================================
     // Collaboration mode methods (bindings_crdt.cc)

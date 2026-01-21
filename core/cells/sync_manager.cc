@@ -280,7 +280,19 @@ void SyncManager::queueOperationsBroadcast() {
     }
 }
 
+void SyncManager::setDebugNoPrune(bool noPrune) {
+    _debugNoPrune = noPrune;
+    if (noPrune) {
+        LOG_DEBUG("[Sync] Debug mode: oplog pruning DISABLED");
+    }
+}
+
 size_t SyncManager::pruneOpLog() {
+    if (_debugNoPrune) {
+        LOG_DEBUG("[Sync] pruneOpLog: skipped (debug noPrune mode)");
+        return 0;
+    }
+
     if (_workbook == nullptr) {
         return 0;
     }

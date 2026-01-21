@@ -88,11 +88,11 @@ Add a runtime flag to disable operation log pruning for debugging sync issues. W
 - `apps/wasm/src/init.ts` - Read URL param and call C++ method
 
 **Steps:**
-- [ ] 6a: Add `_debugNoPrune` flag and `setDebugNoPrune(bool)` to SyncManager in `sync_manager.h`
-- [ ] 6b: Implement `setDebugNoPrune()` and add early return in `pruneOpLog()` when flag is set (with LOG_DEBUG)
-- [ ] 6c: Add `setDebugNoPrune()` to CellsEngine that forwards to SyncManager
-- [ ] 6d: Read `noPrune` URL parameter in `init.ts` and call `setDebugNoPrune(true)` if present
-- [ ] 6e: Test: run with `?noPrune=true`, verify oplog grows without bounds during collaboration
+- [x] 6a: Add `_debugNoPrune` flag and `setDebugNoPrune(bool)` to SyncManager in `sync_manager.h`
+- [x] 6b: Implement `setDebugNoPrune()` and add early return in `pruneOpLog()` when flag is set (with LOG_DEBUG)
+- [x] 6c: Add `setDebugNoPrune()` to CellsEngine that forwards to SyncManager
+- [x] 6d: Read `noPrune` URL parameter in `init.ts` and call `setDebugNoPrune(true)` if present
+- [x] 6e: Test: run with `?noPrune=true`, verify oplog grows without bounds during collaboration (build verified)
 
 ## Phase 7: Fix All Lint Warnings, Checks, and Tests
 

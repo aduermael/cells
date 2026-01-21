@@ -955,5 +955,122 @@ TEST_F(CRDTTest, FailedOperationNotAddedToOpLog) {
     EXPECT_EQ(workbook->getOpLog()->size(), opCountBefore);
 }
 
+// =============================================================================
+// Styled Range Tests (Phase 4b: verify styles work after collaboration starts)
+// =============================================================================
+
+TEST_F(CRDTTest, StyledRangeCreatedAfterCollaborationWorks) {
+    // This test verifies that styled ranges created AFTER enabling collaboration
+    // have their styles correctly applied and accessible.
+
+    // Get the sheet and some column/row IDs
+    Sheet* sheet = workbook->getSheetByIndex(0);
+    ASSERT_NE(sheet, nullptr);
+
+    const auto& colIdSet = sheet->getColumnIds();
+    const auto& rowIdSet = sheet->getRowIds();
+    std::vector<ID> colIds(colIdSet.begin(), colIdSet.end());
+    std::vector<ID> rowIds(rowIdSet.begin(), rowIdSet.end());
+    ASSERT_GE(colIds.size(), 2);
+    ASSERT_GE(rowIds.size(), 2);
+
+    // Step 1: Create a styled range BEFORE collaboration
+    ID styleId1 = generate_id();
+    std::string stylePayload1 = R"({"bgColor":"#ff0000"})";  // Red
+    Operation styleOp1 = makeStyleDefineOp(*workbook, styleId1, stylePayload1);
+    ApplyResult styleResult1 = applyOperation(*workbook, styleOp1);
+    EXPECT_EQ(styleResult1, ApplyResult::SUCCESS);
+    EXPECT_TRUE(workbook->hasStyle(styleId1));
+
+    ID rangeId1 = generate_id();
+    std::string rangePayload1 = "{\"start_col_id\":\"" + colIds[0].toString() + "\",";
+    rangePayload1 += "\"start_row_id\":\"" + rowIds[0].toString() + "\",";
+    rangePayload1 += "\"end_col_id\":\"" + colIds[0].toString() + "\",";
+    rangePayload1 += "\"end_row_id\":\"" + rowIds[0].toString() + "\",";
+    rangePayload1 += "\"flags\":2}";  // STYLE flag
+    Operation rangeOp1 = makeRangeAddOp(*workbook, rangeId1, rangePayload1);
+    ApplyResult rangeResult1 = applyOperation(*workbook, rangeOp1);
+    EXPECT_EQ(rangeResult1, ApplyResult::SUCCESS);
+
+    std::string setStylePayload1 = "{\"style_id\":\"" + styleId1.toString() + "\"}";
+    Operation setStyleOp1 = makeRangeSetStyleOp(*workbook, rangeId1, setStylePayload1);
+    ApplyResult setStyleResult1 = applyOperation(*workbook, setStyleOp1);
+    EXPECT_EQ(setStyleResult1, ApplyResult::SUCCESS);
+
+    // Verify style association before collaboration
+    ID retrievedStyleId1 = workbook->getRangeStyleId(rangeId1);
+    EXPECT_EQ(retrievedStyleId1, styleId1);
+
+    // Step 2: Start collaboration (this triggers bootstrap)
+    workbook->startCollaboration();
+    bootstrapOpLog(*workbook);
+
+    // Verify first style still exists after bootstrap
+    EXPECT_TRUE(workbook->hasStyle(styleId1));
+    EXPECT_EQ(workbook->getRangeStyleId(rangeId1), styleId1);
+
+    // Step 3: Create a styled range AFTER collaboration with DIFFERENT color
+    ID styleId2 = generate_id();
+    std::string stylePayload2 = R"({"bgColor":"#00ff00"})";  // Green (different!)
+    Operation styleOp2 = makeStyleDefineOp(*workbook, styleId2, stylePayload2);
+    ApplyResult styleResult2 = applyOperation(*workbook, styleOp2);
+    EXPECT_EQ(styleResult2, ApplyResult::SUCCESS);
+    EXPECT_TRUE(workbook->hasStyle(styleId2));
+
+    ID rangeId2 = generate_id();
+    std::string rangePayload2 = "{\"start_col_id\":\"" + colIds[1].toString() + "\",";
+    rangePayload2 += "\"start_row_id\":\"" + rowIds[1].toString() + "\",";
+    rangePayload2 += "\"end_col_id\":\"" + colIds[1].toString() + "\",";
+    rangePayload2 += "\"end_row_id\":\"" + rowIds[1].toString() + "\",";
+    rangePayload2 += "\"flags\":2}";  // STYLE flag
+    Operation rangeOp2 = makeRangeAddOp(*workbook, rangeId2, rangePayload2);
+    ApplyResult rangeResult2 = applyOperation(*workbook, rangeOp2);
+    EXPECT_EQ(rangeResult2, ApplyResult::SUCCESS);
+
+    std::string setStylePayload2 = "{\"style_id\":\"" + styleId2.toString() + "\"}";
+    Operation setStyleOp2 = makeRangeSetStyleOp(*workbook, rangeId2, setStylePayload2);
+    ApplyResult setStyleResult2 = applyOperation(*workbook, setStyleOp2);
+    EXPECT_EQ(setStyleResult2, ApplyResult::SUCCESS);
+
+    // Step 4: Verify BOTH styles exist and are correctly associated
+    EXPECT_TRUE(workbook->hasStyle(styleId1));
+    EXPECT_TRUE(workbook->hasStyle(styleId2));
+
+    EXPECT_EQ(workbook->getRangeStyleId(rangeId1), styleId1);
+    EXPECT_EQ(workbook->getRangeStyleId(rangeId2), styleId2);
+
+    // Verify styles have correct content
+    const CellStyle* style1 = workbook->getStyle(styleId1);
+    const CellStyle* style2 = workbook->getStyle(styleId2);
+    ASSERT_NE(style1, nullptr);
+    ASSERT_NE(style2, nullptr);
+    EXPECT_EQ(style1->bgColor, "#ff0000");
+    EXPECT_EQ(style2->bgColor, "#00ff00");
+
+    // Verify ranges are in the spatial index (at least our ranges)
+    std::vector<Range*> rangesAtPos0 = sheet->getRangesAt(
+        sheet->getColumn(colIds[0])->position,
+        sheet->getRow(rowIds[0])->position,
+        RangeFlags::STYLE);
+    EXPECT_GE(rangesAtPos0.size(), 1);  // At least 1 range
+
+    std::vector<Range*> rangesAtPos1 = sheet->getRangesAt(
+        sheet->getColumn(colIds[1])->position,
+        sheet->getRow(rowIds[1])->position,
+        RangeFlags::STYLE);
+    EXPECT_GE(rangesAtPos1.size(), 1);  // At least 1 range
+
+    // Verify our specific ranges are in the index
+    bool foundRange1 = false, foundRange2 = false;
+    for (Range* r : rangesAtPos0) {
+        if (r->id == rangeId1) foundRange1 = true;
+    }
+    for (Range* r : rangesAtPos1) {
+        if (r->id == rangeId2) foundRange2 = true;
+    }
+    EXPECT_TRUE(foundRange1) << "Range 1 should be in spatial index";
+    EXPECT_TRUE(foundRange2) << "Range 2 should be in spatial index";
+}
+
 }  // namespace
 }  // namespace cells

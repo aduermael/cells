@@ -166,6 +166,7 @@ export interface CellsEngine {
     handlePeerMessage(peerId: string, messageJson: string): string;
     getOutgoingMessages(): string;
     queueOperationsBroadcast(): string;
+    setDebugNoPrune(noPrune: boolean): void;
     startCollaboration(): string;
 
     // C++ SyncClient

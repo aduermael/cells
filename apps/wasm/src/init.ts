@@ -174,6 +174,13 @@ export function initApp(): AppContext {
   // =========================================================================
 
   async function init(): Promise<void> {
+    // Check for debug noPrune URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("noPrune") === "true") {
+      app.client.engine.setDebugNoPrune(true);
+      console.log("[Debug] OpLog pruning disabled via ?noPrune=true");
+    }
+
     // Set up font loading - re-render when fonts are loaded
     onFontLoaded(() => {
       components.render();
