@@ -571,8 +571,8 @@ bazel build //core/cells/... 2>&1 | grep -E "error:|warning:" | head -50
 ### Phase 10: Testing and Validation
 
 - [x] 10a: Run all existing style-related E2E tests - All E2E tests pass (309/312). The 3 failures are unrelated pre-existing issues: borders dropdown UI (2), collab-demo flakiness (1). Fixed serializer_test.cc to use content-addressed base64 styles. Fixed lint errors (removed unused parser functions, added const-correctness to style_buffer.cc). Removed obsolete testdata/styles.zcd.
-- [ ] 10b: Fix borders E2E tests (pre-existing failures unrelated to migration)
-- [ ] 10c: Fix format E2E tests (pre-existing failures unrelated to migration)
+- [x] 10b: Fix borders E2E tests - Fixed "Remove borders with No Border option" by properly handling border style "none" in mergeStyleJson and checking StyleBuffer emptiness. Fixed "Border dropdown closes when clicking outside" by changing test to click B2 instead of E5 (E5 was obscured by the dropdown). Registered border controls with MenuStateManager. All 10 borders tests now pass.
+- [x] 10c: Fix format E2E tests - All 48 format tests pass (no fixes needed)
 - [ ] 10d: Performance benchmarks for style merging (optional)
 
 ### Phase 11: Documentation and Cleanup
