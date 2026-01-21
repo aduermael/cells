@@ -948,7 +948,7 @@ void StyleBuffer::setBorderSide(uint8_t sideBit, BorderStyle style, uint8_t r, u
 
     uint8_t oldMask = _data[offset];
 
-    if (oldMask & sideBit) {
+    if ((oldMask & sideBit) != 0) {
         // Update existing side
         // Find position of this side in the data
         int sideIndex = 0;
@@ -956,7 +956,7 @@ void StyleBuffer::setBorderSide(uint8_t sideBit, BorderStyle style, uint8_t r, u
             if ((1 << i) == sideBit) {
                 break;
             }
-            if (oldMask & (1 << i)) {
+            if ((oldMask & (1 << i)) != 0) {
                 ++sideIndex;
             }
         }
@@ -975,7 +975,7 @@ void StyleBuffer::setBorderSide(uint8_t sideBit, BorderStyle style, uint8_t r, u
             if ((1 << i) == sideBit) {
                 break;
             }
-            if (oldMask & (1 << i)) {
+            if ((oldMask & (1 << i)) != 0) {
                 ++insertIndex;
             }
         }
@@ -993,7 +993,7 @@ void StyleBuffer::clearBorderSide(uint8_t sideBit) {
     const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
     const uint8_t mask = _data[offset];
 
-    if (!(mask & sideBit)) {
+    if ((mask & sideBit) == 0) {
         return;  // Side not set
     }
 
@@ -1003,7 +1003,7 @@ void StyleBuffer::clearBorderSide(uint8_t sideBit) {
         if ((1 << i) == sideBit) {
             break;
         }
-        if (mask & (1 << i)) {
+        if ((mask & (1 << i)) != 0) {
             ++sideIndex;
         }
     }
@@ -1030,7 +1030,7 @@ BorderStyle StyleBuffer::getBorderSideStyle(uint8_t sideBit) const {
     const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
     const uint8_t mask = _data[offset];
 
-    if (!(mask & sideBit)) {
+    if ((mask & sideBit) == 0) {
         return BorderStyle::NONE;
     }
 
@@ -1040,7 +1040,7 @@ BorderStyle StyleBuffer::getBorderSideStyle(uint8_t sideBit) const {
         if ((1 << i) == sideBit) {
             break;
         }
-        if (mask & (1 << i)) {
+        if ((mask & (1 << i)) != 0) {
             ++sideIndex;
         }
     }
@@ -1062,7 +1062,7 @@ void StyleBuffer::getBorderSideColor(uint8_t sideBit, uint8_t& r, uint8_t& g, ui
     const size_t offset = findPropertyOffset(STYLE_FLAG_BORDER);
     const uint8_t mask = _data[offset];
 
-    if (!(mask & sideBit)) {
+    if ((mask & sideBit) == 0) {
         return;
     }
 
@@ -1072,7 +1072,7 @@ void StyleBuffer::getBorderSideColor(uint8_t sideBit, uint8_t& r, uint8_t& g, ui
         if ((1 << i) == sideBit) {
             break;
         }
-        if (mask & (1 << i)) {
+        if ((mask & (1 << i)) != 0) {
             ++sideIndex;
         }
     }

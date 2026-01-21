@@ -36,7 +36,6 @@
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
 #include "core/cells/style_buffer.h"
-#include "core/cells/style_registry.h"
 
 namespace cells {
 
@@ -323,7 +322,6 @@ Workbook::Workbook()
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
       _formatRegistry(std::make_unique<FormatRegistry>()),
-      _styleRegistry(std::make_unique<StyleRegistry>()),
       _depGraph(std::make_unique<DependencyGraph>()) {}
 
 Workbook::Workbook(const ID& id, std::string name)
@@ -333,7 +331,6 @@ Workbook::Workbook(const ID& id, std::string name)
       _namedRanges(std::make_unique<NamedRangeRegistry>()),
       _nodeId(generate_id()),
       _formatRegistry(std::make_unique<FormatRegistry>()),
-      _styleRegistry(std::make_unique<StyleRegistry>()),
       _depGraph(std::make_unique<DependencyGraph>()) {}
 
 Workbook::~Workbook() = default;
@@ -698,42 +695,6 @@ const FormatRegistry* Workbook::getFormatRegistry() const {
     return _formatRegistry.get();
 }
 
-bool Workbook::registerStyle(const ID& styleId, const CellStyle& style) {
-    // Direct registration with specific ID (for CRDT replay)
-    return _styleRegistry->registerStyleDirect(styleId, style);
-}
-
-ID Workbook::findOrRegisterStyle(const CellStyle& style, bool* wasCreated) {
-    // Content-addressed registration with deduplication
-    // DEPRECATED: Use findStyleByContent + STYLE_DEFINE operation instead
-    return _styleRegistry->registerStyle(style, ID(), wasCreated);
-}
-
-ID Workbook::findStyleByContent(const CellStyle& style) const {
-    // Lookup only, no registration - use for deduplication before STYLE_DEFINE
-    return _styleRegistry->findStyleByContent(style);
-}
-
-bool Workbook::hasStyle(const ID& styleId) const {
-    return _styleRegistry->hasStyle(styleId);
-}
-
-const CellStyle* Workbook::getStyle(const ID& styleId) const {
-    return _styleRegistry->getStyle(styleId);
-}
-
-const std::unordered_map<ID, CellStyle, IDHash>& Workbook::getStyles() const {
-    return _styleRegistry->getStyles();
-}
-
-StyleRegistry* Workbook::getStyleRegistry() {
-    return _styleRegistry.get();
-}
-
-const StyleRegistry* Workbook::getStyleRegistry() const {
-    return _styleRegistry.get();
-}
-
 // =============================================================================
 // Workbook-level dependency graph
 // =============================================================================
@@ -811,71 +772,7 @@ bool Workbook::clearFormat(const ID& entityId) {
 }
 
 // =============================================================================
-// Entity style storage (unified: cells, axes, etc.)
-// =============================================================================
-
-ID Workbook::getStyleId(const ID& entityId) const {
-    auto it = _styles.find(entityId);
-    if (it != _styles.end()) {
-        return it->second;
-    }
-    return {};  // null ID
-}
-
-ID Workbook::setStyleId(const ID& entityId, const ID& styleId) {
-    // Get old style ID for reference counting
-    ID oldStyleId;
-    auto existing = _styles.find(entityId);
-    if (existing != _styles.end()) {
-        oldStyleId = existing->second;
-    }
-
-    // If clearing the style (null ID), remove from map
-    if (styleId.isNull()) {
-        if (existing != _styles.end()) {
-            _styles.erase(existing);
-        }
-    } else {
-        // Set style association
-        _styles[entityId] = styleId;
-    }
-
-    // Update reference counts
-    StyleRegistry* registry = getStyleRegistry();
-    if (registry != nullptr) {
-        // Release old style reference (if any)
-        if (!oldStyleId.isNull()) {
-            registry->release(oldStyleId);
-        }
-        // Add reference to new style (if not null)
-        if (!styleId.isNull()) {
-            registry->addRef(styleId);
-        }
-    }
-
-    return oldStyleId;
-}
-
-bool Workbook::clearStyle(const ID& entityId) {
-    auto it = _styles.find(entityId);
-    if (it == _styles.end()) {
-        return false;
-    }
-
-    // Release reference before erasing
-    const ID styleId = it->second;
-    _styles.erase(it);
-
-    StyleRegistry* registry = getStyleRegistry();
-    if (registry != nullptr && !styleId.isNull()) {
-        registry->release(styleId);
-    }
-
-    return true;
-}
-
-// =============================================================================
-// Content-addressed entity style storage (new system)
+// Entity style storage (content-addressed StyleBuffer)
 // =============================================================================
 
 const StyleBuffer* Workbook::getEntityStyle(const ID& entityId) const {
@@ -1284,9 +1181,6 @@ std::unique_ptr<Range> Workbook::removeRange(const ID& rangeId) {
     // Remove from global range ID set
     _rangeIds.erase(rangeId);
 
-    // Also remove any style association
-    _rangeStyles.erase(rangeId);
-
     return removed;
 }
 
@@ -1307,54 +1201,8 @@ std::vector<ID> Workbook::getRangeIdsForSheet(const ID& sheetId) const {
     return result;
 }
 
-// ============================================================================
-// Workbook-Level Range Style Storage
-// ============================================================================
-
-ID Workbook::getRangeStyleId(const ID& rangeId) const {
-    auto it = _rangeStyles.find(rangeId);
-    if (it != _rangeStyles.end()) {
-        return it->second;
-    }
-    return {};  // Return null ID if no style association
-}
-
-void Workbook::setRangeStyleId(const ID& rangeId, const ID& styleId) {
-    // Get the range to update its flags
-    Range* range = getRange(rangeId);
-    if (!range) {
-        return;  // Range doesn't exist
-    }
-
-    // Get the old style ID (if any) for reference counting
-    const ID oldStyleId = getRangeStyleId(rangeId);
-
-    if (styleId.isNull()) {
-        // Remove style association
-        _rangeStyles.erase(rangeId);
-        range->flags = range->flags & ~RangeFlags::STYLE;
-    } else {
-        // Set style association
-        _rangeStyles[rangeId] = styleId;
-        range->flags = range->flags | RangeFlags::STYLE;
-    }
-
-    // Update reference counts
-    StyleRegistry* registry = getStyleRegistry();
-    if (registry != nullptr) {
-        // Release old style reference (if any)
-        if (!oldStyleId.isNull()) {
-            registry->release(oldStyleId);
-        }
-        // Add reference to new style (if not null)
-        if (!styleId.isNull()) {
-            registry->addRef(styleId);
-        }
-    }
-}
-
 // =============================================================================
-// Content-addressed range styles (new system)
+// Range style storage (content-addressed StyleBuffer)
 // =============================================================================
 
 void Workbook::setRangeStyle(const ID& rangeId, const StyleBuffer& style) {

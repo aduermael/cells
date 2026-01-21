@@ -99,9 +99,6 @@ ApplyResult applyWorkbookRename(Workbook& workbook, const Operation& op);
 // Format operations
 ApplyResult applyFormatDefine(Workbook& workbook, const Operation& op);
 
-// Style operations
-ApplyResult applyStyleDefine(Workbook& workbook, const Operation& op);
-
 // Named range operations
 ApplyResult applyNamedRangeDefine(Workbook& workbook, const Operation& op);
 ApplyResult applyNamedRangeDelete(Workbook& workbook, const Operation& op);

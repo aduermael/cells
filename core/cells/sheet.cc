@@ -27,7 +27,6 @@
 #include "core/cells/model.h"
 #include "core/cells/range.h"
 #include "core/cells/range_index.h"
-#include "core/cells/style_registry.h"
 
 namespace cells {
 
@@ -1102,36 +1101,8 @@ void Sheet::clearAllRanges() {
     }
 }
 
-// ============================================================================
-// Range Style Mapping (delegates to Workbook)
-// ============================================================================
-
-ID Sheet::getRangeStyleId(const ID& rangeId) const {
-    if (_workbook == nullptr) {
-        return {};
-    }
-    // Verify range belongs to this sheet
-    const Range* range = _workbook->getRange(rangeId);
-    if (!rangeInSheet(range, this, _workbook)) {
-        return {};
-    }
-    return _workbook->getRangeStyleId(rangeId);
-}
-
-void Sheet::setRangeStyleId(const ID& rangeId, const ID& styleId) {
-    if (_workbook == nullptr) {
-        return;
-    }
-    // Verify range belongs to this sheet
-    const Range* range = _workbook->getRange(rangeId);
-    if (!rangeInSheet(range, this, _workbook)) {
-        return;
-    }
-    _workbook->setRangeStyleId(rangeId, styleId);
-}
-
 // =============================================================================
-// Content-addressed range styles (delegates to Workbook)
+// Range style storage (content-addressed StyleBuffer, delegates to Workbook)
 // =============================================================================
 
 void Sheet::setRangeStyle(const ID& rangeId, const StyleBuffer& style) {

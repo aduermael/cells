@@ -33,7 +33,6 @@
 #include "core/cells/number_formatter.h"
 #include "core/cells/operation.h"
 #include "core/cells/style_buffer.h"
-#include "core/cells/style_registry.h"
 
 namespace cells::wasm {
 
@@ -1461,23 +1460,11 @@ std::string CellsEngine::createStyle(const std::string& styleJson) {
         return "{\"error\":\"No workbook\"}";
     }
 
-    CellStyle style = parseStyleJson(styleJson);
-
-    // Check if identical style already exists (lookup only, no registration)
-    ID styleId = _workbook->findStyleByContent(style);
-    if (!styleId.isNull()) {
-        return "{\"success\":true,\"styleId\":\"" + styleId.toString() + "\",\"existing\":true}";
-    }
-
-    // Style doesn't exist - create via STYLE_DEFINE operation
-    // This is the ONLY way styles should be created (CRDT-native)
-    styleId = generate_id();
-    Operation styleOp = makeStyleDefineOp(*_workbook, styleId, styleJson);
-    applyOperation(*_workbook, styleOp);
-
-    broadcastPendingOperations();
-
-    return "{\"success\":true,\"styleId\":\"" + styleId.toString() + "\"}";
+    // Content-addressed styles: no need to pre-register styles.
+    // Styles are now defined by their content and stored directly on entities.
+    // This method is deprecated but returns success for backward compatibility.
+    (void)styleJson;
+    return "{\"success\":true,\"deprecated\":true,\"message\":\"Styles are now content-addressed\"}";
 }
 
 std::string CellsEngine::getAvailableStyles() {
@@ -1485,18 +1472,21 @@ std::string CellsEngine::getAvailableStyles() {
         return "[]";
     }
 
+    // Content-addressed styles: return entity styles (unique styles used by entities)
     std::ostringstream ss;
     ss << "[";
 
-    const auto& styles = _workbook->getStyles();
+    const auto& entityStyles = _workbook->getEntityStyles();
     bool first = true;
-    for (const auto& [id, style] : styles) {
+    for (const auto& [entityId, styleBuf] : entityStyles) {
         if (!first) {
             ss << ",";
         }
         first = false;
 
-        ss << "{\"id\":\"" << id.toString() << "\",\"style\":" << styleToJson(style) << "}";
+        const CellStyle style = styleBuf.toCellStyle();
+        ss << "{\"entityId\":\"" << entityId.toString() << "\",\"style\":" << styleToJson(style)
+           << "}";
     }
 
     ss << "]";
@@ -1914,9 +1904,9 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
     // Clear redundant cell-level styles within the range (I2: Range style clears cell styles)
     // When applying a range style, remove matching properties from individual cells to avoid redundancy
     for (const auto& cellId : sheet->getCellIds()) {
-        // Read style from workbook map
-        const ID cellStyleId = _workbook->getStyleId(cellId);
-        if (cellStyleId.isNull()) {
+        // Read style from entity (content-addressed)
+        const StyleBuffer* cellStyleBuf = _workbook->getEntityStyle(cellId);
+        if (cellStyleBuf == nullptr) {
             continue;  // Cell has no style, skip
         }
 
@@ -1937,37 +1927,21 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         }
 
         // Get the cell's current style
-        const CellStyle* cellStylePtr = _workbook->getStyle(cellStyleId);
-        if (cellStylePtr == nullptr) {
-            continue;
-        }
+        const CellStyle cellStyle = cellStyleBuf->toCellStyle();
 
         // Strip properties that match the range style
-        CellStyle strippedStyle = stripMatchingStyleProperties(*cellStylePtr, style, styleJson);
+        CellStyle strippedStyle = stripMatchingStyleProperties(cellStyle, style, styleJson);
 
-        // If the stripped style is empty, clear the cell's styleId
-        // Otherwise, create/find the stripped style and update the cell
+        // If the stripped style is empty, clear the cell's style
+        // Otherwise, update the cell with the stripped style (content-addressed)
         if (strippedStyle.isEmpty()) {
-            // Clear the cell's style
-            std::string clearPayload = "{\"style_id\":\"~\"}";
-            Operation clearOp = makeCellSetStyleOp(*_workbook, cellId, clearPayload);
+            // Clear the cell's style using content-addressed operation
+            Operation clearOp = makeCellClearStyleOp(*_workbook, cellId);
             applyOperation(*_workbook, clearOp);
-        } else if (strippedStyle != *cellStylePtr) {
-            // Style changed, need to update the cell
-            // Check if identical style already exists (lookup only, no registration)
-            ID newStyleId = _workbook->findStyleByContent(strippedStyle);
-            if (newStyleId.isNull()) {
-                // Style doesn't exist - create via STYLE_DEFINE operation
-                // This is the ONLY way styles should be created (CRDT-native)
-                newStyleId = generate_id();
-                std::string fullStyleJson = styleToJson(strippedStyle);
-                Operation styleDefineOp = makeStyleDefineOp(*_workbook, newStyleId, fullStyleJson);
-                applyOperation(*_workbook, styleDefineOp);
-            }
-
-            // Update the cell's styleId
-            std::string updatePayload = "{\"style_id\":\"" + newStyleId.toString() + "\"}";
-            Operation updateOp = makeCellSetStyleOp(*_workbook, cellId, updatePayload);
+        } else if (strippedStyle != cellStyle) {
+            // Style changed, need to update the cell with new content-addressed style
+            StyleBuffer strippedBuf = StyleBuffer::fromCellStyle(strippedStyle);
+            Operation updateOp = makeCellSetStyleOp(*_workbook, cellId, strippedBuf);
             applyOperation(*_workbook, updateOp);
         }
     }

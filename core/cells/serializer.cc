@@ -2,12 +2,14 @@
 
 #include <algorithm>
 #include <iomanip>
+#include <map>
 #include <sstream>
 #include <vector>
 
 #include "core/cells/formula_serializer.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
+#include "core/cells/style_buffer.h"
 
 namespace cells {
 
@@ -126,6 +128,63 @@ BorderStyle stringToBorderStyle(const std::string& str) {
 
 Serializer::Serializer() = default;
 
+void Serializer::buildStyleIdMapping(const Workbook& workbook) const {
+    entityToStyleId_.clear();
+
+    // Collect unique styles and generate IDs for deduplication
+    // Use a string key derived from the CellStyle for deduplication
+    std::map<std::string, ID> styleKeyToId;  // styleKey -> generated style ID
+    int styleCounter = 0;
+
+    // Helper lambda to create a style key from CellStyle
+    auto makeStyleKey = [](const CellStyle& style) -> std::string {
+        std::ostringstream keyStream;
+        keyStream << style.bold << style.italic << style.underline << style.wrapText;
+        keyStream << style.bgColor << style.textColor << style.fontFamily;
+        keyStream << static_cast<int>(style.fontSize) << static_cast<int>(style.hAlign);
+        keyStream << static_cast<int>(style.vAlign) << style.defined;
+        // Add border info to key
+        keyStream << static_cast<int>(style.border.top.style) << style.border.top.color;
+        keyStream << static_cast<int>(style.border.right.style) << style.border.right.color;
+        keyStream << static_cast<int>(style.border.bottom.style) << style.border.bottom.color;
+        keyStream << static_cast<int>(style.border.left.style) << style.border.left.color;
+        return keyStream.str();
+    };
+
+    // Helper lambda to add a style to the mapping
+    auto addStyleMapping = [&](const ID& entityId, const StyleBuffer& styleBuf) {
+        const CellStyle style = styleBuf.toCellStyle();
+        const std::string key = makeStyleKey(style);
+
+        auto it = styleKeyToId.find(key);
+        if (it == styleKeyToId.end()) {
+            // Generate a unique style ID
+            std::ostringstream idStream;
+            idStream << "STY" << std::setfill('0') << std::setw(5) << styleCounter++;
+            const ID styleId(idStream.str());
+            styleKeyToId[key] = styleId;
+            entityToStyleId_[entityId] = styleId;
+        } else {
+            entityToStyleId_[entityId] = it->second;
+        }
+    };
+
+    // Add entity styles (cells, axes)
+    for (const auto& [entityId, styleBuf] : workbook.getEntityStyles()) {
+        addStyleMapping(entityId, styleBuf);
+    }
+
+    // Add range styles (stored in Range::style field)
+    for (const auto& sheet : workbook.sheets) {
+        for (const ID& rangeId : sheet->getRangeIds()) {
+            const Range* range = sheet->getRange(rangeId);
+            if (range != nullptr && range->style.has_value()) {
+                addStyleMapping(range->id, *range->style);
+            }
+        }
+    }
+}
+
 std::string Serializer::serialize(const Workbook& workbook) const {
     std::ostringstream ss;
     serialize(workbook, ss);
@@ -133,6 +192,9 @@ std::string Serializer::serialize(const Workbook& workbook) const {
 }
 
 void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
+    // Build the style ID mapping for deduplication during serialization
+    buildStyleIdMapping(workbook);
+
     serializeHeader(workbook, out);
 
     // Serialize custom formats (before sheets, as cells may reference them)
@@ -186,16 +248,46 @@ void Serializer::serializeCustomFormats(const Workbook& workbook, std::ostream& 
 }
 
 void Serializer::serializeStyles(const Workbook& workbook, std::ostream& out) const {
-    const auto& styles = workbook.getStyles();
-    if (styles.empty()) {
+    const auto& entityStyles = workbook.getEntityStyles();
+    if (entityStyles.empty()) {
         return;
+    }
+
+    // Collect unique styles by using the style IDs from entityToStyleId_
+    // Build a map from style ID -> CellStyle
+    std::map<ID, CellStyle> uniqueStyles;
+
+    for (const auto& [entityId, styleBuf] : entityStyles) {
+        auto it = entityToStyleId_.find(entityId);
+        if (it != entityToStyleId_.end()) {
+            const ID& styleId = it->second;
+            if (uniqueStyles.find(styleId) == uniqueStyles.end()) {
+                uniqueStyles[styleId] = styleBuf.toCellStyle();
+            }
+        }
+    }
+
+    // Add range styles (stored in Range::style field)
+    for (const auto& sheet : workbook.sheets) {
+        for (const ID& rangeId : sheet->getRangeIds()) {
+            const Range* range = sheet->getRange(rangeId);
+            if (range != nullptr && range->style.has_value()) {
+                auto it = entityToStyleId_.find(range->id);
+                if (it != entityToStyleId_.end()) {
+                    const ID& styleId = it->second;
+                    if (uniqueStyles.find(styleId) == uniqueStyles.end()) {
+                        uniqueStyles[styleId] = range->style->toCellStyle();
+                    }
+                }
+            }
+        }
     }
 
     // Sort styles by ID for deterministic output
     std::vector<std::pair<std::string, const CellStyle*>> ordered;
-    ordered.reserve(styles.size());
+    ordered.reserve(uniqueStyles.size());
 
-    for (const auto& [styleId, style] : styles) {
+    for (auto& [styleId, style] : uniqueStyles) {
         ordered.emplace_back(styleId.toString(), &style);
     }
 
@@ -546,9 +638,9 @@ void Serializer::serializeRanges(const Sheet& sheet, std::ostream& out) const {
 
         // Add style reference if RANGE_STYLE flag is set
         if (range->hasFlag(RangeFlags::STYLE)) {
-            const ID styleId = sheet.getRangeStyleId(range->id);
-            if (!styleId.isNull()) {
-                out << " sty:" << styleId.toString();
+            auto styleIt = entityToStyleId_.find(range->id);
+            if (styleIt != entityToStyleId_.end()) {
+                out << " sty:" << styleIt->second.toString();
             }
         }
 
@@ -576,11 +668,11 @@ void Serializer::serializeAxis(const Workbook& workbook, const Axis& axis, char 
         out << " hidden:1";
     }
 
-    // Axis style is stored in workbook._styles map (not in Axis struct)
+    // Axis style is stored in workbook._entityStyles map (not in Axis struct)
     if (axis.hasStyle()) {
-        const ID styleId = workbook.getStyleId(axis.id);
-        if (!styleId.isNull()) {
-            out << " sty:" << styleId.toString();
+        auto it = entityToStyleId_.find(axis.id);
+        if (it != entityToStyleId_.end()) {
+            out << " sty:" << it->second.toString();
         }
     }
 
@@ -609,10 +701,10 @@ void Serializer::serializeCell(const Workbook& workbook, const Cell& cell, const
         out << " fmt:" << formatId.toString();
     }
 
-    // Optional style property (only if not null/default) - read from workbook map
-    const ID styleId = workbook.getStyleId(cell.id);
-    if (!styleId.isNull()) {
-        out << " sty:" << styleId.toString();
+    // Optional style property (only if not null/default) - read from entityToStyleId_
+    auto styleIt = entityToStyleId_.find(cell.id);
+    if (styleIt != entityToStyleId_.end()) {
+        out << " sty:" << styleIt->second.toString();
     }
 
     out << "\n";

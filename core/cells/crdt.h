@@ -81,8 +81,8 @@ Operation makeCellClearOp(Workbook& workbook, const ID& cellId);
 Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const std::string& payload);
 
 // Generate a CELL_SET_STYLE operation to set a cell's style.
-// Payload: {"style_id":"..."} or {"style_id":"~"} for default/no style
-// DEPRECATED: Use makeCellSetStyleOp with StyleBuffer for content-addressed styles
+// Payload: {"style":"<base64>"} or {"style":""} to clear
+// For legacy payloads, prefer using the StyleBuffer overload below.
 Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const std::string& payload);
 
 // Generate a CELL_SET_STYLE operation using content-addressed StyleBuffer.
@@ -160,14 +160,6 @@ Operation makeWorkbookRenameOp(Workbook& workbook, const std::string& payload);
 // Payload: {"format_id":"...","format_code":"..."}
 Operation makeFormatDefineOp(Workbook& workbook, const ID& formatId, const std::string& payload);
 
-// Generate a STYLE_DEFINE operation for defining a cell style.
-// DEPRECATED: Use content-addressed styles via RANGE_SET_STYLE with StyleBuffer instead.
-// New code should use makeRangeSetStyleOp(workbook, rangeId, StyleBuffer) which embeds
-// the style data directly in the operation payload as base64-encoded StyleBuffer.
-// Kept for backward compatibility with cell styles (which still use the old system).
-// Payload: JSON with style properties (bold, italic, bgColor, etc.)
-Operation makeStyleDefineOp(Workbook& workbook, const ID& styleId, const std::string& payload);
-
 // Generate a NAMED_RANGE_DEFINE operation for defining a named range.
 // Payload: JSON with named range definition
 // {"name":"MyRange","scope":"W","scopeSheetId":"-",
@@ -206,9 +198,9 @@ Operation makeRangeUpdateCornersOp(Workbook& workbook, const ID& rangeId,
 Operation makeRangeUpdateFlagsOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
 
 // Generate a RANGE_SET_STYLE operation for setting range style metadata.
-// Payload: {"sheet_id":"...","style_id":"..."}
+// Payload: {"style":"<base64>"} or {"style":""} to clear
 // target_id: the range's UUID
-// DEPRECATED: Use makeRangeSetStyleOp with StyleBuffer instead
+// For new code, prefer using the StyleBuffer overload below.
 Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
 
 // Generate a RANGE_SET_STYLE operation using content-addressed StyleBuffer.

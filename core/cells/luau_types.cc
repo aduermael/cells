@@ -41,6 +41,7 @@
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/model.h"
 #include "core/cells/ref_converter.h"
+#include "core/cells/style_buffer.h"
 
 #include "lua.h"     // NOLINT(build/include_subdir)
 #include "lualib.h"  // NOLINT(build/include_subdir)
@@ -181,7 +182,7 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
         return 1;
     }
 
-    // Handle .style property - returns style table or nil (read from workbook map)
+    // Handle .style property - returns style table or nil (read from workbook entity styles)
     if (strcmp(key, "style") == 0) {
         // Get workbook to look up style
         const Workbook* workbook = getWorkbook(L);
@@ -189,45 +190,42 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
             lua_pushnil(L);
             return 1;
         }
-        const ID styleId = workbook->getStyleId(cell->id);
-        if (styleId.isNull()) {
+        const StyleBuffer* styleBuf = workbook->getEntityStyle(cell->id);
+        if (styleBuf == nullptr) {
             lua_pushnil(L);
             return 1;
         }
-        const CellStyle* style = workbook->getStyle(styleId);
-        if (style == nullptr) {
-            lua_pushnil(L);
-            return 1;
-        }
+        // Convert to CellStyle for Lua table
+        const CellStyle style = styleBuf->toCellStyle();
         // Return style as Lua table
         lua_newtable(L);
-        lua_pushboolean(L, style->bold ? 1 : 0);
+        lua_pushboolean(L, style.bold ? 1 : 0);
         lua_setfield(L, -2, "bold");
-        lua_pushboolean(L, style->italic ? 1 : 0);
+        lua_pushboolean(L, style.italic ? 1 : 0);
         lua_setfield(L, -2, "italic");
-        lua_pushboolean(L, style->underline ? 1 : 0);
+        lua_pushboolean(L, style.underline ? 1 : 0);
         lua_setfield(L, -2, "underline");
-        lua_pushboolean(L, style->wrapText ? 1 : 0);
+        lua_pushboolean(L, style.wrapText ? 1 : 0);
         lua_setfield(L, -2, "wrapText");
-        if (!style->bgColor.empty()) {
-            lua_pushstring(L, style->bgColor.c_str());
+        if (!style.bgColor.empty()) {
+            lua_pushstring(L, style.bgColor.c_str());
             lua_setfield(L, -2, "bgColor");
         }
-        if (!style->textColor.empty()) {
-            lua_pushstring(L, style->textColor.c_str());
+        if (!style.textColor.empty()) {
+            lua_pushstring(L, style.textColor.c_str());
             lua_setfield(L, -2, "textColor");
         }
-        if (!style->fontFamily.empty()) {
-            lua_pushstring(L, style->fontFamily.c_str());
+        if (!style.fontFamily.empty()) {
+            lua_pushstring(L, style.fontFamily.c_str());
             lua_setfield(L, -2, "fontFamily");
         }
-        if (style->fontSize > 0) {
-            lua_pushnumber(L, style->fontSize);
+        if (style.fontSize > 0) {
+            lua_pushnumber(L, style.fontSize);
             lua_setfield(L, -2, "fontSize");
         }
         // Horizontal alignment
         const char* hAlignStr = "left";
-        switch (style->hAlign) {
+        switch (style.hAlign) {
             case TextAlign::CENTER:
                 hAlignStr = "center";
                 break;
@@ -244,7 +242,7 @@ int LuauSandbox::luaCellIndex(lua_State* L) {
         lua_setfield(L, -2, "hAlign");
         // Vertical alignment
         const char* vAlignStr = "bottom";
-        switch (style->vAlign) {
+        switch (style.vAlign) {
             case VerticalAlign::TOP:
                 vAlignStr = "top";
                 break;
@@ -586,8 +584,8 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
 
         // Handle nil - clear style
         if (lua_isnil(L, 3) != 0) {
-            const std::string payload = R"({"style_id":"~"})";
-            const Operation op = makeCellSetStyleOp(*workbook, cell->id, payload);
+            const std::string clearPayload = R"({"style":""})";
+            const Operation op = makeCellSetStyleOp(*workbook, cell->id, clearPayload);
             applyOperation(*workbook, op);
             return 0;
         }
@@ -600,13 +598,10 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
         // Build style from table
         CellStyle style;
 
-        // Get existing style to merge with (if any) - read from workbook map
-        const ID existingStyleId = workbook->getStyleId(cell->id);
-        if (!existingStyleId.isNull()) {
-            const CellStyle* existing = workbook->getStyle(existingStyleId);
-            if (existing != nullptr) {
-                style = *existing;
-            }
+        // Get existing style to merge with (if any) - read from workbook entity styles
+        const StyleBuffer* existingStyle = workbook->getEntityStyle(cell->id);
+        if (existingStyle != nullptr) {
+            style = existingStyle->toCellStyle();
         }
 
         // Merge provided properties, setting defined flags for provided properties
@@ -707,70 +702,17 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
 
         // If style is empty, clear it
         if (style.isEmpty()) {
-            const std::string payload = R"({"style_id":"~"})";
-            const Operation op = makeCellSetStyleOp(*workbook, cell->id, payload);
+            const std::string clearPayload = R"({"style":""})";
+            const Operation op = makeCellSetStyleOp(*workbook, cell->id, clearPayload);
             applyOperation(*workbook, op);
             return 0;
         }
 
-        // Generate a new style ID and define the style
-        const ID styleId = generate_id();
+        // Convert CellStyle to content-addressed StyleBuffer
+        const StyleBuffer styleBuf = StyleBuffer::fromCellStyle(style);
 
-        // Build STYLE_DEFINE payload
-        std::string stylePayload = "{";
-        stylePayload += R"("bold":)" + std::string(style.bold ? "true" : "false");
-        stylePayload += R"(,"italic":)" + std::string(style.italic ? "true" : "false");
-        stylePayload += R"(,"underline":)" + std::string(style.underline ? "true" : "false");
-        stylePayload += R"(,"wrapText":)" + std::string(style.wrapText ? "true" : "false");
-        if (!style.bgColor.empty()) {
-            stylePayload += R"(,"bgColor":")" + jsonEscape(style.bgColor) + R"(")";
-        }
-        if (!style.textColor.empty()) {
-            stylePayload += R"(,"textColor":")" + jsonEscape(style.textColor) + R"(")";
-        }
-        if (!style.fontFamily.empty()) {
-            stylePayload += R"(,"fontFamily":")" + jsonEscape(style.fontFamily) + R"(")";
-        }
-        if (style.fontSize > 0) {
-            stylePayload += R"(,"fontSize":)" + std::to_string(style.fontSize);
-        }
-        // Alignment
-        const char* hAlignName = "left";
-        switch (style.hAlign) {
-            case TextAlign::CENTER:
-                hAlignName = "center";
-                break;
-            case TextAlign::RIGHT:
-                hAlignName = "right";
-                break;
-            case TextAlign::JUSTIFY:
-                hAlignName = "justify";
-                break;
-            default:
-                break;
-        }
-        stylePayload += R"(,"hAlign":")" + std::string(hAlignName) + R"(")";
-        const char* vAlignName = "bottom";
-        switch (style.vAlign) {
-            case VerticalAlign::TOP:
-                vAlignName = "top";
-                break;
-            case VerticalAlign::MIDDLE:
-                vAlignName = "middle";
-                break;
-            default:
-                break;
-        }
-        stylePayload += R"(,"vAlign":")" + std::string(vAlignName) + R"(")";
-        stylePayload += "}";
-
-        // Apply STYLE_DEFINE operation
-        const Operation defineOp = makeStyleDefineOp(*workbook, styleId, stylePayload);
-        applyOperation(*workbook, defineOp);
-
-        // Apply CELL_SET_STYLE operation
-        const std::string cellPayload = R"({"style_id":")" + styleId.toString() + R"("})";
-        const Operation styleOp = makeCellSetStyleOp(*workbook, cell->id, cellPayload);
+        // Apply CELL_SET_STYLE operation with content-addressed style
+        const Operation styleOp = makeCellSetStyleOp(*workbook, cell->id, styleBuf);
         applyOperation(*workbook, styleOp);
 
         return 0;

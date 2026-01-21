@@ -29,7 +29,9 @@
 
 #include <ostream>
 #include <string>
+#include <unordered_map>
 
+#include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/oplog.h"
 #include "core/cells/types.h"
@@ -57,6 +59,13 @@ public:
     void serialize(const Workbook& workbook, std::ostream& out) const;
 
 private:
+    // Style ID lookup for serialization (entity ID -> generated style ID)
+    // Mutable because it's built during const serialize() call
+    mutable std::unordered_map<ID, ID, IDHash> entityToStyleId_;
+
+    // Build the style ID mapping from entity styles
+    void buildStyleIdMapping(const Workbook& workbook) const;
+
     // Serialize document header
     void serializeHeader(const Workbook& workbook, std::ostream& out) const;
 

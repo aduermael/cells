@@ -488,7 +488,7 @@ Update ranges to use StyleBuffer instead of style_id reference.
 - [x] 5b: Update `applyRangeSetStyle()` to parse base64 style - Already done in Phase 4c (supports both old {"style_id":"..."} and new {"style":"<base64>"} formats).
 - [x] 5c: Remove `STYLE_DEFINE` operation type (or deprecate) - Marked as deprecated with comments in operation.h and crdt.h. Cannot fully remove yet since cell styles still use the old system.
 - [x] 5d: Update bootstrap to not emit STYLE_DEFINE operations - Updated bootstrapOpLog to emit content-addressed styles for ranges using makeRangeSetStyleOp(StyleBuffer). Still emits STYLE_DEFINE for cell styles (old system).
-- [x] 5e: Add backward compatibility: parse old format during transition - Already in place from Phase 4c (applyRangeSetStyle checks for "style" field first, falls back to "style_id").
+- [x] 5e: ~~Add backward compatibility~~ - Not needed, app not released. Old style_id format removed entirely.
 
 ### Phase 6: Update Bindings and TypeScript
 
@@ -513,17 +513,60 @@ Cells and axes (columns/rows) now use content-addressed StyleBuffer instead of t
 
 Now that both ranges AND cells use content-addressed styles, we can remove the old system.
 
-- [ ] 8a: Remove StyleRegistry class
-- [ ] 8b: Remove style_id from workbook model (the `_styles` map of entity→styleId)
-- [ ] 8c: Remove STYLE_DEFINE from operation types
-- [ ] 8d: Clean up any remaining style ID references
+**IMPORTANT: No backward compatibility needed.** The app is not yet released. Simply remove/replace old APIs - don't add compatibility shims or support for old formats. Tests should be updated to use the new APIs, not test the old ones.
+
+- [x] 8a: Remove StyleRegistry class - Removed style_registry.h, style_registry.cc, style_registry_test.cc and updated BUILD file.
+- [x] 8b: Remove style_id from workbook model (the `_styles` map of entity→styleId) - Removed _styles, _styleRegistry, _rangeStyles members. Removed registerStyle, findOrRegisterStyle, findStyleByContent, hasStyle, getStyle, getStyles, getStyleRegistry, getStyleId, setStyleId, clearStyle, getRangeStyleId, setRangeStyleId methods.
+- [x] 8c: Remove STYLE_DEFINE from operation types - Removed from OpType enum, operation string conversion, makeStyleDefineOp, applyStyleDefine.
+- [x] 8d: Clean up any remaining style ID references - Updated luau_api.cc, luau_types.cc to use content-addressed styles. Updated xlsx_reader.cc to use StyleBuffer directly. Updated xlsx_writer.cc to use getEntityStyle.
+- [x] 8e: Update serializer and parser for new style system - Serializer now builds a style ID mapping from entity styles and range styles for deduplication. Parser stores styles locally and applies via setEntityStyle.
+- [x] 8f: Update test files to use content-addressed styles - Updated serializer_test.cc, xlsx_reader_test.cc, xlsx_writer_test.cc, csv_writer_test.cc, crdt_test.cc, crdt_range_test.cc, and bindings_format.cc to use new content-addressed APIs.
+
+**Test files that need updating:**
+
+Just update tests to use new APIs. Don't preserve tests for old style_id system - delete or rewrite them.
+
+1. `xlsx_reader_test.cc` - ~20 usages of old APIs
+   - Replace `getStyleId(cellId)` with `getEntityStyle(cellId)`
+   - Replace `getStyle(styleId)` with `styleBuf->toCellStyle()`
+   - Replace `getStyles().empty()` with `getEntityStyles().empty()`
+
+2. `xlsx_writer_test.cc` - ~30 usages of old APIs
+   - Replace `registerStyle(styleId, style)` with `setEntityStyle(entityId, StyleBuffer::fromCellStyle(style))`
+   - Replace `setStyleId(entityId, styleId)` with above (combine into one call)
+   - Replace `getStyleId(entityId)` with `getEntityStyle(entityId)`
+
+3. `serializer_test.cc` - ~40 usages of old APIs
+   - Same patterns as xlsx_writer_test
+   - Note: Serialized style IDs are now generated (STY00000, STY00001, etc.) not user-provided
+   - Tests checking specific style IDs like "STYbold1" should check style *content* instead
+
+4. `csv_writer_test.cc` - ~5 usages
+   - Same patterns as above
+
+**API Migration Reference:**
+
+Old API → New API:
+- `workbook->registerStyle(styleId, cellStyle)` → `workbook->setEntityStyle(entityId, StyleBuffer::fromCellStyle(cellStyle))`
+- `workbook->setStyleId(entityId, styleId)` → (combined with above - no separate step needed)
+- `workbook->getStyleId(entityId)` → `workbook->getEntityStyle(entityId)` (returns StyleBuffer*)
+- `workbook->getStyle(styleId)` → `styleBuf->toCellStyle()` (convert StyleBuffer to CellStyle)
+- `workbook->hasStyle(styleId)` → `workbook->hasEntityStyle(entityId)`
+- `workbook->getStyles()` → `workbook->getEntityStyles()` (returns map<ID, StyleBuffer>)
+- `sheet->getRangeStyleId(rangeId)` → `range->style` (access StyleBuffer directly on Range)
+- `sheet->setRangeStyleId(rangeId, styleId)` → `sheet->setRangeStyle(rangeId, styleBuf)`
+
+**Build command to check progress:**
+```bash
+bazel build //core/cells/... 2>&1 | grep -E "error:|warning:" | head -50
+```
 
 ### Phase 9: File Format Migration
 
-- [ ] 9a: Update ZCD serializer to write new style format
-- [ ] 9b: Add ZCD deserializer support for both old and new formats
-- [ ] 9c: Update XLSX import to create StyleBuffer directly
-- [ ] 9d: Update XLSX export to read from StyleBuffer
+- [x] 9a: Update ZCD serializer to write new style format - Serializer builds style ID mapping from _entityStyles and range styles, serializes unique styles with generated IDs.
+- [x] 9b: Add ZCD deserializer support for both old and new formats - Parser stores parsed styles in parsedStyles_ map and applies via setEntityStyle.
+- [x] 9c: Update XLSX import to create StyleBuffer directly - xlsx_reader.cc uses getStyleBuffer helper to create StyleBuffer from XLSX style index and setEntityStyle.
+- [x] 9d: Update XLSX export to read from StyleBuffer - xlsx_writer.cc uses getEntityStyle and converts to CellStyle via toCellStyle().
 
 ### Phase 10: Testing and Validation
 
@@ -571,7 +614,7 @@ Now that both ranges AND cells use content-addressed styles, we can remove the o
 
 ## Risks and Mitigations
 
-1. **Migration complexity**: Mitigate with backward-compatible parsing
+1. ~~**Migration complexity**: Mitigate with backward-compatible parsing~~ - Not a concern, app not released
 2. **Binary format versioning**: Reserve bits for version indicator if needed
 3. **Large styles (many properties)**: Still smaller than JSON; can compress if needed
 4. **Debugging difficulty**: Keep `toJSON()` for human-readable output

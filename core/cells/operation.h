@@ -78,14 +78,6 @@ enum class OpType : uint8_t {
     // Format operations
     FORMAT_DEFINE = 40,  // Define a custom number format
 
-    // Style operations
-    // DEPRECATED: Use content-addressed styles via RANGE_SET_STYLE payload instead.
-    // Style definitions are now embedded directly in RANGE_SET_STYLE operations as
-    // base64-encoded StyleBuffer data. This eliminates the sync bug where STYLE_DEFINE
-    // operations could be pruned while RANGE_SET_STYLE references remained.
-    // Kept for backward compatibility parsing of old operations.
-    STYLE_DEFINE = 41,  // Define a cell style (DEPRECATED)
-
     // Named range operations
     NAMED_RANGE_DEFINE = 50,  // Define a named range
     NAMED_RANGE_DELETE = 51,  // Delete a named range

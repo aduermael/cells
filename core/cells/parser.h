@@ -85,6 +85,8 @@ private:
     std::unordered_map<ID, std::string, IDHash> pendingSharedFormulas_;
     // Cell ID -> Cell* for resolving references after parsing
     std::unordered_map<ID, Cell*, IDHash> cellsByIdForResolution_;
+    // Parsed style definitions: style ID -> CellStyle (for applying to cells/axes)
+    std::unordered_map<ID, CellStyle, IDHash> parsedStyles_;
 
     // Reset parser state for new parse
     void reset();

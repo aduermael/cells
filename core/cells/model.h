@@ -59,7 +59,6 @@ struct OpLog;
 struct SpillInfo;
 struct Range;
 class RangeIndex;
-class StyleRegistry;
 class FormatRegistry;
 enum class RangeFlags : uint8_t;
 
@@ -667,22 +666,10 @@ struct Sheet {
     void clearAllRanges();
 
     // ========================================================================
-    // Range Style Mapping (delegates to Workbook)
+    // Range style storage (content-addressed StyleBuffer, delegates to Workbook)
     // ========================================================================
 
-    // Get the style ID associated with a range (delegates to Workbook)
-    // DEPRECATED: Use getRangeStyle() instead for content-addressed styles
-    [[nodiscard]] ID getRangeStyleId(const ID& rangeId) const;
-
-    // Set the style ID for a range (delegates to Workbook)
-    // DEPRECATED: Use setRangeStyle() instead for content-addressed styles
-    void setRangeStyleId(const ID& rangeId, const ID& styleId);
-
-    // ========================================================================
-    // Content-addressed range styles (new system, delegates to Workbook)
-    // ========================================================================
-
-    // Set the style directly on a range using content-addressed StyleBuffer
+    // Set the style on a range using content-addressed StyleBuffer
     void setRangeStyle(const ID& rangeId, const StyleBuffer& style);
 
     // Set the style directly on a range (move semantics)
@@ -906,41 +893,6 @@ struct Workbook {
     [[nodiscard]] const FormatRegistry* getFormatRegistry() const;
 
     // ========================================================================
-    // Cell styles (CRDT-synced)
-    // ========================================================================
-
-    // Register a style definition with a specific ID (called by CRDT when applying STYLE_DEFINE)
-    // Returns true if the style was newly added, false if it already existed
-    // Note: This preserves the exact ID - no deduplication. For deduplication, use
-    // findOrRegisterStyle.
-    bool registerStyle(const ID& styleId, const CellStyle& style);
-
-    // Find an existing style matching the content, or register a new one
-    // Returns the ID of the matching/new style (may differ from any proposed ID)
-    // This provides content-addressed deduplication - identical styles share one ID.
-    // If wasCreated is provided, it will be set to true if a new style was created.
-    // DEPRECATED: Use findStyleByContent + STYLE_DEFINE operation instead.
-    ID findOrRegisterStyle(const CellStyle& style, bool* wasCreated = nullptr);
-
-    // Find an existing style by content (lookup only, no registration)
-    // Returns the style ID if found, or null ID if not found.
-    // Use this before creating STYLE_DEFINE operations for deduplication.
-    [[nodiscard]] ID findStyleByContent(const CellStyle& style) const;
-
-    // Check if a style is defined
-    [[nodiscard]] bool hasStyle(const ID& styleId) const;
-
-    // Get a style by ID (returns nullptr if not found)
-    [[nodiscard]] const CellStyle* getStyle(const ID& styleId) const;
-
-    // Get all styles (for bootstrapOpLog and sync)
-    [[nodiscard]] const std::unordered_map<ID, CellStyle, IDHash>& getStyles() const;
-
-    // Get the style registry for advanced operations (ref counting, etc.)
-    [[nodiscard]] StyleRegistry* getStyleRegistry();
-    [[nodiscard]] const StyleRegistry* getStyleRegistry() const;
-
-    // ========================================================================
     // Entity format storage (unified: cells, axes, etc.)
     // ========================================================================
 
@@ -955,31 +907,10 @@ struct Workbook {
     bool clearFormat(const ID& entityId);
 
     // ========================================================================
-    // Entity style storage (unified: cells, axes, etc.)
+    // Entity style storage (content-addressed StyleBuffer)
     // ========================================================================
 
-    // ---- DEPRECATED: Old style_id-based system ----
-    // These methods use StyleRegistry and style IDs. Use the content-addressed
-    // methods below (setEntityStyle, getEntityStyle) for new code.
-
-    // Get the style ID for an entity (cell, axis, etc.) - returns null ID if no style
-    // DEPRECATED: Use getEntityStyle() instead
-    [[nodiscard]] ID getStyleId(const ID& entityId) const;
-
-    // Set the style ID for an entity. Returns the old style ID (null if none).
-    // Pass null ID to clear the style (same as clearStyle).
-    // DEPRECATED: Use setEntityStyle() instead
-    ID setStyleId(const ID& entityId, const ID& styleId);
-
-    // Clear the style for an entity. Returns true if the entity had a style.
-    // DEPRECATED: Use clearEntityStyle() instead
-    bool clearStyle(const ID& entityId);
-
-    // ---- Content-addressed style system ----
-    // These methods use StyleBuffer directly without style IDs or StyleRegistry.
-    // The style data IS its identity (content-addressed).
-
-    // Get the content-addressed style for an entity (cell, axis, etc.)
+    // Get the style for an entity (cell, axis, etc.)
     // Returns nullptr if no style is set
     [[nodiscard]] const StyleBuffer* getEntityStyle(const ID& entityId) const;
 
@@ -993,6 +924,11 @@ struct Workbook {
 
     // Check if entity has a content-addressed style
     [[nodiscard]] bool hasEntityStyle(const ID& entityId) const;
+
+    // Get all entity styles (for serialization)
+    [[nodiscard]] const std::unordered_map<ID, StyleBuffer, IDHash>& getEntityStyles() const {
+        return _entityStyles;
+    }
 
     // ========================================================================
     // Workbook-level shared formula tracking (runtime-only)
@@ -1085,30 +1021,10 @@ struct Workbook {
     [[nodiscard]] std::vector<ID> getRangeIdsForSheet(const ID& sheetId) const;
 
     // ========================================================================
-    // Range style storage (moved from Sheet for consistency)
+    // Range style storage (content-addressed StyleBuffer)
     // ========================================================================
 
-    // Get the style ID associated with a range (returns null ID if no style)
-    // DEPRECATED: Use Range::getStyle() instead for content-addressed styles
-    [[nodiscard]] ID getRangeStyleId(const ID& rangeId) const;
-
-    // Set the style ID for a range (also sets RANGE_STYLE flag on the range)
-    // Pass null ID to remove the style association
-    // DEPRECATED: Use setRangeStyle(rangeId, StyleBuffer) instead
-    void setRangeStyleId(const ID& rangeId, const ID& styleId);
-
-    // Get all range-style mappings (for serialization)
-    // DEPRECATED: Use Range::getStyle() instead for content-addressed styles
-    [[nodiscard]] const std::unordered_map<ID, ID, IDHash>& getRangeStyles() const {
-        return _rangeStyles;
-    }
-
-    // ========================================================================
-    // Content-addressed range styles (new system)
-    // ========================================================================
-
-    // Set the style directly on a range using content-addressed StyleBuffer
-    // This stores the style in the Range itself (no separate style ID needed)
+    // Set the style on a range using content-addressed StyleBuffer
     void setRangeStyle(const ID& rangeId, const StyleBuffer& style);
 
     // Set the style directly on a range (move semantics)
@@ -1146,26 +1062,15 @@ private:
     // Synced via FORMAT_DEFINE operations
     std::unique_ptr<FormatRegistry> _formatRegistry;
 
-    // Cell style registry with deduplication and reference counting
-    // Synced via STYLE_DEFINE operations
-    std::unique_ptr<StyleRegistry> _styleRegistry;
-
     // ========================================================================
-    // Cell format/style storage (moved from Cell struct for memory efficiency)
+    // Entity format/style storage
     // ========================================================================
 
     // Entity ID -> format ID mapping (cells, axes, or other entities with formats)
-    // Unified format map: since UUIDs are unique across resource types, one map suffices
     std::unordered_map<ID, ID, IDHash> _formats;
 
-    // Entity ID -> style ID mapping (cells, axes, or other entities with styles)
-    // Unified style map: since UUIDs are unique across resource types, one map suffices
-    // DEPRECATED: Use _entityStyles (content-addressed StyleBuffer) for new code
-    std::unordered_map<ID, ID, IDHash> _styles;
-
     // Entity ID -> content-addressed StyleBuffer mapping (cells, axes, etc.)
-    // This is the new style system that replaces _styles + StyleRegistry
-    // Content-addressed: the style data IS its identity, no separate style IDs needed
+    // Content-addressed: the style data IS its identity
     std::unordered_map<ID, StyleBuffer, IDHash> _entityStyles;
 
     // ========================================================================
@@ -1230,10 +1135,6 @@ private:
 
     // Global set of all range IDs for fast iteration
     std::unordered_set<ID, IDHash> _rangeIds;
-
-    // Range-to-styleId mapping (for ranges with RANGE_STYLE flag)
-    // Key: range ID, Value: style ID from Workbook::styles
-    std::unordered_map<ID, ID, IDHash> _rangeStyles;
 };
 
 }  // namespace cells

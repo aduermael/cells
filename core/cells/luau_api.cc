@@ -36,6 +36,7 @@
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/model.h"
 #include "core/cells/ref_converter.h"
+#include "core/cells/style_buffer.h"
 
 #include "lua.h"     // NOLINT(build/include_subdir)
 #include "lualib.h"  // NOLINT(build/include_subdir)
@@ -777,11 +778,9 @@ int LuauSandbox::luaSetColumnStyle(lua_State* L) {
     }
     lua_pop(L, 1);
 
-    // Register the style and apply to column
-    const ID styleId = generate_id();
-    workbook->registerStyle(styleId, style);
-
-    const Operation op = makeAxisSetStyleOp(*workbook, col->id, styleId);
+    // Convert to content-addressed StyleBuffer and apply to column
+    const StyleBuffer styleBuf = StyleBuffer::fromCellStyle(style);
+    const Operation op = makeAxisSetStyleOp(*workbook, col->id, styleBuf);
     applyOperation(*workbook, op);
 
     return 0;
@@ -862,11 +861,9 @@ int LuauSandbox::luaSetRowStyle(lua_State* L) {
     }
     lua_pop(L, 1);
 
-    // Register the style and apply to row
-    const ID styleId = generate_id();
-    workbook->registerStyle(styleId, style);
-
-    const Operation op = makeAxisSetStyleOp(*workbook, row->id, styleId);
+    // Convert to content-addressed StyleBuffer and apply to row
+    const StyleBuffer styleBuf = StyleBuffer::fromCellStyle(style);
+    const Operation op = makeAxisSetStyleOp(*workbook, row->id, styleBuf);
     applyOperation(*workbook, op);
 
     return 0;
@@ -1391,14 +1388,14 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
 
     // Handle nil - clear style
     if (lua_isnil(L, 2) != 0) {
-        const std::string payload = R"({"style_id":"~"})";
+        const std::string clearPayload = R"({"style":""})";
         for (int c = fromCol; c <= toCol; c++) {
             for (int r = fromRow; r <= toRow; r++) {
                 const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
                 const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
                 const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
 
-                const Operation op = makeCellSetStyleOp(*workbook, cell->id, payload);
+                const Operation op = makeCellSetStyleOp(*workbook, cell->id, clearPayload);
                 applyOperation(*workbook, op);
             }
         }
@@ -1501,84 +1498,31 @@ int LuauSandbox::luaSetStyle(lua_State* L) {
 
     // If style is empty, clear it
     if (style.isEmpty()) {
-        const std::string payload = R"({"style_id":"~"})";
+        const std::string clearPayload = R"({"style":""})";
         for (int c = fromCol; c <= toCol; c++) {
             for (int r = fromRow; r <= toRow; r++) {
                 const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
                 const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
                 const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
 
-                const Operation op = makeCellSetStyleOp(*workbook, cell->id, payload);
+                const Operation op = makeCellSetStyleOp(*workbook, cell->id, clearPayload);
                 applyOperation(*workbook, op);
             }
         }
         return 0;
     }
 
-    // Generate a new style ID and define the style
-    const ID styleId = generate_id();
+    // Convert CellStyle to content-addressed StyleBuffer
+    const StyleBuffer styleBuf = StyleBuffer::fromCellStyle(style);
 
-    // Build STYLE_DEFINE payload
-    std::string stylePayload = "{";
-    stylePayload += R"("bold":)" + std::string(style.bold ? "true" : "false");
-    stylePayload += R"(,"italic":)" + std::string(style.italic ? "true" : "false");
-    stylePayload += R"(,"underline":)" + std::string(style.underline ? "true" : "false");
-    stylePayload += R"(,"wrapText":)" + std::string(style.wrapText ? "true" : "false");
-    if (!style.bgColor.empty()) {
-        stylePayload += R"(,"bgColor":")" + jsonEscape(style.bgColor) + R"(")";
-    }
-    if (!style.textColor.empty()) {
-        stylePayload += R"(,"textColor":")" + jsonEscape(style.textColor) + R"(")";
-    }
-    if (!style.fontFamily.empty()) {
-        stylePayload += R"(,"fontFamily":")" + jsonEscape(style.fontFamily) + R"(")";
-    }
-    if (style.fontSize > 0) {
-        stylePayload += R"(,"fontSize":)" + std::to_string(style.fontSize);
-    }
-    // Alignment
-    const char* hAlignName = "left";
-    switch (style.hAlign) {
-        case TextAlign::CENTER:
-            hAlignName = "center";
-            break;
-        case TextAlign::RIGHT:
-            hAlignName = "right";
-            break;
-        case TextAlign::JUSTIFY:
-            hAlignName = "justify";
-            break;
-        default:
-            break;
-    }
-    stylePayload += R"(,"hAlign":")" + std::string(hAlignName) + R"(")";
-    const char* vAlignName = "bottom";
-    switch (style.vAlign) {
-        case VerticalAlign::TOP:
-            vAlignName = "top";
-            break;
-        case VerticalAlign::MIDDLE:
-            vAlignName = "middle";
-            break;
-        default:
-            break;
-    }
-    stylePayload += R"(,"vAlign":")" + std::string(vAlignName) + R"(")";
-    stylePayload += "}";
-
-    // Apply STYLE_DEFINE operation
-    const Operation defineOp = makeStyleDefineOp(*workbook, styleId, stylePayload);
-    applyOperation(*workbook, defineOp);
-
-    // Apply CELL_SET_STYLE to all cells in range
-    const std::string cellPayload = R"({"style_id":")" + styleId.toString() + R"("})";
+    // Apply CELL_SET_STYLE to all cells in range using content-addressed style
     for (int c = fromCol; c <= toCol; c++) {
         for (int r = fromRow; r <= toRow; r++) {
             const Axis* col = sheet->getOrCreateColumnByPosition(static_cast<uint32_t>(c));
             const Axis* row = sheet->getOrCreateRowByPosition(static_cast<uint32_t>(r));
             const Cell* cell = sheet->getOrCreateCellAt(col->id, row->id);
 
-            const Operation op = makeCellSetStyleOp(*workbook, cell->id, cellPayload);
+            const Operation op = makeCellSetStyleOp(*workbook, cell->id, styleBuf);
             applyOperation(*workbook, op);
         }
     }

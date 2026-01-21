@@ -60,29 +60,6 @@ cc_library(
 )
 
 cc_library(
-    name = "style_registry",
-    srcs = ["style_registry.cc"],
-    hdrs = ["style_registry.h"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":id",
-        ":style_types",
-        ":types",
-    ],
-)
-
-cc_test(
-    name = "style_registry_test",
-    srcs = ["style_registry_test.cc"],
-    deps = [
-        ":id",
-        ":style_registry",
-        ":style_types",
-        "@googletest//:gtest_main",
-    ],
-)
-
-cc_library(
     name = "format_registry",
     srcs = ["format_registry.cc"],
     hdrs = ["format_registry.h"],
@@ -306,7 +283,6 @@ cc_library(
         ":oplog",
         ":range",
         ":range_index",
-        ":style_registry",
         ":style_types",
         ":types",
     ],
@@ -331,7 +307,6 @@ cc_library(
         ":number_format",
         ":operation",
         ":range",
-        ":style_registry",
         "//core/log",
     ],
 )

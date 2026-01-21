@@ -544,12 +544,11 @@ TEST(CSVWriterTest, StyleWarningForStyledSheet) {
     auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
     cell->value = CellValue("Bold Text");
 
-    // Register and apply a style (store in workbook map)
+    // Apply a style directly on entity (content-addressed)
     CellStyle boldStyle;
     boldStyle.bold = true;
-    ID styleId = generate_id();
-    workbook->registerStyle(styleId, boldStyle);
-    workbook->setStyleId(cell->id, styleId);
+    boldStyle.setDefined(DEFINED_BOLD);
+    workbook->setEntityStyle(cell->id, StyleBuffer::fromCellStyle(boldStyle));
     cell->markHasStyle();
 
     sheet->addCell(std::move(cell));
@@ -582,11 +581,11 @@ TEST(CSVWriterTest, StyleWarningOnlyOnce) {
     ID colId = col->id;
     sheet->addColumn(std::move(col));
 
-    // Register style
+    // Create style (content-addressed)
     CellStyle boldStyle;
     boldStyle.bold = true;
-    ID styleId = generate_id();
-    workbook->registerStyle(styleId, boldStyle);
+    boldStyle.setDefined(DEFINED_BOLD);
+    const StyleBuffer boldStyleBuf = StyleBuffer::fromCellStyle(boldStyle);
 
     // Create multiple styled cells
     for (int i = 0; i < 5; i++) {
@@ -597,10 +596,11 @@ TEST(CSVWriterTest, StyleWarningOnlyOnce) {
 
         auto cell = std::make_unique<Cell>(generate_id(), colId, rowId);
         cell->value = CellValue("Row " + std::to_string(i));
-        // Store style in workbook map
-        workbook->setStyleId(cell->id, styleId);
+        // Set style directly on entity
+        ID cellId = cell->id;
         cell->markHasStyle();
         sheet->addCell(std::move(cell));
+        workbook->setEntityStyle(cellId, boldStyleBuf);
     }
 
     workbook->addSheet(std::move(sheet));

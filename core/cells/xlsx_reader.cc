@@ -14,6 +14,7 @@
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
+#include "core/cells/style_buffer.h"
 #include "core/cells/types.h"
 
 #include "miniz.h"
@@ -702,21 +703,6 @@ struct XLSXStyles {
         return hasStyle;
     }
 };
-
-// Create a unique key string from a CellStyle (for deduplication)
-std::string cellStyleToKey(const cells::CellStyle& style) {
-    std::ostringstream oss;
-    oss << (style.bold ? "B" : "b") << (style.italic ? "I" : "i") << (style.underline ? "U" : "u")
-        << (style.wrapText ? "W" : "w") << "|" << style.bgColor << "|" << style.textColor << "|"
-        << style.fontFamily << "|" << static_cast<int>(style.fontSize) << "|"
-        << static_cast<int>(style.hAlign) << "|" << static_cast<int>(style.vAlign);
-    // Add border info to key
-    oss << "|B:" << static_cast<int>(style.border.top.style) << "," << style.border.top.color << ":"
-        << static_cast<int>(style.border.right.style) << "," << style.border.right.color << ":"
-        << static_cast<int>(style.border.bottom.style) << "," << style.border.bottom.color << ":"
-        << static_cast<int>(style.border.left.style) << "," << style.border.left.color;
-    return oss.str();
-}
 
 // ---------------------------------------------------------------------------
 // Named Range parsing helpers
@@ -1534,8 +1520,6 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     // Parse styles if requested
     start = std::chrono::steady_clock::now();
     XLSXStyles xlsxStyles;
-    // Map from CellStyle to our style ID (for deduplication)
-    std::unordered_map<std::string, ID> styleToId;
 
     if (options.readStyles) {
         const std::string stylesContent = zip.readFile("xl/styles.xml");
@@ -1548,30 +1532,21 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
     // Create workbook
     auto workbook = std::make_unique<Workbook>(generate_id(), "Imported");
 
-    // Style application helper - gets or creates a style ID for an XLSX style index
+    // Style application helper - creates a StyleBuffer from an XLSX style index
     // Defined here to be usable for both cell styles and axis default styles
-    auto getOrCreateStyleId = [&](int xlsxStyleIndex) -> ID {
+    // Returns empty optional if no style should be applied
+    auto getStyleBuffer = [&](int xlsxStyleIndex) -> std::optional<StyleBuffer> {
         if (!options.readStyles || xlsxStyleIndex <= 0) {
-            return {};  // Null ID - no style or default style
+            return std::nullopt;  // No style or default style
         }
 
         CellStyle cellStyle;
         if (!xlsxStyles.getCellStyle(xlsxStyleIndex, cellStyle)) {
-            return {};  // Failed to convert style
+            return std::nullopt;  // Failed to convert style
         }
 
-        // Check if this style already exists (deduplication)
-        const std::string styleKey = cellStyleToKey(cellStyle);
-        auto it = styleToId.find(styleKey);
-        if (it != styleToId.end()) {
-            return it->second;
-        }
-
-        // Register new style
-        const ID styleId = generate_id();
-        workbook->registerStyle(styleId, cellStyle);
-        styleToId[styleKey] = styleId;
-        return styleId;
+        // Convert CellStyle to content-addressed StyleBuffer
+        return StyleBuffer::fromCellStyle(cellStyle);
     };
 
     // Format ID helper - maps XLSX style index to Cells format ID
@@ -1777,12 +1752,12 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             auto widthIt = columnWidths.find(c);
             col->size = (widthIt != columnWidths.end()) ? widthIt->second : DEFAULT_COLUMN_WIDTH;
             col->setHidden(columnHidden.count(c) > 0);
-            // Apply column default style if present (store in workbook map)
+            // Apply column default style if present (store in workbook entity styles)
             auto styleIt = columnStyleIndex.find(c);
             if (styleIt != columnStyleIndex.end()) {
-                const ID styleId = getOrCreateStyleId(styleIt->second);
-                if (!styleId.isNull()) {
-                    workbook->setStyleId(col->id, styleId);
+                auto styleBuf = getStyleBuffer(styleIt->second);
+                if (styleBuf.has_value()) {
+                    workbook->setEntityStyle(col->id, *styleBuf);
                     col->setHasStyle(true);
                 }
             }
@@ -1797,12 +1772,12 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
             auto heightIt = rowHeights.find(r);
             rowAxis->size = (heightIt != rowHeights.end()) ? heightIt->second : DEFAULT_ROW_HEIGHT;
             rowAxis->setHidden(rowHidden.count(r) > 0);
-            // Apply row default style if present (store in workbook map)
+            // Apply row default style if present (store in workbook entity styles)
             auto styleIt = rowStyleIndex.find(r);
             if (styleIt != rowStyleIndex.end()) {
-                const ID styleId = getOrCreateStyleId(styleIt->second);
-                if (!styleId.isNull()) {
-                    workbook->setStyleId(rowAxis->id, styleId);
+                auto styleBuf = getStyleBuffer(styleIt->second);
+                if (styleBuf.has_value()) {
+                    workbook->setEntityStyle(rowAxis->id, *styleBuf);
                     rowAxis->setHasStyle(true);
                 }
             }
@@ -1896,9 +1871,9 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
 
                 // Apply style if present - store in workbook map
                 const int styleIndex = cellNode.attribute("s").as_int(0);
-                const ID styleId = getOrCreateStyleId(styleIndex);
-                if (!styleId.isNull()) {
-                    workbook->setStyleId(cell->id, styleId);
+                auto styleBuf = getStyleBuffer(styleIndex);
+                if (styleBuf.has_value()) {
+                    workbook->setEntityStyle(cell->id, *styleBuf);
                     cell->markHasStyle();
                 }
 

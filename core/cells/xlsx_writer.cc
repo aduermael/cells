@@ -1616,33 +1616,28 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
     std::unordered_map<const Axis*, size_t> axisStyleIndices;
 
     for (const auto& sheet : workbook.sheets) {
-        // Collect cell styles (read from workbook map)
+        // Collect cell styles from content-addressed entity styles
         for (const auto& cellId : sheet->getCellIds()) {
             const Cell* cell = workbook.getCell(cellId);
             if (!cell) {
                 continue;
             }
-            const ID cellStyleId = workbook.getStyleId(cellId);
-            if (!cellStyleId.isNull()) {
-                // Look up the CellStyle in the workbook
-                const CellStyle* style = workbook.getStyle(cellStyleId);
-                if (style != nullptr) {
-                    const size_t styleIdx = styleTable.getOrAddFormat(*style);
-                    cellStyleIndices[cell] = styleIdx;
-                }
+            const StyleBuffer* styleBuf = workbook.getEntityStyle(cellId);
+            if (styleBuf != nullptr) {
+                const CellStyle style = styleBuf->toCellStyle();
+                const size_t styleIdx = styleTable.getOrAddFormat(style);
+                cellStyleIndices[cell] = styleIdx;
             }
         }
         // Collect column default styles
         for (const ID& colId : sheet->getColumnIds()) {
             const Axis* col = sheet->getColumn(colId);
             if (col != nullptr && col->hasStyle()) {
-                const ID styleId = workbook.getStyleId(col->id);
-                if (!styleId.isNull()) {
-                    const CellStyle* style = workbook.getStyle(styleId);
-                    if (style != nullptr) {
-                        const size_t styleIdx = styleTable.getOrAddFormat(*style);
-                        axisStyleIndices[col] = styleIdx;
-                    }
+                const StyleBuffer* styleBuf = workbook.getEntityStyle(col->id);
+                if (styleBuf != nullptr) {
+                    const CellStyle style = styleBuf->toCellStyle();
+                    const size_t styleIdx = styleTable.getOrAddFormat(style);
+                    axisStyleIndices[col] = styleIdx;
                 }
             }
         }
@@ -1650,13 +1645,11 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         for (const ID& rowId : sheet->getRowIds()) {
             const Axis* row = sheet->getRow(rowId);
             if (row != nullptr && row->hasStyle()) {
-                const ID styleId = workbook.getStyleId(row->id);
-                if (!styleId.isNull()) {
-                    const CellStyle* style = workbook.getStyle(styleId);
-                    if (style != nullptr) {
-                        const size_t styleIdx = styleTable.getOrAddFormat(*style);
-                        axisStyleIndices[row] = styleIdx;
-                    }
+                const StyleBuffer* styleBuf = workbook.getEntityStyle(row->id);
+                if (styleBuf != nullptr) {
+                    const CellStyle style = styleBuf->toCellStyle();
+                    const size_t styleIdx = styleTable.getOrAddFormat(style);
+                    axisStyleIndices[row] = styleIdx;
                 }
             }
         }

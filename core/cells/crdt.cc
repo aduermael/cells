@@ -347,10 +347,6 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             result = internal::applyFormatDefine(workbook, op);
             break;
 
-        case OpType::STYLE_DEFINE:
-            result = internal::applyStyleDefine(workbook, op);
-            break;
-
         case OpType::NAMED_RANGE_DEFINE:
             result = internal::applyNamedRangeDefine(workbook, op);
             break;
@@ -385,10 +381,6 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
     if (result == ApplyResult::SUCCESS || result == ApplyResult::SUPERSEDED ||
         result == ApplyResult::RESURRECTED) {
         oplog->addOperation(op);
-        if (op.type == OpType::STYLE_DEFINE) {
-            LOG_DEBUG("[CRDT] applyOperation: STYLE_DEFINE %s added to oplog (result=%d)",
-                      op.target_id.toString().c_str(), static_cast<int>(result));
-        }
 
         // Periodic pruning for non-collaboration mode
         // When not collaborating, oplog is only needed for undo/export, so prune periodically
@@ -397,9 +389,6 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             // Prune all ops - no peers to sync with
             oplog->clear();
         }
-    } else if (op.type == OpType::STYLE_DEFINE) {
-        LOG_DEBUG("[CRDT] applyOperation: STYLE_DEFINE %s NOT added to oplog (result=%d)",
-                  op.target_id.toString().c_str(), static_cast<int>(result));
     }
 
     return result;
@@ -602,11 +591,6 @@ Operation makeWorkbookRenameOp(Workbook& workbook, const std::string& payload) {
 Operation makeFormatDefineOp(Workbook& workbook, const ID& formatId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::FORMAT_DEFINE, formatId, payload};
-}
-
-Operation makeStyleDefineOp(Workbook& workbook, const ID& styleId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::STYLE_DEFINE, styleId, payload};
 }
 
 Operation makeNamedRangeDefineOp(Workbook& workbook, const std::string& payload) {

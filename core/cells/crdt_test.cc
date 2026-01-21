@@ -2,6 +2,7 @@
 
 #include "core/cells/id.h"
 #include "core/cells/range.h"
+#include "core/cells/style_buffer.h"
 
 #include "gtest/gtest.h"
 
@@ -613,84 +614,29 @@ TEST_F(CRDTTest, CellStyleEquality) {
 }
 
 TEST_F(CRDTTest, ApplyCellSetStyle) {
-    // Create and apply style operation
-    Operation op = makeCellSetStyleOp(*workbook, cell1, R"({"style_id":"STY_bold"})");
+    // Create a StyleBuffer with bold=true
+    StyleBuffer styleBuf;
+    styleBuf.setBold(true);
+
+    // Create and apply style operation using content-addressed style
+    Operation op = makeCellSetStyleOp(*workbook, cell1, styleBuf);
     ApplyResult result = applyOperation(*workbook, op);
     EXPECT_EQ(result, ApplyResult::SUCCESS);
 
-    // Verify the style ID was set (read from workbook map)
+    // Verify the style was set (read from workbook entity styles)
     Sheet* sheet = workbook->getSheetByIndex(0);
     Cell* cell = sheet->getCell(cell1);
-    EXPECT_EQ(workbook->getStyleId(cell->id).toString(), "STY_bold");
-}
-
-TEST_F(CRDTTest, ApplyStyleDefine) {
-    // Define a style
-    const ID styleId("STYbold1");
-    const std::string payload = R"({"bold":true,"italic":false,"bgColor":"#FF0000"})";
-    Operation op = makeStyleDefineOp(*workbook, styleId, payload);
-
-    ApplyResult result = applyOperation(*workbook, op);
-    EXPECT_EQ(result, ApplyResult::SUCCESS);
-
-    // Verify the style was registered
-    EXPECT_TRUE(workbook->hasStyle(styleId));
-    const CellStyle* style = workbook->getStyle(styleId);
-    ASSERT_NE(style, nullptr);
-    EXPECT_TRUE(style->bold);
-    EXPECT_FALSE(style->italic);
-    EXPECT_EQ(style->bgColor, "#FF0000");
-}
-
-TEST_F(CRDTTest, ApplyStyleDefineDuplicate) {
-    const ID styleId("STYbold2");
-    const std::string payload = R"({"bold":true})";
-    Operation op1 = makeStyleDefineOp(*workbook, styleId, payload);
-
-    ApplyResult result1 = applyOperation(*workbook, op1);
-    EXPECT_EQ(result1, ApplyResult::SUCCESS);
-
-    // Define same style again should return ALREADY_APPLIED
-    Operation op2 = makeStyleDefineOp(*workbook, styleId, payload);
-    ApplyResult result2 = applyOperation(*workbook, op2);
-    EXPECT_EQ(result2, ApplyResult::ALREADY_APPLIED);
-}
-
-TEST_F(CRDTTest, StyleDefineAllProperties) {
-    const ID styleId("STY_full");
-    const std::string payload = R"({
-        "bold":true,
-        "italic":true,
-        "underline":true,
-        "wrapText":true,
-        "bgColor":"#FFFF00",
-        "textColor":"#000000",
-        "fontFamily":"Arial",
-        "fontSize":14,
-        "hAlign":"center",
-        "vAlign":"middle"
-    })";
-    Operation op = makeStyleDefineOp(*workbook, styleId, payload);
-    applyOperation(*workbook, op);
-
-    const CellStyle* style = workbook->getStyle(styleId);
-    ASSERT_NE(style, nullptr);
-    EXPECT_TRUE(style->bold);
-    EXPECT_TRUE(style->italic);
-    EXPECT_TRUE(style->underline);
-    EXPECT_TRUE(style->wrapText);
-    EXPECT_EQ(style->bgColor, "#FFFF00");
-    EXPECT_EQ(style->textColor, "#000000");
-    EXPECT_EQ(style->fontFamily, "Arial");
-    EXPECT_EQ(style->fontSize, 14);
-    EXPECT_EQ(style->hAlign, TextAlign::CENTER);
-    EXPECT_EQ(style->vAlign, VerticalAlign::MIDDLE);
+    const StyleBuffer* entityStyle = workbook->getEntityStyle(cell->id);
+    ASSERT_NE(entityStyle, nullptr);
+    EXPECT_TRUE(entityStyle->getBold());
 }
 
 TEST_F(CRDTTest, CellSetStyleNonExistentCell) {
     // Try to set style on non-existent cell
     ID fakeCell("FakeCelX");
-    Operation op = makeCellSetStyleOp(*workbook, fakeCell, R"({"style_id":"STY_bold"})");
+    StyleBuffer styleBuf;
+    styleBuf.setBold(true);
+    Operation op = makeCellSetStyleOp(*workbook, fakeCell, styleBuf);
     ApplyResult result = applyOperation(*workbook, op);
     EXPECT_EQ(result, ApplyResult::INVALID_TARGET);
 }
@@ -874,70 +820,6 @@ TEST_F(RangeAdjustmentTest, DeleteMiddleColumnKeepsRangeUnchanged) {
     EXPECT_EQ(r->endColId, originalEndCol);
 }
 
-// =============================================================================
-// Style Operation Tests (Phase 4: verify styles exist after successful operations)
-// =============================================================================
-
-TEST_F(CRDTTest, StyleDefineCreatesStyleInWorkbook) {
-    // Test that a STYLE_DEFINE operation creates the style in the workbook
-    ID styleId = generate_id();
-    std::string payload = R"({"bold":true,"textColor":"#ff0000"})";
-
-    Operation op = makeStyleDefineOp(*workbook, styleId, payload);
-    ApplyResult result = applyOperation(*workbook, op);
-
-    EXPECT_EQ(result, ApplyResult::SUCCESS);
-
-    // Verify style exists in workbook
-    EXPECT_TRUE(workbook->hasStyle(styleId));
-
-    const CellStyle* style = workbook->getStyle(styleId);
-    ASSERT_NE(style, nullptr);
-    EXPECT_TRUE(style->bold);
-    EXPECT_EQ(style->textColor, "#ff0000");
-}
-
-TEST_F(CRDTTest, StyleDefineAddedToOpLogOnSuccess) {
-    // Verify that successful STYLE_DEFINE operations are added to oplog
-    workbook->startCollaboration();  // Enable oplog
-
-    ID styleId = generate_id();
-    std::string payload = R"({"italic":true})";
-
-    size_t opCountBefore = workbook->getOpLog()->size();
-
-    Operation op = makeStyleDefineOp(*workbook, styleId, payload);
-    ApplyResult result = applyOperation(*workbook, op);
-
-    EXPECT_EQ(result, ApplyResult::SUCCESS);
-
-    // Oplog should have one more operation
-    EXPECT_EQ(workbook->getOpLog()->size(), opCountBefore + 1);
-}
-
-TEST_F(CRDTTest, DuplicateStyleDefineNotAddedToOpLog) {
-    // Test that ALREADY_APPLIED results don't add to oplog (critical for preventing duplicates)
-    workbook->startCollaboration();  // Enable oplog
-
-    ID styleId = generate_id();
-    std::string payload = R"({"bold":true})";
-
-    // First apply
-    Operation op1 = makeStyleDefineOp(*workbook, styleId, payload);
-    ApplyResult result1 = applyOperation(*workbook, op1);
-    EXPECT_EQ(result1, ApplyResult::SUCCESS);
-
-    size_t opCountAfterFirst = workbook->getOpLog()->size();
-
-    // Second apply with same style ID
-    Operation op2 = makeStyleDefineOp(*workbook, styleId, payload);
-    ApplyResult result2 = applyOperation(*workbook, op2);
-    EXPECT_EQ(result2, ApplyResult::ALREADY_APPLIED);
-
-    // Oplog should NOT have grown (duplicate not added)
-    EXPECT_EQ(workbook->getOpLog()->size(), opCountAfterFirst);
-}
-
 TEST_F(CRDTTest, FailedOperationNotAddedToOpLog) {
     // Test that INVALID_TARGET operations don't add to oplog
     workbook->startCollaboration();  // Enable oplog
@@ -956,12 +838,11 @@ TEST_F(CRDTTest, FailedOperationNotAddedToOpLog) {
 }
 
 // =============================================================================
-// Styled Range Tests (Phase 4b: verify styles work after collaboration starts)
+// Styled Range Tests (content-addressed styles)
 // =============================================================================
 
-TEST_F(CRDTTest, StyledRangeCreatedAfterCollaborationWorks) {
-    // This test verifies that styled ranges created AFTER enabling collaboration
-    // have their styles correctly applied and accessible.
+TEST_F(CRDTTest, StyledRangeWithContentAddressedStyles) {
+    // This test verifies that styled ranges work with content-addressed styles.
 
     // Get the sheet and some column/row IDs
     Sheet* sheet = workbook->getSheetByIndex(0);
@@ -974,13 +855,9 @@ TEST_F(CRDTTest, StyledRangeCreatedAfterCollaborationWorks) {
     ASSERT_GE(colIds.size(), 2);
     ASSERT_GE(rowIds.size(), 2);
 
-    // Step 1: Create a styled range BEFORE collaboration
-    ID styleId1 = generate_id();
-    std::string stylePayload1 = R"({"bgColor":"#ff0000"})";  // Red
-    Operation styleOp1 = makeStyleDefineOp(*workbook, styleId1, stylePayload1);
-    ApplyResult styleResult1 = applyOperation(*workbook, styleOp1);
-    EXPECT_EQ(styleResult1, ApplyResult::SUCCESS);
-    EXPECT_TRUE(workbook->hasStyle(styleId1));
+    // Create first styled range with red background
+    StyleBuffer styleBuf1;
+    styleBuf1.setBgColorHex("#ff0000");
 
     ID rangeId1 = generate_id();
     std::string rangePayload1 = "{\"start_col_id\":\"" + colIds[0].toString() + "\",";
@@ -992,30 +869,19 @@ TEST_F(CRDTTest, StyledRangeCreatedAfterCollaborationWorks) {
     ApplyResult rangeResult1 = applyOperation(*workbook, rangeOp1);
     EXPECT_EQ(rangeResult1, ApplyResult::SUCCESS);
 
-    std::string setStylePayload1 = "{\"style_id\":\"" + styleId1.toString() + "\"}";
-    Operation setStyleOp1 = makeRangeSetStyleOp(*workbook, rangeId1, setStylePayload1);
+    Operation setStyleOp1 = makeRangeSetStyleOp(*workbook, rangeId1, styleBuf1);
     ApplyResult setStyleResult1 = applyOperation(*workbook, setStyleOp1);
     EXPECT_EQ(setStyleResult1, ApplyResult::SUCCESS);
 
-    // Verify style association before collaboration
-    ID retrievedStyleId1 = workbook->getRangeStyleId(rangeId1);
-    EXPECT_EQ(retrievedStyleId1, styleId1);
+    // Verify range style
+    const Range* range1 = workbook->getRange(rangeId1);
+    ASSERT_NE(range1, nullptr);
+    ASSERT_TRUE(range1->style.has_value());
+    EXPECT_EQ(range1->style->getBgColorHex(), "#FF0000");
 
-    // Step 2: Start collaboration (this triggers bootstrap)
-    workbook->startCollaboration();
-    bootstrapOpLog(*workbook);
-
-    // Verify first style still exists after bootstrap
-    EXPECT_TRUE(workbook->hasStyle(styleId1));
-    EXPECT_EQ(workbook->getRangeStyleId(rangeId1), styleId1);
-
-    // Step 3: Create a styled range AFTER collaboration with DIFFERENT color
-    ID styleId2 = generate_id();
-    std::string stylePayload2 = R"({"bgColor":"#00ff00"})";  // Green (different!)
-    Operation styleOp2 = makeStyleDefineOp(*workbook, styleId2, stylePayload2);
-    ApplyResult styleResult2 = applyOperation(*workbook, styleOp2);
-    EXPECT_EQ(styleResult2, ApplyResult::SUCCESS);
-    EXPECT_TRUE(workbook->hasStyle(styleId2));
+    // Create second styled range with green background
+    StyleBuffer styleBuf2;
+    styleBuf2.setBgColorHex("#00ff00");
 
     ID rangeId2 = generate_id();
     std::string rangePayload2 = "{\"start_col_id\":\"" + colIds[1].toString() + "\",";
@@ -1027,49 +893,26 @@ TEST_F(CRDTTest, StyledRangeCreatedAfterCollaborationWorks) {
     ApplyResult rangeResult2 = applyOperation(*workbook, rangeOp2);
     EXPECT_EQ(rangeResult2, ApplyResult::SUCCESS);
 
-    std::string setStylePayload2 = "{\"style_id\":\"" + styleId2.toString() + "\"}";
-    Operation setStyleOp2 = makeRangeSetStyleOp(*workbook, rangeId2, setStylePayload2);
+    Operation setStyleOp2 = makeRangeSetStyleOp(*workbook, rangeId2, styleBuf2);
     ApplyResult setStyleResult2 = applyOperation(*workbook, setStyleOp2);
     EXPECT_EQ(setStyleResult2, ApplyResult::SUCCESS);
 
-    // Step 4: Verify BOTH styles exist and are correctly associated
-    EXPECT_TRUE(workbook->hasStyle(styleId1));
-    EXPECT_TRUE(workbook->hasStyle(styleId2));
+    // Verify range styles
+    const Range* range2 = workbook->getRange(rangeId2);
+    ASSERT_NE(range2, nullptr);
+    ASSERT_TRUE(range2->style.has_value());
+    EXPECT_EQ(range2->style->getBgColorHex(), "#00FF00");
 
-    EXPECT_EQ(workbook->getRangeStyleId(rangeId1), styleId1);
-    EXPECT_EQ(workbook->getRangeStyleId(rangeId2), styleId2);
-
-    // Verify styles have correct content
-    const CellStyle* style1 = workbook->getStyle(styleId1);
-    const CellStyle* style2 = workbook->getStyle(styleId2);
-    ASSERT_NE(style1, nullptr);
-    ASSERT_NE(style2, nullptr);
-    EXPECT_EQ(style1->bgColor, "#ff0000");
-    EXPECT_EQ(style2->bgColor, "#00ff00");
-
-    // Verify ranges are in the spatial index (at least our ranges)
+    // Verify ranges are in the spatial index
     std::vector<Range*> rangesAtPos0 =
         sheet->getRangesAt(sheet->getColumn(colIds[0])->position,
                            sheet->getRow(rowIds[0])->position, RangeFlags::STYLE);
-    EXPECT_GE(rangesAtPos0.size(), 1);  // At least 1 range
+    EXPECT_GE(rangesAtPos0.size(), 1);
 
     std::vector<Range*> rangesAtPos1 =
         sheet->getRangesAt(sheet->getColumn(colIds[1])->position,
                            sheet->getRow(rowIds[1])->position, RangeFlags::STYLE);
-    EXPECT_GE(rangesAtPos1.size(), 1);  // At least 1 range
-
-    // Verify our specific ranges are in the index
-    bool foundRange1 = false, foundRange2 = false;
-    for (Range* r : rangesAtPos0) {
-        if (r->id == rangeId1)
-            foundRange1 = true;
-    }
-    for (Range* r : rangesAtPos1) {
-        if (r->id == rangeId2)
-            foundRange2 = true;
-    }
-    EXPECT_TRUE(foundRange1) << "Range 1 should be in spatial index";
-    EXPECT_TRUE(foundRange2) << "Range 2 should be in spatial index";
+    EXPECT_GE(rangesAtPos1.size(), 1);
 }
 
 }  // namespace

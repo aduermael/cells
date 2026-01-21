@@ -57,9 +57,6 @@ const char* opTypeToString(OpType type) {
         // Format operations
         case OpType::FORMAT_DEFINE:
             return "FORMAT_DEFINE";
-        // Style operations
-        case OpType::STYLE_DEFINE:
-            return "STYLE_DEFINE";
         // Named range operations
         case OpType::NAMED_RANGE_DEFINE:
             return "NAMED_RANGE_DEFINE";
@@ -134,10 +131,6 @@ OpType stringToOpType(const std::string& str) {
     // Format operations
     if (str == "FORMAT_DEFINE") {
         return OpType::FORMAT_DEFINE;
-    }
-    // Style operations
-    if (str == "STYLE_DEFINE") {
-        return OpType::STYLE_DEFINE;
     }
     // Named range operations
     if (str == "NAMED_RANGE_DEFINE") {

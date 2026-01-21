@@ -22,7 +22,6 @@
 #include "core/cells/formula_parser.h"
 #include "core/cells/number_format.h"
 #include "core/cells/style_buffer.h"
-#include "core/cells/style_registry.h"
 
 namespace cells {
 namespace internal {

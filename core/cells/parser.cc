@@ -8,6 +8,7 @@
 #include "core/cells/formula_parser.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
+#include "core/cells/style_buffer.h"
 
 namespace cells {
 
@@ -34,6 +35,7 @@ void Parser::reset() {
     errorMsg_.clear();
     pendingSharedFormulas_.clear();
     cellsByIdForResolution_.clear();
+    parsedStyles_.clear();
 }
 
 bool Parser::setError(const std::string& message) {
@@ -511,8 +513,8 @@ bool Parser::parseStyle(std::string_view line) {
         }
     }
 
-    // Register the style in the workbook
-    workbook_->registerStyle(styleId, style);
+    // Store the style for later application (when cells/axes reference it)
+    parsedStyles_[styleId] = style;
     return true;
 }
 
@@ -1044,11 +1046,14 @@ bool Parser::parseColumn(std::string_view line) {
         }
     }
 
-    // Store style/format IDs in workbook map (before moving col)
+    // Store style/format in workbook (before moving col)
     const ID colId = col->id;
     currentSheet_->addColumn(std::move(col));
     if (workbook_ != nullptr && !styleId.isNull()) {
-        workbook_->setStyleId(colId, styleId);
+        auto it = parsedStyles_.find(styleId);
+        if (it != parsedStyles_.end()) {
+            workbook_->setEntityStyle(colId, StyleBuffer::fromCellStyle(it->second));
+        }
     }
     if (workbook_ != nullptr && !formatId.isNull()) {
         workbook_->setFormatId(colId, formatId);
@@ -1114,11 +1119,14 @@ bool Parser::parseRow(std::string_view line) {
         }
     }
 
-    // Store style/format IDs in workbook map (before moving row)
+    // Store style/format in workbook (before moving row)
     const ID rowId = row->id;
     currentSheet_->addRow(std::move(row));
     if (workbook_ != nullptr && !styleId.isNull()) {
-        workbook_->setStyleId(rowId, styleId);
+        auto it = parsedStyles_.find(styleId);
+        if (it != parsedStyles_.end()) {
+            workbook_->setEntityStyle(rowId, StyleBuffer::fromCellStyle(it->second));
+        }
     }
     if (workbook_ != nullptr && !formatId.isNull()) {
         workbook_->setFormatId(rowId, formatId);
@@ -1260,15 +1268,18 @@ bool Parser::parseCellProps(std::string_view props, Cell& cell) {
             }
             props = (end < props.size()) ? props.substr(end) : "";
         } else if (key == "sty") {
-            // Style ID: 8 characters - store in workbook map, not cell
+            // Style ID: 8 characters - look up style and store in workbook
             size_t end = props.find_first_of(" \t");
             if (end == std::string_view::npos) {
                 end = props.size();
             }
             const ID styleId(std::string(props.substr(0, end)));
             if (workbook_ != nullptr && !styleId.isNull()) {
-                workbook_->setStyleId(cell.id, styleId);
-                cell.markHasStyle();
+                auto it = parsedStyles_.find(styleId);
+                if (it != parsedStyles_.end()) {
+                    workbook_->setEntityStyle(cell.id, StyleBuffer::fromCellStyle(it->second));
+                    cell.markHasStyle();
+                }
             }
             props = (end < props.size()) ? props.substr(end) : "";
         } else {
@@ -1502,7 +1513,11 @@ bool Parser::parseRange(std::string_view line) {
         if (line.substr(0, 4) == "sty:") {
             const ID styleId(std::string(line.substr(4)));
             if (!styleId.isNull()) {
-                currentSheet_->setRangeStyleId(rangePtr->id, styleId);
+                auto it = parsedStyles_.find(styleId);
+                if (it != parsedStyles_.end()) {
+                    currentSheet_->setRangeStyle(rangePtr->id,
+                                                 StyleBuffer::fromCellStyle(it->second));
+                }
             }
         }
     }

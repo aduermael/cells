@@ -9,6 +9,7 @@
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/range.h"
+#include "core/cells/style_buffer.h"
 
 namespace cells {
 namespace {
@@ -317,7 +318,6 @@ TEST_F(CRDTRangeTest, UpdateFlagsOnNonExistentRangeReturnsInvalidTarget) {
 
 TEST_F(CRDTRangeTest, SetStyleAddsStyleFlag) {
     const ID rangeId = generate_id();
-    const ID styleId = generate_id();
 
     // Add a range without STYLE flag
     std::string addPayload = "{\"sheet_id\":\"" + sheetId.toString() + "\",";
@@ -334,11 +334,11 @@ TEST_F(CRDTRangeTest, SetStyleAddsStyleFlag) {
     const Range* range = sheet->getRange(rangeId);
     ASSERT_FALSE(range->hasFlag(RangeFlags::STYLE));
 
-    // Set a style
-    std::string stylePayload = "{\"sheet_id\":\"" + sheetId.toString() + "\",";
-    stylePayload += "\"style_id\":\"" + styleId.toString() + "\"}";
+    // Set a style using content-addressed StyleBuffer
+    StyleBuffer styleBuf;
+    styleBuf.setBgColorHex("#ff0000");
 
-    Operation styleOp = makeRangeSetStyleOp(*workbook, rangeId, stylePayload);
+    Operation styleOp = makeRangeSetStyleOp(*workbook, rangeId, styleBuf);
     ApplyResult result = applyOperation(*workbook, styleOp);
 
     EXPECT_EQ(result, ApplyResult::SUCCESS);
@@ -359,9 +359,8 @@ TEST_F(CRDTRangeTest, SetStyleEmptyRemovesStyleFlag) {
     Operation addOp = makeRangeAddOp(*workbook, rangeId, addPayload);
     applyOperation(*workbook, addOp);
 
-    // Clear the style
-    std::string clearPayload = "{\"sheet_id\":\"" + sheetId.toString() + "\",";
-    clearPayload += "\"style_id\":\"\"}";
+    // Clear the style using empty style payload
+    std::string clearPayload = R"({"style":""})";
 
     Operation clearOp = makeRangeSetStyleOp(*workbook, rangeId, clearPayload);
     ApplyResult result = applyOperation(*workbook, clearOp);
