@@ -87,7 +87,12 @@ FormulaResolver itself should NOT create entities. Instead:
   - Note: axis/cell creation for target cells still uses direct methods (separate issue)
 - [x] 3e: Update `luau_api.cc` setCell formula path (same pattern)
   - Formula setting via Luau scripts now uses CRDT-compliant two-phase approach
-- [ ] 3f: Update `formula_recalc.cc` spill expansion path (same pattern)
+- [ ] 3f: DEFERRED - `formula_recalc.cc` spill expansion needs deeper refactor
+  - Issue: calculateSpillRange() creates axes directly during recalculation
+  - Challenge: Array size is dynamic (depends on inputs like =SEQUENCE(A1,B1))
+  - Needs: Return required axes info from calculateSpillRange, caller creates via CRDT
+  - This is a separate architectural issue from formula resolution input path
+  - Tracked as separate work item to avoid blocking Phase 3 completion
 
 ## Phase 4: Remove direct entity creation from FormulaResolver
 
