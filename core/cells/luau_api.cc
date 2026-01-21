@@ -311,9 +311,37 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                 payload = R"({"type":"f","value":")" + jsonEscape(uuidFormula) + R"(","col_id":")" +
                           colIdStr + R"(","row_id":")" + rowIdStr + R"("})";
             } else {
-                // Resolve the AST - this creates cells/axes for referenced positions
+                // CRDT-compliant resolution: discover and create entities first
                 FormulaResolver resolver(*workbook, *sheet);
-                const ResolveResult resolveRes = resolver.resolve(ast.get());
+                RequiredEntities required = resolver.getRequiredEntities(ast.get());
+
+                // Create required columns via CRDT operations
+                for (const auto& pending : required.columns) {
+                    std::string colPayload = "{\"pos\":" + std::to_string(pending.position) +
+                                             ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+                    Operation colOp = makeColInsertOp(*workbook, pending.id, pending.sheetId, colPayload);
+                    applyOperation(*workbook, colOp);
+                }
+
+                // Create required rows via CRDT operations
+                for (const auto& pending : required.rows) {
+                    std::string rowPayload = "{\"pos\":" + std::to_string(pending.position) +
+                                             ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+                    Operation rowOp = makeRowInsertOp(*workbook, pending.id, pending.sheetId, rowPayload);
+                    applyOperation(*workbook, rowOp);
+                }
+
+                // Create required cells via CRDT operations (empty cells for references)
+                for (const auto& pending : required.cells) {
+                    std::string cellPayload = "{\"type\":\"s\",\"value\":\"\",\"col_id\":\"" +
+                                              pending.colId.toString() + "\",\"row_id\":\"" +
+                                              pending.rowId.toString() + "\"}";
+                    Operation cellOp = makeCellSetValueOp(*workbook, pending.id, pending.sheetId, cellPayload);
+                    applyOperation(*workbook, cellOp);
+                }
+
+                // Now resolve with existingOnly=true (all entities should exist)
+                const ResolveResult resolveRes = resolver.resolve(ast.get(), true);
                 if (!resolveRes.success) {
                     // Resolution failed - use fallback
                     RefConverter conv;

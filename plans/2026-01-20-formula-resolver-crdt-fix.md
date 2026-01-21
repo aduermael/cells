@@ -85,7 +85,8 @@ FormulaResolver itself should NOT create entities. Instead:
 - [x] 3d: Update `fill_range.cc` getFillValueNonNumeric for formula resolution
   - Formula references in auto-fill now use CRDT-compliant two-phase approach
   - Note: axis/cell creation for target cells still uses direct methods (separate issue)
-- [ ] 3e: Update `luau_api.cc` Luau script path (same pattern)
+- [x] 3e: Update `luau_api.cc` setCell formula path (same pattern)
+  - Formula setting via Luau scripts now uses CRDT-compliant two-phase approach
 - [ ] 3f: Update `formula_recalc.cc` spill expansion path (same pattern)
 
 ## Phase 4: Remove direct entity creation from FormulaResolver
