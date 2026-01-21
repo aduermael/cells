@@ -470,6 +470,9 @@ private:
     // Internal helpers for agent SSE parsing
     void handleAgentSSEEvent(const std::string& eventType, const std::string& data);
     void executeAgentTool();
+
+    // Broadcast pending operations to peers (queue + send)
+    void broadcastPendingOperations();
 };
 
 }  // namespace cells::wasm

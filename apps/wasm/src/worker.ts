@@ -712,6 +712,10 @@ function handleMessage(msg: WorkerRequest): void {
             // ================================================================
             // Debug/Development
             // ================================================================
+            case "setDebugNoPrune":
+                engine.setDebugNoPrune(params.noPrune as boolean);
+                respond({ type: "debugNoPruneSet", success: true });
+                break;
             case "debugParseFormula":
                 handleDebugParseFormula(engine, params, respond);
                 break;

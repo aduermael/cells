@@ -278,9 +278,7 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
     // Now resolve with existingOnly=true (all entities should exist)
     ResolveResult result = resolver.resolve(ast.get(), true);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     rebuildViewportIndex();
 

@@ -196,12 +196,22 @@ Option C: Move broadcast responsibility to C++ SyncManager
 
 **Recommended: Option C** - cleanest separation of concerns
 
+**Implementation approach:**
+1. Remove broadcast call from TypeScript listener (stops echoing)
+2. Add `broadcastPendingOperations()` helper in C++ that calls `_syncClient->broadcastOperations()`
+3. Replace all `_syncManager->queueOperationsBroadcast()` calls with helper
+4. Key insight: SyncClient creates its OWN SyncManager, so we must use `broadcastOperations()` not `processOutgoing()`
+
+**Testing note:** Run only `collab.spec.ts` during iteration, full test suite after fix confirmed.
+
 **Steps:**
-- [ ] 6.7a: Verify C++ bindings already call `queueOperationsBroadcast()` after local operations
-- [ ] 6.7b: Remove the broadcast call from `init-listeners.ts` (line 269-272)
-- [ ] 6.7c: Ensure `handleOperations` and `handleSyncResponse` do NOT trigger broadcasts
-- [ ] 6.7d: Test: Peer 1 creates styled range, verify Peer 2 does NOT echo ops back
-- [ ] 6.7e: Test: Both peers see the styled range correctly
+- [x] 6.7a: Verify C++ bindings already call `queueOperationsBroadcast()` after local operations
+- [x] 6.7b: Remove the broadcast call from `init-listeners.ts` (line 269-272)
+- [x] 6.7c: Ensure `handleOperations` and `handleSyncResponse` do NOT trigger broadcasts
+- [x] 6.7d: Add `broadcastPendingOperations()` helper that calls `_syncClient->broadcastOperations()` (SyncClient has its own SyncManager)
+- [x] 6.7e: Replace all binding calls to use the new helper
+- [x] 6.7f: Test: collab tests pass (6/6)
+- [x] 6.7g: Test: collab-style-sync tests pass (8/8) - styled ranges sync correctly!
 
 ## Phase 6.8: Add CRDT Sync Metadata to ZCD File Format
 

@@ -75,9 +75,7 @@ std::string CellsEngine::setCellFormat(const std::string& cellIdStr,
     Operation op = makeCellSetFormatOp(*_workbook, cellId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     notifyListeners(ChangeType::CELL_CHANGED);
     return "{\"success\":true}";
@@ -160,9 +158,7 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
     Operation op = makeCellSetFormatOp(*_workbook, cellId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     if (colCreated) {
         _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
@@ -265,9 +261,7 @@ std::string CellsEngine::createCustomFormat(const std::string& formatCode) {
     Operation op = makeFormatDefineOp(*_workbook, formatId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     return "{\"success\":true,\"formatId\":\"" + formatId.toString() + "\"}";
 }
@@ -1294,9 +1288,7 @@ std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::s
     Operation op = makeCellSetStyleOp(*_workbook, cellId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     notifyListeners(ChangeType::CELL_CHANGED);
     return "{\"success\":true}";
@@ -1407,9 +1399,7 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
     Operation op = makeCellSetStyleOp(*_workbook, cellId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     if (colCreated) {
         _viewportIndex.onAxisInserted(colId, true, col, DEFAULT_COLUMN_WIDTH);
@@ -1532,9 +1522,7 @@ std::string CellsEngine::createStyle(const std::string& styleJson) {
     Operation styleOp = makeStyleDefineOp(*_workbook, styleId, styleJson);
     applyOperation(*_workbook, styleOp);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     return "{\"success\":true,\"styleId\":\"" + styleId.toString() + "\"}";
 }
@@ -1737,9 +1725,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
                 Operation removeOp = makeRangeRemoveOp(*_workbook, existingRange->id, removePayload.str());
                 applyOperation(*_workbook, removeOp);
 
-                if (_syncManager) {
-                    _syncManager->queueOperationsBroadcast();
-                }
+                broadcastPendingOperations();
 
                 rebuildViewportIndex();
                 notifyListeners(ChangeType::CELL_CHANGED);
@@ -1767,9 +1753,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
             Operation updateOp = makeRangeSetStyleOp(*_workbook, existingRange->id, updatePayload.str());
             applyOperation(*_workbook, updateOp);
 
-            if (_syncManager) {
-                _syncManager->queueOperationsBroadcast();
-            }
+            broadcastPendingOperations();
 
             rebuildViewportIndex();
             notifyListeners(ChangeType::CELL_CHANGED);
@@ -2109,9 +2093,7 @@ std::string CellsEngine::setRangeStyleOnSheet(uint32_t sheetIndex, uint32_t star
         }
     }
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     rebuildViewportIndex();
     notifyListeners(ChangeType::CELL_CHANGED);

@@ -177,6 +177,19 @@ void CellsEngine::notifyLoadProgress(size_t cellsLoaded, size_t totalEstimate) {
     _listener(std::string("load_progress"), data.str());
 }
 
+void CellsEngine::broadcastPendingOperations() {
+    // If SyncClient exists, use it (it has its own SyncManager)
+    // Note: SyncClient creates its own SyncManager internally, so we must use
+    // its broadcastOperations() which queues to the right SyncManager AND sends.
+    if (_syncClient) {
+        _syncClient->broadcastOperations();
+    } else if (_syncManager) {
+        // Fallback: queue to CellsEngine's SyncManager for later retrieval
+        // (used when collaboration is manual via handlePeerMessage/getOutgoingMessages)
+        _syncManager->queueOperationsBroadcast();
+    }
+}
+
 // ============================================================================
 // Sheet info methods
 // ============================================================================
@@ -273,9 +286,7 @@ std::string CellsEngine::addSheet(const std::string& name) {
     Operation op = makeSheetCreateOp(*_workbook, sheetId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     notifyListeners(ChangeType::SHEET_CHANGED);
 
@@ -304,9 +315,7 @@ std::string CellsEngine::deleteSheet(int index) {
     Operation op = makeSheetDeleteOp(*_workbook, sheetId);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     if (_activeSheetIndex >= _workbook->sheetCount()) {
         _activeSheetIndex = _workbook->sheetCount() - 1;
@@ -352,9 +361,7 @@ std::string CellsEngine::renameSheet(int index, const std::string& name) {
     Operation op = makeSheetRenameOp(*_workbook, sheetId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     notifyListeners(ChangeType::SHEET_CHANGED);
     return "{\"success\":true}";
@@ -467,9 +474,7 @@ std::string CellsEngine::updateCell(const std::string& cellIdStr, const std::str
     Operation op = makeCellSetValueOp(*_workbook, cellId, payload);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     markDirty(sheet, cellId);
     std::vector<ID> changed = {cellId};
@@ -599,9 +604,7 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
         applyOperation(*_workbook, formatOp);
     }
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     markDirty(sheet, cellId);
     std::vector<ID> changed = {cellId};
@@ -921,9 +924,7 @@ std::string CellsEngine::deleteCell(const std::string& cellIdStr) {
     Operation op = makeCellClearOp(*_workbook, cellId);
     applyOperation(*_workbook, op);
 
-    if (_syncManager) {
-        _syncManager->queueOperationsBroadcast();
-    }
+    broadcastPendingOperations();
 
     _viewportIndex.onCellRemoved(colId, rowId);
 
@@ -980,9 +981,7 @@ std::string CellsEngine::deleteCellAt(uint32_t col, uint32_t row) {
         Operation op = makeCellClearOp(*_workbook, cellToDelete->id);
         applyOperation(*_workbook, op);
 
-        if (_syncManager) {
-            _syncManager->queueOperationsBroadcast();
-        }
+        broadcastPendingOperations();
 
         _viewportIndex.onCellRemoved(colId, rowId);
 

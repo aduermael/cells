@@ -242,7 +242,7 @@ export class PresenceBroadcaster {
     }
 
     const currentSheetId = String(this.activeSheetIndex);
-    const allPeers = this.syncAdapter.getRemotePeers();
+    // const allPeers = this.syncAdapter.getRemotePeers();  // For debug logging
     const peers = this.syncAdapter.getPeersOnSheet(currentSheetId);
     const now = Date.now();
 

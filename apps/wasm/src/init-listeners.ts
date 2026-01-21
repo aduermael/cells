@@ -266,10 +266,9 @@ export function setupDataListeners(config: DataListenersConfig): {
     updateFormulaBar();
     updateScrollbars();
 
-    // Queue operations broadcast to peers
-    if (app.collaborationInitialized && app.syncAdapter) {
-      await app.syncAdapter.queueLocalOperationsBroadcast();
-    }
+    // Note: Do NOT broadcast here - C++ bindings already call queueOperationsBroadcast()
+    // after local operations. Broadcasting here would cause remote ops to be echoed back
+    // to the sender, corrupting sync state after oplog pruning.
   }
 
   return {

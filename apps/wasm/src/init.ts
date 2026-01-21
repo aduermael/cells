@@ -176,8 +176,8 @@ export function initApp(): AppContext {
   async function init(): Promise<void> {
     // Check for debug noPrune URL parameter
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get("noPrune") === "true") {
-      app.client.engine.setDebugNoPrune(true);
+    if (urlParams.get("noPrune") === "true" && app.wasmClient) {
+      await app.wasmClient.setDebugNoPrune(true);
       console.log("[Debug] OpLog pruning disabled via ?noPrune=true");
     }
 

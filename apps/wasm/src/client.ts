@@ -1052,6 +1052,10 @@ export class CellsClient {
 
   // ========== Debug/Development API ==========
 
+  async setDebugNoPrune(noPrune: boolean): Promise<void> {
+    await this._send("setDebugNoPrune", { noPrune });
+  }
+
   async debugParseFormula(formulaText: string): Promise<FormulaParseResult> {
     const response = await this._send("debugParseFormula", { formulaText });
     return JSON.parse(response.result as string) as FormulaParseResult;
