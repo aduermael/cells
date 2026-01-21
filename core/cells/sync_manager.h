@@ -119,8 +119,9 @@ public:
     void queueOperationsBroadcast();
 
     // Prune old operations from the OpLog.
-    // - If no peers: prunes ALL operations (nothing to sync)
-    // - If peers: prunes operations older than the minimum HLC all peers have
+    // - Always keeps at least 500 operations for debugging visibility
+    // - If no peers: prunes down to 500 ops
+    // - If peers: prunes operations older than min HLC all peers have, keeping 500 minimum
     // Returns number of operations pruned.
     size_t pruneOpLog();
 

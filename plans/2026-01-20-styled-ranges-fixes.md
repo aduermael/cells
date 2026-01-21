@@ -246,7 +246,7 @@ The original sync issues were caused by the operation echo bug, not missing sync
 - This provides better visibility into sync state for debugging
 
 **Steps:**
-- [ ] 8a: Modify `pruneOpLog()` to keep minimum 500 operations
+- [x] 8a: Modify `pruneOpLog()` to keep minimum 500 operations. Added `pruneKeeping()` and `pruneBeforeKeeping()` methods to OpLog. Updated `pruneOpLog()` in SyncManager to use `kMinOpLogRetention = 500`.
 - [ ] 8b: Wait for user to provide more details about remaining style sync issue (using retained ops)
 - [ ] 8c: (Further steps TBD based on debugging findings)
 

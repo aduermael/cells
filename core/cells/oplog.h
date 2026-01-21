@@ -82,6 +82,14 @@ struct OpLog {
     // Returns number of operations pruned.
     size_t pruneOperationsBefore(const HLC& threshold);
 
+    // Prune operations while keeping at least minToKeep operations.
+    // Returns number of operations pruned.
+    size_t pruneKeeping(size_t minToKeep);
+
+    // Prune operations with HLC <= threshold, but keep at least minToKeep operations.
+    // Returns number of operations pruned.
+    size_t pruneBeforeKeeping(const HLC& threshold, size_t minToKeep);
+
 private:
     // All operations in HLC order
     std::vector<Operation> _operations;

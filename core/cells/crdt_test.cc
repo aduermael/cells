@@ -1048,25 +1048,25 @@ TEST_F(CRDTTest, StyledRangeCreatedAfterCollaborationWorks) {
     EXPECT_EQ(style2->bgColor, "#00ff00");
 
     // Verify ranges are in the spatial index (at least our ranges)
-    std::vector<Range*> rangesAtPos0 = sheet->getRangesAt(
-        sheet->getColumn(colIds[0])->position,
-        sheet->getRow(rowIds[0])->position,
-        RangeFlags::STYLE);
+    std::vector<Range*> rangesAtPos0 =
+        sheet->getRangesAt(sheet->getColumn(colIds[0])->position,
+                           sheet->getRow(rowIds[0])->position, RangeFlags::STYLE);
     EXPECT_GE(rangesAtPos0.size(), 1);  // At least 1 range
 
-    std::vector<Range*> rangesAtPos1 = sheet->getRangesAt(
-        sheet->getColumn(colIds[1])->position,
-        sheet->getRow(rowIds[1])->position,
-        RangeFlags::STYLE);
+    std::vector<Range*> rangesAtPos1 =
+        sheet->getRangesAt(sheet->getColumn(colIds[1])->position,
+                           sheet->getRow(rowIds[1])->position, RangeFlags::STYLE);
     EXPECT_GE(rangesAtPos1.size(), 1);  // At least 1 range
 
     // Verify our specific ranges are in the index
     bool foundRange1 = false, foundRange2 = false;
     for (Range* r : rangesAtPos0) {
-        if (r->id == rangeId1) foundRange1 = true;
+        if (r->id == rangeId1)
+            foundRange1 = true;
     }
     for (Range* r : rangesAtPos1) {
-        if (r->id == rangeId2) foundRange2 = true;
+        if (r->id == rangeId2)
+            foundRange2 = true;
     }
     EXPECT_TRUE(foundRange1) << "Range 1 should be in spatial index";
     EXPECT_TRUE(foundRange2) << "Range 2 should be in spatial index";

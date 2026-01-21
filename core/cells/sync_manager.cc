@@ -13,6 +13,10 @@ namespace cells {
 
 namespace {
 
+// Minimum number of operations to retain in the oplog for debugging.
+// This provides visibility into recent sync state without unbounded growth.
+constexpr size_t kMinOpLogRetention = 500;
+
 // Simple JSON string extraction (reused pattern from operation.cc)
 std::string extractJSONString(const std::string& json, const std::string& key) {
     const std::string searchKey = "\"" + key + "\":";
@@ -304,12 +308,17 @@ size_t SyncManager::pruneOpLog() {
 
     const size_t sizeBefore = oplog->size();
 
+    // Always keep at least kMinOpLogRetention operations for debugging visibility
+    if (sizeBefore <= kMinOpLogRetention) {
+        return 0;
+    }
+
     if (_peers.empty()) {
-        // No peers - prune everything (use current HLC as threshold)
-        const HLC currentHLC = oplog->getCurrentHLC();
-        const size_t pruned = oplog->pruneOperationsBefore(currentHLC);
+        // No peers - prune but keep minimum for debugging
+        const size_t pruned = oplog->pruneKeeping(kMinOpLogRetention);
         if (pruned > 0) {
-            LOG_DEBUG("[Sync] pruneOpLog: no peers, pruned %zu ops (was %zu)", pruned, sizeBefore);
+            LOG_DEBUG("[Sync] pruneOpLog: no peers, pruned %zu ops (was %zu, kept %zu)", pruned,
+                      sizeBefore, oplog->size());
         }
         return pruned;
     }
@@ -330,10 +339,11 @@ size_t SyncManager::pruneOpLog() {
         return 0;
     }
 
-    const size_t pruned = oplog->pruneOperationsBefore(minHLC);
+    // Prune up to threshold, but always keep at least kMinOpLogRetention ops
+    const size_t pruned = oplog->pruneBeforeKeeping(minHLC, kMinOpLogRetention);
     if (pruned > 0) {
-        LOG_DEBUG("[Sync] pruneOpLog: pruned %zu ops (was %zu, now %zu) threshold=%s", pruned,
-                  sizeBefore, oplog->size(), minHLC.toString().c_str());
+        LOG_DEBUG("[Sync] pruneOpLog: pruned %zu ops (was %zu, now %zu, min_kept=%zu) threshold=%s",
+                  pruned, sizeBefore, oplog->size(), kMinOpLogRetention, minHLC.toString().c_str());
     }
     return pruned;
 }

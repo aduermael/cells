@@ -192,4 +192,63 @@ size_t OpLog::pruneOperationsBefore(const HLC& threshold) {
     return pruned_count;
 }
 
+size_t OpLog::pruneKeeping(size_t minToKeep) {
+    if (_operations.size() <= minToKeep) {
+        return 0;  // Already at or below minimum
+    }
+
+    // Calculate how many to prune
+    const size_t toPrune = _operations.size() - minToKeep;
+
+    // Get the HLC threshold (we want to prune operations with index < toPrune)
+    // The threshold is the HLC of the last operation we want to prune
+    const HLC threshold = _operations[toPrune - 1].hlc;
+
+    return pruneOperationsBefore(threshold);
+}
+
+size_t OpLog::pruneBeforeKeeping(const HLC& threshold, size_t minToKeep) {
+    if (_operations.empty()) {
+        return 0;
+    }
+
+    // Find how many operations would be pruned by threshold
+    size_t wouldPrune = 0;
+    size_t left = 0;
+    size_t right = _operations.size();
+
+    while (left < right) {
+        const size_t mid = left + (right - left) / 2;
+        if (_operations[mid].hlc <= threshold) {
+            left = mid + 1;
+        } else {
+            right = mid;
+        }
+    }
+    wouldPrune = left;
+
+    if (wouldPrune == 0) {
+        return 0;  // Nothing to prune
+    }
+
+    // Check if pruning would leave us below minimum
+    const size_t remaining = _operations.size() - wouldPrune;
+    if (remaining < minToKeep) {
+        // Adjust: only prune enough to leave minToKeep
+        if (_operations.size() <= minToKeep) {
+            return 0;  // Can't prune anything
+        }
+        const size_t maxToPrune = _operations.size() - minToKeep;
+        if (maxToPrune == 0) {
+            return 0;
+        }
+        // Use the HLC just before where we need to keep
+        const HLC adjustedThreshold = _operations[maxToPrune - 1].hlc;
+        return pruneOperationsBefore(adjustedThreshold);
+    }
+
+    // Safe to prune up to threshold
+    return pruneOperationsBefore(threshold);
+}
+
 }  // namespace cells
