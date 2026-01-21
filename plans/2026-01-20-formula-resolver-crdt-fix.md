@@ -97,21 +97,48 @@ FormulaResolver itself should NOT create entities. Instead:
 
 ---
 
-## Secondary Issue: Background Color After Collaboration
+## Issue B: Local Peer Doesn't See Own Style After Collaboration
 
-User reports: "after collaboration started, I can't even locally keep setting background colors"
+**Symptom:** After collaboration is enabled:
+- Peer 1 applies a style (e.g., green background)
+- Peer 2 sees the style correctly (sync works!)
+- Peer 1 doesn't see their own style locally (BUG)
 
 ### Investigation Status
-- Style sync tests (`collab-style-sync.test.mjs`) pass
-- Style-before-collab tests pass
-- `setCellStyleAt` code path looks correct (uses `applyOperation`)
 
-### Next Steps
-- [ ] Get more specific reproduction steps from user
-- [ ] Check browser console for errors during style application
-- [ ] Verify the specific scenario (single peer? multi-peer? which cells?)
+**Tests pass:**
+- `collab-style-sync.test.mjs` - all style sync tests pass
+- `style-before-collab.test.mjs` - styles before collab sync correctly
+- `setCellStyleAt` code path correctly uses `applyOperation`
 
-This may be a UI/event handling issue rather than a CRDT issue.
+**Code flow is correct:**
+1. C++ `applyOperation` applies style to model
+2. C++ `notifyListeners("cell")` sends notification
+3. Worker posts "dataChanged" message
+4. JS `handleDataChanged` schedules `processDataChanges`
+5. JS `fetchViewport()` queries WASM for fresh data
+6. JS `render()` should display new style
+
+**Possible causes (need investigation):**
+- Race condition between worker messages
+- Viewport fetch returning stale data in some cases
+- State corruption after collaboration starts
+- Missing viewport invalidation in some code path
+
+### Reproduction Steps (from user)
+1. Peer 1 sets yellow cell
+2. Peer 1 creates collaboration link
+3. Peer 2 joins, sees yellow cell
+4. Peer 1 sets green cell
+5. Peer 2 sees green cell - peer 1 doesn't
+
+### Debug Approach
+
+- [ ] Ba: Add console.log in JS `processDataChanges` to verify it runs
+- [ ] Bb: Log viewport data after fetch to verify style is included
+- [ ] Bc: Check if `notifyListeners` is being called after local style ops
+- [ ] Bd: Test if issue is specific to certain style operations (bg color vs bold)
+- [ ] Be: Check for any error suppression that might hide failures
 
 ---
 
