@@ -110,6 +110,33 @@ Add a runtime flag to disable operation log pruning for debugging sync issues. W
 - [x] 6.5c: Add periodic pruning in `applyOperation()` (crdt.cc) - prune every 100 ops when not collaborating
 - [x] 6.5d: Build and test - all tests pass
 
+## Phase 6.6: Investigate Missing STYLE_DEFINE on Peer 1
+
+**Problem**: After collaboration starts, Peer 1 creates a styled range but doesn't see it. The range exists with `sty:GskBKIkv` but the style definition is missing from Peer 1's workbook.
+
+**Observations from test case**:
+- Peer 1 file: Has `RG Ebk4KDxy ... sty:GskBKIkv` but NO `Y GskBKIkv {...}` style definition
+- Peer 1 oplog: Only `RANGE_SET_STYLE` - no `STYLE_DEFINE`
+- Peer 2 file: Has BOTH `Y GskBKIkv {"bgColor":"#FBBF24"}` AND the range correctly
+- User reports range "flashes" on Peer 1 briefly
+
+**Hypothesis**: The `STYLE_DEFINE` operation is not being added to oplog on Peer 1. Possibly related to Phase 4 change (only add to oplog on success). The style might be:
+1. Created with a duplicate ID (returns non-success)
+2. Failing to apply for some reason
+3. Being created then overwritten with a different ID
+
+**Investigation approach**:
+1. First check the code path: where is STYLE_DEFINE created during setRangeStyle?
+2. Check if duplicate style detection could be returning wrong result
+3. Add debug logs to trace the exact flow if needed
+
+**Steps:**
+- [ ] 6.6a: Trace code path in setRangeStyle (bindings_format.cc) - where is STYLE_DEFINE created?
+- [ ] 6.6b: Check applyStyleDefine return values - what could cause it to not be added to oplog?
+- [ ] 6.6c: If needed, add LOG_DEBUG in: createStyle, applyStyleDefine, setRangeStyle to trace exact flow
+- [ ] 6.6d: Fix the root cause
+- [ ] 6.6e: Test and verify styled ranges appear on peer that created them
+
 ## Phase 7: Fix All Lint Warnings, Checks, and Tests
 
 - [ ] 7a: Run C++ linter and fix all warnings (including pre-existing)
