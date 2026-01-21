@@ -905,27 +905,40 @@ void mergeStyleJson(CellStyle& style, const std::string& json) {
     }
     // Merge border properties if present
     if (hasJsonField(json, "border")) {
-        BorderEdge topEdge = extractBorderEdge(json, "top");
-        BorderEdge rightEdge = extractBorderEdge(json, "right");
-        BorderEdge bottomEdge = extractBorderEdge(json, "bottom");
-        BorderEdge leftEdge = extractBorderEdge(json, "left");
-        // Only update edges that are specified in the JSON
-        // Set defined flag for each border edge present
-        if (topEdge.hasValue() || topEdge.style != BorderStyle::NONE) {
-            style.border.top = topEdge;
-            style.setDefined(DEFINED_BORDER_TOP);
-        }
-        if (rightEdge.hasValue() || rightEdge.style != BorderStyle::NONE) {
-            style.border.right = rightEdge;
-            style.setDefined(DEFINED_BORDER_RIGHT);
-        }
-        if (bottomEdge.hasValue() || bottomEdge.style != BorderStyle::NONE) {
-            style.border.bottom = bottomEdge;
-            style.setDefined(DEFINED_BORDER_BOTTOM);
-        }
-        if (leftEdge.hasValue() || leftEdge.style != BorderStyle::NONE) {
-            style.border.left = leftEdge;
-            style.setDefined(DEFINED_BORDER_LEFT);
+        // Extract the border JSON substring to check which edges are present
+        std::string borderKey = "\"border\":";
+        size_t borderPos = json.find(borderKey);
+        if (borderPos != std::string::npos) {
+            size_t braceStart = json.find('{', borderPos + borderKey.length());
+            if (braceStart != std::string::npos) {
+                int braceCount = 1;
+                size_t braceEnd = braceStart + 1;
+                while (braceEnd < json.size() && braceCount > 0) {
+                    if (json[braceEnd] == '{') braceCount++;
+                    else if (json[braceEnd] == '}') braceCount--;
+                    braceEnd++;
+                }
+                std::string borderJson = json.substr(braceStart, braceEnd - braceStart);
+
+                // Only update edges that are explicitly specified in the JSON
+                // This allows setting style to "none" to remove borders
+                if (hasJsonField(borderJson, "top")) {
+                    style.border.top = extractBorderEdge(json, "top");
+                    style.setDefined(DEFINED_BORDER_TOP);
+                }
+                if (hasJsonField(borderJson, "right")) {
+                    style.border.right = extractBorderEdge(json, "right");
+                    style.setDefined(DEFINED_BORDER_RIGHT);
+                }
+                if (hasJsonField(borderJson, "bottom")) {
+                    style.border.bottom = extractBorderEdge(json, "bottom");
+                    style.setDefined(DEFINED_BORDER_BOTTOM);
+                }
+                if (hasJsonField(borderJson, "left")) {
+                    style.border.left = extractBorderEdge(json, "left");
+                    style.setDefined(DEFINED_BORDER_LEFT);
+                }
+            }
         }
     }
 }
@@ -1266,10 +1279,21 @@ std::string CellsEngine::setCellStyle(const std::string& cellIdStr, const std::s
     mergeStyleJson(style, styleJson);
 
     // Convert to content-addressed StyleBuffer and emit operation
+    // Note: CellStyle.isEmpty() checks if any properties are defined, but
+    // StyleBuffer.isEmpty() checks if any properties have actual values.
+    // When setting borders to "none", CellStyle has defined bits set but
+    // StyleBuffer is empty (no actual border values).
     if (!style.isEmpty()) {
         StyleBuffer styleBuffer = StyleBuffer::fromCellStyle(style);
-        Operation op = makeCellSetStyleOp(*_workbook, cellId, styleBuffer);
-        applyOperation(*_workbook, op);
+        if (!styleBuffer.isEmpty()) {
+            Operation op = makeCellSetStyleOp(*_workbook, cellId, styleBuffer);
+            applyOperation(*_workbook, op);
+        } else {
+            // CellStyle has defined properties but StyleBuffer is empty
+            // This happens when borders are set to "none" - clear the style
+            Operation op = makeCellClearStyleOp(*_workbook, cellId);
+            applyOperation(*_workbook, op);
+        }
     } else {
         Operation op = makeCellClearStyleOp(*_workbook, cellId);
         applyOperation(*_workbook, op);
@@ -1364,10 +1388,21 @@ std::string CellsEngine::setCellStyleAt(uint32_t col, uint32_t row, const std::s
     }
 
     // Convert to content-addressed StyleBuffer and emit operation
+    // Note: CellStyle.isEmpty() checks if any properties are defined, but
+    // StyleBuffer.isEmpty() checks if any properties have actual values.
+    // When setting borders to "none", CellStyle has defined bits set but
+    // StyleBuffer is empty (no actual border values).
     if (!style.isEmpty()) {
         StyleBuffer styleBuffer = StyleBuffer::fromCellStyle(style);
-        Operation op = makeCellSetStyleOp(*_workbook, cellId, styleBuffer);
-        applyOperation(*_workbook, op);
+        if (!styleBuffer.isEmpty()) {
+            Operation op = makeCellSetStyleOp(*_workbook, cellId, styleBuffer);
+            applyOperation(*_workbook, op);
+        } else {
+            // CellStyle has defined properties but StyleBuffer is empty
+            // This happens when borders are set to "none" - clear the style
+            Operation op = makeCellClearStyleOp(*_workbook, cellId);
+            applyOperation(*_workbook, op);
+        }
     } else {
         Operation op = makeCellClearStyleOp(*_workbook, cellId);
         applyOperation(*_workbook, op);

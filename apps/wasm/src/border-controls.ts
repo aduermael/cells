@@ -12,6 +12,7 @@
 
 import type { WasmDataSource } from "./wasm-data-source";
 import type { Position, BorderStyle, CellBorder } from "./types";
+import { getMenuStateManager } from "./menu-state";
 
 // =============================================================================
 // Types
@@ -95,6 +96,10 @@ export class BorderControls {
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectionRange = callbacks.getSelectionRange;
     this.requestRender = callbacks.requestRender;
+
+    // Register with menu state manager for mutual exclusivity with other menus
+    const menuState = getMenuStateManager();
+    menuState.registerMenu("border", () => this.closeDropdown());
 
     this.setupEventListeners();
   }

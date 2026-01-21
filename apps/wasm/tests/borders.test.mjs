@@ -100,7 +100,8 @@ const tests = {
     assertTrue(isOpen, 'Dropdown should be open after clicking button');
 
     // Click on the canvas (outside the dropdown)
-    await clickCell(ctx.page, 'E5');
+    // Use B2 instead of E5 to avoid clicking on the dropdown itself
+    await clickCell(ctx.page, 'B2');
     await sleep(200);
 
     // Check that dropdown is closed
