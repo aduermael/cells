@@ -54,7 +54,7 @@ public:
     // If an identical code exists, returns existing ID.
     // Otherwise creates a new format entry with the provided ID (or generates one).
     // If wasCreated is provided, it will be set to true if a new format was created.
-    // DEPRECATED: Use findFormatByCode + FORMAT_DEFINE operation instead.
+    // Note: For CRDT operations, use findFormatByCode + FORMAT_DEFINE operation.
     ID findOrRegisterFormat(const std::string& formatCode, const ID& proposedId = ID(),
                             bool* wasCreated = nullptr);
 
