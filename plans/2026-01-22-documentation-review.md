@@ -33,7 +33,7 @@ Review and update all documentation files to accurately reflect current codebase
 ## Phase 1: Core Documentation (README, Getting Started, Agents)
 
 - [x] 1a: Review and update `README.md` - updated stats, fixed E2E test list, marked unimplemented features as planned
-- [ ] 1b: Review and update `GETTING_STARTED.md` - verify build commands work, update CLI examples
+- [x] 1b: Review and update `GETTING_STARTED.md` - fixed E2E test list, updated WASM size (729KB→5.1MB), updated dist structure
 - [ ] 1c: Review and update `AGENTS.md` - verify guidelines match current workflow
 
 ## Phase 2: Data Model and CRDT Documentation

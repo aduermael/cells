@@ -75,7 +75,7 @@ bazel run :e2e-headed
 bazel run :e2e-headed -- smoke
 ```
 
-**Available tests:** smoke, formula, editing, column-move, clipboard, selection, script, collab, initial-sync, collab-demo
+**Available tests:** smoke, formula, editing, column-move, clipboard, selection, collab, initial-sync, collab-demo, merged-cells, named-ranges, borders, format, zoom-*, and more (see `apps/wasm/tests/` for full list)
 
 ## CLI Tool
 
@@ -159,12 +159,14 @@ The `bazel run :wasm-dist` command creates a `dist/wasm/` directory with all fil
 ```
 dist/wasm/
 ├── cells_wasm_bin.js      # WASM loader (Emscripten)
-├── cells_wasm_bin.wasm    # Compiled engine (~729KB)
+├── cells_wasm_bin.wasm    # Compiled engine (~5.1MB)
 ├── worker.js              # Web Worker (bundled from TypeScript)
 ├── main.js                # Main thread code (bundled from TypeScript)
 ├── index.html             # Spreadsheet UI
 ├── cells.d.ts             # TypeScript definitions for WASM API
-└── shared/                # CSS styles
+├── shared/                # CSS styles
+├── favicons/              # Browser icons
+└── icon.svg               # App icon
 ```
 
 ### Features
