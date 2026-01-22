@@ -45,7 +45,7 @@ Each axis knows its own position, making it simple to sort and serialize.
 ### File Structure
 
 ```
-#zcd v1
+#cells v1
 D <doc-id> "<name>"
 
 #formats (optional, for custom number formats)
@@ -77,7 +77,7 @@ O <hlc> <op-type> <args...>
 A simple spreadsheet with: A1=2, A2="foo", D4==A1+10
 
 ```
-#zcd v1
+#cells v1
 D Qx7mXp2L "Untitled"
 
 S bF3hL8mN "Sheet1"
@@ -101,7 +101,7 @@ X wK3nJ7pM vT5mK9xL yB9tX3wN f "=$kR7pN2wQ$jH4sW8nF+10"
 
 | Prefix | Meaning | Format |
 |--------|---------|--------|
-| `#zcd` | Format version | `#zcd v1` |
+| `#cells` | Format version | `#cells v1` |
 | `D` | Document | `D <id> "<name>"` |
 | `F` | Custom format | `F <id> "<format-code>"` |
 | `S` | Sheet | `S <id> "<name>"` |

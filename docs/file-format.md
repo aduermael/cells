@@ -23,7 +23,7 @@ Current version: **v1**
 
 Files begin with a version header:
 ```
-#zcd v1
+#cells v1
 ```
 
 ## Document Structure
@@ -31,7 +31,7 @@ Files begin with a version header:
 A ZCD file contains the following sections in order:
 
 ```
-#zcd v1                             # Version header
+#cells v1                             # Version header
 D <doc-id> "<name>"                 # Document declaration
 
 S <sheet-id> "<name>"               # Sheet declaration
@@ -344,7 +344,7 @@ Lines beginning with `#` are section markers or comments:
 
 | Marker | Purpose |
 |--------|---------|
-| `#zcd v1` | File format version header |
+| `#cells v1` | File format version header |
 | `#cols` | Start of columns section |
 | `#rows` | Start of rows section |
 | `#cells` | Start of cells section |
@@ -428,7 +428,7 @@ Style operations use the content-addressed `"style"` field containing base64-enc
 A simple spreadsheet with numbers, text, a formula, and styles:
 
 ```
-#zcd v1
+#cells v1
 D aB3cD4eF "Example"
 
 S gH5jK6mN "Sheet1"
