@@ -35,8 +35,8 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Type | Lines |
 |------|------:|
-| Markdown | 17,596 |
-| Inline Comments | 18,161 |
+| Markdown | 17,584 |
+| Inline Comments | 18,164 |
 
 ### Test Counts
 
@@ -48,7 +48,7 @@ A high-performance, collaborative spreadsheet engine with:
 | E2E (Puppeteer) | 322 |
 | **Total** | **3036** |
 
-- **Commits**: 1370
+- **Commits**: 1375
 - **WASM Module**: 5.10 MB
 - **Total Web Bundle**: 7.06 MB
 
