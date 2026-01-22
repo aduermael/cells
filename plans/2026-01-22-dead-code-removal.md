@@ -46,7 +46,7 @@ Remove unused code to keep the codebase lean during early development. This foll
 
 ## Phase 4: Standardize ZCD format documentation
 - [x] 4a: Update docs to use `#cells v1` consistently (matching existing practice) - Updated file-format.md and persistence.md to use `#cells v1` header instead of `#zcd v1`.
-- [ ] 4b: Add `#cells v1` header to `testdata/named_ranges.zcd` (currently missing)
+- [x] 4b: Add `#cells v1` header to `testdata/named_ranges.zcd` (currently missing)
 
 ## Phase 5: Final verification
 - [ ] 5a: Run tests to verify no regressions

@@ -1,3 +1,4 @@
+#cells v1
 D dOC12345 "Named Ranges Test"
 N "MyTotal" W - CELL xA1bC2dE sH3eE4tB
 N "DataRange" W - RANGE xA1bC2dE xB3dE4fG sH3eE4tB
