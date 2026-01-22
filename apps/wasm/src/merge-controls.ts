@@ -139,8 +139,6 @@ export class MergeControls {
     const { start, end } = this.getSelectionRange();
     const cell = this.getSelectedCell();
 
-    console.log("MergeControls.mergeAll: selection range", { start, end, cell });
-
     // If no range selection, we need at least a selection start
     if (!start || !end) {
       if (!cell) return;
@@ -161,9 +159,7 @@ export class MergeControls {
     }
 
     try {
-      console.log("MergeControls.mergeAll: calling mergeCells", { minCol, minRow, maxCol, maxRow });
-      const result = await this.dataSource.mergeCells(minCol, minRow, maxCol, maxRow);
-      console.log("MergeControls.mergeAll: result", result);
+      await this.dataSource.mergeCells(minCol, minRow, maxCol, maxRow);
       this.requestRender();
     } catch (error) {
       console.error("Failed to merge cells:", error);

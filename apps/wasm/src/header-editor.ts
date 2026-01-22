@@ -153,12 +153,6 @@ export class ColumnHeaderEditor {
     this.uiStateMachine.transition(UIEvent.START_COLUMN_HEADER_EDIT);
     this.editingColumnIndex = colIndex;
     this.onSetEditingColumnIndex(colIndex);
-    console.log(
-      "startEditingColumnHeader: editingColumnIndex =",
-      this.editingColumnIndex,
-      "state =",
-      this.uiStateMachine.getState()
-    );
     this.onRender(); // Redraw to hide the column header text
 
     // Position the editor
