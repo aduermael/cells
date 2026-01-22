@@ -294,6 +294,7 @@ cc_library(
     hdrs = ["model.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":axis_index",
         ":dependency_graph",
         ":format_registry",
         ":formula_ast",

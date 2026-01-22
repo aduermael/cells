@@ -134,14 +134,29 @@ Most impactful fix - eliminate O(total_cells) loop per viewport query.
 
 Architectural change to eliminate rebuild on sheet switch.
 
-- [ ] 4a: Add `AxisIndex _columnIndex` and `AxisIndex _rowIndex` to Sheet class
-- [ ] 4b: Update Sheet to maintain AxisIndex on `insertColumn()`, `deleteColumn()`, `resizeColumn()`, `moveColumn()`
-- [ ] 4c: Same for row operations
-- [ ] 4d: Modify ViewportIndex to reference Sheet's AxisIndex (not own copies)
-- [ ] 4e: Update `rebuildViewportIndex()` to only rebuild cell HashMap (O(k) for cells, not O(n) for axes)
-- [ ] 4f: Remove duplicate AxisIndex from ViewportIndex
-- [ ] 4g: Unit tests for Sheet-owned AxisIndex
-- [ ] 4h: Tests pass: `make test` and `npm run test:stable`
+- [x] 4a: Add `AxisIndex _columnIndex` and `AxisIndex _rowIndex` to Sheet class
+  - Added `_columnAxisIndex` and `_rowAxisIndex` members to Sheet in `model.h`
+  - Added accessor methods `getColumnAxisIndex()` and `getRowAxisIndex()`
+- [x] 4b: Update Sheet to maintain AxisIndex on `insertColumn()`, `deleteColumn()`, `resizeColumn()`, `moveColumn()`
+  - Modified `addColumn()`, `insertColumnAt()`, `deleteColumn()`, `moveColumn()`, `removeColumnFromIndex()`
+  - Updated CRDT `applyColResize()` to update Sheet's AxisIndex
+- [x] 4c: Same for row operations
+  - Modified `addRow()`, `insertRowAt()`, `deleteRow()`, `moveRow()`, `removeRowFromIndex()`
+  - Updated CRDT `applyRowResize()` to update Sheet's AxisIndex
+- [x] 4d: Modify ViewportIndex to reference Sheet's AxisIndex (not own copies)
+  - ViewportIndex now stores `_sheet` pointer and delegates all axis queries to Sheet's AxisIndex
+  - Coordinate conversions (`pixelToColumn`, `columnToPixel`, etc.) delegate to Sheet
+- [x] 4e: Update `rebuildViewportIndex()` to only rebuild cell HashMap (O(k) for cells, not O(n) for axes)
+  - `ViewportIndex::build()` now only builds the cell HashMap
+  - Axis indexes are maintained incrementally by Sheet
+- [x] 4f: Remove duplicate AxisIndex from ViewportIndex
+  - Removed `_columns` and `_rows` members from ViewportIndex
+  - `onAxisInserted()`, `onAxisResized()`, `onAxisMoved()` are now no-ops (Sheet maintains AxisIndex)
+  - `onAxisDeleted()` only removes cells from the HashMap
+- [x] 4g: Unit tests for Sheet-owned AxisIndex
+  - Updated viewport_index_test.cc to use Sheet's axis operations
+  - Tests now verify ViewportIndex correctly delegates to Sheet's AxisIndex
+- [x] 4h: Tests pass: `bazel run :check` and `bazel run :e2e`
 
 ### Phase 5: Fix O(n) in onAxisInserted
 

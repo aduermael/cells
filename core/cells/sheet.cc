@@ -240,6 +240,7 @@ void Sheet::addColumn(std::unique_ptr<Axis> col) {
 
     const ID colId = col->id;
     const uint32_t position = col->position;
+    const uint32_t size = col->size;
 
     // Add to workbook storage (takes ownership)
     if (_workbook->addColumn(std::move(col)) == nullptr) {
@@ -251,6 +252,27 @@ void Sheet::addColumn(std::unique_ptr<Axis> col) {
 
     // Update position index
     _columnIndex[position] = colId;
+
+    // Update axis index for viewport queries
+    // Fast path: if position >= current count, this is an append (O(log n))
+    // Slow path: compute tree position by counting smaller positions (O(n))
+    const size_t currentCount = _columnAxisIndex.count();
+    if (position >= currentCount) {
+        // Appending at or beyond the end - use fast append
+        _columnAxisIndex.append(colId, size);
+    } else {
+        // Inserting in the middle - compute correct tree position
+        size_t treePos = 0;
+        for (const ID& existingColId : _columnIds) {
+            if (existingColId != colId) {
+                const Axis* existingCol = _workbook->getColumn(existingColId);
+                if (existingCol && existingCol->position < position) {
+                    treePos++;
+                }
+            }
+        }
+        _columnAxisIndex.insert(colId, treePos, size);
+    }
 }
 
 void Sheet::addRow(std::unique_ptr<Axis> row) {
@@ -263,6 +285,7 @@ void Sheet::addRow(std::unique_ptr<Axis> row) {
 
     const ID rowId = row->id;
     const uint32_t position = row->position;
+    const uint32_t size = row->size;
 
     // Add to workbook storage (takes ownership)
     if (_workbook->addRow(std::move(row)) == nullptr) {
@@ -274,6 +297,27 @@ void Sheet::addRow(std::unique_ptr<Axis> row) {
 
     // Update position index
     _rowIndex[position] = rowId;
+
+    // Update axis index for viewport queries
+    // Fast path: if position >= current count, this is an append (O(log n))
+    // Slow path: compute tree position by counting smaller positions (O(n))
+    const size_t currentCount = _rowAxisIndex.count();
+    if (position >= currentCount) {
+        // Appending at or beyond the end - use fast append
+        _rowAxisIndex.append(rowId, size);
+    } else {
+        // Inserting in the middle - compute correct tree position
+        size_t treePos = 0;
+        for (const ID& existingRowId : _rowIds) {
+            if (existingRowId != rowId) {
+                const Axis* existingRow = _workbook->getRow(existingRowId);
+                if (existingRow && existingRow->position < position) {
+                    treePos++;
+                }
+            }
+        }
+        _rowAxisIndex.insert(rowId, treePos, size);
+    }
 }
 
 void Sheet::removeColumnFromIndex(const ID& colId) {
@@ -282,6 +326,8 @@ void Sheet::removeColumnFromIndex(const ID& colId) {
     if (col) {
         _columnIndex.erase(col->position);
     }
+    // Remove from axis index (O(log n))
+    _columnAxisIndex.remove(colId);
     // Remove from column ID set
     _columnIds.erase(colId);
 }
@@ -292,6 +338,8 @@ void Sheet::removeRowFromIndex(const ID& rowId) {
     if (row) {
         _rowIndex.erase(row->position);
     }
+    // Remove from axis index (O(log n))
+    _rowAxisIndex.remove(rowId);
     // Remove from row ID set
     _rowIds.erase(rowId);
 }
@@ -437,6 +485,9 @@ bool Sheet::moveColumn(const ID& colId, uint32_t newPosition) {
         return true;  // No-op
     }
 
+    // Update axis index (O(log n) move operation)
+    _columnAxisIndex.move(colId, newPosition);
+
     // Shift other columns and rebuild position index
     _columnIndex.clear();
     if (newPosition < oldPosition) {
@@ -494,6 +545,9 @@ bool Sheet::moveRow(const ID& rowId, uint32_t newPosition) {
         return true;  // No-op
     }
 
+    // Update axis index (O(log n) move operation)
+    _rowAxisIndex.move(rowId, newPosition);
+
     // Shift other rows and rebuild position index
     _rowIndex.clear();
     if (newPosition < oldPosition) {
@@ -547,9 +601,24 @@ Axis* Sheet::insertColumnAt(uint32_t position) {
     // Create new column at the specified position with sheet ID
     auto col = std::make_unique<Axis>(generate_id(), id, true);
     col->position = position;
+    const ID colId = col->id;
+    const uint32_t size = col->size;
     // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const rawPtr = col.get();
-    addColumn(std::move(col));
+
+    // Add to workbook storage (takes ownership)
+    if (_workbook != nullptr && _workbook->addColumn(std::move(col)) == nullptr) {
+        return nullptr;  // Failed to add
+    }
+
+    // Add to this sheet's column set
+    _columnIds.insert(colId);
+
+    // Update position index
+    _columnIndex[position] = colId;
+
+    // Insert into axis index at the correct tree position (O(log n))
+    _columnAxisIndex.insert(colId, position, size);
 
     // Rebuild position index for all columns
     for (const ID& cid : _columnIds) {
@@ -581,9 +650,24 @@ Axis* Sheet::insertRowAt(uint32_t position) {
     // Create new row at the specified position with sheet ID
     auto row = std::make_unique<Axis>(generate_id(), id, false);
     row->position = position;
+    const ID rowId = row->id;
+    const uint32_t size = row->size;
     // NOLINTNEXTLINE(misc-const-correctness) - returned as non-const
     Axis* const rawPtr = row.get();
-    addRow(std::move(row));
+
+    // Add to workbook storage (takes ownership)
+    if (_workbook != nullptr && _workbook->addRow(std::move(row)) == nullptr) {
+        return nullptr;  // Failed to add
+    }
+
+    // Add to this sheet's row set
+    _rowIds.insert(rowId);
+
+    // Update position index
+    _rowIndex[position] = rowId;
+
+    // Insert into axis index at the correct tree position (O(log n))
+    _rowAxisIndex.insert(rowId, position, size);
 
     // Rebuild position index for all rows
     for (const ID& rid : _rowIds) {
@@ -633,6 +717,9 @@ bool Sheet::deleteColumn(const ID& colId) {
             _workbook->removeCell(cellId);
         }
     }
+
+    // Remove from axis index (O(log n))
+    _columnAxisIndex.remove(colId);
 
     // Remove from this sheet's column set
     _columnIds.erase(colId);
@@ -694,6 +781,9 @@ bool Sheet::deleteRow(const ID& rowId) {
             _workbook->removeCell(cellId);
         }
     }
+
+    // Remove from axis index (O(log n))
+    _rowAxisIndex.remove(rowId);
 
     // Remove from this sheet's row set
     _rowIds.erase(rowId);

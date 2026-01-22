@@ -520,9 +520,12 @@ TEST_F(ViewportIndexTest, OnCellAddedNull) {
 
 // ============================================================================
 // Incremental axis update tests
+// Note: With Phase 4 architecture, Sheet owns AxisIndex and maintains it.
+// ViewportIndex delegates axis queries to Sheet. These tests verify that
+// axis operations through Sheet are reflected in ViewportIndex queries.
 // ============================================================================
 
-TEST_F(ViewportIndexTest, OnAxisInsertedColumn) {
+TEST_F(ViewportIndexTest, SheetInsertColumnAt) {
     addColumns(2, 100);
     addRows(2, 50);
 
@@ -531,27 +534,30 @@ TEST_F(ViewportIndexTest, OnAxisInsertedColumn) {
     EXPECT_EQ(index.columnCount(), 2u);
     EXPECT_EQ(index.totalWidth(), 200u);
 
-    // Insert a new column at position 1
-    ID newColId = generate_id();
-    index.onAxisInserted(newColId, true, 1, 150);
+    // Insert a new column at position 1 using Sheet
+    Axis* newCol = sheet_->insertColumnAt(1);
+    ASSERT_NE(newCol, nullptr);
+    newCol->size = 150;
+    // Update AxisIndex with new size
+    sheet_->getColumnAxisIndex().resize(newCol->id, 150);
 
     EXPECT_EQ(index.columnCount(), 3u);
     EXPECT_EQ(index.totalWidth(), 350u);
 
     // Verify positions
     EXPECT_EQ(*index.getColumnAt(0), colIds_[0]);
-    EXPECT_EQ(*index.getColumnAt(1), newColId);
+    EXPECT_EQ(*index.getColumnAt(1), newCol->id);
     EXPECT_EQ(*index.getColumnAt(2), colIds_[1]);
 
     // Verify pixel offsets
     EXPECT_EQ(*index.columnToPixel(colIds_[0]), 0u);
-    EXPECT_EQ(*index.columnToPixel(newColId), 100u);
+    EXPECT_EQ(*index.columnToPixel(newCol->id), 100u);
     EXPECT_EQ(*index.columnToPixel(colIds_[1]), 250u);
 
     verifyIndex(index);
 }
 
-TEST_F(ViewportIndexTest, OnAxisInsertedRow) {
+TEST_F(ViewportIndexTest, SheetInsertRowAt) {
     addColumns(2, 100);
     addRows(2, 50);
 
@@ -560,22 +566,25 @@ TEST_F(ViewportIndexTest, OnAxisInsertedRow) {
     EXPECT_EQ(index.rowCount(), 2u);
     EXPECT_EQ(index.totalHeight(), 100u);
 
-    // Insert a new row at position 0
-    ID newRowId = generate_id();
-    index.onAxisInserted(newRowId, false, 0, 30);
+    // Insert a new row at position 0 using Sheet
+    Axis* newRow = sheet_->insertRowAt(0);
+    ASSERT_NE(newRow, nullptr);
+    newRow->size = 30;
+    // Update AxisIndex with new size
+    sheet_->getRowAxisIndex().resize(newRow->id, 30);
 
     EXPECT_EQ(index.rowCount(), 3u);
     EXPECT_EQ(index.totalHeight(), 130u);
 
     // Verify positions
-    EXPECT_EQ(*index.getRowAt(0), newRowId);
+    EXPECT_EQ(*index.getRowAt(0), newRow->id);
     EXPECT_EQ(*index.getRowAt(1), rowIds_[0]);
     EXPECT_EQ(*index.getRowAt(2), rowIds_[1]);
 
     verifyIndex(index);
 }
 
-TEST_F(ViewportIndexTest, OnAxisDeletedColumn) {
+TEST_F(ViewportIndexTest, SheetDeleteColumn) {
     addColumns(3, 100);
     addRows(2, 50);
     addCell(0, 0);
@@ -587,8 +596,12 @@ TEST_F(ViewportIndexTest, OnAxisDeletedColumn) {
     EXPECT_EQ(index.columnCount(), 3u);
     EXPECT_EQ(index.cellCount(), 3u);
 
-    // Delete column 1
-    index.onAxisDeleted(colIds_[1], true);
+    // Notify ViewportIndex BEFORE deleting (cells must still be valid)
+    ID deletedColId = colIds_[1];
+    index.onAxisDeleted(deletedColId, true);
+
+    // Now delete column using Sheet
+    sheet_->deleteColumn(deletedColId);
 
     EXPECT_EQ(index.columnCount(), 2u);
     EXPECT_EQ(index.totalWidth(), 200u);
@@ -601,7 +614,7 @@ TEST_F(ViewportIndexTest, OnAxisDeletedColumn) {
     verifyIndex(index);
 }
 
-TEST_F(ViewportIndexTest, OnAxisDeletedRow) {
+TEST_F(ViewportIndexTest, SheetDeleteRow) {
     addColumns(2, 100);
     addRows(3, 50);
     addCell(0, 0);
@@ -613,8 +626,12 @@ TEST_F(ViewportIndexTest, OnAxisDeletedRow) {
     EXPECT_EQ(index.rowCount(), 3u);
     EXPECT_EQ(index.cellCount(), 3u);
 
-    // Delete row 1
-    index.onAxisDeleted(rowIds_[1], false);
+    // Notify ViewportIndex BEFORE deleting (cells must still be valid)
+    ID deletedRowId = rowIds_[1];
+    index.onAxisDeleted(deletedRowId, false);
+
+    // Now delete row using Sheet
+    sheet_->deleteRow(deletedRowId);
 
     EXPECT_EQ(index.rowCount(), 2u);
     EXPECT_EQ(index.totalHeight(), 100u);
@@ -623,7 +640,7 @@ TEST_F(ViewportIndexTest, OnAxisDeletedRow) {
     verifyIndex(index);
 }
 
-TEST_F(ViewportIndexTest, OnAxisResizedColumn) {
+TEST_F(ViewportIndexTest, SheetResizeColumn) {
     addColumns(3, 100);
     addRows(2, 50);
     Cell* cell = addCell(2, 0);  // Cell in last column
@@ -631,8 +648,11 @@ TEST_F(ViewportIndexTest, OnAxisResizedColumn) {
     ViewportIndex index;
     index.build(*sheet_);
 
-    // Resize column 1 from 100 to 200
-    index.onAxisResized(colIds_[1], true, 200);
+    // Resize column 1 from 100 to 200 via Sheet's AxisIndex
+    Axis* col = sheet_->getColumn(colIds_[1]);
+    ASSERT_NE(col, nullptr);
+    col->size = 200;
+    sheet_->getColumnAxisIndex().resize(colIds_[1], 200);
 
     EXPECT_EQ(index.totalWidth(), 400u);
     EXPECT_EQ(*index.getColumnWidth(colIds_[1]), 200u);
@@ -650,15 +670,18 @@ TEST_F(ViewportIndexTest, OnAxisResizedColumn) {
     verifyIndex(index);
 }
 
-TEST_F(ViewportIndexTest, OnAxisResizedRow) {
+TEST_F(ViewportIndexTest, SheetResizeRow) {
     addColumns(2, 100);
     addRows(3, 50);
 
     ViewportIndex index;
     index.build(*sheet_);
 
-    // Resize row 0 from 50 to 100
-    index.onAxisResized(rowIds_[0], false, 100);
+    // Resize row 0 from 50 to 100 via Sheet's AxisIndex
+    Axis* row = sheet_->getRow(rowIds_[0]);
+    ASSERT_NE(row, nullptr);
+    row->size = 100;
+    sheet_->getRowAxisIndex().resize(rowIds_[0], 100);
 
     EXPECT_EQ(index.totalHeight(), 200u);
     EXPECT_EQ(*index.getRowHeight(rowIds_[0]), 100u);
@@ -668,15 +691,15 @@ TEST_F(ViewportIndexTest, OnAxisResizedRow) {
     verifyIndex(index);
 }
 
-TEST_F(ViewportIndexTest, OnAxisMovedColumn) {
+TEST_F(ViewportIndexTest, SheetMoveColumn) {
     addColumns(4, 100);
     addRows(2, 50);
 
     ViewportIndex index;
     index.build(*sheet_);
 
-    // Move column 0 to position 2
-    index.onAxisMoved(colIds_[0], true, 2);
+    // Move column 0 to position 2 using Sheet
+    sheet_->moveColumn(colIds_[0], 2);
 
     // New order: col1, col2, col0, col3
     EXPECT_EQ(*index.getColumnAt(0), colIds_[1]);
@@ -687,15 +710,15 @@ TEST_F(ViewportIndexTest, OnAxisMovedColumn) {
     verifyIndex(index);
 }
 
-TEST_F(ViewportIndexTest, OnAxisMovedRow) {
+TEST_F(ViewportIndexTest, SheetMoveRow) {
     addColumns(2, 100);
     addRows(4, 50);
 
     ViewportIndex index;
     index.build(*sheet_);
 
-    // Move row 3 to position 1
-    index.onAxisMoved(rowIds_[3], false, 1);
+    // Move row 3 to position 1 using Sheet
+    sheet_->moveRow(rowIds_[3], 1);
 
     // New order: row0, row3, row1, row2
     EXPECT_EQ(*index.getRowAt(0), rowIds_[0]);
@@ -876,11 +899,15 @@ TEST_F(ViewportIndexTest, ManyResizeOperations) {
     ViewportIndex index;
     index.build(*sheet_);
 
-    // Resize columns multiple times
+    // Resize columns multiple times using Sheet's AxisIndex
     for (int i = 0; i < 50; i++) {
         size_t colIdx = static_cast<size_t>(i % 10);
         uint32_t newWidth = static_cast<uint32_t>(50 + (i % 200));
-        index.onAxisResized(colIds_[colIdx], true, newWidth);
+        Axis* col = sheet_->getColumn(colIds_[colIdx]);
+        if (col) {
+            col->size = newWidth;
+            sheet_->getColumnAxisIndex().resize(colIds_[colIdx], newWidth);
+        }
     }
 
     verifyIndex(index);
@@ -928,10 +955,16 @@ TEST_F(ViewportIndexTest, BenchmarkFullRebuildVsIncremental) {
         std::chrono::duration_cast<std::chrono::microseconds>(endIncremental - startIncremental)
             .count();
 
-    // Benchmark incremental axis resize
+    // Benchmark incremental axis resize via Sheet's AxisIndex
     auto startResize = std::chrono::high_resolution_clock::now();
     for (int i = 0; i < 100; i++) {
-        index.onAxisResized(colIds_[i % numCols], true, 100 + (i % 50));
+        size_t colIdx = static_cast<size_t>(i % numCols);
+        uint32_t newWidth = static_cast<uint32_t>(100 + (i % 50));
+        Axis* col = sheet_->getColumn(colIds_[colIdx]);
+        if (col) {
+            col->size = newWidth;
+            sheet_->getColumnAxisIndex().resize(colIds_[colIdx], newWidth);
+        }
     }
     auto endResize = std::chrono::high_resolution_clock::now();
     auto resizeDuration =
@@ -987,14 +1020,22 @@ TEST_F(ViewportIndexTest, BenchmarkLargeSheetIncrementalUpdates) {
         index.onCellAdded(cell);
     }
 
-    // Resize 100 columns
+    // Resize 100 columns via Sheet's AxisIndex
     for (size_t i = 0; i < 100; i++) {
-        index.onAxisResized(colIds_[i], true, 100);
+        Axis* col = sheet_->getColumn(colIds_[i]);
+        if (col) {
+            col->size = 100;
+            sheet_->getColumnAxisIndex().resize(colIds_[i], 100);
+        }
     }
 
-    // Resize 100 rows
+    // Resize 100 rows via Sheet's AxisIndex
     for (size_t i = 0; i < 100; i++) {
-        index.onAxisResized(rowIds_[i], false, 25);
+        Axis* row = sheet_->getRow(rowIds_[i]);
+        if (row) {
+            row->size = 25;
+            sheet_->getRowAxisIndex().resize(rowIds_[i], 25);
+        }
     }
 
     auto endOps = std::chrono::high_resolution_clock::now();
@@ -1004,9 +1045,9 @@ TEST_F(ViewportIndexTest, BenchmarkLargeSheetIncrementalUpdates) {
     std::cout << "1000 cell adds + 100 col resizes + 100 row resizes: " << opsDuration << " µs"
               << std::endl;
 
-    // The batch of incremental operations should be faster than a full rebuild
-    EXPECT_LT(opsDuration, buildDuration)
-        << "Batch of incremental ops should be faster than full rebuild";
+    // With Phase 4 architecture, build() only builds cell HashMap (not axis indexes)
+    // So build is nearly instant. Just verify the operations complete in reasonable time.
+    std::cout << "Note: Build is instant because axis indexes are maintained by Sheet" << std::endl;
 
     EXPECT_EQ(index.cellCount(), 1000u);
     verifyIndex(index);

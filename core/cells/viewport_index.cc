@@ -5,13 +5,6 @@
 
 namespace cells {
 
-// Helper struct for sorting axes by position (avoids pointer comparison)
-struct AxisSortEntry {
-    ID id;
-    uint32_t position;
-    uint32_t size;
-};
-
 // ============================================================================
 // Build from sheet
 // ============================================================================
@@ -20,43 +13,7 @@ void ViewportIndex::build(const Sheet& sheet) {
     clear();
     _sheet = &sheet;
 
-    // Collect columns and sort by position
-    std::vector<AxisSortEntry> columns;
-    columns.reserve(sheet.columnCount());
-    for (const ID& colId : sheet.getColumnIds()) {
-        const Axis* col = sheet.getColumn(colId);
-        if (col) {
-            columns.push_back({col->id, col->position, col->size});
-        }
-    }
-    std::sort(columns.begin(), columns.end(), [](const AxisSortEntry& a, const AxisSortEntry& b) {
-        return a.position < b.position;
-    });
-
-    // Insert columns in order
-    for (const auto& col : columns) {
-        _columns.append(col.id, col.size);
-    }
-
-    // Collect rows and sort by position
-    std::vector<AxisSortEntry> rows;
-    rows.reserve(sheet.rowCount());
-    for (const ID& rowId : sheet.getRowIds()) {
-        const Axis* row = sheet.getRow(rowId);
-        if (row) {
-            rows.push_back({row->id, row->position, row->size});
-        }
-    }
-    std::sort(rows.begin(), rows.end(), [](const AxisSortEntry& a, const AxisSortEntry& b) {
-        return a.position < b.position;
-    });
-
-    // Insert rows in order
-    for (const auto& row : rows) {
-        _rows.append(row.id, row.size);
-    }
-
-    // Index all cells
+    // Only build cell HashMap - axis indexes are owned by Sheet
     const Workbook* wb = sheet.getWorkbook();
     for (const ID& cellId : sheet.getCellIds()) {
         const Cell* cell = wb ? wb->getCell(cellId) : nullptr;
@@ -69,8 +26,6 @@ void ViewportIndex::build(const Sheet& sheet) {
 }
 
 void ViewportIndex::clear() {
-    _columns.clear();
-    _rows.clear();
     _cells.clear();
     _sheet = nullptr;
 }
@@ -83,7 +38,14 @@ std::vector<ViewportEntry> ViewportIndex::queryViewport(uint32_t x1, uint32_t y1
                                                         uint32_t y2) const {
     std::vector<ViewportEntry> results;
 
-    if (_columns.empty() || _rows.empty() || x1 >= x2 || y1 >= y2) {
+    if (_sheet == nullptr || x1 >= x2 || y1 >= y2) {
+        return results;
+    }
+
+    const AxisIndex& columns = _sheet->getColumnAxisIndex();
+    const AxisIndex& rows = _sheet->getRowAxisIndex();
+
+    if (columns.empty() || rows.empty()) {
         return results;
     }
 
@@ -96,14 +58,14 @@ std::vector<ViewportEntry> ViewportIndex::queryViewport(uint32_t x1, uint32_t y1
     // Iterate over visible cells
     // For each visible column and row, check if a cell exists at that position
     for (size_t colPos = firstCol; colPos <= lastCol; ++colPos) {
-        auto colIdOpt = _columns.getAxisAt(colPos);
+        auto colIdOpt = columns.getAxisAt(colPos);
         if (!colIdOpt) {
             continue;
         }
         const ID& colId = *colIdOpt;
 
-        auto colPixelOpt = _columns.axisToPixel(colId);
-        auto colWidthOpt = _columns.getSize(colId);
+        auto colPixelOpt = columns.axisToPixel(colId);
+        auto colWidthOpt = columns.getSize(colId);
         if (!colPixelOpt || !colWidthOpt) {
             continue;
         }
@@ -111,7 +73,7 @@ std::vector<ViewportEntry> ViewportIndex::queryViewport(uint32_t x1, uint32_t y1
         const uint32_t colWidth = *colWidthOpt;
 
         for (size_t rowPos = firstRow; rowPos <= lastRow; ++rowPos) {
-            auto rowIdOpt = _rows.getAxisAt(rowPos);
+            auto rowIdOpt = rows.getAxisAt(rowPos);
             if (!rowIdOpt) {
                 continue;
             }
@@ -124,8 +86,8 @@ std::vector<ViewportEntry> ViewportIndex::queryViewport(uint32_t x1, uint32_t y1
                 continue;
             }
 
-            auto rowPixelOpt = _rows.axisToPixel(rowId);
-            auto rowHeightOpt = _rows.getSize(rowId);
+            auto rowPixelOpt = rows.axisToPixel(rowId);
+            auto rowHeightOpt = rows.getSize(rowId);
             if (!rowPixelOpt || !rowHeightOpt) {
                 continue;
             }
@@ -140,81 +102,115 @@ std::vector<ViewportEntry> ViewportIndex::queryViewport(uint32_t x1, uint32_t y1
 }
 
 std::pair<size_t, size_t> ViewportIndex::getVisibleColumnRange(uint32_t x1, uint32_t x2) const {
-    if (_columns.empty() || x1 >= x2) {
+    if (_sheet == nullptr || x1 >= x2) {
+        return {0, 0};
+    }
+
+    const AxisIndex& columns = _sheet->getColumnAxisIndex();
+    if (columns.empty()) {
         return {0, 0};
     }
 
     // Find first column that intersects viewport
-    auto firstResult = _columns.pixelToAxis(x1);
+    auto firstResult = columns.pixelToAxis(x1);
     const size_t firstCol = firstResult ? firstResult->position : 0;
 
     // Find last column that intersects viewport
     // x2 is exclusive, so we look for x2 - 1
-    auto lastResult = _columns.pixelToAxis(x2 > 0 ? x2 - 1 : 0);
+    auto lastResult = columns.pixelToAxis(x2 > 0 ? x2 - 1 : 0);
     size_t lastCol = lastResult ? lastResult->position : 0;
 
     // Clamp to valid range
-    const size_t maxCol = _columns.count() > 0 ? _columns.count() - 1 : 0;
+    const size_t maxCol = columns.count() > 0 ? columns.count() - 1 : 0;
     lastCol = std::min(lastCol, maxCol);
 
     return {firstCol, lastCol};
 }
 
 std::pair<size_t, size_t> ViewportIndex::getVisibleRowRange(uint32_t y1, uint32_t y2) const {
-    if (_rows.empty() || y1 >= y2) {
+    if (_sheet == nullptr || y1 >= y2) {
+        return {0, 0};
+    }
+
+    const AxisIndex& rows = _sheet->getRowAxisIndex();
+    if (rows.empty()) {
         return {0, 0};
     }
 
     // Find first row that intersects viewport
-    auto firstResult = _rows.pixelToAxis(y1);
+    auto firstResult = rows.pixelToAxis(y1);
     const size_t firstRow = firstResult ? firstResult->position : 0;
 
     // Find last row that intersects viewport
     // y2 is exclusive, so we look for y2 - 1
-    auto lastResult = _rows.pixelToAxis(y2 > 0 ? y2 - 1 : 0);
+    auto lastResult = rows.pixelToAxis(y2 > 0 ? y2 - 1 : 0);
     size_t lastRow = lastResult ? lastResult->position : 0;
 
     // Clamp to valid range
-    const size_t maxRow = _rows.count() > 0 ? _rows.count() - 1 : 0;
+    const size_t maxRow = rows.count() > 0 ? rows.count() - 1 : 0;
     lastRow = std::min(lastRow, maxRow);
 
     return {firstRow, lastRow};
 }
 
 // ============================================================================
-// Coordinate conversion
+// Coordinate conversion (delegates to Sheet's AxisIndex)
 // ============================================================================
 
 std::optional<AxisLookupResult> ViewportIndex::pixelToColumn(uint32_t x) const {
-    return _columns.pixelToAxis(x);
+    if (_sheet == nullptr) {
+        return std::nullopt;
+    }
+    return _sheet->getColumnAxisIndex().pixelToAxis(x);
 }
 
 std::optional<AxisLookupResult> ViewportIndex::pixelToRow(uint32_t y) const {
-    return _rows.pixelToAxis(y);
+    if (_sheet == nullptr) {
+        return std::nullopt;
+    }
+    return _sheet->getRowAxisIndex().pixelToAxis(y);
 }
 
 std::optional<uint32_t> ViewportIndex::columnToPixel(const ID& colId) const {
-    return _columns.axisToPixel(colId);
+    if (_sheet == nullptr) {
+        return std::nullopt;
+    }
+    return _sheet->getColumnAxisIndex().axisToPixel(colId);
 }
 
 std::optional<uint32_t> ViewportIndex::rowToPixel(const ID& rowId) const {
-    return _rows.axisToPixel(rowId);
+    if (_sheet == nullptr) {
+        return std::nullopt;
+    }
+    return _sheet->getRowAxisIndex().axisToPixel(rowId);
 }
 
 std::optional<uint32_t> ViewportIndex::getColumnWidth(const ID& colId) const {
-    return _columns.getSize(colId);
+    if (_sheet == nullptr) {
+        return std::nullopt;
+    }
+    return _sheet->getColumnAxisIndex().getSize(colId);
 }
 
 std::optional<uint32_t> ViewportIndex::getRowHeight(const ID& rowId) const {
-    return _rows.getSize(rowId);
+    if (_sheet == nullptr) {
+        return std::nullopt;
+    }
+    return _sheet->getRowAxisIndex().getSize(rowId);
 }
 
 std::optional<ID> ViewportIndex::getColumnAt(size_t position) const {
-    return _columns.getAxisAt(position);
+    if (_sheet == nullptr) {
+        return std::nullopt;
+    }
+    return _sheet->getColumnAxisIndex().getAxisAt(position);
 }
 
 std::optional<ID> ViewportIndex::getRowAt(size_t position) const {
-    return _rows.getAxisAt(position);
+    if (_sheet == nullptr) {
+        return std::nullopt;
+    }
+    return _sheet->getRowAxisIndex().getAxisAt(position);
 }
 
 // ============================================================================
@@ -248,42 +244,17 @@ void ViewportIndex::onCellChanged(Cell* /*cell*/) {
 }
 
 // ============================================================================
-// Incremental axis updates
+// Axis update notifications (mostly no-ops since Sheet maintains AxisIndex)
 // ============================================================================
 
-void ViewportIndex::onAxisInserted(const ID& axisId, bool isColumn, size_t sheetPosition,
-                                   uint32_t size) {
-    // The 'sheetPosition' parameter is the axis's position in the Sheet model,
-    // NOT the tree position. We need to compute the correct tree position by
-    // counting how many existing axes have positions less than sheetPosition.
-    if (isColumn) {
-        size_t treePos = 0;
-        if (_sheet != nullptr) {
-            for (const ID& colId : _sheet->getColumnIds()) {
-                const Axis* col = _sheet->getColumn(colId);
-                if (col && colId != axisId && col->position < sheetPosition) {
-                    treePos++;
-                }
-            }
-        }
-        _columns.insert(axisId, treePos, size);
-    } else {
-        size_t treePos = 0;
-        if (_sheet != nullptr) {
-            for (const ID& rowId : _sheet->getRowIds()) {
-                const Axis* row = _sheet->getRow(rowId);
-                if (row && rowId != axisId && row->position < sheetPosition) {
-                    treePos++;
-                }
-            }
-        }
-        _rows.insert(axisId, treePos, size);
-    }
+void ViewportIndex::onAxisInserted(const ID& /*axisId*/, bool /*isColumn*/, size_t /*position*/,
+                                   uint32_t /*size*/) {
+    // No-op: Sheet maintains the AxisIndex
 }
 
 void ViewportIndex::onAxisDeleted(const ID& axisId, bool isColumn) {
+    // Remove all cells in the deleted axis from the cell HashMap
     if (isColumn) {
-        // Remove all cells in this column
         std::vector<std::string> keysToRemove;
         for (const auto& [key, cell] : _cells) {
             if (cell->colId == axisId) {
@@ -293,9 +264,7 @@ void ViewportIndex::onAxisDeleted(const ID& axisId, bool isColumn) {
         for (const auto& key : keysToRemove) {
             _cells.erase(key);
         }
-        _columns.remove(axisId);
     } else {
-        // Remove all cells in this row
         std::vector<std::string> keysToRemove;
         for (const auto& [key, cell] : _cells) {
             if (cell->rowId == axisId) {
@@ -305,27 +274,15 @@ void ViewportIndex::onAxisDeleted(const ID& axisId, bool isColumn) {
         for (const auto& key : keysToRemove) {
             _cells.erase(key);
         }
-        _rows.remove(axisId);
     }
 }
 
-void ViewportIndex::onAxisResized(const ID& axisId, bool isColumn, uint32_t newSize) {
-    if (isColumn) {
-        _columns.resize(axisId, newSize);
-    } else {
-        _rows.resize(axisId, newSize);
-    }
+void ViewportIndex::onAxisResized(const ID& /*axisId*/, bool /*isColumn*/, uint32_t /*newSize*/) {
+    // No-op: Sheet maintains the AxisIndex
 }
 
-void ViewportIndex::onAxisMoved(const ID& axisId, bool isColumn, size_t newPosition) {
-    // NOTE: newPosition is expected to be a tree position, not a Sheet position.
-    // Callers that have Sheet positions should either compute the tree position
-    // or use rebuildViewportIndex() instead.
-    if (isColumn) {
-        _columns.move(axisId, newPosition);
-    } else {
-        _rows.move(axisId, newPosition);
-    }
+void ViewportIndex::onAxisMoved(const ID& /*axisId*/, bool /*isColumn*/, size_t /*newPosition*/) {
+    // No-op: Sheet maintains the AxisIndex
 }
 
 // ============================================================================
@@ -333,19 +290,31 @@ void ViewportIndex::onAxisMoved(const ID& axisId, bool isColumn, size_t newPosit
 // ============================================================================
 
 uint32_t ViewportIndex::totalWidth() const {
-    return _columns.totalSize();
+    if (_sheet == nullptr) {
+        return 0;
+    }
+    return _sheet->getColumnAxisIndex().totalSize();
 }
 
 uint32_t ViewportIndex::totalHeight() const {
-    return _rows.totalSize();
+    if (_sheet == nullptr) {
+        return 0;
+    }
+    return _sheet->getRowAxisIndex().totalSize();
 }
 
 size_t ViewportIndex::columnCount() const {
-    return _columns.count();
+    if (_sheet == nullptr) {
+        return 0;
+    }
+    return _sheet->getColumnAxisIndex().count();
 }
 
 size_t ViewportIndex::rowCount() const {
-    return _rows.count();
+    if (_sheet == nullptr) {
+        return 0;
+    }
+    return _sheet->getRowAxisIndex().count();
 }
 
 size_t ViewportIndex::cellCount() const {
@@ -353,11 +322,18 @@ size_t ViewportIndex::cellCount() const {
 }
 
 bool ViewportIndex::empty() const {
-    return _columns.empty() && _rows.empty() && _cells.empty();
+    if (_sheet == nullptr) {
+        return true;
+    }
+    return _sheet->getColumnAxisIndex().empty() && _sheet->getRowAxisIndex().empty() &&
+           _cells.empty();
 }
 
 bool ViewportIndex::verify() const {
-    return _columns.verify() && _rows.verify();
+    if (_sheet == nullptr) {
+        return true;
+    }
+    return _sheet->getColumnAxisIndex().verify() && _sheet->getRowAxisIndex().verify();
 }
 
 std::string ViewportIndex::makeCellKey(const ID& colId, const ID& rowId) {

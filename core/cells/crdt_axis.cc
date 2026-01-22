@@ -269,10 +269,12 @@ ApplyResult applyRowDelete(Workbook& workbook, const Operation& op) {
 
 ApplyResult applyColResize(Workbook& workbook, const Operation& op) {
     Axis* axis = nullptr;
+    Sheet* targetSheet = nullptr;
 
     for (auto& s : workbook.sheets) {
         axis = s->getColumn(op.target_id);
         if (axis != nullptr) {
+            targetSheet = s.get();
             break;
         }
     }
@@ -298,15 +300,22 @@ ApplyResult applyColResize(Workbook& workbook, const Operation& op) {
     const auto new_size = static_cast<uint32_t>(std::stoul(size_str));
     axis->size = new_size;
 
+    // Update Sheet's axis index with the new size
+    if (targetSheet != nullptr) {
+        targetSheet->getColumnAxisIndex().resize(op.target_id, new_size);
+    }
+
     return ApplyResult::SUCCESS;
 }
 
 ApplyResult applyRowResize(Workbook& workbook, const Operation& op) {
     Axis* axis = nullptr;
+    Sheet* targetSheet = nullptr;
 
     for (auto& s : workbook.sheets) {
         axis = s->getRow(op.target_id);
         if (axis != nullptr) {
+            targetSheet = s.get();
             break;
         }
     }
@@ -331,6 +340,11 @@ ApplyResult applyRowResize(Workbook& workbook, const Operation& op) {
 
     const auto new_size = static_cast<uint32_t>(std::stoul(size_str));
     axis->size = new_size;
+
+    // Update Sheet's axis index with the new size
+    if (targetSheet != nullptr) {
+        targetSheet->getRowAxisIndex().resize(op.target_id, new_size);
+    }
 
     return ApplyResult::SUCCESS;
 }

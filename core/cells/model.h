@@ -41,6 +41,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "core/cells/axis_index.h"
 #include "core/cells/operation.h"
 #include "core/cells/oplog.h"
 #include "core/cells/style_buffer.h"
@@ -674,6 +675,18 @@ struct Sheet {
     [[nodiscard]] SpillIndex* getSpillIndex() { return _spillIndex.get(); }
     [[nodiscard]] const SpillIndex* getSpillIndex() const { return _spillIndex.get(); }
 
+    // ========================================================================
+    // Axis Spatial Index (for fast pixel-to-axis conversion)
+    // ========================================================================
+
+    // Get the column axis index for viewport queries
+    [[nodiscard]] AxisIndex& getColumnAxisIndex() { return _columnAxisIndex; }
+    [[nodiscard]] const AxisIndex& getColumnAxisIndex() const { return _columnAxisIndex; }
+
+    // Get the row axis index for viewport queries
+    [[nodiscard]] AxisIndex& getRowAxisIndex() { return _rowAxisIndex; }
+    [[nodiscard]] const AxisIndex& getRowAxisIndex() const { return _rowAxisIndex; }
+
     // Update the spill index with a new or changed spill extent
     // Called by Workbook when a spill range is registered
     void updateSpillIndex(const ID& masterCellId, uint32_t startCol, uint32_t startRow,
@@ -726,6 +739,18 @@ private:
 
     // Secondary index: (colId, rowId) -> cellId
     std::unordered_map<std::string, ID> _cellIndex;
+
+    // ========================================================================
+    // Axis Spatial Index (OSTree for O(log n) pixel-to-axis conversion)
+    // These indexes maintain axis positions and sizes for viewport queries.
+    // They are maintained incrementally as axes are added/removed/resized.
+    // ========================================================================
+
+    // Column axis index for pixel-to-column conversion
+    AxisIndex _columnAxisIndex;
+
+    // Row axis index for pixel-to-row conversion
+    AxisIndex _rowAxisIndex;
 
     // ========================================================================
     // Unified Range System

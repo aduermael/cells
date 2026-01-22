@@ -3,23 +3,22 @@
 // =============================================================================
 //
 // Spatial index for efficient viewport queries: "which cells are visible in
-// this pixel rectangle?" Uses two AxisIndex instances (columns, rows) plus
-// a cell hash map for O(log n + k) queries where k = visible cells.
+// this pixel rectangle?" Delegates coordinate conversion to Sheet's AxisIndex
+// and maintains a cell hash map for O(log n + k) queries where k = visible cells.
 //
 // Key responsibilities:
 // - Query cells within a viewport (pixel coordinates) for rendering
 // - Convert pixel coordinates to column/row IDs and vice versa
-// - Support incremental O(log n) updates for cell and axis changes
 // - Maintain cell index for O(1) cell lookups by (colId, rowId)
 //
-// Unlike a quadtree which requires O(n) rebuilds, ViewportIndex supports:
-// - Cell additions/removals: O(1)
-// - Axis insertions/deletions: O(log n)
-// - Axis resizing: O(log n)
-// - Axis reordering: O(log n)
+// Architecture:
+// - Sheet owns AxisIndex for columns and rows (maintained incrementally)
+// - ViewportIndex stores cell HashMap and delegates axis queries to Sheet
+// - On sheet switch: only rebuild cell HashMap (O(k) where k = cells)
+// - Axis operations are O(log n) via Sheet's AxisIndex
 //
 // Query algorithm:
-// 1. Use AxisIndex to find visible column/row ranges
+// 1. Use Sheet's AxisIndex to find visible column/row ranges
 // 2. Iterate visible ranges, look up cells in hash map
 // 3. Return ViewportEntry list with cell pointers and bounding boxes
 //
@@ -61,33 +60,25 @@ struct ViewportEntry {
 
 // ViewportIndex - spatial index for cells using pixel coordinates
 //
-// Uses two Order-Statistic Trees (via AxisIndex) to provide O(log n) operations:
+// Delegates to Sheet's AxisIndex for coordinate conversions (O(log n)):
 // - pixelToColumn(x): find which column contains pixel offset x
 // - pixelToRow(y): find which row contains pixel offset y
 // - columnToPixel(colId): get pixel offset of column's left edge
 // - rowToPixel(rowId): get pixel offset of row's top edge
 //
-// Unlike the quadtree which requires O(n) full rebuilds, ViewportIndex supports
-// incremental O(log n) updates for:
-// - Cell additions/removals
-// - Axis insertions/deletions
-// - Axis resizing (width/height changes)
-// - Axis reordering (move operations)
-//
-// Cells are stored by reference in a HashMap for O(1) access by (colId, rowId).
-// The viewport query uses the AxisIndex to find visible columns/rows, then
-// iterates the visible range to collect cells.
+// Maintains cell HashMap for O(1) access by (colId, rowId).
+// Sheet switch only rebuilds cell HashMap (O(k) where k = cells),
+// not axis indexes (they persist in Sheet).
 //
 // Usage:
 //   ViewportIndex index;
-//   index.build(sheet);  // Populate from sheet data
+//   index.build(sheet);  // Build cell HashMap only
 //
 //   // Query cells in viewport (pixel coordinates)
 //   auto entries = index.queryViewport(0, 0, 800, 600);
 //
 //   // Incremental updates
 //   index.onCellAdded(cell);
-//   index.onAxisResized(colId, true, 150);  // true = column
 //
 class ViewportIndex {
 public:
@@ -107,8 +98,8 @@ public:
     // ========================================================================
 
     // Populate index from sheet data
-    // Clears any existing data and rebuilds from scratch
-    // Time complexity: O(n log n) where n = max(columns, rows)
+    // Only builds the cell HashMap - axis indexes are owned by Sheet
+    // Time complexity: O(k) where k = number of cells
     void build(const Sheet& sheet);
 
     // Clear all data
@@ -136,6 +127,7 @@ public:
 
     // ========================================================================
     // Coordinate conversion (pixel <-> axis)
+    // Delegates to Sheet's AxisIndex for O(log n) lookups
     // ========================================================================
 
     // Find which column contains a pixel X offset
@@ -183,20 +175,24 @@ public:
     void onCellChanged(Cell* cell);
 
     // ========================================================================
-    // Incremental axis updates
+    // Axis update notifications (for API compatibility)
+    // These are now no-ops since Sheet maintains the AxisIndex
     // ========================================================================
 
     // Called when a new axis (column/row) is inserted
-    // isColumn: true = column, false = row
+    // No-op: Sheet maintains the AxisIndex
     void onAxisInserted(const ID& axisId, bool isColumn, size_t position, uint32_t size);
 
     // Called when an axis is deleted
+    // Removes cells in the deleted axis from the cell HashMap
     void onAxisDeleted(const ID& axisId, bool isColumn);
 
     // Called when an axis is resized
+    // No-op: Sheet maintains the AxisIndex
     void onAxisResized(const ID& axisId, bool isColumn, uint32_t newSize);
 
     // Called when an axis is moved to a new position
+    // No-op: Sheet maintains the AxisIndex
     void onAxisMoved(const ID& axisId, bool isColumn, size_t newPosition);
 
     // ========================================================================
@@ -225,15 +221,11 @@ public:
     [[nodiscard]] bool verify() const;
 
 private:
-    // Column and row indices
-    AxisIndex _columns;
-    AxisIndex _rows;
-
     // Cell storage: (colId, rowId) -> Cell*
     // Composite key is colId.toString() + rowId.toString()
     std::unordered_map<std::string, Cell*> _cells;
 
-    // Pointer to the sheet (for cell lookups during queries)
+    // Pointer to the sheet (for axis lookups during queries)
     const Sheet* _sheet{nullptr};
 
     // Helper: make composite key for cell lookup
