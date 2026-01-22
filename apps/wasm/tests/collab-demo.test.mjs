@@ -602,28 +602,17 @@ async function runCollabDemo() {
     results.push(await runTest('Act 5: The Formulas Come Alive', async () => {
       console.log('\n  [Shuying] Adding cost calculations...\n');
 
-      // Shuying adds cost rate in F1 with styling
-      await setCellValue(shuyingPage, 'F1', 'Rate/day:');
-      await clickCell(shuyingPage, 'F1');
-      await applyItalic(shuyingPage);
-      await sleep(100);
-
-      await setCellValue(shuyingPage, 'G1', '$500');
-      await clickCell(shuyingPage, 'G1');
-      await applyBold(shuyingPage);
-      await applyTextColor(shuyingPage, COLORS.GOLD);
-      await sleep(300);
-
-      // Shuying adds cost formulas
-      await setCellValue(shuyingPage, 'D4', '=C4*$G$1');
+      // Shuying adds cost formulas (days * $500/day rate)
+      console.log('  [Shuying] Adding cost formulas at $500/day rate...\n');
+      await setCellValue(shuyingPage, 'D4', '=C4*500');
       await sleep(200);
-      await setCellValue(shuyingPage, 'D5', '=C5*$G$1');
+      await setCellValue(shuyingPage, 'D5', '=C5*500');
       await sleep(200);
-      await setCellValue(shuyingPage, 'D6', '=C6*$G$1');
+      await setCellValue(shuyingPage, 'D6', '=C6*500');
       await sleep(200);
-      await setCellValue(shuyingPage, 'D7', '=C7*$G$1');
+      await setCellValue(shuyingPage, 'D7', '=C7*500');
       await sleep(200);
-      await setCellValue(shuyingPage, 'D8', '=C8*$G$1');
+      await setCellValue(shuyingPage, 'D8', '=C8*500');
       await sleep(300);
 
       // Apply currency format to cost column
@@ -668,7 +657,7 @@ async function runCollabDemo() {
       await verifyCellSynced(robertPage, 'D10', '=SUM(D4:D8)', 'Robert');
 
       console.log('  [Robert] The formulas are calculating automatically!');
-      console.log('  [Shuying] The gold rate and purple totals look so retro!\n');
+      console.log('  [Shuying] Purple totals look so retro!\n');
     }));
 
     // === ACT 6: STATUS UPDATES ===
@@ -800,7 +789,7 @@ async function runCollabDemo() {
       console.log('  - Hot pink title with Georgia font');
       console.log('  - Cyan header row with Helvetica font');
       console.log('  - Lavender/light cyan alternating rows');
-      console.log('  - Cost formulas with gold rate highlight');
+      console.log('  - Cost formulas ($500/day rate)');
       console.log('  - Electric purple totals row');
       console.log('  - Neon status badges (green/orange/magenta/coral)');
       console.log('  - Retro credits with Courier New font');
@@ -844,7 +833,7 @@ async function runCollabDemo() {
   console.log('  - Bold & italic formatting');
   console.log('  - Multiple font families (Georgia, Helvetica, Courier New)');
   console.log('  - Cell borders');
-  console.log('  - Currency formatting with gold rate highlight');
+  console.log('  - Currency formatting for costs');
   console.log('  - Lavender/cyan alternating row colors');
   console.log('  - Neon status badges (green/orange/magenta/coral)');
   console.log('  - Column & row resizing with synced dimensions');
