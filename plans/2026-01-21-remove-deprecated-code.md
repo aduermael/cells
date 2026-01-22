@@ -61,11 +61,11 @@ The `existingOnly=false` parameter is only used for XLSX import. Replace with pr
 
 ### Phase 6: Clean Up Deprecated Comments and Documentation
 
-- [ ] 6a: Remove "for backward compatibility" comments from code that no longer has legacy paths
-- [ ] 6b: Update `docs/networking.md` to remove "Legacy JS (deprecated)" row from the table
-- [ ] 6c: Remove "// legacy" comments from test files after updating them
-- [ ] 6d: Update `formula_recalc.h` comment about backward compatibility (line 70)
-- [ ] 6e: Remove deprecated flag from format_registry.h `findOrRegisterFormat` or remove the method entirely
+- [x] 6a: Remove "for backward compatibility" comments from code that no longer has legacy paths - cleaned up operation.cc, formula_serializer.cc, types.ts, cells.d.ts, range_test.cc, helpers.mjs
+- [x] 6b: Update `docs/networking.md` to remove "Legacy JS (deprecated)" row from the table
+- [x] 6c: Remove "// legacy" comments from test files after updating them - updated formula_resolver_test.cc, number_format_test.cc
+- [x] 6d: Update `formula_recalc.h` comment about backward compatibility - renamed to "convenience overload"
+- [x] 6e: Remove deprecated flag from format_registry.h `findOrRegisterFormat` or remove the method entirely - replaced DEPRECATED with note about CRDT usage
 
 ### Phase 7: Remove Optional Fields Added for Backward Compatibility
 
