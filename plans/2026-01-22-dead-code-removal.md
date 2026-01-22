@@ -44,9 +44,9 @@ Remove unused code to keep the codebase lean during early development. This foll
 ## Phase 3: Remove hello.cc demo file
 - [x] 3a: Remove `apps/wasm/hello.cc` and its BUILD target `hello_wasm` - Deleted the demo hello world WASM file and removed hello_wasm_bin and hello_wasm targets from BUILD.
 
-## Phase 4: Standardize ZCD format documentation
-- [x] 4a: Update docs to use `#cells v1` consistently (matching existing practice) - Updated file-format.md and persistence.md to use `#cells v1` header instead of `#zcd v1`.
-- [x] 4b: Add `#cells v1` header to `testdata/named_ranges.zcd` (currently missing)
+## Phase 4: Standardize ZCD format header
+- [x] 4a: Update testdata/*.zcd files to use `#zcd v1` consistently (matching documentation) - Updated 9 test files from `#cells v1` to `#zcd v1`.
+- [x] 4b: Add `#zcd v1` header to `testdata/named_ranges.zcd` (was missing)
 
 ## Phase 5: Final verification
 - [ ] 5a: Run tests to verify no regressions
