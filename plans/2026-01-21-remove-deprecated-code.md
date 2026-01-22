@@ -75,10 +75,10 @@ The `existingOnly=false` parameter is only used for XLSX import. Replace with pr
 
 ### Phase 8: Final Cleanup and Validation
 
-- [ ] 8a: Run full test suite (unit tests + E2E tests)
-- [ ] 8b: Run linter and fix any issues
-- [ ] 8c: Search for remaining "deprecated", "legacy", "backward" references and address any missed items
-- [ ] 8d: Build all targets to ensure no compilation errors
+- [x] 8a: Run full test suite (unit tests + E2E tests) - all 56 unit tests and 313 E2E tests pass
+- [x] 8b: Run linter and fix any issues - lint check passed
+- [x] 8c: Search for remaining "deprecated", "legacy", "backward" references and address any missed items - cleaned up format-controls.ts (removed dead FMT_C code), parser.cc/h (updated "legacy style ID" comments), crdt.h (updated "legacy payloads" comment), formula_display.cc (changed "Legacy" to "Fallback")
+- [x] 8d: Build all targets to ensure no compilation errors - WASM dist build successful
 
 ## Files to Modify
 

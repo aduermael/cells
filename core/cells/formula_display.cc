@@ -183,7 +183,7 @@ std::string FormulaDisplayConverter::cellRefToStringInternal(const CellRefNode* 
         }
     }
 
-    // Legacy: no cellId resolved, use sheetId/sheetName for prefix
+    // Fallback: no cellId resolved, use sheetId/sheetName for prefix
     if (!node->sheetId.empty() && _workbook != nullptr) {
         const ID sheetIdObj(node->sheetId);
         const Sheet* crossSheet = _workbook->getSheet(sheetIdObj);
@@ -194,7 +194,7 @@ std::string FormulaDisplayConverter::cellRefToStringInternal(const CellRefNode* 
             }
         }
     } else if (!node->sheetName.empty() && !suppressSheetPrefix) {
-        // Legacy sheetName reference (unresolved formula)
+        // Fallback: sheetName reference (unresolved formula)
         sheetPrefix = getSheetPrefix("", node->sheetName);
     }
 

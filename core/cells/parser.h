@@ -119,7 +119,7 @@ private:
     // Non-static because it needs access to workbook_ for format/style storage
     bool parseCellProps(std::string_view props, Cell& cell);
 
-    // Parse style value (content-addressed base64 or legacy style ID)
+    // Parse style value (content-addressed base64)
     // Returns StyleBuffer if the value can be parsed, nullopt otherwise
     [[nodiscard]] std::optional<StyleBuffer> parseStyleValue(const std::string& value) const;
     bool parseCellValue(std::string_view value, char type, CellValue& out, size_t& consumed);

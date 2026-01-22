@@ -694,7 +694,7 @@ export class FormatControls {
     this.percentBtn.classList.toggle("active", isPercentage);
 
     // If this is a currency format, update the currency dropdown to show the right currency
-    // Format ID pattern: C<CURRENCY>_0XX (e.g., CUSD_002) or legacy FMT_C0XX
+    // Format ID pattern: C<CURRENCY>_0XX (e.g., CUSD_002)
     if (isCurrency) {
       const match = formatId.match(/^C([A-Z]{3})_0\d{2}$/);
       if (match) {
@@ -702,10 +702,6 @@ export class FormatControls {
         this.currentCurrency = currency;
         const symbol = this.getCurrencySymbol(currency);
         this.currencyDropdownLabel.textContent = symbol;
-      } else if (formatId.startsWith("FMT_C")) {
-        // Legacy USD format
-        this.currentCurrency = "USD";
-        this.currencyDropdownLabel.textContent = "$";
       }
     }
 

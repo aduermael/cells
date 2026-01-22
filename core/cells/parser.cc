@@ -219,9 +219,9 @@ bool Parser::parseFormat(std::string_view line) {
 }
 
 bool Parser::parseStyle(std::string_view line) {
-    // Y lines (legacy style definitions) are no longer used.
+    // Y lines (old style definitions) are no longer used.
     // Styles are now content-addressed and embedded directly in entities as base64.
-    // Just ignore Y lines for now (return true to not fail the parse).
+    // Ignore Y lines (return true to not fail the parse).
     (void)line;
     return true;
 }
@@ -655,7 +655,7 @@ bool Parser::parseAxisProps(std::string_view props, Axis& axis,
                 props = props.substr(endPos);
             }
         } else if (key == "sty") {
-            // Style value - content-addressed base64 or legacy style ID
+            // Style value - content-addressed base64
             const size_t endPos = props.find_first_of(" \t");
             const std::string_view valueStr =
                 (endPos == std::string_view::npos) ? props : props.substr(0, endPos);
@@ -976,7 +976,7 @@ bool Parser::parseCellProps(std::string_view props, Cell& cell) {
             }
             props = (end < props.size()) ? props.substr(end) : "";
         } else if (key == "sty") {
-            // Style value: content-addressed base64 or legacy style ID
+            // Style value: content-addressed base64
             size_t end = props.find_first_of(" \t");
             if (end == std::string_view::npos) {
                 end = props.size();
@@ -1214,7 +1214,7 @@ bool Parser::parseRange(std::string_view line) {
     const Range* rangePtr = range.get();
     currentSheet_->addRange(std::move(range));
 
-    // Parse optional style reference (content-addressed base64 or legacy style ID)
+    // Parse optional style reference (content-addressed base64)
     if (spacePos != std::string_view::npos) {
         line = line.substr(spacePos + 1);
         // Look for "sty:" property

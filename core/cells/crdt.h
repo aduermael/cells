@@ -80,9 +80,9 @@ Operation makeCellClearOp(Workbook& workbook, const ID& cellId);
 // Payload: {"format_id":"FMT_C002"} or {"format_id":"~"} for default
 Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const std::string& payload);
 
-// Generate a CELL_SET_STYLE operation to set a cell's style.
+// Generate a CELL_SET_STYLE operation to set a cell's style from raw JSON payload.
 // Payload: {"style":"<base64>"} or {"style":""} to clear
-// For legacy payloads, prefer using the StyleBuffer overload below.
+// Prefer using the StyleBuffer overload below for type safety.
 Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const std::string& payload);
 
 // Generate a CELL_SET_STYLE operation using content-addressed StyleBuffer.
