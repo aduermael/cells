@@ -39,7 +39,7 @@ Review and update all documentation files to accurately reflect current codebase
 ## Phase 2: Data Model and CRDT Documentation
 
 - [x] 2a: Review `docs/data-model.md` - updated Cell/CellValue/CellError types, Axis flags, Sheet/Workbook fields, cell storage, added collaboration mode section
-- [ ] 2b: Review `docs/crdt.md` - verify operations against `crdt.cc/h`, update operation list and diagrams
+- [x] 2b: Review `docs/crdt.md` - updated all operation types with codes, fixed OpLog fields and methods, updated implementation status, simplified undo/redo section to reflect not-implemented state
 
 ## Phase 3: Formula Engine Documentation
 

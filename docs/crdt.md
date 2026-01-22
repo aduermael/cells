@@ -20,13 +20,13 @@ This architectural constraint ensures:
 | Component | Status | Source Files |
 |-----------|--------|--------------|
 | Hybrid Logical Clock | Implemented | `core/cells/hlc.h`, `hlc.cc` |
-| CRDT operations | Implemented | `core/cells/crdt.h`, `crdt.cc` |
+| CRDT operations | Implemented | `core/cells/crdt.h`, `crdt.cc`, `crdt_*.cc` |
 | Operation types | Implemented | `core/cells/operation.h`, `operation.cc` |
 | Operation log (OpLog) | Implemented | `core/cells/oplog.h`, `oplog.cc` |
 | Sync manager | Implemented | `core/cells/sync_manager.h`, `sync_manager.cc` |
 | WebRTC P2P sync | Implemented | `core/net/` |
-| Presence/cursors | Implemented | `core/net/common/Presence.cc` |
-| Branch-based undo/redo | Planned | — |
+| Presence/cursors | Implemented | `core/net/include/Presence.h`, `core/net/common/Presence.cc` |
+| Undo/redo | Not implemented | — |
 
 ## Overview
 
@@ -82,28 +82,76 @@ Comparison: wall_time → logical → node_id (lexicographic)
 
 ### Cell Operations
 
-| Operation | Description |
-|-----------|-------------|
-| `CELL_SET_VALUE` | Set cell value/formula |
-| `CELL_CLEAR` | Clear cell |
-| `CELL_SET_STYLE` | Change formatting |
+| Operation | Code | Description |
+|-----------|------|-------------|
+| `CELL_SET_VALUE` | 0 | Set cell value/formula |
+| `CELL_CLEAR` | 1 | Clear cell contents |
+| `CELL_SET_STYLE` | 2 | Set cell style properties |
+| `CELL_SET_FORMAT` | 3 | Set cell number format |
 
-### Dimension Operations
+### Column Operations
 
-| Operation | Description |
-|-----------|-------------|
-| `DIM_INSERT_AXIS` | Insert column/row |
-| `DIM_DELETE_AXIS` | Delete column/row |
-| `DIM_MOVE_AXIS` | Reorder |
-| `DIM_RESIZE_AXIS` | Change width/height |
+| Operation | Code | Description |
+|-----------|------|-------------|
+| `COL_INSERT` | 10 | Insert new column |
+| `COL_DELETE` | 11 | Delete column |
+| `COL_MOVE` | 12 | Move column to new position |
+| `COL_RESIZE` | 13 | Resize column width |
+| `COL_RENAME` | 14 | Rename column |
+
+### Row Operations
+
+| Operation | Code | Description |
+|-----------|------|-------------|
+| `ROW_INSERT` | 15 | Insert new row |
+| `ROW_DELETE` | 16 | Delete row |
+| `ROW_MOVE` | 17 | Move row to new position |
+| `ROW_RESIZE` | 18 | Resize row height |
+
+### Axis Operations (both columns and rows)
+
+| Operation | Code | Description |
+|-----------|------|-------------|
+| `AXIS_SET_HIDDEN` | 19 | Set axis hidden state |
+| `AXIS_SET_STYLE` | 52 | Set axis default style |
+| `AXIS_SET_FORMAT` | 53 | Set axis default format |
 
 ### Sheet Operations
 
-| Operation | Description |
-|-----------|-------------|
-| `SHEET_CREATE` | Create sheet |
-| `SHEET_DELETE` | Delete sheet |
-| `SHEET_RENAME` | Rename sheet |
+| Operation | Code | Description |
+|-----------|------|-------------|
+| `SHEET_CREATE` | 20 | Create new sheet |
+| `SHEET_DELETE` | 21 | Delete sheet |
+| `SHEET_RENAME` | 22 | Rename sheet |
+
+### Workbook Operations
+
+| Operation | Code | Description |
+|-----------|------|-------------|
+| `WORKBOOK_RENAME` | 30 | Rename workbook |
+
+### Format Operations
+
+| Operation | Code | Description |
+|-----------|------|-------------|
+| `FORMAT_DEFINE` | 40 | Define a custom number format |
+
+### Named Range Operations
+
+| Operation | Code | Description |
+|-----------|------|-------------|
+| `NAMED_RANGE_DEFINE` | 50 | Define a named range |
+| `NAMED_RANGE_DELETE` | 51 | Delete a named range |
+
+### Range Operations (unified range system)
+
+| Operation | Code | Description |
+|-----------|------|-------------|
+| `RANGE_ADD` | 60 | Add a new range |
+| `RANGE_REMOVE` | 61 | Remove a range by ID |
+| `RANGE_UPDATE_CORNERS` | 62 | Update range corner IDs (resize) |
+| `RANGE_UPDATE_FLAGS` | 63 | Update range flags bitmask |
+| `RANGE_SET_STYLE` | 64 | Set style metadata for a style range |
 
 ## Conflict Resolution Rules
 
@@ -123,40 +171,34 @@ When one client deletes an axis while another edits a cell in it:
 
 ## Operation Log (OpLog)
 
-All operations are stored in an append-only log:
+All operations are stored in an append-only log with efficient indexes:
 
-| Field | Purpose |
-|-------|---------|
-| `log_file` | Append-only persistence |
-| `by_cell_id` | Index for cell history |
-| `by_axis_id` | Index for axis history |
-| `last_synced` | Last operation sent to peers |
+| Field | Type | Purpose |
+|-------|------|---------|
+| `_operations` | `vector<Operation>` | Operations in HLC order |
+| `_by_entity` | `map<ID, vector<size_t>>` | Entity ID → operation indices |
+| `_hlc_index` | `map<string, size_t>` | HLC string → index (deduplication) |
 
-### OpLog Compaction
+### Key Operations
 
-Over time, compress old operations:
-- Only compact operations all peers have seen
-- Merge consecutive operations on same cell
-- Snapshot old state
+| Method | Description |
+|--------|-------------|
+| `addOperation(op)` | Add operation, returns false if duplicate |
+| `getOperationsSince(hlc)` | Get all ops after given HLC |
+| `getOperationsForEntity(id)` | Get all ops for an entity |
+| `getLatestOperationForEntity(id)` | Get most recent op for entity |
+| `pruneOperationsBefore(hlc)` | GC old acknowledged ops |
 
-## Undo/Redo: Branch-Based History
+### OpLog Garbage Collection
 
-We use branch-based undo/redo - undo operations are just more operations that get synced.
+Prune old operations that all peers have acknowledged:
+- `pruneOperationsBefore(threshold)` - remove ops with HLC ≤ threshold
+- `pruneKeeping(minToKeep)` - keep at least N most recent ops
+- `pruneBeforeKeeping(threshold, min)` - combine both strategies
 
-### Why Branch-Based?
+## Undo/Redo
 
-1. **Git-friendly**: Undo operations visible in file diffs
-2. **CRDT-native**: No special "inverse" logic
-3. **Collaborative**: Other users see the undo
-4. **Time-travel**: Can view state at any point
-5. **No data loss**: All states preserved
-
-### How It Works
-
-1. Track checkpoints (HLC timestamps) after each user action
-2. Undo: Generate reverse operations for everything since last checkpoint
-3. Redo: Replay the operations that were undone
-4. Reverse operations are broadcast to all peers
+Undo/redo is not yet implemented. The planned approach is branch-based history where undo operations are regular CRDT operations that get synced to peers.
 
 ## Presence & Cursors
 
