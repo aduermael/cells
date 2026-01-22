@@ -66,8 +66,7 @@ EvalResult evaluateCell(Sheet* sheet, const ID& cellId);
 // This recalculates ALL dependents regardless of which sheet they're on.
 void recalculate(Workbook* workbook, const std::vector<ID>& changedCells);
 
-// Legacy sheet-based recalculate (delegates to workbook-level version)
-// Kept for backward compatibility with existing callers
+// Sheet-based recalculate (convenience overload, delegates to workbook-level version)
 void recalculate(Sheet* sheet, const std::vector<ID>& changedCells);
 
 // Recalculate all volatile cells and their dependents

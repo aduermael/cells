@@ -322,7 +322,7 @@ void recalculate(Workbook* workbook, const std::vector<ID>& changedCells) {
     }
 }
 
-// Legacy sheet-based recalculate - delegates to workbook-level version
+// Sheet-based recalculate - delegates to workbook-level version
 void recalculate(Sheet* sheet, const std::vector<ID>& changedCells) {
     if (!sheet) {
         return;
