@@ -352,7 +352,7 @@ TEST(ParseFormatIdTest, InvalidFormats) {
     parsed = parseFormatId("XXXXXXXX");
     EXPECT_FALSE(parsed.valid);
 
-    // Legacy format (not parsed dynamically, should be looked up in registry)
+    // Custom format (not parsed dynamically, should be looked up in registry)
     parsed = parseFormatId("FMT_GEN0");
     EXPECT_FALSE(parsed.valid);
 }

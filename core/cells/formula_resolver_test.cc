@@ -69,7 +69,6 @@ protected:
     }
 
     // Helper to resolve a formula, creating any missing entities first.
-    // This replaces the legacy `resolve(ast, false)` pattern.
     // Uses the sheetId from RequiredEntities to create entities on the correct sheet.
     ResolveResult resolveWithEntityCreation(FormulaResolver& resolver, ASTNode* ast,
                                             Sheet* /* defaultSheet - unused */) {
