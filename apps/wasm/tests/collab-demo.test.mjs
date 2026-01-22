@@ -15,6 +15,7 @@
 // - Number formatting (currency)
 // - Lavender/cyan alternating row colors
 // - Neon status badges (green/orange/magenta/coral)
+// - Column & row resizing with synced dimensions
 //
 // Run in headed mode to watch the demo:
 //   bazel run :e2e-headed -- collab
@@ -35,6 +36,8 @@ import {
   waitForPeerConnection,
   assertWithRetry,
   selectRange,
+  resizeColumn,
+  resizeRow,
 } from './helpers.mjs';
 
 // =============================================================================
@@ -263,61 +266,6 @@ async function waitForAllPeers(pages, expectedPeerCount, timeout = 20000) {
 }
 
 /**
- * Resize a column by simulating a drag on the column border
- * @param {Page} page - Puppeteer page
- * @param {string} colLetter - Column letter (A, B, C, etc.)
- * @param {number} newWidth - New width in pixels
- */
-async function resizeColumn(page, colLetter, newWidth) {
-  const colIndex = colLetter.toUpperCase().charCodeAt(0) - 65;
-
-  // Get canvas position and current column right edge
-  const info = await page.evaluate(({ colIndex }) => {
-    const HEADER_WIDTH = 50;
-    const HEADER_HEIGHT = 24;
-    const DEFAULT_COL_WIDTH = 100;
-
-    const canvas = document.getElementById('grid');
-    const rect = canvas.getBoundingClientRect();
-
-    // Calculate current column right edge
-    let rightEdge = HEADER_WIDTH;
-    for (let i = 0; i <= colIndex; i++) {
-      // Try to get actual width from grid event handler state
-      const w = window._appContext?.eventManager?.colWidths?.get(i) || DEFAULT_COL_WIDTH;
-      rightEdge += w;
-    }
-
-    // Get current width
-    const currentWidth = window._appContext?.eventManager?.colWidths?.get(colIndex) || DEFAULT_COL_WIDTH;
-
-    return {
-      canvasLeft: rect.left,
-      canvasTop: rect.top,
-      rightEdge,
-      currentWidth,
-      headerHeight: HEADER_HEIGHT
-    };
-  }, { colIndex });
-
-  // Position to start drag: right edge of column, in header area
-  const startX = info.canvasLeft + info.rightEdge;
-  const startY = info.canvasTop + info.headerHeight / 2;
-
-  // Calculate how much to drag
-  const dragDelta = newWidth - info.currentWidth;
-  const endX = startX + dragDelta;
-
-  // Simulate the drag
-  await page.mouse.move(startX, startY);
-  await page.mouse.down();
-  await page.mouse.move(endX, startY, { steps: 10 });
-  await page.mouse.up();
-
-  await sleep(300);
-}
-
-/**
  * Drag a column to a new position
  * @param {Page} page - Puppeteer page
  * @param {string} sourceCol - Source column letter (e.g., "B")
@@ -510,6 +458,78 @@ async function runCollabDemo() {
 
       console.log('  [Shuying] Wow! The styling synced to me perfectly!');
       console.log('  [Shuying] Love the retro pink title and cyan headers!\n');
+    }));
+
+    // === ACT 2.5: THE TEAM ADJUSTS THE LAYOUT ===
+    results.push(await runTest('Act 2.5: Making Room for Greatness', async () => {
+      console.log('\n  [Shuying] These feature names are getting cut off...\n');
+      console.log('  [Shuying] Let me widen column A for those long feature names!\n');
+
+      // Shuying widens column A to fit "Real-time Collaboration"
+      await resizeColumn(shuyingPage, 'A', 180);
+      await sleep(400);
+
+      console.log('  [Shuying] Column A is now 180px - much better!\n');
+
+      // Verify Shuying can still click cells correctly after resize
+      await clickCell(shuyingPage, 'A4');
+      await sleep(200);
+      const featureValue = await getFormulaBarContent(shuyingPage);
+      assertEqual(featureValue, 'Real-time Collaboration', 'A4 should be clickable after resize');
+
+      console.log('  [Nico] Nice! That title row needs more presence though...\n');
+      console.log('  [Nico] Making the title row taller for that epic 80s vibe!\n');
+
+      // Nico makes the title row taller
+      await resizeRow(nicoPage, 1, 36);
+      await sleep(400);
+
+      console.log('  [Nico] Row 1 is now 36px tall - very VHS cover art!\n');
+
+      // Verify Nico can still click cells in the resized row
+      await clickCell(nicoPage, 'A1');
+      await sleep(200);
+      const titleValue = await getFormulaBarContent(nicoPage);
+      assertEqual(titleValue, 'CELLS - Master Plan 2025', 'A1 should be clickable after row resize');
+
+      console.log('  [Robert] Let me make the Status column wider for those badges...\n');
+
+      // Robert widens column E for status badges
+      await resizeColumn(robertPage, 'E', 120);
+      await sleep(400);
+
+      console.log('  [Robert] Column E is now 120px - room for all those neon badges!\n');
+
+      // Critical test: verify clicking cells in columns AFTER the resized column A works
+      console.log('  [Team] Testing clicks after all the resizing...\n');
+
+      // Click on column B (after resized column A) - this is the key test!
+      await clickCell(nicoPage, 'B3');
+      await sleep(200);
+      const ownerHeader = await getFormulaBarContent(nicoPage);
+      assertEqual(ownerHeader, 'Owner', 'B3 should be clickable after column A resize');
+
+      // Click on column C (two columns after resize)
+      await clickCell(robertPage, 'C3');
+      await sleep(200);
+      const daysHeader = await getFormulaBarContent(robertPage);
+      assertEqual(daysHeader, 'Days', 'C3 should be clickable after column A resize');
+
+      // Click on column D
+      await clickCell(shuyingPage, 'D3');
+      await sleep(200);
+      const costHeader = await getFormulaBarContent(shuyingPage);
+      assertEqual(costHeader, 'Cost', 'D3 should be clickable after column A resize');
+
+      // Test clicking in a row after the resized row 1
+      await clickCell(nicoPage, 'A3');
+      await sleep(200);
+      const featureHeader = await getFormulaBarContent(nicoPage);
+      assertEqual(featureHeader, 'Feature', 'A3 should be clickable after row 1 resize');
+
+      console.log('  [Shuying] Perfect! All the resizes synced and clicks work great!');
+      console.log('  [Nico] The layout is looking totally tubular now!');
+      console.log('  [Robert] Ready for the data - this is gonna be radical!\n');
     }));
 
     // === ACT 3: ROBERT ASSIGNS OWNERS ===
@@ -827,6 +847,7 @@ async function runCollabDemo() {
   console.log('  - Currency formatting with gold rate highlight');
   console.log('  - Lavender/cyan alternating row colors');
   console.log('  - Neon status badges (green/orange/magenta/coral)');
+  console.log('  - Column & row resizing with synced dimensions');
   console.log('');
   console.log('====================================================\n');
 

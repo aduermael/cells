@@ -100,41 +100,52 @@ export function parseCellRef(ref) {
 }
 
 /**
- * Calculate pixel position for a cell using the renderer's coordinate system.
- * This properly accounts for scroll position, zoom, and custom column/row sizes.
+ * Calculate pixel position for a cell using actual column/row sizes.
+ * This properly accounts for scroll position, zoom, and custom column/row sizes,
+ * and always calculates from the current colWidths/rowHeights Maps rather than
+ * relying on cached pixel offsets (which may be stale after resizing).
  */
 export async function cellToPixelFromRenderer(page, col, row) {
   return await page.evaluate(({ col, row }) => {
+    const HEADER_WIDTH = 50;
+    const HEADER_HEIGHT = 24;
+    const DEFAULT_COL_WIDTH = 100;
+    const DEFAULT_ROW_HEIGHT = 24;
+
     const ctx = window._appContext;
     if (!ctx || !ctx.app) {
       // Fallback to basic calculation if context not available
-      const HEADER_WIDTH = 50;
-      const HEADER_HEIGHT = 24;
-      const DEFAULT_COL_WIDTH = 100;
-      const DEFAULT_ROW_HEIGHT = 24;
       return {
         x: HEADER_WIDTH + col * DEFAULT_COL_WIDTH + DEFAULT_COL_WIDTH / 2,
         y: HEADER_HEIGHT + row * DEFAULT_ROW_HEIGHT + DEFAULT_ROW_HEIGHT / 2,
       };
     }
 
-    const renderer = ctx.app.renderer;
+    const app = ctx.app;
+    const renderer = app.renderer;
     const zoomFactor = renderer.getZoomFactor();
 
-    // Use renderer's methods that properly account for scroll and zoom
-    const cellX = renderer.getDragAdjustedColX(col);
-    const cellY = renderer.getDragAdjustedRowY(row);
+    // Calculate X position directly from colWidths (no cached offsets)
+    // This ensures accuracy even after column resizes
+    let offsetX = 0;
+    for (let i = 0; i < col; i++) {
+      offsetX += app.colWidths.get(i) ?? DEFAULT_COL_WIDTH;
+    }
+    const cellWidth = app.colWidths.get(col) ?? DEFAULT_COL_WIDTH;
+    const cellX = Math.round(HEADER_WIDTH * zoomFactor) + Math.round(offsetX * zoomFactor) - Math.round(app.scrollX * zoomFactor);
 
-    const colWidths = ctx.app.colWidths;
-    const rowHeights = ctx.app.rowHeights;
-
-    const DEFAULT_COL_WIDTH = 100;
-    const DEFAULT_ROW_HEIGHT = 24;
-
-    const width = Math.round((colWidths.get(col) ?? DEFAULT_COL_WIDTH) * zoomFactor);
-    const height = Math.round((rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT) * zoomFactor);
+    // Calculate Y position directly from rowHeights (no cached offsets)
+    // This ensures accuracy even after row resizes
+    let offsetY = 0;
+    for (let i = 0; i < row; i++) {
+      offsetY += app.rowHeights.get(i) ?? DEFAULT_ROW_HEIGHT;
+    }
+    const cellHeight = app.rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
+    const cellY = Math.round(HEADER_HEIGHT * zoomFactor) + Math.round(offsetY * zoomFactor) - Math.round(app.scrollY * zoomFactor);
 
     // Return center of cell
+    const width = Math.round(cellWidth * zoomFactor);
+    const height = Math.round(cellHeight * zoomFactor);
     return { x: cellX + width / 2, y: cellY + height / 2 };
   }, { col, row });
 }
@@ -367,24 +378,51 @@ export function sleep(ms) {
 }
 
 /**
- * Calculate the fill handle position for a cell
+ * Calculate the fill handle position for a cell using actual dimensions.
  * The fill handle is a 6x6px square positioned at the bottom-right corner of the selection.
  * Its position is: x = selectionRight - 3, y = selectionBottom - 3
  * So to hit the center, we go to selectionRight and selectionBottom (corner of the cell)
  */
-export function cellFillHandlePosition(col, row, canvasInfo) {
-  const HEADER_WIDTH = 50;
-  const HEADER_HEIGHT = 24;
-  const DEFAULT_COL_WIDTH = 100;
-  const DEFAULT_ROW_HEIGHT = 24;
+export async function cellFillHandlePosition(page, col, row) {
+  const canvasInfo = await getCanvasInfo(page);
+  const pos = await page.evaluate(({ col, row }) => {
+    const HEADER_WIDTH = 50;
+    const HEADER_HEIGHT = 24;
+    const DEFAULT_COL_WIDTH = 100;
+    const DEFAULT_ROW_HEIGHT = 24;
 
-  // Calculate bottom-right corner of the cell (where the fill handle center is)
-  const cellRightX = HEADER_WIDTH + (col + 1) * DEFAULT_COL_WIDTH;
-  const cellBottomY = HEADER_HEIGHT + (row + 1) * DEFAULT_ROW_HEIGHT;
+    const ctx = window._appContext;
+    if (!ctx || !ctx.app) {
+      // Fallback to basic calculation
+      return {
+        x: HEADER_WIDTH + (col + 1) * DEFAULT_COL_WIDTH,
+        y: HEADER_HEIGHT + (row + 1) * DEFAULT_ROW_HEIGHT,
+      };
+    }
+
+    const app = ctx.app;
+    const zoomFactor = app.renderer.getZoomFactor();
+
+    // Calculate X position (right edge of cell)
+    let offsetX = 0;
+    for (let i = 0; i <= col; i++) {
+      offsetX += app.colWidths.get(i) ?? DEFAULT_COL_WIDTH;
+    }
+    const cellRightX = Math.round(HEADER_WIDTH * zoomFactor) + Math.round(offsetX * zoomFactor) - Math.round(app.scrollX * zoomFactor);
+
+    // Calculate Y position (bottom edge of cell)
+    let offsetY = 0;
+    for (let i = 0; i <= row; i++) {
+      offsetY += app.rowHeights.get(i) ?? DEFAULT_ROW_HEIGHT;
+    }
+    const cellBottomY = Math.round(HEADER_HEIGHT * zoomFactor) + Math.round(offsetY * zoomFactor) - Math.round(app.scrollY * zoomFactor);
+
+    return { x: cellRightX, y: cellBottomY };
+  }, { col, row });
 
   return {
-    x: canvasInfo.left + cellRightX,
-    y: canvasInfo.top + cellBottomY,
+    x: canvasInfo.left + pos.x,
+    y: canvasInfo.top + pos.y,
   };
 }
 
@@ -405,7 +443,7 @@ export async function getCanvasCursor(page) {
 export async function moveToFillHandle(page, cellRef) {
   const { col, row } = parseCellRef(cellRef);
   const canvasInfo = await getCanvasInfo(page);
-  const { x, y } = cellFillHandlePosition(col, row, canvasInfo);
+  const { x, y } = await cellFillHandlePosition(page, col, row);
 
   // Dispatch a pointermove event directly on the canvas
   // Must use PointerEvent since canvas handlers listen for pointer events, not mouse events
@@ -575,22 +613,44 @@ export async function assertWithRetry(assertFn, { retries = 3, initialDelay = 50
 }
 
 /**
- * Calculate pixel position for a column header
+ * Calculate pixel position for a column header using actual column sizes.
+ * @param {import('puppeteer').Page} page
  * @param {number} col - Column index (0-based)
- * @param {object} canvasInfo - Canvas bounding rect info
  */
-export function colHeaderToPixel(col, canvasInfo) {
-  const HEADER_WIDTH = 50;
-  const HEADER_HEIGHT = 24;
-  const DEFAULT_COL_WIDTH = 100;
+export async function colHeaderToPixel(page, col) {
+  const canvasInfo = await getCanvasInfo(page);
+  const pos = await page.evaluate(({ col }) => {
+    const HEADER_WIDTH = 50;
+    const HEADER_HEIGHT = 24;
+    const DEFAULT_COL_WIDTH = 100;
 
-  // Position in the middle of the column header
-  const x = HEADER_WIDTH + col * DEFAULT_COL_WIDTH + DEFAULT_COL_WIDTH / 2;
-  const y = HEADER_HEIGHT / 2; // Middle of header
+    const ctx = window._appContext;
+    if (!ctx || !ctx.app) {
+      // Fallback to basic calculation
+      return {
+        x: HEADER_WIDTH + col * DEFAULT_COL_WIDTH + DEFAULT_COL_WIDTH / 2,
+        y: HEADER_HEIGHT / 2,
+      };
+    }
+
+    const app = ctx.app;
+    const zoomFactor = app.renderer.getZoomFactor();
+
+    // Calculate X position (center of column header)
+    let offsetX = 0;
+    for (let i = 0; i < col; i++) {
+      offsetX += app.colWidths.get(i) ?? DEFAULT_COL_WIDTH;
+    }
+    const colWidth = app.colWidths.get(col) ?? DEFAULT_COL_WIDTH;
+    const x = Math.round(HEADER_WIDTH * zoomFactor) + Math.round(offsetX * zoomFactor) + Math.round(colWidth * zoomFactor / 2) - Math.round(app.scrollX * zoomFactor);
+    const y = Math.round(HEADER_HEIGHT * zoomFactor / 2);
+
+    return { x, y };
+  }, { col });
 
   return {
-    x: canvasInfo.left + x,
-    y: canvasInfo.top + y,
+    x: canvasInfo.left + pos.x,
+    y: canvasInfo.top + pos.y,
   };
 }
 
@@ -604,9 +664,8 @@ export async function dragColumn(page, sourceCol, targetCol) {
   const sourceColIndex = sourceCol.toUpperCase().charCodeAt(0) - 65;
   const targetColIndex = targetCol.toUpperCase().charCodeAt(0) - 65;
 
-  const canvasInfo = await getCanvasInfo(page);
-  const source = colHeaderToPixel(sourceColIndex, canvasInfo);
-  const target = colHeaderToPixel(targetColIndex, canvasInfo);
+  const source = await colHeaderToPixel(page, sourceColIndex);
+  const target = await colHeaderToPixel(page, targetColIndex);
 
   // Start drag on the column header
   await page.mouse.move(source.x, source.y);
@@ -634,14 +693,10 @@ export async function dragColumn(page, sourceCol, targetCol) {
 export async function dragFillHandle(page, fromCellRef, toCellRef) {
   const from = parseCellRef(fromCellRef);
   const to = parseCellRef(toCellRef);
-  const canvasInfo = await getCanvasInfo(page);
 
-  // Get fill handle position (bottom-right corner of the from cell)
-  const { x: startX, y: startY } = cellFillHandlePosition(from.col, from.row, canvasInfo);
-
-  // Get target fill handle position (bottom-right corner of target cell)
-  // This ensures the drag direction is clearly vertical or horizontal
-  const { x: endX, y: endY } = cellFillHandlePosition(to.col, to.row, canvasInfo);
+  // Get fill handle positions using actual cell dimensions
+  const { x: startX, y: startY } = await cellFillHandlePosition(page, from.col, from.row);
+  const { x: endX, y: endY } = await cellFillHandlePosition(page, to.col, to.row);
 
   // Start at fill handle
   await page.mouse.move(startX, startY);
@@ -688,6 +743,128 @@ export async function selectRange(page, startRef, endRef) {
   await page.mouse.click(x, y);
   await page.keyboard.up('Shift');
   await sleep(100);
+}
+
+/**
+ * Resize a column by dragging its right edge
+ * @param {import('puppeteer').Page} page
+ * @param {string} colLetter - Column letter (e.g., "A")
+ * @param {number} newWidth - New width in pixels
+ */
+export async function resizeColumn(page, colLetter, newWidth) {
+  const colIndex = colLetter.toUpperCase().charCodeAt(0) - 65;
+
+  const info = await page.evaluate(({ colIndex }) => {
+    const HEADER_WIDTH = 50;
+    const HEADER_HEIGHT = 24;
+    const DEFAULT_COL_WIDTH = 100;
+
+    const canvas = document.getElementById('grid');
+    const rect = canvas.getBoundingClientRect();
+
+    const ctx = window._appContext;
+    const app = ctx?.app;
+    const zoomFactor = app?.renderer?.getZoomFactor() ?? 1;
+
+    // Calculate current column right edge using actual widths
+    let rightEdge = HEADER_WIDTH * zoomFactor;
+    for (let i = 0; i <= colIndex; i++) {
+      const w = app?.colWidths?.get(i) ?? DEFAULT_COL_WIDTH;
+      rightEdge += w * zoomFactor;
+    }
+    if (app) {
+      rightEdge -= app.scrollX * zoomFactor;
+    }
+
+    // Get current width
+    const currentWidth = app?.colWidths?.get(colIndex) ?? DEFAULT_COL_WIDTH;
+
+    return {
+      canvasLeft: rect.left,
+      canvasTop: rect.top,
+      rightEdge,
+      currentWidth,
+      headerHeight: HEADER_HEIGHT * zoomFactor,
+      zoomFactor
+    };
+  }, { colIndex });
+
+  // Position to start drag: right edge of column, in header area
+  const startX = info.canvasLeft + info.rightEdge;
+  const startY = info.canvasTop + info.headerHeight / 2;
+
+  // Calculate how much to drag (account for zoom)
+  const dragDelta = (newWidth - info.currentWidth) * info.zoomFactor;
+  const endX = startX + dragDelta;
+
+  // Simulate the drag
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(endX, startY, { steps: 10 });
+  await page.mouse.up();
+
+  await sleep(300);
+}
+
+/**
+ * Resize a row by dragging its bottom edge
+ * @param {import('puppeteer').Page} page
+ * @param {number} rowNumber - Row number (1-based)
+ * @param {number} newHeight - New height in pixels
+ */
+export async function resizeRow(page, rowNumber, newHeight) {
+  const rowIndex = rowNumber - 1;
+
+  const info = await page.evaluate(({ rowIndex }) => {
+    const HEADER_WIDTH = 50;
+    const HEADER_HEIGHT = 24;
+    const DEFAULT_ROW_HEIGHT = 24;
+
+    const canvas = document.getElementById('grid');
+    const rect = canvas.getBoundingClientRect();
+
+    const ctx = window._appContext;
+    const app = ctx?.app;
+    const zoomFactor = app?.renderer?.getZoomFactor() ?? 1;
+
+    // Calculate current row bottom edge using actual heights
+    let bottomEdge = HEADER_HEIGHT * zoomFactor;
+    for (let i = 0; i <= rowIndex; i++) {
+      const h = app?.rowHeights?.get(i) ?? DEFAULT_ROW_HEIGHT;
+      bottomEdge += h * zoomFactor;
+    }
+    if (app) {
+      bottomEdge -= app.scrollY * zoomFactor;
+    }
+
+    // Get current height
+    const currentHeight = app?.rowHeights?.get(rowIndex) ?? DEFAULT_ROW_HEIGHT;
+
+    return {
+      canvasLeft: rect.left,
+      canvasTop: rect.top,
+      bottomEdge,
+      currentHeight,
+      headerWidth: HEADER_WIDTH * zoomFactor,
+      zoomFactor
+    };
+  }, { rowIndex });
+
+  // Position to start drag: bottom edge of row, in header area
+  const startX = info.canvasLeft + info.headerWidth / 2;
+  const startY = info.canvasTop + info.bottomEdge;
+
+  // Calculate how much to drag (account for zoom)
+  const dragDelta = (newHeight - info.currentHeight) * info.zoomFactor;
+  const endY = startY + dragDelta;
+
+  // Simulate the drag
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX, endY, { steps: 10 });
+  await page.mouse.up();
+
+  await sleep(300);
 }
 
 /**
