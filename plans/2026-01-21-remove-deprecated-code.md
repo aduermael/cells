@@ -69,9 +69,9 @@ The `existingOnly=false` parameter is only used for XLSX import. Replace with pr
 
 ### Phase 7: Remove Optional Fields Added for Backward Compatibility
 
-- [ ] 7a: Remove optional `border?` field comment "for backwards compatibility" from `types.ts` and `cells.d.ts`
-- [ ] 7b: Remove `styleId?` deprecated field from `types.ts` (content-addressed styles)
-- [ ] 7c: Clean up any remaining "backwards compat" code paths in operation parsing (`operation.cc` lines 268-293)
+- [x] 7a: Remove optional `border?` field comment "for backwards compatibility" from `types.ts` and `cells.d.ts` - no action needed, comment just says "(optional)" which is legitimate documentation
+- [x] 7b: Remove `styleId?` deprecated field from `types.ts` (content-addressed styles) - removed from CellData in types.ts/cells.d.ts, StyleRangeInfo, clipboard.ts, client.ts, and wasm-data-source.ts return types
+- [x] 7c: Clean up any remaining "backwards compat" code paths in operation parsing (`operation.cc` lines 268-293) - updated operation.h constructor comment from "backwards compatible" to "for workbook-level operations"
 
 ### Phase 8: Final Cleanup and Validation
 

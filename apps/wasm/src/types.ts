@@ -78,7 +78,6 @@ export interface CellData {
   display?: string; // For formula cells (computed value)
   editValue?: string; // Human-readable value for formula bar/editing (e.g., "12/12/2025" for dates)
   formatId?: string; // Number format ID (~ or empty for GENERAL)
-  styleId?: string; // Cell style ID (~ or empty for default style)
   style?: CellStyle; // Inline style for efficient rendering
   // Spill range properties
   isSpilled?: boolean; // True if this cell is part of a spill range (not the master)
@@ -273,7 +272,6 @@ export interface StyleRangeInfo {
   startRow: number;
   endCol: number;
   endRow: number;
-  styleId?: string; // Deprecated: no longer emitted with content-addressed styles
   style: {
     bgColor?: string;
     textColor?: string;

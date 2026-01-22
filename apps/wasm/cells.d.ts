@@ -317,7 +317,6 @@ declare module 'cells-wasm' {
     formula?: string;    // For formula cells (A1 notation)
     display?: string;    // For formula cells (computed value)
     isError?: boolean;   // True if formula evaluated to an error
-    styleId?: string;    // Cell style ID (~ or empty for default style)
   }
 
   /**

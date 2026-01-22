@@ -281,7 +281,7 @@ export class WasmDataSource {
     endCol: number,
     endRow: number,
     style: Partial<CellStyle>,
-  ): Promise<{ success: boolean; rangeId?: string; styleId?: string }> {
+  ): Promise<{ success: boolean; rangeId?: string }> {
     return this._client.setRangeStyle(startCol, startRow, endCol, endRow, style);
   }
 
@@ -296,7 +296,7 @@ export class WasmDataSource {
     endCol: number,
     endRow: number,
     style: Partial<CellStyle>,
-  ): Promise<{ success: boolean; rangeId?: string; styleId?: string }> {
+  ): Promise<{ success: boolean; rangeId?: string }> {
     return this._client.setRangeStyleOnSheet(
       sheetIndex,
       startCol,

@@ -110,10 +110,10 @@ struct Operation {
     // Default constructor
     Operation();
 
-    // Construct with all fields (backwards compatible - no sheetId)
+    // Construct without sheetId (for workbook-level operations)
     Operation(const HLC& hlc, OpType type, const ID& target, std::string payload);
 
-    // Construct with all fields including sheetId
+    // Construct with sheetId (for sheet-specific operations)
     Operation(const HLC& hlc, OpType type, const ID& target, const ID& sheetId,
               std::string payload);
 

@@ -618,7 +618,7 @@ export class CellsClient {
     endCol: number,
     endRow: number,
     style: Partial<CellStyle>,
-  ): Promise<{ success: boolean; rangeId?: string; styleId?: string }> {
+  ): Promise<{ success: boolean; rangeId?: string }> {
     const response = await this._send("setRangeStyle", {
       startCol,
       startRow,
@@ -629,8 +629,6 @@ export class CellsClient {
     return {
       success: true,
       rangeId: response.rangeId ? String(response.rangeId) : undefined,
-      // styleId is deprecated with content-addressed styles
-      styleId: response.styleId ? String(response.styleId) : undefined,
     };
   }
 
@@ -653,7 +651,7 @@ export class CellsClient {
     endCol: number,
     endRow: number,
     style: Partial<CellStyle>,
-  ): Promise<{ success: boolean; rangeId?: string; styleId?: string }> {
+  ): Promise<{ success: boolean; rangeId?: string }> {
     const response = await this._send("setRangeStyleOnSheet", {
       sheetIndex,
       startCol,
@@ -665,8 +663,6 @@ export class CellsClient {
     return {
       success: true,
       rangeId: response.rangeId ? String(response.rangeId) : undefined,
-      // styleId is deprecated with content-addressed styles
-      styleId: response.styleId ? String(response.styleId) : undefined,
     };
   }
 

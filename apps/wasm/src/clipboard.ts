@@ -64,8 +64,6 @@ export interface ClipboardCell {
   type: CellData["type"];
   /** Number format ID (e.g., "FMT_P002" for percentage with 2 decimals) */
   formatId?: string;
-  /** Style ID for cell styling */
-  styleId?: string;
   /** Style properties (if available from viewport data) */
   style?: CellData["style"];
 }
@@ -328,10 +326,7 @@ export class ClipboardManager {
             clipCell.formatId = cell.formatId;
           }
 
-          // Include style ID and style properties if present
-          if (cell.styleId && cell.styleId !== "~") {
-            clipCell.styleId = cell.styleId;
-          }
+          // Include style properties if present
           if (cell.style) {
             clipCell.style = cell.style;
           }
