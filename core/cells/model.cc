@@ -1099,6 +1099,41 @@ void Workbook::registerSpillRange(const ID& masterCellId,
         auto key = makePositionKey(colId, rowId);
         _spilledFrom[key] = masterCellId;
     }
+
+    // Update spatial index for fast viewport queries
+    // Find the sheet containing this cell via its column
+    if (master != nullptr) {
+        const Axis* col = getColumn(master->colId);
+        if (col != nullptr) {
+            Sheet* sheet = getSheetById(col->sheetId);
+            if (sheet != nullptr) {
+                // Get master cell position
+                const Axis* masterRow = getRow(master->rowId);
+                if (masterRow != nullptr) {
+                    // Calculate bounding box: start with master position
+                    uint32_t minCol = col->position;
+                    uint32_t maxCol = col->position;
+                    uint32_t minRow = masterRow->position;
+                    uint32_t maxRow = masterRow->position;
+
+                    // Expand to include all spilled positions
+                    for (const auto& [spillColId, spillRowId] : positions) {
+                        const Axis* spillCol = getColumn(spillColId);
+                        const Axis* spillRow = getRow(spillRowId);
+                        if (spillCol != nullptr && spillRow != nullptr) {
+                            minCol = std::min(minCol, spillCol->position);
+                            maxCol = std::max(maxCol, spillCol->position);
+                            minRow = std::min(minRow, spillRow->position);
+                            maxRow = std::max(maxRow, spillRow->position);
+                        }
+                    }
+
+                    // Update sheet's spill index
+                    sheet->updateSpillIndex(masterCellId, minCol, minRow, maxCol, maxRow);
+                }
+            }
+        }
+    }
 }
 
 void Workbook::clearSpillRange(const ID& masterCellId) {
@@ -1117,6 +1152,16 @@ void Workbook::clearSpillRange(const ID& masterCellId) {
     Cell* master = getCell(masterCellId);
     if (master != nullptr) {
         master->clearFlag(CellFlags::SPILL_MASTER);
+
+        // Remove from spatial index
+        // Find the sheet containing this cell via its column
+        const Axis* col = getColumn(master->colId);
+        if (col != nullptr) {
+            Sheet* sheet = getSheetById(col->sheetId);
+            if (sheet != nullptr) {
+                sheet->removeFromSpillIndex(masterCellId);
+            }
+        }
     }
 
     // Remove the master entry
@@ -1129,6 +1174,13 @@ void Workbook::clearAllSpillRanges() {
         Cell* master = getCell(masterId);
         if (master != nullptr) {
             master->clearFlag(CellFlags::SPILL_MASTER);
+        }
+    }
+
+    // Clear spill indexes on all sheets
+    for (auto& sheet : sheets) {
+        if (sheet != nullptr) {
+            sheet->clearSpillIndex();
         }
     }
 

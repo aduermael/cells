@@ -60,6 +60,27 @@ cc_library(
 )
 
 cc_library(
+    name = "spill_index",
+    srcs = ["spill_index.cc"],
+    hdrs = ["spill_index.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":rtree",
+        ":types",
+    ],
+)
+
+cc_test(
+    name = "spill_index_test",
+    srcs = ["spill_index_test.cc"],
+    deps = [
+        ":id",
+        ":spill_index",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "format_registry",
     srcs = ["format_registry.cc"],
     hdrs = ["format_registry.h"],
@@ -283,6 +304,7 @@ cc_library(
         ":oplog",
         ":range",
         ":range_index",
+        ":spill_index",
         ":style_types",
         ":types",
     ],

@@ -25,6 +25,7 @@
 #include "core/cells/formula_serializer.h"
 #include "core/cells/number_formatter.h"
 #include "core/cells/range.h"
+#include "core/cells/spill_index.h"
 
 namespace cells::wasm {
 
@@ -513,104 +514,115 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         actualCellPositions.insert({entry.cell->colId, entry.cell->rowId});
     }
 
-    // Iterate through all spill masters and check if any spilled positions are in viewport
-    for (const auto& cellId : sheet->getCellIds()) {
-        Cell* cell = _workbook->getCell(cellId);
-        if (!cell) continue;
+    // Use SpillIndex for O(log n + k) viewport query instead of O(n) iteration
+    // Query the spatial index for spill masters whose extents intersect the viewport
+    const SpillIndex* spillIndex = sheet->getSpillIndex();
+    if (spillIndex != nullptr && !spillIndex->empty()) {
+        // Query spill masters whose bounding boxes intersect the viewport
+        // Note: col2/row2 are exclusive, so query with col2-1, row2-1
+        std::vector<ID> matchingMasters =
+            spillIndex->queryRange(col1, row1, col2 > 0 ? col2 - 1 : 0, row2 > 0 ? row2 - 1 : 0);
 
-        const SpillInfo* spillInfo = sheet->getSpillInfo(cell->id);
-        if (spillInfo == nullptr || spillInfo->spilledPositions.empty()) {
-            continue;
-        }
-
-        // Get the master cell's formula for display (grayed out in spilled cells)
-        std::string masterFormula;
-        Formula* formula = cell->getFormula();
-        if (formula != nullptr && formula->ast != nullptr) {
-            // Use FormulaDisplayConverter for context-aware display
-            FormulaDisplayConverter displayConverter(*sheet, _workbook.get());
-            masterFormula = displayConverter.toDisplayString(formula->ast);
-        }
-
-        // Check each spilled position
-        for (size_t i = 0; i < spillInfo->spilledPositions.size(); ++i) {
-            const auto& [colId, rowId] = spillInfo->spilledPositions[i];
-
-            // Skip if there's an actual cell at this position (already handled above)
-            if (actualCellPositions.count({colId, rowId}) > 0) {
+        for (const ID& masterId : matchingMasters) {
+            Cell* cell = _workbook->getCell(masterId);
+            if (cell == nullptr) {
                 continue;
             }
 
-            // Check if position is within the viewport
-            const Axis* col = sheet->getColumn(colId);
-            const Axis* row = sheet->getRow(rowId);
-            if (!col || !row) {
+            const SpillInfo* spillInfo = sheet->getSpillInfo(masterId);
+            if (spillInfo == nullptr || spillInfo->spilledPositions.empty()) {
                 continue;
             }
 
-            uint32_t colPos = col->position;
-            uint32_t rowPos = row->position;
-
-            if (colPos < col1 || colPos >= col2 || rowPos < row1 || rowPos >= row2) {
-                continue;
+            // Get the master cell's formula for display (grayed out in spilled cells)
+            std::string masterFormula;
+            Formula* formula = cell->getFormula();
+            if (formula != nullptr && formula->ast != nullptr) {
+                // Use FormulaDisplayConverter for context-aware display
+                FormulaDisplayConverter displayConverter(*sheet, _workbook.get());
+                masterFormula = displayConverter.toDisplayString(formula->ast);
             }
 
-            // This is a virtual spilled cell in the viewport
-            if (!firstCell) {
-                json << ",";
-            }
-            firstCell = false;
+            // Check each spilled position (still need to filter within the viewport)
+            for (size_t i = 0; i < spillInfo->spilledPositions.size(); ++i) {
+                const auto& [colId, rowId] = spillInfo->spilledPositions[i];
 
-            json << "{";
-            // Virtual spilled cells don't have their own ID - use a generated one
-            json << "\"col\":" << colPos << ",";
-            json << "\"row\":" << rowPos << ",";
-            json << "\"isSpilled\":true,";
-            json << "\"spillMasterId\":\"" << cell->id.toString() << "\",";
-            if (!masterFormula.empty()) {
-                json << "\"masterFormula\":\"" << jsonEscape(masterFormula) << "\",";
-            }
-            json << "\"type\":\"s\",";  // Spilled value type
+                // Skip if there's an actual cell at this position (already handled above)
+                if (actualCellPositions.count({colId, rowId}) > 0) {
+                    continue;
+                }
 
-            // Get the spilled value
-            if (i < spillInfo->spilledValues.size()) {
-                const CellValue& val = spillInfo->spilledValues[i];
-                std::string displayValue;
-                if (val.type == CellValueType::NUMBER) {
-                    double num = val.asNumber();
-                    if (std::floor(num) == num && std::abs(num) < 1e15) {
-                        displayValue = std::to_string(static_cast<long long>(num));
-                    } else {
-                        std::ostringstream numStr;
-                        numStr << std::setprecision(15) << num;
-                        displayValue = numStr.str();
-                        // Remove trailing zeros after decimal
-                        size_t dot = displayValue.find('.');
-                        if (dot != std::string::npos) {
-                            size_t last = displayValue.find_last_not_of('0');
-                            if (last != std::string::npos && last > dot) {
-                                displayValue = displayValue.substr(0, last + 1);
-                            } else if (last == dot) {
-                                displayValue = displayValue.substr(0, dot);
+                // Check if position is within the viewport
+                const Axis* col = sheet->getColumn(colId);
+                const Axis* row = sheet->getRow(rowId);
+                if (col == nullptr || row == nullptr) {
+                    continue;
+                }
+
+                uint32_t colPos = col->position;
+                uint32_t rowPos = row->position;
+
+                if (colPos < col1 || colPos >= col2 || rowPos < row1 || rowPos >= row2) {
+                    continue;
+                }
+
+                // This is a virtual spilled cell in the viewport
+                if (!firstCell) {
+                    json << ",";
+                }
+                firstCell = false;
+
+                json << "{";
+                // Virtual spilled cells don't have their own ID - use a generated one
+                json << "\"col\":" << colPos << ",";
+                json << "\"row\":" << rowPos << ",";
+                json << "\"isSpilled\":true,";
+                json << "\"spillMasterId\":\"" << cell->id.toString() << "\",";
+                if (!masterFormula.empty()) {
+                    json << "\"masterFormula\":\"" << jsonEscape(masterFormula) << "\",";
+                }
+                json << "\"type\":\"s\",";  // Spilled value type
+
+                // Get the spilled value
+                if (i < spillInfo->spilledValues.size()) {
+                    const CellValue& val = spillInfo->spilledValues[i];
+                    std::string displayValue;
+                    if (val.type == CellValueType::NUMBER) {
+                        double num = val.asNumber();
+                        if (std::floor(num) == num && std::abs(num) < 1e15) {
+                            displayValue = std::to_string(static_cast<long long>(num));
+                        } else {
+                            std::ostringstream numStr;
+                            numStr << std::setprecision(15) << num;
+                            displayValue = numStr.str();
+                            // Remove trailing zeros after decimal
+                            size_t dot = displayValue.find('.');
+                            if (dot != std::string::npos) {
+                                size_t last = displayValue.find_last_not_of('0');
+                                if (last != std::string::npos && last > dot) {
+                                    displayValue = displayValue.substr(0, last + 1);
+                                } else if (last == dot) {
+                                    displayValue = displayValue.substr(0, dot);
+                                }
                             }
                         }
+                    } else if (val.type == CellValueType::STRING) {
+                        displayValue = val.raw;
+                    } else if (val.type == CellValueType::BOOLEAN) {
+                        displayValue = val.asBoolean() ? "TRUE" : "FALSE";
+                    } else if (val.type == CellValueType::ERROR) {
+                        displayValue = errorToString(val.error);
+                        json << "\"isError\":true,";
                     }
-                } else if (val.type == CellValueType::STRING) {
-                    displayValue = val.raw;
-                } else if (val.type == CellValueType::BOOLEAN) {
-                    displayValue = val.asBoolean() ? "TRUE" : "FALSE";
-                } else if (val.type == CellValueType::ERROR) {
-                    displayValue = errorToString(val.error);
-                    json << "\"isError\":true,";
+                    json << "\"display\":\"" << jsonEscape(displayValue) << "\",";
+                    json << "\"value\":\"" << jsonEscape(val.raw) << "\"";
+                } else {
+                    json << "\"display\":\"\",";
+                    json << "\"value\":\"\"";
                 }
-                json << "\"display\":\"" << jsonEscape(displayValue) << "\",";
-                json << "\"value\":\"" << jsonEscape(val.raw) << "\"";
-            } else {
-                json << "\"display\":\"\",";
-                json << "\"value\":\"\"";
-            }
 
-            json << "}";
+                json << "}";
+            }
         }
     }
 

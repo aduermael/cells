@@ -27,6 +27,7 @@
 #include "core/cells/model.h"
 #include "core/cells/range.h"
 #include "core/cells/range_index.h"
+#include "core/cells/spill_index.h"
 
 namespace cells {
 
@@ -1163,6 +1164,38 @@ StyleBuffer* Sheet::getRangeStyle(const ID& rangeId) {
         return nullptr;
     }
     return _workbook->getRangeStyle(rangeId);
+}
+
+// =============================================================================
+// Spill Range Spatial Index (for fast viewport queries)
+// =============================================================================
+
+void Sheet::updateSpillIndex(const ID& masterCellId, uint32_t startCol, uint32_t startRow,
+                             uint32_t endCol, uint32_t endRow) {
+    // Create index if it doesn't exist yet (lazy initialization)
+    if (!_spillIndex) {
+        _spillIndex = std::make_unique<SpillIndex>();
+    }
+
+    // Check if already indexed (update bounds) or new (insert)
+    const SpillPositionBounds* existingBounds = _spillIndex->getBounds(masterCellId);
+    if (existingBounds != nullptr) {
+        _spillIndex->updateBounds(masterCellId, startCol, startRow, endCol, endRow);
+    } else {
+        _spillIndex->insert(masterCellId, startCol, startRow, endCol, endRow);
+    }
+}
+
+void Sheet::removeFromSpillIndex(const ID& masterCellId) {
+    if (_spillIndex) {
+        _spillIndex->remove(masterCellId);
+    }
+}
+
+void Sheet::clearSpillIndex() {
+    if (_spillIndex) {
+        _spillIndex->clear();
+    }
 }
 
 }  // namespace cells

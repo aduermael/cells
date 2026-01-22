@@ -59,6 +59,7 @@ struct OpLog;
 struct SpillInfo;
 struct Range;
 class RangeIndex;
+class SpillIndex;
 class FormatRegistry;
 enum class RangeFlags : uint8_t;
 
@@ -666,6 +667,26 @@ struct Sheet {
     void clearAllRanges();
 
     // ========================================================================
+    // Spill Range Spatial Index (for fast viewport queries)
+    // ========================================================================
+
+    // Get the spill index for direct spatial queries
+    [[nodiscard]] SpillIndex* getSpillIndex() { return _spillIndex.get(); }
+    [[nodiscard]] const SpillIndex* getSpillIndex() const { return _spillIndex.get(); }
+
+    // Update the spill index with a new or changed spill extent
+    // Called by Workbook when a spill range is registered
+    void updateSpillIndex(const ID& masterCellId, uint32_t startCol, uint32_t startRow,
+                          uint32_t endCol, uint32_t endRow);
+
+    // Remove a spill extent from the index
+    // Called by Workbook when a spill range is cleared
+    void removeFromSpillIndex(const ID& masterCellId);
+
+    // Clear all spill extents from the index
+    void clearSpillIndex();
+
+    // ========================================================================
     // Range style storage (content-addressed StyleBuffer, delegates to Workbook)
     // ========================================================================
 
@@ -716,6 +737,16 @@ private:
     // Spatial index for range queries (stores Range pointers from Workbook)
     // Positions are sheet-local, so R-tree must remain per-sheet
     std::unique_ptr<RangeIndex> _rangeIndex;
+
+    // ========================================================================
+    // Spill Range Spatial Index
+    // Spill data is stored at Workbook level. Sheet maintains a spatial index
+    // (R-tree) for fast viewport queries to find spill extents.
+    // ========================================================================
+
+    // Spatial index for spill extent queries (stores master cell IDs)
+    // Indexed by bounding box of master + all spilled positions
+    std::unique_ptr<SpillIndex> _spillIndex;
 
     // Build composite key for cell index
     static std::string makeCellKey(const ID& colId, const ID& rowId);

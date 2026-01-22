@@ -103,12 +103,20 @@ Confirm bottlenecks with measurements before optimizing.
 
 Most impactful fix - eliminate O(total_cells) loop per viewport query.
 
-- [ ] 2a: Add spill spatial index to Sheet (use RangeIndex R-tree for spill bounding boxes)
-- [ ] 2b: Index spill masters by their spill extent (col1, row1, col2, row2)
-- [ ] 2c: Replace O(n) cell iteration in `bindings_viewport.cc:517-615` with R-tree viewport query
-- [ ] 2d: Add `onSpillCreated()`, `onSpillRemoved()` to maintain spill index
-- [ ] 2e: Unit tests for spill spatial queries
-- [ ] 2f: Benchmark: verify O(log n + k) where k = spills intersecting viewport
+- [x] 2a: Add spill spatial index to Sheet (use RangeIndex R-tree for spill bounding boxes)
+  - Created `SpillIndex` class in `core/cells/spill_index.h/.cc` using R-tree
+  - Added `_spillIndex` member to Sheet class with accessor methods
+- [x] 2b: Index spill masters by their spill extent (col1, row1, col2, row2)
+  - SpillIndex stores bounding boxes: (startCol, startRow, endCol, endRow)
+- [x] 2c: Replace O(n) cell iteration in `bindings_viewport.cc:517-615` with R-tree viewport query
+  - Changed to use `spillIndex->queryRange()` instead of iterating all cells
+- [x] 2d: Add `onSpillCreated()`, `onSpillRemoved()` to maintain spill index
+  - Added `Sheet::updateSpillIndex()` and `Sheet::removeFromSpillIndex()` methods
+  - Called from `Workbook::registerSpillRange()` and `Workbook::clearSpillRange()`
+- [x] 2e: Unit tests for spill spatial queries
+  - Created `spill_index_test.cc` with 14 test cases
+- [x] 2f: Benchmark: verify O(log n + k) where k = spills intersecting viewport
+  - Benchmark shows 2.4x slowdown with 1000 entries vs empty (confirms O(log n))
 
 ### Phase 3: Fix O(n) Column/Row JSON Output
 

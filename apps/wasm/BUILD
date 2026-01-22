@@ -89,6 +89,7 @@ cc_binary(
         "//core/cells:operation",
         "//core/cells:oplog",
         "//core/cells:parser",
+        "//core/cells:spill_index",
         "//core/cells:viewport_index",
         "//core/cells:ref_converter",
         "//core/cells:serializer",
