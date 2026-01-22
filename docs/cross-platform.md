@@ -35,10 +35,14 @@ The cells engine is designed for **web deployment only**. Native builds exist fo
 
 | Target | Compiler | Output | Use Case |
 |--------|----------|--------|----------|
-| WASM | Emscripten | cells.wasm + .js | Web application |
-| macOS | Clang | libcells.a | CLI tool |
-| Linux | GCC/Clang | libcells.a | CLI tool, CI |
-| Windows | MSVC | cells.lib | CLI tool |
+| WASM | Emscripten | cells_wasm.wasm + .js | Web application |
+| macOS | Clang | cells (binary) | CLI tool |
+| Linux | GCC/Clang | cells (binary) | CLI tool, CI |
+
+Build commands (all via Bazel):
+- `bazel run :wasm-dist` - Build WASM and copy to dist/wasm/
+- `bazel run :cli` - Build and run native CLI (debug)
+- `bazel run :cli-release` - Build and run native CLI (release)
 
 ## Web-Specific Architecture
 
@@ -110,13 +114,19 @@ The CLI tool uses native builds (not WASM) for performance:
 
 ```bash
 # File conversion
-./cells convert input.xlsx output.zcd
+cells -i input.xlsx output.zcd
+cells -i data.csv report.xlsx
 
 # File inspection
-./cells inspect file.zcd
+cells -I file.zcd
+cells -I budget.xlsx --sheet Summary
 
-# Validation
-./cells validate file.zcd
+# Real-time sync (join a room)
+cells sync 'https://cells.example.com/?room=abc123'
+cells sync <url> --apply workbook.zcd   # Apply remote ops to local file
+cells sync <url> --send workbook.zcd    # Broadcast local workbook
 ```
+
+Supported formats: `.zcd` (native), `.csv`/`.tsv`, `.xlsx` (Excel 2007+).
 
 The CLI shares the same C++ core as the WASM build but links directly instead of going through Emscripten.

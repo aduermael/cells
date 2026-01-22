@@ -58,7 +58,7 @@ Review and update all documentation files to accurately reflect current codebase
 ## Phase 6: UI and Platform Documentation
 
 - [x] 6a: Review `docs/rendering.md` - added zoom support (10%-400%), updated implementation status table (fill handle, spill range, text wrapping, cell borders), fixed color palette (green #058601 not blue), updated rendering pipeline order, fixed OSTree node description (position is implicit), added formula reference colors, updated file list with all TypeScript renderer modules
-- [ ] 6b: Review `docs/cross-platform.md` - verify build targets, remove deprecated platforms
+- [x] 6b: Review `docs/cross-platform.md` - removed Windows (not configured), updated CLI syntax (cells -i/-I not cells convert/inspect), added sync subcommand, added bazel build commands
 
 ## Phase 7: Type System and Guidelines
 
