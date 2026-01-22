@@ -31,7 +31,7 @@ The DIM_* operations (100-104) are deprecated, replaced by COL_*/ROW_* operation
 
 The `existingOnly=false` parameter is only used for XLSX import. Replace with proper CRDT-compliant resolution.
 
-- [ ] 2a: Update `bindings_file.cc` XLSX import to use `getRequiredEntities()` + CRDT operations instead of legacy mode
+- [x] 2a: Update `bindings_file.cc` XLSX import to use `getRequiredEntities()` + create entities + resolve instead of legacy mode
 - [ ] 2b: Update all test files to use `existingOnly=true` (or refactor tests to create entities properly before resolution)
 - [ ] 2c: Remove the `existingOnly` parameter from `FormulaResolver::resolve()` (always enforce existing-only mode)
 - [ ] 2d: Remove legacy entity auto-creation code from `formula_resolver.cc`

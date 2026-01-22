@@ -155,12 +155,49 @@ std::string CellsEngine::loadFromXLSXDataPtr(uintptr_t ptr, size_t size) {
                 if (!cell) continue;
                 if (cell->isFormula() && cell->formula != nullptr &&
                     cell->formula->ast != nullptr) {
+                    // Create any missing entities referenced by the formula
+                    // This ensures all referenced cells exist before resolution
+                    RequiredEntities required = resolver.getRequiredEntities(cell->formula->ast);
+
+                    // Create axes by position first (order matters for cell creation)
+                    for (const auto& col : required.columns) {
+                        sheet->getOrCreateColumnByPosition(col.position);
+                    }
+                    for (const auto& row : required.rows) {
+                        sheet->getOrCreateRowByPosition(row.position);
+                    }
+
+                    // Create cells - need to map pending IDs to positions, then to actual IDs
+                    for (const auto& pendingCell : required.cells) {
+                        // Build map from pending ID to position
+                        auto findColPos = [&required, sheet](const ID& colId) -> uint32_t {
+                            for (const auto& c : required.columns) {
+                                if (c.id == colId) return c.position;
+                            }
+                            // Column existed before - look up directly
+                            const Axis* axis = sheet->getColumn(colId);
+                            return axis ? axis->position : 0;
+                        };
+                        auto findRowPos = [&required, sheet](const ID& rowId) -> uint32_t {
+                            for (const auto& r : required.rows) {
+                                if (r.id == rowId) return r.position;
+                            }
+                            // Row existed before - look up directly
+                            const Axis* axis = sheet->getRow(rowId);
+                            return axis ? axis->position : 0;
+                        };
+
+                        uint32_t colPos = findColPos(pendingCell.colId);
+                        uint32_t rowPos = findRowPos(pendingCell.rowId);
+                        const Axis* col = sheet->getColumnByPosition(colPos);
+                        const Axis* row = sheet->getRowByPosition(rowPos);
+                        if (col && row) {
+                            sheet->getOrCreateCellAt(col->id, row->id);
+                        }
+                    }
+
                     // Resolve formula references from A1 notation to UUIDs
-                    // This converts CellRefNode column/row to resolved cellId
-                    // NOTE: Using legacy mode (existingOnly=false) for file loading
-                    // because collaboration hasn't started yet, and formulas may
-                    // reference cells that don't exist in the import
-                    resolver.resolve(cell->formula->ast, false);
+                    resolver.resolve(cell->formula->ast);
 
                     if (depGraph != nullptr) {
                         depGraph->addFormula(cell->id, cell->formula->ast, positionResolver,
