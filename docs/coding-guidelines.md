@@ -8,13 +8,13 @@ All C++ code must be formatted using clang-format. Configuration is in `.clang-f
 
 ```bash
 # Format all files
-./scripts/format.sh
+bazel run :format
 
 # Check formatting (CI mode)
-./scripts/format.sh --check
+bazel run :format -- --check
 
 # Format specific files
-./scripts/format.sh core/cells/model.cc
+bazel run :format -- core/cells/model.cc
 ```
 
 ### Linting (clang-tidy)
@@ -23,26 +23,26 @@ Static analysis using clang-tidy. Configuration is in `.clang-tidy`.
 
 ```bash
 # Lint all files
-./scripts/lint.sh
+bazel run :lint
 
 # Lint and auto-fix
-./scripts/lint.sh --fix
+bazel run :lint -- --fix
 
 # Lint specific files
-./scripts/lint.sh core/cells/model.cc
+bazel run :lint -- core/cells/model.cc
 ```
 
-### Makefile Commands
+### Bazel Build Commands
 
 ```bash
-make format       # Format all C++ code
-make format-check # Check formatting (CI mode)
-make lint         # Run linter
-make lint-fix     # Lint with auto-fix
-make check        # Run all checks (format + lint + build)
-make fix          # Fix all auto-fixable issues
-make build        # Build with Bazel
-make clean        # Clean build artifacts
+bazel run :format        # Format all C++ code
+bazel run :format -- --check  # Check formatting (CI mode)
+bazel run :lint          # Run linter
+bazel run :lint -- --fix # Lint with auto-fix
+bazel run :check         # Run all checks (test + lint + type-check)
+bazel run :test          # Run unit tests
+bazel run :e2e           # Run E2E tests
+bazel run :wasm-dist     # Build WASM distribution
 ```
 
 ### Requirements
@@ -68,22 +68,21 @@ export PATH="$(brew --prefix llvm)/bin:$PATH"  # Add to .zshrc
 
 ## Standard Library Usage
 
-Avoid `std::` when avoidable. Prefer simpler, more explicit alternatives:
-
-| Avoid | Prefer | Reason |
-|-------|--------|--------|
-| `std::variant` | Tagged union or pointer | Simpler, no template bloat |
-| `std::optional` | Pointer or sentinel value | More explicit |
-| `std::function` | Function pointer or virtual | Less overhead |
-| `std::shared_ptr` | Raw pointer with clear ownership | Simpler lifetime |
-
 **Acceptable std:: usage:**
 - `std::string` - No practical alternative for dynamic strings
 - `std::vector` - No practical alternative for dynamic arrays
 - `std::unordered_map` - Hash maps are complex to implement correctly
 - `std::unique_ptr` - RAII for owned heap objects (prevents leaks)
+- `std::optional` - Used for fallible operations and optional return values
 - `<cstdint>` types - `uint32_t`, `size_t`, etc.
 - `<cstring>` functions - `memcpy`, `memset`, etc.
+
+**Avoid:**
+| Avoid | Prefer | Reason |
+|-------|--------|--------|
+| `std::variant` | Tagged union or pointer | Simpler, no template bloat |
+| `std::function` | Function pointer or virtual | Less overhead |
+| `std::shared_ptr` | Raw pointer with clear ownership | Simpler lifetime |
 
 ## Memory Management
 
