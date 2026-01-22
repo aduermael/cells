@@ -85,10 +85,9 @@ Example:
 ### Commit Messages
 
 **Format rules:**
-- **Plain text only** — no title/body separation, just raw text
+- **Title + optional body** — brief title (50 chars), optional bullet points
 - **Maximum 5 lines** — keep it brief
-- **No "Co-Authored-By:" lines** — never include these
-- **No "Generated with" text** — never include AI attribution
+- **Include "Co-Authored-By:" lines** — add `Co-Authored-By: Claude <noreply@anthropic.com>` at the end
 
 When executing a plan, each subtask gets its own commit named by phase and subtask:
 
@@ -208,7 +207,7 @@ bazel run :e2e-headed          # All tests, browser visible
 bazel run :e2e-headed -- smoke # Single test, browser visible
 ```
 
-**Available tests:** smoke, formula, editing, column-move, clipboard, selection, script, collab, initial-sync, collab-demo
+**Available tests:** smoke, formula, editing, column-move, clipboard, selection, collab, initial-sync, collab-demo, merged-cells, named-ranges, borders, format, zoom-*, and more (see `apps/wasm/tests/` for full list)
 
 **Note:** All tests must pass. There is no "stable" subset - if a test is flaky or broken, fix it or remove it.
 

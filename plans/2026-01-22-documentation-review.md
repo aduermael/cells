@@ -34,7 +34,7 @@ Review and update all documentation files to accurately reflect current codebase
 
 - [x] 1a: Review and update `README.md` - updated stats, fixed E2E test list, marked unimplemented features as planned
 - [x] 1b: Review and update `GETTING_STARTED.md` - fixed E2E test list, updated WASM size (729KB→5.1MB), updated dist structure
-- [ ] 1c: Review and update `AGENTS.md` - verify guidelines match current workflow
+- [x] 1c: Review and update `AGENTS.md` - fixed E2E test list, updated commit message guidelines to match actual practice
 
 ## Phase 2: Data Model and CRDT Documentation
 
