@@ -36,7 +36,7 @@ Remove unused code to keep the codebase lean during early development. This foll
 ---
 
 ## Phase 1: Remove unused TypeScript types
-- [ ] 1a: Remove unused type exports from `apps/wasm/src/types.ts`
+- [x] 1a: Remove unused type exports from `apps/wasm/src/types.ts` - Removed 19 unused types: LoadResult, OperationResult, ApplyOperationResult, ApplyOperationsResult, CRDTOperation, OperationsResponse, CppPresence, GridCell, RenderedColumn, RenderedRow, ScrollPosition, ViewportBounds, HitTestType, HitTestResult, CollabStatus, ClientOptions, WorkerMessageType, WorkerMessage, WorkerResponse. Kept NamedRangeScope, NamedRangeTargetType, CppPeerInfo as they're used by other interfaces.
 
 ## Phase 2: Clean up StyleControls dead callback
 - [ ] 2a: Remove `getSelectedCellData` from `StyleControlsCallbacks` interface in `apps/wasm/src/style-controls.ts`
