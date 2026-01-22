@@ -81,6 +81,12 @@ get_last_commit_of_date() {
     git log --format="%H" --until="${date}T23:59:59" --since="${date}T00:00:00" -1
 }
 
+# Function to get cumulative commit count up to a given date
+get_commit_count_until_date() {
+    local date="$1"
+    git rev-list --count --until="${date}T23:59:59" HEAD
+}
+
 # Function to run CLOC and extract totals
 run_cloc_product() {
     local path="$1"
@@ -149,6 +155,9 @@ for DATE in $DATES_TO_PROCESS; do
     TEST_LINES=$(run_cloc_test "$WORKTREE_PATH")
     DOCS_LINES=$(run_cloc_docs "$WORKTREE_PATH")
 
+    # Get cumulative commit count
+    COMMIT_COUNT=$(get_commit_count_until_date "$DATE")
+
     # Remove worktree
     git worktree remove --force "$WORKTREE_PATH" 2>/dev/null || rm -rf "$WORKTREE_PATH"
 
@@ -159,13 +168,14 @@ for DATE in $DATES_TO_PROCESS; do
         --argjson product "$PRODUCT_LINES" \
         --argjson test "$TEST_LINES" \
         --argjson docs "$DOCS_LINES" \
-        '{date: $date, commit: $commit, productTotal: $product, testTotal: $test, docsTotal: $docs}')
+        --argjson commits "$COMMIT_COUNT" \
+        '{date: $date, commit: $commit, productTotal: $product, testTotal: $test, docsTotal: $docs, commitCount: $commits}')
 
     # Update history file
     jq --argjson entry "$NEW_ENTRY" '.history += [$entry]' "$HISTORY_FILE" > "$HISTORY_FILE.tmp"
     mv "$HISTORY_FILE.tmp" "$HISTORY_FILE"
 
-    echo "    Product: $PRODUCT_LINES, Test: $TEST_LINES, Docs: $DOCS_LINES" >&2
+    echo "    Product: $PRODUCT_LINES, Test: $TEST_LINES, Docs: $DOCS_LINES, Commits: $COMMIT_COUNT" >&2
 done
 
 # Update generated timestamp

@@ -71,6 +71,12 @@ extract_lines() {
     echo "$json" | jq -r ".[\"$lang\"].code // 0" 2>/dev/null || echo 0
 }
 
+# Extract total comment lines from CLOC JSON (all languages combined)
+extract_total_comments() {
+    local json="$1"
+    echo "$json" | jq -r '.SUM.comment // 0' 2>/dev/null || echo 0
+}
+
 # Function to format bytes to human readable
 format_size() {
     local bytes=$1
@@ -113,6 +119,7 @@ luau_lines=$(extract_lines "$SOURCE_JSON" "Luau")
 objcpp_lines=$(extract_lines "$SOURCE_JSON" "Objective-C++")
 md_lines=$(extract_lines "$SOURCE_JSON" "Markdown")
 sh_lines=$(extract_lines "$SOURCE_JSON" "Bourne Shell")
+comment_lines=$(extract_total_comments "$SOURCE_JSON")
 # Starlark: CLOC may report as "Starlark" or "Bazel" depending on file extension
 bzl_lines=$(($(extract_lines "$SOURCE_JSON" "Starlark") + $(extract_lines "$SOURCE_JSON" "Bazel")))
 
@@ -250,12 +257,17 @@ generate_readme_section() {
     echo ""
     echo "### Documentation"
     echo ""
-    echo "| Language | Lines |"
-    echo "|----------|------:|"
+    echo "| Type | Lines |"
+    echo "|------|------:|"
     if [ "$md_lines" -gt 0 ]; then
         formatted=$(echo "$md_lines" | awk '{printf "%'\''d", $1}')
         echo "| Markdown | $formatted |"
-    else
+    fi
+    if [ "$comment_lines" -gt 0 ]; then
+        formatted=$(echo "$comment_lines" | awk '{printf "%'\''d", $1}')
+        echo "| Inline Comments | $formatted |"
+    fi
+    if [ "$md_lines" -eq 0 ] && [ "$comment_lines" -eq 0 ]; then
         echo "| (none) | 0 |"
     fi
 
