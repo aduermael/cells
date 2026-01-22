@@ -22,7 +22,7 @@
 // =============================================================================
 
 import type { WasmDataSource } from "./wasm-data-source";
-import type { CellStyle, Position, CellData } from "./types";
+import type { CellStyle, Position } from "./types";
 import { getMenuStateManager } from "./menu-state";
 
 // =============================================================================
@@ -70,8 +70,6 @@ export interface StyleControlsConfig {
 export interface StyleControlsCallbacks {
   /** Get the currently selected cell position */
   getSelectedCell: () => Position | null;
-  /** Get the selected cell data (for current style) */
-  getSelectedCellData: () => CellData | null;
   /** Get the current selection range (start and end) */
   getSelectionRange: () => { start: Position | null; end: Position | null };
   /** Request render after style change */
@@ -189,8 +187,6 @@ export class StyleControls {
     this.valignBottomBtn = config.valignBottomBtn;
 
     this.getSelectedCell = callbacks.getSelectedCell;
-    // Note: getSelectedCellData from callbacks is no longer used - we now use
-    // getEffectiveCellStyle which resolves the full style hierarchy
     this.getSelectionRange = callbacks.getSelectionRange;
     this.requestRender = callbacks.requestRender;
     this.updateFormulaBar = callbacks.updateFormulaBar;

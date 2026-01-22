@@ -789,10 +789,6 @@ export function createComponents(config: ComponentsConfig): Components {
     },
     {
       getSelectedCell: () => app.selectedCell,
-      getSelectedCellData: () => {
-        if (!app.selectedCell) return null;
-        return getCellAt(app.selectedCell.col, app.selectedCell.row, app.cells) ?? null;
-      },
       getSelectionRange: () => ({
         start: app.selectionStart,
         end: app.selectionEnd,
