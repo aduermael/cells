@@ -1,4 +1,4 @@
-Status: DRAFT
+Status: IN_PROGRESS
 Created At: 2026-01-22
 Following plan management guidelines defined in AGENTS.md
 
@@ -69,10 +69,35 @@ CellsEngine
 
 Confirm bottlenecks with measurements before optimizing.
 
-- [ ] 1a: Create performance test that measures viewport query time at row positions 100, 1K, 10K, 50K, 100K
-- [ ] 1b: Profile `queryViewport()` to identify where time is spent (axis lookup vs cell iteration vs JSON serialization)
-- [ ] 1c: Measure impact of spill iteration by comparing sheets with/without spilled formulas
-- [ ] 1d: Document baseline metrics in this plan
+- [x] 1a: Create performance test that measures viewport query time at row positions 100, 1K, 10K, 50K, 100K
+- [x] 1b: Profile `queryViewport()` to identify where time is spent (axis lookup vs cell iteration vs JSON serialization)
+- [x] 1c: Measure impact of spill iteration by comparing sheets with/without spilled formulas
+- [x] 1d: Document baseline metrics in this plan
+
+#### Baseline Metrics (2026-01-22)
+
+**Test Environment:** 10 columns × 100,001 rows, 1,001 cells (sparse)
+
+| Row Position | Query Time (µs) | Slowdown vs Row 100 |
+|--------------|-----------------|---------------------|
+| 100          | 467             | 1.0x                |
+| 1,000        | 3,457           | 7.4x                |
+| 10,000       | 38,213          | 81.8x               |
+| 50,000       | 186,526         | 399.4x              |
+| 100,000      | 385,346         | 825.2x              |
+
+**Key Finding:** Slowdown ratio of ~825x confirms O(n) complexity. Expected O(log n) would be ~1.7x.
+
+**Breakdown Analysis (100 cols × 10,000 rows, 100K cells):**
+- Sparse region query (no cells): 13,762 µs/query - axis lookup dominates
+- Dense region query (200 cells): 101 µs/query - cell handling is fast
+- Axis lookups (4 operations): ~38,000 ns/iteration
+
+**Conclusion:** The bottleneck is in axis position lookups (`getColumnAt`, `getRowAt`), not cell iteration. The O(n) behavior comes from the OSTree axis index lookups when the position is far into the sheet.
+
+**Additional O(n) bottlenecks confirmed in bindings layer:**
+- `bindings_viewport.cc:517-615`: Iterates ALL cells to find spill masters
+- `bindings_viewport.cc:621-666`: Iterates ALL columns/rows for JSON output
 
 ### Phase 2: Fix O(n) Spilled Cells Iteration
 

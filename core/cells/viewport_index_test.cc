@@ -1,6 +1,7 @@
 #include "core/cells/viewport_index.h"
 
 #include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -1008,6 +1009,220 @@ TEST_F(ViewportIndexTest, BenchmarkLargeSheetIncrementalUpdates) {
         << "Batch of incremental ops should be faster than full rebuild";
 
     EXPECT_EQ(index.cellCount(), 1000u);
+    verifyIndex(index);
+}
+
+// ============================================================================
+// Phase 1a: Viewport query performance at different row positions
+// Measures O(log n) vs O(n) behavior by querying at positions 100, 1K, 10K, 50K, 100K
+// ============================================================================
+
+TEST_F(ViewportIndexTest, BenchmarkViewportQueryAtRowPositions) {
+    // Test row positions to measure (in Excel row numbers, 0-indexed internally)
+    const std::vector<size_t> testRowPositions = {100, 1000, 10000, 50000, 100000};
+    const size_t maxRows = 100001;  // Enough rows for all test positions
+    const size_t numCols = 10;
+    const uint32_t colWidth = 100;
+    const uint32_t rowHeight = 24;
+
+    // Create sheet with enough rows for 100K test
+    addColumns(numCols, colWidth);
+    addRows(maxRows, rowHeight);
+
+    // Add cells sparsely - one cell per row in column 0 (like a typical spreadsheet)
+    // This creates a realistic scenario where cells exist throughout the sheet
+    for (size_t r = 0; r < maxRows; r += 100) {  // Every 100th row has a cell
+        addCell(0, r);
+    }
+
+    ViewportIndex index;
+    index.build(*sheet_);
+
+    std::cout << "\n=== Phase 1a: Viewport Query Performance at Row Positions ===" << std::endl;
+    std::cout << "Sheet: " << numCols << " columns x " << maxRows << " rows" << std::endl;
+    std::cout << "Cells indexed: " << index.cellCount() << std::endl;
+    std::cout << "Total height: " << index.totalHeight() << " pixels" << std::endl;
+    std::cout << std::endl;
+
+    // Standard viewport size (50 rows visible)
+    const uint32_t viewportHeight = 50 * rowHeight;  // 1200 pixels
+    const uint32_t viewportWidth = numCols * colWidth;
+
+    std::cout << "Query viewport: " << viewportWidth << "x" << viewportHeight << " pixels (50 rows)"
+              << std::endl;
+    std::cout << std::endl;
+
+    // Measure query time at each row position
+    std::cout << "Row Position | Pixel Y1    | Query Time (µs) | Cells Found" << std::endl;
+    std::cout << "-------------|-------------|-----------------|------------" << std::endl;
+
+    std::vector<int64_t> queryTimes;
+    const int iterations = 100;
+
+    for (size_t rowPos : testRowPositions) {
+        // Calculate pixel coordinates for this row position
+        uint32_t pixelY1 = static_cast<uint32_t>(rowPos * rowHeight);
+        uint32_t pixelY2 = pixelY1 + viewportHeight;
+
+        // Ensure we don't exceed sheet bounds
+        if (pixelY2 > index.totalHeight()) {
+            pixelY2 = index.totalHeight();
+            pixelY1 = pixelY2 > viewportHeight ? pixelY2 - viewportHeight : 0;
+        }
+
+        // Warm-up query
+        auto warmup = index.queryViewport(0, pixelY1, viewportWidth, pixelY2);
+
+        // Timed queries
+        auto start = std::chrono::high_resolution_clock::now();
+        std::vector<ViewportEntry> results;
+        for (int i = 0; i < iterations; i++) {
+            results = index.queryViewport(0, pixelY1, viewportWidth, pixelY2);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration =
+            std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / iterations;
+
+        queryTimes.push_back(duration);
+
+        std::cout << std::setw(12) << rowPos << " | " << std::setw(11) << pixelY1 << " | "
+                  << std::setw(15) << duration << " | " << std::setw(10) << results.size()
+                  << std::endl;
+    }
+
+    std::cout << std::endl;
+
+    // Verify O(log n) behavior: query times should not grow linearly with row position
+    // Allow up to 3x slowdown from row 100 to row 100K (O(log n) would be ~1.7x)
+    // O(n) would show ~1000x slowdown
+    if (!queryTimes.empty() && queryTimes[0] > 0) {
+        double slowdown =
+            static_cast<double>(queryTimes.back()) / static_cast<double>(queryTimes[0]);
+        std::cout << "Slowdown ratio (row 100 -> row 100K): " << std::fixed << std::setprecision(2)
+                  << slowdown << "x" << std::endl;
+        std::cout << "Expected for O(log n): ~1.7x, Expected for O(n): ~1000x" << std::endl;
+
+        // Soft assertion: if slowdown > 10x, we likely have O(n) behavior somewhere
+        if (slowdown > 10.0) {
+            std::cout << "WARNING: Slowdown ratio suggests O(n) complexity!" << std::endl;
+        }
+    }
+
+    // Print target performance (will be enforced after optimization)
+    // Current implementation has O(n) behavior; this test documents baseline
+    std::cout << std::endl;
+    std::cout << "Target after optimization: all queries under 1ms (1000 µs)" << std::endl;
+    for (size_t i = 0; i < queryTimes.size(); i++) {
+        if (queryTimes[i] >= 1000) {
+            std::cout << "  Row " << testRowPositions[i] << ": " << queryTimes[i]
+                      << " µs (exceeds target)" << std::endl;
+        }
+    }
+
+    verifyIndex(index);
+}
+
+// ============================================================================
+// Phase 1b: Profile where time is spent in queryViewport
+// Break down: axis lookup vs cell iteration vs result building
+// ============================================================================
+
+TEST_F(ViewportIndexTest, BenchmarkQueryViewportBreakdown) {
+    const size_t numCols = 100;
+    const size_t numRows = 10000;
+    const uint32_t colWidth = 100;
+    const uint32_t rowHeight = 24;
+
+    addColumns(numCols, colWidth);
+    addRows(numRows, rowHeight);
+
+    // Add cells in a dense region (first 1000 rows, all columns)
+    for (size_t r = 0; r < 1000; r++) {
+        for (size_t c = 0; c < numCols; c++) {
+            addCell(c, r);
+        }
+    }
+
+    ViewportIndex index;
+    index.build(*sheet_);
+
+    std::cout << "\n=== Phase 1b: Query Viewport Breakdown ===" << std::endl;
+    std::cout << "Sheet: " << numCols << " columns x " << numRows << " rows" << std::endl;
+    std::cout << "Cells: " << index.cellCount() << std::endl;
+    std::cout << std::endl;
+
+    const int iterations = 1000;
+    const uint32_t viewportWidth = 800;   // ~8 columns
+    const uint32_t viewportHeight = 600;  // ~25 rows
+
+    // Test 1: Query sparse region (no cells)
+    {
+        // Query bottom of sheet where there are no cells
+        uint32_t y1 = 9000 * rowHeight;  // Row 9000+
+        uint32_t y2 = y1 + viewportHeight;
+
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < iterations; i++) {
+            auto results = index.queryViewport(0, y1, viewportWidth, y2);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration =
+            std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / iterations;
+
+        std::cout << "Sparse region query (no cells): " << duration << " µs/query" << std::endl;
+    }
+
+    // Test 2: Query dense region (many cells)
+    {
+        // Query top of sheet where cells are dense
+        uint32_t y1 = 0;
+        uint32_t y2 = viewportHeight;
+
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < iterations; i++) {
+            auto results = index.queryViewport(0, y1, viewportWidth, y2);
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration =
+            std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / iterations;
+
+        auto results = index.queryViewport(0, y1, viewportWidth, y2);
+        std::cout << "Dense region query (" << results.size() << " cells): " << duration
+                  << " µs/query" << std::endl;
+    }
+
+    // Test 3: Just axis lookups (measure getColumnAt, getRowAt, pixelTo*)
+    {
+        volatile uint32_t sink = 0;  // Prevent optimization
+        auto start = std::chrono::high_resolution_clock::now();
+        for (int i = 0; i < iterations * 100; i++) {
+            auto colId = index.getColumnAt(50);  // Middle column
+            auto rowId = index.getRowAt(5000);   // Middle row
+            auto colPixel = index.columnToPixel(colIds_[50]);
+            auto rowPixel = index.rowToPixel(rowIds_[5000]);
+            // Use results to prevent optimization
+            if (colId)
+                sink += 1;
+            if (rowId)
+                sink += 1;
+            if (colPixel)
+                sink += *colPixel;
+            if (rowPixel)
+                sink += *rowPixel;
+        }
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() /
+                        (iterations * 100);
+
+        std::cout << "Axis lookups (getColumnAt + getRowAt + 2x pixelTo*): " << duration
+                  << " ns/iteration" << std::endl;
+        (void)sink;  // Suppress unused warning
+    }
+
+    std::cout << std::endl;
+    std::cout << "If dense query >> sparse query, cell iteration is the bottleneck." << std::endl;
+    std::cout << "If both are slow, axis lookup is the bottleneck." << std::endl;
+
     verifyIndex(index);
 }
 
