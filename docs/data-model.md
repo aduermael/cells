@@ -15,37 +15,64 @@ The fundamental unit of data. Each cell is identified by a UUID, not coordinates
 | Field | Description |
 |-------|-------------|
 | `id` | Unique identifier (8-char base62) |
-| `x` | Column axis UUID |
-| `y` | Row axis UUID |
-| `value` | Raw value as string (NULL = empty) |
-| `type` | Value type (auto-inferred or explicit) |
-| `error` | Error state (CELL_OK = no error) |
-| `formula` | Formula text + parsed AST (NULL = not a formula) |
-| `style` | Formatting (optional) |
-| `modified_at` | HLC timestamp for CRDT |
+| `colId` | Column axis UUID |
+| `rowId` | Row axis UUID |
+| `value` | CellValue struct (raw string + type + error) |
+| `formula` | Parsed AST, null = value cell (owned pointer) |
+
+**CellValue struct**:
+| Field | Description |
+|-------|-------------|
+| `raw` | Raw string representation |
+| `type` | CellValueType enum |
+| `error` | CellError enum (NONE if no error) |
+
+**Cell Flags** (runtime only, not persisted):
+| Flag | Description |
+|------|-------------|
+| `SHARED_FORMULA_MASTER` | Cell owns a shared formula |
+| `SHARED_FORMULA_SUBSCRIBER` | Cell uses another cell's formula |
+| `SPILL_MASTER` | Cell is a spill range master |
+| `SPILLED_FROM` | Position has spilled data |
+| `HAS_FORMAT` | Cell has custom format in workbook map |
+| `HAS_STYLE` | Cell has custom style in workbook map |
 
 ### Cell Value Types
 
 | Type | Description |
 |------|-------------|
-| `AUTO` | Infer from string content |
-| `NUMBER` | Numeric |
-| `TEXT` | String |
+| `NUMBER` | Numeric value (42, 3.14, -100) |
+| `STRING` | String value |
+| `FORMULA` | Formula (unevaluated or pre-evaluation) |
 | `BOOLEAN` | true/false |
-| `DATE` | Date value |
-| `NULL` | Empty |
+| `ERROR` | Error value (#DIV/0!, #REF!, etc.) |
+| `DATE` | ISO 8601 date (2024-01-15) |
+| `DATE_TIME` | ISO 8601 datetime (2024-01-15T10:30:00Z) |
+
+**Formula Result Types** (runtime only, never serialized):
+| Type | Description |
+|------|-------------|
+| `FORMULA_NUMBER` | Formula evaluating to number |
+| `FORMULA_STRING` | Formula evaluating to string |
+| `FORMULA_BOOLEAN` | Formula evaluating to boolean |
+| `FORMULA_ERROR` | Formula evaluating to error |
+| `FORMULA_EMPTY` | Formula evaluating to empty |
 
 ### Cell Errors
 
 | Error | Excel Equivalent |
 |-------|------------------|
+| `NONE` | No error |
 | `VALUE` | #VALUE! |
 | `REF` | #REF! |
 | `NAME` | #NAME? |
 | `DIV` | #DIV/0! |
-| `NULL` | #NULL! |
+| `NULL_REF` | #NULL! |
 | `NUM` | #NUM! |
-| `CIRCULAR` | Circular reference |
+| `CIRCULAR` | #CIRCULAR! |
+| `NA` | #N/A |
+| `SPILL` | #SPILL! |
+| `CALC` | #CALC! |
 
 ### Axis (Column or Row)
 
@@ -53,40 +80,88 @@ Represents a single column or row with an explicit visual position.
 
 | Field | Description |
 |-------|-------------|
-| `id` | Unique identifier |
-| `is_column` | true = column (x), false = row (y) |
+| `id` | Unique identifier (8-char base62) |
+| `sheetId` | ID of the sheet this axis belongs to |
+| `name` | Custom name (empty = compute A,B,C or 1,2,3) |
 | `position` | Visual position (0-indexed integer) |
-| `name` | Custom name (NULL = compute A,B,C or 1,2,3) |
 | `size` | Width (column) or height (row) in pixels |
-| `hidden` | Visibility flag |
-| `constraints` | Type constraints (columns only) |
+| `_flags` | Combined AxisFlags byte |
+
+**AxisFlags**:
+| Flag | Description |
+|------|-------------|
+| `IS_COLUMN` | true = column (x), false = row (y) |
+| `HIDDEN` | Visibility flag |
+| `HAS_STYLE` | Axis has style in workbook map |
+| `HAS_FORMAT` | Axis has format in workbook map |
 
 **Note**: Display names (A, B, C or 1, 2, 3) are computed from position, not stored.
 
 ### Sheet
 
-A 2D grid containing cells.
+A 2D grid containing cells. Cells, columns, and rows are stored at Workbook level; Sheet maintains indexes for position-based lookups.
 
 | Field | Description |
 |-------|-------------|
 | `id` | Unique identifier |
 | `name` | Sheet name |
-| `cells` | Cell storage (sharded hashmap) |
-| `columns` | Axis storage (hashmap by UUID) |
-| `rows` | Axis storage (hashmap by UUID) |
+| `showGridLines` | Show grid lines (default: true) |
+| `zoomScale` | Zoom level percentage (10-400, default: 100) |
+| `freezeCol` | Number of frozen columns (0 = none) |
+| `freezeRow` | Number of frozen rows (0 = none) |
+
+**Internal indexes** (Sheet maintains, Workbook owns data):
+| Index | Description |
+|-------|-------------|
+| `_columnIds` | Set of column IDs belonging to this sheet |
+| `_rowIds` | Set of row IDs belonging to this sheet |
+| `_columnIndex` | position → colId mapping |
+| `_rowIndex` | position → rowId mapping |
+| `_cellIndex` | (colId, rowId) → cellId mapping |
+| `_rangeIndex` | R-tree spatial index for range queries |
 
 ### Workbook
 
-Top-level container.
+Top-level container. Owns all cells, axes, and ranges; sheets maintain indexes.
 
 | Field | Description |
 |-------|-------------|
-| `id` | Unique identifier |
-| `name` | Workbook name |
-| `sheets` | List of sheets |
-| `named_ranges` | Named range definitions |
-| `styles` | Style registry |
-| `clock` | CRDT vector clock |
+| `id` | Document ID |
+| `name` | Document name |
+| `sheets` | List of sheets (order matters for tabs) |
+
+**Primary storage** (Workbook owns):
+| Storage | Description |
+|---------|-------------|
+| `_cells` | cell ID → Cell (unique_ptr) |
+| `_columns` | column ID → Axis (unique_ptr) |
+| `_rows` | row ID → Axis (unique_ptr) |
+| `_ranges` | range ID → Range (unique_ptr) |
+
+**Collaboration**:
+| Field | Description |
+|-------|-------------|
+| `_oplog` | Operation log for CRDT sync |
+| `_nodeId` | Local peer identity for HLC |
+| `_lastHLC` | Last HLC for generating operations |
+| `_collabMode` | OFFLINE or COLLABORATING |
+
+**Formula/Style management**:
+| Field | Description |
+|-------|-------------|
+| `_namedRanges` | NamedRangeRegistry |
+| `_depGraph` | Global DependencyGraph |
+| `_formatRegistry` | Custom format definitions |
+| `_formats` | entity ID → format ID mapping |
+| `_entityStyles` | entity ID → StyleBuffer mapping |
+
+**Runtime tracking** (not persisted):
+| Field | Description |
+|-------|-------------|
+| `_sharedFormulaMasters` | master ID → SharedFormulaInfo |
+| `_sharedFormulaFrom` | subscriber ID → master ID |
+| `_spillMasters` | master ID → SpillInfo |
+| `_spilledFrom` | (colId, rowId) → master ID |
 
 ## Visual Representation
 
@@ -184,11 +259,10 @@ UUID:         aB3kQ2x  cD5mN8y        fH2pR4t  gK7sT1w
 
 ## Cell Storage
 
-Sharded hashmap for O(1) access with parallelization:
-- 64 shards (power of 2 for fast modulo)
-- Per-shard read-write locks
-- UUID hash determines shard
-- Enables parallel iteration for recalc/rendering
+Cells are stored in a flat `unordered_map` at the Workbook level:
+- Primary storage: `Workbook::_cells` (cell ID → unique_ptr<Cell>)
+- O(1) lookup by cell ID
+- Sheets maintain secondary indexes for position-based lookups
 
 ## Design Decisions
 
@@ -205,6 +279,21 @@ Sharded hashmap for O(1) access with parallelization:
 2. **Git-friendly**: Insert = 1 line added (vs. 3 lines with linked lists)
 3. **CRDT-compatible**: Position conflicts resolved via LWW
 4. **Easy sorting**: Just sort by position field
+
+## Collaboration Mode
+
+The workbook can be in one of two modes:
+
+| Mode | Description |
+|------|-------------|
+| `OFFLINE` | No collaboration - edits bypass OpLog, direct mutation |
+| `COLLABORATING` | Active collaboration - edits tracked in OpLog, broadcast to peers |
+
+**CRDT Contract**: When `CollabMode` is `COLLABORATING`, all model modifications MUST go through CRDT operations (see `crdt.cc`). Direct mutations will NOT sync to other peers.
+
+Exceptions (direct mutation allowed):
+1. File loading (initial state, no peers yet)
+2. Applying operations from peers (the operation handles the mutation)
 
 ## Range Formatting
 
