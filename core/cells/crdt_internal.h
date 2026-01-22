@@ -82,12 +82,6 @@ ApplyResult applyAxisSetHidden(Workbook& workbook, const Operation& op);
 ApplyResult applyAxisSetStyle(Workbook& workbook, const Operation& op);
 ApplyResult applyAxisSetFormat(Workbook& workbook, const Operation& op);
 
-// Legacy DIM_* operations (backwards compatibility)
-ApplyResult applyDimInsertAxis(Workbook& workbook, const Operation& op);
-ApplyResult applyDimResizeAxis(Workbook& workbook, const Operation& op);
-ApplyResult applyDimMoveAxis(Workbook& workbook, const Operation& op);
-ApplyResult applyDimRenameAxis(Workbook& workbook, const Operation& op);
-
 // Sheet operations
 ApplyResult applySheetCreate(Workbook& workbook, const Operation& op);
 ApplyResult applySheetDelete(Workbook& workbook, const Operation& op);

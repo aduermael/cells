@@ -10,11 +10,15 @@ TEST(OpTypeTest, OpTypeToStringAndBack) {
     EXPECT_STREQ(opTypeToString(OpType::CELL_SET_VALUE), "CELL_SET_VALUE");
     EXPECT_STREQ(opTypeToString(OpType::CELL_CLEAR), "CELL_CLEAR");
     EXPECT_STREQ(opTypeToString(OpType::CELL_SET_STYLE), "CELL_SET_STYLE");
-    EXPECT_STREQ(opTypeToString(OpType::DIM_INSERT_AXIS), "DIM_INSERT_AXIS");
-    EXPECT_STREQ(opTypeToString(OpType::DIM_DELETE_AXIS), "DIM_DELETE_AXIS");
-    EXPECT_STREQ(opTypeToString(OpType::DIM_MOVE_AXIS), "DIM_MOVE_AXIS");
-    EXPECT_STREQ(opTypeToString(OpType::DIM_RESIZE_AXIS), "DIM_RESIZE_AXIS");
-    EXPECT_STREQ(opTypeToString(OpType::DIM_RENAME_AXIS), "DIM_RENAME_AXIS");
+    EXPECT_STREQ(opTypeToString(OpType::COL_INSERT), "COL_INSERT");
+    EXPECT_STREQ(opTypeToString(OpType::COL_DELETE), "COL_DELETE");
+    EXPECT_STREQ(opTypeToString(OpType::COL_MOVE), "COL_MOVE");
+    EXPECT_STREQ(opTypeToString(OpType::COL_RESIZE), "COL_RESIZE");
+    EXPECT_STREQ(opTypeToString(OpType::COL_RENAME), "COL_RENAME");
+    EXPECT_STREQ(opTypeToString(OpType::ROW_INSERT), "ROW_INSERT");
+    EXPECT_STREQ(opTypeToString(OpType::ROW_DELETE), "ROW_DELETE");
+    EXPECT_STREQ(opTypeToString(OpType::ROW_MOVE), "ROW_MOVE");
+    EXPECT_STREQ(opTypeToString(OpType::ROW_RESIZE), "ROW_RESIZE");
     EXPECT_STREQ(opTypeToString(OpType::SHEET_CREATE), "SHEET_CREATE");
     EXPECT_STREQ(opTypeToString(OpType::SHEET_DELETE), "SHEET_DELETE");
     EXPECT_STREQ(opTypeToString(OpType::SHEET_RENAME), "SHEET_RENAME");
@@ -23,11 +27,15 @@ TEST(OpTypeTest, OpTypeToStringAndBack) {
     EXPECT_EQ(stringToOpType("CELL_SET_VALUE"), OpType::CELL_SET_VALUE);
     EXPECT_EQ(stringToOpType("CELL_CLEAR"), OpType::CELL_CLEAR);
     EXPECT_EQ(stringToOpType("CELL_SET_STYLE"), OpType::CELL_SET_STYLE);
-    EXPECT_EQ(stringToOpType("DIM_INSERT_AXIS"), OpType::DIM_INSERT_AXIS);
-    EXPECT_EQ(stringToOpType("DIM_DELETE_AXIS"), OpType::DIM_DELETE_AXIS);
-    EXPECT_EQ(stringToOpType("DIM_MOVE_AXIS"), OpType::DIM_MOVE_AXIS);
-    EXPECT_EQ(stringToOpType("DIM_RESIZE_AXIS"), OpType::DIM_RESIZE_AXIS);
-    EXPECT_EQ(stringToOpType("DIM_RENAME_AXIS"), OpType::DIM_RENAME_AXIS);
+    EXPECT_EQ(stringToOpType("COL_INSERT"), OpType::COL_INSERT);
+    EXPECT_EQ(stringToOpType("COL_DELETE"), OpType::COL_DELETE);
+    EXPECT_EQ(stringToOpType("COL_MOVE"), OpType::COL_MOVE);
+    EXPECT_EQ(stringToOpType("COL_RESIZE"), OpType::COL_RESIZE);
+    EXPECT_EQ(stringToOpType("COL_RENAME"), OpType::COL_RENAME);
+    EXPECT_EQ(stringToOpType("ROW_INSERT"), OpType::ROW_INSERT);
+    EXPECT_EQ(stringToOpType("ROW_DELETE"), OpType::ROW_DELETE);
+    EXPECT_EQ(stringToOpType("ROW_MOVE"), OpType::ROW_MOVE);
+    EXPECT_EQ(stringToOpType("ROW_RESIZE"), OpType::ROW_RESIZE);
     EXPECT_EQ(stringToOpType("SHEET_CREATE"), OpType::SHEET_CREATE);
     EXPECT_EQ(stringToOpType("SHEET_DELETE"), OpType::SHEET_DELETE);
     EXPECT_EQ(stringToOpType("SHEET_RENAME"), OpType::SHEET_RENAME);
@@ -100,11 +108,15 @@ TEST(OperationTest, FromStringWithAllOpTypes) {
         {"1000.0.Kj7mXp2Q CELL_SET_VALUE nP6kR2mW {}", OpType::CELL_SET_VALUE},
         {"1000.0.Kj7mXp2Q CELL_CLEAR nP6kR2mW {}", OpType::CELL_CLEAR},
         {"1000.0.Kj7mXp2Q CELL_SET_STYLE nP6kR2mW {}", OpType::CELL_SET_STYLE},
-        {"1000.0.Kj7mXp2Q DIM_INSERT_AXIS nP6kR2mW {}", OpType::DIM_INSERT_AXIS},
-        {"1000.0.Kj7mXp2Q DIM_DELETE_AXIS nP6kR2mW {}", OpType::DIM_DELETE_AXIS},
-        {"1000.0.Kj7mXp2Q DIM_MOVE_AXIS nP6kR2mW {}", OpType::DIM_MOVE_AXIS},
-        {"1000.0.Kj7mXp2Q DIM_RESIZE_AXIS nP6kR2mW {}", OpType::DIM_RESIZE_AXIS},
-        {"1000.0.Kj7mXp2Q DIM_RENAME_AXIS nP6kR2mW {}", OpType::DIM_RENAME_AXIS},
+        {"1000.0.Kj7mXp2Q COL_INSERT nP6kR2mW {}", OpType::COL_INSERT},
+        {"1000.0.Kj7mXp2Q COL_DELETE nP6kR2mW {}", OpType::COL_DELETE},
+        {"1000.0.Kj7mXp2Q COL_MOVE nP6kR2mW {}", OpType::COL_MOVE},
+        {"1000.0.Kj7mXp2Q COL_RESIZE nP6kR2mW {}", OpType::COL_RESIZE},
+        {"1000.0.Kj7mXp2Q COL_RENAME nP6kR2mW {}", OpType::COL_RENAME},
+        {"1000.0.Kj7mXp2Q ROW_INSERT nP6kR2mW {}", OpType::ROW_INSERT},
+        {"1000.0.Kj7mXp2Q ROW_DELETE nP6kR2mW {}", OpType::ROW_DELETE},
+        {"1000.0.Kj7mXp2Q ROW_MOVE nP6kR2mW {}", OpType::ROW_MOVE},
+        {"1000.0.Kj7mXp2Q ROW_RESIZE nP6kR2mW {}", OpType::ROW_RESIZE},
         {"1000.0.Kj7mXp2Q SHEET_CREATE nP6kR2mW {}", OpType::SHEET_CREATE},
         {"1000.0.Kj7mXp2Q SHEET_DELETE nP6kR2mW {}", OpType::SHEET_DELETE},
         {"1000.0.Kj7mXp2Q SHEET_RENAME nP6kR2mW {}", OpType::SHEET_RENAME},

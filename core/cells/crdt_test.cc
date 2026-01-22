@@ -192,7 +192,7 @@ TEST_F(CRDTTest, SheetRename) {
 }
 
 TEST_F(CRDTTest, AxisResize) {
-    Operation op = makeDimResizeAxisOp(*workbook, col1, R"({"size":200})");
+    Operation op = makeColResizeOp(*workbook, col1, R"({"size":200})");
     ApplyResult result = applyOperation(*workbook, op);
     EXPECT_EQ(result, ApplyResult::SUCCESS);
 

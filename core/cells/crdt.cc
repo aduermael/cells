@@ -305,28 +305,6 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
             result = internal::applyAxisSetFormat(workbook, op);
             break;
 
-        // Legacy DIM_* operations (backwards compatibility)
-        case OpType::DIM_INSERT_AXIS:
-            result = internal::applyDimInsertAxis(workbook, op);
-            break;
-
-        case OpType::DIM_DELETE_AXIS:
-            // Legacy: Not fully implemented - just accept it
-            result = ApplyResult::SUCCESS;
-            break;
-
-        case OpType::DIM_RESIZE_AXIS:
-            result = internal::applyDimResizeAxis(workbook, op);
-            break;
-
-        case OpType::DIM_MOVE_AXIS:
-            result = internal::applyDimMoveAxis(workbook, op);
-            break;
-
-        case OpType::DIM_RENAME_AXIS:
-            result = internal::applyDimRenameAxis(workbook, op);
-            break;
-
         case OpType::SHEET_CREATE:
             result = internal::applySheetCreate(workbook, op);
             break;
@@ -459,32 +437,7 @@ Operation makeCellClearStyleOp(Workbook& workbook, const ID& cellId) {
     return {hlc, OpType::CELL_SET_STYLE, cellId, "{\"style\":\"\"}"};
 }
 
-Operation makeDimInsertAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::DIM_INSERT_AXIS, axisId, payload};
-}
-
-Operation makeDimDeleteAxisOp(Workbook& workbook, const ID& axisId) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::DIM_DELETE_AXIS, axisId, "{}"};
-}
-
-Operation makeDimResizeAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::DIM_RESIZE_AXIS, axisId, payload};
-}
-
-Operation makeDimMoveAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::DIM_MOVE_AXIS, axisId, payload};
-}
-
-Operation makeDimRenameAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::DIM_RENAME_AXIS, axisId, payload};
-}
-
-// New COL_*/ROW_* operation makers (no isCol in payload)
+// COL_*/ROW_* operation makers
 Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::COL_INSERT, axisId, payload};

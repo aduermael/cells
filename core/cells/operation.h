@@ -48,7 +48,7 @@ enum class OpType : uint8_t {
     CELL_SET_STYLE = 2,   // Set cell style properties
     CELL_SET_FORMAT = 3,  // Set cell number format
 
-    // Column operations (preferred over DIM_* operations)
+    // Column operations
     COL_INSERT = 10,  // Insert new column
     COL_DELETE = 11,  // Delete column
     COL_MOVE = 12,    // Move column to new position
@@ -88,14 +88,6 @@ enum class OpType : uint8_t {
     RANGE_UPDATE_CORNERS = 62,  // Update range corner IDs (resize)
     RANGE_UPDATE_FLAGS = 63,    // Update range flags bitmask
     RANGE_SET_STYLE = 64,       // Set style metadata for a style range
-
-    // Legacy operations (deprecated, kept for backwards compatibility parsing)
-    // These map to COL_* or ROW_* based on isCol payload field
-    DIM_INSERT_AXIS = 100,  // Use COL_INSERT or ROW_INSERT instead
-    DIM_DELETE_AXIS = 101,  // Use COL_DELETE or ROW_DELETE instead
-    DIM_MOVE_AXIS = 102,    // Use COL_MOVE or ROW_MOVE instead
-    DIM_RESIZE_AXIS = 103,  // Use COL_RESIZE or ROW_RESIZE instead
-    DIM_RENAME_AXIS = 104,  // Use COL_RENAME instead (rows cannot be renamed)
 };
 
 // Convert OpType to string for serialization

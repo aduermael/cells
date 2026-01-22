@@ -62,17 +62,6 @@ const char* opTypeToString(OpType type) {
             return "NAMED_RANGE_DEFINE";
         case OpType::NAMED_RANGE_DELETE:
             return "NAMED_RANGE_DELETE";
-        // Legacy DIM_* operations (deprecated)
-        case OpType::DIM_INSERT_AXIS:
-            return "DIM_INSERT_AXIS";
-        case OpType::DIM_DELETE_AXIS:
-            return "DIM_DELETE_AXIS";
-        case OpType::DIM_MOVE_AXIS:
-            return "DIM_MOVE_AXIS";
-        case OpType::DIM_RESIZE_AXIS:
-            return "DIM_RESIZE_AXIS";
-        case OpType::DIM_RENAME_AXIS:
-            return "DIM_RENAME_AXIS";
         // Range operations
         case OpType::RANGE_ADD:
             return "RANGE_ADD";
@@ -100,21 +89,6 @@ OpType stringToOpType(const std::string& str) {
     }
     if (str == "CELL_SET_FORMAT") {
         return OpType::CELL_SET_FORMAT;
-    }
-    if (str == "DIM_INSERT_AXIS") {
-        return OpType::DIM_INSERT_AXIS;
-    }
-    if (str == "DIM_DELETE_AXIS") {
-        return OpType::DIM_DELETE_AXIS;
-    }
-    if (str == "DIM_MOVE_AXIS") {
-        return OpType::DIM_MOVE_AXIS;
-    }
-    if (str == "DIM_RESIZE_AXIS") {
-        return OpType::DIM_RESIZE_AXIS;
-    }
-    if (str == "DIM_RENAME_AXIS") {
-        return OpType::DIM_RENAME_AXIS;
     }
     if (str == "SHEET_CREATE") {
         return OpType::SHEET_CREATE;

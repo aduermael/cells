@@ -19,13 +19,13 @@ The codebase contains various deprecated patterns that should be removed:
 
 The DIM_* operations (100-104) are deprecated, replaced by COL_*/ROW_* operations. Remove all code handling them.
 
-- [ ] 1a: Remove DIM_* enum values from `operation.h`
-- [ ] 1b: Remove DIM_* string conversions from `operation.cc`
-- [ ] 1c: Remove `applyDimInsertAxis`, `applyDimDeleteAxis`, `applyDimMoveAxis`, `applyDimResizeAxis`, `applyDimRenameAxis` from `crdt_axis.cc`
-- [ ] 1d: Remove DIM_* case statements from `crdt.cc` dispatch
-- [ ] 1e: Remove DIM_* declarations from `crdt_internal.h`
-- [ ] 1f: Update header comment in `crdt_axis.cc` to remove DIM_* reference
-- [ ] 1g: Run tests and fix any failures
+- [x] 1a: Remove DIM_* enum values from `operation.h`
+- [x] 1b: Remove DIM_* string conversions from `operation.cc`
+- [x] 1c: Remove `applyDimInsertAxis`, `applyDimDeleteAxis`, `applyDimMoveAxis`, `applyDimResizeAxis`, `applyDimRenameAxis` from `crdt_axis.cc`
+- [x] 1d: Remove DIM_* case statements from `crdt.cc` dispatch
+- [x] 1e: Remove DIM_* declarations from `crdt_internal.h`
+- [x] 1f: Update header comment in `crdt_axis.cc` to remove DIM_* reference
+- [x] 1g: Run tests and fix any failures - updated `operation_test.cc` and `crdt_test.cc` to use COL_*/ROW_* operations
 
 ### Phase 2: Remove Formula Resolver Legacy Mode
 

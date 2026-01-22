@@ -95,23 +95,7 @@ Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const StyleBu
 // Payload format: {"style":""}
 Operation makeCellClearStyleOp(Workbook& workbook, const ID& cellId);
 
-// Generate a DIM_INSERT_AXIS operation for inserting a column or row.
-Operation makeDimInsertAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
-
-// Generate a DIM_DELETE_AXIS operation for deleting a column or row.
-Operation makeDimDeleteAxisOp(Workbook& workbook, const ID& axisId);
-
-// Generate a DIM_RESIZE_AXIS operation for resizing a column or row.
-Operation makeDimResizeAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
-
-// Generate a DIM_MOVE_AXIS operation for moving a column or row to a new position.
-Operation makeDimMoveAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
-
-// Generate a DIM_RENAME_AXIS operation for renaming a column or row.
-// DEPRECATED: Use makeColRenameOp instead (rows cannot be renamed).
-Operation makeDimRenameAxisOp(Workbook& workbook, const ID& axisId, const std::string& payload);
-
-// Column operations (preferred over DIM_* operations)
+// Column operations
 // The sheetId version specifies which sheet the column belongs to.
 Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const std::string& payload);
 Operation makeColInsertOp(Workbook& workbook, const ID& axisId, const ID& sheetId,
