@@ -53,7 +53,7 @@ Review and update all documentation files to accurately reflect current codebase
 ## Phase 5: Networking and Sync Documentation
 
 - [x] 5a: Review `docs/sync-protocol.md` - fixed op field name (type→op), operations batch (operations→batch), ping/pong field (timestamp→ts), added hello peer_id field, added ack message type, fixed presence format (uses null not has_* flags, integer indices not ID strings), added editing field, fixed throttle rate (30→5/sec), added peer-list/error message formats, added all operation codes, added workbook/format/named range ops
-- [ ] 5b: Review `docs/networking.md` - verify WebRTC implementation details
+- [x] 5b: Review `docs/networking.md` - updated implementation status (all platforms now implemented), fixed JS→TS file paths, updated message protocol table with channels, fixed C++ API examples (SyncClient, SyncClientDelegate, PresenceManager), added libdatachannel to platform libraries
 
 ## Phase 6: UI and Platform Documentation
 

@@ -2,7 +2,7 @@
 
 ## Implementation Status
 
-**Current state (December 2024):** Core networking implemented in C++ with cross-platform support.
+**Current state:** Core networking implemented in C++ with cross-platform support.
 
 ### C++ Core Layer (`core/net/`)
 
@@ -19,18 +19,21 @@
 
 | Platform | Status | Source Files |
 |----------|--------|--------------|
-| Web (Emscripten) | ✅ Implemented | `core/net/web/*.cc` |
-| Apple (iOS/macOS) | 📋 Planned | `core/net/apple/*.mm` (stubs) |
+| Web (Emscripten) | ✅ Implemented | `core/net/web/` (HttpRequest, WebSocket, WebRTC bindings) |
+| Apple (iOS/macOS) | ✅ Implemented | `core/net/apple/` (HttpRequest, WebSocket, WebRTC via stasel/WebRTC) |
+| Native (libdatachannel) | ✅ Implemented | `core/net/native/` (RTC via libdatachannel) |
 
-### JavaScript Layer (`apps/wasm/static/shared/`)
+### TypeScript Layer (`apps/wasm/src/`)
 
 | Component | Status | Source Files |
 |-----------|--------|--------------|
-| C++ Sync Adapter | ✅ Implemented | `cpp-sync-adapter.js` (thin wrapper over C++) |
-| Presence UI | ✅ Implemented | `presence.js` (renders remote cursors) |
-| Collab UI | ✅ Implemented | `collab-ui.js` (status indicator) |
+| C++ Sync Adapter | ✅ Implemented | `cpp-sync-adapter.ts` (thin wrapper over C++) |
+| Presence Broadcast | ✅ Implemented | `presence-broadcast.ts` (sends cursor/selection updates) |
+| Presence UI | ✅ Implemented | `presence.ts`, `grid-presence-renderer.ts` (renders remote cursors) |
+| Collab UI | ✅ Implemented | `collab-ui.ts` (connection status indicator) |
+| RTC Proxy | ✅ Implemented | `rtc-proxy.ts` (WebRTC JS interop) |
 
-The P2P collaboration layer is fully functional. Sync logic lives in C++ (`core/net/`) for cross-platform reuse. JavaScript is now a thin wrapper that handles UI rendering only. Presence data (cursors, selections) is broadcast in real-time but intentionally ephemeral - it is never stored in files or the Workbook.
+The P2P collaboration layer is fully functional. Sync logic lives in C++ (`core/net/`) for cross-platform reuse. TypeScript handles UI rendering only. Presence data (cursors, selections) is broadcast in real-time but intentionally ephemeral - it is never stored in files or the Workbook.
 
 ---
 
@@ -122,26 +125,30 @@ Auto-select based on peer count.
 
 ## Message Protocol
 
-| Message Type | Purpose |
-|--------------|---------|
-| `operations` | Batch of CRDT ops |
-| `syncRequest` | Request ops since HLC |
-| `syncResponse` | Response with ops |
-| `presence` | Cursor, selection, name |
-| `hello` | Initial handshake |
-| `ping/pong` | Keep-alive |
+See `docs/sync-protocol.md` for the complete wire format specification.
+
+| Message Type | Channel | Purpose |
+|--------------|---------|---------|
+| `hello` | operations | Initial handshake, exchange HLC and op count |
+| `sync-request` | operations | Request ops since HLC |
+| `sync-response` | operations | Response with requested ops |
+| `operations` | operations | Batch of CRDT ops (real-time broadcast) |
+| `ack` | operations | Acknowledge received ops |
+| `ping/pong` | operations | Latency measurement |
+| `presence` | presence | Cursor, selection, editing state |
 
 ## Sync Protocol
 
 ```
 Initial connection:
-  A ── hello(hlc=100) ──► B
-  A ◄─ hello(hlc=150) ─── B
-  A ── syncRequest(100) ─► B    // "Send me ops since my clock"
-  A ◄─ syncResponse([...]) ── B
+  A ── hello(hlc=100, op_count=5) ──► B
+  A ◄─ hello(hlc=150, op_count=8) ─── B
+  A ── sync-request(since=100) ──────► B    // "Send me ops since my clock"
+  A ◄─ sync-response([...]) ────────── B
 
 Ongoing:
-  A ── operations([op]) ──► B   // Real-time as user edits
+  A ── operations(batch=[op]) ──────► B   // Real-time as user edits
+  A ◄─ ack(hlc=...) ────────────────── B   // Confirm receipt
 ```
 
 ## Offline & Reconnection
@@ -199,21 +206,26 @@ The main entry point for sync functionality:
 ```cpp
 #include "core/net/include/SyncClient.h"
 
-// Create sync client with callbacks
-auto sync = SyncClient::create();
+// Create sync client for a workbook
+SyncClientConfig config;
+config.signaling_url = "wss://cells.example.com/ws";
+auto sync = std::make_unique<SyncClient>(workbook, config);
 sync->setDelegate(myDelegate);
 
-// Connect to a room
-sync->connect("wss://cells.example.com", "room-id", "my-peer-id");
+// Start sync (joins room, connects to peers)
+sync->startSync("room-id", "my-peer-id");  // peer_id auto-generated if empty
 
 // Check state
-SyncState state = sync->getState();  // DISCONNECTED, CONNECTING, CONNECTED
+SyncClientState state = sync->getState();  // OFFLINE, CONNECTING, SYNCING, ONLINE, RECONNECTING
 
-// Push local operations
-sync->pushOperations(operations);
+// Broadcast local operations after editing
+sync->broadcastOperations();
 
-// Disconnect
-sync->disconnect();
+// Process outgoing messages (call periodically)
+sync->processOutgoing();
+
+// Stop sync and disconnect
+sync->stopSync();
 ```
 
 ### SyncClientDelegate
@@ -222,14 +234,16 @@ Implement to receive sync events:
 
 ```cpp
 class MySyncDelegate : public SyncClientDelegate {
-    void syncClientStateDidChange(SyncClient* client, SyncState state) override;
-    void syncClientPeerDidJoin(SyncClient* client, const std::string& peerId) override;
-    void syncClientPeerDidLeave(SyncClient* client, const std::string& peerId) override;
-    void syncClientDidReceiveOperations(SyncClient* client,
-                                         const std::vector<Operation>& ops) override;
-    void syncClientPresenceDidChange(SyncClient* client,
-                                      const std::string& peerId,
-                                      const PresenceData& presence) override;
+    void syncClientStateDidChange(SyncClient& client, SyncClientState state) override;
+    void syncClientPeerDidChange(SyncClient& client, const PeerInfo& peer) override;
+    void syncClientPeerDidDisconnect(SyncClient& client, const std::string& peer_id) override;
+    void syncClientDataDidChange(SyncClient& client) override;  // Trigger UI refresh
+    void syncClientDidError(SyncClient& client, const std::string& error) override;
+    void syncClientLatencyDidUpdate(SyncClient& client, const std::string& peer_id,
+                                    int latency_ms) override;
+    void syncClientPresenceDidUpdate(SyncClient& client, const std::string& peer_id,
+                                     const PresenceData& presence) override;
+    void syncClientPresenceDidRemove(SyncClient& client, const std::string& peer_id) override;
 };
 ```
 
@@ -240,18 +254,32 @@ Manages cursor/selection presence:
 ```cpp
 #include "core/net/include/Presence.h"
 
-// Update local presence (called on cursor move)
-PresenceData presence;
-presence.cursor_cell = "abc123";
-presence.selection_start = "abc123";
-presence.selection_end = "def456";
-presenceManager->updateLocalPresence(presence);
+// Get presence manager from sync client
+PresenceManager* presence = syncClient->getPresenceManager();
+
+// Update local presence (called on cursor/selection changes)
+presence->setCurrentSheet("sheet123");
+presence->setCursor(0, 0);  // col, row (zero-based)
+presence->setSelection({0, 0}, {5, 10});  // start, end
+presence->setMousePosition(150.5, 200.0);  // x, y
+presence->setEditing(0, 0, "=SUM(");  // col, row, text
+
+// Clear presence states
+presence->clearCursor();
+presence->clearSelection();
+presence->clearMousePosition();
+presence->clearEditing();
 
 // Get remote presences
-auto remotes = presenceManager->getRemotePresences();
+auto remotes = presence->getRemotePeers();
 for (const auto& [peerId, data] : remotes) {
-    // Render remote cursor at data.cursor_cell
+    if (data.has_cursor) {
+        // Render remote cursor at (data.cursor.col, data.cursor.row)
+    }
 }
+
+// Get peers on a specific sheet
+auto peersOnSheet = presence->getPeersOnSheet("sheet123");
 ```
 
 ## Platform Libraries
@@ -259,5 +287,6 @@ for (const auto& [peerId, data] : remotes) {
 | Platform | Library | Notes |
 |----------|---------|-------|
 | iOS/macOS | [stasel/WebRTC](https://github.com/stasel/WebRTC) | BSD-3 license, prebuilt XCFramework |
-| Web | Native RTCPeerConnection | Via Emscripten bindings |
-| All | `core/net/` | Cross-platform C++ abstraction |
+| Web | Native RTCPeerConnection | Via Emscripten bindings (`core/net/web/`) |
+| Native | [libdatachannel](https://github.com/paullouisageneau/libdatachannel) | C++ WebRTC implementation (`core/net/native/`) |
+| All | `core/net/` | Cross-platform C++ abstraction layer |
