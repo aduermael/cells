@@ -549,8 +549,8 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
                 applyOperation(*_workbook, cellOp);
             }
 
-            // Now resolve with existingOnly=true (all entities should exist)
-            ResolveResult resolveResult = resolver.resolve(ast.get(), true);
+            // Now resolve (all entities should exist)
+            ResolveResult resolveResult = resolver.resolve(ast.get());
 
             if (resolveResult.success) {
                 // Serialize AST to UUID format for storage
@@ -721,8 +721,8 @@ std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::strin
                 applyOperation(*_workbook, cellOp);
             }
 
-            // Now resolve with existingOnly=true (all entities should exist)
-            ResolveResult resolveResult = resolver.resolve(ast.get(), true);
+            // Now resolve (all entities should exist)
+            ResolveResult resolveResult = resolver.resolve(ast.get());
 
             if (resolveResult.success) {
                 // Serialize AST to UUID format for storage

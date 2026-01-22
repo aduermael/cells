@@ -275,8 +275,8 @@ std::string CellsEngine::getFormulaReferences(const std::string& formulaText) {
         applyOperation(*_workbook, cellOp);
     }
 
-    // Now resolve with existingOnly=true (all entities should exist)
-    ResolveResult result = resolver.resolve(ast.get(), true);
+    // Now resolve (all entities should exist)
+    ResolveResult result = resolver.resolve(ast.get());
 
     broadcastPendingOperations();
 

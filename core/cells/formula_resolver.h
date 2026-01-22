@@ -12,17 +12,12 @@
 // - Detect volatile functions (NOW, RAND, etc.)
 // - Identify entities needed for formula resolution (getRequiredEntities)
 //
-// CRDT-Compliant Resolution (recommended):
+// CRDT-Compliant Resolution:
 // 1. Parse formula text -> AST (via FormulaParser)
 // 2. Discover required entities (getRequiredEntities)
 // 3. Create missing entities via applyOperation()
-// 4. Resolve AST refs -> UUIDs (resolve with existingOnly=true)
+// 4. Resolve AST refs -> UUIDs (resolve)
 // 5. Serialize AST -> UUID formula text (via FormulaSerializer)
-//
-// Legacy Resolution (for file loading only):
-// 1. Parse formula text -> AST (via FormulaParser)
-// 2. Resolve AST refs -> UUIDs (resolve with existingOnly=false)
-// 3. Serialize AST -> UUID formula text (via FormulaSerializer)
 //
 // Dependencies: formula_ast.h, formula_display.h, model.h, named_ranges.h
 // Used by: bindings.cc (cell editing), bindings_file.cc (XLSX import)
@@ -143,14 +138,10 @@ public:
     // Resolve all references in an AST
     // Modifies the AST in place, filling in UUID fields
     //
-    // When existingOnly=true (default, CRDT-compliant):
-    // - Returns error if any referenced entity doesn't exist
-    // - Use with getRequiredEntities() for CRDT-compatible resolution
-    // - Caller should create entities via applyOperation() before calling resolve()
-    // When existingOnly=false (legacy mode for file loading only):
-    // - Auto-creates entities directly (bypasses CRDT)
-    // - Only use for XLSX import where collaboration hasn't started
-    ResolveResult resolve(ASTNode* ast, bool existingOnly = true);
+    // Returns error if any referenced entity doesn't exist.
+    // Use with getRequiredEntities() for CRDT-compatible resolution:
+    // caller should create entities via applyOperation() before calling resolve()
+    ResolveResult resolve(ASTNode* ast);
 
     // Extract all references from a resolved AST
     // Used for UI highlighting and dependency tracking
@@ -212,11 +203,9 @@ private:
     Workbook& _workbook;
     Sheet& _sheet;
     NamedRangeRegistry* _namedRanges;
-    bool _existingOnly{false};  // When true, don't create entities; return error instead
 };
 
 // Note: FormulaDisplayConverter is now in formula_display.h
-// It's included above for backward compatibility with existing code
 
 }  // namespace cells
 

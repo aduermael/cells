@@ -273,8 +273,8 @@ FillCellInfo getFillValueNonNumeric(const DetectedPattern& pattern, int index, i
                 applyOperation(*workbook, cellOp);
             }
 
-            // Now resolve with existingOnly=true (all entities should exist)
-            resolver.resolve(adjustedAST.get(), true);
+            // Now resolve (all entities should exist)
+            resolver.resolve(adjustedAST.get());
 
             // Serialize to UUID format for CRDT storage
             info.value = FormulaSerializer::serialize(adjustedAST.get());

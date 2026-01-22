@@ -777,8 +777,7 @@ TEST_F(FormulaResolverTest, ExistingOnlyMode_FailsOnMissingCell) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    // Use existingOnly=true (CRDT-compliant mode)
-    auto result = resolver.resolve(ast.get(), true);
+    auto result = resolver.resolve(ast.get());
 
     // Should fail because cell doesn't exist
     EXPECT_FALSE(result.success);
@@ -790,8 +789,7 @@ TEST_F(FormulaResolverTest, ExistingOnlyMode_SucceedsWithExistingCell) {
     ASSERT_NE(ast, nullptr);
 
     FormulaResolver resolver(*workbook, *sheet1);
-    // Use existingOnly=true (CRDT-compliant mode)
-    auto result = resolver.resolve(ast.get(), true);
+    auto result = resolver.resolve(ast.get());
 
     // Should succeed because cell exists
     EXPECT_TRUE(result.success);
@@ -804,7 +802,7 @@ TEST_F(FormulaResolverTest, TwoPhaseApproach_CreateThenResolve) {
     // Verify the CRDT-compliant two-phase approach works:
     // 1. Get required entities
     // 2. Create entities manually
-    // 3. Resolve with existingOnly=true
+    // 3. Resolve
 
     // A2 doesn't exist
     EXPECT_EQ(sheet1->getCellAt(colAId, row2Id), nullptr);
@@ -822,8 +820,8 @@ TEST_F(FormulaResolverTest, TwoPhaseApproach_CreateThenResolve) {
     auto newCell = std::make_unique<Cell>(required.cells[0].id, colAId, row2Id);
     sheet1->addCell(std::move(newCell));
 
-    // Phase 3: Resolve with existingOnly=true should now succeed
-    auto result = resolver.resolve(ast.get(), true);
+    // Phase 3: Resolve should now succeed
+    auto result = resolver.resolve(ast.get());
     EXPECT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
 
     // Cell reference should point to the created cell

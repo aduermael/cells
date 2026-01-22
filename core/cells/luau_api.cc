@@ -346,8 +346,8 @@ int LuauSandbox::luaCellSet(lua_State* L) {
                     applyOperation(*workbook, cellOp);
                 }
 
-                // Now resolve with existingOnly=true (all entities should exist)
-                const ResolveResult resolveRes = resolver.resolve(ast.get(), true);
+                // Now resolve (all entities should exist)
+                const ResolveResult resolveRes = resolver.resolve(ast.get());
                 if (!resolveRes.success) {
                     // Resolution failed - use fallback
                     RefConverter conv;

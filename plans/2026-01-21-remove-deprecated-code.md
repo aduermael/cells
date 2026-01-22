@@ -33,10 +33,10 @@ The `existingOnly=false` parameter is only used for XLSX import. Replace with pr
 
 - [x] 2a: Update `bindings_file.cc` XLSX import to use `getRequiredEntities()` + create entities + resolve instead of legacy mode
 - [x] 2b: Updated 13 test files to use `existingOnly=true` with helper functions that create required entities before resolution
-- [ ] 2c: Remove the `existingOnly` parameter from `FormulaResolver::resolve()` (always enforce existing-only mode)
-- [ ] 2d: Remove legacy entity auto-creation code from `formula_resolver.cc`
-- [ ] 2e: Update `formula_resolver.h` documentation (remove "Legacy Resolution" section)
-- [ ] 2f: Run tests and fix any failures
+- [x] 2c: Remove the `existingOnly` parameter from `FormulaResolver::resolve()` - removed parameter, `_existingOnly` member, and all call sites using explicit `true`
+- [x] 2d: Remove legacy entity auto-creation code from `formula_resolver.cc` - removed all `_existingOnly` branches that called `getOrCreate*` methods
+- [x] 2e: Update `formula_resolver.h` documentation - removed "Legacy Resolution" section and updated comments
+- [x] 2f: Run tests and fix any failures - all 313 E2E tests pass, all core unit tests pass
 
 ### Phase 3: Remove Deprecated Luau API Methods
 

@@ -421,8 +421,8 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
                         applyOperation(*workbook, cellOp);
                     }
 
-                    // Phase 2: Resolve with existing entities only
-                    const ResolveResult resolveRes = resolver.resolve(ast.get(), true);
+                    // Phase 2: Resolve with existing entities
+                    const ResolveResult resolveRes = resolver.resolve(ast.get());
                     if (!resolveRes.success) {
                         // Resolution failed (e.g., sheet not found) - use fallback
                         RefConverter conv;
