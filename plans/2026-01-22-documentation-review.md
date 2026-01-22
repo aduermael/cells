@@ -52,7 +52,7 @@ Review and update all documentation files to accurately reflect current codebase
 
 ## Phase 5: Networking and Sync Documentation
 
-- [ ] 5a: Review `docs/sync-protocol.md` - verify protocol against `core/net/` implementation
+- [x] 5a: Review `docs/sync-protocol.md` - fixed op field name (type→op), operations batch (operations→batch), ping/pong field (timestamp→ts), added hello peer_id field, added ack message type, fixed presence format (uses null not has_* flags, integer indices not ID strings), added editing field, fixed throttle rate (30→5/sec), added peer-list/error message formats, added all operation codes, added workbook/format/named range ops
 - [ ] 5b: Review `docs/networking.md` - verify WebRTC implementation details
 
 ## Phase 6: UI and Platform Documentation
