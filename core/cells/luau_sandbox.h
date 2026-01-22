@@ -179,9 +179,6 @@ private:
     // Output operations
     static int luaPrint(lua_State* L);
 
-    // Cell object methods (called on cell tables via __index)
-    static int luaCellGetRef(lua_State* L);
-
     // Helper: Get context from registry
     static Workbook* getWorkbook(lua_State* L);
     static Sheet* getSheet(lua_State* L);

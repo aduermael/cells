@@ -1038,47 +1038,6 @@ void LuauSandbox::pushSheetObject(lua_State* L, Sheet* sheet) const {
 }
 
 // ============================================================================
-// Cell object method: getRef() - DEPRECATED, use .ref property
-// Kept for backward compatibility during transition
-// Returns the current A1 reference for the cell
-// ============================================================================
-int LuauSandbox::luaCellGetRef(lua_State* L) {
-    // Get the cell UUID from the table
-    lua_getfield(L, 1, "_uuid");
-    if (lua_isstring(L, -1) == 0) {
-        luaL_error(L, "getRef: invalid cell object");
-    }
-    const char* uuidStr = lua_tostring(L, -1);
-    lua_pop(L, 1);
-
-    // NOLINTBEGIN(misc-const-correctness) - Sheet methods not const-correct
-    Sheet* sheet = getSheet(L);
-    if (sheet == nullptr) {
-        luaL_error(L, "getRef: no context set");
-    }
-
-    const ID cellId(uuidStr);
-    Cell* cell = sheet->getCell(cellId);
-    if (cell == nullptr) {
-        luaL_error(L, "getRef: cell not found");
-    }
-
-    // Get the cell's current position
-    Axis* col = sheet->getColumn(cell->colId);
-    Axis* row = sheet->getRow(cell->rowId);
-    // NOLINTEND(misc-const-correctness)
-    if (col == nullptr || row == nullptr) {
-        luaL_error(L, "getRef: cell position not found");
-    }
-
-    // Convert to A1 notation
-    const std::string a1Ref =
-        RefConverter::columnIndexToLetter(col->position) + std::to_string(row->position + 1);
-    lua_pushstring(L, a1Ref.c_str());
-    return 1;
-}
-
-// ============================================================================
 // Helper: Create and push a cell object
 // Cell objects only store _uuid - all properties (value, formula, ref) are
 // fetched dynamically from the Workbook via __index metamethod

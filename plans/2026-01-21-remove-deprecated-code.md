@@ -40,9 +40,9 @@ The `existingOnly=false` parameter is only used for XLSX import. Replace with pr
 
 ### Phase 3: Remove Deprecated Luau API Methods
 
-- [ ] 3a: Remove `luaCellGetRef()` method from `luau_types.cc` (users should use `.ref` property)
-- [ ] 3b: Update Luau Cell metatable to not register `getRef` method
-- [ ] 3c: Run tests and fix any failures (update any tests using getRef())
+- [x] 3a: Remove `luaCellGetRef()` method from `luau_types.cc` (users should use `.ref` property) - removed function definition and header declaration
+- [x] 3b: Update Luau Cell metatable to not register `getRef` method - no change needed, method was never registered (only declared but unused)
+- [x] 3c: Run tests and fix any failures - all tests pass, no tests were using getRef()
 
 ### Phase 4: Remove Deprecated Bindings and Dead Code
 
