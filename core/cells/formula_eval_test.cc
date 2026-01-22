@@ -52,9 +52,12 @@ protected:
             return EvalResult::Error(CellError::VALUE);
         }
 
-        // Resolve references
+        // Create any missing entities before resolution
         FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
-        resolver.resolve(ast.get(), false);  // legacy mode for tests
+        createRequiredEntities(resolver, ast.get());
+
+        // Resolve references
+        resolver.resolve(ast.get());
 
         // Evaluate
         std::unordered_set<ID> evaluating;
@@ -66,6 +69,52 @@ protected:
         ctx.recursionDepth = 0;
 
         return evaluate(ast.get(), ctx);
+    }
+
+    // Helper to create missing entities before resolution
+    void createRequiredEntities(FormulaResolver& resolver, ASTNode* ast) {
+        RequiredEntities required = resolver.getRequiredEntities(ast);
+
+        // Helper to find sheet by ID
+        auto getSheet = [this](const ID& sheetId) -> Sheet* {
+            for (auto& s : workbook->sheets) {
+                if (s->id == sheetId)
+                    return s.get();
+            }
+            return nullptr;
+        };
+
+        // Create cells - axes already exist in SetUp()
+        for (const auto& pendingCell : required.cells) {
+            Sheet* targetSheet = getSheet(pendingCell.sheetId);
+            if (!targetSheet)
+                continue;
+
+            auto findColPos = [&required, targetSheet](const ID& colId) -> uint32_t {
+                for (const auto& c : required.columns) {
+                    if (c.id == colId)
+                        return c.position;
+                }
+                const Axis* axis = targetSheet->getColumn(colId);
+                return axis ? axis->position : 0;
+            };
+            auto findRowPos = [&required, targetSheet](const ID& rowId) -> uint32_t {
+                for (const auto& r : required.rows) {
+                    if (r.id == rowId)
+                        return r.position;
+                }
+                const Axis* axis = targetSheet->getRow(rowId);
+                return axis ? axis->position : 0;
+            };
+
+            uint32_t colPos = findColPos(pendingCell.colId);
+            uint32_t rowPos = findRowPos(pendingCell.rowId);
+            const Axis* col = targetSheet->getColumnByPosition(colPos);
+            const Axis* row = targetSheet->getRowByPosition(rowPos);
+            if (col && row) {
+                targetSheet->getOrCreateCellAt(col->id, row->id);
+            }
+        }
     }
 
     // Set a cell value at a given column/row position (0-indexed)
@@ -108,7 +157,8 @@ protected:
         auto ast = parser.parse();
         if (ast && !parser.hasErrors()) {
             FormulaResolver resolver(*workbook, *sheet);
-            resolver.resolve(ast.get(), false);  // legacy mode for tests
+            createRequiredEntities(resolver, ast.get());
+            resolver.resolve(ast.get());
             sheet->setCellFormula(cell->id, formula, ast.release());
         }
 
@@ -1589,7 +1639,7 @@ TEST_F(FormulaEvalTest, CrossSheetCellRef_Evaluates) {
 
     // Resolve - this should find Sheet2 and set cellId (but NOT sheetId)
     FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
-    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
+    auto result = resolver.resolve(ast.get());
     ASSERT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
 
     // The AST should be a CellRefNode - sheetId should NOT be set (cells are globally unique)
@@ -1650,7 +1700,7 @@ TEST_F(FormulaEvalTest, CrossSheetRange_SUMEvaluates) {
     ASSERT_FALSE(parser.hasErrors());
 
     FormulaResolver resolver(*workbook, *sheet, workbook->getNamedRanges());
-    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
+    auto result = resolver.resolve(ast.get());
     ASSERT_TRUE(result.success) << "Resolution failed: " << result.errorMessage;
 
     std::unordered_set<ID> evaluating;

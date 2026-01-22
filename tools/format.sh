@@ -7,16 +7,7 @@
 #   bazel run :format -- FILE...  # Format specific files
 
 set -euo pipefail
-
-# Use Bazel's workspace directory if available (when run via bazel run)
-# Otherwise fall back to script location (when run directly)
-if [ -n "${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
-    REPO_ROOT="$BUILD_WORKSPACE_DIRECTORY"
-    SCRIPT_DIR="$REPO_ROOT/tools"
-else
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/guard.sh"
 
 # Colors for output
 RED='\033[0;31m'

@@ -76,7 +76,8 @@ protected:
         }
 
         FormulaResolver resolver(*workbook, *sheet);
-        resolver.resolve(ast.get(), false);  // legacy mode for tests
+        createRequiredEntities(resolver, ast.get());
+        resolver.resolve(ast.get());
 
         auto result = sheet->setCellFormula(cell->id, formula, ast.release());
         if (!result.success) {
@@ -84,6 +85,36 @@ protected:
         }
 
         return cell;
+    }
+
+    // Helper to create missing entities before resolution
+    void createRequiredEntities(FormulaResolver& resolver, ASTNode* ast) {
+        RequiredEntities required = resolver.getRequiredEntities(ast);
+        for (const auto& pendingCell : required.cells) {
+            auto findColPos = [&required, this](const ID& colId) -> uint32_t {
+                for (const auto& c : required.columns) {
+                    if (c.id == colId)
+                        return c.position;
+                }
+                const Axis* axis = sheet->getColumn(colId);
+                return axis ? axis->position : 0;
+            };
+            auto findRowPos = [&required, this](const ID& rowId) -> uint32_t {
+                for (const auto& r : required.rows) {
+                    if (r.id == rowId)
+                        return r.position;
+                }
+                const Axis* axis = sheet->getRow(rowId);
+                return axis ? axis->position : 0;
+            };
+            uint32_t colPos = findColPos(pendingCell.colId);
+            uint32_t rowPos = findRowPos(pendingCell.rowId);
+            const Axis* c = sheet->getColumnByPosition(colPos);
+            const Axis* r = sheet->getRowByPosition(rowPos);
+            if (c && r) {
+                sheet->getOrCreateCellAt(c->id, r->id);
+            }
+        }
     }
 
     // Get cell value as double (assumes it's a number)
@@ -1122,7 +1153,7 @@ TEST_F(FormulaRecalcTest, CrossSheetDependency) {
     ASSERT_FALSE(parser.hasErrors());
 
     FormulaResolver resolver(*workbook, *sheet);
-    ResolveResult resolveResult = resolver.resolve(ast.get(), false);  // legacy mode for tests
+    ResolveResult resolveResult = resolver.resolve(ast.get());
     ASSERT_TRUE(resolveResult.success);
 
     // Set the formula on sheet1B1
@@ -1194,7 +1225,7 @@ TEST_F(FormulaRecalcTest, CrossSheetRangeDependency) {
     ASSERT_FALSE(parser.hasErrors());
 
     FormulaResolver resolver(*workbook, *sheet);
-    ResolveResult resolveResult = resolver.resolve(ast.get(), false);  // legacy mode for tests
+    ResolveResult resolveResult = resolver.resolve(ast.get());
     ASSERT_TRUE(resolveResult.success);
 
     auto result = sheet->setCellFormula(sheet1B1->id, "=SUM(Sheet2!A1:A3)", ast.release());

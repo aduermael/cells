@@ -2,6 +2,34 @@ load("@emsdk//emscripten_toolchain:wasm_rules.bzl", "wasm_cc_binary")
 
 package(default_visibility = ["//visibility:public"])
 
+# Build guard: prevents direct `bazel build //apps/wasm` commands
+# The wrapper scripts (bazel run :wasm-dist, etc.) pass --define=CELLS_INTERNAL=1
+config_setting(
+    name = "_internal_build",
+    define_values = {"CELLS_INTERNAL": "1"},
+)
+
+# This genrule produces an empty source file that's required by the build.
+# It fails with a helpful error if CELLS_INTERNAL=1 is not defined.
+genrule(
+    name = "_build_guard",
+    outs = ["_build_guard.cc"],
+    cmd = select({
+        ":_internal_build": "echo '// Build guard passed' > $@",
+        "//conditions:default": """
+echo "" >&2
+echo "Error: Do not build //apps/wasm targets directly." >&2
+echo "" >&2
+echo "Use one of these commands instead:" >&2
+echo "  bazel run :wasm-dist   # Build optimized WASM for production" >&2
+echo "  bazel run :wasm-debug  # Build WASM with debug symbols" >&2
+echo "  bazel run :wasm        # Build WASM for development" >&2
+echo "" >&2
+exit 1
+""",
+    }),
+)
+
 # Common Emscripten linker options for the cells WASM build
 EMSCRIPTEN_LINKOPTS = [
     "--bind",  # Enable Embind for C++/JavaScript interop
@@ -21,7 +49,10 @@ EMSCRIPTEN_LINKOPTS = [
 # Hello world test binary
 cc_binary(
     name = "hello_wasm_bin",
-    srcs = ["hello.cc"],
+    srcs = [
+        "hello.cc",
+        ":_build_guard",
+    ],
     linkopts = EMSCRIPTEN_LINKOPTS,
 )
 
@@ -44,6 +75,7 @@ cc_binary(
         "bindings_formula.cc",
         "bindings_luau.cc",
         "bindings_viewport.cc",
+        ":_build_guard",
     ],
     linkopts = EMSCRIPTEN_LINKOPTS + [
         "-s SINGLE_FILE=0",  # Keep .wasm separate for better caching

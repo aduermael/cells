@@ -50,9 +50,10 @@ protected:
             return EvalResult::Error(CellError::VALUE);
         }
 
-        // Resolve references
+        // Create missing entities and resolve references
         FormulaResolver resolver(*workbook, *sheet);
-        resolver.resolve(ast.get(), false);  // legacy mode for tests
+        createRequiredEntities(resolver, ast.get());
+        resolver.resolve(ast.get());
 
         // Evaluate
         std::unordered_set<ID> evaluating;
@@ -63,6 +64,36 @@ protected:
         ctx.recursionDepth = 0;
 
         return evaluate(ast.get(), ctx);
+    }
+
+    // Helper to create missing entities before resolution
+    void createRequiredEntities(FormulaResolver& resolver, ASTNode* ast) {
+        RequiredEntities required = resolver.getRequiredEntities(ast);
+        for (const auto& pendingCell : required.cells) {
+            auto findColPos = [&required, this](const ID& colId) -> uint32_t {
+                for (const auto& c : required.columns) {
+                    if (c.id == colId)
+                        return c.position;
+                }
+                const Axis* axis = sheet->getColumn(colId);
+                return axis ? axis->position : 0;
+            };
+            auto findRowPos = [&required, this](const ID& rowId) -> uint32_t {
+                for (const auto& r : required.rows) {
+                    if (r.id == rowId)
+                        return r.position;
+                }
+                const Axis* axis = sheet->getRow(rowId);
+                return axis ? axis->position : 0;
+            };
+            uint32_t colPos = findColPos(pendingCell.colId);
+            uint32_t rowPos = findRowPos(pendingCell.rowId);
+            const Axis* col = sheet->getColumnByPosition(colPos);
+            const Axis* row = sheet->getRowByPosition(rowPos);
+            if (col && row) {
+                sheet->getOrCreateCellAt(col->id, row->id);
+            }
+        }
     }
 
     // Set a cell value (number)

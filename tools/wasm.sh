@@ -2,18 +2,11 @@
 # Build WASM module for development
 # Output: dist/wasm/
 set -euo pipefail
-
-# Use Bazel's workspace directory if available (when run via bazel run)
-# Otherwise fall back to script location (when run directly)
-if [ -n "${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
-    REPO_ROOT="$BUILD_WORKSPACE_DIRECTORY"
-else
-    REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/guard.sh"
 cd "$REPO_ROOT"
 
 echo "Building WASM module..."
-bazel build --config=wasm //apps/wasm:cells_wasm
+bazel build --config=wasm --define=CELLS_INTERNAL=1 //apps/wasm:cells_wasm
 
 echo "Creating dist/wasm directory..."
 rm -rf dist/wasm

@@ -5,14 +5,7 @@
 #          selection, script, collab, initial-sync, collab-demo, collab-style-sync
 #          or omit to run all tests (default)
 set -euo pipefail
-
-# Use Bazel's workspace directory if available (when run via bazel run)
-# Otherwise fall back to script location (when run directly)
-if [ -n "${BUILD_WORKSPACE_DIRECTORY:-}" ]; then
-    REPO_ROOT="$BUILD_WORKSPACE_DIRECTORY"
-else
-    REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-fi
+source "$(dirname "${BASH_SOURCE[0]}")/guard.sh"
 cd "$REPO_ROOT"
 
 # Auto-detect available cores

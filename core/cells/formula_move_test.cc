@@ -69,7 +69,7 @@ bool setResolvedFormula(Workbook& wb, Sheet& sheet, const ID& cellId,
     }
 
     FormulaResolver resolver(wb, sheet, wb.getNamedRanges());
-    auto result = resolver.resolve(ast.get(), false);  // legacy mode for tests
+    auto result = resolver.resolve(ast.get());
     if (!result.success) {
         return false;
     }

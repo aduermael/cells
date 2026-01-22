@@ -51,9 +51,40 @@ protected:
         auto ast = parser.parse();
         if (ast) {
             FormulaResolver resolver(*workbook_, *sheet_, &registry_);
-            resolver.resolve(ast.get(), false);  // legacy mode for tests
+            createRequiredEntities(resolver, ast.get());
+            resolver.resolve(ast.get());
         }
         return ast;
+    }
+
+    // Helper to create missing entities before resolution
+    void createRequiredEntities(FormulaResolver& resolver, ASTNode* ast) {
+        RequiredEntities required = resolver.getRequiredEntities(ast);
+        for (const auto& pendingCell : required.cells) {
+            auto findColPos = [&required, this](const ID& colId) -> uint32_t {
+                for (const auto& c : required.columns) {
+                    if (c.id == colId)
+                        return c.position;
+                }
+                const Axis* axis = sheet_->getColumn(colId);
+                return axis ? axis->position : 0;
+            };
+            auto findRowPos = [&required, this](const ID& rowId) -> uint32_t {
+                for (const auto& r : required.rows) {
+                    if (r.id == rowId)
+                        return r.position;
+                }
+                const Axis* axis = sheet_->getRow(rowId);
+                return axis ? axis->position : 0;
+            };
+            uint32_t colPos = findColPos(pendingCell.colId);
+            uint32_t rowPos = findRowPos(pendingCell.rowId);
+            const Axis* col = sheet_->getColumnByPosition(colPos);
+            const Axis* row = sheet_->getRowByPosition(rowPos);
+            if (col && row) {
+                sheet_->getOrCreateCellAt(col->id, row->id);
+            }
+        }
     }
 
     // Create a cell at (col, row) with the given formula
