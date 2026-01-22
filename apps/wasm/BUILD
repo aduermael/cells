@@ -46,21 +46,6 @@ EMSCRIPTEN_LINKOPTS = [
     "-s DISABLE_EXCEPTION_CATCHING=0",  # Enable exception catching in WASM
 ]
 
-# Hello world test binary
-cc_binary(
-    name = "hello_wasm_bin",
-    srcs = [
-        "hello.cc",
-        ":_build_guard",
-    ],
-    linkopts = EMSCRIPTEN_LINKOPTS,
-)
-
-wasm_cc_binary(
-    name = "hello_wasm",
-    cc_target = ":hello_wasm_bin",
-)
-
 # Main cells WASM binary with full bindings including XLSX support
 # Requires --config=wasm to enable exceptions for pugixml dependency
 cc_binary(

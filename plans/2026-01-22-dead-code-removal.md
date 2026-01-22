@@ -42,7 +42,7 @@ Remove unused code to keep the codebase lean during early development. This foll
 - [x] 2a: Remove `getSelectedCellData` from `StyleControlsCallbacks` interface in `apps/wasm/src/style-controls.ts` - Removed unused callback and its invocation in init-components.ts. The callback was replaced by getEffectiveCellStyle which resolves the full style hierarchy.
 
 ## Phase 3: Remove hello.cc demo file
-- [ ] 3a: Remove `apps/wasm/hello.cc` and its BUILD target `hello_wasm`
+- [x] 3a: Remove `apps/wasm/hello.cc` and its BUILD target `hello_wasm` - Deleted the demo hello world WASM file and removed hello_wasm_bin and hello_wasm targets from BUILD.
 
 ## Phase 4: Standardize ZCD format documentation
 - [ ] 4a: Update docs to use `#cells v1` consistently (matching existing practice)
