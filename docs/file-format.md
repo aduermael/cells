@@ -36,22 +36,19 @@ D <doc-id> "<name>"                 # Document declaration
 
 S <sheet-id> "<name>"               # Sheet declaration
 #cols                               # Columns section marker
-C <id> <position> [props...]        # Column definitions
+C <id> <position> [props...] [sty:<base64>]  # Column definitions
 #rows                               # Rows section marker
-R <id> <position> [props...]        # Row definitions
+R <id> <position> [props...] [sty:<base64>]  # Row definitions
 #cells                              # Cells section marker
-X <id> <col> <row> <type> <value>   # Cell definitions
-
-#styles                             # Style definitions (future)
-T <id> <properties...>
-#cell-styles                        # Cell-style mappings (future)
-Y <cell-id> <style-ids>
+X <id> <col> <row> <type> <value> [sty:<base64>]  # Cell definitions
+#ranges                             # Range definitions marker
+RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<base64>]
 
 #oplog                              # Operation log section
 O <hlc> <op-type> <target-id> <payload>
 ```
 
-Multiple sheets repeat the `S`, `#cols`, `C`, `#rows`, `R`, `#cells`, `X` pattern.
+Multiple sheets repeat the `S`, `#cols`, `C`, `#rows`, `R`, `#cells`, `X`, `#ranges`, `RG` pattern.
 
 ## Entity Types
 
@@ -131,21 +128,80 @@ Defines a cell value at a specific column/row intersection.
 
 See [Cell Types](#cell-types) for details.
 
-### Style (T) - Future
+### Range (RG)
 
-Defines a reusable style.
+Defines a styled range spanning multiple cells.
 
-**Format:** `T <id> <properties...>`
+**Format:** `RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<base64>]`
 
-**Status:** Reserved for future implementation.
+**Fields:**
+- `id`: 8-character base62 range identifier
+- `start_col`, `start_row`: IDs of top-left corner
+- `end_col`, `end_row`: IDs of bottom-right corner
+- `flags`: Range flags bitmap (1=STYLE, 2=MERGE, etc.)
+- `sty:<base64>`: Optional content-addressed style (see [Content-Addressed Styles](#content-addressed-styles))
 
-### Cell-Style Mapping (Y) - Future
+**Example:**
+```
+RG rGfH3jK2 cA1bC2dE rA1bC2dE cB3dE4fG rB3dE4fG 1 sty:BECA+78k
+```
 
-Maps a cell to one or more styles.
+## Content-Addressed Styles
 
-**Format:** `Y <cell-id> <style-ids>`
+Styles use a **content-addressed** binary encoding where the style's content IS its identity. This eliminates sync issues with style IDs and enables efficient storage.
 
-**Status:** Reserved for future implementation.
+### Style Property Encoding
+
+Styles are encoded as binary data using a flag-based system:
+
+```
++--------+--------+--------+...
+| Flag 0 | Flag 1 | Props  |
++--------+--------+--------+...
+```
+
+**Flag Byte 0:**
+- Bits 0-1: Flag byte count (always 0b00 = 2 bytes currently)
+- Bit 2: bold present
+- Bit 3: italic present
+- Bit 4: underline present
+- Bit 5: strikethrough present
+- Bit 6: bgColor present
+- Bit 7: textColor present
+
+**Flag Byte 1:**
+- Bit 0: fontSize present
+- Bit 1: fontFamily present
+- Bit 2: horizontalAlign present
+- Bit 3: verticalAlign present
+- Bit 4: textWrap present
+- Bit 5: numberFormat present
+- Bit 6: border present
+- Bit 7: reserved
+
+**Property Data** follows flags in order:
+- Booleans: 1 byte packed (bold, italic, underline, strikethrough, textWrap)
+- Colors: 3 bytes RGB each
+- Font size: 1 byte (value - 6, supports 6-261pt)
+- Font family: 1 byte length + UTF-8 string
+- Alignment: 1 byte (3 bits hAlign, 3 bits vAlign)
+- Number format: 8 bytes format ID
+- Border: 1 byte sides mask + 4 bytes per side (style + RGB)
+
+### Style Examples
+
+```
+# Bold with yellow background
+sty:BECx+78k
+
+# Font size 14, center aligned
+sty:AQUBAQ==
+
+# All four borders with different colors
+sty:QEAPAAAAAAABwP8AAp//AADP/wA=
+```
+
+The base64-encoded style is deterministic: same properties always produce identical bytes, enabling natural deduplication.
 
 ### Operation (O)
 
@@ -292,8 +348,7 @@ Lines beginning with `#` are section markers or comments:
 | `#cols` | Start of columns section |
 | `#rows` | Start of rows section |
 | `#cells` | Start of cells section |
-| `#styles` | Start of styles section |
-| `#cell-styles` | Start of cell-style mappings |
+| `#ranges` | Start of ranges section |
 | `#oplog` | Start of operation log |
 
 Any other line starting with `#` is treated as a comment and ignored.
@@ -322,20 +377,39 @@ Format: `<wall_time>.<logical>.<node_id>`
 
 | Type | Code | Description |
 |------|------|-------------|
-| Cell Operations | | |
+| **Cell Operations** | | |
 | `CELL_SET_VALUE` | 0 | Set cell value |
 | `CELL_CLEAR` | 1 | Clear cell contents |
-| `CELL_SET_STYLE` | 2 | Set cell style |
-| Dimension Operations | | |
-| `DIM_INSERT_AXIS` | 10 | Insert column or row |
-| `DIM_DELETE_AXIS` | 11 | Delete column or row |
-| `DIM_MOVE_AXIS` | 12 | Move column or row |
-| `DIM_RESIZE_AXIS` | 13 | Resize column/row |
-| `DIM_RENAME_AXIS` | 14 | Rename column/row |
-| Sheet Operations | | |
-| `SHEET_CREATE` | 20 | Create sheet |
+| `CELL_SET_STYLE` | 2 | Set cell style (content-addressed) |
+| `CELL_SET_FORMAT` | 3 | Set cell number format |
+| **Column Operations** | | |
+| `COL_INSERT` | 10 | Insert new column |
+| `COL_DELETE` | 11 | Delete column |
+| `COL_MOVE` | 12 | Move column to new position |
+| `COL_RESIZE` | 13 | Resize column width |
+| `COL_RENAME` | 14 | Rename column |
+| **Row Operations** | | |
+| `ROW_INSERT` | 15 | Insert new row |
+| `ROW_DELETE` | 16 | Delete row |
+| `ROW_MOVE` | 17 | Move row to new position |
+| `ROW_RESIZE` | 18 | Resize row height |
+| **Axis Operations** | | |
+| `AXIS_SET_HIDDEN` | 19 | Set axis hidden state |
+| `AXIS_SET_STYLE` | 52 | Set axis default style (content-addressed) |
+| `AXIS_SET_FORMAT` | 53 | Set axis default format |
+| **Sheet Operations** | | |
+| `SHEET_CREATE` | 20 | Create new sheet |
 | `SHEET_DELETE` | 21 | Delete sheet |
 | `SHEET_RENAME` | 22 | Rename sheet |
+| **Named Range Operations** | | |
+| `NAMED_RANGE_DEFINE` | 50 | Define a named range |
+| `NAMED_RANGE_DELETE` | 51 | Delete a named range |
+| **Range Operations** | | |
+| `RANGE_ADD` | 60 | Add a new range |
+| `RANGE_REMOVE` | 61 | Remove a range by ID |
+| `RANGE_UPDATE_CORNERS` | 62 | Update range corners (resize) |
+| `RANGE_UPDATE_FLAGS` | 63 | Update range flags bitmask |
+| `RANGE_SET_STYLE` | 64 | Set range style (content-addressed) |
 
 ### Example
 
@@ -343,11 +417,15 @@ Format: `<wall_time>.<logical>.<node_id>`
 #oplog
 O 1705312200000.0.N3f8hJ2w CELL_SET_VALUE nP6kR2mW {"type":"n","value":"42"}
 O 1705312200001.0.N3f8hJ2w CELL_SET_VALUE hT8sL4xQ {"type":"s","value":"Hello"}
+O 1705312200002.0.N3f8hJ2w CELL_SET_STYLE xA1bC2dE {"style":"BEAB"}
+O 1705312200003.0.N3f8hJ2w RANGE_SET_STYLE rGfH3jK2 {"style":"BECA+78k"}
 ```
+
+Style operations use the content-addressed `"style"` field containing base64-encoded binary style data.
 
 ## Complete Example
 
-A simple spreadsheet with numbers, text, and a formula:
+A simple spreadsheet with numbers, text, a formula, and styles:
 
 ```
 #zcd v1
@@ -357,28 +435,37 @@ S gH5jK6mN "Sheet1"
 
 #cols
 C cA1bC2dE 0
-C cB3dE4fG 1
+C cB3dE4fG 1 w:120 sty:BEAB
 
 #rows
-R rA1bC2dE 0
+R rA1bC2dE 0 sty:BECx+78k
 R rB3dE4fG 1
 R rC5fG6hJ 2
 
 #cells
-X xA1aB2cD cA1bC2dE rA1bC2dE n 10
+X xA1aB2cD cA1bC2dE rA1bC2dE n 10 sty:BEAB
 X xA2aB3cD cA1bC2dE rB3dE4fG n 20
 X xA3aB4cD cA1bC2dE rC5fG6hJ f "=$cA1bC2dE$rA1bC2dE+$cA1bC2dE$rB3dE4fG"
 X xB1bC2dE cB3dE4fG rA1bC2dE s "Values"
 X xB2bC3dE cB3dE4fG rB3dE4fG s "below"
+
+#ranges
+RG rGaB1cD2 cA1bC2dE rA1bC2dE cB3dE4fG rB3dE4fG 1 sty:BECA+78k
 ```
 
 This represents:
 
 |   | A  | B      |
 |---|-------|--------|
-| 1 | 10    | Values |
+| 1 | 10 (bold)   | Values |
 | 2 | 20    | below  |
 | 3 | =A1+A2 |       |
+
+With:
+- Row 1 has a yellow background (sty:BECx+78k)
+- Cell A1 is bold (sty:BEAB)
+- Column B is 120px wide and bold
+- Range A1:B2 has a yellow background
 
 ## Git Merge Behavior
 

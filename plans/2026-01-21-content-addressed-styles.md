@@ -577,7 +577,7 @@ bazel build //core/cells/... 2>&1 | grep -E "error:|warning:" | head -50
 
 ### Phase 11: Documentation and Cleanup
 
-- [ ] 11a: Update architecture documentation
+- [x] 11a: Update architecture documentation - Updated docs/file-format.md and docs/sync-protocol.md with content-addressed style format, new operation types, and examples.
 - [ ] 11b: Remove debug logging added during development
 - [ ] 11c: Final code review and cleanup
 

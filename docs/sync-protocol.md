@@ -252,16 +252,32 @@ Each operation in the sync protocol has the following structure:
 |------|-------------|---------|
 | `CELL_SET_VALUE` | Set cell value | `{"value":"..."}` |
 | `CELL_CLEAR` | Clear cell | `{}` |
-| `CELL_SET_STYLE` | Set cell style | `{"bold":true,"italic":false,...}` |
+| `CELL_SET_STYLE` | Set cell style (content-addressed) | `{"style":"<base64>"}` |
+| `CELL_SET_FORMAT` | Set cell number format | `{"format_id":"..."}` |
 
-#### Axis Operations (Column/Row)
+#### Column Operations
 | Type | Description | Payload |
 |------|-------------|---------|
-| `DIM_INSERT_AXIS` | Insert column/row | `{"dimension":0,"after":"..."}` |
-| `DIM_DELETE_AXIS` | Delete column/row | `{}` |
-| `DIM_MOVE_AXIS` | Move column/row | `{"after":"..."}` |
-| `DIM_RESIZE_AXIS` | Resize width/height | `{"size":100}` |
-| `DIM_RENAME_AXIS` | Rename column/row | `{"name":"..."}` |
+| `COL_INSERT` | Insert column | `{"after":"..."}` |
+| `COL_DELETE` | Delete column | `{}` |
+| `COL_MOVE` | Move column | `{"after":"..."}` |
+| `COL_RESIZE` | Resize width | `{"size":100}` |
+| `COL_RENAME` | Rename column | `{"name":"..."}` |
+
+#### Row Operations
+| Type | Description | Payload |
+|------|-------------|---------|
+| `ROW_INSERT` | Insert row | `{"after":"..."}` |
+| `ROW_DELETE` | Delete row | `{}` |
+| `ROW_MOVE` | Move row | `{"after":"..."}` |
+| `ROW_RESIZE` | Resize height | `{"size":24}` |
+
+#### Axis Operations (apply to both columns and rows)
+| Type | Description | Payload |
+|------|-------------|---------|
+| `AXIS_SET_HIDDEN` | Set hidden state | `{"hidden":true}` |
+| `AXIS_SET_STYLE` | Set default style (content-addressed) | `{"style":"<base64>"}` |
+| `AXIS_SET_FORMAT` | Set default format | `{"format_id":"..."}` |
 
 #### Sheet Operations
 | Type | Description | Payload |
@@ -269,6 +285,23 @@ Each operation in the sync protocol has the following structure:
 | `SHEET_CREATE` | Create sheet | `{"name":"..."}` |
 | `SHEET_DELETE` | Delete sheet | `{}` |
 | `SHEET_RENAME` | Rename sheet | `{"name":"..."}` |
+
+#### Range Operations
+| Type | Description | Payload |
+|------|-------------|---------|
+| `RANGE_ADD` | Add a new range | `{"start_col":"...","start_row":"...","end_col":"...","end_row":"...","flags":1}` |
+| `RANGE_REMOVE` | Remove range | `{}` |
+| `RANGE_UPDATE_CORNERS` | Update range bounds | `{"start_col":"...","start_row":"...","end_col":"...","end_row":"..."}` |
+| `RANGE_UPDATE_FLAGS` | Update range flags | `{"flags":3}` |
+| `RANGE_SET_STYLE` | Set range style (content-addressed) | `{"style":"<base64>"}` |
+
+#### Content-Addressed Style Format
+
+Style operations use base64-encoded binary data in the `"style"` field. The binary format uses a flag-based encoding:
+- 2 flag bytes indicate which properties are present
+- Property data follows in flag order
+
+Example: `{"style":"BEAB"}` sets bold to true (~4 bytes encoded).
 
 ### HLC Format
 
