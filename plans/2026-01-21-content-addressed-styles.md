@@ -579,7 +579,7 @@ bazel build //core/cells/... 2>&1 | grep -E "error:|warning:" | head -50
 
 - [x] 11a: Update architecture documentation - Updated docs/file-format.md and docs/sync-protocol.md with content-addressed style format, new operation types, and examples.
 - [x] 11b: Remove debug logging added during development - Removed console.log statements from merge-controls.ts and header-editor.ts. Other logging is either behind debug flags or intentional feature logging.
-- [ ] 11c: Final code review and cleanup
+- [x] 11c: Final code review and cleanup - Removed deprecated makeAxisSetStyleOp(ID) overload, updated outdated comments in model.h and parser.h.
 
 ## File Changes Summary
 

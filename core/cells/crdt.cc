@@ -547,11 +547,6 @@ Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden)
     return {hlc, OpType::AXIS_SET_HIDDEN, axisId, hidden ? "1" : "0"};
 }
 
-Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const ID& styleId) {
-    const HLC hlc = workbook.getCurrentHLC();
-    return {hlc, OpType::AXIS_SET_STYLE, axisId, styleId.isNull() ? "" : styleId.toString()};
-}
-
 Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const StyleBuffer& style) {
     const HLC hlc = workbook.getCurrentHLC();
     const std::string payload = "{\"style\":\"" + style.toBase64() + "\"}";

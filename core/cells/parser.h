@@ -109,7 +109,7 @@ private:
     bool parseColumn(std::string_view line);      // C <id> <pos> [props]
     bool parseRow(std::string_view line);         // R <id> <pos> [props]
     bool parseCell(std::string_view line);        // X <id> <col> <row> <type> <value>
-    bool parseRange(std::string_view line);       // RG <id> <corners> <flags> [sty:<styleId>]
+    bool parseRange(std::string_view line);       // RG <id> <corners> <flags> [sty:<base64>]
     bool parseOperation(std::string_view line);   // O <hlc> <op-type> <target-id> <payload>
 
     // Helper parsers

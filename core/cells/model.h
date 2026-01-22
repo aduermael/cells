@@ -178,8 +178,8 @@ inline CellFlags& operator&=(CellFlags& a, CellFlags b) {
 
 // Cell - fundamental unit of data
 // Either a direct value OR a formula with cached result
-// Note: formatId and styleId are stored at the Workbook level (see Workbook::_formats,
-// _styles) to save memory - most cells don't have custom formats/styles.
+// Note: formatId is stored at the Workbook level (see Workbook::_formats) and
+// styles use content-addressed StyleBuffer (see Workbook::_entityStyles).
 struct Cell {
     ID id;             // Unique identifier (8-char base62)
     ID colId;          // Column axis ID
