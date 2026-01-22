@@ -23,15 +23,15 @@ Remove unused code to keep the codebase lean during early development. This foll
 ### C++ (apps/wasm/hello.cc)
 - Demo WASM hello world file - no longer needed for development
 
-### Documentation Inconsistency
+### Documentation Inconsistency (RESOLVED)
 - `docs/file-format.md` and `docs/persistence.md` document `#zcd v1` as the version header
-- All test files and parser tests use `#cells v1`
-- Parser treats `#` lines as comments, so both work, but should be consistent
+- Test files were using `#cells v1` but have been updated to `#zcd v1`
+- Parser treats `#` lines as comments, so both work, but `#zcd v1` is canonical
 
 ### ZCD Test Files (testdata/*.zcd)
-- All files use `#cells v1` comment header
-- Documentation says `#zcd v1`
-- Need to decide on canonical format and update accordingly
+- Documentation says `#zcd v1` (correct - "zcd" is the file format name)
+- Test files were using `#cells v1` (incorrect - "cells" is just the app name)
+- Updated test files to use `#zcd v1` for consistency
 
 ---
 
@@ -49,5 +49,5 @@ Remove unused code to keep the codebase lean during early development. This foll
 - [x] 4b: Add `#zcd v1` header to `testdata/named_ranges.zcd` (was missing)
 
 ## Phase 5: Final verification
-- [ ] 5a: Run tests to verify no regressions
-- [ ] 5b: Run TypeScript type check
+- [x] 5a: Run tests to verify no regressions - All 56 C++ unit tests pass, all 313 E2E tests pass.
+- [x] 5b: Run TypeScript type check - Passes with no errors.
