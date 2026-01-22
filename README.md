@@ -13,13 +13,13 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Language | Lines |
 |----------|------:|
-| C++ | 42,280 |
-| TypeScript | 21,940 |
+| C++ | 43,072 |
+| TypeScript | 21,910 |
 | CSS | 2,699 |
-| Starlark | 1,671 |
-| JavaScript | 1,420 |
+| Starlark | 1,708 |
+| JavaScript | 1,579 |
 | Go | 1,363 |
-| Shell | 1,186 |
+| Shell | 1,152 |
 | HTML | 1,047 |
 | Objective-C++ | 1,007 |
 
@@ -27,29 +27,29 @@ A high-performance, collaborative spreadsheet engine with:
 
 | Language | Lines |
 |----------|------:|
-| C++ | 30,303 |
-| JavaScript | 10,139 |
+| C++ | 31,457 |
+| JavaScript | 11,596 |
 | Go | 315 |
 
 ### Documentation
 
 | Language | Lines |
 |----------|------:|
-| Markdown | 16,317 |
+| Markdown | 17,504 |
 
 ### Test Counts
 
 | Category | Tests |
 |----------|------:|
-| Unit (C++) | 2616 |
+| Unit (C++) | 2671 |
 | Unit (Go) | 13 |
 | Unit (JavaScript) | 30 |
-| E2E (Puppeteer) | 302 |
-| **Total** | **2961** |
+| E2E (Puppeteer) | 322 |
+| **Total** | **3036** |
 
-- **Commits**: 1265
-- **WASM Module**: 5.13 MB
-- **Total Web Bundle**: 7.08 MB
+- **Commits**: 1351
+- **WASM Module**: 5.11 MB
+- **Total Web Bundle**: 7.06 MB
 
 <sub>Lines counted with [CLOC](https://github.com/AlDanial/cloc) (excludes comments and blanks). Generated with `./tools/generate-stats.sh`</sub>
 
