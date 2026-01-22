@@ -629,53 +629,59 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
     json << "],\"columns\":[";
 
     // Include column info for the viewport
+    // O(k log n) where k = visible columns: iterate positions in range, use getColumnAt()
     bool firstCol = true;
-    for (const ID& id : sheet->getColumnIds()) {
-        const Axis* col = sheet->getColumn(id);
+    for (size_t pos = col1; pos < col2; ++pos) {
+        auto colId = _viewportIndex.getColumnAt(pos);
+        if (!colId) {
+            continue;
+        }
+        const Axis* col = sheet->getColumn(*colId);
         if (!col) {
             continue;
         }
-        if (col->position >= col1 && col->position < col2) {
-            if (!firstCol) {
-                json << ",";
-            }
-            firstCol = false;
-            json << "{";
-            json << "\"id\":\"" << id.toString() << "\",";
-            json << "\"pos\":" << col->position << ",";
-            json << "\"width\":" << col->size << ",";
-            auto pixelOffset = _viewportIndex.columnToPixel(id);
-            json << "\"pixelOffset\":" << (pixelOffset ? *pixelOffset : 0) << ",";
-            json << "\"name\":\"" << jsonEscape(col->name) << "\",";
-            json << "\"hidden\":" << (col->hidden() ? "true" : "false");
-            json << "}";
+        if (!firstCol) {
+            json << ",";
         }
+        firstCol = false;
+        json << "{";
+        json << "\"id\":\"" << colId->toString() << "\",";
+        json << "\"pos\":" << col->position << ",";
+        json << "\"width\":" << col->size << ",";
+        auto pixelOffset = _viewportIndex.columnToPixel(*colId);
+        json << "\"pixelOffset\":" << (pixelOffset ? *pixelOffset : 0) << ",";
+        json << "\"name\":\"" << jsonEscape(col->name) << "\",";
+        json << "\"hidden\":" << (col->hidden() ? "true" : "false");
+        json << "}";
     }
 
     json << "],\"rows\":[";
 
     // Include row info for the viewport
+    // O(k log n) where k = visible rows: iterate positions in range, use getRowAt()
     bool firstRow = true;
-    for (const ID& id : sheet->getRowIds()) {
-        const Axis* row = sheet->getRow(id);
+    for (size_t pos = row1; pos < row2; ++pos) {
+        auto rowId = _viewportIndex.getRowAt(pos);
+        if (!rowId) {
+            continue;
+        }
+        const Axis* row = sheet->getRow(*rowId);
         if (!row) {
             continue;
         }
-        if (row->position >= row1 && row->position < row2) {
-            if (!firstRow) {
-                json << ",";
-            }
-            firstRow = false;
-            json << "{";
-            json << "\"id\":\"" << id.toString() << "\",";
-            json << "\"pos\":" << row->position << ",";
-            json << "\"height\":" << row->size << ",";
-            auto pixelOffset = _viewportIndex.rowToPixel(id);
-            json << "\"pixelOffset\":" << (pixelOffset ? *pixelOffset : 0) << ",";
-            json << "\"name\":\"" << jsonEscape(row->name) << "\",";
-            json << "\"hidden\":" << (row->hidden() ? "true" : "false");
-            json << "}";
+        if (!firstRow) {
+            json << ",";
         }
+        firstRow = false;
+        json << "{";
+        json << "\"id\":\"" << rowId->toString() << "\",";
+        json << "\"pos\":" << row->position << ",";
+        json << "\"height\":" << row->size << ",";
+        auto pixelOffset = _viewportIndex.rowToPixel(*rowId);
+        json << "\"pixelOffset\":" << (pixelOffset ? *pixelOffset : 0) << ",";
+        json << "\"name\":\"" << jsonEscape(row->name) << "\",";
+        json << "\"hidden\":" << (row->hidden() ? "true" : "false");
+        json << "}";
     }
 
     json << "],\"styleRanges\":[";

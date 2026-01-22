@@ -120,10 +120,15 @@ Most impactful fix - eliminate O(total_cells) loop per viewport query.
 
 ### Phase 3: Fix O(n) Column/Row JSON Output
 
-- [ ] 3a: Change `bindings_viewport.cc:621-666` to use ViewportIndex position range instead of iterating all axes
-- [ ] 3b: Use `getColumnAt(position)` for each position in viewport range
-- [ ] 3c: Same optimization for rows
-- [ ] 3d: Verify O(k log n) where k = visible columns/rows
+- [x] 3a: Change `bindings_viewport.cc:621-666` to use ViewportIndex position range instead of iterating all axes
+  - Changed column loop to iterate `[col1, col2)` positions, calling `getColumnAt(pos)` for each
+- [x] 3b: Use `getColumnAt(position)` for each position in viewport range
+- [x] 3c: Same optimization for rows
+  - Changed row loop to iterate `[row1, row2)` positions, calling `getRowAt(pos)` for each
+- [x] 3d: Verify O(k log n) where k = visible columns/rows
+  - Before: O(total_columns + total_rows) per query
+  - After: O(k_cols × log(n) + k_rows × log(m)) where k_cols and k_rows are visible counts
+  - For 20 visible columns and 50 visible rows in a 100K row sheet: ~1K ops vs ~100K ops
 
 ### Phase 4: Move AxisIndex to Sheet Level
 
