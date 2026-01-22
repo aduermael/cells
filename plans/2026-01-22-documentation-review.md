@@ -47,7 +47,7 @@ Review and update all documentation files to accurately reflect current codebase
 
 ## Phase 4: Persistence and File Format Documentation
 
-- [ ] 4a: Review `docs/file-format.md` - verify ZCD format against `parser.cc/h`, `serializer.cc/h`
+- [x] 4a: Review `docs/file-format.md` - fixed version header (#zcd v1), added F/N/V line types, updated error codes, fixed range flags, added missing operations
 - [ ] 4b: Review `docs/persistence.md` - verify file format support, remove outdated options
 
 ## Phase 5: Networking and Sync Documentation

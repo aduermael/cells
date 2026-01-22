@@ -23,7 +23,7 @@ Current version: **v1**
 
 Files begin with a version header:
 ```
-#cells v1
+#zcd v1
 ```
 
 ## Document Structure
@@ -31,24 +31,23 @@ Files begin with a version header:
 A ZCD file contains the following sections in order:
 
 ```
-#cells v1                             # Version header
-D <doc-id> "<name>"                 # Document declaration
+#zcd v1                               # Version header
+D <doc-id> "<name>"                   # Document declaration
+F <format-id> "<format-code>"         # Custom number format definitions (optional)
+N "<name>" <scope> <scope-sheet-id> <target-type> <target-data>  # Named ranges (optional)
 
-S <sheet-id> "<name>"               # Sheet declaration
-#cols                               # Columns section marker
-C <id> <position> [props...] [sty:<base64>]  # Column definitions
-#rows                               # Rows section marker
-R <id> <position> [props...] [sty:<base64>]  # Row definitions
-#cells                              # Cells section marker
-X <id> <col> <row> <type> <value> [sty:<base64>]  # Cell definitions
-#ranges                             # Range definitions marker
-RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<base64>]
+S <sheet-id> "<name>"                 # Sheet declaration
+V <key:value...>                      # Sheet view properties (optional)
+C <id> <position> [props...]          # Column definitions
+R <id> <position> [props...]          # Row definitions
+X <id> <col> <row> <type> <value> [props...]  # Cell definitions
+RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<base64>]  # Range definitions
 
-#oplog                              # Operation log section
+#oplog                                # Operation log section
 O <hlc> <op-type> <target-id> <payload>
 ```
 
-Multiple sheets repeat the `S`, `#cols`, `C`, `#rows`, `R`, `#cells`, `X`, `#ranges`, `RG` pattern.
+Multiple sheets repeat the `S`, `V`, `C`, `R`, `X`, `RG` pattern.
 
 ## Entity Types
 
@@ -63,6 +62,49 @@ Declares the workbook with a unique ID and name.
 D tY8pL3mK "Budget 2024"
 ```
 
+### Custom Format (F)
+
+Defines a custom number format that can be referenced by cells and axes.
+
+**Format:** `F <id> "<format-code>"`
+
+**Fields:**
+- `id`: 8-character base62 identifier
+- `format-code`: Excel-compatible number format string
+
+**Examples:**
+```
+F fMt12345 "#,##0.00"
+F fMtCurr1 "$#,##0.00;($#,##0.00)"
+F fMtPct01 "0.00%"
+```
+
+### Named Range (N)
+
+Defines a named range for use in formulas. Named ranges can be workbook-scoped (accessible from all sheets) or sheet-scoped (accessible only within a specific sheet).
+
+**Format:** `N "<name>" <scope> <scope-sheet-id> <target-type> <target-data>`
+
+**Fields:**
+- `name`: The name to use in formulas (quoted string)
+- `scope`: `W` for workbook scope, `S` for sheet scope
+- `scope-sheet-id`: Sheet ID for sheet-scoped names, `-` for workbook-scoped
+- `target-type`: One of `CELL`, `RANGE`, `COLUMN`, `ROW`, `COLUMN_RANGE`, `ROW_RANGE`
+- `target-data`: IDs based on target type, plus target sheet ID
+
+**Target data format by type:**
+- `CELL`: `<cell-id> <sheet-id>`
+- `RANGE`: `<id1> <id2> <sheet-id>`
+- `COLUMN` / `ROW`: `<axis-id> <sheet-id>`
+- `COLUMN_RANGE` / `ROW_RANGE`: `<id1> <id2> <sheet-id>`
+
+**Examples:**
+```
+N "TotalSales" W - CELL xA1bC2dE sH1jK2mN
+N "DataRange" W - RANGE cA1bC2dE cB3dE4fG sH1jK2mN
+N "LocalValue" S sH1jK2mN CELL xC5fG6hJ sH1jK2mN
+```
+
 ### Sheet (S)
 
 Declares a worksheet within the workbook.
@@ -74,50 +116,81 @@ Declares a worksheet within the workbook.
 S qR5sW2xN "Summary"
 ```
 
+### Sheet View (V)
+
+Optional line defining sheet view properties. Appears after the sheet declaration and before columns.
+
+**Format:** `V <key:value...>`
+
+**Properties:**
+- `showGridLines:0|1`: Show or hide grid lines (default: 1)
+- `zoomScale:<10-400>`: Zoom percentage (default: 100)
+- `freezeCol:<n>`: Number of frozen columns (default: 0)
+- `freezeRow:<n>`: Number of frozen rows (default: 0)
+
+Only non-default values are serialized.
+
+**Examples:**
+```
+V showGridLines:0 zoomScale:125
+V freezeCol:1 freezeRow:2
+```
+
 ### Column (C)
 
 Defines a column with optional properties.
 
-**Format:** `C <id> <position> [w:<width>] [name:"<name>"]`
+**Format:** `C <id> <position> [props...]`
 
 **Fields:**
 - `id`: 8-character base62 identifier
 - `position`: 0-indexed column position
-- `w:<width>`: Optional width in pixels (default: 100)
-- `name:"<name>"`: Optional column name
+
+**Optional Properties:**
+- `w:<width>`: Width in pixels (default: 100)
+- `name:"<name>"`: Column name
+- `hidden:1`: Column is hidden
+- `sty:<base64>`: Default style for cells in this column
+- `fmt:<format-id>`: Default number format for cells in this column
 
 **Examples:**
 ```
 C cA1bC2dE 0                    # Column at position 0, default width
 C cB3dE4fG 1 w:150             # Column at position 1, 150px wide
 C cC5fG6hJ 2 name:"Total"      # Column at position 2 with name
-C cD7hJ8kL 3 w:200 name:"Rev"  # Both width and name
+C cD7hJ8kL 3 w:200 hidden:1    # Hidden column, 200px wide
 ```
 
 ### Row (R)
 
 Defines a row with optional properties.
 
-**Format:** `R <id> <position> [h:<height>] [name:"<name>"]`
+**Format:** `R <id> <position> [props...]`
 
 **Fields:**
 - `id`: 8-character base62 identifier
 - `position`: 0-indexed row position
-- `h:<height>`: Optional height in pixels (default: 24)
-- `name:"<name>"`: Optional row name
+
+**Optional Properties:**
+- `h:<height>`: Height in pixels (default: 24)
+- `name:"<name>"`: Row name
+- `hidden:1`: Row is hidden
+- `sty:<base64>`: Default style for cells in this row
+- `fmt:<format-id>`: Default number format for cells in this row
 
 **Examples:**
 ```
 R rA1bC2dE 0                    # Row at position 0, default height
 R rB3dE4fG 1 h:30              # Row at position 1, 30px tall
 R rC5fG6hJ 2 name:"Header"     # Row at position 2 with name
+R rD7hJ8kL 3 hidden:1          # Hidden row
 ```
 
 ### Cell (X)
 
 Defines a cell value at a specific column/row intersection.
 
-**Format:** `X <id> <col-id> <row-id> <type> <value>`
+**Format:** `X <id> <col-id> <row-id> <type> <value> [props...]`
 
 **Fields:**
 - `id`: 8-character base62 cell identifier
@@ -126,24 +199,43 @@ Defines a cell value at a specific column/row intersection.
 - `type`: Single character indicating value type
 - `value`: Type-specific value representation
 
+**Optional Properties:**
+- `fmt:<format-id>`: Number format for this cell
+- `sty:<base64>`: Cell style (content-addressed)
+
 See [Cell Types](#cell-types) for details.
 
 ### Range (RG)
 
-Defines a styled range spanning multiple cells.
+Defines a range spanning multiple cells. Ranges can serve multiple purposes based on their flags.
 
 **Format:** `RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<base64>]`
 
 **Fields:**
 - `id`: 8-character base62 range identifier
-- `start_col`, `start_row`: IDs of top-left corner
-- `end_col`, `end_row`: IDs of bottom-right corner
-- `flags`: Range flags bitmap (1=STYLE, 2=MERGE, etc.)
+- `start_col`, `start_row`: Column/row IDs of top-left corner
+- `end_col`, `end_row`: Column/row IDs of bottom-right corner
+- `flags`: Range flags bitmap (see below)
 - `sty:<base64>`: Optional content-addressed style (see [Content-Addressed Styles](#content-addressed-styles))
 
-**Example:**
+**Range Flags:**
+
+| Value | Name | Description |
+|-------|------|-------------|
+| 1 | MERGE | Cells are merged (anchor at top-left) |
+| 2 | STYLE | Has style metadata (background, borders, etc.) |
+| 4 | CONDITIONAL_FORMAT | Has conditional format rules |
+| 8 | DATA_VALIDATION | Has data validation rules |
+| 16 | NAMED | Is a named range |
+| 32 | PRINT_AREA | Defines print area |
+| 64 | FILTER | Has auto-filter |
+
+Flags can be combined (e.g., `3` = MERGE + STYLE).
+
+**Examples:**
 ```
-RG rGfH3jK2 cA1bC2dE rA1bC2dE cB3dE4fG rB3dE4fG 1 sty:BECA+78k
+RG rGfH3jK2 cA1bC2dE rA1bC2dE cB3dE4fG rB3dE4fG 2 sty:BECA+78k
+RG rMerge01 cC5fG6hJ rC5fG6hJ cD7hJ8kL rE9kL0mN 1
 ```
 
 ## Content-Addressed Styles
@@ -299,7 +391,10 @@ Error values are stored as unquoted error codes:
 | `#DIV/0!` | Division by zero |
 | `#NULL!` | Incorrect range reference |
 | `#NUM!` | Invalid numeric value |
+| `#N/A` | Value not available (e.g., lookup not found) |
 | `#CIRCULAR!` | Circular reference detected |
+| `#SPILL!` | Array formula blocked by existing data |
+| `#CALC!` | Calculation error (e.g., FILTER with no results) |
 
 ```
 X xA1bC2dE cA1bC2dE rA1bC2dE e #DIV/0!
@@ -344,14 +439,10 @@ Lines beginning with `#` are section markers or comments:
 
 | Marker | Purpose |
 |--------|---------|
-| `#cells v1` | File format version header |
-| `#cols` | Start of columns section |
-| `#rows` | Start of rows section |
-| `#cells` | Start of cells section |
-| `#ranges` | Start of ranges section |
-| `#oplog` | Start of operation log |
+| `#zcd v1` | File format version header (required, first line) |
+| `#oplog` | Start of operation log section |
 
-Any other line starting with `#` is treated as a comment and ignored.
+Any other line starting with `#` is treated as a comment and ignored. The parser recognizes lines by their prefix character (`D`, `F`, `N`, `S`, `V`, `C`, `R`, `X`, `RG`, `O`), so section markers for columns, rows, cells, and ranges are not required.
 
 ## Operation Log
 
@@ -401,6 +492,10 @@ Format: `<wall_time>.<logical>.<node_id>`
 | `SHEET_CREATE` | 20 | Create new sheet |
 | `SHEET_DELETE` | 21 | Delete sheet |
 | `SHEET_RENAME` | 22 | Rename sheet |
+| **Workbook Operations** | | |
+| `WORKBOOK_RENAME` | 30 | Rename workbook |
+| **Format Operations** | | |
+| `FORMAT_DEFINE` | 40 | Define a custom number format |
 | **Named Range Operations** | | |
 | `NAMED_RANGE_DEFINE` | 50 | Define a named range |
 | `NAMED_RANGE_DELETE` | 51 | Delete a named range |
@@ -428,29 +523,21 @@ Style operations use the content-addressed `"style"` field containing base64-enc
 A simple spreadsheet with numbers, text, a formula, and styles:
 
 ```
-#cells v1
+#zcd v1
 D aB3cD4eF "Example"
 
 S gH5jK6mN "Sheet1"
-
-#cols
 C cA1bC2dE 0
 C cB3dE4fG 1 w:120 sty:BEAB
-
-#rows
 R rA1bC2dE 0 sty:BECx+78k
 R rB3dE4fG 1
 R rC5fG6hJ 2
-
-#cells
 X xA1aB2cD cA1bC2dE rA1bC2dE n 10 sty:BEAB
 X xA2aB3cD cA1bC2dE rB3dE4fG n 20
 X xA3aB4cD cA1bC2dE rC5fG6hJ f "=$cA1bC2dE$rA1bC2dE+$cA1bC2dE$rB3dE4fG"
 X xB1bC2dE cB3dE4fG rA1bC2dE s "Values"
 X xB2bC3dE cB3dE4fG rB3dE4fG s "below"
-
-#ranges
-RG rGaB1cD2 cA1bC2dE rA1bC2dE cB3dE4fG rB3dE4fG 1 sty:BECA+78k
+RG rGaB1cD2 cA1bC2dE rA1bC2dE cB3dE4fG rB3dE4fG 2 sty:BECA+78k
 ```
 
 This represents:
