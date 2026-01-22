@@ -7,7 +7,7 @@
 #   bazel run :format -- FILE...  # Format specific files
 
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/guard.sh"
+source "${BUILD_WORKSPACE_DIRECTORY:-}/tools/guard.sh"
 
 # Colors for output
 RED='\033[0;31m'

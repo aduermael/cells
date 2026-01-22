@@ -2,7 +2,7 @@
 # Build production WASM distribution package
 # Output: dist/wasm/ (optimized)
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/guard.sh"
+source "${BUILD_WORKSPACE_DIRECTORY:-}/tools/guard.sh"
 cd "$REPO_ROOT"
 
 echo "Building WASM module (optimized)..."

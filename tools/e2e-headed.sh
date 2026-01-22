@@ -2,7 +2,7 @@
 # Run E2E tests with browser visible (for debugging)
 # Usage: bazel run :e2e-headed [-- <test>]
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/guard.sh"
+source "${BUILD_WORKSPACE_DIRECTORY:-}/tools/guard.sh"
 cd "$REPO_ROOT/apps/wasm"
 
 export BAZEL_RUN=1

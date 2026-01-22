@@ -5,7 +5,7 @@
 #          selection, script, collab, initial-sync, collab-demo, collab-style-sync
 #          or omit to run all tests (default)
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/guard.sh"
+source "${BUILD_WORKSPACE_DIRECTORY:-}/tools/guard.sh"
 cd "$REPO_ROOT"
 
 # Auto-detect available cores

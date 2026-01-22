@@ -1,7 +1,7 @@
 #!/bin/bash
 # Run unit tests (C++)
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/guard.sh"
+source "${BUILD_WORKSPACE_DIRECTORY:-}/tools/guard.sh"
 cd "$REPO_ROOT"
 
 bazel test //core/...

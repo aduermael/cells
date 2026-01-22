@@ -2,7 +2,7 @@
 # Build CLI binary with optimizations (for production/release)
 # Output: dist/cli/cells
 set -euo pipefail
-source "$(dirname "${BASH_SOURCE[0]}")/guard.sh"
+source "${BUILD_WORKSPACE_DIRECTORY:-}/tools/guard.sh"
 cd "$REPO_ROOT"
 
 echo "Building CLI (optimized)..."
