@@ -43,7 +43,7 @@ Review and update all documentation files to accurately reflect current codebase
 
 ## Phase 3: Formula Engine Documentation
 
-- [ ] 3a: Review `docs/formula-engine.md` - verify against `formula_*.cc/h`, update function list, AST diagrams
+- [x] 3a: Review `docs/formula-engine.md` - updated function count from "60+" to 83, fixed AST node types (added COLUMN_REF, ROW_REF, etc.), added complete function list by category with all 83 functions, updated reference format documentation, added file references
 
 ## Phase 4: Persistence and File Format Documentation
 
