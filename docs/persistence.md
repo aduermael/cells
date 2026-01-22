@@ -45,31 +45,20 @@ Each axis knows its own position, making it simple to sort and serialize.
 ### File Structure
 
 ```
-#cells v1
+#zcd v1
 D <doc-id> "<name>"
-
-#formats (optional, for custom number formats)
-F <format-id> "<format-code>"
+F <format-id> "<format-code>"         # Custom number formats (optional)
+N "<name>" <scope> <sheet-id> <type> <target-data>  # Named ranges (optional)
 
 S <sheet-id> "<name>"
-
-#cols
+V <key:value...>                      # Sheet view properties (optional)
 C <id> <position> [props...]
-
-#rows
 R <id> <position> [props...]
-
-#cells
-X <id> <col-id> <row-id> <type> <value>
-
-#styles
-T <id> <properties...>
-
-#cell-styles
-Y <cell-id> <style-ids>
+X <id> <col-id> <row-id> <type> <value> [props...]
+RG <id> <corners> <flags> [sty:<base64>]  # Ranges (merged cells, styles, etc.)
 
 #oplog
-O <hlc> <op-type> <args...>
+O <hlc> <op-type> <target-id> <payload>
 ```
 
 ### Example
@@ -77,21 +66,15 @@ O <hlc> <op-type> <args...>
 A simple spreadsheet with: A1=2, A2="foo", D4==A1+10
 
 ```
-#cells v1
+#zcd v1
 D Qx7mXp2L "Untitled"
 
 S bF3hL8mN "Sheet1"
-
-#cols
 C kR7pN2wQ 0
 C vT5mK9xL 3
-
-#rows
 R jH4sW8nF 0
 R qM2kL5pR 1
 R yB9tX3wN 3
-
-#cells
 X nP6kR2mW kR7pN2wQ jH4sW8nF n 2
 X hT8sL4xQ kR7pN2wQ qM2kL5pR s "foo"
 X wK3nJ7pM vT5mK9xL yB9tX3wN f "=$kR7pN2wQ$jH4sW8nF+10"
@@ -101,22 +84,31 @@ X wK3nJ7pM vT5mK9xL yB9tX3wN f "=$kR7pN2wQ$jH4sW8nF+10"
 
 | Prefix | Meaning | Format |
 |--------|---------|--------|
-| `#cells` | Format version | `#cells v1` |
+| `#zcd` | Format version | `#zcd v1` |
 | `D` | Document | `D <id> "<name>"` |
 | `F` | Custom format | `F <id> "<format-code>"` |
+| `N` | Named range | `N "<name>" <scope> <sheet-id> <type> <data>` |
 | `S` | Sheet | `S <id> "<name>"` |
+| `V` | Sheet view | `V <key:value...>` |
 | `C` | Column | `C <id> <position> [props...]` |
 | `R` | Row | `R <id> <position> [props...]` |
-| `X` | Cell | `X <id> <col> <row> <type> <value>` |
-| `T` | Style | `T <id> <properties>` |
-| `Y` | Cell-style | `Y <cell-id> <style-ids>` |
-| `O` | Operation | `O <hlc> <op-type> <args...>` |
+| `X` | Cell | `X <id> <col> <row> <type> <value> [props...]` |
+| `RG` | Range | `RG <id> <corners> <flags> [sty:<base64>]` |
+| `O` | Operation | `O <hlc> <op-type> <target-id> <payload>` |
+
+Styles are content-addressed and stored inline as `sty:<base64>` properties on columns, rows, cells, and ranges.
 
 ### Position Notation
 
 - Position is a 0-indexed integer
 - Sparse positions are allowed (e.g., columns at 0, 3, 10)
-- Props: `w:<width>`, `h:<height>`, `name:"<name>"`
+
+**Optional Properties:**
+- `w:<width>` / `h:<height>`: Size in pixels
+- `name:"<name>"`: Axis name
+- `hidden:1`: Hidden axis
+- `sty:<base64>`: Default style (content-addressed)
+- `fmt:<format-id>`: Default number format
 
 ### Cell Types
 
@@ -155,13 +147,12 @@ User changes A1 from 2 to 42:
 ### Insert Column
 
 ```diff
- #cols
  C kR7pN2wQ 0
 +C mT3xK8pW 1
  C vT5mK9xL 3
 ```
 
-**Result**: 1 line added. Simple!
+**Result**: 1 line added. No section markers needed.
 
 ### Concurrent Edits (No Conflict)
 
