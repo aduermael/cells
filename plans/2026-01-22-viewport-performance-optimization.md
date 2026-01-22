@@ -143,8 +143,16 @@ Now that Sheet owns AxisIndex, insertion position is known.
 
 - [ ] 6a: Re-run performance benchmarks from Phase 1
 - [ ] 6b: Verify all viewport operations are O(log n) or better at 100K rows
-- [ ] 6c: Full test pass: `make test` and `npm run test:stable`
+- [ ] 6c: Full test pass: `bazel run :check`
 - [ ] 6d: Update docs/rendering.md with final architecture
+
+### Phase 7: Fix Pre-existing Test Failures
+
+Fix all failing tests discovered during this work, even if unrelated to viewport optimization.
+
+- [ ] 7a: Fix spill E2E test: "Spilled cell shows grayed formula bar: A2 should be marked as spilled"
+- [ ] 7b: Investigate and fix any other intermittent test failures
+- [ ] 7c: Ensure `bazel run :check` and `bazel run :e2e` pass with zero failures
 
 ## Design Decisions
 
