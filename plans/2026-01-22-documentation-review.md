@@ -64,7 +64,7 @@ Review and update all documentation files to accurately reflect current codebase
 
 - [x] 7a: Review `docs/type-system.md` - updated cell value types to match CellValueType enum (added DATE_TIME, FORMULA, removed unimplemented DURATION/RICH_TEXT/ARRAY), added error types table, updated implementation status (January 2025), marked all unimplemented sections (Column Type Constraints, Validation Flow, Relations, Formula Type Hints), updated XLSX export feature table
 - [x] 7b: Review `docs/coding-guidelines.md` - fixed script paths (./scripts/ → bazel run :), replaced Makefile section with Bazel commands, moved std::optional to acceptable usage (heavily used in codebase)
-- [ ] 7c: Review `docs/naming-conventions.md` - verify conventions match codebase
+- [x] 7c: Review `docs/naming-conventions.md` - fixed private member naming (added _ prefix), fixed enum value examples to match actual code (NUMBER, STRING, DIV, REF instead of CELL_ERROR_DIV)
 
 ---
 

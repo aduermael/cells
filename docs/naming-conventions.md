@@ -15,10 +15,10 @@
 |------|------------|---------|
 | Functions, methods | camelCase | `isNull()`, `getValue()`, `addCell()` |
 | Variables (local) | camelCase | `cellCount`, `firstCol` |
-| Variables (member) | camelCase | `this->prevId`, `this->gapBefore` |
+| Variables (private member) | _camelCase | `_cellIndex`, `_workbook` |
 | Parameters | camelCase | `void setName(const std::string& newName)` |
-| Constants | SCREAMING_SNAKE_CASE | `ID_LENGTH`, `DEFAULT_COL_WIDTH` |
-| Enum values | SCREAMING_SNAKE_CASE | `CELL_ERROR_DIV`, `VALUE_TYPE_NUMBER` |
+| Constants | SCREAMING_SNAKE_CASE | `ID_LENGTH`, `DEFAULT_ROW_HEIGHT` |
+| Enum values | SCREAMING_SNAKE_CASE | `NUMBER`, `STRING`, `DIV`, `REF` |
 
 ## Files
 
