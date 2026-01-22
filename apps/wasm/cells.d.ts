@@ -294,7 +294,7 @@ declare module 'cells-wasm' {
     fontSize: number;    // Font size in points, 0 for default (11pt)
     hAlign: TextAlign;
     vAlign: VerticalAlign;
-    border?: CellBorder; // Cell borders (optional for backwards compatibility)
+    border?: CellBorder; // Cell borders (optional)
   }
 
   /**

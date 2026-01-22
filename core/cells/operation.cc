@@ -204,7 +204,7 @@ std::string Operation::toString() const {
 
 Operation Operation::fromString(const std::string& str) {
     // Parse: "wall.logical.node OP_TYPE target_id sheetId payload"
-    // Also supports legacy format without sheetId: "wall.logical.node OP_TYPE target_id payload"
+    // Also supports format without sheetId: "wall.logical.node OP_TYPE target_id payload"
 
     // Find first space (after HLC)
     const size_t first_space = str.find(' ');
@@ -239,12 +239,12 @@ Operation Operation::fromString(const std::string& str) {
     const std::string target_str = str.substr(second_space + 1, third_space - second_space - 1);
     const ID target(target_str);
 
-    // Check if next field is sheetId or payload (for backwards compatibility)
+    // Check if next field is sheetId or payload
     // sheetId is 8 alphanumeric chars or "~" for null
     // payload starts with "{" or is empty
     const size_t fourth_space = str.find(' ', third_space + 1);
     if (fourth_space == std::string::npos) {
-        // No fourth space - rest is payload (legacy format without sheetId)
+        // No fourth space - rest is payload (format without sheetId)
         const std::string payload = str.substr(third_space + 1);
         return {hlc, type, target, payload};
     }
@@ -253,7 +253,7 @@ Operation Operation::fromString(const std::string& str) {
     const std::string maybe_sheet = str.substr(third_space + 1, fourth_space - third_space - 1);
 
     // If it looks like a sheetId (8 chars alphanumeric or "~"), parse it as such
-    // Otherwise treat as legacy format where this is the start of payload
+    // Otherwise this is the start of payload
     const bool is_sheet_id =
         (maybe_sheet == "~") ||
         (maybe_sheet.size() == 8 && std::all_of(maybe_sheet.begin(), maybe_sheet.end(), ::isalnum));
@@ -264,7 +264,7 @@ Operation Operation::fromString(const std::string& str) {
         return {hlc, type, target, sheetId, payload};
     }
 
-    // Legacy format - treat everything after target_id as payload
+    // Treat everything after target_id as payload
     const std::string payload = str.substr(third_space + 1);
     return {hlc, type, target, payload};
 }

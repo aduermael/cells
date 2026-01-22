@@ -88,8 +88,7 @@ std::string FormulaSerializer::cellRefToUuidString(const CellRefNode* node) {
     // The sheet context is only needed for display (derived dynamically from
     // cell's column's sheetId by FormulaDisplayConverter).
     //
-    // For backward compatibility when parsing old formulas, we still accept
-    // sheet prefixes in the parser, but we never write them out.
+    // The parser accepts optional sheet prefixes for flexibility.
 
     // If we have a resolved cellId, use UUID format
     if (!node->cellId.empty()) {

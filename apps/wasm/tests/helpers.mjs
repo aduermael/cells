@@ -151,7 +151,7 @@ export async function cellToPixelFromRenderer(page, col, row) {
 }
 
 /**
- * Calculate pixel position for a cell (legacy sync version for backward compat)
+ * Calculate pixel position for a cell (sync version)
  * Uses approximate default dimensions from the app
  */
 export function cellToPixel(col, row, canvasInfo) {

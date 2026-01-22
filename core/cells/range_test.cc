@@ -741,7 +741,7 @@ TEST(RangeStyleTest, MoveSemantics) {
 }
 
 TEST(RangeStyleTest, HasStyleWithFlagOnly) {
-    // Test that hasStyle() returns true when only the flag is set (for backwards compatibility)
+    // Test that hasStyle() returns true when only the flag is set
     Range r;
     r.flags = RangeFlags::STYLE;
 
