@@ -218,14 +218,6 @@ export interface RegisteredStyle {
   style: CellStyle;
 }
 
-/** Result from createStyle */
-export interface CreateStyleResult {
-  success?: boolean;
-  styleId?: string;
-  existing?: boolean; // true if style already existed
-  error?: string;
-}
-
 // ============================================================================
 // Formula Function Types
 // ============================================================================

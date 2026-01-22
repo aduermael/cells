@@ -79,7 +79,6 @@ export interface CellsEngine {
     setCellStyleAt(col: number, row: number, styleJson: string): string;
     getCellStyle(cellId: string): string;
     getCellStyleAt(col: number, row: number): string;
-    createStyle(styleJson: string): string;
     getAvailableStyles(): string;
 
     // Range style operations
@@ -137,7 +136,6 @@ export interface CellsEngine {
     // Export
     exportToCells(): string;
     exportToCSV(): string;
-    exportToXLSX(): string;
     exportToXLSXPtr(): string;
     freeExportBuffer(): void;
     hasFormulas(): boolean;

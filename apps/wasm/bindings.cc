@@ -141,7 +141,6 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("setCellStyleAt", &cells::wasm::CellsEngine::setCellStyleAt)
         .function("getCellStyle", &cells::wasm::CellsEngine::getCellStyle)
         .function("getCellStyleAt", &cells::wasm::CellsEngine::getCellStyleAt)
-        .function("createStyle", &cells::wasm::CellsEngine::createStyle)
         .function("getAvailableStyles", &cells::wasm::CellsEngine::getAvailableStyles)
         // Range styles
         .function("setRangeStyle", &cells::wasm::CellsEngine::setRangeStyle)
@@ -176,7 +175,6 @@ EMSCRIPTEN_BINDINGS(cells) {
         // Export
         .function("exportToCells", &cells::wasm::CellsEngine::exportToCells)
         .function("exportToCSV", &cells::wasm::CellsEngine::exportToCSV)
-        .function("exportToXLSX", &cells::wasm::CellsEngine::exportToXLSX)
         .function("exportToXLSXPtr", &cells::wasm::CellsEngine::exportToXLSXPtr)
         .function("freeExportBuffer", &cells::wasm::CellsEngine::freeExportBuffer)
         .function("hasFormulas", &cells::wasm::CellsEngine::hasFormulas)

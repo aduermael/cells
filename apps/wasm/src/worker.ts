@@ -70,7 +70,6 @@ import {
     handleSetCellStyleAt,
     handleGetCellStyle,
     handleGetCellStyleAt,
-    handleCreateStyle,
     handleGetAvailableStyles,
     handleSetRangeStyle,
     handleSetRangeStyleOnSheet,
@@ -486,9 +485,6 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "getCellStyleAt":
                 handleGetCellStyleAt(engine, params, respond);
-                break;
-            case "createStyle":
-                handleCreateStyle(engine, params, respond);
                 break;
             case "getAvailableStyles":
                 handleGetAvailableStyles(engine, params, respond);

@@ -31,7 +31,8 @@ import type {
   RowInfo,
   Position,
 } from "./types";
-import { GridRenderer, type FormulaHighlight } from "./grid-renderer";
+import { GridRenderer } from "./grid-renderer";
+import type { FormulaHighlight } from "./grid-constants";
 import { WasmDataSource } from "./wasm-data-source";
 import { createUIStateMachine, UIState, type UIStateMachine } from "./ui-state";
 import { CollabUI } from "./collab-ui";
@@ -247,6 +248,13 @@ export class App {
   collaborationInitialized: boolean = false;
   collaborationInitializing: boolean = false;
   astDebugPanelVisible: boolean = false;
+
+  /**
+   * Flag indicating viewport data is stale and being refreshed.
+   * When true, presence rendering should be deferred to avoid cursor offset issues.
+   * This handles the race between dimension syncs and cursor rendering.
+   */
+  viewportRefreshPending: boolean = false;
 
   // =========================================================================
   // Sheet/Viewport State

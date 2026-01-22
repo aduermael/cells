@@ -22,9 +22,7 @@
 //
 // =============================================================================
 
-// Import CollabState from the new C++ adapter (with fallback to old collab-manager)
-// The CppSyncAdapter exports CollabState for backwards compatibility
-import { CollabState } from "./cpp-sync-adapter";
+import { SyncState } from "./cpp-sync-adapter";
 import { generateRandomName } from "./presence";
 import { getMenuStateManager } from "./menu-state";
 import type { SyncStateType, PeerPresence, RoomId, SyncStats } from "./types";
@@ -83,20 +81,20 @@ interface CollabUIOptions {
  * Status text for each collaboration state
  */
 const STATUS_TEXT: Record<string, string> = {
-    [CollabState.OFFLINE]: "Offline",
-    [CollabState.CONNECTING]: "Connecting...",
-    [CollabState.SYNCING]: "Syncing...",
-    [CollabState.ONLINE]: "Online",
+    [SyncState.OFFLINE]: "Offline",
+    [SyncState.CONNECTING]: "Connecting...",
+    [SyncState.SYNCING]: "Syncing...",
+    [SyncState.ONLINE]: "Online",
 };
 
 /**
  * Detailed status text shown in the details panel
  */
 const DETAILED_STATUS_TEXT: Record<string, string> = {
-    [CollabState.OFFLINE]: "Working offline",
-    [CollabState.CONNECTING]: "Establishing connection...",
-    [CollabState.SYNCING]: "Synchronizing data...",
-    [CollabState.ONLINE]: "Connected",
+    [SyncState.OFFLINE]: "Working offline",
+    [SyncState.CONNECTING]: "Establishing connection...",
+    [SyncState.SYNCING]: "Synchronizing data...",
+    [SyncState.ONLINE]: "Connected",
 };
 
 // ============================================================================
@@ -138,7 +136,7 @@ export class CollabUI {
         this._detailsPanel = null;
         this._shareTooltip = null;
 
-        this._currentState = CollabState.OFFLINE;
+        this._currentState = SyncState.OFFLINE;
         this._peerCount = 0;
         this._showingDetails = false;
         this._linkCopied = false;
@@ -793,7 +791,7 @@ export class CollabUI {
 
         const avgLatency = this._collabManager.getAverageLatency();
 
-        if (avgLatency !== null && this._currentState === CollabState.ONLINE) {
+        if (avgLatency !== null && this._currentState === SyncState.ONLINE) {
             latencyRow.style.display = "";
             const isPoor = avgLatency > 500;
             latencyValue.textContent = `${avgLatency}ms`;
@@ -825,7 +823,7 @@ export class CollabUI {
 
         const stats = this._collabManager.stats;
 
-        if (stats && this._currentState === CollabState.ONLINE) {
+        if (stats && this._currentState === SyncState.ONLINE) {
             statsRow.style.display = "";
             // Show sent/received and oplog size (for debugging sync issues)
             const oplogInfo =
@@ -847,9 +845,9 @@ export class CollabUI {
 
         // Show actions when connecting or online (to allow force reconnect)
         const showActions =
-            this._currentState === CollabState.CONNECTING ||
-            this._currentState === CollabState.SYNCING ||
-            this._currentState === CollabState.ONLINE;
+            this._currentState === SyncState.CONNECTING ||
+            this._currentState === SyncState.SYNCING ||
+            this._currentState === SyncState.ONLINE;
 
         actionsPanel.style.display = showActions ? "" : "none";
     }

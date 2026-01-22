@@ -18,7 +18,7 @@
 
 import type { App, DOMElements } from "./app";
 import type { ReferenceInfo } from "./client-types";
-import type { FormulaHighlight } from "./grid-renderer";
+import type { FormulaHighlight } from "./grid-constants";
 import { colorizeFormula } from "./formula-colorizer.js";
 import { editingSession } from "./editing-session";
 

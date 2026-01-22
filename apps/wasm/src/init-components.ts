@@ -18,7 +18,7 @@
 
 import type { App, DOMElements } from "./app";
 import type { Position } from "./types";
-import type { FormulaHighlight } from "./grid-renderer";
+import type { FormulaHighlight } from "./grid-constants";
 import { PresenceBroadcaster } from "./presence-broadcast";
 import { AstDebugPanel } from "./ast-debug";
 import { ScriptPanel } from "./script-panel";
@@ -46,8 +46,6 @@ import {
   DEFAULT_ROW_HEIGHT,
   HEADER_WIDTH,
   HEADER_HEIGHT,
-} from "./grid-renderer";
-import {
   getZoomFactor,
   getZoomedHeaderWidth,
   getZoomedHeaderHeight,

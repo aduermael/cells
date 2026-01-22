@@ -306,16 +306,6 @@ declare module 'cells-wasm' {
   }
 
   /**
-   * Result from createStyle
-   */
-  interface CreateStyleResult {
-    success?: boolean;
-    styleId?: string;
-    existing?: boolean;  // true if style already existed
-    error?: string;
-  }
-
-  /**
    * Cell data from viewport query
    */
   interface CellData {
@@ -492,13 +482,6 @@ declare module 'cells-wasm' {
      * @returns JSON string with CellStyle properties
      */
     getCellStyleAt(col: number, row: number): string;
-
-    /**
-     * Create a style definition and get its ID
-     * @param styleJson - JSON string with style properties
-     * @returns JSON string with CreateStyleResult
-     */
-    createStyle(styleJson: string): string;
 
     /**
      * Get all registered styles
@@ -678,14 +661,6 @@ declare module 'cells-wasm' {
      * @returns CSV content as string, or empty on error
      */
     exportToCSV(): string;
-
-    /**
-     * Export workbook to XLSX format
-     * Note: Only available in cells_wasm_full build
-     * @returns XLSX binary data as string, or empty on error
-     * @deprecated Use exportToXLSXPtr() for binary-safe transfer
-     */
-    exportToXLSX(): string;
 
     /**
      * Export workbook to XLSX format using pointer-based binary transfer
@@ -994,7 +969,6 @@ declare module 'cells-wasm' {
     CellBorder,
     CellStyle,
     RegisteredStyle,
-    CreateStyleResult,
     // Formula API types (Phase 7)
     ValidateFormulaResult,
     RefType,

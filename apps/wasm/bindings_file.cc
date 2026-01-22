@@ -8,7 +8,7 @@
 // - loadFromXLSXDataPtr: Parse XLSX from binary data
 // - exportToCells: Export to .zcd format
 // - exportToCSV: Export to CSV
-// - exportToXLSX: Export to XLSX binary
+// - exportToXLSXPtr: Export to XLSX binary (binary-safe)
 // - hasFormulas: Check if workbook contains formulas
 //
 // =============================================================================
@@ -235,39 +235,6 @@ std::string CellsEngine::exportToCSV() {
         return "";
     }
     return result.output;
-}
-
-std::string CellsEngine::exportToXLSX() {
-    if (!_workbook) {
-        return "";
-    }
-
-    // Ensure /tmp directory exists in Emscripten's virtual filesystem
-    mkdir("/tmp", 0777);
-
-    const char* tempPath = "/tmp/export.xlsx";
-    auto result = writeXLSX(*_workbook, tempPath);
-    if (!result.ok()) {
-        return "";
-    }
-
-    // Read back the file
-    FILE* f = fopen(tempPath, "rb");
-    if (!f) {
-        return "";
-    }
-
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    std::string data(size, '\0');
-    fread(&data[0], 1, size, f);
-    fclose(f);
-
-    remove(tempPath);
-
-    return data;
 }
 
 std::string CellsEngine::exportToXLSXPtr() {

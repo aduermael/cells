@@ -36,7 +36,6 @@ import type {
   FormatDetails,
   CellStyle,
   RegisteredStyle,
-  CreateStyleResult,
 } from "./types";
 import type {
   WorkerMessage,
@@ -590,16 +589,6 @@ export class CellsClient {
   async getCellStyleAt(col: number, row: number): Promise<CellStyle> {
     const response = await this._send("getCellStyleAt", { col, row });
     return response as unknown as CellStyle;
-  }
-
-  /**
-   * Create a style definition and get its ID.
-   * @param style Style properties
-   * @returns Result with styleId on success
-   */
-  async createStyle(style: Partial<CellStyle>): Promise<CreateStyleResult> {
-    const response = await this._send("createStyle", { styleJson: JSON.stringify(style) });
-    return response as unknown as CreateStyleResult;
   }
 
   /**

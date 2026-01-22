@@ -24,7 +24,8 @@
 // =============================================================================
 
 import type { CppSyncAdapter } from "./cpp-sync-adapter";
-import type { GridRenderer, RemotePresenceRender } from "./grid-renderer";
+import type { GridRenderer } from "./grid-renderer";
+import type { RemotePresenceRender } from "./grid-constants";
 import type { Position } from "./types";
 
 // =============================================================================

@@ -36,7 +36,6 @@ import type {
   NamedRangeInfo,
   CellStyle,
   RegisteredStyle,
-  CreateStyleResult,
 } from "./types";
 import type { LuauToken, AutocompleteResult } from "./client-types";
 import { getMimeType, toSnakeCase } from "./utils";
@@ -261,11 +260,6 @@ export class WasmDataSource {
   /** Get cell style by position */
   async getCellStyleAt(col: number, row: number): Promise<CellStyle> {
     return this._client.getCellStyleAt(col, row);
-  }
-
-  /** Create a style definition and get its ID */
-  async createStyle(style: Partial<CellStyle>): Promise<CreateStyleResult> {
-    return this._client.createStyle(style);
   }
 
   /** Get all registered styles */

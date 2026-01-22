@@ -24,7 +24,7 @@ import {
     HEADER_HEIGHT,
     DEFAULT_COL_WIDTH,
     DEFAULT_ROW_HEIGHT,
-} from "./grid-renderer";
+} from "./grid-constants";
 import { hasRangeSelection } from "./grid-utils";
 import type { AppEventManagerConfig } from "./app-events";
 

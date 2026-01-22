@@ -95,9 +95,6 @@ export const SyncState = {
   ERROR: "error" as const,
 };
 
-// Also export as CollabState for backwards compatibility with collab-ui.js
-export const CollabState = SyncState;
-
 // ============================================================================
 // EventEmitter
 // ============================================================================

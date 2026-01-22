@@ -27,8 +27,6 @@ import {
     HEADER_WIDTH,
     DEFAULT_COL_WIDTH,
     DEFAULT_ROW_HEIGHT,
-} from "./grid-renderer.js";
-import {
     getZoomFactor,
     getZoomedHeaderWidth,
     getZoomedHeaderHeight,

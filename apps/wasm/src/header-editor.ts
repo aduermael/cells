@@ -31,7 +31,7 @@ import {
   HEADER_WIDTH,
   HEADER_HEIGHT,
   DEFAULT_COL_WIDTH,
-} from "./grid-renderer";
+} from "./grid-constants";
 import type { Position, SheetInfo, CellData } from "./types";
 import type { FormulaHighlight } from "./grid-constants";
 import { colToLetter, getCellAt } from "./grid-utils";

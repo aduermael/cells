@@ -66,29 +66,6 @@ import {
 import { drawFormulaHighlights } from "./grid-formula-renderer.js";
 import { ensureFont, getFallbackFonts } from "./font-loader.js";
 
-// Re-export constants and types for backwards compatibility
-export {
-  HEADER_HEIGHT,
-  HEADER_WIDTH,
-  DEFAULT_COL_WIDTH,
-  DEFAULT_ROW_HEIGHT,
-  CELL_PADDING,
-  PRIMARY_COLOR,
-  SECONDARY_COLOR,
-  COLORS,
-  getGridColors,
-  FORMULA_REF_COLORS,
-  FORMULA_ERROR_COLOR,
-  SPILL_RANGE_COLOR,
-  type GridColors,
-  type NormalizedRange,
-  type RemotePresenceRender,
-  type GridRendererState,
-  type FormulaHighlight,
-  type SpillRangeHighlight,
-} from "./grid-constants.js";
-
-
 /**
  * GridRenderer handles all canvas drawing operations for the spreadsheet
  */

@@ -1490,18 +1490,6 @@ std::string CellsEngine::getCellStyleAt(uint32_t col, uint32_t row) {
     return styleToJson(defaultStyle);
 }
 
-std::string CellsEngine::createStyle(const std::string& styleJson) {
-    if (!_workbook) {
-        return "{\"error\":\"No workbook\"}";
-    }
-
-    // Content-addressed styles: no need to pre-register styles.
-    // Styles are now defined by their content and stored directly on entities.
-    // This method is deprecated but returns success for backward compatibility.
-    (void)styleJson;
-    return "{\"success\":true,\"deprecated\":true,\"message\":\"Styles are now content-addressed\"}";
-}
-
 std::string CellsEngine::getAvailableStyles() {
     if (!_workbook) {
         return "[]";

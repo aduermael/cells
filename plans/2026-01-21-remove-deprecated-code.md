@@ -46,11 +46,11 @@ The `existingOnly=false` parameter is only used for XLSX import. Replace with pr
 
 ### Phase 4: Remove Deprecated Bindings and Dead Code
 
-- [ ] 4a: Remove or refactor `createStyle()` in `bindings_format.cc` (currently returns deprecated message)
-- [ ] 4b: Remove `exportToXLSX()` marked as deprecated in `cells.d.ts` (keep only `exportToXLSXPtr`)
-- [ ] 4c: Remove "for backwards compatibility" re-exports in `grid-renderer.ts`
-- [ ] 4d: Remove CollabState re-export "for backwards compatibility" in `cpp-sync-adapter.ts` and `collab-ui.ts`
-- [ ] 4e: Run tests and fix any failures
+- [x] 4a: Remove or refactor `createStyle()` in `bindings_format.cc` (currently returns deprecated message) - removed from bindings_format.cc, bindings.h, bindings.cc, cells.d.ts, worker-types.ts, worker-handlers.ts, worker.ts, client.ts, wasm-data-source.ts, types.ts
+- [x] 4b: Remove `exportToXLSX()` marked as deprecated in `cells.d.ts` (keep only `exportToXLSXPtr`) - removed from bindings_file.cc, bindings.h, bindings.cc, cells.d.ts, worker-types.ts
+- [x] 4c: Remove "for backwards compatibility" re-exports in `grid-renderer.ts` - updated 10 files to import from grid-constants.js directly
+- [x] 4d: Remove CollabState re-export "for backwards compatibility" in `cpp-sync-adapter.ts` and `collab-ui.ts` - renamed to use SyncState directly
+- [x] 4e: Run tests and fix any failures - all 313 E2E tests pass, all core unit tests pass
 
 ### Phase 5: Remove Legacy Currency Format Aliases
 

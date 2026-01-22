@@ -647,16 +647,6 @@ export function handleGetCellStyleAt(
     respond({ type: "cellStyle", ...result });
 }
 
-export function handleCreateStyle(
-    engine: CellsEngine,
-    params: Record<string, unknown>,
-    respond: RespondFn,
-): void {
-    const { styleJson } = params as { styleJson: string };
-    const result = JSON.parse(engine.createStyle(styleJson));
-    respond({ type: "styleCreated", ...result });
-}
-
 export function handleGetAvailableStyles(
     engine: CellsEngine,
     _params: Record<string, unknown>,

@@ -160,7 +160,6 @@ public:
     std::string setCellStyleAt(uint32_t col, uint32_t row, const std::string& styleJson);
     std::string getCellStyle(const std::string& cellIdStr);
     std::string getCellStyleAt(uint32_t col, uint32_t row);
-    std::string createStyle(const std::string& styleJson);
     std::string getAvailableStyles();
 
     // Range style operations (creates a Range with RANGE_STYLE flag)
@@ -232,7 +231,6 @@ public:
 
     std::string exportToCells();
     std::string exportToCSV();
-    std::string exportToXLSX();
     std::string exportToXLSXPtr();  // Returns {ptr, size} for binary-safe transfer
     void freeExportBuffer();        // Release memory after JS copies the data
     bool hasFormulas();

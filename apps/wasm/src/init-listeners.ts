@@ -20,7 +20,7 @@
 import type { App } from "./app";
 import type { SheetTabsManager } from "./sheet-tabs";
 import type { DataChangeType } from "./wasm-data-source";
-import { DEFAULT_COL_WIDTH, DEFAULT_ROW_HEIGHT } from "./grid-renderer";
+import { DEFAULT_COL_WIDTH, DEFAULT_ROW_HEIGHT } from "./grid-constants";
 
 // =============================================================================
 // Types
