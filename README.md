@@ -319,7 +319,7 @@ bazel run :e2e-headed           # All tests
 bazel run :e2e-headed -- smoke  # Single test
 ```
 
-**Available tests:** smoke, formula, editing, column-move, clipboard, selection, script, collab, initial-sync, collab-demo
+**Available tests:** smoke, formula, editing, column-move, clipboard, selection, collab, initial-sync, collab-demo, merged-cells, named-ranges, borders, format, zoom-*, and more (see `apps/wasm/tests/` for full list)
 
 Test files are in `apps/wasm/tests/`:
 - `harness.mjs` - Test harness (starts server + Chrome)
@@ -411,33 +411,12 @@ Cells works exactly like Excel out of the box. Advanced features are **opt-in an
 2. **Discover gradually**: Column typing, validation, relations are there when you need them
 3. **Never locked in**: Always export to XLSX (with clear warnings about feature loss)
 
-### Stickiness Through Features Excel Can't Represent
+### Planned: Features Excel Can't Represent
 
-These features create value that keeps users in Cells:
+These features are planned to create value that keeps users in Cells:
 
 - **Relations**: Link cells to rows in other sheets (stable UUID references, not fragile A1)
 - **Select/Multi-select**: Dropdown options with colors (stored in column, not data validation hacks)
 - **Column validation**: Required fields, unique constraints, regex patterns
 - **Views**: Multiple views of same data (grid, kanban, calendar, gallery)
 - **API-first**: Every sheet is queryable via API
-
-**Critical**: When exporting to XLSX, clearly inform users which features will be lost:
-
-```
-⚠ Export to Excel
-
-These features will be lost:
-• Column "Status" - Select options and colors
-• Column "Project" - Relation to Projects sheet (will become plain text)
-• Column "Email" - Validation pattern
-
-The data itself will be preserved. Continue?
-```
-
-### Not AirTable
-
-AirTable enforces structure. We don't:
-- **AirTable**: Must define field types upfront, structured-first
-- **Cells**: Type anywhere, constrain later (or never), spreadsheet-first
-
-Column types in Cells are like training wheels you can add to any column at any time - not a requirement to use the product.

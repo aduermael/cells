@@ -32,7 +32,7 @@ Review and update all documentation files to accurately reflect current codebase
 
 ## Phase 1: Core Documentation (README, Getting Started, Agents)
 
-- [ ] 1a: Review and update `README.md` - verify architecture diagram accuracy, update stats, remove future items
+- [x] 1a: Review and update `README.md` - updated stats, fixed E2E test list, marked unimplemented features as planned
 - [ ] 1b: Review and update `GETTING_STARTED.md` - verify build commands work, update CLI examples
 - [ ] 1c: Review and update `AGENTS.md` - verify guidelines match current workflow
 
