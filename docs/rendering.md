@@ -11,8 +11,13 @@ Rendering is handled by **TypeScript Canvas2D** in the browser. The C++ core pro
 | Selection rendering | Implemented |
 | Column/row resize preview | Implemented |
 | Drag-and-drop ghost | Implemented |
-| Formula bar highlights | Implemented |
+| Formula reference highlights | Implemented |
 | Presence cursors (collab) | Implemented |
+| Zoom (10%-400%) | Implemented |
+| Fill handle and fill preview | Implemented |
+| Spill range highlight | Implemented |
+| Text wrapping | Implemented |
+| Cell borders | Implemented |
 
 ## Architecture
 
@@ -59,18 +64,19 @@ The visible area of the spreadsheet:
 3. Find visible cells based on scroll position
 4. Generate cell layout info (position, size, selection state)
 
-### Draw Commands
+### Canvas2D Operations
 
-Abstract platform-independent drawing operations:
+The TypeScript renderer draws directly to Canvas2D (no intermediate draw commands):
 
-| Command | Purpose |
-|---------|---------|
-| `DRAW_RECT` | Cell backgrounds, selection highlight |
-| `DRAW_TEXT` | Cell content |
-| `DRAW_LINE` | Grid lines |
-| `DRAW_CLIP_PUSH/POP` | Clipping for cell overflow |
+| Method | Purpose |
+|--------|---------|
+| `fillRect()` | Cell backgrounds, selection highlight |
+| `fillText()` | Cell content, headers |
+| `strokeRect()` | Cell borders, selection borders |
+| `moveTo()/lineTo()` | Grid lines |
+| `save()/clip()/restore()` | Clipping for cell content overflow |
 
-The core generates a draw list; platform backends interpret it.
+The C++ core provides data (cell values, formatted text, styles) but does not generate draw commands.
 
 ## Rendering Pipeline
 
@@ -149,15 +155,22 @@ The actual implementation is in TypeScript at `apps/wasm/src/grid-renderer.ts` u
 The `render()` method draws in this order:
 
 1. **Clear canvas** - Full clear each frame (no dirty tracking)
-2. **Grid lines** - Vertical and horizontal lines in cell area
-3. **Cell values** - Text content with clipping per cell
-4. **Column selection** - Highlight if column selected
-5. **Row selection** - Highlight if row selected
-6. **Cell/Range selection** - Border and fill for selected cells
-7. **Column headers** - A, B, C... with selection highlight
-8. **Row headers** - 1, 2, 3... with selection highlight
-9. **Corner** - Top-left fixed area
-10. **Header borders** - Lines separating headers from cells
+2. **Cell background** - Fill cell area with theme background color
+3. **Grid lines** - Vertical and horizontal lines in cell area
+4. **Style range backgrounds** - Background colors for styled empty cell ranges
+5. **Cell backgrounds** - Background colors for individual cells
+6. **Cell borders** - Custom borders with edge deduplication
+7. **Cell values** - Text content with clipping per cell
+8. **Formula highlights** - Colored boxes for formula references during editing
+9. **Spill range highlight** - Blue dashed border for dynamic array spill ranges
+10. **Column/row selection** - Highlight if column or row selected
+11. **Cell/Range selection** - Border and fill for selected cells
+12. **Fill handle** - Small square at selection corner for drag-fill
+13. **Fill preview** - Dashed border during fill handle drag
+14. **Column headers** - A, B, C... with selection highlight
+15. **Row headers** - 1, 2, 3... with selection highlight
+16. **Corner** - Top-left fixed area
+17. **Header borders** - Lines separating headers from cells
 
 ### High-DPI Support
 
@@ -183,23 +196,62 @@ Special handling for column/row reordering:
 
 ### Color Palette
 
+Theme-aware colors via CSS variables with fallback values:
+
 ```typescript
 const COLORS = {
-    gridLine: '#f0f0f0',      // Subtle grid
+    gridLine: '#f0f0f0',      // Subtle grid lines
     headerBg: '#f8f9fa',      // Header background
     headerBorder: '#dee2e6',  // Header border
+    headerSeparator: 'rgba(0, 0, 0, 0.06)', // Subtle separators
     headerText: '#495057',    // Header text
     cellText: '#212529',      // Cell text
-    selectionBorder: '#0d6efd', // Selection border (blue)
-    selectionBg: 'rgba(13, 110, 253, 0.1)', // Selection fill
+    cellBg: '#ffffff',        // Cell background
+    selectionBorder: '#058601', // Selection border (green)
+    selectionBg: 'rgba(5, 134, 1, 0.1)', // Selection fill
     cornerBg: '#e9ecef'       // Corner background
 } as const;
 ```
 
+Colors are dynamically loaded from CSS variables at render time to support dark mode.
+
+### Formula Reference Colors
+
+When editing formulas, each reference gets a unique color for visual identification:
+
+```typescript
+const FORMULA_REF_COLORS = [
+  { border: '#4285f4', bg: 'rgba(66, 133, 244, 0.15)' },  // Blue
+  { border: '#ea4335', bg: 'rgba(234, 67, 53, 0.15)' },   // Red
+  { border: '#fbbc04', bg: 'rgba(251, 188, 4, 0.15)' },   // Yellow
+  { border: '#34a853', bg: 'rgba(52, 168, 83, 0.15)' },   // Green
+  { border: '#ff6d00', bg: 'rgba(255, 109, 0, 0.15)' },   // Orange
+  { border: '#ab47bc', bg: 'rgba(171, 71, 188, 0.15)' },  // Purple
+  { border: '#00acc1', bg: 'rgba(0, 172, 193, 0.15)' },   // Cyan
+  { border: '#8d6e63', bg: 'rgba(141, 110, 99, 0.15)' },  // Brown
+];
+```
+
+### Zoom Support
+
+Zoom is implemented via dimension scaling during rendering (not CSS transform):
+
+```typescript
+// Zoom range: 10% - 400%
+renderer.setZoomScale(150);  // Set to 150%
+
+// Zoom affects all dimensions:
+// - Header width/height
+// - Column widths and row heights
+// - Cell padding
+// - Font sizes
+```
+
+Zoom state is stored in SheetInfo and persisted with the sheet.
+
 ### Future Improvements
 
 - **Dirty region tracking** - Currently full redraw every frame
-- **Zoom** - Not yet supported
 - **Smooth scrolling easing** - Direct scroll position updates
 
 ---
@@ -241,13 +293,12 @@ The viewport query system uses Order-Statistic Trees (augmented red-black trees)
 ### Order-Statistic Tree
 
 Each node stores:
-- `id`: Axis UUID (column or row)
+- `id`: 8-char base62 UUID (column or row identifier)
 - `size`: Pixel width/height of this axis
 - `subtree_total`: Sum of sizes in this subtree (used for O(log n) offset lookups)
-- `position`: Logical position (for ordering)
 - Red-black tree pointers (left, right, parent) and color
 
-The `subtree_total` augmentation enables O(log n) pixel-to-axis lookups by walking down the tree and tracking cumulative offsets.
+Position is implicit from tree structure (in-order traversal order), not stored in nodes. The `subtree_total` augmentation enables O(log n) pixel-to-axis lookups by walking down the tree and tracking cumulative offsets.
 
 ### Integration with TypeScript
 
@@ -280,6 +331,14 @@ Memory per axis: ~48 bytes (UUID + size + subtree_total + pointers + balance)
 
 | File | Description |
 |------|-------------|
+| `apps/wasm/src/grid-renderer.ts` | Main GridRenderer class with render() method |
+| `apps/wasm/src/grid-constants.ts` | Constants, colors, zoom helpers, shared types |
+| `apps/wasm/src/grid-header-renderer.ts` | Column/row header rendering |
+| `apps/wasm/src/grid-selection-renderer.ts` | Selection, fill handle, spill range rendering |
+| `apps/wasm/src/grid-presence-renderer.ts` | Remote user cursors and selections |
+| `apps/wasm/src/grid-formula-renderer.ts` | Formula reference highlight rendering |
+| `apps/wasm/src/grid-events.ts` | Mouse/keyboard event handling |
+| `apps/wasm/src/grid-utils.ts` | Cell bounds calculation utilities |
 | `core/cells/ostree.h/cc` | Generic Order-Statistic Tree implementation |
 | `core/cells/axis_index.h/cc` | AxisIndex wrapping OSTree for column/row indexing |
 | `core/cells/viewport_index.h/cc` | ViewportIndex combining two AxisIndexes + cell HashMap |
