@@ -105,16 +105,16 @@ static ID getPercentageFormatId(uint8_t decimals) {
 static ID getCurrencyFormatId(uint8_t decimals) {
     switch (decimals) {
         case 0:
-            return BuiltInFormats::CURRENCY_0;
+            return BuiltInFormats::CURRENCY_USD_0;
         case 1:
-            return BuiltInFormats::CURRENCY_1;
+            return BuiltInFormats::CURRENCY_USD_1;
         case 2:
-            return BuiltInFormats::CURRENCY_2;
+            return BuiltInFormats::CURRENCY_USD_2;
         case 3:
-            return BuiltInFormats::CURRENCY_3;
+            return BuiltInFormats::CURRENCY_USD_3;
         case 4:
         default:
-            return BuiltInFormats::CURRENCY_4;
+            return BuiltInFormats::CURRENCY_USD_4;
     }
 }
 

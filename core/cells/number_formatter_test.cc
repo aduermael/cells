@@ -426,7 +426,7 @@ TEST(FormatWithFormatTest, CurrencyFormat) {
 
 TEST(FormatNumberTest, WithRegistry) {
     NumberFormatRegistry registry;
-    auto result = formatNumber(registry, 1234.56, BuiltInFormats::CURRENCY_2);
+    auto result = formatNumber(registry, 1234.56, BuiltInFormats::CURRENCY_USD_2);
     EXPECT_FALSE(result.isError);
     EXPECT_EQ(result.text, "$1,234.56");
 }
@@ -614,7 +614,7 @@ TEST(EditValueTest, PercentageWithDecimalsReturnsPercentString) {
 TEST(EditValueTest, CurrencyReturnsRawValue) {
     NumberFormatRegistry registry;
     // Currency should return raw value, not formatted display
-    auto editValue = formatEditValue(registry, 1000.56, BuiltInFormats::CURRENCY_2);
+    auto editValue = formatEditValue(registry, 1000.56, BuiltInFormats::CURRENCY_USD_2);
     // Should return "1000.56" not "$1,000.56"
     EXPECT_EQ(editValue, "1000.56");
 }
@@ -641,7 +641,7 @@ TEST(EditValueTest, NullFormatIdReturnsRawValue) {
 
 TEST(EditValueTest, IntegerReturnsWithoutDecimals) {
     NumberFormatRegistry registry;
-    auto editValue = formatEditValue(registry, 1000.0, BuiltInFormats::CURRENCY_2);
+    auto editValue = formatEditValue(registry, 1000.0, BuiltInFormats::CURRENCY_USD_2);
     // Integer value should show without unnecessary decimals
     EXPECT_EQ(editValue, "1000");
 }

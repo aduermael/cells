@@ -112,14 +112,14 @@ TEST(CurrencyParsingTest, SimpleDollar) {
     EXPECT_TRUE(result.success);
     EXPECT_DOUBLE_EQ(result.numericValue, 1234.0);
     EXPECT_EQ(result.formatCategory, NumberFormatCategory::CURRENCY);
-    EXPECT_EQ(result.formatId, BuiltInFormats::CURRENCY_0);
+    EXPECT_EQ(result.formatId, BuiltInFormats::CURRENCY_USD_0);
 }
 
 TEST(CurrencyParsingTest, DollarWithDecimals) {
     auto result = parseCurrency("$1,234.56");
     EXPECT_TRUE(result.success);
     EXPECT_DOUBLE_EQ(result.numericValue, 1234.56);
-    EXPECT_EQ(result.formatId, BuiltInFormats::CURRENCY_2);
+    EXPECT_EQ(result.formatId, BuiltInFormats::CURRENCY_USD_2);
 }
 
 TEST(CurrencyParsingTest, NegativeDollar) {
@@ -140,19 +140,19 @@ TEST(CurrencyParsingTest, NoCurrencySymbol) {
 }
 
 TEST(CurrencyParsingTest, OneDecimalPlace) {
-    // $99.9 has 1 decimal place, so should use CURRENCY_1
+    // $99.9 has 1 decimal place, so should use CURRENCY_USD_1
     auto result = parseCurrency("$99.9");
     EXPECT_TRUE(result.success);
     EXPECT_DOUBLE_EQ(result.numericValue, 99.9);
-    EXPECT_EQ(result.formatId, BuiltInFormats::CURRENCY_1);
+    EXPECT_EQ(result.formatId, BuiltInFormats::CURRENCY_USD_1);
 }
 
 TEST(CurrencyParsingTest, ThreeDecimalPlaces) {
-    // $99.999 has 3 decimal places, so should use CURRENCY_3
+    // $99.999 has 3 decimal places, so should use CURRENCY_USD_3
     auto result = parseCurrency("$99.999");
     EXPECT_TRUE(result.success);
     EXPECT_DOUBLE_EQ(result.numericValue, 99.999);
-    EXPECT_EQ(result.formatId, BuiltInFormats::CURRENCY_3);
+    EXPECT_EQ(result.formatId, BuiltInFormats::CURRENCY_USD_3);
 }
 
 // =============================================================================

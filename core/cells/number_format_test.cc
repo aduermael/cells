@@ -93,12 +93,12 @@ TEST(NumberFormatRegistryTest, BuiltInFormatsExist) {
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_SEP3));
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::NUMBER_SEP4));
 
-    // Currency formats (0-4 decimal places)
-    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_0));
-    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_1));
-    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_2));
-    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_3));
-    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_4));
+    // Currency formats - USD (0-4 decimal places)
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_USD_0));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_USD_1));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_USD_2));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_USD_3));
+    EXPECT_TRUE(registry.hasFormat(BuiltInFormats::CURRENCY_USD_4));
 
     // Accounting formats
     EXPECT_TRUE(registry.hasFormat(BuiltInFormats::ACCOUNTING_0));
@@ -140,7 +140,7 @@ TEST(NumberFormatRegistryTest, GetDefaultFormat) {
 TEST(NumberFormatRegistryTest, GetFormat) {
     NumberFormatRegistry registry;
 
-    const NumberFormat* currencyFmt = registry.getFormat(BuiltInFormats::CURRENCY_2);
+    const NumberFormat* currencyFmt = registry.getFormat(BuiltInFormats::CURRENCY_USD_2);
     ASSERT_NE(currencyFmt, nullptr);
     EXPECT_EQ(currencyFmt->category, NumberFormatCategory::CURRENCY);
     EXPECT_EQ(currencyFmt->decimalPlaces, 2);
@@ -178,9 +178,9 @@ TEST(NumberFormatRegistryTest, CannotRegisterDuplicate) {
 TEST(NumberFormatRegistryTest, GetFormatsByCategory) {
     NumberFormatRegistry registry;
 
-    // Currency formats: 5 legacy USD + 5 USD + 5 EUR + 5 GBP + 5 JPY + 5 CNY = 30
+    // Currency formats: 5 USD + 5 EUR + 5 GBP + 5 JPY + 5 CNY = 25
     auto currencyFormats = registry.getFormatsByCategory(NumberFormatCategory::CURRENCY);
-    EXPECT_EQ(currencyFormats.size(), 30);
+    EXPECT_EQ(currencyFormats.size(), 25);
 
     auto dateFormats = registry.getFormatsByCategory(NumberFormatCategory::DATE);
     EXPECT_EQ(dateFormats.size(), 3);  // DATE_SHORT, DATE_LONG, DATE_ISO
@@ -194,11 +194,11 @@ TEST(NumberFormatRegistryTest, GetAllFormats) {
     NumberFormatRegistry registry;
 
     const auto& allFormats = registry.getAllFormats();
-    // Should have all built-in formats (56 total)
+    // Should have all built-in formats (51 total)
     // 1 General + 5 Number (0-4 decimals) + 5 Number with separators (0-4 decimals) +
-    // 30 Currency (5 legacy + 5 USD + 5 EUR + 5 GBP + 5 JPY + 5 CNY) + 2 Accounting +
+    // 25 Currency (5 USD + 5 EUR + 5 GBP + 5 JPY + 5 CNY) + 2 Accounting +
     // 5 Percentage (0-4 decimals) + 3 Date + 2 Time + 1 DateTime + 1 Scientific + 1 Text
-    EXPECT_EQ(allFormats.size(), 56);
+    EXPECT_EQ(allFormats.size(), 51);
 }
 
 TEST(BuiltInFormatsTest, VerifyFormatCodes) {
@@ -567,11 +567,6 @@ TEST(GetFormatDetailsTest, Currency) {
               R"({"category":"currency","decimals":2,"separator":true,"currency":"USD"})");
     EXPECT_EQ(getFormatDetails("CEUR_004"),
               R"({"category":"currency","decimals":4,"separator":true,"currency":"EUR"})");
-}
-
-TEST(GetFormatDetailsTest, LegacyCurrency) {
-    EXPECT_EQ(getFormatDetails("FMT_C002"),
-              R"({"category":"currency","decimals":2,"separator":true,"currency":"USD"})");
 }
 
 TEST(GetFormatDetailsTest, BuiltInFormats) {

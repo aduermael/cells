@@ -54,10 +54,10 @@ The `existingOnly=false` parameter is only used for XLSX import. Replace with pr
 
 ### Phase 5: Remove Legacy Currency Format Aliases
 
-- [ ] 5a: Remove `CURRENCY_0` through `CURRENCY_4` legacy aliases from `number_format.h`
-- [ ] 5b: Remove legacy USD currency format ID constants from `number_format.cc`
-- [ ] 5c: Update any code still using the legacy aliases to use the new format IDs
-- [ ] 5d: Run tests and fix any failures
+- [x] 5a: Remove `CURRENCY_0` through `CURRENCY_4` legacy aliases from `number_format.h`
+- [x] 5b: Remove legacy USD currency format ID constants from `number_format.cc` - also removed FMT_C0XX parsing from parseFormatId() and getFormatDetails()
+- [x] 5c: Update any code still using the legacy aliases to use the new format IDs - updated input_parser.cc, number_format_test.cc, number_formatter_test.cc, input_parser_test.cc
+- [x] 5d: Run tests and fix any failures - all 313 E2E tests pass, all core unit tests pass
 
 ### Phase 6: Clean Up Deprecated Comments and Documentation
 

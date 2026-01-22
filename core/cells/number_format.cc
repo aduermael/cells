@@ -132,14 +132,7 @@ const ID NUMBER_SEP2("FMT_NS02");
 const ID NUMBER_SEP3("FMT_NS03");
 const ID NUMBER_SEP4("FMT_NS04");
 
-// Legacy USD currency format IDs (for backward compatibility)
-const ID CURRENCY_0("FMT_C000");
-const ID CURRENCY_1("FMT_C001");
-const ID CURRENCY_2("FMT_C002");
-const ID CURRENCY_3("FMT_C003");
-const ID CURRENCY_4("FMT_C004");
-
-// USD currency formats (new naming, 8 chars: CUSD_0XX)
+// USD currency formats (8 chars: CUSD_0XX)
 const ID CURRENCY_USD_0("CUSD_000");
 const ID CURRENCY_USD_1("CUSD_001");
 const ID CURRENCY_USD_2("CUSD_002");
@@ -231,18 +224,6 @@ std::string getFormatDetails(const std::string& formatId) {
                "\",\"decimals\":" + std::to_string(parsed.decimalPlaces) +
                ",\"separator\":" + (parsed.useThousandsSeparator ? "true" : "false") +
                ",\"currency\":" + currencyJson + "}";
-    }
-
-    // Handle legacy currency formats (FMT_C0XX)
-    if (formatId.size() == 8 && formatId.substr(0, 5) == "FMT_C" && formatId[5] == '0') {
-        if (std::isdigit(static_cast<unsigned char>(formatId[6])) != 0 &&
-            std::isdigit(static_cast<unsigned char>(formatId[7])) != 0) {
-            const int decimals = (formatId[6] - '0') * 10 + (formatId[7] - '0');
-            if (decimals <= 15) {
-                return "{\"category\":\"currency\",\"decimals\":" + std::to_string(decimals) +
-                       ",\"separator\":true,\"currency\":\"USD\"}";
-            }
-        }
     }
 
     // Handle non-parseable built-in formats
@@ -364,24 +345,6 @@ ParsedFormatId parseFormatId(const std::string& id) {
                 result.category = NumberFormatCategory::NUMBER;
                 result.decimalPlaces = static_cast<uint8_t>(decimals);
                 result.useThousandsSeparator = true;
-                result.valid = true;
-                return result;
-            }
-        }
-    }
-
-    // Pattern: FMT_C0XX (legacy currency format with XX decimal places, USD only)
-    // Example: FMT_C002 = USD currency with 2 decimal places
-    if (id.size() == 8 && id.substr(0, 5) == "FMT_C" && id[5] == '0') {
-        if (std::isdigit(static_cast<unsigned char>(id[6])) != 0 &&
-            std::isdigit(static_cast<unsigned char>(id[7])) != 0) {
-            const int decimals = (id[6] - '0') * 10 + (id[7] - '0');
-            if (decimals <= 15) {
-                result.category = NumberFormatCategory::CURRENCY;
-                result.decimalPlaces = static_cast<uint8_t>(decimals);
-                result.useThousandsSeparator = true;
-                result.currencyCode = "USD";
-                result.currencySymbol = "$";
                 result.valid = true;
                 return result;
             }
@@ -549,19 +512,6 @@ void NumberFormatRegistry::initBuiltInFormats() {
     getOrCreateFormat(BuiltInFormats::NUMBER_SEP2);
     getOrCreateFormat(BuiltInFormats::NUMBER_SEP3);
     getOrCreateFormat(BuiltInFormats::NUMBER_SEP4);
-
-    // Legacy currency formats (FMT_C0XX) - must be registered manually as they
-    // don't follow the CXXX_0YY pattern
-    formats_[BuiltInFormats::CURRENCY_0] =
-        NumberFormat(BuiltInFormats::CURRENCY_0, Cat::CURRENCY, "$#,##0", 0, true, "$", false);
-    formats_[BuiltInFormats::CURRENCY_1] =
-        NumberFormat(BuiltInFormats::CURRENCY_1, Cat::CURRENCY, "$#,##0.0", 1, true, "$", false);
-    formats_[BuiltInFormats::CURRENCY_2] =
-        NumberFormat(BuiltInFormats::CURRENCY_2, Cat::CURRENCY, "$#,##0.00", 2, true, "$", false);
-    formats_[BuiltInFormats::CURRENCY_3] =
-        NumberFormat(BuiltInFormats::CURRENCY_3, Cat::CURRENCY, "$#,##0.000", 3, true, "$", false);
-    formats_[BuiltInFormats::CURRENCY_4] =
-        NumberFormat(BuiltInFormats::CURRENCY_4, Cat::CURRENCY, "$#,##0.0000", 4, true, "$", false);
 
     // Currency formats - USD (CXXX_0YY pattern) - use dynamic system
     getOrCreateFormat(BuiltInFormats::CURRENCY_USD_0);

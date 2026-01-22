@@ -104,13 +104,6 @@ extern const ID NUMBER_SEP2;  // Thousands separator, 2 decimals
 extern const ID NUMBER_SEP3;  // Thousands separator, 3 decimals
 extern const ID NUMBER_SEP4;  // Thousands separator, 4 decimals
 
-// Currency formats - USD (0-4 decimal places)
-extern const ID CURRENCY_0;  // $1,234 (USD, 0 decimals) - legacy alias
-extern const ID CURRENCY_1;  // $1,234.5 (USD, 1 decimal) - legacy alias
-extern const ID CURRENCY_2;  // $1,234.56 (USD, 2 decimals) - legacy alias
-extern const ID CURRENCY_3;  // $1,234.567 (USD, 3 decimals) - legacy alias
-extern const ID CURRENCY_4;  // $1,234.5678 (USD, 4 decimals) - legacy alias
-
 // Currency formats - USD
 extern const ID CURRENCY_USD_0;  // $1,234
 extern const ID CURRENCY_USD_1;  // $1,234.5
