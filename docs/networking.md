@@ -29,7 +29,6 @@
 | C++ Sync Adapter | ✅ Implemented | `cpp-sync-adapter.js` (thin wrapper over C++) |
 | Presence UI | ✅ Implemented | `presence.js` (renders remote cursors) |
 | Collab UI | ✅ Implemented | `collab-ui.js` (status indicator) |
-| Legacy JS (deprecated) | ⚠️ Deprecated | `webrtc-manager.js`, `signaling-client.js`, `collab-manager.js` |
 
 The P2P collaboration layer is fully functional. Sync logic lives in C++ (`core/net/`) for cross-platform reuse. JavaScript is now a thin wrapper that handles UI rendering only. Presence data (cursors, selections) is broadcast in real-time but intentionally ephemeral - it is never stored in files or the Workbook.
 
