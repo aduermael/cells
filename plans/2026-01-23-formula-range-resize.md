@@ -113,7 +113,7 @@ Detect when the mouse is over formula highlight interaction zones and show appro
 
 Handle mouse drag to move or resize formula ranges and update the formula text.
 
-- [ ] 3a: Add formula range manipulation state tracking
+- [x] 3a: Add formula range manipulation state tracking
   ```typescript
   interface FormulaRangeDragState {
     action: "move" | "resize";
@@ -124,15 +124,19 @@ Handle mouse drag to move or resize formula ranges and update the formula text.
     dragStartCell: { col, row };  // Grid cell where drag started
   }
   ```
+  - Added `FormulaRangeDragState` interface in formula-interaction.ts
+  - Added `formulaRangeDragState` property to MouseEventHandlers
+  - Added helper functions: `createDragState()`, `calculateResizedRange()`, `calculateMovedRange()`, `rangeToA1Notation()`
 
-- [ ] 3b: Handle mousedown on formula highlight interaction zone
+- [x] 3b: Handle mousedown on formula highlight interaction zone
   - When in formula editing mode and clicking a border or corner:
   - Determine action (resize for corners, move for borders)
   - Set drag state, capture pointer
   - Store original range bounds and source position
   - Change cursor to `grabbing` for move actions
+  - Integrated hit testing in handleMouseDown before fill handle check
 
-- [ ] 3c: Handle mousemove during formula range manipulation
+- [x] 3c: Handle mousemove during formula range manipulation
   - **For resize**: Calculate new range bounds based on which corner is dragged
     - Only the dragged corner moves, opposite corner stays fixed
     - Minimum size is 1 cell
@@ -141,18 +145,18 @@ Handle mouse drag to move or resize formula ranges and update the formula text.
     - Clamp to valid grid coordinates (>= 0)
   - Generate new reference text
   - Call `replaceReferenceAtPosition()` to update formula
-  - Formula highlights update automatically
+  - Formula highlights update automatically via existing infrastructure
 
-- [ ] 3d: Handle mouseup to complete manipulation
+- [x] 3d: Handle mouseup to complete manipulation
   - Clear drag state
   - Release pointer capture
   - Restore cursor to `grab` or default
   - Focus back on formula editor
 
-- [ ] 3e: Handle Escape to cancel manipulation
-  - Restore original reference text
-  - Clear drag state
-  - Focus back on formula editor
+- [x] 3e: Handle Escape to cancel manipulation
+  - Added `cancelFormulaRangeDrag()` method that restores original reference text
+  - Added document keydown listener for Escape during formula range drag
+  - Clears drag state and focuses back on formula editor
 
 ---
 

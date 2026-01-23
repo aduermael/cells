@@ -4,8 +4,29 @@
 import {
   type CornerPosition,
   type BorderPosition,
+  type FormulaHighlight,
 } from "./grid-constants.js";
 import { computeFormulaInteractionZones, type FormulaHighlightRendererState } from "./grid-formula-renderer.js";
+import { colToLetter } from "./grid-utils.js";
+
+/**
+ * State for tracking formula range drag operations (move/resize).
+ */
+export interface FormulaRangeDragState {
+  action: "move" | "resize";
+  highlightIndex: number;
+  corner?: CornerPosition;  // For resize
+  border?: BorderPosition;  // For move
+  originalRange: {
+    startCol: number;
+    startRow: number;
+    endCol: number;
+    endRow: number;
+  };
+  sourcePosition: { start: number; end: number };  // Position in formula text
+  dragStartCell: { col: number; row: number };  // Grid cell where drag started
+  highlight: FormulaHighlight;  // Reference to the highlight being manipulated
+}
 
 /**
  * Result of hit testing a formula highlight interaction zone.
@@ -126,4 +147,206 @@ export function getCursorForHitResult(
   }
 
   return "default";
+}
+
+/**
+ * Create a drag state from a hit result and the corresponding highlight.
+ *
+ * @param hitResult The hit test result
+ * @param highlight The formula highlight being manipulated
+ * @param highlightIndex Index of the highlight
+ * @param dragStartCell Grid cell where drag started
+ * @returns FormulaRangeDragState or null if highlight type not supported
+ */
+export function createDragState(
+  hitResult: FormulaHighlightHitResult,
+  highlight: FormulaHighlight,
+  dragStartCell: { col: number; row: number }
+): FormulaRangeDragState | null {
+  // Extract range from highlight
+  let startCol: number, startRow: number, endCol: number, endRow: number;
+
+  if (highlight.type === "cell" && highlight.col !== undefined && highlight.row !== undefined) {
+    startCol = highlight.col;
+    startRow = highlight.row;
+    endCol = highlight.col;
+    endRow = highlight.row;
+  } else if (
+    highlight.type === "range" &&
+    highlight.startCol !== undefined &&
+    highlight.startRow !== undefined &&
+    highlight.endCol !== undefined &&
+    highlight.endRow !== undefined
+  ) {
+    startCol = highlight.startCol;
+    startRow = highlight.startRow;
+    endCol = highlight.endCol;
+    endRow = highlight.endRow;
+  } else {
+    // Column/row references and named ranges not supported for resize/move
+    return null;
+  }
+
+  return {
+    action: hitResult.action,
+    highlightIndex: hitResult.highlightIndex,
+    corner: hitResult.corner,
+    border: hitResult.border,
+    originalRange: { startCol, startRow, endCol, endRow },
+    sourcePosition: { start: highlight.sourceStart, end: highlight.sourceEnd },
+    dragStartCell,
+    highlight,
+  };
+}
+
+/**
+ * Calculate new range bounds based on resize operation.
+ * The dragged corner moves, opposite corner stays fixed.
+ *
+ * @param dragState Current drag state
+ * @param currentCell Current mouse position in grid coordinates
+ * @returns New range bounds { startCol, startRow, endCol, endRow }
+ */
+export function calculateResizedRange(
+  dragState: FormulaRangeDragState,
+  currentCell: { col: number; row: number }
+): { startCol: number; startRow: number; endCol: number; endRow: number } {
+  const { originalRange, corner } = dragState;
+  let { startCol, startRow, endCol, endRow } = originalRange;
+
+  // Normalize so start <= end
+  const minCol = Math.min(startCol, endCol);
+  const maxCol = Math.max(startCol, endCol);
+  const minRow = Math.min(startRow, endRow);
+  const maxRow = Math.max(startRow, endRow);
+
+  // Move the appropriate corner based on which one is being dragged
+  let newMinCol = minCol;
+  let newMaxCol = maxCol;
+  let newMinRow = minRow;
+  let newMaxRow = maxRow;
+
+  switch (corner) {
+    case "nw": // Top-left corner
+      newMinCol = currentCell.col;
+      newMinRow = currentCell.row;
+      break;
+    case "ne": // Top-right corner
+      newMaxCol = currentCell.col;
+      newMinRow = currentCell.row;
+      break;
+    case "sw": // Bottom-left corner
+      newMinCol = currentCell.col;
+      newMaxRow = currentCell.row;
+      break;
+    case "se": // Bottom-right corner
+      newMaxCol = currentCell.col;
+      newMaxRow = currentCell.row;
+      break;
+  }
+
+  // Ensure min <= max (swap if needed due to drag crossing)
+  if (newMinCol > newMaxCol) {
+    [newMinCol, newMaxCol] = [newMaxCol, newMinCol];
+  }
+  if (newMinRow > newMaxRow) {
+    [newMinRow, newMaxRow] = [newMaxRow, newMinRow];
+  }
+
+  // Clamp to valid grid coordinates
+  newMinCol = Math.max(0, newMinCol);
+  newMinRow = Math.max(0, newMinRow);
+  newMaxCol = Math.max(0, newMaxCol);
+  newMaxRow = Math.max(0, newMaxRow);
+
+  return {
+    startCol: newMinCol,
+    startRow: newMinRow,
+    endCol: newMaxCol,
+    endRow: newMaxRow,
+  };
+}
+
+/**
+ * Calculate new range bounds based on move operation.
+ * All corners move by the same delta.
+ *
+ * @param dragState Current drag state
+ * @param currentCell Current mouse position in grid coordinates
+ * @returns New range bounds { startCol, startRow, endCol, endRow }
+ */
+export function calculateMovedRange(
+  dragState: FormulaRangeDragState,
+  currentCell: { col: number; row: number }
+): { startCol: number; startRow: number; endCol: number; endRow: number } {
+  const { originalRange, dragStartCell } = dragState;
+
+  // Calculate delta from drag start
+  const deltaCol = currentCell.col - dragStartCell.col;
+  const deltaRow = currentCell.row - dragStartCell.row;
+
+  // Normalize original range
+  const minCol = Math.min(originalRange.startCol, originalRange.endCol);
+  const maxCol = Math.max(originalRange.startCol, originalRange.endCol);
+  const minRow = Math.min(originalRange.startRow, originalRange.endRow);
+  const maxRow = Math.max(originalRange.startRow, originalRange.endRow);
+
+  // Apply delta
+  let newMinCol = minCol + deltaCol;
+  let newMaxCol = maxCol + deltaCol;
+  let newMinRow = minRow + deltaRow;
+  let newMaxRow = maxRow + deltaRow;
+
+  // Clamp to valid grid coordinates (>= 0)
+  // If the range would go negative, shift it back
+  if (newMinCol < 0) {
+    const shift = -newMinCol;
+    newMinCol = 0;
+    newMaxCol += shift;
+  }
+  if (newMinRow < 0) {
+    const shift = -newMinRow;
+    newMinRow = 0;
+    newMaxRow += shift;
+  }
+
+  return {
+    startCol: newMinCol,
+    startRow: newMinRow,
+    endCol: newMaxCol,
+    endRow: newMaxRow,
+  };
+}
+
+/**
+ * Convert range coordinates to A1 notation.
+ * Returns "A1" for single cells, "A1:B5" for ranges.
+ *
+ * @param startCol Start column (0-indexed)
+ * @param startRow Start row (0-indexed)
+ * @param endCol End column (0-indexed)
+ * @param endRow End row (0-indexed)
+ * @returns A1 notation string
+ */
+export function rangeToA1Notation(
+  startCol: number,
+  startRow: number,
+  endCol: number,
+  endRow: number
+): string {
+  // Convert to 1-indexed rows
+  const startRowNum = startRow + 1;
+  const endRowNum = endRow + 1;
+
+  // Convert columns to letters
+  const startColLetter = colToLetter(startCol);
+  const endColLetter = colToLetter(endCol);
+
+  // Check if it's a single cell
+  if (startCol === endCol && startRow === endRow) {
+    return `${startColLetter}${startRowNum}`;
+  }
+
+  // Return range notation
+  return `${startColLetter}${startRowNum}:${endColLetter}${endRowNum}`;
 }

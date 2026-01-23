@@ -52,7 +52,15 @@ import {
 } from "./context-menu";
 import { editingSession } from "./editing-session";
 import type { AppEventManagerConfig } from "./app-events";
-import { hitTestFormulaHighlight, getCursorForHitResult } from "./formula-interaction";
+import {
+    hitTestFormulaHighlight,
+    getCursorForHitResult,
+    createDragState,
+    calculateResizedRange,
+    calculateMovedRange,
+    rangeToA1Notation,
+    type FormulaRangeDragState,
+} from "./formula-interaction";
 
 // =============================================================================
 // Mouse Event Handler Mixin
@@ -85,6 +93,9 @@ export class MouseEventHandlers {
 
     /** Pointer ID captured during drag operations */
     protected capturedPointerId: number | null = null;
+
+    /** Formula range drag state for move/resize operations */
+    protected formulaRangeDragState: FormulaRangeDragState | null = null;
 
     constructor(config: AppEventManagerConfig) {
         this.config = config;
@@ -356,6 +367,60 @@ export class MouseEventHandlers {
     }
 
     // =========================================================================
+    // Formula Range Drag Cancellation
+    // =========================================================================
+
+    /**
+     * Cancel the current formula range drag operation and restore the original reference.
+     * Called when Escape is pressed during drag.
+     */
+    cancelFormulaRangeDrag(): void {
+        if (!this.formulaRangeDragState) return;
+
+        const { canvas, cellEditor, formulaBarEditor, render } = this.config;
+        const dragState = this.formulaRangeDragState;
+
+        // Restore original reference text
+        const originalRange = dragState.originalRange;
+        const originalRef = rangeToA1Notation(
+            originalRange.startCol,
+            originalRange.startRow,
+            originalRange.endCol,
+            originalRange.endRow
+        );
+
+        // Update formula text back to original
+        const activeEditor = cellEditor.isEditing() ? cellEditor : formulaBarEditor;
+        activeEditor.replaceReferenceAtPosition(
+            dragState.sourcePosition.start,
+            dragState.sourcePosition.end,
+            originalRef
+        );
+
+        // Clear drag state
+        this.formulaRangeDragState = null;
+        if (this.capturedPointerId !== null) {
+            canvas.releasePointerCapture(this.capturedPointerId);
+            this.capturedPointerId = null;
+        }
+        canvas.style.cursor = "default";
+
+        // Focus back on the active formula editor
+        const display = this.getActiveFormulaDisplay();
+        if (display) {
+            display.focus();
+        }
+        render();
+    }
+
+    /**
+     * Check if a formula range drag is currently active.
+     */
+    isFormulaRangeDragging(): boolean {
+        return this.formulaRangeDragState !== null;
+    }
+
+    // =========================================================================
     // Canvas Event Setup
     // =========================================================================
 
@@ -375,6 +440,14 @@ export class MouseEventHandlers {
         canvas.addEventListener("contextmenu", (e) =>
             this.handleContextMenu(e),
         );
+
+        // Handle Escape key during formula range drag
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && this.formulaRangeDragState) {
+                e.preventDefault();
+                this.cancelFormulaRangeDrag();
+            }
+        });
     }
 
     // =========================================================================
@@ -676,6 +749,57 @@ export class MouseEventHandlers {
             }
         }
 
+        // Formula highlight interaction (resize/move) - check before fill handle
+        if (this.isInFormulaEditingMode() && x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+            const { getFormulaHighlights, getColPixelOffsets, getRowPixelOffsets } = this.config;
+            const highlights = getFormulaHighlights();
+            if (highlights.length > 0) {
+                const hitResult = hitTestFormulaHighlight(
+                    x,
+                    y,
+                    {
+                        scrollX,
+                        scrollY,
+                        colWidths,
+                        rowHeights,
+                        colPixelOffsets: getColPixelOffsets(),
+                        rowPixelOffsets: getRowPixelOffsets(),
+                        formulaHighlights: highlights,
+                        hoveredFormulaRefIndex: -1,
+                        isFormulaEditing: true,
+                    },
+                    canvas.width,
+                    canvas.height
+                );
+
+                if (hitResult) {
+                    const highlight = highlights[hitResult.highlightIndex];
+                    if (highlight) {
+                        const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+                        const discoveredRows = this.config.getDiscoveredRows();
+                        const row = getRowAtY(
+                            y,
+                            scrollY,
+                            rowHeights,
+                            Math.max(sheetInfo.rowCount, discoveredRows)
+                        );
+
+                        if (col >= 0 && row >= 0) {
+                            const dragState = createDragState(hitResult, highlight, { col, row });
+                            if (dragState) {
+                                this.formulaRangeDragState = dragState;
+                                canvas.setPointerCapture(e.pointerId);
+                                this.capturedPointerId = e.pointerId;
+                                canvas.style.cursor = getCursorForHitResult(hitResult, true);
+                                e.preventDefault();
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Fill handle click
         if (this.isPointInFillHandle(x, y)) {
             const selStart = getSelectionStart();
@@ -886,6 +1010,50 @@ export class MouseEventHandlers {
                     });
                     render();
                 }
+            }
+            return;
+        }
+
+        // Handle formula range manipulation (move/resize) during drag
+        if (this.formulaRangeDragState && x > HEADER_WIDTH && y > HEADER_HEIGHT) {
+            const { cellEditor, formulaBarEditor } = this.config;
+            const col = getColAtX(x, scrollX, colWidths, sheetInfo.colCount);
+            const discoveredRows = this.config.getDiscoveredRows();
+            const row = getRowAtY(
+                y,
+                scrollY,
+                rowHeights,
+                Math.max(sheetInfo.rowCount, discoveredRows)
+            );
+
+            if (col >= 0 && row >= 0) {
+                const dragState = this.formulaRangeDragState;
+                let newRange: { startCol: number; startRow: number; endCol: number; endRow: number };
+
+                if (dragState.action === "resize") {
+                    newRange = calculateResizedRange(dragState, { col, row });
+                } else {
+                    newRange = calculateMovedRange(dragState, { col, row });
+                }
+
+                // Generate new reference text
+                const newRef = rangeToA1Notation(
+                    newRange.startCol,
+                    newRange.startRow,
+                    newRange.endCol,
+                    newRange.endRow
+                );
+
+                // Update formula text using replaceReferenceAtPosition
+                const activeEditor = cellEditor.isEditing() ? cellEditor : formulaBarEditor;
+                activeEditor.replaceReferenceAtPosition(
+                    dragState.sourcePosition.start,
+                    dragState.sourcePosition.end,
+                    newRef
+                );
+
+                // Update source position for next iteration (reference length may have changed)
+                dragState.sourcePosition.end = dragState.sourcePosition.start + newRef.length;
             }
             return;
         }
@@ -1176,6 +1344,21 @@ export class MouseEventHandlers {
             canvas.style.cursor = "default";
             render();
             updateFormulaBar();
+        }
+
+        // End formula range manipulation (move/resize)
+        if (this.formulaRangeDragState) {
+            this.formulaRangeDragState = null;
+            if (this.capturedPointerId !== null) {
+                canvas.releasePointerCapture(this.capturedPointerId);
+                this.capturedPointerId = null;
+            }
+            canvas.style.cursor = "default";
+            // Focus back on the active formula editor
+            const display = this.getActiveFormulaDisplay();
+            if (display) {
+                display.focus();
+            }
         }
 
         // End formula drag selection
