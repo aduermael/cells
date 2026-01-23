@@ -311,6 +311,58 @@ const tests = {
     assertEqual(styleB5.bgColor?.toUpperCase(), colColor.toUpperCase(),
       'B5 should have column style (outside range)');
   },
+
+  'Toolbar reflects column style when column is selected': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Set column A to have right alignment
+    await clickColumnHeader(ctx.page, 'A');
+    await sleep(100);
+    await ctx.page.click('#align-right-btn');
+    await sleep(300);
+
+    // Click elsewhere to deselect
+    await clickCell(ctx.page, 'C3');
+    await sleep(200);
+
+    // Now re-select column A
+    await clickColumnHeader(ctx.page, 'A');
+    await sleep(300);
+
+    // Check that the right alignment button is now active
+    const isRightActive = await ctx.page.evaluate(() => {
+      const btn = document.getElementById('align-right-btn');
+      return btn?.classList.contains('active');
+    });
+    assertTrue(isRightActive, 'Right align button should be active when column A is selected');
+  },
+
+  'Toolbar reflects row style when row is selected': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Set row 2 to have center alignment
+    await clickRowHeader(ctx.page, 1); // 0-indexed, so row 2 is index 1
+    await sleep(100);
+    await ctx.page.click('#align-center-btn');
+    await sleep(300);
+
+    // Click elsewhere to deselect
+    await clickCell(ctx.page, 'C3');
+    await sleep(200);
+
+    // Now re-select row 2
+    await clickRowHeader(ctx.page, 1);
+    await sleep(200);
+
+    // Check that the center alignment button is now active
+    const isCenterActive = await ctx.page.evaluate(() => {
+      const btn = document.getElementById('align-center-btn');
+      return btn?.classList.contains('active');
+    });
+    assertTrue(isCenterActive, 'Center align button should be active when row 2 is selected');
+  },
 };
 
 runTests(tests);

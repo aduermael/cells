@@ -228,10 +228,33 @@ export class StyleControls {
    * styles inherited from ranges.
    */
   async updateForCurrentCell(): Promise<void> {
-    const position = this.getSelectedCell();
+    if (!this.dataSource) {
+      // No data source - reset to defaults
+      this.setDisplayedStyle({
+        bold: false,
+        italic: false,
+        underline: false,
+        bgColor: "",
+        textColor: "",
+      });
+      return;
+    }
 
-    if (!position || !this.dataSource) {
-      // No cell selected or no data source - reset to defaults
+    // Check if a column or row is selected (via header click)
+    const selectedAxis = this.getSelectedAxis();
+    if (selectedAxis) {
+      // Axis selection - fetch the column or row style
+      const axisStyle =
+        selectedAxis.type === "column"
+          ? await this.dataSource.getColumnStyle(selectedAxis.index)
+          : await this.dataSource.getRowStyle(selectedAxis.index);
+      this.setDisplayedStyle(axisStyle);
+      return;
+    }
+
+    const position = this.getSelectedCell();
+    if (!position) {
+      // No cell selected - reset to defaults
       this.setDisplayedStyle({
         bold: false,
         italic: false,

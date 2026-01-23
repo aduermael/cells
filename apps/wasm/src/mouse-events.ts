@@ -590,6 +590,7 @@ export class MouseEventHandlers {
 
                 clearFormulaHighlights();
                 render();
+                updateFormulaBar(); // Update toolbar to show column style
                 e.preventDefault();
                 return;
             }
@@ -668,6 +669,7 @@ export class MouseEventHandlers {
 
                 clearFormulaHighlights();
                 render();
+                updateFormulaBar(); // Update toolbar to show row style
                 e.preventDefault();
                 return;
             }

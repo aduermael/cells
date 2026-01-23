@@ -335,6 +335,13 @@ export function createComponents(config: ComponentsConfig): Components {
       elements.formulaDisplay.textContent = "";
       elements.formulaDisplay.dataset.placeholder =
         "Select a cell to view or edit its value";
+      // Don't return early - still update style controls for column/row selection
+      if (formatControlsRef) {
+        formatControlsRef.updateForCurrentCell();
+      }
+      if (styleControlsRef) {
+        styleControlsRef.updateForCurrentCell();
+      }
       return;
     }
 
