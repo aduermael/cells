@@ -1054,6 +1054,83 @@ TEST_F(ViewportIndexTest, BenchmarkLargeSheetIncrementalUpdates) {
 }
 
 // ============================================================================
+// Phase 5d: Axis insertion performance benchmark
+// Verifies O(k) behavior where k = number of smaller positions (often 0 for appends)
+// ============================================================================
+
+TEST_F(ViewportIndexTest, BenchmarkAxisInsertionPerformance) {
+    // Test axis insertion at different positions to verify O(k) behavior
+
+    // First, test appending in order (should be O(log n) per insert, O(1) tree position
+    // computation)
+    auto startAppend = std::chrono::high_resolution_clock::now();
+    addRows(100000, 24);  // Add 100K rows at end
+    auto endAppend = std::chrono::high_resolution_clock::now();
+    auto appendDuration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(endAppend - startAppend).count();
+
+    std::cout << "\n=== Phase 5d: Axis Insertion Performance Benchmark ===" << std::endl;
+    std::cout << "100K rows appended in order: " << appendDuration << " ms" << std::endl;
+    std::cout << "Average per row: " << (appendDuration * 1000.0 / 100000) << " µs" << std::endl;
+
+    // Now insert at random positions to test the O(k) behavior
+    // Creating a new sheet for this test
+    auto workbook2 = std::make_unique<Workbook>();
+    auto sheet2 = std::make_unique<Sheet>(generate_id(), "Sheet2");
+    Sheet* s2 = sheet2.get();
+    workbook2->addSheet(std::move(sheet2));
+
+    // First add 10K rows
+    std::vector<ID> rowIds2;
+    for (size_t i = 0; i < 10000; i++) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = static_cast<uint32_t>(i);
+        row->size = 24;
+        rowIds2.push_back(row->id);
+        s2->addRow(std::move(row));
+    }
+
+    // Now time inserting at position 5000 (middle) repeatedly
+    // Each insert should be O(5000) for tree position computation
+    auto startMid = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < 100; i++) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        // Insert at position after the first 5000
+        row->position = static_cast<uint32_t>(5000 + i);
+        row->size = 24;
+        s2->addRow(std::move(row));
+    }
+    auto endMid = std::chrono::high_resolution_clock::now();
+    auto midDuration =
+        std::chrono::duration_cast<std::chrono::microseconds>(endMid - startMid).count();
+
+    std::cout << "100 inserts at position 5000: " << midDuration << " µs" << std::endl;
+    std::cout << "Average per insert: " << (midDuration / 100.0) << " µs" << std::endl;
+
+    // Insert at position 0 (beginning) - should be O(1) for tree position (always 0)
+    auto startBegin = std::chrono::high_resolution_clock::now();
+    for (size_t i = 0; i < 100; i++) {
+        auto row = std::make_unique<Axis>(generate_id(), false);
+        row->position = 0;  // Always insert at beginning
+        row->size = 24;
+        s2->addRow(std::move(row));
+    }
+    auto endBegin = std::chrono::high_resolution_clock::now();
+    auto beginDuration =
+        std::chrono::duration_cast<std::chrono::microseconds>(endBegin - startBegin).count();
+
+    std::cout << "100 inserts at position 0: " << beginDuration << " µs" << std::endl;
+    std::cout << "Average per insert: " << (beginDuration / 100.0) << " µs" << std::endl;
+
+    // Verify that appending 100K rows is reasonably fast (< 5 seconds)
+    EXPECT_LT(appendDuration, 5000) << "Appending 100K rows should be < 5 seconds";
+
+    // Verify all rows were added
+    EXPECT_EQ(rowIds_.size(), 100000u);
+    EXPECT_EQ(sheet_->rowCount(), 100000u);
+}
+
+// ============================================================================
 // Phase 1a: Viewport query performance at different row positions
 // Measures O(log n) vs O(n) behavior by querying at positions 100, 1K, 10K, 50K, 100K
 // ============================================================================

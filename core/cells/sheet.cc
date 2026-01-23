@@ -250,27 +250,24 @@ void Sheet::addColumn(std::unique_ptr<Axis> col) {
     // Add to this sheet's column set
     _columnIds.insert(colId);
 
-    // Update position index
+    // Update axis index for viewport queries
+    // Tree position = number of columns with smaller positions
+    //
+    // Fast path: Check if this is an append (new position > all existing positions)
+    // before inserting into the map. This avoids the O(n) distance calculation.
+    const bool isAppend = _columnIndex.empty() || position > _columnIndex.rbegin()->first;
+
+    // Update position index (sorted std::map)
     _columnIndex[position] = colId;
 
-    // Update axis index for viewport queries
-    // Fast path: if position >= current count, this is an append (O(log n))
-    // Slow path: compute tree position by counting smaller positions (O(n))
-    const size_t currentCount = _columnAxisIndex.count();
-    if (position >= currentCount) {
-        // Appending at or beyond the end - use fast append
+    if (isAppend) {
+        // Fast path: appending at the end - tree position = count before insert
         _columnAxisIndex.append(colId, size);
     } else {
-        // Inserting in the middle - compute correct tree position
-        size_t treePos = 0;
-        for (const ID& existingColId : _columnIds) {
-            if (existingColId != colId) {
-                const Axis* existingCol = _workbook->getColumn(existingColId);
-                if (existingCol && existingCol->position < position) {
-                    treePos++;
-                }
-            }
-        }
+        // Slow path: inserting in the middle - count elements with smaller positions
+        // std::distance is O(n) for bidirectional iterators, but this case is rare
+        auto it = _columnIndex.find(position);
+        const auto treePos = static_cast<size_t>(std::distance(_columnIndex.begin(), it));
         _columnAxisIndex.insert(colId, treePos, size);
     }
 }
@@ -295,27 +292,24 @@ void Sheet::addRow(std::unique_ptr<Axis> row) {
     // Add to this sheet's row set
     _rowIds.insert(rowId);
 
-    // Update position index
+    // Update axis index for viewport queries
+    // Tree position = number of rows with smaller positions
+    //
+    // Fast path: Check if this is an append (new position > all existing positions)
+    // before inserting into the map. This avoids the O(n) distance calculation.
+    const bool isAppend = _rowIndex.empty() || position > _rowIndex.rbegin()->first;
+
+    // Update position index (sorted std::map)
     _rowIndex[position] = rowId;
 
-    // Update axis index for viewport queries
-    // Fast path: if position >= current count, this is an append (O(log n))
-    // Slow path: compute tree position by counting smaller positions (O(n))
-    const size_t currentCount = _rowAxisIndex.count();
-    if (position >= currentCount) {
-        // Appending at or beyond the end - use fast append
+    if (isAppend) {
+        // Fast path: appending at the end - tree position = count before insert
         _rowAxisIndex.append(rowId, size);
     } else {
-        // Inserting in the middle - compute correct tree position
-        size_t treePos = 0;
-        for (const ID& existingRowId : _rowIds) {
-            if (existingRowId != rowId) {
-                const Axis* existingRow = _workbook->getRow(existingRowId);
-                if (existingRow && existingRow->position < position) {
-                    treePos++;
-                }
-            }
-        }
+        // Slow path: inserting in the middle - count elements with smaller positions
+        // std::distance is O(n) for bidirectional iterators, but this case is rare
+        auto it = _rowIndex.find(position);
+        const auto treePos = static_cast<size_t>(std::distance(_rowIndex.begin(), it));
         _rowAxisIndex.insert(rowId, treePos, size);
     }
 }

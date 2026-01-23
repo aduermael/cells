@@ -35,6 +35,7 @@
 
 #include <cstdint>
 
+#include <map>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -734,8 +735,10 @@ private:
     std::unordered_set<ID, IDHash> _rowIds;
 
     // Position-to-ID indexes for fast position-based lookups
-    std::unordered_map<uint32_t, ID> _columnIndex;  // position -> colId
-    std::unordered_map<uint32_t, ID> _rowIndex;     // position -> rowId
+    // Using std::map (sorted) to enable O(k) tree position computation
+    // where k = number of axes with smaller positions (often 0 for appends)
+    std::map<uint32_t, ID> _columnIndex;  // position -> colId (sorted by position)
+    std::map<uint32_t, ID> _rowIndex;     // position -> rowId (sorted by position)
 
     // Secondary index: (colId, rowId) -> cellId
     std::unordered_map<std::string, ID> _cellIndex;
