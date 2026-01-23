@@ -91,9 +91,9 @@ Expose axis styles through the WASM bindings and add UI to apply them.
 - [x] 2e: Add `setColumnStyle()` and `setRowStyle()` methods to CellsClient and WasmDataSource
   - Added to client.ts and wasm-data-source.ts
 
-- [ ] 2f: Update style-controls.ts to detect when an entire column/row is selected
-  - When column header clicked → apply style to column axis
-  - When row header clicked → apply style to row axis
+- [x] 2f: Update style-controls.ts to detect when an entire column/row is selected
+  - Added `getSelectedAxis` callback that checks app.selectedColumn/selectedRow
+  - Updated applyStyleToSelection to use setColumnStyle/setRowStyle when axis selected
 
 - [ ] 2g: Add tests for column/row style application and inheritance
 

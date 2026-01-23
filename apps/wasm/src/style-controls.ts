@@ -72,6 +72,8 @@ export interface StyleControlsCallbacks {
   getSelectedCell: () => Position | null;
   /** Get the current selection range (start and end) */
   getSelectionRange: () => { start: Position | null; end: Position | null };
+  /** Get the selected axis (column or row header click) */
+  getSelectedAxis: () => { type: "column" | "row"; index: number } | null;
   /** Request render after style change */
   requestRender: () => void;
   /** Update the formula bar display */
@@ -138,6 +140,7 @@ export class StyleControls {
 
   private getSelectedCell: () => Position | null;
   private getSelectionRange: () => { start: Position | null; end: Position | null };
+  private getSelectedAxis: () => { type: "column" | "row"; index: number } | null;
   private requestRender: () => void;
   private updateFormulaBar: () => void;
 
@@ -188,6 +191,7 @@ export class StyleControls {
 
     this.getSelectedCell = callbacks.getSelectedCell;
     this.getSelectionRange = callbacks.getSelectionRange;
+    this.getSelectedAxis = callbacks.getSelectedAxis;
     this.requestRender = callbacks.requestRender;
     this.updateFormulaBar = callbacks.updateFormulaBar;
 
@@ -563,12 +567,25 @@ export class StyleControls {
   /**
    * Apply a style update to all cells in the current selection range.
    *
-   * Uses Range-based styling for multi-cell selections, which creates a single
-   * Range object with RANGE_STYLE flag instead of creating empty cell entries.
-   * Single-cell selections still use cell-level styling.
+   * Priority for style application:
+   * 1. Column selection (header click) → setColumnStyle (axis-level style)
+   * 2. Row selection (header click) → setRowStyle (axis-level style)
+   * 3. Multi-cell range → setStyleForRange (range-level style)
+   * 4. Single cell → setCellStyleAt (cell-level style)
    */
   private async applyStyleToSelection(styleUpdate: Partial<CellStyle>): Promise<void> {
     if (!this.dataSource) return;
+
+    // Check if a full column or row is selected (header click)
+    const selectedAxis = this.getSelectedAxis();
+    if (selectedAxis) {
+      if (selectedAxis.type === "column") {
+        await this.dataSource.setColumnStyle(selectedAxis.index, styleUpdate);
+      } else {
+        await this.dataSource.setRowStyle(selectedAxis.index, styleUpdate);
+      }
+      return;
+    }
 
     const { start, end } = this.getSelectionRange();
     const cell = this.getSelectedCell();
