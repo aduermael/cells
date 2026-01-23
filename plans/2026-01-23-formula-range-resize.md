@@ -86,7 +86,7 @@ Detect when the mouse is over formula highlight interaction zones and show appro
   - Returns: `{ highlightIndex, action: "resize" | "move", corner?, border? } | null`
   - Created `formula-interaction.ts` with `hitTestFormulaHighlight()` and cursor helpers
 
-- [ ] 2b: Define cursor mapping for all interaction zones
+- [x] 2b: Define cursor mapping for all interaction zones
   - **Corners (resize)**:
     - `nw` / `se`: `nwse-resize`
     - `ne` / `sw`: `nesw-resize`
@@ -94,6 +94,7 @@ Detect when the mouse is over formula highlight interaction zones and show appro
     - All borders: `grab` (or `grabbing` when dragging)
   - **Inside formula ref**: default cursor (no action)
   - **Main selection fill handle**: `crosshair` (existing)
+  - Implemented via `getCursorForCorner()` and `getCursorForHitResult()` in formula-interaction.ts
 
 - [ ] 2c: Update `handleMouseMove()` in mouse-events.ts for cursor changes
   - Call `hitTestFormulaHighlight()` when in formula editing mode
