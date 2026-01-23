@@ -163,6 +163,76 @@ EffectiveStyleResult getEffectiveStyle(const Cell& cell, const Sheet& sheet, con
     return result;
 }
 
+// Overload for virtual cells (no Cell object exists) - uses axis IDs directly
+// This is used for virtual spilled cells that inherit column/row styles
+EffectiveStyleResult getEffectiveStyleForPosition(const Sheet& sheet, const Workbook& workbook,
+                                                   uint32_t colPos, uint32_t rowPos,
+                                                   const ID& colId, const ID& rowId) {
+    EffectiveStyleResult result = {{}, nullptr, {}, false, false, false, false, false};
+    CellStyle combinedStyle;
+    bool hasAnyStyle = false;
+
+    // No cell style for virtual cells (they don't exist as Cell objects)
+
+    // Priority 2: Range styles (for ranges with RANGE_STYLE flag)
+    std::vector<Range*> styleRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::STYLE);
+    for (Range* range : styleRanges) {
+        const StyleBuffer* styleBuffer = range->getStyle();
+        if (styleBuffer == nullptr) {
+            continue;
+        }
+        CellStyle rangeStyle = styleBuffer->toCellStyle();
+        if (!hasAnyStyle) {
+            combinedStyle = rangeStyle;
+            hasAnyStyle = true;
+        } else {
+            combinedStyle = mergeStyles(combinedStyle, rangeStyle);
+        }
+        result.fromRange = true;
+    }
+
+    // Priority 3: Column's default style
+    if (!colId.isNull()) {
+        const Axis* col = sheet.getColumn(colId);
+        if (col != nullptr && col->hasStyle()) {
+            const StyleBuffer* colStyle = workbook.getEntityStyle(col->id);
+            if (colStyle != nullptr) {
+                if (!hasAnyStyle) {
+                    combinedStyle = colStyle->toCellStyle();
+                    hasAnyStyle = true;
+                } else {
+                    combinedStyle = mergeStyles(combinedStyle, colStyle->toCellStyle());
+                }
+                result.fromColumn = true;
+            }
+        }
+    }
+
+    // Priority 4: Row's default style
+    if (!rowId.isNull()) {
+        const Axis* row = sheet.getRow(rowId);
+        if (row != nullptr && row->hasStyle()) {
+            const StyleBuffer* rowStyle = workbook.getEntityStyle(row->id);
+            if (rowStyle != nullptr) {
+                if (!hasAnyStyle) {
+                    combinedStyle = rowStyle->toCellStyle();
+                    hasAnyStyle = true;
+                } else {
+                    combinedStyle = mergeStyles(combinedStyle, rowStyle->toCellStyle());
+                }
+                result.fromRow = true;
+            }
+        }
+    }
+
+    if (hasAnyStyle) {
+        result.mergedStyle = combinedStyle;
+        result.hasMergedStyle = true;
+    }
+
+    return result;
+}
+
 // Helper: Convert BorderStyle enum to JSON string value
 const char* borderStyleToString(cells::BorderStyle style) {
     switch (style) {
@@ -638,6 +708,62 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 // Virtual spilled cells don't have their own ID - use a generated one
                 json << "\"col\":" << colPos << ",";
                 json << "\"row\":" << rowPos << ",";
+
+                // Compute effective style from column/row axes (virtual cells have no cell style)
+                EffectiveStyleResult effectiveStyle = getEffectiveStyleForPosition(
+                    *sheet, *_workbook, colPos, rowPos, colId, rowId);
+                if (effectiveStyle.hasMergedStyle) {
+                    const CellStyle* style = &effectiveStyle.mergedStyle;
+                    json << "\"style\":{";
+                    json << "\"bold\":" << (style->bold ? "true" : "false");
+                    json << ",\"italic\":" << (style->italic ? "true" : "false");
+                    json << ",\"underline\":" << (style->underline ? "true" : "false");
+                    json << ",\"wrapText\":" << (style->wrapText ? "true" : "false");
+                    if (!style->bgColor.empty()) {
+                        json << ",\"bgColor\":\"" << style->bgColor << "\"";
+                    }
+                    if (!style->textColor.empty()) {
+                        json << ",\"textColor\":\"" << style->textColor << "\"";
+                    }
+                    if (!style->fontFamily.empty()) {
+                        json << ",\"fontFamily\":\"" << style->fontFamily << "\"";
+                    }
+                    if (style->fontSize > 0) {
+                        json << ",\"fontSize\":" << static_cast<int>(style->fontSize);
+                    }
+                    switch (style->hAlign) {
+                        case TextAlign::GENERAL: break;
+                        case TextAlign::LEFT: json << ",\"hAlign\":\"left\""; break;
+                        case TextAlign::CENTER: json << ",\"hAlign\":\"center\""; break;
+                        case TextAlign::RIGHT: json << ",\"hAlign\":\"right\""; break;
+                        case TextAlign::JUSTIFY: json << ",\"hAlign\":\"justify\""; break;
+                    }
+                    switch (style->vAlign) {
+                        case VerticalAlign::TOP: json << ",\"vAlign\":\"top\""; break;
+                        case VerticalAlign::MIDDLE: json << ",\"vAlign\":\"middle\""; break;
+                        case VerticalAlign::BOTTOM: json << ",\"vAlign\":\"bottom\""; break;
+                    }
+                    if (style->border.hasValue()) {
+                        json << ",\"border\":{";
+                        serializeBorderEdge(json, "top", style->border.top);
+                        json << ",";
+                        serializeBorderEdge(json, "right", style->border.right);
+                        json << ",";
+                        serializeBorderEdge(json, "bottom", style->border.bottom);
+                        json << ",";
+                        serializeBorderEdge(json, "left", style->border.left);
+                        json << "}";
+                    }
+                    if (effectiveStyle.fromRange) {
+                        json << ",\"inheritedFrom\":\"range\"";
+                    } else if (effectiveStyle.fromColumn) {
+                        json << ",\"inheritedFrom\":\"column\"";
+                    } else if (effectiveStyle.fromRow) {
+                        json << ",\"inheritedFrom\":\"row\"";
+                    }
+                    json << "},";
+                }
+
                 json << "\"isSpilled\":true,";
                 json << "\"spillMasterId\":\"" << cell->id.toString() << "\",";
                 if (!masterFormula.empty()) {

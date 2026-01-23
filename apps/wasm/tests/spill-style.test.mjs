@@ -5,6 +5,7 @@ import { runTests } from './harness.mjs';
 import {
   waitForAppReady,
   clickCell,
+  clickColumnHeader,
   setCellValue,
   getCellDisplayValue,
   assertEqual,
@@ -40,7 +41,54 @@ async function getCellIsSpilled(page, cellRef) {
   }, { col, row });
 }
 
+/**
+ * Get the effective cell style from the engine
+ */
+async function getEffectiveCellStyle(page, col, row) {
+  return await page.evaluate(async ({ col, row }) => {
+    if (window._appContext && window._appContext.app && window._appContext.app.dataSource) {
+      return await window._appContext.app.dataSource.getEffectiveCellStyle(col, row);
+    }
+    return {};
+  }, { col, row });
+}
+
+/**
+ * Click alignment button to set cell/column alignment
+ */
+async function clickAlignRight(page) {
+  await page.click('#align-right-btn');
+  await sleep(200);
+}
+
 const tests = {
+  'Column style alignment applies to virtual spilled cells': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Create a spill with SEQUENCE(3)
+    await setCellValue(ctx.page, 'B1', '=SEQUENCE(3)');
+    await sleep(300);
+
+    // Verify spill is working - B2 should show 2
+    let val2 = await getCellDisplayValue(ctx.page, 'B2');
+    assertEqual(val2, '2', 'B2 should display 2');
+
+    // Select column B and set right alignment
+    await clickColumnHeader(ctx.page, 'B');
+    await sleep(100);
+    await clickAlignRight(ctx.page);
+    await sleep(300);
+
+    // Check that B2's effective style has right alignment
+    const styleB2 = await getEffectiveCellStyle(ctx.page, 1, 1);
+    assertEqual(styleB2.hAlign, 'right', 'B2 should have right alignment from column style');
+
+    // Verify the value is still displayed correctly
+    val2 = await getCellDisplayValue(ctx.page, 'B2');
+    assertEqual(val2, '2', 'B2 should still display 2 after column styling');
+  },
+
   'Setting alignment on spilled cell should NOT break spill': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
