@@ -60,21 +60,17 @@ This creates a cell with `type=STRING, value=""`.
 
 When no alignment is explicitly set, no alignment button should be active (Excel behavior).
 
-- [ ] 1a: Update `style-controls.ts::setDisplayedStyle()` to handle undefined/GENERAL alignment
-  - Remove the fallback to "left" on line 620: `const hAlign = style.hAlign || "left"`
-  - Instead, pass undefined through and let `updateHAlignButtons()` handle it
+- [x] 1a: Update `style-controls.ts::setDisplayedStyle()` to handle undefined/GENERAL alignment
+  - Removed the fallback to "left", now passes undefined through to updateHAlignButtons()
 
-- [ ] 1b: Update `updateHAlignButtons()` to show no active button when alignment is undefined
-  - When `hAlign` is undefined/null/empty, don't activate any button
-  - Only activate a button when alignment is explicitly "left", "center", or "right"
+- [x] 1b: Update `updateHAlignButtons()` to show no active button when alignment is undefined
+  - Added `noActive` check for when alignment is undefined or mixed
 
-- [ ] 1c: Apply same fix to vertical alignment in `updateVAlignButtons()`
-  - Don't default to "bottom" - only show active when explicitly set
+- [x] 1c: Apply same fix to vertical alignment in `updateVAlignButtons()`
+  - Applied same pattern: no button active when vAlign is undefined
 
-- [ ] 1d: Add test verifying:
-  - Number cell with no explicit alignment: no alignment button active
-  - Cell with explicit right-align: right button active
-  - Cell with explicit left-align: left button active
+- [x] 1d: Add test verifying:
+  - Created `alignment-ui.test.mjs` E2E test with comprehensive alignment button tests
 
 ## Phase 2: Add API and UI for Axis (Column/Row) Styles
 

@@ -617,9 +617,11 @@ export class StyleControls {
     this.updateFontSizeDisplay(style.fontSize || 12, mixed?.fontSize);
 
     // Update alignment buttons (TextAlign includes "justify", but we only show left/center/right)
-    const hAlign = style.hAlign === "justify" ? "left" : (style.hAlign || "left");
-    this.updateHAlignButtons(hAlign as "left" | "center" | "right", mixed?.hAlign);
-    this.updateVAlignButtons(style.vAlign || "bottom", mixed?.vAlign);
+    // When no explicit alignment is set (undefined), no button should be active (Excel behavior)
+    // The renderer handles GENERAL alignment based on content type (right for numbers, left for text)
+    const hAlign = style.hAlign === "justify" ? "left" : style.hAlign;
+    this.updateHAlignButtons(hAlign, mixed?.hAlign);
+    this.updateVAlignButtons(style.vAlign, mixed?.vAlign);
   }
 
   private updateButtonState(
@@ -688,18 +690,22 @@ export class StyleControls {
     });
   }
 
-  private updateHAlignButtons(hAlign: "left" | "center" | "right", isMixed?: boolean): void {
-    // When mixed, don't highlight any button
-    this.alignLeftBtn.classList.toggle("active", !isMixed && hAlign === "left");
-    this.alignCenterBtn.classList.toggle("active", !isMixed && hAlign === "center");
-    this.alignRightBtn.classList.toggle("active", !isMixed && hAlign === "right");
+  private updateHAlignButtons(hAlign: "left" | "center" | "right" | undefined, isMixed?: boolean): void {
+    // When mixed or undefined (GENERAL alignment), don't highlight any button
+    // This matches Excel behavior where buttons only show active when explicitly set
+    const noActive = isMixed || !hAlign;
+    this.alignLeftBtn.classList.toggle("active", !noActive && hAlign === "left");
+    this.alignCenterBtn.classList.toggle("active", !noActive && hAlign === "center");
+    this.alignRightBtn.classList.toggle("active", !noActive && hAlign === "right");
   }
 
-  private updateVAlignButtons(vAlign: "top" | "middle" | "bottom", isMixed?: boolean): void {
-    // When mixed, don't highlight any button
-    this.valignTopBtn.classList.toggle("active", !isMixed && vAlign === "top");
-    this.valignMiddleBtn.classList.toggle("active", !isMixed && vAlign === "middle");
-    this.valignBottomBtn.classList.toggle("active", !isMixed && vAlign === "bottom");
+  private updateVAlignButtons(vAlign: "top" | "middle" | "bottom" | undefined, isMixed?: boolean): void {
+    // When mixed or undefined (GENERAL alignment), don't highlight any button
+    // This matches Excel behavior where buttons only show active when explicitly set
+    const noActive = isMixed || !vAlign;
+    this.valignTopBtn.classList.toggle("active", !noActive && vAlign === "top");
+    this.valignMiddleBtn.classList.toggle("active", !noActive && vAlign === "middle");
+    this.valignBottomBtn.classList.toggle("active", !noActive && vAlign === "bottom");
   }
 
   // =========================================================================
