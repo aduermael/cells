@@ -196,7 +196,11 @@ Now that Sheet owns AxisIndex, insertion position is known.
 
   - Slowdown ratio: **1.66x** (expected ~1.7x for O(log n)) ✓
 - [x] 6d: Full test pass: `bazel run :check` - all 57 unit tests + 313 E2E tests pass
-- [ ] 6e: Update docs/rendering.md with final architecture
+- [x] 6e: Update docs/rendering.md with final architecture
+  - Documented Sheet-level AxisIndex ownership (no more ViewportIndex copies)
+  - Added SpillIndex R-tree documentation
+  - Added subtree_count field for O(log n) position lookups
+  - Included benchmark results showing 1.66x slowdown at 100K rows (O(log n) confirmed)
 
 ### Phase 7: Fix Pre-existing Test Failures
 
