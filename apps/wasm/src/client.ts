@@ -714,6 +714,40 @@ export class CellsClient {
     return response as unknown as { style: CellStyle; mixed: Partial<Record<keyof CellStyle, boolean>> };
   }
 
+  // ========== Axis Style Operations API (entire column/row styles) ==========
+
+  /**
+   * Set a column's default style, creating the column if needed.
+   */
+  async setColumnStyle(colPosition: number, style: Partial<CellStyle>): Promise<{ success: boolean }> {
+    await this._send("setColumnStyle", { colPosition, styleJson: JSON.stringify(style) });
+    return { success: true };
+  }
+
+  /**
+   * Set a row's default style, creating the row if needed.
+   */
+  async setRowStyle(rowPosition: number, style: Partial<CellStyle>): Promise<{ success: boolean }> {
+    await this._send("setRowStyle", { rowPosition, styleJson: JSON.stringify(style) });
+    return { success: true };
+  }
+
+  /**
+   * Get a column's default style.
+   */
+  async getColumnStyle(colPosition: number): Promise<CellStyle> {
+    const response = await this._send("getColumnStyle", { colPosition });
+    return response.style as CellStyle;
+  }
+
+  /**
+   * Get a row's default style.
+   */
+  async getRowStyle(rowPosition: number): Promise<CellStyle> {
+    const response = await this._send("getRowStyle", { rowPosition });
+    return response.style as CellStyle;
+  }
+
   // ========== Column/Row Operations API ==========
 
   async resizeColumn(colId: string, width: number): Promise<{ success: boolean }> {

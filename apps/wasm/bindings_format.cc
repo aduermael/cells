@@ -2238,4 +2238,190 @@ std::string CellsEngine::getEffectiveStyleForRange(uint32_t col1, uint32_t row1,
     return ss.str();
 }
 
+// ============================================================================
+// Axis Style Operations - Set/Get styles for entire columns or rows
+// ============================================================================
+
+std::string CellsEngine::setColumnStyle(uint32_t colPosition, const std::string& styleJson) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Find existing column at position
+    Axis* existingCol = sheet->getColumnByPosition(colPosition);
+    ID colId;
+    bool colCreated = false;
+
+    if (existingCol != nullptr) {
+        colId = existingCol->id;
+    } else {
+        // Create column if it doesn't exist
+        colId = generate_id();
+        colCreated = true;
+        std::string colPayload = "{\"pos\":" + std::to_string(colPosition) +
+                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
+        applyOperation(*_workbook, colOp);
+    }
+
+    // Get existing style if column has one
+    CellStyle style;
+    Axis* col = sheet->getColumn(colId);
+    if (col != nullptr && col->hasStyle()) {
+        const StyleBuffer* existingStyle = _workbook->getEntityStyle(col->id);
+        if (existingStyle != nullptr) {
+            style = existingStyle->toCellStyle();
+        }
+    }
+
+    // Merge incoming JSON with existing style
+    mergeStyleJson(style, styleJson);
+
+    // Convert to content-addressed StyleBuffer and emit operation
+    if (!style.isEmpty()) {
+        StyleBuffer styleBuffer = StyleBuffer::fromCellStyle(style);
+        if (!styleBuffer.isEmpty()) {
+            Operation op = makeAxisSetStyleOp(*_workbook, colId, styleBuffer);
+            applyOperation(*_workbook, op);
+        } else {
+            // Style properties resolved to empty - clear the style
+            Operation op = makeAxisClearStyleOp(*_workbook, colId);
+            applyOperation(*_workbook, op);
+        }
+    } else {
+        Operation op = makeAxisClearStyleOp(*_workbook, colId);
+        applyOperation(*_workbook, op);
+    }
+
+    broadcastPendingOperations();
+
+    if (colCreated) {
+        _viewportIndex.onAxisInserted(colId, true, colPosition, DEFAULT_COLUMN_WIDTH);
+    }
+
+    notifyListeners(ChangeType::CELL_CHANGED);
+    return "{\"success\":true}";
+}
+
+std::string CellsEngine::setRowStyle(uint32_t rowPosition, const std::string& styleJson) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Find existing row at position
+    Axis* existingRow = sheet->getRowByPosition(rowPosition);
+    ID rowId;
+    bool rowCreated = false;
+
+    if (existingRow != nullptr) {
+        rowId = existingRow->id;
+    } else {
+        // Create row if it doesn't exist
+        rowId = generate_id();
+        rowCreated = true;
+        std::string rowPayload = "{\"pos\":" + std::to_string(rowPosition) +
+                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
+        applyOperation(*_workbook, rowOp);
+    }
+
+    // Get existing style if row has one
+    CellStyle style;
+    Axis* row = sheet->getRow(rowId);
+    if (row != nullptr && row->hasStyle()) {
+        const StyleBuffer* existingStyle = _workbook->getEntityStyle(row->id);
+        if (existingStyle != nullptr) {
+            style = existingStyle->toCellStyle();
+        }
+    }
+
+    // Merge incoming JSON with existing style
+    mergeStyleJson(style, styleJson);
+
+    // Convert to content-addressed StyleBuffer and emit operation
+    if (!style.isEmpty()) {
+        StyleBuffer styleBuffer = StyleBuffer::fromCellStyle(style);
+        if (!styleBuffer.isEmpty()) {
+            Operation op = makeAxisSetStyleOp(*_workbook, rowId, styleBuffer);
+            applyOperation(*_workbook, op);
+        } else {
+            // Style properties resolved to empty - clear the style
+            Operation op = makeAxisClearStyleOp(*_workbook, rowId);
+            applyOperation(*_workbook, op);
+        }
+    } else {
+        Operation op = makeAxisClearStyleOp(*_workbook, rowId);
+        applyOperation(*_workbook, op);
+    }
+
+    broadcastPendingOperations();
+
+    if (rowCreated) {
+        _viewportIndex.onAxisInserted(rowId, false, rowPosition, DEFAULT_ROW_HEIGHT);
+    }
+
+    notifyListeners(ChangeType::CELL_CHANGED);
+    return "{\"success\":true}";
+}
+
+std::string CellsEngine::getColumnStyle(uint32_t colPosition) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{}";
+    }
+
+    Axis* col = sheet->getColumnByPosition(colPosition);
+    if (col == nullptr || !col->hasStyle()) {
+        CellStyle defaultStyle;
+        return styleToJson(defaultStyle);
+    }
+
+    const StyleBuffer* style = _workbook->getEntityStyle(col->id);
+    if (style != nullptr) {
+        return styleToJson(style->toCellStyle());
+    }
+
+    CellStyle defaultStyle;
+    return styleToJson(defaultStyle);
+}
+
+std::string CellsEngine::getRowStyle(uint32_t rowPosition) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{}";
+    }
+
+    Axis* row = sheet->getRowByPosition(rowPosition);
+    if (row == nullptr || !row->hasStyle()) {
+        CellStyle defaultStyle;
+        return styleToJson(defaultStyle);
+    }
+
+    const StyleBuffer* style = _workbook->getEntityStyle(row->id);
+    if (style != nullptr) {
+        return styleToJson(style->toCellStyle());
+    }
+
+    CellStyle defaultStyle;
+    return styleToJson(defaultStyle);
+}
+
 }  // namespace cells::wasm

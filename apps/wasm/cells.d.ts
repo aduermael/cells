@@ -554,6 +554,40 @@ declare module 'cells-wasm' {
     getEffectiveStyleForRange(col1: number, row1: number, col2: number, row2: number): string;
 
     // ========================================================================
+    // Axis styles (entire column/row styles)
+    // ========================================================================
+
+    /**
+     * Set a column's default style, creating the column if needed
+     * @param colPosition - Column position (0-based)
+     * @param styleJson - JSON string with style properties
+     * @returns JSON string with OperationResult
+     */
+    setColumnStyle(colPosition: number, styleJson: string): string;
+
+    /**
+     * Set a row's default style, creating the row if needed
+     * @param rowPosition - Row position (0-based)
+     * @param styleJson - JSON string with style properties
+     * @returns JSON string with OperationResult
+     */
+    setRowStyle(rowPosition: number, styleJson: string): string;
+
+    /**
+     * Get a column's default style
+     * @param colPosition - Column position (0-based)
+     * @returns JSON string with CellStyle properties
+     */
+    getColumnStyle(colPosition: number): string;
+
+    /**
+     * Get a row's default style
+     * @param rowPosition - Row position (0-based)
+     * @returns JSON string with CellStyle properties
+     */
+    getRowStyle(rowPosition: number): string;
+
+    // ========================================================================
     // Column/row resize
     // ========================================================================
 

@@ -749,6 +749,64 @@ export function handleGetEffectiveStyleForRange(
 }
 
 // ============================================================================
+// Axis Style Operations (entire column/row styles)
+// ============================================================================
+
+export function handleSetColumnStyle(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { colPosition, styleJson } = params as {
+        colPosition: number;
+        styleJson: string;
+    };
+    const result = JSON.parse(engine.setColumnStyle(colPosition, styleJson)) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "columnStyleSet", success: true });
+    }
+}
+
+export function handleSetRowStyle(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { rowPosition, styleJson } = params as {
+        rowPosition: number;
+        styleJson: string;
+    };
+    const result = JSON.parse(engine.setRowStyle(rowPosition, styleJson)) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "rowStyleSet", success: true });
+    }
+}
+
+export function handleGetColumnStyle(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { colPosition } = params as { colPosition: number };
+    const result = JSON.parse(engine.getColumnStyle(colPosition));
+    respond({ type: "columnStyle", style: result });
+}
+
+export function handleGetRowStyle(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { rowPosition } = params as { rowPosition: number };
+    const result = JSON.parse(engine.getRowStyle(rowPosition));
+    respond({ type: "rowStyle", style: result });
+}
+
+// ============================================================================
 // Column/Row Operations
 // ============================================================================
 

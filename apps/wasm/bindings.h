@@ -174,6 +174,12 @@ public:
     std::string getEffectiveCellStyle(uint32_t col, uint32_t row);
     std::string getEffectiveStyleForRange(uint32_t col1, uint32_t row1, uint32_t col2, uint32_t row2);
 
+    // Axis style operations (set/get styles for entire columns or rows)
+    std::string setColumnStyle(uint32_t colPosition, const std::string& styleJson);
+    std::string setRowStyle(uint32_t rowPosition, const std::string& styleJson);
+    std::string getColumnStyle(uint32_t colPosition);
+    std::string getRowStyle(uint32_t rowPosition);
+
     // ========================================================================
     // Column/row resize operations (bindings_core.cc)
     // ========================================================================

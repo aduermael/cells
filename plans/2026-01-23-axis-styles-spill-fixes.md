@@ -76,18 +76,20 @@ When no alignment is explicitly set, no alignment button should be active (Excel
 
 Expose axis styles through the WASM bindings and add UI to apply them.
 
-- [ ] 2a: Add `setColumnStyle(colPosition, styleJson)` to CellsEngine in bindings_format.cc
-  - Find column by position
-  - Create `AXIS_SET_STYLE` operation
-  - Apply and return success/error
+- [x] 2a: Add `setColumnStyle(colPosition, styleJson)` to CellsEngine in bindings_format.cc
+  - Added to bindings_format.cc with column creation if needed, style merging, and AXIS_SET_STYLE operation
 
-- [ ] 2b: Add `setRowStyle(rowPosition, styleJson)` similarly
+- [x] 2b: Add `setRowStyle(rowPosition, styleJson)` similarly
+  - Added to bindings_format.cc with same pattern as setColumnStyle
 
-- [ ] 2c: Add `getColumnStyle(colPosition)` and `getRowStyle(rowPosition)` to read axis styles
+- [x] 2c: Add `getColumnStyle(colPosition)` and `getRowStyle(rowPosition)` to read axis styles
+  - Added to bindings_format.cc
 
-- [ ] 2d: Add TypeScript bindings in cells.d.ts, worker-types.ts, worker-handlers.ts
+- [x] 2d: Add TypeScript bindings in cells.d.ts, worker-types.ts, worker-handlers.ts
+  - Updated all three files with the new functions
 
-- [ ] 2e: Add `setColumnStyle()` and `setRowStyle()` methods to CellsClient and WasmDataSource
+- [x] 2e: Add `setColumnStyle()` and `setRowStyle()` methods to CellsClient and WasmDataSource
+  - Added to client.ts and wasm-data-source.ts
 
 - [ ] 2f: Update style-controls.ts to detect when an entire column/row is selected
   - When column header clicked → apply style to column axis

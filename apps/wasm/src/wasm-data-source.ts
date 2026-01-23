@@ -362,6 +362,38 @@ export class WasmDataSource {
   }
 
   // ==========================================================================
+  // Axis Style Operations (entire column/row styles)
+  // ==========================================================================
+
+  /**
+   * Set a column's default style, creating the column if needed.
+   */
+  async setColumnStyle(colPosition: number, style: Partial<CellStyle>): Promise<{ success: boolean }> {
+    return this._client.setColumnStyle(colPosition, style);
+  }
+
+  /**
+   * Set a row's default style, creating the row if needed.
+   */
+  async setRowStyle(rowPosition: number, style: Partial<CellStyle>): Promise<{ success: boolean }> {
+    return this._client.setRowStyle(rowPosition, style);
+  }
+
+  /**
+   * Get a column's default style.
+   */
+  async getColumnStyle(colPosition: number): Promise<CellStyle> {
+    return this._client.getColumnStyle(colPosition);
+  }
+
+  /**
+   * Get a row's default style.
+   */
+  async getRowStyle(rowPosition: number): Promise<CellStyle> {
+    return this._client.getRowStyle(rowPosition);
+  }
+
+  // ==========================================================================
   // Column Operations
   // ==========================================================================
 

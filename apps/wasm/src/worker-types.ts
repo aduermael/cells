@@ -103,6 +103,12 @@ export interface CellsEngine {
     getEffectiveCellStyle(col: number, row: number): string;
     getEffectiveStyleForRange(col1: number, row1: number, col2: number, row2: number): string;
 
+    // Axis style operations (entire column/row styles)
+    setColumnStyle(colPosition: number, styleJson: string): string;
+    setRowStyle(rowPosition: number, styleJson: string): string;
+    getColumnStyle(colPosition: number): string;
+    getRowStyle(rowPosition: number): string;
+
     // Column/row operations
     resizeColumn(colId: string, width: number): string;
     resizeColumnByPos(pos: number, width: number): string;

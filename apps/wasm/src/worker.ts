@@ -76,6 +76,10 @@ import {
     handleRemoveRangeStyle,
     handleGetEffectiveCellStyle,
     handleGetEffectiveStyleForRange,
+    handleSetColumnStyle,
+    handleSetRowStyle,
+    handleGetColumnStyle,
+    handleGetRowStyle,
     handleResizeColumn,
     handleResizeColumnByPos,
     handleResizeRow,
@@ -511,6 +515,22 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "getEffectiveStyleForRange":
                 handleGetEffectiveStyleForRange(engine, params, respond);
+                break;
+
+            // ================================================================
+            // Axis Style Operations (entire column/row styles)
+            // ================================================================
+            case "setColumnStyle":
+                handleSetColumnStyle(engine, params, respond);
+                break;
+            case "setRowStyle":
+                handleSetRowStyle(engine, params, respond);
+                break;
+            case "getColumnStyle":
+                handleGetColumnStyle(engine, params, respond);
+                break;
+            case "getRowStyle":
+                handleGetRowStyle(engine, params, respond);
                 break;
 
             // ================================================================
