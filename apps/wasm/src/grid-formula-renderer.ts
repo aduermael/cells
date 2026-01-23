@@ -10,7 +10,12 @@ import {
   getZoomedHeaderHeight,
   getZoomedColWidth,
   getZoomedRowHeight,
+  getZoomFactor,
+  FORMULA_HANDLE_SIZE,
   type FormulaHighlight,
+  type FormulaHighlightInteraction,
+  type CornerPosition,
+  type BorderPosition,
 } from "./grid-constants.js";
 import { getCellBounds, getRangeBounds } from "./grid-utils.js";
 
@@ -25,6 +30,8 @@ export interface FormulaHighlightRendererState {
   formulaHighlights: FormulaHighlight[];
   /** Index of hovered formula reference (-1 = none) */
   hoveredFormulaRefIndex: number;
+  /** Whether formula editing is active (controls handle visibility) */
+  isFormulaEditing?: boolean;
 }
 
 // Default fallback color (blue)
@@ -432,4 +439,321 @@ export function drawFormulaHighlights(
   }
 
   ctx.restore();
+}
+
+/**
+ * Draw resize handles at corners of formula highlights.
+ * Only draws when in formula editing mode.
+ * Returns interaction zones for hit testing.
+ */
+export function drawFormulaHighlightHandles(
+  ctx: CanvasRenderingContext2D,
+  state: FormulaHighlightRendererState,
+  viewWidth: number,
+  viewHeight: number
+): FormulaHighlightInteraction[] {
+  const interactions: FormulaHighlightInteraction[] = [];
+
+  if (!state.formulaHighlights || state.formulaHighlights.length === 0) {
+    return interactions;
+  }
+
+  // Only draw handles when actively editing a formula
+  if (!state.isFormulaEditing) {
+    return interactions;
+  }
+
+  const zoomFactor = getZoomFactor();
+  const handleSize = Math.round(FORMULA_HANDLE_SIZE * zoomFactor);
+  const halfHandle = handleSize / 2;
+  const zoomedHeaderWidth = getZoomedHeaderWidth();
+  const zoomedHeaderHeight = getZoomedHeaderHeight();
+
+  ctx.save();
+
+  for (let idx = 0; idx < state.formulaHighlights.length; idx++) {
+    const highlight = state.formulaHighlights[idx];
+    if (!highlight) continue;
+
+    // Skip named ranges - they can't be resized/moved via drag
+    if (highlight.type === "named") continue;
+
+    const color = getHighlightColor(highlight);
+    let bounds: { x: number; y: number; width: number; height: number } | null = null;
+
+    // Get bounds based on highlight type
+    if (highlight.type === "cell" && highlight.col !== undefined && highlight.row !== undefined) {
+      bounds = getCellBounds(
+        highlight.col,
+        highlight.row,
+        state.scrollX,
+        state.scrollY,
+        state.colWidths,
+        state.rowHeights
+      );
+    } else if (
+      highlight.type === "range" &&
+      highlight.startCol !== undefined &&
+      highlight.startRow !== undefined &&
+      highlight.endCol !== undefined &&
+      highlight.endRow !== undefined
+    ) {
+      bounds = getRangeBounds(
+        highlight.startCol,
+        highlight.startRow,
+        highlight.endCol,
+        highlight.endRow,
+        state.scrollX,
+        state.scrollY,
+        state.colWidths,
+        state.rowHeights
+      );
+    }
+    // Column and row references don't have corner handles (infinite extent)
+
+    if (!bounds) continue;
+
+    const { x, y, width, height } = bounds;
+
+    // Skip if completely outside visible area
+    if (
+      x + width <= zoomedHeaderWidth ||
+      x >= viewWidth ||
+      y + height <= zoomedHeaderHeight ||
+      y >= viewHeight
+    ) {
+      continue;
+    }
+
+    // Define corner positions
+    const corners: Array<{ pos: CornerPosition; cx: number; cy: number }> = [
+      { pos: "nw", cx: x, cy: y },
+      { pos: "ne", cx: x + width, cy: y },
+      { pos: "sw", cx: x, cy: y + height },
+      { pos: "se", cx: x + width, cy: y + height },
+    ];
+
+    // Draw corner handles and collect interaction zones
+    ctx.fillStyle = color.border;
+    for (const corner of corners) {
+      const handleX = corner.cx - halfHandle;
+      const handleY = corner.cy - halfHandle;
+
+      // Only draw if handle is in visible area
+      if (
+        handleX + handleSize > zoomedHeaderWidth &&
+        handleX < viewWidth &&
+        handleY + handleSize > zoomedHeaderHeight &&
+        handleY < viewHeight
+      ) {
+        // Draw the handle (small filled square)
+        ctx.fillRect(handleX, handleY, handleSize, handleSize);
+
+        // Add interaction zone for this corner
+        interactions.push({
+          highlightIndex: idx,
+          zone: "corner",
+          corner: corner.pos,
+          bounds: {
+            x: handleX,
+            y: handleY,
+            width: handleSize,
+            height: handleSize,
+          },
+        });
+      }
+    }
+
+    // Define border interaction zones (for move)
+    // Borders are the edges between corners
+    const borderWidth = 4 * zoomFactor;
+
+    // North border (top edge, excluding corners)
+    interactions.push({
+      highlightIndex: idx,
+      zone: "border",
+      border: "n",
+      bounds: {
+        x: x + halfHandle,
+        y: y - borderWidth / 2,
+        width: width - handleSize,
+        height: borderWidth,
+      },
+    });
+
+    // South border (bottom edge, excluding corners)
+    interactions.push({
+      highlightIndex: idx,
+      zone: "border",
+      border: "s",
+      bounds: {
+        x: x + halfHandle,
+        y: y + height - borderWidth / 2,
+        width: width - handleSize,
+        height: borderWidth,
+      },
+    });
+
+    // West border (left edge, excluding corners)
+    interactions.push({
+      highlightIndex: idx,
+      zone: "border",
+      border: "w",
+      bounds: {
+        x: x - borderWidth / 2,
+        y: y + halfHandle,
+        width: borderWidth,
+        height: height - handleSize,
+      },
+    });
+
+    // East border (right edge, excluding corners)
+    interactions.push({
+      highlightIndex: idx,
+      zone: "border",
+      border: "e",
+      bounds: {
+        x: x + width - borderWidth / 2,
+        y: y + halfHandle,
+        width: borderWidth,
+        height: height - handleSize,
+      },
+    });
+  }
+
+  ctx.restore();
+
+  return interactions;
+}
+
+/**
+ * Compute all interaction zones for formula highlights without drawing.
+ * Used for hit testing during mouse events.
+ */
+export function computeFormulaInteractionZones(
+  state: FormulaHighlightRendererState,
+  viewWidth: number,
+  viewHeight: number
+): FormulaHighlightInteraction[] {
+  const interactions: FormulaHighlightInteraction[] = [];
+
+  if (!state.formulaHighlights || state.formulaHighlights.length === 0) {
+    return interactions;
+  }
+
+  const zoomFactor = getZoomFactor();
+  const handleSize = Math.round(FORMULA_HANDLE_SIZE * zoomFactor);
+  const halfHandle = handleSize / 2;
+  const zoomedHeaderWidth = getZoomedHeaderWidth();
+  const zoomedHeaderHeight = getZoomedHeaderHeight();
+  const borderWidth = 4 * zoomFactor;
+
+  for (let idx = 0; idx < state.formulaHighlights.length; idx++) {
+    const highlight = state.formulaHighlights[idx];
+    if (!highlight) continue;
+
+    // Skip named ranges - they can't be resized/moved via drag
+    if (highlight.type === "named") continue;
+
+    let bounds: { x: number; y: number; width: number; height: number } | null = null;
+    let isColumnOrRow = false;
+
+    // Get bounds based on highlight type
+    if (highlight.type === "cell" && highlight.col !== undefined && highlight.row !== undefined) {
+      bounds = getCellBounds(
+        highlight.col,
+        highlight.row,
+        state.scrollX,
+        state.scrollY,
+        state.colWidths,
+        state.rowHeights
+      );
+    } else if (
+      highlight.type === "range" &&
+      highlight.startCol !== undefined &&
+      highlight.startRow !== undefined &&
+      highlight.endCol !== undefined &&
+      highlight.endRow !== undefined
+    ) {
+      bounds = getRangeBounds(
+        highlight.startCol,
+        highlight.startRow,
+        highlight.endCol,
+        highlight.endRow,
+        state.scrollX,
+        state.scrollY,
+        state.colWidths,
+        state.rowHeights
+      );
+    } else if (highlight.type === "column" || highlight.type === "row") {
+      // Column/row references have limited interaction (move only, specific edges)
+      isColumnOrRow = true;
+      // We'll handle these specially below
+    }
+
+    if (!bounds && !isColumnOrRow) continue;
+
+    if (bounds) {
+      const { x, y, width, height } = bounds;
+
+      // Skip if completely outside visible area
+      if (
+        x + width <= zoomedHeaderWidth ||
+        x >= viewWidth ||
+        y + height <= zoomedHeaderHeight ||
+        y >= viewHeight
+      ) {
+        continue;
+      }
+
+      // Corner interaction zones (resize)
+      const corners: Array<{ pos: CornerPosition; cx: number; cy: number }> = [
+        { pos: "nw", cx: x, cy: y },
+        { pos: "ne", cx: x + width, cy: y },
+        { pos: "sw", cx: x, cy: y + height },
+        { pos: "se", cx: x + width, cy: y + height },
+      ];
+
+      for (const corner of corners) {
+        const handleX = corner.cx - halfHandle;
+        const handleY = corner.cy - halfHandle;
+
+        interactions.push({
+          highlightIndex: idx,
+          zone: "corner",
+          corner: corner.pos,
+          bounds: {
+            x: handleX,
+            y: handleY,
+            width: handleSize,
+            height: handleSize,
+          },
+        });
+      }
+
+      // Border interaction zones (move)
+      const borders: Array<{ pos: BorderPosition; bx: number; by: number; bw: number; bh: number }> = [
+        { pos: "n", bx: x + halfHandle, by: y - borderWidth / 2, bw: width - handleSize, bh: borderWidth },
+        { pos: "s", bx: x + halfHandle, by: y + height - borderWidth / 2, bw: width - handleSize, bh: borderWidth },
+        { pos: "w", bx: x - borderWidth / 2, by: y + halfHandle, bw: borderWidth, bh: height - handleSize },
+        { pos: "e", bx: x + width - borderWidth / 2, by: y + halfHandle, bw: borderWidth, bh: height - handleSize },
+      ];
+
+      for (const border of borders) {
+        interactions.push({
+          highlightIndex: idx,
+          zone: "border",
+          border: border.pos,
+          bounds: {
+            x: border.bx,
+            y: border.by,
+            width: border.bw,
+            height: border.bh,
+          },
+        });
+      }
+    }
+  }
+
+  return interactions;
 }

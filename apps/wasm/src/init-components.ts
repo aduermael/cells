@@ -133,6 +133,8 @@ export function createComponents(config: ComponentsConfig): Components {
   // Forward references for controls (initialized later)
   let formatControlsRef: FormatControls | null = null;
   let styleControlsRef: StyleControls | null = null;
+  let cellEditorRef: CellEditor | null = null;
+  let formulaBarEditorRef: FormulaBarEditor | null = null;
 
   // =========================================================================
   // Rendering Helpers
@@ -171,6 +173,8 @@ export function createComponents(config: ComponentsConfig): Components {
         : -1,
       formulaHighlights: app.formulaHighlights,
       hoveredFormulaRefIndex: app.hoveredFormulaRefIndex,
+      isFormulaEditing: (cellEditorRef?.isFormulaMode() ?? false) ||
+                        (formulaBarEditorRef?.isFormulaMode() ?? false),
       discoveredRows: app.discoveredRows,
       isFillDragging: app.isFillDragging,
       fillPreviewRange: app.fillPreviewRange,
@@ -708,6 +712,10 @@ export function createComponents(config: ComponentsConfig): Components {
   });
 
   formulaBarEditor.setFormulaBarContainer(elements.formulaBar);
+
+  // Set forward references for rendering state updates
+  cellEditorRef = cellEditor;
+  formulaBarEditorRef = formulaBarEditor;
 
   // =========================================================================
   // Create Managers

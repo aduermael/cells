@@ -63,7 +63,7 @@ import {
   getColumnHeaderText,
   type HeaderRendererState,
 } from "./grid-header-renderer.js";
-import { drawFormulaHighlights } from "./grid-formula-renderer.js";
+import { drawFormulaHighlights, drawFormulaHighlightHandles } from "./grid-formula-renderer.js";
 import { ensureFont, getFallbackFonts } from "./font-loader.js";
 
 /**
@@ -132,6 +132,9 @@ export class GridRenderer {
 
   // Index of hovered formula reference (-1 = none)
   hoveredFormulaRefIndex = -1;
+
+  // Whether formula editing is active (controls handle visibility)
+  isFormulaEditing = false;
 
   // Fill handle bounds (for hit testing in grid events)
   fillHandleBounds: FillHandleBounds | null = null;
@@ -344,8 +347,11 @@ export class GridRenderer {
         rowPixelOffsets: this.rowPixelOffsets,
         formulaHighlights: this.formulaHighlights,
         hoveredFormulaRefIndex: this.hoveredFormulaRefIndex,
+        isFormulaEditing: this.isFormulaEditing,
       };
       drawFormulaHighlights(ctx, formulaState, viewWidth, viewHeight);
+      // Draw resize/move handles on formula highlights when editing
+      drawFormulaHighlightHandles(ctx, formulaState, viewWidth, viewHeight);
     }
 
     // Spill range highlight (drawn before selection so it appears behind)

@@ -253,6 +253,33 @@ export interface SpillRangeHighlight {
   masterRow: number;
 }
 
+// =============================================================================
+// Formula Highlight Interaction Types
+// =============================================================================
+
+/** Corner positions for resize handles */
+export type CornerPosition = "nw" | "ne" | "sw" | "se";
+
+/** Border positions for move handles */
+export type BorderPosition = "n" | "s" | "e" | "w";
+
+/** Type of interaction zone */
+export type InteractionZoneType = "corner" | "border" | "inside";
+
+/** Interaction zone for formula highlight hit testing */
+export interface FormulaHighlightInteraction {
+  highlightIndex: number;
+  zone: InteractionZoneType;
+  corner?: CornerPosition;
+  border?: BorderPosition;
+  bounds: { x: number; y: number; width: number; height: number };
+}
+
+/** Constants for formula highlight interaction */
+export const FORMULA_HANDLE_SIZE = 6;      // 6x6 pixel corner handles
+export const FORMULA_HANDLE_PADDING = 3;   // Extra hit area padding
+export const FORMULA_BORDER_HIT_WIDTH = 4; // Border hit area width for move
+
 /** State references that can be set from the main application */
 export interface GridRendererState {
   sheetInfo?: SheetInfo | null;
@@ -286,6 +313,8 @@ export interface GridRendererState {
   formulaHighlights?: FormulaHighlight[];
   /** Index of hovered formula reference (-1 = none) */
   hoveredFormulaRefIndex?: number;
+  /** Whether formula editing is active (controls handle visibility) */
+  isFormulaEditing?: boolean;
   /** Virtual scrolling: discovered row count (expands as user scrolls down) */
   discoveredRows?: number;
   /** Whether currently dragging the fill handle */

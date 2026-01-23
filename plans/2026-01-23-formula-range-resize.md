@@ -45,18 +45,22 @@ Key files:
 
 Draw resize handles at corners and make borders interactive for moving.
 
-- [ ] 1a: Extend `FormulaHighlight` interface to track interaction zones
+- [x] 1a: Extend `FormulaHighlight` interface to track interaction zones
   - Cell references: 4 corners (resize), 4 borders (move)
   - Range references: 4 corners (resize), 4 borders (move)
   - Column/row references: relevant edges only
+  - Added interaction types to grid-constants.ts: `CornerPosition`, `BorderPosition`, `InteractionZoneType`, `FormulaHighlightInteraction`
+  - Added constants: `FORMULA_HANDLE_SIZE`, `FORMULA_HANDLE_PADDING`, `FORMULA_BORDER_HIT_WIDTH`
 
-- [ ] 1b: Create `drawFormulaHighlightHandles()` function in grid-formula-renderer.ts
+- [x] 1b: Create `drawFormulaHighlightHandles()` function in grid-formula-renderer.ts
   - Draw small squares (6x6px) at corners of range highlights
   - Only draw handles when editing a formula (not just viewing highlights)
   - Use the same color as the highlight border
   - Borders themselves become the "move" interaction zone (no extra visual needed)
+  - Added `isFormulaEditing` state to control handle visibility
+  - Integrated handle drawing into grid-renderer.ts
 
-- [ ] 1c: Add interaction zone bounds tracking to support hit testing
+- [x] 1c: Add interaction zone bounds tracking to support hit testing
   - Export `FormulaHighlightInteraction` interface:
     ```typescript
     interface FormulaHighlightInteraction {
@@ -68,6 +72,7 @@ Draw resize handles at corners and make borders interactive for moving.
     }
     ```
   - Return all interaction zones from drawing function for mouse event handling
+  - Added `computeFormulaInteractionZones()` for hit testing without drawing
 
 ---
 
