@@ -128,16 +128,19 @@ Empty cells (no value, no formula) should not block spills. They can have style/
 
 Ensure the style hierarchy is correctly implemented and documented.
 
-- [ ] 4a: Verify style resolution order in `computeEffectiveStyleAt()`:
-  - Current order: cell > range > column > row (cell highest priority)
-  - This matches the design doc and Excel patterns
+- [x] 4a: Verify style resolution order in `computeEffectiveStyleAt()`:
+  - Verified: order is cell > range > column > row (correct)
+  - Uses `mergeEffectiveStyles()` which only fills in undefined properties
+  - Higher priority styles are checked first, their defined properties take precedence
 
-- [ ] 4b: Add test cases for style priority:
-  - Row style + column style at intersection → column wins (column > row)
-  - Cell style + column style → cell wins
-  - Range style + column style → range wins
+- [x] 4b: Add test cases for style priority:
+  - Existing tests in axis-styles.test.mjs already cover:
+    - "Column style takes precedence over row style at intersection"
+    - "Cell style takes precedence over column style"
+  - Added new test: "Range style takes precedence over column style"
 
-- [ ] 4c: Document style priority in code comments
+- [x] 4c: Document style priority in code comments
+  - Added comprehensive comment to `computeEffectiveStyleAt()` documenting the priority order
 
 ---
 

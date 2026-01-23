@@ -12,6 +12,7 @@ import {
   clickCell,
   clickColumnHeader,
   clickRowHeader,
+  selectRange,
   setCellValue,
   sleep,
   assertEqual,
@@ -266,6 +267,49 @@ const tests = {
     const styleB10 = await getEffectiveCellStyle(ctx.page, 1, 9);
     assertEqual(styleB10.bgColor?.toUpperCase(), testColor.toUpperCase(),
       'Empty cell B10 should have column style');
+  },
+
+  'Range style takes precedence over column style': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const colColor = '#3B82F6'; // Blue
+    const rangeColor = '#F59E0B'; // Orange
+
+    // Set column B style
+    await clickColumnHeader(ctx.page, 'B');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, colColor);
+    await sleep(300);
+
+    // Select B2:B4 and apply range style
+    await selectRange(ctx.page, 'B2', 'B4');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, rangeColor);
+    await sleep(300);
+
+    // B2-B4 should have range style (range > column)
+    const styleB2 = await getEffectiveCellStyle(ctx.page, 1, 1);
+    assertEqual(styleB2.bgColor?.toUpperCase(), rangeColor.toUpperCase(),
+      'B2 should have range style (range > column priority)');
+
+    const styleB3 = await getEffectiveCellStyle(ctx.page, 1, 2);
+    assertEqual(styleB3.bgColor?.toUpperCase(), rangeColor.toUpperCase(),
+      'B3 should have range style');
+
+    const styleB4 = await getEffectiveCellStyle(ctx.page, 1, 3);
+    assertEqual(styleB4.bgColor?.toUpperCase(), rangeColor.toUpperCase(),
+      'B4 should have range style');
+
+    // B1 should have column style (outside range)
+    const styleB1 = await getEffectiveCellStyle(ctx.page, 1, 0);
+    assertEqual(styleB1.bgColor?.toUpperCase(), colColor.toUpperCase(),
+      'B1 should have column style (outside range)');
+
+    // B5 should have column style (outside range)
+    const styleB5 = await getEffectiveCellStyle(ctx.page, 1, 4);
+    assertEqual(styleB5.bgColor?.toUpperCase(), colColor.toUpperCase(),
+      'B5 should have column style (outside range)');
   },
 };
 

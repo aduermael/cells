@@ -2067,6 +2067,16 @@ CellStyle mergeEffectiveStyles(const CellStyle& base, const CellStyle& overlay) 
 // Computes the effective style at a position, considering all style sources.
 // Does not require a Cell object - works for empty cells too.
 // Note: sheet is non-const because getCellAt/getRangesAt are non-const
+//
+// Style Priority Order (highest to lowest):
+// 1. Cell style - Properties set directly on the cell always win
+// 2. Range styles - Applied via RANGE_STYLE ranges (merged in application order)
+// 3. Column style - Default formatting for the entire column
+// 4. Row style - Default formatting for the entire row
+//
+// This cascading allows users to set column-wide defaults that can be overridden
+// by specific ranges or individual cells. Column styles take precedence over row
+// styles at intersections, following common spreadsheet UX patterns.
 CellStyle computeEffectiveStyleAt(Sheet& sheet, const Workbook& workbook,
                                    uint32_t colPos, uint32_t rowPos,
                                    ID colId, ID rowId) {
