@@ -462,8 +462,7 @@ export class StyleControls {
   // =========================================================================
 
   private async toggleStyle(property: "bold" | "italic" | "underline" | "wrapText"): Promise<void> {
-    const position = this.getSelectedCell();
-    if (!position || !this.dataSource) return;
+    if (!this.hasValidSelection() || !this.dataSource) return;
 
     // Toggle the current value
     const newValue = !this.currentStyle[property];
@@ -488,9 +487,13 @@ export class StyleControls {
     }
   }
 
+  /** Check if we have a valid selection (cell, range, or axis) */
+  private hasValidSelection(): boolean {
+    return !!(this.getSelectedCell() || this.getSelectedAxis());
+  }
+
   private async applyBgColor(color: string): Promise<void> {
-    const position = this.getSelectedCell();
-    if (!position || !this.dataSource) return;
+    if (!this.hasValidSelection() || !this.dataSource) return;
 
     const styleUpdate: Partial<CellStyle> = { bgColor: color };
 
@@ -508,8 +511,7 @@ export class StyleControls {
   }
 
   private async applyTextColor(color: string): Promise<void> {
-    const position = this.getSelectedCell();
-    if (!position || !this.dataSource) return;
+    if (!this.hasValidSelection() || !this.dataSource) return;
 
     const styleUpdate: Partial<CellStyle> = { textColor: color };
 
@@ -527,8 +529,7 @@ export class StyleControls {
   }
 
   private async applyHAlign(hAlign: "left" | "center" | "right"): Promise<void> {
-    const position = this.getSelectedCell();
-    if (!position || !this.dataSource) return;
+    if (!this.hasValidSelection() || !this.dataSource) return;
 
     const styleUpdate: Partial<CellStyle> = { hAlign };
 
@@ -546,8 +547,7 @@ export class StyleControls {
   }
 
   private async applyVAlign(vAlign: "top" | "middle" | "bottom"): Promise<void> {
-    const position = this.getSelectedCell();
-    if (!position || !this.dataSource) return;
+    if (!this.hasValidSelection() || !this.dataSource) return;
 
     const styleUpdate: Partial<CellStyle> = { vAlign };
 

@@ -924,3 +924,108 @@ export async function exportToZCD(page) {
   });
   return result;
 }
+
+/**
+ * Click on a column header to select the entire column
+ * @param {import('puppeteer').Page} page
+ * @param {number|string} col - Column index (0-based) or letter (e.g., "A")
+ */
+export async function clickColumnHeader(page, col) {
+  const colIndex = typeof col === 'string' ? parseCellRef(col + '1').col : col;
+  const canvasInfo = await getCanvasInfo(page);
+
+  // Calculate column header position
+  const pos = await page.evaluate(({ col }) => {
+    const HEADER_WIDTH = 50;
+    const HEADER_HEIGHT = 24;
+    const DEFAULT_COL_WIDTH = 100;
+
+    const ctx = window._appContext;
+    if (!ctx || !ctx.app) {
+      // Fallback to basic calculation
+      return {
+        x: HEADER_WIDTH + col * DEFAULT_COL_WIDTH + DEFAULT_COL_WIDTH / 2,
+        y: HEADER_HEIGHT / 2, // Middle of header row
+      };
+    }
+
+    const app = ctx.app;
+    const renderer = app.renderer;
+    const zoomFactor = renderer.getZoomFactor();
+
+    // Calculate X position from colWidths
+    let offsetX = 0;
+    for (let i = 0; i < col; i++) {
+      offsetX += app.colWidths.get(i) ?? DEFAULT_COL_WIDTH;
+    }
+    const cellWidth = app.colWidths.get(col) ?? DEFAULT_COL_WIDTH;
+    const cellX = Math.round(HEADER_WIDTH * zoomFactor) + Math.round(offsetX * zoomFactor) - Math.round(app.scrollX * zoomFactor);
+
+    return {
+      x: cellX + Math.round(cellWidth * zoomFactor) / 2,
+      y: Math.round(HEADER_HEIGHT * zoomFactor) / 2, // Middle of header row
+    };
+  }, { col: colIndex });
+
+  const x = canvasInfo.left + pos.x;
+  const y = canvasInfo.top + pos.y;
+
+  await page.mouse.click(x, y);
+  await page.evaluate(() => {
+    const canvas = document.getElementById('grid');
+    if (canvas) canvas.focus();
+  });
+  await sleep(100);
+}
+
+/**
+ * Click on a row header to select the entire row
+ * @param {import('puppeteer').Page} page
+ * @param {number} row - Row index (0-based)
+ */
+export async function clickRowHeader(page, row) {
+  const canvasInfo = await getCanvasInfo(page);
+
+  // Calculate row header position
+  const pos = await page.evaluate(({ row }) => {
+    const HEADER_WIDTH = 50;
+    const HEADER_HEIGHT = 24;
+    const DEFAULT_ROW_HEIGHT = 24;
+
+    const ctx = window._appContext;
+    if (!ctx || !ctx.app) {
+      // Fallback to basic calculation
+      return {
+        x: HEADER_WIDTH / 2, // Middle of header column
+        y: HEADER_HEIGHT + row * DEFAULT_ROW_HEIGHT + DEFAULT_ROW_HEIGHT / 2,
+      };
+    }
+
+    const app = ctx.app;
+    const renderer = app.renderer;
+    const zoomFactor = renderer.getZoomFactor();
+
+    // Calculate Y position from rowHeights
+    let offsetY = 0;
+    for (let i = 0; i < row; i++) {
+      offsetY += app.rowHeights.get(i) ?? DEFAULT_ROW_HEIGHT;
+    }
+    const cellHeight = app.rowHeights.get(row) ?? DEFAULT_ROW_HEIGHT;
+    const cellY = Math.round(HEADER_HEIGHT * zoomFactor) + Math.round(offsetY * zoomFactor) - Math.round(app.scrollY * zoomFactor);
+
+    return {
+      x: Math.round(HEADER_WIDTH * zoomFactor) / 2, // Middle of header column
+      y: cellY + Math.round(cellHeight * zoomFactor) / 2,
+    };
+  }, { row });
+
+  const x = canvasInfo.left + pos.x;
+  const y = canvasInfo.top + pos.y;
+
+  await page.mouse.click(x, y);
+  await page.evaluate(() => {
+    const canvas = document.getElementById('grid');
+    if (canvas) canvas.focus();
+  });
+  await sleep(100);
+}

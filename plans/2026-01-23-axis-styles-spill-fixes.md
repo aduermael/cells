@@ -95,7 +95,9 @@ Expose axis styles through the WASM bindings and add UI to apply them.
   - Added `getSelectedAxis` callback that checks app.selectedColumn/selectedRow
   - Updated applyStyleToSelection to use setColumnStyle/setRowStyle when axis selected
 
-- [ ] 2g: Add tests for column/row style application and inheritance
+- [x] 2g: Add tests for column/row style application and inheritance
+  - Created axis-styles.test.mjs with E2E tests for column/row header styling
+  - Added clickColumnHeader/clickRowHeader helpers to helpers.mjs
 
 ## Phase 3: Fix Spill Blocking by Empty Cells
 
