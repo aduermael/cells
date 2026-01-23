@@ -52,6 +52,7 @@ import {
 } from "./context-menu";
 import { editingSession } from "./editing-session";
 import type { AppEventManagerConfig } from "./app-events";
+import { hitTestFormulaHighlight, getCursorForHitResult } from "./formula-interaction";
 
 // =============================================================================
 // Mouse Event Handler Mixin
@@ -1039,7 +1040,37 @@ export class MouseEventHandlers {
             // Determine cursor based on position - use zoomed dimensions
             const zoomedHeaderHeight = getZoomedHeaderHeight();
             const zoomedHeaderWidth = getZoomedHeaderWidth();
-            if (this.isPointInFillHandle(x, y)) {
+
+            // Check for formula highlight interaction zones when in formula editing mode
+            let formulaHitResult = null;
+            if (this.isInFormulaEditingMode()) {
+                const { getFormulaHighlights, getColPixelOffsets, getRowPixelOffsets, getHoveredGridRefIndex } = this.config;
+                const highlights = getFormulaHighlights();
+                if (highlights.length > 0) {
+                    formulaHitResult = hitTestFormulaHighlight(
+                        x,
+                        y,
+                        {
+                            scrollX,
+                            scrollY,
+                            colWidths,
+                            rowHeights,
+                            colPixelOffsets: getColPixelOffsets(),
+                            rowPixelOffsets: getRowPixelOffsets(),
+                            formulaHighlights: highlights,
+                            hoveredFormulaRefIndex: getHoveredGridRefIndex(),
+                            isFormulaEditing: true,
+                        },
+                        canvas.width,
+                        canvas.height
+                    );
+                }
+            }
+
+            if (formulaHitResult) {
+                // Formula highlight interaction takes priority
+                canvas.style.cursor = getCursorForHitResult(formulaHitResult);
+            } else if (this.isPointInFillHandle(x, y)) {
                 canvas.style.cursor = "crosshair";
             } else if (y < zoomedHeaderHeight && y > 0 && x > zoomedHeaderWidth) {
                 const resizeCol = getResizeHandleCol(

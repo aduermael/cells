@@ -96,10 +96,11 @@ Detect when the mouse is over formula highlight interaction zones and show appro
   - **Main selection fill handle**: `crosshair` (existing)
   - Implemented via `getCursorForCorner()` and `getCursorForHitResult()` in formula-interaction.ts
 
-- [ ] 2c: Update `handleMouseMove()` in mouse-events.ts for cursor changes
+- [x] 2c: Update `handleMouseMove()` in mouse-events.ts for cursor changes
   - Call `hitTestFormulaHighlight()` when in formula editing mode
   - Set cursor based on returned action type
   - Only check when formula highlights exist
+  - Added import for formula-interaction.ts and integrated hit testing in cursor logic
 
 - [ ] 2d: Track `hoveredFormulaInteraction` in app state
   - Stores current interaction zone info for visual feedback
