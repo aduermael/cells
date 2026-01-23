@@ -680,11 +680,14 @@ void OSTree::updateSubtreeTotal(OSNode* node) {
     }
 
     node->subtree_total = node->size;
+    node->subtree_count = 1;
     if (node->left != nullptr) {
         node->subtree_total += node->left->subtree_total;
+        node->subtree_count += node->left->subtree_count;
     }
     if (node->right != nullptr) {
         node->subtree_total += node->right->subtree_total;
+        node->subtree_count += node->right->subtree_count;
     }
 }
 
@@ -705,32 +708,39 @@ void OSTree::deleteSubtree(OSNode* node) {
 }
 
 OSNode* OSTree::nodeAtPosition(size_t position) const {
-    // Use in-order traversal to find node at position
-    // This could be optimized with subtree counts, but keeping it simple for now
-    OSNode* node = first();  // NOLINT(misc-const-correctness)
-    size_t current = 0;
-
-    while (node != nullptr && current < position) {
-        node = next(node);
-        current++;
+    // O(log n) position lookup using subtree_count
+    if (_root == nullptr || position >= _count) {
+        return nullptr;
     }
 
-    return node;
+    // NOLINTNEXTLINE(misc-const-correctness) - returning non-const from const method
+    OSNode* current = _root;
+    size_t remaining = position;
+
+    while (current != nullptr) {
+        const size_t leftCount = current->left != nullptr ? current->left->subtree_count : 0;
+
+        if (remaining < leftCount) {
+            // Target is in left subtree
+            current = current->left;
+        } else if (remaining == leftCount) {
+            // This is the target node
+            return current;
+        } else {
+            // Target is in right subtree
+            remaining -= leftCount + 1;  // Subtract left subtree and current node
+            current = current->right;
+        }
+    }
+
+    return nullptr;
 }
 
 size_t OSTree::leftSubtreeCount(const OSNode* node) {
     if (node == nullptr || node->left == nullptr) {
         return 0;
     }
-
-    // Count nodes in left subtree
-    size_t count = 0;
-    const OSNode* current = minimum(node->left);
-    while (current != nullptr && current != node) {
-        count++;
-        current = next(current);
-    }
-    return count;
+    return node->left->subtree_count;
 }
 
 int OSTree::verifySubtree(const OSNode* node, uint32_t& computedTotal) const {

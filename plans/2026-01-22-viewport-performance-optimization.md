@@ -176,10 +176,27 @@ Now that Sheet owns AxisIndex, insertion position is known.
 
 ### Phase 6: Validation
 
-- [ ] 6a: Re-run performance benchmarks from Phase 1
-- [ ] 6b: Verify all viewport operations are O(log n) or better at 100K rows
-- [ ] 6c: Full test pass: `bazel run :check`
-- [ ] 6d: Update docs/rendering.md with final architecture
+- [x] 6a: Re-run performance benchmarks from Phase 1
+  - Initial run showed O(n) still present (846x slowdown from row 100 to 100K)
+- [x] 6b: **Discovered hidden O(n) bottleneck**: `OSTree::nodeAtPosition()` used linear traversal
+  - Added `subtree_count` field to OSNode struct
+  - Updated `updateSubtreeTotal()` to maintain subtree counts
+  - Rewrote `nodeAtPosition()` to use O(log n) binary search via subtree counts
+  - Updated `leftSubtreeCount()` to use O(1) subtree_count lookup
+- [x] 6c: Verify all viewport operations are O(log n) or better at 100K rows
+  - **Final benchmark results:**
+
+    | Row Position | Before (µs) | After (µs) | Improvement |
+    |--------------|-------------|------------|-------------|
+    | 100          | 478         | 94         | 5.1x        |
+    | 1,000        | 3,455       | 95         | 36x         |
+    | 10,000       | 38,859      | 114        | 341x        |
+    | 50,000       | 198,051     | 112        | 1,768x      |
+    | 100,000      | 404,477     | 156        | 2,593x      |
+
+  - Slowdown ratio: **1.66x** (expected ~1.7x for O(log n)) ✓
+- [x] 6d: Full test pass: `bazel run :check` - all 57 unit tests + 313 E2E tests pass
+- [ ] 6e: Update docs/rendering.md with final architecture
 
 ### Phase 7: Fix Pre-existing Test Failures
 

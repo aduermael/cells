@@ -66,6 +66,7 @@ struct OSNode {
     ID id;                   // Unique identifier
     uint32_t size;           // Size of this node (width/height in pixels)
     uint32_t subtree_total;  // Sum of sizes in this subtree (including this node)
+    size_t subtree_count;    // Count of nodes in this subtree (for O(log n) position lookup)
 
     NodeColor color;
     OSNode* parent;
@@ -75,6 +76,7 @@ struct OSNode {
     OSNode()
         : size(0),
           subtree_total(0),
+          subtree_count(1),
           color(NodeColor::RED),
           parent(nullptr),
           left(nullptr),
@@ -84,6 +86,7 @@ struct OSNode {
         : id(id),
           size(size),
           subtree_total(size),
+          subtree_count(1),
           color(NodeColor::RED),
           parent(nullptr),
           left(nullptr),
