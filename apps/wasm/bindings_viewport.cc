@@ -473,33 +473,95 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
             json << "\"display\":\"" << jsonEscape(displayValue) << "\",";
             json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
         } else {
-            char typeChar = valueTypeToChar(entry.cell->value.type);
-            json << "\"type\":\"" << typeChar << "\",";
-
-            bool useFormattedValue = false;
-            std::string displayValue;
-            std::string editValue;
-
-            if (!cellFormatId.isNull() &&
-                (entry.cell->value.type == CellValueType::NUMBER)) {
-                const double numValue = entry.cell->value.asNumber();
-                FormattedValue formatted =
-                    formatNumber(_formatRegistry, _workbook->getCustomFormats(),
-                                 numValue, cellFormatId);
-                if (!formatted.isError) {
-                    displayValue = formatted.text;
-                    useFormattedValue = true;
+            // Check if this is an empty cell at a spill position - if so, show the spilled value
+            // This allows cells created for style storage to not break spills
+            bool useSpilledValue = false;
+            std::string spilledDisplayValue;
+            if (isSpilledCell && entry.cell->value.raw.empty()) {
+                // Get the spilled value from the master cell's SpillInfo
+                Cell* masterCell = sheet->getCell(spillMaster);
+                if (masterCell != nullptr) {
+                    const SpillInfo* masterSpillInfo = sheet->getSpillInfo(masterCell->id);
+                    if (masterSpillInfo != nullptr) {
+                        // Find the index of this position in spilledPositions
+                        const ID& cellColId = entry.cell->colId;
+                        const ID& cellRowId = entry.cell->rowId;
+                        for (size_t idx = 0; idx < masterSpillInfo->spilledPositions.size(); ++idx) {
+                            const auto& [spillColId, spillRowId] = masterSpillInfo->spilledPositions[idx];
+                            if (spillColId == cellColId && spillRowId == cellRowId) {
+                                // Found the position - get the value
+                                if (idx < masterSpillInfo->spilledValues.size()) {
+                                    const CellValue& val = masterSpillInfo->spilledValues[idx];
+                                    if (val.type == CellValueType::NUMBER || val.type == CellValueType::FORMULA_NUMBER) {
+                                        double num = val.asNumber();
+                                        if (std::floor(num) == num && std::abs(num) < 1e15) {
+                                            spilledDisplayValue = std::to_string(static_cast<long long>(num));
+                                        } else {
+                                            std::ostringstream numStr;
+                                            numStr << std::setprecision(15) << num;
+                                            spilledDisplayValue = numStr.str();
+                                            // Remove trailing zeros after decimal
+                                            size_t dot = spilledDisplayValue.find('.');
+                                            if (dot != std::string::npos) {
+                                                size_t last = spilledDisplayValue.find_last_not_of('0');
+                                                if (last != std::string::npos && last > dot) {
+                                                    spilledDisplayValue = spilledDisplayValue.substr(0, last + 1);
+                                                } else if (last == dot) {
+                                                    spilledDisplayValue = spilledDisplayValue.substr(0, dot);
+                                                }
+                                            }
+                                        }
+                                    } else if (val.type == CellValueType::STRING || val.type == CellValueType::FORMULA_STRING) {
+                                        spilledDisplayValue = val.raw;
+                                    } else if (val.type == CellValueType::BOOLEAN || val.type == CellValueType::FORMULA_BOOLEAN) {
+                                        spilledDisplayValue = val.asBoolean() ? "TRUE" : "FALSE";
+                                    } else if (val.type == CellValueType::ERROR || val.type == CellValueType::FORMULA_ERROR) {
+                                        spilledDisplayValue = errorToString(val.error);
+                                        json << "\"isError\":true,";
+                                    }
+                                    useSpilledValue = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
                 }
-                // Compute edit value for formatted numbers (using cellFormatId from workbook map)
-                editValue = formatEditValue(_formatRegistry, numValue, cellFormatId);
             }
 
-            if (useFormattedValue) {
-                json << "\"value\":\"" << jsonEscape(entry.cell->value.raw) << "\",";
-                json << "\"display\":\"" << jsonEscape(displayValue) << "\",";
-                json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
+            if (useSpilledValue) {
+                // This cell is empty but at a spill position - show spilled value
+                json << "\"type\":\"s\",";  // Mark as spilled value type
+                json << "\"display\":\"" << jsonEscape(spilledDisplayValue) << "\",";
+                json << "\"value\":\"" << jsonEscape(spilledDisplayValue) << "\"";
             } else {
-                json << "\"value\":\"" << jsonEscape(entry.cell->value.raw) << "\"";
+                char typeChar = valueTypeToChar(entry.cell->value.type);
+                json << "\"type\":\"" << typeChar << "\",";
+
+                bool useFormattedValue = false;
+                std::string displayValue;
+                std::string editValue;
+
+                if (!cellFormatId.isNull() &&
+                    (entry.cell->value.type == CellValueType::NUMBER)) {
+                    const double numValue = entry.cell->value.asNumber();
+                    FormattedValue formatted =
+                        formatNumber(_formatRegistry, _workbook->getCustomFormats(),
+                                     numValue, cellFormatId);
+                    if (!formatted.isError) {
+                        displayValue = formatted.text;
+                        useFormattedValue = true;
+                    }
+                    // Compute edit value for formatted numbers (using cellFormatId from workbook map)
+                    editValue = formatEditValue(_formatRegistry, numValue, cellFormatId);
+                }
+
+                if (useFormattedValue) {
+                    json << "\"value\":\"" << jsonEscape(entry.cell->value.raw) << "\",";
+                    json << "\"display\":\"" << jsonEscape(displayValue) << "\",";
+                    json << "\"editValue\":\"" << jsonEscape(editValue) << "\"";
+                } else {
+                    json << "\"value\":\"" << jsonEscape(entry.cell->value.raw) << "\"";
+                }
             }
         }
 
@@ -587,7 +649,7 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 if (i < spillInfo->spilledValues.size()) {
                     const CellValue& val = spillInfo->spilledValues[i];
                     std::string displayValue;
-                    if (val.type == CellValueType::NUMBER) {
+                    if (val.type == CellValueType::NUMBER || val.type == CellValueType::FORMULA_NUMBER) {
                         double num = val.asNumber();
                         if (std::floor(num) == num && std::abs(num) < 1e15) {
                             displayValue = std::to_string(static_cast<long long>(num));
@@ -606,11 +668,11 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                                 }
                             }
                         }
-                    } else if (val.type == CellValueType::STRING) {
+                    } else if (val.type == CellValueType::STRING || val.type == CellValueType::FORMULA_STRING) {
                         displayValue = val.raw;
-                    } else if (val.type == CellValueType::BOOLEAN) {
+                    } else if (val.type == CellValueType::BOOLEAN || val.type == CellValueType::FORMULA_BOOLEAN) {
                         displayValue = val.asBoolean() ? "TRUE" : "FALSE";
-                    } else if (val.type == CellValueType::ERROR) {
+                    } else if (val.type == CellValueType::ERROR || val.type == CellValueType::FORMULA_ERROR) {
                         displayValue = errorToString(val.error);
                         json << "\"isError\":true,";
                     }
