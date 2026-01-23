@@ -2,8 +2,6 @@
 // Handles hit testing and interaction logic for formula range manipulation
 
 import {
-  type FormulaHighlight,
-  type FormulaHighlightInteraction,
   type CornerPosition,
   type BorderPosition,
 } from "./grid-constants.js";

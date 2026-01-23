@@ -102,9 +102,10 @@ Detect when the mouse is over formula highlight interaction zones and show appro
   - Only check when formula highlights exist
   - Added import for formula-interaction.ts and integrated hit testing in cursor logic
 
-- [ ] 2d: Track `hoveredFormulaInteraction` in app state
+- [x] 2d: Track `hoveredFormulaInteraction` in app state
   - Stores current interaction zone info for visual feedback
   - Used to highlight the corner handle being hovered
+  - Note: Cursor feedback is now working. Visual highlighting of hovered handles deferred to Phase 5.
 
 ---
 
