@@ -52,7 +52,7 @@ This creates a cell with `type=STRING, value=""`.
 
 **Actual root cause from screenshots:** When user changes alignment on B2 (a spilled cell), a new cell is created for style storage. The spill system sees this new cell as blocking. The spilled value then doesn't display because the cell at B2 now exists with its own (empty) value instead of showing the spilled value.
 
-**Fix needed:** Cells that exist only for style/format metadata (no user-entered value or formula) should not block spills. The spill system should check if a cell is "content-less" (only has style/format, no actual value).
+**Fix needed:** Empty cells (no hardcoded value, no formula) should not block spills. A cell can have style/format metadata and still be considered empty.
 
 ---
 
@@ -99,32 +99,27 @@ Expose axis styles through the WASM bindings and add UI to apply them.
 
 - [ ] 2g: Add tests for column/row style application and inheritance
 
-## Phase 3: Fix Spill Blocking by Style-Only Cells
+## Phase 3: Fix Spill Blocking by Empty Cells
 
-Allow spills to overwrite cells that only contain style/format metadata.
+Empty cells (no value, no formula) should not block spills. They can have style/format metadata.
 
-- [ ] 3a: Define "style-only cell" criteria in checkSpillBlocked():
-  - Cell exists but has no formula
-  - Cell has `type=STRING` with empty value (`raw.empty()`)
-  - OR cell has `type=FORMULA_EMPTY`
-  - These cells exist only for style/format storage and should not block spills
+- [ ] 3a: Update `checkSpillBlocked()` in formula_recalc.cc to correctly identify empty cells
+  - A cell is empty if: `!cell->isFormula() && cell->value.raw.empty()`
+  - Empty cells should NOT block spills (regardless of style/format)
+  - Review current logic - it may already handle empty strings but miss edge cases
 
-- [ ] 3b: Update `checkSpillBlocked()` in formula_recalc.cc to allow style-only cells
-  - A cell is style-only if: `!cell->isFormula() && (cell->value.raw.empty() || cell->value.type == FORMULA_EMPTY)`
-  - Style-only cells should NOT block spills
+- [ ] 3b: Ensure `setCellStyleAt()` creates truly empty cells when no value exists
+  - Current code creates cell with `type=STRING, value=""`
+  - This should be recognized as empty by spill blocking logic
+  - May need to use a different type or ensure the check in 3a covers this case
 
-- [ ] 3c: Update `setCellStyleAt()` to not create cells when styling a spilled position
-  - Check if position is within a spill range (using `sheet->getSpillMaster()`)
-  - If spilled: store style differently (maybe on the spill master or in a separate index)
-  - Alternative: Allow the cell creation but ensure it doesn't block spill in step 3b
-
-- [ ] 3d: Ensure spilled cells can still be styled without breaking the spill
+- [ ] 3c: Ensure spilled cells can be styled without breaking the spill
   - When user styles B2 (a spilled cell from B1's UNIQUE formula):
-  - The style should be stored
-  - The spilled value should still display
+  - The empty cell is created to store style
+  - The spilled value should still display (empty cell doesn't block)
   - The style should apply to the display of the spilled value
 
-- [ ] 3e: Add tests for:
+- [ ] 3d: Add tests for:
   - Setting style on a spilled cell doesn't break the spill
   - Setting alignment on a spilled number cell shows correct alignment
   - Spill still works after removing the style
@@ -156,18 +151,9 @@ Ensure the style hierarchy is correctly implemented and documented.
 
 When column and row styles both exist at an intersection, **column style takes precedence** (column > row). This is a design decision for consistency.
 
-### Spill-Safe Style Storage
+### Empty Cells and Spills
 
-For spilled cells, we have two options:
-
-**Option A (Simpler):** Allow style-only cells to coexist with spills
-- Spill blocking logic ignores cells that have no actual content (style-only)
-- The cell still stores the style
-- When rendering, spilled value + cell style are combined
-
-**Option B (Cleaner):** Store spill cell styles on the master cell
-- No separate cells created for spilled positions
-- Master cell stores map of relative position → style
-- More complex but cleaner data model
-
-**Chosen approach:** Option A - simpler to implement and maintains the current architecture.
+Empty cells (no value, no formula) can coexist with spills:
+- An empty cell can have style/format metadata
+- Spill blocking logic should ignore empty cells
+- When rendering a spilled position that also has an empty cell with style, combine the spilled value with the cell's style
