@@ -16,11 +16,12 @@ This plan addresses three related issues:
 - Numbers render right-aligned in the grid (grid-renderer handles GENERAL correctly)
 - But the toolbar incorrectly shows left-alignment button as active
 
-**Expected behavior:**
-- When viewing a number cell with GENERAL alignment, the right-align button should be active
-- The UI should know the cell's content type to determine effective alignment
+**Expected behavior (Excel approach):**
+- When no alignment is explicitly set at any level (cell, range, axis), no alignment button should be active
+- The renderer handles GENERAL alignment based on content type (right for numbers, left for text)
+- Alignment buttons only show active when user has explicitly set an alignment
 
-**Root cause:** The UI layer doesn't know the cell's value type when determining button state.
+**Root cause:** The UI defaults to "left" when alignment is undefined, instead of showing no selection.
 
 ### Issue 2: No UI for Axis Styles
 
@@ -57,25 +58,23 @@ This creates a cell with `type=STRING, value=""`.
 
 ## Phase 1: Fix UI Alignment Button State for GENERAL Alignment
 
-Make the toolbar show the effective visual alignment based on content type.
+When no alignment is explicitly set, no alignment button should be active (Excel behavior).
 
-- [ ] 1a: Extend `getEffectiveCellStyle()` API to also return cell value type (or visual alignment)
-  - Option A: Add `valueType` field to response indicating "number", "string", "boolean", "date", "formula_number", etc.
-  - Option B: Add `visualHAlign` field that resolves GENERAL to "right" for numbers, "left" for text
-  - **Chosen approach:** Option B - compute `visualHAlign` in C++ and return it alongside raw `hAlign`
+- [ ] 1a: Update `style-controls.ts::setDisplayedStyle()` to handle undefined/GENERAL alignment
+  - Remove the fallback to "left" on line 620: `const hAlign = style.hAlign || "left"`
+  - Instead, pass undefined through and let `updateHAlignButtons()` handle it
 
-- [ ] 1b: Update `bindings_format.cc::getEffectiveCellStyle()` to include `visualHAlign` in JSON response
-  - When `hAlign == GENERAL`: check cell value type, return "right" for numbers/dates, "left" for text
-  - When `hAlign != GENERAL`: return the explicit alignment
+- [ ] 1b: Update `updateHAlignButtons()` to show no active button when alignment is undefined
+  - When `hAlign` is undefined/null/empty, don't activate any button
+  - Only activate a button when alignment is explicitly "left", "center", or "right"
 
-- [ ] 1c: Update `bindings_format.cc::getEffectiveStyleForRange()` similarly for multi-cell selections
+- [ ] 1c: Apply same fix to vertical alignment in `updateVAlignButtons()`
+  - Don't default to "bottom" - only show active when explicitly set
 
-- [ ] 1d: Update TypeScript `CellStyle` type to include optional `visualHAlign` field
-
-- [ ] 1e: Update `style-controls.ts::setDisplayedStyle()` to use `visualHAlign` when present
-  - Change line 620 to use `style.visualHAlign || style.hAlign || "left"`
-
-- [ ] 1f: Add test verifying number cells show right-align button active
+- [ ] 1d: Add test verifying:
+  - Number cell with no explicit alignment: no alignment button active
+  - Cell with explicit right-align: right button active
+  - Cell with explicit left-align: left button active
 
 ## Phase 2: Add API and UI for Axis (Column/Row) Styles
 
