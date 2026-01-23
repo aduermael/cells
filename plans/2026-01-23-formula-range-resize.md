@@ -80,10 +80,11 @@ Draw resize handles at corners and make borders interactive for moving.
 
 Detect when the mouse is over formula highlight interaction zones and show appropriate cursors.
 
-- [ ] 2a: Add `hitTestFormulaHighlight()` function in new `formula-interaction.ts` module
+- [x] 2a: Add `hitTestFormulaHighlight()` function in new `formula-interaction.ts` module
   - Takes mouse position, formula highlights, scroll, and dimension info
   - Priority order: corners (resize) > borders (move) > inside (no action for formula refs)
   - Returns: `{ highlightIndex, action: "resize" | "move", corner?, border? } | null`
+  - Created `formula-interaction.ts` with `hitTestFormulaHighlight()` and cursor helpers
 
 - [ ] 2b: Define cursor mapping for all interaction zones
   - **Corners (resize)**:
