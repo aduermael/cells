@@ -89,6 +89,7 @@ export interface DOMElements {
   cellEditor: HTMLInputElement;
   cellDisplay: HTMLElement;
   columnHeaderEditor: HTMLInputElement;
+  formattingToolbar: HTMLElement;
   formulaBar: HTMLElement;
   cellRefWrapper: HTMLElement;
   cellReference: HTMLElement;
@@ -147,7 +148,6 @@ export interface DOMElements {
   customFormatError: HTMLElement;
   customFormatApplyBtn: HTMLButtonElement;
   customFormatCancelBtn: HTMLButtonElement;
-  settingsBtn: HTMLButtonElement;
   // Style controls
   styleControls: HTMLElement;
   styleBoldBtn: HTMLButtonElement;
@@ -590,6 +590,7 @@ export function createApp(): App {
     cellEditor: getElement<HTMLInputElement>("cell-editor"),
     cellDisplay: getElement("cell-display"),
     columnHeaderEditor: getElement<HTMLInputElement>("column-header-editor"),
+    formattingToolbar: getElement("formatting-toolbar"),
     formulaBar: getElement("formula-bar"),
     cellRefWrapper: getElement("cell-ref-wrapper"),
     cellReference: getElement("cell-reference"),
@@ -648,7 +649,6 @@ export function createApp(): App {
     customFormatError: getElement("custom-format-error"),
     customFormatApplyBtn: getElement<HTMLButtonElement>("custom-format-apply"),
     customFormatCancelBtn: getElement<HTMLButtonElement>("custom-format-cancel"),
-    settingsBtn: getElement<HTMLButtonElement>("settings-btn"),
     // Style controls
     styleControls: getElement("style-controls"),
     styleBoldBtn: getElement<HTMLButtonElement>("style-bold-btn"),

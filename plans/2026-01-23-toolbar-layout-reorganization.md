@@ -25,5 +25,5 @@ Reorganize the UI layout to be more familiar to Excel users by separating the fo
 - [x] 2e: Style the code button to be positioned at the right edge of the formula bar (it naturally flows to the right due to flex layout)
 
 ## Phase 3: JavaScript/TypeScript Updates
-- [ ] 3a: Remove settings button element query and event handler from init code (app.ts or related file)
-- [ ] 3b: Verify all toolbar controls still work after DOM restructuring
+- [x] 3a: Remove settings button element query and event handler from init code (app.ts, init-components.ts)
+- [x] 3b: Add formattingToolbar element to app.ts and file-loader.ts, show it when loading files

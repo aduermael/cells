@@ -40,6 +40,7 @@ export interface FileLoaderConfig {
   loading: HTMLElement;
   error: HTMLElement;
   canvas: HTMLCanvasElement;
+  formattingToolbar: HTMLElement;
   formulaBar: HTMLElement;
   bottomBar: HTMLElement;
   emptyState: HTMLElement;
@@ -263,8 +264,9 @@ export class FileLoader {
     if (exportBtn) exportBtn.disabled = false;
     if (newBtn) newBtn.style.display = "";
 
-    // Show the canvas, formula bar, and bottom bar (hide empty state)
+    // Show the canvas, formatting toolbar, formula bar, and bottom bar (hide empty state)
     canvas.style.display = "block";
+    formattingToolbar.classList.remove("hidden");
     formulaBar.classList.remove("hidden");
     bottomBar.classList.remove("hidden");
     emptyState.classList.add("hidden");
@@ -398,8 +400,9 @@ export class FileLoader {
     if (exportBtn) exportBtn.disabled = false;
     if (newBtn) newBtn.style.display = "";
 
-    // Show the canvas, formula bar, and bottom bar (hide empty state)
+    // Show the canvas, formatting toolbar, formula bar, and bottom bar (hide empty state)
     canvas.style.display = "block";
+    formattingToolbar.classList.remove("hidden");
     formulaBar.classList.remove("hidden");
     bottomBar.classList.remove("hidden");
     emptyState.classList.add("hidden");

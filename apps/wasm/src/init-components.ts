@@ -869,10 +869,6 @@ export function createComponents(config: ComponentsConfig): Components {
     }
   );
 
-  elements.settingsBtn.addEventListener("click", () => {
-    alert("Settings - Coming Soon!");
-  });
-
   // Named ranges dropdown for quick insertion
   const namedRangesDropdown = new NamedRangesDropdown(
     elements.formulaBar,
@@ -926,6 +922,7 @@ export function createComponents(config: ComponentsConfig): Components {
     loading: elements.loading,
     error: elements.error,
     canvas: elements.canvas,
+    formattingToolbar: elements.formattingToolbar,
     formulaBar: elements.formulaBar,
     bottomBar: elements.bottomBar,
     emptyState: elements.emptyState,
