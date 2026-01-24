@@ -543,6 +543,20 @@ canvas {
     display: none;
 }
 
+/* Formatting Toolbar - horizontal row of style and format controls */
+#formatting-toolbar {
+    display: flex;
+    align-items: center;
+    padding: var(--bar-padding-y) var(--bar-padding-x);
+    background: var(--bar-bg);
+    border-bottom: 1px solid var(--color-border);
+    gap: var(--bar-gap);
+}
+
+#formatting-toolbar.hidden {
+    display: none;
+}
+
 /* Formula Bar - Single row layout */
 #formula-bar {
     position: relative; /* For autocomplete popup positioning */
@@ -559,23 +573,19 @@ canvas {
     display: none;
 }
 
-/* Format Controls in Formula Bar - two rows with flex */
+/* Format Controls in Formatting Toolbar - single horizontal row */
 #format-controls {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: var(--spacing-xs);
     flex-shrink: 0;
 }
 
-/* Row 1: Format dropdown + Currency button */
-#format-controls-row1 {
-    display: flex;
-    gap: var(--spacing-xs);
-}
-
-/* Row 2: Decimal buttons spanning full width */
+/* Format controls rows - now inline (no stacking) */
+#format-controls-row1,
 #format-controls-row2 {
     display: flex;
+    align-items: center;
     gap: var(--spacing-xs);
 }
 
@@ -591,11 +601,10 @@ canvas {
     min-width: 36px;
 }
 
-/* Row 2 buttons - equal width, fill row */
+/* Format decimal and percent buttons */
 #format-decimal-decrease,
 #format-decimal-increase,
 #format-percent-btn {
-    flex: 1;
     justify-content: center;
 }
 
@@ -639,30 +648,6 @@ canvas {
     left: 0;
     right: auto;
     min-width: 140px;
-}
-
-/* Style controls separator */
-.style-separator {
-    width: 1px;
-    height: 52px; /* Match height of 2x2 button grid */
-    background: var(--color-border);
-    align-self: center;
-    margin: 0 calc(-1 * var(--spacing-xs)); /* Reduce gap to match button spacing */
-}
-
-.format-separator {
-    width: 1px;
-    height: 52px; /* Match height of 2x2 button grid */
-    background: var(--color-border);
-    align-self: center;
-    margin: 0 calc(-1 * var(--spacing-xs)); /* Reduce gap to match button spacing */
-}
-
-/* Formula bar action buttons (settings + script) - vertical stack */
-#formula-bar-actions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-xs);
 }
 
 /* Currency dropdown */
@@ -960,10 +945,9 @@ canvas {
 }
 
 /* Formula Input Container - wrapper for contenteditable and hidden input */
-/* Height matches 2x2 button grid (24px + 4px gap + 24px = 52px) */
 #formula-input-container {
     flex: 1;
-    height: 52px;
+    min-height: var(--bar-height);
     position: relative;
     display: flex;
     align-items: center;
@@ -2884,23 +2868,19 @@ canvas {
    Style Controls (text formatting, colors)
    ============================================================================ */
 
-/* Style controls container - two rows layout like format controls */
+/* Style controls container - single horizontal row */
 #style-controls {
     display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: var(--spacing-xs);
     flex-shrink: 0;
 }
 
-/* Row 1: Bold, Italic, Underline buttons */
-#style-controls-row1 {
-    display: flex;
-    gap: var(--spacing-xs);
-}
-
-/* Row 2: Background color, Text color buttons */
+/* Style controls rows - now inline (no stacking) */
+#style-controls-row1,
 #style-controls-row2 {
     display: flex;
+    align-items: center;
     gap: var(--spacing-xs);
 }
 

@@ -18,11 +18,11 @@ Reorganize the UI layout to be more familiar to Excel users by separating the fo
 - [x] 1f: Remove the separator divs (`.style-separator`, `.format-separator`) and `#formula-bar-actions` wrapper
 
 ## Phase 2: CSS Layout Updates
-- [ ] 2a: Add CSS for `#formatting-toolbar` (flex row, same background/border styling as formula-bar, full width)
-- [ ] 2b: Update `#style-controls` CSS to be horizontal (single row, not two rows stacked)
-- [ ] 2c: Update `#format-controls` CSS to be horizontal (single row, not two rows stacked)
-- [ ] 2d: Update `#formula-bar` CSS - formula input container should flex-grow to fill available width
-- [ ] 2e: Style the code button to be positioned at the right edge of the formula bar
+- [x] 2a: Add CSS for `#formatting-toolbar` (flex row, same background/border styling as formula-bar, full width)
+- [x] 2b: Update `#style-controls` CSS to be horizontal (single row, not two rows stacked)
+- [x] 2c: Update `#format-controls` CSS to be horizontal (single row, not two rows stacked)
+- [x] 2d: Update `#formula-bar` CSS - formula input container should flex-grow to fill available width
+- [x] 2e: Style the code button to be positioned at the right edge of the formula bar (it naturally flows to the right due to flex layout)
 
 ## Phase 3: JavaScript/TypeScript Updates
 - [ ] 3a: Remove settings button element query and event handler from init code (app.ts or related file)
