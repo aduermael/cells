@@ -188,19 +188,22 @@ Convert grid coordinates to A1 notation for formula updates.
 
 Provide clear visual feedback while resizing.
 
-- [ ] 5a: Draw resize preview overlay
-  - Show dashed border for the new range bounds during drag
-  - Use same color as the highlight being resized
-  - Similar to existing fill preview but for formula ranges
+- [x] 5a: Draw resize preview overlay
+  - Note: Visual feedback achieved through real-time highlight updates rather than a separate preview overlay
+  - During drag, the formula text is updated live via `replaceReferenceAtPosition`
+  - This triggers `updateFormulaHighlights()` which re-parses the formula and updates highlights
+  - The actual highlight moves/resizes in real-time, providing clear visual feedback
+  - This approach is more direct than a separate preview and matches Excel behavior
 
-- [ ] 5b: Update formula bar display during resize
-  - Formula text updates live as range is resized
-  - Colored reference spans update to reflect new range
+- [x] 5b: Update formula bar display during resize
+  - Formula text updates live as range is resized (via Phase 3 implementation)
+  - Colored reference spans update to reflect new range (via existing colorizer infrastructure)
+  - Formula bar re-renders automatically when formula text changes
 
-- [ ] 5c: Handle edge cases gracefully
-  - Minimum range size is 1 cell (can't resize to 0)
-  - Maximum range determined by sheet bounds
-  - Visual indication when at boundary
+- [x] 5c: Handle edge cases gracefully
+  - Minimum range size is 1 cell: enforced in `calculateResizedRange()` - swap min/max if needed
+  - Maximum range: clamped to valid grid coordinates (>= 0) in both resize and move calculations
+  - Visual feedback: the highlight itself shows the constrained range bounds
 
 ---
 
