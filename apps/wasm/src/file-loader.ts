@@ -212,6 +212,7 @@ export class FileLoader {
   ): Promise<void> {
     const {
       canvas,
+      formattingToolbar,
       formulaBar,
       bottomBar,
       emptyState,
@@ -365,6 +366,7 @@ export class FileLoader {
   async createEmptyWorkbook(): Promise<void> {
     const {
       canvas,
+      formattingToolbar,
       formulaBar,
       bottomBar,
       emptyState,
