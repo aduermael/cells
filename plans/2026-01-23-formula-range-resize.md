@@ -164,17 +164,23 @@ Handle mouse drag to move or resize formula ranges and update the formula text.
 
 Convert grid coordinates to A1 notation for formula updates.
 
-- [ ] 4a: Create utility function `rangeToA1Notation()`
+- [x] 4a: Create utility function `rangeToA1Notation()`
   - Input: startCol, startRow, endCol, endRow
   - Output: "A1:B5" for ranges, "A1" for single cells
   - Handle column references (e.g., "A:B")
   - Handle row references (e.g., "1:5")
   - Preserve absolute reference markers ($) if present in original
+  - Added `AbsoluteMarkers` interface and `parseAbsoluteMarkers()` function
+  - Updated `rangeToA1Notation()` to accept optional `AbsoluteMarkers` parameter
 
-- [ ] 4b: Preserve original reference properties
+- [x] 4b: Preserve original reference properties
   - Track if original reference had $ markers (absolute references)
   - When generating new reference text, preserve these markers on unchanged parts
   - E.g., resizing "$A$1:B2" horizontally should keep "$A" absolute
+  - Added `originalRefText` and `absoluteMarkers` to `FormulaRangeDragState`
+  - Updated `createDragState()` to parse and store absolute markers from original reference
+  - Updated mouse-events.ts to pass absolute markers when generating new references
+  - Cancel operation now restores exact original reference text
 
 ---
 

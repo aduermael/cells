@@ -380,21 +380,12 @@ export class MouseEventHandlers {
         const { canvas, cellEditor, formulaBarEditor, render } = this.config;
         const dragState = this.formulaRangeDragState;
 
-        // Restore original reference text
-        const originalRange = dragState.originalRange;
-        const originalRef = rangeToA1Notation(
-            originalRange.startCol,
-            originalRange.startRow,
-            originalRange.endCol,
-            originalRange.endRow
-        );
-
-        // Update formula text back to original
+        // Restore original reference text (use the stored original text to preserve $ markers)
         const activeEditor = cellEditor.isEditing() ? cellEditor : formulaBarEditor;
         activeEditor.replaceReferenceAtPosition(
             dragState.sourcePosition.start,
             dragState.sourcePosition.end,
-            originalRef
+            dragState.originalRefText
         );
 
         // Clear drag state
@@ -577,6 +568,7 @@ export class MouseEventHandlers {
             updateFormulaBar,
             clearFormulaHighlights,
             cellEditor,
+            formulaBarEditor,
             commitFormulaBarEdit,
         } = this.config;
 
@@ -785,7 +777,12 @@ export class MouseEventHandlers {
                         );
 
                         if (col >= 0 && row >= 0) {
-                            const dragState = createDragState(hitResult, highlight, { col, row });
+                            // Get original reference text for preserving $ markers
+                            const activeEditor = cellEditor.isEditing() ? cellEditor : formulaBarEditor;
+                            const formulaText = activeEditor.getValue();
+                            const originalRefText = formulaText.slice(highlight.sourceStart, highlight.sourceEnd);
+
+                            const dragState = createDragState(hitResult, highlight, { col, row }, originalRefText);
                             if (dragState) {
                                 this.formulaRangeDragState = dragState;
                                 canvas.setPointerCapture(e.pointerId);
@@ -1036,12 +1033,13 @@ export class MouseEventHandlers {
                     newRange = calculateMovedRange(dragState, { col, row });
                 }
 
-                // Generate new reference text
+                // Generate new reference text, preserving $ markers from original
                 const newRef = rangeToA1Notation(
                     newRange.startCol,
                     newRange.startRow,
                     newRange.endCol,
-                    newRange.endRow
+                    newRange.endRow,
+                    dragState.absoluteMarkers
                 );
 
                 // Update formula text using replaceReferenceAtPosition

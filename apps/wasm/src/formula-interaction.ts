@@ -10,6 +10,17 @@ import { computeFormulaInteractionZones, type FormulaHighlightRendererState } fr
 import { colToLetter } from "./grid-utils.js";
 
 /**
+ * Absolute reference markers for A1 notation.
+ * Each flag indicates whether $ was present in the original reference.
+ */
+export interface AbsoluteMarkers {
+  startColAbsolute: boolean;  // $A in $A1 or $A$1:B2
+  startRowAbsolute: boolean;  // $1 in A$1 or $A$1:B2
+  endColAbsolute: boolean;    // $B in A1:$B2 or A1:$B$2
+  endRowAbsolute: boolean;    // $2 in A1:B$2 or A1:$B$2
+}
+
+/**
  * State for tracking formula range drag operations (move/resize).
  */
 export interface FormulaRangeDragState {
@@ -26,6 +37,8 @@ export interface FormulaRangeDragState {
   sourcePosition: { start: number; end: number };  // Position in formula text
   dragStartCell: { col: number; row: number };  // Grid cell where drag started
   highlight: FormulaHighlight;  // Reference to the highlight being manipulated
+  originalRefText: string;  // Original reference text (for preserving $ markers)
+  absoluteMarkers?: AbsoluteMarkers;  // Parsed absolute reference markers
 }
 
 /**
@@ -154,14 +167,15 @@ export function getCursorForHitResult(
  *
  * @param hitResult The hit test result
  * @param highlight The formula highlight being manipulated
- * @param highlightIndex Index of the highlight
  * @param dragStartCell Grid cell where drag started
+ * @param originalRefText The original reference text from the formula (for preserving $ markers)
  * @returns FormulaRangeDragState or null if highlight type not supported
  */
 export function createDragState(
   hitResult: FormulaHighlightHitResult,
   highlight: FormulaHighlight,
-  dragStartCell: { col: number; row: number }
+  dragStartCell: { col: number; row: number },
+  originalRefText: string
 ): FormulaRangeDragState | null {
   // Extract range from highlight
   let startCol: number, startRow: number, endCol: number, endRow: number;
@@ -187,6 +201,9 @@ export function createDragState(
     return null;
   }
 
+  // Parse absolute markers from original reference text
+  const absoluteMarkers = parseAbsoluteMarkers(originalRefText);
+
   return {
     action: hitResult.action,
     highlightIndex: hitResult.highlightIndex,
@@ -196,6 +213,8 @@ export function createDragState(
     sourcePosition: { start: highlight.sourceStart, end: highlight.sourceEnd },
     dragStartCell,
     highlight,
+    originalRefText,
+    absoluteMarkers,
   };
 }
 
@@ -319,20 +338,73 @@ export function calculateMovedRange(
 }
 
 /**
- * Convert range coordinates to A1 notation.
+ * Parse absolute reference markers ($) from a reference string.
+ * Handles cell references (A1, $A1, A$1, $A$1) and range references (A1:B2, $A$1:$B$2, etc.)
+ *
+ * @param refText The original reference text (e.g., "$A$1:B2")
+ * @returns AbsoluteMarkers indicating which parts had $ markers
+ */
+export function parseAbsoluteMarkers(refText: string): AbsoluteMarkers {
+  const markers: AbsoluteMarkers = {
+    startColAbsolute: false,
+    startRowAbsolute: false,
+    endColAbsolute: false,
+    endRowAbsolute: false,
+  };
+
+  // Remove any sheet prefix (e.g., "Sheet1!" or "'Sheet Name'!")
+  let ref = refText;
+  const sheetPrefixMatch = ref.match(/^(?:'[^']+'|[^!]+)!/);
+  if (sheetPrefixMatch) {
+    ref = ref.slice(sheetPrefixMatch[0].length);
+  }
+
+  // Split by colon to separate start and end of range
+  const parts = ref.split(":");
+
+  // Parse first part (start cell or single cell)
+  if (parts[0]) {
+    const startMatch = parts[0].match(/^(\$?)([A-Za-z]+)(\$?)(\d+)$/);
+    if (startMatch) {
+      markers.startColAbsolute = startMatch[1] === "$";
+      markers.startRowAbsolute = startMatch[3] === "$";
+    }
+  }
+
+  // Parse second part (end cell) if it exists
+  if (parts[1]) {
+    const endMatch = parts[1].match(/^(\$?)([A-Za-z]+)(\$?)(\d+)$/);
+    if (endMatch) {
+      markers.endColAbsolute = endMatch[1] === "$";
+      markers.endRowAbsolute = endMatch[3] === "$";
+    }
+  } else {
+    // Single cell reference: copy start markers to end
+    markers.endColAbsolute = markers.startColAbsolute;
+    markers.endRowAbsolute = markers.startRowAbsolute;
+  }
+
+  return markers;
+}
+
+/**
+ * Convert range coordinates to A1 notation with optional absolute reference preservation.
  * Returns "A1" for single cells, "A1:B5" for ranges.
+ * If absoluteMarkers is provided, preserves $ markers from the original reference.
  *
  * @param startCol Start column (0-indexed)
  * @param startRow Start row (0-indexed)
  * @param endCol End column (0-indexed)
  * @param endRow End row (0-indexed)
+ * @param absoluteMarkers Optional markers to preserve $ from original reference
  * @returns A1 notation string
  */
 export function rangeToA1Notation(
   startCol: number,
   startRow: number,
   endCol: number,
-  endRow: number
+  endRow: number,
+  absoluteMarkers?: AbsoluteMarkers
 ): string {
   // Convert to 1-indexed rows
   const startRowNum = startRow + 1;
@@ -344,9 +416,21 @@ export function rangeToA1Notation(
 
   // Check if it's a single cell
   if (startCol === endCol && startRow === endRow) {
+    if (absoluteMarkers) {
+      const colPrefix = absoluteMarkers.startColAbsolute ? "$" : "";
+      const rowPrefix = absoluteMarkers.startRowAbsolute ? "$" : "";
+      return `${colPrefix}${startColLetter}${rowPrefix}${startRowNum}`;
+    }
     return `${startColLetter}${startRowNum}`;
   }
 
   // Return range notation
+  if (absoluteMarkers) {
+    const startColPrefix = absoluteMarkers.startColAbsolute ? "$" : "";
+    const startRowPrefix = absoluteMarkers.startRowAbsolute ? "$" : "";
+    const endColPrefix = absoluteMarkers.endColAbsolute ? "$" : "";
+    const endRowPrefix = absoluteMarkers.endRowAbsolute ? "$" : "";
+    return `${startColPrefix}${startColLetter}${startRowPrefix}${startRowNum}:${endColPrefix}${endColLetter}${endRowPrefix}${endRowNum}`;
+  }
   return `${startColLetter}${startRowNum}:${endColLetter}${endRowNum}`;
 }
