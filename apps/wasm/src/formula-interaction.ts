@@ -39,6 +39,7 @@ export interface FormulaRangeDragState {
   highlight: FormulaHighlight;  // Reference to the highlight being manipulated
   originalRefText: string;  // Original reference text (for preserving $ markers)
   absoluteMarkers?: AbsoluteMarkers;  // Parsed absolute reference markers
+  sheetPrefix?: string;  // Sheet prefix for cross-sheet references (e.g., "Sheet1!" or "'My Sheet'!")
 }
 
 /**
@@ -204,6 +205,9 @@ export function createDragState(
   // Parse absolute markers from original reference text
   const absoluteMarkers = parseAbsoluteMarkers(originalRefText);
 
+  // Extract sheet prefix for cross-sheet references (e.g., "Sheet1!" or "'My Sheet'!")
+  const sheetPrefix = extractSheetPrefix(originalRefText);
+
   return {
     action: hitResult.action,
     highlightIndex: hitResult.highlightIndex,
@@ -215,6 +219,7 @@ export function createDragState(
     highlight,
     originalRefText,
     absoluteMarkers,
+    sheetPrefix,
   };
 }
 
@@ -338,6 +343,18 @@ export function calculateMovedRange(
 }
 
 /**
+ * Extract the sheet prefix from a reference string.
+ * Handles both simple sheet names (Sheet1!) and quoted names ('My Sheet'!).
+ *
+ * @param refText The reference text (e.g., "Sheet1!A1" or "'My Sheet'!A1:B2")
+ * @returns The sheet prefix including the exclamation mark, or empty string if none
+ */
+export function extractSheetPrefix(refText: string): string {
+  const sheetPrefixMatch = refText.match(/^(?:'[^']+'|[^!]+)!/);
+  return sheetPrefixMatch ? sheetPrefixMatch[0] : "";
+}
+
+/**
  * Parse absolute reference markers ($) from a reference string.
  * Handles cell references (A1, $A1, A$1, $A$1) and range references (A1:B2, $A$1:$B$2, etc.)
  *
@@ -391,12 +408,14 @@ export function parseAbsoluteMarkers(refText: string): AbsoluteMarkers {
  * Convert range coordinates to A1 notation with optional absolute reference preservation.
  * Returns "A1" for single cells, "A1:B5" for ranges.
  * If absoluteMarkers is provided, preserves $ markers from the original reference.
+ * If sheetPrefix is provided, prepends it to the reference (e.g., "Sheet1!A1:B5").
  *
  * @param startCol Start column (0-indexed)
  * @param startRow Start row (0-indexed)
  * @param endCol End column (0-indexed)
  * @param endRow End row (0-indexed)
  * @param absoluteMarkers Optional markers to preserve $ from original reference
+ * @param sheetPrefix Optional sheet prefix for cross-sheet references
  * @returns A1 notation string
  */
 export function rangeToA1Notation(
@@ -404,7 +423,8 @@ export function rangeToA1Notation(
   startRow: number,
   endCol: number,
   endRow: number,
-  absoluteMarkers?: AbsoluteMarkers
+  absoluteMarkers?: AbsoluteMarkers,
+  sheetPrefix?: string
 ): string {
   // Convert to 1-indexed rows
   const startRowNum = startRow + 1;
@@ -414,23 +434,31 @@ export function rangeToA1Notation(
   const startColLetter = colToLetter(startCol);
   const endColLetter = colToLetter(endCol);
 
+  // Build the reference without sheet prefix first
+  let ref: string;
+
   // Check if it's a single cell
   if (startCol === endCol && startRow === endRow) {
     if (absoluteMarkers) {
       const colPrefix = absoluteMarkers.startColAbsolute ? "$" : "";
       const rowPrefix = absoluteMarkers.startRowAbsolute ? "$" : "";
-      return `${colPrefix}${startColLetter}${rowPrefix}${startRowNum}`;
+      ref = `${colPrefix}${startColLetter}${rowPrefix}${startRowNum}`;
+    } else {
+      ref = `${startColLetter}${startRowNum}`;
     }
-    return `${startColLetter}${startRowNum}`;
+  } else {
+    // Range notation
+    if (absoluteMarkers) {
+      const startColPrefix = absoluteMarkers.startColAbsolute ? "$" : "";
+      const startRowPrefix = absoluteMarkers.startRowAbsolute ? "$" : "";
+      const endColPrefix = absoluteMarkers.endColAbsolute ? "$" : "";
+      const endRowPrefix = absoluteMarkers.endRowAbsolute ? "$" : "";
+      ref = `${startColPrefix}${startColLetter}${startRowPrefix}${startRowNum}:${endColPrefix}${endColLetter}${endRowPrefix}${endRowNum}`;
+    } else {
+      ref = `${startColLetter}${startRowNum}:${endColLetter}${endRowNum}`;
+    }
   }
 
-  // Return range notation
-  if (absoluteMarkers) {
-    const startColPrefix = absoluteMarkers.startColAbsolute ? "$" : "";
-    const startRowPrefix = absoluteMarkers.startRowAbsolute ? "$" : "";
-    const endColPrefix = absoluteMarkers.endColAbsolute ? "$" : "";
-    const endRowPrefix = absoluteMarkers.endRowAbsolute ? "$" : "";
-    return `${startColPrefix}${startColLetter}${startRowPrefix}${startRowNum}:${endColPrefix}${endColLetter}${endRowPrefix}${endRowNum}`;
-  }
-  return `${startColLetter}${startRowNum}:${endColLetter}${endRowNum}`;
+  // Prepend sheet prefix if provided
+  return sheetPrefix ? `${sheetPrefix}${ref}` : ref;
 }

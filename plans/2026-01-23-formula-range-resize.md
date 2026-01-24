@@ -226,10 +226,11 @@ Apply consistent cursor feedback to the main cell selection for a cohesive UX.
 
 Connect all pieces and handle edge cases.
 
-- [ ] 7a: Integrate with existing formula editing flow
-  - Works with both cell editor and formula bar
-  - Respects cross-sheet references (preserve sheet prefix)
-  - Handles named ranges appropriately (move/resize not applicable)
+- [x] 7a: Integrate with existing formula editing flow
+  - Works with both cell editor and formula bar (both use same `replaceReferenceAtPosition` method)
+  - Respects cross-sheet references: added `extractSheetPrefix()` and `sheetPrefix` field to `FormulaRangeDragState`
+  - Updated `rangeToA1Notation()` to accept optional sheet prefix parameter
+  - Named ranges already handled - they're skipped in hit testing (`computeFormulaInteractionZones`)
 
 - [ ] 7b: Handle keyboard modifiers during manipulation
   - Shift during resize: maintain aspect ratio (optional)

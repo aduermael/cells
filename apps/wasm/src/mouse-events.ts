@@ -1033,13 +1033,14 @@ export class MouseEventHandlers {
                     newRange = calculateMovedRange(dragState, { col, row });
                 }
 
-                // Generate new reference text, preserving $ markers from original
+                // Generate new reference text, preserving $ markers and sheet prefix from original
                 const newRef = rangeToA1Notation(
                     newRange.startCol,
                     newRange.startRow,
                     newRange.endCol,
                     newRange.endRow,
-                    dragState.absoluteMarkers
+                    dragState.absoluteMarkers,
+                    dragState.sheetPrefix
                 );
 
                 // Update formula text using replaceReferenceAtPosition
