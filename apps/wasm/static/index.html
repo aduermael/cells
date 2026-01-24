@@ -73,18 +73,7 @@
                 <div id="collab-ui-container"></div>
             </div>
         </div>
-        <div id="formula-bar" class="hidden">
-            <!-- Left: Cell reference with named ranges dropdown + Formula input -->
-            <div id="cell-ref-wrapper">
-                <span id="cell-reference" title="Click for named ranges">A1</span>
-                <svg class="cell-ref-dropdown-arrow" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M6 9l6 6 6-6"/>
-                </svg>
-            </div>
-            <div id="formula-input-container">
-                <input type="text" id="formula-input" />
-                <div id="formula-display" contenteditable="true" spellcheck="false" data-placeholder="Select a cell to view or edit its value"></div>
-            </div>
+        <div id="formatting-toolbar" class="hidden">
             <!-- Style controls (text formatting + colors) -->
             <div id="style-controls">
                 <div id="style-controls-row1">
@@ -430,8 +419,7 @@
                     </button>
                 </div>
             </div>
-            <div class="style-separator"></div>
-            <!-- Number Format controls (two rows) + Action buttons -->
+            <!-- Number Format controls -->
             <div id="format-controls">
                 <div id="format-controls-row1">
                     <div class="dropdown" id="format-dropdown">
@@ -495,21 +483,24 @@
                     <button class="btn btn-icon btn-sm" id="format-percent-btn" title="Percentage format">%</button>
                 </div>
             </div>
-            <div class="format-separator"></div>
-            <div id="formula-bar-actions">
-                <button class="btn btn-icon btn-sm" id="settings-btn" title="Settings (coming soon)">
-                    <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                    </svg>
-                </button>
-                <button class="btn btn-icon btn-sm" id="script-panel-btn" title="Open script panel (Lua scripting)">
-                    <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="16 18 22 12 16 6"></polyline>
-                        <polyline points="8 6 2 12 8 18"></polyline>
-                    </svg>
-                </button>
+        </div>
+        <div id="formula-bar" class="hidden">
+            <div id="cell-ref-wrapper">
+                <span id="cell-reference" title="Click for named ranges">A1</span>
+                <svg class="cell-ref-dropdown-arrow" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"/>
+                </svg>
             </div>
+            <div id="formula-input-container">
+                <input type="text" id="formula-input" />
+                <div id="formula-display" contenteditable="true" spellcheck="false" data-placeholder="Select a cell to view or edit its value"></div>
+            </div>
+            <button class="btn btn-icon btn-sm" id="script-panel-btn" title="Open script panel (Lua scripting)">
+                <svg class="btn-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="16 18 22 12 16 6"></polyline>
+                    <polyline points="8 6 2 12 8 18"></polyline>
+                </svg>
+            </button>
         </div>
         <div id="script-panel" class="hidden">
             <div id="script-panel-content">

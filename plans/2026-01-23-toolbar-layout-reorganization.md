@@ -10,12 +10,12 @@ Reorganize the UI layout to be more familiar to Excel users by separating the fo
 - Row 2 (Formula Bar): cell reference dropdown | formula input (full width) | code button
 
 ## Phase 1: HTML Structure Reorganization
-- [ ] 1a: Create new `#formatting-toolbar` div between `#header` and `#formula-bar` in index.html
-- [ ] 1b: Move `#style-controls` into the new `#formatting-toolbar`
-- [ ] 1c: Move `#format-controls` into the new `#formatting-toolbar`
-- [ ] 1d: Remove the settings button (`#settings-btn`) and its container
-- [ ] 1e: Move `#script-panel-btn` directly into `#formula-bar` (after formula input container)
-- [ ] 1f: Remove the separator divs (`.style-separator`, `.format-separator`) and `#formula-bar-actions` wrapper
+- [x] 1a: Create new `#formatting-toolbar` div between `#header` and `#formula-bar` in index.html
+- [x] 1b: Move `#style-controls` into the new `#formatting-toolbar`
+- [x] 1c: Move `#format-controls` into the new `#formatting-toolbar`
+- [x] 1d: Remove the settings button (`#settings-btn`) and its container
+- [x] 1e: Move `#script-panel-btn` directly into `#formula-bar` (after formula input container)
+- [x] 1f: Remove the separator divs (`.style-separator`, `.format-separator`) and `#formula-bar-actions` wrapper
 
 ## Phase 2: CSS Layout Updates
 - [ ] 2a: Add CSS for `#formatting-toolbar` (flex row, same background/border styling as formula-bar, full width)
