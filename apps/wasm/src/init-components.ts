@@ -351,8 +351,15 @@ export function createComponents(config: ComponentsConfig): Components {
 
     let isSpilledCell = false;
     if (hasRangeSelection(app.selectionStart, app.selectionEnd)) {
-      if (app.selectionStart) {
-        const ref = colToLetter(app.selectionStart.col) + (app.selectionStart.row + 1);
+      if (app.selectionStart && app.selectionEnd) {
+        // Normalize range to top-left:bottom-right order
+        const minCol = Math.min(app.selectionStart.col, app.selectionEnd.col);
+        const maxCol = Math.max(app.selectionStart.col, app.selectionEnd.col);
+        const minRow = Math.min(app.selectionStart.row, app.selectionEnd.row);
+        const maxRow = Math.max(app.selectionStart.row, app.selectionEnd.row);
+        const startRef = colToLetter(minCol) + (minRow + 1);
+        const endRef = colToLetter(maxCol) + (maxRow + 1);
+        const ref = startRef + ":" + endRef;
         elements.cellReference.textContent = ref;
         const anchorCell = getCellAt(app.selectionStart.col, app.selectionStart.row, app.cells);
         const value = getFormulaBarValue(anchorCell);

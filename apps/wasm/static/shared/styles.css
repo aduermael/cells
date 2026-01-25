@@ -899,7 +899,7 @@ canvas {
     cursor: pointer;
     transition: all var(--transition-fast);
     min-width: 70px;
-    max-width: 100px;
+    max-width: 140px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1056,7 +1056,7 @@ canvas {
     outline: none;
     white-space: pre;
     overflow: hidden;
-    line-height: 50px; /* Match container height minus border */
+    line-height: 26px; /* Match container height minus border */
 }
 
 #formula-display:empty::before {
