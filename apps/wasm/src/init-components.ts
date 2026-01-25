@@ -854,6 +854,7 @@ export function createComponents(config: ComponentsConfig): Components {
   const borderControls = new BorderControls(
     {
       borderDropdown: elements.borderDropdown,
+      borderDropdownMenu: elements.borderDropdownMenu,
       borderBtn: elements.borderBtn,
       borderStyleIndicator: elements.borderStyleIndicator,
       borderAllBtn: elements.borderAllBtn,

@@ -190,6 +190,7 @@ export interface DOMElements {
   unmergeBtn: HTMLButtonElement;
   // Border controls
   borderDropdown: HTMLElement;
+  borderDropdownMenu: HTMLElement;
   borderBtn: HTMLButtonElement;
   borderStyleIndicator: SVGElement;
   borderAllBtn: HTMLButtonElement;
@@ -698,6 +699,7 @@ export function createApp(): App {
     unmergeBtn: getElement<HTMLButtonElement>("unmerge-btn"),
     // Border controls
     borderDropdown: getElement("border-dropdown"),
+    borderDropdownMenu: getElement("border-dropdown").querySelector(".dropdown-menu") as HTMLElement,
     borderBtn: getElement<HTMLButtonElement>("border-btn"),
     borderStyleIndicator: getSvgElement("border-style-indicator"),
     borderAllBtn: getElement<HTMLButtonElement>("border-all-btn"),

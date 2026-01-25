@@ -128,7 +128,7 @@ Borders applied at the axis level should also render on empty cells.
   - Adjust if overflow right/bottom/left/top
   - Apply final position
 
-- [ ] 4b: Apply `positionDropdown()` to `border-controls.ts`
+- [x] 4b: Apply `positionDropdown()` to `border-controls.ts`
 
 - [ ] 4c: Apply `positionDropdown()` to `style-controls.ts` (color picker, font dropdown)
 

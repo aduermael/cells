@@ -13,6 +13,7 @@
 import type { WasmDataSource } from "./wasm-data-source";
 import type { Position, BorderStyle, CellBorder } from "./types";
 import { getMenuStateManager } from "./menu-state";
+import { positionDropdown } from "./dropdown-utils";
 
 // =============================================================================
 // Types
@@ -21,6 +22,7 @@ import { getMenuStateManager } from "./menu-state";
 /** Border controls configuration - DOM element references */
 export interface BorderControlsConfig {
   borderDropdown: HTMLElement;
+  borderDropdownMenu: HTMLElement;
   borderBtn: HTMLButtonElement;
   borderStyleIndicator: SVGElement;
   borderAllBtn: HTMLButtonElement;
@@ -57,6 +59,7 @@ export type BorderType = "all" | "outer" | "top" | "bottom" | "left" | "right" |
  */
 export class BorderControls {
   private borderDropdown: HTMLElement;
+  private borderDropdownMenu: HTMLElement;
   private borderBtn: HTMLButtonElement;
   private borderStyleIndicator: SVGElement;
   private borderAllBtn: HTMLButtonElement;
@@ -80,6 +83,7 @@ export class BorderControls {
 
   constructor(config: BorderControlsConfig, callbacks: BorderControlsCallbacks) {
     this.borderDropdown = config.borderDropdown;
+    this.borderDropdownMenu = config.borderDropdownMenu;
     this.borderBtn = config.borderBtn;
     this.borderStyleIndicator = config.borderStyleIndicator;
     this.borderAllBtn = config.borderAllBtn;
@@ -298,8 +302,15 @@ export class BorderControls {
     if (isOpen) {
       this.closeDropdown();
     } else {
-      this.borderDropdown.classList.add("open");
+      this.openDropdown();
     }
+  }
+
+  private openDropdown(): void {
+    this.borderDropdown.classList.add("open");
+    // Position the dropdown menu to stay within viewport bounds
+    const buttonRect = this.borderBtn.getBoundingClientRect();
+    positionDropdown(this.borderDropdownMenu, buttonRect);
   }
 
   private closeDropdown(): void {
