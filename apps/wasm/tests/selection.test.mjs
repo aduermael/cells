@@ -45,7 +45,7 @@ const tests = {
     // We can't directly test canvas rendering, but we verify the state is correct
   },
 
-  'Range selection maintains anchor cell reference': async (ctx) => {
+  'Range selection shows range in cell reference': async (ctx) => {
     await ctx.page.goto(ctx.baseUrl);
     await waitForAppReady(ctx.page);
 
@@ -53,9 +53,9 @@ const tests = {
     await selectRange(ctx.page, 'B2', 'D4');
     await sleep(100);
 
-    // The cell reference should show the anchor cell
+    // The cell reference should show the full range (Excel behavior)
     const cellRef = await getCurrentCellRef(ctx.page);
-    assertEqual(cellRef, 'B2', 'Cell reference should show anchor cell B2');
+    assertEqual(cellRef, 'B2:D4', 'Cell reference should show full range B2:D4');
   },
 
   'Can navigate within range selection with Tab': async (ctx) => {
@@ -98,9 +98,9 @@ const tests = {
     await ctx.page.keyboard.up('Shift');
     await sleep(100);
 
-    // Cell ref should still show anchor
+    // Cell ref should show the extended range (Excel behavior)
     const cellRef = await getCurrentCellRef(ctx.page);
-    assertEqual(cellRef, 'B2', 'Anchor cell should remain B2');
+    assertEqual(cellRef, 'B2:C2', 'Cell reference should show extended range B2:C2');
 
     // Verify we can still see the formula bar (anchor cell data)
     // If we enter a value, it should go in the anchor cell
@@ -175,9 +175,9 @@ const tests = {
     await dragFillHandle(ctx.page, 'B2', 'B5');
     await sleep(200);
 
-    // Verify selection extended - cell reference should show anchor B2
+    // Verify selection extended - cell reference should show the filled range (Excel behavior)
     const cellRef = await getCurrentCellRef(ctx.page);
-    assertEqual(cellRef, 'B2', 'Anchor cell should remain B2 after fill drag');
+    assertEqual(cellRef, 'B2:B5', 'Cell reference should show filled range B2:B5 after fill drag');
 
     // Note: The actual fill operation (copying values) is Phase 4
     // This test just verifies the drag extends the selection
@@ -199,9 +199,9 @@ const tests = {
     await dragFillHandle(ctx.page, 'C3', 'F3');
     await sleep(200);
 
-    // Verify selection extended - cell reference should show anchor C3
+    // Verify selection extended - cell reference should show the filled range (Excel behavior)
     const cellRef = await getCurrentCellRef(ctx.page);
-    assertEqual(cellRef, 'C3', 'Anchor cell should remain C3 after fill drag right');
+    assertEqual(cellRef, 'C3:F3', 'Cell reference should show filled range C3:F3 after fill drag right');
   },
 
   'Fill handle drag from range selection': async (ctx) => {
@@ -221,9 +221,9 @@ const tests = {
     await dragFillHandle(ctx.page, 'A2', 'A5');
     await sleep(200);
 
-    // Verify anchor is still A1
+    // Verify selection shows the extended range (Excel behavior)
     const cellRef = await getCurrentCellRef(ctx.page);
-    assertEqual(cellRef, 'A1', 'Anchor cell should remain A1 after range fill drag');
+    assertEqual(cellRef, 'A1:A5', 'Cell reference should show extended range A1:A5 after range fill drag');
   },
 
   'Fill creates linear sequence from two values': async (ctx) => {

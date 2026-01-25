@@ -108,7 +108,10 @@ Borders applied at the axis level should also render on empty cells.
   - Added CellBorder type to AxisStyleInfo interface
   - Updated render() to call axis borders before cell borders
 
-- [ ] 3c: Add tests for axis border rendering
+- [x] 3c: Add tests for axis border rendering
+  - Added API-based tests for column and row border styling
+  - Added test to verify borders appear in axisStyles viewport output
+  - Added test for combined background and border on axis styles
 
 ## Phase 4: Create Shared Dropdown Positioning Utility
 

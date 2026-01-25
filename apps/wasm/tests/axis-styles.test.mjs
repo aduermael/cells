@@ -20,6 +20,22 @@ import {
 } from './helpers.mjs';
 
 /**
+ * Apply a border to the current selection using the toolbar dropdown
+ * @param {import('puppeteer').Page} page
+ * @param {'all' | 'outer' | 'top' | 'bottom' | 'left' | 'right' | 'none'} borderType
+ */
+async function applyBorder(page, borderType) {
+  // Click the border button to open the dropdown
+  await page.click('#border-btn');
+  await sleep(100);
+
+  // Click the appropriate border option
+  const buttonId = `#border-${borderType}-btn`;
+  await page.click(buttonId);
+  await sleep(200);
+}
+
+/**
  * Apply a background color using the toolbar
  */
 async function applyBackgroundColor(page, color) {
@@ -570,6 +586,201 @@ const tests = {
       isColorApproximately(pixelE3, rowColor, 30),
       `E3 should show row color (green) (got r=${pixelE3?.r}, g=${pixelE3?.g}, b=${pixelE3?.b})`
     );
+  },
+
+  // ==========================================================================
+  // Axis border tests (Phase 3)
+  // ==========================================================================
+
+  'Setting column border via API applies border to column axis': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Apply border to column B using the API directly
+    const borderStyle = {
+      border: {
+        top: { style: 'thin', color: '#000000' },
+        bottom: { style: 'thin', color: '#000000' },
+        left: { style: 'thin', color: '#000000' },
+        right: { style: 'thin', color: '#000000' },
+      }
+    };
+    await ctx.page.evaluate(async ({ style }) => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.dataSource) return;
+      await ctx.app.dataSource.setColumnStyle(1, style); // Column B = index 1
+    }, { style: borderStyle });
+    await sleep(300);
+
+    // Verify column style includes border
+    const colStyle = await getColumnStyle(ctx.page, 1); // Column B = index 1
+    assertTrue(colStyle !== null, 'Column style should exist');
+    assertTrue(colStyle.border !== undefined, 'Column should have border property');
+    assertTrue(colStyle.border?.top?.style === 'thin', 'Column should have top border');
+    assertTrue(colStyle.border?.bottom?.style === 'thin', 'Column should have bottom border');
+    assertTrue(colStyle.border?.left?.style === 'thin', 'Column should have left border');
+    assertTrue(colStyle.border?.right?.style === 'thin', 'Column should have right border');
+
+    // Verify effective style at various cells in column B includes border
+    const styleB5 = await getEffectiveCellStyle(ctx.page, 1, 4); // B5 = col 1, row 4
+    assertTrue(styleB5.border !== undefined, 'B5 should have border');
+    assertTrue(styleB5.border?.top?.style === 'thin', 'B5 should inherit column top border');
+
+    // Verify cells in other columns don't have the border
+    const styleC5 = await getEffectiveCellStyle(ctx.page, 2, 4); // C5 = col 2, row 4
+    assertTrue(!styleC5.border || styleC5.border?.top?.style === 'none', 'C5 should not have border');
+  },
+
+  'Setting row border via API applies border to row axis': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Apply border to row 3 using the API directly
+    const borderStyle = {
+      border: {
+        top: { style: 'thin', color: '#000000' },
+        bottom: { style: 'thin', color: '#000000' },
+        left: { style: 'thin', color: '#000000' },
+        right: { style: 'thin', color: '#000000' },
+      }
+    };
+    await ctx.page.evaluate(async ({ style }) => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.dataSource) return;
+      await ctx.app.dataSource.setRowStyle(2, style); // Row 3 = index 2
+    }, { style: borderStyle });
+    await sleep(300);
+
+    // Verify row style includes border
+    const rowStyle = await getRowStyle(ctx.page, 2); // Row 3 = index 2
+    assertTrue(rowStyle !== null, 'Row style should exist');
+    assertTrue(rowStyle.border !== undefined, 'Row should have border property');
+    assertTrue(rowStyle.border?.top?.style === 'thin', 'Row should have top border');
+    assertTrue(rowStyle.border?.bottom?.style === 'thin', 'Row should have bottom border');
+
+    // Verify effective style at various cells in row 3 includes border
+    const styleE3 = await getEffectiveCellStyle(ctx.page, 4, 2); // E3 = col 4, row 2
+    assertTrue(styleE3.border !== undefined, 'E3 should have border');
+    assertTrue(styleE3.border?.top?.style === 'thin', 'E3 should inherit row top border');
+
+    // Verify cells in other rows don't have the border
+    const styleE4 = await getEffectiveCellStyle(ctx.page, 4, 3); // E4 = col 4, row 3
+    assertTrue(!styleE4.border || styleE4.border?.top?.style === 'none', 'E4 should not have border');
+  },
+
+  'Column border is included in axisStyles output': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Apply left border to column C using the API
+    const borderStyle = {
+      border: {
+        top: { style: 'none', color: '' },
+        bottom: { style: 'none', color: '' },
+        left: { style: 'thin', color: '#000000' },
+        right: { style: 'none', color: '' },
+      }
+    };
+    await ctx.page.evaluate(async ({ style }) => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.dataSource) return;
+      await ctx.app.dataSource.setColumnStyle(2, style); // Column C = index 2
+    }, { style: borderStyle });
+    await sleep(300);
+
+    // Query viewport and check that axisStyles includes the border
+    const viewportResult = await ctx.page.evaluate(async () => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.dataSource) return null;
+      return await ctx.app.dataSource.client.queryViewport(0, 0, 10, 10);
+    });
+
+    assertTrue(viewportResult !== null, 'Viewport result should exist');
+    assertTrue(viewportResult.axisStyles !== undefined, 'axisStyles should exist in viewport result');
+
+    // Find column C (index 2) in axisStyles
+    const colCStyle = viewportResult.axisStyles.find(
+      s => s.type === 'column' && s.position === 2
+    );
+    assertTrue(colCStyle !== undefined, 'Column C should be in axisStyles');
+    assertTrue(colCStyle.style.border !== undefined, 'Column C style should have border');
+    assertTrue(colCStyle.style.border?.left?.style === 'thin', 'Column C should have left border');
+  },
+
+  'Row border is included in axisStyles output': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Apply bottom border to row 4 using the API
+    const borderStyle = {
+      border: {
+        top: { style: 'none', color: '' },
+        bottom: { style: 'thin', color: '#000000' },
+        left: { style: 'none', color: '' },
+        right: { style: 'none', color: '' },
+      }
+    };
+    await ctx.page.evaluate(async ({ style }) => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.dataSource) return;
+      await ctx.app.dataSource.setRowStyle(3, style); // Row 4 = index 3
+    }, { style: borderStyle });
+    await sleep(300);
+
+    // Query viewport and check that axisStyles includes the border
+    const viewportResult = await ctx.page.evaluate(async () => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.dataSource) return null;
+      return await ctx.app.dataSource.client.queryViewport(0, 0, 10, 10);
+    });
+
+    assertTrue(viewportResult !== null, 'Viewport result should exist');
+    assertTrue(viewportResult.axisStyles !== undefined, 'axisStyles should exist in viewport result');
+
+    // Find row 4 (index 3) in axisStyles
+    const row4Style = viewportResult.axisStyles.find(
+      s => s.type === 'row' && s.position === 3
+    );
+    assertTrue(row4Style !== undefined, 'Row 4 should be in axisStyles');
+    assertTrue(row4Style.style.border !== undefined, 'Row 4 style should have border');
+    assertTrue(row4Style.style.border?.bottom?.style === 'thin', 'Row 4 should have bottom border');
+  },
+
+  'Axis border with background works together': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const testColor = '#3B82F6'; // Blue
+
+    // Apply both background and border to column D using the API
+    const combinedStyle = {
+      bgColor: testColor,
+      border: {
+        top: { style: 'thin', color: '#000000' },
+        bottom: { style: 'thin', color: '#000000' },
+        left: { style: 'thin', color: '#000000' },
+        right: { style: 'thin', color: '#000000' },
+      }
+    };
+    await ctx.page.evaluate(async ({ style }) => {
+      const ctx = window._appContext;
+      if (!ctx || !ctx.app || !ctx.app.dataSource) return;
+      await ctx.app.dataSource.setColumnStyle(3, style); // Column D = index 3
+    }, { style: combinedStyle });
+    await sleep(300);
+
+    // Verify column style has both background and border
+    const colStyle = await getColumnStyle(ctx.page, 3);
+    assertTrue(colStyle !== null, 'Column style should exist');
+    assertEqual(colStyle.bgColor?.toUpperCase(), testColor.toUpperCase(), 'Column should have background color');
+    assertTrue(colStyle.border !== undefined, 'Column should have border');
+    assertTrue(colStyle.border?.top?.style === 'thin', 'Column should have top border');
+
+    // Verify effective style at cells includes both properties
+    const styleD5 = await getEffectiveCellStyle(ctx.page, 3, 4); // D5 = col 3, row 4
+    assertEqual(styleD5.bgColor?.toUpperCase(), testColor.toUpperCase(), 'D5 should have background color');
+    assertTrue(styleD5.border !== undefined, 'D5 should have border');
+    assertTrue(styleD5.border?.top?.style === 'thin', 'D5 should inherit column top border');
   },
 };
 
