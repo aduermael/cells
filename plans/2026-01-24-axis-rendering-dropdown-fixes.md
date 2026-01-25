@@ -124,7 +124,10 @@ Borders applied at the axis level should also render on empty cells.
 
 - [ ] 4e: Apply `positionDropdown()` to `named-ranges-dropdown.ts`
 
-- [ ] 4f: Test dropdown positioning at screen edges (manually verify edge cases)
+- [ ] 4f: Add E2E test for dropdown boundary enforcement
+  - Test all dropdown menus (border, color picker, font, format, named ranges)
+  - Position window/viewport so dropdowns would overflow edges
+  - Verify each dropdown stays within screen bounds with minimum padding from edges
 
 ---
 
