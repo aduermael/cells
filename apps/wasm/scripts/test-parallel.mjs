@@ -59,6 +59,8 @@ const COLLECTIONS = {
     'xlsx-export.test.mjs',
     // Phase 4: Dropdown positioning tests
     'dropdown-positioning.test.mjs',
+    // Phase 5: Dropdown frame tests
+    'dropdown-frame.test.mjs',
   ],
   collab: [
     'collab.test.mjs',

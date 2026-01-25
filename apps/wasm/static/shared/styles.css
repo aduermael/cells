@@ -1163,6 +1163,27 @@ canvas {
     transform: rotate(180deg);
 }
 
+/* =============================================================================
+ * Dropdown Frame (shared container for all dropdowns)
+ * =============================================================================
+ * Used by DropdownFrame class for consistent dropdown styling.
+ * Uses fixed positioning - the positionDropdown() utility handles placement.
+ */
+.dropdown-frame {
+    position: fixed;
+    min-width: 120px;
+    padding: var(--spacing-xs);
+    background: var(--color-bg-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 16px var(--color-shadow);
+    z-index: 1000;
+}
+
+.dropdown-frame.hidden {
+    display: none;
+}
+
 .dropdown-menu {
     position: absolute;
     top: 100%;

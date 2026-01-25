@@ -43,22 +43,22 @@ This plan addresses two requirements:
 
 Create a reusable TypeScript class that provides consistent dropdown container behavior.
 
-- [ ] 1a: Create `dropdown-frame.ts` with `DropdownFrame` class
+- [x] 1a: Create `dropdown-frame.ts` with `DropdownFrame` class
   - Constructor accepts: anchor element, content element, menu ID (for MenuStateManager)
-  - Methods: `open()`, `close()`, `toggle()`, `isOpen()`
+  - Methods: `open()`, `close()`, `toggle()`, `isOpen()`, `destroy()`
   - Automatically registers with MenuStateManager
   - Applies consistent CSS class `.dropdown-frame` to content wrapper
   - Handles outside click and Escape key to close
   - Uses `positionDropdown()` from `dropdown-utils.ts` for positioning
 
-- [ ] 1b: Add `.dropdown-frame` CSS class to `styles.css`
+- [x] 1b: Add `.dropdown-frame` CSS class to `styles.css`
   - Use existing `.dropdown-menu` styling as base (same border, shadow, border-radius, padding, z-index)
-  - Support both fixed and absolute positioning modes
+  - Uses fixed positioning (positionDropdown() handles placement)
+  - Added `.dropdown-frame.hidden` for hide/show toggling
 
-- [ ] 1c: Add E2E test for DropdownFrame behavior
-  - Test that opening one dropdown closes others
-  - Test outside click closes dropdown
-  - Test Escape key closes dropdown
+- [x] 1c: Add E2E test for DropdownFrame behavior
+  - Created `dropdown-frame.test.mjs` with tests using existing toolbar dropdowns (font family, font size, color pickers, border)
+  - Tests: opening one closes others, outside click closes, Escape key closes, cross-component mutual exclusivity
 
 ## Phase 2: Integrate FormatControls with MenuStateManager
 

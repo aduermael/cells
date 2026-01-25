@@ -197,6 +197,14 @@ export class BorderControls {
         this.closeDropdown();
       }
     });
+
+    // Close dropdown on Escape key
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && this.borderDropdown.classList.contains("open")) {
+        e.preventDefault();
+        this.closeDropdown();
+      }
+    });
   }
 
   /**
@@ -307,6 +315,10 @@ export class BorderControls {
   }
 
   private openDropdown(): void {
+    // Notify MenuStateManager - this will close other menus
+    const menuState = getMenuStateManager();
+    menuState.openMenu("border");
+
     this.borderDropdown.classList.add("open");
     // Position the dropdown menu to stay within viewport bounds
     const buttonRect = this.borderBtn.getBoundingClientRect();
@@ -315,6 +327,9 @@ export class BorderControls {
 
   private closeDropdown(): void {
     this.borderDropdown.classList.remove("open");
+    // Notify MenuStateManager that this menu is now closed
+    const menuState = getMenuStateManager();
+    menuState.closeMenu("border");
   }
 
   /**

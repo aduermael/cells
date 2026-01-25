@@ -428,7 +428,39 @@ export class StyleControls {
 
     // Keyboard shortcuts for style toggles
     document.addEventListener("keydown", (e) => {
-      // Only handle if no input/textarea is focused
+      // Escape key closes all style dropdowns
+      if (e.key === "Escape") {
+        const hasOpenDropdown =
+          this.bgColorWrapper.classList.contains("open") ||
+          this.textColorWrapper.classList.contains("open") ||
+          this.fontFamilyDropdown.classList.contains("open") ||
+          this.fontSizeDropdown.classList.contains("open");
+
+        if (hasOpenDropdown) {
+          e.preventDefault();
+          // Close all dropdowns and notify MenuStateManager
+          const menuState = getMenuStateManager();
+          if (this.bgColorWrapper.classList.contains("open")) {
+            this.bgColorWrapper.classList.remove("open");
+            menuState.closeMenu("bgColor");
+          }
+          if (this.textColorWrapper.classList.contains("open")) {
+            this.textColorWrapper.classList.remove("open");
+            menuState.closeMenu("textColor");
+          }
+          if (this.fontFamilyDropdown.classList.contains("open")) {
+            this.fontFamilyDropdown.classList.remove("open");
+            menuState.closeMenu("fontFamily");
+          }
+          if (this.fontSizeDropdown.classList.contains("open")) {
+            this.fontSizeDropdown.classList.remove("open");
+            menuState.closeMenu("fontSize");
+          }
+          return;
+        }
+      }
+
+      // Only handle other shortcuts if no input/textarea is focused
       const active = document.activeElement;
       if (
         active &&
