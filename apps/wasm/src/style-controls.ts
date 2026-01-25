@@ -24,6 +24,7 @@
 import type { WasmDataSource } from "./wasm-data-source";
 import type { CellStyle, Position } from "./types";
 import { getMenuStateManager } from "./menu-state";
+import { positionDropdown } from "./dropdown-utils";
 
 // =============================================================================
 // Types
@@ -754,6 +755,8 @@ export class StyleControls {
 
   private toggleColorPopup(type: "bg" | "text"): void {
     const wrapper = type === "bg" ? this.bgColorWrapper : this.textColorWrapper;
+    const btn = type === "bg" ? this.bgColorBtn : this.textColorBtn;
+    const popup = type === "bg" ? this.bgColorPopup : this.textColorPopup;
     const menuId = type === "bg" ? "bgColor" : "textColor";
     const menuState = getMenuStateManager();
     const isOpen = wrapper.classList.contains("open");
@@ -764,6 +767,9 @@ export class StyleControls {
     // Toggle the clicked one
     if (!isOpen) {
       wrapper.classList.add("open");
+      // Position the popup to stay within viewport bounds
+      const buttonRect = btn.getBoundingClientRect();
+      positionDropdown(popup, buttonRect);
       // Notify MenuStateManager - this will close other menus via their callbacks
       menuState.openMenu(menuId);
     } else {
@@ -801,6 +807,8 @@ export class StyleControls {
 
   private toggleFontDropdown(type: "family" | "size"): void {
     const dropdown = type === "family" ? this.fontFamilyDropdown : this.fontSizeDropdown;
+    const btn = type === "family" ? this.fontFamilyBtn : this.fontSizeBtn;
+    const menu = type === "family" ? this.fontFamilyMenu : this.fontSizeMenu;
     const menuId = type === "family" ? "fontFamily" : "fontSize";
     const menuState = getMenuStateManager();
     const isOpen = dropdown.classList.contains("open");
@@ -811,6 +819,9 @@ export class StyleControls {
     // Toggle the clicked one
     if (!isOpen) {
       dropdown.classList.add("open");
+      // Position the menu to stay within viewport bounds
+      const buttonRect = btn.getBoundingClientRect();
+      positionDropdown(menu, buttonRect);
       // Notify MenuStateManager - this will close other menus via their callbacks
       menuState.openMenu(menuId);
     } else {
