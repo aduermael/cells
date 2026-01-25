@@ -115,7 +115,7 @@ Borders applied at the axis level should also render on empty cells.
 
 ## Phase 4: Create Shared Dropdown Positioning Utility
 
-- [ ] 4a: Create `dropdown-utils.ts` with `positionDropdown()` function
+- [x] 4a: Create `dropdown-utils.ts` with `positionDropdown()` function
   ```typescript
   export function positionDropdown(
     dropdown: HTMLElement,
