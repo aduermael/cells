@@ -132,7 +132,7 @@ Borders applied at the axis level should also render on empty cells.
 
 - [x] 4c: Apply `positionDropdown()` to `style-controls.ts` (color picker, font dropdown)
 
-- [ ] 4d: Apply `positionDropdown()` to `format-controls.ts`
+- [x] 4d: Apply `positionDropdown()` to `format-controls.ts`
 
 - [ ] 4e: Apply `positionDropdown()` to `named-ranges-dropdown.ts`
 

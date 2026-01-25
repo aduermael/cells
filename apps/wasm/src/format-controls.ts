@@ -27,6 +27,7 @@
 
 import type { WasmDataSource } from "./wasm-data-source";
 import type { NumberFormatCategory, Position, CellData } from "./types";
+import { positionDropdown } from "./dropdown-utils";
 
 // =============================================================================
 // Types
@@ -415,6 +416,9 @@ export class FormatControls {
   private openDropdown(): void {
     this.isDropdownOpen = true;
     this.formatDropdown.classList.add("open");
+    // Position the dropdown menu to stay within viewport bounds
+    const buttonRect = this.formatDropdownBtn.getBoundingClientRect();
+    positionDropdown(this.formatDropdownMenu, buttonRect);
     this.updateDropdownActiveState();
   }
 
@@ -447,6 +451,9 @@ export class FormatControls {
   private openCurrencyDropdown(): void {
     this.isCurrencyDropdownOpen = true;
     this.currencyDropdown.classList.add("open");
+    // Position the dropdown menu to stay within viewport bounds
+    const buttonRect = this.currencyDropdownBtn.getBoundingClientRect();
+    positionDropdown(this.currencyDropdownMenu, buttonRect);
     this.updateCurrencyDropdownActiveState();
   }
 
