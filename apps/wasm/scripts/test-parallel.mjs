@@ -57,6 +57,8 @@ const COLLECTIONS = {
     'spill.test.mjs',
     'styled-empty-cells.test.mjs',
     'xlsx-export.test.mjs',
+    // Phase 4: Dropdown positioning tests
+    'dropdown-positioning.test.mjs',
   ],
   collab: [
     'collab.test.mjs',

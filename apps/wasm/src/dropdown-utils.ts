@@ -25,6 +25,7 @@ export interface PositionDropdownOptions {
 /**
  * Position a dropdown element relative to an anchor element, adjusting for screen edges.
  *
+ * Uses fixed positioning to allow the dropdown to escape any parent overflow constraints.
  * The dropdown will be positioned:
  * - Below the anchor if preferBelow is true (default), otherwise above
  * - Aligned to the left edge of the anchor if preferRight is true (default)
@@ -44,10 +45,14 @@ export function positionDropdown(
 ): void {
   const { padding = 8, preferBelow = true, preferRight = true } = options;
 
+  // Reset any existing position properties that might conflict
+  dropdown.style.right = "auto";
+  dropdown.style.bottom = "auto";
+  dropdown.style.position = "fixed";
+
   // Temporarily position off-screen to measure dimensions
   dropdown.style.left = "-9999px";
   dropdown.style.top = "-9999px";
-  dropdown.style.position = "fixed";
 
   // Get dropdown dimensions
   const dropdownRect = dropdown.getBoundingClientRect();
@@ -140,10 +145,14 @@ export function positionDropdownAbsolute(
   const anchorRect = anchorElement.getBoundingClientRect();
   const containerRect = container.getBoundingClientRect();
 
+  // Reset any existing position properties that might conflict
+  dropdown.style.right = "auto";
+  dropdown.style.bottom = "auto";
+  dropdown.style.position = "absolute";
+
   // Temporarily position off-screen to measure dimensions
   dropdown.style.left = "-9999px";
   dropdown.style.top = "-9999px";
-  dropdown.style.position = "absolute";
 
   // Get dropdown dimensions
   const dropdownRect = dropdown.getBoundingClientRect();
