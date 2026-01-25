@@ -86,6 +86,12 @@ export class GridRenderer {
     endRow: number;
     style: { bgColor?: string; textColor?: string };
   }> = [];
+  /** Axis styles for rendering full column/row backgrounds */
+  axisStyles: Array<{
+    type: "column" | "row";
+    position: number;
+    style: { bgColor?: string; textColor?: string };
+  }> = [];
   colWidths: Map<number, number> = new Map();
   rowHeights: Map<number, number> = new Map();
   colNames: Map<number, string> = new Map();
@@ -331,6 +337,9 @@ export class GridRenderer {
     ctx.clip();
 
     this._drawGridLines(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+    // Draw backgrounds in order: axis styles → range styles → cell styles
+    // Each layer overrides the previous at intersections
+    this._drawAxisStyleBackgrounds(ctx, viewWidth, viewHeight, headerState);
     this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
     this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
     this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
@@ -525,6 +534,61 @@ export class GridRenderer {
 
       ctx.fillStyle = bgColor;
       ctx.fillRect(startX, startY, totalWidth, totalHeight);
+    }
+  }
+
+  /**
+   * Draw axis style backgrounds (full column/row fills).
+   * Row styles are drawn first, then column styles, so columns override rows at intersections.
+   */
+  private _drawAxisStyleBackgrounds(
+    ctx: CanvasRenderingContext2D,
+    viewWidth: number,
+    viewHeight: number,
+    headerState: HeaderRendererState
+  ): void {
+    const zoomedHeaderWidth = getZoomedHeaderWidth();
+    const zoomedHeaderHeight = getZoomedHeaderHeight();
+
+    // Separate row and column styles
+    const rowStyles = this.axisStyles.filter(s => s.type === "row");
+    const colStyles = this.axisStyles.filter(s => s.type === "column");
+
+    // Draw row styles first (horizontal strips spanning full visible width)
+    for (const axisStyle of rowStyles) {
+      const bgColor = axisStyle.style?.bgColor;
+      if (!bgColor) continue;
+
+      const row = axisStyle.position;
+      const startY = getRowY(row, headerState);
+      const baseH = this.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+      const rowHeight = getZoomedRowHeight(baseH);
+
+      // Skip if entirely outside viewport
+      if (startY + rowHeight < zoomedHeaderHeight || startY > viewHeight) continue;
+
+      // Draw from left edge of grid to full visible width
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(zoomedHeaderWidth, startY, viewWidth - zoomedHeaderWidth, rowHeight);
+    }
+
+    // Draw column styles second (vertical strips spanning full visible height)
+    // This ensures columns override rows at intersections
+    for (const axisStyle of colStyles) {
+      const bgColor = axisStyle.style?.bgColor;
+      if (!bgColor) continue;
+
+      const col = axisStyle.position;
+      const startX = getColX(col, headerState);
+      const baseW = this.colWidths.get(col) || DEFAULT_COL_WIDTH;
+      const colWidth = getZoomedColWidth(baseW);
+
+      // Skip if entirely outside viewport
+      if (startX + colWidth < zoomedHeaderWidth || startX > viewWidth) continue;
+
+      // Draw from top edge of grid to full visible height
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(startX, zoomedHeaderHeight, colWidth, viewHeight - zoomedHeaderHeight);
     }
   }
 

@@ -180,6 +180,7 @@ export function createComponents(config: ComponentsConfig): Components {
       fillPreviewRange: app.fillPreviewRange,
       spillRangeHighlight: app.spillRangeHighlight,
       styleRanges: app.styleRanges,
+      axisStyles: app.axisStyles,
     });
   }
 
