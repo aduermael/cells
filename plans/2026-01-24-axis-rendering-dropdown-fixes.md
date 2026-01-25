@@ -134,7 +134,7 @@ Borders applied at the axis level should also render on empty cells.
 
 - [x] 4d: Apply `positionDropdown()` to `format-controls.ts`
 
-- [ ] 4e: Apply `positionDropdown()` to `named-ranges-dropdown.ts`
+- [x] 4e: Apply `positionDropdown()` to `named-ranges-dropdown.ts`
 
 - [ ] 4f: Add E2E test for dropdown boundary enforcement
   - Test all dropdown menus (border, color picker, font, format, named ranges)

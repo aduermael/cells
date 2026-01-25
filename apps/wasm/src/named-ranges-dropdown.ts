@@ -3,6 +3,7 @@
 
 import type { NamedRangeInfo } from "./types";
 import type { WasmDataSource } from "./wasm-data-source";
+import { positionDropdown } from "./dropdown-utils";
 
 /** Callback when a named range is selected */
 export type OnSelectCallback = (name: string) => void;
@@ -123,13 +124,10 @@ export class NamedRangesDropdown {
   /** Position the popup below the trigger element */
   private positionPopup(): void {
     const triggerRect = this.triggerElement.getBoundingClientRect();
-    const containerRect = this.popup.parentElement?.getBoundingClientRect();
-    if (!containerRect) return;
-
-    // Position below the trigger
-    this.popup.style.left = `${triggerRect.left - containerRect.left}px`;
-    this.popup.style.top = `${triggerRect.bottom - containerRect.top + 2}px`;
+    // Set minimum width before positioning (affects measured dimensions)
     this.popup.style.minWidth = `${Math.max(triggerRect.width, 200)}px`;
+    // Position popup with viewport boundary enforcement
+    positionDropdown(this.popup, triggerRect);
   }
 
   /** Render the popup content */
