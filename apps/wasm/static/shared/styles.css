@@ -15,6 +15,7 @@
     --color-bg-active: #dee2e6;
     --color-bg-input: #ffffff;
     --color-border: #dee2e6;
+    --color-separator: #e9ecef;
     --color-border-hover: #adb5bd;
     --color-text-primary: #212529;
     --color-text-secondary: #495057;
@@ -193,7 +194,7 @@ body {
 /* Header */
 #header {
     min-height: var(--bar-height);
-    padding: var(--bar-padding-y) var(--bar-padding-x) 0;
+    padding: var(--bar-padding-x) var(--bar-padding-x) var(--spacing-xs);
     background: var(--bar-bg);
     border-bottom: none;
     display: flex;
@@ -328,7 +329,16 @@ body {
 
 .btn:focus {
     outline: none;
+}
+
+.btn:focus-visible {
     box-shadow: 0 0 0 2px rgba(5, 134, 1, 0.2);
+}
+
+/* No focus ring for formatting toolbar buttons */
+#formatting-toolbar .btn:focus,
+#formatting-toolbar .btn:focus-visible {
+    box-shadow: none;
 }
 
 /* Primary variant */
@@ -543,14 +553,71 @@ canvas {
     display: none;
 }
 
-/* Formatting Toolbar - horizontal row of style and format controls */
+/* Formatting Toolbar - blocks layout */
 #formatting-toolbar {
     display: flex;
-    align-items: center;
-    padding: var(--bar-padding-y) var(--bar-padding-x);
+    flex-direction: row;
+    align-items: stretch;
+    padding: var(--spacing-xs) var(--bar-padding-x);
     background: var(--bar-bg);
-    border-bottom: 1px solid var(--color-border);
-    gap: var(--bar-gap);
+    gap: var(--spacing-md);
+}
+
+/* Thin separators between toolbar blocks */
+.toolbar-block:not(:last-child) {
+    padding-right: var(--spacing-md);
+    border-right: 1px solid var(--color-separator);
+}
+
+/* Toolbar block - each block is a 2-row column */
+.toolbar-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Toolbar block row - horizontal row within a block */
+.toolbar-block-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    height: 24px;
+}
+
+/* Style controls block - first row has flexible elements */
+#style-controls.toolbar-block .toolbar-block-row:first-child {
+    min-width: 0;
+}
+
+#style-controls.toolbar-block #font-family-dropdown {
+    flex: 1;
+    min-width: 60px;
+}
+
+/* Format controls block - first row has flexible element */
+#format-controls.toolbar-block .toolbar-block-row:first-child #format-dropdown {
+    flex: 1;
+    min-width: 70px;
+}
+
+#format-controls.toolbar-block #format-dropdown-btn {
+    width: 100%;
+    justify-content: space-between;
+}
+
+/* Remove borders from all buttons in formatting toolbar */
+#formatting-toolbar .btn {
+    border: none;
+    background: transparent;
+}
+
+#formatting-toolbar .btn:hover {
+    background: var(--color-bg-hover);
+}
+
+#formatting-toolbar .btn:active,
+#formatting-toolbar .btn.active {
+    background: var(--color-bg-active);
 }
 
 #formatting-toolbar.hidden {
@@ -560,12 +627,12 @@ canvas {
 /* Formula Bar - Single row layout */
 #formula-bar {
     position: relative; /* For autocomplete popup positioning */
-    min-height: var(--bar-height);
+    height: 36px;
     display: flex;
     align-items: center;
-    padding: var(--bar-padding-y) var(--bar-padding-x);
+    padding: var(--spacing-xs) var(--bar-padding-x) var(--bar-padding-x);
     background: var(--bar-bg);
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: none;
     gap: var(--bar-gap);
 }
 
@@ -573,23 +640,13 @@ canvas {
     display: none;
 }
 
-/* Format Controls in Formatting Toolbar - single horizontal row */
-#format-controls {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    flex-shrink: 0;
+/* Formula bar button - match height of other elements */
+#formula-bar .btn {
+    height: 28px;
 }
 
-/* Format controls rows - now inline (no stacking) */
-#format-controls-row1,
-#format-controls-row2 {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
-#format-controls .btn.btn-sm {
+/* Format buttons styling */
+#formatting-toolbar .btn.btn-sm {
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-medium);
 }
@@ -610,14 +667,12 @@ canvas {
 
 /* Active state for percent button */
 #format-percent-btn.active {
-    background: var(--color-primary);
-    color: var(--color-bg-primary);
-    border-color: var(--color-primary);
+    background: var(--color-bg-active);
+    font-weight: var(--font-weight-bold);
 }
 
 #format-percent-btn.active:hover {
-    background: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
+    background: var(--color-bg-active);
 }
 
 #format-dropdown {
@@ -627,6 +682,7 @@ canvas {
 #format-dropdown-btn {
     min-width: 80px;
     justify-content: space-between;
+    border: 1px solid var(--color-border) !important;
 }
 
 #format-dropdown-label {
@@ -691,14 +747,12 @@ canvas {
 
 /* Active state for currency dropdown */
 #currency-dropdown.active #currency-dropdown-btn {
-    background: var(--color-primary);
-    color: var(--color-bg-primary);
-    border-color: var(--color-primary);
+    background: var(--color-bg-active);
+    font-weight: var(--font-weight-bold);
 }
 
 #currency-dropdown.active #currency-dropdown-btn:hover {
-    background: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
+    background: var(--color-bg-active);
 }
 
 /* Checkmark for active format in dropdown */
@@ -833,7 +887,7 @@ canvas {
 /* Cell reference wrapper with dropdown functionality */
 #cell-ref-wrapper {
     position: relative;
-    height: 52px;
+    height: 28px;
     padding: 0 var(--control-padding-x);
     font-size: var(--control-font-size);
     font-weight: var(--font-weight-medium);
@@ -947,7 +1001,7 @@ canvas {
 /* Formula Input Container - wrapper for contenteditable and hidden input */
 #formula-input-container {
     flex: 1;
-    min-height: var(--bar-height);
+    height: 28px;
     position: relative;
     display: flex;
     align-items: center;
@@ -1651,7 +1705,9 @@ canvas {
     outline: none;
     resize: none;
     line-height: 1.4;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    transition:
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast);
 }
 
 #chat-input:focus {
@@ -2175,7 +2231,6 @@ canvas {
 #script-panel.hidden {
     display: none;
 }
-
 
 #script-panel-content {
     flex: 1;
@@ -2868,22 +2923,6 @@ canvas {
    Style Controls (text formatting, colors)
    ============================================================================ */
 
-/* Style controls container - single horizontal row */
-#style-controls {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-    flex-shrink: 0;
-}
-
-/* Style controls rows - now inline (no stacking) */
-#style-controls-row1,
-#style-controls-row2 {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
-}
-
 /* Style buttons (B, I, U) */
 .style-btn {
     min-width: 24px;
@@ -2901,14 +2940,12 @@ canvas {
 
 /* Active state for style buttons (when format is applied) */
 .style-btn.active {
-    background: var(--color-primary);
-    color: var(--color-bg-primary);
-    border-color: var(--color-primary);
+    background: var(--color-bg-active);
+    font-weight: var(--font-weight-bold);
 }
 
 .style-btn.active:hover {
-    background: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
+    background: var(--color-bg-active);
 }
 
 /* Color picker wrapper (contains button + popup) */
@@ -3070,6 +3107,7 @@ canvas {
 #font-family-btn {
     width: 100%;
     height: 24px; /* Fixed height to prevent layout shifts */
+    border: 1px solid var(--color-border) !important;
 }
 
 #font-family-label {
@@ -3085,6 +3123,7 @@ canvas {
 
 #font-size-btn {
     min-width: 40px;
+    border: 1px solid var(--color-border) !important;
 }
 
 #font-size-label {
@@ -3290,10 +3329,7 @@ canvas {
 /* Alignment button groups */
 .align-btn-group {
     display: flex;
-    gap: 1px;
-    background: var(--color-border);
-    border-radius: var(--border-radius);
-    padding: 1px;
+    gap: var(--spacing-xs);
 }
 
 .align-btn {
@@ -3303,17 +3339,9 @@ canvas {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-bg-primary);
+    background: transparent;
     border: none;
-    border-radius: 0;
-}
-
-.align-btn:first-child {
-    border-radius: var(--border-radius-smaller) 0 0 var(--border-radius-smaller);
-}
-
-.align-btn:last-child {
-    border-radius: 0 var(--border-radius-smaller) var(--border-radius-smaller) 0;
+    border-radius: var(--border-radius);
 }
 
 .align-btn:hover {
@@ -3321,12 +3349,12 @@ canvas {
 }
 
 .align-btn.active {
-    background: var(--color-primary);
-    color: var(--color-bg-primary);
+    background: var(--color-bg-active);
+    font-weight: var(--font-weight-bold);
 }
 
 .align-btn.active:hover {
-    background: var(--color-primary-hover);
+    background: var(--color-bg-active);
 }
 
 .align-btn svg {
