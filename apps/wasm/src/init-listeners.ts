@@ -117,6 +117,7 @@ export function setupDataListeners(config: DataListenersConfig): {
       app.columns = data.columns || [];
       app.rows = data.rows || [];
       app.styleRanges = data.styleRanges || [];
+      app.axisStyles = data.axisStyles || [];
 
       // Clear caches for viewport range before repopulating
       for (let col = startCol; col < endCol; col++) {

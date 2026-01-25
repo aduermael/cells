@@ -51,7 +51,7 @@ Create a shared utility function based on context-menu's `positionMenu()` logic 
 
 Add `axisStyles` array to viewport response containing styled columns/rows.
 
-- [ ] 1a: Define `AxisStyleInfo` type in `types.ts`:
+- [x] 1a: Define `AxisStyleInfo` type in `types.ts`:
   ```typescript
   interface AxisStyleInfo {
     type: 'column' | 'row';
@@ -60,14 +60,14 @@ Add `axisStyles` array to viewport response containing styled columns/rows.
   }
   ```
 
-- [ ] 1b: Update `bindings_viewport.cc` to include `axisStyles` array in JSON response
+- [x] 1b: Update `bindings_viewport.cc` to include `axisStyles` array in JSON response
   - Iterate through columns with `hasStyle()` flag
   - Iterate through rows with `hasStyle()` flag
   - For each styled axis, include position and style properties
 
-- [ ] 1c: Update TypeScript types (`ViewportResult`, `wasm-data-source.ts`, `client-types.ts`) to include `axisStyles`
+- [x] 1c: Update TypeScript types (`ViewportResult`, `wasm-data-source.ts`, `client-types.ts`) to include `axisStyles`
 
-- [ ] 1d: Store `axisStyles` in `app.ts` state alongside `styleRanges`
+- [x] 1d: Store `axisStyles` in `app.ts` state alongside `styleRanges`
 
 ## Phase 2: Render Axis Styles as Full-Viewport Backgrounds
 

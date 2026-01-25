@@ -225,12 +225,29 @@ export interface StyleRangeInfo {
   };
 }
 
+/** Axis style info for rendering full column/row backgrounds */
+export interface AxisStyleInfo {
+  type: "column" | "row";
+  position: number; // Column or row index
+  style: {
+    bgColor?: string;
+    textColor?: string;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    wrapText?: boolean;
+    fontFamily?: string;
+    fontSize?: number;
+  };
+}
+
 /** Viewport query result */
 export interface ViewportResult {
   cells: CellData[];
   columns: ColumnInfo[];
   rows: RowInfo[];
   styleRanges?: StyleRangeInfo[]; // Ranges with RANGE_STYLE flag for background rendering
+  axisStyles?: AxisStyleInfo[]; // Column/row styles for full-axis background rendering
 }
 
 // ============================================================================

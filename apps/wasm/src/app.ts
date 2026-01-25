@@ -273,6 +273,13 @@ export class App {
     style: { bgColor?: string; textColor?: string };
   }> = [];
 
+  /** Axis styles for rendering full column/row backgrounds */
+  axisStyles: Array<{
+    type: "column" | "row";
+    position: number;
+    style: { bgColor?: string; textColor?: string };
+  }> = [];
+
   // Scroll position
   scrollX: number = 0;
   scrollY: number = 0;

@@ -970,6 +970,152 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         json << "}}";
     }
 
+    json << "],\"axisStyles\":[";
+
+    // Include axis styles (columns and rows with styles) for full-axis background rendering
+    // These are separate from styleRanges and allow the frontend to render full column/row fills
+    bool firstAxisStyle = true;
+
+    // First, output styled columns (iterate through visible columns)
+    for (size_t pos = col1; pos < col2; ++pos) {
+        auto colId = _viewportIndex.getColumnAt(pos);
+        if (!colId) {
+            continue;
+        }
+        const Axis* col = sheet->getColumn(*colId);
+        if (!col || !col->hasStyle()) {
+            continue;
+        }
+        const StyleBuffer* styleBuffer = _workbook->getEntityStyle(col->id);
+        if (styleBuffer == nullptr) {
+            continue;
+        }
+        CellStyle style = styleBuffer->toCellStyle();
+
+        // Only include if style has visible properties
+        if (style.bgColor.empty() && style.textColor.empty() && !style.bold && !style.italic &&
+            !style.underline && !style.wrapText && style.fontFamily.empty() && style.fontSize == 0) {
+            continue;
+        }
+
+        if (!firstAxisStyle) {
+            json << ",";
+        }
+        firstAxisStyle = false;
+
+        json << "{\"type\":\"column\",\"position\":" << pos << ",\"style\":{";
+        bool firstProp = true;
+        if (!style.bgColor.empty()) {
+            json << "\"bgColor\":\"" << style.bgColor << "\"";
+            firstProp = false;
+        }
+        if (!style.textColor.empty()) {
+            if (!firstProp) json << ",";
+            json << "\"textColor\":\"" << style.textColor << "\"";
+            firstProp = false;
+        }
+        if (style.bold) {
+            if (!firstProp) json << ",";
+            json << "\"bold\":true";
+            firstProp = false;
+        }
+        if (style.italic) {
+            if (!firstProp) json << ",";
+            json << "\"italic\":true";
+            firstProp = false;
+        }
+        if (style.underline) {
+            if (!firstProp) json << ",";
+            json << "\"underline\":true";
+            firstProp = false;
+        }
+        if (style.wrapText) {
+            if (!firstProp) json << ",";
+            json << "\"wrapText\":true";
+            firstProp = false;
+        }
+        if (!style.fontFamily.empty()) {
+            if (!firstProp) json << ",";
+            json << "\"fontFamily\":\"" << style.fontFamily << "\"";
+            firstProp = false;
+        }
+        if (style.fontSize != 0) {
+            if (!firstProp) json << ",";
+            json << "\"fontSize\":" << static_cast<int>(style.fontSize);
+        }
+        json << "}}";
+    }
+
+    // Then, output styled rows (iterate through visible rows)
+    for (size_t pos = row1; pos < row2; ++pos) {
+        auto rowId = _viewportIndex.getRowAt(pos);
+        if (!rowId) {
+            continue;
+        }
+        const Axis* row = sheet->getRow(*rowId);
+        if (!row || !row->hasStyle()) {
+            continue;
+        }
+        const StyleBuffer* styleBuffer = _workbook->getEntityStyle(row->id);
+        if (styleBuffer == nullptr) {
+            continue;
+        }
+        CellStyle style = styleBuffer->toCellStyle();
+
+        // Only include if style has visible properties
+        if (style.bgColor.empty() && style.textColor.empty() && !style.bold && !style.italic &&
+            !style.underline && !style.wrapText && style.fontFamily.empty() && style.fontSize == 0) {
+            continue;
+        }
+
+        if (!firstAxisStyle) {
+            json << ",";
+        }
+        firstAxisStyle = false;
+
+        json << "{\"type\":\"row\",\"position\":" << pos << ",\"style\":{";
+        bool firstProp = true;
+        if (!style.bgColor.empty()) {
+            json << "\"bgColor\":\"" << style.bgColor << "\"";
+            firstProp = false;
+        }
+        if (!style.textColor.empty()) {
+            if (!firstProp) json << ",";
+            json << "\"textColor\":\"" << style.textColor << "\"";
+            firstProp = false;
+        }
+        if (style.bold) {
+            if (!firstProp) json << ",";
+            json << "\"bold\":true";
+            firstProp = false;
+        }
+        if (style.italic) {
+            if (!firstProp) json << ",";
+            json << "\"italic\":true";
+            firstProp = false;
+        }
+        if (style.underline) {
+            if (!firstProp) json << ",";
+            json << "\"underline\":true";
+            firstProp = false;
+        }
+        if (style.wrapText) {
+            if (!firstProp) json << ",";
+            json << "\"wrapText\":true";
+            firstProp = false;
+        }
+        if (!style.fontFamily.empty()) {
+            if (!firstProp) json << ",";
+            json << "\"fontFamily\":\"" << style.fontFamily << "\"";
+            firstProp = false;
+        }
+        if (style.fontSize != 0) {
+            if (!firstProp) json << ",";
+            json << "\"fontSize\":" << static_cast<int>(style.fontSize);
+        }
+        json << "}}";
+    }
+
     json << "]}";
 
     return json.str();
