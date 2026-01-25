@@ -73,21 +73,24 @@ Add `axisStyles` array to viewport response containing styled columns/rows.
 
 Draw axis styles as full column/row fills before other backgrounds.
 
-- [ ] 2a: Add `_drawAxisStyleBackgrounds()` method to `grid-renderer.ts`
+- [x] 2a: Add `_drawAxisStyleBackgrounds()` method to `grid-renderer.ts`
   - For column styles: draw a vertical strip spanning the full visible height
   - For row styles: draw a horizontal strip spanning the full visible width
   - Draw column styles after row styles (column takes priority at intersection)
 
-- [ ] 2b: Update `GridRenderer.render()` to call `_drawAxisStyleBackgrounds()` before `_drawStyleRangeBackgrounds()` and `_drawCellBackgrounds()`
+- [x] 2b: Update `GridRenderer.render()` to call `_drawAxisStyleBackgrounds()` before `_drawStyleRangeBackgrounds()` and `_drawCellBackgrounds()`
   - Render order should be: axis styles → range styles → cell styles (layered properly so higher priority draws last and covers lower)
 
-- [ ] 2c: Pass `axisStyles` to `GridRenderer` in `init-components.ts`
+- [x] 2c: Pass `axisStyles` to `GridRenderer` in `init-components.ts`
 
-- [ ] 2d: Add E2E tests for axis style rendering
-  - Apply background to column, verify empty cells show color
-  - Apply background to row, verify empty cells show color
-  - Verify cell style overrides column style
-  - Verify range style overrides row style
+- [x] 2d: Add E2E tests for axis style rendering
+  - Added visual rendering tests that verify canvas pixel colors
+  - Tests column style renders on empty cells
+  - Tests row style renders on empty cells
+  - Tests cell style overrides column style
+  - Tests range style overrides row style
+  - Fixed client.ts to include axisStyles in queryViewport response
+  - Fixed viewport position output to use Axis.position instead of loop index
 
 ## Phase 3: Apply Axis Styles to Borders
 

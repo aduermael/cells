@@ -1003,7 +1003,8 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         }
         firstAxisStyle = false;
 
-        json << "{\"type\":\"column\",\"position\":" << pos << ",\"style\":{";
+        // Output the column's actual grid position (from Axis object), not the loop index
+        json << "{\"type\":\"column\",\"position\":" << col->position << ",\"style\":{";
         bool firstProp = true;
         if (!style.bgColor.empty()) {
             json << "\"bgColor\":\"" << style.bgColor << "\"";
@@ -1073,7 +1074,8 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         }
         firstAxisStyle = false;
 
-        json << "{\"type\":\"row\",\"position\":" << pos << ",\"style\":{";
+        // Output the row's actual grid position (from Axis object), not the loop index
+        json << "{\"type\":\"row\",\"position\":" << row->position << ",\"style\":{";
         bool firstProp = true;
         if (!style.bgColor.empty()) {
             json << "\"bgColor\":\"" << style.bgColor << "\"";

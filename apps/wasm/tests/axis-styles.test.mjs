@@ -363,6 +363,272 @@ const tests = {
     });
     assertTrue(isCenterActive, 'Center align button should be active when row 2 is selected');
   },
+
+  // ==========================================================================
+  // Visual rendering tests (canvas pixel verification)
+  // ==========================================================================
+
+  'Column style renders background on empty cells (visual)': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const testColor = '#3B82F6'; // Blue 500
+
+    // Set column B style
+    await clickColumnHeader(ctx.page, 'B');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, testColor);
+    await sleep(300);
+
+    // Click elsewhere to deselect
+    await clickCell(ctx.page, 'D1');
+    await sleep(100);
+
+    // Verify pixels at empty cells in column B show the background color
+    // B5 (col 1, row 4) should have the blue background
+    const posB5 = await getCellPosition(ctx.page, 1, 4);
+    const pixelB5 = await getPixelColor(
+      ctx.page,
+      posB5.x + posB5.width / 2,
+      posB5.y + posB5.height / 2
+    );
+    assertTrue(
+      isColorApproximately(pixelB5, testColor, 30),
+      `Empty cell B5 should visually show column background (got r=${pixelB5?.r}, g=${pixelB5?.g}, b=${pixelB5?.b})`
+    );
+
+    // B10 (col 1, row 9) should also have the blue background
+    const posB10 = await getCellPosition(ctx.page, 1, 9);
+    const pixelB10 = await getPixelColor(
+      ctx.page,
+      posB10.x + posB10.width / 2,
+      posB10.y + posB10.height / 2
+    );
+    assertTrue(
+      isColorApproximately(pixelB10, testColor, 30),
+      `Empty cell B10 should visually show column background (got r=${pixelB10?.r}, g=${pixelB10?.g}, b=${pixelB10?.b})`
+    );
+
+    // Cells in other columns should NOT have the background
+    const posC5 = await getCellPosition(ctx.page, 2, 4);
+    const pixelC5 = await getPixelColor(
+      ctx.page,
+      posC5.x + posC5.width / 2,
+      posC5.y + posC5.height / 2
+    );
+    assertTrue(
+      !isColorApproximately(pixelC5, testColor, 30),
+      `Cell C5 should NOT have the column B background color`
+    );
+  },
+
+  'Row style renders background on empty cells (visual)': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const testColor = '#22C55E'; // Green 500
+
+    // Set row 3 style (index 2)
+    await clickRowHeader(ctx.page, 2);
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, testColor);
+    await sleep(300);
+
+    // Click elsewhere to deselect
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // Verify pixels at empty cells in row 3 show the background color
+    // E3 (col 4, row 2) should have the green background
+    const posE3 = await getCellPosition(ctx.page, 4, 2);
+    const pixelE3 = await getPixelColor(
+      ctx.page,
+      posE3.x + posE3.width / 2,
+      posE3.y + posE3.height / 2
+    );
+    assertTrue(
+      isColorApproximately(pixelE3, testColor, 30),
+      `Empty cell E3 should visually show row background (got r=${pixelE3?.r}, g=${pixelE3?.g}, b=${pixelE3?.b})`
+    );
+
+    // G3 (col 6, row 2) should also have the green background
+    const posG3 = await getCellPosition(ctx.page, 6, 2);
+    const pixelG3 = await getPixelColor(
+      ctx.page,
+      posG3.x + posG3.width / 2,
+      posG3.y + posG3.height / 2
+    );
+    assertTrue(
+      isColorApproximately(pixelG3, testColor, 30),
+      `Empty cell G3 should visually show row background (got r=${pixelG3?.r}, g=${pixelG3?.g}, b=${pixelG3?.b})`
+    );
+
+    // Cells in other rows should NOT have the background
+    const posE4 = await getCellPosition(ctx.page, 4, 3);
+    const pixelE4 = await getPixelColor(
+      ctx.page,
+      posE4.x + posE4.width / 2,
+      posE4.y + posE4.height / 2
+    );
+    assertTrue(
+      !isColorApproximately(pixelE4, testColor, 30),
+      `Cell E4 should NOT have the row 3 background color`
+    );
+  },
+
+  'Cell style overrides column style visually': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const colColor = '#3B82F6'; // Blue
+    const cellColor = '#EF4444'; // Red
+
+    // Set column B style
+    await clickColumnHeader(ctx.page, 'B');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, colColor);
+    await sleep(300);
+
+    // Set cell B3 style to override
+    await clickCell(ctx.page, 'B3');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, cellColor);
+    await sleep(300);
+
+    // Click elsewhere to deselect
+    await clickCell(ctx.page, 'D1');
+    await sleep(100);
+
+    // B3 should show red (cell override)
+    const posB3 = await getCellPosition(ctx.page, 1, 2);
+    const pixelB3 = await getPixelColor(
+      ctx.page,
+      posB3.x + posB3.width / 2,
+      posB3.y + posB3.height / 2
+    );
+    assertTrue(
+      isColorApproximately(pixelB3, cellColor, 30),
+      `B3 should show cell color (red), not column color (got r=${pixelB3?.r}, g=${pixelB3?.g}, b=${pixelB3?.b})`
+    );
+
+    // B5 should show blue (column style, no cell override)
+    const posB5 = await getCellPosition(ctx.page, 1, 4);
+    const pixelB5 = await getPixelColor(
+      ctx.page,
+      posB5.x + posB5.width / 2,
+      posB5.y + posB5.height / 2
+    );
+    assertTrue(
+      isColorApproximately(pixelB5, colColor, 30),
+      `B5 should show column color (blue) (got r=${pixelB5?.r}, g=${pixelB5?.g}, b=${pixelB5?.b})`
+    );
+  },
+
+  'Range style overrides row style visually': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    const rowColor = '#22C55E'; // Green
+    const rangeColor = '#F59E0B'; // Orange
+
+    // Set row 3 style (index 2)
+    await clickRowHeader(ctx.page, 2);
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, rowColor);
+    await sleep(300);
+
+    // Apply range style to C3:D3 (should override row style in that area)
+    await selectRange(ctx.page, 'C3', 'D3');
+    await sleep(100);
+    await applyBackgroundColor(ctx.page, rangeColor);
+    await sleep(300);
+
+    // Click elsewhere to deselect
+    await clickCell(ctx.page, 'A1');
+    await sleep(100);
+
+    // C3 should show orange (range override)
+    const posC3 = await getCellPosition(ctx.page, 2, 2);
+    const pixelC3 = await getPixelColor(
+      ctx.page,
+      posC3.x + posC3.width / 2,
+      posC3.y + posC3.height / 2
+    );
+    assertTrue(
+      isColorApproximately(pixelC3, rangeColor, 30),
+      `C3 should show range color (orange) (got r=${pixelC3?.r}, g=${pixelC3?.g}, b=${pixelC3?.b})`
+    );
+
+    // E3 should show green (row style, outside range)
+    const posE3 = await getCellPosition(ctx.page, 4, 2);
+    const pixelE3 = await getPixelColor(
+      ctx.page,
+      posE3.x + posE3.width / 2,
+      posE3.y + posE3.height / 2
+    );
+    assertTrue(
+      isColorApproximately(pixelE3, rowColor, 30),
+      `E3 should show row color (green) (got r=${pixelE3?.r}, g=${pixelE3?.g}, b=${pixelE3?.b})`
+    );
+  },
 };
+
+/**
+ * Get pixel color at a specific canvas coordinate
+ */
+async function getPixelColor(page, x, y) {
+  return await page.evaluate(({ x, y }) => {
+    const canvas = document.getElementById('grid');
+    if (!canvas) return null;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const imageData = ctx.getImageData(x * dpr, y * dpr, 1, 1);
+    return {
+      r: imageData.data[0],
+      g: imageData.data[1],
+      b: imageData.data[2],
+      a: imageData.data[3],
+    };
+  }, { x, y });
+}
+
+/**
+ * Get the position of a cell in canvas coordinates
+ */
+async function getCellPosition(page, col, row) {
+  return await page.evaluate(({ col, row }) => {
+    const HEADER_WIDTH = 50;
+    const HEADER_HEIGHT = 24;
+    const DEFAULT_COL_WIDTH = 100;
+    const DEFAULT_ROW_HEIGHT = 24;
+
+    const x = HEADER_WIDTH + col * DEFAULT_COL_WIDTH;
+    const y = HEADER_HEIGHT + row * DEFAULT_ROW_HEIGHT;
+
+    return {
+      x,
+      y,
+      width: DEFAULT_COL_WIDTH,
+      height: DEFAULT_ROW_HEIGHT,
+    };
+  }, { col, row });
+}
+
+/**
+ * Check if a color is approximately a certain hex color
+ */
+function isColorApproximately(pixel, hexColor, tolerance = 10) {
+  if (!pixel) return false;
+
+  const r = parseInt(hexColor.slice(1, 3), 16);
+  const g = parseInt(hexColor.slice(3, 5), 16);
+  const b = parseInt(hexColor.slice(5, 7), 16);
+
+  return (
+    Math.abs(pixel.r - r) <= tolerance &&
+    Math.abs(pixel.g - g) <= tolerance &&
+    Math.abs(pixel.b - b) <= tolerance
+  );
+}
 
 runTests(tests);

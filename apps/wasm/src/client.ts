@@ -350,6 +350,7 @@ export class CellsClient {
       columns: (response.columns as ViewportResult["columns"]) || [],
       rows: (response.rows as ViewportResult["rows"]) || [],
       styleRanges: (response.styleRanges as ViewportResult["styleRanges"]) || [],
+      axisStyles: (response.axisStyles as ViewportResult["axisStyles"]) || [],
     };
   }
 
