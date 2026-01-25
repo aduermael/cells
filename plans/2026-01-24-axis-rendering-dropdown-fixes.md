@@ -96,11 +96,17 @@ Draw axis styles as full column/row fills before other backgrounds.
 
 Borders applied at the axis level should also render on empty cells.
 
-- [ ] 3a: Include border properties in axis style output from `bindings_viewport.cc`
+- [x] 3a: Include border properties in axis style output from `bindings_viewport.cc`
+  - Added border.hasValue() check to axis style visibility condition
+  - Added border serialization (top, right, bottom, left) to column and row axis style output
 
-- [ ] 3b: Update `_drawAxisStyleBackgrounds()` to also draw borders
-  - For column borders: draw left/right borders for the full visible height
-  - For row borders: draw top/bottom borders for the full visible width
+- [x] 3b: Update `_drawAxisStyleBackgrounds()` to also draw borders
+  - Added new `_drawAxisStyleBorders()` method to grid-renderer.ts
+  - For column borders: draws left/right borders spanning full visible height
+  - For row borders: draws top/bottom borders spanning full visible width
+  - Supports all border styles including double borders and dashed patterns
+  - Added CellBorder type to AxisStyleInfo interface
+  - Updated render() to call axis borders before cell borders
 
 - [ ] 3c: Add tests for axis border rendering
 

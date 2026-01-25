@@ -225,7 +225,7 @@ export interface StyleRangeInfo {
   };
 }
 
-/** Axis style info for rendering full column/row backgrounds */
+/** Axis style info for rendering full column/row backgrounds and borders */
 export interface AxisStyleInfo {
   type: "column" | "row";
   position: number; // Column or row index
@@ -238,6 +238,7 @@ export interface AxisStyleInfo {
     wrapText?: boolean;
     fontFamily?: string;
     fontSize?: number;
+    border?: CellBorder;
   };
 }
 

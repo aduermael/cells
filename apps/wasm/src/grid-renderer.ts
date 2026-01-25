@@ -24,7 +24,7 @@
 //
 // =============================================================================
 
-import type { SheetInfo, CellData, Position, BorderStyle } from "./types.js";
+import type { SheetInfo, CellData, Position, BorderStyle, CellBorder } from "./types.js";
 import {
   DEFAULT_COL_WIDTH,
   DEFAULT_ROW_HEIGHT,
@@ -86,11 +86,11 @@ export class GridRenderer {
     endRow: number;
     style: { bgColor?: string; textColor?: string };
   }> = [];
-  /** Axis styles for rendering full column/row backgrounds */
+  /** Axis styles for rendering full column/row backgrounds and borders */
   axisStyles: Array<{
     type: "column" | "row";
     position: number;
-    style: { bgColor?: string; textColor?: string };
+    style: { bgColor?: string; textColor?: string; border?: CellBorder };
   }> = [];
   colWidths: Map<number, number> = new Map();
   rowHeights: Map<number, number> = new Map();
@@ -342,6 +342,9 @@ export class GridRenderer {
     this._drawAxisStyleBackgrounds(ctx, viewWidth, viewHeight, headerState);
     this._drawStyleRangeBackgrounds(ctx, viewWidth, viewHeight, headerState);
     this._drawCellBackgrounds(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
+    // Draw borders in order: axis borders → cell borders
+    // Cell borders override axis borders at the same edge
+    this._drawAxisStyleBorders(ctx, viewWidth, viewHeight, headerState);
     this._drawCellBorders(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
     this._drawCellValues(ctx, viewWidth, viewHeight, colHasMoved, rowHasMoved, headerState);
 
@@ -590,6 +593,158 @@ export class GridRenderer {
       ctx.fillStyle = bgColor;
       ctx.fillRect(startX, zoomedHeaderHeight, colWidth, viewHeight - zoomedHeaderHeight);
     }
+  }
+
+  /**
+   * Draw axis style borders (full column/row borders).
+   * For column styles: draws left/right borders spanning full visible height.
+   * For row styles: draws top/bottom borders spanning full visible width.
+   */
+  private _drawAxisStyleBorders(
+    ctx: CanvasRenderingContext2D,
+    viewWidth: number,
+    viewHeight: number,
+    headerState: HeaderRendererState
+  ): void {
+    const zoomedHeaderWidth = getZoomedHeaderWidth();
+    const zoomedHeaderHeight = getZoomedHeaderHeight();
+
+    // Separate row and column styles
+    const rowStyles = this.axisStyles.filter(s => s.type === "row");
+    const colStyles = this.axisStyles.filter(s => s.type === "column");
+
+    // Draw row borders (horizontal lines spanning full visible width)
+    for (const axisStyle of rowStyles) {
+      const border = axisStyle.style?.border;
+      if (!border) continue;
+
+      const row = axisStyle.position;
+      const startY = getRowY(row, headerState);
+      const baseH = this.rowHeights.get(row) || DEFAULT_ROW_HEIGHT;
+      const rowHeight = getZoomedRowHeight(baseH);
+
+      // Skip if entirely outside viewport
+      if (startY + rowHeight < zoomedHeaderHeight || startY > viewHeight) continue;
+
+      // Draw top border
+      if (border.top && border.top.style !== "none") {
+        const width = this._getBorderWidth(border.top.style);
+        ctx.strokeStyle = border.top.color || "#000000";
+        ctx.lineWidth = width;
+        this._setBorderDash(ctx, border.top.style);
+
+        if (border.top.style === "double") {
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(zoomedHeaderWidth, Math.round(startY) - 1 + 0.5);
+          ctx.lineTo(viewWidth, Math.round(startY) - 1 + 0.5);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(zoomedHeaderWidth, Math.round(startY) + 1 + 0.5);
+          ctx.lineTo(viewWidth, Math.round(startY) + 1 + 0.5);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(zoomedHeaderWidth, Math.round(startY) + 0.5);
+          ctx.lineTo(viewWidth, Math.round(startY) + 0.5);
+          ctx.stroke();
+        }
+      }
+
+      // Draw bottom border
+      if (border.bottom && border.bottom.style !== "none") {
+        const width = this._getBorderWidth(border.bottom.style);
+        ctx.strokeStyle = border.bottom.color || "#000000";
+        ctx.lineWidth = width;
+        this._setBorderDash(ctx, border.bottom.style);
+
+        const bottomY = startY + rowHeight;
+        if (border.bottom.style === "double") {
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(zoomedHeaderWidth, Math.round(bottomY) - 1 + 0.5);
+          ctx.lineTo(viewWidth, Math.round(bottomY) - 1 + 0.5);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(zoomedHeaderWidth, Math.round(bottomY) + 1 + 0.5);
+          ctx.lineTo(viewWidth, Math.round(bottomY) + 1 + 0.5);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(zoomedHeaderWidth, Math.round(bottomY) + 0.5);
+          ctx.lineTo(viewWidth, Math.round(bottomY) + 0.5);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw column borders (vertical lines spanning full visible height)
+    for (const axisStyle of colStyles) {
+      const border = axisStyle.style?.border;
+      if (!border) continue;
+
+      const col = axisStyle.position;
+      const startX = getColX(col, headerState);
+      const baseW = this.colWidths.get(col) || DEFAULT_COL_WIDTH;
+      const colWidth = getZoomedColWidth(baseW);
+
+      // Skip if entirely outside viewport
+      if (startX + colWidth < zoomedHeaderWidth || startX > viewWidth) continue;
+
+      // Draw left border
+      if (border.left && border.left.style !== "none") {
+        const width = this._getBorderWidth(border.left.style);
+        ctx.strokeStyle = border.left.color || "#000000";
+        ctx.lineWidth = width;
+        this._setBorderDash(ctx, border.left.style);
+
+        if (border.left.style === "double") {
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(Math.round(startX) - 1 + 0.5, zoomedHeaderHeight);
+          ctx.lineTo(Math.round(startX) - 1 + 0.5, viewHeight);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(Math.round(startX) + 1 + 0.5, zoomedHeaderHeight);
+          ctx.lineTo(Math.round(startX) + 1 + 0.5, viewHeight);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(Math.round(startX) + 0.5, zoomedHeaderHeight);
+          ctx.lineTo(Math.round(startX) + 0.5, viewHeight);
+          ctx.stroke();
+        }
+      }
+
+      // Draw right border
+      if (border.right && border.right.style !== "none") {
+        const width = this._getBorderWidth(border.right.style);
+        ctx.strokeStyle = border.right.color || "#000000";
+        ctx.lineWidth = width;
+        this._setBorderDash(ctx, border.right.style);
+
+        const rightX = startX + colWidth;
+        if (border.right.style === "double") {
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(Math.round(rightX) - 1 + 0.5, zoomedHeaderHeight);
+          ctx.lineTo(Math.round(rightX) - 1 + 0.5, viewHeight);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(Math.round(rightX) + 1 + 0.5, zoomedHeaderHeight);
+          ctx.lineTo(Math.round(rightX) + 1 + 0.5, viewHeight);
+          ctx.stroke();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(Math.round(rightX) + 0.5, zoomedHeaderHeight);
+          ctx.lineTo(Math.round(rightX) + 0.5, viewHeight);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Reset line dash
+    ctx.setLineDash([]);
   }
 
   /** Draw grid lines */

@@ -992,9 +992,10 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         }
         CellStyle style = styleBuffer->toCellStyle();
 
-        // Only include if style has visible properties
+        // Only include if style has visible properties (including borders)
         if (style.bgColor.empty() && style.textColor.empty() && !style.bold && !style.italic &&
-            !style.underline && !style.wrapText && style.fontFamily.empty() && style.fontSize == 0) {
+            !style.underline && !style.wrapText && style.fontFamily.empty() && style.fontSize == 0 &&
+            !style.border.hasValue()) {
             continue;
         }
 
@@ -1043,6 +1044,20 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         if (style.fontSize != 0) {
             if (!firstProp) json << ",";
             json << "\"fontSize\":" << static_cast<int>(style.fontSize);
+            firstProp = false;
+        }
+        // Include border if any edge has a non-NONE style
+        if (style.border.hasValue()) {
+            if (!firstProp) json << ",";
+            json << "\"border\":{";
+            serializeBorderEdge(json, "top", style.border.top);
+            json << ",";
+            serializeBorderEdge(json, "right", style.border.right);
+            json << ",";
+            serializeBorderEdge(json, "bottom", style.border.bottom);
+            json << ",";
+            serializeBorderEdge(json, "left", style.border.left);
+            json << "}";
         }
         json << "}}";
     }
@@ -1063,9 +1078,10 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         }
         CellStyle style = styleBuffer->toCellStyle();
 
-        // Only include if style has visible properties
+        // Only include if style has visible properties (including borders)
         if (style.bgColor.empty() && style.textColor.empty() && !style.bold && !style.italic &&
-            !style.underline && !style.wrapText && style.fontFamily.empty() && style.fontSize == 0) {
+            !style.underline && !style.wrapText && style.fontFamily.empty() && style.fontSize == 0 &&
+            !style.border.hasValue()) {
             continue;
         }
 
@@ -1114,6 +1130,20 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         if (style.fontSize != 0) {
             if (!firstProp) json << ",";
             json << "\"fontSize\":" << static_cast<int>(style.fontSize);
+            firstProp = false;
+        }
+        // Include border if any edge has a non-NONE style
+        if (style.border.hasValue()) {
+            if (!firstProp) json << ",";
+            json << "\"border\":{";
+            serializeBorderEdge(json, "top", style.border.top);
+            json << ",";
+            serializeBorderEdge(json, "right", style.border.right);
+            json << ",";
+            serializeBorderEdge(json, "bottom", style.border.bottom);
+            json << ",";
+            serializeBorderEdge(json, "left", style.border.left);
+            json << "}";
         }
         json << "}}";
     }
