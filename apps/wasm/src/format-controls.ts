@@ -28,6 +28,7 @@
 import type { WasmDataSource } from "./wasm-data-source";
 import type { NumberFormatCategory, Position, CellData } from "./types";
 import { positionDropdown } from "./dropdown-utils";
+import { getMenuStateManager } from "./menu-state";
 
 // =============================================================================
 // Types
@@ -178,6 +179,12 @@ export class FormatControls {
     this.updateFormulaBar = callbacks.updateFormulaBar;
 
     this.setupEventListeners();
+
+    // Register menus with MenuStateManager for mutual exclusivity
+    const menuState = getMenuStateManager();
+    menuState.registerMenu("format", () => this.closeDropdown());
+    menuState.registerMenu("currency", () => this.closeCurrencyDropdown());
+    menuState.registerMenu("customFormat", () => this.closeCustomFormatPanel());
   }
 
   // =========================================================================
@@ -356,7 +363,34 @@ export class FormatControls {
 
     // Keyboard shortcuts
     document.addEventListener("keydown", (e) => {
-      // Only handle if no input/textarea is focused
+      // Escape key closes all format dropdowns
+      if (e.key === "Escape") {
+        const hasOpenDropdown =
+          this.isDropdownOpen ||
+          this.isCurrencyDropdownOpen ||
+          this.isCustomFormatPanelOpen;
+
+        if (hasOpenDropdown) {
+          e.preventDefault();
+          // Close all dropdowns and notify MenuStateManager
+          const menuState = getMenuStateManager();
+          if (this.isDropdownOpen) {
+            this.closeDropdown();
+            menuState.closeMenu("format");
+          }
+          if (this.isCurrencyDropdownOpen) {
+            this.closeCurrencyDropdown();
+            menuState.closeMenu("currency");
+          }
+          if (this.isCustomFormatPanelOpen) {
+            this.closeCustomFormatPanel();
+            menuState.closeMenu("customFormat");
+          }
+          return;
+        }
+      }
+
+      // Only handle other shortcuts if no input/textarea is focused
       const active = document.activeElement;
       if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" ||
           (active as HTMLElement).contentEditable === "true")) {
@@ -420,11 +454,15 @@ export class FormatControls {
     const buttonRect = this.formatDropdownBtn.getBoundingClientRect();
     positionDropdown(this.formatDropdownMenu, buttonRect);
     this.updateDropdownActiveState();
+    // Notify MenuStateManager - this will close other menus via their callbacks
+    getMenuStateManager().openMenu("format");
   }
 
   private closeDropdown(): void {
-    this.isDropdownOpen = false;
-    this.formatDropdown.classList.remove("open");
+    if (this.isDropdownOpen) {
+      this.isDropdownOpen = false;
+      this.formatDropdown.classList.remove("open");
+    }
   }
 
   private updateDropdownActiveState(): void {
@@ -455,11 +493,15 @@ export class FormatControls {
     const buttonRect = this.currencyDropdownBtn.getBoundingClientRect();
     positionDropdown(this.currencyDropdownMenu, buttonRect);
     this.updateCurrencyDropdownActiveState();
+    // Notify MenuStateManager - this will close other menus via their callbacks
+    getMenuStateManager().openMenu("currency");
   }
 
   private closeCurrencyDropdown(): void {
-    this.isCurrencyDropdownOpen = false;
-    this.currencyDropdown.classList.remove("open");
+    if (this.isCurrencyDropdownOpen) {
+      this.isCurrencyDropdownOpen = false;
+      this.currencyDropdown.classList.remove("open");
+    }
   }
 
   private updateCurrencyDropdownActiveState(): void {
@@ -513,14 +555,19 @@ export class FormatControls {
 
     // Focus the input
     setTimeout(() => this.customFormatInput.focus(), 0);
+
+    // Notify MenuStateManager - this will close other menus via their callbacks
+    getMenuStateManager().openMenu("customFormat");
   }
 
   private closeCustomFormatPanel(): void {
-    this.isCustomFormatPanelOpen = false;
-    this.customFormatPanel.classList.add("hidden");
-    if (this.customFormatDebounceTimer) {
-      clearTimeout(this.customFormatDebounceTimer);
-      this.customFormatDebounceTimer = null;
+    if (this.isCustomFormatPanelOpen) {
+      this.isCustomFormatPanelOpen = false;
+      this.customFormatPanel.classList.add("hidden");
+      if (this.customFormatDebounceTimer) {
+        clearTimeout(this.customFormatDebounceTimer);
+        this.customFormatDebounceTimer = null;
+      }
     }
   }
 

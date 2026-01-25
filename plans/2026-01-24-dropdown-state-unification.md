@@ -64,11 +64,11 @@ Create a reusable TypeScript class that provides consistent dropdown container b
 
 Complete the partial integration from the previous plan.
 
-- [ ] 2a: Import and register `format`, `currency`, `customFormat` menus in FormatControls constructor
-- [ ] 2b: Update `openDropdown()` / `toggleDropdown()` to call `menuState.openMenu('format')`
-- [ ] 2c: Update `openCurrencyDropdown()` to call `menuState.openMenu('currency')`
-- [ ] 2d: Update `openCustomFormatPanel()` to call `menuState.openMenu('customFormat')`
-- [ ] 2e: Update close methods to call corresponding `menuState.closeMenu()`
+- [x] 2a: Import and register `format`, `currency`, `customFormat` menus in FormatControls constructor
+- [x] 2b: Update `openDropdown()` / `toggleDropdown()` to call `menuState.openMenu('format')`
+- [x] 2c: Update `openCurrencyDropdown()` to call `menuState.openMenu('currency')`
+- [x] 2d: Update `openCustomFormatPanel()` to call `menuState.openMenu('customFormat')`
+- [x] 2e: Update close methods to call corresponding `menuState.closeMenu()` and added Escape key handler to close dropdowns and notify MenuStateManager
 
 ## Phase 3: Integrate MergeControls with MenuStateManager
 
