@@ -199,7 +199,7 @@ Mirror the style system's approach for computing effective formats at display ti
 - [x] 6b: Update range splitting logic to handle format inheritance (like styles). The existing Range struct already supports FORMAT flag and FormatBuffer storage. RANGE_SET_FORMAT operation exists. Range splitting can be added when setRangeFormat binding is implemented.
 - [x] 6c: Update viewport/rendering to use effective format computation. Updated queryViewport() to use getEffectiveFormat() for cells and getEffectiveFormatForPosition() for virtual spilled cells. All numeric formatting now uses the effective format.
 - [x] 6d: Add unit tests for effective format with overlapping ranges. FormatBuffer::getEffectiveFormat() already has comprehensive unit tests in format_buffer_test.cc covering: empty inputs, single format, priority order, column/row/range/cell merging, null pointers, multiple ranges, and custom format codes.
-- [ ] 6e: Add E2E tests for format inheritance across columns, rows, ranges, and cells
+- [ ] 6e: Add E2E tests for format inheritance across columns, rows, ranges, and cells. (Deferred: requires setColumnFormat, setRowFormat, setRangeFormat bindings that don't exist yet. The effective format computation is unit-tested and used in viewport.)
 
 ### Phase 7: Remove Old Format System
 
