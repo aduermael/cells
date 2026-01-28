@@ -806,6 +806,57 @@ bool Workbook::hasEntityStyle(const ID& entityId) const {
 }
 
 // =============================================================================
+// Entity format storage (content-addressed FormatBuffer)
+// =============================================================================
+
+const FormatBuffer* Workbook::getEntityFormat(const ID& entityId) const {
+    auto it = _entityFormats.find(entityId);
+    if (it != _entityFormats.end()) {
+        return &it->second;
+    }
+    return nullptr;
+}
+
+FormatBuffer* Workbook::getEntityFormat(const ID& entityId) {
+    auto it = _entityFormats.find(entityId);
+    if (it != _entityFormats.end()) {
+        return &it->second;
+    }
+    return nullptr;
+}
+
+void Workbook::setEntityFormat(const ID& entityId, const FormatBuffer& format) {
+    if (format.isEmpty()) {
+        // Empty format = clear
+        _entityFormats.erase(entityId);
+    } else {
+        _entityFormats[entityId] = format;
+    }
+}
+
+void Workbook::setEntityFormat(const ID& entityId, FormatBuffer&& format) {
+    if (format.isEmpty()) {
+        // Empty format = clear
+        _entityFormats.erase(entityId);
+    } else {
+        _entityFormats[entityId] = std::move(format);
+    }
+}
+
+bool Workbook::clearEntityFormat(const ID& entityId) {
+    auto it = _entityFormats.find(entityId);
+    if (it == _entityFormats.end()) {
+        return false;
+    }
+    _entityFormats.erase(it);
+    return true;
+}
+
+bool Workbook::hasEntityFormat(const ID& entityId) const {
+    return _entityFormats.find(entityId) != _entityFormats.end();
+}
+
+// =============================================================================
 // Workbook-level shared formula tracking
 // =============================================================================
 

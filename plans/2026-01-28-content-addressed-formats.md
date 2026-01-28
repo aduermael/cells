@@ -161,10 +161,10 @@ Analogous to StyleBuffer, but for number format encoding.
 
 ### Phase 2: Integrate FormatBuffer with Model
 
-- [ ] 2a: Add `_entityFormats` map (ID → FormatBuffer) to Workbook alongside `_entityStyles`
-- [ ] 2b: Add `setEntityFormat(entityId, FormatBuffer)`, `getEntityFormat(entityId)`, `clearEntityFormat()`, `hasEntityFormat()` methods
-- [ ] 2c: Update Cell struct to optionally store FormatBuffer instead of format ID
-- [ ] 2d: Add `fmt:` field to Range struct for range-level formats (like `sty:`)
+- [x] 2a: Add `_entityFormats` map (ID → FormatBuffer) to Workbook alongside `_entityStyles`
+- [x] 2b: Add `setEntityFormat(entityId, FormatBuffer)`, `getEntityFormat(entityId)`, `clearEntityFormat()`, `hasEntityFormat()` methods
+- [x] 2c: Update Cell struct to optionally store FormatBuffer instead of format ID (Cell already uses HAS_FORMAT flag pointing to workbook-level storage; now points to _entityFormats)
+- [x] 2d: Add `fmt:` field to Range struct for range-level formats (like `sty:`). Added FORMAT flag, std::optional<FormatBuffer> format field, and accessor methods.
 
 ### Phase 3: Update CRDT Operations
 

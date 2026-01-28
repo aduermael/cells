@@ -43,6 +43,7 @@
 #include <vector>
 
 #include "core/cells/axis_index.h"
+#include "core/cells/format_buffer.h"
 #include "core/cells/operation.h"
 #include "core/cells/oplog.h"
 #include "core/cells/style_buffer.h"
@@ -990,6 +991,36 @@ struct Workbook {
     }
 
     // ========================================================================
+    // Entity format storage (content-addressed FormatBuffer)
+    // ========================================================================
+
+    // Get the format for an entity (cell, axis, range, etc.)
+    // Returns nullptr if no format is set
+    [[nodiscard]] const FormatBuffer* getEntityFormat(const ID& entityId) const;
+
+    // Get mutable format for an entity (returns nullptr if no format)
+    [[nodiscard]] FormatBuffer* getEntityFormat(const ID& entityId);
+
+    // Set a content-addressed format for an entity
+    // Pass empty FormatBuffer or use clearEntityFormat() to clear
+    void setEntityFormat(const ID& entityId, const FormatBuffer& format);
+
+    // Set a content-addressed format with move semantics
+    void setEntityFormat(const ID& entityId, FormatBuffer&& format);
+
+    // Clear the content-addressed format for an entity
+    // Returns true if the entity had a format
+    bool clearEntityFormat(const ID& entityId);
+
+    // Check if entity has a content-addressed format
+    [[nodiscard]] bool hasEntityFormat(const ID& entityId) const;
+
+    // Get all entity formats (for serialization)
+    [[nodiscard]] const std::unordered_map<ID, FormatBuffer, IDHash>& getEntityFormats() const {
+        return _entityFormats;
+    }
+
+    // ========================================================================
     // Workbook-level shared formula tracking (runtime-only)
     // ========================================================================
 
@@ -1131,6 +1162,10 @@ private:
     // Entity ID -> content-addressed StyleBuffer mapping (cells, axes, etc.)
     // Content-addressed: the style data IS its identity
     std::unordered_map<ID, StyleBuffer, IDHash> _entityStyles;
+
+    // Entity ID -> content-addressed FormatBuffer mapping (cells, axes, ranges, etc.)
+    // Content-addressed: the format data IS its identity (no separate format ID needed)
+    std::unordered_map<ID, FormatBuffer, IDHash> _entityFormats;
 
     // ========================================================================
     // Workbook-level dependency graph (global, shared by all sheets)

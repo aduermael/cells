@@ -50,6 +50,7 @@ cc_library(
     hdrs = ["range.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":format_buffer",
         ":style_buffer",
         ":types",
     ],
@@ -313,6 +314,7 @@ cc_library(
     deps = [
         ":axis_index",
         ":dependency_graph",
+        ":format_buffer",
         ":format_registry",
         ":formula_ast",
         ":formula_parser",

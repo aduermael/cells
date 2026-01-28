@@ -25,6 +25,7 @@
 #include <optional>
 #include <vector>
 
+#include "core/cells/format_buffer.h"
 #include "core/cells/style_buffer.h"
 #include "core/cells/types.h"
 
@@ -50,7 +51,7 @@ enum class RangeFlags : uint8_t {
     NAMED = 1 << 4,               // Is a named range
     PRINT_AREA = 1 << 5,          // Defines print area
     FILTER = 1 << 6,              // Has auto-filter
-    // 1 bit reserved for future use
+    FORMAT = 1 << 7,              // Has number format (content-addressed FormatBuffer)
 };
 
 // Bitwise operators for RangeFlags
@@ -107,6 +108,10 @@ struct Range {
     // When set, the STYLE flag should also be set
     std::optional<StyleBuffer> style;
 
+    // Content-addressed format stored directly in range (number format)
+    // When set, the FORMAT flag should also be set
+    std::optional<FormatBuffer> format;
+
     Range() = default;
 
     // Create a range with all IDs
@@ -148,6 +153,11 @@ struct Range {
     // Check if this has style metadata (checks both flag and style presence)
     [[nodiscard]] bool hasStyle() const { return hasFlag(RangeFlags::STYLE) || style.has_value(); }
 
+    // Check if this has format metadata (checks both flag and format presence)
+    [[nodiscard]] bool hasFormat() const {
+        return hasFlag(RangeFlags::FORMAT) || format.has_value();
+    }
+
     // =========================================================================
     // Style accessors (content-addressed style)
     // =========================================================================
@@ -176,6 +186,38 @@ struct Range {
     void clearStyle() {
         style.reset();
         flags = flags & ~RangeFlags::STYLE;
+    }
+
+    // =========================================================================
+    // Format accessors (content-addressed format)
+    // =========================================================================
+
+    // Get the format buffer (returns nullptr if no format)
+    [[nodiscard]] const FormatBuffer* getFormat() const {
+        return format.has_value() ? &format.value() : nullptr;
+    }
+
+    // Get mutable format buffer (returns nullptr if no format)
+    [[nodiscard]] FormatBuffer* getFormat() {
+        return format.has_value() ? &format.value() : nullptr;
+    }
+
+    // Set the format (also sets the FORMAT flag)
+    void setFormat(const FormatBuffer& f) {
+        format = f;
+        flags = flags | RangeFlags::FORMAT;
+    }
+
+    // Set the format with move semantics (also sets the FORMAT flag)
+    void setFormat(FormatBuffer&& f) {
+        format = std::move(f);
+        flags = flags | RangeFlags::FORMAT;
+    }
+
+    // Clear the format (removes both the format data and the FORMAT flag)
+    void clearFormat() {
+        format.reset();
+        flags = flags & ~RangeFlags::FORMAT;
     }
 
     // Equality comparison (by ID only - ranges with same ID are the same range)
