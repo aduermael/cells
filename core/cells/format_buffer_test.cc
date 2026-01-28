@@ -691,5 +691,337 @@ TEST(FormatBufferTest, StandardFormats) {
     }
 }
 
+// =============================================================================
+// Merge Tests
+// =============================================================================
+
+TEST(FormatBufferTest, MergeCategory) {
+    FormatBuffer base;
+    base.setCategory(NumberFormatCategory::NUMBER);
+
+    FormatBuffer other;
+    other.setCategory(NumberFormatCategory::PERCENTAGE);
+
+    base.merge(other);
+    EXPECT_EQ(base.getCategory(), NumberFormatCategory::PERCENTAGE);
+}
+
+TEST(FormatBufferTest, MergeDecimals) {
+    FormatBuffer base;
+    base.setDecimals(2);
+
+    FormatBuffer other;
+    other.setDecimals(4);
+
+    base.merge(other);
+    EXPECT_EQ(base.getDecimals(), 4);
+}
+
+TEST(FormatBufferTest, MergeThousandsSeparator) {
+    FormatBuffer base;
+    base.setThousandsSeparator(false);
+
+    FormatBuffer other;
+    other.setThousandsSeparator(true);
+
+    base.merge(other);
+    EXPECT_TRUE(base.getThousandsSeparator());
+}
+
+TEST(FormatBufferTest, MergeCurrencySymbol) {
+    FormatBuffer base;
+    base.setCurrencySymbol("$");
+
+    FormatBuffer other;
+    other.setCurrencySymbol("€");
+
+    base.merge(other);
+    EXPECT_EQ(base.getCurrencySymbol(), "€");
+}
+
+TEST(FormatBufferTest, MergeCustomFormatCode) {
+    FormatBuffer base;
+    base.setCustomFormatCode("# BANANA");
+
+    FormatBuffer other;
+    other.setCustomFormatCode("# APPLE");
+
+    base.merge(other);
+    EXPECT_EQ(base.getCustomFormatCode(), "# APPLE");
+}
+
+TEST(FormatBufferTest, MergePreservesNonOverlapping) {
+    FormatBuffer base;
+    base.setCategory(NumberFormatCategory::CURRENCY);
+    base.setCurrencySymbol("$");
+
+    FormatBuffer other;
+    other.setDecimals(2);
+    other.setThousandsSeparator(true);
+
+    base.merge(other);
+
+    // Base properties preserved
+    EXPECT_EQ(base.getCategory(), NumberFormatCategory::CURRENCY);
+    EXPECT_EQ(base.getCurrencySymbol(), "$");
+
+    // Other properties added
+    EXPECT_EQ(base.getDecimals(), 2);
+    EXPECT_TRUE(base.getThousandsSeparator());
+}
+
+TEST(FormatBufferTest, MergeEmpty) {
+    FormatBuffer base;
+    base.setCategory(NumberFormatCategory::NUMBER);
+    base.setDecimals(2);
+
+    FormatBuffer empty;
+
+    base.merge(empty);
+
+    // Base unchanged
+    EXPECT_EQ(base.getCategory(), NumberFormatCategory::NUMBER);
+    EXPECT_EQ(base.getDecimals(), 2);
+}
+
+TEST(FormatBufferTest, MergeIntoEmpty) {
+    FormatBuffer base;
+
+    FormatBuffer other;
+    other.setCategory(NumberFormatCategory::PERCENTAGE);
+    other.setDecimals(2);
+
+    base.merge(other);
+
+    EXPECT_EQ(base.getCategory(), NumberFormatCategory::PERCENTAGE);
+    EXPECT_EQ(base.getDecimals(), 2);
+}
+
+// =============================================================================
+// HasCollision Tests
+// =============================================================================
+
+TEST(FormatBufferTest, HasCollisionCategory) {
+    FormatBuffer a;
+    a.setCategory(NumberFormatCategory::NUMBER);
+
+    FormatBuffer b;
+    b.setCategory(NumberFormatCategory::PERCENTAGE);
+
+    EXPECT_TRUE(a.hasCollision(b));
+}
+
+TEST(FormatBufferTest, HasCollisionDecimals) {
+    FormatBuffer a;
+    a.setDecimals(2);
+
+    FormatBuffer b;
+    b.setDecimals(4);
+
+    EXPECT_TRUE(a.hasCollision(b));
+}
+
+TEST(FormatBufferTest, HasCollisionNoOverlap) {
+    FormatBuffer a;
+    a.setCategory(NumberFormatCategory::NUMBER);
+
+    FormatBuffer b;
+    b.setDecimals(2);
+
+    EXPECT_FALSE(a.hasCollision(b));
+}
+
+TEST(FormatBufferTest, HasCollisionEmpty) {
+    FormatBuffer a;
+    a.setCategory(NumberFormatCategory::NUMBER);
+
+    FormatBuffer b;
+
+    EXPECT_FALSE(a.hasCollision(b));
+}
+
+TEST(FormatBufferTest, HasCollisionBothEmpty) {
+    FormatBuffer a;
+    FormatBuffer b;
+
+    EXPECT_FALSE(a.hasCollision(b));
+}
+
+TEST(FormatBufferTest, HasCollisionMultipleFlags) {
+    FormatBuffer a;
+    a.setCategory(NumberFormatCategory::CURRENCY);
+    a.setDecimals(2);
+    a.setCurrencySymbol("$");
+
+    FormatBuffer b;
+    b.setDecimals(4);               // Overlaps on decimals
+    b.setThousandsSeparator(true);  // No overlap
+
+    EXPECT_TRUE(a.hasCollision(b));
+}
+
+// =============================================================================
+// GetEffectiveFormat Tests
+// =============================================================================
+
+TEST(FormatBufferTest, GetEffectiveFormatEmpty) {
+    std::vector<const FormatBuffer*> formats;
+    FormatBuffer result = FormatBuffer::getEffectiveFormat(formats);
+
+    EXPECT_TRUE(result.isEmpty());
+}
+
+TEST(FormatBufferTest, GetEffectiveFormatSingle) {
+    FormatBuffer f;
+    f.setCategory(NumberFormatCategory::PERCENTAGE);
+    f.setDecimals(2);
+
+    std::vector<const FormatBuffer*> formats = {&f};
+    FormatBuffer result = FormatBuffer::getEffectiveFormat(formats);
+
+    EXPECT_EQ(result.getCategory(), NumberFormatCategory::PERCENTAGE);
+    EXPECT_EQ(result.getDecimals(), 2);
+}
+
+TEST(FormatBufferTest, GetEffectiveFormatPriorityOrder) {
+    FormatBuffer first;
+    first.setCategory(NumberFormatCategory::NUMBER);
+    first.setDecimals(2);
+
+    FormatBuffer second;
+    second.setCategory(NumberFormatCategory::PERCENTAGE);  // Overrides first
+
+    std::vector<const FormatBuffer*> formats = {&first, &second};
+    FormatBuffer result = FormatBuffer::getEffectiveFormat(formats);
+
+    // Second's category wins
+    EXPECT_EQ(result.getCategory(), NumberFormatCategory::PERCENTAGE);
+    // First's decimals preserved (second didn't set decimals)
+    EXPECT_EQ(result.getDecimals(), 2);
+}
+
+TEST(FormatBufferTest, GetEffectiveFormatColumnRowCell) {
+    FormatBuffer column;
+    column.setCategory(NumberFormatCategory::NUMBER);
+    column.setDecimals(0);
+
+    FormatBuffer row;
+    row.setDecimals(2);  // Overrides column decimals
+
+    FormatBuffer cell;
+    cell.setCategory(NumberFormatCategory::PERCENTAGE);  // Overrides row's NUMBER
+
+    std::vector<const FormatBuffer*> ranges;
+    FormatBuffer result = FormatBuffer::getEffectiveFormat(&column, &row, ranges, &cell);
+
+    // Cell's category wins
+    EXPECT_EQ(result.getCategory(), NumberFormatCategory::PERCENTAGE);
+    // Row's decimals wins (cell didn't set decimals)
+    EXPECT_EQ(result.getDecimals(), 2);
+}
+
+TEST(FormatBufferTest, GetEffectiveFormatWithRanges) {
+    FormatBuffer column;
+    column.setCategory(NumberFormatCategory::NUMBER);
+
+    FormatBuffer range1;
+    range1.setDecimals(1);
+
+    FormatBuffer range2;
+    range2.setDecimals(2);
+    range2.setThousandsSeparator(true);
+
+    FormatBuffer cell;
+    cell.setCurrencySymbol("$");
+
+    std::vector<const FormatBuffer*> ranges = {&range1, &range2};
+    FormatBuffer result = FormatBuffer::getEffectiveFormat(&column, nullptr, ranges, &cell);
+
+    // Column category preserved (no override)
+    EXPECT_EQ(result.getCategory(), NumberFormatCategory::NUMBER);
+    // range2 decimals wins over range1
+    EXPECT_EQ(result.getDecimals(), 2);
+    // range2 thousands separator
+    EXPECT_TRUE(result.getThousandsSeparator());
+    // cell currency symbol
+    EXPECT_EQ(result.getCurrencySymbol(), "$");
+}
+
+TEST(FormatBufferTest, GetEffectiveFormatNullPointers) {
+    FormatBuffer cell;
+    cell.setCategory(NumberFormatCategory::PERCENTAGE);
+    cell.setDecimals(2);
+
+    std::vector<const FormatBuffer*> ranges;
+    FormatBuffer result = FormatBuffer::getEffectiveFormat(nullptr, nullptr, ranges, &cell);
+
+    EXPECT_EQ(result.getCategory(), NumberFormatCategory::PERCENTAGE);
+    EXPECT_EQ(result.getDecimals(), 2);
+}
+
+TEST(FormatBufferTest, GetEffectiveFormatSkipsEmpty) {
+    FormatBuffer column;  // Empty
+
+    FormatBuffer row;
+    row.setCategory(NumberFormatCategory::CURRENCY);
+    row.setDecimals(2);
+
+    FormatBuffer empty;  // Empty
+
+    FormatBuffer cell;
+    cell.setCurrencySymbol("€");
+
+    std::vector<const FormatBuffer*> ranges = {&empty};
+    FormatBuffer result = FormatBuffer::getEffectiveFormat(&column, &row, ranges, &cell);
+
+    EXPECT_EQ(result.getCategory(), NumberFormatCategory::CURRENCY);
+    EXPECT_EQ(result.getDecimals(), 2);
+    EXPECT_EQ(result.getCurrencySymbol(), "€");
+}
+
+TEST(FormatBufferTest, GetEffectiveFormatAllProperties) {
+    FormatBuffer col;
+    col.setCategory(NumberFormatCategory::CURRENCY);
+
+    FormatBuffer row;
+    row.setDecimals(2);
+
+    FormatBuffer range;
+    range.setThousandsSeparator(true);
+
+    FormatBuffer cell;
+    cell.setCurrencySymbol("$");
+
+    std::vector<const FormatBuffer*> ranges = {&range};
+    FormatBuffer result = FormatBuffer::getEffectiveFormat(&col, &row, ranges, &cell);
+
+    // All properties accumulated
+    EXPECT_EQ(result.getCategory(), NumberFormatCategory::CURRENCY);
+    EXPECT_EQ(result.getDecimals(), 2);
+    EXPECT_TRUE(result.getThousandsSeparator());
+    EXPECT_EQ(result.getCurrencySymbol(), "$");
+
+    // Verify format code reflects all properties
+    EXPECT_EQ(result.toFormatCode(), "$#,##0.00");
+}
+
+TEST(FormatBufferTest, GetEffectiveFormatCustomCode) {
+    FormatBuffer col;
+    col.setCategory(NumberFormatCategory::NUMBER);
+    col.setDecimals(2);
+
+    FormatBuffer cell;
+    cell.setCustomFormatCode("# BANANA");
+
+    std::vector<const FormatBuffer*> ranges;
+    FormatBuffer result = FormatBuffer::getEffectiveFormat(&col, nullptr, ranges, &cell);
+
+    // Custom code takes precedence in output
+    EXPECT_EQ(result.toFormatCode(), "# BANANA");
+    // But other properties are still present
+    EXPECT_EQ(result.getCategory(), NumberFormatCategory::NUMBER);
+    EXPECT_EQ(result.getDecimals(), 2);
+}
+
 }  // namespace
 }  // namespace cells

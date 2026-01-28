@@ -803,4 +803,73 @@ std::string FormatBuffer::toJSON() const {
     return ss.str();
 }
 
+// =============================================================================
+// Format merging
+// =============================================================================
+
+void FormatBuffer::merge(const FormatBuffer& other) {
+    // Merge each property: other's property overrides this one
+    if (other.hasCategory()) {
+        setCategory(other.getCategory());
+    }
+    if (other.hasDecimals()) {
+        setDecimals(other.getDecimals());
+    }
+    if (other.hasThousandsSeparator()) {
+        setThousandsSeparator(other.getThousandsSeparator());
+    }
+    if (other.hasCurrencySymbol()) {
+        setCurrencySymbol(other.getCurrencySymbol());
+    }
+    if (other.hasCustomFormatCode()) {
+        setCustomFormatCode(other.getCustomFormatCode());
+    }
+}
+
+bool FormatBuffer::hasCollision(const FormatBuffer& other) const {
+    // Fast check: AND the flags together
+    // Any overlapping flags = collision
+    return (getFlags() & other.getFlags()) != 0;
+}
+
+FormatBuffer FormatBuffer::getEffectiveFormat(const std::vector<const FormatBuffer*>& formats) {
+    FormatBuffer result;
+
+    // Merge formats in order: later formats override earlier ones
+    for (const FormatBuffer* format : formats) {
+        if (format != nullptr && !format->isEmpty()) {
+            result.merge(*format);
+        }
+    }
+
+    return result;
+}
+
+FormatBuffer FormatBuffer::getEffectiveFormat(const FormatBuffer* columnFormat,
+                                              const FormatBuffer* rowFormat,
+                                              const std::vector<const FormatBuffer*>& rangeFormats,
+                                              const FormatBuffer* cellFormat) {
+    // Build the priority list: column < row < ranges < cell
+    // Column has lowest priority, cell has highest
+    std::vector<const FormatBuffer*> formats;
+    formats.reserve(2 + rangeFormats.size() + 1);
+
+    if (columnFormat != nullptr) {
+        formats.push_back(columnFormat);
+    }
+    if (rowFormat != nullptr) {
+        formats.push_back(rowFormat);
+    }
+    for (const FormatBuffer* rangeFormat : rangeFormats) {
+        if (rangeFormat != nullptr) {
+            formats.push_back(rangeFormat);
+        }
+    }
+    if (cellFormat != nullptr) {
+        formats.push_back(cellFormat);
+    }
+
+    return getEffectiveFormat(formats);
+}
+
 }  // namespace cells

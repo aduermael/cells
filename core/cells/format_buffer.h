@@ -177,6 +177,31 @@ public:
     [[nodiscard]] std::string toJSON() const;
 
     // =========================================================================
+    // Format merging (for computing effective formats)
+    // =========================================================================
+
+    // Merge another format into this one.
+    // Properties from 'other' override properties in this format.
+    void merge(const FormatBuffer& other);
+
+    // Check if this format has any property collision with another format.
+    // Returns true if both formats define the same property.
+    [[nodiscard]] bool hasCollision(const FormatBuffer& other) const;
+
+    // Compute effective format by merging multiple FormatBuffers.
+    // The order defines priority: later formats override earlier ones.
+    // Typical usage: getEffectiveFormat({columnFormat, rowFormat, rangeFormats..., cellFormat})
+    // Returns the merged result.
+    [[nodiscard]] static FormatBuffer getEffectiveFormat(
+        const std::vector<const FormatBuffer*>& formats);
+
+    // Convenience overload for common case: column, row, and cell formats.
+    // rangeFormats are merged in order (first range has lowest priority).
+    [[nodiscard]] static FormatBuffer getEffectiveFormat(
+        const FormatBuffer* columnFormat, const FormatBuffer* rowFormat,
+        const std::vector<const FormatBuffer*>& rangeFormats, const FormatBuffer* cellFormat);
+
+    // =========================================================================
     // Equality and comparison
     // =========================================================================
 

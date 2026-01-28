@@ -146,10 +146,10 @@ Analogous to StyleBuffer, but for number format encoding.
 - [x] 1e: Implement `toFormatCode()` to generate Excel-style format code from properties
 - [x] 1f: Implement `fromFormatCode()` to parse Excel-style format code into properties
 - [x] 1g: Add unit tests for all properties and edge cases
-- [ ] 1h: Add `merge()` method to merge another format into this one (like StyleBuffer)
-- [ ] 1i: Add `hasCollision()` to check if two formats define the same property
-- [ ] 1j: Add `getEffectiveFormat()` static method to compute effective format from multiple sources
-- [ ] 1k: Add unit tests for merge and effective format computation
+- [x] 1h: Add `merge()` method to merge another format into this one (like StyleBuffer)
+- [x] 1i: Add `hasCollision()` to check if two formats define the same property
+- [x] 1j: Add `getEffectiveFormat()` static method to compute effective format from multiple sources
+- [x] 1k: Add unit tests for merge and effective format computation
 
 ### Phase 2: Integrate FormatBuffer with Model
 
