@@ -3,6 +3,7 @@
 
 import type { FunctionInfo } from "./types";
 import type { WasmDataSource } from "./wasm-data-source";
+import { getMenuStateManager } from "./menu-state";
 
 /** Callback when a function is selected */
 export type OnSelectCallback = (functionName: string) => void;
@@ -32,9 +33,12 @@ export class FormulaAutocomplete {
 
     // Create popup element
     this.popup = document.createElement("div");
-    this.popup.className = "autocomplete-popup formula-autocomplete";
+    this.popup.className = "autocomplete-popup formula-autocomplete dropdown-frame";
     this.popup.style.display = "none";
     container.appendChild(this.popup);
+
+    // Register with MenuStateManager
+    getMenuStateManager().registerMenu("formulaAutocomplete", () => this.hide());
 
     // Load functions immediately
     this.loadFunctions();
@@ -225,6 +229,7 @@ export class FormulaAutocomplete {
     this.visible = true;
     this.popup.style.display = "block";
     this.positionPopup();
+    getMenuStateManager().openMenu("formulaAutocomplete");
   }
 
   /** Hide the popup */
@@ -233,6 +238,7 @@ export class FormulaAutocomplete {
     this.visible = false;
     this.popup.style.display = "none";
     this.prefix = "";
+    getMenuStateManager().closeMenu("formulaAutocomplete");
   }
 
   /** Position the popup near the input */
