@@ -146,6 +146,10 @@ Analogous to StyleBuffer, but for number format encoding.
 - [x] 1e: Implement `toFormatCode()` to generate Excel-style format code from properties
 - [x] 1f: Implement `fromFormatCode()` to parse Excel-style format code into properties
 - [x] 1g: Add unit tests for all properties and edge cases
+- [ ] 1h: Add `merge()` method to merge another format into this one (like StyleBuffer)
+- [ ] 1i: Add `hasCollision()` to check if two formats define the same property
+- [ ] 1j: Add `getEffectiveFormat()` static method to compute effective format from multiple sources
+- [ ] 1k: Add unit tests for merge and effective format computation
 
 ### Phase 2: Integrate FormatBuffer with Model
 
@@ -179,21 +183,31 @@ Analogous to StyleBuffer, but for number format encoding.
 - [ ] 5d: Update TypeScript types for new format system
 - [ ] 5e: Update format dropdown/toolbar to work with new system
 
-### Phase 6: Remove Old Format System
+### Phase 6: Effective Format Computation and Range Splitting
 
-- [ ] 6a: Remove FormatRegistry class
-- [ ] 6b: Remove NumberFormatRegistry (or simplify to just formatting logic)
-- [ ] 6c: Remove FORMAT_DEFINE from operation types
-- [ ] 6d: Remove built-in format ID constants (CUSD_002, FMT_P002, etc.)
-- [ ] 6e: Clean up any remaining format ID references
+Mirror the style system's approach for computing effective formats at display time.
 
-### Phase 7: Testing and Documentation
+- [ ] 6a: Implement `getEffectiveCellFormat()` in model (column < row < range < cell priority)
+- [ ] 6b: Update range splitting logic to handle format inheritance (like styles)
+- [ ] 6c: Update viewport/rendering to use effective format computation
+- [ ] 6d: Add unit tests for effective format with overlapping ranges
+- [ ] 6e: Add E2E tests for format inheritance across columns, rows, ranges, and cells
 
-- [ ] 7a: Update unit tests to use new FormatBuffer APIs (no legacy format ID tests)
-- [ ] 7b: Run all existing format-related E2E tests
-- [ ] 7c: Fix any failing tests
-- [ ] 7d: Update docs/file-format.md with new format encoding
-- [ ] 7e: Update docs/persistence.md to remove `F` line documentation
+### Phase 7: Remove Old Format System
+
+- [ ] 7a: Remove FormatRegistry class
+- [ ] 7b: Remove NumberFormatRegistry (or simplify to just formatting logic)
+- [ ] 7c: Remove FORMAT_DEFINE from operation types
+- [ ] 7d: Remove built-in format ID constants (CUSD_002, FMT_P002, etc.)
+- [ ] 7e: Clean up any remaining format ID references
+
+### Phase 8: Testing and Documentation
+
+- [ ] 8a: Update unit tests to use new FormatBuffer APIs (no legacy format ID tests)
+- [ ] 8b: Run all existing format-related E2E tests
+- [ ] 8c: Fix any failing tests
+- [ ] 8d: Update docs/file-format.md with new format encoding
+- [ ] 8e: Update docs/persistence.md to remove `F` line documentation
 
 ## File Changes Summary
 
