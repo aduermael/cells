@@ -19,6 +19,7 @@
 // =============================================================================
 
 import type { AutocompleteResult, AutocompleteSuggestion } from "./client-types";
+import { getMenuStateManager } from "./menu-state";
 
 // =============================================================================
 // Types
@@ -78,6 +79,9 @@ export class ScriptAutocomplete {
 
     this.createPopup();
     this.setupEventListeners();
+
+    // Register with MenuStateManager
+    getMenuStateManager().registerMenu("scriptAutocomplete", () => this.hide());
   }
 
   // =========================================================================
@@ -150,6 +154,7 @@ export class ScriptAutocomplete {
     this.popup.style.display = "none";
     this.visible = false;
     this.items = [];
+    getMenuStateManager().closeMenu("scriptAutocomplete");
   }
 
   /**
@@ -283,6 +288,7 @@ export class ScriptAutocomplete {
     this.selectedIndex = 0;
     this.visible = true;
     this.userNavigated = false; // Reset navigation state for new suggestions
+    getMenuStateManager().openMenu("scriptAutocomplete");
 
     // Build popup content
     this.popup.innerHTML = "";

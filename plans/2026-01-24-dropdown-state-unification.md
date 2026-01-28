@@ -88,7 +88,7 @@ Complete the partial integration from the previous plan.
 
 - [x] 5a: Add `formulaAutocomplete` and `scriptAutocomplete` to `MenuId` type
 - [x] 5b: Register formula-autocomplete with MenuStateManager
-- [ ] 5c: Register script-autocomplete with MenuStateManager
+- [x] 5c: Register script-autocomplete with MenuStateManager
 - [ ] 5d: Apply `.dropdown-frame` class to autocomplete popups
 
 ## Phase 6: Add Comprehensive E2E Tests
