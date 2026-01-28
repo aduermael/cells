@@ -27,10 +27,13 @@ import { RTCProxy, type RTCMessagePayload } from "./rtc-proxy";
 import type {
   FileFormat,
   SheetInfo,
-  NumberFormat,
+  FormatProperties,
+  FormatTemplate,
   ParsedInputResult,
   FormattedValueResult,
-  CellFormatIdResult,
+  CellFormatResult,
+  CreateFormatResult,
+  MakeFormatResult,
   FunctionInfo,
   NamedRangeInfo,
   FormatDetails,
@@ -407,10 +410,10 @@ export class CellsClient {
   /**
    * Set the number format for a cell by cell ID.
    * @param cellId Cell ID
-   * @param formatId Format ID (use "~" for default/GENERAL format)
+   * @param format Format properties JSON (e.g., {category: "NUMBER", decimals: 2})
    */
-  async setCellFormat(cellId: string, formatId: string): Promise<{ success: boolean }> {
-    await this._send("setCellFormat", { cellId, formatId });
+  async setCellFormat(cellId: string, format: FormatProperties): Promise<{ success: boolean }> {
+    await this._send("setCellFormat", { cellId, formatJson: JSON.stringify(format) });
     return { success: true };
   }
 
@@ -418,30 +421,30 @@ export class CellsClient {
    * Set the number format for a cell by position.
    * @param col Column position (0-indexed)
    * @param row Row position (0-indexed)
-   * @param formatId Format ID (use "~" for default/GENERAL format)
+   * @param format Format properties (e.g., {category: "NUMBER", decimals: 2})
    */
-  async setCellFormatAt(col: number, row: number, formatId: string): Promise<{ success: boolean }> {
-    await this._send("setCellFormatAt", { col, row, formatId });
+  async setCellFormatAt(col: number, row: number, format: FormatProperties): Promise<{ success: boolean }> {
+    await this._send("setCellFormatAt", { col, row, formatJson: JSON.stringify(format) });
     return { success: true };
   }
 
   /**
-   * Get all available number formats.
-   * Returns an array of NumberFormat objects.
+   * Get all available format templates.
+   * Returns an array of FormatTemplate objects for the format dropdown.
    */
-  async getAvailableFormats(): Promise<NumberFormat[]> {
+  async getAvailableFormats(): Promise<FormatTemplate[]> {
     const response = await this._send("getAvailableFormats", {});
-    return (response as unknown as { formats: NumberFormat[] }).formats;
+    return response as unknown as FormatTemplate[];
   }
 
   /**
    * Create a custom number format from an Excel-style format code.
    * @param formatCode Excel-style format code (e.g., "#,##0.00", "0.00%")
-   * @returns Object with formatId on success, error on failure
+   * @returns Object with format properties on success, error on failure
    */
-  async createCustomFormat(formatCode: string): Promise<{ formatId?: string; error?: string }> {
+  async createCustomFormat(formatCode: string): Promise<CreateFormatResult> {
     const response = await this._send("createCustomFormat", { formatCode });
-    return response as { formatId?: string; error?: string };
+    return response as unknown as CreateFormatResult;
   }
 
   /**
@@ -463,13 +466,13 @@ export class CellsClient {
   }
 
   /**
-   * Get the format ID for a cell by cell ID.
+   * Get the format properties for a cell by cell ID.
    * @param cellId Cell ID
-   * @returns Format ID (~ for GENERAL)
+   * @returns Format properties (category, decimals, separator, currency, etc.)
    */
-  async getCellFormatId(cellId: string): Promise<CellFormatIdResult> {
+  async getCellFormat(cellId: string): Promise<CellFormatResult> {
     const response = await this._send("getCellFormatId", { cellId });
-    return response as CellFormatIdResult;
+    return response as CellFormatResult;
   }
 
   /**
@@ -483,13 +486,13 @@ export class CellsClient {
   }
 
   /**
-   * Format a numeric value according to a format ID.
+   * Format a numeric value according to format properties.
    * @param value The numeric value to format
-   * @param formatId Format ID (use "~" or empty for GENERAL)
+   * @param format Format properties (e.g., {category: "NUMBER", decimals: 2})
    * @returns Formatted value result
    */
-  async formatCellValue(value: number, formatId: string): Promise<FormattedValueResult> {
-    const response = await this._send("formatCellValue", { value, formatId });
+  async formatCellValue(value: number, format: FormatProperties): Promise<FormattedValueResult> {
+    const response = await this._send("formatCellValue", { value, formatJson: JSON.stringify(format) });
     return response as FormattedValueResult;
   }
 
@@ -516,36 +519,36 @@ export class CellsClient {
   }
 
   /**
-   * Get detailed information about a format ID.
-   * @param formatId Format ID to get details for
+   * Get format details from a base64-encoded format or format properties.
+   * @param formatInput Base64 format string or JSON format properties
    * @returns Format details including category, decimals, separator, currency
    */
-  async getFormatDetails(formatId: string): Promise<FormatDetails> {
-    const response = await this._send("getFormatDetails", { formatId });
+  async getFormatDetails(formatInput: string): Promise<FormatDetails> {
+    const response = await this._send("getFormatDetails", { formatId: formatInput });
     return response as unknown as FormatDetails;
   }
 
   /**
-   * Generate a format ID for given parameters.
+   * Generate format properties for given parameters.
    * @param category Format category: "number", "currency", "percentage"
    * @param decimals Decimal places (0-15)
    * @param separator Whether to use thousands separator (only for number)
-   * @param currency Currency code for currency category (e.g., "USD")
-   * @returns Object with formatId on success, error on failure
+   * @param currency Currency symbol for currency category (e.g., "$")
+   * @returns Object with format properties on success, error on failure
    */
-  async makeFormatId(
+  async makeFormat(
     category: string,
     decimals: number,
     separator: boolean,
     currency: string
-  ): Promise<{ formatId?: string; error?: string }> {
+  ): Promise<MakeFormatResult> {
     const response = await this._send("makeFormatId", {
       category,
       decimals,
       separator,
       currency,
     });
-    return response as { formatId?: string; error?: string };
+    return response as MakeFormatResult;
   }
 
   // ========== Cell Style Operations API ==========

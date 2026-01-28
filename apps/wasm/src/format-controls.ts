@@ -26,7 +26,7 @@
 // =============================================================================
 
 import type { WasmDataSource } from "./wasm-data-source";
-import type { NumberFormatCategory, Position, CellData } from "./types";
+import type { NumberFormatCategory, Position, CellData, FormatProperties } from "./types";
 import { positionDropdown } from "./dropdown-utils";
 import { getMenuStateManager } from "./menu-state";
 
@@ -202,7 +202,7 @@ export class FormatControls {
 
     if (!cellData || !this.dataSource) {
       // No cell selected or no data source - show General
-      this.setDisplayedFormat("~", "GENERAL");
+      this.setDisplayedFormat("GENERAL");
       return;
     }
 
@@ -211,15 +211,15 @@ export class FormatControls {
     if (start && end && (start.col !== end.col || start.row !== end.row)) {
       const hasMixed = this.checkMixedFormats(start, end);
       if (hasMixed) {
-        this.setDisplayedFormat("~", "MIXED" as NumberFormatCategory);
+        this.setDisplayedFormat("MIXED");
         return;
       }
     }
 
     // Get format from cell data
-    const formatId = cellData.formatId || "~";
-    const category = await this.getCategoryForFormatId(formatId);
-    this.setDisplayedFormat(formatId, category);
+    const formatBase64 = cellData.format || "";
+    const category = await this.getCategoryForFormat(formatBase64);
+    this.setDisplayedFormat(category);
   }
 
   /**
@@ -233,14 +233,14 @@ export class FormatControls {
 
     // Get the format of the first cell (anchor)
     const firstCell = this.getCellDataAt(minCol, minRow);
-    const firstFormat = firstCell?.formatId || "~";
+    const firstFormat = firstCell?.format || "";
 
     // Check all cells in range
     for (let col = minCol; col <= maxCol; col++) {
       for (let row = minRow; row <= maxRow; row++) {
         if (col === minCol && row === minRow) continue; // Skip first cell
         const cell = this.getCellDataAt(col, row);
-        const cellFormat = cell?.formatId || "~";
+        const cellFormat = cell?.format || "";
         if (cellFormat !== firstFormat) {
           return true; // Found different format
         }
@@ -516,14 +516,19 @@ export class FormatControls {
     const position = this.getSelectedCell();
     if (!position || !this.dataSource) return;
 
-    // Get the format ID for this currency (with 2 decimal places, industry standard)
-    const formatId = this.getFormatIdForCurrency(currency, 2);
+    // Create format properties for this currency (with 2 decimal places, industry standard)
+    const format: FormatProperties = {
+      category: "CURRENCY",
+      decimals: 2,
+      separator: true,
+      currency: symbol,
+    };
 
     try {
-      await this.applyFormatToSelection(formatId);
+      await this.applyFormatToSelection(format);
       this.currentCurrency = currency;
       this.currencyDropdownLabel.textContent = symbol;
-      this.setDisplayedFormat(formatId, "CURRENCY");
+      this.setDisplayedFormat("CURRENCY");
       this.currencyDropdown.classList.add("active");
       this.requestRender();
       this.updateFormulaBar();
@@ -532,11 +537,15 @@ export class FormatControls {
     }
   }
 
-  private getFormatIdForCurrency(currency: CurrencyType, decimalPlaces: number): string {
-    // Format ID pattern: C<CURRENCY>_0<DECIMAL_PLACES> (8 chars total)
-    // e.g., CUSD_002 for USD with 2 decimal places
-    const decStr = decimalPlaces.toString().padStart(2, "0");
-    return `C${currency}_0${decStr}`;
+  private getCurrencySymbolForType(currency: CurrencyType): string {
+    switch (currency) {
+      case "USD": return "$";
+      case "EUR": return "€";
+      case "GBP": return "£";
+      case "JPY": return "¥";
+      case "CNY": return "¥";
+      default: return "$";
+    }
   }
 
   // =========================================================================
@@ -630,7 +639,7 @@ export class FormatControls {
     if (!position || !this.dataSource) return;
 
     try {
-      // Create the custom format and get its ID
+      // Create the custom format and get its properties
       const result = await this.dataSource.client.createCustomFormat(formatCode);
       if (result.error) {
         this.customFormatError.textContent = result.error;
@@ -638,12 +647,12 @@ export class FormatControls {
         return;
       }
 
-      if (result.formatId) {
+      if (result.format) {
         // Apply the format to all cells in selection range
-        await this.applyFormatToSelection(result.formatId);
+        await this.applyFormatToSelection(result.format);
 
         // Update display
-        this.setDisplayedFormat(result.formatId, "CUSTOM");
+        this.setDisplayedFormat("CUSTOM");
 
         // Trigger re-render and formula bar update
         this.requestRender();
@@ -662,75 +671,88 @@ export class FormatControls {
   // Private Methods - Format Operations
   // =========================================================================
 
-  private async getCategoryForFormatId(formatId: string): Promise<NumberFormatCategory> {
-    if (formatId === "~" || formatId === "") {
+  private async getCategoryForFormat(formatBase64: string): Promise<NumberFormatCategory> {
+    if (!formatBase64 || formatBase64 === "") {
       return "GENERAL";
     }
 
     // Query C++ for format details (single source of truth)
     if (this.dataSource) {
-      const details = await this.dataSource.client.getFormatDetails(formatId);
-      if (!details.error) {
-        return details.category.toUpperCase() as NumberFormatCategory;
+      const details = await this.dataSource.client.getFormatDetails(formatBase64);
+      if (!details.error && details.category) {
+        return details.category;
       }
     }
 
     return "GENERAL";
   }
 
-  private async getFormatIdForCategory(category: NumberFormatCategory): Promise<string> {
-    if (!this.dataSource) return "~";
-
-    // Use sensible defaults for each category
-    // Currency: 2 decimals (industry standard: $100.00)
-    // Accounting: 2 decimals (matches Currency default)
-    // Number: 2 decimals (matches Excel Number format default)
-    // Percentage: 0 decimals (clean: 15%)
-    let decimals = 0;
-    let separator = false;
-    let currency = "";
-
-    const categoryLower = category.toLowerCase();
-
+  private getFormatForCategory(category: NumberFormatCategory): FormatProperties {
+    // Create format properties for each category with sensible defaults
     switch (category) {
       case "CURRENCY":
-        decimals = 2;
-        separator = true;
-        currency = this.currentCurrency; // Use currently selected currency
-        break;
+        return {
+          category: "CURRENCY",
+          decimals: 2,
+          separator: true,
+          currency: this.getCurrencySymbolForType(this.currentCurrency),
+        };
       case "ACCOUNTING":
-        // Accounting format: use built-in FMT_A002 (2 decimals, aligned $ with parentheses for negatives)
-        return "FMT_A002";
+        return {
+          category: "ACCOUNTING",
+          decimals: 2,
+          separator: true,
+          currency: this.getCurrencySymbolForType(this.currentCurrency),
+        };
       case "NUMBER":
-        decimals = 2;
-        separator = false;
-        break;
+        return {
+          category: "NUMBER",
+          decimals: 2,
+          separator: false,
+        };
       case "PERCENTAGE":
-        decimals = 0;
-        separator = false;
-        break;
+        return {
+          category: "PERCENTAGE",
+          decimals: 0,
+        };
+      case "DATE":
+        return {
+          category: "DATE",
+          formatCode: "m/d/yyyy",
+        };
+      case "TIME":
+        return {
+          category: "TIME",
+          formatCode: "h:mm AM/PM",
+        };
+      case "DATE_TIME":
+        return {
+          category: "DATE_TIME",
+          formatCode: "m/d/yyyy h:mm",
+        };
+      case "SCIENTIFIC":
+        return {
+          category: "SCIENTIFIC",
+          decimals: 2,
+        };
+      case "FRACTION":
+        return {
+          category: "FRACTION",
+          formatCode: "# ?/?",
+        };
+      case "TEXT":
+        return {
+          category: "TEXT",
+        };
+      case "GENERAL":
       default:
-        // For non-numeric categories (DATE, TIME, etc.), return well-known format IDs
-        if (category === "DATE") return "FMT_DSHT";
-        if (category === "TIME") return "FMT_T12H";
-        if (category === "SCIENTIFIC") return "FMT_SCI2";
-        if (category === "TEXT") return "FMT_TEXT";
-        if (category === "GENERAL") return "~";
-        // Fall back to number format (2 decimals, matches Excel)
-        return "FMT_N002";
+        return {
+          category: "GENERAL",
+        };
     }
-
-    const result = await this.dataSource.client.makeFormatId(
-      categoryLower,
-      decimals,
-      separator,
-      currency
-    );
-
-    return result.formatId || "~";
   }
 
-  private setDisplayedFormat(formatId: string, category: NumberFormatCategory | "MIXED"): void {
+  private setDisplayedFormat(category: NumberFormatCategory | "MIXED"): void {
     // Store real category (not MIXED) for format operations
     if (category !== "MIXED") {
       this.currentCategory = category;
@@ -746,18 +768,6 @@ export class FormatControls {
     // Update percent button active state (inactive for MIXED)
     const isPercentage = category === "PERCENTAGE";
     this.percentBtn.classList.toggle("active", isPercentage);
-
-    // If this is a currency format, update the currency dropdown to show the right currency
-    // Format ID pattern: C<CURRENCY>_0XX (e.g., CUSD_002)
-    if (isCurrency) {
-      const match = formatId.match(/^C([A-Z]{3})_0\d{2}$/);
-      if (match) {
-        const currency = match[1] as CurrencyType;
-        this.currentCurrency = currency;
-        const symbol = this.getCurrencySymbol(currency);
-        this.currencyDropdownLabel.textContent = symbol;
-      }
-    }
 
     // Update dropdown active state if open
     if (this.isDropdownOpen) {
@@ -808,15 +818,15 @@ export class FormatControls {
       return;
     }
 
-    // Get the format ID for this category
-    const formatId = await this.getFormatIdForCategory(category);
+    // Get the format properties for this category
+    const format = this.getFormatForCategory(category);
 
     try {
       // Apply format to all cells in selection range
-      await this.applyFormatToSelection(formatId);
+      await this.applyFormatToSelection(format);
 
       // Update display
-      this.setDisplayedFormat(formatId, category);
+      this.setDisplayedFormat(category);
 
       // Trigger re-render and formula bar update
       this.requestRender();
@@ -832,34 +842,31 @@ export class FormatControls {
 
     // Get current format
     const cellData = this.getSelectedCellData();
-    const currentFormatId = cellData?.formatId || "~";
+    const formatBase64 = cellData?.format || "";
 
     // Get format details from C++ (single source of truth)
-    const details = await this.dataSource.client.getFormatDetails(currentFormatId);
+    const details = await this.dataSource.client.getFormatDetails(formatBase64);
     if (details.error) {
       console.error("Failed to get format details:", details.error);
       return;
     }
 
     // Calculate new decimals (0-15 range)
-    const newDecimals = Math.max(0, Math.min(15, details.decimals + delta));
+    const currentDecimals = details.decimals ?? 0;
+    const newDecimals = Math.max(0, Math.min(15, currentDecimals + delta));
 
-    // Generate the new format ID via C++ API
-    const result = await this.dataSource.client.makeFormatId(
-      details.category,
-      newDecimals,
-      details.separator,
-      details.currency || ""
-    );
-
-    if (result.error || !result.formatId) {
-      console.error("Failed to generate format ID:", result.error);
-      return;
-    }
+    // Create new format with updated decimals
+    const category = details.category || "NUMBER";
+    const format: FormatProperties = {
+      category: category,
+      decimals: newDecimals,
+      separator: details.separator,
+      currency: details.currency,
+    };
 
     try {
-      await this.applyFormatToSelection(result.formatId);
-      this.setDisplayedFormat(result.formatId, details.category.toUpperCase() as NumberFormatCategory);
+      await this.applyFormatToSelection(format);
+      this.setDisplayedFormat(category);
       this.requestRender();
       this.updateFormulaBar();
     } catch (error) {
@@ -870,7 +877,7 @@ export class FormatControls {
   /**
    * Apply a format to all cells in the current selection range.
    */
-  private async applyFormatToSelection(formatId: string): Promise<void> {
+  private async applyFormatToSelection(format: FormatProperties): Promise<void> {
     if (!this.dataSource) return;
 
     const { start, end } = this.getSelectionRange();
@@ -879,7 +886,7 @@ export class FormatControls {
     // If no range selection, just apply to selected cell
     if (!start || !end || (start.col === end.col && start.row === end.row)) {
       if (cell) {
-        await this.dataSource.setCellFormatAt(cell.col, cell.row, formatId);
+        await this.dataSource.setCellFormatAt(cell.col, cell.row, format);
       }
       return;
     }
@@ -892,7 +899,7 @@ export class FormatControls {
 
     for (let col = minCol; col <= maxCol; col++) {
       for (let row = minRow; row <= maxRow; row++) {
-        await this.dataSource.setCellFormatAt(col, row, formatId);
+        await this.dataSource.setCellFormatAt(col, row, format);
       }
     }
   }

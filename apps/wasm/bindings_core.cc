@@ -23,6 +23,8 @@
 
 #include "core/cells/crdt.h"
 #include "core/cells/fill_range.h"
+#include "core/cells/format_buffer.h"
+#include "core/cells/format_code_formatter.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_resolver.h"
@@ -598,10 +600,36 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
     Operation op = makeCellSetValueOp(*_workbook, cellId, sheet->id, payload);
     applyOperation(*_workbook, op);
 
-    if (!detectedFormatId.isNull() && detectedFormatId != _workbook->getFormatId(cell->id)) {
-        std::string formatPayload = "{\"format_id\":\"" + detectedFormatId.toString() + "\"}";
-        Operation formatOp = makeCellSetFormatOp(*_workbook, cellId, formatPayload);
-        applyOperation(*_workbook, formatOp);
+    // Convert detected format ID to FormatBuffer
+    std::string formatBase64;
+    if (!detectedFormatId.isNull()) {
+        // Check if cell already has the same format
+        const FormatBuffer* existingFormat = _workbook->getEntityFormat(cell->id);
+
+        // Parse the format ID to get properties
+        ParsedFormatId parsed = parseFormatId(detectedFormatId.toString());
+        if (parsed.valid) {
+            FormatBuffer newFormat;
+            newFormat.setCategory(parsed.category);
+            if (parsed.decimalPlaces > 0) {
+                newFormat.setDecimals(parsed.decimalPlaces);
+            }
+            if (parsed.useThousandsSeparator) {
+                newFormat.setThousandsSeparator(true);
+            }
+            if (!parsed.currencyCode.empty()) {
+                newFormat.setCurrencySymbol(getCurrencySymbol(parsed.currencyCode));
+            }
+
+            // Only apply if different from existing format
+            if (existingFormat == nullptr || *existingFormat != newFormat) {
+                Operation formatOp = makeCellSetFormatOp(*_workbook, cellId, newFormat);
+                applyOperation(*_workbook, formatOp);
+                formatBase64 = newFormat.toBase64();
+            } else if (existingFormat != nullptr) {
+                formatBase64 = existingFormat->toBase64();
+            }
+        }
     }
 
     broadcastPendingOperations();
@@ -632,8 +660,8 @@ std::string CellsEngine::updateCellWithFormatDetection(const std::string& cellId
 
     notifyListeners(ChangeType::CELL_CHANGED);
 
-    std::string formatIdStr = detectedFormatId.isNull() ? "~" : detectedFormatId.toString();
-    return "{\"success\":true,\"formatId\":\"" + formatIdStr + "\"}";
+    // Return format as base64 instead of format ID
+    return "{\"success\":true,\"format\":\"" + formatBase64 + "\"}";
 }
 
 std::string CellsEngine::createCell(uint32_t col, uint32_t row, const std::string& value) {
@@ -849,10 +877,14 @@ std::string CellsEngine::getOrCreateCellAt(uint32_t col, uint32_t row) {
 
         // Compute editValue for formatted numbers (dates, percentages, etc.)
         std::string editValue = existingCell->value.raw;
-        const ID cellFormatId = _workbook->getFormatId(existingCell->id);
-        if (existingCell->value.type == CellValueType::NUMBER && !cellFormatId.isNull()) {
+        const FormatBuffer* cellFormat = _workbook->getEntityFormat(existingCell->id);
+        if (existingCell->value.type == CellValueType::NUMBER &&
+            cellFormat != nullptr && !cellFormat->isEmpty()) {
             double numValue = existingCell->value.asNumber();
-            editValue = formatEditValue(_formatRegistry, numValue, cellFormatId);
+            FormatCodeResult formatted = cells::formatWithCode(numValue, cellFormat->toFormatCode());
+            if (formatted.success) {
+                editValue = formatted.text;
+            }
         }
 
         if (existingCell->isFormula()) {

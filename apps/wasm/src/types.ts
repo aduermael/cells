@@ -24,7 +24,8 @@ export interface CellData {
   formula?: string; // For formula cells (A1 notation)
   display?: string; // For formula cells (computed value)
   editValue?: string; // Human-readable value for formula bar/editing (e.g., "12/12/2025" for dates)
-  formatId?: string; // Number format ID (~ or empty for GENERAL)
+  format?: string; // Base64-encoded format (content-addressed)
+  formatId?: string; // Deprecated - use format instead
   style?: CellStyle; // Inline style for efficient rendering
   // Spill range properties
   isSpilled?: boolean; // True if this cell is part of a spill range (not the master)
@@ -59,9 +60,36 @@ export type NumberFormatCategory =
   | "TEXT"
   | "CUSTOM";
 
-/** Number format definition */
+/**
+ * Content-addressed format properties.
+ * Used for setting and getting cell formats.
+ */
+export interface FormatProperties {
+  category?: NumberFormatCategory;
+  decimals?: number; // 0-15
+  separator?: boolean; // thousands separator
+  currency?: string; // currency symbol (e.g., "$", "€")
+  formatCode?: string; // custom Excel-style format code
+  effectiveFormatCode?: string; // generated format code (read-only)
+  base64?: string; // base64 encoding of FormatBuffer (read-only)
+}
+
+/**
+ * Format template for UI dropdown.
+ * Returned by getAvailableFormats().
+ */
+export interface FormatTemplate {
+  category: NumberFormatCategory;
+  decimals: number;
+  separator: boolean;
+  currency?: string;
+  formatCode: string;
+  name: string;
+}
+
+/** Number format definition (legacy, for backwards compatibility) */
 export interface NumberFormat {
-  id: string; // Format ID (8-char base62)
+  id?: string; // Deprecated - use FormatProperties instead
   category: NumberFormatCategory;
   formatCode: string; // Excel-style format code (e.g., "#,##0.00")
   decimalPlaces: number;
@@ -76,7 +104,8 @@ export interface ParsedInputResult {
   type?: "number" | "string";
   numericValue?: number;
   stringValue?: string;
-  formatId?: string; // ~ for GENERAL
+  format?: string; // base64 encoded format (new)
+  formatId?: string; // Deprecated - use format instead
   category?: NumberFormatCategory;
   error?: string;
 }
@@ -87,19 +116,41 @@ export interface FormattedValueResult {
   error?: string;
 }
 
-/** Result from getCellFormatId */
-export interface CellFormatIdResult {
-  formatId?: string; // ~ for GENERAL
+/** Result from getCellFormat - returns decoded format properties */
+export interface CellFormatResult {
+  category?: NumberFormatCategory;
+  decimals?: number;
+  separator?: boolean;
+  currency?: string;
+  formatCode?: string;
+  effectiveFormatCode?: string;
+  base64?: string;
   error?: string;
 }
 
-/** Details about a format ID from getFormatDetails */
+/** Details about a format (from getFormatDetails) */
 export interface FormatDetails {
-  category: string; // "number", "currency", "percentage", "general", etc.
-  decimals: number; // 0-15
-  separator: boolean; // whether thousands separator is used
-  currency: string | null; // currency code if applicable, null otherwise
-  error?: string; // set if format ID is not recognized
+  category?: NumberFormatCategory;
+  decimals?: number;
+  separator?: boolean;
+  currency?: string;
+  formatCode?: string;
+  effectiveFormatCode?: string;
+  base64?: string;
+  error?: string;
+}
+
+/** Result from makeFormatId - now returns format properties */
+export interface MakeFormatResult {
+  format?: FormatProperties;
+  error?: string;
+}
+
+/** Result from createCustomFormat - returns format properties */
+export interface CreateFormatResult {
+  success: boolean;
+  format?: FormatProperties;
+  error?: string;
 }
 
 // ============================================================================

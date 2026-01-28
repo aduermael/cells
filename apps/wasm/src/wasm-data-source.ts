@@ -28,10 +28,11 @@ import type {
   CellData,
   ColumnInfo,
   RowInfo,
-  NumberFormat,
+  FormatProperties,
+  FormatTemplate,
   ParsedInputResult,
   FormattedValueResult,
-  CellFormatIdResult,
+  CellFormatResult,
   FunctionInfo,
   NamedRangeInfo,
   CellStyle,
@@ -204,17 +205,17 @@ export class WasmDataSource {
   // ==========================================================================
 
   /** Set cell format by cell ID */
-  async setCellFormat(cellId: string, formatId: string): Promise<{ success: boolean }> {
-    return this._client.setCellFormat(cellId, formatId);
+  async setCellFormat(cellId: string, format: FormatProperties): Promise<{ success: boolean }> {
+    return this._client.setCellFormat(cellId, format);
   }
 
   /** Set cell format by position */
-  async setCellFormatAt(col: number, row: number, formatId: string): Promise<{ success: boolean }> {
-    return this._client.setCellFormatAt(col, row, formatId);
+  async setCellFormatAt(col: number, row: number, format: FormatProperties): Promise<{ success: boolean }> {
+    return this._client.setCellFormatAt(col, row, format);
   }
 
-  /** Get all available number formats */
-  async getAvailableFormats(): Promise<NumberFormat[]> {
+  /** Get all available format templates */
+  async getAvailableFormats(): Promise<FormatTemplate[]> {
     return this._client.getAvailableFormats();
   }
 
@@ -228,9 +229,9 @@ export class WasmDataSource {
     return this._client.getNamedRanges();
   }
 
-  /** Get cell format ID */
-  async getCellFormatId(cellId: string): Promise<CellFormatIdResult> {
-    return this._client.getCellFormatId(cellId);
+  /** Get cell format properties */
+  async getCellFormat(cellId: string): Promise<CellFormatResult> {
+    return this._client.getCellFormat(cellId);
   }
 
   /** Parse user input and auto-detect format */
@@ -238,9 +239,9 @@ export class WasmDataSource {
     return this._client.parseUserInputValue(input);
   }
 
-  /** Format a numeric value according to a format ID */
-  async formatCellValue(value: number, formatId: string): Promise<FormattedValueResult> {
-    return this._client.formatCellValue(value, formatId);
+  /** Format a numeric value according to format properties */
+  async formatCellValue(value: number, format: FormatProperties): Promise<FormattedValueResult> {
+    return this._client.formatCellValue(value, format);
   }
 
   /** Format a cell's value using its assigned format */

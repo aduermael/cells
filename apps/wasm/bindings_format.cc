@@ -22,6 +22,7 @@
 #include <utility>
 
 #include "core/cells/crdt.h"
+#include "core/cells/format_buffer.h"
 #include "core/cells/range.h"
 #include "core/log/include/Logger.h"
 #include "core/cells/range_index.h"
@@ -36,8 +37,138 @@
 
 namespace cells::wasm {
 
+namespace {
+
+// =============================================================================
+// Format JSON parsing helpers
+// =============================================================================
+
+// Helper to convert string to NumberFormatCategory
+NumberFormatCategory stringToCategoryInternal(const std::string& str) {
+    if (str == "GENERAL" || str == "general") return NumberFormatCategory::GENERAL;
+    if (str == "NUMBER" || str == "number") return NumberFormatCategory::NUMBER;
+    if (str == "CURRENCY" || str == "currency") return NumberFormatCategory::CURRENCY;
+    if (str == "ACCOUNTING" || str == "accounting") return NumberFormatCategory::ACCOUNTING;
+    if (str == "PERCENTAGE" || str == "percentage") return NumberFormatCategory::PERCENTAGE;
+    if (str == "DATE" || str == "date") return NumberFormatCategory::DATE;
+    if (str == "TIME" || str == "time") return NumberFormatCategory::TIME;
+    if (str == "DATE_TIME" || str == "dateTime" || str == "date_time") return NumberFormatCategory::DATE_TIME;
+    if (str == "SCIENTIFIC" || str == "scientific") return NumberFormatCategory::SCIENTIFIC;
+    if (str == "FRACTION" || str == "fraction") return NumberFormatCategory::FRACTION;
+    if (str == "TEXT" || str == "text") return NumberFormatCategory::TEXT;
+    if (str == "CUSTOM" || str == "custom") return NumberFormatCategory::CUSTOM;
+    return NumberFormatCategory::GENERAL;
+}
+
+// Parse format JSON into FormatBuffer
+// Accepts: {"category":"NUMBER","decimals":2,"separator":true,"currency":"$","formatCode":"#,##0.00"}
+// All fields are optional.
+FormatBuffer parseFormatJson(const std::string& json) {
+    FormatBuffer format;
+
+    // Parse category
+    std::string category = extractPayloadField(json, "category");
+    if (!category.empty()) {
+        format.setCategory(stringToCategoryInternal(category));
+    }
+
+    // Parse decimals
+    if (json.find("\"decimals\":") != std::string::npos) {
+        // Extract integer value
+        size_t pos = json.find("\"decimals\":");
+        if (pos != std::string::npos) {
+            pos += 11; // length of "\"decimals\":"
+            while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+            int value = 0;
+            while (pos < json.size() && json[pos] >= '0' && json[pos] <= '9') {
+                value = value * 10 + (json[pos] - '0');
+                pos++;
+            }
+            format.setDecimals(static_cast<uint8_t>(std::min(value, 15)));
+        }
+    }
+
+    // Parse separator (thousands separator)
+    if (json.find("\"separator\":") != std::string::npos) {
+        size_t pos = json.find("\"separator\":");
+        if (pos != std::string::npos) {
+            pos += 12; // length of "\"separator\":"
+            while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
+            bool value = (json.substr(pos, 4) == "true");
+            format.setThousandsSeparator(value);
+        }
+    }
+
+    // Parse currency symbol
+    std::string currency = extractPayloadField(json, "currency");
+    if (!currency.empty()) {
+        format.setCurrencySymbol(currency);
+    }
+
+    // Parse custom format code
+    std::string formatCode = extractPayloadField(json, "formatCode");
+    if (!formatCode.empty()) {
+        format.setCustomFormatCode(formatCode);
+    }
+
+    return format;
+}
+
+// Convert FormatBuffer to JSON for returning to JS
+std::string formatBufferToJson(const FormatBuffer& format) {
+    std::ostringstream ss;
+    ss << "{";
+    bool first = true;
+
+    // Category
+    if (format.hasCategory()) {
+        ss << "\"category\":\"" << formatCategoryToString(format.getCategory()) << "\"";
+        first = false;
+    }
+
+    // Decimals
+    if (format.hasDecimals()) {
+        if (!first) ss << ",";
+        ss << "\"decimals\":" << static_cast<int>(format.getDecimals());
+        first = false;
+    }
+
+    // Thousands separator
+    if (format.hasThousandsSeparator()) {
+        if (!first) ss << ",";
+        ss << "\"separator\":" << (format.getThousandsSeparator() ? "true" : "false");
+        first = false;
+    }
+
+    // Currency symbol
+    if (format.hasCurrencySymbol()) {
+        if (!first) ss << ",";
+        ss << "\"currency\":\"" << jsonEscape(format.getCurrencySymbol()) << "\"";
+        first = false;
+    }
+
+    // Custom format code
+    if (format.hasCustomFormatCode()) {
+        if (!first) ss << ",";
+        ss << "\"formatCode\":\"" << jsonEscape(format.getCustomFormatCode()) << "\"";
+        first = false;
+    }
+
+    // Always include the generated format code for display/formatting
+    if (!first) ss << ",";
+    ss << "\"effectiveFormatCode\":\"" << jsonEscape(format.toFormatCode()) << "\"";
+
+    // Include base64 encoding for reference
+    ss << ",\"base64\":\"" << format.toBase64() << "\"";
+
+    ss << "}";
+    return ss.str();
+}
+
+}  // namespace
+
 std::string CellsEngine::setCellFormat(const std::string& cellIdStr,
-                                        const std::string& formatIdStr) {
+                                        const std::string& formatJson) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"No sheet available\"}";
     }
@@ -57,23 +188,17 @@ std::string CellsEngine::setCellFormat(const std::string& cellIdStr,
         return "{\"error\":\"Cell not found\"}";
     }
 
-    ID formatId;
-    if (formatIdStr != "~" && !formatIdStr.empty()) {
-        if (formatIdStr.size() != ID_LENGTH) {
-            return "{\"error\":\"Invalid format ID\"}";
-        }
-        formatId = ID(formatIdStr);
-        if (!_formatRegistry.hasFormat(formatId) && !_workbook->hasCustomFormat(formatId)) {
-            const ParsedFormatId parsed = parseFormatId(formatIdStr);
-            if (!parsed.valid) {
-                return "{\"error\":\"Format not found\"}";
-            }
-        }
-    }
+    // Parse format properties from JSON
+    FormatBuffer format = parseFormatJson(formatJson);
 
-    std::string payload = "{\"format_id\":\"" + formatIdStr + "\"}";
-    Operation op = makeCellSetFormatOp(*_workbook, cellId, payload);
-    applyOperation(*_workbook, op);
+    // Apply format or clear if empty
+    if (!format.isEmpty()) {
+        Operation op = makeCellSetFormatOp(*_workbook, cellId, format);
+        applyOperation(*_workbook, op);
+    } else {
+        Operation op = makeCellClearFormatOp(*_workbook, cellId);
+        applyOperation(*_workbook, op);
+    }
 
     broadcastPendingOperations();
 
@@ -82,7 +207,7 @@ std::string CellsEngine::setCellFormat(const std::string& cellIdStr,
 }
 
 std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
-                                          const std::string& formatIdStr) {
+                                          const std::string& formatJson) {
     if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
         return "{\"error\":\"No sheet available\"}";
     }
@@ -92,19 +217,8 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
         return "{\"error\":\"Sheet not found\"}";
     }
 
-    ID formatId;
-    if (formatIdStr != "~" && !formatIdStr.empty()) {
-        if (formatIdStr.size() != ID_LENGTH) {
-            return "{\"error\":\"Invalid format ID\"}";
-        }
-        formatId = ID(formatIdStr);
-        if (!_formatRegistry.hasFormat(formatId) && !_workbook->hasCustomFormat(formatId)) {
-            const ParsedFormatId parsed = parseFormatId(formatIdStr);
-            if (!parsed.valid) {
-                return "{\"error\":\"Format not found\"}";
-            }
-        }
-    }
+    // Parse format properties from JSON
+    FormatBuffer format = parseFormatJson(formatJson);
 
     // Find or create column at position
     ID colId;
@@ -154,9 +268,14 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
         applyOperation(*_workbook, cellOp);
     }
 
-    std::string payload = "{\"format_id\":\"" + formatIdStr + "\"}";
-    Operation op = makeCellSetFormatOp(*_workbook, cellId, payload);
-    applyOperation(*_workbook, op);
+    // Apply format or clear if empty
+    if (!format.isEmpty()) {
+        Operation op = makeCellSetFormatOp(*_workbook, cellId, format);
+        applyOperation(*_workbook, op);
+    } else {
+        Operation op = makeCellClearFormatOp(*_workbook, cellId);
+        applyOperation(*_workbook, op);
+    }
 
     broadcastPendingOperations();
 
@@ -178,92 +297,84 @@ std::string CellsEngine::setCellFormatAt(uint32_t col, uint32_t row,
 }
 
 std::string CellsEngine::getAvailableFormats() {
+    // Return a static list of predefined format templates
+    // Each template includes the format properties needed to create a FormatBuffer
     std::ostringstream ss;
     ss << "[";
 
+    // Helper lambda to add a format entry
+    auto addFormat = [&ss](bool& first, const char* category, int decimals, bool separator,
+                           const char* currency, const char* formatCode, const char* name) {
+        if (!first) ss << ",";
+        first = false;
+        ss << "{";
+        ss << "\"category\":\"" << category << "\"";
+        ss << ",\"decimals\":" << decimals;
+        ss << ",\"separator\":" << (separator ? "true" : "false");
+        if (currency && currency[0]) {
+            ss << ",\"currency\":\"" << currency << "\"";
+        }
+        ss << ",\"formatCode\":\"" << formatCode << "\"";
+        ss << ",\"name\":\"" << name << "\"";
+        ss << "}";
+    };
+
     bool first = true;
 
-    // Built-in formats from registry
-    const auto& allFormats = _formatRegistry.getAllFormats();
-    for (const auto& [id, format] : allFormats) {
-        if (!first) {
-            ss << ",";
-        }
-        first = false;
+    // General
+    addFormat(first, "GENERAL", 0, false, "", "General", "General");
 
-        ss << "{";
-        ss << "\"id\":\"" << id.toString() << "\"";
-        ss << ",\"category\":\"" << formatCategoryToString(format.category) << "\"";
-        ss << ",\"formatCode\":\"" << jsonEscape(format.formatCode) << "\"";
-        ss << ",\"decimalPlaces\":" << static_cast<int>(format.decimalPlaces);
-        ss << ",\"useThousandsSeparator\":" << (format.useThousandsSeparator ? "true" : "false");
-        ss << ",\"currencySymbol\":\"" << jsonEscape(format.currencySymbol) << "\"";
-        ss << ",\"isAccounting\":" << (format.isAccounting ? "true" : "false");
-        ss << ",\"isCustom\":false";
-        ss << "}";
-    }
+    // Number formats
+    addFormat(first, "NUMBER", 0, false, "", "0", "Number (0 decimals)");
+    addFormat(first, "NUMBER", 2, false, "", "0.00", "Number (2 decimals)");
+    addFormat(first, "NUMBER", 2, true, "", "#,##0.00", "Number with separator");
 
-    // Custom formats from workbook
-    if (_workbook) {
-        const auto& customFormats = _workbook->getCustomFormats();
-        for (const auto& [formatId, formatCode] : customFormats) {
-            if (!first) {
-                ss << ",";
-            }
-            first = false;
+    // Currency formats
+    addFormat(first, "CURRENCY", 2, true, "$", "$#,##0.00", "Currency (USD)");
+    addFormat(first, "CURRENCY", 2, true, "€", "€#,##0.00", "Currency (EUR)");
+    addFormat(first, "CURRENCY", 2, true, "£", "£#,##0.00", "Currency (GBP)");
+    addFormat(first, "CURRENCY", 0, true, "¥", "¥#,##0", "Currency (JPY)");
 
-            const ParsedFormatCode parsed = parseFormatCode(formatCode);
-            NumberFormatCategory category = NumberFormatCategory::NUMBER;
-            if (parsed.hasPercent) {
-                category = NumberFormatCategory::PERCENTAGE;
-            } else if (!parsed.currencySymbol.empty()) {
-                category = NumberFormatCategory::CURRENCY;
-            }
+    // Percentage formats
+    addFormat(first, "PERCENTAGE", 0, false, "", "0%", "Percent (0 decimals)");
+    addFormat(first, "PERCENTAGE", 2, false, "", "0.00%", "Percent (2 decimals)");
 
-            ss << "{";
-            ss << "\"id\":\"" << formatId.toString() << "\"";
-            ss << ",\"category\":\"" << formatCategoryToString(category) << "\"";
-            ss << ",\"formatCode\":\"" << jsonEscape(formatCode) << "\"";
-            ss << ",\"decimalPlaces\":" << static_cast<int>(parsed.decimalPlaces);
-            ss << ",\"useThousandsSeparator\":"
-               << (parsed.hasThousandsSeparator ? "true" : "false");
-            ss << ",\"currencySymbol\":\"" << jsonEscape(parsed.currencySymbol) << "\"";
-            ss << ",\"isAccounting\":false";
-            ss << ",\"isCustom\":true";
-            ss << "}";
-        }
-    }
+    // Date formats
+    addFormat(first, "DATE", 0, false, "", "m/d/yyyy", "Date (Short)");
+    addFormat(first, "DATE", 0, false, "", "mmmm d, yyyy", "Date (Long)");
+
+    // Time formats
+    addFormat(first, "TIME", 0, false, "", "h:mm AM/PM", "Time (12-hour)");
+    addFormat(first, "TIME", 0, false, "", "h:mm:ss", "Time (24-hour)");
+
+    // Scientific notation
+    addFormat(first, "SCIENTIFIC", 2, false, "", "0.00E+00", "Scientific");
+
+    // Text
+    addFormat(first, "TEXT", 0, false, "", "@", "Text");
 
     ss << "]";
     return ss.str();
 }
 
 std::string CellsEngine::createCustomFormat(const std::string& formatCode) {
-    if (!_workbook) {
-        return "{\"error\":\"No workbook\"}";
-    }
-
+    // With content-addressed formats, we simply parse the format code into a FormatBuffer
+    // and return its JSON representation. No need to register it in the workbook.
     auto validationError = validateFormatCode(formatCode);
     if (validationError) {
         return "{\"error\":\"" + jsonEscape(*validationError) + "\"}";
     }
 
-    // Check if identical format already exists (lookup only, no registration)
-    ID formatId = _workbook->findFormatByCode(formatCode);
-    if (!formatId.isNull()) {
-        return "{\"success\":true,\"formatId\":\"" + formatId.toString() + "\",\"existing\":true}";
+    // Parse format code into FormatBuffer
+    auto maybeFormat = FormatBuffer::fromFormatCode(formatCode);
+    if (!maybeFormat.has_value()) {
+        // If fromFormatCode fails, create a format with just the custom code
+        FormatBuffer format;
+        format.setCustomFormatCode(formatCode);
+        return "{\"success\":true,\"format\":" + formatBufferToJson(format) + "}";
     }
 
-    // Format doesn't exist - create via FORMAT_DEFINE operation
-    // This is the ONLY way formats should be created (CRDT-native)
-    formatId = generate_id();
-    std::string payload = "{\"format_code\":\"" + jsonEscape(formatCode) + "\"}";
-    Operation op = makeFormatDefineOp(*_workbook, formatId, payload);
-    applyOperation(*_workbook, op);
-
-    broadcastPendingOperations();
-
-    return "{\"success\":true,\"formatId\":\"" + formatId.toString() + "\"}";
+    return "{\"success\":true,\"format\":" + formatBufferToJson(*maybeFormat) + "}";
 }
 
 std::string CellsEngine::getFormulaFunctions() {
@@ -310,9 +421,14 @@ std::string CellsEngine::getCellFormatId(const std::string& cellIdStr) {
         return "{\"error\":\"Cell not found\"}";
     }
 
-    const ID formatId = _workbook->getFormatId(cell->id);
-    std::string formatIdStr = formatId.isNull() ? "~" : formatId.toString();
-    return "{\"formatId\":\"" + formatIdStr + "\"}";
+    // Get format from content-addressed storage
+    const FormatBuffer* format = _workbook->getEntityFormat(cell->id);
+    if (format == nullptr || format->isEmpty()) {
+        // No format - return empty JSON (GENERAL format)
+        return "{\"category\":\"GENERAL\",\"effectiveFormatCode\":\"General\",\"base64\":\"\"}";
+    }
+
+    return formatBufferToJson(*format);
 }
 
 std::string CellsEngine::parseUserInputValue(const std::string& input) {
@@ -342,21 +458,16 @@ std::string CellsEngine::parseUserInputValue(const std::string& input) {
     return ss.str();
 }
 
-std::string CellsEngine::formatCellValue(double value, const std::string& formatIdStr) {
-    ID formatId;
-    if (formatIdStr != "~" && !formatIdStr.empty()) {
-        if (formatIdStr.size() != ID_LENGTH) {
-            return "{\"error\":\"Invalid format ID\"}";
-        }
-        formatId = ID(formatIdStr);
-    }
+std::string CellsEngine::formatCellValue(double value, const std::string& formatJson) {
+    // Parse format properties from JSON
+    FormatBuffer format = parseFormatJson(formatJson);
 
-    const auto& customFormats =
-        _workbook ? _workbook->getCustomFormats() : _emptyCustomFormats;
-    FormattedValue result = formatNumber(_formatRegistry, customFormats, value, formatId);
+    // Get the format code and use it to format the value
+    std::string formatCode = format.toFormatCode();
+    FormatCodeResult result = cells::formatWithCode(value, formatCode);
 
     std::ostringstream ss;
-    if (result.isError) {
+    if (!result.success) {
         ss << "{\"error\":\"" << jsonEscape(result.errorMessage) << "\"}";
     } else {
         ss << "{\"text\":\"" << jsonEscape(result.text) << "\"}";
@@ -424,12 +535,17 @@ std::string CellsEngine::formatCellById(const std::string& cellIdStr) {
         return "{\"text\":\"" + jsonEscape(text) + "\"}";
     }
 
-    const ID cellFormatId = _workbook->getFormatId(cell->id);
-    FormattedValue result =
-        formatNumber(_formatRegistry, _workbook->getCustomFormats(), numericValue, cellFormatId);
+    // Get format from content-addressed storage
+    const FormatBuffer* format = _workbook->getEntityFormat(cell->id);
+    std::string formatCode = "General";
+    if (format != nullptr && !format->isEmpty()) {
+        formatCode = format->toFormatCode();
+    }
+
+    FormatCodeResult result = cells::formatWithCode(numericValue, formatCode);
 
     std::ostringstream ss;
-    if (result.isError) {
+    if (!result.success) {
         ss << "{\"error\":\"" << jsonEscape(result.errorMessage) << "\"}";
     } else {
         ss << "{\"text\":\"" << jsonEscape(result.text) << "\"}";
@@ -437,17 +553,48 @@ std::string CellsEngine::formatCellById(const std::string& cellIdStr) {
     return ss.str();
 }
 
-std::string CellsEngine::getFormatDetails(const std::string& formatId) {
-    return cells::getFormatDetails(formatId);
+std::string CellsEngine::getFormatDetails(const std::string& formatInput) {
+    // Accept either:
+    // 1. Base64-encoded FormatBuffer (e.g., "AQQI")
+    // 2. JSON format properties (e.g., {"category":"NUMBER","decimals":2})
+    // Returns format properties as JSON
+
+    // Try to parse as base64 first
+    auto maybeFormat = FormatBuffer::fromBase64(formatInput);
+    if (maybeFormat.has_value()) {
+        return formatBufferToJson(*maybeFormat);
+    }
+
+    // Try to parse as JSON
+    if (formatInput.find('{') != std::string::npos) {
+        FormatBuffer format = parseFormatJson(formatInput);
+        return formatBufferToJson(format);
+    }
+
+    // Empty or invalid input - return GENERAL format
+    return "{\"category\":\"GENERAL\",\"effectiveFormatCode\":\"General\",\"base64\":\"\"}";
 }
 
 std::string CellsEngine::makeFormatId(const std::string& category, int decimals, bool separator,
                                        const std::string& currency) {
-    std::string result = cells::makeFormatId(category, decimals, separator, currency);
-    if (result.empty()) {
-        return "{\"error\":\"Invalid parameters\"}";
+    // Create a FormatBuffer with the given properties and return its JSON
+    FormatBuffer format;
+
+    // Set category
+    format.setCategory(stringToCategoryInternal(category));
+
+    // Set decimals
+    format.setDecimals(static_cast<uint8_t>(std::min(std::max(decimals, 0), 15)));
+
+    // Set thousands separator
+    format.setThousandsSeparator(separator);
+
+    // Set currency symbol
+    if (!currency.empty()) {
+        format.setCurrencySymbol(currency);
     }
-    return "{\"formatId\":\"" + result + "\"}";
+
+    return "{\"format\":" + formatBufferToJson(format) + "}";
 }
 
 // ============================================================================

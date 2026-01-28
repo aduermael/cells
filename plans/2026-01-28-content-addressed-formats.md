@@ -185,11 +185,11 @@ Analogous to StyleBuffer, but for number format encoding.
 
 ### Phase 5: Update Bindings and TypeScript
 
-- [ ] 5a: Update `setCellFormat()` binding to accept format properties directly
-- [ ] 5b: Update `getCellFormat()` to return decoded format properties
-- [ ] 5c: Remove format registry APIs from bindings
-- [ ] 5d: Update TypeScript types for new format system
-- [ ] 5e: Update format dropdown/toolbar to work with new system
+- [x] 5a: Update `setCellFormat()` binding to accept format properties directly. Updated setCellFormat() and setCellFormatAt() to accept format JSON, parse it into FormatBuffer, and apply via makeCellSetFormatOp(). Added format JSON parsing helpers.
+- [x] 5b: Update `getCellFormat()` to return decoded format properties. Updated getCellFormatId() to return JSON with category, decimals, separator, currency, formatCode, effectiveFormatCode, and base64. Updated formatCellById() and formatCellValue() to use FormatBuffer-based formatting.
+- [x] 5c: Remove format registry APIs from bindings. Updated getAvailableFormats() to return static format templates, createCustomFormat() to return FormatBuffer properties, getFormatDetails() to accept base64/JSON, makeFormatId() to return format properties. Updated viewport to use FormatBuffer instead of format IDs for formatting.
+- [x] 5d: Update TypeScript types for new format system. Added FormatProperties interface, FormatTemplate, CellFormatResult, CreateFormatResult, MakeFormatResult. Updated CellData to use `format` (base64) instead of `formatId`. Updated client.ts and wasm-data-source.ts APIs.
+- [x] 5e: Update format dropdown/toolbar to work with new system. Updated format-controls.ts to use FormatProperties instead of format IDs. Updated handleCategorySelect, handleCurrencySelect, handleDecimalChange, applyFormatToSelection. Updated clipboard.ts to use format base64.
 
 ### Phase 6: Effective Format Computation and Range Splitting
 

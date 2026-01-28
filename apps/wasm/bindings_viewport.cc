@@ -19,6 +19,8 @@
 #include <set>
 #include <sstream>
 
+#include "core/cells/format_buffer.h"
+#include "core/cells/format_code_formatter.h"
 #include "core/cells/formula_display.h"
 #include "core/cells/formula_eval.h"
 #include "core/cells/formula_recalc.h"
@@ -350,10 +352,13 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         json << "\"col\":" << colPos << ",";
         json << "\"row\":" << rowPos << ",";
 
-        // Include formatId if cell has a format (read from workbook map)
-        const ID cellFormatId = _workbook->getFormatId(entry.cell->id);
-        if (!cellFormatId.isNull()) {
-            json << "\"formatId\":\"" << cellFormatId.toString() << "\",";
+        // Get format from content-addressed storage
+        const FormatBuffer* cellFormat = _workbook->getEntityFormat(entry.cell->id);
+        std::string formatCode = "General";
+        if (cellFormat != nullptr && !cellFormat->isEmpty()) {
+            formatCode = cellFormat->toFormatCode();
+            // Include format base64 for reference
+            json << "\"format\":\"" << cellFormat->toBase64() << "\",";
         }
 
         // Include effective style (resolves cell > range > column > row hierarchy)
@@ -501,20 +506,21 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 json << "\"isError\":true,";
             } else if (result.isNumber()) {
                 const double num = result.getNumber();
-                // Compute edit value for formula results (using cellFormatId from workbook map)
-                editValue = formatEditValue(_formatRegistry, num, cellFormatId);
-                if (!cellFormatId.isNull()) {
-                    FormattedValue formatted = formatNumber(
-                        _formatRegistry, _workbook->getCustomFormats(), num, cellFormatId);
-                    if (!formatted.isError) {
+                // Use FormatBuffer-based formatting
+                if (cellFormat != nullptr && !cellFormat->isEmpty()) {
+                    FormatCodeResult formatted = cells::formatWithCode(num, formatCode);
+                    if (formatted.success) {
                         displayValue = formatted.text;
                     } else {
                         std::ostringstream numStr;
                         numStr << std::setprecision(15) << num;
                         displayValue = numStr.str();
                     }
+                    // Edit value: use format code formatter for user-friendly edit
+                    editValue = displayValue;  // For now, same as display
                 } else if (std::floor(num) == num && std::abs(num) < 1e15) {
                     displayValue = std::to_string(static_cast<long long>(num));
+                    editValue = displayValue;
                 } else {
                     std::ostringstream numStr;
                     numStr << std::setprecision(15) << num;
@@ -529,6 +535,7 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                             displayValue = displayValue.substr(0, dot);
                         }
                     }
+                    editValue = displayValue;
                 }
             } else if (result.isString()) {
                 displayValue = result.getString();
@@ -611,18 +618,16 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 std::string displayValue;
                 std::string editValue;
 
-                if (!cellFormatId.isNull() &&
+                if (cellFormat != nullptr && !cellFormat->isEmpty() &&
                     (entry.cell->value.type == CellValueType::NUMBER)) {
                     const double numValue = entry.cell->value.asNumber();
-                    FormattedValue formatted =
-                        formatNumber(_formatRegistry, _workbook->getCustomFormats(),
-                                     numValue, cellFormatId);
-                    if (!formatted.isError) {
+                    FormatCodeResult formatted = cells::formatWithCode(numValue, formatCode);
+                    if (formatted.success) {
                         displayValue = formatted.text;
                         useFormattedValue = true;
                     }
-                    // Compute edit value for formatted numbers (using cellFormatId from workbook map)
-                    editValue = formatEditValue(_formatRegistry, numValue, cellFormatId);
+                    // Edit value same as display for now
+                    editValue = displayValue;
                 }
 
                 if (useFormattedValue) {

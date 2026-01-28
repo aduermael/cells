@@ -62,8 +62,8 @@ export interface ClipboardCell {
   formula?: string;
   /** Cell type */
   type: CellData["type"];
-  /** Number format ID (e.g., "FMT_P002" for percentage with 2 decimals) */
-  formatId?: string;
+  /** Number format (base64-encoded FormatBuffer) */
+  format?: string;
   /** Style properties (if available from viewport data) */
   style?: CellData["style"];
 }
@@ -320,10 +320,9 @@ export class ClipboardManager {
             clipCell.formula = cell.formula;
           }
 
-          // Include format ID if present (non-GENERAL format)
-          // Format ID "~" means GENERAL, so we skip it
-          if (cell.formatId && cell.formatId !== "~") {
-            clipCell.formatId = cell.formatId;
+          // Include format if present (non-empty base64 means non-GENERAL format)
+          if (cell.format && cell.format !== "") {
+            clipCell.format = cell.format;
           }
 
           // Include style properties if present
@@ -470,12 +469,13 @@ export class ClipboardManager {
 
         // Apply format if present (only for internal paste, not TSV from external apps)
         // We detect internal paste by checking if sourceCol/sourceRow are set
-        if (cell.formatId && data.sourceCol !== undefined) {
+        if (cell.format && data.sourceCol !== undefined) {
           try {
+            // Decode format from base64 and apply
             await this.dataSource.setCellFormatAt(
               targetCol,
               targetRow,
-              cell.formatId
+              { base64: cell.format }
             );
           } catch (formatErr) {
             console.error(
