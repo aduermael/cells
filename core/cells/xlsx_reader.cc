@@ -10,9 +10,11 @@
 #include <unordered_map>
 #include <vector>
 
+#include "core/cells/format_buffer.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/id.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/number_format.h"
 #include "core/cells/range.h"
 #include "core/cells/style_buffer.h"
 #include "core/cells/types.h"
@@ -998,10 +1000,8 @@ XLSXStyles parseStylesXml(const std::string& content, const XLSXThemeColors& the
     return styles;
 }
 
-// Map XLSX numFmtId to Cells format ID
-// Returns empty string for General format or if format cannot be mapped
-// For custom formats (numFmtId >= 164), returns the format code string which
-// can be registered as a custom format in the workbook
+// Map XLSX numFmtId to content-addressed FormatBuffer
+// Returns nullopt for General format or if format cannot be mapped
 //
 // Excel built-in format IDs (from ECMA-376 Part 1, Section 18.8.30):
 // 0: General
@@ -1024,86 +1024,146 @@ XLSXStyles parseStylesXml(const std::string& content, const XLSXThemeColors& the
 // 37-40: Accounting formats
 // 45-48: Time formats
 // 49: @ (Text)
-cells::ID mapNumFmtIdToFormatId(int numFmtId, const XLSXStyles& styles) {
+std::optional<cells::FormatBuffer> mapNumFmtIdToFormatBuffer(int numFmtId,
+                                                             const XLSXStyles& styles) {
+    using Category = cells::NumberFormatCategory;
+    cells::FormatBuffer fmt;
+
     // Handle built-in Excel formats (0-163)
     switch (numFmtId) {
         case 0:  // General
-            return {};
+            return std::nullopt;
 
-        case 1:                            // 0 (integer)
-            return cells::ID("FMT_N000");  // NUMBER_0
-        case 2:                            // 0.00
-            return cells::ID("FMT_N002");  // NUMBER_2
-        case 3:                            // #,##0
-            return cells::ID("FMT_NS00");  // NUMBER_SEP
-        case 4:                            // #,##0.00
-            return cells::ID("FMT_NS02");  // NUMBER_SEP2
+        case 1:  // 0 (integer)
+            fmt.setCategory(Category::NUMBER);
+            fmt.setDecimals(0);
+            return fmt;
+
+        case 2:  // 0.00
+            fmt.setCategory(Category::NUMBER);
+            fmt.setDecimals(2);
+            return fmt;
+
+        case 3:  // #,##0
+            fmt.setCategory(Category::NUMBER);
+            fmt.setDecimals(0);
+            fmt.setThousandsSeparator(true);
+            return fmt;
+
+        case 4:  // #,##0.00
+            fmt.setCategory(Category::NUMBER);
+            fmt.setDecimals(2);
+            fmt.setThousandsSeparator(true);
+            return fmt;
 
         // Currency formats (5-8) - USD with various decimal places
-        case 5:                            // $#,##0_);($#,##0)
-        case 6:                            // $#,##0_);[Red]($#,##0)
-            return cells::ID("CUSD_000");  // CURRENCY_USD_0
-        case 7:                            // $#,##0.00_);($#,##0.00)
-        case 8:                            // $#,##0.00_);[Red]($#,##0.00)
-            return cells::ID("CUSD_002");  // CURRENCY_USD_2
+        case 5:  // $#,##0_);($#,##0)
+        case 6:  // $#,##0_);[Red]($#,##0)
+            fmt.setCategory(Category::CURRENCY);
+            fmt.setDecimals(0);
+            fmt.setThousandsSeparator(true);
+            fmt.setCurrencySymbol("$");
+            return fmt;
+
+        case 7:  // $#,##0.00_);($#,##0.00)
+        case 8:  // $#,##0.00_);[Red]($#,##0.00)
+            fmt.setCategory(Category::CURRENCY);
+            fmt.setDecimals(2);
+            fmt.setThousandsSeparator(true);
+            fmt.setCurrencySymbol("$");
+            return fmt;
 
         // Number formats with parentheses (37-40) - not accounting, just number with parens
-        case 37:                           // #,##0_);(#,##0)
-        case 38:                           // #,##0_);[Red](#,##0)
-            return cells::ID("FMT_NS00");  // NUMBER_SEP (thousands separator, 0 decimals)
-        case 39:                           // #,##0.00_);(#,##0.00)
-        case 40:                           // #,##0.00_);[Red](#,##0.00)
-            return cells::ID("FMT_NS02");  // NUMBER_SEP2 (thousands separator, 2 decimals)
+        case 37:  // #,##0_);(#,##0)
+        case 38:  // #,##0_);[Red](#,##0)
+            fmt.setCategory(Category::NUMBER);
+            fmt.setDecimals(0);
+            fmt.setThousandsSeparator(true);
+            return fmt;
+
+        case 39:  // #,##0.00_);(#,##0.00)
+        case 40:  // #,##0.00_);[Red](#,##0.00)
+            fmt.setCategory(Category::NUMBER);
+            fmt.setDecimals(2);
+            fmt.setThousandsSeparator(true);
+            return fmt;
 
         // Accounting formats (41-44) - with aligned currency symbols
         case 41:  // _(*#,##0_);_(*(#,##0);_(*"-"_);_(@_) - no currency, 0 decimals
         case 42:  // _($*#,##0_);_($*(#,##0);_($*"-"_);_(@_) - USD, 0 decimals
-            return cells::ID("FMT_A000");  // ACCOUNTING_0
+            fmt.setCategory(Category::ACCOUNTING);
+            fmt.setDecimals(0);
+            fmt.setThousandsSeparator(true);
+            if (numFmtId == 42) {
+                fmt.setCurrencySymbol("$");
+            }
+            return fmt;
+
         case 43:  // _(*#,##0.00_);_(*(#,##0.00);_(*"-"??_);_(@_) - no currency, 2 decimals
         case 44:  // _($*#,##0.00_);_($*(#,##0.00);_($*"-"??_);_(@_) - USD, 2 decimals
-            return cells::ID("FMT_A002");  // ACCOUNTING_2
+            fmt.setCategory(Category::ACCOUNTING);
+            fmt.setDecimals(2);
+            fmt.setThousandsSeparator(true);
+            if (numFmtId == 44) {
+                fmt.setCurrencySymbol("$");
+            }
+            return fmt;
 
         // Percentage formats
-        case 9:                            // 0%
-            return cells::ID("FMT_P000");  // PERCENTAGE_0
-        case 10:                           // 0.00%
-            return cells::ID("FMT_P002");  // PERCENTAGE_2
+        case 9:  // 0%
+            fmt.setCategory(Category::PERCENTAGE);
+            fmt.setDecimals(0);
+            return fmt;
+
+        case 10:  // 0.00%
+            fmt.setCategory(Category::PERCENTAGE);
+            fmt.setDecimals(2);
+            return fmt;
 
         // Scientific notation
-        case 11:                           // 0.00E+00
-        case 48:                           // ##0.0E+0
-            return cells::ID("FMT_SCI2");  // SCIENTIFIC_2
+        case 11:  // 0.00E+00
+        case 48:  // ##0.0E+0
+            fmt.setCategory(Category::SCIENTIFIC);
+            fmt.setDecimals(2);
+            return fmt;
 
         // Fraction formats (12-13) - we don't have direct support, use general
         case 12:  // # ?/?
         case 13:  // # ??/??
-            return {};
+            return std::nullopt;
 
         // Date formats (14-17)
-        case 14:                           // mm-dd-yy or m/d/yyyy
-        case 15:                           // d-mmm-yy
-        case 16:                           // d-mmm
-        case 17:                           // mmm-yy
-            return cells::ID("FMT_DSHT");  // DATE_SHORT
+        case 14:  // mm-dd-yy or m/d/yyyy
+        case 15:  // d-mmm-yy
+        case 16:  // d-mmm
+        case 17:  // mmm-yy
+            fmt.setCategory(Category::DATE);
+            return fmt;
 
         // Time formats (18-21, 45-47)
-        case 18:                           // h:mm AM/PM
-        case 19:                           // h:mm:ss AM/PM
-            return cells::ID("FMT_T12H");  // TIME_12H
-        case 20:                           // h:mm
-        case 21:                           // h:mm:ss
-        case 45:                           // mm:ss
-        case 46:                           // [h]:mm:ss
-        case 47:                           // mmss.0
-            return cells::ID("FMT_T24H");  // TIME_24H
+        case 18:  // h:mm AM/PM
+        case 19:  // h:mm:ss AM/PM
+            fmt.setCategory(Category::TIME);
+            fmt.setCustomFormatCode("h:mm AM/PM");
+            return fmt;
+
+        case 20:  // h:mm
+        case 21:  // h:mm:ss
+        case 45:  // mm:ss
+        case 46:  // [h]:mm:ss
+        case 47:  // mmss.0
+            fmt.setCategory(Category::TIME);
+            return fmt;
 
         // DateTime (22)
-        case 22:                           // m/d/yy h:mm
-            return cells::ID("FMT_DTSH");  // DATETIME_SHORT
+        case 22:  // m/d/yy h:mm
+            fmt.setCategory(Category::DATE_TIME);
+            return fmt;
 
         // Text format
-        case 49:                           // @
-            return cells::ID("FMT_TEXT");  // TEXT
+        case 49:  // @
+            fmt.setCategory(Category::TEXT);
+            return fmt;
 
         default:
             break;
@@ -1113,172 +1173,22 @@ cells::ID mapNumFmtIdToFormatId(int numFmtId, const XLSXStyles& styles) {
     // Look up the format code and try to map it
     auto it = styles.customNumFormats.find(numFmtId);
     if (it == styles.customNumFormats.end()) {
-        return {};  // Custom format not found
+        return std::nullopt;  // Custom format not found
     }
 
     const std::string& formatCode = it->second;
 
-    // Try to detect format type from format code and map to built-in format
-
-    // Check for accounting format (contains _( or _* alignment patterns)
-    // Accounting formats use patterns like: _($* #,##0.00_) or _(*#,##0_)
-    if (formatCode.find("_(*") != std::string::npos ||
-        formatCode.find("_($*") != std::string::npos ||
-        formatCode.find("_(\"$\"*") != std::string::npos) {
-        // Count decimal places
-        int decimals = 0;
-        const size_t dotPos = formatCode.find('.');
-        if (dotPos != std::string::npos) {
-            for (size_t i = dotPos + 1; i < formatCode.size(); ++i) {
-                if (formatCode[i] == '0') {
-                    ++decimals;
-                } else if (formatCode[i] != '#') {
-                    break;  // Stop at first non-digit placeholder
-                }
-            }
-        }
-        if (decimals >= 2) {
-            return cells::ID("FMT_A002");  // ACCOUNTING_2
-        }
-        return cells::ID("FMT_A000");  // ACCOUNTING_0
+    // Use FormatBuffer::fromFormatCode to parse the Excel format string
+    // This will extract category, decimals, currency symbol, etc.
+    auto parsedFormat = cells::FormatBuffer::fromFormatCode(formatCode);
+    if (parsedFormat.has_value()) {
+        return parsedFormat;
     }
 
-    // Check for percentage (contains %)
-    if (formatCode.find('%') != std::string::npos) {
-        // Count decimal places by looking for pattern like ".00%"
-        const size_t percentPos = formatCode.find('%');
-        const size_t dotPos = formatCode.rfind('.', percentPos);
-        if (dotPos != std::string::npos) {
-            int decimals = 0;
-            for (size_t i = dotPos + 1; i < percentPos; ++i) {
-                if (formatCode[i] == '0' || formatCode[i] == '#') {
-                    ++decimals;
-                }
-            }
-            if (decimals >= 0 && decimals <= 15) {
-                char formatId[9];
-                std::snprintf(formatId, sizeof(formatId), "FMT_P0%02d", decimals);
-                return cells::ID(formatId);
-            }
-        }
-        return cells::ID("FMT_P000");  // Default percentage
-    }
-
-    // Check for currency (contains $, €, £, ¥, or currency locale patterns)
-    bool hasCurrency = false;
-    std::string currencyCode = "USD";
-    if (formatCode.find('$') != std::string::npos || formatCode.find("[$") != std::string::npos) {
-        hasCurrency = true;
-        currencyCode = "USD";
-    } else if (formatCode.find("€") != std::string::npos ||
-               formatCode.find("[$€") != std::string::npos) {
-        hasCurrency = true;
-        currencyCode = "EUR";
-    } else if (formatCode.find("£") != std::string::npos ||
-               formatCode.find("[$£") != std::string::npos) {
-        hasCurrency = true;
-        currencyCode = "GBP";
-    } else if (formatCode.find("¥") != std::string::npos ||
-               formatCode.find("[$¥") != std::string::npos) {
-        hasCurrency = true;
-        // Could be JPY or CNY - default to JPY
-        currencyCode = "JPY";
-    }
-
-    if (hasCurrency) {
-        // Count decimal places
-        int decimals = 0;
-        const size_t dotPos = formatCode.find('.');
-        if (dotPos != std::string::npos) {
-            for (size_t i = dotPos + 1; i < formatCode.size(); ++i) {
-                if (formatCode[i] == '0' || formatCode[i] == '#') {
-                    ++decimals;
-                } else {
-                    break;  // Stop at first non-digit placeholder
-                }
-            }
-        }
-        decimals = std::min(decimals, 15);
-        char formatId[9];
-        std::snprintf(formatId, sizeof(formatId), "C%s_0%02d", currencyCode.c_str(), decimals);
-        return cells::ID(formatId);
-    }
-
-    // Check for date patterns (contains y, m, d in date context)
-    bool hasDatePattern = false;
-    {
-        std::string lower = formatCode;
-        for (char& c : lower) {
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        }
-        // Look for date patterns - must have year or day indicators
-        if ((lower.find("yy") != std::string::npos || lower.find("dd") != std::string::npos) &&
-            lower.find("mm") != std::string::npos) {
-            hasDatePattern = true;
-        }
-        // Or month name patterns
-        if (lower.find("mmm") != std::string::npos) {
-            hasDatePattern = true;
-        }
-    }
-
-    if (hasDatePattern) {
-        // Check if it also has time
-        std::string lower = formatCode;
-        for (char& c : lower) {
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        }
-        if (lower.find("h:") != std::string::npos || lower.find(":mm") != std::string::npos) {
-            return cells::ID("FMT_DTSH");  // DATETIME_SHORT
-        }
-        return cells::ID("FMT_DSHT");  // DATE_SHORT
-    }
-
-    // Check for time patterns (h:mm or similar)
-    {
-        std::string lower = formatCode;
-        for (char& c : lower) {
-            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        }
-        if (lower.find("h:") != std::string::npos || lower.find(":mm") != std::string::npos ||
-            lower.find(":ss") != std::string::npos) {
-            if (lower.find("am") != std::string::npos || lower.find("pm") != std::string::npos) {
-                return cells::ID("FMT_T12H");  // TIME_12H
-            }
-            return cells::ID("FMT_T24H");  // TIME_24H
-        }
-    }
-
-    // Check for scientific notation (contains E)
-    if (formatCode.find('E') != std::string::npos || formatCode.find('e') != std::string::npos) {
-        return cells::ID("FMT_SCI2");  // SCIENTIFIC_2
-    }
-
-    // Plain number format - check for thousands separator and decimals
-    const bool hasThousandsSep =
-        formatCode.find("#,##") != std::string::npos || formatCode.find(',') != std::string::npos;
-
-    // Count decimal places
-    int decimals = 0;
-    const size_t dotPos = formatCode.find('.');
-    if (dotPos != std::string::npos) {
-        for (size_t i = dotPos + 1; i < formatCode.size(); ++i) {
-            if (formatCode[i] == '0' || formatCode[i] == '#') {
-                ++decimals;
-            } else {
-                break;
-            }
-        }
-    }
-    decimals = std::min(decimals, 15);
-
-    char formatId[9];
-    if (hasThousandsSep) {
-        std::snprintf(formatId, sizeof(formatId), "FMT_NS%02d", decimals);
-    } else {
-        std::snprintf(formatId, sizeof(formatId), "FMT_N0%02d", decimals);
-    }
-    return cells::ID(formatId);
+    // If we can't parse it, store as custom format code
+    fmt = cells::FormatBuffer();
+    fmt.setCustomFormatCode(formatCode);
+    return fmt;
 }
 
 }  // namespace
@@ -1549,30 +1459,30 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
         return StyleBuffer::fromCellStyle(cellStyle);
     };
 
-    // Format ID helper - maps XLSX style index to Cells format ID
-    // Cache to avoid recomputing format IDs for the same style index
-    std::unordered_map<int, ID> styleIndexToFormatId;
-    auto getFormatId = [&](int xlsxStyleIndex) -> ID {
+    // Format helper - maps XLSX style index to content-addressed FormatBuffer
+    // Cache to avoid recomputing formats for the same style index
+    std::unordered_map<int, std::optional<FormatBuffer>> styleIndexToFormat;
+    auto getFormatBuffer = [&](int xlsxStyleIndex) -> std::optional<FormatBuffer> {
         if (!options.readStyles || xlsxStyleIndex < 0) {
-            return {};  // No format
+            return std::nullopt;  // No format
         }
 
         // Check cache
-        auto cacheIt = styleIndexToFormatId.find(xlsxStyleIndex);
-        if (cacheIt != styleIndexToFormatId.end()) {
+        auto cacheIt = styleIndexToFormat.find(xlsxStyleIndex);
+        if (cacheIt != styleIndexToFormat.end()) {
             return cacheIt->second;
         }
 
         // Get numFmtId from cell format
         if (xlsxStyleIndex >= static_cast<int>(xlsxStyles.cellFormats.size())) {
-            styleIndexToFormatId[xlsxStyleIndex] = {};
-            return {};
+            styleIndexToFormat[xlsxStyleIndex] = std::nullopt;
+            return std::nullopt;
         }
 
         const int numFmtId = xlsxStyles.cellFormats[xlsxStyleIndex].numFmtId;
-        const ID formatId = mapNumFmtIdToFormatId(numFmtId, xlsxStyles);
-        styleIndexToFormatId[xlsxStyleIndex] = formatId;
-        return formatId;
+        auto formatBuf = mapNumFmtIdToFormatBuffer(numFmtId, xlsxStyles);
+        styleIndexToFormat[xlsxStyleIndex] = formatBuf;
+        return formatBuf;
     };
 
     // Process each sheet
@@ -1878,9 +1788,9 @@ static XLSXReadResult parseXLSXFromZip(detail::ZipReader& zip, const XLSXReadOpt
                 }
 
                 // Apply number format if present - store in workbook map
-                const ID formatId = getFormatId(styleIndex);
-                if (!formatId.isNull()) {
-                    workbook->setFormatId(cell->id, formatId);
+                auto formatBuf = getFormatBuffer(styleIndex);
+                if (formatBuf.has_value()) {
+                    workbook->setEntityFormat(cell->id, *formatBuf);
                     cell->markHasFormat();
                 }
 

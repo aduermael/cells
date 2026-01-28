@@ -2,8 +2,10 @@
 
 #include <string>
 
+#include "core/cells/format_buffer.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/number_format.h"
 
 #include "gtest/gtest.h"
 
@@ -635,26 +637,21 @@ TEST(XLSXReaderTest, ReadNumberFormatsFromLBOModel) {
     bool foundNumberFormat = false;
 
     for (const auto& cellId : sheet->getCellIds()) {
-        const ID formatId = result.workbook->getFormatId(cellId);
-        if (formatId.isNull()) {
+        const FormatBuffer* formatBuf = result.workbook->getEntityFormat(cellId);
+        if (formatBuf == nullptr) {
             continue;
         }
 
-        const std::string formatIdStr = formatId.toString();
-
-        // Check for currency format (CUSD_*, CEUR_*, etc.)
-        if (formatIdStr[0] == 'C' && formatIdStr.size() >= 5 && formatIdStr[4] == '_') {
-            foundCurrencyFormat = true;
-        }
-
-        // Check for percentage format (FMT_P*)
-        if (formatIdStr.substr(0, 5) == "FMT_P") {
-            foundPercentageFormat = true;
-        }
-
-        // Check for number format with separator (FMT_NS*)
-        if (formatIdStr.substr(0, 6) == "FMT_NS") {
-            foundNumberFormat = true;
+        // Check format category using content-addressed FormatBuffer
+        if (formatBuf->hasCategory()) {
+            NumberFormatCategory cat = formatBuf->getCategory();
+            if (cat == NumberFormatCategory::CURRENCY) {
+                foundCurrencyFormat = true;
+            } else if (cat == NumberFormatCategory::PERCENTAGE) {
+                foundPercentageFormat = true;
+            } else if (cat == NumberFormatCategory::NUMBER && formatBuf->hasThousandsSeparator()) {
+                foundNumberFormat = true;
+            }
         }
     }
 
@@ -681,7 +678,7 @@ TEST(XLSXReaderTest, ReadNumberFormatsWithStyles) {
 
     for (const auto& cellId : sheet->getCellIds()) {
         const bool hasStyle = result.workbook->getEntityStyle(cellId) != nullptr;
-        const bool hasFormat = !result.workbook->getFormatId(cellId).isNull();
+        const bool hasFormat = result.workbook->getEntityFormat(cellId) != nullptr;
 
         if (hasStyle && hasFormat) {
             cellsWithStyleAndFormat++;
@@ -710,10 +707,10 @@ TEST(XLSXReaderTest, NumberFormatsNotImportedWhenStylesDisabled) {
     Sheet* sheet = result.workbook->getSheetByIndex(0);
     ASSERT_NE(sheet, nullptr);
 
-    // All cells should have null formatId when styles are disabled (read from workbook map)
+    // All cells should have null format when styles are disabled (read from workbook map)
     for (const auto& cellId : sheet->getCellIds()) {
-        EXPECT_TRUE(result.workbook->getFormatId(cellId).isNull())
-            << "formatId should be null when readStyles=false";
+        EXPECT_EQ(result.workbook->getEntityFormat(cellId), nullptr)
+            << "format should be null when readStyles=false";
     }
 }
 
