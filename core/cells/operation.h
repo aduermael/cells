@@ -88,6 +88,7 @@ enum class OpType : uint8_t {
     RANGE_UPDATE_CORNERS = 62,  // Update range corner IDs (resize)
     RANGE_UPDATE_FLAGS = 63,    // Update range flags bitmask
     RANGE_SET_STYLE = 64,       // Set style metadata for a style range
+    RANGE_SET_FORMAT = 65,      // Set format metadata for a format range
 };
 
 // Convert OpType to string for serialization

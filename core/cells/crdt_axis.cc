@@ -19,6 +19,7 @@
 // =============================================================================
 
 #include "core/cells/crdt_internal.h"
+#include "core/cells/format_buffer.h"
 #include "core/cells/format_code_parser.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
@@ -457,7 +458,34 @@ ApplyResult applyAxisSetFormat(Workbook& workbook, const Operation& op) {
         }
     }
 
-    // Payload is the format ID (or empty string to clear)
+    // Try new content-addressed format first: {"format":"<base64>"}
+    const std::string formatBase64 = extractJSONString(op.payload, "format");
+    if (!formatBase64.empty()) {
+        // New content-addressed format
+        auto maybeFormat = FormatBuffer::fromBase64(formatBase64);
+        if (!maybeFormat.has_value()) {
+            return ApplyResult::INVALID_PAYLOAD;
+        }
+        if (maybeFormat->isEmpty()) {
+            // Empty format clears
+            workbook.clearEntityFormat(axis->id);
+            axis->setHasFormat(false);
+        } else {
+            workbook.setEntityFormat(axis->id, *maybeFormat);
+            axis->setHasFormat(true);
+        }
+        return ApplyResult::SUCCESS;
+    }
+
+    // Check for empty format field (explicit clear)
+    if (op.payload.find("\"format\":") != std::string::npos) {
+        // "format" key present but empty - clear format
+        workbook.clearEntityFormat(axis->id);
+        axis->setHasFormat(false);
+        return ApplyResult::SUCCESS;
+    }
+
+    // Legacy: Payload is the format ID (or empty string to clear)
     // Axis formats are stored in workbook._formats map (not in Axis struct)
     if (op.payload.empty()) {
         workbook.setFormatId(axis->id, ID{});  // Clear format

@@ -103,6 +103,7 @@ ApplyResult applyRangeRemove(Workbook& workbook, const Operation& op);
 ApplyResult applyRangeUpdateCorners(Workbook& workbook, const Operation& op);
 ApplyResult applyRangeUpdateFlags(Workbook& workbook, const Operation& op);
 ApplyResult applyRangeSetStyle(Workbook& workbook, const Operation& op);
+ApplyResult applyRangeSetFormat(Workbook& workbook, const Operation& op);
 
 }  // namespace internal
 }  // namespace cells

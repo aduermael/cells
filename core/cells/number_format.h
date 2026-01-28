@@ -42,17 +42,18 @@ namespace cells {
 
 // Number format categories following Excel conventions
 enum class NumberFormatCategory : uint8_t {
-    GENERAL,     // Default format, displays as entered
-    NUMBER,      // Numeric with optional decimals and thousands separator
-    CURRENCY,    // Currency format ($1,234.56)
-    ACCOUNTING,  // Accounting format (aligned currency symbols, negatives in parens)
-    PERCENTAGE,  // Percentage (15% stored as 0.15)
-    DATE,        // Date only (1/15/2024)
-    TIME,        // Time only (12:30 PM)
-    DATE_TIME,   // Date and time combined
-    SCIENTIFIC,  // Scientific notation (1.5E+10)
-    FRACTION,    // Fractional display (1/4)
-    TEXT,        // Text format (numbers displayed as text)
+    GENERAL = 0,     // Default format, displays as entered
+    NUMBER = 1,      // Numeric with optional decimals and thousands separator
+    CURRENCY = 2,    // Currency format ($1,234.56)
+    ACCOUNTING = 3,  // Accounting format (aligned currency symbols, negatives in parens)
+    PERCENTAGE = 4,  // Percentage (15% stored as 0.15)
+    DATE = 5,        // Date only (1/15/2024)
+    TIME = 6,        // Time only (12:30 PM)
+    DATE_TIME = 7,   // Date and time combined
+    SCIENTIFIC = 8,  // Scientific notation (1.5E+10)
+    FRACTION = 9,    // Fractional display (1/4)
+    TEXT = 10,       // Text format (numbers displayed as text)
+    CUSTOM = 11,     // Custom format that doesn't fit standard categories
 };
 
 // Convert NumberFormatCategory to string for serialization

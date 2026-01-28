@@ -353,6 +353,10 @@ ApplyResult applyOperation(Workbook& workbook, const Operation& op) {
         case OpType::RANGE_SET_STYLE:
             result = internal::applyRangeSetStyle(workbook, op);
             break;
+
+        case OpType::RANGE_SET_FORMAT:
+            result = internal::applyRangeSetFormat(workbook, op);
+            break;
     }
 
     // Only add to OpLog on successful application
@@ -419,6 +423,17 @@ Operation makeCellClearOp(Workbook& workbook, const ID& cellId) {
 Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::CELL_SET_FORMAT, cellId, payload};
+}
+
+Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const FormatBuffer& format) {
+    const HLC hlc = workbook.getCurrentHLC();
+    const std::string payload = "{\"format\":\"" + format.toBase64() + "\"}";
+    return {hlc, OpType::CELL_SET_FORMAT, cellId, payload};
+}
+
+Operation makeCellClearFormatOp(Workbook& workbook, const ID& cellId) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::CELL_SET_FORMAT, cellId, "{\"format\":\"\"}"};
 }
 
 Operation makeCellSetStyleOp(Workbook& workbook, const ID& cellId, const std::string& payload) {
@@ -516,6 +531,17 @@ Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const ID& fo
     return {hlc, OpType::AXIS_SET_FORMAT, axisId, formatId.isNull() ? "" : formatId.toString()};
 }
 
+Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const FormatBuffer& format) {
+    const HLC hlc = workbook.getCurrentHLC();
+    const std::string payload = "{\"format\":\"" + format.toBase64() + "\"}";
+    return {hlc, OpType::AXIS_SET_FORMAT, axisId, payload};
+}
+
+Operation makeAxisClearFormatOp(Workbook& workbook, const ID& axisId) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::AXIS_SET_FORMAT, axisId, "{\"format\":\"\"}"};
+}
+
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload) {
     const HLC hlc = workbook.getCurrentHLC();
     return {hlc, OpType::SHEET_CREATE, sheetId, payload};
@@ -595,6 +621,22 @@ Operation makeRangeClearStyleOp(Workbook& workbook, const ID& rangeId) {
     const HLC hlc = workbook.getCurrentHLC();
     // Clear format: {"style":""}
     return {hlc, OpType::RANGE_SET_STYLE, rangeId, "{\"style\":\"\"}"};
+}
+
+Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const std::string& payload) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::RANGE_SET_FORMAT, rangeId, payload};
+}
+
+Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const FormatBuffer& format) {
+    const HLC hlc = workbook.getCurrentHLC();
+    const std::string payload = "{\"format\":\"" + format.toBase64() + "\"}";
+    return {hlc, OpType::RANGE_SET_FORMAT, rangeId, payload};
+}
+
+Operation makeRangeClearFormatOp(Workbook& workbook, const ID& rangeId) {
+    const HLC hlc = workbook.getCurrentHLC();
+    return {hlc, OpType::RANGE_SET_FORMAT, rangeId, "{\"format\":\"\"}"};
 }
 
 // =============================================================================

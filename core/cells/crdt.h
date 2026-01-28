@@ -31,6 +31,7 @@
 
 #include <cstdint>
 
+#include "core/cells/format_buffer.h"
 #include "core/cells/model.h"
 #include "core/cells/operation.h"
 #include "core/cells/style_buffer.h"
@@ -77,8 +78,19 @@ Operation makeCellSetValueOp(Workbook& workbook, const ID& cellId, const ID& she
 Operation makeCellClearOp(Workbook& workbook, const ID& cellId);
 
 // Generate a CELL_SET_FORMAT operation to set a cell's number format.
-// Payload: {"format_id":"FMT_C002"} or {"format_id":"~"} for default
+// Legacy payload: {"format_id":"FMT_C002"} or {"format_id":"~"} for default
+// Prefer using the FormatBuffer overload below for content-addressed formats.
 Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const std::string& payload);
+
+// Generate a CELL_SET_FORMAT operation using content-addressed FormatBuffer.
+// Payload format: {"format":"<base64-encoded-formatbuffer>"}
+// This is the new format for content-addressed formats.
+// target_id: the cell's UUID
+Operation makeCellSetFormatOp(Workbook& workbook, const ID& cellId, const FormatBuffer& format);
+
+// Generate a CELL_SET_FORMAT operation to clear the format.
+// Payload format: {"format":""}
+Operation makeCellClearFormatOp(Workbook& workbook, const ID& cellId);
 
 // Generate a CELL_SET_STYLE operation to set a cell's style from raw JSON payload.
 // Payload: {"style":"<base64>"} or {"style":""} to clear
@@ -122,8 +134,17 @@ Operation makeAxisSetHiddenOp(Workbook& workbook, const ID& axisId, bool hidden)
 Operation makeAxisSetStyleOp(Workbook& workbook, const ID& axisId, const StyleBuffer& style);
 // Clear axis style - payload: {"style":""}
 Operation makeAxisClearStyleOp(Workbook& workbook, const ID& axisId);
-// payload: format ID string, or empty string to clear format
+// Legacy payload: format ID string, or empty string to clear format
+// Prefer using the FormatBuffer overload below for content-addressed formats.
 Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const ID& formatId);
+
+// Generate an AXIS_SET_FORMAT operation using content-addressed FormatBuffer.
+// Payload format: {"format":"<base64-encoded-formatbuffer>"}
+Operation makeAxisSetFormatOp(Workbook& workbook, const ID& axisId, const FormatBuffer& format);
+
+// Generate an AXIS_SET_FORMAT operation to clear the format.
+// Payload format: {"format":""}
+Operation makeAxisClearFormatOp(Workbook& workbook, const ID& axisId);
 
 // Generate a SHEET_CREATE operation.
 Operation makeSheetCreateOp(Workbook& workbook, const ID& sheetId, const std::string& payload);
@@ -194,6 +215,21 @@ Operation makeRangeSetStyleOp(Workbook& workbook, const ID& rangeId, const Style
 // Payload format: {"style":""}
 // target_id: the range's UUID
 Operation makeRangeClearStyleOp(Workbook& workbook, const ID& rangeId);
+
+// Generate a RANGE_SET_FORMAT operation for setting range format metadata.
+// Payload: {"format":"<base64>"} or {"format":""} to clear
+// target_id: the range's UUID
+Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const std::string& payload);
+
+// Generate a RANGE_SET_FORMAT operation using content-addressed FormatBuffer.
+// Payload format: {"format":"<base64-encoded-formatbuffer>"}
+// target_id: the range's UUID
+Operation makeRangeSetFormatOp(Workbook& workbook, const ID& rangeId, const FormatBuffer& format);
+
+// Generate a RANGE_SET_FORMAT operation to clear the format.
+// Payload format: {"format":""}
+// target_id: the range's UUID
+Operation makeRangeClearFormatOp(Workbook& workbook, const ID& rangeId);
 
 // Bootstrap the OpLog with the current workbook state.
 // Called when transitioning from OFFLINE to COLLABORATING mode.

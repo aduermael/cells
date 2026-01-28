@@ -33,7 +33,10 @@ cc_library(
     srcs = ["format_buffer.cc"],
     hdrs = ["format_buffer.h"],
     visibility = ["//visibility:public"],
-    deps = [":format_code_parser"],
+    deps = [
+        ":format_code_parser",
+        ":number_format",
+    ],
 )
 
 cc_test(
@@ -41,6 +44,7 @@ cc_test(
     srcs = ["format_buffer_test.cc"],
     deps = [
         ":format_buffer",
+        ":number_format",
         "@googletest//:gtest_main",
     ],
 )

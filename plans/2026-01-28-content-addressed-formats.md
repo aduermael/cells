@@ -168,11 +168,11 @@ Analogous to StyleBuffer, but for number format encoding.
 
 ### Phase 3: Update CRDT Operations
 
-- [ ] 3a: Modify `CELL_SET_FORMAT` payload to contain base64 format instead of format_id
-- [ ] 3b: Update `applyCellSetFormat()` to parse base64 format
-- [ ] 3c: Add `RANGE_SET_FORMAT` operation for range-level formats (similar to RANGE_SET_STYLE)
-- [ ] 3d: Add `AXIS_SET_FORMAT` operation update for content-addressed formats
-- [ ] 3e: Remove `FORMAT_DEFINE` operation type
+- [x] 3a: Modify `CELL_SET_FORMAT` payload to contain base64 format instead of format_id. Updated payload format to `{"format":"<base64>"}` while maintaining backward compatibility with legacy `{"format_id":"..."}` format.
+- [x] 3b: Update `applyCellSetFormat()` to parse base64 format. Added support for content-addressed FormatBuffer with fallback to legacy format_id parsing.
+- [x] 3c: Add `RANGE_SET_FORMAT` operation for range-level formats (similar to RANGE_SET_STYLE). Added `OpType::RANGE_SET_FORMAT = 65`, maker functions, and `applyRangeSetFormat()` handler.
+- [x] 3d: Add `AXIS_SET_FORMAT` operation update for content-addressed formats. Updated `applyAxisSetFormat()` to support `{"format":"<base64>"}` payload with fallback to legacy format ID.
+- [ ] 3e: Remove `FORMAT_DEFINE` operation type (deferred to Phase 7 - need to remove format registry first)
 
 ### Phase 4: Update Serialization
 

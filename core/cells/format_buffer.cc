@@ -11,6 +11,7 @@
 #include <sstream>
 
 #include "core/cells/format_code_parser.h"
+#include "core/cells/number_format.h"  // For NumberFormatCategory enum definition
 
 namespace cells {
 

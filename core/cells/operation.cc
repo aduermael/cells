@@ -73,6 +73,8 @@ const char* opTypeToString(OpType type) {
             return "RANGE_UPDATE_FLAGS";
         case OpType::RANGE_SET_STYLE:
             return "RANGE_SET_STYLE";
+        case OpType::RANGE_SET_FORMAT:
+            return "RANGE_SET_FORMAT";
     }
     return "CELL_SET_VALUE";
 }
@@ -167,6 +169,9 @@ OpType stringToOpType(const std::string& str) {
     }
     if (str == "RANGE_SET_STYLE") {
         return OpType::RANGE_SET_STYLE;
+    }
+    if (str == "RANGE_SET_FORMAT") {
+        return OpType::RANGE_SET_FORMAT;
     }
     return OpType::CELL_SET_VALUE;  // Default
 }

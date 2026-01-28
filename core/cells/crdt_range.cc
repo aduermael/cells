@@ -35,8 +35,10 @@
 #include <memory>
 
 #include "core/cells/crdt_internal.h"
+#include "core/cells/format_buffer.h"
 #include "core/cells/model.h"
 #include "core/cells/range.h"
+#include "core/cells/style_buffer.h"
 
 namespace cells {
 namespace internal {
@@ -256,6 +258,57 @@ ApplyResult applyRangeSetStyle(Workbook& workbook, const Operation& op) {
             return ApplyResult::INVALID_PAYLOAD;
         }
         sheet->setRangeStyle(range->id, std::move(styleOpt.value()));
+    }
+
+    return ApplyResult::SUCCESS;
+}
+
+// =============================================================================
+// RANGE_SET_FORMAT Operation
+// =============================================================================
+//
+// Payload format: {"format":"<base64>"}
+//   The format field contains a base64-encoded FormatBuffer.
+//   If format is empty "", clears the format.
+//   The format data is stored directly in the Range struct.
+//
+// The range is identified by op.target_id (the range's UUID).
+// The sheet is derived from the range's startColId (columns belong to exactly one sheet).
+//
+
+ApplyResult applyRangeSetFormat(Workbook& workbook, const Operation& op) {
+    // Get the range by ID from workbook-level storage
+    Range* range = workbook.getRange(op.target_id);
+    if (range == nullptr) {
+        return ApplyResult::INVALID_TARGET;
+    }
+
+    // Check for newer format operations on this range
+    const OpLog* oplog = workbook.getOpLog();
+    auto ops = oplog->getOperationsForEntity(op.target_id);
+    for (const auto& existing : ops) {
+        if (existing.type == OpType::RANGE_SET_FORMAT && existing.hlc > op.hlc) {
+            return ApplyResult::SUPERSEDED;
+        }
+    }
+
+    // Parse payload: {"format":"<base64>"} (content-addressed)
+    // Empty string clears the format
+    const std::string formatBase64 = extractJSONString(op.payload, "format");
+    if (formatBase64.empty()) {
+        // Check if "format" key is present but empty vs not present
+        if (op.payload.find("\"format\":") != std::string::npos) {
+            // Explicit clear
+            range->clearFormat();
+        } else {
+            return ApplyResult::INVALID_PAYLOAD;
+        }
+    } else {
+        auto formatOpt = FormatBuffer::fromBase64(formatBase64);
+        if (!formatOpt.has_value()) {
+            return ApplyResult::INVALID_PAYLOAD;
+        }
+        range->setFormat(std::move(formatOpt.value()));
     }
 
     return ApplyResult::SUCCESS;

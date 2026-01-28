@@ -19,6 +19,7 @@
 
 #include "core/cells/crdt_internal.h"
 #include "core/cells/dependency_graph.h"
+#include "core/cells/format_buffer.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/number_format.h"
 #include "core/cells/style_buffer.h"
@@ -229,26 +230,53 @@ ApplyResult applyCellSetFormat(Workbook& workbook, const Operation& op) {
         }
     }
 
-    // Parse payload: {"format_id":"FMT_C002"}
-    const std::string formatIdStr = extractJSONString(op.payload, "format_id");
-    if (formatIdStr.empty()) {
-        return ApplyResult::INVALID_PAYLOAD;
+    // Parse payload: {"format":"<base64>"} (content-addressed)
+    // Empty string clears the format
+    // Also support legacy {"format_id":"..."} for backward compatibility during transition
+    const std::string formatBase64 = extractJSONString(op.payload, "format");
+    if (!formatBase64.empty()) {
+        // New content-addressed format
+        auto maybeFormat = FormatBuffer::fromBase64(formatBase64);
+        if (!maybeFormat.has_value()) {
+            return ApplyResult::INVALID_PAYLOAD;
+        }
+        if (maybeFormat->isEmpty()) {
+            // Empty format clears
+            workbook.clearEntityFormat(cell->id);
+            cell->clearHasFormat();
+        } else {
+            workbook.setEntityFormat(cell->id, *maybeFormat);
+            cell->markHasFormat();
+        }
+        return ApplyResult::SUCCESS;
     }
 
-    const ID formatId(formatIdStr);
-
-    // Store format in workbook-level map and update cell flag
-    if (formatId.isNull()) {
-        // Clear format - remove from map and clear flag
-        workbook.setFormatId(cell->id, formatId);
+    // Check for empty format field (explicit clear)
+    // Need to distinguish between missing key and empty value
+    if (op.payload.find("\"format\":") != std::string::npos) {
+        // "format" key present but empty - clear format
+        workbook.clearEntityFormat(cell->id);
         cell->clearHasFormat();
-    } else {
-        // Set format - store in map and set flag
-        workbook.setFormatId(cell->id, formatId);
-        cell->markHasFormat();
+        return ApplyResult::SUCCESS;
     }
 
-    return ApplyResult::SUCCESS;
+    // Legacy format_id support (for backward compatibility during transition)
+    const std::string formatIdStr = extractJSONString(op.payload, "format_id");
+    if (!formatIdStr.empty()) {
+        const ID formatId(formatIdStr);
+        if (formatId.isNull() || formatIdStr == "~") {
+            // Clear format
+            workbook.setFormatId(cell->id, ID{});
+            cell->clearHasFormat();
+        } else {
+            // Set format ID (legacy path)
+            workbook.setFormatId(cell->id, formatId);
+            cell->markHasFormat();
+        }
+        return ApplyResult::SUCCESS;
+    }
+
+    return ApplyResult::INVALID_PAYLOAD;
 }
 
 ApplyResult applyCellSetStyle(Workbook& workbook, const Operation& op) {

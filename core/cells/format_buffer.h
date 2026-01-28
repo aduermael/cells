@@ -38,24 +38,13 @@
 
 namespace cells {
 
-// =============================================================================
-// NumberFormatCategory Enum
-// =============================================================================
-
-enum class NumberFormatCategory : uint8_t {
-    GENERAL = 0,
-    NUMBER = 1,
-    CURRENCY = 2,
-    ACCOUNTING = 3,
-    PERCENTAGE = 4,
-    DATE = 5,
-    TIME = 6,
-    DATE_TIME = 7,
-    SCIENTIFIC = 8,
-    FRACTION = 9,
-    TEXT = 10,
-    CUSTOM = 11  // For formats that don't fit standard categories
-};
+// Forward declaration - NumberFormatCategory is defined in number_format.h
+// We use the same enum values as number_format.h for compatibility.
+// Note: When this enum is serialized in FormatBuffer, we use the numeric values:
+// GENERAL=0, NUMBER=1, CURRENCY=2, ACCOUNTING=3, PERCENTAGE=4, DATE=5, TIME=6,
+// DATE_TIME=7, SCIENTIFIC=8, FRACTION=9, TEXT=10
+// Forward declare here; full definition is in number_format.h
+enum class NumberFormatCategory : uint8_t;
 
 // =============================================================================
 // Flag Bit Positions
