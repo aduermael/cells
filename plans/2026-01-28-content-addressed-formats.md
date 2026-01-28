@@ -133,6 +133,14 @@ Base64: ~15 characters
 - Update any testdata ZCD files if they contain format references
 - Update unit tests to use new format encoding
 
+## E2E Test Expectations
+
+During implementation phases, the following E2E test failures can be **ignored** as they are pre-existing issues unrelated to this work:
+
+- `cross-sheet-formula-edit` - "Mixed references: same-sheet and cross-sheet cells in one formula" (formula evaluation issue)
+
+All other E2E test failures during phases should be investigated and fixed before proceeding.
+
 ## Implementation Phases
 
 ### Phase 1: Create FormatBuffer Class
@@ -205,9 +213,17 @@ Mirror the style system's approach for computing effective formats at display ti
 
 - [ ] 8a: Update unit tests to use new FormatBuffer APIs (no legacy format ID tests)
 - [ ] 8b: Run all existing format-related E2E tests
-- [ ] 8c: Fix any failing tests
+- [ ] 8c: Fix any failing tests related to format changes
 - [ ] 8d: Update docs/file-format.md with new format encoding
 - [ ] 8e: Update docs/persistence.md to remove `F` line documentation
+
+### Phase 9: Fix All E2E Test Failures
+
+Fix any remaining E2E test failures, including pre-existing issues unrelated to this plan.
+
+- [ ] 9a: Fix `cross-sheet-formula-edit` test failure (mixed references formula evaluation)
+- [ ] 9b: Run full E2E suite and ensure 100% pass rate
+- [ ] 9c: Verify no regressions in unit tests
 
 ## File Changes Summary
 
