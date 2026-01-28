@@ -181,7 +181,7 @@ export class ScriptAutocomplete {
    */
   private createPopup(): void {
     this.popup = document.createElement("div");
-    this.popup.className = "autocomplete-popup";
+    this.popup.className = "autocomplete-popup dropdown-frame";
     this.popup.style.display = "none";
     // Append to panel so it's positioned relative to the editor
     this.panel.appendChild(this.popup);

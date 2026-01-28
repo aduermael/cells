@@ -2824,7 +2824,7 @@ canvas {
 }
 
 /* ============================================================================
-   Autocomplete Popup (script editor)
+   Autocomplete Popup (script editor) - extends .dropdown-frame
    ============================================================================ */
 
 .autocomplete-popup {
@@ -2833,12 +2833,6 @@ canvas {
     max-width: 400px;
     max-height: 200px;
     overflow-y: auto;
-    background: var(--color-bg-primary);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-    box-shadow: 0 4px 16px var(--color-shadow);
-    z-index: 1000;
-    padding: var(--spacing-xs);
 }
 
 .autocomplete-item {
