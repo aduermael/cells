@@ -29,6 +29,23 @@ cc_test(
 )
 
 cc_library(
+    name = "format_buffer",
+    srcs = ["format_buffer.cc"],
+    hdrs = ["format_buffer.h"],
+    visibility = ["//visibility:public"],
+    deps = [":format_code_parser"],
+)
+
+cc_test(
+    name = "format_buffer_test",
+    srcs = ["format_buffer_test.cc"],
+    deps = [
+        ":format_buffer",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "range",
     hdrs = ["range.h"],
     visibility = ["//visibility:public"],

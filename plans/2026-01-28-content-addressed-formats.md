@@ -139,13 +139,13 @@ Base64: ~15 characters
 
 Analogous to StyleBuffer, but for number format encoding.
 
-- [ ] 1a: Create `format_buffer.h` with FormatBuffer struct and flag constants
-- [ ] 1b: Implement property setters (setCategory, setDecimals, setCurrencySymbol, setCustomFormatCode)
-- [ ] 1c: Implement property getters that read from binary data based on flags
-- [ ] 1d: Implement `toBase64()` and `fromBase64()` serialization
-- [ ] 1e: Implement `toFormatCode()` to generate Excel-style format code from properties
-- [ ] 1f: Implement `fromFormatCode()` to parse Excel-style format code into properties
-- [ ] 1g: Add unit tests for all properties and edge cases
+- [x] 1a: Create `format_buffer.h` with FormatBuffer struct and flag constants
+- [x] 1b: Implement property setters (setCategory, setDecimals, setCurrencySymbol, setCustomFormatCode)
+- [x] 1c: Implement property getters that read from binary data based on flags
+- [x] 1d: Implement `toBase64()` and `fromBase64()` serialization
+- [x] 1e: Implement `toFormatCode()` to generate Excel-style format code from properties
+- [x] 1f: Implement `fromFormatCode()` to parse Excel-style format code into properties
+- [x] 1g: Add unit tests for all properties and edge cases
 
 ### Phase 2: Integrate FormatBuffer with Model
 
