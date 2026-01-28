@@ -19,7 +19,8 @@ export type MenuId =
   | "currency"
   | "customFormat"
   | "merge"
-  | "border";
+  | "border"
+  | "namedRanges";
 
 /** Callback for when a menu is closed externally */
 export type MenuCloseCallback = () => void;
