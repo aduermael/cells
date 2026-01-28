@@ -72,10 +72,10 @@ Complete the partial integration from the previous plan.
 
 ## Phase 3: Integrate MergeControls with MenuStateManager
 
-- [ ] 3a: Import MenuStateManager and register `merge` menu in MergeControls constructor
-- [ ] 3b: Update `toggleDropdown()` to call `menuState.openMenu('merge')` when opening
-- [ ] 3c: Update `closeDropdown()` to call `menuState.closeMenu('merge')`
-- [ ] 3d: Apply `.dropdown-menu` class to merge dropdown menu for consistent styling
+- [x] 3a: Import MenuStateManager and register `merge` menu in MergeControls constructor
+- [x] 3b: Update `toggleDropdown()` to call `menuState.openMenu('merge')` when opening
+- [x] 3c: Update `closeDropdown()` to call `menuState.closeMenu('merge')` and added Escape key handler
+- [x] 3d: Apply `.dropdown-menu` class to merge dropdown menu for consistent styling (already present in HTML)
 
 ## Phase 4: Integrate NamedRangesDropdown with MenuStateManager
 

@@ -17,6 +17,7 @@
 
 import type { WasmDataSource } from "./wasm-data-source";
 import type { Position } from "./types";
+import { getMenuStateManager } from "./menu-state";
 
 // =============================================================================
 // Types
@@ -73,6 +74,9 @@ export class MergeControls {
     this.requestRender = callbacks.requestRender;
 
     this.setupEventListeners();
+
+    // Register with MenuStateManager for mutual exclusivity with other menus
+    getMenuStateManager().registerMenu("merge", () => this.closeDropdown());
   }
 
   /** Set the data source after WASM initialization */
@@ -112,6 +116,14 @@ export class MergeControls {
         this.closeDropdown();
       }
     });
+
+    // Escape key closes the dropdown
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && this.mergeDropdown.classList.contains("open")) {
+        e.preventDefault();
+        this.closeDropdown();
+      }
+    });
   }
 
   private toggleDropdown(): void {
@@ -120,11 +132,17 @@ export class MergeControls {
       this.closeDropdown();
     } else {
       this.mergeDropdown.classList.add("open");
+      // Notify MenuStateManager - this will close other menus via their callbacks
+      getMenuStateManager().openMenu("merge");
     }
   }
 
   private closeDropdown(): void {
+    const wasOpen = this.mergeDropdown.classList.contains("open");
     this.mergeDropdown.classList.remove("open");
+    if (wasOpen) {
+      getMenuStateManager().closeMenu("merge");
+    }
   }
 
   /**
