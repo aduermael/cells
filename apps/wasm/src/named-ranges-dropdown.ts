@@ -4,6 +4,7 @@
 import type { NamedRangeInfo } from "./types";
 import type { WasmDataSource } from "./wasm-data-source";
 import { positionDropdown } from "./dropdown-utils";
+import { getMenuStateManager } from "./menu-state";
 
 /** Callback when a named range is selected */
 export type OnSelectCallback = (name: string) => void;
@@ -34,6 +35,10 @@ export class NamedRangesDropdown {
     this.popup.className = "named-ranges-dropdown";
     this.popup.style.display = "none";
     container.appendChild(this.popup);
+
+    // Register with MenuStateManager for mutual exclusivity
+    const menuState = getMenuStateManager();
+    menuState.registerMenu("namedRanges", () => this.hide());
 
     // Setup click handler on trigger element
     this.triggerElement.addEventListener("click", (e) => {

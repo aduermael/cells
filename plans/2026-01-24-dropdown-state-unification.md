@@ -80,7 +80,7 @@ Complete the partial integration from the previous plan.
 ## Phase 4: Integrate NamedRangesDropdown with MenuStateManager
 
 - [x] 4a: Add `namedRanges` to `MenuId` type in `menu-state.ts`
-- [ ] 4b: Import MenuStateManager and register in NamedRangesDropdown
+- [x] 4b: Import MenuStateManager and register in NamedRangesDropdown
 - [ ] 4c: Update show/hide methods to use MenuStateManager
 - [ ] 4d: Apply `.dropdown-frame` class for consistent styling
 
