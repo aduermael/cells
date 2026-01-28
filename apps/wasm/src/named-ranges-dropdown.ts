@@ -87,6 +87,10 @@ export class NamedRangesDropdown {
 
   /** Show the popup */
   public async show(): Promise<void> {
+    // Notify MenuStateManager to close other menus
+    const menuState = getMenuStateManager();
+    menuState.openMenu("namedRanges");
+
     if (!this.dataSource) {
       // Show message when no data source
       this.popup.innerHTML = '<div class="named-ranges-empty">No file loaded</div>';
@@ -119,6 +123,9 @@ export class NamedRangesDropdown {
     this.visible = false;
     this.popup.style.display = "none";
     this.triggerElement.classList.remove("active");
+    // Notify MenuStateManager
+    const menuState = getMenuStateManager();
+    menuState.closeMenu("namedRanges");
   }
 
   /** Check if popup is visible */

@@ -81,7 +81,7 @@ Complete the partial integration from the previous plan.
 
 - [x] 4a: Add `namedRanges` to `MenuId` type in `menu-state.ts`
 - [x] 4b: Import MenuStateManager and register in NamedRangesDropdown
-- [ ] 4c: Update show/hide methods to use MenuStateManager
+- [x] 4c: Update show/hide methods to use MenuStateManager
 - [ ] 4d: Apply `.dropdown-frame` class for consistent styling
 
 ## Phase 5: Integrate Autocomplete Popups with MenuStateManager
