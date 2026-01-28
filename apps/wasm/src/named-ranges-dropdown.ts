@@ -32,7 +32,7 @@ export class NamedRangesDropdown {
 
     // Create popup element
     this.popup = document.createElement("div");
-    this.popup.className = "named-ranges-dropdown";
+    this.popup.className = "dropdown-frame named-ranges-dropdown";
     this.popup.style.display = "none";
     container.appendChild(this.popup);
 
