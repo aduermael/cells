@@ -125,11 +125,13 @@ Base64: ~15 characters
 
 ### Migration Notes
 
-- Remove `F` (FORMAT_DEFINE) line support from serializer
-- Remove FormatRegistry class
-- Update parser to decode base64 format specs
-- Update all `fmt:` references to use new encoding
-- No backward compatibility needed (app not released)
+**No backward compatibility needed** - app not released. Simply:
+
+- Remove `F` (FORMAT_DEFINE) line parsing entirely (parser should error on unknown line type)
+- Remove FormatRegistry class completely
+- Update parser to only accept base64-encoded `fmt:` values
+- Update any testdata ZCD files if they contain format references
+- Update unit tests to use new format encoding
 
 ## Implementation Phases
 
@@ -162,11 +164,12 @@ Analogous to StyleBuffer, but for number format encoding.
 
 ### Phase 4: Update Serialization
 
-- [ ] 4a: Update ZCD serializer to write base64 formats directly (remove `F` lines)
-- [ ] 4b: Update ZCD parser for base64 formats in `fmt:` property
+- [ ] 4a: Update ZCD serializer to write base64 formats directly (no more `F` lines)
+- [ ] 4b: Update ZCD parser to only accept base64 `fmt:` values (remove `F` line parsing entirely)
 - [ ] 4c: Update XLSX import to create FormatBuffer directly
 - [ ] 4d: Update XLSX export to read from FormatBuffer
 - [ ] 4e: Update bootstrap to emit content-addressed formats
+- [ ] 4f: Update any testdata ZCD files that contain format references
 
 ### Phase 5: Update Bindings and TypeScript
 
@@ -186,10 +189,11 @@ Analogous to StyleBuffer, but for number format encoding.
 
 ### Phase 7: Testing and Documentation
 
-- [ ] 7a: Run all existing format-related E2E tests
-- [ ] 7b: Update/fix any failing tests
-- [ ] 7c: Update architecture documentation
-- [ ] 7d: Update file-format.md with new format encoding
+- [ ] 7a: Update unit tests to use new FormatBuffer APIs (no legacy format ID tests)
+- [ ] 7b: Run all existing format-related E2E tests
+- [ ] 7c: Fix any failing tests
+- [ ] 7d: Update docs/file-format.md with new format encoding
+- [ ] 7e: Update docs/persistence.md to remove `F` line documentation
 
 ## File Changes Summary
 
@@ -229,5 +233,3 @@ Analogous to StyleBuffer, but for number format encoding.
 1. **Larger cell data for custom formats**: Long format codes increase cell size. Mitigation: Most cells use simple formats (few bytes). Custom formats are rare.
 
 2. **Format code parsing complexity**: Need to parse format codes to extract properties. Mitigation: Already have `parseFormatCode()` function; just use it in reverse.
-
-3. **Backward compatibility**: Not needed - app not released.
