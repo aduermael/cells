@@ -5,6 +5,7 @@
 #include "core/cells/format_buffer.h"
 
 #include "core/cells/number_format.h"  // For NumberFormatCategory enum
+
 #include "gtest/gtest.h"
 
 namespace cells {

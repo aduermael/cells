@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_set>
 
+#include "core/cells/format_buffer.h"
 #include "core/cells/formula_eval.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
@@ -12,6 +13,7 @@
 #include "core/cells/id.h"
 #include "core/cells/model.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/number_format.h"
 #include "core/cells/parser.h"
 
 #include "gtest/gtest.h"
@@ -901,8 +903,13 @@ TEST(CellFormatTest, SerializeCellWithFormat) {
 
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cell->value = CellValue(1234.56);
-    // Store format in workbook map
-    wb->setFormatId(cell->id, ID("FMT_C002"));
+    // Store format in workbook map using content-addressed FormatBuffer
+    FormatBuffer fmt;
+    fmt.setCategory(NumberFormatCategory::CURRENCY);
+    fmt.setDecimals(2);
+    fmt.setThousandsSeparator(true);
+    fmt.setCurrencySymbol("$");
+    wb->setEntityFormat(cell->id, fmt);
     cell->markHasFormat();
 
     sheet->addColumn(std::move(col));
@@ -912,8 +919,10 @@ TEST(CellFormatTest, SerializeCellWithFormat) {
 
     const std::string output = serialize(*wb);
 
-    // Should contain the format property
-    EXPECT_NE(output.find("fmt:FMT_C002"), std::string::npos);
+    // Should contain the format property as base64
+    EXPECT_NE(output.find("fmt:"), std::string::npos);
+    // Verify it's base64 encoded (contains the format we set)
+    EXPECT_NE(output.find("fmt:" + fmt.toBase64()), std::string::npos);
 }
 
 TEST(CellFormatTest, SerializeCellWithoutFormat) {
@@ -947,8 +956,11 @@ TEST(CellFormatTest, RoundtripCellWithFormat) {
 
     auto cell = std::make_unique<Cell>(ID("xA1bC2dE"), ID("cA1bC2dE"), ID("rA1bC2dE"));
     cell->value = CellValue(0.15);
-    // Store format in workbook map
-    wb->setFormatId(cell->id, ID("FMT_P002"));
+    // Store format in workbook map using content-addressed FormatBuffer
+    FormatBuffer fmt;
+    fmt.setCategory(NumberFormatCategory::PERCENTAGE);
+    fmt.setDecimals(2);
+    wb->setEntityFormat(cell->id, fmt);
     cell->markHasFormat();
 
     sheet->addColumn(std::move(col));
@@ -958,7 +970,7 @@ TEST(CellFormatTest, RoundtripCellWithFormat) {
 
     // Serialize
     const std::string serialized = serialize(*wb);
-    EXPECT_NE(serialized.find("fmt:FMT_P002"), std::string::npos);
+    EXPECT_NE(serialized.find("fmt:" + fmt.toBase64()), std::string::npos);
 
     // Parse back
     ParseResult result = parse(serialized);
@@ -968,17 +980,28 @@ TEST(CellFormatTest, RoundtripCellWithFormat) {
     Sheet* parsedSheet = result.workbook->getSheetByIndex(0);
     Cell* parsedCell = parsedSheet->getCell(ID("xA1bC2dE"));
     ASSERT_NE(parsedCell, nullptr);
-    EXPECT_EQ(result.workbook->getFormatId(parsedCell->id), ID("FMT_P002"));
+    const FormatBuffer* parsedFmt = result.workbook->getEntityFormat(parsedCell->id);
+    ASSERT_NE(parsedFmt, nullptr);
+    EXPECT_EQ(parsedFmt->getCategory(), NumberFormatCategory::PERCENTAGE);
+    EXPECT_EQ(parsedFmt->getDecimals(), 2);
 }
 
 TEST(CellFormatTest, ParseCellWithFormat) {
-    const std::string content = R"(
-D aB3cD4eF "Test"
-S sH3eE4tB "Sheet"
-C cA1bC2dE 0
-R rA1bC2dE 0
-X xA1bC2dE cA1bC2dE rA1bC2dE n 1234.56 fmt:FMT_C002
-)";
+    // Create a currency format for testing
+    FormatBuffer fmt;
+    fmt.setCategory(NumberFormatCategory::CURRENCY);
+    fmt.setDecimals(2);
+    fmt.setThousandsSeparator(true);
+    fmt.setCurrencySymbol("$");
+    const std::string fmtBase64 = fmt.toBase64();
+
+    const std::string content =
+        "D aB3cD4eF \"Test\"\n"
+        "S sH3eE4tB \"Sheet\"\n"
+        "C cA1bC2dE 0\n"
+        "R rA1bC2dE 0\n"
+        "X xA1bC2dE cA1bC2dE rA1bC2dE n 1234.56 fmt:" +
+        fmtBase64 + "\n";
 
     ParseResult result = parse(content);
     ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
@@ -988,18 +1011,28 @@ X xA1bC2dE cA1bC2dE rA1bC2dE n 1234.56 fmt:FMT_C002
     ASSERT_NE(cell, nullptr);
 
     EXPECT_DOUBLE_EQ(cell->value.asNumber(), 1234.56);
-    // Format is now read from workbook map
-    EXPECT_EQ(result.workbook->getFormatId(cell->id), ID("FMT_C002"));
+    // Format is now read from workbook map as FormatBuffer
+    const FormatBuffer* parsedFmt = result.workbook->getEntityFormat(cell->id);
+    ASSERT_NE(parsedFmt, nullptr);
+    EXPECT_EQ(parsedFmt->getCategory(), NumberFormatCategory::CURRENCY);
+    EXPECT_EQ(parsedFmt->getDecimals(), 2);
+    EXPECT_TRUE(parsedFmt->hasThousandsSeparator());
+    EXPECT_EQ(parsedFmt->getCurrencySymbol(), "$");
 }
 
 TEST(CellFormatTest, ParseCellWithStringValueAndFormat) {
-    const std::string content = R"(
-D aB3cD4eF "Test"
-S sH3eE4tB "Sheet"
-C cA1bC2dE 0
-R rA1bC2dE 0
-X xA1bC2dE cA1bC2dE rA1bC2dE s "Hello" fmt:FMT_TEXT
-)";
+    // Create a text format for testing
+    FormatBuffer fmt;
+    fmt.setCategory(NumberFormatCategory::TEXT);
+    const std::string fmtBase64 = fmt.toBase64();
+
+    const std::string content =
+        "D aB3cD4eF \"Test\"\n"
+        "S sH3eE4tB \"Sheet\"\n"
+        "C cA1bC2dE 0\n"
+        "R rA1bC2dE 0\n"
+        "X xA1bC2dE cA1bC2dE rA1bC2dE s \"Hello\" fmt:" +
+        fmtBase64 + "\n";
 
     ParseResult result = parse(content);
     ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
@@ -1009,18 +1042,26 @@ X xA1bC2dE cA1bC2dE rA1bC2dE s "Hello" fmt:FMT_TEXT
     ASSERT_NE(cell, nullptr);
 
     EXPECT_EQ(cell->value.asString(), "Hello");
-    // Format is now read from workbook map
-    EXPECT_EQ(result.workbook->getFormatId(cell->id), ID("FMT_TEXT"));
+    // Format is now read from workbook map as FormatBuffer
+    const FormatBuffer* parsedFmt = result.workbook->getEntityFormat(cell->id);
+    ASSERT_NE(parsedFmt, nullptr);
+    EXPECT_EQ(parsedFmt->getCategory(), NumberFormatCategory::TEXT);
 }
 
 TEST(CellFormatTest, ParseCellWithFormulaAndFormat) {
-    const std::string content = R"(
-D aB3cD4eF "Test"
-S sH3eE4tB "Sheet"
-C cA1bC2dE 0
-R rA1bC2dE 0
-X xA1bC2dE cA1bC2dE rA1bC2dE f "=A1+A2" fmt:FMT_C002
-)";
+    // Create a currency format for testing
+    FormatBuffer fmt;
+    fmt.setCategory(NumberFormatCategory::CURRENCY);
+    fmt.setDecimals(2);
+    const std::string fmtBase64 = fmt.toBase64();
+
+    const std::string content =
+        "D aB3cD4eF \"Test\"\n"
+        "S sH3eE4tB \"Sheet\"\n"
+        "C cA1bC2dE 0\n"
+        "R rA1bC2dE 0\n"
+        "X xA1bC2dE cA1bC2dE rA1bC2dE f \"=A1+A2\" fmt:" +
+        fmtBase64 + "\n";
 
     ParseResult result = parse(content);
     ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
@@ -1030,29 +1071,36 @@ X xA1bC2dE cA1bC2dE rA1bC2dE f "=A1+A2" fmt:FMT_C002
     ASSERT_NE(cell, nullptr);
 
     EXPECT_TRUE(cell->isFormula());
-    // Format is now read from workbook map
-    EXPECT_EQ(result.workbook->getFormatId(cell->id), ID("FMT_C002"));
+    // Format is now read from workbook map as FormatBuffer
+    const FormatBuffer* parsedFmt = result.workbook->getEntityFormat(cell->id);
+    ASSERT_NE(parsedFmt, nullptr);
+    EXPECT_EQ(parsedFmt->getCategory(), NumberFormatCategory::CURRENCY);
+    EXPECT_EQ(parsedFmt->getDecimals(), 2);
 }
 
-// --- Custom Format Tests ---
+// --- Content-Addressed Format Tests ---
+// NOTE: Custom F lines are no longer serialized. Formats are content-addressed
+// and stored directly on entities as base64. Legacy F lines are ignored on parse.
 
-TEST(CustomFormatTest, SerializeCustomFormats) {
-    auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
+TEST(ContentAddressedFormatTest, FormatBufferSerializesToBase64) {
+    FormatBuffer fmt;
+    fmt.setCategory(NumberFormatCategory::NUMBER);
+    fmt.setDecimals(2);
+    fmt.setThousandsSeparator(true);
 
-    // Register some custom formats
-    wb->registerCustomFormat(ID("cF1aB2cD"), "#,##0.00");
-    wb->registerCustomFormat(ID("cF2eF3gH"), "0.00%");
-    wb->registerCustomFormat(ID("cF3iJ4kL"), "$#,##0.00");
+    const std::string base64 = fmt.toBase64();
+    EXPECT_FALSE(base64.empty());
 
-    const std::string serialized = serialize(*wb);
-
-    // Check that format lines are in the output
-    EXPECT_NE(serialized.find("F cF1aB2cD \"#,##0.00\""), std::string::npos);
-    EXPECT_NE(serialized.find("F cF2eF3gH \"0.00%\""), std::string::npos);
-    EXPECT_NE(serialized.find("F cF3iJ4kL \"$#,##0.00\""), std::string::npos);
+    // Round-trip
+    auto parsed = FormatBuffer::fromBase64(base64);
+    ASSERT_TRUE(parsed.has_value());
+    EXPECT_EQ(parsed->getCategory(), NumberFormatCategory::NUMBER);
+    EXPECT_EQ(parsed->getDecimals(), 2);
+    EXPECT_TRUE(parsed->hasThousandsSeparator());
 }
 
-TEST(CustomFormatTest, ParseCustomFormats) {
+TEST(ContentAddressedFormatTest, LegacyFLinesIgnored) {
+    // Legacy F lines should be ignored (not cause parse errors)
     const std::string content = R"(
 D aB3cD4eF "Test"
 F cF1aB2cD "#,##0.00"
@@ -1063,54 +1111,35 @@ S sH3eE4tB "Sheet"
     ParseResult result = parse(content);
     ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
 
-    // Verify custom formats were parsed
-    EXPECT_TRUE(result.workbook->hasCustomFormat(ID("cF1aB2cD")));
-    EXPECT_TRUE(result.workbook->hasCustomFormat(ID("cF2eF3gH")));
-    EXPECT_EQ(result.workbook->getCustomFormatCode(ID("cF1aB2cD")), "#,##0.00");
-    EXPECT_EQ(result.workbook->getCustomFormatCode(ID("cF2eF3gH")), "0.00%");
+    // Legacy custom formats are NOT stored (F lines ignored)
+    // The new system uses content-addressed formats directly on entities
+    EXPECT_FALSE(result.workbook->hasCustomFormat(ID("cF1aB2cD")));
+    EXPECT_FALSE(result.workbook->hasCustomFormat(ID("cF2eF3gH")));
 }
 
-TEST(CustomFormatTest, RoundtripCustomFormats) {
+TEST(ContentAddressedFormatTest, NoFLinesInOutput) {
     auto wb = std::make_unique<Workbook>(ID("aB3cD4eF"), "Test");
     auto sheet = std::make_unique<Sheet>(ID("sH3eE4tB"), "Sheet");
     wb->addSheet(std::move(sheet));
 
-    // Register custom formats
+    // Even if we register custom formats (legacy API), they won't be serialized as F lines
     wb->registerCustomFormat(ID("cF1aB2cD"), "#,##0.00");
-    wb->registerCustomFormat(ID("cF2eF3gH"), "0.00%");
 
-    // Serialize
     const std::string serialized = serialize(*wb);
 
-    // Parse back
-    ParseResult result = parse(serialized);
-    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
-
-    // Verify custom formats are preserved
-    EXPECT_TRUE(result.workbook->hasCustomFormat(ID("cF1aB2cD")));
-    EXPECT_TRUE(result.workbook->hasCustomFormat(ID("cF2eF3gH")));
-    EXPECT_EQ(result.workbook->getCustomFormatCode(ID("cF1aB2cD")), "#,##0.00");
-    EXPECT_EQ(result.workbook->getCustomFormatCode(ID("cF2eF3gH")), "0.00%");
-
-    // Verify formats can be retrieved
-    const auto& formats = result.workbook->getCustomFormats();
-    EXPECT_EQ(formats.size(), 2);
+    // F lines should NOT appear in output
+    EXPECT_EQ(serialized.find("F cF1aB2cD"), std::string::npos);
 }
 
-TEST(CustomFormatTest, ParseFormatWithSpecialChars) {
-    // Format codes can contain special characters that need escaping
-    const std::string content = R"(
-D aB3cD4eF "Test"
-F cF1aB2cD "[Red]#,##0.00;[Blue]-#,##0.00"
-S sH3eE4tB "Sheet"
-)";
+TEST(ContentAddressedFormatTest, CustomFormatCodeInFormatBuffer) {
+    // For complex Excel format codes, use setCustomFormatCode
+    FormatBuffer fmt;
+    fmt.setCustomFormatCode("[Red]#,##0.00;[Blue]-#,##0.00");
 
-    ParseResult result = parse(content);
-    ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
-
-    EXPECT_TRUE(result.workbook->hasCustomFormat(ID("cF1aB2cD")));
-    EXPECT_EQ(result.workbook->getCustomFormatCode(ID("cF1aB2cD")),
-              "[Red]#,##0.00;[Blue]-#,##0.00");
+    const std::string base64 = fmt.toBase64();
+    auto parsed = FormatBuffer::fromBase64(base64);
+    ASSERT_TRUE(parsed.has_value());
+    EXPECT_EQ(parsed->getCustomFormatCode(), "[Red]#,##0.00;[Blue]-#,##0.00");
 }
 
 // =============================================================================
@@ -1314,15 +1343,21 @@ TEST(StyleSerializationTest, ParseCellWithBothFormatAndStyle) {
     styleBuf.setBold(true);
     const std::string base64Style = styleBuf.toBase64();
 
+    // Create a currency format and encode it
+    FormatBuffer fmtBuf;
+    fmtBuf.setCategory(NumberFormatCategory::CURRENCY);
+    fmtBuf.setDecimals(2);
+    fmtBuf.setCurrencySymbol("$");
+    const std::string base64Fmt = fmtBuf.toBase64();
+
     const std::string content =
         "#cells v1\n"
         "D aB3cD4eF \"Test\"\n"
-        "F FMT_C002 \"$#,##0.00\"\n"
         "S sH3eE4tB \"Sheet\"\n"
         "C cA1bC2dE 0\n"
         "R rA1bC2dE 0\n"
-        "X xA1bC2dE cA1bC2dE rA1bC2dE n 42 fmt:FMT_C002 sty:" +
-        base64Style + "\n";
+        "X xA1bC2dE cA1bC2dE rA1bC2dE n 42 fmt:" +
+        base64Fmt + " sty:" + base64Style + "\n";
 
     ParseResult result = parse(content);
     ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
@@ -1330,8 +1365,12 @@ TEST(StyleSerializationTest, ParseCellWithBothFormatAndStyle) {
     Sheet* sheet = result.workbook->getSheetByIndex(0);
     Cell* cell = sheet->getCell(ID("xA1bC2dE"));
     ASSERT_NE(cell, nullptr);
-    // Format is read from workbook map, style from entity
-    EXPECT_EQ(result.workbook->getFormatId(cell->id).toString(), "FMT_C002");
+    // Format is read from workbook map as FormatBuffer
+    const FormatBuffer* parsedFmt = result.workbook->getEntityFormat(cell->id);
+    ASSERT_NE(parsedFmt, nullptr);
+    EXPECT_EQ(parsedFmt->getCategory(), NumberFormatCategory::CURRENCY);
+    EXPECT_EQ(parsedFmt->getDecimals(), 2);
+    // Style from entity
     const StyleBuffer* parsedBuf = result.workbook->getEntityStyle(cell->id);
     ASSERT_NE(parsedBuf, nullptr);
     const CellStyle style = parsedBuf->toCellStyle();
@@ -1868,11 +1907,18 @@ TEST(StyleZCDRoundtripTest, ParseStyledZCDFile) {
     warnStyle.setBgColor(0xFF, 0xC0, 0x00);  // #FFC000
     const std::string warnB64 = warnStyle.toBase64();
 
-    // Build ZCD content with content-addressed styles
+    // Create a currency format (content-addressed)
+    FormatBuffer currencyFmt;
+    currencyFmt.setCategory(NumberFormatCategory::CURRENCY);
+    currencyFmt.setDecimals(2);
+    currencyFmt.setThousandsSeparator(true);
+    currencyFmt.setCurrencySymbol("$");
+    const std::string currencyB64 = currencyFmt.toBase64();
+
+    // Build ZCD content with content-addressed styles and formats
     std::string content =
         "#cells v1\n"
         "D aB3cD4eF \"Styled Document\"\n"
-        "F FMT_C002 \"$#,##0.00\"\n"
         "S sH3eE4tB \"Data\"\n"
         "C cA1bC2dE 0\n"
         "C cB3dE4fG 1\n"
@@ -1886,14 +1932,14 @@ TEST(StyleZCDRoundtripTest, ParseStyledZCDFile) {
         headerB64 +
         "\n"
         "X xC5fG6hJ cA1bC2dE rB3dE4fG s \"Sales\"\n"
-        "X xD7hJ8kL cB3dE4fG rB3dE4fG n 10000 fmt:FMT_C002 sty:" +
-        moneyB64 +
+        "X xD7hJ8kL cB3dE4fG rB3dE4fG n 10000 fmt:" +
+        currencyB64 + " sty:" + moneyB64 +
         "\n"
         "X xE9kL0mN cA1bC2dE rC5fG6hJ s \"Warning\" sty:" +
         warnB64 +
         "\n"
-        "X xF1mN2pQ cB3dE4fG rC5fG6hJ n -500 fmt:FMT_C002 sty:" +
-        warnB64 + "\n";
+        "X xF1mN2pQ cB3dE4fG rC5fG6hJ n -500 fmt:" +
+        currencyB64 + " sty:" + warnB64 + "\n";
 
     ParseResult result = parse(content);
     ASSERT_TRUE(result.ok()) << (result.error ? result.error->toString() : "");
@@ -1921,7 +1967,9 @@ TEST(StyleZCDRoundtripTest, ParseStyledZCDFile) {
 
     // Verify cell with both format and style
     Cell* amountCell = result.workbook->getSheetByIndex(0)->getCell(ID("xD7hJ8kL"));
-    EXPECT_EQ(result.workbook->getFormatId(amountCell->id).toString(), "FMT_C002");
+    const FormatBuffer* parsedFmt = result.workbook->getEntityFormat(amountCell->id);
+    ASSERT_NE(parsedFmt, nullptr);
+    EXPECT_EQ(parsedFmt->getCategory(), NumberFormatCategory::CURRENCY);
     EXPECT_NE(result.workbook->getEntityStyle(amountCell->id), nullptr);
 
     // Serialize and verify round-trip

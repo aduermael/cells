@@ -5,6 +5,7 @@
 #include <charconv>
 #include <sstream>
 
+#include "core/cells/format_buffer.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
@@ -122,8 +123,10 @@ bool Parser::parseLine(std::string_view line) {
         case 'D':  // Document
             return parseDocument(line.substr(firstNonSpace));
 
-        case 'F':  // Custom format
-            return parseFormat(line.substr(firstNonSpace));
+        case 'F':  // Legacy custom format - ignore (formats are now content-addressed)
+            // Formats are now content-addressed (fmt:<base64> on entities).
+            // F lines are legacy and can be safely ignored during parsing.
+            return true;
 
         case 'S':  // Sheet
             return parseSheet(line.substr(firstNonSpace));
@@ -188,33 +191,11 @@ bool Parser::parseDocument(std::string_view line) {
     return true;
 }
 
-bool Parser::parseFormat(std::string_view line) {
-    // Format: F <id> "<format-code>"
-    if (line.size() < 2 || line[0] != 'F' || line[1] != ' ') {
-        return setError("Invalid format line");
-    }
-
-    line = line.substr(2);  // Skip "F "
-
-    // Parse ID (8 characters)
-    const size_t spacePos = line.find(' ');
-    if (spacePos == std::string_view::npos || spacePos < 1) {
-        return setError("Missing format ID");
-    }
-
-    const std::string idStr(line.substr(0, spacePos));
-    const ID formatId(idStr);
-
-    // Parse quoted format code
-    line = line.substr(spacePos + 1);
-    std::string formatCode;
-    size_t consumed = 0;
-    if (!parseQuotedString(line, formatCode, consumed)) {
-        return setError("Invalid format code, expected quoted string");
-    }
-
-    // Register the custom format in the workbook
-    workbook_->registerCustomFormat(formatId, formatCode);
+bool Parser::parseFormat(std::string_view /*line*/) {
+    // Legacy F lines are no longer used. Formats are now content-addressed
+    // and stored directly on entities as base64 (fmt:<base64>).
+    // This method is kept for API compatibility but does nothing.
+    // The switch statement in parseLine() already returns true for 'F' lines.
     return true;
 }
 
@@ -585,10 +566,16 @@ std::optional<StyleBuffer> Parser::parseStyleValue(const std::string& value) con
     return StyleBuffer::fromBase64(value);
 }
 
+std::optional<FormatBuffer> Parser::parseFormatValue(const std::string& value) const {
+    // Decode base64 FormatBuffer (content-addressed format)
+    return FormatBuffer::fromBase64(value);
+}
+
 bool Parser::parseAxisProps(std::string_view props, Axis& axis,
-                            std::optional<StyleBuffer>* outStyle, ID* outFormatId) {
+                            std::optional<StyleBuffer>* outStyle,
+                            std::optional<FormatBuffer>* outFormat) {
     // Format: key:value pairs separated by space
-    // Examples: w:100 name:"Total" h:30 sty:<base64> fmt:FMT_C002
+    // Examples: w:100 name:"Total" h:30 sty:<base64> fmt:<base64>
 
     while (!props.empty()) {
         // Skip leading whitespace
@@ -671,13 +658,13 @@ bool Parser::parseAxisProps(std::string_view props, Axis& axis,
                 props = props.substr(endPos);
             }
         } else if (key == "fmt") {
-            // Format ID value - output via optional parameter (stored in workbook map by caller)
+            // Format value - content-addressed base64
             const size_t endPos = props.find_first_of(" \t");
             const std::string_view valueStr =
                 (endPos == std::string_view::npos) ? props : props.substr(0, endPos);
 
-            if (outFormatId != nullptr) {
-                *outFormatId = ID(std::string(valueStr));
+            if (outFormat != nullptr) {
+                *outFormat = parseFormatValue(std::string(valueStr));
             }
             axis.setHasFormat(true);  // Set flag for hasFormat() accessor
 
@@ -751,11 +738,11 @@ bool Parser::parseColumn(std::string_view line) {
     }
     col->position = static_cast<uint32_t>(position);
 
-    // Parse optional properties (style stored as StyleBuffer, format as ID)
+    // Parse optional properties (style and format stored as content-addressed buffers)
     std::optional<StyleBuffer> styleBuf;
-    ID formatId;
+    std::optional<FormatBuffer> formatBuf;
     if (propsStart < line.size()) {
-        if (!parseAxisProps(line.substr(propsStart), *col, &styleBuf, &formatId)) {
+        if (!parseAxisProps(line.substr(propsStart), *col, &styleBuf, &formatBuf)) {
             return setError("Invalid column properties");
         }
     }
@@ -766,8 +753,8 @@ bool Parser::parseColumn(std::string_view line) {
     if (workbook_ != nullptr && styleBuf.has_value()) {
         workbook_->setEntityStyle(colId, *styleBuf);
     }
-    if (workbook_ != nullptr && !formatId.isNull()) {
-        workbook_->setFormatId(colId, formatId);
+    if (workbook_ != nullptr && formatBuf.has_value()) {
+        workbook_->setEntityFormat(colId, *formatBuf);
     }
     return true;
 }
@@ -821,11 +808,11 @@ bool Parser::parseRow(std::string_view line) {
     }
     row->position = static_cast<uint32_t>(position);
 
-    // Parse optional properties (style stored as StyleBuffer, format as ID)
+    // Parse optional properties (style and format stored as content-addressed buffers)
     std::optional<StyleBuffer> styleBuf;
-    ID formatId;
+    std::optional<FormatBuffer> formatBuf;
     if (propsStart < line.size()) {
-        if (!parseAxisProps(line.substr(propsStart), *row, &styleBuf, &formatId)) {
+        if (!parseAxisProps(line.substr(propsStart), *row, &styleBuf, &formatBuf)) {
             return setError("Invalid row properties");
         }
     }
@@ -836,8 +823,8 @@ bool Parser::parseRow(std::string_view line) {
     if (workbook_ != nullptr && styleBuf.has_value()) {
         workbook_->setEntityStyle(rowId, *styleBuf);
     }
-    if (workbook_ != nullptr && !formatId.isNull()) {
-        workbook_->setFormatId(rowId, formatId);
+    if (workbook_ != nullptr && formatBuf.has_value()) {
+        workbook_->setEntityFormat(rowId, *formatBuf);
     }
     return true;
 }
@@ -938,7 +925,7 @@ bool Parser::parseCellValue(std::string_view value, char type, CellValue& out, s
 }
 
 bool Parser::parseCellProps(std::string_view props, Cell& cell) {
-    // Parse optional properties: fmt:<formatId>
+    // Parse optional properties: fmt:<base64> sty:<base64>
     // Format: key:value pairs separated by space
 
     while (!props.empty()) {
@@ -964,15 +951,18 @@ bool Parser::parseCellProps(std::string_view props, Cell& cell) {
 
         // Parse value based on key
         if (key == "fmt") {
-            // Format ID: 8 characters - store in workbook map, not cell
+            // Format value: content-addressed base64
             size_t end = props.find_first_of(" \t");
             if (end == std::string_view::npos) {
                 end = props.size();
             }
-            const ID formatId(std::string(props.substr(0, end)));
-            if (workbook_ != nullptr && !formatId.isNull()) {
-                workbook_->setFormatId(cell.id, formatId);
-                cell.markHasFormat();
+            const std::string formatValue(props.substr(0, end));
+            if (workbook_ != nullptr) {
+                auto formatBuf = parseFormatValue(formatValue);
+                if (formatBuf.has_value()) {
+                    workbook_->setEntityFormat(cell.id, *formatBuf);
+                    cell.markHasFormat();
+                }
             }
             props = (end < props.size()) ? props.substr(end) : "";
         } else if (key == "sty") {
@@ -1144,8 +1134,8 @@ bool Parser::resolveSharedFormulas() {
 }
 
 bool Parser::parseRange(std::string_view line) {
-    // Format: RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<styleId>]
-    // Example: RG r8KjP2mN c1AbC2dE r1FgH2iJ c2KlM3nO r2PqR3sT 1 sty:s5WxY6zA
+    // Format: RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [fmt:<base64>]
+    // [sty:<base64>] Example: RG r8KjP2mN c1AbC2dE r1FgH2iJ c2KlM3nO r2PqR3sT 1 fmt:AQMC sty:DAAD
 
     if (line.size() < 3 || line[0] != 'R' || line[1] != 'G' || line[2] != ' ') {
         return setError("Invalid range line");
@@ -1214,15 +1204,46 @@ bool Parser::parseRange(std::string_view line) {
     const Range* rangePtr = range.get();
     currentSheet_->addRange(std::move(range));
 
-    // Parse optional style reference (content-addressed base64)
+    // Parse optional fmt: and sty: properties (content-addressed base64)
     if (spacePos != std::string_view::npos) {
         line = line.substr(spacePos + 1);
-        // Look for "sty:" property
-        if (line.substr(0, 4) == "sty:") {
-            const std::string styleValue(line.substr(4));
-            auto styleBuf = parseStyleValue(styleValue);
-            if (styleBuf.has_value()) {
-                currentSheet_->setRangeStyle(rangePtr->id, *styleBuf);
+
+        // Parse remaining key:value pairs
+        while (!line.empty()) {
+            // Skip leading whitespace
+            const size_t start = line.find_first_not_of(" \t");
+            if (start == std::string_view::npos) {
+                break;
+            }
+            line = line.substr(start);
+
+            // Look for property prefix
+            if (line.size() >= 4 && line.substr(0, 4) == "fmt:") {
+                line = line.substr(4);
+                // Find end of value
+                const size_t end = line.find_first_of(" \t");
+                const std::string formatValue(
+                    (end == std::string_view::npos) ? line : line.substr(0, end));
+                auto formatBuf = parseFormatValue(formatValue);
+                if (formatBuf.has_value()) {
+                    currentSheet_->setRangeFormat(rangePtr->id, *formatBuf);
+                }
+                line = (end == std::string_view::npos) ? "" : line.substr(end);
+            } else if (line.size() >= 4 && line.substr(0, 4) == "sty:") {
+                line = line.substr(4);
+                // Find end of value
+                const size_t end = line.find_first_of(" \t");
+                const std::string styleValue((end == std::string_view::npos) ? line
+                                                                             : line.substr(0, end));
+                auto styleBuf = parseStyleValue(styleValue);
+                if (styleBuf.has_value()) {
+                    currentSheet_->setRangeStyle(rangePtr->id, *styleBuf);
+                }
+                line = (end == std::string_view::npos) ? "" : line.substr(end);
+            } else {
+                // Unknown property, skip to next space
+                const size_t end = line.find_first_of(" \t");
+                line = (end == std::string_view::npos) ? "" : line.substr(end);
             }
         }
     }

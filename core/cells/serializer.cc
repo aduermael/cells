@@ -6,6 +6,7 @@
 #include <sstream>
 #include <vector>
 
+#include "core/cells/format_buffer.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/named_ranges.h"
 #include "core/cells/range.h"
@@ -137,8 +138,8 @@ std::string Serializer::serialize(const Workbook& workbook) const {
 void Serializer::serialize(const Workbook& workbook, std::ostream& out) const {
     serializeHeader(workbook, out);
 
-    // Serialize custom formats (before sheets, as cells may reference them)
-    serializeCustomFormats(workbook, out);
+    // NOTE: Formats are now content-addressed (like styles) and serialized directly
+    // on entities as base64. No separate F lines needed.
 
     // NOTE: Styles are now content-addressed and serialized directly on entities
     // (no separate Y lines needed - the base64 content IS the identity)
@@ -163,28 +164,10 @@ void Serializer::serializeHeader(const Workbook& workbook, std::ostream& out) co
     out << "D " << workbook.id.toString() << " \"" << escapeString(workbook.name) << "\"\n";
 }
 
-void Serializer::serializeCustomFormats(const Workbook& workbook, std::ostream& out) const {
-    const auto& customFormats = workbook.getCustomFormats();
-    if (customFormats.empty()) {
-        return;
-    }
-
-    // Sort formats by ID for deterministic output
-    std::vector<std::pair<std::string, std::string>> ordered;
-    ordered.reserve(customFormats.size());
-
-    for (const auto& [formatId, formatCode] : customFormats) {
-        ordered.emplace_back(formatId.toString(), formatCode);
-    }
-
-    std::sort(ordered.begin(), ordered.end(),
-              [](const auto& a, const auto& b) { return a.first < b.first; });
-
-    // Output format definitions
-    // Format: F <format-id> "<format-code>"
-    for (const auto& [idStr, formatCode] : ordered) {
-        out << "F " << idStr << " \"" << escapeString(formatCode) << "\"\n";
-    }
+void Serializer::serializeCustomFormats(const Workbook& /*workbook*/, std::ostream& /*out*/) const {
+    // No-op: Formats are now content-addressed and serialized directly on entities.
+    // This method is kept for API compatibility but does nothing.
+    // Custom formats are encoded as base64 in fmt: properties on cells/axes.
 }
 
 void Serializer::serializeNamedRanges(const Workbook& workbook, std::ostream& out) const {
@@ -382,14 +365,20 @@ void Serializer::serializeRanges(const Sheet& sheet, std::ostream& out) const {
               [](const auto& a, const auto& b) { return a.first < b.first; });
 
     // Serialize each range
-    // Format: RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<base64>]
+    // Format: RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [fmt:<base64>]
+    // [sty:<base64>]
     for (const auto& item : ordered) {
         const Range* range = item.second;
         out << "RG " << range->id.toString() << " " << range->startColId.toString() << " "
             << range->startRowId.toString() << " " << range->endColId.toString() << " "
             << range->endRowId.toString() << " " << static_cast<int>(range->flags);
 
-        // Add style content directly (content-addressed) if RANGE_STYLE flag is set
+        // Add format content directly (content-addressed) if FORMAT flag is set
+        if (range->hasFlag(RangeFlags::FORMAT) && range->format.has_value()) {
+            out << " fmt:" << range->format->toBase64();
+        }
+
+        // Add style content directly (content-addressed) if STYLE flag is set
         if (range->hasFlag(RangeFlags::STYLE) && range->style.has_value()) {
             out << " sty:" << range->style->toBase64();
         }
@@ -426,11 +415,11 @@ void Serializer::serializeAxis(const Workbook& workbook, const Axis& axis, char 
         }
     }
 
-    // Axis format is stored in workbook._formats map (not in Axis struct)
+    // Axis format is stored in workbook._entityFormats map (content-addressed)
     if (axis.hasFormat()) {
-        const ID formatId = workbook.getFormatId(axis.id);
-        if (!formatId.isNull()) {
-            out << " fmt:" << formatId.toString();
+        const FormatBuffer* formatBuf = workbook.getEntityFormat(axis.id);
+        if (formatBuf != nullptr) {
+            out << " fmt:" << formatBuf->toBase64();
         }
     }
 
@@ -439,16 +428,16 @@ void Serializer::serializeAxis(const Workbook& workbook, const Axis& axis, char 
 
 void Serializer::serializeCell(const Workbook& workbook, const Cell& cell, const Sheet& sheet,
                                std::ostream& out) const {
-    // Format: X <id> <col> <row> <type> <value> [fmt:<formatId>] [sty:<styleId>]
+    // Format: X <id> <col> <row> <type> <value> [fmt:<base64>] [sty:<base64>]
     out << "X " << cell.id.toString() << " " << cell.colId.toString() << " "
         << cell.rowId.toString() << " ";
 
     serializeCellValue(cell.value, cell, sheet, out);
 
-    // Optional format property (only if not null/default) - read from workbook map
-    const ID formatId = workbook.getFormatId(cell.id);
-    if (!formatId.isNull()) {
-        out << " fmt:" << formatId.toString();
+    // Optional format property (content-addressed) - read from workbook map
+    const FormatBuffer* formatBuf = workbook.getEntityFormat(cell.id);
+    if (formatBuf != nullptr) {
+        out << " fmt:" << formatBuf->toBase64();
     }
 
     // Optional style property (content-addressed) - read from workbook

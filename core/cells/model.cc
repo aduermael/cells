@@ -1348,4 +1348,48 @@ StyleBuffer* Workbook::getRangeStyle(const ID& rangeId) {
     return range->getStyle();
 }
 
+// =============================================================================
+// Range format storage (content-addressed FormatBuffer)
+// =============================================================================
+
+void Workbook::setRangeFormat(const ID& rangeId, const FormatBuffer& format) {
+    Range* range = getRange(rangeId);
+    if (!range) {
+        return;  // Range doesn't exist
+    }
+    range->setFormat(format);
+}
+
+void Workbook::setRangeFormat(const ID& rangeId, FormatBuffer&& format) {
+    Range* range = getRange(rangeId);
+    if (!range) {
+        return;  // Range doesn't exist
+    }
+    range->setFormat(std::move(format));
+}
+
+void Workbook::clearRangeFormat(const ID& rangeId) {
+    Range* range = getRange(rangeId);
+    if (!range) {
+        return;  // Range doesn't exist
+    }
+    range->clearFormat();
+}
+
+const FormatBuffer* Workbook::getRangeFormat(const ID& rangeId) const {
+    const Range* range = getRange(rangeId);
+    if (!range) {
+        return nullptr;
+    }
+    return range->getFormat();
+}
+
+FormatBuffer* Workbook::getRangeFormat(const ID& rangeId) {
+    Range* range = getRange(rangeId);
+    if (!range) {
+        return nullptr;
+    }
+    return range->getFormat();
+}
+
 }  // namespace cells

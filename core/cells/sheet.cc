@@ -1251,6 +1251,70 @@ StyleBuffer* Sheet::getRangeStyle(const ID& rangeId) {
 }
 
 // =============================================================================
+// Range format storage (content-addressed FormatBuffer, delegates to Workbook)
+// =============================================================================
+
+void Sheet::setRangeFormat(const ID& rangeId, const FormatBuffer& format) {
+    if (_workbook == nullptr) {
+        return;
+    }
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
+        return;
+    }
+    _workbook->setRangeFormat(rangeId, format);
+}
+
+void Sheet::setRangeFormat(const ID& rangeId, FormatBuffer&& format) {
+    if (_workbook == nullptr) {
+        return;
+    }
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
+        return;
+    }
+    _workbook->setRangeFormat(rangeId, std::move(format));
+}
+
+void Sheet::clearRangeFormat(const ID& rangeId) {
+    if (_workbook == nullptr) {
+        return;
+    }
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
+        return;
+    }
+    _workbook->clearRangeFormat(rangeId);
+}
+
+const FormatBuffer* Sheet::getRangeFormat(const ID& rangeId) const {
+    if (_workbook == nullptr) {
+        return nullptr;
+    }
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
+        return nullptr;
+    }
+    return _workbook->getRangeFormat(rangeId);
+}
+
+FormatBuffer* Sheet::getRangeFormat(const ID& rangeId) {
+    if (_workbook == nullptr) {
+        return nullptr;
+    }
+    // Verify range belongs to this sheet
+    const Range* range = _workbook->getRange(rangeId);
+    if (!rangeInSheet(range, this, _workbook)) {
+        return nullptr;
+    }
+    return _workbook->getRangeFormat(rangeId);
+}
+
+// =============================================================================
 // Spill Range Spatial Index (for fast viewport queries)
 // =============================================================================
 

@@ -115,13 +115,18 @@ private:
     // Helper parsers
     static bool parseQuotedString(std::string_view input, std::string& out, size_t& consumed);
     bool parseAxisProps(std::string_view props, Axis& axis, std::optional<StyleBuffer>* outStyle,
-                        ID* outFormatId = nullptr);
+                        std::optional<FormatBuffer>* outFormat = nullptr);
     // Non-static because it needs access to workbook_ for format/style storage
     bool parseCellProps(std::string_view props, Cell& cell);
 
     // Parse style value (content-addressed base64)
     // Returns StyleBuffer if the value can be parsed, nullopt otherwise
     [[nodiscard]] std::optional<StyleBuffer> parseStyleValue(const std::string& value) const;
+
+    // Parse format value (content-addressed base64)
+    // Returns FormatBuffer if the value can be parsed, nullopt otherwise
+    [[nodiscard]] std::optional<FormatBuffer> parseFormatValue(const std::string& value) const;
+
     bool parseCellValue(std::string_view value, char type, CellValue& out, size_t& consumed);
 };
 

@@ -176,8 +176,8 @@ Analogous to StyleBuffer, but for number format encoding.
 
 ### Phase 4: Update Serialization
 
-- [ ] 4a: Update ZCD serializer to write base64 formats directly (no more `F` lines)
-- [ ] 4b: Update ZCD parser to only accept base64 `fmt:` values (remove `F` line parsing entirely)
+- [x] 4a: Update ZCD serializer to write base64 formats directly (no more `F` lines). Modified serializeCustomFormats() to be a no-op, updated serializeAxis(), serializeCell(), and serializeRanges() to write `fmt:<base64>` using FormatBuffer.toBase64() instead of format ID.
+- [x] 4b: Update ZCD parser to only accept base64 `fmt:` values (remove `F` line parsing entirely). F lines now ignored (legacy), parseAxisProps and parseCellProps updated to parse fmt: as FormatBuffer, parseRange updated to handle fmt: property. Added setRangeFormat methods to Sheet and Workbook.
 - [ ] 4c: Update XLSX import to create FormatBuffer directly
 - [ ] 4d: Update XLSX export to read from FormatBuffer
 - [ ] 4e: Update bootstrap to emit content-addressed formats

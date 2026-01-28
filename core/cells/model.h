@@ -720,6 +720,25 @@ struct Sheet {
     // Get mutable style from a range (returns nullptr if no style)
     [[nodiscard]] StyleBuffer* getRangeStyle(const ID& rangeId);
 
+    // ========================================================================
+    // Range format storage (content-addressed FormatBuffer, delegates to Workbook)
+    // ========================================================================
+
+    // Set the format on a range using content-addressed FormatBuffer
+    void setRangeFormat(const ID& rangeId, const FormatBuffer& format);
+
+    // Set the format directly on a range (move semantics)
+    void setRangeFormat(const ID& rangeId, FormatBuffer&& format);
+
+    // Clear the format from a range
+    void clearRangeFormat(const ID& rangeId);
+
+    // Get the format from a range (returns nullptr if no format)
+    [[nodiscard]] const FormatBuffer* getRangeFormat(const ID& rangeId) const;
+
+    // Get mutable format from a range (returns nullptr if no format)
+    [[nodiscard]] FormatBuffer* getRangeFormat(const ID& rangeId);
+
 private:
     // Parent workbook (set by Workbook::addSheet)
     Workbook* _workbook{nullptr};
@@ -1128,6 +1147,25 @@ struct Workbook {
 
     // Get mutable style from a range (returns nullptr if no style)
     [[nodiscard]] StyleBuffer* getRangeStyle(const ID& rangeId);
+
+    // ========================================================================
+    // Range format storage (content-addressed FormatBuffer)
+    // ========================================================================
+
+    // Set the format on a range using content-addressed FormatBuffer
+    void setRangeFormat(const ID& rangeId, const FormatBuffer& format);
+
+    // Set the format directly on a range (move semantics)
+    void setRangeFormat(const ID& rangeId, FormatBuffer&& format);
+
+    // Clear the format from a range
+    void clearRangeFormat(const ID& rangeId);
+
+    // Get the format from a range (returns nullptr if no format)
+    [[nodiscard]] const FormatBuffer* getRangeFormat(const ID& rangeId) const;
+
+    // Get mutable format from a range (returns nullptr if no format)
+    [[nodiscard]] FormatBuffer* getRangeFormat(const ID& rangeId);
 
 private:
     // Sheet lookup by ID
