@@ -740,14 +740,8 @@ size_t bootstrapOpLog(Workbook& workbook) {
         }
     }
 
-    // Generate FORMAT_DEFINE operations for all custom formats
-    for (const auto& [formatId, formatCode] : workbook.getCustomFormats()) {
-        const std::string payload =
-            "{\"format_code\":\"" + internal::jsonEscape(formatCode) + "\"}";
-        const Operation op = makeFormatDefineOp(workbook, formatId, payload);
-        oplog->addOperation(op);
-        count++;
-    }
+    // Note: FORMAT_DEFINE operations are no longer needed - formats are content-addressed
+    // and embedded directly in CELL_SET_FORMAT, AXIS_SET_FORMAT, RANGE_SET_FORMAT operations
 
     // Generate RANGE_ADD operations for all ranges (merge ranges, style ranges, etc.)
     // This must come AFTER column/row INSERT operations so the axis IDs exist
@@ -828,6 +822,70 @@ size_t bootstrapOpLog(Workbook& workbook) {
                 oplog->addOperation(op);
                 count++;
             }
+        }
+    }
+
+    // Generate CELL_SET_FORMAT operations for cells that have formats
+    for (const auto& sheet : workbook.sheets) {
+        for (const ID& cellId : sheet->getCellIds()) {
+            const Cell* cell = workbook.getCell(cellId);
+            if (!cell || !cell->hasFormat()) {
+                continue;
+            }
+
+            const FormatBuffer* entityFormat = workbook.getEntityFormat(cellId);
+            if (entityFormat != nullptr) {
+                const Operation op = makeCellSetFormatOp(workbook, cellId, *entityFormat);
+                oplog->addOperation(op);
+                count++;
+            }
+        }
+    }
+
+    // Generate AXIS_SET_FORMAT operations for columns and rows that have formats
+    for (const auto& sheet : workbook.sheets) {
+        // Column formats
+        for (const ID& colId : sheet->getColumnIds()) {
+            const Axis* axis = workbook.getColumn(colId);
+            if (!axis || !axis->hasFormat()) {
+                continue;
+            }
+
+            const FormatBuffer* entityFormat = workbook.getEntityFormat(colId);
+            if (entityFormat != nullptr) {
+                const Operation op = makeAxisSetFormatOp(workbook, colId, *entityFormat);
+                oplog->addOperation(op);
+                count++;
+            }
+        }
+
+        // Row formats
+        for (const ID& rowId : sheet->getRowIds()) {
+            const Axis* axis = workbook.getRow(rowId);
+            if (!axis || !axis->hasFormat()) {
+                continue;
+            }
+
+            const FormatBuffer* entityFormat = workbook.getEntityFormat(rowId);
+            if (entityFormat != nullptr) {
+                const Operation op = makeAxisSetFormatOp(workbook, rowId, *entityFormat);
+                oplog->addOperation(op);
+                count++;
+            }
+        }
+    }
+
+    // Generate RANGE_SET_FORMAT operations for ranges that have formats
+    for (const auto& sheet : workbook.sheets) {
+        for (const ID& rangeId : sheet->getRangeIds()) {
+            const Range* range = workbook.getRange(rangeId);
+            if (!range || !range->format.has_value()) {
+                continue;
+            }
+
+            const Operation op = makeRangeSetFormatOp(workbook, rangeId, range->format.value());
+            oplog->addOperation(op);
+            count++;
         }
     }
 

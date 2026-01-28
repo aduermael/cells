@@ -180,7 +180,7 @@ Analogous to StyleBuffer, but for number format encoding.
 - [x] 4b: Update ZCD parser to only accept base64 `fmt:` values (remove `F` line parsing entirely). F lines now ignored (legacy), parseAxisProps and parseCellProps updated to parse fmt: as FormatBuffer, parseRange updated to handle fmt: property. Added setRangeFormat methods to Sheet and Workbook.
 - [x] 4c: Update XLSX import to create FormatBuffer directly. Replaced `mapNumFmtIdToFormatId()` with `mapNumFmtIdToFormatBuffer()`, updated cache and lambda to return `std::optional<FormatBuffer>`, and changed cell processing to use `setEntityFormat()` instead of `setFormatId()`.
 - [x] 4d: Update XLSX export to read from FormatBuffer. Added XLSXNumFmtEntry struct, updated StyleTable to track custom numFmts and convert FormatBuffer to XLSX numFmtId. Updated generateStyles to output numFmts section and use actual numFmtId in cellXfs. Updated cell/axis collection to include FormatBuffer lookup.
-- [ ] 4e: Update bootstrap to emit content-addressed formats
+- [x] 4e: Update bootstrap to emit content-addressed formats. Removed FORMAT_DEFINE operation generation, added CELL_SET_FORMAT, AXIS_SET_FORMAT, and RANGE_SET_FORMAT operations for entities that have formats.
 - [ ] 4f: Update any testdata ZCD files that contain format references
 
 ### Phase 5: Update Bindings and TypeScript
