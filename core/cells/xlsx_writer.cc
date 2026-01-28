@@ -6,8 +6,10 @@
 #include <sstream>
 #include <unordered_map>
 
+#include "core/cells/format_buffer.h"
 #include "core/cells/formula_serializer.h"
 #include "core/cells/named_ranges.h"
+#include "core/cells/number_format.h"
 #include "core/cells/range.h"
 #include "core/cells/ref_converter.h"
 
@@ -607,6 +609,7 @@ struct XLSXCellFormatEntry {
     size_t fontId{0};
     size_t fillId{0};
     size_t borderId{0};
+    size_t numFmtId{0};  // Number format ID (0 = General)
     cells::TextAlign hAlign{cells::TextAlign::GENERAL};
     cells::VerticalAlign vAlign{cells::VerticalAlign::BOTTOM};
     bool wrapText{false};
@@ -614,8 +617,8 @@ struct XLSXCellFormatEntry {
 
     bool operator==(const XLSXCellFormatEntry& other) const {
         return fontId == other.fontId && fillId == other.fillId && borderId == other.borderId &&
-               hAlign == other.hAlign && vAlign == other.vAlign && wrapText == other.wrapText &&
-               hasAlignment == other.hasAlignment;
+               numFmtId == other.numFmtId && hAlign == other.hAlign && vAlign == other.vAlign &&
+               wrapText == other.wrapText && hasAlignment == other.hasAlignment;
     }
 };
 
@@ -630,7 +633,13 @@ std::string rgbToArgb(const std::string& rgb) {
     return rgb;
 }
 
-// Style table that collects fonts, fills, borders, and cell formats for XLSX export
+// Custom number format entry for XLSX export
+struct XLSXNumFmtEntry {
+    size_t numFmtId{0};
+    std::string formatCode;
+};
+
+// Style table that collects fonts, fills, borders, numFmts, and cell formats for XLSX export
 class StyleTable {
 public:
     StyleTable() {
@@ -653,9 +662,10 @@ public:
         formatIndex_[formatKey(formats_[0])] = 0;
     }
 
-    // Get or add a cell format for a given CellStyle
+    // Get or add a cell format for a given CellStyle and optional FormatBuffer
     // Returns the cellXfs index for this style
-    size_t getOrAddFormat(const cells::CellStyle& style) {
+    size_t getOrAddFormat(const cells::CellStyle& style,
+                          const cells::FormatBuffer* formatBuf = nullptr) {
         // First, get or add font
         XLSXFontEntry font;
         font.bold = style.bold;
@@ -683,11 +693,15 @@ public:
         border.bottom.color = rgbToArgb(style.border.bottom.color);
         const size_t borderId = getOrAddBorder(border);
 
+        // Get number format ID
+        const size_t numFmtId = getNumFmtId(formatBuf);
+
         // Create cell format
         XLSXCellFormatEntry xf;
         xf.fontId = fontId;
         xf.fillId = fillId;
         xf.borderId = borderId;
+        xf.numFmtId = numFmtId;
         xf.hAlign = style.hAlign;
         xf.vAlign = style.vAlign;
         xf.wrapText = style.wrapText;
@@ -697,20 +711,135 @@ public:
         return getOrAddCellFormat(xf);
     }
 
+    // Get or add a cell format for FormatBuffer only (no visual style)
+    size_t getOrAddFormatOnly(const cells::FormatBuffer* formatBuf) {
+        if (formatBuf == nullptr || formatBuf->isEmpty()) {
+            return 0;  // Default format
+        }
+
+        const size_t numFmtId = getNumFmtId(formatBuf);
+        if (numFmtId == 0) {
+            return 0;  // General format, use default
+        }
+
+        // Create cell format with just number format
+        XLSXCellFormatEntry xf;
+        xf.numFmtId = numFmtId;
+        return getOrAddCellFormat(xf);
+    }
+
     [[nodiscard]] const std::vector<XLSXFontEntry>& fonts() const { return fonts_; }
     [[nodiscard]] const std::vector<XLSXFillEntry>& fills() const { return fills_; }
     [[nodiscard]] const std::vector<XLSXBorderEntry>& borders() const { return borders_; }
     [[nodiscard]] const std::vector<XLSXCellFormatEntry>& formats() const { return formats_; }
+    [[nodiscard]] const std::vector<XLSXNumFmtEntry>& numFmts() const { return numFmts_; }
 
 private:
     std::vector<XLSXFontEntry> fonts_;
     std::vector<XLSXFillEntry> fills_;
     std::vector<XLSXBorderEntry> borders_;
     std::vector<XLSXCellFormatEntry> formats_;
+    std::vector<XLSXNumFmtEntry> numFmts_;  // Custom number formats (IDs >= 164)
     std::unordered_map<std::string, size_t> fontIndex_;
     std::unordered_map<std::string, size_t> fillIndex_;
     std::unordered_map<std::string, size_t> borderIndex_;
     std::unordered_map<std::string, size_t> formatIndex_;
+    std::unordered_map<std::string, size_t> numFmtIndex_;  // formatCode -> numFmtId
+
+    // Convert FormatBuffer to XLSX numFmtId
+    // Returns 0 for General, built-in IDs (1-49) for standard formats,
+    // or custom IDs (>= 164) for custom format codes
+    size_t getNumFmtId(const cells::FormatBuffer* formatBuf) {
+        if (formatBuf == nullptr || formatBuf->isEmpty()) {
+            return 0;  // General
+        }
+
+        // Check for custom format code first
+        if (formatBuf->hasCustomFormatCode()) {
+            const std::string formatCode = formatBuf->getCustomFormatCode();
+            return getOrAddCustomNumFmt(formatCode);
+        }
+
+        // Map category + properties to built-in XLSX format ID
+        if (!formatBuf->hasCategory()) {
+            return 0;  // General
+        }
+
+        const cells::NumberFormatCategory cat = formatBuf->getCategory();
+        const uint8_t decimals = formatBuf->hasDecimals() ? formatBuf->getDecimals() : 0;
+        const bool hasThousands = formatBuf->hasThousandsSeparator();
+        const bool hasCurrency = formatBuf->hasCurrencySymbol();
+
+        switch (cat) {
+            case cells::NumberFormatCategory::GENERAL:
+                return 0;
+
+            case cells::NumberFormatCategory::NUMBER:
+                if (hasThousands) {
+                    // #,##0 or #,##0.00
+                    return decimals >= 2 ? 4 : 3;
+                }
+                // 0 or 0.00
+                return decimals >= 2 ? 2 : 1;
+
+            case cells::NumberFormatCategory::CURRENCY:
+                // Use built-in USD formats if no specific symbol or $ symbol
+                if (!hasCurrency || formatBuf->getCurrencySymbol() == "$") {
+                    return decimals >= 2 ? 8 : 6;  // $#,##0.00 or $#,##0
+                }
+                // For other currencies, generate custom format code
+                return getOrAddCustomNumFmt(formatBuf->toFormatCode());
+
+            case cells::NumberFormatCategory::ACCOUNTING:
+                return decimals >= 2 ? 44 : 42;  // _($*#,##0.00_) or _($*#,##0_)
+
+            case cells::NumberFormatCategory::PERCENTAGE:
+                return decimals >= 2 ? 10 : 9;  // 0.00% or 0%
+
+            case cells::NumberFormatCategory::DATE:
+                return 14;  // mm-dd-yy
+
+            case cells::NumberFormatCategory::TIME:
+                return 20;  // h:mm
+
+            case cells::NumberFormatCategory::DATE_TIME:
+                return 22;  // m/d/yy h:mm
+
+            case cells::NumberFormatCategory::SCIENTIFIC:
+                return 11;  // 0.00E+00
+
+            case cells::NumberFormatCategory::FRACTION:
+                return 12;  // # ?/?
+
+            case cells::NumberFormatCategory::TEXT:
+                return 49;  // @
+
+            case cells::NumberFormatCategory::CUSTOM:
+                // Generate format code and register as custom
+                return getOrAddCustomNumFmt(formatBuf->toFormatCode());
+        }
+
+        return 0;  // Default to General
+    }
+
+    // Get or add a custom number format
+    // Returns the numFmtId (>= 164) for this format code
+    size_t getOrAddCustomNumFmt(const std::string& formatCode) {
+        if (formatCode.empty()) {
+            return 0;
+        }
+
+        auto it = numFmtIndex_.find(formatCode);
+        if (it != numFmtIndex_.end()) {
+            return it->second;
+        }
+
+        // Custom numFmtIds start at 164 in XLSX
+        const size_t numFmtId = 164 + numFmts_.size();
+        numFmts_.push_back({numFmtId, formatCode});
+        numFmtIndex_[formatCode] = numFmtId;
+        return numFmtId;
+    }
 
     static std::string fontKey(const XLSXFontEntry& f) {
         std::ostringstream oss;
@@ -730,7 +859,7 @@ private:
 
     static std::string formatKey(const XLSXCellFormatEntry& xf) {
         std::ostringstream oss;
-        oss << xf.fontId << "|" << xf.fillId << "|" << xf.borderId << "|"
+        oss << xf.fontId << "|" << xf.fillId << "|" << xf.borderId << "|" << xf.numFmtId << "|"
             << static_cast<int>(xf.hAlign) << "|" << static_cast<int>(xf.vAlign) << "|"
             << xf.wrapText << "|" << xf.hasAlignment;
         return oss.str();
@@ -1346,6 +1475,17 @@ std::string generateStyles(const StyleTable& styles) {
     xml << "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n";
     xml << "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\n";
 
+    // Custom number formats (numFmts) - only if we have any
+    const auto& numFmts = styles.numFmts();
+    if (!numFmts.empty()) {
+        xml << "  <numFmts count=\"" << numFmts.size() << "\">\n";
+        for (const auto& numFmt : numFmts) {
+            xml << "    <numFmt numFmtId=\"" << numFmt.numFmtId << "\" formatCode=\""
+                << escapeXml(numFmt.formatCode) << "\"/>\n";
+        }
+        xml << "  </numFmts>\n";
+    }
+
     // Fonts
     const auto& fonts = styles.fonts();
     xml << "  <fonts count=\"" << fonts.size() << "\">\n";
@@ -1411,10 +1551,13 @@ std::string generateStyles(const StyleTable& styles) {
     const auto& formats = styles.formats();
     xml << "  <cellXfs count=\"" << formats.size() << "\">\n";
     for (const auto& xf : formats) {
-        xml << "    <xf numFmtId=\"0\" fontId=\"" << xf.fontId << "\" fillId=\"" << xf.fillId
-            << "\" borderId=\"" << xf.borderId << "\" xfId=\"0\"";
+        xml << "    <xf numFmtId=\"" << xf.numFmtId << "\" fontId=\"" << xf.fontId << "\" fillId=\""
+            << xf.fillId << "\" borderId=\"" << xf.borderId << "\" xfId=\"0\"";
 
         // Apply flags
+        if (xf.numFmtId > 0) {
+            xml << " applyNumberFormat=\"1\"";
+        }
         if (xf.fontId > 0) {
             xml << " applyFont=\"1\"";
         }
@@ -1610,46 +1753,77 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
         return result;
     }
 
-    // Collect styles from all sheets (cells and axes)
+    // Collect styles and formats from all sheets (cells and axes)
     StyleTable styleTable;
     std::unordered_map<const Cell*, size_t> cellStyleIndices;
     std::unordered_map<const Axis*, size_t> axisStyleIndices;
 
     for (const auto& sheet : workbook.sheets) {
-        // Collect cell styles from content-addressed entity styles
+        // Collect cell styles and formats from content-addressed storage
         for (const auto& cellId : sheet->getCellIds()) {
             const Cell* cell = workbook.getCell(cellId);
             if (!cell) {
                 continue;
             }
             const StyleBuffer* styleBuf = workbook.getEntityStyle(cellId);
-            if (styleBuf != nullptr) {
-                const CellStyle style = styleBuf->toCellStyle();
-                const size_t styleIdx = styleTable.getOrAddFormat(style);
-                cellStyleIndices[cell] = styleIdx;
-            }
-        }
-        // Collect column default styles
-        for (const ID& colId : sheet->getColumnIds()) {
-            const Axis* col = sheet->getColumn(colId);
-            if (col != nullptr && col->hasStyle()) {
-                const StyleBuffer* styleBuf = workbook.getEntityStyle(col->id);
+            const FormatBuffer* formatBuf = workbook.getEntityFormat(cellId);
+
+            if (styleBuf != nullptr || formatBuf != nullptr) {
                 if (styleBuf != nullptr) {
+                    // Has visual style (and possibly format)
                     const CellStyle style = styleBuf->toCellStyle();
-                    const size_t styleIdx = styleTable.getOrAddFormat(style);
-                    axisStyleIndices[col] = styleIdx;
+                    const size_t styleIdx = styleTable.getOrAddFormat(style, formatBuf);
+                    cellStyleIndices[cell] = styleIdx;
+                } else {
+                    // Has format only, no visual style
+                    const size_t styleIdx = styleTable.getOrAddFormatOnly(formatBuf);
+                    if (styleIdx > 0) {
+                        cellStyleIndices[cell] = styleIdx;
+                    }
                 }
             }
         }
-        // Collect row default styles
-        for (const ID& rowId : sheet->getRowIds()) {
-            const Axis* row = sheet->getRow(rowId);
-            if (row != nullptr && row->hasStyle()) {
-                const StyleBuffer* styleBuf = workbook.getEntityStyle(row->id);
+        // Collect column default styles and formats
+        for (const ID& colId : sheet->getColumnIds()) {
+            const Axis* col = sheet->getColumn(colId);
+            if (col == nullptr) {
+                continue;
+            }
+            const StyleBuffer* styleBuf = col->hasStyle() ? workbook.getEntityStyle(col->id) : nullptr;
+            const FormatBuffer* formatBuf = col->hasFormat() ? workbook.getEntityFormat(col->id) : nullptr;
+
+            if (styleBuf != nullptr || formatBuf != nullptr) {
                 if (styleBuf != nullptr) {
                     const CellStyle style = styleBuf->toCellStyle();
-                    const size_t styleIdx = styleTable.getOrAddFormat(style);
+                    const size_t styleIdx = styleTable.getOrAddFormat(style, formatBuf);
+                    axisStyleIndices[col] = styleIdx;
+                } else {
+                    const size_t styleIdx = styleTable.getOrAddFormatOnly(formatBuf);
+                    if (styleIdx > 0) {
+                        axisStyleIndices[col] = styleIdx;
+                    }
+                }
+            }
+        }
+        // Collect row default styles and formats
+        for (const ID& rowId : sheet->getRowIds()) {
+            const Axis* row = sheet->getRow(rowId);
+            if (row == nullptr) {
+                continue;
+            }
+            const StyleBuffer* styleBuf = row->hasStyle() ? workbook.getEntityStyle(row->id) : nullptr;
+            const FormatBuffer* formatBuf = row->hasFormat() ? workbook.getEntityFormat(row->id) : nullptr;
+
+            if (styleBuf != nullptr || formatBuf != nullptr) {
+                if (styleBuf != nullptr) {
+                    const CellStyle style = styleBuf->toCellStyle();
+                    const size_t styleIdx = styleTable.getOrAddFormat(style, formatBuf);
                     axisStyleIndices[row] = styleIdx;
+                } else {
+                    const size_t styleIdx = styleTable.getOrAddFormatOnly(formatBuf);
+                    if (styleIdx > 0) {
+                        axisStyleIndices[row] = styleIdx;
+                    }
                 }
             }
         }
