@@ -93,11 +93,11 @@ Complete the partial integration from the previous plan.
 
 ## Phase 6: Add Comprehensive E2E Tests
 
-- [ ] 6a: Test that opening format dropdown closes style controls dropdowns
-- [ ] 6b: Test that opening merge dropdown closes format dropdown
-- [ ] 6c: Test that opening context menu closes all toolbar dropdowns
-- [ ] 6d: Test that opening named ranges dropdown closes other dropdowns
-- [ ] 6e: Test autocomplete closes when toolbar dropdown opens
+- [x] 6a: Test that opening format dropdown closes style controls dropdowns
+- [x] 6b: Test that opening merge dropdown closes format dropdown
+- [x] 6c: Test that opening context menu closes all toolbar dropdowns
+- [x] 6d: Test that opening named ranges dropdown closes other dropdowns
+- [x] 6e: Test autocomplete closes when toolbar dropdown opens (uses cell-editor-container autocomplete selector)
 
 ---
 
