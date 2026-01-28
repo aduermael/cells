@@ -235,6 +235,131 @@ EffectiveStyleResult getEffectiveStyleForPosition(const Sheet& sheet, const Work
     return result;
 }
 
+// =============================================================================
+// Helper: Effective Format Resolution
+// =============================================================================
+// Resolves the effective number format for a cell following the hierarchy:
+// Priority order (lowest to highest): column < row < range < cell
+//
+// Like styles, format properties from multiple levels are merged:
+// - If cell sets decimals and column sets category, both properties apply
+// - Higher priority sources override lower priority for the same property
+
+struct EffectiveFormatResult {
+    FormatBuffer format;       // The resolved format (merged from all sources)
+    bool hasFormat{false};     // true if any format was found
+    bool fromCell{false};      // true if format contributed from cell
+    bool fromRange{false};     // true if format contributed from a range
+    bool fromColumn{false};    // true if format contributed from column default
+    bool fromRow{false};       // true if format contributed from row default
+};
+
+// Get effective format for a cell (considering cell, range, column, row hierarchy)
+EffectiveFormatResult getEffectiveFormat(const Cell& cell, const Sheet& sheet, const Workbook& workbook,
+                                          uint32_t colPos, uint32_t rowPos) {
+    EffectiveFormatResult result;
+
+    // Collect formats from all sources in priority order (lowest to highest)
+    // Column < Row < Range < Cell (higher priority overrides lower)
+
+    // Priority 4 (lowest): Column's default format
+    const FormatBuffer* colFormat = nullptr;
+    const Axis* col = sheet.getColumn(cell.colId);
+    if (col != nullptr && col->hasFormat()) {
+        colFormat = workbook.getEntityFormat(col->id);
+        if (colFormat != nullptr && !colFormat->isEmpty()) {
+            result.fromColumn = true;
+        }
+    }
+
+    // Priority 3: Row's default format
+    const FormatBuffer* rowFormat = nullptr;
+    const Axis* row = sheet.getRow(cell.rowId);
+    if (row != nullptr && row->hasFormat()) {
+        rowFormat = workbook.getEntityFormat(row->id);
+        if (rowFormat != nullptr && !rowFormat->isEmpty()) {
+            result.fromRow = true;
+        }
+    }
+
+    // Priority 2: Range formats
+    std::vector<const FormatBuffer*> rangeFormats;
+    std::vector<Range*> formatRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::FORMAT);
+    for (Range* range : formatRanges) {
+        const FormatBuffer* rangeFormat = range->getFormat();
+        if (rangeFormat != nullptr && !rangeFormat->isEmpty()) {
+            rangeFormats.push_back(rangeFormat);
+            result.fromRange = true;
+        }
+    }
+
+    // Priority 1 (highest): Cell's own format
+    const FormatBuffer* cellFormat = workbook.getEntityFormat(cell.id);
+    if (cellFormat != nullptr && !cellFormat->isEmpty()) {
+        result.fromCell = true;
+    }
+
+    // Use FormatBuffer::getEffectiveFormat to merge all sources
+    result.format = FormatBuffer::getEffectiveFormat(colFormat, rowFormat, rangeFormats, cellFormat);
+    result.hasFormat = !result.format.isEmpty();
+
+    return result;
+}
+
+// Overload for virtual cells (no Cell object exists) - uses axis IDs directly
+// This is used for virtual spilled cells that inherit column/row formats
+EffectiveFormatResult getEffectiveFormatForPosition(const Sheet& sheet, const Workbook& workbook,
+                                                     uint32_t colPos, uint32_t rowPos,
+                                                     const ID& colId, const ID& rowId) {
+    EffectiveFormatResult result;
+
+    // No cell format for virtual cells (they don't exist as Cell objects)
+
+    // Collect formats from all sources in priority order (lowest to highest)
+    // Column < Row < Range (no cell for virtual cells)
+
+    // Priority 4 (lowest): Column's default format
+    const FormatBuffer* colFormat = nullptr;
+    if (!colId.isNull()) {
+        const Axis* col = sheet.getColumn(colId);
+        if (col != nullptr && col->hasFormat()) {
+            colFormat = workbook.getEntityFormat(col->id);
+            if (colFormat != nullptr && !colFormat->isEmpty()) {
+                result.fromColumn = true;
+            }
+        }
+    }
+
+    // Priority 3: Row's default format
+    const FormatBuffer* rowFormat = nullptr;
+    if (!rowId.isNull()) {
+        const Axis* row = sheet.getRow(rowId);
+        if (row != nullptr && row->hasFormat()) {
+            rowFormat = workbook.getEntityFormat(row->id);
+            if (rowFormat != nullptr && !rowFormat->isEmpty()) {
+                result.fromRow = true;
+            }
+        }
+    }
+
+    // Priority 2: Range formats
+    std::vector<const FormatBuffer*> rangeFormats;
+    std::vector<Range*> formatRanges = sheet.getRangesAt(colPos, rowPos, RangeFlags::FORMAT);
+    for (Range* range : formatRanges) {
+        const FormatBuffer* rangeFormat = range->getFormat();
+        if (rangeFormat != nullptr && !rangeFormat->isEmpty()) {
+            rangeFormats.push_back(rangeFormat);
+            result.fromRange = true;
+        }
+    }
+
+    // Use FormatBuffer::getEffectiveFormat to merge all sources (no cell for virtual cells)
+    result.format = FormatBuffer::getEffectiveFormat(colFormat, rowFormat, rangeFormats, nullptr);
+    result.hasFormat = !result.format.isEmpty();
+
+    return result;
+}
+
 // Helper: Convert BorderStyle enum to JSON string value
 const char* borderStyleToString(cells::BorderStyle style) {
     switch (style) {
@@ -352,13 +477,21 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
         json << "\"col\":" << colPos << ",";
         json << "\"row\":" << rowPos << ",";
 
-        // Get format from content-addressed storage
-        const FormatBuffer* cellFormat = _workbook->getEntityFormat(entry.cell->id);
+        // Get effective format (resolves cell > range > column > row hierarchy)
+        EffectiveFormatResult effectiveFormat = getEffectiveFormat(*entry.cell, *sheet, *_workbook, colPos, rowPos);
         std::string formatCode = "General";
-        if (cellFormat != nullptr && !cellFormat->isEmpty()) {
-            formatCode = cellFormat->toFormatCode();
+        if (effectiveFormat.hasFormat) {
+            formatCode = effectiveFormat.format.toFormatCode();
             // Include format base64 for reference
-            json << "\"format\":\"" << cellFormat->toBase64() << "\",";
+            json << "\"format\":\"" << effectiveFormat.format.toBase64() << "\",";
+            // Indicate if format is inherited
+            if (effectiveFormat.fromRange) {
+                json << "\"formatInheritedFrom\":\"range\",";
+            } else if (effectiveFormat.fromColumn) {
+                json << "\"formatInheritedFrom\":\"column\",";
+            } else if (effectiveFormat.fromRow) {
+                json << "\"formatInheritedFrom\":\"row\",";
+            }
         }
 
         // Include effective style (resolves cell > range > column > row hierarchy)
@@ -506,8 +639,8 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 json << "\"isError\":true,";
             } else if (result.isNumber()) {
                 const double num = result.getNumber();
-                // Use FormatBuffer-based formatting
-                if (cellFormat != nullptr && !cellFormat->isEmpty()) {
+                // Use effective format for display
+                if (effectiveFormat.hasFormat) {
                     FormatCodeResult formatted = cells::formatWithCode(num, formatCode);
                     if (formatted.success) {
                         displayValue = formatted.text;
@@ -618,7 +751,7 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 std::string displayValue;
                 std::string editValue;
 
-                if (cellFormat != nullptr && !cellFormat->isEmpty() &&
+                if (effectiveFormat.hasFormat &&
                     (entry.cell->value.type == CellValueType::NUMBER)) {
                     const double numValue = entry.cell->value.asNumber();
                     FormatCodeResult formatted = cells::formatWithCode(numValue, formatCode);
@@ -714,6 +847,22 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                 json << "\"col\":" << colPos << ",";
                 json << "\"row\":" << rowPos << ",";
 
+                // Compute effective format from column/row axes (virtual cells have no cell format)
+                EffectiveFormatResult effectiveFormat = getEffectiveFormatForPosition(
+                    *sheet, *_workbook, colPos, rowPos, colId, rowId);
+                std::string formatCode = "General";
+                if (effectiveFormat.hasFormat) {
+                    formatCode = effectiveFormat.format.toFormatCode();
+                    json << "\"format\":\"" << effectiveFormat.format.toBase64() << "\",";
+                    if (effectiveFormat.fromRange) {
+                        json << "\"formatInheritedFrom\":\"range\",";
+                    } else if (effectiveFormat.fromColumn) {
+                        json << "\"formatInheritedFrom\":\"column\",";
+                    } else if (effectiveFormat.fromRow) {
+                        json << "\"formatInheritedFrom\":\"row\",";
+                    }
+                }
+
                 // Compute effective style from column/row axes (virtual cells have no cell style)
                 EffectiveStyleResult effectiveStyle = getEffectiveStyleForPosition(
                     *sheet, *_workbook, colPos, rowPos, colId, rowId);
@@ -782,7 +931,18 @@ std::string CellsEngine::queryViewport(uint32_t col1, uint32_t row1, uint32_t co
                     std::string displayValue;
                     if (val.type == CellValueType::NUMBER || val.type == CellValueType::FORMULA_NUMBER) {
                         double num = val.asNumber();
-                        if (std::floor(num) == num && std::abs(num) < 1e15) {
+                        // Use effective format if available
+                        if (effectiveFormat.hasFormat) {
+                            FormatCodeResult formatted = cells::formatWithCode(num, formatCode);
+                            if (formatted.success) {
+                                displayValue = formatted.text;
+                            } else {
+                                // Fallback to default formatting
+                                std::ostringstream numStr;
+                                numStr << std::setprecision(15) << num;
+                                displayValue = numStr.str();
+                            }
+                        } else if (std::floor(num) == num && std::abs(num) < 1e15) {
                             displayValue = std::to_string(static_cast<long long>(num));
                         } else {
                             std::ostringstream numStr;
