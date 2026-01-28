@@ -1789,8 +1789,10 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
             if (col == nullptr) {
                 continue;
             }
-            const StyleBuffer* styleBuf = col->hasStyle() ? workbook.getEntityStyle(col->id) : nullptr;
-            const FormatBuffer* formatBuf = col->hasFormat() ? workbook.getEntityFormat(col->id) : nullptr;
+            const StyleBuffer* styleBuf =
+                col->hasStyle() ? workbook.getEntityStyle(col->id) : nullptr;
+            const FormatBuffer* formatBuf =
+                col->hasFormat() ? workbook.getEntityFormat(col->id) : nullptr;
 
             if (styleBuf != nullptr || formatBuf != nullptr) {
                 if (styleBuf != nullptr) {
@@ -1811,8 +1813,10 @@ XLSXWriteResult XLSXWriter::writeFile(const Workbook& workbook, const std::strin
             if (row == nullptr) {
                 continue;
             }
-            const StyleBuffer* styleBuf = row->hasStyle() ? workbook.getEntityStyle(row->id) : nullptr;
-            const FormatBuffer* formatBuf = row->hasFormat() ? workbook.getEntityFormat(row->id) : nullptr;
+            const StyleBuffer* styleBuf =
+                row->hasStyle() ? workbook.getEntityStyle(row->id) : nullptr;
+            const FormatBuffer* formatBuf =
+                row->hasFormat() ? workbook.getEntityFormat(row->id) : nullptr;
 
             if (styleBuf != nullptr || formatBuf != nullptr) {
                 if (styleBuf != nullptr) {
