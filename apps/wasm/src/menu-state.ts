@@ -20,7 +20,9 @@ export type MenuId =
   | "customFormat"
   | "merge"
   | "border"
-  | "namedRanges";
+  | "namedRanges"
+  | "formulaAutocomplete"
+  | "scriptAutocomplete";
 
 /** Callback for when a menu is closed externally */
 export type MenuCloseCallback = () => void;

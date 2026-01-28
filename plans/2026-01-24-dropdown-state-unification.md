@@ -86,7 +86,7 @@ Complete the partial integration from the previous plan.
 
 ## Phase 5: Integrate Autocomplete Popups with MenuStateManager
 
-- [ ] 5a: Add `formulaAutocomplete` and `scriptAutocomplete` to `MenuId` type
+- [x] 5a: Add `formulaAutocomplete` and `scriptAutocomplete` to `MenuId` type
 - [ ] 5b: Register formula-autocomplete with MenuStateManager
 - [ ] 5c: Register script-autocomplete with MenuStateManager
 - [ ] 5d: Apply `.dropdown-frame` class to autocomplete popups
