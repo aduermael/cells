@@ -588,6 +588,89 @@ declare module 'cells-wasm' {
     getRowStyle(rowPosition: number): string;
 
     // ========================================================================
+    // Axis format operations (column/row formats)
+    // ========================================================================
+
+    /**
+     * Set a column's default format, creating the column if needed.
+     * @param colPosition - Column position (0-based)
+     * @param formatJson - JSON string with format properties (category, decimals, etc.)
+     * @returns JSON string with OperationResult
+     */
+    setColumnFormat(colPosition: number, formatJson: string): string;
+
+    /**
+     * Set a row's default format, creating the row if needed.
+     * @param rowPosition - Row position (0-based)
+     * @param formatJson - JSON string with format properties
+     * @returns JSON string with OperationResult
+     */
+    setRowFormat(rowPosition: number, formatJson: string): string;
+
+    /**
+     * Clear a column's format
+     * @param colPosition - Column position (0-based)
+     * @returns JSON string with OperationResult
+     */
+    clearColumnFormat(colPosition: number): string;
+
+    /**
+     * Clear a row's format
+     * @param rowPosition - Row position (0-based)
+     * @returns JSON string with OperationResult
+     */
+    clearRowFormat(rowPosition: number): string;
+
+    // ========================================================================
+    // Range format operations
+    // ========================================================================
+
+    /**
+     * Set a range's format on the active sheet.
+     * Creates the range if it doesn't exist.
+     * @param startCol - Start column position (0-based)
+     * @param startRow - Start row position (0-based)
+     * @param endCol - End column position (0-based)
+     * @param endRow - End row position (0-based)
+     * @param formatJson - JSON string with format properties
+     * @returns JSON string with OperationResult including range_id
+     */
+    setRangeFormat(
+        startCol: number,
+        startRow: number,
+        endCol: number,
+        endRow: number,
+        formatJson: string,
+    ): string;
+
+    /**
+     * Set a range's format on a specific sheet.
+     * @param sheetIndex - Sheet index
+     * @param startCol - Start column position (0-based)
+     * @param startRow - Start row position (0-based)
+     * @param endCol - End column position (0-based)
+     * @param endRow - End row position (0-based)
+     * @param formatJson - JSON string with format properties
+     * @returns JSON string with OperationResult including range_id
+     */
+    setRangeFormatOnSheet(
+        sheetIndex: number,
+        startCol: number,
+        startRow: number,
+        endCol: number,
+        endRow: number,
+        formatJson: string,
+    ): string;
+
+    /**
+     * Remove a format range at the given position.
+     * @param col - Column position (0-based)
+     * @param row - Row position (0-based)
+     * @returns JSON string with OperationResult
+     */
+    removeRangeFormat(col: number, row: number): string;
+
+    // ========================================================================
     // Column/row resize
     // ========================================================================
 

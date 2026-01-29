@@ -2595,4 +2595,299 @@ std::string CellsEngine::getRowStyle(uint32_t rowPosition) {
     return styleToJson(defaultStyle);
 }
 
+// ============================================================================
+// Axis Format Operations (column/row formats)
+// ============================================================================
+
+std::string CellsEngine::setColumnFormat(uint32_t colPosition, const std::string& formatJson) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Find existing column at position
+    Axis* existingCol = sheet->getColumnByPosition(colPosition);
+    ID colId;
+    bool colCreated = false;
+
+    if (existingCol != nullptr) {
+        colId = existingCol->id;
+    } else {
+        // Create column if it doesn't exist
+        colId = generate_id();
+        colCreated = true;
+        std::string colPayload = "{\"pos\":" + std::to_string(colPosition) +
+                                 ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        Operation colOp = makeColInsertOp(*_workbook, colId, colPayload);
+        applyOperation(*_workbook, colOp);
+    }
+
+    // Parse format JSON and create FormatBuffer
+    FormatBuffer format = parseFormatJson(formatJson);
+
+    // Apply format to column
+    if (!format.isEmpty()) {
+        Operation op = makeAxisSetFormatOp(*_workbook, colId, format);
+        applyOperation(*_workbook, op);
+    } else {
+        // Empty format - clear the format
+        Operation op = makeAxisClearFormatOp(*_workbook, colId);
+        applyOperation(*_workbook, op);
+    }
+
+    broadcastPendingOperations();
+
+    if (colCreated) {
+        _viewportIndex.onAxisInserted(colId, true, colPosition, DEFAULT_COLUMN_WIDTH);
+    }
+
+    notifyListeners(ChangeType::CELL_CHANGED);
+    return "{\"success\":true}";
+}
+
+std::string CellsEngine::setRowFormat(uint32_t rowPosition, const std::string& formatJson) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Find existing row at position
+    Axis* existingRow = sheet->getRowByPosition(rowPosition);
+    ID rowId;
+    bool rowCreated = false;
+
+    if (existingRow != nullptr) {
+        rowId = existingRow->id;
+    } else {
+        // Create row if it doesn't exist
+        rowId = generate_id();
+        rowCreated = true;
+        std::string rowPayload = "{\"pos\":" + std::to_string(rowPosition) +
+                                 ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        Operation rowOp = makeRowInsertOp(*_workbook, rowId, rowPayload);
+        applyOperation(*_workbook, rowOp);
+    }
+
+    // Parse format JSON and create FormatBuffer
+    FormatBuffer format = parseFormatJson(formatJson);
+
+    // Apply format to row
+    if (!format.isEmpty()) {
+        Operation op = makeAxisSetFormatOp(*_workbook, rowId, format);
+        applyOperation(*_workbook, op);
+    } else {
+        // Empty format - clear the format
+        Operation op = makeAxisClearFormatOp(*_workbook, rowId);
+        applyOperation(*_workbook, op);
+    }
+
+    broadcastPendingOperations();
+
+    if (rowCreated) {
+        _viewportIndex.onAxisInserted(rowId, false, rowPosition, DEFAULT_ROW_HEIGHT);
+    }
+
+    notifyListeners(ChangeType::CELL_CHANGED);
+    return "{\"success\":true}";
+}
+
+std::string CellsEngine::clearColumnFormat(uint32_t colPosition) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    Axis* col = sheet->getColumnByPosition(colPosition);
+    if (col == nullptr) {
+        return "{\"success\":true}";  // No column, nothing to clear
+    }
+
+    Operation op = makeAxisClearFormatOp(*_workbook, col->id);
+    applyOperation(*_workbook, op);
+
+    broadcastPendingOperations();
+    notifyListeners(ChangeType::CELL_CHANGED);
+    return "{\"success\":true}";
+}
+
+std::string CellsEngine::clearRowFormat(uint32_t rowPosition) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    Axis* row = sheet->getRowByPosition(rowPosition);
+    if (row == nullptr) {
+        return "{\"success\":true}";  // No row, nothing to clear
+    }
+
+    Operation op = makeAxisClearFormatOp(*_workbook, row->id);
+    applyOperation(*_workbook, op);
+
+    broadcastPendingOperations();
+    notifyListeners(ChangeType::CELL_CHANGED);
+    return "{\"success\":true}";
+}
+
+// ============================================================================
+// Range Format Operations
+// ============================================================================
+
+std::string CellsEngine::setRangeFormat(uint32_t startCol, uint32_t startRow, uint32_t endCol,
+                                        uint32_t endRow, const std::string& formatJson) {
+    // Delegate to setRangeFormatOnSheet with active sheet
+    return setRangeFormatOnSheet(_activeSheetIndex, startCol, startRow, endCol, endRow, formatJson);
+}
+
+std::string CellsEngine::setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t startCol, uint32_t startRow,
+                                               uint32_t endCol, uint32_t endRow,
+                                               const std::string& formatJson) {
+    if (!_workbook || sheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"Invalid sheet index\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(sheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Normalize coordinates (ensure start <= end)
+    const uint32_t minCol = std::min(startCol, endCol);
+    const uint32_t maxCol = std::max(startCol, endCol);
+    const uint32_t minRow = std::min(startRow, endRow);
+    const uint32_t maxRow = std::max(startRow, endRow);
+
+    // Find or create columns/rows at the corner positions
+    ID startColId, endColId, startRowId, endRowId;
+
+    // Find start column
+    Axis* startColAxis = sheet->getColumnByPosition(minCol);
+    if (startColAxis != nullptr) {
+        startColId = startColAxis->id;
+    }
+    if (startColId.isNull()) {
+        startColId = generate_id();
+        std::string payload =
+            "{\"pos\":" + std::to_string(minCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        Operation op = makeColInsertOp(*_workbook, startColId, sheet->id, payload);
+        applyOperation(*_workbook, op);
+    }
+
+    // Find end column
+    Axis* endColAxis = sheet->getColumnByPosition(maxCol);
+    if (endColAxis != nullptr) {
+        endColId = endColAxis->id;
+    }
+    if (endColId.isNull()) {
+        endColId = generate_id();
+        std::string payload =
+            "{\"pos\":" + std::to_string(maxCol) + ",\"size\":" + std::to_string(DEFAULT_COLUMN_WIDTH) + "}";
+        Operation op = makeColInsertOp(*_workbook, endColId, sheet->id, payload);
+        applyOperation(*_workbook, op);
+    }
+
+    // Find start row
+    Axis* startRowAxis = sheet->getRowByPosition(minRow);
+    if (startRowAxis != nullptr) {
+        startRowId = startRowAxis->id;
+    }
+    if (startRowId.isNull()) {
+        startRowId = generate_id();
+        std::string payload =
+            "{\"pos\":" + std::to_string(minRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        Operation op = makeRowInsertOp(*_workbook, startRowId, sheet->id, payload);
+        applyOperation(*_workbook, op);
+    }
+
+    // Find end row
+    Axis* endRowAxis = sheet->getRowByPosition(maxRow);
+    if (endRowAxis != nullptr) {
+        endRowId = endRowAxis->id;
+    }
+    if (endRowId.isNull()) {
+        endRowId = generate_id();
+        std::string payload =
+            "{\"pos\":" + std::to_string(maxRow) + ",\"size\":" + std::to_string(DEFAULT_ROW_HEIGHT) + "}";
+        Operation op = makeRowInsertOp(*_workbook, endRowId, sheet->id, payload);
+        applyOperation(*_workbook, op);
+    }
+
+    // Parse format JSON
+    FormatBuffer format = parseFormatJson(formatJson);
+
+    // Create range insert payload with FORMAT flag
+    std::ostringstream insertPayload;
+    insertPayload << "{\"sheet_id\":\"" << sheet->id.toString() << "\""
+                  << ",\"start_col_id\":\"" << startColId.toString() << "\""
+                  << ",\"start_row_id\":\"" << startRowId.toString() << "\""
+                  << ",\"end_col_id\":\"" << endColId.toString() << "\""
+                  << ",\"end_row_id\":\"" << endRowId.toString() << "\""
+                  << ",\"flags\":" << static_cast<int>(RangeFlags::FORMAT) << "}";
+
+    ID rangeId = generate_id();
+    Operation rangeOp = makeRangeAddOp(*_workbook, rangeId, insertPayload.str());
+    applyOperation(*_workbook, rangeOp);
+
+    // Set format on the range
+    if (!format.isEmpty()) {
+        Operation formatOp = makeRangeSetFormatOp(*_workbook, rangeId, format);
+        applyOperation(*_workbook, formatOp);
+    }
+
+    broadcastPendingOperations();
+
+    rebuildViewportIndex();
+    notifyListeners(ChangeType::CELL_CHANGED);
+
+    return "{\"success\":true,\"range_id\":\"" + rangeId.toString() + "\"}";
+}
+
+std::string CellsEngine::removeRangeFormat(uint32_t col, uint32_t row) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{\"error\":\"No sheet available\"}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{\"error\":\"Sheet not found\"}";
+    }
+
+    // Find format ranges at this position
+    std::vector<Range*> formatRanges = sheet->getRangesAt(col, row, RangeFlags::FORMAT);
+    if (formatRanges.empty()) {
+        return "{\"error\":\"No format range found at this position\"}";
+    }
+
+    // Remove the first format range found
+    Range* range = formatRanges[0];
+    std::ostringstream payload;
+    payload << "{\"sheet_id\":\"" << sheet->id.toString() << "\"}";
+
+    Operation removeOp = makeRangeRemoveOp(*_workbook, range->id, payload.str());
+    applyOperation(*_workbook, removeOp);
+
+    broadcastPendingOperations();
+
+    rebuildViewportIndex();
+    notifyListeners(ChangeType::CELL_CHANGED);
+
+    return "{\"success\":true}";
+}
+
 }  // namespace cells::wasm

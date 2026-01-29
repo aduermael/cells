@@ -816,6 +816,139 @@ export function handleGetRowStyle(
 }
 
 // ============================================================================
+// Axis Format Operations (column/row formats)
+// ============================================================================
+
+export function handleSetColumnFormat(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { colPosition, format } = params as {
+        colPosition: number;
+        format: Record<string, unknown>;
+    };
+    const formatJson = JSON.stringify(format);
+    const result = JSON.parse(engine.setColumnFormat(colPosition, formatJson)) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "columnFormatSet", success: true });
+    }
+}
+
+export function handleSetRowFormat(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { rowPosition, format } = params as {
+        rowPosition: number;
+        format: Record<string, unknown>;
+    };
+    const formatJson = JSON.stringify(format);
+    const result = JSON.parse(engine.setRowFormat(rowPosition, formatJson)) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "rowFormatSet", success: true });
+    }
+}
+
+export function handleClearColumnFormat(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { colPosition } = params as { colPosition: number };
+    const result = JSON.parse(engine.clearColumnFormat(colPosition)) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "columnFormatCleared", success: true });
+    }
+}
+
+export function handleClearRowFormat(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { rowPosition } = params as { rowPosition: number };
+    const result = JSON.parse(engine.clearRowFormat(rowPosition)) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "rowFormatCleared", success: true });
+    }
+}
+
+// ============================================================================
+// Range Format Operations
+// ============================================================================
+
+export function handleSetRangeFormat(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { startCol, startRow, endCol, endRow, format } = params as {
+        startCol: number;
+        startRow: number;
+        endCol: number;
+        endRow: number;
+        format: Record<string, unknown>;
+    };
+    const formatJson = JSON.stringify(format);
+    const result = JSON.parse(
+        engine.setRangeFormat(startCol, startRow, endCol, endRow, formatJson),
+    ) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "rangeFormatSet", success: true, range_id: result.range_id });
+    }
+}
+
+export function handleSetRangeFormatOnSheet(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { sheetIndex, startCol, startRow, endCol, endRow, format } = params as {
+        sheetIndex: number;
+        startCol: number;
+        startRow: number;
+        endCol: number;
+        endRow: number;
+        format: Record<string, unknown>;
+    };
+    const formatJson = JSON.stringify(format);
+    const result = JSON.parse(
+        engine.setRangeFormatOnSheet(sheetIndex, startCol, startRow, endCol, endRow, formatJson),
+    ) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "rangeFormatSet", success: true, range_id: result.range_id });
+    }
+}
+
+export function handleRemoveRangeFormat(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { col, row } = params as { col: number; row: number };
+    const result = JSON.parse(engine.removeRangeFormat(col, row)) as JsonResult;
+    if (result.error) {
+        respond({ type: "error", error: result.error });
+    } else {
+        respond({ type: "rangeFormatRemoved", success: true });
+    }
+}
+
+// ============================================================================
 // Column/Row Operations
 // ============================================================================
 

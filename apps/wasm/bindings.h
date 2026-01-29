@@ -180,6 +180,19 @@ public:
     std::string getColumnStyle(uint32_t colPosition);
     std::string getRowStyle(uint32_t rowPosition);
 
+    // Axis format operations (set/clear formats for entire columns or rows)
+    std::string setColumnFormat(uint32_t colPosition, const std::string& formatJson);
+    std::string setRowFormat(uint32_t rowPosition, const std::string& formatJson);
+    std::string clearColumnFormat(uint32_t colPosition);
+    std::string clearRowFormat(uint32_t rowPosition);
+
+    // Range format operations (set/clear formats for rectangular ranges)
+    std::string setRangeFormat(uint32_t startCol, uint32_t startRow, uint32_t endCol, uint32_t endRow,
+                               const std::string& formatJson);
+    std::string setRangeFormatOnSheet(uint32_t sheetIndex, uint32_t startCol, uint32_t startRow,
+                                      uint32_t endCol, uint32_t endRow, const std::string& formatJson);
+    std::string removeRangeFormat(uint32_t col, uint32_t row);
+
     // ========================================================================
     // Column/row resize operations (bindings_core.cc)
     // ========================================================================

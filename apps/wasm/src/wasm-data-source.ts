@@ -405,6 +405,62 @@ export class WasmDataSource {
   }
 
   // ==========================================================================
+  // Axis Format Operations
+  // ==========================================================================
+
+  /** Set a column's default format */
+  async setColumnFormat(colPosition: number, format: FormatProperties): Promise<{ success: boolean }> {
+    return this._client.setColumnFormat(colPosition, format);
+  }
+
+  /** Set a row's default format */
+  async setRowFormat(rowPosition: number, format: FormatProperties): Promise<{ success: boolean }> {
+    return this._client.setRowFormat(rowPosition, format);
+  }
+
+  /** Clear a column's format */
+  async clearColumnFormat(colPosition: number): Promise<{ success: boolean }> {
+    return this._client.clearColumnFormat(colPosition);
+  }
+
+  /** Clear a row's format */
+  async clearRowFormat(rowPosition: number): Promise<{ success: boolean }> {
+    return this._client.clearRowFormat(rowPosition);
+  }
+
+  // ==========================================================================
+  // Range Format Operations
+  // ==========================================================================
+
+  /** Set a range's format */
+  async setRangeFormat(
+    startCol: number,
+    startRow: number,
+    endCol: number,
+    endRow: number,
+    format: FormatProperties,
+  ): Promise<{ success: boolean; range_id?: string }> {
+    return this._client.setRangeFormat(startCol, startRow, endCol, endRow, format);
+  }
+
+  /** Set a range's format on a specific sheet */
+  async setRangeFormatOnSheet(
+    sheetIndex: number,
+    startCol: number,
+    startRow: number,
+    endCol: number,
+    endRow: number,
+    format: FormatProperties,
+  ): Promise<{ success: boolean; range_id?: string }> {
+    return this._client.setRangeFormatOnSheet(sheetIndex, startCol, startRow, endCol, endRow, format);
+  }
+
+  /** Remove a format range at a position */
+  async removeRangeFormat(col: number, row: number): Promise<{ success: boolean }> {
+    return this._client.removeRangeFormat(col, row);
+  }
+
+  // ==========================================================================
   // Column Operations
   // ==========================================================================
 

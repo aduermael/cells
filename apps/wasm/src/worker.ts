@@ -80,6 +80,13 @@ import {
     handleSetRowStyle,
     handleGetColumnStyle,
     handleGetRowStyle,
+    handleSetColumnFormat,
+    handleSetRowFormat,
+    handleClearColumnFormat,
+    handleClearRowFormat,
+    handleSetRangeFormat,
+    handleSetRangeFormatOnSheet,
+    handleRemoveRangeFormat,
     handleResizeColumn,
     handleResizeColumnByPos,
     handleResizeRow,
@@ -531,6 +538,35 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "getRowStyle":
                 handleGetRowStyle(engine, params, respond);
+                break;
+
+            // ================================================================
+            // Axis Format Operations (entire column/row formats)
+            // ================================================================
+            case "setColumnFormat":
+                handleSetColumnFormat(engine, params, respond);
+                break;
+            case "setRowFormat":
+                handleSetRowFormat(engine, params, respond);
+                break;
+            case "clearColumnFormat":
+                handleClearColumnFormat(engine, params, respond);
+                break;
+            case "clearRowFormat":
+                handleClearRowFormat(engine, params, respond);
+                break;
+
+            // ================================================================
+            // Range Format Operations
+            // ================================================================
+            case "setRangeFormat":
+                handleSetRangeFormat(engine, params, respond);
+                break;
+            case "setRangeFormatOnSheet":
+                handleSetRangeFormatOnSheet(engine, params, respond);
+                break;
+            case "removeRangeFormat":
+                handleRemoveRangeFormat(engine, params, respond);
                 break;
 
             // ================================================================

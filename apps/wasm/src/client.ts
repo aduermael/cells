@@ -752,6 +752,94 @@ export class CellsClient {
     return response.style as CellStyle;
   }
 
+  // ========== Axis Format Operations API ==========
+
+  /**
+   * Set a column's default format, creating the column if needed.
+   */
+  async setColumnFormat(colPosition: number, format: FormatProperties): Promise<{ success: boolean }> {
+    await this._send("setColumnFormat", { colPosition, format });
+    return { success: true };
+  }
+
+  /**
+   * Set a row's default format, creating the row if needed.
+   */
+  async setRowFormat(rowPosition: number, format: FormatProperties): Promise<{ success: boolean }> {
+    await this._send("setRowFormat", { rowPosition, format });
+    return { success: true };
+  }
+
+  /**
+   * Clear a column's format.
+   */
+  async clearColumnFormat(colPosition: number): Promise<{ success: boolean }> {
+    await this._send("clearColumnFormat", { colPosition });
+    return { success: true };
+  }
+
+  /**
+   * Clear a row's format.
+   */
+  async clearRowFormat(rowPosition: number): Promise<{ success: boolean }> {
+    await this._send("clearRowFormat", { rowPosition });
+    return { success: true };
+  }
+
+  // ========== Range Format Operations API ==========
+
+  /**
+   * Set a range's format, creating the range if needed.
+   * Returns the range ID.
+   */
+  async setRangeFormat(
+    startCol: number,
+    startRow: number,
+    endCol: number,
+    endRow: number,
+    format: FormatProperties,
+  ): Promise<{ success: boolean; range_id?: string }> {
+    const response = await this._send("setRangeFormat", {
+      startCol,
+      startRow,
+      endCol,
+      endRow,
+      format,
+    });
+    return { success: true, range_id: response.range_id as string | undefined };
+  }
+
+  /**
+   * Set a range's format on a specific sheet.
+   * Returns the range ID.
+   */
+  async setRangeFormatOnSheet(
+    sheetIndex: number,
+    startCol: number,
+    startRow: number,
+    endCol: number,
+    endRow: number,
+    format: FormatProperties,
+  ): Promise<{ success: boolean; range_id?: string }> {
+    const response = await this._send("setRangeFormatOnSheet", {
+      sheetIndex,
+      startCol,
+      startRow,
+      endCol,
+      endRow,
+      format,
+    });
+    return { success: true, range_id: response.range_id as string | undefined };
+  }
+
+  /**
+   * Remove a format range at the given position.
+   */
+  async removeRangeFormat(col: number, row: number): Promise<{ success: boolean }> {
+    await this._send("removeRangeFormat", { col, row });
+    return { success: true };
+  }
+
   // ========== Column/Row Operations API ==========
 
   async resizeColumn(colId: string, width: number): Promise<{ success: boolean }> {

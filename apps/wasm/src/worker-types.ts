@@ -109,6 +109,30 @@ export interface CellsEngine {
     getColumnStyle(colPosition: number): string;
     getRowStyle(rowPosition: number): string;
 
+    // Axis format operations (entire column/row formats)
+    setColumnFormat(colPosition: number, formatJson: string): string;
+    setRowFormat(rowPosition: number, formatJson: string): string;
+    clearColumnFormat(colPosition: number): string;
+    clearRowFormat(rowPosition: number): string;
+
+    // Range format operations
+    setRangeFormat(
+        startCol: number,
+        startRow: number,
+        endCol: number,
+        endRow: number,
+        formatJson: string,
+    ): string;
+    setRangeFormatOnSheet(
+        sheetIndex: number,
+        startCol: number,
+        startRow: number,
+        endCol: number,
+        endRow: number,
+        formatJson: string,
+    ): string;
+    removeRangeFormat(col: number, row: number): string;
+
     // Column/row operations
     resizeColumn(colId: string, width: number): string;
     resizeColumnByPos(pos: number, width: number): string;

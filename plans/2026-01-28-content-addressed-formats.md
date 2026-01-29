@@ -225,6 +225,36 @@ Fix any remaining E2E test failures, including pre-existing issues unrelated to 
 - [x] 9b: Run full E2E suite and ensure 100% pass rate - 331/331 tests pass
 - [x] 9c: Verify no regressions in unit tests - 57/57 tests pass
 
+### Phase 10: Column and Row Format Bindings
+
+Add bindings for setting format on columns and rows (matching existing setColumnStyle/setRowStyle pattern).
+
+- [x] 10a: Add `setColumnFormat(colPosition, formatProps)` binding in C++. Uses `makeAxisSetFormatOp` with FormatBuffer. Pattern follows `setColumnStyle`.
+- [x] 10b: Add `setRowFormat(rowPosition, formatProps)` binding in C++. Uses `makeAxisSetFormatOp` with FormatBuffer. Pattern follows `setRowStyle`.
+- [x] 10c: Add `clearColumnFormat(colPosition)` and `clearRowFormat(rowPosition)` bindings.
+- [x] 10d: Register bindings in bindings.cc and add to bindings.h.
+- [x] 10e: Add TypeScript types and worker handlers for new bindings.
+
+### Phase 11: Range Format Bindings
+
+Add bindings for setting format on ranges (matching existing setRangeStyle pattern).
+
+- [x] 11a: Add `setRangeFormat(startCol, startRow, endCol, endRow, formatProps)` binding in C++. Creates or finds range, applies format via `makeRangeSetFormatOp`.
+- [x] 11b: Add `setRangeFormatOnSheet(sheetIndex, startCol, startRow, endCol, endRow, formatProps)` for cross-sheet support.
+- [x] 11c: Add `removeRangeFormat(col, row)` to remove format range at a position.
+- [x] 11d: Register bindings in bindings.cc and add to bindings.h.
+- [x] 11e: Add TypeScript types and worker handlers for new bindings.
+
+### Phase 12: Format Inheritance E2E Tests
+
+Complete the deferred 6e by adding E2E tests for format inheritance.
+
+- [ ] 12a: Add E2E test for column format inheritance (cells in column inherit column's format).
+- [ ] 12b: Add E2E test for row format inheritance (cells in row inherit row's format).
+- [ ] 12c: Add E2E test for range format inheritance (cells in range inherit range's format).
+- [ ] 12d: Add E2E test for format priority order (cell > range > column > row).
+- [ ] 12e: Update 6e status in plan to complete.
+
 ## File Changes Summary
 
 **New files:**

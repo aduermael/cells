@@ -154,6 +154,15 @@ EMSCRIPTEN_BINDINGS(cells) {
         .function("setRowStyle", &cells::wasm::CellsEngine::setRowStyle)
         .function("getColumnStyle", &cells::wasm::CellsEngine::getColumnStyle)
         .function("getRowStyle", &cells::wasm::CellsEngine::getRowStyle)
+        // Axis formats (entire column/row formats)
+        .function("setColumnFormat", &cells::wasm::CellsEngine::setColumnFormat)
+        .function("setRowFormat", &cells::wasm::CellsEngine::setRowFormat)
+        .function("clearColumnFormat", &cells::wasm::CellsEngine::clearColumnFormat)
+        .function("clearRowFormat", &cells::wasm::CellsEngine::clearRowFormat)
+        // Range formats
+        .function("setRangeFormat", &cells::wasm::CellsEngine::setRangeFormat)
+        .function("setRangeFormatOnSheet", &cells::wasm::CellsEngine::setRangeFormatOnSheet)
+        .function("removeRangeFormat", &cells::wasm::CellsEngine::removeRangeFormat)
         // Column/row resize
         .function("resizeColumn", &cells::wasm::CellsEngine::resizeColumn)
         .function("resizeColumnByPos", &cells::wasm::CellsEngine::resizeColumnByPos)
