@@ -214,8 +214,8 @@ Mirror the style system's approach for computing effective formats at display ti
 - [x] 8a: Update unit tests to use new FormatBuffer APIs (no legacy format ID tests). Updated `luau_sandbox_test.cc` to use FormatBuffer content-addressed format strings. Updated Luau API (`luau_types.cc`, `luau_api.cc`) to convert legacy format IDs (FMT_C002, FMT_P002, etc.) to FormatBuffer. Fixed formatCategoryToString to return uppercase category names (CURRENCY, PERCENTAGE, etc.) to match TypeScript types.
 - [x] 8b: Run all existing format-related E2E tests. 313/331 tests pass (18 failed). Fixed: worker handler param name mismatch (formatId → formatJson), removed updateFormulaBar() calls that overwrote format display, updated custom-format tests for content-addressed API. Main remaining issues: custom prefix/suffix formats display incorrectly, formula bar shows formatted instead of raw value, accounting format spacing issues, multi-cell format dropdown detection.
 - [x] 8c: Fix any failing tests related to format changes. 324/331 tests pass (7 remaining). Fixed: (1) Formula bar now shows raw value for currency/accounting but formatted value for percentage/date (Excel parity) via `computeEditValue()` helper. (2) Updated clipboard tests to use `format` (base64) instead of deprecated `formatId`. (3) Added base64 format parsing support to `parseFormatJson()`. Remaining issues: accounting format display (4 tests), multi-cell format dropdown detection (2 tests), currency vs percentage priority (1 test).
-- [ ] 8d: Update docs/file-format.md with new format encoding
-- [ ] 8e: Update docs/persistence.md to remove `F` line documentation
+- [x] 8d: Update docs/file-format.md with new format encoding. Removed `F` line section, updated `fmt:` to use base64, added content-addressed format encoding section, removed FORMAT_DEFINE from operations, added RANGE_SET_FORMAT operation.
+- [x] 8e: Update docs/persistence.md to remove `F` line documentation. Removed `F` line from structure and prefix table, updated `fmt:` to use base64 content-addressed format.
 
 ### Phase 9: Fix All E2E Test Failures
 

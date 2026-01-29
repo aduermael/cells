@@ -33,7 +33,6 @@ A ZCD file contains the following sections in order:
 ```
 #zcd v1                               # Version header
 D <doc-id> "<name>"                   # Document declaration
-F <format-id> "<format-code>"         # Custom number format definitions (optional)
 N "<name>" <scope> <scope-sheet-id> <target-type> <target-data>  # Named ranges (optional)
 
 S <sheet-id> "<name>"                 # Sheet declaration
@@ -41,7 +40,7 @@ V <key:value...>                      # Sheet view properties (optional)
 C <id> <position> [props...]          # Column definitions
 R <id> <position> [props...]          # Row definitions
 X <id> <col> <row> <type> <value> [props...]  # Cell definitions
-RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<base64>]  # Range definitions
+RG <id> <start_col> <start_row> <end_col> <end_row> <flags> [sty:<base64>] [fmt:<base64>]  # Range definitions
 
 #oplog                                # Operation log section
 O <hlc> <op-type> <target-id> <payload>
@@ -60,23 +59,6 @@ Declares the workbook with a unique ID and name.
 **Example:**
 ```
 D tY8pL3mK "Budget 2024"
-```
-
-### Custom Format (F)
-
-Defines a custom number format that can be referenced by cells and axes.
-
-**Format:** `F <id> "<format-code>"`
-
-**Fields:**
-- `id`: 8-character base62 identifier
-- `format-code`: Excel-compatible number format string
-
-**Examples:**
-```
-F fMt12345 "#,##0.00"
-F fMtCurr1 "$#,##0.00;($#,##0.00)"
-F fMtPct01 "0.00%"
 ```
 
 ### Named Range (N)
@@ -150,8 +132,8 @@ Defines a column with optional properties.
 - `w:<width>`: Width in pixels (default: 100)
 - `name:"<name>"`: Column name
 - `hidden:1`: Column is hidden
-- `sty:<base64>`: Default style for cells in this column
-- `fmt:<format-id>`: Default number format for cells in this column
+- `sty:<base64>`: Default style for cells in this column (content-addressed)
+- `fmt:<base64>`: Default number format for cells in this column (content-addressed)
 
 **Examples:**
 ```
@@ -175,8 +157,8 @@ Defines a row with optional properties.
 - `h:<height>`: Height in pixels (default: 24)
 - `name:"<name>"`: Row name
 - `hidden:1`: Row is hidden
-- `sty:<base64>`: Default style for cells in this row
-- `fmt:<format-id>`: Default number format for cells in this row
+- `sty:<base64>`: Default style for cells in this row (content-addressed)
+- `fmt:<base64>`: Default number format for cells in this row (content-addressed)
 
 **Examples:**
 ```
@@ -200,10 +182,51 @@ Defines a cell value at a specific column/row intersection.
 - `value`: Type-specific value representation
 
 **Optional Properties:**
-- `fmt:<format-id>`: Number format for this cell
+- `fmt:<base64>`: Number format for this cell (content-addressed)
 - `sty:<base64>`: Cell style (content-addressed)
 
 See [Cell Types](#cell-types) for details.
+
+## Content-Addressed Number Formats
+
+Number formats use a **content-addressed** binary encoding, similar to styles. The format's content IS its identity.
+
+### Format Property Encoding
+
+Formats are encoded as binary data using a flag-based system:
+
+```
++--------+--------+--------+...
+| Flags  | Props  | Props  |...
++--------+--------+--------+
+```
+
+**Flag Byte:**
+- Bit 0: category present (otherwise GENERAL)
+- Bit 1: decimals present (otherwise 0)
+- Bit 2: thousands separator flag (if set, use separator)
+- Bit 3: currency symbol present
+- Bit 4: custom format code present (raw Excel-style string)
+- Bits 5-7: reserved
+
+**Property Data** follows in flag order:
+- Category: 1 byte (0=GENERAL, 1=NUMBER, 2=CURRENCY, 3=ACCOUNTING, 4=PERCENTAGE, 5=DATE, 6=TIME, 7=DATE_TIME, 8=SCIENTIFIC, 9=FRACTION, 10=TEXT)
+- Decimals: 1 byte (0-15)
+- Currency symbol: 1 byte length + UTF-8 string
+- Custom format code: 2 bytes length + UTF-8 string
+
+### Format Examples
+
+```
+# Percentage with 2 decimals
+fmt:BAQC
+
+# USD Currency with 2 decimals and thousands separator
+fmt:DwIC+AEk
+
+# Custom format "# BANANA"
+fmt:ERoBCCMgQkFOQU5B
+```
 
 ### Range (RG)
 
@@ -487,15 +510,13 @@ Format: `<wall_time>.<logical>.<node_id>`
 | **Axis Operations** | | |
 | `AXIS_SET_HIDDEN` | 19 | Set axis hidden state |
 | `AXIS_SET_STYLE` | 52 | Set axis default style (content-addressed) |
-| `AXIS_SET_FORMAT` | 53 | Set axis default format |
+| `AXIS_SET_FORMAT` | 53 | Set axis default format (content-addressed) |
 | **Sheet Operations** | | |
 | `SHEET_CREATE` | 20 | Create new sheet |
 | `SHEET_DELETE` | 21 | Delete sheet |
 | `SHEET_RENAME` | 22 | Rename sheet |
 | **Workbook Operations** | | |
 | `WORKBOOK_RENAME` | 30 | Rename workbook |
-| **Format Operations** | | |
-| `FORMAT_DEFINE` | 40 | Define a custom number format |
 | **Named Range Operations** | | |
 | `NAMED_RANGE_DEFINE` | 50 | Define a named range |
 | `NAMED_RANGE_DELETE` | 51 | Delete a named range |
@@ -505,6 +526,7 @@ Format: `<wall_time>.<logical>.<node_id>`
 | `RANGE_UPDATE_CORNERS` | 62 | Update range corners (resize) |
 | `RANGE_UPDATE_FLAGS` | 63 | Update range flags bitmask |
 | `RANGE_SET_STYLE` | 64 | Set range style (content-addressed) |
+| `RANGE_SET_FORMAT` | 65 | Set range number format (content-addressed) |
 
 ### Example
 
@@ -513,10 +535,12 @@ Format: `<wall_time>.<logical>.<node_id>`
 O 1705312200000.0.N3f8hJ2w CELL_SET_VALUE nP6kR2mW {"type":"n","value":"42"}
 O 1705312200001.0.N3f8hJ2w CELL_SET_VALUE hT8sL4xQ {"type":"s","value":"Hello"}
 O 1705312200002.0.N3f8hJ2w CELL_SET_STYLE xA1bC2dE {"style":"BEAB"}
-O 1705312200003.0.N3f8hJ2w RANGE_SET_STYLE rGfH3jK2 {"style":"BECA+78k"}
+O 1705312200003.0.N3f8hJ2w CELL_SET_FORMAT xA1bC2dE {"format":"BAQC"}
+O 1705312200004.0.N3f8hJ2w RANGE_SET_STYLE rGfH3jK2 {"style":"BECA+78k"}
+O 1705312200005.0.N3f8hJ2w RANGE_SET_FORMAT rGfH3jK2 {"format":"DwIC+AEk"}
 ```
 
-Style operations use the content-addressed `"style"` field containing base64-encoded binary style data.
+Style and format operations use content-addressed base64-encoded binary data. The `"style"` field contains encoded style properties, and the `"format"` field contains encoded format properties.
 
 ## Complete Example
 

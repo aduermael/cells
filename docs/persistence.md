@@ -47,7 +47,6 @@ Each axis knows its own position, making it simple to sort and serialize.
 ```
 #zcd v1
 D <doc-id> "<name>"
-F <format-id> "<format-code>"         # Custom number formats (optional)
 N "<name>" <scope> <sheet-id> <type> <target-data>  # Named ranges (optional)
 
 S <sheet-id> "<name>"
@@ -55,7 +54,7 @@ V <key:value...>                      # Sheet view properties (optional)
 C <id> <position> [props...]
 R <id> <position> [props...]
 X <id> <col-id> <row-id> <type> <value> [props...]
-RG <id> <corners> <flags> [sty:<base64>]  # Ranges (merged cells, styles, etc.)
+RG <id> <corners> <flags> [sty:<base64>] [fmt:<base64>]  # Ranges (merged cells, styles, formats)
 
 #oplog
 O <hlc> <op-type> <target-id> <payload>
@@ -86,17 +85,16 @@ X wK3nJ7pM vT5mK9xL yB9tX3wN f "=$kR7pN2wQ$jH4sW8nF+10"
 |--------|---------|--------|
 | `#zcd` | Format version | `#zcd v1` |
 | `D` | Document | `D <id> "<name>"` |
-| `F` | Custom format | `F <id> "<format-code>"` |
 | `N` | Named range | `N "<name>" <scope> <sheet-id> <type> <data>` |
 | `S` | Sheet | `S <id> "<name>"` |
 | `V` | Sheet view | `V <key:value...>` |
 | `C` | Column | `C <id> <position> [props...]` |
 | `R` | Row | `R <id> <position> [props...]` |
 | `X` | Cell | `X <id> <col> <row> <type> <value> [props...]` |
-| `RG` | Range | `RG <id> <corners> <flags> [sty:<base64>]` |
+| `RG` | Range | `RG <id> <corners> <flags> [sty:<base64>] [fmt:<base64>]` |
 | `O` | Operation | `O <hlc> <op-type> <target-id> <payload>` |
 
-Styles are content-addressed and stored inline as `sty:<base64>` properties on columns, rows, cells, and ranges.
+Styles and formats are content-addressed and stored inline as `sty:<base64>` and `fmt:<base64>` properties on columns, rows, cells, and ranges.
 
 ### Position Notation
 
@@ -108,7 +106,7 @@ Styles are content-addressed and stored inline as `sty:<base64>` properties on c
 - `name:"<name>"`: Axis name
 - `hidden:1`: Hidden axis
 - `sty:<base64>`: Default style (content-addressed)
-- `fmt:<format-id>`: Default number format
+- `fmt:<base64>`: Default number format (content-addressed)
 
 ### Cell Types
 
