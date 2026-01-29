@@ -9,6 +9,8 @@ import { runTests } from './harness.mjs';
 import {
   waitForAppReady,
   clickCell,
+  clickColumnHeader,
+  clickRowHeader,
   setCellValue,
   getCellDisplayValue,
   assertEqual,
@@ -250,6 +252,99 @@ const tests = {
     // Verify it now shows column format (only column format remains)
     display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '$1,234.56', 'Should revert to column format after clearing row format');
+  },
+
+  // ==========================================================================
+  // Toolbar-based format application tests (user workflow)
+  // ==========================================================================
+
+  'Column format via toolbar: click header then currency button': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Click column B header to select the entire column
+    await clickColumnHeader(ctx.page, 'B');
+    await sleep(200);
+
+    // Verify column is selected
+    let selectedCol = await ctx.page.evaluate(() => {
+      const app = window._appContext?.app;
+      return app?.selectedColumn ?? -1;
+    });
+    assertEqual(selectedCol, 1, 'Column B (index 1) should be selected');
+
+    // Click the currency button to apply currency format
+    await ctx.page.click('#currency-dropdown-btn');
+    await sleep(300);
+
+    // Verify column is still selected
+    selectedCol = await ctx.page.evaluate(() => {
+      const app = window._appContext?.app;
+      return app?.selectedColumn ?? -1;
+    });
+    assertEqual(selectedCol, 1, 'Column B should still be selected after clicking $ button');
+
+    // Verify the format dropdown shows Currency (BEFORE entering any values)
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Currency', 'Format dropdown should show Currency after clicking $ button');
+
+    // Now enter values in column B and verify they display as currency
+    // Note: this will deselect the column and select individual cells
+    await setCellValue(ctx.page, 'B1', '100');
+    await sleep(200);
+    let display = await getCellDisplayValue(ctx.page, 'B1');
+    assertEqual(display, '$100.00', 'B1 should display as currency');
+
+    await setCellValue(ctx.page, 'B2', '1234.56');
+    await sleep(200);
+    display = await getCellDisplayValue(ctx.page, 'B2');
+    assertEqual(display, '$1,234.56', 'B2 should display as currency with thousands separator');
+
+    await setCellValue(ctx.page, 'B3', '9999');
+    await sleep(200);
+    display = await getCellDisplayValue(ctx.page, 'B3');
+    assertEqual(display, '$9,999.00', 'B3 should display as currency');
+
+    // Verify cells in column A (not formatted) don't have currency format
+    await setCellValue(ctx.page, 'A1', '100');
+    await sleep(200);
+    display = await getCellDisplayValue(ctx.page, 'A1');
+    assertEqual(display, '100', 'A1 should NOT display as currency (different column)');
+  },
+
+  'Row format via toolbar: click header then percent button': async (ctx) => {
+    await ctx.page.goto(ctx.baseUrl);
+    await waitForAppReady(ctx.page);
+
+    // Click row 2 header to select the entire row (0-based index 1)
+    await clickRowHeader(ctx.page, 1);
+    await sleep(200);
+
+    // Verify row is selected
+    const selectedRow = await ctx.page.evaluate(() => {
+      const app = window._appContext?.app;
+      return app?.selectedRow ?? -1;
+    });
+    assertEqual(selectedRow, 1, 'Row 2 (index 1) should be selected');
+
+    // Click the percent button to apply percentage format
+    await ctx.page.click('#format-percent-btn');
+    await sleep(300);
+
+    // Verify the format dropdown shows Percent
+    const formatLabel = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabel, 'Percent', 'Format dropdown should show Percent after clicking % button');
+
+    // Now enter values in row 2 and verify they display as percentage
+    await setCellValue(ctx.page, 'A2', '0.25');
+    await sleep(200);
+    let display = await getCellDisplayValue(ctx.page, 'A2');
+    assertEqual(display, '25%', 'A2 should display as percentage');
+
+    await setCellValue(ctx.page, 'B2', '0.5');
+    await sleep(200);
+    display = await getCellDisplayValue(ctx.page, 'B2');
+    assertEqual(display, '50%', 'B2 should display as percentage');
   },
 };
 

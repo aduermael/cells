@@ -198,10 +198,24 @@ export class FormatControls {
 
   /** Update the displayed format for the current cell selection */
   async updateForCurrentCell(): Promise<void> {
-    const cellData = this.getSelectedCellData();
+    if (!this.dataSource) {
+      // No data source - show General
+      this.setDisplayedFormat("GENERAL");
+      return;
+    }
 
-    if (!cellData || !this.dataSource) {
-      // No cell selected or no data source - show General
+    // Check if a column or row is selected (via header click)
+    // When axis is selected, keep the current format display (set by the handler)
+    const selectedAxis = this.getSelectedAxis();
+    if (selectedAxis) {
+      // TODO: Add getColumnFormat/getRowFormat APIs to fetch and display axis format
+      // For now, keep whatever format was set by the handler
+      return;
+    }
+
+    const cellData = this.getSelectedCellData();
+    if (!cellData) {
+      // No cell selected - show General
       this.setDisplayedFormat("GENERAL");
       return;
     }
@@ -513,8 +527,7 @@ export class FormatControls {
   }
 
   private async handleCurrencySelect(currency: CurrencyType, symbol: string): Promise<void> {
-    const position = this.getSelectedCell();
-    if (!position || !this.dataSource) return;
+    if (!this.hasValidSelection() || !this.dataSource) return;
 
     // Create format properties for this currency (with 2 decimal places, industry standard)
     const format: FormatProperties = {
@@ -635,8 +648,7 @@ export class FormatControls {
       return;
     }
 
-    const position = this.getSelectedCell();
-    if (!position || !this.dataSource) return;
+    if (!this.hasValidSelection() || !this.dataSource) return;
 
     try {
       // Create the custom format and get its properties
@@ -807,9 +819,13 @@ export class FormatControls {
     return names[category] || category;
   }
 
+  /** Check if we have a valid selection (cell, range, or axis) */
+  private hasValidSelection(): boolean {
+    return !!(this.getSelectedCell() || this.getSelectedAxis());
+  }
+
   private async handleCategorySelect(category: NumberFormatCategory): Promise<void> {
-    const position = this.getSelectedCell();
-    if (!position || !this.dataSource) return;
+    if (!this.hasValidSelection() || !this.dataSource) return;
 
     // Handle custom format specially - open the panel instead
     if (category === "CUSTOM") {
@@ -837,8 +853,7 @@ export class FormatControls {
   }
 
   private async handleDecimalChange(delta: number): Promise<void> {
-    const position = this.getSelectedCell();
-    if (!position || !this.dataSource) return;
+    if (!this.hasValidSelection() || !this.dataSource) return;
 
     // Get current format
     const cellData = this.getSelectedCellData();
