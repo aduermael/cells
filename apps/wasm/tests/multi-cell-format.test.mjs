@@ -81,16 +81,17 @@ async function getCellStyle(page, cellRef) {
 
 /**
  * Set cell format using the data source directly
+ * Now accepts format properties object instead of legacy format IDs
  */
-async function setCellFormat(page, cellRef, formatId) {
-  return page.evaluate(async ({ ref, formatId }) => {
+async function setCellFormat(page, cellRef, formatProps) {
+  return page.evaluate(async ({ ref, formatProps }) => {
     const col = ref.charCodeAt(0) - 'A'.charCodeAt(0);
     const row = parseInt(ref.slice(1)) - 1;
     const ctx = window._appContext;
     if (!ctx?.app?.dataSource) return false;
-    await ctx.app.dataSource.setCellFormatAt(col, row, formatId);
+    await ctx.app.dataSource.setCellFormatAt(col, row, formatProps);
     return true;
-  }, { ref: cellRef, formatId });
+  }, { ref: cellRef, formatProps });
 }
 
 const tests = {
@@ -218,9 +219,9 @@ const tests = {
     await setCellValue(ctx.page, 'E2', '200');
     await sleep(200);
 
-    // Apply different formats via data source
-    await setCellFormat(ctx.page, 'E1', 'CUSD_002'); // Currency
-    await setCellFormat(ctx.page, 'E2', 'FMT_P000'); // Percentage
+    // Apply different formats via data source (content-addressed format properties)
+    await setCellFormat(ctx.page, 'E1', { category: 'CURRENCY', decimals: 2, separator: true, currency: '$' });
+    await setCellFormat(ctx.page, 'E2', { category: 'PERCENTAGE', decimals: 0 });
     await sleep(100);
 
     // Re-fetch viewport to get updated cell data with formats
@@ -248,9 +249,9 @@ const tests = {
     await setCellValue(ctx.page, 'F2', '200');
     await sleep(200);
 
-    // Apply same format to both
-    await setCellFormat(ctx.page, 'F1', 'CUSD_002');
-    await setCellFormat(ctx.page, 'F2', 'CUSD_002');
+    // Apply same format to both (content-addressed format properties)
+    await setCellFormat(ctx.page, 'F1', { category: 'CURRENCY', decimals: 2, separator: true, currency: '$' });
+    await setCellFormat(ctx.page, 'F2', { category: 'CURRENCY', decimals: 2, separator: true, currency: '$' });
     await sleep(200);
 
     // Select range with uniform format

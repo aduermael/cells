@@ -317,15 +317,45 @@ TEST(FormatWithCodeTest, NegativeZero) {
 // --- Real-World Format Codes ---
 
 TEST(FormatWithCodeTest, AccountingPositive) {
+    // Old-style accounting (no space)
     auto result = formatWithCode(1234.56, "$#,##0.00;($#,##0.00)");
     EXPECT_TRUE(result.success);
     EXPECT_EQ(result.text, "$1,234.56");
 }
 
 TEST(FormatWithCodeTest, AccountingNegative) {
+    // Old-style accounting (no space)
     auto result = formatWithCode(-1234.56, "$#,##0.00;($#,##0.00)");
     EXPECT_TRUE(result.success);
     EXPECT_EQ(result.text, "($1,234.56)");
+}
+
+TEST(FormatWithCodeTest, AccountingSpacePositive) {
+    // New accounting format with space between symbol and number
+    auto result = formatWithCode(2.29, "\"$ \"#,##0.00;(\"$ \"#,##0.00)");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.text, "$ 2.29");
+}
+
+TEST(FormatWithCodeTest, AccountingSpaceNegative) {
+    // New accounting format - negative in parentheses
+    auto result = formatWithCode(-108.30, "\"$ \"#,##0.00;(\"$ \"#,##0.00)");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.text, "($ 108.30)");
+}
+
+TEST(FormatWithCodeTest, AccountingSpaceZero) {
+    // New accounting format - zero
+    auto result = formatWithCode(0, "\"$ \"#,##0.00;(\"$ \"#,##0.00)");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.text, "$ 0.00");
+}
+
+TEST(FormatWithCodeTest, AccountingSpaceLarge) {
+    // New accounting format - large number with thousands separator
+    auto result = formatWithCode(1234567.89, "\"$ \"#,##0.00;(\"$ \"#,##0.00)");
+    EXPECT_TRUE(result.success);
+    EXPECT_EQ(result.text, "$ 1,234,567.89");
 }
 
 TEST(FormatWithCodeTest, PercentageHighPrecision) {

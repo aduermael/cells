@@ -438,6 +438,17 @@ TEST(FormatBufferTest, ToFormatCodeCurrencyEuro) {
     EXPECT_EQ(f.toFormatCode(), "€#,##0.00");
 }
 
+TEST(FormatBufferTest, ToFormatCodeAccounting) {
+    FormatBuffer f;
+    f.setCategory(NumberFormatCategory::ACCOUNTING);
+    f.setDecimals(2);
+    f.setThousandsSeparator(true);
+    f.setCurrencySymbol("$");
+
+    // Accounting format: positive with space, negative in parentheses
+    EXPECT_EQ(f.toFormatCode(), "\"$ \"#,##0.00;(\"$ \"#,##0.00)");
+}
+
 TEST(FormatBufferTest, ToFormatCodeScientific) {
     FormatBuffer f;
     f.setCategory(NumberFormatCategory::SCIENTIFIC);

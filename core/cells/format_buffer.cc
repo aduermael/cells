@@ -632,13 +632,20 @@ std::string FormatBuffer::toFormatCode() const {
             break;
 
         case NumberFormatCategory::ACCOUNTING:
-            // Accounting format with alignment padding
-            result = "_(" + currency + "* #,##0";
+            // Accounting format: symbol with space, negative in parentheses
+            // Generate simpler format code that produces correct output:
+            // positive: "$ 1,234.56" / negative: "($ 1,234.56)" / zero: "$ 0.00"
+            result = "\"" + currency + " \"#,##0";
             if (decimals > 0) {
                 result += ".";
                 result += std::string(decimals, '0');
             }
-            result += "_)";
+            result += ";(\"" + currency + " \"#,##0";
+            if (decimals > 0) {
+                result += ".";
+                result += std::string(decimals, '0');
+            }
+            result += ")";
             break;
 
         case NumberFormatCategory::PERCENTAGE:

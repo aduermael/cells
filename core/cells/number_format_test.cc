@@ -676,16 +676,17 @@ TEST(FormatPriorityTest, PriorityOrdering) {
 }
 
 // --- Format Inheritance Tests ---
+// NOTE: These tests use format codes (content-addressed format system) instead of legacy format IDs
 
 TEST(InferFormatTest, NullAstReturnsEmpty) {
-    FormatLookup lookup = [](const std::string&) { return "CUSD_002"; };
+    FormatLookup lookup = [](const std::string&) { return "$#,##0.00"; };
     EXPECT_EQ(inferFormatFromFormula(nullptr, lookup), "");
 }
 
 TEST(InferFormatTest, NoReferencesReturnsEmpty) {
     // Create an AST with just a number literal
     NumberLiteralNode node(42.0);
-    FormatLookup lookup = [](const std::string&) { return "CUSD_002"; };
+    FormatLookup lookup = [](const std::string&) { return "$#,##0.00"; };
     EXPECT_EQ(inferFormatFromFormula(&node, lookup), "");
 }
 
@@ -696,12 +697,12 @@ TEST(InferFormatTest, SingleCellRefInheritsCurrency) {
 
     FormatLookup lookup = [](const std::string& cellId) {
         if (cellId == "CELL_001") {
-            return std::string("CUSD_002");  // USD currency, 2 decimals
+            return std::string("$#,##0.00");  // Currency format code
         }
         return std::string("");
     };
 
-    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "CUSD_002");
+    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "$#,##0.00");
 }
 
 TEST(InferFormatTest, SingleCellRefInheritsPercentage) {
@@ -710,12 +711,12 @@ TEST(InferFormatTest, SingleCellRefInheritsPercentage) {
 
     FormatLookup lookup = [](const std::string& cellId) {
         if (cellId == "CELL_002") {
-            return std::string("FMT_P002");  // Percentage, 2 decimals
+            return std::string("0.00%");  // Percentage format code
         }
         return std::string("");
     };
 
-    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "FMT_P002");
+    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "0.00%");
 }
 
 TEST(InferFormatTest, GeneralFormatNotInherited) {
@@ -759,12 +760,12 @@ TEST(InferFormatTest, BinaryOpBothSameFormat) {
 
     FormatLookup lookup = [](const std::string& cellId) {
         if (cellId == "CELL_A1" || cellId == "CELL_B1") {
-            return std::string("CUSD_002");  // Both have currency
+            return std::string("$#,##0.00");  // Both have currency
         }
         return std::string("");
     };
 
-    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "CUSD_002");
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "$#,##0.00");
 }
 
 TEST(InferFormatTest, BinaryOpCurrencyWinsOverPercentage) {
@@ -777,17 +778,19 @@ TEST(InferFormatTest, BinaryOpCurrencyWinsOverPercentage) {
 
     BinaryOpNode binOp(BinaryOp::ADD, std::move(left), std::move(right));
 
+    // Now using format codes instead of legacy format IDs
     FormatLookup lookup = [](const std::string& cellId) {
         if (cellId == "CELL_A1") {
-            return std::string("FMT_P002");  // Percentage
+            return std::string("0.00%");  // Percentage format code
         }
         if (cellId == "CELL_B1") {
-            return std::string("CUSD_002");  // Currency (higher priority)
+            return std::string("$#,##0.00");  // Currency format code (higher priority)
         }
         return std::string("");
     };
 
-    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "CUSD_002");
+    // Currency format code wins
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "$#,##0.00");
 }
 
 TEST(InferFormatTest, BinaryOpCurrencyWinsRegardlessOfOrder) {
@@ -799,17 +802,19 @@ TEST(InferFormatTest, BinaryOpCurrencyWinsRegardlessOfOrder) {
 
     BinaryOpNode binOp(BinaryOp::ADD, std::move(left), std::move(right));
 
+    // Now using format codes instead of legacy format IDs
     FormatLookup lookup = [](const std::string& cellId) {
         if (cellId == "CELL_A1") {
-            return std::string("CUSD_002");  // Currency (higher priority)
+            return std::string("$#,##0.00");  // Currency format code (higher priority)
         }
         if (cellId == "CELL_B1") {
-            return std::string("FMT_P002");  // Percentage
+            return std::string("0.00%");  // Percentage format code
         }
         return std::string("");
     };
 
-    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "CUSD_002");
+    // Currency format code wins
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "$#,##0.00");
 }
 
 TEST(InferFormatTest, MoreDecimalsWinsInSameCategory) {
@@ -821,17 +826,19 @@ TEST(InferFormatTest, MoreDecimalsWinsInSameCategory) {
 
     BinaryOpNode binOp(BinaryOp::ADD, std::move(left), std::move(right));
 
+    // Now using format codes instead of legacy format IDs
     FormatLookup lookup = [](const std::string& cellId) {
         if (cellId == "CELL_A1") {
-            return std::string("FMT_N002");  // NUMBER, 2 decimals
+            return std::string("0.00");  // NUMBER, 2 decimals
         }
         if (cellId == "CELL_B1") {
-            return std::string("FMT_N004");  // NUMBER, 4 decimals (more specific)
+            return std::string("0.0000");  // NUMBER, 4 decimals (more specific)
         }
         return std::string("");
     };
 
-    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "FMT_N004");
+    // 4 decimals format wins
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "0.0000");
 }
 
 TEST(InferFormatTest, LiteralWithRefInheritsFromRef) {
@@ -843,14 +850,15 @@ TEST(InferFormatTest, LiteralWithRefInheritsFromRef) {
 
     BinaryOpNode binOp(BinaryOp::MULTIPLY, std::move(left), std::move(right));
 
+    // Now using format codes instead of legacy format IDs
     FormatLookup lookup = [](const std::string& cellId) {
         if (cellId == "CELL_A1") {
-            return std::string("CUSD_002");
+            return std::string("$#,##0.00");  // Currency format code
         }
         return std::string("");
     };
 
-    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "CUSD_002");
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "$#,##0.00");
 }
 
 TEST(InferFormatTest, FunctionCallInheritsFromArgs) {
@@ -865,10 +873,10 @@ TEST(InferFormatTest, FunctionCallInheritsFromArgs) {
     funcCall.args.push_back(std::move(arg2));
 
     FormatLookup lookup = [](const std::string&) {
-        return std::string("FMT_P002");  // Both have percentage
+        return std::string("0.00%");  // Both have percentage
     };
 
-    EXPECT_EQ(inferFormatFromFormula(&funcCall, lookup), "FMT_P002");
+    EXPECT_EQ(inferFormatFromFormula(&funcCall, lookup), "0.00%");
 }
 
 TEST(InferFormatTest, RangeRefInheritsFromCorners) {
@@ -882,16 +890,16 @@ TEST(InferFormatTest, RangeRefInheritsFromCorners) {
 
     FormatLookup lookup = [](const std::string& cellId) {
         if (cellId == "CELL_A1") {
-            return std::string("CUSD_002");  // Currency
+            return std::string("$#,##0.00");  // Currency
         }
         if (cellId == "CELL_B2") {
-            return std::string("FMT_P002");  // Percentage
+            return std::string("0.00%");  // Percentage
         }
         return std::string("");
     };
 
     // Currency wins over percentage
-    EXPECT_EQ(inferFormatFromFormula(&rangeRef, lookup), "CUSD_002");
+    EXPECT_EQ(inferFormatFromFormula(&rangeRef, lookup), "$#,##0.00");
 }
 
 TEST(InferFormatTest, UnaryOpInheritsFromOperand) {
@@ -903,12 +911,12 @@ TEST(InferFormatTest, UnaryOpInheritsFromOperand) {
 
     FormatLookup lookup = [](const std::string& cellId) {
         if (cellId == "CELL_A1") {
-            return std::string("CUSD_002");
+            return std::string("$#,##0.00");  // Currency format code
         }
         return std::string("");
     };
 
-    EXPECT_EQ(inferFormatFromFormula(&unaryOp, lookup), "CUSD_002");
+    EXPECT_EQ(inferFormatFromFormula(&unaryOp, lookup), "$#,##0.00");
 }
 
 TEST(InferFormatTest, UseCellFormatNotUnderlyingFormula) {
@@ -920,13 +928,13 @@ TEST(InferFormatTest, UseCellFormatNotUnderlyingFormula) {
 
     FormatLookup lookup = [](const std::string& cellId) {
         if (cellId == "CELL_A1") {
-            // A1's formatId is currency (it has a formula =B1 but format is currency)
-            return std::string("CUSD_002");
+            // A1's format is currency (it has a formula =B1 but format is currency)
+            return std::string("$#,##0.00");
         }
         return std::string("");
     };
 
-    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "CUSD_002");
+    EXPECT_EQ(inferFormatFromFormula(&cellRef, lookup), "$#,##0.00");
 }
 
 TEST(InferFormatTest, SeparatorBeatsNoSeparatorSameDecimals) {
@@ -940,16 +948,16 @@ TEST(InferFormatTest, SeparatorBeatsNoSeparatorSameDecimals) {
 
     FormatLookup lookup = [](const std::string& cellId) {
         if (cellId == "CELL_A1") {
-            return std::string("FMT_N002");  // NUMBER, 2 decimals, no separator
+            return std::string("0.00");  // NUMBER, 2 decimals, no separator
         }
         if (cellId == "CELL_B1") {
-            return std::string("FMT_NS02");  // NUMBER, 2 decimals, with separator
+            return std::string("#,##0.00");  // NUMBER, 2 decimals, with separator
         }
         return std::string("");
     };
 
-    // FMT_NS02 (with separator) should win
-    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "FMT_NS02");
+    // Format with separator should win
+    EXPECT_EQ(inferFormatFromFormula(&binOp, lookup), "#,##0.00");
 }
 
 }  // namespace

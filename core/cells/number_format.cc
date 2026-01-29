@@ -748,37 +748,89 @@ void collectCellRefs(const ASTNode* node, std::vector<std::string>& cellIds) {
     }
 }
 
-// Compare two format IDs: returns true if candidate is "more specific" than current
+// Get category from a format code string (content-addressed format)
+NumberFormatCategory getCategoryFromFormatCode(const std::string& formatCode) {
+    if (formatCode.empty() || formatCode == "General" || formatCode == "general") {
+        return NumberFormatCategory::GENERAL;
+    }
+
+    // Parse the format code using the format code parser
+    const ParsedFormatCode parsed = parseFormatCode(formatCode);
+    if (!parsed.valid || parsed.sections.empty()) {
+        return NumberFormatCategory::GENERAL;
+    }
+
+    // Check for percentage (has % in the format)
+    if (parsed.hasPercent) {
+        return NumberFormatCategory::PERCENTAGE;
+    }
+
+    // Check for currency (has currency symbol)
+    if (!parsed.currencySymbol.empty()) {
+        // Check if accounting format (has parentheses for negatives or space before number)
+        if (formatCode.find("_(") != std::string::npos ||
+            formatCode.find("\"$ \"") != std::string::npos ||
+            formatCode.find("\"€ \"") != std::string::npos ||
+            formatCode.find("\"£ \"") != std::string::npos) {
+            return NumberFormatCategory::ACCOUNTING;
+        }
+        return NumberFormatCategory::CURRENCY;
+    }
+
+    // Check for scientific notation
+    if (formatCode.find("E+") != std::string::npos || formatCode.find("E-") != std::string::npos) {
+        return NumberFormatCategory::SCIENTIFIC;
+    }
+
+    // Check for date/time (has yy, mm, dd, hh, ss patterns)
+    if (formatCode.find("yy") != std::string::npos || formatCode.find("mm") != std::string::npos ||
+        formatCode.find("dd") != std::string::npos) {
+        if (formatCode.find("hh") != std::string::npos ||
+            formatCode.find("ss") != std::string::npos) {
+            return NumberFormatCategory::DATE_TIME;
+        }
+        return NumberFormatCategory::DATE;
+    }
+    if (formatCode.find("hh") != std::string::npos || formatCode.find("ss") != std::string::npos) {
+        return NumberFormatCategory::TIME;
+    }
+
+    // Check for fraction
+    if (formatCode.find("?/?") != std::string::npos) {
+        return NumberFormatCategory::FRACTION;
+    }
+
+    // Check for text format
+    if (formatCode == "@") {
+        return NumberFormatCategory::TEXT;
+    }
+
+    // Default to NUMBER for any numeric format with 0 or #
+    if (formatCode.find('0') != std::string::npos || formatCode.find('#') != std::string::npos) {
+        return NumberFormatCategory::NUMBER;
+    }
+
+    return NumberFormatCategory::GENERAL;
+}
+
+// Compare two format codes: returns true if candidate is "more specific" than current
 // More specific means: higher priority category, or same category with more decimals
-bool isMoreSpecific(const std::string& candidateId, const std::string& currentId) {
-    if (candidateId.empty() || candidateId == "~" || candidateId == "FMT_GEN0") {
+// Now works with content-addressed format codes instead of legacy format IDs
+bool isMoreSpecific(const std::string& candidateCode, const std::string& currentCode) {
+    if (candidateCode.empty() || candidateCode == "General" || candidateCode == "general") {
         return false;  // GENERAL is never more specific
     }
-    if (currentId.empty() || currentId == "~" || currentId == "FMT_GEN0") {
+    if (currentCode.empty() || currentCode == "General" || currentCode == "general") {
         return true;  // Anything is more specific than GENERAL
     }
 
-    // Parse both format IDs
-    const ParsedFormatId candidate = parseFormatId(candidateId);
-    const ParsedFormatId current = parseFormatId(currentId);
+    // Get categories from format codes
+    const NumberFormatCategory candidateCat = getCategoryFromFormatCode(candidateCode);
+    const NumberFormatCategory currentCat = getCategoryFromFormatCode(currentCode);
 
-    // If either fails to parse, fall back to built-in handling
-    if (!candidate.valid && !current.valid) {
-        // Both unparseable - compare by string (arbitrary but stable)
-        return candidateId > currentId;
-    }
-    if (!candidate.valid) {
-        // Candidate is unparseable (custom format?) - it wins if current is basic
-        return getFormatPriority(current.category) < 50;  // Custom formats beat basic NUMBER
-    }
-    if (!current.valid) {
-        // Current is unparseable - candidate must have higher priority to win
-        return getFormatPriority(candidate.category) >= 50;
-    }
-
-    // Both parsed successfully - compare by priority
-    const int candidatePriority = getFormatPriority(candidate.category);
-    const int currentPriority = getFormatPriority(current.category);
+    // Compare by priority
+    const int candidatePriority = getFormatPriority(candidateCat);
+    const int currentPriority = getFormatPriority(currentCat);
 
     if (candidatePriority > currentPriority) {
         return true;
@@ -787,18 +839,22 @@ bool isMoreSpecific(const std::string& candidateId, const std::string& currentId
         return false;
     }
 
-    // Same priority (likely same category) - compare specificity
-    // More decimal places = more specific
-    if (candidate.decimalPlaces > current.decimalPlaces) {
-        return true;
-    }
-    if (candidate.decimalPlaces < current.decimalPlaces) {
-        return false;
-    }
+    // Same priority (same category) - compare by decimal places
+    const ParsedFormatCode candidateParsed = parseFormatCode(candidateCode);
+    const ParsedFormatCode currentParsed = parseFormatCode(currentCode);
 
-    // Same decimals - prefer separator over no separator
-    if (candidate.useThousandsSeparator && !current.useThousandsSeparator) {
-        return true;
+    if (candidateParsed.valid && currentParsed.valid) {
+        if (candidateParsed.decimalPlaces > currentParsed.decimalPlaces) {
+            return true;
+        }
+        if (candidateParsed.decimalPlaces < currentParsed.decimalPlaces) {
+            return false;
+        }
+
+        // Same decimals - prefer separator over no separator
+        if (candidateParsed.hasThousandsSeparator && !currentParsed.hasThousandsSeparator) {
+            return true;
+        }
     }
 
     return false;  // Current wins (or tie)
