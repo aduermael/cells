@@ -211,7 +211,7 @@ Mirror the style system's approach for computing effective formats at display ti
 
 ### Phase 8: Testing and Documentation
 
-- [ ] 8a: Update unit tests to use new FormatBuffer APIs (no legacy format ID tests)
+- [x] 8a: Update unit tests to use new FormatBuffer APIs (no legacy format ID tests). Updated `luau_sandbox_test.cc` to use FormatBuffer content-addressed format strings. Updated Luau API (`luau_types.cc`, `luau_api.cc`) to convert legacy format IDs (FMT_C002, FMT_P002, etc.) to FormatBuffer. Fixed formatCategoryToString to return uppercase category names (CURRENCY, PERCENTAGE, etc.) to match TypeScript types.
 - [ ] 8b: Run all existing format-related E2E tests
 - [ ] 8c: Fix any failing tests related to format changes
 - [ ] 8d: Update docs/file-format.md with new format encoding

@@ -8,17 +8,18 @@ namespace cells {
 namespace {
 
 TEST(NumberFormatCategoryTest, ToString) {
-    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::GENERAL), "general");
-    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::NUMBER), "number");
-    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::CURRENCY), "currency");
-    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::ACCOUNTING), "accounting");
-    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::PERCENTAGE), "percentage");
-    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::DATE), "date");
-    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::TIME), "time");
-    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::DATE_TIME), "datetime");
-    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::SCIENTIFIC), "scientific");
-    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::FRACTION), "fraction");
-    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::TEXT), "text");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::GENERAL), "GENERAL");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::NUMBER), "NUMBER");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::CURRENCY), "CURRENCY");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::ACCOUNTING), "ACCOUNTING");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::PERCENTAGE), "PERCENTAGE");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::DATE), "DATE");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::TIME), "TIME");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::DATE_TIME), "DATE_TIME");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::SCIENTIFIC), "SCIENTIFIC");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::FRACTION), "FRACTION");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::TEXT), "TEXT");
+    EXPECT_STREQ(formatCategoryToString(NumberFormatCategory::CUSTOM), "CUSTOM");
 }
 
 TEST(NumberFormatCategoryTest, FromString) {
@@ -532,56 +533,56 @@ TEST(NumberFormatRegistryTest, BuiltInFormatsUsesDynamicSystem) {
 
 TEST(GetFormatDetailsTest, General) {
     EXPECT_EQ(getFormatDetails("~"),
-              R"({"category":"general","decimals":0,"separator":false,"currency":null})");
+              R"({"category":"GENERAL","decimals":0,"separator":false,"currency":null})");
     EXPECT_EQ(getFormatDetails(""),
-              R"({"category":"general","decimals":0,"separator":false,"currency":null})");
+              R"({"category":"GENERAL","decimals":0,"separator":false,"currency":null})");
     EXPECT_EQ(getFormatDetails("FMT_GEN0"),
-              R"({"category":"general","decimals":0,"separator":false,"currency":null})");
+              R"({"category":"GENERAL","decimals":0,"separator":false,"currency":null})");
 }
 
 TEST(GetFormatDetailsTest, Number) {
     EXPECT_EQ(getFormatDetails("FMT_N000"),
-              R"({"category":"number","decimals":0,"separator":false,"currency":null})");
+              R"({"category":"NUMBER","decimals":0,"separator":false,"currency":null})");
     EXPECT_EQ(getFormatDetails("FMT_N002"),
-              R"({"category":"number","decimals":2,"separator":false,"currency":null})");
+              R"({"category":"NUMBER","decimals":2,"separator":false,"currency":null})");
     EXPECT_EQ(getFormatDetails("FMT_N012"),
-              R"({"category":"number","decimals":12,"separator":false,"currency":null})");
+              R"({"category":"NUMBER","decimals":12,"separator":false,"currency":null})");
 }
 
 TEST(GetFormatDetailsTest, NumberWithSeparator) {
     EXPECT_EQ(getFormatDetails("FMT_NS00"),
-              R"({"category":"number","decimals":0,"separator":true,"currency":null})");
+              R"({"category":"NUMBER","decimals":0,"separator":true,"currency":null})");
     EXPECT_EQ(getFormatDetails("FMT_NS02"),
-              R"({"category":"number","decimals":2,"separator":true,"currency":null})");
+              R"({"category":"NUMBER","decimals":2,"separator":true,"currency":null})");
 }
 
 TEST(GetFormatDetailsTest, Percentage) {
     EXPECT_EQ(getFormatDetails("FMT_P000"),
-              R"({"category":"percentage","decimals":0,"separator":false,"currency":null})");
+              R"({"category":"PERCENTAGE","decimals":0,"separator":false,"currency":null})");
     EXPECT_EQ(getFormatDetails("FMT_P002"),
-              R"({"category":"percentage","decimals":2,"separator":false,"currency":null})");
+              R"({"category":"PERCENTAGE","decimals":2,"separator":false,"currency":null})");
 }
 
 TEST(GetFormatDetailsTest, Currency) {
     EXPECT_EQ(getFormatDetails("CUSD_002"),
-              R"({"category":"currency","decimals":2,"separator":true,"currency":"USD"})");
+              R"({"category":"CURRENCY","decimals":2,"separator":true,"currency":"USD"})");
     EXPECT_EQ(getFormatDetails("CEUR_004"),
-              R"({"category":"currency","decimals":4,"separator":true,"currency":"EUR"})");
+              R"({"category":"CURRENCY","decimals":4,"separator":true,"currency":"EUR"})");
 }
 
 TEST(GetFormatDetailsTest, BuiltInFormats) {
     EXPECT_EQ(getFormatDetails("FMT_A002"),
-              R"({"category":"accounting","decimals":2,"separator":true,"currency":"USD"})");
+              R"({"category":"ACCOUNTING","decimals":2,"separator":true,"currency":"USD"})");
     EXPECT_EQ(getFormatDetails("FMT_DSHT"),
-              R"({"category":"date","decimals":0,"separator":false,"currency":null})");
+              R"({"category":"DATE","decimals":0,"separator":false,"currency":null})");
     EXPECT_EQ(getFormatDetails("FMT_T12H"),
-              R"({"category":"time","decimals":0,"separator":false,"currency":null})");
+              R"({"category":"TIME","decimals":0,"separator":false,"currency":null})");
     EXPECT_EQ(getFormatDetails("FMT_DTSH"),
-              R"({"category":"datetime","decimals":0,"separator":false,"currency":null})");
+              R"({"category":"DATE_TIME","decimals":0,"separator":false,"currency":null})");
     EXPECT_EQ(getFormatDetails("FMT_SCI2"),
-              R"({"category":"scientific","decimals":2,"separator":false,"currency":null})");
+              R"({"category":"SCIENTIFIC","decimals":2,"separator":false,"currency":null})");
     EXPECT_EQ(getFormatDetails("FMT_TEXT"),
-              R"({"category":"text","decimals":0,"separator":false,"currency":null})");
+              R"({"category":"TEXT","decimals":0,"separator":false,"currency":null})");
 }
 
 TEST(GetFormatDetailsTest, UnknownFormat) {

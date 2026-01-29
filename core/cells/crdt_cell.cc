@@ -199,10 +199,9 @@ ApplyResult applyCellSetValue(Workbook& workbook, const Operation& op) {
                 inferFormatFromFormula(formula->ast, formatLookup);
             if (!inheritedFormatCode.empty()) {
                 // Parse the format code to create a FormatBuffer
-                FormatBuffer inheritedFormat;
-                (void)inheritedFormat.fromFormatCode(inheritedFormatCode);
-                if (!inheritedFormat.isEmpty()) {
-                    workbook.setEntityFormat(cell->id, inheritedFormat);
+                auto maybeFormat = FormatBuffer::fromFormatCode(inheritedFormatCode);
+                if (maybeFormat.has_value() && !maybeFormat->isEmpty()) {
+                    workbook.setEntityFormat(cell->id, *maybeFormat);
                     cell->markHasFormat();
                 }
             }

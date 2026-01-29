@@ -28,6 +28,7 @@
 #include "core/cells/crdt.h"
 #include "core/cells/dependency_graph.h"
 #include "core/cells/fill_range.h"
+#include "core/cells/format_buffer.h"
 #include "core/cells/formula_parser.h"
 #include "core/cells/formula_recalc.h"
 #include "core/cells/formula_resolver.h"
@@ -35,6 +36,7 @@
 #include "core/cells/id.h"
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/model.h"
+#include "core/cells/number_format.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/style_buffer.h"
 
@@ -73,6 +75,49 @@ static std::string jsonEscape(const std::string& str) {
         }
     }
     return result;
+}
+
+// Helper: Convert a legacy format ID (e.g., "FMT_C002", "FMT_P002", "CUSD_002") to FormatBuffer
+// Returns empty optional if not a recognized legacy format ID
+static std::optional<FormatBuffer> formatIdToBuffer(const std::string& formatIdStr) {
+    // Try to parse as a legacy format ID using parseFormatId (handles FMT_P, FMT_N, CXXX patterns)
+    ParsedFormatId parsed = parseFormatId(formatIdStr);
+
+    // Also handle FMT_C0XX pattern (currency with default USD, XX decimals)
+    // These are used in the Luau API documentation but not parsed by parseFormatId
+    if (!parsed.valid && formatIdStr.size() == 8 && formatIdStr.substr(0, 5) == "FMT_C" &&
+        formatIdStr[5] == '0') {
+        if (std::isdigit(static_cast<unsigned char>(formatIdStr[6])) != 0 &&
+            std::isdigit(static_cast<unsigned char>(formatIdStr[7])) != 0) {
+            const int decimals = (formatIdStr[6] - '0') * 10 + (formatIdStr[7] - '0');
+            if (decimals <= 15) {
+                parsed.category = NumberFormatCategory::CURRENCY;
+                parsed.decimalPlaces = static_cast<uint8_t>(decimals);
+                parsed.useThousandsSeparator = true;
+                parsed.currencyCode = "USD";
+                parsed.currencySymbol = "$";
+                parsed.valid = true;
+            }
+        }
+    }
+
+    if (!parsed.valid) {
+        return std::nullopt;
+    }
+
+    // Create FormatBuffer from parsed components
+    FormatBuffer format;
+    format.setCategory(parsed.category);
+    if (parsed.decimalPlaces > 0) {
+        format.setDecimals(parsed.decimalPlaces);
+    }
+    if (parsed.useThousandsSeparator) {
+        format.setThousandsSeparator(true);
+    }
+    if (!parsed.currencySymbol.empty()) {
+        format.setCurrencySymbol(parsed.currencySymbol);
+    }
+    return format;
 }
 
 // Helper: Parse column letter (A, B, ..., AA, ...) to 0-based index
@@ -1297,26 +1342,44 @@ int LuauSandbox::luaPrint(lua_State* L) {
 }
 
 // ============================================================================
-// Cells API: setFormat(range, formatId)
+// Cells API: setFormat(range, formatStr)
 // Apply format to all cells in range
 // range: A1 notation like "A1:B10" or "A1" for single cell
-// formatId: format ID string like "FMT_C002", "FMT_P001", or nil to clear
+// formatStr: format ID (e.g., "FMT_C002"), base64 encoded format, or nil to clear
 // ============================================================================
 int LuauSandbox::luaSetFormat(lua_State* L) {
     const char* range = luaL_checkstring(L, 1);
 
-    // Get formatId (can be string or nil)
-    std::string formatIdStr = "~";  // Default: clear format
+    // Get format string (can be string or nil)
+    std::string formatBase64;  // Empty = clear format
     if (lua_isstring(L, 2) != 0) {
-        formatIdStr = lua_tostring(L, 2);
+        const std::string formatStr = lua_tostring(L, 2);
+
+        // Try to parse as legacy format ID first (e.g., "FMT_C002")
+        auto maybeFormat = formatIdToBuffer(formatStr);
+        if (maybeFormat.has_value()) {
+            formatBase64 = maybeFormat->toBase64();
+        } else {
+            // Try as base64 directly
+            auto maybeBase64 = FormatBuffer::fromBase64(formatStr);
+            if (maybeBase64.has_value()) {
+                formatBase64 = formatStr;
+            } else {
+                luaL_error(L, "setFormat: invalid format string '%s'", formatStr.c_str());
+                return 0;
+            }
+        }
     } else if (lua_isnil(L, 2) == 0) {
-        luaL_error(L, "setFormat: second argument must be format ID string or nil");
+        luaL_error(L, "setFormat: second argument must be format string or nil");
+        return 0;
     }
+    // nil clears format (empty base64)
 
     Sheet* sheet = getSheet(L);
     Workbook* workbook = getWorkbook(L);
     if (sheet == nullptr || workbook == nullptr) {
         luaL_error(L, "setFormat: no context set");
+        return 0;
     }
 
     // Parse range
@@ -1326,6 +1389,7 @@ int LuauSandbox::luaSetFormat(lua_State* L) {
     int toRow = 0;
     if (!parseA1Range(range, &fromCol, &fromRow, &toCol, &toRow)) {
         luaL_error(L, "setFormat: invalid range '%s'", range);
+        return 0;
     }
 
     // Normalize range
@@ -1337,7 +1401,7 @@ int LuauSandbox::luaSetFormat(lua_State* L) {
     }
 
     // Apply format to all cells in range
-    const std::string payload = R"({"format_id":")" + jsonEscape(formatIdStr) + R"("})";
+    const std::string payload = R"({"format":")" + formatBase64 + R"("})";
 
     for (int c = fromCol; c <= toCol; c++) {
         for (int r = fromRow; r <= toRow; r++) {

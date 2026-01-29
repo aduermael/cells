@@ -17,64 +17,69 @@ namespace cells {
 const char* formatCategoryToString(NumberFormatCategory category) {
     switch (category) {
         case NumberFormatCategory::GENERAL:
-            return "general";
+            return "GENERAL";
         case NumberFormatCategory::NUMBER:
-            return "number";
+            return "NUMBER";
         case NumberFormatCategory::CURRENCY:
-            return "currency";
+            return "CURRENCY";
         case NumberFormatCategory::ACCOUNTING:
-            return "accounting";
+            return "ACCOUNTING";
         case NumberFormatCategory::PERCENTAGE:
-            return "percentage";
+            return "PERCENTAGE";
         case NumberFormatCategory::DATE:
-            return "date";
+            return "DATE";
         case NumberFormatCategory::TIME:
-            return "time";
+            return "TIME";
         case NumberFormatCategory::DATE_TIME:
-            return "datetime";
+            return "DATE_TIME";
         case NumberFormatCategory::SCIENTIFIC:
-            return "scientific";
+            return "SCIENTIFIC";
         case NumberFormatCategory::FRACTION:
-            return "fraction";
+            return "FRACTION";
         case NumberFormatCategory::TEXT:
-            return "text";
+            return "TEXT";
+        case NumberFormatCategory::CUSTOM:
+            return "CUSTOM";
     }
-    return "general";
+    return "GENERAL";
 }
 
 NumberFormatCategory stringToFormatCategory(const std::string& str) {
-    if (str == "general") {
+    if (str == "general" || str == "GENERAL") {
         return NumberFormatCategory::GENERAL;
     }
-    if (str == "number") {
+    if (str == "number" || str == "NUMBER") {
         return NumberFormatCategory::NUMBER;
     }
-    if (str == "currency") {
+    if (str == "currency" || str == "CURRENCY") {
         return NumberFormatCategory::CURRENCY;
     }
-    if (str == "accounting") {
+    if (str == "accounting" || str == "ACCOUNTING") {
         return NumberFormatCategory::ACCOUNTING;
     }
-    if (str == "percentage") {
+    if (str == "percentage" || str == "PERCENTAGE") {
         return NumberFormatCategory::PERCENTAGE;
     }
-    if (str == "date") {
+    if (str == "date" || str == "DATE") {
         return NumberFormatCategory::DATE;
     }
-    if (str == "time") {
+    if (str == "time" || str == "TIME") {
         return NumberFormatCategory::TIME;
     }
-    if (str == "datetime") {
+    if (str == "datetime" || str == "DATE_TIME") {
         return NumberFormatCategory::DATE_TIME;
     }
-    if (str == "scientific") {
+    if (str == "scientific" || str == "SCIENTIFIC") {
         return NumberFormatCategory::SCIENTIFIC;
     }
-    if (str == "fraction") {
+    if (str == "fraction" || str == "FRACTION") {
         return NumberFormatCategory::FRACTION;
     }
-    if (str == "text") {
+    if (str == "text" || str == "TEXT") {
         return NumberFormatCategory::TEXT;
+    }
+    if (str == "custom" || str == "CUSTOM") {
+        return NumberFormatCategory::CUSTOM;
     }
     return NumberFormatCategory::GENERAL;
 }
@@ -211,7 +216,7 @@ std::string getCurrencySymbol(const std::string& currencyCode) {
 std::string getFormatDetails(const std::string& formatId) {
     // Handle special cases
     if (formatId.empty() || formatId == "~" || formatId == "FMT_GEN0") {
-        return R"({"category":"general","decimals":0,"separator":false,"currency":null})";
+        return R"({"category":"GENERAL","decimals":0,"separator":false,"currency":null})";
     }
 
     // Try to parse as a dynamic format ID
@@ -229,23 +234,23 @@ std::string getFormatDetails(const std::string& formatId) {
     // Handle non-parseable built-in formats
     if (formatId == "FMT_A000" || formatId == "FMT_A002") {
         const int decimals = (formatId == "FMT_A002") ? 2 : 0;
-        return "{\"category\":\"accounting\",\"decimals\":" + std::to_string(decimals) +
+        return "{\"category\":\"ACCOUNTING\",\"decimals\":" + std::to_string(decimals) +
                ",\"separator\":true,\"currency\":\"USD\"}";
     }
     if (formatId == "FMT_DSHT" || formatId == "FMT_DLNG" || formatId == "FMT_DISO") {
-        return R"({"category":"date","decimals":0,"separator":false,"currency":null})";
+        return R"({"category":"DATE","decimals":0,"separator":false,"currency":null})";
     }
     if (formatId == "FMT_T12H" || formatId == "FMT_T24H") {
-        return R"({"category":"time","decimals":0,"separator":false,"currency":null})";
+        return R"({"category":"TIME","decimals":0,"separator":false,"currency":null})";
     }
     if (formatId == "FMT_DTSH") {
-        return R"({"category":"datetime","decimals":0,"separator":false,"currency":null})";
+        return R"({"category":"DATE_TIME","decimals":0,"separator":false,"currency":null})";
     }
     if (formatId == "FMT_SCI2") {
-        return R"({"category":"scientific","decimals":2,"separator":false,"currency":null})";
+        return R"({"category":"SCIENTIFIC","decimals":2,"separator":false,"currency":null})";
     }
     if (formatId == "FMT_TEXT") {
-        return R"({"category":"text","decimals":0,"separator":false,"currency":null})";
+        return R"({"category":"TEXT","decimals":0,"separator":false,"currency":null})";
     }
 
     return R"({"error":"Unknown format"})";

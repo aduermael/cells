@@ -41,6 +41,7 @@
 #include "core/cells/id.h"
 #include "core/cells/luau_sandbox.h"
 #include "core/cells/model.h"
+#include "core/cells/number_format.h"
 #include "core/cells/ref_converter.h"
 #include "core/cells/style_buffer.h"
 
@@ -48,6 +49,49 @@
 #include "lualib.h"  // NOLINT(build/include_subdir)
 
 namespace cells {
+
+// Helper: Convert a legacy format ID (e.g., "FMT_C002", "FMT_P002", "CUSD_002") to FormatBuffer
+// Returns empty optional if not a recognized legacy format ID
+static std::optional<FormatBuffer> formatIdToBuffer(const std::string& formatIdStr) {
+    // Try to parse as a legacy format ID using parseFormatId (handles FMT_P, FMT_N, CXXX patterns)
+    ParsedFormatId parsed = parseFormatId(formatIdStr);
+
+    // Also handle FMT_C0XX pattern (currency with default USD, XX decimals)
+    // These are used in the Luau API documentation but not parsed by parseFormatId
+    if (!parsed.valid && formatIdStr.size() == 8 && formatIdStr.substr(0, 5) == "FMT_C" &&
+        formatIdStr[5] == '0') {
+        if (std::isdigit(static_cast<unsigned char>(formatIdStr[6])) != 0 &&
+            std::isdigit(static_cast<unsigned char>(formatIdStr[7])) != 0) {
+            const int decimals = (formatIdStr[6] - '0') * 10 + (formatIdStr[7] - '0');
+            if (decimals <= 15) {
+                parsed.category = NumberFormatCategory::CURRENCY;
+                parsed.decimalPlaces = static_cast<uint8_t>(decimals);
+                parsed.useThousandsSeparator = true;
+                parsed.currencyCode = "USD";
+                parsed.currencySymbol = "$";
+                parsed.valid = true;
+            }
+        }
+    }
+
+    if (!parsed.valid) {
+        return std::nullopt;
+    }
+
+    // Create FormatBuffer from parsed components
+    FormatBuffer format;
+    format.setCategory(parsed.category);
+    if (parsed.decimalPlaces > 0) {
+        format.setDecimals(parsed.decimalPlaces);
+    }
+    if (parsed.useThousandsSeparator) {
+        format.setThousandsSeparator(true);
+    }
+    if (!parsed.currencySymbol.empty()) {
+        format.setCurrencySymbol(parsed.currencySymbol);
+    }
+    return format;
+}
 
 // Helper: Escape a string for JSON (duplicated from luau_api.cc for independence)
 static std::string jsonEscape(const std::string& str) {
@@ -523,7 +567,7 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
         luaL_error(L, "cell.formula is read-only (use setCell with = prefix)");
     }
 
-    // Handle cell.format = "FMT_C002" or cell.format = nil
+    // Handle cell.format = "FMT_C002" or cell.format = "<base64>" or cell.format = nil
     if (strcmp(key, "format") == 0) {
         // Get the cell UUID from the table
         lua_getfield(L, 1, "_uuid");
@@ -546,15 +590,32 @@ int LuauSandbox::luaCellNewIndex(lua_State* L) {
             luaL_error(L, "format: cell not found");
         }
 
-        // Build payload - null ID "~" clears format
-        std::string formatIdStr = "~";
+        // Handle nil to clear format
+        std::string formatBase64;
         if (lua_isstring(L, 3) != 0) {
-            formatIdStr = lua_tostring(L, 3);
+            const std::string formatStr = lua_tostring(L, 3);
+
+            // Try to parse as legacy format ID first (e.g., "FMT_C002")
+            auto maybeFormat = formatIdToBuffer(formatStr);
+            if (maybeFormat.has_value()) {
+                formatBase64 = maybeFormat->toBase64();
+            } else {
+                // Try as base64 directly
+                auto maybeBase64 = FormatBuffer::fromBase64(formatStr);
+                if (maybeBase64.has_value()) {
+                    formatBase64 = formatStr;
+                } else {
+                    luaL_error(L, "cell.format: invalid format string");
+                    return 0;
+                }
+            }
         } else if (lua_isnil(L, 3) == 0) {
             luaL_error(L, "cell.format: expected string or nil");
+            return 0;
         }
+        // nil clears format (empty base64)
 
-        const std::string payload = R"({"format_id":")" + jsonEscape(formatIdStr) + R"("})";
+        const std::string payload = R"({"format":")" + formatBase64 + R"("})";
         const Operation op = makeCellSetFormatOp(*workbook, cell->id, payload);
         applyOperation(*workbook, op);
         return 0;

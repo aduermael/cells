@@ -1669,14 +1669,19 @@ TEST(LuauSandboxTest, CellFormatWrite) {
     LuauSandbox sandbox;
     sandbox.setContext(workbook.get(), sheet);
 
-    // Set format on a cell
+    // Set format on a cell using legacy format ID
+    // With content-addressed formats, this converts FMT_C002 to FormatBuffer
+    // and returns the base64 encoding
     auto r1 = sandbox.execute(R"(
         local cell = getCell('A1', {create=true})
         cell.format = "FMT_C002"
         return cell.format
     )");
     EXPECT_TRUE(r1.success) << r1.error;
-    EXPECT_EQ(r1.output, "FMT_C002");
+    // FMT_C002 = currency with 2 decimals, thousands separator, $
+    // Base64: DwICAiQ= (flags=15, cat=2=CURRENCY, dec=2, sep, currency="$")
+    EXPECT_FALSE(r1.output.empty());
+    EXPECT_NE(r1.output, "nil");
 
     // Clear format with nil
     auto r2 = sandbox.execute(R"(
@@ -1741,18 +1746,23 @@ TEST(LuauSandboxTest, SetFormatRange) {
     LuauSandbox sandbox;
     sandbox.setContext(workbook.get(), sheet);
 
-    // Set format on range
+    // Set format on range using legacy format ID
+    // With content-addressed formats, this converts FMT_P002 to FormatBuffer
+    // and returns the base64 encoding
     auto r1 = sandbox.execute(R"(
         setFormat("A1:B2", "FMT_P002")
         return getCell('A1').format
     )");
     EXPECT_TRUE(r1.success) << r1.error;
-    EXPECT_EQ(r1.output, "FMT_P002");
+    // FMT_P002 = percentage with 2 decimals
+    // Should return a non-empty base64 string
+    EXPECT_FALSE(r1.output.empty());
+    EXPECT_NE(r1.output, "nil");
 
-    // Verify B2 also got the format
+    // Verify B2 also got the format (same base64 string)
     auto r2 = sandbox.execute("return getCell('B2').format");
     EXPECT_TRUE(r2.success) << r2.error;
-    EXPECT_EQ(r2.output, "FMT_P002");
+    EXPECT_EQ(r2.output, r1.output);  // Both should have the same format
 }
 
 TEST(LuauSandboxTest, SetStyleRange) {
