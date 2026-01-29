@@ -199,7 +199,7 @@ Mirror the style system's approach for computing effective formats at display ti
 - [x] 6b: Update range splitting logic to handle format inheritance (like styles). The existing Range struct already supports FORMAT flag and FormatBuffer storage. RANGE_SET_FORMAT operation exists. Range splitting can be added when setRangeFormat binding is implemented.
 - [x] 6c: Update viewport/rendering to use effective format computation. Updated queryViewport() to use getEffectiveFormat() for cells and getEffectiveFormatForPosition() for virtual spilled cells. All numeric formatting now uses the effective format.
 - [x] 6d: Add unit tests for effective format with overlapping ranges. FormatBuffer::getEffectiveFormat() already has comprehensive unit tests in format_buffer_test.cc covering: empty inputs, single format, priority order, column/row/range/cell merging, null pointers, multiple ranges, and custom format codes.
-- [ ] 6e: Add E2E tests for format inheritance across columns, rows, ranges, and cells. (Deferred: requires setColumnFormat, setRowFormat, setRangeFormat bindings that don't exist yet. The effective format computation is unit-tested and used in viewport.)
+- [x] 6e: Add E2E tests for format inheritance across columns, rows, ranges, and cells. Completed in Phase 12 after bindings were added. Tests in format-inheritance.test.mjs cover all inheritance scenarios.
 
 ### Phase 7: Remove Old Format System
 
@@ -249,11 +249,11 @@ Add bindings for setting format on ranges (matching existing setRangeStyle patte
 
 Complete the deferred 6e by adding E2E tests for format inheritance.
 
-- [ ] 12a: Add E2E test for column format inheritance (cells in column inherit column's format).
-- [ ] 12b: Add E2E test for row format inheritance (cells in row inherit row's format).
-- [ ] 12c: Add E2E test for range format inheritance (cells in range inherit range's format).
-- [ ] 12d: Add E2E test for format priority order (cell > range > column > row).
-- [ ] 12e: Update 6e status in plan to complete.
+- [x] 12a: Add E2E test for column format inheritance (cells in column inherit column's format). Test: "Column format is inherited by cells in that column".
+- [x] 12b: Add E2E test for row format inheritance (cells in row inherit row's format). Test: "Row format is inherited by cells in that row".
+- [x] 12c: Add E2E test for range format inheritance (cells in range inherit range's format). Test: "Range format is inherited by cells in that range".
+- [x] 12d: Add E2E test for format priority order (cell > range > row > column). Tests: "Cell format overrides column format", "Range format overrides column format", "Row format overrides column format", "Clearing row format reverts to column format". Note: priority order matches styles where row > column (row has higher priority than column).
+- [x] 12e: Update 6e status in plan to complete.
 
 ## File Changes Summary
 
