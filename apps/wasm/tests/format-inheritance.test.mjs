@@ -310,6 +310,13 @@ const tests = {
     await sleep(200);
     display = await getCellDisplayValue(ctx.page, 'A1');
     assertEqual(display, '100', 'A1 should NOT display as currency (different column)');
+
+    // Re-select column B and verify the format dropdown still shows Currency
+    await clickColumnHeader(ctx.page, 'B');
+    await sleep(300);
+
+    const formatLabelAfterReselect = await ctx.page.$eval('#format-dropdown-label', el => el.textContent);
+    assertEqual(formatLabelAfterReselect, 'Currency', 'Format dropdown should show Currency when re-selecting formatted column');
   },
 
   'Row format via toolbar: click header then percent button': async (ctx) => {

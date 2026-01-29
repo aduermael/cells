@@ -157,6 +157,8 @@ EMSCRIPTEN_BINDINGS(cells) {
         // Axis formats (entire column/row formats)
         .function("setColumnFormat", &cells::wasm::CellsEngine::setColumnFormat)
         .function("setRowFormat", &cells::wasm::CellsEngine::setRowFormat)
+        .function("getColumnFormat", &cells::wasm::CellsEngine::getColumnFormat)
+        .function("getRowFormat", &cells::wasm::CellsEngine::getRowFormat)
         .function("clearColumnFormat", &cells::wasm::CellsEngine::clearColumnFormat)
         .function("clearRowFormat", &cells::wasm::CellsEngine::clearRowFormat)
         // Range formats

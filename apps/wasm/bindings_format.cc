@@ -2595,6 +2595,104 @@ std::string CellsEngine::getRowStyle(uint32_t rowPosition) {
     return styleToJson(defaultStyle);
 }
 
+std::string CellsEngine::getColumnFormat(uint32_t colPosition) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{}";
+    }
+
+    Axis* col = sheet->getColumnByPosition(colPosition);
+    if (col == nullptr || !col->hasFormat()) {
+        return "{}";
+    }
+
+    const FormatBuffer* format = _workbook->getEntityFormat(col->id);
+    if (format != nullptr && !format->isEmpty()) {
+        // Return format properties as JSON
+        std::ostringstream json;
+        json << "{";
+        json << "\"category\":\"" << formatCategoryToString(format->getCategory()) << "\"";
+        if (format->hasDecimals()) {
+            json << ",\"decimals\":" << static_cast<int>(format->getDecimals());
+        }
+        if (format->hasThousandsSeparator()) {
+            json << ",\"separator\":" << (format->getThousandsSeparator() ? "true" : "false");
+        }
+        if (format->hasCurrencySymbol()) {
+            json << ",\"currency\":\"" << format->getCurrencySymbol() << "\"";
+        }
+        if (format->hasCustomFormatCode()) {
+            // Escape quotes in format code
+            std::string code = format->getCustomFormatCode();
+            std::string escaped;
+            for (char c : code) {
+                if (c == '"') escaped += "\\\"";
+                else if (c == '\\') escaped += "\\\\";
+                else escaped += c;
+            }
+            json << ",\"formatCode\":\"" << escaped << "\"";
+        }
+        json << ",\"base64\":\"" << format->toBase64() << "\"";
+        json << "}";
+        return json.str();
+    }
+
+    return "{}";
+}
+
+std::string CellsEngine::getRowFormat(uint32_t rowPosition) {
+    if (!_workbook || _activeSheetIndex >= _workbook->sheetCount()) {
+        return "{}";
+    }
+
+    auto* sheet = _workbook->getSheetByIndex(_activeSheetIndex);
+    if (!sheet) {
+        return "{}";
+    }
+
+    Axis* row = sheet->getRowByPosition(rowPosition);
+    if (row == nullptr || !row->hasFormat()) {
+        return "{}";
+    }
+
+    const FormatBuffer* format = _workbook->getEntityFormat(row->id);
+    if (format != nullptr && !format->isEmpty()) {
+        // Return format properties as JSON
+        std::ostringstream json;
+        json << "{";
+        json << "\"category\":\"" << formatCategoryToString(format->getCategory()) << "\"";
+        if (format->hasDecimals()) {
+            json << ",\"decimals\":" << static_cast<int>(format->getDecimals());
+        }
+        if (format->hasThousandsSeparator()) {
+            json << ",\"separator\":" << (format->getThousandsSeparator() ? "true" : "false");
+        }
+        if (format->hasCurrencySymbol()) {
+            json << ",\"currency\":\"" << format->getCurrencySymbol() << "\"";
+        }
+        if (format->hasCustomFormatCode()) {
+            // Escape quotes in format code
+            std::string code = format->getCustomFormatCode();
+            std::string escaped;
+            for (char c : code) {
+                if (c == '"') escaped += "\\\"";
+                else if (c == '\\') escaped += "\\\\";
+                else escaped += c;
+            }
+            json << ",\"formatCode\":\"" << escaped << "\"";
+        }
+        json << ",\"base64\":\"" << format->toBase64() << "\"";
+        json << "}";
+        return json.str();
+    }
+
+    return "{}";
+}
+
 // ============================================================================
 // Axis Format Operations (column/row formats)
 // ============================================================================

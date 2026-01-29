@@ -786,6 +786,22 @@ export class CellsClient {
     return { success: true };
   }
 
+  /**
+   * Get a column's default format.
+   */
+  async getColumnFormat(colPosition: number): Promise<FormatProperties> {
+    const response = await this._send("getColumnFormat", { colPosition });
+    return response.format as FormatProperties;
+  }
+
+  /**
+   * Get a row's default format.
+   */
+  async getRowFormat(rowPosition: number): Promise<FormatProperties> {
+    const response = await this._send("getRowFormat", { rowPosition });
+    return response.format as FormatProperties;
+  }
+
   // ========== Range Format Operations API ==========
 
   /**

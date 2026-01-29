@@ -84,6 +84,8 @@ import {
     handleSetRowFormat,
     handleClearColumnFormat,
     handleClearRowFormat,
+    handleGetColumnFormat,
+    handleGetRowFormat,
     handleSetRangeFormat,
     handleSetRangeFormatOnSheet,
     handleRemoveRangeFormat,
@@ -554,6 +556,12 @@ function handleMessage(msg: WorkerRequest): void {
                 break;
             case "clearRowFormat":
                 handleClearRowFormat(engine, params, respond);
+                break;
+            case "getColumnFormat":
+                handleGetColumnFormat(engine, params, respond);
+                break;
+            case "getRowFormat":
+                handleGetRowFormat(engine, params, respond);
                 break;
 
             // ================================================================

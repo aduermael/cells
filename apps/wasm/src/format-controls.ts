@@ -205,11 +205,26 @@ export class FormatControls {
     }
 
     // Check if a column or row is selected (via header click)
-    // When axis is selected, keep the current format display (set by the handler)
     const selectedAxis = this.getSelectedAxis();
     if (selectedAxis) {
-      // TODO: Add getColumnFormat/getRowFormat APIs to fetch and display axis format
-      // For now, keep whatever format was set by the handler
+      // Fetch and display the axis format
+      const axisFormat =
+        selectedAxis.type === "column"
+          ? await this.dataSource.getColumnFormat(selectedAxis.index)
+          : await this.dataSource.getRowFormat(selectedAxis.index);
+
+      // Extract category from format properties
+      const category = (axisFormat?.category as NumberFormatCategory) || "GENERAL";
+      this.setDisplayedFormat(category);
+
+      // Update currency state if applicable
+      if (category === "CURRENCY" || category === "ACCOUNTING") {
+        const symbol = axisFormat?.currency || "$";
+        this.currencyDropdownLabel.textContent = symbol;
+        this.currencyDropdown.classList.add("active");
+        // Try to map symbol to currency type
+        this.currentCurrency = this.getCurrencyTypeForSymbol(symbol);
+      }
       return;
     }
 
@@ -798,6 +813,16 @@ export class FormatControls {
       CNY: "¥",
     };
     return symbols[currency] || "$";
+  }
+
+  private getCurrencyTypeForSymbol(symbol: string): CurrencyType {
+    switch (symbol) {
+      case "$": return "USD";
+      case "€": return "EUR";
+      case "£": return "GBP";
+      case "¥": return "JPY"; // Could also be CNY, default to JPY
+      default: return "USD";
+    }
   }
 
   private getCategoryDisplayName(category: NumberFormatCategory | "MIXED"): string {

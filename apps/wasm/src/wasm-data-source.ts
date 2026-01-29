@@ -428,6 +428,16 @@ export class WasmDataSource {
     return this._client.clearRowFormat(rowPosition);
   }
 
+  /** Get a column's default format */
+  async getColumnFormat(colPosition: number): Promise<FormatProperties> {
+    return this._client.getColumnFormat(colPosition);
+  }
+
+  /** Get a row's default format */
+  async getRowFormat(rowPosition: number): Promise<FormatProperties> {
+    return this._client.getRowFormat(rowPosition);
+  }
+
   // ==========================================================================
   // Range Format Operations
   // ==========================================================================

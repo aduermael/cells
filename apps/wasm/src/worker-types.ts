@@ -114,6 +114,8 @@ export interface CellsEngine {
     setRowFormat(rowPosition: number, formatJson: string): string;
     clearColumnFormat(colPosition: number): string;
     clearRowFormat(rowPosition: number): string;
+    getColumnFormat(colPosition: number): string;
+    getRowFormat(rowPosition: number): string;
 
     // Range format operations
     setRangeFormat(

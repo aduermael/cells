@@ -179,6 +179,8 @@ public:
     std::string setRowStyle(uint32_t rowPosition, const std::string& styleJson);
     std::string getColumnStyle(uint32_t colPosition);
     std::string getRowStyle(uint32_t rowPosition);
+    std::string getColumnFormat(uint32_t colPosition);
+    std::string getRowFormat(uint32_t rowPosition);
 
     // Axis format operations (set/clear formats for entire columns or rows)
     std::string setColumnFormat(uint32_t colPosition, const std::string& formatJson);

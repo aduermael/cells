@@ -883,6 +883,26 @@ export function handleClearRowFormat(
     }
 }
 
+export function handleGetColumnFormat(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { colPosition } = params as { colPosition: number };
+    const result = JSON.parse(engine.getColumnFormat(colPosition));
+    respond({ type: "columnFormat", format: result });
+}
+
+export function handleGetRowFormat(
+    engine: CellsEngine,
+    params: Record<string, unknown>,
+    respond: RespondFn,
+): void {
+    const { rowPosition } = params as { rowPosition: number };
+    const result = JSON.parse(engine.getRowFormat(rowPosition));
+    respond({ type: "rowFormat", format: result });
+}
+
 // ============================================================================
 // Range Format Operations
 // ============================================================================
